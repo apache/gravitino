@@ -1,0 +1,66 @@
+//
+//  Licensed to the Apache Software Foundation (ASF) under one or more
+//  contributor license agreements.  See the NOTICE file distributed with
+//  this work for additional information regarding copyright ownership.
+//  The ASF licenses this file to You under the Apache License, Version 2.0
+//  (the "License"); you may not use this file except in compliance with
+//  the License.  You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+//  Unless required by applicable law or agreed to in writing, software
+//  distributed under the License is distributed on an "AS IS" BASIS,
+//  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//  See the License for the specific language governing permissions and
+//  limitations under the License.
+//
+:imagesdir: ../images/
+
+== Decision Making
+
+=== Introduction
+
+This document describes the roles and responsibilities of the project, who may vote, how voting works, how conflicts are resolved, etc.
+
+The https://www.apache.org/foundation/faq[Apache Foundation FAQ] and http://www.apache.org/foundation/faq.html[How-It-Works] explain the operation and background of the foundation. Terms used are defined in the https://www.apache.org/foundation/glossary[ASF glossary].
+
+Apache has a http://www.apache.org/foundation/policies/conduct.html[code of conduct] that it expects its members to follow.
+
+=== Roles and Responsibilities
+
+Apache projects define a set of https://www.apache.org/foundation/how-it-works.html#roles[roles] with associated rights and responsibilities.
+
+==== Project Management Committee
+
+The http://www.apache.org/dev/pmc.html#what-is-a-pmc[PMC] has many https://www.apache.org/foundation/how-it-works.html#pmc[responsibilities] including complying with http://www.apache.org/dev/pmc.html#policy[ASF policies], https://www.apache.org/foundation/board/reporting[reporting to the board], https://www.apache.org/foundation/voting.html[approving releases] and adding new http://www.apache.org/dev/pmc.html#newcommitter[committers] and http://www.apache.org/dev/pmc.html#newpmc[PMC members].
+
+==== The Chair
+
+The http://www.apache.org/dev/pmc.html#chair[chair] ensures board reports are submitted and that the project's roster is up to date.
+
+=== Decision Making
+
+Different decisions require different forms of approval but community consensus is always the goal. Voting when needed should be open for http://www.apache.org/legal/release-policy.html#release-approval[at least 72 hours].
+
+- https://www.apache.org/foundation/glossary.html#ConsensusApproval[Consensus Approval] – Consensus approval requires 3 https://www.apache.org/foundation/voting.html#binding-votes[binding] +1 votes and no -1 votes (https://www.apache.org/foundation/glossary.html#Veto[vetoes]).
+- https://www.apache.org/foundation/glossary.html#MajorityApproval[Majority Approval] – requires at least 3 https://www.apache.org/foundation/voting.html#binding-votes[binding] +1 votes more +1 votes than -1 votes.
+- https://www.apache.org/foundation/glossary.html#LazyConsensus[Lazy Consensus] – consensus no objections (‘silence gives assent’).
+
+|===
+|Action                     |Who can vote |Approval           |Where to vote             |Board approval required
+|Code change                |Committer    |Lazy Consensus     |public dev or commit list |
+|Release                    |PMC          |Majority Approval  |public dev list           |
+|New committer              |PMC          |Consensus Approval |private list              |
+|New PMC member             |PMC          |Consensus Approval |private list              |Yes 1)
+|Existing committer removal |PMC          |Consensus Approval |private list              |
+|Existing PMC removal       |PMC          |Consensus Approval |private list              |Yes 2)
+|Change chair               |PMC          |Consensus Approval |private list              |Yes 3)
+|===
+
+1. http://www.apache.org/dev/pmc.html#notice_period[Notice] must be given to board.
+2. Except PMC member in question. Only the board can http://www.apache.org/dev/pmc.html#pmc-removal[remove PMC members].
+3. Need to be http://www.apache.org/dev/pmc.html#newchair[approved by the board] at the next board meeting.
+
+
+
+

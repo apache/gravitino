@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!--
+ 
+ Licensed to the Apache Software Foundation (ASF) under one or more
+ contributor license agreements.  See the NOTICE file distributed with
+ this work for additional information regarding copyright ownership.
+ The ASF licenses this file to You under the Apache License, Version 2.0
+ (the "License"); you may not use this file except in compliance with
+ the License.  You may obtain a copy of the License at
+ 
+ http://www.apache.org/licenses/LICENSE-2.0
+ 
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ See the License for the specific language governing permissions and
+ limitations under the License.
+ 
+ -->
+<project name="Training">
+
+  <skin>
+    <groupId>io.github.devacfr.maven.skins</groupId>
+    <artifactId>reflow-maven-skin</artifactId>
+    <version>${reflow.skin.version}</version>
+  </skin>
+
+  <!-- Hide the publish date as this will cause changes on every generated page every day -->
+  <publishDate position="none"/>
+  <!-- Hide the version as we are usually deploying the develop version -->
+  <version position="none" />
+
+  <!--
+      Details on how to configure the reflow skin:
+      http://andriusvelykis.github.io/reflow-maven-skin/skin/
+  -->
+  <custom>
+    <reflowSkin>
+      <localResources>true</localResources>
+      <absoluteResourceURL>https://training.apache.org/</absoluteResourceURL>
+      <titleTemplate>Apache Training® (Incubating) - %2$s</titleTemplate>
+      <slogan position="bannerLeft">Training material for Apache projects</slogan>
+      <showApacheEvents>true</showApacheEvents>
+      <toc>top</toc>
+      <bottomNav maxSpan="6">
+        <column>Apache</column>
+        <column>modules</column>
+      </bottomNav>
+      <brand>
+        <name>Apache Training (Incubating)</name>
+        <href>https://training.apache.org/</href>
+      </brand>
+      <bottomDescription>
+        <![CDATA[
+          <p id="bottomNote" style="font-size: 15px">
+          Apache Training is an effort undergoing incubation at The Apache Software Foundation (ASF), sponsored by the Apache Incubator. Incubation is required of all newly accepted projects until a further review indicates that the infrastructure, communications, and decision making process have stabilized in a manner consistent with other successful ASF projects. While incubation status is not necessarily a reflection of the completeness or stability of the code, it does indicate that the project has yet to be fully endorsed by the ASF.
+          </p>
+        ]]>
+      </bottomDescription>
+      <breadcrumbs>true</breadcrumbs>
+      <highlightJs>true</highlightJs>
+      <pages>
+        <developer-info>
+          <toc>sidebar</toc>
+        </developer-info>
+      </pages>
+    </reflowSkin>
+  </custom>
+
+  <poweredBy>
+    <logo name="Apache Software Foundation" img="https://www.apache.org/images/asf_logo.png" href="https://www.apache.org/"/>
+  </poweredBy>
+
+  <bannerLeft>
+      <name>Apache Training (incubating)</name>
+      <src>https://training.apache.org/images/apache_training_logo.png</src>
+      <href>https://training.apache.org/</href>
+  </bannerLeft>
+
+  <bannerRight>
+    <name>Apache Incubator</name>
+    <src>https://incubator.apache.org/images/incubator_feather_egg_logo_sm.png</src>
+    <href>http://incubator.apache.org/</href>
+  </bannerRight>
+
+  <body>
+    <head>
+      <!-- Use JQuery to manipulate the final output of the page, which is a lot simpler than adjusting the templates for site generation. -->
+      <![CDATA[
+        <script>
+          document.addEventListener("DOMContentLoaded", function(event) {
+            /* Add an image for promoting Apache events below the right banner */
+            $("#bannerRight").append('<p id="apacheEvents"><a href="//www.apache.org/events/current-event.html"><img src="//www.apache.org/events/current-event-234x60.png"/></a></p>');
+            /* Append the trademarks info to the copyright section */
+            $(".copyright").append('<p>Apache Training, Apache, the Apache feather logo, and the Apache Training project logo are either registered trademarks or trademarks of The Apache Software Foundation in the United States and other countries. All other marks mentioned may be trademarks or registered trademarks of their respective owners.</p>');
+          });
+        </script>
+      ]]>
+    </head>
+
+    <menu name="Developers">
+      <item name="Bug &amp; Issue Tracker" href="developers/issues.html"/>
+      <item name="Building Training" href="developers/building.html"/>
+      <item name="Continuous Integration" href="developers/ci.html"/>
+      <item name="Contributing" href="developers/contributing.html"/>
+      <item name="Decision Making" href="developers/decisions.html"/>
+      <!--item name="Maturity" href="developers/maturity.html"/>
+      <item name="Releasing" href="developers/release.html"/-->
+      <item name="Team" href="developers/team.html"/>
+      <item name="Website" href="developers/website.html"/>
+      <item name="Wiki" href="developers/wiki.html"/>
+    </menu>
+    <menu name="Apache" inherit="bottom">
+      <item name="Apache Software Foundation" href="http://www.apache.org/"/>
+      <item name="How Apache Works" href="https://www.apache.org/foundation/how-it-works.html"/>
+      <item name="License" href="http://www.apache.org/licenses/"/>
+      <item name="Sponsoring Apache" href="http://www.apache.org/foundation/sponsorship.html"/>
+      <item name="Thanks" href="http://www.apache.org/foundation/thanks.html"/>
+    </menu>
+    <menu ref="modules" inherit="bottom"/>
+  </body>
+
+</project>

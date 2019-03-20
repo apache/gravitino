@@ -1,0 +1,91 @@
+/*
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+*/
+
+/* Import the fontawesome 5 css */
+@import url("all.min.css");
+
+.green {
+    color: #008000;
+}
+
+.yellow {
+    color: #ffa500;
+}
+
+.red {
+    color: #ff0000;
+}
+
+.protocolIsoOnTcp {
+    background-color: #068D9D;
+}
+
+.protocolIsoTP {
+    background-color: #53599A;
+}
+
+.protocolS7 {
+    background-color: #6D9DC5;
+}
+
+.protocolId {
+    background-color: #AEECEF;
+}
+
+.protocolParameter {
+    background-color: #80DED9;
+}
+
+.pull-right {
+    width: 400px;
+}
+
+#bannerRight > img {
+    width: 400px;
+}
+
+#apacheEvents {
+    position: relative;
+    width: 234px;
+    top: 20px;
+    left: 83px
+}
+
+/* Set where the focus will be set when using anchor links */
+h2[id]:before {
+    display: block;
+    content: "";
+    height: 360px;
+    margin: -360px 0 0;
+}
+
+/* Set where the focus will be set when using anchor links */
+h3[id]:before, h4[id]:before, h5[id]:before, h6[id]:before, a[name]:before {
+    display: block;
+    content: "";
+    height: 106px;
+    margin: -106px 0 0;
+}
+
+/* Re-Format the position of the "to top" link */
+body > div.container.subfooter > div > div > p.pull-right {
+    width: 100px;
+    height: 60px;
+    text-align: right;
+}

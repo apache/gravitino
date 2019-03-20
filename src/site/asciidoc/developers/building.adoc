@@ -1,0 +1,71 @@
+//
+//  Licensed to the Apache Software Foundation (ASF) under one or more
+//  contributor license agreements.  See the NOTICE file distributed with
+//  this work for additional information regarding copyright ownership.
+//  The ASF licenses this file to You under the Apache License, Version 2.0
+//  (the "License"); you may not use this file except in compliance with
+//  the License.  You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+//  Unless required by applicable law or agreed to in writing, software
+//  distributed under the License is distributed on an "AS IS" BASIS,
+//  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//  See the License for the specific language governing permissions and
+//  limitations under the License.
+//
+
+== Building Training Website
+
+The Apache Training Website is built with `Apache Maven` and we have tried to make the build as simple as possible.
+
+For your convenience we also have provided a `Maven-Wrapper`, that should allow building with only `Java 8` or greater as requirement.
+
+=== Requirements
+
+The only requirements to building the Apache Training website should be:
+
+* Java 8 JDK (or newer)
+* Apache Maven (3.1.0 or newer) *(Optional)*
+
+=== Using the Maven-Wrapper
+
+The so-called `Maven-Wrapper` is used by calling the Maven-Wrapper scripts `mvnw` (Mac & Linux) or `mvnw.cmd` (Windows) instead of the default Maven commands `mvn` and `mvn.cmd`.
+
+These helpers ensure Maven is available in at least the version defined in `.mvn/maven-wrapper.properties`.
+If no suitable version can be found, it is automatically downloaded and installed alongside the project (So it doesn't have to be downloaded every time and every project can have it's own Maven version)
+
+After the script has ensured a suitable Maven version is available, this is used and all arguments and parameters are transparently forwarded to this.
+So simply adding the additional `w` to each of the Maven commands, there should be no difference to using a pre-installed Maven version.
+
+=== Using Maven
+
+This document can't provide you with all the details needed to get started with `Maven` itself.
+But there is a lot of good documentation out there.
+
+Justin McLean and Christofer Dutz even recorded a not quite 2 hour Maven training Video some time ago for another Apache project.
+
+It should handle all the details needed to get a general understanding of Maven and how it works.
+
+.Recording of a Maven Training for Apache Flex from 2016
+video::167857327[vimeo,width=640,height=420]
+
+=== Building the Apache Training Website with Maven
+
+The PLC4X Website is also part of the same GIT repository that contains the code and it is built by Maven as well.
+
+In order to build the website the following command should be sufficient:
+
+    mvn site
+
+However this will generate the website for each module inside it's `target/site` directory.
+Opening this in a browser and navigating from pages of one module to another will not work as these links expect a different directory structure.
+In order to create a fully navigatable version of the Website, the following command should be sufficient:
+
+    mvn site site:stage
+
+This will generate an additional `target/staging` directory which contains the fully functional version.
+
+A lot of documentation on Maven suggests to use the `site:site` goal directly instead of calling the `site` phase, but in case of Apache Training there is more than just the site generation that has to be executed.
+
+This is just a quick-start version of the site generation, for a fully detailed documentation please read the http://training.apache.org/developers/website.html[Website] documentation page.

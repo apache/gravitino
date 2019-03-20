@@ -1,0 +1,521 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+
+  Licensed to the Apache Software Foundation (ASF) under one or more
+  contributor license agreements.  See the NOTICE file distributed with
+  this work for additional information regarding copyright ownership.
+  The ASF licenses this file to You under the Apache License, Version 2.0
+  (the "License"); you may not use this file except in compliance with
+  the License.  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+
+-->
+<project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://maven.apache.org/POM/4.0.0"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>org.apache</groupId>
+    <artifactId>apache</artifactId>
+    <version>21</version>
+  </parent>
+
+  <groupId>org.apache.training</groupId>
+  <artifactId>training-website</artifactId>
+  <version>0.4.0-SNAPSHOT</version>
+  <packaging>pom</packaging>
+
+  <name>Training</name>
+  <description>
+    Write something sensible here ...
+  </description>
+  <url>https://training.apache.org</url>
+  <inceptionYear>2019</inceptionYear>
+
+  <scm>
+    <connection>scm:git:https://gitbox.apache.org/repos/asf/incubator-training.git</connection>
+    <developerConnection>scm:git:https://gitbox.apache.org/repos/asf/incubator-training.git</developerConnection>
+    <url>https://github.com/apache/incubator-trainingx</url>
+    <tag>HEAD</tag>
+  </scm>
+
+  <!-- Only configure the site distribution as the rest is handled by the apache parent -->
+  <distributionManagement>
+    <site>
+      <id>apache.website</id>
+      <url>scm:git:https://gitbox.apache.org/repos/asf/incubator-training.git</url>
+    </site>
+  </distributionManagement>
+
+  <issueManagement>
+    <system>Jira</system>
+    <url>https://issues.apache.org/jira/browse/TRAINING</url>
+  </issueManagement>
+
+  <mailingLists>
+    <mailingList>
+      <name>Apache Training Developer List</name>
+      <subscribe>dev-subscribe@training.apache.org</subscribe>
+      <unsubscribe>dev-unsubscribe@training.apache.org</unsubscribe>
+      <post>dev@training.apache.org</post>
+      <archive>http://mail-archives.apache.org/mod_mbox/training-dev/</archive>
+    </mailingList>
+    <mailingList>
+      <name>Apache Training Commits List</name>
+      <subscribe>commit-subscribe@training.apache.org</subscribe>
+      <unsubscribe>commits-unsubscribe@training.apache.org</unsubscribe>
+      <post>commits@training.apache.org</post>
+      <archive>http://mail-archives.apache.org/mod_mbox/training-commits/</archive>
+    </mailingList>
+  </mailingLists>
+
+  <properties>
+    <java.version>1.8</java.version>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <project.reporting.outputencoding>UTF-8</project.reporting.outputencoding>
+
+    <!-- Site properties -->
+    <reflow.skin.version>1.5.0</reflow.skin.version>
+    <fontawesome.version>5.2.0</fontawesome.version>
+  </properties>
+
+  <modules>
+  </modules>
+
+  <build>
+    <plugins>
+      <!-- Check if all source files have the required apache license headers -->
+      <plugin>
+        <groupId>org.apache.rat</groupId>
+        <artifactId>apache-rat-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>license-check</id>
+            <phase>verify</phase>
+            <goals>
+              <goal>check</goal>
+            </goals>
+          </execution>
+        </executions>
+        <configuration>
+          <excludes>
+            <!-- Git related files -->
+            <exclude>**/.git/**</exclude>
+            <exclude>**/.gitignore</exclude>
+
+            <!-- Maven related files -->
+            <exclude>**/target/**</exclude>
+
+            <!-- Eclipse related files -->
+            <exclude>**/.project</exclude>
+            <exclude>**/.settings/**</exclude>
+            <exclude>**/.classpath</exclude>
+
+            <!-- IntelliJ related files -->
+            <exclude>**/.idea/**</exclude>
+            <exclude>**/*.iml</exclude>
+
+            <!-- Asciidoctor generated files -->
+            <exclude>**/.asciidoctor/**</exclude>
+
+            <!-- Jenkins build related files -->
+            <exclude>.repository/**</exclude>
+
+            <!-- JSON doesn't like comments -->
+            <exclude>**/*.json</exclude>
+
+            <!-- Output of the profiler maven extension -->
+            <exclude>**/.profiler/**</exclude>
+          </excludes>
+        </configuration>
+      </plugin>
+
+      <!-- Generate the legally required text files in the jars -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-remote-resources-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>process-resource-bundles</id>
+            <goals>
+              <goal>process</goal>
+            </goals>
+            <configuration>
+              <resourceBundles>
+                <!-- Will generate META-INF/{DEPENDENCIES,LICENSE,NOTICE} -->
+                <resourceBundle>org.apache:apache-jar-resource-bundle:1.4</resourceBundle>
+                <!-- Will generate META-INF/DISCLAIMER  -->
+                <resourceBundle>org.apache:apache-incubator-disclaimer-resource-bundle:1.1</resourceBundle>
+              </resourceBundles>
+              <!-- Content in this directory will be appended to generated resources -->
+              <appendedResourcesDirectory>${basedir}/src/remote-resources</appendedResourcesDirectory>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+
+      <!--
+        ===================================
+        ==                               ==
+        ==    SITE GENERATION PLUGINS    ==
+        ==                               ==
+        ===================================
+
+        Starting here the following plugins are used for generating the projects website.
+
+        Most of the complexity is due to the fact that we selected "localResouces" in the site.xml
+        This causes the generated output not to rely on external resources. Therefore we have to
+        manually take care of fetching and packaging these external resources with the generated site.
+      -->
+
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>unpack</id>
+            <!-- Only execute this for the parent module -->
+            <inherited>false</inherited>
+            <phase>pre-site</phase>
+            <goals>
+              <goal>unpack</goal>
+            </goals>
+            <configuration>
+              <artifactItems>
+                <artifactItem>
+                  <groupId>io.github.devacfr.maven.skins</groupId>
+                  <artifactId>reflow-default-webdeps</artifactId>
+                  <version>${reflow.skin.version}</version>
+                  <type>jar</type>
+                  <overWrite>false</overWrite>
+                  <includes>
+                    **/css/bootstrap.min.css,
+                    **/css/fontawesome/*,
+                    **/js/*.js,
+                    **/js/languages/*,
+                    **/js/styles/default.min.css
+                  </includes>
+                </artifactItem>
+              </artifactItems>
+              <outputDirectory>${project.build.directory}/site</outputDirectory>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+
+      <!--
+        Replace the bootstrap css with the version of the theme
+      -->
+      <plugin>
+        <groupId>com.googlecode.maven-download-plugin</groupId>
+        <artifactId>download-maven-plugin</artifactId>
+        <version>1.4.1</version>
+        <executions>
+          <execution>
+            <id>get-fontawesome</id>
+            <!-- Only execute this for the parent module -->
+            <inherited>false</inherited>
+            <phase>pre-site</phase>
+            <goals>
+              <goal>wget</goal>
+            </goals>
+            <configuration>
+              <url>https://use.fontawesome.com/releases/v${fontawesome.version}/fontawesome-free-${fontawesome.version}-web.zip</url>
+              <unpack>true</unpack>
+              <outputDirectory>${project.build.directory}/dependency/fontawesome</outputDirectory>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-resources-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>copy-site-resources</id>
+            <!-- Only execute this for the parent module -->
+            <inherited>false</inherited>
+            <phase>pre-site</phase>
+            <goals>
+              <goal>copy-resources</goal>
+            </goals>
+            <configuration>
+              <outputDirectory>${project.build.directory}/site</outputDirectory>
+              <resources>
+                <resource>
+                  <directory>
+                    ${project.build.directory}/dependency/fontawesome/fontawesome-free-${fontawesome.version}-web
+                  </directory>
+                  <includes>
+                    <include>css/all.min.css</include>
+                  </includes>
+                </resource>
+                <resource>
+                  <directory>
+                    ${project.build.directory}/dependency/fontawesome/fontawesome-free-${fontawesome.version}-web/webfonts
+                  </directory>
+                  <targetPath>${project.build.directory}/site/fonts</targetPath>
+                </resource>
+              </resources>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+
+      <!--
+        The bootstrap uses "fonts" as directory for locating fonts and fontawesome uses "webfonts".
+        This plugin updates the css to also use "fonts".
+      -->
+      <plugin>
+        <groupId>com.google.code.maven-replacer-plugin</groupId>
+        <artifactId>replacer</artifactId>
+        <version>1.5.3</version>
+        <executions>
+          <execution>
+            <id>streamline-font-urls</id>
+            <!-- Only execute this for the parent module -->
+            <inherited>false</inherited>
+            <phase>pre-site</phase>
+            <goals>
+              <goal>replace</goal>
+            </goals>
+            <configuration>
+              <file>${project.build.directory}/site/css/all.min.css</file>
+              <replacements>
+                <replacement>
+                  <token>../webfonts/</token>
+                  <value>../fonts/</value>
+                </replacement>
+              </replacements>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+
+      <!--
+        Make the maven-site-plugin stage the output in the "asf-site" branch
+      -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-scm-publish-plugin</artifactId>
+        <configuration>
+          <!-- mono-module doesn't require site:stage -->
+          <content>${project.build.directory}/staging</content>
+          <!-- branch where to deploy -->
+          <scmBranch>asf-site</scmBranch>
+        </configuration>
+      </plugin>
+    </plugins>
+
+    <pluginManagement>
+      <plugins>
+        <plugin>
+          <groupId>org.apache.rat</groupId>
+          <artifactId>apache-rat-plugin</artifactId>
+          <configuration>
+            <!--
+                Make rat output the files with missing licensed directly into the
+                build output (This way we don't have to look into the rat.txt to find
+                out which ones)
+            -->
+            <consoleOutput>true</consoleOutput>
+          </configuration>
+        </plugin>
+
+        <!-- Configure the Site generation -->
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-site-plugin</artifactId>
+          <configuration>
+            <!--templateFile>${session.executionRootDirectory}/src/site/template/site.vm</templateFile-->
+            <generateReports>true</generateReports>
+            <generateSitemap>true</generateSitemap>
+            <relativizeDecorationLinks>false</relativizeDecorationLinks>
+            <locales>en</locales>
+            <inputEncoding>${project.build.sourceEncoding}</inputEncoding>
+            <outputEncoding>${project.reporting.outputencoding}</outputEncoding>
+            <!--
+              IntelliJ can't find the asciidoc config option in the site plugin, which is correct.
+              However this config section is used by the asciidoctor site plugin extension. So plead
+              ignore this error, it's actually ok.
+            -->
+            <asciidoc>
+              <attributes>
+                <source-highlighter>prettify</source-highlighter>
+                <imagesoutdir>${project.build.directory}/site/images</imagesoutdir>
+              </attributes>
+              <requires>
+                <require>asciidoctor-diagram</require>
+              </requires>
+            </asciidoc>
+          </configuration>
+          <dependencies>
+            <!-- All dependencies needed by the reflow skin -->
+            <dependency>
+              <groupId>io.github.devacfr.maven.skins</groupId>
+              <artifactId>reflow-velocity-tools</artifactId>
+              <version>${reflow.skin.version}</version>
+            </dependency>
+            <!-- add support for scm/git site deployment -->
+            <dependency>
+              <groupId>org.apache.maven.wagon</groupId>
+              <artifactId>wagon-scm</artifactId>
+              <version>2.12</version>
+            </dependency>
+            <dependency>
+              <groupId>org.apache.maven.scm</groupId>
+              <artifactId>maven-scm-api</artifactId>
+              <version>1.9.5</version>
+            </dependency>
+            <dependency>
+              <groupId>org.apache.maven.scm</groupId>
+              <artifactId>maven-scm-manager-plexus</artifactId>
+              <version>1.9.5</version>
+            </dependency>
+            <dependency>
+              <groupId>org.apache.maven.scm</groupId>
+              <artifactId>maven-scm-provider-gitexe</artifactId>
+              <version>1.9.5</version>
+            </dependency>
+            <!-- Add support for asciidoctor -->
+            <dependency>
+              <groupId>org.asciidoctor</groupId>
+              <artifactId>asciidoctor-maven-plugin</artifactId>
+              <version>1.5.7.1</version>
+            </dependency>
+            <dependency>
+              <groupId>org.jruby</groupId>
+              <artifactId>jruby-complete</artifactId>
+              <version>9.1.13.0</version>
+            </dependency>
+            <dependency>
+              <groupId>org.asciidoctor</groupId>
+              <artifactId>asciidoctorj</artifactId>
+              <version>1.5.6</version>
+            </dependency>
+            <dependency>
+              <groupId>org.asciidoctor</groupId>
+              <artifactId>asciidoctorj-diagram</artifactId>
+              <version>1.5.4.1</version>
+            </dependency>
+          </dependencies>
+        </plugin>
+      </plugins>
+    </pluginManagement>
+  </build>
+
+  <reporting>
+    <plugins>
+    </plugins>
+  </reporting>
+
+  <!-- Make Snapshots of Apache projects available -->
+  <repositories>
+    <repository>
+      <id>apache-snapshots</id>
+      <url>https://repository.apache.org/content/repositories/snapshots</url>
+      <releases>
+        <enabled>false</enabled>
+      </releases>
+      <snapshots>
+        <enabled>true</enabled>
+      </snapshots>
+    </repository>
+  </repositories>
+
+  <profiles>
+    <profile>
+      <id>only-eclipse</id>
+      <activation>
+        <property>
+          <name>m2e.version</name>
+        </property>
+      </activation>
+      <build>
+        <pluginManagement>
+          <plugins>
+            <!--
+              This is a fake plugin which is used to tell m2e (Eclipse) how
+              to process this maven project.
+            -->
+            <plugin>
+              <groupId>org.eclipse.m2e</groupId>
+              <artifactId>lifecycle-mapping</artifactId>
+              <version>1.0.0</version>
+              <configuration>
+                <lifecycleMappingMetadata>
+                  <pluginExecutions>
+                    <pluginExecution>
+                      <pluginExecutionFilter>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-remote-resources-plugin</artifactId>
+                        <versionRange>[1.0.0,)</versionRange>
+                        <goals>
+                          <goal>process</goal>
+                        </goals>
+                      </pluginExecutionFilter>
+                      <action>
+                        <ignore/>
+                      </action>
+                    </pluginExecution>
+                  </pluginExecutions>
+                </lifecycleMappingMetadata>
+              </configuration>
+            </plugin>
+          </plugins>
+        </pluginManagement>
+      </build>
+    </profile>
+
+    <!--
+      This profile extends the default "apache-release" configuration with automatic checksum-
+      generation for the release source artifact. It is automatically activated during the
+      release build and only needed there.
+    -->
+    <profile>
+      <id>apache-release</id>
+      <build>
+        <plugins>
+          <!--
+            Create MD5 and SHA512 checksum files for the release artifacts.
+          -->
+          <plugin>
+            <groupId>net.nicoulaj.maven.plugins</groupId>
+            <artifactId>checksum-maven-plugin</artifactId>
+            <version>1.8</version>
+            <executions>
+              <execution>
+                <goals>
+                  <goal>files</goal>
+                </goals>
+              </execution>
+            </executions>
+            <configuration>
+              <algorithms>
+                <algorithm>SHA-512</algorithm>
+              </algorithms>
+              <fileSets>
+                <fileSet>
+                  <directory>${project.build.directory}</directory>
+                  <includes>
+                    <include>apache-training-incubating-${project.version}-source-release.zip</include>
+                  </includes>
+                </fileSet>
+              </fileSets>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
+
+</project>

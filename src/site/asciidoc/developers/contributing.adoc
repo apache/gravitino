@@ -1,0 +1,117 @@
+//
+//  Licensed to the Apache Software Foundation (ASF) under one or more
+//  contributor license agreements.  See the NOTICE file distributed with
+//  this work for additional information regarding copyright ownership.
+//  The ASF licenses this file to You under the Apache License, Version 2.0
+//  (the "License"); you may not use this file except in compliance with
+//  the License.  You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+//  Unless required by applicable law or agreed to in writing, software
+//  distributed under the License is distributed on an "AS IS" BASIS,
+//  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//  See the License for the specific language governing permissions and
+//  limitations under the License.
+//
+:imagesdir: ../images/
+
+== Contributing
+
+=== Forms of contribution
+
+There are multiple forms in which you can become involved with the Apache Training project.
+
+These usually are, but are not limited to:
+
+- Submitting Pull Requests
+- Filing Bug-Reports
+- Active communication on our mailing lists
+- Promoting the project (articles, blog posts, talks at conferences)
+- Documentation
+
+=== Pull-Requests
+
+The simplest way to submit code changes, is via a GitHub pull-request.
+
+In order to do this first create a GitHub account and sign into you account.
+
+After that's done, please to to our https://github.com/apache/incubator-training[GitHub site] and create a so-called `Fork`.
+
+image::contributing-github-fork.png[]
+
+What happens now, is that GitHub creates a full copy of the Apache Training repo in your account. Only you can commit to this.
+
+Now ideally you check-out your cloned repository:
+
+    git clone https://github.com/{your-user-id}/incubator-training.git
+
+Now you have a copy of Apache Training on your computer and you can change whatever you want and as it's your copy, you can even commit these changes without any danger of breaking things.
+
+As soon as you're finished with your changes and want us to have a look, it's time to create a so-called `Pull-Request`.
+
+You do that by going to your forked repository page on GitHub.
+
+Every forked repository has an additional button called "New Pull Request":
+
+image::contributing-github-create-pull-request.png[]
+
+If you click on this, we will receive a notification on your changes and can review them. We also can discuss your changes and have you perfect your pull request before we accept and merge it into Apache Training.
+
+==== Keeping your fork up to date
+
+As we are continuously working on Training and you created a copy of our repo, this will become out-of-date pretty soon.
+
+In order get the changes we introduced in the official repo you have to tell git about that.
+
+You do this locally by adding a new so-called `remote`. Per default the remote you cloned from is called `origin`.
+
+Usually you will call the second remote `upstream` but in general you can call it whatever you like.
+
+Add the remote on the commandline (or your git gui of choice):
+
+    git remote add upstream https://github.com/apache/incubator-training.git
+
+If you list all your remotes, with the following command:
+
+    git remote -v
+
+It should output something like this:
+
+    origin    https://github.com/{your-user-id}/incubator-training.git (fetch)
+    origin    https://github.com/{your-user-id}/incubator-training.git (push)
+    upstream    https://github.com/apache/incubator-training.git (fetch)
+    upstream    https://github.com/apache/incubator-training.git (push)
+
+If that's so, you're fine to continue, if not ... well you could ask for assistance on our dev-list.
+
+In order to get all changes of our upstream-repository, just execute the following command:
+
+    git pull upstream
+
+This will get all changed from upstream and merge them locally. In order to update your GitHub version, you have to push things back to `origin`. You can do this by executing the following command:
+
+    git push
+
+(If no remote is provided, git will use `origin` per default)
+
+===  Bug Reports
+
+We use https://issues.apache.org/jira/projects/TRAINING[JIRA] as our Bug & Issue Tracker.
+
+Feel free to submit `feature requests`, `bug reports`, `patches`, `comment on issues`, ...
+
+In order to be able to do so, you need to create an account first.
+
+Currently Apache has a separate login system for JIRA and all other services, this might change in the future, but right now it's the way things are.
+
+So if you are considering to contribute more than just a one-time-patch, please choose a username that hasn't been used by an existing http://people.apache.org/committer-index.html[Apache committer] as this will simplify things if we invite you to become part of the team.
+
+If you want to be assigned to an issue because you want to work on it, please request to be added to the JIRA groups on our http://training.apache.org/mailing-lists.html[developers mailing list]
+
+=== Documentation
+
+As our documentation and website are generated as a side-product of our build, contributing to this technically the same as contributing to the code.
+
+All our content is written in Asciidoctor and is located in `src/site/asciidoc` directories. For a reference of the Asciidoctor syntax please have a look at the https://asciidoctor.org/docs/user-manual/#introduction-to-asciidoctor[Asciidoctor documentation].
+

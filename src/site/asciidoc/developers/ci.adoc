@@ -1,0 +1,33 @@
+//
+//  Licensed to the Apache Software Foundation (ASF) under one or more
+//  contributor license agreements.  See the NOTICE file distributed with
+//  this work for additional information regarding copyright ownership.
+//  The ASF licenses this file to You under the Apache License, Version 2.0
+//  (the "License"); you may not use this file except in compliance with
+//  the License.  You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+//  Unless required by applicable law or agreed to in writing, software
+//  distributed under the License is distributed on an "AS IS" BASIS,
+//  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//  See the License for the specific language governing permissions and
+//  limitations under the License.
+//
+:imagesdir: ../images/
+
+== Continuous Integration
+
+We are currently using only Apache Jenkins for building.
+
+- Apache's Jenkins at: https://builds.apache.org/view/S-Z/job/Training/
+
+Only build jobs on Apache's Jenkins are allowed to publish SNAPSHOT versions of the Maven artifacts to Apaches Nexus as well as auto publish generated websites to production.
+
+=== Structure of the Jenkins Pipeline build
+
+We are using the Jenkins `multi-branch pipeline plugin` to automatically setup build for branches based upon the build definition in the `Jenkinsfile` in the root of the project.
+
+In general it decides between building of the `master` branch and all others.
+
+When building `master` the build not only builds the project itself, it also deploys the generated site content to the `asf-site` branch which deploys the website.
