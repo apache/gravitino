@@ -78,10 +78,13 @@ pipeline {
                 echo 'Staging Site'
                 // Build a directory containing the aggregated website.
                 sh 'mvn site:stage'
+
+                /* Enable this as soon as we have multiple modules
                 // Make sure the script is executable.
                 sh 'chmod +x tools/clean-site.sh'
-                // Remove some redundant resources, which shouldn't be required.
+                // Remove some redundant resources, which shouldn'tbe required.
                 sh 'tools/clean-site.sh'
+                */
             }
         }
 
