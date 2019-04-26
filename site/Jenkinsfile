@@ -90,7 +90,7 @@ pipeline {
 
         stage('Deploy site') {
             when {
-                branch 'master'
+                branch 'feature/changed-directory-structure'
             }
             steps {
                 echo 'Deploying Site'

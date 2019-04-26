@@ -26,6 +26,8 @@
     <groupId>org.apache</groupId>
     <artifactId>apache</artifactId>
     <version>21</version>
+    <!-- Otherwise maven complains about the pom upstairs having different coordinates. -->
+    <relativePath></relativePath>
   </parent>
 
   <groupId>org.apache.training</groupId>
