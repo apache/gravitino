@@ -1,0 +1,764 @@
+////
+
+  Licensed to the Apache Software Foundation (ASF) under one or more
+  contributor license agreements.  See the NOTICE file distributed with
+  this work for additional information regarding copyright ownership.
+  The ASF licenses this file to You under the Apache License, Version 2.0
+  (the "License"); you may not use this file except in compliance with
+  the License.  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+
+////
+
+include::_settings.adoc[]
+:presenter_name: Some Cool Guy
+:presenter_company: Apache Software Foundation
+
+== Example Presentation
+Doc Writer <mr.cool@apache.org>
+2014-09-09
+:revnumber: {project-version}
+:example-caption!:
+
+== Introduction
+
+[%step]
+* This is a presentation for an example project.
+* This project does something.
+* We just haven't decided what that is yet.
+
+== Speaker Notes
+
+Press the `*s*` key to access speaker notes.
+
+[NOTE.speaker]
+--
+You've unlocked the super secret notes area.
+Neat huh?
+--
+
+== Blank screen
+
+You can press `*b*` or `*.*` to blank your current screen.
+
+Hit it again to bring it back.
+
+== Overview
+
+Press the `*esc*` key to get an overview of your slides.
+
+== Attributes
+
+Press the down arrow key to see the next sub-slide.
+
+=== Attributes Part 1
+.Built-in
+asciidoctor-version:: {asciidoctor-version}
+safe-mode-name:: {safe-mode-name}
+docdir:: {docdir}
+docfile:: {docfile}
+imagesdir:: {imagesdir}
+
+=== Attributes Part 2
+.Custom
+project-version:: {project-version}
+sourcedir:: {sourcedir}
+
+== Including documents from subdir
+
+.include::subdir/_b.adoc[]
+
+include::subdir/_b.adoc[]
+
+== Images
+
+[.thumb]
+image::logo-and-name-white.png[scaledwidth=75%]
+
+== Videos
+
+Play videos from Youtube, or locally
+
+video::BKorP55Aqvg[youtube, width=640, height=480]
+
+== Lists
+
+Asciidoctor allows a wide variety of list option.
+
+For details see the documentation starting at: http://asciidoctor.org/docs/user-manual/#unordered-lists
+
+Press the down arrow key to see the some examples.
+
+=== Unordered List
+
+* Protons
+* Electrons
+* Neutrons
+
+=== Ordered List
+
+. Protons
+. Electrons
+. Neutrons
+
+=== Nested List
+
+Nest lists, by duplicating the list-char
+
+* Protons
+** Electrons
+* Neutrons
+
+== Tables
+
+[cols="2*", options="header"]
+|===
+| Header A | Header B
+| Cell A1 | Cell B1
+| Cell A2 | Cell B2
+| Cell A3 | Cell B3
+|===
+
+== Source Code
+
+[source,java]
+.Java code from project
+----
+include::{sourcedir}/example/StringUtils.java[tags=contains,indent=0]
+----
+
+== Diagrams
+
+Press the down arrow key to see the different types of diagrams
+
+=== Ditaa Diagram
+
+[ditaa,asciidoctor-diagram-process]
+....
+                   +-------------+
+                   | Asciidoctor |-------+
+                   |   diagram   |       |
+                   +-------------+       | PNG out
+                       ^                 |
+                       | ditaa in        |
+                       |                 v
+ +--------+   +--------+----+    /---------------\
+ |        |---+ Asciidoctor +--->|               |
+ |  Text  |   +-------------+    |   Beautiful   |
+ |Document|   |   !magic!   |    |    Output     |
+ |     {d}|   |             |    |               |
+ +---+----+   +-------------+    \---------------/
+     :                                   ^
+     |          Lots of work             |
+     +-----------------------------------+
+....
+
+=== PlantUML Diagram
+
+[plantuml,auth-protocol]
+....
+Alice -> Bob: Authentication Request
+Bob --> Alice: Authentication Response
+
+Alice -> Bob: Another authentication Request
+Alice <-- Bob: another authentication Response
+....
+
+=== GraphVIZ Diagram
+
+[graphviz, dot-example, svg]
+----
+digraph g {
+    a -> b
+    b -> c
+    c -> d
+    d -> a
+}
+----
+
+=== Seqdag Diagram
+
+[seqdiag,s7-communication,svg]
+....
+{
+    A -> B -> C;
+         B -> D;
+}
+....
+
+=== Blockdiag Diagram
+
+[blockdiag,blockdiag-test]
+....
+{
+   A -> B -> C -> D;
+   A -> E -> F -> G;
+}
+....
+
+=== Actdiag Diagram
+
+[actdiag,actdiag-test]
+....
+{
+  write -> convert -> image
+
+  lane user {
+     label = "User"
+     write [label = "Writing reST"];
+     image [label = "Get diagram IMAGE"];
+  }
+  lane actdiag {
+     convert [label = "Convert reST to Image"];
+  }
+}
+....
+
+=== Nwdiag Diagram
+
+[nwdiag,nwdiag-test]
+....
+{
+  network dmz {
+      address = "210.x.x.x/24"
+
+      web01 [address = "210.x.x.1"];
+      web02 [address = "210.x.x.2"];
+  }
+  network internal {
+      address = "172.x.x.x/24";
+
+      web01 [address = "172.x.x.1"];
+      web02 [address = "172.x.x.2"];
+      db01;
+      db02;
+  }
+}
+....
+
+=== Rackdiag Diagram
+
+[rackdiag,rackdiag-test]
+....
+{
+  // Change order of rack-number as ascending
+  ascending;
+
+  // define height of rack
+  12U;
+
+  // define description of rack
+  description = "Tokyo/1234 East";
+
+  // define rack units
+  1: UPS [2U];   // define height of unit
+  3: DB Server [5kg]  // define weight of unit
+  4: Web Server [0.5A]  // define ampere of unit
+  5: Web Server
+  6: Web Server
+  7: Load Balancer
+  8: L3 Switch
+}
+....
+
+=== Packetdiag Diagram
+
+[packetdiag,packetdiag-test,svg]
+....
+{
+  colwidth = 32
+  node_height = 72
+
+  0-15: Source Port
+  16-31: Destination Port
+  32-63: Sequence Number
+  64-95: Acknowledgment Number
+  96-99: Data Offset
+  100-105: Reserved
+  106: URG [rotate = 270]
+  107: ACK [rotate = 270]
+  108: PSH [rotate = 270]
+  109: RST [rotate = 270]
+  110: SYN [rotate = 270]
+  111: FIN [rotate = 270]
+  112-127: Window
+  128-143: Checksum
+  144-159: Urgent Pointer
+  160-191: (Options and Padding)
+  192-223: data [colheight = 3]
+}
+....
+
+=== Meme Diagram
+
+meme::../resources/images/Yoda.png[May the Source,Be With You]
+
+=== Entity Relation Diagram
+
+[erd,erd-test,svg]
+....
+[Person]
+*name
+height
+weight
++birth_location_id
+
+[Location]
+*id
+city
+state
+country
+
+# Cardinality    Syntax
+# 0 or 1         ?
+# exactly 1      1
+# 0 or more      *
+# 1 or more      +
+Person *--1 Location
+....
+
+[NOTE.speaker]
+--
+--
+
+////
+=== Mermaid: Flowchart
+
+mermaid::diagrams/mermaid-flowchart-test.mmd[png]
+
+[NOTE.speaker]
+--
+--
+
+=== Mermaid: Sequence Diagram
+
+[mermaid,"mermaid-sequence-diagram-test",svg]
+....
+sequenceDiagram
+    participant Alice
+    participant Bob
+    Alice->John: Hello John, how are you?
+    loop Healthcheck
+        John->John: Fight against hypochondria
+    end
+    Note right of John: Rational thoughts <br/>prevail...
+    John-->Alice: Great!
+    John->Bob: How about you?
+    Bob-->John: Jolly good!
+....
+
+=== Mermaid: Gant Diagram
+
+[mermaid,mermaid-gant-diagram-test,svg]
+....
+gantt
+        dateFormat  YYYY-MM-DD
+        title Adding GANTT diagram functionality to mermaid
+        section A section
+        Completed task            :done,    des1, 2014-01-06,2014-01-08
+        Active task               :active,  des2, 2014-01-09, 3d
+        Future task               :         des3, after des2, 5d
+        Future task2               :         des4, after des3, 5d
+        section Critical tasks
+        Completed task in the critical line :crit, done, 2014-01-06,24h
+        Implement parser and jison          :crit, done, after des1, 2d
+        Create tests for parser             :crit, active, 3d
+        Future task in critical line        :crit, 5d
+        Create tests for renderer           :2d
+        Add to mermaid                      :1d
+....
+////
+
+=== SVGBob: Mindmap
+
+[svgbob,svgbob-mindmap-test,svg]
+....
+                                            .-->  Alpha
+                                           /
+                                          .---->  Initial Release
+          Planning *-------.             /         \
+                            \           /           '---> Patch 1
+      Initial research       \         /             \
+                *             \       /               '-->  Patch 2
+                 \             \     .---------> Beta
+                  \             \   /
+                   \             o o                      _______
+                    \          .---. o--.___             /       \
+                     '------> (     )       '----*--->  . Release .
+                               `---' o                   \_______/
+                               o  o o \
+                              /    \ \ \
+                          .--'      \ \ \
+                         /           \ \ '----+->  Push backs
+                        .             \ \      \
+                       /|              \ \      '----> Setbacks
+                      / .               \ \
+                     V /|                \ '-----> Reception
+                Team  / .                 \
+                     v /|                  \
+             Worklaod / .                   '-->> Career change
+                     V /
+                 PTO  /
+                     V
+                 Bug
+....
+
+=== SVGBob: Circuit Diagram
+
+[svgbob,svgbob-circuit-diagram-test,svg]
+....
++10-15V           ___0,047R
+      *------o------o-|___|-o--o---------o----o-------.
+             |      |       |  |         |    |       |
+            ---     |       | .+.        |    |       |
+      470uF ###     |       | | | 2k2    |    |       |
+             | +    |       | | |        |    |      .+.
+      *------o      '--.    | '+'       .+.   |      '-'
+             |         |6   |7 |8    1k | |   |       |
+            GND      .-+----+--+--.     | |   |       |
+                     |            |     '+'   |       |
+                     |            |1     |  |/  BC    |
+                     |            +------o--+   547   |
+                     |            |      |  |`>       |
+                     |            |     ,+.   |       |
+                     |            | 220R| |   o----||-+  IRF9Z34
+                     |            |     | |   |    |+->
+                     |  MC34063   |     `+'   |    ||-+
+                     |            |      |    |       |  BYV29     -12V6
+                     |            |      '----'       o--|<-o----o--X OUT
+                     |            |2                  |     |    |
+                     |            |--o                C|    |    |
+                     |            | GND         30uH  C|    |   --- 470
+                     |            |3      1nF         C|    |   ###  uF
+                     |            |-------||--.       |     |    | +
+                     '-----+----+-'           |      GND    |   GND
+                          5|   4|             |             |
+                           |    '-------------o-------------o
+                           |                           ___  |
+                           '------/\/\/------------o--|___|-'
+                                                   |       1k0
+                                                  .+.
+                                                  | | 5k6 + 3k3
+                                                  | | in Serie
+                                                  '+'
+                                                   |
+                                                  GND
+....
+
+=== Syntrax
+
+[syntrax,syntrax-test,svg]
+....
+indentstack(10,
+  line(opt('-'), choice('0', line('1-9', loop(None, '0-9'))),
+    opt('.', loop('0-9', None))),
+
+  line(opt(choice('e', 'E'), choice(None, '+', '-'), loop('0-9', None)))
+)
+....
+
+////
+=== Umlet
+
+[umlet,umlet-test,svg]
+....
+<?xml version="1.0" encoding="UTF-8"?><umlet_diagram><element><type>com.umlet.element.base.Relation</type><coordinates><x>739</x><y>16</y><w>232</w><h>264</h></coordinates><panel_attributes>lt=&lt;-
+when(spidersensor="rotate")
+/block spider</panel_attributes><additional_attributes>161;244;161;34;71;34;71;74</additional_attributes></element><element><type>com.umlet.element.custom.FinalState</type><coordinates><x>890</x><y>260</y><w>20</w><h>20</h></coordinates><panel_attributes></panel_attributes><additional_attributes>transparentSelection=false</additional_attributes></element><element><type>com.umlet.element.base.Relation</type><coordinates><x>750</x><y>170</y><w>160</w><h>137</h></coordinates><panel_attributes>lt=&lt;-
+after (10s)
+/ block spider</panel_attributes><additional_attributes>140;100;66;100;66;20</additional_attributes></element><element><type>com.umlet.element.custom.State</type><coordinates><x>340</x><y>420</y><w>100</w><h>40</h></coordinates><panel_attributes>wait</panel_attributes><additional_attributes>transparentSelection=false</additional_attributes></element><element><type>com.umlet.element.custom.HistoryState</type><coordinates><x>230</x><y>440</y><w>20</w><h>20</h></coordinates><panel_attributes></panel_attributes><additional_attributes>transparentSelection=false</additional_attributes></element><element><type>com.umlet.element.base.Relation</type><coordinates><x>230</x><y>416</y><w>130</w><h>54</h></coordinates><panel_attributes>lt=&lt;-
+restart</panel_attributes><additional_attributes>20;34;110;34</additional_attributes></element><element><type>com.umlet.element.base.Relation</type><coordinates><x>270</x><y>396</y><w>90</w><h>54</h></coordinates><panel_attributes>lt=&lt;-
+pause</panel_attributes><additional_attributes>70;34;20;34</additional_attributes></element><element><type>com.umlet.element.custom.FinalState</type><coordinates><x>90</x><y>400</y><w>20</w><h>20</h></coordinates><panel_attributes></panel_attributes><additional_attributes>transparentSelection=false</additional_attributes></element><element><type>com.umlet.element.base.Relation</type><coordinates><x>46</x><y>256</y><w>114</w><h>164</h></coordinates><panel_attributes>lt=&lt;-
+after (10s)
+/timeout</panel_attributes><additional_attributes>54;144;54;34;94;34</additional_attributes></element><element><type>com.umlet.element.base.Relation</type><coordinates><x>230</x><y>110</y><w>190</w><h>170</h></coordinates><panel_attributes>lt=&lt;-
+timeout</panel_attributes><additional_attributes>20;150;110;150;110;20;170;20</additional_attributes></element><element><type>com.umlet.element.custom.State</type><coordinates><x>700</x><y>90</y><w>180</w><h>100</h></coordinates><panel_attributes>accept
+boarding pass
+--
+entry/ release card
+do/release spider</panel_attributes><additional_attributes>transparentSelection=true</additional_attributes></element><element><type>com.umlet.element.base.Relation</type><coordinates><x>540</x><y>140</y><w>205</w><h>100</h></coordinates><panel_attributes>lt=&lt;-
+[passenger booked]</panel_attributes><additional_attributes>160;20;120;80;20;80</additional_attributes></element><element><type>com.umlet.element.base.Relation</type><coordinates><x>450</x><y>210</y><w>239</w><h>190</h></coordinates><panel_attributes>lt=&lt;-
+[passenger not booked]</panel_attributes><additional_attributes>219;170;99;170;99;20</additional_attributes></element><element><type>com.umlet.element.custom.State</type><coordinates><x>670</x><y>350</y><w>120</w><h>50</h></coordinates><panel_attributes>reject
+boarding pass</panel_attributes><additional_attributes>transparentSelection=false</additional_attributes></element><element><type>com.umlet.element.base.Relation</type><coordinates><x>480</x><y>130</y><w>142</w><h>100</h></coordinates><panel_attributes>lt=&lt;-
+result of search</panel_attributes><additional_attributes>71;80;71;20</additional_attributes></element><element><type>com.umlet.element.base.Relation</type><coordinates><x>270</x><y>70</y><w>150</w><h>40</h></coordinates><panel_attributes>lt=&lt;-</panel_attributes><additional_attributes>130;20;20;20</additional_attributes></element><element><type>com.umlet.element.custom.ThreeWayRelation</type><coordinates><x>540</x><y>210</y><w>20</w><h>20</h></coordinates><panel_attributes></panel_attributes><additional_attributes>transparentSelection=false</additional_attributes></element><element><type>com.umlet.element.custom.State</type><coordinates><x>140</x><y>60</y><w>150</w><h>420</h></coordinates><panel_attributes>read boarding pass
+--</panel_attributes><additional_attributes>transparentSelection=true</additional_attributes></element><element><type>com.umlet.element.custom.State</type><coordinates><x>400</x><y>60</y><w>180</w><h>90</h></coordinates><panel_attributes>check passenger
+--
+entry/start search
+do/blink lamp</panel_attributes><additional_attributes>transparentSelection=true</additional_attributes></element><element><type>com.umlet.element.custom.FinalState</type><coordinates><x>170</x><y>410</y><w>20</w><h>20</h></coordinates><panel_attributes></panel_attributes><additional_attributes>transparentSelection=false</additional_attributes></element><element><type>com.umlet.element.custom.State</type><coordinates><x>150</x><y>240</y><w>100</w><h>40</h></coordinates><panel_attributes>read
+passenger ID</panel_attributes><additional_attributes>transparentSelection=false</additional_attributes></element><element><type>com.umlet.element.custom.State</type><coordinates><x>150</x><y>330</y><w>100</w><h>40</h></coordinates><panel_attributes>identify
+passenger</panel_attributes><additional_attributes>transparentSelection=false</additional_attributes></element><element><type>com.umlet.element.base.Relation</type><coordinates><x>160</x><y>260</y><w>40</w><h>90</h></coordinates><panel_attributes>lt=&lt;-</panel_attributes><additional_attributes>20;70;20;20</additional_attributes></element><element><type>com.umlet.element.base.Relation</type><coordinates><x>160</x><y>100</y><w>40</w><h>70</h></coordinates><panel_attributes>lt=&lt;-</panel_attributes><additional_attributes>20;50;20;20</additional_attributes></element><element><type>com.umlet.element.base.Relation</type><coordinates><x>160</x><y>350</y><w>40</w><h>80</h></coordinates><panel_attributes>lt=&lt;-</panel_attributes><additional_attributes>20;60;20;20</additional_attributes></element><element><type>com.umlet.element.base.Relation</type><coordinates><x>140</x><y>170</y><w>78</w><h>90</h></coordinates><panel_attributes>lt=&lt;-
+[valid]</panel_attributes><additional_attributes>39;70;39;20</additional_attributes></element><element><type>com.umlet.element.custom.State</type><coordinates><x>150</x><y>150</y><w>100</w><h>40</h></coordinates><panel_attributes>check
+validity</panel_attributes><additional_attributes>transparentSelection=false</additional_attributes></element><element><type>com.umlet.element.custom.InitialState</type><coordinates><x>170</x><y>100</y><w>20</w><h>20</h></coordinates><panel_attributes></panel_attributes><additional_attributes>transparentSelection=false</additional_attributes></element></umlet_diagram>
+....
+////
+
+=== Vega
+
+[vega,vega-test, svg]
+....
+{
+  "$schema": "https://vega.github.io/schema/vega/v4.json",
+  "width": 500,
+  "padding": 5,
+
+  "config": {
+    "axisBand": {
+      "bandPosition": 1,
+      "tickExtra": true,
+      "tickOffset": 0
+    }
+  },
+
+  "signals": [
+    { "name": "fields",
+      "value": ["petalWidth", "petalLength", "sepalWidth", "sepalLength"] },
+    { "name": "plotWidth", "value": 60 },
+    { "name": "height", "update": "(plotWidth + 10) * length(fields)"}
+  ],
+
+  "data": [
+    {
+      "name": "iris",
+      "url": "data/iris.json",
+      "transform": [
+        {
+          "type": "fold",
+          "fields": {"signal": "fields"},
+          "as": ["organ", "value"]
+        }
+      ]
+    }
+  ],
+
+  "scales": [
+    {
+      "name": "layout",
+      "type": "band",
+      "range": "height",
+      "domain": {"data": "iris", "field": "organ"}
+    },
+    {
+      "name": "xscale",
+      "type": "linear",
+      "range": "width", "round": true,
+      "domain": {"data": "iris", "field": "value"},
+      "zero": true, "nice": true
+    }
+  ],
+
+  "axes": [
+    {"orient": "bottom", "scale": "xscale", "zindex": 1},
+    {"orient": "left", "scale": "layout", "tickCount": 5, "zindex": 1}
+  ],
+
+  "marks": [
+    {
+      "type": "group",
+      "from": {
+        "facet": {
+          "data": "iris",
+          "name": "organs",
+          "groupby": "organ"
+        }
+      },
+
+      "encode": {
+        "enter": {
+          "yc": {"scale": "layout", "field": "organ", "band": 0.5},
+          "height": {"signal": "plotWidth"},
+          "width": {"signal": "width"}
+        }
+      },
+
+      "data": [
+        {
+          "name": "summary",
+          "source": "organs",
+          "transform": [
+            {
+              "type": "aggregate",
+              "fields": ["value", "value", "value", "value", "value"],
+              "ops": ["min", "q1", "median", "q3", "max"],
+              "as": ["min", "q1", "median", "q3", "max"]
+            }
+          ]
+        }
+      ],
+
+      "marks": [
+        {
+          "type": "rect",
+          "from": {"data": "summary"},
+          "encode": {
+            "enter": {
+              "fill": {"value": "black"},
+              "height": {"value": 1}
+            },
+            "update": {
+              "yc": {"signal": "plotWidth / 2", "offset": -0.5},
+              "x": {"scale": "xscale", "field": "min"},
+              "x2": {"scale": "xscale", "field": "max"}
+            }
+          }
+        },
+        {
+          "type": "rect",
+          "from": {"data": "summary"},
+          "encode": {
+            "enter": {
+              "fill": {"value": "steelblue"},
+              "cornerRadius": {"value": 4}
+            },
+            "update": {
+              "yc": {"signal": "plotWidth / 2"},
+              "height": {"signal": "plotWidth / 2"},
+              "x": {"scale": "xscale", "field": "q1"},
+              "x2": {"scale": "xscale", "field": "q3"}
+            }
+          }
+        },
+        {
+          "type": "rect",
+          "from": {"data": "summary"},
+          "encode": {
+            "enter": {
+              "fill": {"value": "aliceblue"},
+              "width": {"value": 2}
+            },
+            "update": {
+              "yc": {"signal": "plotWidth / 2"},
+              "height": {"signal": "plotWidth / 2"},
+              "x": {"scale": "xscale", "field": "median"}
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
+....
+
+== Embedded HTML/JavaScript
+
+++++
+  <div id="iot-riskks1"></div>
+  <script type="text/javascript">
+c3.generate({
+  bindto: '#iot-riskks1',
+  size: { height: 500, width: 1000 },
+  data: {
+    x: 'x',
+    columns: [
+        ['x','Security','IT/OT Integration','Unclear ROI', 'Technical Expertise', 'Interoperability', 'Data Portability', 'Vendor Risk', 'Transition Risk', 'Legal/regulatory issues', 'Network constraints', 'Vendor lock-in'],
+        ['%',43, 30, 28, 26, 26, 24, 22, 22, 22, 21, 18]
+    ],
+    type: 'bar'
+  },
+  axis: {
+    rotated: true,
+    x: {
+      type: 'category',
+      tick: {
+        rotate: -90
+      }
+    }
+  }
+});
+</script>
+++++
+
+== Going crazy (Click in the middle of the screen)
+
+++++
+
+<style>
+.fade {
+  position: relative;
+  width: 100%;
+  min-height: 60vh;
+  top: -25px;
+  background-image: linear-gradient(0deg, transparent, black 75%);
+  z-index: 1;
+}
+
+.star-wars {
+  display: flex;
+  justify-content: center;
+  position: relative;
+  height: 800px;
+  color: #feda4a;
+  font-family: 'Pathway Gothic One', sans-serif;
+  font-size: 500%;
+  font-weight: 600;
+  letter-spacing: 6px;
+  line-height: 150%;
+  perspective: 600px;
+  text-align: justify;
+}
+
+.crawl {
+  position: relative;
+  top: 9999px;
+  transform-origin: 50% 100%;
+  animation: crawl 120s linear;
+}
+
+.crawl > .title {
+  font-size: 90%;
+  text-align: center;
+}
+
+.crawl > .title h1 {
+  margin: 0 0 100px;
+  text-transform: uppercase;
+}
+
+.hide {
+  display: none;
+}
+
+@keyframes crawl {
+  0% {
+    top: 0;
+    transform: rotateX(20deg)  translateZ(0);
+  }
+  100% {
+    top: -6000px;
+    transform: rotateX(25deg) translateZ(-2500px);
+  }
+}
+</style>
+
+<script type="text/javascript">
+  function start(){
+    document.getElementById('animation').className ='crawl';
+  }
+</script>
+
+<section class="star-wars" onclick="start()">
+  <div id="animation" class="hide">
+
+    <div class="title">
+      <p>Episode IV</p>
+      <h1>A New Hope</h1>
+      <h3>Industry 4.0 done our way</h3>
+    </div>
+
+    <p>It is a period of technological change. Rebel Industry 4.0 open-source software solutions, striking from hidden bases, have won their first victories against the evil proprietary Industrial Empire.</p>
+    <p>During the battle, Rebel spies managed to reverse engineer secret industrial protocols to the Empire’s ultimate weapons, the industrial Programmable Logic Controllers, almost unprotected pieces of hardware with enough power to destroy an entire planet.</p>
+    <p>Pursued by the Empire’s sinister agents, Christofer races to Cologne aboard his ICE, custodian of his plans to revolutionize the way we are building Industry 4.0 applications, that can free all companies and restore freedom to the industry …</p>
+
+  </div>
+
+</section>
+++++
+
+
+
+
