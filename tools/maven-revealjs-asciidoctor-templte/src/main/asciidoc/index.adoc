@@ -752,7 +752,7 @@ c3.generate({
 
     <p>It is a period of technological change. Rebel Industry 4.0 open-source software solutions, striking from hidden bases, have won their first victories against the evil proprietary Industrial Empire.</p>
     <p>During the battle, Rebel spies managed to reverse engineer secret industrial protocols to the Empire’s ultimate weapons, the industrial Programmable Logic Controllers, almost unprotected pieces of hardware with enough power to destroy an entire planet.</p>
-    <p>Pursued by the Empire’s sinister agents, Christofer races to Cologne aboard his ICE, custodian of his plans to revolutionize the way we are building Industry 4.0 applications, that can free all companies and restore freedom to the industry …</p>
+    <p>Pursued by the Empire’s sinister agents, Christofer races to Las Vegas aboard his intercontinental shuttle, custodian of his plans to revolutionize the way we are building Industry 4.0 applications, that can free all companies and restore freedom to the industry …</p>
 
   </div>
 
