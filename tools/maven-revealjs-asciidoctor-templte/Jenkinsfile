@@ -20,6 +20,12 @@
  */
 pipeline {
 
+    agent {
+        node {
+            label 'ubuntu'
+        }
+    }
+
     tools {
         maven 'Maven 3 (latest)'
         jdk 'JDK 1.8 (latest)'
