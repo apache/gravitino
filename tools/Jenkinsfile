@@ -21,9 +21,6 @@
 
 pipeline {
     agent any
-    options {
-        timestamps()
-    }
     stages {
         stage('Build RevealJS Template') {
             when {
