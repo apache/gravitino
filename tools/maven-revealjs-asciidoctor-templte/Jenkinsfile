@@ -35,6 +35,9 @@ pipeline {
 
     stages {
         stage('Initialization') {
+            when {
+                changeset "tools/maven-revealjs-asciidoctor-templte/**"
+            }
             steps {
                 echo 'Building Branch: ' + env.BRANCH_NAME
                 echo 'Using PATH = ' + env.PATH
@@ -42,6 +45,9 @@ pipeline {
         }
 
         stage('Cleanup') {
+            when {
+                changeset "tools/maven-revealjs-asciidoctor-templte/**"
+            }
             steps {
                 echo 'Cleaning up the workspace'
                 deleteDir()
@@ -49,6 +55,9 @@ pipeline {
         }
 
         stage('Checkout') {
+            when {
+                changeset "tools/maven-revealjs-asciidoctor-templte/**"
+            }
             steps {
                 echo 'Checking out branch ' + env.BRANCH_NAME
                 checkout scm
@@ -56,6 +65,9 @@ pipeline {
         }
 
         stage('Build') {
+            when {
+                changeset "tools/maven-revealjs-asciidoctor-templte/**"
+            }
             steps {
                 echo 'Building'
                 sh 'mvn -f tools/maven-revealjs-asciidoctor-templte/pom.xml package'

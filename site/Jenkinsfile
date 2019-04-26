@@ -46,6 +46,9 @@ pipeline {
 
     stages {
         stage('Initialization') {
+            when {
+                changeset "site/**"
+            }
             steps {
                 echo 'Building Branch: ' + env.BRANCH_NAME
                 echo 'Using PATH = ' + env.PATH
@@ -53,6 +56,9 @@ pipeline {
         }
 
         stage('Cleanup') {
+            when {
+                changeset "site/**"
+            }
             steps {
                 echo 'Cleaning up the workspace'
                 deleteDir()
@@ -60,6 +66,9 @@ pipeline {
         }
 
         stage('Checkout') {
+            when {
+                changeset "site/**"
+            }
             steps {
                 echo 'Checking out branch ' + env.BRANCH_NAME
                 checkout scm
@@ -67,6 +76,9 @@ pipeline {
         }
 
         stage('Build site') {
+            when {
+                changeset "site/**"
+            }
             steps {
                 echo 'Building Site'
                 sh 'mvn -f site/pom.xml site'
@@ -74,6 +86,9 @@ pipeline {
         }
 
         stage('Stage site') {
+            when {
+                changeset "site/**"
+            }
             steps {
                 echo 'Staging Site'
                 // Build a directory containing the aggregated website.
@@ -89,6 +104,9 @@ pipeline {
         }
 
         stage('Deploy site') {
+            when {
+                changeset "site/**"
+            }
             when {
                 branch 'feature/changed-directory-structure'
             }
