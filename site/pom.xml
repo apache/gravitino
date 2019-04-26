@@ -33,7 +33,7 @@
   <version>0.4.0-SNAPSHOT</version>
   <packaging>pom</packaging>
 
-  <name>Training</name>
+  <name>Training: Website</name>
   <description>
     Write something sensible here ...
   </description>

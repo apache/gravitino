@@ -107,7 +107,7 @@ pipeline {
             script {
                 if(env.BRANCH_NAME == "develop") {
                     emailext(
-                        subject: "[BUILD-FAILURE]: Job '${env.JOB_NAME} [${env.BRANCH_NAME}] [${env.BUILD_NUMBER}]'",
+                        subject: "[Website][BUILD-FAILURE]: Job '${env.JOB_NAME} [${env.BRANCH_NAME}] [${env.BUILD_NUMBER}]'",
                         body: """
 BUILD-FAILURE: Job '${env.JOB_NAME} [${env.BRANCH_NAME}] [${env.BUILD_NUMBER}]':
 
@@ -124,7 +124,7 @@ Check console output at "<a href="${env.BUILD_URL}">${env.JOB_NAME} [${env.BRANC
             script {
                 if(env.BRANCH_NAME == "develop") {
                     emailext(
-                        subject: "[BUILD-UNSTABLE]: Job '${env.JOB_NAME} [${env.BRANCH_NAME}] [${env.BUILD_NUMBER}]'",
+                        subject: "[Website][BUILD-UNSTABLE]: Job '${env.JOB_NAME} [${env.BRANCH_NAME}] [${env.BUILD_NUMBER}]'",
                         body: """
 BUILD-UNSTABLE: Job '${env.JOB_NAME} [${env.BRANCH_NAME}] [${env.BUILD_NUMBER}]':
 
@@ -144,7 +144,7 @@ Check console output at "<a href="${env.BUILD_URL}">${env.JOB_NAME} [${env.BRANC
             script {
                 if ((env.BRANCH_NAME == "develop") && (currentBuild.previousBuild != null) && (currentBuild.previousBuild.result != 'SUCCESS')) {
                     emailext (
-                        subject: "[BUILD-STABLE]: Job '${env.JOB_NAME} [${env.BRANCH_NAME}] [${env.BUILD_NUMBER}]'",
+                        subject: "[Website][BUILD-STABLE]: Job '${env.JOB_NAME} [${env.BRANCH_NAME}] [${env.BUILD_NUMBER}]'",
                         body: """
 BUILD-STABLE: Job '${env.JOB_NAME} [${env.BRANCH_NAME}] [${env.BUILD_NUMBER}]':
 
@@ -155,23 +155,6 @@ Is back to normal.
                 }
             }
         }
-
-        // This block might become interesting if development is done on a branch other than master.
-        /*always {
-            script {
-                if(env.BRANCH_NAME == "master") {
-                    emailext(
-                        subject: "[COMMIT-TO-MASTER]: A commit to the master branch was made'",
-                        body: """
-COMMIT-TO-MASTER: A commit to the master branch was made:
-
-Check console output at "<a href="${env.BUILD_URL}">${env.JOB_NAME} [${env.BRANCH_NAME}] [${env.BUILD_NUMBER}]</a>"
-""",
-                        to: "dev@training.apache.org"
-                    )
-                }
-            }
-        }*/
     }
 
 }
