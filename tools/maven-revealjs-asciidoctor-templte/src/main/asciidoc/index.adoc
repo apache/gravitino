@@ -18,12 +18,12 @@
 ////
 
 include::_settings.adoc[]
-:presenter_name: Some Cool Guy
+:presenter_name: Some Cool Person
 :presenter_company: Apache Software Foundation
 
 == Example Presentation
-Doc Writer <mr.cool@apache.org>
-2014-09-09
+Doc Writer <cool.person@apache.org>
+{docdate}
 :revnumber: {project-version}
 :example-caption!:
 
