@@ -1,0 +1,288 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+
+  Licensed to the Apache Software Foundation (ASF) under one or more
+  contributor license agreements.  See the NOTICE file distributed with
+  this work for additional information regarding copyright ownership.
+  The ASF licenses this file to You under the Apache License, Version 2.0
+  (the "License"); you may not use this file except in compliance with
+  the License.  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>org.apache</groupId>
+        <artifactId>apache</artifactId>
+        <version>21</version>
+    </parent>
+
+    <groupId>org.apache.training</groupId>
+    <artifactId>navigating-ASF-incubation</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+    <packaging>war</packaging>
+
+    <name>Navigating the ASF Incubator Process</name>
+    <description>All about taking a project through incubation from start to finish.</description>
+
+    <properties>
+        <project.slides.directory>${project.build.directory}/generated-slides</project.slides.directory>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <asciidoctor.maven.plugin.version>2.0.0-RC.1</asciidoctor.maven.plugin.version>
+        <asciidoctorj.version>2.0.0-RC.2</asciidoctorj.version>
+        <asciidoctorj.diagram.version>1.5.16</asciidoctorj.diagram.version>
+        <asciidoctorj.extensions-lab.version>1.0.0</asciidoctorj.extensions-lab.version>
+        <revealjs.version>3.7.0</revealjs.version>
+        <asciidoctor-revealjs.version>2.0.0</asciidoctor-revealjs.version>
+    </properties>
+
+    <build>
+        <plugins>
+            <!-- Check if all source files have the required apache license headers -->
+            <plugin>
+                <groupId>org.apache.rat</groupId>
+                <artifactId>apache-rat-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>license-check</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <consoleOutput>true</consoleOutput>
+                    <excludes>
+                        <!-- TODO: This is a mofified version of an asciidoctor file ... nor sure we can stick an Apache Header on it -->
+                        <exclude>libs/docinfo-hack/document.html.slim</exclude>
+
+                        <!-- Maven related files -->
+                        <exclude>**/target/**</exclude>
+
+                        <!-- Eclipse related files -->
+                        <exclude>**/.project</exclude>
+                        <exclude>**/.settings/**</exclude>
+                        <exclude>**/.classpath</exclude>
+
+                        <!-- IntelliJ related files -->
+                        <exclude>**/.idea/**</exclude>
+                        <exclude>**/*.iml</exclude>
+
+                        <!-- Asciidoctor generated files -->
+                        <exclude>**/.asciidoctor/**</exclude>
+
+                        <!-- JSON doesn't like comments -->
+                        <exclude>**/*.json</exclude>
+                        <!-- Mermaid does't like comments -->
+                        <exclude>**/*.mmd</exclude>
+
+                        <!-- Output of the profiler maven extension -->
+                        <exclude>**/.profiler/**</exclude>
+                    </excludes>
+                </configuration>
+            </plugin>
+
+            <plugin>
+                <groupId>com.googlecode.maven-download-plugin</groupId>
+                <artifactId>download-maven-plugin</artifactId>
+                <version>1.4.1</version>
+                <executions>
+                    <execution>
+                        <id>install-asciidoctor-revealjs</id>
+                        <phase>generate-resources</phase>
+                        <goals>
+                            <goal>wget</goal>
+                        </goals>
+                        <configuration>
+                            <url>https://github.com/asciidoctor/asciidoctor-reveal.js/archive/v${asciidoctor-revealjs.version}.zip</url>
+                            <unpack>true</unpack>
+                            <outputFileName>asciidoctor-reveal.js-${asciidoctor-revealjs.version}.zip</outputFileName>
+                            <outputDirectory>${project.build.directory}</outputDirectory>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>install-revealjs</id>
+                        <phase>generate-resources</phase>
+                        <goals>
+                            <goal>wget</goal>
+                        </goals>
+                        <configuration>
+                            <url>https://github.com/hakimel/reveal.js/archive/${revealjs.version}.zip</url>
+                            <unpack>true</unpack>
+                            <outputFileName>reveal.js-${revealjs.version}.zip</outputFileName>
+                            <outputDirectory>${project.slides.directory}</outputDirectory>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>download-c3-css</id>
+                        <phase>generate-resources</phase>
+                        <goals>
+                            <goal>wget</goal>
+                        </goals>
+                        <configuration>
+                            <url>https://cdnjs.cloudflare.com/ajax/libs/c3/0.6.12/c3.min.css</url>
+                            <outputDirectory>${project.slides.directory}/css</outputDirectory>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>download-c3-js</id>
+                        <phase>generate-resources</phase>
+                        <goals>
+                            <goal>wget</goal>
+                        </goals>
+                        <configuration>
+                            <url>https://cdnjs.cloudflare.com/ajax/libs/c3/0.6.12/c3.min.js</url>
+                            <outputDirectory>${project.slides.directory}/js</outputDirectory>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>download-d3-js</id>
+                        <phase>generate-resources</phase>
+                        <goals>
+                            <goal>wget</goal>
+                        </goals>
+                        <configuration>
+                            <url>https://cdnjs.cloudflare.com/ajax/libs/d3/5.7.0/d3.min.js</url>
+                            <outputDirectory>${project.slides.directory}/js</outputDirectory>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-resources-plugin</artifactId>
+                <version>3.1.0</version>
+                <executions>
+                    <execution>
+                        <id>copy-resources</id>
+                        <phase>generate-resources</phase>
+                        <goals>
+                            <goal>copy-resources</goal>
+                        </goals>
+                        <configuration>
+                            <outputDirectory>${project.build.directory}</outputDirectory>
+                            <resources>
+                                <!-- Copy the normal resources into the root of the slides directory -->
+                                <resource>
+                                    <directory>src/main/resources</directory>
+                                    <targetPath>${project.slides.directory}</targetPath>
+                                </resource>
+                                <!-- Copy our css-theme to the reveal.js theme directory -->
+                                <resource>
+                                    <directory>src/main/theme</directory>
+                                    <filtering>true</filtering>
+                                    <targetPath>${project.slides.directory}/reveal.js-${revealjs.version}/css/theme</targetPath>
+                                </resource>
+                                <!-- Patch one of the "slim" files as the 'docinfo' integration doesn't seem to work -->
+                                <resource>
+                                    <directory>libs/docinfo-hack</directory>
+                                    <targetPath>${project.build.directory}/asciidoctor-reveal.js-${asciidoctor-revealjs.version}/templates</targetPath>
+                                </resource>
+                            </resources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.asciidoctor</groupId>
+                <artifactId>asciidoctor-maven-plugin</artifactId>
+                <version>${asciidoctor.maven.plugin.version}</version>
+                <executions>
+                    <execution>
+                        <id>generate-slides</id>
+                        <phase>process-resources</phase>
+                        <goals>
+                            <goal>process-asciidoc</goal>
+                        </goals>
+                        <configuration>
+                            <!-- Tell asciidoctor to use the reveal.js backend and not the default html -->
+                            <backend>revealjs</backend>
+                            <!-- Configure where are all the asciidoc source files located -->
+                            <sourceDirectory>src/main/asciidoc</sourceDirectory>
+                            <!-- Configure the target director to where will the output be generated -->
+                            <outputDirectory>${project.slides.directory}</outputDirectory>
+                            <!-- Enable optional modules for generating diagrams and charts -->
+                            <requires>
+                                <require>asciidoctor-diagram</require>
+                                <!--require>chart-block-macro</require-->
+                            </requires>
+                            <!-- This has to point to the asciidoctor-revealjs directory which contains all the "slim" files -->
+                            <templateDir>${project.build.directory}/asciidoctor-reveal.js-${asciidoctor-revealjs.version}/templates</templateDir>
+                            <attributes>
+                                <!--imagesdir></imagesdir-->
+                                <!--
+                                    Tell the system the relative path to the reveal.js files
+                                    inside the generated-slides directory.
+                                -->
+                                <revealjsdir>reveal.js-${revealjs.version}</revealjsdir>
+                                <!--
+                                    Use our custom theme, which is defined by src/main/theme/apache.css
+                                    and copied inside the reveal.js installation by the resources plugin a few lines
+                                    up inside this pom.
+                                -->
+                                <revealjs_theme>apache</revealjs_theme>
+                                <!-- Some basic settings -->
+                                <revealjs_transition>linear</revealjs_transition>
+                                <project-version>${project.version}</project-version>
+                                <source-highlighter>highlightjs</source-highlighter>
+                                <!--highlightjs-theme>https://raw.githubusercontent.com/isagalaev/highlight.js/master/src/styles/arduino-light.css</highlightjs-theme-->
+                                <erd>${basedir}/libs/third-party/erd/.stack-work/dist/x86_64-osx/Cabal-2.2.0.1/build/erd/erd</erd>
+                                <!--convert>${basedir}/libs/third-party/ImageMagick-7.0.8/bin/convert</convert>
+                                <identify>${basedir}/libs/third-party/ImageMagick-7.0.8/bin/identify</identify-->
+                                <mermaid>${basedir}/libs/third-party/node_modules/.bin/mmdc</mermaid>
+                                <phantomjs>${basedir}/libs/third-party/phantomjs-2.1.1-macosx/bin/phantomjs</phantomjs>
+                                <svgbob>/Users/christofer.dutz/.cargo/bin/svgbob</svgbob>
+                                <vg2svg>${basedir}/libs/third-party/node_modules/.bin/vg2svg</vg2svg>
+                            </attributes>
+                        </configuration>
+                    </execution>
+                </executions>
+                <dependencies>
+                    <dependency>
+                        <groupId>org.asciidoctor</groupId>
+                        <artifactId>asciidoctorj</artifactId>
+                        <version>${asciidoctorj.version}</version>
+                    </dependency>
+                    <dependency>
+                        <groupId>org.asciidoctor</groupId>
+                        <artifactId>asciidoctorj-diagram</artifactId>
+                        <version>${asciidoctorj.diagram.version}</version>
+                    </dependency>
+                    <!--dependency>
+                        <groupId>org.asciidoctor</groupId>
+                        <artifactId>asciidoctorj-extensions-lab</artifactId>
+                        <version>${asciidoctorj.extensions-lab.version}</version>
+                        <!- Referenced locally till it's officially released ->
+                        <scope>system</scope>
+                        <systemPath>${basedir}/libs/asciidoctorj-extensions-lab-${asciidoctorj.extensions-lab.version}.jar</systemPath>
+                    </dependency-->
+                </dependencies>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-war-plugin</artifactId>
+                <version>3.2.2</version>
+                <configuration>
+                    <failOnMissingWebXml>false</failOnMissingWebXml>
+                    <warSourceDirectory>${project.build.directory}/generated-slides</warSourceDirectory>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.eclipse.jetty</groupId>
+                <artifactId>jetty-maven-plugin</artifactId>
+                <version>9.4.14.v20181114</version>
+            </plugin>
+        </plugins>
+    </build>
+</project>
