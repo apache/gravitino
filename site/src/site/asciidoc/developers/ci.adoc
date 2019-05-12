@@ -20,7 +20,7 @@
 
 We are currently using only Apache Jenkins for building.
 
-- Apache's Jenkins at: https://builds.apache.org/view/S-Z/job/Training/
+- Apache's Jenkins at https://builds.apache.org/view/S-Z/job/Training/
 
 Only build jobs on Apache's Jenkins are allowed to publish SNAPSHOT versions of the Maven artifacts to Apaches Nexus as well as auto publish generated websites to production.
 
@@ -28,6 +28,6 @@ Only build jobs on Apache's Jenkins are allowed to publish SNAPSHOT versions of 
 
 We are using the Jenkins `multi-branch pipeline plugin` to automatically setup build for branches based upon the build definition in the `Jenkinsfile` in the root of the project.
 
-In general it decides between building of the `master` branch and all others.
+In general, it decides between building the `master` branch and all others.
 
 When building `master` the build not only builds the project itself, it also deploys the generated site content to the `asf-site` branch which deploys the website.

@@ -38,7 +38,7 @@
     <reflowSkin>
       <localResources>true</localResources>
       <absoluteResourceURL>https://training.apache.org/</absoluteResourceURL>
-      <titleTemplate>Apache Training® (Incubating) - %2$s</titleTemplate>
+      <titleTemplate>Apache Training&trade; (Incubating) - %2$s</titleTemplate>
       <slogan position="bannerLeft">Training material for Apache projects</slogan>
       <showApacheEvents>true</showApacheEvents>
       <toc>top</toc>
@@ -73,7 +73,7 @@
 
   <bannerLeft>
       <name>Apache Training (incubating)</name>
-      <src>https://training.apache.org/images/apache_training_logo.png</src>
+      <src>/images/apache_training_logo.png</src>
       <href>https://training.apache.org/</href>
   </bannerLeft>
 

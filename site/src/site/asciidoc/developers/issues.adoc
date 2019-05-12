@@ -15,6 +15,6 @@
 //  limitations under the License.
 //
 
-== Bug & Issue Tracker
+== Bug &amp; Issue Tracker
 
 https://issues.apache.org/jira/projects/TRAINING

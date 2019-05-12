@@ -32,11 +32,11 @@ These usually are, but are not limited to:
 
 === Pull-Requests
 
-The simplest way to submit code changes, is via a GitHub pull-request.
+The simplest way to submit code changes is via a GitHub pull-request.
 
-In order to do this first create a GitHub account and sign into you account.
+In order to do this first create a GitHub account and sign into your account.
 
-After that's done, please to to our https://github.com/apache/incubator-training[GitHub site] and create a so-called `Fork`.
+After that's done, please go to our https://github.com/apache/incubator-training[GitHub site] and create a so-called `Fork`.
 
 image::contributing-github-fork.png[]
 
@@ -62,13 +62,13 @@ If you click on this, we will receive a notification on your changes and can rev
 
 As we are continuously working on Training and you created a copy of our repo, this will become out-of-date pretty soon.
 
-In order get the changes we introduced in the official repo you have to tell git about that.
+In order to get the changes we introduced in the official repo you have to tell git about that.
 
-You do this locally by adding a new so-called `remote`. Per default the remote you cloned from is called `origin`.
+You do this locally by adding a new so-called `remote`. Per default, the remote you cloned from is called `origin`.
 
-Usually you will call the second remote `upstream` but in general you can call it whatever you like.
+Usually you will call the second remote `upstream` but in general, you can call it whatever you like.
 
-Add the remote on the commandline (or your git gui of choice):
+Add the remote on the command line (or your git gui of choice):
 
     git remote add upstream https://github.com/apache/incubator-training.git
 
@@ -83,9 +83,9 @@ It should output something like this:
     upstream    https://github.com/apache/incubator-training.git (fetch)
     upstream    https://github.com/apache/incubator-training.git (push)
 
-If that's so, you're fine to continue, if not ... well you could ask for assistance on our dev-list.
+If that's so, you're fine to continue, if not ... well, you could ask for assistance on our dev-list.
 
-In order to get all changes of our upstream-repository, just execute the following command:
+In order to get all changes in our upstream-repository, just execute the following command:
 
     git pull upstream
 
@@ -97,13 +97,13 @@ This will get all changed from upstream and merge them locally. In order to upda
 
 ===  Bug Reports
 
-We use https://issues.apache.org/jira/projects/TRAINING[JIRA] as our Bug & Issue Tracker.
+We use https://issues.apache.org/jira/projects/TRAINING[JIRA] as our Bug &amp; Issue Tracker.
 
 Feel free to submit `feature requests`, `bug reports`, `patches`, `comment on issues`, ...
 
 In order to be able to do so, you need to create an account first.
 
-Currently Apache has a separate login system for JIRA and all other services, this might change in the future, but right now it's the way things are.
+Currently, Apache has a separate login system for JIRA and all other services, this might change in the future, but right now it's the way things are.
 
 So if you are considering to contribute more than just a one-time-patch, please choose a username that hasn't been used by an existing http://people.apache.org/committer-index.html[Apache committer] as this will simplify things if we invite you to become part of the team.
 
@@ -111,7 +111,7 @@ If you want to be assigned to an issue because you want to work on it, please re
 
 === Documentation
 
-As our documentation and website are generated as a side-product of our build, contributing to this technically the same as contributing to the code.
+As our documentation and website are generated as a side-product of our build, contributing to this technically is the same as contributing to the code.
 
 All our content is written in Asciidoctor and is located in `src/site/asciidoc` directories. For a reference of the Asciidoctor syntax please have a look at the https://asciidoctor.org/docs/user-manual/#introduction-to-asciidoctor[Asciidoctor documentation].
 
