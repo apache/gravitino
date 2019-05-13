@@ -154,6 +154,6 @@ In order to be able to push to the `asf-site` GIT branch, a dedicated build job 
 
 Only on these machines are jobs allowed to push changes to a Git repo and here only to a branch named `asf-site`.
 
-See https://builds.apache.org/view/M-R/job/4X/job/PLC4X%20Site/ for details on the PLC4X Jenkins Website build job.
+See https://builds.apache.org/view/S-Z/view/Training%20(incubating)/job/Training%20Multi-Branch%20Pipeline/ for details on the Training Jenkins Website build job.
 
 As soon as the content is updated in the `asf-site` the `gitpubsub` mechanism will make those changes available at https://training.apache.org
