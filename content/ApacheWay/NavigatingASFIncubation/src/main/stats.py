@@ -54,11 +54,11 @@ with urllib.request.urlopen("https://whimsy.apache.org/public/committee-info.jso
     print(":pmcs: " + str(count))
 
     ipmcs = pmcs["incubator"]["roster"]
-    print(":ipmcs:" + str(len(ipmcs)))
+    print(":ipmcs: " + str(len(ipmcs)))
 
     chair = pmcs["incubator"]["chair"]
     for apachename in chair:
-         print(":ipmc_chair:" + str(chair[apachename]["name"])) 
+         print(":ipmc_chair: " + str(chair[apachename]["name"])) 
 
 with urllib.request.urlopen("https://whimsy.apache.org/public/pods-scan.json") as url:
     pods = json.loads(url.read().decode())
