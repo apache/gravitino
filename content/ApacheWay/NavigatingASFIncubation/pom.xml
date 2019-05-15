@@ -212,6 +212,8 @@
                             <sourceDirectory>src/main/asciidoc</sourceDirectory>
                             <!-- Configure the target director to where will the output be generated -->
                             <outputDirectory>${project.slides.directory}</outputDirectory>
+                            <!-- output file-->
+	                        <outputFile>index.html</outputFile>
                             <!-- Enable optional modules for generating diagrams and charts -->
                             <requires>
                                 <require>asciidoctor-diagram</require>
