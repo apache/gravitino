@@ -20,6 +20,20 @@ These slides can be found in [github](https://github.com/apache/incubator-traini
 
 The slides are generated from [asciidoctor](https://asciidoctor.org) markup and displayed with [reveal.js](https://asciidoctor.org/docs/asciidoctor-revealjs/). This means the content can be kept under version control and exported to a number of formats other than HTML.
 
+## How to Use the Slides
+
+First edit the author, email and position information found in the title slide ot the top of slide content file here:
+
+`./src/main/asciidoc/index.adoc`
+
+Editing any of the content there will change content on the slides.
+
+Then edit the information that will appear in the about me slide found here:
+
+`./src/main/asciidoc/aboutme.adoc`
+
+Then build the slides to generate the HTML.
+
 ## How to Build
 
 To installed the needed dependencies run:
@@ -29,6 +43,12 @@ To installed the needed dependencies run:
 Then run:
 
 `mvn clean compile`
+
+## How to Update the ASF Statistics
+
+To update the ASF statistics (no of podlings, no of committers etc. etc.) run:
+
+`python3 stats.py > asciidoc/projectstats.adoc`
 
 ## How to View the Slides
 
@@ -47,7 +67,7 @@ Some key shortcuts that may help you give a presentation:
 - Press O (for overview) will show a slide map / overview.
 - Press B will black the screen.
 
-## How to Make a Release
+## (ASF only) How to Make a Release
 
 To remove the 3rd party dependencies in the release, clean, package and create the needed signature files, run this :
 
