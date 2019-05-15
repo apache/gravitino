@@ -57,8 +57,8 @@ Different decisions require different forms of approval but community consensus 
 |Change chair               |PMC          |Consensus Approval |private list              |Yes 3)
 |===
 
-1. http://www.apache.org/dev/pmc.html#notice_period[Notice] must be given to board.
-2. Except PMC member in question. Only the board can http://www.apache.org/dev/pmc.html#pmc-removal[remove PMC members].
+1. http://www.apache.org/dev/pmc.html#notice_period[Notice] must be given to the board.
+2. Except for the PMC member in question. Only the board can http://www.apache.org/dev/pmc.html#pmc-removal[remove PMC members].
 3. Need to be http://www.apache.org/dev/pmc.html#newchair[approved by the board] at the next board meeting.
 
 

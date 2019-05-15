@@ -1,0 +1,298 @@
+////
+
+  Licensed to the Apache Software Foundation (ASF) under one or more
+  contributor license agreements.  See the NOTICE file distributed with
+  this work for additional information regarding copyright ownership.
+  The ASF licenses this file to You under the Apache License, Version 2.0
+  (the "License"); you may not use this file except in compliance with
+  the License.  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+
+////
+
+
+== Navigating the ASF Incubator Process
+:description: 45 minute talk on the Apache Way and navigating a project through the incubator
+:keywords: Apache Way,Incubator
+:author: Justin Mclean
+:email: jmclean@apache.org
+:position: V.P. Apache Incubator
+{author} +
+{position} +
+{email} +
+
+image::ApacheLogo.png[]
+
+== Who am I?
+include::aboutme.adoc[]
+
+== What is the ASF?
+include::projectstats.adoc[]
+* World’s largest Open Source Foundation
+* A neutral space where independent projects can prosper
+* Creates open source software for the public good free of charge
+* Business friendly Apache License 2.0
+* {committers} committers, {members} members, {PMCs} PMCs, {podlings} podlings
+
+== What is the Apache Incubator?
+* Where communities come to learn the Apache Way
+* Likes existing projects with a community around them
+* Main entry point for new projects
+
+== ! 
+image::IncubatingProjects.png[]
+
+== Why Come to Apache?
+* Open community development
+* Move away from vendor driven development
+* Grow your community
+* No one is the boss
+
+== Why Should you Incubate?
+* Learn the Apache Way
+* Learn ASF policies
+* To grow a community
+* To foster independence
+* To clarify licensing and intellectual property rights
+
+== Why we Have an incubating Process?
+* Podling follows the Apache Way
+* Ensure donations comply with the Apache 2.0 license
+* Podling follows the ASF structure of contributors, committers and PMC members
+* Podling grants more responsibility via meritocracy
+* Ensure that decision making is done in the open
+* People act as individuals, not the company they work for
+
+== The Apache Way
+* Charity - For the public good. Software costs nothing.
+* Pragmatic - Business friendly.
+* Community - Collaboration, consensus and diversity.
+* Merit - The more you do you more responsibility you have. Not just code contributions.
+* Open - Everything in the public view. Discussions occur on mailing lists. Everyone can participate.
+* Consensus - Work together to find ways forward.
+
+=== The Apache Way - Charity
+* No charge for Apache software
+* We rely on donations to keep things running
+* Few paid staff, everyone is a volunteer
+* Not “pay to play”
+
+=== The Apache Way - Pragmatic
+* Apache License 2.0 is business friendly
+* No obligation to give anything back
+* Diverse communities
+* Few hard rules, but have guidelines to help projects
+* Don’t need to work on it full time
+
+=== The Apache Way - Community
+* Many people working together
+* More resources than a single company
+* Diversity of people, experience and ideas
+* Individuals not companies
+* Given responsibility via earning merit
+* Discussion on the mailing list
+
+=== The Apache Way - Merit  
+* Individuals gain merit by contributing to a project
+* Users become contributors become committers become PMC members
+* PMC appoints new PMC and committer members
+* Merit does not expire
+* Committers get access to the repository
+* PMC vote on releases
+* PMC decide the direction of the projects via consensus
+
+=== The Apache Way - Open
+* Everything (mostly) is available to the public
+* What isn’t public is available to all members
+* Code is made publicly available
+* All discussions made in the open
+* Discussion are archived and searchable
+* Discussions are asynchronous
+* No face to face meetings
+* Everyone knows what is going on
+
+=== The Apache Way - Consensus
+* Community works towards consensus on major decisions
+* Use lazy consensus for minor ones
+* Not 100% agreement, but all agree it is a way forward
+
+== Apache License
+* Permissive license - you can do what you want
+* Business friendly - can be used for commercial projects
+* Requires source headers, a LICENSE and (optionally) a NOTICE file
+* If not an ASF project:
+** You don’t need to publish the source
+** You don’t have to give back to the project
+** You don’t need to ask for permission to use
+
+== State of Play
+* {PMCs} projects in the incubator
+* {IPMCs} IPMC members (but not all are active)
+* Projects usually stay 1 to 2 years in the incubator
+* A dozen or so successful releases a month
+* About 70% of releases pass an IPMC vote
+
+== How to Get Into the Incubator
+* Find a champion to help you through the proposal process
+* Draft a proposal with details why you think it’s suitable
+* Find (usually 3) mentors to help you guide you through the TLP process
+* May take a little while to go through these steps
+* Discuss on the incubator general mailing list (which may attract more potential committers)
+* IPMC Votes on the proposal - most are accepted
+
+== Acceptance Into the Incubator
+* The Champion's role is over and they are more like a mentor from this point on
+* Mentors help with setup of the podling
+* Setup includes the mailing lists, version control, bug tracking and web site
+* Have initial committers sign ICLAs and add to podling roster
+* Bring initial code in via a software grant
+
+== What to do During Incubation
+* Create your website
+* Learn how to make software releases and refine your build process
+* Grow the community by adding new committers
+* Learn to communicate in the open
+* Scrub your code and perform IP clearance
+* May need to relicense 3rd party code
+
+== Build a Community
+* Open asynchronous communication on email lists
+* Decisions need to be made in the open
+* JIRA / git discussion also OK (mirrored to list)
+* Project independence with no company influence
+* Welcoming to new people
+* Answer user questions
+* Add new committers and PPMC members
+
+== How to Get Out
+* Become a Top Level Project
+* Retire
+
+== Source Releases
+* Must be cryptographically signed
+* Must have an incubating disclaimer
+* Have LICENSE and NOTICE file that follow Apache policy 
+* Follow licensing terms of any 3rd party bundled software
+* 3rd party files are compatible with the Apache license
+* Source files have ASF headers
+* Contain source code and no compiled code
+
+== Release Vote Process
+* Podling creates a release candidate
+* Vote on dev mailing list until 3 +1 votes and more +1 than -1
+* If vote fails need to make a new release candidate
+* Vote on incubator general mailing list
+* Need 3 +1 and more +1 than -1 by IPMC members
+* If vote fails need to make a new release candidate
+* Can release once vote passes and 72 hours pass
+
+== Representative Voting
+image::VoteData.png[votedata,500]
+
+== Why Your Release May Get a -1
+* Unexpected binary in the source release
+* Includes Category X licensed software (usually GPL)
+* Included Category B license software
+* LICENSE or NOTICE issue
+* Copyright issue
+* Missing license header or header issue
+* Contains encryption software
+
+== -1 is Not a Veto
+* Release votes need 3 +1 votes and more +1 than -1 votes to pass
+* Only IPMC votes are binding but good to take notice of other votes
+* People can change their minds and vote again
+* People put up conditional votes
+* That being said a -1 vote is often for a good reason so you should at least look into it
+
+== It Doesn’t Have to be Perfect
+* Incubating projects are not expected to get it right the first time
+* May not be familiar with policy at the start
+* Policy doesn't cover all situations
+* Different projects may do things in different ways, policies are in most cases guidance
+* A release containing no surprises is a good thing
+
+=== Legal vs Policy
+* Licenses provide certain legal obligations you need to comply with
+* Apache policy adds a little more:
+** Need to have NOTICE file
+** List all licenses in LICENSE (even if it not required)
+
+=== Developers vs Licensing
+* We’re not the only people who have difficulty or frustration with licensing
+* Apache projects tend to be on average a lot better!
+* External projects often:
+** Have Unclear licenses
+** Include code under a different (sometimes incompatible) licenses 
+** If Apache 2.0 licensed are missing a NOTICE file
+** Try to have funny licenses
+
+=== 33 Copies of BSD
+video::33BSD.mp4[]
+
+=== WTF Intel Lawyers
+video::wtf.mp4[]
+
+=== Only Dead People
+video::deadpeople.mp4[]
+
+=== GPL or BSD?
+video::both.mp4[]
+
+== Category A
+* Can bundle software and can depend on
+* Doesn’t add any restrictions above and beyond what the Apache License 2.0 does
+* Common licenses include Apache License 2.0, Apache License 1.1, 2 or 3 clause BSD (without advertising clause), MIT/X11, W3C, Unicode, CC copyright only
+
+== Category B
+* Probably can’t include in a source release
+* Contain some restriction of use
+* May be able to use the binary form to limit the chance of corruption
+* Common license include: +
+Common Development and Distribution License (CDDL), Eclipse Public License (EPL), Mozilla Public License (MPL), Creative Common Attribution (CC-A)
+
+== Category X
+* Can’t depend on
+* Can’t bundle software
+* A few exceptions for build tools and optional dependencies
+* Common Category X include: +
+GPL, LGPL, CC non commercial, JSON, BSD 4 clause, Apache 1.0?
+
+== Binary Distributions
+* Not considered an official release
+* Need to comply the same way with policies as source distributions
+* LICENSE and NOTICE may be different as the content of the release is often different from the source release
+
+== What Been Covered
+* Apache Incubator
+* The Apache Way
+* Releases
+* Community
+* Licenses
+
+== Questions?
+Ask now, see me after the session, or email me, {author} at {email}.
+
+== Useful Links
+* Legal previously asked questions +
+https://www.apache.org/legal/resolved
+* Incubator release process (DRAFT)
+http://incubator.apache.org/guides/releasemanagement.html  +
+https://incubator.apache.org/guides/release.html
+* Assembling License and Notice How To +
+http://www.apache.org/dev/licensing-howto.html
+
+== Useful Links (cont)
+* Apache Maturity Model +
+http://community.apache.org/apache-way/apache-project-maturity-model.html
+* Legal mailing list archive +
+http://mail-archives.apache.org/mod_mbox/www-legal-discuss/
+* Legal JIRA +
+https://issues.apache.org/jira/browse/LEGAL

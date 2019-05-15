@@ -1,0 +1,214 @@
+doctype 5
+html lang=(attr :lang, 'en' unless attr? :nolang)
+  head
+    meta charset="utf-8"
+    - revealjsdir = (attr :revealjsdir, 'reveal.js')
+    - unless (asset_uri_scheme = (attr 'asset-uri-scheme', 'https')).empty?
+      - asset_uri_scheme = %(#{asset_uri_scheme}:)
+    - cdn_base = %(#{asset_uri_scheme}//cdnjs.cloudflare.com/ajax/libs)
+    - [:description, :keywords, :author, :copyright].each do |key|
+      - if attr? key
+        meta name=key content=(attr key)
+    title=(doctitle sanitize: true, use_fallback: true)
+    meta content="yes" name="apple-mobile-web-app-capable"
+    meta content="black-translucent" name="apple-mobile-web-app-status-bar-style"
+    meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, minimal-ui" name="viewport"
+    link href="#{revealjsdir}/css/reveal.css" rel="stylesheet"
+    link href="css/c3.min.css" rel="stylesheet"
+    script src="js/d3.min.js" charset="utf-8"
+    script src="js/c3.min.js"
+    / Default theme required even when using custom theme
+    - if attr? :revealjs_customtheme
+      link rel='stylesheet' href=(attr :revealjs_customtheme) id='theme'
+    - else
+      link rel='stylesheet' href='#{revealjsdir}/css/theme/#{attr 'revealjs_theme', 'black'}.css' id='theme'
+    - if attr? :icons, 'font'
+      - if attr? 'iconfont-remote'
+        link rel='stylesheet' href=(attr 'iconfont-cdn', %(#{cdn_base}/font-awesome/4.3.0/css/font-awesome.min.css))
+      - else
+        link rel='stylesheet' href=(normalize_web_path %(#{attr 'iconfont-name', 'font-awesome'}.css), (attr 'stylesdir', ''), false)
+    - if attr? :stem
+      - eqnums_val = (attr 'eqnums', 'none')
+      - eqnums_val = 'AMS' if eqnums_val == ''
+      - eqnums_opt = %( equationNumbers: { autoNumber: "#{eqnums_val}" } )
+      script type='text/x-mathjax-config'
+        | MathJax.Hub.Config({
+          tex2jax: {
+            inlineMath: [#{Asciidoctor::INLINE_MATH_DELIMITERS[:latexmath].to_s}],
+            displayMath: [#{Asciidoctor::BLOCK_MATH_DELIMITERS[:latexmath].to_s}],
+            ignoreClass: "nostem|nolatexmath"
+          },
+          asciimath2jax: {
+            delimiters: [#{Asciidoctor::BLOCK_MATH_DELIMITERS[:asciimath].to_s}],
+            ignoreClass: "nostem|noasciimath"
+          },
+          TeX: {#{eqnums_opt}}
+          });
+      script src='#{cdn_base}/mathjax/2.4.0/MathJax.js?config=TeX-MML-AM_HTMLorMML'
+    - case attr 'source-highlighter'
+    - when 'coderay'
+      - if (attr 'coderay-css', 'class') == 'class'
+        - if @safe >= Asciidoctor::SafeMode::SECURE || (attr? :linkcss)
+          link rel='stylesheet' href=normalize_web_path('asciidoctor-coderay.css', (attr :stylesdir, ''))
+        - else
+          style=Asciidoctor::Stylesheets.instance.coderay_stylesheet_data
+    - when 'pygments'
+      - if (attr 'pygments-css', 'class') == 'class'
+        - if @safe >= Asciidoctor::SafeMode::SECURE || (attr? :linkcss)
+          link rel='stylesheet' href=normalize_web_path('asciidoctor-pygments.css', (attr :stylesdir, ''))
+        - else
+          style=Asciidoctor::Stylesheets.instance.pygments_stylesheet_data(attr 'pygments-style')
+    / For syntax highlighting
+    - if attr? 'highlightjs-theme'
+      link href=(attr 'highlightjs-theme') rel="stylesheet"
+    - else
+      link href="#{revealjsdir}/lib/css/zenburn.css" rel="stylesheet"
+    / If the query includes 'print-pdf', use the PDF print sheet
+    javascript:
+      var link = document.createElement( 'link' );
+      link.rel = 'stylesheet';
+      link.type = 'text/css';
+      link.href = window.location.search.match( /print-pdf/gi ) ? "#{revealjsdir}/css/print/pdf.css" : "#{revealjsdir}/css/print/paper.css";
+      document.getElementsByTagName( 'head' )[0].appendChild( link );
+    /[if lt IE 9]
+      <script src="#{revealjsdir}/lib/js/html5shiv.js"></script>
+    - unless (docinfo_content = docinfo :header, '.html').empty?
+      =docinfo_content
+    - if attr? :customcss
+      link rel='stylesheet' href=((customcss = attr :customcss).empty? ? 'asciidoctor-revealjs.css' : customcss)
+  body
+    .header
+      .left
+      .right
+    .reveal
+      / Any section element inside of this container is displayed as a slide
+      .slides
+        - unless notitle || !has_header?
+          - bg_image = (attr? 'title-slide-background-image') ? (image_uri(attr 'title-slide-background-image')) : nil
+          - bg_video = (attr? 'title-slide-background-video') ? (media_uri(attr 'title-slide-background-video')) : nil
+          section.title(class = role
+            data-state='title'
+            data-transition=(attr 'title-slide-transition')
+            data-transition-speed=(attr 'title-slide-transition-speed')
+            data-background=(attr 'title-slide-background')
+            data-background-size=(attr 'title-slide-background-size')
+            data-background-image=bg_image
+            data-background-video=bg_video
+            data-background-video-loop=(attr 'title-slide-background-video-loop')
+            data-background-video-muted=(attr 'title-slide-background-video-muted')
+            data-background-iframe=(attr 'title-slide-background-iframe')
+            data-background-color=(attr 'title-slide-background-color')
+            data-background-repeat=(attr 'title-slide-background-repeat')
+            data-background-position=(attr 'title-slide-background-position')
+            data-background-transition=(attr 'title-slide-background-transition'))
+            - if (_title_obj = doctitle partition: true, use_fallback: true).subtitle?
+              h1=slice_text _title_obj.title, (_slice = header.option? :slice)
+              h2=slice_text _title_obj.subtitle, _slice
+            - else
+              h1=@header.title
+            - preamble = @document.find_by context: :preamble
+            - unless preamble.nil? or preamble.length == 0
+              div.preamble=preamble.pop.content
+            - unless author.nil?
+              p.author: small=author
+        =content
+    .footer
+      .left
+      .right Copyright &copy; 2019 Justin Mclean, Licensed under the Apache License, Version 2.0.<br>Apache and the Apache feather logo are trademarks of The Apache Software Foundation.
+    script src="#{revealjsdir}/lib/js/head.min.js"
+    script src="#{revealjsdir}/js/reveal.js"
+    javascript:
+      // See https://github.com/hakimel/reveal.js#configuration for a full list of configuration options
+      Reveal.initialize({
+        // Display controls in the bottom right corner
+        controls: #{to_boolean(attr 'revealjs_controls', true)},
+        // Display a presentation progress bar
+        progress: #{to_boolean(attr 'revealjs_progress', true)},
+        // Set a per-slide timing for speaker notes, null means none
+        defaultTiming: #{attr 'revealjs_defaultTiming', 'null'},
+        // Display the page number of the current slide
+        slideNumber: #{to_boolean(attr 'revealjs_slidenumber', false)},
+        // Push each slide change to the browser history
+        history: #{to_boolean(attr 'revealjs_history', false)},
+        // Enable keyboard shortcuts for navigation
+        keyboard: #{to_boolean(attr 'revealjs_keyboard', true)},
+        // Enable the slide overview mode
+        overview: #{to_boolean(attr 'revealjs_overview', true)},
+        // Vertical centering of slides
+        center: #{to_boolean(attr 'revealjs_center', true)},
+        // Enables touch navigation on devices with touch input
+        touch: #{to_boolean(attr 'revealjs_touch', true)},
+        // Loop the presentation
+        loop: #{to_boolean(attr 'revealjs_loop', false)},
+        // Change the presentation direction to be RTL
+        rtl: #{to_boolean(attr 'revealjs_rtl', false)},
+        // Randomizes the order of slides each time the presentation loads
+        shuffle: #{to_boolean(attr 'revealjs_shuffle', false)},
+        // Turns fragments on and off globally
+        fragments: #{to_boolean(attr 'revealjs_fragments', true)},
+        // Flags if the presentation is running in an embedded mode,
+        // i.e. contained within a limited portion of the screen
+        embedded: #{to_boolean(attr 'revealjs_embedded', false)},
+        // Flags if we should show a help overlay when the questionmark
+        // key is pressed
+        help: #{to_boolean(attr 'revealjs_help', true)},
+        // Flags if speaker notes should be visible to all viewers
+        showNotes: #{to_boolean(attr 'revealjs_showNotes', false)},
+        // Global override for autolaying embedded media (video/audio/iframe)
+        // - null: Media will only autoplay if data-autoplay is present
+        // - true: All media will autoplay, regardless of individual setting
+        // - false: No media will autoplay, regardless of individual setting
+        autoPlayMedia: #{attr 'revealjs_autoPlayMedia', 'null'},
+        // Number of milliseconds between automatically proceeding to the
+        // next slide, disabled when set to 0, this value can be overwritten
+        // by using a data-autoslide attribute on your slides
+        autoSlide: #{attr 'revealjs_autoslide', 0},
+        // Stop auto-sliding after user input
+        autoSlideStoppable: #{to_boolean(attr 'revealjs_autoslidestoppable', true)},
+        // Enable slide navigation via mouse wheel
+        mouseWheel: #{to_boolean(attr 'revealjs_mousewheel', false)},
+        // Hides the address bar on mobile devices
+        hideAddressBar: #{to_boolean(attr 'revealjs_hideaddressbar', true)},
+        // Opens links in an iframe preview overlay
+        previewLinks: #{to_boolean(attr 'revealjs_previewlinks', false)},
+        // Theme (e.g., beige, black, league, night, serif, simple, sky, solarized, white)
+        // NOTE setting the theme in the config no longer works in reveal.js 3.x
+        //theme: Reveal.getQueryHash().theme || '#{attr 'revealjs_theme', 'black'}',
+        // Transition style (e.g., none, fade, slide, convex, concave, zoom)
+        transition: Reveal.getQueryHash().transition || '#{attr 'revealjs_transition', 'slide'}',
+        // Transition speed (e.g., default, fast, slow)
+        transitionSpeed: '#{attr 'revealjs_transitionspeed', 'default'}',
+        // Transition style for full page slide backgrounds (e.g., none, fade, slide, convex, concave, zoom)
+        backgroundTransition: '#{attr 'revealjs_backgroundtransition', 'fade'}',
+        // Number of slides away from the current that are visible
+        viewDistance: #{attr 'revealjs_viewdistance', 3},
+        // Parallax background image (e.g., "'https://s3.amazonaws.com/hakim-static/reveal-js/reveal-parallax-1.jpg'")
+        parallaxBackgroundImage: '#{attr 'revealjs_parallaxbackgroundimage', ''}',
+        // Parallax background size in CSS syntax (e.g., "2100px 900px")
+        parallaxBackgroundSize: '#{attr 'revealjs_parallaxbackgroundsize', ''}',
+
+        // The "normal" size of the presentation, aspect ratio will be preserved
+        // when the presentation is scaled to fit different resolutions. Can be
+        // specified using percentage units.
+        width: #{attr 'revealjs_width', 960},
+        height: #{attr 'revealjs_height', 700},
+
+        // Factor of the display size that should remain empty around the content
+        margin: #{attr 'revealjs_margin', 0.1},
+
+        // Bounds for smallest/largest possible scale to apply to content
+        minScale: #{attr 'revealjs_minscale', 0.2},
+        maxScale: #{attr 'revealjs_maxscale', 1.5},
+
+        // Optional libraries used to extend on reveal.js
+        dependencies: [
+            { src: '#{revealjsdir}/lib/js/classList.js', condition: function() { return !document.body.classList; } },
+            { src: '#{revealjsdir}/plugin/markdown/marked.js', condition: function() { return !!document.querySelector( '[data-markdown]' ); } },
+            { src: '#{revealjsdir}/plugin/markdown/markdown.js', condition: function() { return !!document.querySelector( '[data-markdown]' ); } },
+            #{(attr? 'source-highlighter', 'highlightjs') ? "{ src: '#{revealjsdir}/plugin/highlight/highlight.js', async: true, callback: function() { hljs.initHighlightingOnLoad(); } }," : nil}
+            { src: '#{revealjsdir}/plugin/zoom-js/zoom.js', async: true },
+            { src: '#{revealjsdir}/plugin/notes/notes.js', async: true }
+        ]
+      });
+    - unless (docinfo_content = (docinfo :footer, '.html')).empty?
+      =docinfo_content
