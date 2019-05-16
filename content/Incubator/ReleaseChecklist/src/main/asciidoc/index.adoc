@@ -1,0 +1,76 @@
+////
+
+  Licensed to the Apache Software Foundation (ASF) under one or more
+  contributor license agreements.  See the NOTICE file distributed with
+  this work for additional information regarding copyright ownership.
+  The ASF licenses this file to You under the Apache License, Version 2.0
+  (the "License"); you may not use this file except in compliance with
+  the License.  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+
+////
+
+
+
+== Incubator Release Checklist
+:description: Incubator Release checklist
+:keywords: ASF,Release,Incubator
+:author: Justin Mclean
+:email: jmclean@apache.org
+:icons: font
+:docinfo:
+:nofooter:
+
+Releases made at the Apache Software Foundation by podling projects need to be voted on by the Incubator project management committee (IPMC) to see if they comply with ASF legal, release and distribution policy.
+
+NOTE: Note that this is not official policy but may help with checking releases.
+
+.Please fill in the following:
+[%interactive, none]
+* [ ] Are release files in the correct location?
+* [ ] Do release files have the word incubating in their name?
+* [ ] Are the digital signature and hashes correct?
+* [ ] Does a DISCLAIMER file exist?
+* [ ] Do LICENSE and NOTICE files exist?
+* [ ] Is the LICENSE and NOTICE text correct?
+* [ ] Is the NOTICE year correct?
+* [ ] Un-included software dependencies are not mentioned in LICENSE or NOTICE?
+* [ ] License information is not mentioned in NOTICE?
+* Is there any 3rd party code contained inside the release? If so:
+[%interactive, none]
+** [ ] Does the software have a compatible license?
+** [ ] Are all software licenses mentioned in LICENSE?
+** [ ] Is the full text of the licenses (or pointers to it) in LICENSE?
+** Is any of this code Apache licensed? Do they have NOTICE files? If so:
+[%interactive, none]
+*** [ ] Have relevant parts of those NOTICE files been added to this NOTICE file?
+* [ ] Do all source files have ASF headers?
+* [ ] Do the contents of the release match with what's tagged in version control?
+* [ ] Are there any unexpected binary files in the release?
+* [ ] Can you compile from source? Is the instruction clear?
+
+.Is the issue minor?
+[%interactive, none]
+* [ ] Yes
+* [ ] No
+* [ ] Unsure
+
+.Could it possibly be fixed in the next release?
+[%interactive, none]
+* [ ] Yes
+* [ ] No
+* [ ] Unsure
+
+.I vote with:
+[%interactive, none]
+* [ ] +1 release the software
+* [ ] +0 not sure if it should be released
+* [ ] -1 do not release the software because...
+
