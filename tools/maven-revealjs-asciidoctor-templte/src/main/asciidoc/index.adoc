@@ -80,7 +80,7 @@ include::subdir/_b.adoc[]
 == Images
 
 [.thumb]
-image::logo-and-name-white.png[scaledwidth=75%]
+image::logo-apache.png[scaledwidth=75%]
 
 == Videos
 
@@ -298,7 +298,7 @@ digraph g {
 
 === Meme Diagram
 
-meme::../resources/images/Yoda.png[May the Source,Be With You]
+meme::../resources/images/toddy.jpg[May the Source,Be With You]
 
 === Entity Relation Diagram
 

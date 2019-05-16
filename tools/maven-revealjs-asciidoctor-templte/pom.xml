@@ -66,7 +66,8 @@
                     <excludes>
                         <!-- TODO: This is a mofified version of an asciidoctor file ... nor sure we can stick an Apache Header on it -->
                         <exclude>libs/docinfo-hack/document.html.slim</exclude>
-
+                        <!-- Exclude everything downloaded by the install-deps scripts -->
+                        <exclude>libs/third-party/**</exclude>
                         <!-- Maven related files -->
                         <exclude>**/target/**</exclude>
 
@@ -244,7 +245,7 @@
                                 <identify>${basedir}/libs/third-party/ImageMagick-7.0.8/bin/identify</identify-->
                                 <mermaid>${basedir}/libs/third-party/node_modules/.bin/mmdc</mermaid>
                                 <phantomjs>${basedir}/libs/third-party/phantomjs-2.1.1-macosx/bin/phantomjs</phantomjs>
-                                <svgbob>/Users/christofer.dutz/.cargo/bin/svgbob</svgbob>
+                                <svgbob>${basedir}/libs/third-party/svgbob/bin/svgbob</svgbob>
                                 <vg2svg>${basedir}/libs/third-party/node_modules/.bin/vg2svg</vg2svg>
                             </attributes>
                         </configuration>
