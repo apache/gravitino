@@ -42,7 +42,7 @@ pipeline {
     stages {
         stage('Initialization') {
             when {
-                changeset "tools/maven-revealjs-asciidoctor-templte/**"
+                changeset "tools/maven-revealjs-asciidoctor-template/**"
             }
             steps {
                 echo 'Building Branch: ' + env.BRANCH_NAME
@@ -52,7 +52,7 @@ pipeline {
 
         stage('Cleanup') {
             when {
-                changeset "tools/maven-revealjs-asciidoctor-templte/**"
+                changeset "tools/maven-revealjs-asciidoctor-template/**"
             }
             steps {
                 echo 'Cleaning up the workspace'
@@ -62,7 +62,7 @@ pipeline {
 
         stage('Checkout') {
             when {
-                changeset "tools/maven-revealjs-asciidoctor-templte/**"
+                changeset "tools/maven-revealjs-asciidoctor-template/**"
             }
             steps {
                 echo 'Checking out branch ' + env.BRANCH_NAME
@@ -72,11 +72,11 @@ pipeline {
 
         stage('Build') {
             when {
-                changeset "tools/maven-revealjs-asciidoctor-templte/**"
+                changeset "tools/maven-revealjs-asciidoctor-template/**"
             }
             steps {
                 echo 'Building'
-                sh 'mvn -f tools/maven-revealjs-asciidoctor-templte/pom.xml package'
+                sh 'mvn -f tools/maven-revealjs-asciidoctor-template/pom.xml package'
             }
         }
     }
