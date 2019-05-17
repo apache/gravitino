@@ -14,8 +14,6 @@ The purpose of the Training project is to create high-quality training material 
 Vist [Apache Training (incubating)](https://training.apache.org) for more information on the project.
 These slides can be found in [github](https://github.com/apache/incubator-training/tree/master/content/ApacheWay/NavigatingASFIncubation.). Pull requests welcome.
 
-[I'm an inline-style link](https://www.google.com)
-
 ## Technology Used
 
 The slides are generated from [asciidoctor](https://asciidoctor.org) markup and displayed with [reveal.js](https://asciidoctor.org/docs/asciidoctor-revealjs/). This means the content can be kept under version control and exported to a number of formats other than HTML.
@@ -36,7 +34,7 @@ Then build the slides to generate the HTML.
 
 ## How to Build
 
-To installed the needed dependencies run:
+To install the needed dependencies on OSX run:
 
 `install-deps.sh`
 
@@ -57,6 +55,12 @@ Once built, the generated slides can be found at:
 `target/generated-slides/index.html`
 
 Just open the `index.html` in a browser to view the slides.
+
+Some features require the slides to be viewed via a http/https url you can do this by running:
+
+`mvn jetty:run-exploded`
+
+And goto `http://127.0.0.1/index.html` in a browser to view.
 
 Some key shortcuts that may help you give a presentation:
 
