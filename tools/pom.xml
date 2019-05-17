@@ -30,7 +30,7 @@
   <name>Training: Tools</name>
 
   <modules>
-    <module>maven-revealjs-asciidoctor-templte</module>
+    <module>maven-revealjs-asciidoctor-template</module>
   </modules>
 
 </project>
