@@ -244,7 +244,6 @@
                                 <identify>${basedir}/libs/third-party/ImageMagick-7.0.8/bin/identify</identify-->
                                 <mermaid>${basedir}/libs/third-party/node_modules/.bin/mmdc</mermaid>
                                 <phantomjs>${basedir}/libs/third-party/phantomjs-2.1.1-macosx/bin/phantomjs</phantomjs>
-                                <svgbob>/Users/christofer.dutz/.cargo/bin/svgbob</svgbob>
                                 <vg2svg>${basedir}/libs/third-party/node_modules/.bin/vg2svg</vg2svg>
                             </attributes>
                         </configuration>
