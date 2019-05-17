@@ -60,7 +60,7 @@ Some features require the slides to be viewed via a http/https url you can do th
 
 `mvn jetty:run-exploded`
 
-And goto `http://127.0.0.1/index.html` in a browser to view.
+And goto `http://127.0.0.1:8080/index.html` in a browser to view.
 
 Some key shortcuts that may help you give a presentation:
 
