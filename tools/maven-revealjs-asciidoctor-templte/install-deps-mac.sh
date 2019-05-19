@@ -27,6 +27,7 @@ git clone git://github.com/BurntSushi/erd
 cd erd
 stack init
 stack build --system-ghc
+cd ..
 
 # Install Mermaid
 npm install mermaid.cli
@@ -36,7 +37,7 @@ wget https://bitbucket.org/ariya/phantomjs/downloads/phantomjs-2.1.1-macosx.zip
 unzip phantomjs-2.1.1-macosx.zip
 
 # SVGBob
-#cargo install svgbob_cli
+cargo install svgbob_cli --path ./svgbob
 
 # Syntrax
 pip install --upgrade syntrax

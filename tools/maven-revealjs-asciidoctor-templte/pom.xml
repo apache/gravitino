@@ -36,6 +36,7 @@
     <description>An example project that demonstrates how to integrate convert Asciidoc to a reveal.js presentation with the Asciidoctor Maven plugin.</description>
 
     <properties>
+        <project.main.contentfile>index</project.main.contentfile>
         <project.slides.directory>${project.build.directory}/generated-slides</project.slides.directory>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <asciidoctor.maven.plugin.version>2.0.0-RC.1</asciidoctor.maven.plugin.version>
@@ -66,7 +67,8 @@
                     <excludes>
                         <!-- TODO: This is a mofified version of an asciidoctor file ... nor sure we can stick an Apache Header on it -->
                         <exclude>libs/docinfo-hack/document.html.slim</exclude>
-
+                        <!-- Exclude everything downloaded by the install-deps scripts -->
+                        <exclude>libs/third-party/**</exclude>
                         <!-- Maven related files -->
                         <exclude>**/target/**</exclude>
 
@@ -212,8 +214,6 @@
                             <sourceDirectory>src/main/asciidoc</sourceDirectory>
                             <!-- Configure the target director to where will the output be generated -->
                             <outputDirectory>${project.slides.directory}</outputDirectory>
-                            <!-- output file-->
-                            <outputFile>index.html</outputFile>
                             <!-- Enable optional modules for generating diagrams and charts -->
                             <requires>
                                 <require>asciidoctor-diagram</require>
@@ -244,7 +244,7 @@
                                 <identify>${basedir}/libs/third-party/ImageMagick-7.0.8/bin/identify</identify-->
                                 <mermaid>${basedir}/libs/third-party/node_modules/.bin/mmdc</mermaid>
                                 <phantomjs>${basedir}/libs/third-party/phantomjs-2.1.1-macosx/bin/phantomjs</phantomjs>
-                                <svgbob>/Users/christofer.dutz/.cargo/bin/svgbob</svgbob>
+                                <svgbob>${basedir}/libs/third-party/svgbob/bin/svgbob</svgbob>
                                 <vg2svg>${basedir}/libs/third-party/node_modules/.bin/vg2svg</vg2svg>
                             </attributes>
                         </configuration>
@@ -284,6 +284,24 @@
                 <groupId>org.eclipse.jetty</groupId>
                 <artifactId>jetty-maven-plugin</artifactId>
                 <version>9.4.14.v20181114</version>
+            </plugin>
+            <plugin>
+                <groupId>com.coderplus.maven.plugins</groupId>
+                <artifactId>copy-rename-maven-plugin</artifactId>
+                <version>1.0</version>
+                <executions>
+                    <execution>
+                        <id>rename-slide-file</id>
+                        <phase>process-resources</phase>
+                        <goals>
+                            <goal>rename</goal>
+                        </goals>
+                        <configuration>
+                            <sourceFile>${project.slides.directory}/${project.main.contentfile}.revealjs</sourceFile>
+                            <destinationFile>${project.slides.directory}/${project.main.contentfile}.html</destinationFile>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>

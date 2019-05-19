@@ -36,6 +36,7 @@
     <description>All about taking a project through incubation from start to finish.</description>
 
     <properties>
+        <project.main.contentfile>index</project.main.contentfile>
         <project.slides.directory>${project.build.directory}/generated-slides</project.slides.directory>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <asciidoctor.maven.plugin.version>2.0.0-RC.1</asciidoctor.maven.plugin.version>
@@ -212,8 +213,6 @@
                             <sourceDirectory>src/main/asciidoc</sourceDirectory>
                             <!-- Configure the target director to where will the output be generated -->
                             <outputDirectory>${project.slides.directory}</outputDirectory>
-                            <!-- output file-->
-                            <outputFile>index.html</outputFile>
                             <!-- Enable optional modules for generating diagrams and charts -->
                             <requires>
                                 <require>asciidoctor-diagram</require>
@@ -284,6 +283,24 @@
                 <groupId>org.eclipse.jetty</groupId>
                 <artifactId>jetty-maven-plugin</artifactId>
                 <version>9.4.14.v20181114</version>
+            </plugin>
+            <plugin>
+                <groupId>com.coderplus.maven.plugins</groupId>
+                <artifactId>copy-rename-maven-plugin</artifactId>
+                <version>1.0</version>
+                <executions>
+                    <execution>
+                        <id>rename-slide-file</id>
+                        <phase>process-resources</phase>
+                        <goals>
+                            <goal>rename</goal>
+                        </goals>
+                        <configuration>
+                            <sourceFile>${project.slides.directory}/${project.main.contentfile}.revealjs</sourceFile>
+                            <destinationFile>${project.slides.directory}/${project.main.contentfile}.html</destinationFile>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>
