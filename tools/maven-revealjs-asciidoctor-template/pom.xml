@@ -50,10 +50,11 @@
         <revealjs.version>3.7.0</revealjs.version>
         <asciidoctor-revealjs.version>2.0.0</asciidoctor-revealjs.version>
 
+        <copy-rename-maven-plugin.version>1.0</copy-rename-maven-plugin.version>
         <download-maven-plugin.version>1.4.1</download-maven-plugin.version>
+        <jetty-maven-plugin.version>9.4.14.v20181114</jetty-maven-plugin.version>
         <maven-resources-plugin.version>3.1.0</maven-resources-plugin.version>
         <maven-war-plugin.version>3.2.2</maven-war-plugin.version>
-        <jetty-maven-plugin.version>9.4.14.v20181114</jetty-maven-plugin.version>
     </properties>
 
     <build>
@@ -289,7 +290,7 @@
             <plugin>
                 <groupId>com.coderplus.maven.plugins</groupId>
                 <artifactId>copy-rename-maven-plugin</artifactId>
-                <version>1.0</version>
+                <version>${copy-rename-maven-plugin.version}</version>
                 <executions>
                     <execution>
                         <id>rename-slide-file</id>
