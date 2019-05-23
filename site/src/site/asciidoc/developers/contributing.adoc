@@ -20,84 +20,58 @@
 
 === Forms of contribution
 
-There are multiple forms in which you can become involved with the Apache Training project.
+The Apache Training (Incubating) project welcomes contributions in all forms, sizes, and shapes.
+Below you can find a small list of possible ways that you can contribute if you have some spare time and want to get involved.
 
-These usually are, but are not limited to:
+This list is by no means finite. There are without doubt dozens of other useful ways that you can pick, please do not let this limit your creativity!
 
-- Submitting Pull Requests
+- Adding to the webpage
 - Filing Bug-Reports
+- Converting donated materials
 - Active communication on our mailing lists
 - Promoting the project (articles, blog posts, talks at conferences)
-- Documentation
+- Writing documentation
 
-=== Pull-Requests
+=== Finding a Project
+If you want to get involved, but do not have a specific project in mind please feel free to check our issue tracker for https://issues.apache.org/Jira/issues/?jql=project%20%3D%20TRAINING%20AND%20labels%20%3D%20beginner%20AND%20assignee%20in%20(EMPTY)[unassigned issues with the _beginner_ label]. These should be good candidates to get your feet wet and gather some experience before tackling larger issues.
 
-The simplest way to submit code changes is via a GitHub pull-request.
+If nothing catches your eye and you come up with something that you want to work on by yourself, please do share your intent by either posting on the mailing list or creating an issue, as this allows us to limit duplication of effort as much as possible.
 
-In order to do this first create a GitHub account and sign into your account.
+=== Code Contributions
+Many of the actions listed above will take the form of contributions to the git repository, for which we have defined a few basic guidelines to ensure we can all collaborate effectively.
+Code contributions can take two forms, you can either create a pull request on GitHub or directly attach patch files to a Jira issue for review.
 
-After that's done, please go to our https://github.com/apache/incubator-training[GitHub site] and create a so-called `Fork`.
+A Jira ticket and a pull request are not mutually exclusive, and we encourage people to create both, first a Jira to discuss the issue, task, improvement in general and later on a pull request for actual implementation discussions.
+If you follow this process, please prefix the name of your pull request with the Jira issue number, this will ensure that they automatically get linked.
+If, for example, you open a pull request to fix issue TRAINING-123, then your PR title could read "_TRAINING-123: Fix stuff_".
 
-image::contributing-github-fork.png[]
+If you are not familiar with git, how to create pull requests and similar workflows, below is a list of useful links that should help you get started.
+However as with all other things, please do reach out to us on the mailing list if anything is unclear and you need help, we are more than happy to help!
 
-What happens now, is that GitHub creates a full copy of the Apache Training repo in your account. Only you can commit to this.
+- https://help.github.com/en/articles/fork-a-repo[Forking a repository]
+- https://help.github.com/en/articles/about-branches[About branches]
+- https://help.github.com/en/articles/about-pull-requests[About pull requests]
+- https://lab.github.com/[Github Learning Lab]
 
-Now ideally you check-out your cloned repository:
+==== Review Process
+The Training project follows a review-then-commit workflow, which basically means that no commit should be made to the repository that has not been reviewed and approved by the required number of persons.
 
-    git clone https://github.com/{your-user-id}/incubator-training.git
+For reviews we distinguish between _content_ commits that add content to training decks and _functional_ commits like code changes to tools or similar things.
 
-Now you have a copy of Apache Training on your computer and you can change whatever you want and as it's your copy, you can even commit these changes without any danger of breaking things.
+*Code Commits* require one approving review.
+This review has to be done by a committer if the pull request was created by a non-committer. If a committer creates a pull request and explicitly requests a review from a non-committer, then this review is sufficient.
 
-As soon as you're finished with your changes and want us to have a look, it's time to create a so-called `Pull-Request`.
+*Content Commits* require one or more approving reviews. As we do not expect to initially have committers that are also experts in all fields for which we host content there may be a need for two reviews in this case: one for form by a committer and one for content by someone who considers themselves a subject matter expert.
+If the committer considers themselves to be an expert on the material one review is sufficient, just like for code commits.
 
-You do that by going to your forked repository page on GitHub.
+*Trivial Changes*
+Committers can, at their discretion, decide that a change is trivial and does not need to be explicitly approved.
+In this case, the pull request or Jira issue should be marked accordingly and left open for review for at least 72 hours.
+After this period has passed it can be merged without review.
 
-Every forked repository has an additional button called "New Pull Request":
+=== Issue Reports
 
-image::contributing-github-create-pull-request.png[]
-
-If you click on this, we will receive a notification on your changes and can review them. We also can discuss your changes and have you perfect your pull request before we accept and merge it into Apache Training.
-
-==== Keeping your fork up to date
-
-As we are continuously working on Training and you created a copy of our repo, this will become out-of-date pretty soon.
-
-In order to get the changes we introduced in the official repo you have to tell git about that.
-
-You do this locally by adding a new so-called `remote`. Per default, the remote you cloned from is called `origin`.
-
-Usually you will call the second remote `upstream` but in general, you can call it whatever you like.
-
-Add the remote on the command line (or your git gui of choice):
-
-    git remote add upstream https://github.com/apache/incubator-training.git
-
-If you list all your remotes, with the following command:
-
-    git remote -v
-
-It should output something like this:
-
-    origin    https://github.com/{your-user-id}/incubator-training.git (fetch)
-    origin    https://github.com/{your-user-id}/incubator-training.git (push)
-    upstream    https://github.com/apache/incubator-training.git (fetch)
-    upstream    https://github.com/apache/incubator-training.git (push)
-
-If that's so, you're fine to continue, if not ... well, you could ask for assistance on our dev-list.
-
-In order to get all changes in our upstream-repository, just execute the following command:
-
-    git pull upstream
-
-This will get all changed from upstream and merge them locally. In order to update your GitHub version, you have to push things back to `origin`. You can do this by executing the following command:
-
-    git push
-
-(If no remote is provided, git will use `origin` per default)
-
-===  Bug Reports
-
-We use https://issues.apache.org/jira/projects/TRAINING[JIRA] as our Bug &amp; Issue Tracker.
+We use https://issues.apache.org/jira/projects/TRAINING[JIRA] as our Issue Tracker.
 
 Feel free to submit `feature requests`, `bug reports`, `patches`, `comment on issues`, ...
 
