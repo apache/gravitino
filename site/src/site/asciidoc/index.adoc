@@ -43,6 +43,14 @@ There are tons of companies offering training for and around the Apache ecosyste
 
 It is the mission of the Apache foundation “to provide software for the public good” and we believe this project can help with that mission by making the software more accessible for a broader audience.
 
+=== A Short Word About Linguistics
+The plural form of training was used frequently in the early stages of the project, which is strictly speaking not grammatically correct, as well as misleading from the perspective of this project.
+Training, being a gerund (verb used as noun) does not have a plural form, so should always be followed by a quantifiable noun like _sessions_ or _slides_.
+
+Additionally, the existence of this project is to a large extent based on the believe that a good training session consists of much more than just the material that is being shown, a distinction that is distracted from by the use of _training_ as all-encompassing term.
+
+While we will not tell anybody how to phrase this, as a project we will try to keep any official wording as concise as possible and stay away from the use of _training_ or _trainings_.
+
 === Next steps
 The initial goal for the first few weeks or months is to have discussions and agreements on various scoping and technical issues as well as integrating existing donated material.
 
