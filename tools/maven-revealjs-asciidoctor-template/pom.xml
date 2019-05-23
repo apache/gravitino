@@ -25,6 +25,9 @@
         <groupId>org.apache</groupId>
         <artifactId>apache</artifactId>
         <version>21</version>
+
+        <!-- Required in our case as per http://maven.apache.org/ref/3.0.3/maven-model/maven.html#class_parent -->
+        <relativePath></relativePath>
     </parent>
 
     <groupId>org.apache.training</groupId>
@@ -39,12 +42,19 @@
         <project.main.contentfile>index</project.main.contentfile>
         <project.slides.directory>${project.build.directory}/generated-slides</project.slides.directory>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+
         <asciidoctor.maven.plugin.version>2.0.0-RC.1</asciidoctor.maven.plugin.version>
         <asciidoctorj.version>2.0.0-RC.2</asciidoctorj.version>
         <asciidoctorj.diagram.version>1.5.16</asciidoctorj.diagram.version>
         <asciidoctorj.extensions-lab.version>1.0.0</asciidoctorj.extensions-lab.version>
         <revealjs.version>3.7.0</revealjs.version>
         <asciidoctor-revealjs.version>2.0.0</asciidoctor-revealjs.version>
+
+        <copy-rename-maven-plugin.version>1.0</copy-rename-maven-plugin.version>
+        <download-maven-plugin.version>1.4.1</download-maven-plugin.version>
+        <jetty-maven-plugin.version>9.4.14.v20181114</jetty-maven-plugin.version>
+        <maven-resources-plugin.version>3.1.0</maven-resources-plugin.version>
+        <maven-war-plugin.version>3.2.2</maven-war-plugin.version>
     </properties>
 
     <build>
@@ -98,7 +108,7 @@
             <plugin>
                 <groupId>com.googlecode.maven-download-plugin</groupId>
                 <artifactId>download-maven-plugin</artifactId>
-                <version>1.4.1</version>
+                <version>${download-maven-plugin.version}</version>
                 <executions>
                     <execution>
                         <id>install-asciidoctor-revealjs</id>
@@ -164,7 +174,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-resources-plugin</artifactId>
-                <version>3.1.0</version>
+                <version>${maven-resources-plugin.version}</version>
                 <executions>
                     <execution>
                         <id>copy-resources</id>
@@ -261,20 +271,12 @@
                         <artifactId>asciidoctorj-diagram</artifactId>
                         <version>${asciidoctorj.diagram.version}</version>
                     </dependency>
-                    <!--dependency>
-                        <groupId>org.asciidoctor</groupId>
-                        <artifactId>asciidoctorj-extensions-lab</artifactId>
-                        <version>${asciidoctorj.extensions-lab.version}</version>
-                        <!- Referenced locally till it's officially released ->
-                        <scope>system</scope>
-                        <systemPath>${basedir}/libs/asciidoctorj-extensions-lab-${asciidoctorj.extensions-lab.version}.jar</systemPath>
-                    </dependency-->
                 </dependencies>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-war-plugin</artifactId>
-                <version>3.2.2</version>
+                <version>${maven-war-plugin.version}</version>
                 <configuration>
                     <failOnMissingWebXml>false</failOnMissingWebXml>
                     <warSourceDirectory>${project.build.directory}/generated-slides</warSourceDirectory>
@@ -283,12 +285,12 @@
             <plugin>
                 <groupId>org.eclipse.jetty</groupId>
                 <artifactId>jetty-maven-plugin</artifactId>
-                <version>9.4.14.v20181114</version>
+                <version>${jetty-maven-plugin.version}</version>
             </plugin>
             <plugin>
                 <groupId>com.coderplus.maven.plugins</groupId>
                 <artifactId>copy-rename-maven-plugin</artifactId>
-                <version>1.0</version>
+                <version>${copy-rename-maven-plugin.version}</version>
                 <executions>
                     <execution>
                         <id>rename-slide-file</id>
