@@ -20,7 +20,7 @@
 
 
 ############# install necessary packages
-yum install -y git httpd graphviz maven nodejs wget bzip2 python36 python36-pip pygobject3 cargo
+yum install -y git graphviz maven nodejs wget bzip2 python36 python36-pip pygobject3 cargo
 
 ############# install further libs for pycairo
 #yum install -y python36-cairo-devel libjpeg-devel giflib-devel cairo cairomm-devel libjpeg-turbo-devel pango pango-devel pangomm pangomm-devel
@@ -53,15 +53,8 @@ cargo install svgbob_cli
 echo 'export PATH=$PATH:$HOME/.cargo/bin' >> ~/.bash_profile
 . ~/.bash_profile
 
-#############
-systemctl start httpd
-systemctl enable httpd
-
 
 ############# 
 cd ~/incubator-training/tools/maven-revealjs-asciidoctor-templte/
-mvn clean package
-
-rm -fr /var/www/html/generated-slides
-cp target/generated-slides/ /var/www/html/ -r
+mvn jetty:run-exploded
 
