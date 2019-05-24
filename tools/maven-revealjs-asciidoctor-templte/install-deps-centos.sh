@@ -22,11 +22,7 @@
 ############# install necessary packages
 yum install -y git graphviz maven nodejs wget bzip2 python36 python36-pip pygobject3 cargo
 
-############# install further libs for pycairo
-#yum install -y python36-cairo-devel libjpeg-devel giflib-devel cairo cairomm-devel libjpeg-turbo-devel pango pango-devel pangomm pangomm-devel
-
 #############
-#python3 -m pip install --upgrade pip setuptools seqdiag blockdiag actdiag nwdiag convert pycairo syntrax racks opc-diag
 python3 -m pip install --upgrade pip setuptools seqdiag blockdiag actdiag nwdiag convert syntrax racks opc-diag
 npm install vega pango
 
@@ -45,16 +41,21 @@ cd third-party
 git clone https://github.com/BurntSushi/erd.git
 cd erd
 stack install
-echo 'export PATH=$PATH:$HOME/.local/bin' >> ~/.bash_profile
-. ~/.bash_profile
+read -p "Add stack ($HOME/.local/bin) to PATH ($PATH) ? (y/n)" -n 1 -r YES_NO
+if [ $YES_NO  = "y" ]; then
+   echo 'export PATH=$PATH:$HOME/.local/bin' >> ~/.bash_profile
+   . ~/.bash_profile
+fi
 
 ############# install SVGBob
 cargo install svgbob_cli
-echo 'export PATH=$PATH:$HOME/.cargo/bin' >> ~/.bash_profile
-. ~/.bash_profile
-
+read -p "Add cargo ($HOME/.cargo/bin) to PATH ($PATH) ? (y/n)" -n 1 -r YES_NO
+if [ $YES_NO  = "y" ]; then
+   echo 'export PATH=$PATH:$HOME/.cargo/bin' >> ~/.bash_profile
+   . ~/.bash_profile
+fi
 
 ############# 
-cd ~/incubator-training/tools/maven-revealjs-asciidoctor-templte/
+cd ../../..
 mvn jetty:run-exploded
 
