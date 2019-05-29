@@ -203,7 +203,7 @@
 ----------------------------------------------
 
 This product includes a modified version of this file:
-tools/maven-revealjs-asciidoctor-templte/libs/docinfo-hack/document.html.slim
+tools/maven-revealjs-asciidoctor-template/libs/docinfo-hack/document.html.slim
 developed at https://github.com/asciidoctor/asciidoctor-reveal.js
 
 Available under an MIT license:
