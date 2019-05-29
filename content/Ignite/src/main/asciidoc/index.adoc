@@ -1,0 +1,101 @@
+////
+
+  Licensed to the Apache Software Foundation (ASF) under one or more
+  contributor license agreements.  See the NOTICE file distributed with
+  this work for additional information regarding copyright ownership.
+  The ASF licenses this file to You under the Apache License, Version 2.0
+  (the "License"); you may not use this file except in compliance with
+  the License.  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+
+////
+:revealjs_progress: true
+:revealjs_slidenumber: true
+:sourcedir: ../java
+
+== What is Apache Ignite?
+Ignite™ is a memory-centric distributed database, caching, and processing platform.
+
+2 major use-cases
+
+- In-Memory Data Grid (IMDG)
+- In-Memory Database (IMDB)
+
+== In-Memory Data Grid
+IMDG = Stores data (data grid) + Processes data (compute grid)
+
+- Stores entries in-memory
+- Data is distributed among nodes
+- Needs external store
+- Collocated Processing = code goes to data
+
+== In-Memory Database
+In Memory (or memory-centric) database
+
+- Ignite has Native Persistence since V2.1
+- Scalable: Each node stores only it's own data part
+
+Ignite can be used in combined mode
+(part of data is in-memory, part - persisted)
+
+== Why you may need Apache Ignite™
+- To speed up a slow traditional database by caching entries
+- To cache data from remote sources (REST, SOAP, any other network protocols)
+- For projects from scratch: Build a scalable solution with horizontal scaling
+- To remove a computational load from overloaded database
+- Avoid single point of failure by changing traditional database to cluster
+
+== Nodes
+Apache Ignite cluster consists of two (major) type of nodes
+
+- Server node
+* Can store data
+* Can execute compute jobs
+* Usually, standalone JVM
+
+- Client node
+* Used to connect to the cluster
+
+== Setting up a project
+
+Gradle
+[source,groovy]
+----
+compile group: 'org.apache.ignite', name: 'ignite-core', version: '2.7.0'
+----
+
+Maven
+[source,xml]
+----
+<dependency>
+  <groupId>org.apache.ignite</groupId>
+  <artifactId>ignite-core</artifactId>
+  <version>2.7.0</version>
+</dependency>
+----
+
+== Starting a server node
+By default, Ignite starts server node
+[source,java]
+----
+include::{sourcedir}/example/StartServerNode.java[tags=contains,indent=0]
+----
+
+== Starting client
+Change configuration to start Ignite client
+[source,java]
+----
+include::{sourcedir}/example/StartClientNode.java[tags=contains,indent=0]
+----
+Both server and client nodes will log
+
+`Topology snapshot [ver=2, locNode=b5fc314f, servers=1, clients=1, state=ACTIVE, CPUs=12, offheap=3.2GB, heap=7.1GB]`
+
+This means nodes detected each other
