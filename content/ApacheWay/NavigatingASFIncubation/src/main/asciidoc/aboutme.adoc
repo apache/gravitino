@@ -17,9 +17,4 @@
 
 ////
 
-* V.P. Apache Incubator
-* Freelance developer - programming for 30 years
-* Incubator PMC plus a few others
-* Apache member
-* Mentor of several Apache projects
-* Reviewed 350+ incubator releases at Apache
+* TODO Fill in your own your info here

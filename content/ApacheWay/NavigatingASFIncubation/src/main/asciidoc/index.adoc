@@ -21,9 +21,9 @@
 == Navigating the ASF Incubator Process
 :description: 45 minute talk on the Apache Way and navigating a project through the incubator
 :keywords: Apache Way,Incubator
-:author: Justin Mclean
-:email: jmclean@apache.org
-:position: V.P. Apache Incubator
+:author: Your Name
+:email: Your email
+:position: Your Job title
 {author} +
 {position} +
 {email} +
