@@ -58,6 +58,7 @@ under the License.
 
 #bannerRight > img {
     width: 400px;
+    padding-top: 10px
 }
 
 #apacheEvents {
@@ -88,4 +89,10 @@ body > div.container.subfooter > div > div > p.pull-right {
     width: 100px;
     height: 60px;
     text-align: right;
+}
+
+#bannerLeft > img {
+    height: 180px;
+    padding-bottom: 10px;
+    padding-top: 10px
 }

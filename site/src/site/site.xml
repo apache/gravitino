@@ -73,7 +73,7 @@
 
   <bannerLeft>
       <name>Apache Training (incubating)</name>
-      <src>/images/apache_training_logo.png</src>
+      <src>/images/training-logo.svg</src>
       <href>https://training.apache.org/</href>
   </bannerLeft>
 
