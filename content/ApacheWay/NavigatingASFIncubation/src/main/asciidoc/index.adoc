@@ -133,7 +133,7 @@ image::IncubatingProjects.png[]
 ** You don’t need to ask for permission to use
 
 == State of Play
-* {PMCs} projects in the incubator
+* {podlings} projects in the incubator
 * {IPMCs} IPMC members (but not all are active)
 * Projects usually stay 1 to 2 years in the incubator
 * A dozen or so successful releases a month
