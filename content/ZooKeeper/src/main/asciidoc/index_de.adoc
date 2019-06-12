@@ -1,0 +1,177 @@
+////
+
+  Licensed to the Apache Software Foundation (ASF) under one or more
+  contributor license agreements.  See the NOTICE file distributed with
+  this work for additional information regarding copyright ownership.
+  The ASF licenses this file to You under the Apache License, Version 2.0
+  (the "License"); you may not use this file except in compliance with
+  the License.  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+
+////
+
+
+[%notitle]
+== Apache ZooKeeper
+:description: Kurzeinführung in Apache ZooKeeper
+:keywords: Apache ZooKeeper
+
+image::http://www.apache.org/logos/res/zookeeper/zookeeper.png[]
+
+
+== Einführung
+
+ZooKeeper ist ein verteilter, hochverfügbarer, skalierbarer und strikt konsistenter data store
+
+
+== Einführung
+* Aktuelle Version ist 3.5.5 (Mai 2019)
+** Veröffentlicht nach fünf Jahren Entwicklungszeit
+** Wichtige neue Features: Dynamic Reconfiguration, "container" znode und mehr
+* Eines der erste Tools aus dem Hadoop Ökosystem
+* Ursprünglich bei Yahoo! gebaut, nun ein Apache Projekt
+
+
+== Use Cases
+* Wird von vielen Tools aus dem Hadoop Ökosystem genutzt
+** HA (HBase, YARN, Hive, …)
+** Koordination (HBase, ...)
+* "Rezepte", die einfach mit ZooKeeper zu implementieren sind:
+** Group Membership, Name Service, Configuration, Barriers, Queues, Locks, Leader Election, Two-phased commit
+* Während ZooKeeper im Hadoop Ökosystem entstanden ist, wird es heute viel außerhalb genutzt
+** z.B. Solr und andere Tools
+
+
+== Data Model
+image::data-model.png[]
+
+
+== Data Model
+* Hierarchie von "nodes" (znode genannt)
+** Ähnlich wie in Dateisystemen
+* Jeder znode kann sowohl andere Nodes als Kinder haben als auch Daten
+** Dies ist anders als in herkömmlichen Dateisystemen wo ein Knoten *entweder* eine Datei *oder* ein Verzeichnis ist
+** Die Daten in einem Knoten sind normalerweise klein
+** Im Bereich weniger Kilobyte
+
+
+== Data Model
+* Alle Updates sind streng geordnet und nur ein einzelner Master Prozess schreibt Daten, daher ist ZooKeeper nicht als data store für hohes Transaktionsvolumen ausgelegt
+* ZooKeeper kennt mehrere verschiedene Arten von Nodes
+* Eine Verbindung zu ZooKeeper wird "session"genannt und bekommt auch eine Id
+** Verbindungsaufbau ist relativ teuer, da er auch eine Wahl/ein Quorum erfordert
+* Man kann ein "Watch" auf ein ZNode setzen und bekommt dann eine Benachrichtigung wenn sich einer ändert
+
+
+== Nodetypen
+* Ephemeral Nodes
+** Werden automatisch gelöscht wenn die Session geschlossen wird in der sie erstellt wurden
+** Kann benutzt werden um verfügbare Server zu überwachen
+* Persistent Nodes
+** Diese werden nicht gelöscht wenn die Session endet
+
+
+== Nodetypen
+* Time to live (TTL) nodes (seit 3.5)
+** Wenn ein Node erstellt wird kann ein TTL Wert (in ms) angegeben werden
+** Wenn der Node nicht innerhalb des TTL Zeitraums geändert wird und er keine children hat, kann er automatisch gelöscht werden
+* Container Nodes
+** Wenn alle child nodes gelöscht wurden kann der Container Node selbst auch automatisch gelcöscht werden
+
+
+== Nodetypen
+* Ephemeral, Persistent und TTL Nodes können zusätzlich _sequential_ sein
+** Das fügt automatisch eine monoton ansteigende Zahl ans Ende des Node namens an
+
+
+== Implementation Details
+* ZooKeeper benutzt ein wire protocol basierend auf einer Bibliothek namens "Jute"
+** Ursrprünglich aus Hadoop extrahiert
+** Nicht außerhalb von ZooKeeper verwendet
+* Es gibt native Clients für C und Java
+** Andere (z.b. Python) werden von der Community verwaltetOther (e.g. Python)
+* Apache Curator ist eine Java basierte Client Library, die häufig zum Zugriff verwendet wird da sie high level Konzepte in ihrer API anbietet
+
+
+== Zab Protocol
+* ZooKeeper ist ein verteiltes System um Daten zu speichern
+* Es braucht einen Weg damit sich mehrere Server auf Änderungen an Daten einigen können
+* Das ist wo das "Zab" Protokoll ins Spiel kommt
+
+
+== Zab Protocol
+* ZooKeeper kann mehrere Server verwenden, dies nennt sich "Ensemble"
+* _Zab_ ist ein Algorithmus um zuverlässige Lieferungen und totale und kausale Reihenfolge von Nachrichten zu bieten trotz unzuverlässiger Netzwerke
+* In einem Ensemble gibt es höchstens einen Leader welcher unterstüttz wird von einer Mehrheit (ein Quorum) an Followern
+
+
+== Stimmen / Votes
+* ZooKeeper benutzt den Begriff _vote_ was eine Wahlmöglichkeit unterstellt
+* In Wirklichkeit haben Server keine Wahl sondern müssen nur Änderungen bestätigen
+* Das ist ähnlich zu two-phase-commit Protokollen
+
+
+== Exkurs: Quorum
+* ZooKeeper basiert stark auf dem Konzept eines "Quorum"
+* Es gibt zwei Implementierungen um das Quorum festzustellen
+** Majority
+** Hierarchical
+
+
+== Exkurs: Majority Quorum
+* Der Default und sehr einfach
+* Alle voting server haben eine Stimme
+** Nicht alle Server wählen (mehr dazu später)
+* Quorum ist erreicht wenn mehr als die Hälfte (Mehrheit) der Voter einen Schreibvorgang bestätigt haben (gewählt haben)
+* Beispiel: Ein Ensemble von 9 voting servern benötigt Stimmen von 5 Servern um erfolgreich zu sein
+
+
+== Exkurs: Hierarchical Quorum
+* Servers gehören einer Gruppe an und haben ein Gewicht
+* Quorum ist erreicht wenn für die Mehrheit aller Gruppen jeweils mehr als die Hälfte des totalen Gewichts (pro Gruppe) gewählt hat
+* Beispiel:
+** 9 server, 3 Gruppen, Gewicht von 1 für jeden Server
+** Quorum erfordert die Mehrheit in zwei Gruppen
+** Jede Gruppe benötigt ein Gewicht von 2 (also 2 Server) um Quorum zu erreichen
+** Insgesamt sind 4 Votes nötig um Quorum zu erreichen
+
+
+== Sidebar: Hierarchical Quorum
+* Ein kaum benutztes Features
+* Mehr Informationen gibt es in https://issues.apache.org/jira/browse/ZOOKEEPER-29[ZOOKEEPER-29]
+* Die ursprüngliche Idee war, dass dieses Feature zu nutzen wenn Cluster über mehrere (phyische) Standorte verteilt sind unter der Annahme, dass Fehler eher mit einem Standort als mit einer einzelnen Instanz korrelieren
+
+
+== Zab Protocol
+* Alle mitwählenden Server wählen einen Leader
+** Leader ist derjenige mit den meisten Stimmen (Quorum)
+** Daher meist eine ungerade Anzahl an Servern
+* Alle Servers können Read requests beantworten aber alle Schreibrequests werden an den Leader weitergeleitet
+** Clients können trotzdem mit einem beliebigen Server sprechen (ohne seine Rolle zu kennen), die Requests werden automatisch weiter geleitete
+
+
+== Scaling
+* Alle Datenänderungen werden zur Wahl gestellt (koordiniert vom Leader)
+* Je mehr Server es gibt desto länger dauert dieser Prozess
+* Daher gibt es das Konzept von "participants"und "observern"
+** Participants wählen mit
+** Observer nehmen nicht aktiv an der Wahl teil sondern hören nur auf das Ergebnis
+* Das erlaubt es ZooKeeper einfach zu skalieren ohne auf Performanzeinbusse hinzunehmen
+
+
+== Scaling
+* Dynamic Reconfiguration
+** Vor 3.5 waren die Mitgliedschafen in einem Ensemble statisch, ein Neustart war erforderlich um das zu ändern
+** Ab Version 3.5 kann dies (und viel mehr) dynamisch geändert werden ohne, dass ein Neustart erforderlich ist
+
+
+== Resources
+* https://cwiki.apache.org/confluence/display/ZOOKEEPER/ZooKeeperArticles[ZooKeeper Artikel]
+** Links zu detaillierten Beschreibungen des Zab Protokolls
