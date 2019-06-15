@@ -44,7 +44,7 @@ endif::[]
 * Likes existing projects with a community around them
 * Main entry point for new projects
 
-== Why we Have an incubating Process?
+== Why we Have an Incubating Process?
 * Podling follows the Apache Way
 * Ensure donations comply with the Apache 2.0 license
 * Podling follows the ASF structure of contributors, committers and PMC members
@@ -64,7 +64,7 @@ endif::[]
 * Permissive license - you can do what you want
 * Business friendly - can be used for commercial projects
 * Requires source headers, a LICENSE and (optionally) a NOTICE file
-* If your not an ASF project:
+* If your are not an ASF project:
 ** You don’t need to publish the source
 ** You don’t have to give back to the project
 ** You don’t need to ask for permission to use
@@ -193,7 +193,7 @@ video::both.mp4[]
 == Documentation Issues vs Errors
 * It’s better to have a documentation issue than a licensing error
 * Minor issues are OK to be fixed in the next release
-* If you unsure a license should be added add it
+* If you're unsure a license should be listed
 
 == Universal Donor
 * Give anyone confidence they can use our software without any legal issues
@@ -275,7 +275,7 @@ image::LICENSE.png[]
 image::NOTICE.png[]
 
 == Required Notices
-* Some confusion to what is a required notice
+* Some confusion to what to what a required notice is
 * Advertising clauses (but are probably category X)
 * Link to the  source / how to get original
 * State changes made
@@ -359,9 +359,9 @@ https://vimeo.com/171210141
 == Where to Ask for Help
 * Ask on your mailing lists
 * Ask your mentors
-* Email the incubator mailing list at:+ 
+* Email the incubator mailing list at: + 
 general@incubator.apache.org
-* Email the legal discuss mailing list at: 
+* Email the legal discuss mailing list at: +
 legal-discuss@apache.org
 
 == The Incubator is Broken
@@ -372,7 +372,7 @@ legal-discuss@apache.org
 * We need more people reviewing releases and helping improve documentation
 
 == How can we improve?
-Please email the incubator mailing list at:
+Please email the incubator mailing list at: +
 general@incubator.apache.org
 We’re happy to talk about it. Perhaps a bit too much :-)
 
