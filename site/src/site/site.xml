@@ -98,6 +98,9 @@
       ]]>
     </head>
 
+    <menu name="Users">
+      <item name="Downloads" href="downloads.html"/>
+    </menu>
     <menu name="Developers">
       <item name="Bug &amp; Issue Tracker" href="developers/issues.html"/>
       <item name="Building Training" href="developers/building.html"/>
