@@ -24,6 +24,12 @@ Sorted by first name:
 [width="100%",cols="2,4,1,1",options="header"]
 |=========================================================
 |Name |Bio | |
+| *Austin Bennet*
+
+Data Engineer/Scientist
+
+San Francisco |Austin Bennett works with data for Sling Media (a DISH Company), mentors/teaches aspiring Data Scientists through various online outlets, as well as covers odds and ends for Bamboozoology, LLC. He is also a Cognitive Linguist and Researcher with an interest in Multimodal Communication; those pursuits are largely through RedHenLab.org. He is enthusiastic about the promise of Apache Beam, and Open Source Software generally. | a|image::team/abennett.png[abennett, 200, 200]
+
 | *Christofer Dutz*
 
  IoT Consultant
@@ -36,5 +42,6 @@ Sorted by first name:
 
 Trainer and Consultant
 
-Various |Justin Mclean has been teaching for 10+ years and now splits his time between that and software development. He runs his own consulting company Class Software for 25+ years and has spoken at numerous conferences in his home of Australia and overseas. He's heavily involved in open source hardware and software, and runs the IoT meetup in Sydney. He currently teaches at an online college and is a casual academic at a university. | a|image::team/jmclean.jpg[jmclean, 200, 200]
+Sydney |Justin Mclean has been teaching for 10+ years and now splits his time between that and software development. He runs his own consulting company Class Software for 25+ years and has spoken at numerous conferences in his home of Australia and overseas. He's heavily involved in open source hardware and software, and runs the IoT meetup in Sydney. He currently teaches at an online college and is a casual academic at a university. | a|image::team/jmclean.jpg[jmclean, 200, 200]
+
 
