@@ -269,9 +269,9 @@
                 </resource>
                 <resource>
                   <directory>
-                    ${project.basedir}/content
+                    ${project.basedir}/src/content
                   </directory>
-                  <targetPath>${project.build.directory}/site/content</targetPath>
+                  <targetPath>${project.build.directory}/site/contnet</targetPath>
                 </resource>
               </resources>
             </configuration>
