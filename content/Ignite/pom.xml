@@ -192,6 +192,11 @@
                         <configuration>
                             <outputDirectory>${project.build.directory}</outputDirectory>
                             <resources>
+                                <!-- Copy the normal resources into the root of the slides directory -->
+                                <resource>
+                                    <directory>src/main/resources</directory>
+                                    <targetPath>${project.slides.directory}</targetPath>
+                                </resource>
                                 <!-- Copy our css-theme to the reveal.js theme directory -->
                                 <resource>
                                     <directory>src/main/theme</directory>
@@ -224,7 +229,7 @@
         <dependency>
             <groupId>org.apache.ignite</groupId>
             <artifactId>ignite-core</artifactId>
-            <version>2.7.0</version>
+            <version>2.7.5</version>
         </dependency>
     </dependencies>
 </project>
