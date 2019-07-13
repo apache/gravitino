@@ -70,6 +70,7 @@ endif::[]
 ** You don’t need to ask for permission to use
 
 == State of Play
+include::projectstats.adoc[]
 * {podlings} projects in the incubator
 * {IPMCs} IPMC members (but not all are active)
 * Projects usually stay around 2 years in the incubator
