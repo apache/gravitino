@@ -37,7 +37,7 @@
 
   <name>Training: Website</name>
   <description>
-    Write something really sensible here ....
+   Website for the Apache Training project
   </description>
   <url>https://training.apache.org</url>
   <inceptionYear>2019</inceptionYear>
@@ -266,6 +266,12 @@
                     ${project.build.directory}/dependency/fontawesome/fontawesome-free-${fontawesome.version}-web/webfonts
                   </directory>
                   <targetPath>${project.build.directory}/site/fonts</targetPath>
+                </resource>
+                <resource>
+                  <directory>
+                    ${project.basedir}/src/content
+                  </directory>
+                  <targetPath>${project.build.directory}/site/contnet</targetPath>
                 </resource>
               </resources>
             </configuration>
