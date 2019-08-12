@@ -65,16 +65,16 @@
   <mailingLists>
     <mailingList>
       <name>Apache Training Developer List</name>
-      <subscribe>dev-subscribe@training.apache.org</subscribe>
-      <unsubscribe>dev-unsubscribe@training.apache.org</unsubscribe>
-      <post>dev@training.apache.org</post>
+      <subscribe>mailto:dev-subscribe@training.apache.org</subscribe>
+      <unsubscribe>mailto:dev-unsubscribe@training.apache.org</unsubscribe>
+      <post>mailto:dev@training.apache.org</post>
       <archive>http://mail-archives.apache.org/mod_mbox/training-dev/</archive>
     </mailingList>
     <mailingList>
       <name>Apache Training Commits List</name>
-      <subscribe>commit-subscribe@training.apache.org</subscribe>
-      <unsubscribe>commits-unsubscribe@training.apache.org</unsubscribe>
-      <post>commits@training.apache.org</post>
+      <subscribe>mailto:commit-subscribe@training.apache.org</subscribe>
+      <unsubscribe>mailto:commits-unsubscribe@training.apache.org</unsubscribe>
+      <post>mailto:commits@training.apache.org</post>
       <archive>http://mail-archives.apache.org/mod_mbox/training-commits/</archive>
     </mailingList>
   </mailingLists>
