@@ -34,7 +34,7 @@ The site content itself is generated from `asciidoc` files (ending `.adoc`) whic
 
 Beyond the basic goodies, the build is also configured to generate images from ASCII data using the `asciidoctor-diagram` plugin.
 
-This allows us to generate images like the ones on the http://4x.apache.org/protocols/s7/index.html[S7 Protocol Description page]
+This allows us to generate images like the ones on the http://plc4x.apache.org/plc4j/plc4j-protocols/plc4j-protocol-s7/index.html[S7 Protocol Description page]
 
 === Providing new content
 

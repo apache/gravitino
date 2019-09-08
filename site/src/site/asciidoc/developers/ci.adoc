@@ -20,7 +20,7 @@
 
 We are currently using only Apache Jenkins for building.
 
-- Apache's Jenkins at https://builds.apache.org/view/S-Z/job/Training/
+- Apache's Jenkins at https://builds.apache.org/view/S-Z/view/Training%20(incubating)/
 
 Only build jobs on Apache's Jenkins are allowed to publish SNAPSHOT versions of the Maven artifacts to Apaches Nexus as well as auto publish generated websites to production.
 

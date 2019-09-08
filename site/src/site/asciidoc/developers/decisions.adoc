@@ -22,7 +22,7 @@
 
 This document describes the roles and responsibilities of the project, who may vote, how voting works, how conflicts are resolved, etc.
 
-The https://www.apache.org/foundation/faq[Apache Foundation FAQ] and http://www.apache.org/foundation/faq.html[How-It-Works] explain the operation and background of the foundation. Terms used are defined in the https://www.apache.org/foundation/glossary[ASF glossary].
+The https://www.apache.org/foundation/faq[Apache Foundation FAQ] and https://apache.org/foundation/how-it-works.html[How-It-Works] explain the operation and background of the foundation. Terms used are defined in the https://www.apache.org/foundation/glossary[ASF glossary].
 
 Apache has a http://www.apache.org/foundation/policies/conduct.html[code of conduct] that it expects its members to follow.
 

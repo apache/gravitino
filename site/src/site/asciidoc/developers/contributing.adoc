@@ -33,7 +33,7 @@ This list is by no means finite. There are without doubt dozens of other useful 
 - Writing documentation
 
 === Finding a Project
-If you want to get involved, but do not have a specific project in mind please feel free to check our issue tracker for https://issues.apache.org/Jira/issues/?jql=project%20%3D%20TRAINING%20AND%20labels%20%3D%20beginner%20AND%20assignee%20in%20(EMPTY)[unassigned issues with the _beginner_ label]. These should be good candidates to get your feet wet and gather some experience before tackling larger issues.
+If you want to get involved, but do not have a specific project in mind please feel free to check our issue tracker for https://issues.apache.org/jira/issues/?jql=project%20%3D%20TRAINING%20AND%20labels%20%3D%20beginner%20AND%20assignee%20in%20(EMPTY)[unassigned issues with the _beginner_ label]. These should be good candidates to get your feet wet and gather some experience before tackling larger issues.
 
 If nothing catches your eye and you come up with something that you want to work on by yourself, please do share your intent by either posting on the mailing list or creating an issue, as this allows us to limit duplication of effort as much as possible.
 
