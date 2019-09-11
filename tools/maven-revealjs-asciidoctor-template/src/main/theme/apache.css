@@ -281,8 +281,24 @@ body {
 .reveal .slide-number {
   color: #42affa; }
 
+/*********************************************
+ * GENERAL PURPOSE COLORS
+ *********************************************/
+
 .reveal .red {
   color: red;
+}
+
+.reveal .orange {
+  color: orange;
+}
+
+.reveal .yellow {
+  color: yellow;
+}
+
+.reveal .green {
+  color: green;
 }
 
 /*********************************************
@@ -346,4 +362,19 @@ body {
   height: 100px;
   background-image: url("../../../images/logo-training.png");
 }*/
+
+/*********************************************
+ * Add the ability to split into two columns
+ *********************************************/
+
+.reveal .west {
+  position: fixed;
+  left: 5%;
+}
+
+.reveal .east {
+  position: fixed;
+  right: 5%;
+}
+
 

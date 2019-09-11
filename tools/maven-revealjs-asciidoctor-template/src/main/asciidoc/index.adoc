@@ -134,6 +134,34 @@ Nest lists, by duplicating the list-char
 include::{sourcedir}/example/StringUtils.java[tags=contains,indent=0]
 ----
 
+== Two columns
+
+[.west]
+* Blah
+* Blah
+* Blah
+* Blah
+* Blah
+
+[.east]
+* Blah
+* Blah
+* Blah
+* Blah
+* Blah
+
+== Fontawesome Icons
+
+* icon:check[role=green]
+* icon:wrench[]
+* icon:beer[role=orange]
+
+[NOTE.speaker]
+--
+* Find icons here: https://fontawesome.com/v4.7.0/icons/
+* Color icons by defining css styles in apache.css and referencing them with "role"
+--
+
 == Diagrams
 
 Press the down arrow key to see the different types of diagrams

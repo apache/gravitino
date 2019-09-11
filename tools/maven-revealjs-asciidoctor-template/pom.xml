@@ -44,10 +44,10 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
         <asciidoctor.maven.plugin.version>2.0.0-RC.1</asciidoctor.maven.plugin.version>
-        <asciidoctorj.version>2.0.0-RC.2</asciidoctorj.version>
-        <asciidoctorj.diagram.version>1.5.16</asciidoctorj.diagram.version>
+        <asciidoctorj.version>2.1.0</asciidoctorj.version>
+        <asciidoctorj.diagram.version>1.5.18</asciidoctorj.diagram.version>
         <asciidoctorj.extensions-lab.version>1.0.0</asciidoctorj.extensions-lab.version>
-        <revealjs.version>3.7.0</revealjs.version>
+        <revealjs.version>3.8.0</revealjs.version>
         <asciidoctor-revealjs.version>2.0.0</asciidoctor-revealjs.version>
 
         <copy-rename-maven-plugin.version>1.0</copy-rename-maven-plugin.version>
