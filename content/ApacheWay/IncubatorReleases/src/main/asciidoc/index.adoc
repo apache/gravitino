@@ -34,23 +34,23 @@ ifdef::IANAL[]
 * I’m not a lawyer, and nothing on these sides is legal advice
 * Occasionally I get things wrong
 * My understanding has changed over time
-* Sometimes it’s complex, and there’s more than one “right” answer
+* Sometimes it's complex, and there's more than one “right” answer
 * I’m a volunteer and not paid to do this. Not even by my day job
 * This talk contains my views and may not represent the incubator as a whole
 endif::[]
 
 == What is the Apache Incubator?
-* Where communities come to learn the Apache Way
-* Likes existing projects with a community around them
 * Main entry point for new projects
+* Where communities come to learn the Apache Way
+* Links existing projects with a community around them
 
 == Why we Have an Incubating Process?
-* Podling follows the Apache Way
 * Ensure donations comply with the Apache 2.0 license
 * Podling follows the ASF structure of contributors, committers and PMC members
 * Podling grants more responsibility via meritocracy
 * Ensure that decision making is done in the open
 * People act as individuals, not the company they work for
+* Podling learns to follow the Apache Way
 
 == The Apache Way
 * Charity - For the public good. Software costs nothing
@@ -65,26 +65,42 @@ endif::[]
 * Business friendly - can be used for commercial projects
 * Requires source headers, a LICENSE and (optionally) a NOTICE file
 * If your are not an ASF project:
-** You don’t need to publish the source
-** You don’t have to give back to the project
-** You don’t need to ask for permission to use
+** You don't need to publish the source
+** You don't have to give back to the project
+** You don't need to ask for permission to use
+
+[.notes]
+--
+Policy and social requirements on top of license
+--
 
 == State of Play
 include::projectstats.adoc[]
 * {podlings} projects in the incubator
 * {IPMCs} IPMC members (but not all are active)
 * Projects usually stay around 2 years in the incubator
-* A dozen or more successful releases a month
-* About 70% of releases pass the incubator
+* A dozen or so successful releases a month
+* About 80% of releases pass the incubator
 
 == Source Releases
 * Must be cryptographically signed
-* Must have an incubating disclaimer
+* Must have an incubating disclaimer (there's two now)
 * Have LICENSE and NOTICE file that follow Apache policy
 * Follow licensing terms of any 3rd party bundled software
 * 3rd party files are compatible with the Apache license
 * Source files have ASF headers
 * Contain source code and no compiled code
+
+== Work in Progress Disclaimer
+* Less strict and your release may not comply with ASF policy
+* Must still be legal
+* You can list known issues
+* Issues noted must be fixed before graduation
+
+[.notes]
+--
+Lets you get on with making release and moving towards graduation
+--
 
 == Incubator Vote Process
 * Podling creates a release candidate
@@ -94,6 +110,11 @@ include::projectstats.adoc[]
 * Need 3 +1 and more +1 than -1 by IPMC members
 * If vote fails need to make a new release candidate
 * Can release once vote passes and 72 hours pass
+
+[.notes]
+--
+72 hours is a guideline. In fact most "rules" are guidelines.
+--
 
 == Why Your Release May Get a -1
 * Unexpected binary in the source release
@@ -105,35 +126,42 @@ include::projectstats.adoc[]
 * Contains encryption software
 
 == Representative Voting
-image::VoteData.png[votedata,500]
+* About 80% of releases pass 
+* Slight improvement on past years
+* Work in progress disclaimer will change this
 
 == -1 is Not a Veto
 * Release votes need 3 +1 votes and more +1 than -1 votes to pass
 * Only IPMC votes are binding but good to take notice of other votes
 * People can change their minds and vote again
 * People can put up conditional votes
-* That being said a -1 vote is often for a good reason
+* A -1 vote needs a good reason
 
-== It Doesn’t Have to be Perfect
+== It Doesn't Have to be Perfect
 * Incubating projects are not expected to get it right the first time
 * May not be familiar with policy at the start
-* Policy doesn't cover all situations
-* Different projects may do things in different ways, policies are in most cases guidance
+* Policy an guidelines doesn't cover all situations
+* Different projects may do things in different ways
 * A release containing no surprises is a good thing
 
 == Make it Easy to Review
-* Don’t make people have to think hard about it
+* Don't make people have to think hard about it
 * Provide well-named artefacts
-* Don’t try to be smart with licensing or headers
+* Don't try to be clever with licensing or headers or rat exclusions
 * Include compile instructions in the release
 * Make it easy to compile
 
 == There's Not One Right Answer
 * Documentation can sometimes be confusing and sometimes out of date
-* Some cultural knowledge isn’t well documented
+* Some cultural knowledge isn't well documented
 * Large IPMC and some differing opinions on what is “correct”
 * Often multiple ways to solve the same issue
-* If in doubt err on the side of caution - often changes needed are minimal
+* If in doubt err on the side of caution, often changes needed are minimal
+
+.[.notes]
+--
+Again guidelines not rules. You can do things in a different way.
+--
 
 == Top Level Projects As Examples
 * Policy changes over time / may be out of date
@@ -148,7 +176,8 @@ image::VoteData.png[votedata,500]
 * Use sha256 or sha512 for hash
 
 == Disclaimer
-* Best to put in a file called DISCLAIMER
+* Two different disclaimers
+* Put in a file called DISCLAIMER or DISCLAIMER_WIP
 * Could also be in README
 
 == Tagging
@@ -158,7 +187,7 @@ image::VoteData.png[votedata,500]
 * Note that git tags can be changed so provide hash in vote email
 
 == Licensing
-* Seems where a lot of the issues occur
+* This is where a lot of the issues occur
 * Observed some reluctance to understand
 * Language barrier to even those who speak English
 * Can be complex
@@ -169,9 +198,15 @@ image::VoteData.png[votedata,500]
 * Apache policy adds a little more:
 ** Need to have NOTICE file
 ** List all licenses in LICENSE (even if it's not required)
+** Respect 3rd party licenses and headers
+
+[.notes]
+--
+Last is more a social convention, ask permission even if the license allows use.
+--
 
 == Developers vs Licensing
-* We’re not the only people who have difficulty or frustration with licensing
+* We're not the only people who have difficulty or frustration with licensing
 * Apache projects tend to be on average a lot better!
 * External projects often:
 ** Have unclear licenses
@@ -192,9 +227,9 @@ video::deadpeople.mp4[]
 video::both.mp4[]
 
 == Documentation Issues vs Errors
-* It’s better to have a documentation issue than a licensing error
+* It's better to have a documentation issue than a licensing error
 * Minor issues are OK to be fixed in the next release
-* If you're unsure a license should be listed
+* If you're unsure a license should be listed list it
 
 == Universal Donor
 * Give anyone confidence they can use our software without any legal issues
@@ -211,6 +246,7 @@ video::both.mp4[]
 * When bundling software check to see what it contains
 * In particular look for Category B and Category X software
 * Look at photos or other resources like fonts that you may not have permissions to distribute or may be under another license
+* Check links in code
 * Manual inspection is not always required but often a good idea
 
 == Rat
@@ -219,7 +255,7 @@ video::both.mp4[]
 * Will not find double headers
 * Will not check for multiple licenses in the same file
 * Only knows about a few licenses
-* Exclusions can be too wide and miss something
+* Often exclusions can be too wide and miss something
 
 == Rat Output
 image::rat.png[]
@@ -228,31 +264,30 @@ image::rat.png[]
 * One way is to use find and grep +
 `find . -type f -exec grep -i "$1" {} \;`
 * Search for common license names “GPL”, “BSD”, “MIT”
-* Search for “copyright” piped to sort -u
+* Search for “copyright” and pipe to sort -u
 * Compare between releases
 
 == Pesky JS files
-* JS files, especial minified ones, are often missing license headers or license details
+* JS files, especially minified ones, are often missing license headers or license details
 * Some license require full text to be contained somewhere
 * Lots are under non-Apache licenses including GPL
-* Other included other bundled software e.g.  jQuery and Bootstrap
+* Other included other bundled software e.g. jQuery and Bootstrap
 * Licenses change between versions
 * Take care!
 
 == Other People’s Cat Photos
 * Copy all the images! +
 `find . -name "*.jpg" -exec cp {} images \;`
-* View all images using OS or favourite image browsing tool
+* View all images using your OS or favourite image browsing tool
 * If you find something that may be suspect:
 ** Look at image metadata
-** Google reverse image search
+** Find it with a Google reverse image search
 
 == Troublesome Fonts
 * Licensing around fonts can be complex
 * Look at font meta-data
 * Make sure you have permission to distribute
-* As fonts are binary may not be evident to the reviewer how they are licensed
-* You may want to make that clear in the LICENSE file
+* As fonts are binary may not be evident to users how they are licensed. You may want to make that clear in the LICENSE file
 
 == License File
 * License file named LICENSE or LICENSE.txt in the root directory
@@ -268,9 +303,9 @@ image::LICENSE.png[]
 * Keep year up to date
 * Only add what is needed
 ** Relocated copyright notices
-** Required notices from bundled Apache software notice files
+** Content from bundled Apache software notice files
 ** All other required notices
-* In general licensing info shouldn’t be in the notice file
+* In general licensing info shouldn't be in the notice file
 
 == Notice file
 image::NOTICE.png[]
@@ -280,24 +315,24 @@ image::NOTICE.png[]
 * Advertising clauses (but are probably category X)
 * Link to the  source / how to get original
 * State changes made
-* Not copyright notice
+* Are not copyright notices
 
 == Category A
 * Can bundle software and can depend on
-* Doesn’t add any restrictions above and beyond what the Apache License 2.0 does
+* Doesn't add any restrictions above and beyond what the Apache License 2.0 does
 * Common licenses include: +
 Apache License 2.0, Apache License 1.1, 2 or 3 clause BSD (without advertising clause), MIT/X11, W3C, Unicode, CC copyright only
 
 == Category B
-* Probably can’t include in a source release
-* Contain some restriction of use
+* Probably can't include in a source release
+* Contains some restriction of use
 * May be able to use the binary form to limit the chance of corruption
 * Common license include: +
 Common Development and Distribution License (CDDL), Eclipse Public License (EPL), Mozilla Public License (MPL), most Creative Common licenses
 
 == Category X
-* Can’t depend on
-* Can’t bundle software
+* Can't depend on
+* Can't bundle software
 * A few exceptions for build tools and optional dependencies
 * Common Category X include: +
 GPL, LGPL, CC non commercial, JSON, BSD 4 clause, Apache 1.0?
@@ -309,12 +344,12 @@ GPL, LGPL, CC non commercial, JSON, BSD 4 clause, Apache 1.0?
 
 == Headers
 * All Apache licensed source files should have an ASF header
-* Don’t include a copyright line
+* Don't include a copyright line
 * Use correct header
 
 == Can Compile From Code
 * Helps to have clear instructions on how to in the release
-* If it doesn’t work on a platform, please note that
+* If it doesn't work on a platform, please note that
 * If you need to install a 3rd party component to get it to compile, please note that
 * Make it easy to compile
 
@@ -323,13 +358,13 @@ GPL, LGPL, CC non commercial, JSON, BSD 4 clause, Apache 1.0?
 * Showing how to assemble LICENSE and NOTICE
 * Github with explanation and check-in step by step showing changes +
 https://github.com/justinmclean/ApacheWombat
-* Short screencast (5 minutes) video of assembly +
+* Short screen cast (5 minutes) video of assembly +
 https://vimeo.com/171210141
 
-== Wombat Walk Through
+=== Wombat Walk Through
 * Get boilerplate LICENSE and NOTICE files via curl
 * Get NOTICE file to correct copyright and year
-* Add Bootstrap’s MIT license to LICENSE
+* Add Bootstrap's MIT license to LICENSE
 * index.html contains HTML shiv which is dual licensed MIT/GPL
 * Add HTML shiv MIT to LICENSE
 * index.html depends on Respond.js and jQuery but not bundled
@@ -346,16 +381,16 @@ https://vimeo.com/171210141
 * Unexpected binary files in the source release
 * Contents of LICENSE and NOTICE files
 * Source and binary have same LICENSE and NOTICE
-* Release not in the correct place
-* Missing DISCLAIMER
 * Missing headers
-* Issues missed  due to Rat exclusions
+* Issues missed due to Rat exclusions
 * Issues missed due to automation
+* Missing DISCLAIMER
+* Release not in the correct place
 
 == Binary Distributions
 * Not considered an official release
-* Need to comply the same way with policies as source distributions
-* LICENSE and NOTICE may be different as the content of the release is often different from the source release
+* Need to comply the same way with ASF policies as source distributions
+* LICENSE and NOTICE may be different as the contents of the release is often different from the source release
 
 == Where to Ask for Help
 * Ask on your mailing lists
@@ -367,15 +402,16 @@ legal-discuss@apache.org
 
 == The Incubator is Broken
 * Every few years this comes up, I don't think it is, but like most things, it's not perfect
-* It does add a lot of value for a relatively small amount of work for those involved
+* It adds a lot of value for a relatively small amount of work for those involved
 * Follow the general list and see what issues incubating projects do/don't run into
 * We could do with more help. Get involved! You don't have to be an ASF member
 * We need more people reviewing releases and helping improve documentation
 
-== How can we improve?
+== We're here to help +
+How can we improve?
 Please email the incubator mailing list at: +
 general@incubator.apache.org
-We’re happy to talk about it. Perhaps a bit too much :-)
+We're happy to talk about it. Perhaps a bit too much :-)
 
 == Questions?
 Ask now, see me after the session, or email me, Your Name at Your email.
