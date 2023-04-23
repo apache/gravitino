@@ -1,0 +1,92 @@
+syntax = "proto3";
+
+import "google/protobuf/empty.proto";
+
+option java_multiple_files = true;
+option java_package = "com.datastrato.catalog.proto";
+
+message SchemaVersion {
+  // Schema version number.
+  uint32 major_number = 1;
+  uint32 minor_number = 2;
+  uint32 patch_number = 3;
+}
+
+message Tenant {
+  string tenant_name = 1;
+  string comment = 2;
+  int64 create_time = 3;
+  SchemaVersion version = 4;
+}
+
+message Catalog {
+  string catalog_name = 1;
+  string comment = 2;
+  int64 create_time = 3;
+}
+
+message Schema {
+  string schema_name = 1;
+  string comment = 2;
+  map<string, string> properties = 3;
+  int64 create_time = 4;
+}
+
+enum Nullability {
+  NULLABILITY_UNSPECIFIED = 0;
+  NULLABILITY_REQUIRED = 1;
+  NULLABILITY_OPTIONAL = 2;
+}
+
+enum Type {
+  BOOLEAN = 0;
+  I8 = 1;
+  I16 = 2;
+  I32 = 3;
+  I64 = 4;
+  FP32 = 5;
+  FP64 = 6;
+  STRING = 7;
+  TIMESTAMP = 8;
+  DATE = 9;
+  TIME = 10;
+  INTERVAL_YEAR = 11;
+  INTERVAL_DAY = 12;
+  TIMESTAMP_TZ = 13;
+  UUID = 14;
+
+  FIXED_CHAR = 15;
+  VARCHAR = 16;
+  FIXED_BINARY = 17;
+  DECIMAL = 18;
+
+  STRUCT = 19;
+  LIST = 20;
+  MAP = 21;
+}
+
+message Column {
+  int32 column_id = 1;
+  string column_name = 2;
+  string comment = 3;
+  Type column_type = 4;
+  Nullability nullability = 5;
+}
+
+message Table {
+  enum TableType {
+    TYPE_MANAGED = 0;
+    TYPE_EXTERNAL = 1;
+    TYPE_VIEW = 2;
+  }
+  int32 table_id = 1;
+  string table_name = 2;
+  TableType table_type = 3;
+  repeated Column columns = 4;
+
+  int64 create_time = 5;
+  int64 last_access_time = 6;
+
+  string view_expanded_text = 7;
+  string view_original_text = 8;
+}
