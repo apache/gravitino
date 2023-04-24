@@ -27,9 +27,10 @@ message Catalog {
 
 message Schema {
   string schema_name = 1;
-  string comment = 2;
-  map<string, string> properties = 3;
-  int64 create_time = 4;
+  int32 schema_id = 2;
+  string comment = 3;
+  map<string, string> properties = 4;
+  int64 create_time = 5;
 }
 
 enum Nullability {
@@ -47,22 +48,23 @@ enum Type {
   FP32 = 5;
   FP64 = 6;
   STRING = 7;
-  TIMESTAMP = 8;
-  DATE = 9;
-  TIME = 10;
-  INTERVAL_YEAR = 11;
-  INTERVAL_DAY = 12;
-  TIMESTAMP_TZ = 13;
-  UUID = 14;
 
-  FIXED_CHAR = 15;
-  VARCHAR = 16;
-  FIXED_BINARY = 17;
-  DECIMAL = 18;
+  TIMESTAMP = 15;
+  DATE = 16;
+  TIME = 17;
+  INTERVAL_YEAR = 18;
+  INTERVAL_DAY = 19;
+  TIMESTAMP_TZ = 20;
 
-  STRUCT = 19;
-  LIST = 20;
-  MAP = 21;
+  UUID = 25;
+  FIXED_CHAR = 26;
+  VARCHAR = 27;
+  FIXED_BINARY = 28;
+  DECIMAL = 29;
+
+  STRUCT = 35;
+  LIST = 36;
+  MAP = 37;
 }
 
 message Column {
@@ -79,14 +81,18 @@ message Table {
     TYPE_EXTERNAL = 1;
     TYPE_VIEW = 2;
   }
+
   int32 table_id = 1;
-  string table_name = 2;
-  TableType table_type = 3;
-  repeated Column columns = 4;
+  int32 schema_id = 2;
+  string table_name = 3;
+  TableType table_type = 4;
+  repeated int32 columns = 5;
 
-  int64 create_time = 5;
-  int64 last_access_time = 6;
+  int64 create_time = 6;
+  int64 last_access_time = 7;
 
-  string view_expanded_text = 7;
-  string view_original_text = 8;
+  string view_expanded_text = 8;
+  string view_original_text = 9;
+
+  map<string, string> properties = 10;
 }
