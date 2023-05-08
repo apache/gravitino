@@ -1,9 +1,14 @@
 syntax = "proto3";
 
 import "google/protobuf/empty.proto";
+import "google/protobuf/descriptor.proto";
 
 option java_multiple_files = true;
 option java_package = "com.datastrato.catalog.proto";
+
+extend google.protobuf.EnumValueOptions {
+  optional string catalog_enum_value_option = 50000;
+}
 
 message SchemaVersion {
   // Schema version number.
@@ -19,10 +24,23 @@ message Tenant {
   SchemaVersion version = 4;
 }
 
+message Connection {
+  int32 connection_id = 1;
+  string connection_name = 2;
+  string comment = 3;
+  int64 create_time = 4;
+  map<string, string> properties = 5;
+}
+
+message Function {
+
+}
+
 message Catalog {
-  string catalog_name = 1;
-  string comment = 2;
-  int64 create_time = 3;
+  int32 catalog_id = 1;
+  string catalog_name = 2;
+  string comment = 3;
+  int64 create_time = 4;
 }
 
 message Schema {
@@ -34,37 +52,37 @@ message Schema {
 }
 
 enum Nullability {
-  NULLABILITY_UNSPECIFIED = 0;
-  NULLABILITY_REQUIRED = 1;
-  NULLABILITY_OPTIONAL = 2;
+  NULLABILITY_UNSPECIFIED = 0 [(catalog_enum_value_option) = "NULLABILITY_UNSPECIFIED"];
+  NULLABILITY_REQUIRED = 1 [(catalog_enum_value_option) = "NULLABILITY_REQUIRED"];
+  NULLABILITY_OPTIONAL = 2 [(catalog_enum_value_option) = "NULLABILITY_OPTIONAL"];
 }
 
 enum Type {
-  BOOLEAN = 0;
-  I8 = 1;
-  I16 = 2;
-  I32 = 3;
-  I64 = 4;
-  FP32 = 5;
-  FP64 = 6;
-  STRING = 7;
+  BOOLEAN = 0 [(catalog_enum_value_option) = "BOOLEAN"];
+  I8 = 1 [(catalog_enum_value_option) = "I8"];
+  I16 = 2 [(catalog_enum_value_option) = "I16"];
+  I32 = 3 [(catalog_enum_value_option) = "I32"];
+  I64 = 4 [(catalog_enum_value_option) = "I64"];
+  FP32 = 5 [(catalog_enum_value_option) = "FP32"];
+  FP64 = 6 [(catalog_enum_value_option) = "FP64"];
+  STRING = 7 [(catalog_enum_value_option) = "STRING"];
 
-  TIMESTAMP = 15;
-  DATE = 16;
-  TIME = 17;
-  INTERVAL_YEAR = 18;
-  INTERVAL_DAY = 19;
-  TIMESTAMP_TZ = 20;
+  TIMESTAMP = 15 [(catalog_enum_value_option) = "TIMESTAMP"];
+  DATE = 16 [(catalog_enum_value_option) = "DATE"];
+  TIME = 17 [(catalog_enum_value_option) = "TIME"];
+  INTERVAL_YEAR = 18 [(catalog_enum_value_option) = "INTERVAL_YEAR"];
+  INTERVAL_DAY = 19 [(catalog_enum_value_option) = "INTERVAL_DAY"];
+  TIMESTAMP_TZ = 20 [(catalog_enum_value_option) = "TIMESTAMP_TZ"];
 
-  UUID = 25;
-  FIXED_CHAR = 26;
-  VARCHAR = 27;
-  FIXED_BINARY = 28;
-  DECIMAL = 29;
+  UUID = 25 [(catalog_enum_value_option) = "UUID"];
+  FIXED_CHAR = 26 [(catalog_enum_value_option) = "FIXED_CHAR"];
+  VARCHAR = 27 [(catalog_enum_value_option) = "VARCHAR"];
+  FIXED_BINARY = 28 [(catalog_enum_value_option) = "FIXED_BINARY"];
+  DECIMAL = 29 [(catalog_enum_value_option) = "DECIMAL"];
 
-  STRUCT = 35;
-  LIST = 36;
-  MAP = 37;
+  STRUCT = 35 [(catalog_enum_value_option) = "STRUCT"];
+  LIST = 36 [(catalog_enum_value_option) = "LIST"];
+  MAP = 37 [(catalog_enum_value_option) = "MAP"];
 }
 
 message Column {
@@ -77,9 +95,10 @@ message Column {
 
 message Table {
   enum TableType {
-    TYPE_MANAGED = 0;
-    TYPE_EXTERNAL = 1;
-    TYPE_VIEW = 2;
+    TYPE_LOGICAL
+    TYPE_MANAGED = 0 [(catalog_enum_value_option) = "TYPE_MANAGED"];
+    TYPE_EXTERNAL = 1 [(catalog_enum_value_option) = "TYPE_EXTERNAL"];
+    TYPE_VIEW = 2 [(catalog_enum_value_option) = "TYPE_VIEW"];
   }
 
   int32 table_id = 1;
