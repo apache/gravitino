@@ -1,0 +1,31 @@
+name: Epic
+title: "[EPIC] "
+description: An epic issue with multiple sub-tasks
+labels: [ "kind:epic,priority:major" ]
+body:
+
+  - type: textarea
+    attributes:
+      label: Describe the proposal
+      description: >
+        Please put the related docs here if required.
+      placeholder: >
+        Please describe the content of the proposal clearly and concisely.
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Task list
+      description: >
+        For more details, please refer to [github docs](https://docs.github.com/en/issues/tracking-your-work-with-issues/about-task-lists).
+      placeholder: >
+        Please create sub-tasks with the pre-create issues here and @ the assignees if you know any of them. A simple example is as follows:
+          - [ ] #1
+            - [ ] #11 @user1
+            - [ ] #12
+            - [ ] #13
+          - [ ] #2 @user2
+          - [ ] #3
+    validations:
+      required: true

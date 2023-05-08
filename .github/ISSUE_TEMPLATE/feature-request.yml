@@ -1,0 +1,40 @@
+name: Feature Request
+title: "[FEATURE] "
+description: Suggest an idea for Unified Catalog
+labels: [ "kind:feature,priority:major" ]
+body:
+
+  - type: textarea
+    attributes:
+      label: Describe the feature
+      description: What is it?
+      placeholder: >
+        Please describe the feature you want here.
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Motivation
+      description: Why should it be implemented?
+      placeholder: >
+        Please describe your motivation for requesting this feature.
+    validations:
+      required: false
+
+  - type: textarea
+    attributes:
+      label: Describe the solution
+      description: How could it be implemented?
+      placeholder: >
+        Please describe the solution to implement the new feature if you have any.
+    validations:
+      required: false
+
+  - type: textarea
+    attributes:
+      label: Additional context
+      placeholder: >
+        Anything else we need to know.
+    validations:
+      required: false
