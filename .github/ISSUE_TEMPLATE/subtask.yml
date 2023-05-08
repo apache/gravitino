@@ -1,0 +1,21 @@
+name: Subtask
+title: "[Subtask] "
+description: A subtask issue
+labels: [ "kind:subtask" ]
+body:
+
+  - type: textarea
+    attributes:
+      label: Describe the subtask
+      placeholder: >
+        Please describe the content of the subtask clearly and concisely.
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Parent issue
+      placeholder: >
+        Please put the parent issue link here.
+    validations:
+      required: true
