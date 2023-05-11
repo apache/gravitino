@@ -7,9 +7,7 @@
      - "[MINOR] docs: fix typo in README"
      - "[#255] test: fix flaky test NameOfTheTest"
    Reference: https://www.conventionalcommits.org/en/v1.0.0/
-2. Contributor guidelines:
-   https://github.com/apache/incubator-uniffle/blob/master/CONTRIBUTING.md
-3. If the PR is unfinished, please mark this PR as draft.
+2. If the PR is unfinished, please mark this PR as draft.
 -->
 
 ### What changes were proposed in this pull request?
