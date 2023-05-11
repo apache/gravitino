@@ -1,0 +1,23 @@
+# See https://gh-community.github.io/issue-template-feedback/structured/
+
+name: Improvement
+title: "[Improvement] "
+description: Suggest an improvement on performance, code quality, user experience, etc
+labels: [ "improvement" ]
+body:
+
+  - type: textarea
+    attributes:
+      label: What would you like to be improved?
+      placeholder: >
+        Please describe the problem you see and how it is needed to be improved.
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: How should we improve?
+      placeholder: >
+        Please provide the solution if you have thoughts.
+    validations:
+      required: false
