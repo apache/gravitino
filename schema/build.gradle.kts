@@ -10,6 +10,7 @@ plugins {
 
 dependencies {
   implementation(libs.protobuf.java)
+  implementation("io.substrait:core:${project.property("substrait.version")}")
 }
 
 sourceSets {

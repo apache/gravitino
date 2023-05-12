@@ -21,9 +21,12 @@ java {
 }
 
 allprojects {
-  repositories { mavenCentral() }
+  repositories {
+    mavenCentral()
+    mavenLocal()
+  }
 
-  group = "com.datastrato.catalog"
+  group = "com.datastrato.unified_catalog"
   version = "${version}"
 
   plugins.withType<SpotlessPlugin>().configureEach {

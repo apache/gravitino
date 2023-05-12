@@ -1,117 +1,109 @@
 syntax = "proto3";
 
-import "google/protobuf/empty.proto";
-import "google/protobuf/descriptor.proto";
+import "google/protobuf/timestamp.proto";
+import "substrait/type.proto";
 
 option java_multiple_files = true;
-option java_package = "com.datastrato.catalog.proto";
+option java_package = "com.datastrato.unified_catalog.schema.proto";
 
-extend google.protobuf.EnumValueOptions {
-  optional string catalog_enum_value_option = 50000;
-}
-
+/**
+ * The version of schema definition. Schema is backward compatible within the
+ * same major version. The minor version is used for schema evolution.
+ */
 message SchemaVersion {
-  // Schema version number.
   uint32 major_number = 1;
   uint32 minor_number = 2;
-  uint32 patch_number = 3;
 }
 
+/**
+ * The AuditInfo message is used to record the audit information of a resource.
+ */
+message AuditInfo {
+  string creator = 1;
+  google.protobuf.Timestamp create_time = 2;
+  string last_modifier = 3;
+  google.protobuf.Timestamp last_modified_time = 4;
+  string last_access_user = 5;
+  google.protobuf.Timestamp last_access_time = 6;
+}
+
+/**
+ * The Tenant message is used to record the tenant information.
+ */
 message Tenant {
-  string tenant_name = 1;
-  string comment = 2;
-  int64 create_time = 3;
-  SchemaVersion version = 4;
-}
-
-message Connection {
-  int32 connection_id = 1;
-  string connection_name = 2;
+  uint32 id = 1;
+  string name = 2;
   string comment = 3;
-  int64 create_time = 4;
-  map<string, string> properties = 5;
+  AuditInfo audit_info = 4;
+  SchemaVersion version = 5;
 }
 
-message Function {
-
-}
-
-message Catalog {
-  int32 catalog_id = 1;
-  string catalog_name = 2;
-  string comment = 3;
-  int64 create_time = 4;
-}
-
-message Schema {
-  string schema_name = 1;
-  int32 schema_id = 2;
+/**
+ * The Lakehouse message is used to record the lakehouse information. Lakehouse is used track all
+  the information of the data lake, data warehouse, and data mart.
+ */
+message Lakehouse {
+  uint64 id = 1;
+  string name = 2;
   string comment = 3;
   map<string, string> properties = 4;
-  int64 create_time = 5;
+  AuditInfo audit_info = 5;
 }
 
-enum Nullability {
-  NULLABILITY_UNSPECIFIED = 0 [(catalog_enum_value_option) = "NULLABILITY_UNSPECIFIED"];
-  NULLABILITY_REQUIRED = 1 [(catalog_enum_value_option) = "NULLABILITY_REQUIRED"];
-  NULLABILITY_OPTIONAL = 2 [(catalog_enum_value_option) = "NULLABILITY_OPTIONAL"];
+/**
+ * The Zone message is used to record the zone information. Zone is a second level of container
+ * to organize all the tables and other entities.
+ */
+message Zone {
+  uint64 id = 1;
+  uint64 lakehouse_id = 2;
+  string name = 3;
+  string comment = 4;
+  map<string, string> properties = 5;
+  AuditInfo audit_info = 6;
 }
 
-enum Type {
-  BOOLEAN = 0 [(catalog_enum_value_option) = "BOOLEAN"];
-  I8 = 1 [(catalog_enum_value_option) = "I8"];
-  I16 = 2 [(catalog_enum_value_option) = "I16"];
-  I32 = 3 [(catalog_enum_value_option) = "I32"];
-  I64 = 4 [(catalog_enum_value_option) = "I64"];
-  FP32 = 5 [(catalog_enum_value_option) = "FP32"];
-  FP64 = 6 [(catalog_enum_value_option) = "FP64"];
-  STRING = 7 [(catalog_enum_value_option) = "STRING"];
-
-  TIMESTAMP = 15 [(catalog_enum_value_option) = "TIMESTAMP"];
-  DATE = 16 [(catalog_enum_value_option) = "DATE"];
-  TIME = 17 [(catalog_enum_value_option) = "TIME"];
-  INTERVAL_YEAR = 18 [(catalog_enum_value_option) = "INTERVAL_YEAR"];
-  INTERVAL_DAY = 19 [(catalog_enum_value_option) = "INTERVAL_DAY"];
-  TIMESTAMP_TZ = 20 [(catalog_enum_value_option) = "TIMESTAMP_TZ"];
-
-  UUID = 25 [(catalog_enum_value_option) = "UUID"];
-  FIXED_CHAR = 26 [(catalog_enum_value_option) = "FIXED_CHAR"];
-  VARCHAR = 27 [(catalog_enum_value_option) = "VARCHAR"];
-  FIXED_BINARY = 28 [(catalog_enum_value_option) = "FIXED_BINARY"];
-  DECIMAL = 29 [(catalog_enum_value_option) = "DECIMAL"];
-
-  STRUCT = 35 [(catalog_enum_value_option) = "STRUCT"];
-  LIST = 36 [(catalog_enum_value_option) = "LIST"];
-  MAP = 37 [(catalog_enum_value_option) = "MAP"];
-}
-
+/**
+ * The Column message is used to record the column information. Column uses Substrait's type
+ * system to define the column type, follows the Substrait's type serialization and deserialization.
+ */
 message Column {
-  int32 column_id = 1;
-  string column_name = 2;
-  string comment = 3;
-  Type column_type = 4;
-  Nullability nullability = 5;
+  uint32 id = 1;
+  uint64 entity_id = 2;
+  uint64 entity_snapshot_id = 3;
+  string name = 4;
+  substrait.Type type = 5;
+  string comment = 6;
+  uint32 position = 7;
 }
 
+/**
+ * The Table message is used to record the table information. Table is used to describe the
+ * the information of a structured data set.
+ */
 message Table {
-  enum TableType {
-    TYPE_LOGICAL
-    TYPE_MANAGED = 0 [(catalog_enum_value_option) = "TYPE_MANAGED"];
-    TYPE_EXTERNAL = 1 [(catalog_enum_value_option) = "TYPE_EXTERNAL"];
-    TYPE_VIEW = 2 [(catalog_enum_value_option) = "TYPE_VIEW"];
+  // VirtualTable is mainly used as a reference to a table in a remote system.
+  message VirtualTable {
+    uint32 connection_id = 1;
+    string table_identifier = 2;
   }
 
-  int32 table_id = 1;
-  int32 schema_id = 2;
-  string table_name = 3;
-  TableType table_type = 4;
-  repeated int32 columns = 5;
+  message ViewTable {}
+  message ExternalTable {}
+  message ManagedTable {}
 
-  int64 create_time = 6;
-  int64 last_access_time = 7;
+  uint64 id = 1;
+  uint64 zone_id = 2;
+  string name = 3;
 
-  string view_expanded_text = 8;
-  string view_original_text = 9;
+  oneof kind {
+    VirtualTable virtual_table = 4;
+    ViewTable view_table = 5;
+    ExternalTable external_table = 6;
+    ManagedTable managed_table = 7;
+  }
 
-  map<string, string> properties = 10;
+  uint64 snapshot_id = 8;
+  map<string, string> properties = 9;
+  AuditInfo audit_info = 10;
 }
