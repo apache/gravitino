@@ -33,7 +33,7 @@ We use Substrait’s type system to define our schema’s type, the advantages o
 
 Disadvantages:
 
-1. Substrait is still in fast iteration, the spec is not fully defined yet, and the project is not mature enough. So we potentially have the risk of breaking backward compatibility.
+1. Substrait is still in fast iteration, the spec is not fully defined yet, also the project is not mature enough. So we potentially have the risk of breaking backward compatibility.
 2. Also Substrait lacks best practices, the learning curve is relatively high.
 
 Substrait’s type system can be referred here https://substrait.io/types/type_system/.
@@ -114,18 +114,27 @@ Note. The `type` field serialization and deserialization need to follow Substrai
 
 ##### Table
 
-**TableType**
+**TableType - VirtualTable**
 
-TableType is an enumeration type to differentiate the type of tables.
+| Field Name          | Field Type      | Description                                                  | Optional |
+| ------------------- | --------------- | ------------------------------------------------------------ | -------- |
+| connection_id (TBD) | uint32          | The unique id to represent the connector which used to get physical table | Required |
+| physical_identifier | repeated string | The identifier to specify the physical table                 | Required |
 
-**TYPE_VIRTUAL** - A virtual table that maps to a physical table
+**TableType - ViewTable**
 
-| Field Name  | Field Type          | Description                              | Optional |
-| ----------- | ------------------- | ---------------------------------------- | -------- |
-| id          | uint64              | The unique to represent this table       | Required |
-| zone_id     | uint64              | The id of zone which includes this table | Required |
-| name        | string              | Table name specified by creator          | Required |
-| type        | TableType           | The type of table                        | Required |
-| snapshot_id | uint64              | current snapshot of this table           | Required |
-| properties  | map<string, string> | Properties in kv pair of this Table      | Optional |
-| audit_info  | AuditInfo           | The detailed audit info of Table         | Required |
+**TableType - ExternalTable**
+
+**TableType - ManagedTable**
+
+
+| Field Name    | Field Type          | Description                                     | Optional |
+| ------------- | ------------------- | ----------------------------------------------- | -------- |
+| id            | uint64              | The unique to represent this table              | Required |
+| zone_id       | uint64              | The id of zone which includes this table        | Required |
+| name          | string              | Table name specified by creator                 | Required |
+| type          | TableType           | The type of table                               | Required |
+| snapshot_id   | uint64              | current snapshot of this table                  | Required |
+| properties    | map<string, string> | Properties in kv pair of this Table             | Optional |
+| audit_info    | AuditInfo           | The detailed audit info of Table                | Required |
+| virtual_table | oneof TableType     | Specific table info corresponding to table type | Required |
