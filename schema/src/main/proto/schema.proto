@@ -83,27 +83,35 @@ message Column {
  */
 message Table {
   // VirtualTable is mainly used as a reference to a table in a remote system.
-  message VirtualTable {
+  message VirtualTableInfo {
     uint32 connection_id = 1;
-    string table_identifier = 2;
+    repeated string table_identifier = 2;
   }
 
-  message ViewTable {}
-  message ExternalTable {}
-  message ManagedTable {}
+  message ViewTableInfo {}
+  message ExternalTableInfo {}
+  message ManagedTableInfo {}
+
+  enum TableType {
+    VIRTUAL = 0;
+    VIEW = 1;
+    EXTERNAL = 2;
+    TYPE_MANAGED = 3;
+  }
 
   uint64 id = 1;
   uint64 zone_id = 2;
   string name = 3;
+  TableType type = 4;
 
-  oneof kind {
-    VirtualTable virtual_table = 4;
-    ViewTable view_table = 5;
-    ExternalTable external_table = 6;
-    ManagedTable managed_table = 7;
+  oneof extra_info {
+    VirtualTableInfo virtual_table = 5;
+    ViewTableInfo view_table = 6;
+    ExternalTableInfo external_table = 7;
+    ManagedTableInfo managed_table = 8;
   }
 
-  uint64 snapshot_id = 8;
-  map<string, string> properties = 9;
-  AuditInfo audit_info = 10;
+  uint64 snapshot_id = 9;
+  map<string, string> properties = 10;
+  AuditInfo audit_info = 11;
 }

@@ -32,20 +32,14 @@ public class Field {
   }
 
   public static Field required(String fieldName, Class<?> typeClass) {
-    return new Builder(false)
-        .withName(fieldName)
-        .withTypeClass(typeClass)
-        .build();
+    return new Builder(false).withName(fieldName).withTypeClass(typeClass).build();
   }
 
   public static Field optional(String fieldName, Class<?> typeClass) {
-    return new Builder(true)
-        .withName(fieldName)
-        .withTypeClass(typeClass)
-        .build();
+    return new Builder(true).withName(fieldName).withTypeClass(typeClass).build();
   }
 
-    public <T> void validate(T fieldValue) {
+  public <T> void validate(T fieldValue) {
     if (fieldValue == null && !optional) {
       throw new IllegalArgumentException("Field " + fieldName + " is required");
     }
