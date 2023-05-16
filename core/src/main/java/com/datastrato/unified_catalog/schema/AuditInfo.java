@@ -2,29 +2,31 @@ package com.datastrato.unified_catalog.schema;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableMap;
 import java.time.Instant;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
+import javax.annotation.Nullable;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 
 @Getter
 @EqualsAndHashCode
 public final class AuditInfo implements Entity {
-  private static final Field CREATOR =
+  public static final Field CREATOR =
       Field.required("creator", String.class, "The name of user who creates the entity");
-  private static final Field CREATE_TIME =
+  public static final Field CREATE_TIME =
       Field.required("create_time", Instant.class, "The time when the entity is created");
-  private static final Field LAST_MODIFIER =
+  public static final Field LAST_MODIFIER =
       Field.optional(
           "last_modifier", String.class, "The name of user who last modifies the entity");
-  private static final Field LAST_MODIFIED_TIME =
+  public static final Field LAST_MODIFIED_TIME =
       Field.optional(
           "last_modified_time", Instant.class, "The time when the entity is last modified");
-  private static final Field LAST_ACCESS_USER =
+  public static final Field LAST_ACCESS_USER =
       Field.optional(
           "last_access_user", String.class, "The name of user who last accesses the entity");
-  private static final Field LAST_ACCESS_TIME =
+  public static final Field LAST_ACCESS_TIME =
       Field.optional(
           "last_access_time", Instant.class, "The time when the entity is last accessed");
 
@@ -34,15 +36,19 @@ public final class AuditInfo implements Entity {
   @JsonProperty("create_time")
   private Instant createTime;
 
+  @Nullable
   @JsonProperty("last_modifier")
   private String lastModifier;
 
+  @Nullable
   @JsonProperty("last_modified_time")
   private Instant lastModifiedTime;
 
+  @Nullable
   @JsonProperty("last_access_user")
   private String lastAccessUser;
 
+  @Nullable
   @JsonProperty("last_access_time")
   private Instant lastAccessTime;
 
@@ -53,41 +59,28 @@ public final class AuditInfo implements Entity {
     CREATOR.validate(creator);
     CREATE_TIME.validate(createTime);
 
-    LAST_MODIFIER.validate(lastModifier);
-    LAST_MODIFIED_TIME.validate(lastModifiedTime);
-    if (lastModifier != null) {
-      Preconditions.checkArgument(
-          lastModifiedTime != null, "last_modified_time must be set if last_modifier is set");
-    }
-    if (lastModifier == null) {
-      Preconditions.checkArgument(
-          lastModifiedTime == null,
-          "last_modified_time must not be set if last_modifier is not set");
-    }
+    Preconditions.checkArgument(
+        lastModifier == null && lastModifiedTime == null
+            || lastModifier != null && lastModifiedTime != null,
+        "last_modifier and last_modified_time must be both set or both not set");
 
-    LAST_ACCESS_USER.validate(lastAccessUser);
-    LAST_ACCESS_TIME.validate(lastAccessTime);
-    if (lastAccessUser != null) {
-      Preconditions.checkArgument(
-          lastAccessTime != null, "last_access_time must be set if last_access_user is set");
-    }
-    if (lastAccessUser == null) {
-      Preconditions.checkArgument(
-          lastAccessTime == null,
-          "last_access_time must not be set if last_access_user is not set");
-    }
+    Preconditions.checkArgument(
+        lastAccessUser == null && lastAccessTime == null
+            || lastAccessUser != null && lastAccessTime != null,
+        "last_access_user and last_access_time must be both set or both not set");
   }
 
   @Override
   public Map<Field, Object> fields() {
-    return new ImmutableMap.Builder<Field, Object>()
-        .put(CREATOR, creator)
-        .put(CREATE_TIME, createTime)
-        .put(LAST_MODIFIER, lastModifier)
-        .put(LAST_MODIFIED_TIME, lastModifiedTime)
-        .put(LAST_ACCESS_USER, lastAccessUser)
-        .put(LAST_ACCESS_TIME, lastAccessTime)
-        .build();
+    Map<Field, Object> fields = new HashMap<>();
+    fields.put(CREATOR, creator);
+    fields.put(CREATE_TIME, createTime);
+    fields.put(LAST_MODIFIER, lastModifier);
+    fields.put(LAST_MODIFIED_TIME, lastModifiedTime);
+    fields.put(LAST_ACCESS_USER, lastAccessUser);
+    fields.put(LAST_ACCESS_TIME, lastAccessTime);
+
+    return Collections.unmodifiableMap(fields);
   }
 
   public static class Builder {

@@ -1,8 +1,10 @@
 package com.datastrato.unified_catalog.schema;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.google.common.collect.ImmutableMap;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
+import javax.annotation.Nullable;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 
@@ -10,15 +12,15 @@ import lombok.Getter;
 @EqualsAndHashCode
 public class Lakehouse implements Entity, Auditable {
 
-  private static final Field ID =
+  public static final Field ID =
       Field.required("id", Long.class, "The unique identifier of the lakehouse");
-  private static final Field NAME =
+  public static final Field NAME =
       Field.required("name", String.class, "The name of the lakehouse");
-  private static final Field COMMENT =
+  public static final Field COMMENT =
       Field.optional("comment", String.class, "The comment of the lakehouse");
-  private static final Field PROPERTIES =
-      Field.required("properties", Map.class, "The properties of the lakehouse");
-  private static final Field AUDIT_INFO =
+  public static final Field PROPERTIES =
+      Field.optional("properties", Map.class, "The properties of the lakehouse");
+  public static final Field AUDIT_INFO =
       Field.required("audit_info", AuditInfo.class, "The audit info of the lakehouse");
 
   @JsonProperty("id")
@@ -27,9 +29,11 @@ public class Lakehouse implements Entity, Auditable {
   @JsonProperty("name")
   private String name;
 
+  @Nullable
   @JsonProperty("comment")
   private String comment;
 
+  @Nullable
   @JsonProperty("properties")
   private Map<String, String> properties;
 
@@ -40,12 +44,14 @@ public class Lakehouse implements Entity, Auditable {
 
   @Override
   public Map<Field, Object> fields() {
-    return new ImmutableMap.Builder<Field, Object>()
-        .put(ID, id)
-        .put(NAME, name)
-        .put(COMMENT, comment)
-        .put(PROPERTIES, properties)
-        .build();
+    Map<Field, Object> fields = new HashMap<>();
+    fields.put(ID, id);
+    fields.put(NAME, name);
+    fields.put(COMMENT, comment);
+    fields.put(PROPERTIES, properties);
+    fields.put(AUDIT_INFO, auditInfo);
+
+    return Collections.unmodifiableMap(fields);
   }
 
   @Override
@@ -60,27 +66,27 @@ public class Lakehouse implements Entity, Auditable {
       lakehouse = new Lakehouse();
     }
 
-    public Builder id(Long id) {
+    public Builder withId(Long id) {
       lakehouse.id = id;
       return this;
     }
 
-    public Builder name(String name) {
+    public Builder withName(String name) {
       lakehouse.name = name;
       return this;
     }
 
-    public Builder comment(String comment) {
+    public Builder withComment(String comment) {
       lakehouse.comment = comment;
       return this;
     }
 
-    public Builder properties(Map<String, String> properties) {
+    public Builder withProperties(Map<String, String> properties) {
       lakehouse.properties = properties;
       return this;
     }
 
-    public Builder auditInfo(AuditInfo auditInfo) {
+    public Builder withAuditInfo(AuditInfo auditInfo) {
       lakehouse.auditInfo = auditInfo;
       return this;
     }

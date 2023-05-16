@@ -1,9 +1,11 @@
 package com.datastrato.unified_catalog.schema;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.google.common.collect.ImmutableMap;
 import io.substrait.type.Type;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
+import javax.annotation.Nullable;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 
@@ -11,25 +13,25 @@ import lombok.Getter;
 @EqualsAndHashCode
 public final class Column implements Entity, Auditable {
 
-  private static final Field ID =
+  public static final Field ID =
       Field.required("id", Integer.class, "The unique identifier of the column");
-  private static final Field ENTITY_ID =
+  public static final Field ENTITY_ID =
       Field.required(
           "entity_id",
           Long.class,
           "The unique identifier of the parent entity which this column belongs to");
-  private static final Field ENTITY_SNAPSHOT_ID =
+  public static final Field ENTITY_SNAPSHOT_ID =
       Field.required(
           "entity_snapshot_id",
           Long.class,
           "The snapshot id of the parent entity which this column belongs to");
-  private static final Field NAME = Field.required("name", String.class, "The name of the column");
-  private static final Field TYPE = Field.required("type", Type.class, "The type of the column");
-  private static final Field COMMENT =
+  public static final Field NAME = Field.required("name", String.class, "The name of the column");
+  public static final Field TYPE = Field.required("type", Type.class, "The type of the column");
+  public static final Field COMMENT =
       Field.optional("comment", String.class, "The comment of the column");
-  private static final Field POSITION =
+  public static final Field POSITION =
       Field.required("position", Integer.class, "The position of the column");
-  private static final Field AUDIT_INFO =
+  public static final Field AUDIT_INFO =
       Field.required("audit_info", AuditInfo.class, "The audit info of the column");
 
   @JsonProperty("id")
@@ -47,6 +49,7 @@ public final class Column implements Entity, Auditable {
   @JsonProperty("type")
   private Type type;
 
+  @Nullable
   @JsonProperty("comment")
   private String comment;
 
@@ -60,15 +63,17 @@ public final class Column implements Entity, Auditable {
 
   @Override
   public Map<Field, Object> fields() {
-    return new ImmutableMap.Builder<Field, Object>()
-        .put(ID, id)
-        .put(ENTITY_ID, entityId)
-        .put(ENTITY_SNAPSHOT_ID, entitySnapshotId)
-        .put(NAME, name)
-        .put(TYPE, type)
-        .put(COMMENT, comment)
-        .put(POSITION, position)
-        .build();
+    Map<Field, Object> fields = new HashMap<>();
+    fields.put(ID, id);
+    fields.put(ENTITY_ID, entityId);
+    fields.put(ENTITY_SNAPSHOT_ID, entitySnapshotId);
+    fields.put(NAME, name);
+    fields.put(TYPE, type);
+    fields.put(COMMENT, comment);
+    fields.put(POSITION, position);
+    fields.put(AUDIT_INFO, auditInfo);
+
+    return Collections.unmodifiableMap(fields);
   }
 
   @Override
@@ -83,42 +88,42 @@ public final class Column implements Entity, Auditable {
       column = new Column();
     }
 
-    public Builder id(Integer id) {
+    public Builder withId(Integer id) {
       column.id = id;
       return this;
     }
 
-    public Builder entityId(Long entityId) {
+    public Builder withEntityId(Long entityId) {
       column.entityId = entityId;
       return this;
     }
 
-    public Builder entitySnapshotId(Long entitySnapshotId) {
+    public Builder withEntitySnapshotId(Long entitySnapshotId) {
       column.entitySnapshotId = entitySnapshotId;
       return this;
     }
 
-    public Builder name(String name) {
+    public Builder withName(String name) {
       column.name = name;
       return this;
     }
 
-    public Builder type(Type type) {
+    public Builder withType(Type type) {
       column.type = type;
       return this;
     }
 
-    public Builder comment(String comment) {
+    public Builder withComment(String comment) {
       column.comment = comment;
       return this;
     }
 
-    public Builder position(Integer position) {
+    public Builder withPosition(Integer position) {
       column.position = position;
       return this;
     }
 
-    public Builder auditInfo(AuditInfo auditInfo) {
+    public Builder withAuditInfo(AuditInfo auditInfo) {
       column.auditInfo = auditInfo;
       return this;
     }

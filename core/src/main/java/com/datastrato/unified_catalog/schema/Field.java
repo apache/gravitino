@@ -1,5 +1,8 @@
 package com.datastrato.unified_catalog.schema;
 
+import lombok.EqualsAndHashCode;
+
+@EqualsAndHashCode
 public class Field {
   // The name of the field
   private String fieldName;

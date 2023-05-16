@@ -25,6 +25,9 @@ dependencies {
   testCompileOnly("org.projectlombok:lombok:${project.property("lombok.version")}")
   testAnnotationProcessor(
     "org.projectlombok:lombok:${project.property("lombok.version")}")
+  testImplementation("org.junit.jupiter:junit-jupiter-api:${project.property("junit5.version")}")
+  testImplementation("org.junit.jupiter:junit-jupiter-params:${project.property("junit5.version")}")
+  testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine")
 }
 
 java {

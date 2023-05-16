@@ -1,9 +1,8 @@
 package com.datastrato.unified_catalog.schema;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.google.common.collect.ImmutableMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import javax.annotation.Nullable;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 
@@ -27,24 +26,24 @@ public class Table implements Entity, Auditable, hasExtraInfo {
     }
   }
 
-  private static final Field ID =
+  public static final Field ID =
       Field.required("id", Long.class, "The unique identifier of the table");
-  private static final Field ZONE_ID =
+  public static final Field ZONE_ID =
       Field.required(
           "zone_id", Long.class, "The unique identifier of the zone which this table belongs to");
-  private static final Field NAME = Field.required("name", String.class, "The name of the table");
-  private static final Field COMMENT =
+  public static final Field NAME = Field.required("name", String.class, "The name of the table");
+  public static final Field COMMENT =
       Field.optional("comment", String.class, "The comment of the table");
-  private static final Field TABLE_TYPE =
+  public static final Field TABLE_TYPE =
       Field.required("type", TableType.class, "The type of the table");
-  private static final Field SNAPSHOT_ID =
+  public static final Field SNAPSHOT_ID =
       Field.required("snapshot_id", Long.class, "The snapshot id of the table");
-  private static final Field PROPERTIES =
+  public static final Field PROPERTIES =
       Field.optional("properties", Map.class, "The properties of the table");
-  private static final Field AUDIT_INFO =
+  public static final Field AUDIT_INFO =
       Field.required("audit_info", AuditInfo.class, "The audit info of the table");
-  private static final Field EXTRA_INFO =
-      Field.optional("extra_info", hasExtraInfo.ExtraInfo.class, "The extra info of the table");
+  public static final Field EXTRA_INFO =
+      Field.required("extra_info", hasExtraInfo.ExtraInfo.class, "The extra info of the table");
 
   @JsonProperty("id")
   private Long id;
@@ -55,6 +54,7 @@ public class Table implements Entity, Auditable, hasExtraInfo {
   @JsonProperty("name")
   private String name;
 
+  @Nullable
   @JsonProperty("comment")
   private String comment;
 
@@ -64,6 +64,7 @@ public class Table implements Entity, Auditable, hasExtraInfo {
   @JsonProperty("snapshot_id")
   private Long snapshotId;
 
+  @Nullable
   @JsonProperty("properties")
   private Map<String, String> properties;
 
@@ -80,17 +81,18 @@ public class Table implements Entity, Auditable, hasExtraInfo {
 
   @Override
   public Map<Field, Object> fields() {
-    return new ImmutableMap.Builder<Field, Object>()
-        .put(ID, id)
-        .put(ZONE_ID, zoneId)
-        .put(NAME, name)
-        .put(COMMENT, comment)
-        .put(TABLE_TYPE, type)
-        .put(SNAPSHOT_ID, snapshotId)
-        .put(PROPERTIES, properties)
-        .put(AUDIT_INFO, auditInfo)
-        .put(EXTRA_INFO, extraInfo)
-        .build();
+    Map<Field, Object> fields = new HashMap<>();
+    fields.put(ID, id);
+    fields.put(ZONE_ID, zoneId);
+    fields.put(NAME, name);
+    fields.put(COMMENT, comment);
+    fields.put(TABLE_TYPE, type);
+    fields.put(SNAPSHOT_ID, snapshotId);
+    fields.put(PROPERTIES, properties);
+    fields.put(AUDIT_INFO, auditInfo);
+    fields.put(EXTRA_INFO, extraInfo);
+
+    return Collections.unmodifiableMap(fields);
   }
 
   @Override
@@ -110,52 +112,52 @@ public class Table implements Entity, Auditable, hasExtraInfo {
       table = new Table();
     }
 
-    public Builder id(Long id) {
+    public Builder withId(Long id) {
       table.id = id;
       return this;
     }
 
-    public Builder zoneId(Long zoneId) {
+    public Builder withZoneId(Long zoneId) {
       table.zoneId = zoneId;
       return this;
     }
 
-    public Builder name(String name) {
+    public Builder withName(String name) {
       table.name = name;
       return this;
     }
 
-    public Builder comment(String comment) {
+    public Builder withComment(String comment) {
       table.comment = comment;
       return this;
     }
 
-    public Builder type(TableType type) {
+    public Builder withType(TableType type) {
       table.type = type;
       return this;
     }
 
-    public Builder snapshotId(Long snapshotId) {
+    public Builder withSnapshotId(Long snapshotId) {
       table.snapshotId = snapshotId;
       return this;
     }
 
-    public Builder properties(Map<String, String> properties) {
+    public Builder withProperties(Map<String, String> properties) {
       table.properties = properties;
       return this;
     }
 
-    public Builder auditInfo(AuditInfo auditInfo) {
+    public Builder withAuditInfo(AuditInfo auditInfo) {
       table.auditInfo = auditInfo;
       return this;
     }
 
-    public Builder extraInfo(hasExtraInfo.ExtraInfo extraInfo) {
+    public Builder withExtraInfo(hasExtraInfo.ExtraInfo extraInfo) {
       table.extraInfo = extraInfo;
       return this;
     }
 
-    public Builder columns(List<Column> columns) {
+    public Builder withColumns(List<Column> columns) {
       table.columns = columns;
       return this;
     }

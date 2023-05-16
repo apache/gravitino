@@ -4,14 +4,16 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.collect.ImmutableMap;
 import java.util.List;
 import java.util.Map;
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 
 @Getter
+@EqualsAndHashCode
 public final class VirtualTableInfo implements hasExtraInfo.ExtraInfo {
 
-  private static final Field CONNECTION_ID =
+  public static final Field CONNECTION_ID =
       Field.required("connection_id", Integer.class, "The unique identifier of the connection");
-  private static final Field IDENTIFIER =
+  public static final Field IDENTIFIER =
       Field.required("identifier", List.class, "The unique identifier of the table");
 
   @JsonProperty("connection_id")

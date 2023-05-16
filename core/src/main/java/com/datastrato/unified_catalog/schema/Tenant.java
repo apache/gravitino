@@ -1,8 +1,10 @@
 package com.datastrato.unified_catalog.schema;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.google.common.collect.ImmutableMap;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
+import javax.annotation.Nullable;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 
@@ -10,14 +12,14 @@ import lombok.Getter;
 @EqualsAndHashCode
 public final class Tenant implements Entity, Auditable {
 
-  private static final Field ID =
+  public static final Field ID =
       Field.required("id", Integer.class, "The unique identifier of the tenant");
-  private static final Field NAME = Field.required("name", String.class, "The name of the tenant");
-  private static final Field COMMENT =
+  public static final Field NAME = Field.required("name", String.class, "The name of the tenant");
+  public static final Field COMMENT =
       Field.optional("comment", String.class, "The comment of the tenant");
-  private static final Field AUDIT_INFO =
+  public static final Field AUDIT_INFO =
       Field.required("audit_info", AuditInfo.class, "The audit info of the tenant");
-  private static final Field VERSION =
+  public static final Field VERSION =
       Field.required("version", SchemaVersion.class, "The version of the tenant");
 
   @JsonProperty("id")
@@ -26,6 +28,7 @@ public final class Tenant implements Entity, Auditable {
   @JsonProperty("name")
   private String name;
 
+  @Nullable
   @JsonProperty("comment")
   private String comment;
 
@@ -39,13 +42,14 @@ public final class Tenant implements Entity, Auditable {
 
   @Override
   public Map<Field, Object> fields() {
-    return new ImmutableMap.Builder<Field, Object>()
-        .put(ID, id)
-        .put(NAME, name)
-        .put(COMMENT, comment)
-        .put(AUDIT_INFO, auditInfo)
-        .put(VERSION, version)
-        .build();
+    Map<Field, Object> fields = new HashMap<>();
+    fields.put(ID, id);
+    fields.put(NAME, name);
+    fields.put(COMMENT, comment);
+    fields.put(AUDIT_INFO, auditInfo);
+    fields.put(VERSION, version);
+
+    return Collections.unmodifiableMap(fields);
   }
 
   @Override
@@ -60,27 +64,27 @@ public final class Tenant implements Entity, Auditable {
       this.tenant = new Tenant();
     }
 
-    public Builder id(Integer id) {
+    public Builder withId(Integer id) {
       this.tenant.id = id;
       return this;
     }
 
-    public Builder name(String name) {
+    public Builder withName(String name) {
       this.tenant.name = name;
       return this;
     }
 
-    public Builder comment(String comment) {
+    public Builder withComment(String comment) {
       this.tenant.comment = comment;
       return this;
     }
 
-    public Builder auditInfo(AuditInfo auditInfo) {
+    public Builder withAuditInfo(AuditInfo auditInfo) {
       this.tenant.auditInfo = auditInfo;
       return this;
     }
 
-    public Builder version(SchemaVersion version) {
+    public Builder withVersion(SchemaVersion version) {
       this.tenant.version = version;
       return this;
     }
