@@ -1,0 +1,18 @@
+[versions]
+junit = "5.8.1"
+protoc = "3.17.3"
+protobuf-plugin = "0.9.2"
+spotless-plugin = '6.11.0'
+gradle-extensions-plugin = '1.74'
+publish-plugin = '1.1.0'
+
+[libraries]
+protobuf-java = { group = "com.google.protobuf", name = "protobuf-java", version.ref = "protoc" }
+
+[bundles]
+
+[plugins]
+protobuf = { id = "com.google.protobuf", version.ref = "protobuf-plugin" }
+spotless = { id = "com.diffplug.spotless", version.ref = "spotless-plugin" }
+gradle-extensions = { id = "com.github.vlsi.gradle-extensions", version.ref = "gradle-extensions-plugin" }
+publish = { id = "io.github.gradle-nexus.publish-plugin", version.ref = "publish-plugin" }
