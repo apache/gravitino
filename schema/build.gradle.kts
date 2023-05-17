@@ -4,20 +4,12 @@ plugins {
   `maven-publish`
   id("java")
   id("idea")
-  id("com.google.protobuf") version "0.9.2"
-  id("com.diffplug.spotless") version "6.11.0"
+  alias(libs.plugins.protobuf)
+  alias(libs.plugins.spotless)
 }
 
 dependencies {
-  implementation("com.google.protobuf:protobuf-java:${project.property("protoc.version")}")
-}
-
-java {
-  toolchain {
-    languageVersion.set(JavaLanguageVersion.of(8))
-    withJavadocJar()
-    withSourcesJar()
-  }
+  implementation(libs.protobuf.java)
 }
 
 sourceSets {
@@ -28,5 +20,5 @@ sourceSets {
 }
 
 protobuf {
-  protoc { artifact = "com.google.protobuf:protoc:${project.property("protoc.version")}" }
+  protoc { artifact = "com.google.protobuf:protoc:${libs.versions.protoc.get()}"}
 }
