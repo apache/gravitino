@@ -5,16 +5,19 @@ plugins {
   `maven-publish`
   id("java")
   id("idea")
-  id("com.github.vlsi.gradle-extensions") version "1.74"
-  id("com.diffplug.spotless") version "6.11.0"
-  id("io.github.gradle-nexus.publish-plugin") version "1.1.0"
+  alias(libs.plugins.gradle.extensions)
+  alias(libs.plugins.spotless)
+  alias(libs.plugins.publish)
 }
 
 repositories { mavenCentral() }
 
-java { toolchain { languageVersion.set(JavaLanguageVersion.of(8)) } }
-
-dependencies {
+java {
+  toolchain {
+    languageVersion.set(JavaLanguageVersion.of(8))
+    withJavadocJar()
+    withSourcesJar()
+  }
 }
 
 allprojects {
