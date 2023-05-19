@@ -318,8 +318,6 @@ public class TestEntityJsonSerDe {
     Assertions.assertEquals(expectedJson1, serJson1);
     Zone deserZone1 = JsonUtils.objectMapper().readValue(serJson1, Zone.class);
     Assertions.assertEquals(zone1, deserZone1);
-    System.out.println(deserZone);
-    System.out.println(deserZone1);
   }
 
   @Test
