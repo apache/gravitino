@@ -1,5 +1,6 @@
 import com.diffplug.gradle.spotless.SpotlessExtension
 import com.diffplug.gradle.spotless.SpotlessPlugin
+import com.github.vlsi.gradle.dsl.configureEach
 
 plugins {
   `maven-publish`
@@ -21,9 +22,16 @@ java {
 }
 
 allprojects {
-  repositories { mavenCentral() }
+  repositories {
+    mavenCentral()
+    mavenLocal()
+  }
 
-  group = "com.datastrato.catalog"
+  tasks.configureEach<Test> {
+    useJUnitPlatform()
+  }
+
+  group = "com.datastrato.unified_catalog"
   version = "${version}"
 
   plugins.withType<SpotlessPlugin>().configureEach {

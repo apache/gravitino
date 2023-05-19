@@ -1,92 +1,117 @@
 syntax = "proto3";
 
-import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+import "substrait/type.proto";
 
 option java_multiple_files = true;
-option java_package = "com.datastrato.catalog.proto";
+option java_package = "com.datastrato.unified_catalog.schema.proto";
 
+/**
+ * The version of schema definition. Schema is backward compatible within the
+ * same major version. The minor version is used for schema evolution.
+ */
 message SchemaVersion {
-  // Schema version number.
   uint32 major_number = 1;
   uint32 minor_number = 2;
-  uint32 patch_number = 3;
 }
 
+/**
+ * The AuditInfo message is used to record the audit information of a resource.
+ */
+message AuditInfo {
+  string creator = 1;
+  google.protobuf.Timestamp create_time = 2;
+  string last_modifier = 3;
+  google.protobuf.Timestamp last_modified_time = 4;
+  string last_access_user = 5;
+  google.protobuf.Timestamp last_access_time = 6;
+}
+
+/**
+ * The Tenant message is used to record the tenant information.
+ */
 message Tenant {
-  string tenant_name = 1;
-  string comment = 2;
-  int64 create_time = 3;
-  SchemaVersion version = 4;
-}
-
-message Catalog {
-  string catalog_name = 1;
-  string comment = 2;
-  int64 create_time = 3;
-}
-
-message Schema {
-  string schema_name = 1;
-  string comment = 2;
-  map<string, string> properties = 3;
-  int64 create_time = 4;
-}
-
-enum Nullability {
-  NULLABILITY_UNSPECIFIED = 0;
-  NULLABILITY_REQUIRED = 1;
-  NULLABILITY_OPTIONAL = 2;
-}
-
-enum Type {
-  BOOLEAN = 0;
-  I8 = 1;
-  I16 = 2;
-  I32 = 3;
-  I64 = 4;
-  FP32 = 5;
-  FP64 = 6;
-  STRING = 7;
-  TIMESTAMP = 8;
-  DATE = 9;
-  TIME = 10;
-  INTERVAL_YEAR = 11;
-  INTERVAL_DAY = 12;
-  TIMESTAMP_TZ = 13;
-  UUID = 14;
-
-  FIXED_CHAR = 15;
-  VARCHAR = 16;
-  FIXED_BINARY = 17;
-  DECIMAL = 18;
-
-  STRUCT = 19;
-  LIST = 20;
-  MAP = 21;
-}
-
-message Column {
-  int32 column_id = 1;
-  string column_name = 2;
+  uint32 id = 1;
+  string name = 2;
   string comment = 3;
-  Type column_type = 4;
-  Nullability nullability = 5;
+  AuditInfo audit_info = 4;
+  SchemaVersion version = 5;
 }
 
+/**
+ * The Lakehouse message is used to record the lakehouse information. Lakehouse is used track all
+  the information of the data lake, data warehouse, and data mart.
+ */
+message Lakehouse {
+  uint64 id = 1;
+  string name = 2;
+  string comment = 3;
+  map<string, string> properties = 4;
+  AuditInfo audit_info = 5;
+}
+
+/**
+ * The Zone message is used to record the zone information. Zone is a second level of container
+ * to organize all the tables and other entities.
+ */
+message Zone {
+  uint64 id = 1;
+  uint64 lakehouse_id = 2;
+  string name = 3;
+  string comment = 4;
+  map<string, string> properties = 5;
+  AuditInfo audit_info = 6;
+}
+
+/**
+ * The Column message is used to record the column information. Column uses Substrait's type
+ * system to define the column type, follows the Substrait's type serialization and deserialization.
+ */
+message Column {
+  uint32 id = 1;
+  uint64 entity_id = 2;
+  uint64 entity_snapshot_id = 3;
+  string name = 4;
+  substrait.Type type = 5;
+  string comment = 6;
+  uint32 position = 7;
+}
+
+/**
+ * The Table message is used to record the table information. Table is used to describe the
+ * the information of a structured data set.
+ */
 message Table {
-  enum TableType {
-    TYPE_MANAGED = 0;
-    TYPE_EXTERNAL = 1;
-    TYPE_VIEW = 2;
+  // VirtualTable is mainly used as a reference to a table in a remote system.
+  message VirtualTableInfo {
+    uint32 connection_id = 1;
+    repeated string table_identifier = 2;
   }
-  int32 table_id = 1;
-  string table_name = 2;
-  TableType table_type = 3;
-  repeated Column columns = 4;
 
-  int64 create_time = 5;
-  int64 last_access_time = 6;
+  message ViewTableInfo {}
+  message ExternalTableInfo {}
+  message ManagedTableInfo {}
 
-  string view_expanded_text = 7;
-  string view_original_text = 8;
+  enum TableType {
+    VIRTUAL = 0;
+    VIEW = 1;
+    EXTERNAL = 2;
+    TYPE_MANAGED = 3;
+  }
+
+  uint64 id = 1;
+  uint64 zone_id = 2;
+  string name = 3;
+  TableType type = 4;
+
+  oneof extra_info {
+    VirtualTableInfo virtual_table = 5;
+    ViewTableInfo view_table = 6;
+    ExternalTableInfo external_table = 7;
+    ManagedTableInfo managed_table = 8;
+  }
+
+  uint64 snapshot_id = 9;
+  map<string, string> properties = 10;
+  AuditInfo audit_info = 11;
 }

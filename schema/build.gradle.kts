@@ -10,6 +10,7 @@ plugins {
 
 dependencies {
   implementation(libs.protobuf.java)
+  implementation(libs.substrait.java.core)
 }
 
 sourceSets {
