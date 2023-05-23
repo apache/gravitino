@@ -56,3 +56,10 @@ we need to deploy the crawler to different hosts and multiple data centers in Do
 ## Metadata Type System
 We use Substrait’s type system to define our metadata schema’s type, 
 Substrait’s type system can be referred here https://substrait.io/types/type_system/.
+In this way, different engines can read and write the same data based on the same schema and field type. 
+Instead of each engine having to build a separate external table, 
+multiple engines can be seamlessly connected in the future.
+
+## Multi-version
+We need to support multi-version for metadata, Each time we find an existing change in the metadata,
+We save all history version data by adding a new version metadata record.
