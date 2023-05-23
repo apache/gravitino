@@ -9,9 +9,11 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
+import lombok.ToString;
 
 @Getter
 @EqualsAndHashCode
+@ToString
 public final class AuditInfo implements Entity {
   public static final Field CREATOR =
       Field.required("creator", String.class, "The name of user who creates the entity");

@@ -1,6 +1,9 @@
 package com.datastrato.unified_catalog.schema;
 
+import com.datastrato.unified_catalog.schema.json.JsonUtils;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import io.substrait.type.Type;
 import java.util.Collections;
 import java.util.HashMap;
@@ -8,9 +11,11 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
+import lombok.ToString;
 
 @Getter
 @EqualsAndHashCode
+@ToString
 public final class Column implements Entity, Auditable {
 
   public static final Field ID =
@@ -47,6 +52,8 @@ public final class Column implements Entity, Auditable {
   private String name;
 
   @JsonProperty("type")
+  @JsonSerialize(using = JsonUtils.TypeSerializer.class)
+  @JsonDeserialize(using = JsonUtils.TypeDeserializer.class)
   private Type type;
 
   @Nullable
