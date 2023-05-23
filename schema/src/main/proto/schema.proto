@@ -21,10 +21,10 @@ message SchemaVersion {
 message AuditInfo {
   string creator = 1;
   google.protobuf.Timestamp create_time = 2;
-  string last_modifier = 3;
-  google.protobuf.Timestamp last_modified_time = 4;
-  string last_access_user = 5;
-  google.protobuf.Timestamp last_access_time = 6;
+  optional string last_modifier = 3;
+  optional google.protobuf.Timestamp last_modified_time = 4;
+  optional string last_access_user = 5;
+  optional google.protobuf.Timestamp last_access_time = 6;
 }
 
 /**
@@ -33,7 +33,7 @@ message AuditInfo {
 message Tenant {
   uint32 id = 1;
   string name = 2;
-  string comment = 3;
+  optional string comment = 3;
   AuditInfo audit_info = 4;
   SchemaVersion version = 5;
 }
@@ -45,7 +45,7 @@ message Tenant {
 message Lakehouse {
   uint64 id = 1;
   string name = 2;
-  string comment = 3;
+  optional string comment = 3;
   map<string, string> properties = 4;
   AuditInfo audit_info = 5;
 }
@@ -58,7 +58,7 @@ message Zone {
   uint64 id = 1;
   uint64 lakehouse_id = 2;
   string name = 3;
-  string comment = 4;
+  optional string comment = 4;
   map<string, string> properties = 5;
   AuditInfo audit_info = 6;
 }
@@ -73,7 +73,7 @@ message Column {
   uint64 entity_snapshot_id = 3;
   string name = 4;
   substrait.Type type = 5;
-  string comment = 6;
+  optional string comment = 6;
   uint32 position = 7;
 }
 
@@ -114,4 +114,5 @@ message Table {
   uint64 snapshot_id = 9;
   map<string, string> properties = 10;
   AuditInfo audit_info = 11;
+  optional string comment = 12;
 }

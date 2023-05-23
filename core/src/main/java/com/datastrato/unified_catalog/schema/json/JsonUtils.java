@@ -9,6 +9,8 @@ import io.substrait.type.Type;
 import io.substrait.type.parser.ParseToPojo;
 import io.substrait.type.parser.TypeStringParser;
 import java.io.IOException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class JsonUtils {
   private static ObjectMapper mapper = null;
@@ -29,6 +31,8 @@ public class JsonUtils {
   }
 
   public static class TypeSerializer extends JsonSerializer<io.substrait.type.Type> {
+    private static final Logger LOG = LoggerFactory.getLogger(TypeSerializer.class);
+
     private final StringTypeVisitor visitor = new StringTypeVisitor();
 
     @Override
@@ -37,12 +41,14 @@ public class JsonUtils {
       try {
         gen.writeString(value.accept(visitor));
       } catch (Exception e) {
+        LOG.warn("Unable to serialize type {}.", value, e);
         throw new IOException("Unable to serialize type " + value, e);
       }
     }
   }
 
   public static class TypeDeserializer extends JsonDeserializer<io.substrait.type.Type> {
+    private static final Logger LOG = LoggerFactory.getLogger(TypeDeserializer.class);
 
     @Override
     public Type deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
@@ -50,6 +56,7 @@ public class JsonUtils {
       try {
         return TypeStringParser.parse(s, ParseToPojo::type);
       } catch (Exception e) {
+        LOG.warn("Unable to parse string {}.", s.replace("\n", " \\n"), e);
         throw new IOException("Unable to parse string " + s.replace("\n", " \\n"), e);
       }
     }
