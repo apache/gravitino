@@ -1,7 +1,13 @@
 package com.datastrato.unified_catalog.schema;
 
+import com.fasterxml.jackson.annotation.JsonSubTypes;
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
+
 /** Interface for entities that have extra info. */
 public interface hasExtraInfo {
+
+  @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY, property = "type")
+  @JsonSubTypes({@JsonSubTypes.Type(value = VirtualTableInfo.class, name = "VIRTUAL")})
   interface ExtraInfo extends Entity {}
 
   /**

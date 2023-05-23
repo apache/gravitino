@@ -5,11 +5,13 @@ import java.util.*;
 import javax.annotation.Nullable;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
+import lombok.ToString;
 
 @Getter
 @EqualsAndHashCode
+@ToString
 public class Table implements Entity, Auditable, hasExtraInfo {
-  enum TableType {
+  public enum TableType {
     VIRTUAL("VIRTUAL"),
     VIEW("VIEW"),
     EXTERNAL("EXTERNAL"),

@@ -6,9 +6,11 @@ import java.util.List;
 import java.util.Map;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
+import lombok.ToString;
 
 @Getter
 @EqualsAndHashCode
+@ToString
 public final class VirtualTableInfo implements hasExtraInfo.ExtraInfo {
 
   public static final Field CONNECTION_ID =
@@ -21,6 +23,12 @@ public final class VirtualTableInfo implements hasExtraInfo.ExtraInfo {
 
   @JsonProperty("identifier")
   private final List<String> identifier;
+
+  // Only for Jackson deserialization
+  private VirtualTableInfo() {
+    this.connectionId = null;
+    this.identifier = null;
+  }
 
   public VirtualTableInfo(Integer connectionId, List<String> identifier) {
     this.connectionId = connectionId;

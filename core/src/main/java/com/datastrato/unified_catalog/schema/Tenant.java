@@ -7,9 +7,11 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
+import lombok.ToString;
 
 @Getter
 @EqualsAndHashCode
+@ToString
 public final class Tenant implements Entity, Auditable {
 
   public static final Field ID =
