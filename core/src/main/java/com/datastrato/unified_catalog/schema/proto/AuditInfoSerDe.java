@@ -1,6 +1,6 @@
 package com.datastrato.unified_catalog.schema.proto;
 
-public class AuditInfoSerDe
+class AuditInfoSerDe
     implements ProtoSerDe<com.datastrato.unified_catalog.schema.AuditInfo, AuditInfo> {
   @Override
   public AuditInfo serialize(com.datastrato.unified_catalog.schema.AuditInfo auditInfo) {

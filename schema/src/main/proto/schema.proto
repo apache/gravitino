@@ -75,6 +75,7 @@ message Column {
   substrait.Type type = 5;
   optional string comment = 6;
   uint32 position = 7;
+  AuditInfo audit_info = 8;
 }
 
 /**

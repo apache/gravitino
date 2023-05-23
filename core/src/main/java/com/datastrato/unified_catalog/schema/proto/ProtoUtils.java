@@ -3,7 +3,7 @@ package com.datastrato.unified_catalog.schema.proto;
 import com.google.protobuf.Timestamp;
 import java.time.Instant;
 
-public class ProtoUtils {
+class ProtoUtils {
 
   private ProtoUtils() {}
 
