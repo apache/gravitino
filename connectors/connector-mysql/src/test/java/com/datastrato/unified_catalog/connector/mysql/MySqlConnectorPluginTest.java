@@ -1,6 +1,6 @@
-package com.datastrato.catalog.connector.mysql;
+package com.datastrato.unified_catalog.connector.mysql;
 
-import com.datastrato.catalog.connectors.commons.ConnectorPluginManager;
+import com.datastrato.unified_catalog.connectors.commons.ConnectorPluginManager;
 import org.junit.jupiter.api.Test;
 import java.util.Objects;
 

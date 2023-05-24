@@ -1,10 +1,19 @@
 [versions]
-junit = "5.8.1"
+junit-jupiter = "5.8.1"
 protoc = "3.17.3"
 substrait = "0.9.0"
 jackson = "2.13.4"
 guava = "29.0-jre"
 lombok = "1.18.20"
+slf4j-api = "1.7.32"
+commons-lang3 = "3.12.0"
+google-inject-guice = "4.1.0"
+junit-bom = "5.9.1"
+mockito-core = "3.12.4"
+google-auto-service = "1.0-rc3"
+google-findbugs-jsr305 = "3.0.2"
+apache-tomcat-jdbc = "10.1.0"
+junit-junit = "4.13.1"
 protobuf-plugin = "0.9.2"
 spotless-plugin = '6.11.0'
 gradle-extensions-plugin = '1.74'
@@ -20,9 +29,21 @@ jackson-datatype-jdk8 = { group = "com.fasterxml.jackson.datatype", name = "jack
 jackson-datatype-jsr310 = { group = "com.fasterxml.jackson.datatype", name = "jackson-datatype-jsr310", version.ref = "jackson" }
 guava = { group = "com.google.guava", name = "guava", version.ref = "guava" }
 lombok = { group = "org.projectlombok", name = "lombok", version.ref = "lombok" }
-junit-jupiter-api = { group = "org.junit.jupiter", name = "junit-jupiter-api", version.ref = "junit" }
-junit-jupiter-params = { group = "org.junit.jupiter", name = "junit-jupiter-params", version.ref = "junit" }
+junit-jupiter-api = { group = "org.junit.jupiter", name = "junit-jupiter-api", version.ref = "junit-jupiter" }
+junit-jupiter-params = { group = "org.junit.jupiter", name = "junit-jupiter-params", version.ref = "junit-jupiter" }
 junit-jupiter-engine = { group = "org.junit.jupiter", name = "junit-jupiter-engine"}
+junit-jupiter = { group = "org.junit.jupiter", name = "junit-jupiter"}
+junit-junit = { group = "org.junit", name = "junit", version.ref = "junit-junit" }
+
+junit-bom = { group = "org.junit", name = "junit-bom", version.ref = "junit-bom" }
+slf4j-api = { group = "org.slf4j", name = "slf4j-api", version.ref = "slf4j-api" }
+apache-commons-lang3 = { group = "org.apache.commons", name = "commons-lang3", version.ref = "commons-lang3" }
+google-inject-guice = { group = "com.google.inject", name = "guice", version.ref = "google-inject-guice" }
+google-auto-service = { group = "com.google.auto.service", name = "auto-service", version.ref = "google-auto-service" }
+google-findbugs-jsr305 = { group = "com.google.code.findbugs", name = "jsr305", version.ref = "google-findbugs-jsr305" }
+mockito-core = { group = "org.mockito", name = "mockito-core", version.ref = "mockito-core" }
+apache-tomcat-jdbc = { group = "org.apache.tomcat", name = "tomcat-jdbc", version.ref = "apache-tomcat-jdbc" }
+
 
 [bundles]
 

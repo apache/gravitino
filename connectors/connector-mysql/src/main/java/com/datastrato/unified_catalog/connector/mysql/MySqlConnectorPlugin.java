@@ -1,6 +1,6 @@
-package com.datastrato.catalog.connector.mysql;
+package com.datastrato.unified_catalog.connector.mysql;
 
-import com.datastrato.catalog.connectors.commons.ConnectorPlugin;
+import com.datastrato.unified_catalog.connectors.commons.ConnectorPlugin;
 import com.google.auto.service.AutoService;
 import com.google.common.annotations.VisibleForTesting;
 

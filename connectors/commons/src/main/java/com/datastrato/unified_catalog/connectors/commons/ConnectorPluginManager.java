@@ -1,4 +1,4 @@
-package com.datastrato.catalog.connectors.commons;
+package com.datastrato.unified_catalog.connectors.commons;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;

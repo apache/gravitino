@@ -2,7 +2,7 @@ plugins {
     id("java")
 }
 
-group = "com.datastrato.catalog.connectors.mysql"
+group = "com.datastrato.unified_catalog.connectors.mysql"
 version = "0.1.0"
 
 repositories {
@@ -12,19 +12,17 @@ repositories {
 dependencies {
     implementation(project(":connectors:commons"))
 
-    implementation("com.google.guava:guava:30.1.1-jre")
-    implementation("org.apache.commons:commons-lang3:3.12.0")
-    implementation("org.projectlombok:lombok:1.18.26")
-    implementation("org.slf4j:slf4j-api:1.7.32")
-    implementation("com.google.inject:guice:4.1.0")
-
-    testImplementation(platform("org.junit:junit-bom:5.9.1"))
-    testImplementation("org.junit.jupiter:junit-jupiter")
-    testImplementation("org.slf4j:slf4j-api:1.7.32")
-    testImplementation("org.mockito:mockito-core:3.12.4")
-
-    compileOnly("com.google.auto.service:auto-service:1.0-rc3")
-    annotationProcessor("com.google.auto.service:auto-service:1.0-rc3")
+    compileOnly(libs.google.auto.service)
+    annotationProcessor(libs.google.auto.service)
+    implementation(libs.guava)
+    implementation(libs.apache.commons.lang3)
+    implementation(libs.lombok)
+    implementation(libs.slf4j.api)
+    implementation(libs.google.inject.guice)
+    testImplementation(platform(libs.junit.bom))
+    testImplementation(libs.junit.jupiter)
+    testImplementation(libs.slf4j.api)
+    testImplementation(libs.mockito.core)
 }
 
 tasks.test {
