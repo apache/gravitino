@@ -1,6 +1,5 @@
 package com.datastrato.catalog.connector.mysql;
 
-import com.datastrato.catalog.connectors.commons.ConnectorFactory;
 import com.datastrato.catalog.connectors.commons.ConnectorPlugin;
 import com.google.auto.service.AutoService;
 import com.google.common.annotations.VisibleForTesting;
@@ -16,10 +15,5 @@ public class MySqlConnectorPlugin implements ConnectorPlugin {
     @Override
     public String getType() {
         return CONNECTOR_TYPE;
-    }
-
-    @Override
-    public ConnectorFactory create() {
-        return new MySqlConnectorFactory();
     }
 }

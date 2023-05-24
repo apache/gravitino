@@ -1,7 +1,6 @@
 package com.datastrato.catalog.connector.mysql;
 
-import com.datastrato.catalog.connectors.commons.manager.ConnectorManager;
-import com.datastrato.catalog.connectors.commons.manager.PluginManager;
+import com.datastrato.catalog.connectors.commons.ConnectorPluginManager;
 import org.junit.jupiter.api.Test;
 import java.util.Objects;
 
@@ -18,10 +17,9 @@ class MySqlConnectorPluginTest {
 
     @Test
     public void loadMySqlPluginTest() throws Exception {
-        ConnectorManager connectorManager = new ConnectorManager();
-        PluginManager pluginManager = new PluginManager(connectorManager);
+        ConnectorPluginManager pluginManager = new ConnectorPluginManager();
 
         pluginManager.loadPlugins();
-        assert (connectorManager.getPlugin(MySqlConnectorPlugin.CONNECTOR_TYPE) instanceof MySqlConnectorPlugin);
+        assert (pluginManager.getPlugin(MySqlConnectorPlugin.CONNECTOR_TYPE) instanceof MySqlConnectorPlugin);
     }
 }

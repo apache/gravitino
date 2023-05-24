@@ -10,11 +10,4 @@ public interface ConnectorPlugin {
      * @return Returns the type of the plugin.
      */
     String getType();
-
-    /**
-     * Returns the service implementation for the type.
-     *
-     * @return connector factory
-     */
-    ConnectorFactory create();
 }

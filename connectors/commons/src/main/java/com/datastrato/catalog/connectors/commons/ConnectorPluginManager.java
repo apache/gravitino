@@ -1,11 +1,13 @@
-package com.datastrato.catalog.connectors.commons.manager;
+package com.datastrato.catalog.connectors.commons;
 
-import com.datastrato.catalog.connectors.commons.ConnectorPlugin;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.List;
 import java.util.ServiceLoader;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -13,19 +15,14 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * Connector plugins need to be loaded before loading the catalogs.
  */
 @Slf4j
-public class PluginManager {
-    private final ConnectorManager connectorManager;
-    private final AtomicBoolean pluginsLoaded = new AtomicBoolean();
-    private final AtomicBoolean pluginsLoading = new AtomicBoolean();
+public class ConnectorPluginManager {
+    // Map<ConnectorType, ConnectorPlugin>
+    private final ConcurrentMap<String, ConnectorPlugin> plugins = new ConcurrentHashMap<>();
 
-    public PluginManager(final ConnectorManager connectorManager) {
-        this.connectorManager = connectorManager;
-    }
+    private final AtomicBoolean pluginsLoading = new AtomicBoolean();
 
     /**
      * Loads the plugins.
-     *
-     * @throws Exception error
      */
     public void loadPlugins() throws Exception {
         if (!this.pluginsLoading.compareAndSet(false, true)) {
@@ -37,24 +34,27 @@ public class PluginManager {
         final List<ConnectorPlugin> connectorPlugins = ImmutableList.copyOf(serviceLoader);
 
         if (connectorPlugins.isEmpty()) {
-            log.warn("No service providers of type {}", ConnectorPlugin.class.getName());
+            log.warn("No connector plugin of type {}", ConnectorPlugin.class.getName());
         }
 
         for (ConnectorPlugin connectorPlugin : connectorPlugins) {
-            log.info("Installing {}", connectorPlugin.getClass().getName());
+            log.info("Installing {} plugin", connectorPlugin.getClass().getName());
             this.installPlugin(connectorPlugin);
             log.info("-- Finished loading plugin {} --", connectorPlugin.getClass().getName());
         }
-
-        this.pluginsLoaded.set(true);
     }
 
     /**
      * Installs the plugins.
-     *
-     * @param connectorPlugin service plugin
      */
     private void installPlugin(final ConnectorPlugin connectorPlugin) {
-        this.connectorManager.addPlugin(connectorPlugin);
+        plugins.put(connectorPlugin.getType(), connectorPlugin);
+    }
+
+    public ConnectorPlugin getPlugin(final String connectorType) {
+        Preconditions.checkNotNull(connectorType, "connectorType is null");
+        final ConnectorPlugin result = plugins.get(connectorType);
+        Preconditions.checkNotNull(result, "No connector plugin exists for type %s", connectorType);
+        return result;
     }
 }
