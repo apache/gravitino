@@ -4,7 +4,6 @@ import com.datastrato.catalog.connectors.commons.*;
 import com.google.common.base.Preconditions;
 import lombok.extern.slf4j.Slf4j;
 
-import javax.annotation.PreDestroy;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -17,7 +16,6 @@ public class ConnectorManager {
     private final ConcurrentMap<String, ConnectorPlugin> plugins = new ConcurrentHashMap<>();
     private final AtomicBoolean stopped = new AtomicBoolean();
 
-    @PreDestroy
     public void stop() {
         if (stopped.getAndSet(true)) {
             return;
