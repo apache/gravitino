@@ -2,64 +2,160 @@
 
 ## Design Prerequisites
 
-The Unified-Catalog receives multiple sources as input, stores associated metadata, 
-and outputs this information through a RESTful api to support the Unified-Catalog UI.
+The Unified-Catalog receives multiple data sources as input, stores associated metadata, 
+and outputs this information through a RESTful API to support the Unified-Catalog UI.
 
 When first designing the Unified-Catalog, one of the major decisions we had to make 
 was whether we would store the metadata we collected or extract it on request. 
-Our service needs to support high throughput and low latency reads, and if we delegate 
-this responsibility to metadata sources, we need all sources to support high throughput 
-and low latency reads, which introduces complexity and risk.
+Our service needs to support `high throughput` and `low latency` reads, and if we delegate 
+this responsibility to metadata sources, we need all data sources to support `high throughput` 
+and `low latency` reads, which introduces complexity and risk.
 For example, a Vertica query that gets a table schema often takes a few seconds to process, 
 making it unsuitable for visualization. Similarly, our Hive metastore manages 
 all of Hive's metadata, making it risky to require high throughput read requests. 
 
-Because the Unified-Catalog supports so many different sources of metadata, 
+Because the Unified-Catalog supports so many different data sources of metadata, 
 we decided to store the metadata in the Unified-Catalog architecture itself. 
 
 In addition, while most use cases require new metadata, they do not need to see 
-the metadata change in real time, making periodic crawling possible.
+the metadata change in real time, making periodic collected or extract possible.
 
-We also separate the request service layer from the data collection layer so that 
-each layer runs in a separate process, as shown in Figure 1 below:
+We also separate the request service layer from the data source connector layer so that 
+each layer runs in a separate process, as shown in below figure:
 ![rfc-2-01.png](rfc-2-01.png)
 
 This isolates the two layers, which reduces collateral impact. 
-For example, a data collection crawl job may use a large amount of system resources, 
+For example, a metadata data connection job may use a large amount of system resources, 
 which may affect the SLA of the api at the request service layer. 
 
-In addition, the data collection layer is less sensitive to outages than the 
+In addition, the data connection layer is less sensitive to outages than the 
 Unified-Catalog's request service layer, ensuring that outdated metadata will still 
-be served if the data collection layer goes down, thus minimizing the impact on users.
+be served if the data connection layer goes down, thus minimizing the impact on users.
 
-## Plug-in mode
-We need to support many kinds of data sources, we not only need to provide a modular connector design, 
-we also need to enable the connector to be integrated in the system as a plug-in, 
-which will better enable developers to extend more data sources without recompiling the whole Unified-Catalog project.
+## Connectors
 
-## Event-based versus scheduled collection
-Our next challenge was to determine the most effective and efficient way to collect metadata 
+Connectors can connect different data source types, such as relational databases or file systems or WebServices,
+and extract metadata from them. We will map data source to `Unified-Catalog` metadata schema, table and column concept. 
+
+### Management
+
+The connector not only extract metadata, But also manipulate metadata for the data source, such as creating a table,
+changing column type, drop table, etc.
+
+### Multiple version
+
+When the connector discovers that the metadata has changed, The connector will create a new version and timestamp of the metadata.
+This allow us to track the history of metadata changes and store all historical metadata information.
+Use can view and rollback to any version of metadata.
+
+### Connector Factory
+
+Instances of the connector are created by the `Connector Factory`, The Factory creates its own connector for each different
+dada source, which is dynamic loaded and run by `Unified-Catalog` system as a plug-in.
+
+### Environment isolation
+
+Because each connector plug-in will contain many dependent JAR packages that easy cause conflicts, 
+We need to have the plug-in run in an isolation environment.
+So we need store each plug-in and its associated dependency packages in a separate directory.
+All jar packages in this directory are dynamical loaded through `ClassLoader` function using java reflate mechanism.
+
+In additionally, packages dependency isolation's functionality also to better supported for running in cloud environment.
+Each plug-in can be stand-alone deployment independence in the kubernetes pod container, 
+Allow each data source connector scala different as needed.
+
+## Event-listen vs. Scheduled
+
+Our next challenge was to determine the most effective and efficient way to collect or extract metadata
 from several different and completely disparate data sources.
 
-We started by creating crawlers that regularly collect information from various data sources 
+Creating metadata change event lister is faster and low cost than period scheduled,
+However, Not all data sources support event notification, 
+So we chose to use the period scheduled mode first and optimize later.
+
+We started by creating crawlers that regularly collect or extract schema from various data sources 
 and microservices that generate metadata information about the dataset.
 
 We needed to collect metadata information frequently in a scalable way without blocking 
 other crawler tasks. To do this, we deployed the crawlers to different machines and 
 needed to coordinate efficiently among the crawlers in a distributed manner. 
 We considered configuring [Quartz](https://github.com/quartz-scheduler/quartz) 
-in cluster mode for distributed scheduling (supported by MySQL).
+in cluster mode for distributed scheduling.
 
 In addition, to accommodate future cloud deployment models, 
-we need to deploy the crawler to different hosts and multiple data centers in Docker containers.
+we need to deploy the crawler to different hosts and multiple cloud in kubernetes pod containers.
 
-## Metadata Type System
-We use Substrait’s type system to define our metadata schema’s type, 
+## Metadata Types
+
+The Type interface in `Unified-Catalog` is used to implement a type store them into repository.
+`Unified-Catalog` comes with a number of built-in types, like `VarcharType` and `BigintType`. 
+The ParametricType interface is used to provide type parameters for types, 
+to allow types like `VARCHAR(10)` or `DECIMAL(10, 4)`.
+
+### Type Signature
+
+The TypeSignature class is used to uniquely identify a type. 
+It contains the type name and the type parameters (if it’s parametric), and its literal parameters.
+Every type map to Substrait's type system.
+
 Substrait’s type system can be referred here https://substrait.io/types/type_system/.
-In this way, different engines can read and write the same data based on the same schema and field type. 
+In this way, different engines can read and write the same data based on the `Unified-Catalog` schema. 
 Instead of each engine having to build a separate external table, 
 multiple engines can be seamlessly connected in the future.
 
-## Multi-version
-We need to support multi-version for metadata, Each time we find an existing change in the metadata,
-We save all history version data by adding a new version metadata record.
+### Type Entity
+
+#### TypeCategory
+
+Type category is enum type, it's used to indicate the type category of the type. contains the following values:
+`VOID`, `BOOLEAN`, `BYTE`, `SHORT`, `INT`, `LONG`, `FLOAT`, `DOUBLE`, `STRING`,
+`DATE`, `TIMESTAMP`, `TIMESTAMPLOCALTZ`, `BINARY`, `DECIMAL`, `VARCHAR`, `CHAR`,
+`INTERVAL_YEAR_MONTH`, `INTERVAL_DAY_TIME`, `UNKNOWN`.
+
+
+| Field Name | Field Type | Description                | Optional |
+|------------|------------|----------------------------| -------- |
+| name       | string     | Type category Name.        | Required |
+| enum_value | uint32     | Type category enum's value | Required |
+
+#### Parametric Type
+
+Parametric Type is used to provide type parameters for types, to allow types like `VARCHAR(10)` or `DECIMAL(10, 4)`, etc.
+
+##### DecimalType
+
+| Field Name | Field Type | Description        | Optional |
+|------------|------------|--------------------| -------- |
+| name       | string     | Type Name.         | Required |
+| precision  | uint32     | Decimal precision. | Required |
+| scale      | uint32     | Decimal scale.     | Required |
+
+##### VarcharType
+
+| Field Name | Field Type | Description                 | Optional |
+|------------|------------|-----------------------------| -------- |
+| name       | string     | Type Name.                  | Required |
+| length     | uint32     | varchar's length. | Required |
+
+##### ListType
+
+| Field Name   | Field Type | Description                 | Optional |
+|--------------|-------|-----------------------------| -------- |
+| name         | string | Type Name.                  | Required |
+| element_type | TypeCategory     | list element type category. | Required |
+
+
+##### MapType
+
+| Field Name | Field Type | Description                   | Optional |
+|------------|-------|-------------------------------| -------- |
+| name       | string | Type Name.                    | Required |
+| key_type   | TypeCategory     | Map's key type category.      | Required |
+| value_type | TypeCategory     | Map's value type category. | Required |
+
+##### VarbinaryType
+
+| Field Name | Field Type | Description           | Optional |
+|------------|------------|-----------------------| -------- |
+| name       | string     | Type Name.            | Required |
+| length     | uint32     | binary's byte length. | Required |
