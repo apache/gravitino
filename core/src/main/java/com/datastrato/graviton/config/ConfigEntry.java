@@ -1,4 +1,8 @@
+<<<<<<< HEAD:core/src/main/java/com/datastrato/graviton/config/ConfigEntry.java
 package com.datastrato.graviton.config;
+=======
+package com.datastrato.unified_catalog.config;
+>>>>>>> b8675ae (Add Config system for Unified Catalog):core/src/main/java/com/datastrato/unified_catalog/config/ConfigEntry.java
 
 import java.util.List;
 import java.util.Map;
@@ -6,6 +10,7 @@ import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.function.Function;
 import lombok.Getter;
+<<<<<<< HEAD:core/src/main/java/com/datastrato/graviton/config/ConfigEntry.java
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -13,6 +18,11 @@ public class ConfigEntry<T> {
 
   private static final Logger LOG = LoggerFactory.getLogger(ConfigEntry.class);
 
+=======
+
+public class ConfigEntry<T> {
+
+>>>>>>> b8675ae (Add Config system for Unified Catalog):core/src/main/java/com/datastrato/unified_catalog/config/ConfigEntry.java
   @Getter private String key;
 
   @Getter private List<String> alternatives;
@@ -112,7 +122,11 @@ public class ConfigEntry<T> {
     String stringValue = stringConverter.apply(value);
     if (stringValue == null) {
       // We don't want user to set a null value to config, so this basically will not happen;
+<<<<<<< HEAD:core/src/main/java/com/datastrato/graviton/config/ConfigEntry.java
       LOG.warn("Config {} value to set is null, ignore setting to Config.", stringValue);
+=======
+      // TODO. Add warning log @jerry
+>>>>>>> b8675ae (Add Config system for Unified Catalog):core/src/main/java/com/datastrato/unified_catalog/config/ConfigEntry.java
       return;
     }
 
