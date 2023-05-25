@@ -1,8 +1,4 @@
-<<<<<<< HEAD:core/src/main/java/com/datastrato/graviton/config/ConfigBuilder.java
 package com.datastrato.graviton.config;
-=======
-package com.datastrato.unified_catalog.config;
->>>>>>> b8675ae (Add Config system for Unified Catalog):core/src/main/java/com/datastrato/unified_catalog/config/ConfigBuilder.java
 
 import java.util.Collections;
 import java.util.List;
