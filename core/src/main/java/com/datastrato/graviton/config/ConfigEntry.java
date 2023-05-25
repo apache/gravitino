@@ -6,8 +6,12 @@ import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.function.Function;
 import lombok.Getter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class ConfigEntry<T> {
+
+  private static final Logger LOG = LoggerFactory.getLogger(ConfigEntry.class);
 
   @Getter private String key;
 
@@ -108,7 +112,7 @@ public class ConfigEntry<T> {
     String stringValue = stringConverter.apply(value);
     if (stringValue == null) {
       // We don't want user to set a null value to config, so this basically will not happen;
-      // TODO. Add warning log @jerry
+      LOG.warn("Config {} value to set is null, ignore setting to Config.", stringValue);
       return;
     }
 
