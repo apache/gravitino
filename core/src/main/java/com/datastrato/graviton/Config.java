@@ -20,6 +20,8 @@ public abstract class Config {
 
   private static final Logger LOG = LoggerFactory.getLogger(Config.class);
 
+  private static final Logger LOG = LoggerFactory.getLogger(Config.class);
+
   private static final String CONFIG_PREPEND = "graviton.";
 
   private final ConcurrentMap<String, String> configMap;
