@@ -11,12 +11,15 @@ dependencies {
     exclude("com.google.guava", "guava")
       .because("Brings in Guava for Andriod, which we don't want (and breaks multimaps).")
   }
-  implementation(libs.substrait.java.core)
+  implementation(libs.substrait.java.core) {
+    exclude("org.slf4j")
+  }
   implementation(libs.jackson.databind)
   implementation(libs.jackson.annotations)
   implementation(libs.jackson.datatype.jdk8)
   implementation(libs.jackson.datatype.jsr310)
   implementation(libs.guava)
+  implementation(libs.bundles.log4j)
 
   compileOnly(libs.lombok)
   annotationProcessor(libs.lombok)

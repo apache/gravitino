@@ -10,7 +10,9 @@ plugins {
 
 dependencies {
   implementation(libs.protobuf.java)
-  implementation(libs.substrait.java.core)
+  implementation(libs.substrait.java.core) {
+    exclude("org.slf4j")
+  }
 }
 
 sourceSets {
