@@ -31,7 +31,7 @@ allprojects {
     useJUnitPlatform()
   }
 
-  group = "com.datastrato.unified_catalog"
+  group = "com.datastrato.graviton"
   version = "${version}"
 
   plugins.withType<SpotlessPlugin>().configureEach {

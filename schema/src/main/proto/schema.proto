@@ -4,7 +4,7 @@ import "google/protobuf/timestamp.proto";
 import "substrait/type.proto";
 
 option java_multiple_files = true;
-option java_package = "com.datastrato.unified_catalog.schema.proto";
+option java_package = "com.datastrato.graviton.schema.proto";
 
 /**
  * The version of schema definition. Schema is backward compatible within the
