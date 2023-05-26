@@ -36,15 +36,14 @@ public final class Config {
 
   public Config loadFromFile(String name) throws IOException {
     String confDir =
-        Optional.ofNullable(System.getenv("UNIFIED_CATALOG_CONF_DIR"))
+        Optional.ofNullable(System.getenv("GRAVITON_CONF_DIR"))
             .orElse(
-                Optional.ofNullable(System.getenv("UNIFIED_CATALOG_HOME"))
+                Optional.ofNullable(System.getenv("GRAVITON_HOME"))
                     .map(s -> s + File.separator + "conf")
                     .orElse(null));
 
     if (confDir == null) {
-      throw new IllegalArgumentException(
-          "UNIFIED_CATALOG_CONF_DIR or UNIFIED_CATALOG_HOME not set");
+      throw new IllegalArgumentException("GRAVITON_CONF_DIR or GRAVITON_HOME not set");
     }
 
     File confFile = new File(confDir + File.separator + name);

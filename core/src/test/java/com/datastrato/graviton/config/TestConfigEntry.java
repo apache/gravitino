@@ -1,4 +1,4 @@
-package com.datastrato.unified_catalog.config;
+package com.datastrato.graviton.config;
 
 import com.google.common.collect.Lists;
 import java.util.NoSuchElementException;
@@ -16,9 +16,9 @@ public class TestConfigEntry {
 
   @BeforeEach
   public void initializeConfigMap() {
-    configMap.put("unified-catalog.test.string", "test-string");
-    configMap.put("unified-catalog.test.string.alt1", "test-string1");
-    configMap.put("unified-catalog.test.string.alt2", "test-string2");
+    configMap.put("graviton.test.string", "test-string");
+    configMap.put("graviton.test.string.alt1", "test-string1");
+    configMap.put("graviton.test.string.alt2", "test-string2");
   }
 
   @AfterEach
@@ -29,7 +29,7 @@ public class TestConfigEntry {
   @Test
   public void testConfWithDefaultValue() {
     ConfigEntry<String> testConf =
-        new ConfigBuilder("unified-catalog.test.string")
+        new ConfigBuilder("graviton.test.string")
             .doc("test")
             .internal()
             .stringConf()
@@ -38,7 +38,7 @@ public class TestConfigEntry {
     Assertions.assertEquals("test-string", value);
 
     ConfigEntry<Integer> testConf1 =
-        new ConfigBuilder("unified-catalog.test.int")
+        new ConfigBuilder("graviton.test.int")
             .doc("test")
             .version("1.0")
             .intConf()
@@ -47,7 +47,7 @@ public class TestConfigEntry {
     Assertions.assertEquals(10, value1);
 
     ConfigEntry<Boolean> testConf2 =
-        new ConfigBuilder("unified-catalog.test.boolean").booleanConf().createWithDefault(true);
+        new ConfigBuilder("graviton.test.boolean").booleanConf().createWithDefault(true);
     boolean value2 = testConf2.readFrom(configMap);
     Assertions.assertTrue(value2);
   }
@@ -55,28 +55,27 @@ public class TestConfigEntry {
   @Test
   public void testConfWithoutDefaultValue() {
     ConfigEntry<String> testConf =
-        new ConfigBuilder("unified-catalog.test.string").doc("test").internal().stringConf();
+        new ConfigBuilder("graviton.test.string").doc("test").internal().stringConf();
     String value = testConf.readFrom(configMap);
     Assertions.assertEquals("test-string", value);
 
-    ConfigEntry<Integer> testConf1 =
-        new ConfigBuilder("unified-catalog.test.int.no-exist").intConf();
+    ConfigEntry<Integer> testConf1 = new ConfigBuilder("graviton.test.int.no-exist").intConf();
     Throwable exception =
         Assertions.assertThrows(NoSuchElementException.class, () -> testConf1.readFrom(configMap));
     Assertions.assertEquals(
-        "No configuration found for key unified-catalog.test.int.no-exist", exception.getMessage());
+        "No configuration found for key graviton.test.int.no-exist", exception.getMessage());
   }
 
   @Test
   public void testConfWithOptionalValue() {
     ConfigEntry<Optional<String>> testConf =
-        new ConfigBuilder("unified-catalog.test.no-exist-string").stringConf().createWithOptional();
+        new ConfigBuilder("graviton.test.no-exist-string").stringConf().createWithOptional();
 
     Optional<String> value = testConf.readFrom(configMap);
     Assertions.assertEquals(Optional.empty(), value);
 
     ConfigEntry<Optional<Integer>> testConf1 =
-        new ConfigBuilder("unified-catalog.test.no-exist-int").intConf().createWithOptional();
+        new ConfigBuilder("graviton.test.no-exist-int").intConf().createWithOptional();
 
     Optional<Integer> value1 = testConf1.readFrom(configMap);
     Assertions.assertEquals(Optional.empty(), value1);
@@ -85,10 +84,9 @@ public class TestConfigEntry {
   @Test
   public void testConfWithAlternatives() {
     ConfigEntry<String> testConf =
-        new ConfigBuilder("unified-catalog.test.string")
+        new ConfigBuilder("graviton.test.string")
             .alternatives(
-                Lists.newArrayList(
-                    "unified-catalog.test.string.alt1", "unified-catalog.test.string.alt1"))
+                Lists.newArrayList("graviton.test.string.alt1", "graviton.test.string.alt1"))
             .stringConf()
             .createWithDefault("test");
 
@@ -96,10 +94,9 @@ public class TestConfigEntry {
     Assertions.assertEquals("test-string", value);
 
     ConfigEntry<String> testConf1 =
-        new ConfigBuilder("unified-catalog.test.string.no-exist")
+        new ConfigBuilder("graviton.test.string.no-exist")
             .alternatives(
-                Lists.newArrayList(
-                    "unified-catalog.test.string.alt1", "unified-catalog.test.string.alt1"))
+                Lists.newArrayList("graviton.test.string.alt1", "graviton.test.string.alt1"))
             .stringConf()
             .createWithDefault("test");
 
@@ -110,18 +107,18 @@ public class TestConfigEntry {
   @Test
   public void testSetConf() {
     ConfigEntry<Integer> testConf =
-        new ConfigBuilder("unified-catalog.test.int").intConf().createWithDefault(1);
+        new ConfigBuilder("graviton.test.int").intConf().createWithDefault(1);
 
     testConf.writeTo(configMap, 10);
-    Assertions.assertEquals("10", configMap.get("unified-catalog.test.int"));
+    Assertions.assertEquals("10", configMap.get("graviton.test.int"));
 
     ConfigEntry<Optional<Integer>> testConf1 =
-        new ConfigBuilder("unified-catalog.test.int1").intConf().createWithOptional();
+        new ConfigBuilder("graviton.test.int1").intConf().createWithOptional();
 
     testConf1.writeTo(configMap, Optional.of(11));
-    Assertions.assertEquals("11", configMap.get("unified-catalog.test.int1"));
+    Assertions.assertEquals("11", configMap.get("graviton.test.int1"));
 
     testConf1.writeTo(configMap, Optional.empty());
-    Assertions.assertEquals("11", configMap.get("unified-catalog.test.int1"));
+    Assertions.assertEquals("11", configMap.get("graviton.test.int1"));
   }
 }

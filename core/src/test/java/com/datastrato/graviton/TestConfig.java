@@ -1,7 +1,7 @@
-package com.datastrato.unified_catalog;
+package com.datastrato.graviton;
 
-import com.datastrato.unified_catalog.config.ConfigBuilder;
-import com.datastrato.unified_catalog.config.ConfigEntry;
+import com.datastrato.graviton.config.ConfigBuilder;
+import com.datastrato.graviton.config.ConfigEntry;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.Properties;
@@ -17,17 +17,17 @@ public class TestConfig {
   @BeforeEach
   public void setUp() {
     props.setProperty("test", "test");
-    props.setProperty("unified-catalog.test.test-string", "test-string");
-    props.setProperty("unified-catalog.test.test-int", "  1  ");
-    props.setProperty("unified-catalog.test.test-boolean", "true");
+    props.setProperty("graviton.test.test-string", "test-string");
+    props.setProperty("graviton.test.test-int", "  1  ");
+    props.setProperty("graviton.test.test-boolean", "true");
   }
 
   @AfterEach
   public void tearDown() {
     props.remove("test");
-    props.remove("unified-catalog.test.test-string");
-    props.remove("unified-catalog.test.test-int");
-    props.remove("unified-catalog.test.test-boolean");
+    props.remove("graviton.test.test-string");
+    props.remove("graviton.test.test-int");
+    props.remove("graviton.test.test-boolean");
   }
 
   @Test
@@ -35,7 +35,7 @@ public class TestConfig {
     ConfigEntry<String> stringConf =
         new ConfigBuilder("test").stringConf().createWithDefault("test-default");
     ConfigEntry<Optional<Integer>> intConf =
-        new ConfigBuilder("unified-catalog.test.test-int").intConf().createWithOptional();
+        new ConfigBuilder("graviton.test.test-int").intConf().createWithOptional();
     ConfigEntry<String> stringConf1 = new ConfigBuilder("test").stringConf();
 
     Config config = new Config(true);
@@ -57,11 +57,9 @@ public class TestConfig {
   @Test
   public void testGetAndSet() {
     ConfigEntry<Optional<Integer>> intConf =
-        new ConfigBuilder("unified-catalog.test.test-int").intConf().createWithOptional();
+        new ConfigBuilder("graviton.test.test-int").intConf().createWithOptional();
     ConfigEntry<Boolean> booleanConf =
-        new ConfigBuilder("unified-catalog.test.test-boolean")
-            .booleanConf()
-            .createWithDefault(false);
+        new ConfigBuilder("graviton.test.test-boolean").booleanConf().createWithDefault(false);
 
     Config config = new Config(true);
 
