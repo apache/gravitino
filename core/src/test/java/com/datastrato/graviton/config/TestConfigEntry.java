@@ -75,7 +75,7 @@ public class TestConfigEntry {
     Assertions.assertEquals(Optional.empty(), value);
 
     ConfigEntry<Optional<Integer>> testConf1 =
-        new ConfigBuilder("unified-catalog.test.no-exist-int").intConf().createWithOptional();
+        new ConfigBuilder("graviton.test.no-exist-int").intConf().createWithOptional();
 
     Optional<Integer> value1 = testConf1.readFrom(configMap);
     Assertions.assertEquals(Optional.empty(), value1);
