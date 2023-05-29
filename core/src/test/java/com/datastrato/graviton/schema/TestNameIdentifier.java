@@ -28,13 +28,13 @@ public class TestNameIdentifier {
   public void testCreateWithInvalidArgs() {
     Assertions.assertThrows(IllegalArgumentException.class, NameIdentifier::of);
     Assertions.assertThrows(IllegalArgumentException.class, () -> NameIdentifier.of("a", null));
-    Assertions.assertThrows(IllegalArgumentException.class,() -> NameIdentifier.of("a", ""));
+    Assertions.assertThrows(IllegalArgumentException.class, () -> NameIdentifier.of("a", ""));
 
     Assertions.assertThrows(IllegalArgumentException.class, () -> NameIdentifier.of(null, "a"));
-    Assertions.assertThrows(IllegalArgumentException.class,
-        () -> NameIdentifier.of(Namespace.empty(), null));
-    Assertions.assertThrows(IllegalArgumentException.class,
-        () -> NameIdentifier.of(Namespace.empty(), ""));
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> NameIdentifier.of(Namespace.empty(), null));
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> NameIdentifier.of(Namespace.empty(), ""));
 
     Assertions.assertThrows(IllegalArgumentException.class, () -> NameIdentifier.parse(null));
     Assertions.assertThrows(IllegalArgumentException.class, () -> NameIdentifier.parse(""));

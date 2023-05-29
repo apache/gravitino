@@ -67,7 +67,7 @@ public class NameIdentifier {
 
   @Override
   public int hashCode() {
-    return Arrays.hashCode(new int[]{namespace.hashCode(), name.hashCode()});
+    return Arrays.hashCode(new int[] {namespace.hashCode(), name.hashCode()});
   }
 
   @Override
