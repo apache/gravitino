@@ -22,7 +22,6 @@ public class TestConfig {
     }
   }
 
-
   private final Properties props = System.getProperties();
 
   @BeforeEach
