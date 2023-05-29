@@ -4,20 +4,21 @@ import com.datastrato.graviton.Config;
 import com.datastrato.graviton.server.GravitonServerException;
 import com.datastrato.graviton.server.ServerConfig;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import java.net.BindException;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import javax.servlet.Servlet;
 import org.eclipse.jetty.server.*;
 import org.eclipse.jetty.server.handler.ErrorHandler;
 import org.eclipse.jetty.server.handler.HandlerCollection;
 import org.eclipse.jetty.servlet.DefaultServlet;
 import org.eclipse.jetty.servlet.ServletContextHandler;
+import org.eclipse.jetty.servlet.ServletHolder;
 import org.eclipse.jetty.util.component.LifeCycle;
 import org.eclipse.jetty.util.thread.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.net.BindException;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
 
 public final class JettyServer {
 
@@ -29,8 +30,9 @@ public final class JettyServer {
 
   private int httpPort;
 
-  public JettyServer() {
-  }
+  private ServletContextHandler servletContextHandler;
+
+  public JettyServer() {}
 
   public synchronized void initialize(Config config) {
     int coreThreads = config.get(ServerConfig.WEBSERVER_CORE_THREADS);
@@ -51,35 +53,27 @@ public final class JettyServer {
     // Create and set Http ServerConnector
     int reqHeaderSize = config.get(ServerConfig.WEBSERVER_REQUEST_HEADER_SIZE);
     int respHeaderSize = config.get(ServerConfig.WEBSERVER_RESPONSE_HEADER_SIZE);
-    ServerConnector httpConnector =
-        createHttpServerConnector(server, reqHeaderSize, respHeaderSize);
-
     host = config.get(ServerConfig.WEBSERVER_HOST);
     httpPort = config.get(ServerConfig.WEBSERVER_PORT);
-    httpConnector.setHost(host);
-    httpConnector.setPort(httpPort);
-    httpConnector.setReuseAddress(true);
-
+    ServerConnector httpConnector =
+        createHttpServerConnector(server, reqHeaderSize, respHeaderSize, host, httpPort);
     server.addConnector(httpConnector);
 
-    // TODO. Create and set https connector
+    // TODO. Create and set https connector @jerry
 
-    ServletContextHandler servletContextHandler = new ServletContextHandler();
-    servletContextHandler.setContextPath("/");
-    servletContextHandler.addServlet(DefaultServlet.class, "/");
-
-    HandlerCollection handlers = new HandlerCollection();
-    handlers.addHandler(servletContextHandler);
-
-    server.setHandler(handlers);
+    // Initialize ServletContextHandler
+    initializeServletContextHandler(server);
   }
 
   public synchronized void start() throws GravitonServerException {
     try {
       server.start();
     } catch (BindException e) {
-      LOG.error("Failed to start web server on host {} port {}, which is already in use.",
-          host, httpPort, e);
+      LOG.error(
+          "Failed to start web server on host {} port {}, which is already in use.",
+          host,
+          httpPort,
+          e);
       throw new GravitonServerException("Failed to start web server.", e);
 
     } catch (Exception e) {
@@ -122,6 +116,46 @@ public final class JettyServer {
     }
   }
 
+  public void addServlet(Servlet servlet, String pathSpec) {
+    servletContextHandler.addServlet(new ServletHolder(servlet), pathSpec);
+  }
+
+  private void initializeServletContextHandler(Server server) {
+    this.servletContextHandler = new ServletContextHandler();
+    servletContextHandler.setContextPath("/");
+    servletContextHandler.addServlet(DefaultServlet.class, "/");
+
+    HandlerCollection handlers = new HandlerCollection();
+    handlers.addHandler(servletContextHandler);
+
+    server.setHandler(handlers);
+  }
+
+  private ServerConnector createHttpServerConnector(
+      Server server, int reqHeaderSize, int respHeaderSize, String host, int port) {
+    HttpConfiguration httpConfig = new HttpConfiguration();
+    httpConfig.setRequestHeaderSize(reqHeaderSize);
+    httpConfig.setResponseHeaderSize(respHeaderSize);
+    httpConfig.setSendServerVersion(true);
+
+    HttpConnectionFactory httpConnectionFactory = new HttpConnectionFactory(httpConfig);
+    ServerConnector connector =
+        creatorServerConnector(server, new ConnectionFactory[] {httpConnectionFactory});
+    connector.setHost(host);
+    connector.setPort(port);
+    connector.setReuseAddress(true);
+
+    return connector;
+  }
+
+  private ServerConnector creatorServerConnector(
+      Server server, ConnectionFactory[] connectionFactories) {
+    Scheduler serverExecutor =
+        new ScheduledExecutorScheduler("graviton-webserver-JettyScheduler", true);
+
+    return new ServerConnector(server, null, serverExecutor, null, -1, -1, connectionFactories);
+  }
+
   private ExecutorThreadPool createThreadPool(int coreThreads, int maxThreads) {
     return new ExecutorThreadPool(
         new ThreadPoolExecutor(
@@ -133,29 +167,6 @@ public final class JettyServer {
             new ThreadFactoryBuilder()
                 .setDaemon(true)
                 .setNameFormat("jetty-webserver-%d")
-                .build())
-    );
-  }
-
-  private ServerConnector creatorServerConnector(
-      Server server, ConnectionFactory[] connectionFactories) {
-    Scheduler serverExecutor =
-        new ScheduledExecutorScheduler("graviton-webserver-JettyScheduler", true);
-
-    ServerConnector connector = new ServerConnector(
-        server, null, serverExecutor, null, -1, -1, connectionFactories);
-
-    return connector;
-  }
-
-  private ServerConnector createHttpServerConnector(Server server, int reqHeaderSize, int respHeaderSize) {
-    HttpConfiguration httpConfig = new HttpConfiguration();
-    httpConfig.setRequestHeaderSize(reqHeaderSize);
-    httpConfig.setResponseHeaderSize(respHeaderSize);
-    httpConfig.setSendServerVersion(true);
-
-    HttpConnectionFactory httpConnectionFactory = new HttpConnectionFactory(httpConfig);
-
-    return creatorServerConnector(server, new ConnectionFactory[] {httpConnectionFactory});
+                .build()));
   }
 }
