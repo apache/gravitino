@@ -1,7 +1,5 @@
 package com.datastrato.graviton.config;
 
-import com.datastrato.graviton.Config;
-
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
