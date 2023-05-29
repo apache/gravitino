@@ -1,8 +1,8 @@
 package com.datastrato.graviton.schema.proto;
 
+import com.datastrato.graviton.schema.HasExtraInfo;
 import com.datastrato.graviton.schema.SchemaVersion;
 import com.datastrato.graviton.schema.VirtualTableInfo;
-import com.datastrato.graviton.schema.hasExtraInfo;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.substrait.type.Type;
@@ -193,7 +193,7 @@ public class TestEntityProtoSerDe {
   public void testTableSerDe() {
     com.datastrato.graviton.schema.Table.TableType tableType =
         com.datastrato.graviton.schema.Table.TableType.VIRTUAL;
-    hasExtraInfo.ExtraInfo extraInfo = new VirtualTableInfo(1, ImmutableList.of("db", "table"));
+    HasExtraInfo.ExtraInfo extraInfo = new VirtualTableInfo(1, ImmutableList.of("db", "table"));
     com.datastrato.graviton.schema.AuditInfo auditInfo =
         new com.datastrato.graviton.schema.AuditInfo.Builder()
             .withCreator("creator")

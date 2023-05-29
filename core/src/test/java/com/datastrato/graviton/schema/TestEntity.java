@@ -39,7 +39,7 @@ public class TestEntity {
   private final Long tableId = 1L;
   private final String tableName = "testTable";
   private final Table.TableType tableType = Table.TableType.VIRTUAL;
-  private final hasExtraInfo.ExtraInfo extraInfo =
+  private final HasExtraInfo.ExtraInfo extraInfo =
       new VirtualTableInfo(1, ImmutableList.of("test"));
 
   @Test
