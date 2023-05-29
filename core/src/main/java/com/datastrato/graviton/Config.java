@@ -1,6 +1,7 @@
 package com.datastrato.graviton;
 
 import com.datastrato.graviton.config.ConfigEntry;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Maps;
 import java.io.File;
 import java.io.IOException;
@@ -95,11 +96,13 @@ public abstract class Config {
         });
   }
 
-  private void loadFromProperties(Properties properties) {
+  @VisibleForTesting
+  void loadFromProperties(Properties properties) {
     loadFromMap(Maps.fromProperties(properties));
   }
 
-  private Properties loadPropertiesFromFile(File file) throws IOException {
+  @VisibleForTesting
+  Properties loadPropertiesFromFile(File file) throws IOException {
     Properties properties = new Properties();
     try (InputStream in = Files.newInputStream(file.toPath())) {
       properties.load(in);

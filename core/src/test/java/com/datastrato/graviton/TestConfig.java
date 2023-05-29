@@ -2,6 +2,9 @@ package com.datastrato.graviton;
 
 import com.datastrato.graviton.config.ConfigBuilder;
 import com.datastrato.graviton.config.ConfigEntry;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.nio.file.Files;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.Properties;
@@ -22,7 +25,7 @@ public class TestConfig {
     }
   }
 
-  private final Properties props = System.getProperties();
+  private final Properties props = new Properties();
 
   @BeforeEach
   public void setUp() {
@@ -30,14 +33,13 @@ public class TestConfig {
     props.setProperty("graviton.test.test-string", "test-string");
     props.setProperty("graviton.test.test-int", "  1  ");
     props.setProperty("graviton.test.test-boolean", "true");
+
+    props.forEach((k, v) -> System.setProperty((String) k, (String) v));
   }
 
   @AfterEach
   public void tearDown() {
-    props.remove("test");
-    props.remove("graviton.test.test-string");
-    props.remove("graviton.test.test-int");
-    props.remove("graviton.test.test-boolean");
+    props.forEach((k, v) -> System.clearProperty((String) k));
   }
 
   @Test
@@ -62,6 +64,43 @@ public class TestConfig {
 
     Optional<Integer> intValue = config.get(intConf);
     Assertions.assertEquals(Optional.of(1), intValue);
+  }
+
+  @Test
+  public void testLoadFormFile() throws Exception {
+    FileOutputStream fos = null;
+    try {
+      File propsFile = Files.createTempFile("tmp_test", ".properties").toFile();
+      fos = new FileOutputStream(propsFile);
+      props.store(fos, "test");
+
+      ConfigEntry<String> stringConf =
+          new ConfigBuilder("test").stringConf().createWithDefault("test-default");
+      ConfigEntry<Integer> intConf = new ConfigBuilder("graviton.test.test-int").intConf();
+      ConfigEntry<Boolean> booleanConf =
+          new ConfigBuilder("graviton.test.test-boolean").booleanConf();
+
+      // Do not load default system properties, loading from file.
+      DummyConfig config = new DummyConfig(false);
+      config.loadFromProperties(config.loadPropertiesFromFile(propsFile));
+
+      // Config "stringConf" will not load into Config, so it will return the value from the file
+      String value = config.get(stringConf);
+      Assertions.assertEquals("test-default", value);
+
+      // Config "intConf" will load into Config, so it will return the value from the file
+      Integer intValue = config.get(intConf);
+      Assertions.assertEquals(1, intValue);
+
+      // Config "booleanConf" will load into Config, so it will return the value from the file
+      Boolean booleanValue = config.get(booleanConf);
+      Assertions.assertEquals(true, booleanValue);
+    } finally {
+      if (fos != null) {
+        fos.close();
+        fos = null;
+      }
+    }
   }
 
   @Test
