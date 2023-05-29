@@ -12,6 +12,17 @@ import org.junit.jupiter.api.Test;
 
 public class TestConfig {
 
+  class DummyConfig extends Config {
+    public DummyConfig(boolean loadSystemProperties) {
+      super(loadSystemProperties);
+    }
+
+    public DummyConfig() {
+      this(true);
+    }
+  }
+
+
   private final Properties props = System.getProperties();
 
   @BeforeEach
@@ -38,7 +49,7 @@ public class TestConfig {
         new ConfigBuilder("graviton.test.test-int").intConf().createWithOptional();
     ConfigEntry<String> stringConf1 = new ConfigBuilder("test").stringConf();
 
-    Config config = new Config(true);
+    DummyConfig config = new DummyConfig(true);
 
     // Config "stringConf" will not load into Config, so it will return the default value
     String value = config.get(stringConf);
@@ -61,7 +72,7 @@ public class TestConfig {
     ConfigEntry<Boolean> booleanConf =
         new ConfigBuilder("graviton.test.test-boolean").booleanConf().createWithDefault(false);
 
-    Config config = new Config(true);
+    DummyConfig config = new DummyConfig(true);
 
     // Config "intConf" will load into Config, so it will return the value from the system
     // properties

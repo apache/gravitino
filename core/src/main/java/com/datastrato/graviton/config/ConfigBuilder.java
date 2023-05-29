@@ -1,5 +1,7 @@
 package com.datastrato.graviton.config;
 
+import com.datastrato.graviton.Config;
+
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -77,6 +79,26 @@ public class ConfigBuilder {
     conf.setValueConverter(func);
 
     Function<Integer, String> stringFunc =
+        t -> Optional.ofNullable(t).map(String::valueOf).orElse(null);
+    conf.setStringConverter(stringFunc);
+
+    return conf;
+  }
+
+  public ConfigEntry<Long> longConf() {
+    ConfigEntry<Long> conf =
+        new ConfigEntry<>(key, version, doc, alternatives, isPublic, isDeprecated);
+    Function<String, Long> func =
+        s -> {
+          if (s == null || s.isEmpty()) {
+            return null;
+          } else {
+            return Long.parseLong(s);
+          }
+        };
+    conf.setValueConverter(func);
+
+    Function<Long, String> stringFunc =
         t -> Optional.ofNullable(t).map(String::valueOf).orElse(null);
     conf.setStringConverter(stringFunc);
 

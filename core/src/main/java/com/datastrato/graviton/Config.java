@@ -15,7 +15,7 @@ import java.util.concurrent.ConcurrentMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public final class Config {
+public abstract class Config {
 
   private static final Logger LOG = LoggerFactory.getLogger(Config.class);
 
@@ -87,8 +87,10 @@ public final class Config {
   private void loadFromMap(Map<String, String> map) {
     map.forEach(
         (k, v) -> {
-          if (k.trim().startsWith(CONFIG_PREPEND)) {
-            configMap.put(k.trim(), v.trim());
+          String trimmedK = k.trim();
+          String trimmedV = v.trim();
+          if (!trimmedK.isEmpty() && !trimmedV.isEmpty() && trimmedK.startsWith(CONFIG_PREPEND)) {
+            configMap.put(trimmedK, trimmedV);
           }
         });
   }
