@@ -13,9 +13,9 @@ public class ServerConfig extends Config {
           .stringConf()
           .createWithDefault("0.0.0.0");
 
-  public static final ConfigEntry<Integer> WEBSERVER_PORT =
-      new ConfigBuilder("graviton.server.webserver.port")
-          .doc("The port number of the built-in web server")
+  public static final ConfigEntry<Integer> WEBSERVER_HTTP_PORT =
+      new ConfigBuilder("graviton.server.webserver.httpPort")
+          .doc("The http port number of the built-in web server")
           .version("0.1.0")
           .intConf()
           .createWithDefault(8090);

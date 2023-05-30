@@ -54,7 +54,7 @@ public final class JettyServer {
     int reqHeaderSize = config.get(ServerConfig.WEBSERVER_REQUEST_HEADER_SIZE);
     int respHeaderSize = config.get(ServerConfig.WEBSERVER_RESPONSE_HEADER_SIZE);
     host = config.get(ServerConfig.WEBSERVER_HOST);
-    httpPort = config.get(ServerConfig.WEBSERVER_PORT);
+    httpPort = config.get(ServerConfig.WEBSERVER_HTTP_PORT);
     ServerConnector httpConnector =
         createHttpServerConnector(server, reqHeaderSize, respHeaderSize, host, httpPort);
     server.addConnector(httpConnector);
@@ -95,6 +95,7 @@ public final class JettyServer {
   public synchronized void stop() {
     if (server != null) {
       try {
+        // Referring from Spark's implementation to avoid the issues.
         ThreadPool threadPool = server.getThreadPool();
         if (threadPool instanceof QueuedThreadPool) {
           ((QueuedThreadPool) threadPool).setStopTimeout(0);
