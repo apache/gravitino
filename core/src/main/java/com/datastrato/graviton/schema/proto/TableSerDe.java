@@ -1,7 +1,7 @@
 package com.datastrato.graviton.schema.proto;
 
+import com.datastrato.graviton.schema.HasExtraInfo;
 import com.datastrato.graviton.schema.VirtualTableInfo;
-import com.datastrato.graviton.schema.hasExtraInfo;
 
 class TableSerDe implements ProtoSerDe<com.datastrato.graviton.schema.Table, Table> {
 
@@ -59,7 +59,7 @@ class TableSerDe implements ProtoSerDe<com.datastrato.graviton.schema.Table, Tab
   private void setTableExtraInfo(
       Table.Builder builder,
       com.datastrato.graviton.schema.Table.TableType tableType,
-      hasExtraInfo.ExtraInfo tableExtraInfo) {
+      HasExtraInfo.ExtraInfo tableExtraInfo) {
     switch (tableType) {
       case VIRTUAL:
         VirtualTableInfo virtualTableInfo = (VirtualTableInfo) tableExtraInfo;
@@ -81,7 +81,7 @@ class TableSerDe implements ProtoSerDe<com.datastrato.graviton.schema.Table, Tab
     }
   }
 
-  private hasExtraInfo.ExtraInfo getTableExtraInfo(
+  private HasExtraInfo.ExtraInfo getTableExtraInfo(
       com.datastrato.graviton.schema.Table.TableType tableType, Table p) {
     switch (tableType) {
       case VIRTUAL:

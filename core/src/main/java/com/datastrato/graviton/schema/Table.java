@@ -10,7 +10,7 @@ import lombok.ToString;
 @Getter
 @EqualsAndHashCode
 @ToString
-public class Table implements Entity, Auditable, hasExtraInfo {
+public class Table implements Entity, Auditable, HasExtraInfo, HasIdentifier {
   public enum TableType {
     VIRTUAL("VIRTUAL"),
     VIEW("VIEW"),
@@ -45,7 +45,7 @@ public class Table implements Entity, Auditable, hasExtraInfo {
   public static final Field AUDIT_INFO =
       Field.required("audit_info", AuditInfo.class, "The audit info of the table");
   public static final Field EXTRA_INFO =
-      Field.required("extra_info", hasExtraInfo.ExtraInfo.class, "The extra info of the table");
+      Field.required("extra_info", HasExtraInfo.ExtraInfo.class, "The extra info of the table");
 
   @JsonProperty("id")
   private Long id;
@@ -74,7 +74,7 @@ public class Table implements Entity, Auditable, hasExtraInfo {
   private AuditInfo auditInfo;
 
   @JsonProperty("extra_info")
-  private hasExtraInfo.ExtraInfo extraInfo;
+  private HasExtraInfo.ExtraInfo extraInfo;
 
   @JsonProperty("columns")
   private List<Column> columns;
@@ -103,8 +103,13 @@ public class Table implements Entity, Auditable, hasExtraInfo {
   }
 
   @Override
-  public hasExtraInfo.ExtraInfo extraInfo() {
+  public HasExtraInfo.ExtraInfo extraInfo() {
     return extraInfo;
+  }
+
+  @Override
+  public String name() {
+    return name;
   }
 
   public static class Builder {
@@ -154,7 +159,7 @@ public class Table implements Entity, Auditable, hasExtraInfo {
       return this;
     }
 
-    public Builder withExtraInfo(hasExtraInfo.ExtraInfo extraInfo) {
+    public Builder withExtraInfo(HasExtraInfo.ExtraInfo extraInfo) {
       table.extraInfo = extraInfo;
       return this;
     }

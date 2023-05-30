@@ -12,7 +12,7 @@ import lombok.ToString;
 @Getter
 @EqualsAndHashCode
 @ToString
-public class Lakehouse implements Entity, Auditable {
+public class Lakehouse implements Entity, Auditable, HasIdentifier {
 
   public static final Field ID =
       Field.required("id", Long.class, "The unique identifier of the lakehouse");
@@ -59,6 +59,11 @@ public class Lakehouse implements Entity, Auditable {
   @Override
   public AuditInfo auditInfo() {
     return auditInfo;
+  }
+
+  @Override
+  public String name() {
+    return name;
   }
 
   public static class Builder {

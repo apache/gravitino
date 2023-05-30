@@ -4,7 +4,7 @@ import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 
 /** Interface for entities that have extra info. */
-public interface hasExtraInfo {
+public interface HasExtraInfo {
 
   @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY, property = "type")
   @JsonSubTypes({@JsonSubTypes.Type(value = VirtualTableInfo.class, name = "VIRTUAL")})
