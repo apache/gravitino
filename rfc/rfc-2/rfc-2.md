@@ -2,15 +2,15 @@
 
 ## Design Prerequisites
 
-The Graviton receives multiple data sources as input, stores associated metadata, 
+The `Graviton` receives multiple data sources as input, stores associated metadata, 
 and outputs this information through a RESTful API to support the Graviton UI.
 
-When first designing the Graviton, one of the major decisions we had to make 
-was whether we would store the metadata we collected or extract it on request. 
-Our service needs to support `high throughput` and `low latency` reads, and if we delegate 
-this responsibility to metadata sources, we need all data sources to support `high throughput` 
-and `low latency` reads, which introduces complexity and risk.
-For example, a Vertica query that gets a table schema often takes a few seconds to process, 
+When designing the Graviton connector, one of the major decisions we had to make was 
+whether we would store the metadata we collected metadata ourselves or extract it 
+real time upon request.
+If we delegate this responsibility to metadata sources, we need all data sources to 
+support `high throughput` and `low latency` reads, which introduces complexity and risk.
+For example, a query that gets a table schema often takes a few seconds to process, 
 making it unsuitable for visualization. Similarly, our Hive metastore manages 
 all of Hive's metadata, making it risky to require high throughput read requests. 
 
@@ -34,14 +34,15 @@ be served if the data connection layer goes down, thus minimizing the impact on 
 
 ## Connectors
 
-Connectors can connect different data source, such as relational databases or file systems or WebServices,
-and extract metadata from them. We will map data source to `Graviton` metadata schema, table and column concept. 
+Connectors can connect different data source, such as relational databases or file systems 
+or WebServices, and extract metadata from them. We will map data source to `Graviton` metadata schema, 
+table and column concept. 
 
 ### ConnectorFactory
 
-Instances of the connector are created by the `ConnectorFactory`, The Factory creates its own connector for each 
-different dada source, The connector factory is responsible for creating an instance of a connector object based 
-on the `create` function  
+Instances of the connector are created by the `ConnectorFactory`, The Factory creates its 
+own connector for each different dada source, The connector factory is responsible for creating 
+an instance of a connector object based on the `create` function:  
 `Connector create(String lakehouse, String tenant, String zone, Map<String, String> config, ConnectorContext context)`.
 
 ### Typical Connectors
@@ -56,38 +57,37 @@ Follow up to add.
 #### File Connector
 Follow up to add.
 
-
 ## Event-listen vs. Scheduled
 
 Our next challenge was to determine the most effective and efficient way to collect or extract metadata
 from several different and completely disparate data sources.
 
 Creating metadata change event lister is faster and low cost than period scheduled,
-However, Not all data sources support event notification,
-So we chose to use the period scheduled mode first and optimize later.
+However, Not all data sources support event notification, So we chose to use the period scheduled mode 
+first and optimize later.
 
 We started by creating crawlers that regularly collect or extract schema from various data sources
 and microservices that generate metadata information about the dataset.
 
-We needed to collect metadata information frequently in a scalable way without blocking
-other crawler tasks. To do this, we deployed the crawlers to different machines and
-needed to coordinate efficiently among the crawlers in a distributed manner.
-We considered configuring [Quartz](https://github.com/quartz-scheduler/quartz)
-in cluster mode for distributed scheduling.
+We needed to collect metadata information frequently in a scalable way without blocking other crawler tasks. 
+To do this, we deployed the crawlers to different machines and needed to coordinate efficiently among the 
+crawlers in a distributed manner.
+We considered configuring [Quartz](https://github.com/quartz-scheduler/quartz) in cluster mode for distributed 
+scheduling.
 
-In addition, to accommodate future cloud deployment models,
-we need to deploy the crawler to different hosts and multiple cloud in kubernetes pod containers.
+In addition, to accommodate future cloud deployment models, we need to deploy the crawler to kubernetes in 
+different clouds.
 
 ## Environment isolation
 
 Because each connector plug-in will contain many dependent JAR packages that easy cause conflicts,
 We need to have the plug-in run in an isolation environment.
 So we need store each plug-in and its associated dependency packages in a separate directory.
-All jar packages in this directory are dynamical loaded through `ClassLoader` function using java reflate mechanism.
+All JAR packages in this directory and dynamical loaded through `ClassLoader` function using java reflate mechanism.
 
 In additionally, packages dependency isolation's functionality also to better supported for running in cloud environment.
-Each plug-in can be stand-alone deployment independence in the kubernetes pod container,
-Allow each data source connector scala different as needed.
+Each plug-in can be stand-alone deployment independence in the kubernetes pod container, Allow each data source 
+connector scala different as needed.
 
 ## Metadata
 
@@ -95,27 +95,27 @@ Allow each data source connector scala different as needed.
 
 The `QualifiedName` class is fully qualified name that references a source of data.
 
-| Field Name  | Field Type          | Description                        | Optional |
-|-------------|---------------------|------------------------------------| -------- |
-| lakehouse   | uint64              | Lakehouse name of the data source. | Required |
-| tenant      | string              | Tenant name of the data source.    | Required |
-| zone        | string              | Zone name of the data source.      | Required |
-| table       | string              | Table name of the data source.     | Optional |
-| mview       | string              | View name of the data sourc.       | Optional |
-| partition   | string              | The partition name of the table.   | Optional |
-| column      | string              | Column name of the data source.    | Optional |
-| column_type | Type Category       | Type category of the Column.       | Optional |
+| Field Name  | Field Type    | Description                        | Optional |
+|-------------|---------------|------------------------------------| -------- |
+| lakehouse   | string        | Lakehouse name of the data source. | Required |
+| tenant      | string        | Tenant name of the data source.    | Required |
+| zone        | string        | Zone name of the data source.      | Required |
+| table       | string        | Table name of the data source.     | Optional |
+| mview       | string        | View name of the data sourc.       | Optional |
+| partition   | string        | The partition name of the table.   | Optional |
+| column      | string        | Column name of the data source.    | Optional |
+| column_type | Type Category | Type category of the Column.       | Optional |
 
 ### Metadata Types
 
-The Type interface in `Graviton` is used to implement a type store them into repository.
+The Type interface in `Graviton` is used to implement a type store them into storage.
 `Graviton` comes with a number of built-in types, like `VarcharType` and `BigintType`.
 The ParametricType interface is used to provide type parameters for types,
 to allow types like `VARCHAR(10)` or `DECIMAL(10, 4)`.
 
 ### Type Signature
 
-The TypeSignature class is used to uniquely identify a type.
+The `TypeSignature` class is used to uniquely identify a type.
 It contains the type name and the type parameters (if it’s parametric), and its literal parameters.
 Every type map to Substrait's type system.
 
@@ -184,21 +184,22 @@ Parametric Type is used to provide type parameters for types, to allow types lik
 Each data source has its own type of definite. There are many different between them and `Graviton`,
 In order to simplify type conversions, We support mapping the relationship between the two via configure.
 
-The connector uses `TypeConverter` object to load the configuration YAML file of the type converter,
+The connector uses `TypeConverter` class to load the configuration YAML file of the type converter,
 basis on the name of the data source, Converts the filed types of the data source to `Gravition` Unified field type.
 
 The rule of the `Graviton` type converter configure file is `{data-source-name}-{version}-type-converter.yaml`,   
 Each data source has a `default` version as the base configure file.
 
 When there is a difference between the new version of the data source field type and the default version,
-We can replace the default version with the higher version.
+`TypeConverter` can replace the default version with the higher version.
 
+#### Rule of the configure file name
 ```bash
 hive-default-type-converter.yaml
 hive-3.1.3-type-converter.yaml
 ```
 
-The format of the type converter configure file like this
+#### Format of the configure file
 ```bash
 # Hive Type to Graviton Type
 datasource.type.to.graviton.type.converter:
@@ -246,14 +247,14 @@ The connector metadata interface allows to implement other write operation featu
 + Support for zone statistics. (Follow up to add)
 + Support for schemas statistics. (Follow up to add)
 + Support for tables, mview statistics, including total number of rows and `columns statistics` etc.
-+ Support `columns statistics`, including MIN and MAX values, ranger of values, number of the distinct values etc.
++ Support `columns statistics`, including `MIN` and `MAX` values, ranger of values, number of the distinct values etc.
 
 ### System Tables
 
 `Graviton` allows manipulation of metadata through SQL in addition to providing a RESTful API.
 
 `Graviton`'s metadata is stored in the back-end storage layer, They are abstracted as a set of system tables,
-different users can access different data base on authorization.
+different users can access different data through authorization.
 
 You can use SQL to operation `Graviton` system metadata, e.g:
 + If you execute `SELECT * FROM system.lakehouse WEHRE name = 'foo'` statements, then return lakehouse's all information,
