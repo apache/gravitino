@@ -16,7 +16,7 @@ import lombok.ToString;
 @Getter
 @EqualsAndHashCode
 @ToString
-public final class Column implements Entity, Auditable {
+public final class Column implements Entity, Auditable, HasIdentifier {
 
   public static final Field ID =
       Field.required("id", Integer.class, "The unique identifier of the column");
@@ -86,6 +86,11 @@ public final class Column implements Entity, Auditable {
   @Override
   public AuditInfo auditInfo() {
     return auditInfo;
+  }
+
+  @Override
+  public String name() {
+    return name;
   }
 
   public static class Builder {

@@ -391,7 +391,7 @@ public class TestEntityJsonSerDe {
 
     Integer connectionId = 1;
     List<String> identifiers = ImmutableList.of("db1", "tabl1");
-    hasExtraInfo.ExtraInfo extraInfo = new VirtualTableInfo(connectionId, identifiers);
+    HasExtraInfo.ExtraInfo extraInfo = new VirtualTableInfo(connectionId, identifiers);
 
     Column column =
         new Column.Builder()

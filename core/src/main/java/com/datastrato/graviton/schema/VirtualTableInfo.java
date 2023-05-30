@@ -11,7 +11,7 @@ import lombok.ToString;
 @Getter
 @EqualsAndHashCode
 @ToString
-public final class VirtualTableInfo implements hasExtraInfo.ExtraInfo {
+public final class VirtualTableInfo implements HasExtraInfo.ExtraInfo {
 
   public static final Field CONNECTION_ID =
       Field.required("connection_id", Integer.class, "The unique identifier of the connection");
