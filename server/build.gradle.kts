@@ -6,22 +6,15 @@ plugins {
 }
 
 dependencies {
-  implementation(project(":schema"));
-  implementation(libs.protobuf.java.util) {
-    exclude("com.google.guava", "guava")
-      .because("Brings in Guava for Andriod, which we don't want (and breaks multimaps).")
-  }
-  implementation(libs.substrait.java.core) {
-    exclude("org.slf4j")
-    exclude("com.fasterxml.jackson.core")
-    exclude("com.fasterxml.jackson.datatype")
-  }
+  implementation(project(":core"));
   implementation(libs.jackson.databind)
   implementation(libs.jackson.annotations)
   implementation(libs.jackson.datatype.jdk8)
   implementation(libs.jackson.datatype.jsr310)
   implementation(libs.guava)
   implementation(libs.bundles.log4j)
+  implementation(libs.bundles.jetty)
+  implementation(libs.bundles.jersey)
 
   compileOnly(libs.lombok)
   annotationProcessor(libs.lombok)
