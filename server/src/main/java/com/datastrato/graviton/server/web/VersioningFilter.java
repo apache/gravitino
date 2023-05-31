@@ -8,13 +8,9 @@ import javax.servlet.*;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletRequestWrapper;
 import javax.servlet.http.HttpServletResponse;
-import javax.ws.rs.container.PreMatching;
-import javax.ws.rs.ext.Provider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-@Provider
-@PreMatching
 public class VersioningFilter implements Filter {
 
   private static final Logger LOG = LoggerFactory.getLogger(VersioningFilter.class);
