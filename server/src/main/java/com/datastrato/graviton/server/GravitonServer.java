@@ -3,6 +3,7 @@ package com.datastrato.graviton.server;
 import com.datastrato.graviton.BaseTenantOperations;
 import com.datastrato.graviton.server.web.JettyServer;
 import com.datastrato.graviton.server.web.ObjectMapperProvider;
+import com.datastrato.graviton.server.web.VersioningFilter;
 import javax.servlet.Servlet;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.jackson.JacksonFeature;
@@ -53,6 +54,7 @@ public class GravitonServer extends ResourceConfig {
 
     Servlet servlet = new ServletContainer(this);
     server.addServlet(servlet, "/api/*");
+    server.addFilter(new VersioningFilter(), "/api/*");
   }
 
   public void start() throws Exception {

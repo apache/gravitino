@@ -18,6 +18,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @Path("/tenants")
+@Consumes(MediaType.APPLICATION_JSON)
+@Produces(MediaType.APPLICATION_JSON)
 public class TenantOperations {
 
   private static final Logger LOG = LoggerFactory.getLogger(TenantOperations.class);
@@ -32,8 +34,7 @@ public class TenantOperations {
   }
 
   @POST
-  @Consumes(MediaType.APPLICATION_JSON)
-  @Produces(MediaType.APPLICATION_JSON)
+  @Produces("application/vnd.graviton.v1+json")
   public Response create(TenantCreateRequest request) {
     try {
       request.validate();
@@ -72,6 +73,7 @@ public class TenantOperations {
 
   @GET
   @Path("{name}")
+  @Produces("application/vnd.graviton.v1+json")
   public Response get(@PathParam("name") String tenantName) {
     if (tenantName == null || tenantName.isEmpty()) {
       return Utils.illegalArguments("Tenant name is required");
@@ -90,6 +92,7 @@ public class TenantOperations {
 
   @DELETE
   @Path("{name}")
+  @Produces("application/vnd.graviton.v1+json")
   public Response delete(@PathParam("name") String tenantName) {
     if (tenantName == null || tenantName.isEmpty()) {
       return Utils.illegalArguments("Tenant name is required");

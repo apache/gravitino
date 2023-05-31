@@ -1,6 +1,7 @@
 package com.datastrato.graviton.server.web;
 
 import com.datastrato.graviton.server.web.rest.BaseResponse;
+import com.datastrato.graviton.server.web.rest.ErrorType;
 import java.util.Optional;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.core.MediaType;
@@ -26,14 +27,14 @@ public class Utils {
 
   public static Response illegalArguments(String message) {
     return Response.status(Response.Status.BAD_GATEWAY)
-        .entity(BaseResponse.illegalArguments(message))
+        .entity(BaseResponse.error(ErrorType.INVALID_ARGUMENTS, message))
         .type(MediaType.APPLICATION_JSON)
         .build();
   }
 
   public static Response internalError(String message) {
     return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
-        .entity(BaseResponse.internalError(message))
+        .entity(BaseResponse.error(ErrorType.INTERNAL_ERROR, message))
         .type(MediaType.APPLICATION_JSON)
         .build();
   }

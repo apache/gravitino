@@ -11,8 +11,6 @@ import lombok.ToString;
 @ToString
 public class BaseResponse {
 
-  private static final BaseResponse OK = new BaseResponse(0, null, null);
-
   @JsonProperty("code")
   private int code;
 
@@ -30,15 +28,7 @@ public class BaseResponse {
     this.message = message;
   }
 
-  public static BaseResponse ok() {
-    return OK;
-  }
-
-  public static BaseResponse illegalArguments(String message) {
-    return new BaseResponse(1001, "Illegal Arguments", message);
-  }
-
-  public static BaseResponse internalError(String message) {
-    return new BaseResponse(1002, "Internal Error", message);
+  public static BaseResponse error(ErrorType type, String message) {
+    return new BaseResponse(type.errorCode(), type.type(), message);
   }
 }
