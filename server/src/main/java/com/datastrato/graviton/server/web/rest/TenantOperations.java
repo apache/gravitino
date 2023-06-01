@@ -87,7 +87,7 @@ public class TenantOperations {
         LOG.warn("Failed to find tenant by name {}", tenantName);
         return Utils.notFound("Failed to find tenant by name " + tenantName);
       } else {
-        return Utils.ok(new TenantResponse(ops.get(identifier)));
+        return Utils.ok(new TenantResponse(tenant));
       }
 
     } catch (Exception e) {
