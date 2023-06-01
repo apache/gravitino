@@ -5,14 +5,18 @@ import com.datastrato.graviton.server.GravitonServerException;
 import com.datastrato.graviton.server.ServerConfig;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.net.BindException;
+import java.util.EnumSet;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import javax.servlet.DispatcherType;
+import javax.servlet.Filter;
 import javax.servlet.Servlet;
 import org.eclipse.jetty.server.*;
 import org.eclipse.jetty.server.handler.ErrorHandler;
 import org.eclipse.jetty.server.handler.HandlerCollection;
 import org.eclipse.jetty.servlet.DefaultServlet;
+import org.eclipse.jetty.servlet.FilterHolder;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
 import org.eclipse.jetty.util.component.LifeCycle;
@@ -119,6 +123,11 @@ public final class JettyServer {
 
   public void addServlet(Servlet servlet, String pathSpec) {
     servletContextHandler.addServlet(new ServletHolder(servlet), pathSpec);
+  }
+
+  public void addFilter(Filter filter, String pathSpec) {
+    servletContextHandler.addFilter(
+        new FilterHolder(filter), pathSpec, EnumSet.allOf(DispatcherType.class));
   }
 
   private void initializeServletContextHandler(Server server) {
