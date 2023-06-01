@@ -62,29 +62,28 @@ and other read/write data operations.
 
 #### Read-only Interface
 
-+ List&lt;String> getSchemaNames()
++ List&lt;String&gt; getSchemaNames()
 + int getSchemaCount()
-+ List&lt;Schema> getSchemas(int pageSize, int offset)
++ List&lt;Schema&gt; getSchemas(int pageSize, int offset)
 + Schema getSchema(final String schemaName)
-+ List&lt;String> getDatabaseNames()
++ List&lt;String&gt; getDatabaseNames()
 + int getDatabaseCount()
-+ List&lt;Database> getDatabases(int pageSize, int offset)
++ List&lt;Database&gt; getDatabases(int pageSize, int offset)
 + Database getDatabase(final String dbName)
-+ List&lt;String> getTableNames(final String dbName)
++ List&lt;String&gt; getTableNames(final String dbName)
 + int getTableCount(final String dbName)
-+ List&lt;Table> getTables(final String dbName, int pageSize, int offset)
++ List&lt;Table&gt; getTables(final String dbName, int pageSize, int offset)
 + Table getTable(final String dbName, final String tableName)
 + String getTableComment(final String dbName, final String tableName)
-+ Map&lt;String, Object> getTableProperties(final String dbName, final String tableName)
-+ List&lt;String> getViewNames(final String dbName)
++ Map&lt;String, Object&gt; getTableProperties(final String dbName, final String tableName)
++ List&lt;String&gt; getViewNames(final String dbName)
 + int getViewCount(final String dbName)
-+ List&lt;Table> getViews(final String dbName, int pageSize, int offset)
++ List&lt;Table&gt; getViews(final String dbName, int pageSize, int offset)
 + Table getView(final String dbName, final String viewName)
 + PartitionStatistics getTableStatistics(final String dbName, final String tableName)
 + ColumnStatistics getColumnStatistics(final String dbName, final String tableName, final String colName)
 
 #### Read/Write Interface
-+ void createSchema(final Database database)
 + void alterSchema(final String schemaName, final Schema schema)
 + void dropSchema(final String schemaName)
 + void createDatabase(final Database database)
@@ -93,13 +92,13 @@ and other read/write data operations.
 + void createTable(final Table table)
 + void alterTable(final String dbName, final String tableName, final Table table)
 + void dropTable(final String dbName, final String tableName)
-+ void setTableProperties(final String dbName, final String tableName, Map&lt;String, Optional<Object>> properties)
-+ void setTableComment(final String dbName, final String tableName, Optional<String> comment)
++ void setTableProperties(final String dbName, final String tableName, Map&lt;String, Optional&lt;Object&gt;&gt; properties)
++ void setTableComment(final String dbName, final String tableName, Optional&lt;String&gt; comment)
 + void addColumn(final String dbName, final String tableName, final Column column)
 + void alterColumn(final String dbName, final String tableName, final String colName, final Column newColumn)
 + void dropColumn(final String dbName, final String tableName, final String colName)
-+ void setTableStatistics(String dbName, String tableName, List<ColumnStatistics> statistics)
-+ void updateTableStatistics(String dbName, String tableName, Function<PartitionStatistics, PartitionStatistics> update)
++ void setTableStatistics(String dbName, String tableName, List&lt;ColumnStatistics&gt; statistics)
++ void updateTableStatistics(String dbName, String tableName, Function&lt;PartitionStatistics, PartitionStatistics&gt; update)
 + void dropTableStatistics(String dbName, String tableName)
 + void setColumnStatistics(String dbName, String tableName, String columnName, ColumnStatistics statistics)
 + void updateColumnStatistics(String dbName, String tableName, String columnName, ColumnStatistics colStatistics)
@@ -107,6 +106,8 @@ and other read/write data operations.
 + void setColumnIndexStatistics(String dbName, String tableName, String columnName, ColumnIndexStatistics statistics)
 + void updateColumnIndexStatistics(String dbName, String tableName, String columnName, ColumnIndexStatistics colStatistics)
 + void dropColumnIndexStatistics(String dbName, String tableName, String columnName)
+
+
 
 Note that there are parts of the metadata that do not have interface.
 + Partition: Since the number of the partitions can often by very large, it's difficult for us to keep track
