@@ -1,6 +1,7 @@
 package com.datastrato.graviton.server.web.rest;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.google.common.base.Preconditions;
 import java.util.Optional;
 import javax.annotation.Nullable;
 import lombok.EqualsAndHashCode;
@@ -33,8 +34,7 @@ public class TenantCreateRequest extends BaseRequest {
 
   @Override
   public void validate() throws IllegalArgumentException {
-    if (name == null || name.isEmpty()) {
-      throw new IllegalArgumentException("\"name\" field is required and cannot be empty");
-    }
+    Preconditions.checkArgument(
+        name != null && !name.isEmpty(), "\"name\" field is required and cannot be empty");
   }
 }
