@@ -35,7 +35,7 @@ public abstract class Config {
     this(true);
   }
 
-  public Config loadFromFile(String name) throws IOException {
+  public Config loadFromFile(String name) throws Exception {
     String confDir =
         Optional.ofNullable(System.getenv("GRAVITON_CONF_DIR"))
             .orElse(
