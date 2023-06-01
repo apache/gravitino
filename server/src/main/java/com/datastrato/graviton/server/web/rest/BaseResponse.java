@@ -28,7 +28,14 @@ public class BaseResponse {
     this.message = message;
   }
 
+  // This is the constructor that is used by Jackson deserializer
+  BaseResponse() {
+    this.code = 0;
+    this.type = null;
+    this.message = null;
+  }
+
   public static BaseResponse error(ErrorType type, String message) {
-    return new BaseResponse(type.errorCode(), type.type(), message);
+    return new BaseResponse(type.errorCode(), type.errorType(), message);
   }
 }

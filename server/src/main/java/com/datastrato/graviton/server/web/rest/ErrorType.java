@@ -13,18 +13,18 @@ public enum ErrorType {
 
   private final int errorCode;
 
-  private final String type;
+  private final String errorType;
 
   ErrorType(int errorCode, String type) {
     this.errorCode = errorCode;
-    this.type = type;
+    this.errorType = type;
   }
 
   public int errorCode() {
     return errorCode;
   }
 
-  public String type() {
-    return type;
+  public String errorType() {
+    return errorType;
   }
 }

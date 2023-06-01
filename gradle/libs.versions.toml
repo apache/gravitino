@@ -9,6 +9,7 @@ slf4j = "2.0.7"
 log4j = "2.20.0"
 jetty = "9.4.51.v20230217"
 jersey = "2.39.1"
+mockito = "3.12.4"
 
 protobuf-plugin = "0.9.2"
 spotless-plugin = '6.11.0'
@@ -40,6 +41,9 @@ jersey-container-servlet-core = { group = "org.glassfish.jersey.containers", nam
 jersey-container-jetty-http = { group = "org.glassfish.jersey.containers", name = "jersey-container-jetty-http", version.ref = "jersey" }
 jersey-media-json-jackson = { group = "org.glassfish.jersey.media", name = "jersey-media-json-jackson", version.ref = "jersey" }
 jersey-hk2 = { group = "org.glassfish.jersey.inject", name = "jersey-hk2", version.ref = "jersey" }
+jersey-test-framework-core = { group = "org.glassfish.jersey.test-framework", name = "jersey-test-framework-core", version.ref = "jersey" }
+jersey-test-framework-provider-jetty = { group = "org.glassfish.jersey.test-framework.providers", name = "jersey-test-framework-provider-jetty", version.ref = "jersey" }
+mockito-core = { group = "org.mockito", name = "mockito-core", version.ref = "mockito" }
 
 [bundles]
 log4j = ["slf4j-api", "log4j-slf4j2-impl", "log4j-api", "log4j-core", "log4j-12-api"]
