@@ -34,51 +34,137 @@ be served if the data connection layer goes down, thus minimizing the impact on 
 
 ## Connectors
 
-Connectors can connect different data source, such as relational databases or file systems 
-or WebServices, and extract metadata from them. We will map data source to `Graviton` metadata schema, 
-table and column concept. 
+Connectors can connect different data source, such as relational databases, file systems 
+or WebServices, Execute fetch metadata or CURD operation from them.
 
-### ConnectorFactory
+### Metadata management mode
 
-Instances of the connector are created by the `ConnectorFactory`, The Factory creates its 
-own connector for each different dada source, The connector factory is responsible for creating 
-an instance of a connector object based on the `create` function:  
-`Connector create(String lakehouse, String tenant, String zone, Map<String, String> config, ConnectorContext context)`.
+![rfc-2-02.png](rfc-2-02.png)
+
+`Graviton` supports two kinds of data source management modes:
+
+#### Unmanaged mode
+When a user sets a data source in `Graviton` to `Unmanaged` mode,
+Connector can only use read-only interface to fetch metadata, and cannot perform Create, Update, and Delete operation.
+
+The underlying data source will be mapped into a `Virtual Table` structure.
+Users only through `Graviton` to view metadata, analyze data lineage, query data, and other read-only operations.
+
+#### Managed mode
+When a user sets a data source in `Graviton` to `Managed` mode,
+Connector can use read/write interface to create, update, read, and delete metadata.
+
+The underlying data source will be mapped into a `Extend Table` or `Internal Table` structure.
+Users can use `Graviton` as a complete portal for data. For example, query data, delete data, modify metadata, 
+and other read/write data operations.
+
+### Metadata Operation Interface
+
+#### Read-only Interface
+
++ List&lt;String> getSchemaNames()
++ int getSchemaCount()
++ List&lt;Schema> getSchemas(int pageSize, int offset)
++ Schema getSchema(final String schemaName)
++ List&lt;String> getDatabaseNames()
++ int getDatabaseCount()
++ List&lt;Database> getDatabases(int pageSize, int offset)
++ Database getDatabase(final String dbName)
++ List&lt;String> getTableNames(final String dbName)
++ int getTableCount(final String dbName)
++ List&lt;Table> getTables(final String dbName, int pageSize, int offset)
++ Table getTable(final String dbName, final String tableName)
++ String getTableComment(final String dbName, final String tableName)
++ Map&lt;String, Object> getTableProperties(final String dbName, final String tableName)
++ List&lt;String> getViewNames(final String dbName)
++ int getViewCount(final String dbName)
++ List&lt;Table> getViews(final String dbName, int pageSize, int offset)
++ Table getView(final String dbName, final String viewName)
++ PartitionStatistics getTableStatistics(final String dbName, final String tableName)
++ ColumnStatistics getColumnStatistics(final String dbName, final String tableName, final String colName)
+
+#### Read/Write Interface
++ void createSchema(final Database database)
++ void alterSchema(final String schemaName, final Schema schema)
++ void dropSchema(final String schemaName)
++ void createDatabase(final Database database)
++ void alterDatabase(final String dbName, final Database database)
++ void dropDatabase(final String dbName)
++ void createTable(final Table table)
++ void alterTable(final String dbName, final String tableName, final Table table)
++ void dropTable(final String dbName, final String tableName)
++ void setTableProperties(final String dbName, final String tableName, Map&lt;String, Optional<Object>> properties)
++ void setTableComment(final String dbName, final String tableName, Optional<String> comment)
++ void addColumn(final String dbName, final String tableName, final Column column)
++ void alterColumn(final String dbName, final String tableName, final String colName, final Column newColumn)
++ void dropColumn(final String dbName, final String tableName, final String colName)
++ void setTableStatistics(String dbName, String tableName, List<ColumnStatistics> statistics)
++ void updateTableStatistics(String dbName, String tableName, Function<PartitionStatistics, PartitionStatistics> update)
++ void dropTableStatistics(String dbName, String tableName)
++ void setColumnStatistics(String dbName, String tableName, String columnName, ColumnStatistics statistics)
++ void updateColumnStatistics(String dbName, String tableName, String columnName, ColumnStatistics colStatistics)
++ void dropColumnStatistics(String dbName, String tableName, String columnName)
++ void setColumnIndexStatistics(String dbName, String tableName, String columnName, ColumnIndexStatistics statistics)
++ void updateColumnIndexStatistics(String dbName, String tableName, String columnName, ColumnIndexStatistics colStatistics)
++ void dropColumnIndexStatistics(String dbName, String tableName, String columnName)
+
+Note that there are parts of the metadata that do not have interface.
++ Partition: Since the number of the partitions can often by very large, it's difficult for us to keep track
+of change to partition, which would put a lot of pressure on `Graviton`. So instead of saving partition information 
+to `Graviton` Storage, we use a real-time operation for read, modify, and delete.
++ Role and Privileges: `Graviton` will have its own permission system in the future, so it is not available at this time.
++ lock, transaction, and token: These future are not supported at this time.
+
+#### Metadata multiple version
+
+When the connector discovers that the metadata has changed, The connector will create a new version and timestamp
+of the metadata.
+This allow us to track the history of metadata changes and store all historical metadata information.
+Use can view and rollback to any version of metadata.
 
 ### Typical Connectors
 `Graviton` prioritize implement very high usage and important connector.
 
 #### Hive Connector
-Follow up to add.
+HMS(hive metastore) manages many big data systems' metadata. like., hive, impala, spark etc. 
 
 #### JDBC Connector
-Follow up to add.
+Base class of JDBC interface database connector, them normal is relationship database or partial KV database.
+JDBCConnector support commonly used metadata operation, We can extend specific metadata manipulation capabilities 
+based on the different databases.
 
 #### File Connector
-Follow up to add.
+Many files are stored in the file storage system (HDFS), Object storage system(S3, OZone), 
+or data lake(IceBerg, Hudi, DeltaLake), FileConnector support many kinds of file format's metadata operation, 
+like., Parquet, AVRO, CSV etc.
 
-## Event-listen vs. Scheduled
+#### Data Source Connector Classification
+| Connector Type | Data sources / Analysis Engine            | Description                     |
+|----------------|-------------------------------------------|---------------------------------|
+| HiveConnector  | Hive, Impala, Spark, etc.                 |  |
+| JDBCConnector  | Redshift, Mysql, Oralce, Clickhouse, etc. |  |
+| FileConnector  | S3, Iceberg, Hudi, DeltaLake, etc.        | Parquet, AVRO, CSV file format. |
 
-Our next challenge was to determine the most effective and efficient way to collect or extract metadata
-from several different and completely disparate data sources.
+### Connector Factory
 
-Creating metadata change event lister is faster and low cost than period scheduled,
-However, Not all data sources support event notification, So we chose to use the period scheduled mode 
-first and optimize later.
+Instances of the connector are created by the `ConnectorFactory`, The Factory creates its
+own connector for each different dada source, The connector factory is responsible for creating
+an instance of a connector object based on the `create` function:  
+`Connector create(String lakehouse, String tenant, String zone, Map<String, String> config, ConnectorContext context)`.
 
-We started by creating crawlers that regularly collect or extract schema from various data sources
-and microservices that generate metadata information about the dataset.
+### Connector service
 
-We needed to collect metadata information frequently in a scalable way without blocking other crawler tasks. 
-To do this, we deployed the crawlers to different machines and needed to coordinate efficiently among the 
-crawlers in a distributed manner.
-We considered configuring [Quartz](https://github.com/quartz-scheduler/quartz) in cluster mode for distributed 
-scheduling.
+In the unmanaged mode, the connector can use period schedule job,
+but in the managed mode, the connector need to run for a long time to support interactive CURD operation.
+So, the connector unified to use the long-term service run mode.
 
-In addition, to accommodate future cloud deployment models, we need to deploy the crawler to kubernetes in 
-different clouds.
+#### Connector service recover
 
-## Environment isolation
+`Graviton` stores connector configure information in the database, 
+and when the connector is restarted, the connector can be restored to its previous stats of operation
+based on the configure information in the database.
+
+#### Environment isolation
 
 Because each connector plug-in will contain many dependent JAR packages that easy cause conflicts,
 We need to have the plug-in run in an isolation environment.
@@ -88,174 +174,3 @@ All JAR packages in this directory and dynamical loaded through `ClassLoader` fu
 In additionally, packages dependency isolation's functionality also to better supported for running in cloud environment.
 Each plug-in can be stand-alone deployment independence in the kubernetes pod container, Allow each data source 
 connector scala different as needed.
-
-## Metadata
-
-### QualifiedName
-
-The `QualifiedName` class is fully qualified name that references a source of data.
-
-| Field Name  | Field Type    | Description                        | Optional |
-|-------------|---------------|------------------------------------| -------- |
-| lakehouse   | string        | Lakehouse name of the data source. | Required |
-| tenant      | string        | Tenant name of the data source.    | Required |
-| zone        | string        | Zone name of the data source.      | Required |
-| table       | string        | Table name of the data source.     | Optional |
-| mview       | string        | View name of the data sourc.       | Optional |
-| partition   | string        | The partition name of the table.   | Optional |
-| column      | string        | Column name of the data source.    | Optional |
-| column_type | Type Category | Type category of the Column.       | Optional |
-
-### Metadata Types
-
-The Type interface in `Graviton` is used to implement a type store them into storage.
-`Graviton` comes with a number of built-in types, like `VarcharType` and `BigintType`.
-The ParametricType interface is used to provide type parameters for types,
-to allow types like `VARCHAR(10)` or `DECIMAL(10, 4)`.
-
-### Type Signature
-
-The `TypeSignature` class is used to uniquely identify a type.
-It contains the type name and the type parameters (if it’s parametric), and its literal parameters.
-Every type map to Substrait's type system.
-
-Substrait’s type system can be referred here https://substrait.io/types/type_system/.
-In this way, different engines can read and write the same data based on the `Graviton` schema.
-Instead of each engine having to build a separate external table,
-multiple engines can be seamlessly connected in the future.
-
-### Type Entity
-
-#### Type Category
-
-Type category is enum type, it's used to indicate the type category of the type. contains the following values:
-`VOID`, `BOOLEAN`, `BYTE`, `SHORT`, `INT`, `LONG`, `FLOAT`, `DOUBLE`, `STRING`,
-`DATE`, `TIMESTAMP`, `TIMESTAMPLOCALTZ`, `BINARY`, `DECIMAL`, `VARCHAR`, `CHAR`,
-`INTERVAL_YEAR_MONTH`, `INTERVAL_DAY_TIME`, `UNKNOWN`.
-
-| Field Name | Field Type | Description                | Optional |
-|------------|------------|----------------------------| -------- |
-| name       | string     | Type category Name.        | Required |
-| enum_value | uint32     | Type category enum's value | Required |
-
-#### Parametric Type
-
-Parametric Type is used to provide type parameters for types, to allow types like `VARCHAR(10)` or `DECIMAL(10, 4)`, etc.
-
-##### DecimalType
-
-| Field Name | Field Type | Description        | Optional |
-|------------|------------|--------------------| -------- |
-| name       | string     | Type Name.         | Required |
-| precision  | uint32     | Decimal precision. | Required |
-| scale      | uint32     | Decimal scale.     | Required |
-
-##### VarcharType
-
-| Field Name | Field Type | Description         | Optional |
-|------------|------------|---------------------| -------- |
-| name       | string     | Type Name.          | Required |
-| length     | uint32     | varchar's length.   | Required |
-
-##### ListType
-
-| Field Name   | Field Type | Description                              | Optional |
-|--------------|-------|------------------------------------------| -------- |
-| name         | string | Type Name.                               | Required |
-| element_type | TypeCategory     | list element type category.              | Required |
-
-##### MapType
-
-| Field Name | Field Type | Description                   | Optional |
-|------------|-------|-------------------------------| -------- |
-| name       | string | Type Name.                    | Required |
-| key_type   | TypeCategory     | Map's key type category.      | Required |
-| value_type | TypeCategory     | Map's value type category. | Required |
-
-##### VarbinaryType
-
-| Field Name | Field Type | Description           | Optional |
-|------------|------------|-----------------------| -------- |
-| name       | string     | Type Name.            | Required |
-| length     | uint32     | binary's byte length. | Required |
-
-### Type Conversions
-
-Each data source has its own type of definite. There are many different between them and `Graviton`,
-In order to simplify type conversions, We support mapping the relationship between the two via configure.
-
-The connector uses `TypeConverter` class to load the configuration YAML file of the type converter,
-basis on the name of the data source, Converts the filed types of the data source to `Gravition` Unified field type.
-
-The rule of the `Graviton` type converter configure file is `{data-source-name}-{version}-type-converter.yaml`,   
-Each data source has a `default` version as the base configure file.
-
-When there is a difference between the new version of the data source field type and the default version,
-`TypeConverter` can replace the default version with the higher version.
-
-#### Rule of the configure file name
-```bash
-hive-default-type-converter.yaml
-hive-3.1.3-type-converter.yaml
-```
-
-#### Format of the configure file
-```bash
-# Hive Type to Graviton Type
-datasource.type.to.graviton.type.converter:
-  - source.type: TINYINT
-    target.type: Int8
-
-  - source.type: SMALLINT
-    target.type: Int16
-
-  - source.type: INT
-    target.type: Int32
-
-  - source.type: BIGINT
-    target.type: Int64
-
-  - source.type: null
-    target.type: void
-```
-
-### Metadata multiple version
-
-When the connector discovers that the metadata has changed, The connector will create a new version and timestamp
-of the metadata.
-This allow us to track the history of metadata changes and store all historical metadata information.
-Use can view and rollback to any version of metadata.
-
-### Metadata operation
-
-The Connector Metadata operation readonly interface allows `Graviton` to obtain a list of lakehouse, tenant, 
-zone, schemas, tables, view and columns and other metadata for a specific data source.
-
-+ listLakehouseNames
-+ listTenantNames
-+ listZoneNames
-+ listTableNames
-+ listViewNames
-+ listPartitionNames
-+ listColumnNames
-
-The connector metadata interface allows to implement other write operation features, like:
-+ Schema manager, which is creating, altering and dropping lakehouse, tenant, zone, schemas, tables, Materialized views and columns.
-+ Support for lakehouse, tenant, zone, schemas, tables, mview and columns comments and properties.
-+ Support for lakehouse statistics. (Follow up to add)
-+ Support for tenant statistics. (Follow up to add)
-+ Support for zone statistics. (Follow up to add)
-+ Support for schemas statistics. (Follow up to add)
-+ Support for tables, mview statistics, including total number of rows and `columns statistics` etc.
-+ Support `columns statistics`, including `MIN` and `MAX` values, ranger of values, number of the distinct values etc.
-
-### System Tables
-
-`Graviton` allows manipulation of metadata through SQL in addition to providing a RESTful API.
-
-`Graviton`'s metadata is stored in the back-end storage layer, They are abstracted as a set of system tables,
-different users can access different data through authorization.
-
-You can use SQL to operation `Graviton` system metadata, e.g:
-+ If you execute `SELECT * FROM system.lakehouse WEHRE name = 'foo'` statements, then return lakehouse's all information,
-such as name and properties.
