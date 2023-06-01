@@ -161,9 +161,9 @@ So, the connector unified to use the long-term service run mode.
 
 #### Connector service recover
 
-`Graviton` stores connector configure information in the database, 
-and when the connector is restarted, the connector can be restored to its previous stats of operation
-based on the configure information in the database.
+`Graviton` stores connector configure in the database, 
+and when the connector is restarted, the connector can be restored to its previous states of operation
+based on the configure in the database.
 
 #### Environment isolation
 
