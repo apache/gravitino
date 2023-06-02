@@ -26,7 +26,7 @@ public class Utils {
   }
 
   public static Response illegalArguments(String message) {
-    return Response.status(Response.Status.BAD_GATEWAY)
+    return Response.status(Response.Status.BAD_REQUEST)
         .entity(BaseResponse.error(ErrorType.INVALID_ARGUMENTS, message))
         .type(MediaType.APPLICATION_JSON)
         .build();
@@ -35,6 +35,13 @@ public class Utils {
   public static Response internalError(String message) {
     return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
         .entity(BaseResponse.error(ErrorType.INTERNAL_ERROR, message))
+        .type(MediaType.APPLICATION_JSON)
+        .build();
+  }
+
+  public static Response notFound(String message) {
+    return Response.status(Response.Status.NOT_FOUND)
+        .entity(BaseResponse.error(ErrorType.NOT_FOUND, message))
         .type(MediaType.APPLICATION_JSON)
         .build();
   }
