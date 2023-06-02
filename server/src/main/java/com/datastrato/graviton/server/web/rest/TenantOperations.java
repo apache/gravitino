@@ -71,6 +71,7 @@ public class TenantOperations {
     }
   }
 
+  // TODO. Are we going to use id or name to get Entity? @Jerry
   @GET
   @Path("{name}")
   @Produces("application/vnd.graviton.v1+json")
@@ -81,7 +82,13 @@ public class TenantOperations {
 
     NameIdentifier identifier = NameIdentifier.parse(tenantName);
     try {
-      return Utils.ok(new TenantResponse(ops.get(identifier)));
+      Tenant tenant = ops.get(identifier);
+      if (tenant == null) {
+        LOG.warn("Failed to find tenant by name {}", tenantName);
+        return Utils.notFound("Failed to find tenant by name " + tenantName);
+      } else {
+        return Utils.ok(new TenantResponse(tenant));
+      }
 
     } catch (Exception e) {
       LOG.error("Failed to get tenant by name {}", tenantName, e);

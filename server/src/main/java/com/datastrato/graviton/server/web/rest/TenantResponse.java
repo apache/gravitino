@@ -18,4 +18,10 @@ public class TenantResponse extends BaseResponse {
     super(0, null, null);
     this.tenant = tenant;
   }
+
+  // This is the constructor that is used by Jackson deserializer
+  TenantResponse() {
+    super();
+    this.tenant = null;
+  }
 }

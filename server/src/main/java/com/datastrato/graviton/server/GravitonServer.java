@@ -47,7 +47,7 @@ public class GravitonServer extends ResourceConfig {
         new AbstractBinder() {
           @Override
           protected void configure() {
-            bind(BaseTenantOperations.class).to(BaseTenantOperations.class);
+            bind(BaseTenantOperations.class).to(BaseTenantOperations.class).ranked(1);
           }
         });
     register(ObjectMapperProvider.class).register(JacksonFeature.class);
