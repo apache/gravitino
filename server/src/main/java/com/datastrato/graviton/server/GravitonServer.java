@@ -1,6 +1,5 @@
 package com.datastrato.graviton.server;
 
-import com.datastrato.graviton.BaseTenantOperations;
 import com.datastrato.graviton.server.web.JettyServer;
 import com.datastrato.graviton.server.web.ObjectMapperProvider;
 import com.datastrato.graviton.server.web.VersioningFilter;

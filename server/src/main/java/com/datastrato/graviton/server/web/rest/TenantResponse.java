@@ -1,6 +1,5 @@
 package com.datastrato.graviton.server.web.rest;
 
-import com.datastrato.graviton.schema.Tenant;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;

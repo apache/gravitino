@@ -1,10 +1,8 @@
 package com.datastrato.graviton.server.web.rest;
 
-import com.datastrato.graviton.BaseTenantOperations;
-import com.datastrato.graviton.schema.AuditInfo;
-import com.datastrato.graviton.schema.NameIdentifier;
-import com.datastrato.graviton.schema.SchemaVersion;
-import com.datastrato.graviton.schema.Tenant;
+import com.datastrato.graviton.meta.AuditInfo;
+import com.datastrato.graviton.NameIdentifier;
+import com.datastrato.graviton.meta.SchemaVersion;
 import com.datastrato.graviton.server.web.Utils;
 import java.time.Instant;
 import java.util.Optional;

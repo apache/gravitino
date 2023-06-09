@@ -3,10 +3,9 @@ package com.datastrato.graviton.server.web.rest;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
-import com.datastrato.graviton.BaseTenantOperations;
-import com.datastrato.graviton.schema.AuditInfo;
-import com.datastrato.graviton.schema.SchemaVersion;
-import com.datastrato.graviton.schema.Tenant;
+import com.datastrato.graviton.meta.AuditInfo;
+import com.datastrato.graviton.meta.SchemaVersion;
+
 import java.time.Instant;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.client.Entity;

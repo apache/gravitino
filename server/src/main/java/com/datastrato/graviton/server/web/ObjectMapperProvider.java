@@ -1,6 +1,6 @@
 package com.datastrato.graviton.server.web;
 
-import com.datastrato.graviton.schema.json.JsonUtils;
+import com.datastrato.graviton.json.JsonUtils;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import javax.ws.rs.ext.ContextResolver;

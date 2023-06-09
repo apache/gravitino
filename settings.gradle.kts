@@ -1,3 +1,3 @@
 rootProject.name = "Graviton"
 
-include("api", "core", "schema", "server")
+include("core", "meta", "server")
