@@ -24,14 +24,20 @@ import com.datastrato.graviton.Namespace;
 import java.util.Map;
 
 /**
+<<<<<<< HEAD
  * The Catalog interface to support namespace operations. If the implemented catalog has namespace
  * semantics, it should implement this interface.
+=======
+ * The Catalog interface to support namespace operations. If the implemented catalog has
+ * namespace semantics, it should implement this interface.
+>>>>>>> 8647c56 (Refactor the schema system and add catalog interfaces)
  */
 public interface SupportsNamespaces {
 
   /**
    * List top-level namespaces from the catalog.
    *
+<<<<<<< HEAD
    * <p>If an entity such as a table, view exists, its parent namespaces must also exist and must be
    * returned by this discovery method. For example, if table a.b.t exists, this method must return
    * ["a"] in the result array.
