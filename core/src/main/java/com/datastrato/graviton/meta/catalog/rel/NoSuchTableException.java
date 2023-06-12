@@ -1,10 +1,8 @@
-package com.datastrato.graviton.meta.catalog.meta;
+package com.datastrato.graviton.meta.catalog.rel;
 
 import com.datastrato.graviton.NoSuchEntityException;
 
-/**
- * Exception thrown when a table with specified name is not existed.
- */
+/** Exception thrown when a table with specified name is not existed. */
 public class NoSuchTableException extends NoSuchEntityException {
 
   public NoSuchTableException(String message) {

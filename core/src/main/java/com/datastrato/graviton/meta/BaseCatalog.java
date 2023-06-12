@@ -2,7 +2,6 @@ package com.datastrato.graviton.meta;
 
 import com.datastrato.graviton.*;
 import com.fasterxml.jackson.annotation.JsonProperty;
-
 import java.io.Closeable;
 import java.util.Collections;
 import java.util.HashMap;
@@ -13,9 +12,9 @@ import lombok.Getter;
 import lombok.ToString;
 
 /**
- * This is the base interface for a Catalog implementation, it defines the interface to
- * initialize and uninitialize the catalog. This interface inherits from Closeable, so that a
- * determined close() method should be called to release any resources that the catalog holds.
+ * This is the base interface for a Catalog implementation, it defines the interface to initialize
+ * and uninitialize the catalog. This interface inherits from Closeable, so that a determined
+ * close() method should be called to release any resources that the catalog holds.
  */
 @Getter
 @EqualsAndHashCode
@@ -42,33 +41,33 @@ public abstract class BaseCatalog implements Entity, Auditable, HasIdentifier, C
       Field.required("audit_info", AuditInfo.class, "The audit info of the catalog");
 
   @JsonProperty("id")
-  private Long id;
+  protected Long id;
 
   @JsonProperty("lakehouse_id")
-  private Long lakehouseId;
+  protected Long lakehouseId;
 
   @JsonProperty("name")
-  private String name;
+  protected String name;
 
   @JsonProperty("type")
-  private Type type;
+  protected Type type;
 
   @Nullable
   @JsonProperty("comment")
-  private String comment;
+  protected String comment;
 
   @Nullable
   @JsonProperty("properties")
-  private Map<String, String> properties;
+  protected Map<String, String> properties;
 
   @JsonProperty("audit_info")
-  private AuditInfo auditInfo;
+  protected AuditInfo auditInfo;
 
   /**
-   * Initialize the catalog with specified configuration. This method is called after
-   * Catalog object is created, but before any other method is called. The method is used to
-   * initialize the connection to the underlying metadata source. RuntimeException will be thrown
-   * if the initialization failed.
+   * Initialize the catalog with specified configuration. This method is called after Catalog object
+   * is created, but before any other method is called. The method is used to initialize the
+   * connection to the underlying metadata source. RuntimeException will be thrown if the
+   * initialization failed.
    *
    * @param config The configuration of this Catalog.
    * @throws RuntimeException if the initialization failed.
@@ -117,8 +116,9 @@ public abstract class BaseCatalog implements Entity, Auditable, HasIdentifier, C
     T build();
   }
 
-  public static abstract class BaseCatalogBuilder<
-      SELF extends Builder<SELF, T>, T extends BaseCatalog> implements Builder<SELF, T> {
+  public abstract static class BaseCatalogBuilder<
+          SELF extends Builder<SELF, T>, T extends BaseCatalog>
+      implements Builder<SELF, T> {
     protected Long id;
     protected Long lakehouseId;
     protected String name;

@@ -18,7 +18,7 @@
 // Referred from Apache's connector/catalog implementation
 // sql/catalyst/src/main/java/org/apache/spark/sql/connector/catalog/TableChange.java
 
-package com.datastrato.graviton.meta.catalog.meta;
+package com.datastrato.graviton.meta.catalog.rel;
 
 import com.datastrato.graviton.EntityChange;
 import io.substrait.type.Type;
@@ -30,8 +30,8 @@ public interface TableChange extends EntityChange {
 
   /**
    * Create a TableChange for setting a table property.
-   * <p>
-   * If the property already exists, it will be replaced with the new value.
+   *
+   * <p>If the property already exists, it will be replaced with the new value.
    *
    * @param property the property name
    * @param value the new property value
@@ -43,8 +43,8 @@ public interface TableChange extends EntityChange {
 
   /**
    * Create a TableChange for removing a table property.
-   * <p>
-   * If the property does not exist, the change will succeed.
+   *
+   * <p>If the property does not exist, the change will succeed.
    *
    * @param property the property name
    * @return a TableChange for the addition
@@ -55,8 +55,8 @@ public interface TableChange extends EntityChange {
 
   /**
    * Create a TableChange for adding an optional column.
-   * <p>
-   * If the field already exists, the change will result in an {@link IllegalArgumentException}.
+   *
+   * <p>If the field already exists, the change will result in an {@link IllegalArgumentException}.
    * If the new field is nested and its parent does not exist or is not a struct, the change will
    * result in an {@link IllegalArgumentException}.
    *
@@ -70,8 +70,8 @@ public interface TableChange extends EntityChange {
 
   /**
    * Create a TableChange for adding a column.
-   * <p>
-   * If the field already exists, the change will result in an {@link IllegalArgumentException}.
+   *
+   * <p>If the field already exists, the change will result in an {@link IllegalArgumentException}.
    * If the new field is nested and its parent does not exist or is not a struct, the change will
    * result in an {@link IllegalArgumentException}.
    *
@@ -80,17 +80,14 @@ public interface TableChange extends EntityChange {
    * @param comment the new field's comment string
    * @return a TableChange for the addition
    */
-  static TableChange addColumn(
-      String[] fieldNames,
-      Type dataType,
-      String comment) {
+  static TableChange addColumn(String[] fieldNames, Type dataType, String comment) {
     return new AddColumn(fieldNames, dataType, comment, null);
   }
 
   /**
    * Create a TableChange for adding a column.
-   * <p>
-   * If the field already exists, the change will result in an {@link IllegalArgumentException}.
+   *
+   * <p>If the field already exists, the change will result in an {@link IllegalArgumentException}.
    * If the new field is nested and its parent does not exist or is not a struct, the change will
    * result in an {@link IllegalArgumentException}.
    *
@@ -101,20 +98,17 @@ public interface TableChange extends EntityChange {
    * @return a TableChange for the addition
    */
   static TableChange addColumn(
-      String[] fieldNames,
-      Type dataType,
-      String comment,
-      ColumnPosition position) {
+      String[] fieldNames, Type dataType, String comment, ColumnPosition position) {
     return new AddColumn(fieldNames, dataType, comment, position);
   }
 
   /**
    * Create a TableChange for renaming a field.
-   * <p>
-   * The name is used to find the field to rename. The new name will replace the leaf field name.
+   *
+   * <p>The name is used to find the field to rename. The new name will replace the leaf field name.
    * For example, renameColumn(["a", "b", "c"], "x") should produce column a.b.x.
-   * <p>
-   * If the field does not exist, the change will result in an {@link IllegalArgumentException}.
+   *
+   * <p>If the field does not exist, the change will result in an {@link IllegalArgumentException}.
    *
    * @param fieldNames the current field names
    * @param newName the new name
@@ -126,10 +120,10 @@ public interface TableChange extends EntityChange {
 
   /**
    * Create a TableChange for updating the type of a field that is nullable.
-   * <p>
-   * The field names are used to find the field to update.
-   * <p>
-   * If the field does not exist, the change will result in an {@link IllegalArgumentException}.
+   *
+   * <p>The field names are used to find the field to update.
+   *
+   * <p>If the field does not exist, the change will result in an {@link IllegalArgumentException}.
    *
    * @param fieldNames field names of the column to update
    * @param newDataType the new data type
@@ -141,10 +135,10 @@ public interface TableChange extends EntityChange {
 
   /**
    * Create a TableChange for updating the comment of a field.
-   * <p>
-   * The name is used to find the field to update.
-   * <p>
-   * If the field does not exist, the change will result in an {@link IllegalArgumentException}.
+   *
+   * <p>The name is used to find the field to update.
+   *
+   * <p>If the field does not exist, the change will result in an {@link IllegalArgumentException}.
    *
    * @param fieldNames field names of the column to update
    * @param newComment the new comment
@@ -156,10 +150,10 @@ public interface TableChange extends EntityChange {
 
   /**
    * Create a TableChange for updating the position of a field.
-   * <p>
-   * The name is used to find the field to update.
-   * <p>
-   * If the field does not exist, the change will result in an {@link IllegalArgumentException}.
+   *
+   * <p>The name is used to find the field to update.
+   *
+   * <p>If the field does not exist, the change will result in an {@link IllegalArgumentException}.
    *
    * @param fieldNames field names of the column to update
    * @param newPosition the new position
@@ -169,14 +163,13 @@ public interface TableChange extends EntityChange {
     return new UpdateColumnPosition(fieldNames, newPosition);
   }
 
-
   /**
    * Create a TableChange for deleting a field.
-   * <p>
-   * If the field does not exist, the change will result in an {@link IllegalArgumentException}.
+   *
+   * <p>If the field does not exist, the change will result in an {@link IllegalArgumentException}.
    *
    * @param fieldNames field names of the column to delete
-   * @param ifExists   silence the error if column doesn't exist during drop
+   * @param ifExists silence the error if column doesn't exist during drop
    * @return a TableChange for the delete
    */
   static TableChange deleteColumn(String[] fieldNames, Boolean ifExists) {
@@ -185,8 +178,8 @@ public interface TableChange extends EntityChange {
 
   /**
    * A TableChange to set a table property.
-   * <p>
-   * If the property already exists, it must be replaced with the new value.
+   *
+   * <p>If the property already exists, it must be replaced with the new value.
    */
   @EqualsAndHashCode
   @Getter
@@ -203,8 +196,8 @@ public interface TableChange extends EntityChange {
 
   /**
    * A TableChange to remove a table property.
-   * <p>
-   * If the property does not exist, the change should succeed.
+   *
+   * <p>If the property does not exist, the change should succeed.
    */
   @EqualsAndHashCode
   @Getter
@@ -229,9 +222,9 @@ public interface TableChange extends EntityChange {
   }
 
   /**
-   * Column position FIRST means the specified column should be the first column.
-   * Note that, the specified column may be a nested field, and then FIRST means this field should
-   * be the first one within the struct.
+   * Column position FIRST means the specified column should be the first column. Note that, the
+   * specified column may be a nested field, and then FIRST means this field should be the first one
+   * within the struct.
    */
   final class First implements ColumnPosition {
     private static final First INSTANCE = new First();
@@ -245,9 +238,9 @@ public interface TableChange extends EntityChange {
   }
 
   /**
-   * Column position AFTER means the specified column should be put after the given `column`.
-   * Note that, the specified column may be a nested field, and then the given `column` refers to
-   * a field in the same struct.
+   * Column position AFTER means the specified column should be put after the given `column`. Note
+   * that, the specified column may be a nested field, and then the given `column` refers to a field
+   * in the same struct.
    */
   @EqualsAndHashCode
   @Getter
@@ -271,26 +264,31 @@ public interface TableChange extends EntityChange {
   }
 
   /**
-   * A TableChange to add a field. The implementation may need to back-fill all the existing data
-   * to add this new column, or remember the column default value specified here and let the reader
+   * A TableChange to add a field. The implementation may need to back-fill all the existing data to
+   * add this new column, or remember the column default value specified here and let the reader
    * fill the column value when reading existing data that do not have this new column.
-   * <p>
-   * If the field already exists, the change must result in an {@link IllegalArgumentException}.
+   *
+   * <p>If the field already exists, the change must result in an {@link IllegalArgumentException}.
    * If the new field is nested and its parent does not exist or is not a struct, the change must
    * result in an {@link IllegalArgumentException}.
    */
   @EqualsAndHashCode
   final class AddColumn implements ColumnChange {
     private final String[] fieldNames;
-    @Getter @Accessors(fluent = true) private final Type dataType;
-    @Getter @Accessors(fluent = true) private final String comment;
-    @Getter @Accessors(fluent = true) private final ColumnPosition position;
 
-    private AddColumn(
-        String[] fieldNames,
-        Type dataType,
-        String comment,
-        ColumnPosition position) {
+    @Getter
+    @Accessors(fluent = true)
+    private final Type dataType;
+
+    @Getter
+    @Accessors(fluent = true)
+    private final String comment;
+
+    @Getter
+    @Accessors(fluent = true)
+    private final ColumnPosition position;
+
+    private AddColumn(String[] fieldNames, Type dataType, String comment, ColumnPosition position) {
       this.fieldNames = fieldNames;
       this.dataType = dataType;
       this.comment = comment;
@@ -305,16 +303,19 @@ public interface TableChange extends EntityChange {
 
   /**
    * A TableChange to rename a field.
-   * <p>
-   * The name is used to find the field to rename. The new name will replace the leaf field name.
+   *
+   * <p>The name is used to find the field to rename. The new name will replace the leaf field name.
    * For example, renameColumn("a.b.c", "x") should produce column a.b.x.
-   * <p>
-   * If the field does not exist, the change must result in an {@link IllegalArgumentException}.
+   *
+   * <p>If the field does not exist, the change must result in an {@link IllegalArgumentException}.
    */
   @EqualsAndHashCode
   final class RenameColumn implements ColumnChange {
     private final String[] fieldNames;
-    @Getter @Accessors(fluent = true) private final String newName;
+
+    @Getter
+    @Accessors(fluent = true)
+    private final String newName;
 
     private RenameColumn(String[] fieldNames, String newName) {
       this.fieldNames = fieldNames;
@@ -329,15 +330,18 @@ public interface TableChange extends EntityChange {
 
   /**
    * A TableChange to update the type of a field.
-   * <p>
-   * The field names are used to find the field to update.
-   * <p>
-   * If the field does not exist, the change must result in an {@link IllegalArgumentException}.
+   *
+   * <p>The field names are used to find the field to update.
+   *
+   * <p>If the field does not exist, the change must result in an {@link IllegalArgumentException}.
    */
   @EqualsAndHashCode
   final class UpdateColumnType implements ColumnChange {
     private final String[] fieldNames;
-    @Getter @Accessors(fluent = true) private final Type newDataType;
+
+    @Getter
+    @Accessors(fluent = true)
+    private final Type newDataType;
 
     private UpdateColumnType(String[] fieldNames, Type newDataType) {
       this.fieldNames = fieldNames;
@@ -352,15 +356,18 @@ public interface TableChange extends EntityChange {
 
   /**
    * A TableChange to update the comment of a field.
-   * <p>
-   * The field names are used to find the field to update.
-   * <p>
-   * If the field does not exist, the change must result in an {@link IllegalArgumentException}.
+   *
+   * <p>The field names are used to find the field to update.
+   *
+   * <p>If the field does not exist, the change must result in an {@link IllegalArgumentException}.
    */
   @EqualsAndHashCode
   final class UpdateColumnComment implements ColumnChange {
     private final String[] fieldNames;
-    @Getter @Accessors(fluent = true) private final String newComment;
+
+    @Getter
+    @Accessors(fluent = true)
+    private final String newComment;
 
     private UpdateColumnComment(String[] fieldNames, String newComment) {
       this.fieldNames = fieldNames;
@@ -375,15 +382,18 @@ public interface TableChange extends EntityChange {
 
   /**
    * A TableChange to update the position of a field.
-   * <p>
-   * The field names are used to find the field to update.
-   * <p>
-   * If the field does not exist, the change must result in an {@link IllegalArgumentException}.
+   *
+   * <p>The field names are used to find the field to update.
+   *
+   * <p>If the field does not exist, the change must result in an {@link IllegalArgumentException}.
    */
   @EqualsAndHashCode
   final class UpdateColumnPosition implements ColumnChange {
     private final String[] fieldNames;
-    @Getter @Accessors(fluent = true) private final ColumnPosition position;
+
+    @Getter
+    @Accessors(fluent = true)
+    private final ColumnPosition position;
 
     private UpdateColumnPosition(String[] fieldNames, ColumnPosition position) {
       this.fieldNames = fieldNames;
@@ -398,13 +408,16 @@ public interface TableChange extends EntityChange {
 
   /**
    * A TableChange to delete a field.
-   * <p>
-   * If the field does not exist, the change must result in an {@link IllegalArgumentException}.
+   *
+   * <p>If the field does not exist, the change must result in an {@link IllegalArgumentException}.
    */
   @EqualsAndHashCode
   final class DeleteColumn implements ColumnChange {
     private final String[] fieldNames;
-    @Getter @Accessors(fluent = true) private final Boolean ifExists;
+
+    @Getter
+    @Accessors(fluent = true)
+    private final Boolean ifExists;
 
     private DeleteColumn(String[] fieldNames, Boolean ifExists) {
       this.fieldNames = fieldNames;

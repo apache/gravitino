@@ -22,9 +22,7 @@ package com.datastrato.graviton.meta.catalog;
 
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
-import com.datastrato.graviton.catalog.meta.*;
-import com.datastrato.graviton.meta.catalog.meta.*;
-
+import com.datastrato.graviton.meta.catalog.rel.*;
 import java.util.Map;
 
 /**
@@ -77,15 +75,13 @@ public interface TableCatalog {
    * @throws TableAlreadyExistsException if the table already exists
    */
   Table createTable(
-      NameIdentifier ident,
-      Column[] columns,
-      String comment,
-      Map<String, String> properties) throws NoSuchNamespaceException, TableAlreadyExistsException;
+      NameIdentifier ident, Column[] columns, String comment, Map<String, String> properties)
+      throws NoSuchNamespaceException, TableAlreadyExistsException;
 
   /**
    * Apply the {@link TableChange change} to a table in the catalog.
    *
-   * Implementations may reject the change. If any change is rejected, no changes should be
+   * <p>Implementations may reject the change. If any change is rejected, no changes should be
    * applied to the table.
    *
    * @param ident a table identifier
@@ -108,8 +104,8 @@ public interface TableCatalog {
   /**
    * Drop a table from the catalog and completely remove its data.
    *
-   * If the catalog supports to purge a table, this method should be overridden.
-   * The default implementation throws an {@link UnsupportedOperationException}.
+   * <p>If the catalog supports to purge a table, this method should be overridden. The default
+   * implementation throws an {@link UnsupportedOperationException}.
    *
    * @param ident a table identifier
    * @return true if the table was purged, false if the table did not exist

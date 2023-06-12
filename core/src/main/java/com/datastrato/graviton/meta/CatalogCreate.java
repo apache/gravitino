@@ -1,16 +1,20 @@
 package com.datastrato.graviton.meta;
 
 import com.datastrato.graviton.EntityCreate;
+import java.util.Map;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.experimental.Accessors;
 
-import java.util.Map;
-
 public interface CatalogCreate extends EntityCreate {
 
-  static CatalogCreate create(String name, String lakehouseName, BaseCatalog.Type type,
-                              String comment, Map<String, String> properties, String creator) {
+  static CatalogCreate create(
+      String name,
+      String lakehouseName,
+      BaseCatalog.Type type,
+      String comment,
+      Map<String, String> properties,
+      String creator) {
     return new CreateCatalog(name, lakehouseName, type, comment, properties, creator);
   }
 
@@ -31,8 +35,13 @@ public interface CatalogCreate extends EntityCreate {
 
     private final String creator;
 
-    private CreateCatalog(String name, String lakehouseName, BaseCatalog.Type type, String comment,
-                          Map<String, String> properties, String creator) {
+    private CreateCatalog(
+        String name,
+        String lakehouseName,
+        BaseCatalog.Type type,
+        String comment,
+        Map<String, String> properties,
+        String creator) {
       this.name = name;
       this.lakehouseName = lakehouseName;
       this.type = type;

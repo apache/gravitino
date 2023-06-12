@@ -49,8 +49,6 @@ class LakehouseSerDe implements ProtoSerDe<com.datastrato.graviton.meta.Lakehous
             p.getVersion().getMajorNumber(), p.getVersion().getMinorNumber());
     builder.withVersion(version);
 
-
-
     return builder.build();
   }
 }

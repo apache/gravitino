@@ -1,7 +1,7 @@
 package com.datastrato.graviton;
 
-public interface EntityOperations<E extends Entity & HasIdentifier, CREATE extends EntityCreate,
-    CHANGE extends EntityChange> {
+public interface EntityOperations<
+    E extends Entity & HasIdentifier, CREATE extends EntityCreate, CHANGE extends EntityChange> {
 
   /**
    * List the entities in the system.
@@ -47,7 +47,7 @@ public interface EntityOperations<E extends Entity & HasIdentifier, CREATE exten
   /**
    * Apply the {@link EntityChange} to alter an entity in the system.
    *
-   * Implementation may reject the change. If any change is rejected, no changes should be
+   * <p>Implementation may reject the change. If any change is rejected, no changes should be
    * applied to the entity.
    *
    * @param ident the identifier of the entity

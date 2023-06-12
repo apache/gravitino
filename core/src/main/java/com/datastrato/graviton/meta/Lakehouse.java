@@ -26,7 +26,7 @@ public class Lakehouse implements Entity, Auditable, HasIdentifier {
   public static final Field AUDIT_INFO =
       Field.required("audit_info", AuditInfo.class, "The audit info of the lakehouse");
   public static final Field SCHEMA_VERSION =
-      Field.required("version", String.class, "The schema version of the lakehouse");
+      Field.required("version", SchemaVersion.class, "The schema version of the lakehouse");
 
   @JsonProperty("id")
   private Long id;

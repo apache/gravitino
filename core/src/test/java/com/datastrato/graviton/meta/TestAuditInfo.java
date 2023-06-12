@@ -1,7 +1,6 @@
 package com.datastrato.graviton.meta;
 
 import java.time.Instant;
-
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -12,7 +11,6 @@ public class TestAuditInfo {
     Instant now = Instant.now();
     String creator = "test";
     String lastModifier = "test1";
-    String lastAccessUser = "test2";
 
     AuditInfo auditInfo =
         new AuditInfo.Builder()
@@ -35,7 +33,6 @@ public class TestAuditInfo {
     Instant now = Instant.now();
     String creator = "test";
     String lastModifier = "test1";
-    String lastAccessUser = "test2";
 
     AuditInfo auditInfo = new AuditInfo.Builder().withCreator(creator).withCreateTime(now).build();
 
@@ -62,19 +59,5 @@ public class TestAuditInfo {
     Assertions.assertEquals(
         "last_modifier and last_modified_time must be both set or both not set",
         exception1.getMessage());
-
-    Throwable exception2 =
-        Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () -> {
-              new AuditInfo.Builder()
-                  .withCreator(creator)
-                  .withCreateTime(now)
-                  .withLastAccessUser(lastAccessUser)
-                  .build();
-            });
-    Assertions.assertEquals(
-        "last_access_user and last_access_time must be both set or both not set",
-        exception2.getMessage());
   }
 }

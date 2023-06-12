@@ -24,17 +24,17 @@ import com.datastrato.graviton.Namespace;
 import java.util.Map;
 
 /**
- * The Catalog interface to support namespace operations. If the implemented catalog has
- * namespace semantics, it should implement this interface.
+ * The Catalog interface to support namespace operations. If the implemented catalog has namespace
+ * semantics, it should implement this interface.
  */
 public interface SupportsNamespaces {
 
   /**
    * List top-level namespaces from the catalog.
    *
-   * If an entity such as a table, view exists, its parent namespaces must also exist
-   * and must be returned by this discovery method. For example, if table a.b.t exists, this method
-   * must return ["a"] in the result array.
+   * <p>If an entity such as a table, view exists, its parent namespaces must also exist and must be
+   * returned by this discovery method. For example, if table a.b.t exists, this method must return
+   * ["a"] in the result array.
    *
    * @return an array of namespace
    * @throws NoSuchNamespaceException if there's no namespace in the catalog
@@ -44,9 +44,9 @@ public interface SupportsNamespaces {
   /**
    * List namespaces in a namespace.
    *
-   * If an entity such as a table, view exists, its parent namespaces must also exist
-   * and must be returned by this discovery method. For example, if table a.b.t exists, this method
-   * invoked as listNamespaces(a) must return [a.b] in the result array
+   * <p>If an entity such as a table, view exists, its parent namespaces must also exist and must be
+   * returned by this discovery method. For example, if table a.b.t exists, this method invoked as
+   * listNamespaces(a) must return [a.b] in the result array
    *
    * @param namespace the namespace to list
    * @return an array of namespace
@@ -57,8 +57,8 @@ public interface SupportsNamespaces {
   /**
    * Check if a namespace exists.
    *
-   * If an entity such as a table, view exists, its parent namespaces must also exist.
-   * For example, if table a.b.t exists, this method invoked as namespaceExists(a) must return true.
+   * <p>If an entity such as a table, view exists, its parent namespaces must also exist. For
+   * example, if table a.b.t exists, this method invoked as namespaceExists(a) must return true.
    *
    * @param namespace the namespace to check
    * @return true if the namespace exists, false otherwise
@@ -82,15 +82,14 @@ public interface SupportsNamespaces {
    * @param change the metadata change to apply
    * @throws NoSuchNamespaceException if the namespace does not exist
    */
-  void alterNamespace(Namespace namespace, NamespaceChange change)
-      throws NoSuchNamespaceException;
+  void alterNamespace(Namespace namespace, NamespaceChange change) throws NoSuchNamespaceException;
 
   /**
    * Drop a namespace from the catalog with cascade option, recursively dropping all objects within
    * the namespace if cascade is tur.
    *
-   * If the catalog implementation does not support this operation, it may throw
-   * {@link UnsupportedOperationException}.
+   * <p>If the catalog implementation does not support this operation, it may throw {@link
+   * UnsupportedOperationException}.
    *
    * @param namespace the namespace to drop
    * @param cascade if true, recursively drop all objects within the namespace
