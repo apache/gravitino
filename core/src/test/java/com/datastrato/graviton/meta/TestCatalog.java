@@ -6,7 +6,7 @@ import java.io.IOException;
 public class TestCatalog extends BaseCatalog {
 
   @Override
-  void initialize(Config config) throws RuntimeException {}
+  public void initialize(Config config) throws RuntimeException {}
 
   @Override
   public void close() throws IOException {}
