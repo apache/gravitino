@@ -4,7 +4,6 @@ import com.datastrato.graviton.EntityCreate;
 import java.util.Map;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
-import lombok.experimental.Accessors;
 
 public interface CatalogCreate extends EntityCreate {
 
@@ -19,7 +18,6 @@ public interface CatalogCreate extends EntityCreate {
   }
 
   @Getter
-  @Accessors(fluent = true)
   @EqualsAndHashCode
   final class CreateCatalog implements CatalogCreate {
 

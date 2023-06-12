@@ -3,7 +3,6 @@ package com.datastrato.graviton.meta;
 import com.datastrato.graviton.EntityChange;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
-import lombok.experimental.Accessors;
 
 public interface LakehouseChange extends EntityChange {
 
@@ -24,7 +23,6 @@ public interface LakehouseChange extends EntityChange {
   }
 
   @Getter
-  @Accessors(fluent = true)
   @EqualsAndHashCode
   final class RenameLakehouse implements LakehouseChange {
     private final String newName;
@@ -35,7 +33,6 @@ public interface LakehouseChange extends EntityChange {
   }
 
   @Getter
-  @Accessors(fluent = true)
   @EqualsAndHashCode
   final class UpdateLakehouseComment implements LakehouseChange {
     private final String newComment;
@@ -46,7 +43,6 @@ public interface LakehouseChange extends EntityChange {
   }
 
   @Getter
-  @Accessors(fluent = true)
   @EqualsAndHashCode
   final class SetProperty implements LakehouseChange {
     private final String property;
@@ -59,7 +55,6 @@ public interface LakehouseChange extends EntityChange {
   }
 
   @Getter
-  @Accessors(fluent = true)
   @EqualsAndHashCode
   final class RemoveProperty implements LakehouseChange {
     private final String property;

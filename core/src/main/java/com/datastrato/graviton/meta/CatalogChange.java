@@ -3,7 +3,6 @@ package com.datastrato.graviton.meta;
 import com.datastrato.graviton.EntityChange;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
-import lombok.experimental.Accessors;
 
 public interface CatalogChange extends EntityChange {
 
@@ -24,7 +23,6 @@ public interface CatalogChange extends EntityChange {
   }
 
   @Getter
-  @Accessors(fluent = true)
   @EqualsAndHashCode
   final class RenameCatalog implements CatalogChange {
     private final String newName;
@@ -35,7 +33,6 @@ public interface CatalogChange extends EntityChange {
   }
 
   @Getter
-  @Accessors(fluent = true)
   @EqualsAndHashCode
   final class UpdateCatalogComment implements CatalogChange {
     private final String newComment;
@@ -46,7 +43,6 @@ public interface CatalogChange extends EntityChange {
   }
 
   @Getter
-  @Accessors(fluent = true)
   final class SetProperty implements CatalogChange {
     private final String property;
     private final String value;

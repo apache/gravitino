@@ -24,7 +24,6 @@ import com.datastrato.graviton.EntityChange;
 import io.substrait.type.Type;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
-import lombok.experimental.Accessors;
 
 public interface TableChange extends EntityChange {
 
@@ -183,7 +182,6 @@ public interface TableChange extends EntityChange {
    */
   @EqualsAndHashCode
   @Getter
-  @Accessors(fluent = true)
   final class SetProperty implements TableChange {
     private final String property;
     private final String value;
@@ -201,7 +199,6 @@ public interface TableChange extends EntityChange {
    */
   @EqualsAndHashCode
   @Getter
-  @Accessors(fluent = true)
   final class RemoveProperty implements TableChange {
     private final String property;
 
@@ -244,7 +241,6 @@ public interface TableChange extends EntityChange {
    */
   @EqualsAndHashCode
   @Getter
-  @Accessors(fluent = true)
   final class After implements ColumnPosition {
     private final String column;
 
@@ -276,17 +272,11 @@ public interface TableChange extends EntityChange {
   final class AddColumn implements ColumnChange {
     private final String[] fieldNames;
 
-    @Getter
-    @Accessors(fluent = true)
-    private final Type dataType;
+    @Getter private final Type dataType;
 
-    @Getter
-    @Accessors(fluent = true)
-    private final String comment;
+    @Getter private final String comment;
 
-    @Getter
-    @Accessors(fluent = true)
-    private final ColumnPosition position;
+    @Getter private final ColumnPosition position;
 
     private AddColumn(String[] fieldNames, Type dataType, String comment, ColumnPosition position) {
       this.fieldNames = fieldNames;
@@ -313,9 +303,7 @@ public interface TableChange extends EntityChange {
   final class RenameColumn implements ColumnChange {
     private final String[] fieldNames;
 
-    @Getter
-    @Accessors(fluent = true)
-    private final String newName;
+    @Getter private final String newName;
 
     private RenameColumn(String[] fieldNames, String newName) {
       this.fieldNames = fieldNames;
@@ -339,9 +327,7 @@ public interface TableChange extends EntityChange {
   final class UpdateColumnType implements ColumnChange {
     private final String[] fieldNames;
 
-    @Getter
-    @Accessors(fluent = true)
-    private final Type newDataType;
+    @Getter private final Type newDataType;
 
     private UpdateColumnType(String[] fieldNames, Type newDataType) {
       this.fieldNames = fieldNames;
@@ -365,9 +351,7 @@ public interface TableChange extends EntityChange {
   final class UpdateColumnComment implements ColumnChange {
     private final String[] fieldNames;
 
-    @Getter
-    @Accessors(fluent = true)
-    private final String newComment;
+    @Getter private final String newComment;
 
     private UpdateColumnComment(String[] fieldNames, String newComment) {
       this.fieldNames = fieldNames;
@@ -391,9 +375,7 @@ public interface TableChange extends EntityChange {
   final class UpdateColumnPosition implements ColumnChange {
     private final String[] fieldNames;
 
-    @Getter
-    @Accessors(fluent = true)
-    private final ColumnPosition position;
+    @Getter private final ColumnPosition position;
 
     private UpdateColumnPosition(String[] fieldNames, ColumnPosition position) {
       this.fieldNames = fieldNames;
@@ -415,9 +397,7 @@ public interface TableChange extends EntityChange {
   final class DeleteColumn implements ColumnChange {
     private final String[] fieldNames;
 
-    @Getter
-    @Accessors(fluent = true)
-    private final Boolean ifExists;
+    @Getter private final Boolean ifExists;
 
     private DeleteColumn(String[] fieldNames, Boolean ifExists) {
       this.fieldNames = fieldNames;

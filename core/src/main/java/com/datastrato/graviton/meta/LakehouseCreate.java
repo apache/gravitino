@@ -4,7 +4,6 @@ import com.datastrato.graviton.EntityCreate;
 import java.util.Map;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
-import lombok.experimental.Accessors;
 
 public interface LakehouseCreate extends EntityCreate {
 
@@ -14,7 +13,6 @@ public interface LakehouseCreate extends EntityCreate {
   }
 
   @Getter
-  @Accessors(fluent = true)
   @EqualsAndHashCode
   final class CreateLakehouse implements LakehouseCreate {
 

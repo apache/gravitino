@@ -23,7 +23,6 @@ package com.datastrato.graviton.meta.catalog;
 import com.datastrato.graviton.EntityChange;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
-import lombok.experimental.Accessors;
 
 public interface NamespaceChange extends EntityChange {
 
@@ -49,7 +48,6 @@ public interface NamespaceChange extends EntityChange {
   }
 
   @Getter
-  @Accessors(fluent = true)
   @EqualsAndHashCode
   final class SetProperty implements NamespaceChange {
     private final String property;
@@ -62,7 +60,6 @@ public interface NamespaceChange extends EntityChange {
   }
 
   @Getter
-  @Accessors(fluent = true)
   @EqualsAndHashCode
   final class RemoveProperty implements NamespaceChange {
     private final String property;

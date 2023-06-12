@@ -12,9 +12,9 @@ import lombok.Getter;
 import lombok.ToString;
 
 /**
- * This is the base interface for a Catalog implementation, it defines the interface to initialize
- * and uninitialize the catalog. This interface inherits from Closeable, so that a determined
- * close() method should be called to release any resources that the catalog holds.
+ * This is the base class for a Catalog implementation, it defines the interface to initialize and
+ * uninitialize the catalog. This class inherits from Closeable, so that a determined close() method
+ * should be called to release any resources that the catalog holds.
  */
 @Getter
 @EqualsAndHashCode
@@ -72,7 +72,7 @@ public abstract class BaseCatalog implements Entity, Auditable, HasIdentifier, C
    * @param config The configuration of this Catalog.
    * @throws RuntimeException if the initialization failed.
    */
-  abstract void initialize(Config config) throws RuntimeException;
+  public abstract void initialize(Config config) throws RuntimeException;
 
   @Override
   public Map<Field, Object> fields() {
