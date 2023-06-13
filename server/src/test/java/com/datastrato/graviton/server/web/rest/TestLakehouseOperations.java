@@ -50,7 +50,7 @@ public class TestLakehouseOperations extends JerseyTest {
   }
 
   @Test
-  public void testCreateTenant() {
+  public void testCreateLakehouse() {
     LakehouseCreateRequest req =
         new LakehouseCreateRequest("lakehouse", "comment", ImmutableMap.of("k1", "v1"));
     Instant now = Instant.now();
@@ -103,7 +103,7 @@ public class TestLakehouseOperations extends JerseyTest {
   }
 
   @Test
-  public void testGetTenant() {
+  public void testGetLakehouse() {
     String lakehouseName = "test";
     Long id = 1L;
     Instant now = Instant.now();
@@ -171,7 +171,7 @@ public class TestLakehouseOperations extends JerseyTest {
   }
 
   @Test
-  public void testDeleteTenant() {
+  public void testDeleteLakehouse() {
     when(lakehouseOperations.dropEntity(any())).thenReturn(true);
     Response resp =
         target("/lakehouses/test")

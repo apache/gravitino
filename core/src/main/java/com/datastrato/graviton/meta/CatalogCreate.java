@@ -5,47 +5,44 @@ import java.util.Map;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 
-public interface CatalogCreate extends EntityCreate {
+@Getter
+@EqualsAndHashCode
+public final class CatalogCreate implements EntityCreate {
 
-  static CatalogCreate create(
+  private final String name;
+
+  private final String lakehouseName;
+
+  private final BaseCatalog.Type type;
+
+  private final String comment;
+
+  private final Map<String, String> properties;
+
+  private final String creator;
+
+  private CatalogCreate(
       String name,
       String lakehouseName,
       BaseCatalog.Type type,
       String comment,
       Map<String, String> properties,
       String creator) {
-    return new CreateCatalog(name, lakehouseName, type, comment, properties, creator);
+    this.name = name;
+    this.lakehouseName = lakehouseName;
+    this.type = type;
+    this.comment = comment;
+    this.properties = properties;
+    this.creator = creator;
   }
 
-  @Getter
-  @EqualsAndHashCode
-  final class CreateCatalog implements CatalogCreate {
-
-    private final String name;
-
-    private final String lakehouseName;
-
-    private final BaseCatalog.Type type;
-
-    private final String comment;
-
-    private final Map<String, String> properties;
-
-    private final String creator;
-
-    private CreateCatalog(
-        String name,
-        String lakehouseName,
-        BaseCatalog.Type type,
-        String comment,
-        Map<String, String> properties,
-        String creator) {
-      this.name = name;
-      this.lakehouseName = lakehouseName;
-      this.type = type;
-      this.comment = comment;
-      this.properties = properties;
-      this.creator = creator;
-    }
+  public static CatalogCreate create(
+      String name,
+      String lakehouseName,
+      BaseCatalog.Type type,
+      String comment,
+      Map<String, String> properties,
+      String creator) {
+    return new CatalogCreate(name, lakehouseName, type, comment, properties, creator);
   }
 }

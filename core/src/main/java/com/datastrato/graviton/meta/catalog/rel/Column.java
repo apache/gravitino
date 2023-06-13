@@ -19,7 +19,7 @@ import javax.annotation.Nullable;
  *
  * <p>Catalog implementation needs to implement it. They should consume it in APIs like {@link
  * TableCatalog#createTable(NameIdentifier, Column[], String, Map)}, and report it in {@link
- * Table#columns()}h a default value and a generation expression.
+ * Table#columns()} a default value and a generation expression.
  */
 public interface Column extends Entity, Auditable, HasIdentifier {
 

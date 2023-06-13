@@ -5,31 +5,28 @@ import java.util.Map;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 
-public interface LakehouseCreate extends EntityCreate {
+@Getter
+@EqualsAndHashCode
+public final class LakehouseCreate implements EntityCreate {
 
-  static LakehouseCreate create(
+  private final String name;
+
+  private final String comment;
+
+  private final Map<String, String> properties;
+
+  private final String creator;
+
+  private LakehouseCreate(
       String name, String comment, Map<String, String> properties, String creator) {
-    return new CreateLakehouse(name, comment, properties, creator);
+    this.name = name;
+    this.comment = comment;
+    this.properties = properties;
+    this.creator = creator;
   }
 
-  @Getter
-  @EqualsAndHashCode
-  final class CreateLakehouse implements LakehouseCreate {
-
-    private final String name;
-
-    private final String comment;
-
-    private final Map<String, String> properties;
-
-    private final String creator;
-
-    private CreateLakehouse(
-        String name, String comment, Map<String, String> properties, String creator) {
-      this.name = name;
-      this.comment = comment;
-      this.properties = properties;
-      this.creator = creator;
-    }
+  public static LakehouseCreate create(
+      String name, String comment, Map<String, String> properties, String creator) {
+    return new LakehouseCreate(name, comment, properties, creator);
   }
 }
