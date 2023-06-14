@@ -20,6 +20,9 @@ public interface Table extends Entity, Auditable, HasIdentifier {
   @JsonProperty("name")
   String name();
 
+  /** return the namespace of the table. */
+  Namespace namespace();
+
   /** return the columns of the table. */
   @JsonProperty("columns")
   Column[] columns();
