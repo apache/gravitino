@@ -10,6 +10,10 @@ log4j = "2.20.0"
 jetty = "9.4.51.v20230217"
 jersey = "2.39.1"
 mockito = "3.12.4"
+hive-v230 = "2.3.0"
+airlift-units = "1.8"
+airlift-log = "231"
+hadoop2 = "2.7.2"
 
 protobuf-plugin = "0.9.2"
 spotless-plugin = '6.11.0'
@@ -44,6 +48,12 @@ jersey-hk2 = { group = "org.glassfish.jersey.inject", name = "jersey-hk2", versi
 jersey-test-framework-core = { group = "org.glassfish.jersey.test-framework", name = "jersey-test-framework-core", version.ref = "jersey" }
 jersey-test-framework-provider-jetty = { group = "org.glassfish.jersey.test-framework.providers", name = "jersey-test-framework-provider-jetty", version.ref = "jersey" }
 mockito-core = { group = "org.mockito", name = "mockito-core", version.ref = "mockito" }
+hive-metastrore-v230 = { group = "org.apache.hive", name = "hive-metastore", version.ref = "hive-v230"}
+hive-exec-v230 = { group = "org.apache.hive", name = "hive-exec", version.ref = "hive-v230"}
+airlift-units = { group = "io.airlift", name = "units", version.ref = "airlift-units"}
+airlift-log = { group = "io.airlift", name = "log", version.ref = "airlift-log"}
+hadoop2-common = { group = "org.apache.hadoop", name = "hadoop-common", version.ref = "hadoop2"}
+hadoop2-mapreduce-client-core = { group = "org.apache.hadoop", name = "hadoop-mapreduce-client-core", version.ref = "hadoop2"}
 
 [bundles]
 log4j = ["slf4j-api", "log4j-slf4j2-impl", "log4j-api", "log4j-core", "log4j-12-api"]
