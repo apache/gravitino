@@ -1,45 +1,69 @@
 package com.datastrato.graviton;
 
-import com.datastrato.graviton.schema.Entity;
-import com.datastrato.graviton.schema.HasIdentifier;
-import com.datastrato.graviton.schema.NameIdentifier;
-
-public interface EntityOperations<T extends Entity & HasIdentifier> {
+public interface EntityOperations<
+    E extends Entity & HasIdentifier, CREATE extends EntityCreate, CHANGE extends EntityChange> {
 
   /**
-   * Creates the entity.
+   * List the entities in the system.
    *
-   * @param t the entity to create.
+   * @return an array of entities
    */
-  default void create(T t) {
-    throw new UnsupportedOperationException("Not implemented yet");
+  E[] listEntities();
+
+  /**
+   * Load an entity by {@link NameIdentifier} from the system.
+   *
+   * @param ident the identifier of the entity
+   * @return the entity
+   * @throws NoSuchEntityException if the entity does not exist
+   */
+  E loadEntity(NameIdentifier ident) throws NoSuchEntityException;
+
+  /**
+   * Check if an entity exists using an {@link NameIdentifier} from the system.
+   *
+   * @param ident the identifier of the entity
+   * @return true if the entity exists, false otherwise
+   */
+  default boolean entityExists(NameIdentifier ident) {
+    try {
+      loadEntity(ident);
+      return true;
+    } catch (NoSuchEntityException e) {
+      return false;
+    }
   }
 
   /**
-   * Gets the entity by name identifier.
+   * Create an entity in the system.
    *
-   * @param nameIdentifier the name identifier of the entity.
-   * @return the entity.
+   * @param ident the identifier of the entity
+   * @param create the entity creation metadata
+   * @return the created entity metadata
+   * @throws EntityAlreadyExistsException if the entity already exists
    */
-  default T get(NameIdentifier nameIdentifier) {
-    throw new UnsupportedOperationException("Not implemented yet");
-  }
+  E createEntity(NameIdentifier ident, CREATE create) throws EntityAlreadyExistsException;
 
   /**
-   * Updates the entity.
+   * Apply the {@link EntityChange} to alter an entity in the system.
    *
-   * @param t the entity to update.
+   * <p>Implementation may reject the change. If any change is rejected, no changes should be
+   * applied to the entity.
+   *
+   * @param ident the identifier of the entity
+   * @param change the entity change to apply to the entity
+   * @return the altered entity metadata
+   * @throws NoSuchEntityException if the entity does not exist
+   * @throws IllegalArgumentException if the change is rejected by the implementation
    */
-  default void update(T t) {
-    throw new UnsupportedOperationException("Not implemented yet");
-  }
+  E alterEntity(NameIdentifier ident, CHANGE change)
+      throws NoSuchEntityException, IllegalArgumentException;
 
   /**
-   * Deletes the entity by name identifier.
+   * Drop an entity from the system.
    *
-   * @param nameIdentifier the name identifier of the entity.
+   * @param ident the identifier of the entity
+   * @return true if the entity was dropped, false if the entity did not exist
    */
-  default void delete(NameIdentifier nameIdentifier) {
-    throw new UnsupportedOperationException("Not implemented yet");
-  }
+  boolean dropEntity(NameIdentifier ident);
 }

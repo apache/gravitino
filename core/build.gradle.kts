@@ -6,7 +6,7 @@ plugins {
 }
 
 dependencies {
-  implementation(project(":schema"));
+  implementation(project(":meta"));
   implementation(libs.protobuf.java.util) {
     exclude("com.google.guava", "guava")
       .because("Brings in Guava for Andriod, which we don't want (and breaks multimaps).")
