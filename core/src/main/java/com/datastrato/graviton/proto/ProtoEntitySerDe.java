@@ -6,7 +6,6 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.google.protobuf.Any;
 import com.google.protobuf.Message;
-import com.google.protobuf.MessageLite;
 import java.io.IOException;
 import java.util.Map;
 import java.util.Optional;
@@ -46,7 +45,7 @@ public class ProtoEntitySerDe implements EntitySerDe {
           (Class<? extends ProtoSerDe<? extends Entity, ? extends Message>>) loadClass(s, loader);
 
       try {
-        ProtoSerDe<? extends Entity, ? extends MessageLite> serde = serdeClass.newInstance();
+        ProtoSerDe<? extends Entity, ? extends Message> serde = serdeClass.newInstance();
         entityToSerDe.put(entityClass, serde);
       } catch (Exception exception) {
         throw new IOException("Failed to instantiate serde class " + s, exception);
@@ -85,12 +84,10 @@ public class ProtoEntitySerDe implements EntitySerDe {
       throw new IOException("Invalid proto for entity " + clazz.getName());
     }
 
-    ProtoSerDe<T, Message> protoSerDe = (ProtoSerDe<T, Message>) entityToSerDe.get(clazz);
-    Class<? extends Message> protoClazz = entityToProto.get(clazz);
-
     try {
+      Class<? extends Message> protoClazz = entityToProto.get(clazz);
       Message anyMessage = any.unpack(protoClazz);
-      return protoSerDe.deserialize(anyMessage);
+      return fromProto(anyMessage);
     } catch (Exception e) {
       throw new IOException("Failed to deserialize entity " + clazz.getName(), e);
     }
@@ -102,7 +99,6 @@ public class ProtoEntitySerDe implements EntitySerDe {
     }
 
     ProtoSerDe<T, M> protoSerDe = (ProtoSerDe<T, M>) entityToSerDe.get(t.getClass());
-
     return protoSerDe.serialize(t);
   }
 
