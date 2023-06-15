@@ -16,7 +16,7 @@ public class EntityStoreFactory {
   private EntityStoreFactory() {}
 
   public static EntityStore createEntityStore(Config config) {
-    String name = config.get(configs.ENTITY_STORE_TYPE);
+    String name = config.get(configs.ENTITY_STORE);
     return createEntityStore(name);
   }
 
