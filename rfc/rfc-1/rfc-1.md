@@ -104,4 +104,4 @@ The relational data structure referrers data stored in DB or DWS, and organized 
 
 * **BaseCatalog**: `BaseCatalog` is the base class for catalog, the implementation should inherit it to implement its own.
 * **SupportNamespaces**: `SupportNamespaces` provides the APIs to create structured metadata, like `Database`.
-* **TableCatalog**: `TableCatalog` defines the APIs to manipulate `Table` and it's `Column` entities. The specific `TableCatalog` implementation should also implement `Table` and `Column` to satisfy the specifc underlying underlying metadata source.
+* **TableCatalog**: `TableCatalog` defines the APIs to manipulate `Table` and it's `Column` entities. The specific `TableCatalog` implementation should also implement `Table` and `Column` to satisfy the specific underlying metadata source.
