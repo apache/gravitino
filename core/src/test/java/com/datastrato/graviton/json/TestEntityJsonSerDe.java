@@ -1,5 +1,6 @@
 package com.datastrato.graviton.json;
 
+import com.datastrato.graviton.Namespace;
 import com.datastrato.graviton.meta.*;
 import com.datastrato.graviton.meta.AuditInfo;
 import com.datastrato.graviton.meta.catalog.rel.Column;
@@ -173,7 +174,9 @@ public class TestEntityJsonSerDe {
     Map<String, String> properties = ImmutableMap.of("k1", "v1", "k2", "v2");
 
     Column column = new TestColumn(name, comment, type, info);
-    Table table = new TestTable(tableName, tableComment, properties, info, new Column[] {column});
+    Namespace namespace = Namespace.of("catalog", "db");
+    Table table =
+        new TestTable(tableName, namespace, tableComment, properties, info, new Column[] {column});
 
     String serJson = JsonUtils.objectMapper().writeValueAsString(table);
     String expectedJson =

@@ -1,6 +1,7 @@
 package com.datastrato.graviton.json;
 
 import com.datastrato.graviton.Field;
+import com.datastrato.graviton.Namespace;
 import com.datastrato.graviton.meta.AuditInfo;
 import com.datastrato.graviton.meta.catalog.rel.Column;
 import com.datastrato.graviton.meta.catalog.rel.Table;
@@ -8,7 +9,9 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import lombok.EqualsAndHashCode;
 
+@EqualsAndHashCode
 public class TestTable implements Table {
 
   public static final Field NAME = Field.required("name", String.class, "The name of the table");
@@ -21,6 +24,8 @@ public class TestTable implements Table {
 
   private String name;
 
+  private Namespace namespace;
+
   private String comment;
 
   private Map<String, String> properties;
@@ -31,11 +36,13 @@ public class TestTable implements Table {
 
   public TestTable(
       String name,
+      Namespace namespace,
       String comment,
       Map<String, String> properties,
       AuditInfo auditInfo,
       Column[] columns) {
     this.name = name;
+    this.namespace = namespace;
     this.comment = comment;
     this.properties = properties;
     this.auditInfo = auditInfo;
@@ -61,6 +68,11 @@ public class TestTable implements Table {
   @Override
   public String name() {
     return name;
+  }
+
+  @Override
+  public Namespace namespace() {
+    return namespace;
   }
 
   @JsonProperty("audit_info")
