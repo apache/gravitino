@@ -1,5 +1,6 @@
 package com.datastrato.graviton;
 
+import com.datastrato.graviton.proto.ProtoEntitySerDe;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.slf4j.Logger;
@@ -12,7 +13,7 @@ public class EntitySerDeFactory {
   // Register EntitySerDe's short name to its full qualified class name in the map. So that user
   // don't need to specify the full qualified class name when creating an EntitySerDe.
   private static final Map<String, String> ENTITY_SERDES =
-      ImmutableMap.of("proto", "com.datastrato.graviton.proto.ProtoEntitySerDe");
+      ImmutableMap.of("proto", ProtoEntitySerDe.class.getCanonicalName());
 
   private EntitySerDeFactory() {}
 
