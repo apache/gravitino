@@ -26,6 +26,7 @@ public interface Column extends Entity, Auditable, HasIdentifier {
   /** Returns the name of this column. */
   @JsonProperty("name")
   String name();
+
   /** Returns the data type of this column. */
   @JsonProperty("type")
   @JsonSerialize(using = JsonUtils.TypeSerializer.class)

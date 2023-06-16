@@ -21,7 +21,7 @@ import lombok.ToString;
 @ToString
 public abstract class BaseCatalog implements Entity, Auditable, HasIdentifier, Closeable {
 
-  enum Type {
+  public enum Type {
     RELATIONAL, // Catalog Type for Relational Data Structure, like db.table, catalog.db.table.
     FILE, // Catalog Type for File System (including HDFS, S3, etc.), like path/to/file
     STREAM, // Catalog Type for Streaming Data, like kafka://topic
@@ -63,6 +63,8 @@ public abstract class BaseCatalog implements Entity, Auditable, HasIdentifier, C
   @JsonProperty("audit_info")
   protected AuditInfo auditInfo;
 
+  protected Namespace namespace;
+
   /**
    * Initialize the catalog with specified configuration. This method is called after Catalog object
    * is created, but before any other method is called. The method is used to initialize the
@@ -98,12 +100,19 @@ public abstract class BaseCatalog implements Entity, Auditable, HasIdentifier, C
     return name;
   }
 
+  @Override
+  public Namespace namespace() {
+    return namespace;
+  }
+
   interface Builder<SELF extends Builder<SELF, T>, T extends BaseCatalog> {
     SELF withId(Long id);
 
     SELF withLakehouseId(Long lakehouseId);
 
     SELF withName(String name);
+
+    SELF withNamespace(Namespace namespace);
 
     SELF withType(Type type);
 
@@ -122,6 +131,7 @@ public abstract class BaseCatalog implements Entity, Auditable, HasIdentifier, C
     protected Long id;
     protected Long lakehouseId;
     protected String name;
+    protected Namespace namespace;
     protected Type type;
     protected String comment;
     protected Map<String, String> properties;
@@ -142,6 +152,12 @@ public abstract class BaseCatalog implements Entity, Auditable, HasIdentifier, C
     @Override
     public SELF withName(String name) {
       this.name = name;
+      return self();
+    }
+
+    @Override
+    public SELF withNamespace(Namespace namespace) {
+      this.namespace = namespace;
       return self();
     }
 
