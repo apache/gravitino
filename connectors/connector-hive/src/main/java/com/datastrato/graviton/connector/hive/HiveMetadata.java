@@ -146,12 +146,12 @@ public class HiveMetadata implements MetadataOperation<Database>
 
   @Override
   public List<String> getAllDatabases(String filter) throws TException {
-    if (filter == null || filter.isEmpty()) {
+//    if (filter == null || filter.isEmpty()) {
       return new ArrayList<>(client.get_all_databases());
-    }
-    return client.get_all_databases()
-            .stream()
-            .filter(n -> n.matches(filter)).toList();
+//    }
+//    return client.get_all_databases()
+//            .stream()
+//            .filter(n -> n.matches(filter)).toList();
   }
 
   @Override

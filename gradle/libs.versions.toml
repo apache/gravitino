@@ -10,7 +10,7 @@ log4j = "2.20.0"
 jetty = "9.4.51.v20230217"
 jersey = "2.39.1"
 mockito = "3.12.4"
-hive-v230 = "2.3.0"
+hive-v230 = "2.3.9"
 airlift-units = "1.8"
 airlift-log = "231"
 hadoop2 = "2.7.2"
@@ -19,6 +19,7 @@ protobuf-plugin = "0.9.2"
 spotless-plugin = '6.11.0'
 gradle-extensions-plugin = '1.74'
 publish-plugin = '1.1.0'
+
 
 [libraries]
 protobuf-java = { group = "com.google.protobuf", name = "protobuf-java", version.ref = "protoc" }
