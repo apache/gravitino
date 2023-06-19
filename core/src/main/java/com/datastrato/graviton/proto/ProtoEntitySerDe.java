@@ -53,16 +53,15 @@ public class ProtoEntitySerDe implements EntitySerDe {
     }
 
     this.entityToProto = Maps.newHashMap();
+    this.protoToEntity = Maps.newHashMap();
     for (Map.Entry<String, String> entry : ENTITY_TO_PROTO.entrySet()) {
       String e = entry.getKey();
       String p = entry.getValue();
       Class<? extends Entity> entityClass = (Class<? extends Entity>) loadClass(e, loader);
       Class<? extends Message> protoClass = (Class<? extends Message>) loadClass(p, loader);
       entityToProto.put(entityClass, protoClass);
+      protoToEntity.put(protoClass, entityClass);
     }
-
-    this.protoToEntity = Maps.newHashMap();
-    entityToProto.forEach((e, p) -> protoToEntity.put(p, e));
   }
 
   @Override
