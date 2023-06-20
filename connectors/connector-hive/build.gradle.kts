@@ -14,8 +14,8 @@ repositories {
 dependencies {
     implementation(project(":connectors:connector-core"))
 
-    implementation(libs.hive.metastrore.v230)
-    implementation(libs.hive.exec.v230)
+    implementation(libs.hive2.metastore)
+    implementation(libs.hive2.exec)
     implementation(libs.airlift.units)
     implementation(libs.airlift.log)
     implementation(libs.guava)

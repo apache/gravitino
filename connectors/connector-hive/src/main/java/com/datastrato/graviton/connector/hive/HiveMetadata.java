@@ -1,6 +1,6 @@
 package com.datastrato.graviton.connector.hive;
 
-import com.datastrato.graviton.connectors.core.MetadataOperation;
+import com.datastrato.graviton.connectors.core.MetaOperation;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.MetaStoreUtils;
 import org.apache.hadoop.hive.metastore.api.Database;
@@ -14,7 +14,6 @@ import org.apache.thrift.TException;
 
 import org.apache.hadoop.conf.Configuration;
 
-import javax.annotation.concurrent.Immutable;
 import javax.security.auth.login.LoginException;
 import java.io.File;
 import java.io.IOException;
@@ -36,7 +35,7 @@ import org.datanucleus.util.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class HiveMetadata implements MetadataOperation<Database>
+public class HiveMetadata implements MetaOperation<Database>
 {
   private static final Logger LOG = LoggerFactory.getLogger(HiveMetadata.class);
   private static final String HIVE_SITE = "conf/hive-site.xml";
@@ -51,34 +50,34 @@ public class HiveMetadata implements MetadataOperation<Database>
 
   private final String confDir = "";
 
-  public static CachingHiveMetastoreBuilder builder()
-  {
-    return new CachingHiveMetastoreBuilder();
-  }
-
-  @Immutable
-  public static class CachingHiveMetastoreBuilder
-  {
-    private String confDir;
-
-    public CachingHiveMetastoreBuilder() {}
-
-    private CachingHiveMetastoreBuilder(String confDir)
-    {
-      this.confDir = confDir;
-    }
-
-    public CachingHiveMetastoreBuilder confDir(String confDir)
-    {
-      this.confDir = confDir;
-      return this;
-    }
-
-    public HiveMetadata build()
-    {
-      return new HiveMetadata(confDir);
-    }
-  }
+//  public static CachingHiveMetastoreBuilder builder()
+//  {
+//    return new CachingHiveMetastoreBuilder();
+//  }
+//
+//  @Immutable
+//  public static class CachingHiveMetastoreBuilder
+//  {
+//    private String confDir;
+//
+//    public CachingHiveMetastoreBuilder() {}
+//
+//    private CachingHiveMetastoreBuilder(String confDir)
+//    {
+//      this.confDir = confDir;
+//    }
+//
+//    public CachingHiveMetastoreBuilder confDir(String confDir)
+//    {
+//      this.confDir = confDir;
+//      return this;
+//    }
+//
+//    public HiveMetadata build()
+//    {
+//      return new HiveMetadata(confDir);
+//    }
+//  }
 
   protected HiveMetadata(String confDir)
   {

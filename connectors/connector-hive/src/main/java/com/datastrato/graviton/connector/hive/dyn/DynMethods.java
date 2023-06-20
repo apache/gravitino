@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.datastrato.graviton.connector.hive;
+package com.datastrato.graviton.connector.hive.dyn;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;

@@ -18,6 +18,8 @@
  */
 package com.datastrato.graviton.connector.hive;
 
+import com.datastrato.graviton.connector.hive.dyn.DynConstructors;
+import com.datastrato.graviton.connector.hive.dyn.DynMethods;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -159,8 +161,8 @@ public class TestHiveMetastore {
       this.executorService = Executors.newSingleThreadExecutor();
       this.executorService.submit(() -> server.serve());
 
-      // in Hive3, setting this as a system prop ensures that it will be picked up whenever a new
-      // HiveConf is created
+      // in Hive3, setting this as a system prop ensures that it will be picked up
+      // whenever a new HiveConf is created
       System.setProperty(
           HiveConf.ConfVars.METASTOREURIS.varname,
           hiveConf.getVar(HiveConf.ConfVars.METASTOREURIS));
@@ -248,9 +250,7 @@ public class TestHiveMetastore {
   private TServer newThriftServer(TServerSocket socket, int poolSize, HiveConf conf)
       throws Exception {
     HiveConf serverConf = new HiveConf(conf);
-    serverConf.set(
-        HiveConf.ConfVars.METASTORECONNECTURLKEY.varname,
-        "jdbc:derby:" + DERBY_PATH + ";create=true");
+    serverConf.set(HiveConf.ConfVars.METASTORECONNECTURLKEY.varname, "jdbc:derby:" + DERBY_PATH + ";create=true");
     baseHandler = HMS_HANDLER_CTOR.newInstance("new db based metaserver", serverConf);
     IHMSHandler handler = GET_BASE_HMS_HANDLER.invoke(serverConf, baseHandler, false);
 
@@ -273,8 +273,7 @@ public class TestHiveMetastore {
     conf.set(HiveConf.ConfVars.METASTORE_DISALLOW_INCOMPATIBLE_COL_TYPE_CHANGES.varname, "false");
     conf.set("iceberg.hive.client-pool-size", "2");
     // Setting this to avoid thrift exception during running Iceberg tests outside Iceberg.
-    conf.set(
-        HiveConf.ConfVars.HIVE_IN_TEST.varname, HiveConf.ConfVars.HIVE_IN_TEST.getDefaultValue());
+    conf.set(HiveConf.ConfVars.HIVE_IN_TEST.varname, HiveConf.ConfVars.HIVE_IN_TEST.getDefaultValue());
   }
 
   private static void setupMetastoreDB(String dbURL) throws SQLException, IOException {

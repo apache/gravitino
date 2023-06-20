@@ -18,6 +18,7 @@
  */
 package com.datastrato.graviton.connector.hive;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.thrift.TException;
 //import org.junit.Assert;
@@ -47,6 +48,14 @@ public class HiveTableTest extends HiveTableBaseTest {
 //        metastoreClient.getTable("hivedb"/*TABLE_IDENTIFIER.namespace().level(0)*/, tableName);
 
     Database database = metastoreClient.getDatabase("hivedb");
+  }
+
+  @Test
+  public void test1() throws Exception {
+    HiveMetaOperation hiveOps = new HiveMetaOperation(this.metastore.hiveConf());
+
+    System.out.println("----------------------------获取所有catalogs-------------------------------------");
+    hiveOps.getAllDatabases(null).forEach(System.out::println);
   }
 
 }
