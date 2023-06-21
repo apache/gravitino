@@ -12,4 +12,11 @@ public interface configs {
           .stringConf()
           // TODO. Change this when we have a EntityStore implementation. @Jerry
           .createWithDefault("in-memory");
+
+  ConfigEntry<String> ENTITY_SERDE =
+      new ConfigBuilder("graviton.entity.serde")
+          .doc("The entity serde to use")
+          .version("0.1.0")
+          .stringConf()
+          .createWithDefault("proto");
 }

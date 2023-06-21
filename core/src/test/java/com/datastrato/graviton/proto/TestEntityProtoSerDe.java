@@ -1,7 +1,10 @@
 package com.datastrato.graviton.proto;
 
+import com.datastrato.graviton.EntitySerDe;
+import com.datastrato.graviton.EntitySerDeFactory;
 import com.datastrato.graviton.meta.SchemaVersion;
 import com.google.common.collect.ImmutableMap;
+import java.io.IOException;
 import java.time.Instant;
 import java.util.Map;
 import org.junit.jupiter.api.Assertions;
@@ -9,12 +12,13 @@ import org.junit.jupiter.api.Test;
 
 public class TestEntityProtoSerDe {
 
+  private final EntitySerDe entitySerDe = EntitySerDeFactory.createEntitySerDe("proto");
+
   @Test
-  public void testAuditInfoSerDe() {
+  public void testAuditInfoSerDe() throws IOException {
     Instant now = Instant.now();
     String creator = "creator";
     String modifier = "modifier";
-    String accessor = "accessor";
 
     com.datastrato.graviton.meta.AuditInfo auditInfo =
         new com.datastrato.graviton.meta.AuditInfo.Builder()
@@ -24,14 +28,16 @@ public class TestEntityProtoSerDe {
             .withLastModifiedTime(now)
             .build();
 
-    AuditInfo auditInfoProto = ProtoUtils.toProto(auditInfo);
+    ProtoEntitySerDe protoEntitySerDe = (ProtoEntitySerDe) entitySerDe;
+
+    AuditInfo auditInfoProto = protoEntitySerDe.toProto(auditInfo);
     Assertions.assertEquals(creator, auditInfoProto.getCreator());
     Assertions.assertEquals(now, ProtoUtils.toInstant(auditInfoProto.getCreateTime()));
     Assertions.assertEquals(modifier, auditInfoProto.getLastModifier());
     Assertions.assertEquals(now, ProtoUtils.toInstant(auditInfoProto.getLastModifiedTime()));
 
     com.datastrato.graviton.meta.AuditInfo auditInfoFromProto =
-        ProtoUtils.fromProto(auditInfoProto);
+        protoEntitySerDe.fromProto(auditInfoProto);
     Assertions.assertEquals(auditInfo, auditInfoFromProto);
 
     // Test with optional fields
@@ -41,24 +47,24 @@ public class TestEntityProtoSerDe {
             .withCreateTime(now)
             .build();
 
-    AuditInfo auditInfoProto1 = ProtoUtils.toProto(auditInfo1);
+    AuditInfo auditInfoProto1 = protoEntitySerDe.toProto(auditInfo1);
 
     Assertions.assertEquals(creator, auditInfoProto1.getCreator());
     Assertions.assertEquals(now, ProtoUtils.toInstant(auditInfoProto1.getCreateTime()));
 
     com.datastrato.graviton.meta.AuditInfo auditInfoFromProto1 =
-        ProtoUtils.fromProto(auditInfoProto1);
+        protoEntitySerDe.fromProto(auditInfoProto1);
     Assertions.assertEquals(auditInfo1, auditInfoFromProto1);
 
     // Test from/to bytes
-    byte[] bytes = ProtoUtils.toBytes(auditInfo1);
+    byte[] bytes = entitySerDe.serialize(auditInfo1);
     com.datastrato.graviton.meta.AuditInfo auditInfoFromBytes =
-        ProtoUtils.fromBytes(bytes, com.datastrato.graviton.meta.AuditInfo.class);
+        entitySerDe.deserialize(bytes, com.datastrato.graviton.meta.AuditInfo.class);
     Assertions.assertEquals(auditInfo1, auditInfoFromBytes);
   }
 
   @Test
-  public void testEntitiesSerDe() {
+  public void testEntitiesSerDe() throws IOException {
     Instant now = Instant.now();
     String creator = "creator";
     Integer tenantId = 1;
@@ -83,15 +89,17 @@ public class TestEntityProtoSerDe {
             .withVersion(version)
             .build();
 
-    Lakehouse lakehouseProto = ProtoUtils.toProto(lakehouse);
+    ProtoEntitySerDe protoEntitySerDe = (ProtoEntitySerDe) entitySerDe;
+
+    Lakehouse lakehouseProto = protoEntitySerDe.toProto(lakehouse);
     Assertions.assertEquals(props, lakehouseProto.getPropertiesMap());
     com.datastrato.graviton.meta.Lakehouse lakehouseFromProto =
-        ProtoUtils.fromProto(lakehouseProto);
+        protoEntitySerDe.fromProto(lakehouseProto);
     Assertions.assertEquals(lakehouse, lakehouseFromProto);
 
-    byte[] lakehouseBytes = ProtoUtils.toBytes(lakehouse);
+    byte[] lakehouseBytes = protoEntitySerDe.serialize(lakehouse);
     com.datastrato.graviton.meta.Lakehouse lakehouseFromBytes =
-        ProtoUtils.fromBytes(lakehouseBytes, com.datastrato.graviton.meta.Lakehouse.class);
+        protoEntitySerDe.deserialize(lakehouseBytes, com.datastrato.graviton.meta.Lakehouse.class);
     Assertions.assertEquals(lakehouse, lakehouseFromBytes);
 
     // Test Lakehouse without props map
@@ -103,15 +111,15 @@ public class TestEntityProtoSerDe {
             .withVersion(version)
             .build();
 
-    Lakehouse lakehouseProto1 = ProtoUtils.toProto(lakehouse1);
+    Lakehouse lakehouseProto1 = protoEntitySerDe.toProto(lakehouse1);
     Assertions.assertEquals(0, lakehouseProto1.getPropertiesCount());
     com.datastrato.graviton.meta.Lakehouse lakehouseFromProto1 =
-        ProtoUtils.fromProto(lakehouseProto1);
+        protoEntitySerDe.fromProto(lakehouseProto1);
     Assertions.assertEquals(lakehouse1, lakehouseFromProto1);
 
-    byte[] lakehouseBytes1 = ProtoUtils.toBytes(lakehouse1);
+    byte[] lakehouseBytes1 = entitySerDe.serialize(lakehouse1);
     com.datastrato.graviton.meta.Lakehouse lakehouseFromBytes1 =
-        ProtoUtils.fromBytes(lakehouseBytes1, com.datastrato.graviton.meta.Lakehouse.class);
+        entitySerDe.deserialize(lakehouseBytes1, com.datastrato.graviton.meta.Lakehouse.class);
     Assertions.assertEquals(lakehouse1, lakehouseFromBytes1);
   }
 }
