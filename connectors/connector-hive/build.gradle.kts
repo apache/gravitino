@@ -18,7 +18,7 @@ dependencies {
     implementation(libs.substrait.java.core)
     implementation(libs.hive2.metastore)
     implementation(libs.hive2.exec) {
-        exclude("org.pentaho:pentaho-aggdesigner-algorithm:5.1.5-jhyde")
+        exclude("org.pentaho", "pentaho-aggdesigner-algorithm")
     }
     implementation(libs.airlift.units)
     implementation(libs.airlift.log)
