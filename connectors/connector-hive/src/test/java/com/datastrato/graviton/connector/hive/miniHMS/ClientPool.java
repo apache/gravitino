@@ -16,8 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.datastrato.graviton.connector.hive;
+package com.datastrato.graviton.connector.hive.miniHMS;
 
+// core/src/main/java/org/apache/iceberg/ClientPool.java
 public interface ClientPool<C, E extends Exception> {
   interface Action<R, C, E extends Exception> {
     R run(C client) throws E;

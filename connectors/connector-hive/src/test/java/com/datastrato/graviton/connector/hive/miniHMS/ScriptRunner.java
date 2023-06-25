@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.datastrato.graviton.connector.hive;
+package com.datastrato.graviton.connector.hive.miniHMS;
 
 import java.io.IOException;
 import java.io.LineNumberReader;
@@ -24,6 +24,7 @@ import java.io.PrintWriter;
 import java.io.Reader;
 import java.sql.*;
 
+// hive-metastore/src/test/java/org/apache/iceberg/hive/ScriptRunner.java
 /** Tool to run database scripts */
 public class ScriptRunner {
 
@@ -50,24 +51,6 @@ public class ScriptRunner {
   public void setDelimiter(String newDelimiter, boolean newFullLineDelimiter) {
     this.delimiter = newDelimiter;
     this.fullLineDelimiter = newFullLineDelimiter;
-  }
-
-  /**
-   * Setter for logWriter property
-   *
-   * @param logWriter - the new value of the logWriter property
-   */
-  public void setLogWriter(PrintWriter logWriter) {
-    this.logWriter = logWriter;
-  }
-
-  /**
-   * Setter for errorLogWriter property
-   *
-   * @param errorLogWriter - the new value of the errorLogWriter property
-   */
-  public void setErrorLogWriter(PrintWriter errorLogWriter) {
-    this.errorLogWriter = errorLogWriter;
   }
 
   /**

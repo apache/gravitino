@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.datastrato.graviton.connector.hive;
+package com.datastrato.graviton.connector.hive.miniHMS;
 
 import com.google.common.base.Preconditions;
 import org.slf4j.Logger;
@@ -26,6 +26,7 @@ import java.io.Closeable;
 import java.util.ArrayDeque;
 import java.util.Deque;
 
+// core/src/main/java/org/apache/iceberg/ClientPoolImpl.java
 public abstract class ClientPoolImpl<C, E extends Exception>
     implements Closeable, ClientPool<C, E> {
   private static final Logger LOG = LoggerFactory.getLogger(ClientPoolImpl.class);

@@ -1,10 +1,9 @@
 package com.datastrato.graviton.connectors.core;
 
-import java.util.Map;
+import java.io.Closeable;
 
-public interface Connector
+public interface Connector extends Closeable
 {
-    String getName();
-
-//    Connector create(String catalogName, Map<String, String> config, ConnectorContext context);
+    @Override
+    void close();
 }

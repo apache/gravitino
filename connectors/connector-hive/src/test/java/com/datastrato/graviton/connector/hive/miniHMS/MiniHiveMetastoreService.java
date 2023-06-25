@@ -16,33 +16,29 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.datastrato.graviton.connector.hive;
+package com.datastrato.graviton.connector.hive.miniHMS;
 
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.Database;
-//import org.apache.iceberg.CatalogProperties;
-//import org.apache.iceberg.CatalogUtil;
-//import org.apache.iceberg.relocated.com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
-//import org.junit.AfterClass;
-//import org.junit.BeforeClass;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.AfterAll;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Collections;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 
-public abstract class HiveMetastoreTest {
-
+// hive-metastore/src/test/java/org/apache/iceberg/hive/HiveMetastoreTest.java
+public abstract class MiniHiveMetastoreService {
+  public static final Logger LOG = LoggerFactory.getLogger(MiniHiveMetastoreService.class);
   protected static final String DB_NAME = "hivedb";
-  protected static final long EVICTION_INTERVAL = TimeUnit.SECONDS.toMillis(10);
 
   protected static HiveMetaStoreClient metastoreClient;
-//  protected static HiveCatalog catalog;
+
   protected static HiveConf hiveConf;
-  protected static TestHiveMetastore metastore;
+  protected static MiniHiveMetastore metastore;
 
   @BeforeAll
   public static void startMetastore() throws Exception {
@@ -50,8 +46,9 @@ public abstract class HiveMetastoreTest {
   }
 
   public static void startMetastore(Map<String, String> hiveConfOverride) throws Exception {
-    HiveMetastoreTest.metastore = new TestHiveMetastore();
-    HiveConf hiveConfWithOverrides = new HiveConf(TestHiveMetastore.class);
+    LOG.info("Starting Hive Metastore");
+    MiniHiveMetastoreService.metastore = new MiniHiveMetastore();
+    HiveConf hiveConfWithOverrides = new HiveConf(MiniHiveMetastore.class);
     if (hiveConfOverride != null) {
       for (Map.Entry<String, String> kv : hiveConfOverride.entrySet()) {
         hiveConfWithOverrides.set(kv.getKey(), kv.getValue());
@@ -59,30 +56,21 @@ public abstract class HiveMetastoreTest {
     }
 
     metastore.start(hiveConfWithOverrides);
-    HiveMetastoreTest.hiveConf = metastore.hiveConf();
-    HiveMetastoreTest.metastoreClient = new HiveMetaStoreClient(hiveConfWithOverrides);
+    MiniHiveMetastoreService.hiveConf = metastore.hiveConf();
+    MiniHiveMetastoreService.metastoreClient = new HiveMetaStoreClient(hiveConfWithOverrides);
     String dbPath = metastore.getDatabasePath(DB_NAME);
     Database db = new Database(DB_NAME, "description", dbPath, Maps.newHashMap());
     metastoreClient.createDatabase(db);
-//    HiveMetastoreTest.catalog =
-//        (HiveCatalog)
-//            CatalogUtil.loadCatalog(
-//                HiveCatalog.class.getName(),
-//                CatalogUtil.ICEBERG_CATALOG_TYPE_HIVE,
-//                ImmutableMap.of(
-//                    CatalogProperties.CLIENT_POOL_CACHE_EVICTION_INTERVAL_MS,
-//                    String.valueOf(EVICTION_INTERVAL)),
-//                hiveConfWithOverrides);
   }
 
   @AfterAll
   public static void stopMetastore() throws Exception {
-//    HiveMetastoreTest.catalog = null;
-
     metastoreClient.close();
-    HiveMetastoreTest.metastoreClient = null;
+    MiniHiveMetastoreService.metastoreClient = null;
 
     metastore.stop();
-    HiveMetastoreTest.metastore = null;
+    MiniHiveMetastoreService.metastore = null;
+
+    LOG.info("Stop Hive Metastore");
   }
 }

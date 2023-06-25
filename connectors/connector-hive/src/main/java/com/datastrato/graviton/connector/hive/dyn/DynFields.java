@@ -30,6 +30,7 @@ import java.security.AccessController;
 import java.security.PrivilegedAction;
 import java.util.Set;
 
+// common/src/main/java/org/apache/iceberg/common/DynFields.java
 public class DynFields {
 
   private DynFields() {}

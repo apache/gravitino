@@ -28,6 +28,7 @@ import java.security.AccessController;
 import java.security.PrivilegedAction;
 import java.util.Arrays;
 
+// common/src/main/java/org/apache/iceberg/common/DynMethods.java
 /** Copied from parquet-common */
 public class DynMethods {
 

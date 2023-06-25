@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.datastrato.graviton.connector.hive;
+package com.datastrato.graviton.connector.hive.miniHMS;
 
 import com.datastrato.graviton.connector.hive.dyn.DynConstructors;
 import com.datastrato.graviton.connector.hive.dyn.DynMethods;
@@ -29,12 +29,6 @@ import org.apache.hadoop.hive.metastore.HiveMetaStore;
 import org.apache.hadoop.hive.metastore.IHMSHandler;
 import org.apache.hadoop.hive.metastore.RetryingHMSHandler;
 import org.apache.hadoop.hive.metastore.TSetIpAddressProcessor;
-import org.apache.hadoop.hive.metastore.api.Table;
-//import org.apache.iceberg.catalog.TableIdentifier;
-//import org.apache.iceberg.common.DynConstructors;
-//import org.apache.iceberg.common.DynMethods;
-//import org.apache.iceberg.hadoop.Util;
-import org.apache.thrift.TException;
 import org.apache.thrift.protocol.TBinaryProtocol;
 import org.apache.thrift.server.TServer;
 import org.apache.thrift.server.TThreadPoolServer;
@@ -53,7 +47,8 @@ import static java.nio.file.Files.createTempDirectory;
 import static java.nio.file.attribute.PosixFilePermissions.asFileAttribute;
 import static java.nio.file.attribute.PosixFilePermissions.fromString;
 
-public class TestHiveMetastore {
+// hive-metastore/src/test/java/org/apache/iceberg/hive/TestHiveMetastore.java
+public class MiniHiveMetastore {
 
   private static final String DEFAULT_DATABASE_NAME = "default";
   private static final int DEFAULT_POOL_SIZE = 5;
@@ -131,7 +126,7 @@ public class TestHiveMetastore {
    * Starts a TestHiveMetastore with the default connection pool size (5) and the default HiveConf.
    */
   public void start() {
-    start(new HiveConf(new Configuration(), TestHiveMetastore.class), DEFAULT_POOL_SIZE);
+    start(new HiveConf(new Configuration(), MiniHiveMetastore.class), DEFAULT_POOL_SIZE);
   }
 
   /**
@@ -238,14 +233,6 @@ public class TestHiveMetastore {
       throw new RuntimeException("Failed to get file system for path: " + path, e);
     }
   }
-
-  public Table getTable(String dbName, String tableName) throws TException, InterruptedException {
-    return clientPool.run(client -> client.getTable(dbName, tableName));
-  }
-
-//  public Table getTable(TableIdentifier identifier) throws TException, InterruptedException {
-//    return getTable(identifier.namespace().toString(), identifier.name());
-//  }
 
   private TServer newThriftServer(TServerSocket socket, int poolSize, HiveConf conf)
       throws Exception {

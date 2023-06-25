@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.datastrato.graviton.connector.hive;
+package com.datastrato.graviton.connector.hive.miniHMS;
 
 import com.datastrato.graviton.connector.hive.dyn.DynMethods;
 import org.apache.hadoop.conf.Configuration;
@@ -26,11 +26,11 @@ import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.RetryingMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.MetaException;
-//import org.apache.iceberg.ClientPoolImpl;
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.thrift.TException;
 import org.apache.thrift.transport.TTransportException;
 
+// hive-metastore/src/main/java/org/apache/iceberg/hive/HiveClientPool.java
 public class HiveClientPool extends ClientPoolImpl<IMetaStoreClient, TException> {
 
   private static final DynMethods.StaticMethod GET_CLIENT =
