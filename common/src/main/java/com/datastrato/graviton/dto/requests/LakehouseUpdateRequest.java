@@ -23,7 +23,6 @@ import lombok.Getter;
 })
 public interface LakehouseUpdateRequest extends RESTRequest {
 
-  /** @return the {@link LakehouseChange} that this request represents */
   LakehouseChange lakehouseChange();
 
   @EqualsAndHashCode
