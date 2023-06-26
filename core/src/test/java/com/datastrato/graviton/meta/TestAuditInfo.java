@@ -22,10 +22,10 @@ public class TestAuditInfo {
 
     auditInfo.validate();
 
-    Assertions.assertEquals(creator, auditInfo.getCreator());
-    Assertions.assertEquals(now, auditInfo.getCreateTime());
-    Assertions.assertEquals(lastModifier, auditInfo.getLastModifier());
-    Assertions.assertEquals(now, auditInfo.getLastModifiedTime());
+    Assertions.assertEquals(creator, auditInfo.creator());
+    Assertions.assertEquals(now, auditInfo.createTime());
+    Assertions.assertEquals(lastModifier, auditInfo.lastModifier());
+    Assertions.assertEquals(now, auditInfo.lastModifiedTime());
   }
 
   @Test
@@ -37,8 +37,8 @@ public class TestAuditInfo {
     AuditInfo auditInfo = new AuditInfo.Builder().withCreator(creator).withCreateTime(now).build();
 
     auditInfo.validate();
-    Assertions.assertNull(auditInfo.getLastModifier());
-    Assertions.assertNull(auditInfo.getLastModifiedTime());
+    Assertions.assertNull(auditInfo.lastModifier());
+    Assertions.assertNull(auditInfo.lastModifiedTime());
 
     Throwable exception =
         Assertions.assertThrows(
