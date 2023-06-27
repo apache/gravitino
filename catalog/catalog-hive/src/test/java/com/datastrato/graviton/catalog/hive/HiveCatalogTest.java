@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Test;
 
 public class HiveCatalogTest extends MiniHiveMetastoreService {
   @Test
-  public void listDatabases() throws TException {
+  public void listDatabases() throws TException, InterruptedException {
     AuditInfo auditInfo =
         new AuditInfo.Builder().withCreator("creator").withCreateTime(Instant.now()).build();
 
@@ -28,7 +28,7 @@ public class HiveCatalogTest extends MiniHiveMetastoreService {
 
     hiveCatalog.initialize(null);
 
-    List<String> dbs = hiveCatalog.client.getAllDatabases();
+    List<String> dbs = hiveCatalog.clientPool.run(client -> client.getAllDatabases());
     Assert.assertEquals(2, dbs.size());
     Assert.assertTrue(dbs.contains("default"));
     Assert.assertTrue(dbs.contains(DB_NAME));

@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.datastrato.graviton.catalog.hive.miniHMS;
+package com.datastrato.graviton;
 
 import com.google.common.base.Preconditions;
 import java.io.Closeable;

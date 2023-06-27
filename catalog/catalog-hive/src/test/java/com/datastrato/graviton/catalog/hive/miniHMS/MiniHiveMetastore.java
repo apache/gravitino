@@ -22,6 +22,7 @@ import static java.nio.file.Files.createTempDirectory;
 import static java.nio.file.attribute.PosixFilePermissions.asFileAttribute;
 import static java.nio.file.attribute.PosixFilePermissions.fromString;
 
+import com.datastrato.graviton.catalog.hive.HiveClientPool;
 import com.datastrato.graviton.catalog.hive.dyn.DynConstructors;
 import com.datastrato.graviton.catalog.hive.dyn.DynMethods;
 import java.io.*;
