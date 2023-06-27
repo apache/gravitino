@@ -22,7 +22,7 @@ public class Utils {
   }
 
   public static Response ok() {
-    return Response.status(Response.Status.OK).type(MediaType.APPLICATION_JSON).build();
+    return Response.status(Response.Status.NO_CONTENT).type(MediaType.APPLICATION_JSON).build();
   }
 
   public static Response illegalArguments(String message) {

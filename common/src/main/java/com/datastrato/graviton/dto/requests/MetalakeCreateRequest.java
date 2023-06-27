@@ -1,6 +1,6 @@
 package com.datastrato.graviton.dto.requests;
 
-import com.datastrato.graviton.dto.RESTRequest;
+import com.datastrato.graviton.rest.RESTRequest;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import java.util.Map;

@@ -1,4 +1,4 @@
-package com.datastrato.graviton.dto;
+package com.datastrato.graviton.rest;
 
 public interface RESTMessage {
 

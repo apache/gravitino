@@ -1,6 +1,7 @@
 package com.datastrato.graviton.dto.responses;
 
 public enum ErrorType {
+  DEFAULT_ERROR(1000, "default_error"),
   INVALID_ARGUMENTS(1001, "invalid_arguments"),
   INTERNAL_ERROR(1002, "internal_error"),
   NOT_FOUND(1003, "not_found"),
@@ -9,7 +10,7 @@ public enum ErrorType {
   CONFLICT(1006, "conflict"),
   TOO_MANY_REQUESTS(1007, "too_many_requests"),
   SERVICE_UNAVAILABLE(1008, "service_unavailable"),
-  UNKNOWN(1009, "unknown");
+  UNKNOWN(1100, "unknown");
 
   private final int errorCode;
 

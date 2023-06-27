@@ -273,7 +273,7 @@ public class TestMetalakesOperations extends JerseyTest {
             .accept("application/vnd.graviton.v1+json")
             .delete();
 
-    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    Assertions.assertEquals(Response.Status.NO_CONTENT.getStatusCode(), resp.getStatus());
 
     // Test throw an exception when deleting tenant.
     doThrow(new RuntimeException("Internal error")).when(metalakesOperations).dropMetalake(any());

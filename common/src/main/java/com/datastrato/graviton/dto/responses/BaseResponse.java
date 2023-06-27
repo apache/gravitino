@@ -1,6 +1,6 @@
 package com.datastrato.graviton.dto.responses;
 
-import com.datastrato.graviton.dto.RESTResponse;
+import com.datastrato.graviton.rest.RESTResponse;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import javax.annotation.Nullable;
