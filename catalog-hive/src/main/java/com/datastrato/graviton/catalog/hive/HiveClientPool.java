@@ -18,8 +18,8 @@
  */
 package com.datastrato.graviton.catalog.hive;
 
-import com.datastrato.graviton.ClientPoolImpl;
 import com.datastrato.graviton.catalog.hive.dyn.DynMethods;
+import com.datastrato.graviton.util.ClientPoolImpl;
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.conf.HiveConf;

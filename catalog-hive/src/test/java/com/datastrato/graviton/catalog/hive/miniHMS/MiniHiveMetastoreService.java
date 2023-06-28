@@ -64,12 +64,11 @@ public abstract class MiniHiveMetastoreService {
 
   @AfterAll
   public static void stopMetastore() throws Exception {
+    LOG.info("Stop Hive Metastore");
     metastoreClient.close();
     MiniHiveMetastoreService.metastoreClient = null;
 
     metastore.stop();
     MiniHiveMetastoreService.metastore = null;
-
-    LOG.info("Stop Hive Metastore");
   }
 }
