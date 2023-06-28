@@ -5,13 +5,13 @@ class AuditInfoSerDe implements ProtoSerDe<com.datastrato.graviton.meta.AuditInf
   public AuditInfo serialize(com.datastrato.graviton.meta.AuditInfo auditInfo) {
     AuditInfo.Builder builder =
         AuditInfo.newBuilder()
-            .setCreator(auditInfo.getCreator())
-            .setCreateTime(ProtoUtils.fromInstant(auditInfo.getCreateTime()));
+            .setCreator(auditInfo.creator())
+            .setCreateTime(ProtoUtils.fromInstant(auditInfo.createTime()));
 
-    if (auditInfo.getLastModifier() != null && auditInfo.getLastModifiedTime() != null) {
+    if (auditInfo.lastModifier() != null && auditInfo.lastModifiedTime() != null) {
       builder
-          .setLastModifier(auditInfo.getLastModifier())
-          .setLastModifiedTime(ProtoUtils.fromInstant(auditInfo.getLastModifiedTime()));
+          .setLastModifier(auditInfo.lastModifier())
+          .setLastModifiedTime(ProtoUtils.fromInstant(auditInfo.lastModifiedTime()));
     }
 
     return builder.build();

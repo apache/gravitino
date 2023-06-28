@@ -1,6 +1,7 @@
 package com.datastrato.graviton.meta;
 
 import com.datastrato.graviton.Field;
+import com.datastrato.graviton.TestCatalog;
 import com.google.common.collect.ImmutableMap;
 import java.time.Instant;
 import java.util.Map;
@@ -27,8 +28,8 @@ public class TestEntity {
 
   @Test
   public void testLakehouse() {
-    Lakehouse lakehouse =
-        new Lakehouse.Builder()
+    BaseLakehouse lakehouse =
+        new BaseLakehouse.Builder()
             .withId(lakehouseId)
             .withName(lakehouseName)
             .withAuditInfo(auditInfo)
@@ -37,12 +38,12 @@ public class TestEntity {
             .build();
 
     Map<Field, Object> fields = lakehouse.fields();
-    Assertions.assertEquals(lakehouseId, fields.get(Lakehouse.ID));
-    Assertions.assertEquals(lakehouseName, fields.get(Lakehouse.NAME));
-    Assertions.assertEquals(map, fields.get(Lakehouse.PROPERTIES));
-    Assertions.assertEquals(auditInfo, fields.get(Lakehouse.AUDIT_INFO));
-    Assertions.assertNull(fields.get(Lakehouse.COMMENT));
-    Assertions.assertEquals(version, fields.get(Lakehouse.SCHEMA_VERSION));
+    Assertions.assertEquals(lakehouseId, fields.get(BaseLakehouse.ID));
+    Assertions.assertEquals(lakehouseName, fields.get(BaseLakehouse.NAME));
+    Assertions.assertEquals(map, fields.get(BaseLakehouse.PROPERTIES));
+    Assertions.assertEquals(auditInfo, fields.get(BaseLakehouse.AUDIT_INFO));
+    Assertions.assertNull(fields.get(BaseLakehouse.COMMENT));
+    Assertions.assertEquals(version, fields.get(BaseLakehouse.SCHEMA_VERSION));
   }
 
   @Test

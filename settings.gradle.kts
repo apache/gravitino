@@ -1,3 +1,3 @@
 rootProject.name = "Graviton"
 
-include("core", "meta", "server", "catalog-hive")
+include("api", "client", "common", "core", "meta", "server", "catalog-hive")

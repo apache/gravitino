@@ -6,7 +6,9 @@ plugins {
 }
 
 dependencies {
-  implementation(project(":core"));
+  implementation(project(":api"))
+  implementation(project(":common"))
+  implementation(project(":core"))
   implementation(libs.jackson.databind)
   implementation(libs.jackson.annotations)
   implementation(libs.jackson.datatype.jdk8)

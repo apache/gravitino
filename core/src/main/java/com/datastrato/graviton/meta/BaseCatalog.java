@@ -1,7 +1,6 @@
 package com.datastrato.graviton.meta;
 
 import com.datastrato.graviton.*;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import java.io.Closeable;
 import java.util.Collections;
 import java.util.HashMap;
@@ -16,16 +15,9 @@ import lombok.ToString;
  * uninitialize the catalog. This class inherits from Closeable, so that a determined close() method
  * should be called to release any resources that the catalog holds.
  */
-@Getter
 @EqualsAndHashCode
 @ToString
-public abstract class BaseCatalog implements Entity, Auditable, HasIdentifier, Closeable {
-
-  public enum Type {
-    RELATIONAL, // Catalog Type for Relational Data Structure, like db.table, catalog.db.table.
-    FILE, // Catalog Type for File System (including HDFS, S3, etc.), like path/to/file
-    STREAM, // Catalog Type for Streaming Data, like kafka://topic
-  }
+public abstract class BaseCatalog implements Catalog, Entity, Auditable, HasIdentifier, Closeable {
 
   public static final Field ID =
       Field.required("id", Long.class, "The unique identifier of the catalog");
@@ -40,27 +32,18 @@ public abstract class BaseCatalog implements Entity, Auditable, HasIdentifier, C
   public static final Field AUDIT_INFO =
       Field.required("audit_info", AuditInfo.class, "The audit info of the catalog");
 
-  @JsonProperty("id")
-  protected Long id;
+  @Getter protected Long id;
 
-  @JsonProperty("lakehouse_id")
-  protected Long lakehouseId;
+  @Getter protected Long lakehouseId;
 
-  @JsonProperty("name")
   protected String name;
 
-  @JsonProperty("type")
   protected Type type;
 
-  @Nullable
-  @JsonProperty("comment")
-  protected String comment;
+  @Nullable protected String comment;
 
-  @Nullable
-  @JsonProperty("properties")
-  protected Map<String, String> properties;
+  @Nullable protected Map<String, String> properties;
 
-  @JsonProperty("audit_info")
   protected AuditInfo auditInfo;
 
   protected Namespace namespace;
@@ -91,7 +74,7 @@ public abstract class BaseCatalog implements Entity, Auditable, HasIdentifier, C
   }
 
   @Override
-  public AuditInfo auditInfo() {
+  public Audit auditInfo() {
     return auditInfo;
   }
 
@@ -103,6 +86,21 @@ public abstract class BaseCatalog implements Entity, Auditable, HasIdentifier, C
   @Override
   public Namespace namespace() {
     return namespace;
+  }
+
+  @Override
+  public Type type() {
+    return type;
+  }
+
+  @Override
+  public String comment() {
+    return comment;
+  }
+
+  @Override
+  public Map<String, String> properties() {
+    return properties;
   }
 
   interface Builder<SELF extends Builder<SELF, T>, T extends BaseCatalog> {

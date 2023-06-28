@@ -1,7 +1,7 @@
 package com.datastrato.graviton.server.web;
 
-import com.datastrato.graviton.server.web.rest.BaseResponse;
-import com.datastrato.graviton.server.web.rest.ErrorType;
+import com.datastrato.graviton.dto.responses.BaseResponse;
+import com.datastrato.graviton.dto.responses.ErrorType;
 import java.util.Optional;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.core.MediaType;

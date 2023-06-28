@@ -80,8 +80,8 @@ public class TestEntityProtoSerDe {
             .build();
 
     // Test Lakehouse
-    com.datastrato.graviton.meta.Lakehouse lakehouse =
-        new com.datastrato.graviton.meta.Lakehouse.Builder()
+    com.datastrato.graviton.meta.BaseLakehouse lakehouse =
+        new com.datastrato.graviton.meta.BaseLakehouse.Builder()
             .withId(lakehouseId)
             .withName(lakehouseName)
             .withProperties(props)
@@ -93,18 +93,19 @@ public class TestEntityProtoSerDe {
 
     Lakehouse lakehouseProto = protoEntitySerDe.toProto(lakehouse);
     Assertions.assertEquals(props, lakehouseProto.getPropertiesMap());
-    com.datastrato.graviton.meta.Lakehouse lakehouseFromProto =
+    com.datastrato.graviton.meta.BaseLakehouse lakehouseFromProto =
         protoEntitySerDe.fromProto(lakehouseProto);
     Assertions.assertEquals(lakehouse, lakehouseFromProto);
 
     byte[] lakehouseBytes = protoEntitySerDe.serialize(lakehouse);
-    com.datastrato.graviton.meta.Lakehouse lakehouseFromBytes =
-        protoEntitySerDe.deserialize(lakehouseBytes, com.datastrato.graviton.meta.Lakehouse.class);
+    com.datastrato.graviton.meta.BaseLakehouse lakehouseFromBytes =
+        protoEntitySerDe.deserialize(
+            lakehouseBytes, com.datastrato.graviton.meta.BaseLakehouse.class);
     Assertions.assertEquals(lakehouse, lakehouseFromBytes);
 
     // Test Lakehouse without props map
-    com.datastrato.graviton.meta.Lakehouse lakehouse1 =
-        new com.datastrato.graviton.meta.Lakehouse.Builder()
+    com.datastrato.graviton.meta.BaseLakehouse lakehouse1 =
+        new com.datastrato.graviton.meta.BaseLakehouse.Builder()
             .withId(lakehouseId)
             .withName(lakehouseName)
             .withAuditInfo(auditInfo)
@@ -113,13 +114,13 @@ public class TestEntityProtoSerDe {
 
     Lakehouse lakehouseProto1 = protoEntitySerDe.toProto(lakehouse1);
     Assertions.assertEquals(0, lakehouseProto1.getPropertiesCount());
-    com.datastrato.graviton.meta.Lakehouse lakehouseFromProto1 =
+    com.datastrato.graviton.meta.BaseLakehouse lakehouseFromProto1 =
         protoEntitySerDe.fromProto(lakehouseProto1);
     Assertions.assertEquals(lakehouse1, lakehouseFromProto1);
 
     byte[] lakehouseBytes1 = entitySerDe.serialize(lakehouse1);
-    com.datastrato.graviton.meta.Lakehouse lakehouseFromBytes1 =
-        entitySerDe.deserialize(lakehouseBytes1, com.datastrato.graviton.meta.Lakehouse.class);
+    com.datastrato.graviton.meta.BaseLakehouse lakehouseFromBytes1 =
+        entitySerDe.deserialize(lakehouseBytes1, com.datastrato.graviton.meta.BaseLakehouse.class);
     Assertions.assertEquals(lakehouse1, lakehouseFromBytes1);
   }
 }

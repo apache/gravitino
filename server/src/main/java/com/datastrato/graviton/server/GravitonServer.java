@@ -1,6 +1,6 @@
 package com.datastrato.graviton.server;
 
-import com.datastrato.graviton.meta.BaseLakehouseOperations;
+import com.datastrato.graviton.meta.BaseLakehousesOperations;
 import com.datastrato.graviton.server.web.JettyServer;
 import com.datastrato.graviton.server.web.ObjectMapperProvider;
 import com.datastrato.graviton.server.web.VersioningFilter;
@@ -47,7 +47,7 @@ public class GravitonServer extends ResourceConfig {
         new AbstractBinder() {
           @Override
           protected void configure() {
-            bind(BaseLakehouseOperations.class).to(BaseLakehouseOperations.class).ranked(1);
+            bind(BaseLakehousesOperations.class).to(BaseLakehousesOperations.class).ranked(1);
           }
         });
     register(ObjectMapperProvider.class).register(JacksonFeature.class);
