@@ -1,10 +1,8 @@
 package com.datastrato.graviton;
 
-import com.datastrato.graviton.json.TestColumn;
-import com.datastrato.graviton.json.TestTable;
 import com.datastrato.graviton.meta.*;
-import com.datastrato.graviton.meta.catalog.rel.Column;
-import com.datastrato.graviton.meta.catalog.rel.Table;
+import com.datastrato.graviton.rel.Column;
+import com.datastrato.graviton.rel.Table;
 import com.google.common.collect.Maps;
 import io.substrait.type.TypeCreator;
 import java.io.IOException;
@@ -50,15 +48,15 @@ public class TestEntityStore {
     AuditInfo auditInfo =
         new AuditInfo.Builder().withCreator("creator").withCreateTime(Instant.now()).build();
 
-    Lakehouse lakehouse =
-        new Lakehouse.Builder()
+    BaseLakehouse lakehouse =
+        new BaseLakehouse.Builder()
             .withId(1L)
             .withName("lakehouse")
             .withAuditInfo(auditInfo)
             .withVersion(SchemaVersion.V_0_1)
             .build();
 
-    BaseCatalog catalog =
+    TestCatalog catalog =
         new TestCatalog.Builder()
             .withId(1L)
             .withName("catalog")
@@ -68,9 +66,9 @@ public class TestEntityStore {
             .withAuditInfo(auditInfo)
             .build();
 
-    Column column = new TestColumn("column", "comment", TypeCreator.NULLABLE.I8, auditInfo);
+    TestColumn column = new TestColumn("column", "comment", TypeCreator.NULLABLE.I8);
 
-    Table table =
+    TestTable table =
         new TestTable(
             "table",
             Namespace.of("lakehouse", "catalog", "db"),

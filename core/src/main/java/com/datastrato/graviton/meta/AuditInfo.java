@@ -1,8 +1,8 @@
 package com.datastrato.graviton.meta;
 
+import com.datastrato.graviton.Audit;
 import com.datastrato.graviton.Entity;
 import com.datastrato.graviton.Field;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import java.time.Instant;
 import java.util.Collections;
@@ -10,14 +10,11 @@ import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
 import lombok.EqualsAndHashCode;
-import lombok.Getter;
-import lombok.Setter;
 import lombok.ToString;
 
-@Getter
 @EqualsAndHashCode
 @ToString
-public final class AuditInfo implements Entity {
+public final class AuditInfo implements Audit, Entity {
   public static final Field CREATOR =
       Field.required("creator", String.class, "The name of user who creates the entity");
   public static final Field CREATE_TIME =
@@ -29,21 +26,13 @@ public final class AuditInfo implements Entity {
       Field.optional(
           "last_modified_time", Instant.class, "The time when the entity is last modified");
 
-  @JsonProperty("creator")
   private String creator;
 
-  @JsonProperty("create_time")
   private Instant createTime;
 
-  @Nullable
-  @JsonProperty("last_modifier")
-  @Setter
-  private String lastModifier;
+  @Nullable private String lastModifier;
 
-  @Nullable
-  @JsonProperty("last_modified_time")
-  @Setter
-  private Instant lastModifiedTime;
+  @Nullable private Instant lastModifiedTime;
 
   private AuditInfo() {}
 
@@ -67,6 +56,26 @@ public final class AuditInfo implements Entity {
     fields.put(LAST_MODIFIED_TIME, lastModifiedTime);
 
     return Collections.unmodifiableMap(fields);
+  }
+
+  @Override
+  public String creator() {
+    return creator;
+  }
+
+  @Override
+  public Instant createTime() {
+    return createTime;
+  }
+
+  @Override
+  public String lastModifier() {
+    return lastModifier;
+  }
+
+  @Override
+  public Instant lastModifiedTime() {
+    return lastModifiedTime;
   }
 
   public static class Builder {

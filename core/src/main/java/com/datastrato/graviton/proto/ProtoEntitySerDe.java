@@ -16,13 +16,15 @@ public class ProtoEntitySerDe implements EntitySerDe {
   // otherwise ProtoEntitySerDe will not be able to deserialize the entity.
   private static final Map<String, String> ENTITY_TO_SERDE =
       ImmutableMap.of(
-          "com.datastrato.graviton.meta.AuditInfo", "com.datastrato.graviton.proto.AuditInfoSerDe",
-          "com.datastrato.graviton.meta.Lakehouse", "com.datastrato.graviton.proto.LakehouseSerDe");
+          "com.datastrato.graviton.meta.AuditInfo",
+          "com.datastrato.graviton.proto.AuditInfoSerDe",
+          "com.datastrato.graviton.meta.BaseLakehouse",
+          "com.datastrato.graviton.proto.BaseLakehouseSerDe");
 
   private static final Map<String, String> ENTITY_TO_PROTO =
       ImmutableMap.of(
           "com.datastrato.graviton.meta.AuditInfo", "com.datastrato.graviton.proto.AuditInfo",
-          "com.datastrato.graviton.meta.Lakehouse", "com.datastrato.graviton.proto.Lakehouse");
+          "com.datastrato.graviton.meta.BaseLakehouse", "com.datastrato.graviton.proto.Lakehouse");
 
   private final Map<Class<? extends Entity>, ProtoSerDe<? extends Entity, ? extends Message>>
       entityToSerDe;

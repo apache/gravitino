@@ -6,7 +6,8 @@ plugins {
 }
 
 dependencies {
-  implementation(project(":meta"));
+  implementation(project(":api"))
+  implementation(project(":meta"))
   implementation(libs.protobuf.java.util) {
     exclude("com.google.guava", "guava")
       .because("Brings in Guava for Andriod, which we don't want (and breaks multimaps).")
@@ -16,10 +17,6 @@ dependencies {
     exclude("com.fasterxml.jackson.core")
     exclude("com.fasterxml.jackson.datatype")
   }
-  implementation(libs.jackson.databind)
-  implementation(libs.jackson.annotations)
-  implementation(libs.jackson.datatype.jdk8)
-  implementation(libs.jackson.datatype.jsr310)
   implementation(libs.guava)
   implementation(libs.bundles.log4j)
 
