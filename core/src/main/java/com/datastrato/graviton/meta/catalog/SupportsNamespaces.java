@@ -76,6 +76,15 @@ public interface SupportsNamespaces {
       throws NamespaceAlreadyExistsException;
 
   /**
+   * Load metadata properties for a namespace.
+   *
+   * @param namespace a namespace. {@link Namespace}
+   * @return a string map of properties for the given namespace
+   * @throws NoSuchNamespaceException If the namespace does not exist (optional)
+   */
+  Map<String, String> loadNamespaceMetadata(Namespace namespace) throws NoSuchNamespaceException;
+
+  /**
    * Apply the metadata change to a namespace in the catalog.
    *
    * @param namespace the namespace to alter
