@@ -1,6 +1,6 @@
 package com.datastrato.graviton.dto.responses;
 
-import com.datastrato.graviton.dto.LakehouseDTO;
+import com.datastrato.graviton.dto.MetalakeDTO;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -9,19 +9,19 @@ import lombok.ToString;
 @Getter
 @ToString
 @EqualsAndHashCode(callSuper = true)
-public class LakehouseResponse extends BaseResponse {
+public class MetalakeResponse extends BaseResponse {
 
-  @JsonProperty("lakehouse")
-  private final LakehouseDTO lakehouse;
+  @JsonProperty("metalake")
+  private final MetalakeDTO metalake;
 
-  public LakehouseResponse(LakehouseDTO lakehouse) {
+  public MetalakeResponse(MetalakeDTO metalake) {
     super(0, null, null);
-    this.lakehouse = lakehouse;
+    this.metalake = metalake;
   }
 
   // This is the constructor that is used by Jackson deserializer
-  public LakehouseResponse() {
+  public MetalakeResponse() {
     super();
-    this.lakehouse = null;
+    this.metalake = null;
   }
 }

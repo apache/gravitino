@@ -84,7 +84,7 @@ public class TestCatalog extends BaseCatalog implements TableCatalog {
     @Override
     protected TestCatalog internalBuild() {
       testCatalog.id = id;
-      testCatalog.lakehouseId = lakehouseId;
+      testCatalog.metalakeId = metalakeId;
       testCatalog.name = name;
       testCatalog.namespace = namespace;
       testCatalog.type = type;

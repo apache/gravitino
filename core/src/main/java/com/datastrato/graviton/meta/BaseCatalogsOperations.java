@@ -3,13 +3,13 @@ package com.datastrato.graviton.meta;
 import com.datastrato.graviton.*;
 import com.datastrato.graviton.exceptions.CatalogAlreadyExistsException;
 import com.datastrato.graviton.exceptions.NoSuchCatalogException;
-import com.datastrato.graviton.exceptions.NoSuchLakehouseException;
+import com.datastrato.graviton.exceptions.NoSuchMetalakeException;
 import java.util.Map;
 
 public class BaseCatalogsOperations implements SupportCatalogs {
 
   @Override
-  public Catalog[] listCatalogs(Namespace namespace) throws NoSuchLakehouseException {
+  public Catalog[] listCatalogs(Namespace namespace) throws NoSuchMetalakeException {
     throw new UnsupportedOperationException("Not implemented yet");
   }
 
@@ -21,7 +21,7 @@ public class BaseCatalogsOperations implements SupportCatalogs {
   @Override
   public Catalog createCatalog(
       NameIdentifier ident, Catalog.Type type, String comment, Map<String, String> properties)
-      throws NoSuchLakehouseException, CatalogAlreadyExistsException {
+      throws NoSuchMetalakeException, CatalogAlreadyExistsException {
     throw new UnsupportedOperationException("Not implemented yet");
   }
 

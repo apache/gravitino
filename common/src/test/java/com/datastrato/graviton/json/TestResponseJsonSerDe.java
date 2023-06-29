@@ -1,10 +1,10 @@
 package com.datastrato.graviton.json;
 
 import com.datastrato.graviton.dto.AuditDTO;
-import com.datastrato.graviton.dto.LakehouseDTO;
+import com.datastrato.graviton.dto.MetalakeDTO;
 import com.datastrato.graviton.dto.responses.BaseResponse;
 import com.datastrato.graviton.dto.responses.ErrorType;
-import com.datastrato.graviton.dto.responses.LakehouseResponse;
+import com.datastrato.graviton.dto.responses.MetalakeResponse;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.collect.ImmutableMap;
 import java.time.Instant;
@@ -27,20 +27,20 @@ public class TestResponseJsonSerDe {
   }
 
   @Test
-  public void testLakehouseResponseSerDe() throws JsonProcessingException {
-    LakehouseDTO lakehouse =
-        LakehouseDTO.builder()
-            .withName("lakehouse")
+  public void testMetalakeResponseSerDe() throws JsonProcessingException {
+    MetalakeDTO metalake =
+        MetalakeDTO.builder()
+            .withName("metalake")
             .withComment("comment")
             .withProperties(ImmutableMap.of("key", "value"))
             .withAudit(
                 AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build())
             .build();
 
-    LakehouseResponse response = new LakehouseResponse(lakehouse);
+    MetalakeResponse response = new MetalakeResponse(metalake);
     String serJson = JsonUtils.objectMapper().writeValueAsString(response);
-    LakehouseResponse deserResponse =
-        JsonUtils.objectMapper().readValue(serJson, LakehouseResponse.class);
+    MetalakeResponse deserResponse =
+        JsonUtils.objectMapper().readValue(serJson, MetalakeResponse.class);
     Assertions.assertEquals(response, deserResponse);
   }
 }

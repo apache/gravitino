@@ -1,7 +1,7 @@
 package com.datastrato.graviton.dto;
 
 import com.datastrato.graviton.Audit;
-import com.datastrato.graviton.Lakehouse;
+import com.datastrato.graviton.Metalake;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import java.util.Map;
@@ -11,7 +11,7 @@ import lombok.ToString;
 
 @EqualsAndHashCode
 @ToString
-public class LakehouseDTO implements Lakehouse {
+public class MetalakeDTO implements Metalake {
 
   @JsonProperty("name")
   private String name;
@@ -27,10 +27,9 @@ public class LakehouseDTO implements Lakehouse {
   @JsonProperty("audit")
   private AuditDTO audit;
 
-  private LakehouseDTO() {}
+  private MetalakeDTO() {}
 
-  private LakehouseDTO(
-      String name, String comment, Map<String, String> properties, AuditDTO audit) {
+  private MetalakeDTO(String name, String comment, Map<String, String> properties, AuditDTO audit) {
     this.name = name;
     this.comment = comment;
     this.properties = properties;
@@ -90,10 +89,10 @@ public class LakehouseDTO implements Lakehouse {
       return (S) this;
     }
 
-    public LakehouseDTO build() {
+    public MetalakeDTO build() {
       Preconditions.checkArgument(name != null && !name.isEmpty(), "name cannot be null or empty");
       Preconditions.checkArgument(audit != null, "audit cannot be null");
-      return new LakehouseDTO(name, comment, properties, audit);
+      return new MetalakeDTO(name, comment, properties, audit);
     }
   }
 }

@@ -48,10 +48,10 @@ public class TestEntityStore {
     AuditInfo auditInfo =
         new AuditInfo.Builder().withCreator("creator").withCreateTime(Instant.now()).build();
 
-    BaseLakehouse lakehouse =
-        new BaseLakehouse.Builder()
+    BaseMetalake metalake =
+        new BaseMetalake.Builder()
             .withId(1L)
-            .withName("lakehouse")
+            .withName("metalake")
             .withAuditInfo(auditInfo)
             .withVersion(SchemaVersion.V_0_1)
             .build();
@@ -60,9 +60,9 @@ public class TestEntityStore {
         new TestCatalog.Builder()
             .withId(1L)
             .withName("catalog")
-            .withNamespace(Namespace.of("lakehouse"))
+            .withNamespace(Namespace.of("metalake"))
             .withType(TestCatalog.Type.RELATIONAL)
-            .withLakehouseId(1L)
+            .withMetalakeId(1L)
             .withAuditInfo(auditInfo)
             .build();
 
@@ -71,20 +71,20 @@ public class TestEntityStore {
     TestTable table =
         new TestTable(
             "table",
-            Namespace.of("lakehouse", "catalog", "db"),
+            Namespace.of("metalake", "catalog", "db"),
             "comment",
             Maps.newHashMap(),
             auditInfo,
             new Column[] {column});
 
     InMemoryEntityStore store = new InMemoryEntityStore();
-    store.storeEntity(lakehouse);
+    store.storeEntity(metalake);
     store.storeEntity(catalog);
     store.storeEntity(table);
     store.storeEntity(column);
 
-    Lakehouse retrievedLakehouse = store.retrieveEntity(lakehouse);
-    Assertions.assertEquals(lakehouse, retrievedLakehouse);
+    Metalake retrievedMetalake = store.retrieveEntity(metalake);
+    Assertions.assertEquals(metalake, retrievedMetalake);
 
     BaseCatalog retrievedCatalog = store.retrieveEntity(catalog);
     Assertions.assertEquals(catalog, retrievedCatalog);

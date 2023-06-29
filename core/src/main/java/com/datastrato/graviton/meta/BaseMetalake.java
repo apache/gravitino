@@ -11,20 +11,19 @@ import lombok.ToString;
 
 @EqualsAndHashCode
 @ToString
-public class BaseLakehouse implements Lakehouse, Entity, Auditable, HasIdentifier {
+public class BaseMetalake implements Metalake, Entity, Auditable, HasIdentifier {
 
   public static final Field ID =
-      Field.required("id", Long.class, "The unique identifier of the lakehouse");
-  public static final Field NAME =
-      Field.required("name", String.class, "The name of the lakehouse");
+      Field.required("id", Long.class, "The unique identifier of the metalake");
+  public static final Field NAME = Field.required("name", String.class, "The name of the metalake");
   public static final Field COMMENT =
-      Field.optional("comment", String.class, "The comment of the lakehouse");
+      Field.optional("comment", String.class, "The comment of the metalake");
   public static final Field PROPERTIES =
-      Field.optional("properties", Map.class, "The properties of the lakehouse");
+      Field.optional("properties", Map.class, "The properties of the metalake");
   public static final Field AUDIT_INFO =
-      Field.required("audit_info", AuditInfo.class, "The audit info of the lakehouse");
+      Field.required("audit_info", AuditInfo.class, "The audit info of the metalake");
   public static final Field SCHEMA_VERSION =
-      Field.required("version", SchemaVersion.class, "The schema version of the lakehouse");
+      Field.required("version", SchemaVersion.class, "The schema version of the metalake");
 
   @Getter private Long id;
 
@@ -38,7 +37,7 @@ public class BaseLakehouse implements Lakehouse, Entity, Auditable, HasIdentifie
 
   @Getter SchemaVersion version;
 
-  private BaseLakehouse() {}
+  private BaseMetalake() {}
 
   @Override
   public Map<Field, Object> fields() {
@@ -74,45 +73,45 @@ public class BaseLakehouse implements Lakehouse, Entity, Auditable, HasIdentifie
   }
 
   public static class Builder {
-    private final BaseLakehouse lakehouse;
+    private final BaseMetalake metalake;
 
     public Builder() {
-      lakehouse = new BaseLakehouse();
+      metalake = new BaseMetalake();
     }
 
     public Builder withId(Long id) {
-      lakehouse.id = id;
+      metalake.id = id;
       return this;
     }
 
     public Builder withName(String name) {
-      lakehouse.name = name;
+      metalake.name = name;
       return this;
     }
 
     public Builder withComment(String comment) {
-      lakehouse.comment = comment;
+      metalake.comment = comment;
       return this;
     }
 
     public Builder withProperties(Map<String, String> properties) {
-      lakehouse.properties = properties;
+      metalake.properties = properties;
       return this;
     }
 
     public Builder withAuditInfo(AuditInfo auditInfo) {
-      lakehouse.auditInfo = auditInfo;
+      metalake.auditInfo = auditInfo;
       return this;
     }
 
     public Builder withVersion(SchemaVersion version) {
-      lakehouse.version = version;
+      metalake.version = version;
       return this;
     }
 
-    public BaseLakehouse build() {
-      lakehouse.validate();
-      return lakehouse;
+    public BaseMetalake build() {
+      metalake.validate();
+      return metalake;
     }
   }
 }

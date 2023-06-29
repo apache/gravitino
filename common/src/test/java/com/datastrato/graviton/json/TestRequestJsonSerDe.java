@@ -11,68 +11,67 @@ import org.junit.jupiter.api.Test;
 public class TestRequestJsonSerDe {
 
   @Test
-  public void testLakehouseCreateRequestSerDe() throws JsonProcessingException {
-    LakehouseCreateRequest request =
-        new LakehouseCreateRequest("lakehouse", "comment", ImmutableMap.of("key", "value"));
+  public void testMetalakeCreateRequestSerDe() throws JsonProcessingException {
+    MetalakeCreateRequest request =
+        new MetalakeCreateRequest("metalake", "comment", ImmutableMap.of("key", "value"));
     String serJson = JsonUtils.objectMapper().writeValueAsString(request);
-    LakehouseCreateRequest deserRequest =
-        JsonUtils.objectMapper().readValue(serJson, LakehouseCreateRequest.class);
+    MetalakeCreateRequest deserRequest =
+        JsonUtils.objectMapper().readValue(serJson, MetalakeCreateRequest.class);
     Assertions.assertEquals(request, deserRequest);
 
     // Test with optional fields
-    LakehouseCreateRequest request1 = new LakehouseCreateRequest("lakehouse", null, null);
+    MetalakeCreateRequest request1 = new MetalakeCreateRequest("Metalake", null, null);
     String serJson1 = JsonUtils.objectMapper().writeValueAsString(request1);
-    LakehouseCreateRequest deserRequest1 =
-        JsonUtils.objectMapper().readValue(serJson1, LakehouseCreateRequest.class);
+    MetalakeCreateRequest deserRequest1 =
+        JsonUtils.objectMapper().readValue(serJson1, MetalakeCreateRequest.class);
     Assertions.assertEquals(request1, deserRequest1);
 
-    LakehouseCreateRequest request2 = new LakehouseCreateRequest("lakehouse", "", null);
+    MetalakeCreateRequest request2 = new MetalakeCreateRequest("Metalake", "", null);
     String serJson2 = JsonUtils.objectMapper().writeValueAsString(request2);
-    LakehouseCreateRequest deserRequest2 =
-        JsonUtils.objectMapper().readValue(serJson2, LakehouseCreateRequest.class);
+    MetalakeCreateRequest deserRequest2 =
+        JsonUtils.objectMapper().readValue(serJson2, MetalakeCreateRequest.class);
     Assertions.assertEquals(request2, deserRequest2);
 
-    LakehouseCreateRequest request3 =
-        new LakehouseCreateRequest("lakehouse", "", ImmutableMap.of());
+    MetalakeCreateRequest request3 = new MetalakeCreateRequest("Metalake", "", ImmutableMap.of());
     String serJson3 = JsonUtils.objectMapper().writeValueAsString(request3);
-    LakehouseCreateRequest deserRequest3 =
-        JsonUtils.objectMapper().readValue(serJson3, LakehouseCreateRequest.class);
+    MetalakeCreateRequest deserRequest3 =
+        JsonUtils.objectMapper().readValue(serJson3, MetalakeCreateRequest.class);
     Assertions.assertEquals(request3, deserRequest3);
   }
 
   @Test
-  public void testLakehouseUpdateRequestSerDe() throws JsonProcessingException {
-    LakehouseUpdateRequest req = new LakehouseUpdateRequest.RenameLakehouseRequest("newLakehouse");
+  public void testmetalakeUpdateRequestSerDe() throws JsonProcessingException {
+    MetalakeUpdateRequest req = new MetalakeUpdateRequest.RenameMetalakeRequest("newMetalake");
     String serJson = JsonUtils.objectMapper().writeValueAsString(req);
-    LakehouseUpdateRequest deserReq =
-        JsonUtils.objectMapper().readValue(serJson, LakehouseUpdateRequest.class);
+    MetalakeUpdateRequest deserReq =
+        JsonUtils.objectMapper().readValue(serJson, MetalakeUpdateRequest.class);
     Assertions.assertEquals(req, deserReq);
 
-    LakehouseUpdateRequest req1 =
-        new LakehouseUpdateRequest.UpdateLakehouseCommentRequest("newComment");
+    MetalakeUpdateRequest req1 =
+        new MetalakeUpdateRequest.UpdateMetalakeCommentRequest("newComment");
     String serJson1 = JsonUtils.objectMapper().writeValueAsString(req1);
-    LakehouseUpdateRequest deserReq1 =
-        JsonUtils.objectMapper().readValue(serJson1, LakehouseUpdateRequest.class);
+    MetalakeUpdateRequest deserReq1 =
+        JsonUtils.objectMapper().readValue(serJson1, MetalakeUpdateRequest.class);
     Assertions.assertEquals(req1, deserReq1);
 
-    LakehouseUpdateRequest req2 =
-        new LakehouseUpdateRequest.SetLakehousePropertyRequest("key", "value");
+    MetalakeUpdateRequest req2 =
+        new MetalakeUpdateRequest.SetMetalakePropertyRequest("key", "value");
     String serJson2 = JsonUtils.objectMapper().writeValueAsString(req2);
-    LakehouseUpdateRequest deserReq2 =
-        JsonUtils.objectMapper().readValue(serJson2, LakehouseUpdateRequest.class);
+    MetalakeUpdateRequest deserReq2 =
+        JsonUtils.objectMapper().readValue(serJson2, MetalakeUpdateRequest.class);
     Assertions.assertEquals(req2, deserReq2);
 
-    LakehouseUpdateRequest req3 = new LakehouseUpdateRequest.RemoveLakehousePropertyRequest("key");
+    MetalakeUpdateRequest req3 = new MetalakeUpdateRequest.RemoveMetalakePropertyRequest("key");
     String serJson3 = JsonUtils.objectMapper().writeValueAsString(req3);
-    LakehouseUpdateRequest deserReq3 =
-        JsonUtils.objectMapper().readValue(serJson3, LakehouseUpdateRequest.class);
+    MetalakeUpdateRequest deserReq3 =
+        JsonUtils.objectMapper().readValue(serJson3, MetalakeUpdateRequest.class);
     Assertions.assertEquals(req3, deserReq3);
 
-    LakehouseUpdatesRequest req4 =
-        new LakehouseUpdatesRequest(ImmutableList.of(req, req1, req2, req3));
+    MetalakeUpdatesRequest req4 =
+        new MetalakeUpdatesRequest(ImmutableList.of(req, req1, req2, req3));
     String serJson4 = JsonUtils.objectMapper().writeValueAsString(req4);
-    LakehouseUpdatesRequest deserReq4 =
-        JsonUtils.objectMapper().readValue(serJson4, LakehouseUpdatesRequest.class);
+    MetalakeUpdatesRequest deserReq4 =
+        JsonUtils.objectMapper().readValue(serJson4, MetalakeUpdatesRequest.class);
     Assertions.assertEquals(req4, deserReq4);
   }
 
