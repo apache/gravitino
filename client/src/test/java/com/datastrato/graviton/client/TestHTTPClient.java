@@ -88,6 +88,16 @@ public class TestHTTPClient {
   }
 
   @Test
+  public void testPutSuccess() throws Exception {
+    testHttpMethodOnSuccess(Method.PUT, true, true);
+  }
+
+  @Test
+  public void testPutFailure() throws Exception {
+    testHttpMethodOnFailure(Method.PUT, true, true);
+  }
+
+  @Test
   public void testGetSuccess() throws Exception {
     testHttpMethodOnSuccess(Method.GET, false, true);
   }
@@ -218,6 +228,8 @@ public class TestHTTPClient {
     switch (method) {
       case POST:
         return restClient.post(path, body, Item.class, headers, onError, responseHeaders);
+      case PUT:
+        return restClient.put(path, body, Item.class, headers, onError, responseHeaders);
       case GET:
         return restClient.get(path, Item.class, headers, onError);
       case HEAD:

@@ -10,6 +10,7 @@ import com.datastrato.graviton.dto.requests.MetalakeUpdateRequest;
 import com.datastrato.graviton.dto.requests.MetalakeUpdatesRequest;
 import com.datastrato.graviton.dto.responses.BaseResponse;
 import com.datastrato.graviton.dto.responses.ErrorType;
+import com.datastrato.graviton.dto.responses.MetalakeListResponse;
 import com.datastrato.graviton.dto.responses.MetalakeResponse;
 import com.datastrato.graviton.exceptions.NoSuchMetalakeException;
 import com.datastrato.graviton.meta.AuditInfo;
@@ -58,6 +59,42 @@ public class TestMetalakesOperations extends JerseyTest {
         });
 
     return resourceConfig;
+  }
+
+  @Test
+  public void testListMetalakes() {
+    String metalakeName = "test";
+    Long id = 1L;
+    Instant now = Instant.now();
+    AuditInfo info = new AuditInfo.Builder().withCreator("graviton").withCreateTime(now).build();
+    BaseMetalake metalake =
+        new BaseMetalake.Builder()
+            .withName(metalakeName)
+            .withId(id)
+            .withAuditInfo(info)
+            .withVersion(SchemaVersion.V_0_1)
+            .build();
+
+    when(metalakesOperations.listMetalakes()).thenReturn(new BaseMetalake[] {metalake, metalake});
+
+    Response resp =
+        target("/metalakes")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.graviton.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
+
+    MetalakeListResponse metalakeListResponse = resp.readEntity(MetalakeListResponse.class);
+    Assertions.assertEquals(0, metalakeListResponse.getCode());
+    Assertions.assertNull(metalakeListResponse.getMessage());
+    Assertions.assertNull(metalakeListResponse.getType());
+
+    MetalakeDTO[] metalakes = metalakeListResponse.getMetalakes();
+    Assertions.assertEquals(2, metalakes.length);
+    Assertions.assertEquals(metalakeName, metalakes[0].name());
+    Assertions.assertEquals(metalakeName, metalakes[1].name());
   }
 
   @Test
@@ -114,7 +151,7 @@ public class TestMetalakesOperations extends JerseyTest {
   }
 
   @Test
-  public void testGetMetalake() {
+  public void testLoadMetalake() {
     String metalakeName = "test";
     Long id = 1L;
     Instant now = Instant.now();
@@ -186,7 +223,7 @@ public class TestMetalakesOperations extends JerseyTest {
   }
 
   @Test
-  public void testUpdateMetalake() {
+  public void testAlterMetalake() {
     String metalakeName = "test";
     Long id = 1L;
     Instant now = Instant.now();
@@ -265,7 +302,7 @@ public class TestMetalakesOperations extends JerseyTest {
   }
 
   @Test
-  public void testDeleteMetalake() {
+  public void testDropMetalake() {
     when(metalakesOperations.dropMetalake(any())).thenReturn(true);
     Response resp =
         target("/metalakes/test")

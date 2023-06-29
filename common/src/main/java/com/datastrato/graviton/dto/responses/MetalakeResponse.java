@@ -2,6 +2,7 @@ package com.datastrato.graviton.dto.responses;
 
 import com.datastrato.graviton.dto.MetalakeDTO;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.google.common.base.Preconditions;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
@@ -23,5 +24,18 @@ public class MetalakeResponse extends BaseResponse {
   public MetalakeResponse() {
     super();
     this.metalake = null;
+  }
+
+  @Override
+  public void validate() throws IllegalArgumentException {
+    Preconditions.checkArgument(metalake != null, "metalake must be non-null");
+    Preconditions.checkArgument(
+        metalake.name() != null && !metalake.name().isEmpty(),
+        "metalake name must be non-null and non-empty");
+    Preconditions.checkArgument(
+        metalake.auditInfo().creator() != null && !metalake.auditInfo().creator().isEmpty(),
+        "metalake creator must be non-null and non-empty");
+    Preconditions.checkArgument(
+        metalake.auditInfo().createTime() != null, "metalake createTime must be non-null");
   }
 }

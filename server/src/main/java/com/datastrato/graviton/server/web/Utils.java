@@ -45,4 +45,11 @@ public class Utils {
         .type(MediaType.APPLICATION_JSON)
         .build();
   }
+
+  public static Response alreadyExists(String message) {
+    return Response.status(Response.Status.CONFLICT)
+        .entity(BaseResponse.error(ErrorType.ALREADY_EXISTS, message))
+        .type(MediaType.APPLICATION_JSON)
+        .build();
+  }
 }
