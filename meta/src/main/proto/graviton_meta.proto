@@ -25,10 +25,10 @@ message AuditInfo {
 }
 
 /**
- * The Lakehouse message is used to record the lakehouse information. Lakehouse is used track all
+ * The Metalake message is used to record the Metalake information. Metalake is used track all
   the metadata of the data lake, data warehouse, and data mart.
  */
-message Lakehouse {
+message Metalake {
   uint64 id = 1;
   string name = 2;
   optional string comment = 3;
@@ -45,7 +45,7 @@ message Catalog {
   }
 
   uint64 id = 1;
-  uint64 lakehouse_id = 2;
+  uint64 metalake_id = 2;
   string name = 3;
   Type type = 4;
   optional string comment = 5;

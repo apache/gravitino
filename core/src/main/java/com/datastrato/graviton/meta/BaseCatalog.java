@@ -21,8 +21,8 @@ public abstract class BaseCatalog implements Catalog, Entity, Auditable, HasIden
 
   public static final Field ID =
       Field.required("id", Long.class, "The unique identifier of the catalog");
-  public static final Field LAKEHOUSE_ID =
-      Field.required("lakehouse_id", Long.class, "The unique identifier of the lakehouse");
+  public static final Field METALAKE_ID =
+      Field.required("metalake_id", Long.class, "The unique identifier of the metalake");
   public static final Field NAME = Field.required("name", String.class, "The name of the catalog");
   public static final Field TYPE = Field.required("type", Type.class, "The type of the catalog");
   public static final Field COMMENT =
@@ -34,7 +34,7 @@ public abstract class BaseCatalog implements Catalog, Entity, Auditable, HasIden
 
   @Getter protected Long id;
 
-  @Getter protected Long lakehouseId;
+  @Getter protected Long metalakeId;
 
   protected String name;
 
@@ -63,7 +63,7 @@ public abstract class BaseCatalog implements Catalog, Entity, Auditable, HasIden
   public Map<Field, Object> fields() {
     Map<Field, Object> fields = new HashMap<>();
     fields.put(ID, id);
-    fields.put(LAKEHOUSE_ID, lakehouseId);
+    fields.put(METALAKE_ID, metalakeId);
     fields.put(NAME, name);
     fields.put(COMMENT, comment);
     fields.put(TYPE, type);
@@ -106,7 +106,7 @@ public abstract class BaseCatalog implements Catalog, Entity, Auditable, HasIden
   interface Builder<SELF extends Builder<SELF, T>, T extends BaseCatalog> {
     SELF withId(Long id);
 
-    SELF withLakehouseId(Long lakehouseId);
+    SELF withMetalakeId(Long metalakeId);
 
     SELF withName(String name);
 
@@ -127,7 +127,7 @@ public abstract class BaseCatalog implements Catalog, Entity, Auditable, HasIden
           SELF extends Builder<SELF, T>, T extends BaseCatalog>
       implements Builder<SELF, T> {
     protected Long id;
-    protected Long lakehouseId;
+    protected Long metalakeId;
     protected String name;
     protected Namespace namespace;
     protected Type type;
@@ -142,8 +142,8 @@ public abstract class BaseCatalog implements Catalog, Entity, Auditable, HasIden
     }
 
     @Override
-    public SELF withLakehouseId(Long lakehouseId) {
-      this.lakehouseId = lakehouseId;
+    public SELF withMetalakeId(Long metalakeId) {
+      this.metalakeId = metalakeId;
       return self();
     }
 

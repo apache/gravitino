@@ -18,13 +18,13 @@ public class ProtoEntitySerDe implements EntitySerDe {
       ImmutableMap.of(
           "com.datastrato.graviton.meta.AuditInfo",
           "com.datastrato.graviton.proto.AuditInfoSerDe",
-          "com.datastrato.graviton.meta.BaseLakehouse",
-          "com.datastrato.graviton.proto.BaseLakehouseSerDe");
+          "com.datastrato.graviton.meta.BaseMetalake",
+          "com.datastrato.graviton.proto.BaseMetalakeSerDe");
 
   private static final Map<String, String> ENTITY_TO_PROTO =
       ImmutableMap.of(
           "com.datastrato.graviton.meta.AuditInfo", "com.datastrato.graviton.proto.AuditInfo",
-          "com.datastrato.graviton.meta.BaseLakehouse", "com.datastrato.graviton.proto.Lakehouse");
+          "com.datastrato.graviton.meta.BaseMetalake", "com.datastrato.graviton.proto.Metalake");
 
   private final Map<Class<? extends Entity>, ProtoSerDe<? extends Entity, ? extends Message>>
       entityToSerDe;

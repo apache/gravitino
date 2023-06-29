@@ -69,8 +69,8 @@ public class TestEntityProtoSerDe {
     String creator = "creator";
     Integer tenantId = 1;
     SchemaVersion version = SchemaVersion.V_0_1;
-    Long lakehouseId = 1L;
-    String lakehouseName = "lakehouse";
+    Long metalakeId = 1L;
+    String metalakeName = "metalake";
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
 
     com.datastrato.graviton.meta.AuditInfo auditInfo =
@@ -79,11 +79,11 @@ public class TestEntityProtoSerDe {
             .withCreateTime(now)
             .build();
 
-    // Test Lakehouse
-    com.datastrato.graviton.meta.BaseLakehouse lakehouse =
-        new com.datastrato.graviton.meta.BaseLakehouse.Builder()
-            .withId(lakehouseId)
-            .withName(lakehouseName)
+    // Test Metalake
+    com.datastrato.graviton.meta.BaseMetalake metalake =
+        new com.datastrato.graviton.meta.BaseMetalake.Builder()
+            .withId(metalakeId)
+            .withName(metalakeName)
             .withProperties(props)
             .withAuditInfo(auditInfo)
             .withVersion(version)
@@ -91,36 +91,36 @@ public class TestEntityProtoSerDe {
 
     ProtoEntitySerDe protoEntitySerDe = (ProtoEntitySerDe) entitySerDe;
 
-    Lakehouse lakehouseProto = protoEntitySerDe.toProto(lakehouse);
-    Assertions.assertEquals(props, lakehouseProto.getPropertiesMap());
-    com.datastrato.graviton.meta.BaseLakehouse lakehouseFromProto =
-        protoEntitySerDe.fromProto(lakehouseProto);
-    Assertions.assertEquals(lakehouse, lakehouseFromProto);
+    Metalake metalakeProto = protoEntitySerDe.toProto(metalake);
+    Assertions.assertEquals(props, metalakeProto.getPropertiesMap());
+    com.datastrato.graviton.meta.BaseMetalake metalakeFromProto =
+        protoEntitySerDe.fromProto(metalakeProto);
+    Assertions.assertEquals(metalake, metalakeFromProto);
 
-    byte[] lakehouseBytes = protoEntitySerDe.serialize(lakehouse);
-    com.datastrato.graviton.meta.BaseLakehouse lakehouseFromBytes =
+    byte[] metalakeBytes = protoEntitySerDe.serialize(metalake);
+    com.datastrato.graviton.meta.BaseMetalake metalakeFromBytes =
         protoEntitySerDe.deserialize(
-            lakehouseBytes, com.datastrato.graviton.meta.BaseLakehouse.class);
-    Assertions.assertEquals(lakehouse, lakehouseFromBytes);
+            metalakeBytes, com.datastrato.graviton.meta.BaseMetalake.class);
+    Assertions.assertEquals(metalake, metalakeFromBytes);
 
-    // Test Lakehouse without props map
-    com.datastrato.graviton.meta.BaseLakehouse lakehouse1 =
-        new com.datastrato.graviton.meta.BaseLakehouse.Builder()
-            .withId(lakehouseId)
-            .withName(lakehouseName)
+    // Test metalake without props map
+    com.datastrato.graviton.meta.BaseMetalake metalake1 =
+        new com.datastrato.graviton.meta.BaseMetalake.Builder()
+            .withId(metalakeId)
+            .withName(metalakeName)
             .withAuditInfo(auditInfo)
             .withVersion(version)
             .build();
 
-    Lakehouse lakehouseProto1 = protoEntitySerDe.toProto(lakehouse1);
-    Assertions.assertEquals(0, lakehouseProto1.getPropertiesCount());
-    com.datastrato.graviton.meta.BaseLakehouse lakehouseFromProto1 =
-        protoEntitySerDe.fromProto(lakehouseProto1);
-    Assertions.assertEquals(lakehouse1, lakehouseFromProto1);
+    Metalake metalakeProto1 = protoEntitySerDe.toProto(metalake1);
+    Assertions.assertEquals(0, metalakeProto1.getPropertiesCount());
+    com.datastrato.graviton.meta.BaseMetalake metalakeFromProto1 =
+        protoEntitySerDe.fromProto(metalakeProto1);
+    Assertions.assertEquals(metalake1, metalakeFromProto1);
 
-    byte[] lakehouseBytes1 = entitySerDe.serialize(lakehouse1);
-    com.datastrato.graviton.meta.BaseLakehouse lakehouseFromBytes1 =
-        entitySerDe.deserialize(lakehouseBytes1, com.datastrato.graviton.meta.BaseLakehouse.class);
-    Assertions.assertEquals(lakehouse1, lakehouseFromBytes1);
+    byte[] metalakeBytes1 = entitySerDe.serialize(metalake1);
+    com.datastrato.graviton.meta.BaseMetalake metalakeFromBytes1 =
+        entitySerDe.deserialize(metalakeBytes1, com.datastrato.graviton.meta.BaseMetalake.class);
+    Assertions.assertEquals(metalake1, metalakeFromBytes1);
   }
 }
