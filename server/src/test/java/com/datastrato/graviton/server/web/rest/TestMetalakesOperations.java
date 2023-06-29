@@ -3,18 +3,18 @@ package com.datastrato.graviton.server.web.rest;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
-import com.datastrato.graviton.LakehouseChange;
-import com.datastrato.graviton.dto.LakehouseDTO;
-import com.datastrato.graviton.dto.requests.LakehouseCreateRequest;
-import com.datastrato.graviton.dto.requests.LakehouseUpdateRequest;
-import com.datastrato.graviton.dto.requests.LakehouseUpdatesRequest;
+import com.datastrato.graviton.MetalakeChange;
+import com.datastrato.graviton.dto.MetalakeDTO;
+import com.datastrato.graviton.dto.requests.MetalakeCreateRequest;
+import com.datastrato.graviton.dto.requests.MetalakeUpdateRequest;
+import com.datastrato.graviton.dto.requests.MetalakeUpdatesRequest;
 import com.datastrato.graviton.dto.responses.BaseResponse;
 import com.datastrato.graviton.dto.responses.ErrorType;
-import com.datastrato.graviton.dto.responses.LakehouseResponse;
-import com.datastrato.graviton.exceptions.NoSuchLakehouseException;
+import com.datastrato.graviton.dto.responses.MetalakeResponse;
+import com.datastrato.graviton.exceptions.NoSuchMetalakeException;
 import com.datastrato.graviton.meta.AuditInfo;
-import com.datastrato.graviton.meta.BaseLakehouse;
-import com.datastrato.graviton.meta.BaseLakehousesOperations;
+import com.datastrato.graviton.meta.BaseMetalake;
+import com.datastrato.graviton.meta.BaseMetalakesOperations;
 import com.datastrato.graviton.meta.SchemaVersion;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
@@ -31,7 +31,7 @@ import org.glassfish.jersey.test.JerseyTest;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-public class TestLakehousesOperations extends JerseyTest {
+public class TestMetalakesOperations extends JerseyTest {
 
   private static class MockServletRequestFactory extends ServletRequestFactoryBase {
     @Override
@@ -42,17 +42,17 @@ public class TestLakehousesOperations extends JerseyTest {
     }
   }
 
-  private BaseLakehousesOperations lakehousesOperations = mock(BaseLakehousesOperations.class);
+  private BaseMetalakesOperations metalakesOperations = mock(BaseMetalakesOperations.class);
 
   @Override
   protected Application configure() {
     ResourceConfig resourceConfig = new ResourceConfig();
-    resourceConfig.register(LakehouseOperations.class);
+    resourceConfig.register(MetalakeOperations.class);
     resourceConfig.register(
         new AbstractBinder() {
           @Override
           protected void configure() {
-            bind(lakehousesOperations).to(BaseLakehousesOperations.class).ranked(2);
+            bind(metalakesOperations).to(BaseMetalakesOperations.class).ranked(2);
             bindFactory(MockServletRequestFactory.class).to(HttpServletRequest.class);
           }
         });
@@ -61,15 +61,15 @@ public class TestLakehousesOperations extends JerseyTest {
   }
 
   @Test
-  public void testCreateLakehouse() {
-    LakehouseCreateRequest req =
-        new LakehouseCreateRequest("lakehouse", "comment", ImmutableMap.of("k1", "v1"));
+  public void testCreateMetalake() {
+    MetalakeCreateRequest req =
+        new MetalakeCreateRequest("metalake", "comment", ImmutableMap.of("k1", "v1"));
     Instant now = Instant.now();
 
-    BaseLakehouse mockLakehouse =
-        new BaseLakehouse.Builder()
+    BaseMetalake mockMetalake =
+        new BaseMetalake.Builder()
             .withId(1L)
-            .withName("lakehouse")
+            .withName("metalake")
             .withComment("comment")
             .withProperties(ImmutableMap.of("k1", "v1"))
             .withAuditInfo(
@@ -77,10 +77,10 @@ public class TestLakehousesOperations extends JerseyTest {
             .withVersion(SchemaVersion.V_0_1)
             .build();
 
-    when(lakehousesOperations.createLakehouse(any(), any(), any())).thenReturn(mockLakehouse);
+    when(metalakesOperations.createMetalake(any(), any(), any())).thenReturn(mockMetalake);
 
     Response resp =
-        target("/lakehouses")
+        target("/metalakes")
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.graviton.v1+json")
             .post(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
@@ -88,19 +88,19 @@ public class TestLakehousesOperations extends JerseyTest {
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
     Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
 
-    LakehouseResponse lakehouseResponse = resp.readEntity(LakehouseResponse.class);
-    Assertions.assertEquals(0, lakehouseResponse.getCode());
-    Assertions.assertNull(lakehouseResponse.getMessage());
-    Assertions.assertNull(lakehouseResponse.getType());
+    MetalakeResponse metalakeResponse = resp.readEntity(MetalakeResponse.class);
+    Assertions.assertEquals(0, metalakeResponse.getCode());
+    Assertions.assertNull(metalakeResponse.getMessage());
+    Assertions.assertNull(metalakeResponse.getType());
 
-    LakehouseDTO lakehouse = lakehouseResponse.getLakehouse();
-    Assertions.assertEquals("lakehouse", lakehouse.name());
-    Assertions.assertEquals("comment", lakehouse.comment());
-    Assertions.assertEquals(ImmutableMap.of("k1", "v1"), lakehouse.properties());
+    MetalakeDTO metalake = metalakeResponse.getMetalake();
+    Assertions.assertEquals("metalake", metalake.name());
+    Assertions.assertEquals("comment", metalake.comment());
+    Assertions.assertEquals(ImmutableMap.of("k1", "v1"), metalake.properties());
 
-    LakehouseCreateRequest req1 = new LakehouseCreateRequest(null, null, null);
+    MetalakeCreateRequest req1 = new MetalakeCreateRequest(null, null, null);
     Response resp1 =
-        target("/lakehouses")
+        target("/metalakes")
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.graviton.v1+json")
             .post(Entity.entity(req1, MediaType.APPLICATION_JSON_TYPE));
@@ -114,23 +114,23 @@ public class TestLakehousesOperations extends JerseyTest {
   }
 
   @Test
-  public void testGetLakehouse() {
-    String lakehouseName = "test";
+  public void testGetMetalake() {
+    String metalakeName = "test";
     Long id = 1L;
     Instant now = Instant.now();
     AuditInfo info = new AuditInfo.Builder().withCreator("graviton").withCreateTime(now).build();
-    BaseLakehouse lakehouse =
-        new BaseLakehouse.Builder()
-            .withName(lakehouseName)
+    BaseMetalake metalake =
+        new BaseMetalake.Builder()
+            .withName(metalakeName)
             .withId(id)
             .withAuditInfo(info)
             .withVersion(SchemaVersion.V_0_1)
             .build();
 
-    when(lakehousesOperations.loadLakehouse(any())).thenReturn(lakehouse);
+    when(metalakesOperations.loadMetalake(any())).thenReturn(metalake);
 
     Response resp =
-        target("/lakehouses/" + lakehouseName)
+        target("/metalakes/" + metalakeName)
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.graviton.v1+json")
             .get();
@@ -138,23 +138,23 @@ public class TestLakehousesOperations extends JerseyTest {
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
     Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
 
-    LakehouseResponse lakehouseResponse = resp.readEntity(LakehouseResponse.class);
-    Assertions.assertEquals(0, lakehouseResponse.getCode());
-    Assertions.assertNull(lakehouseResponse.getMessage());
-    Assertions.assertNull(lakehouseResponse.getType());
+    MetalakeResponse metalakeResponse = resp.readEntity(MetalakeResponse.class);
+    Assertions.assertEquals(0, metalakeResponse.getCode());
+    Assertions.assertNull(metalakeResponse.getMessage());
+    Assertions.assertNull(metalakeResponse.getType());
 
-    LakehouseDTO lakehouse1 = lakehouseResponse.getLakehouse();
-    Assertions.assertEquals(lakehouseName, lakehouse1.name());
-    Assertions.assertNull(lakehouse1.comment());
-    Assertions.assertNull(lakehouse1.properties());
+    MetalakeDTO metalake1 = metalakeResponse.getMetalake();
+    Assertions.assertEquals(metalakeName, metalake1.name());
+    Assertions.assertNull(metalake1.comment());
+    Assertions.assertNull(metalake1.properties());
 
-    // Test when specified lakehouse is not found.
-    doThrow(new NoSuchLakehouseException("Failed to find lakehouse by name " + lakehouseName))
-        .when(lakehousesOperations)
-        .loadLakehouse(any());
+    // Test when specified metalake is not found.
+    doThrow(new NoSuchMetalakeException("Failed to find metalake by name " + metalakeName))
+        .when(metalakesOperations)
+        .loadMetalake(any());
 
     Response resp1 =
-        target("/lakehouses/" + lakehouseName)
+        target("/metalakes/" + metalakeName)
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.graviton.v1+json")
             .get();
@@ -165,13 +165,13 @@ public class TestLakehousesOperations extends JerseyTest {
     Assertions.assertEquals(ErrorType.NOT_FOUND.errorCode(), baseResponse.getCode());
     Assertions.assertEquals(ErrorType.NOT_FOUND.errorType(), baseResponse.getType());
     Assertions.assertEquals(
-        "Failed to find lakehouse by name " + lakehouseName, baseResponse.getMessage());
+        "Failed to find metalake by name " + metalakeName, baseResponse.getMessage());
 
     // Test with internal error
-    doThrow(new RuntimeException("Internal error")).when(lakehousesOperations).loadLakehouse(any());
+    doThrow(new RuntimeException("Internal error")).when(metalakesOperations).loadMetalake(any());
 
     Response resp2 =
-        target("/lakehouses/" + lakehouseName)
+        target("/metalakes/" + metalakeName)
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.graviton.v1+json")
             .get();
@@ -186,57 +186,57 @@ public class TestLakehousesOperations extends JerseyTest {
   }
 
   @Test
-  public void testUpdateLakehouse() {
-    String lakehouseName = "test";
+  public void testUpdateMetalake() {
+    String metalakeName = "test";
     Long id = 1L;
     Instant now = Instant.now();
     AuditInfo info = new AuditInfo.Builder().withCreator("graviton").withCreateTime(now).build();
-    BaseLakehouse lakehouse =
-        new BaseLakehouse.Builder()
-            .withName(lakehouseName)
+    BaseMetalake metalake =
+        new BaseMetalake.Builder()
+            .withName(metalakeName)
             .withId(id)
             .withAuditInfo(info)
             .withVersion(SchemaVersion.V_0_1)
             .build();
 
-    List<LakehouseUpdateRequest> updateRequests =
+    List<MetalakeUpdateRequest> updateRequests =
         Lists.newArrayList(
-            new LakehouseUpdateRequest.RenameLakehouseRequest("newTest"),
-            new LakehouseUpdateRequest.UpdateLakehouseCommentRequest("newComment"));
-    LakehouseChange[] changes =
+            new MetalakeUpdateRequest.RenameMetalakeRequest("newTest"),
+            new MetalakeUpdateRequest.UpdateMetalakeCommentRequest("newComment"));
+    MetalakeChange[] changes =
         updateRequests.stream()
-            .map(LakehouseUpdateRequest::lakehouseChange)
-            .toArray(LakehouseChange[]::new);
+            .map(MetalakeUpdateRequest::metalakeChange)
+            .toArray(MetalakeChange[]::new);
 
-    when(lakehousesOperations.alterLakehouse(any(), any(), any())).thenReturn(lakehouse);
+    when(metalakesOperations.alterMetalake(any(), any(), any())).thenReturn(metalake);
 
-    LakehouseUpdatesRequest req = new LakehouseUpdatesRequest(updateRequests);
+    MetalakeUpdatesRequest req = new MetalakeUpdatesRequest(updateRequests);
 
     Response resp =
-        target("/lakehouses/" + lakehouseName)
+        target("/metalakes/" + metalakeName)
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.graviton.v1+json")
             .put(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
 
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
 
-    LakehouseResponse lakehouseResponse = resp.readEntity(LakehouseResponse.class);
-    Assertions.assertEquals(0, lakehouseResponse.getCode());
-    Assertions.assertNull(lakehouseResponse.getMessage());
-    Assertions.assertNull(lakehouseResponse.getType());
+    MetalakeResponse metalakeResponse = resp.readEntity(MetalakeResponse.class);
+    Assertions.assertEquals(0, metalakeResponse.getCode());
+    Assertions.assertNull(metalakeResponse.getMessage());
+    Assertions.assertNull(metalakeResponse.getType());
 
-    LakehouseDTO lakehouse1 = lakehouseResponse.getLakehouse();
-    Assertions.assertEquals(lakehouseName, lakehouse1.name());
-    Assertions.assertNull(lakehouse1.comment());
-    Assertions.assertNull(lakehouse1.properties());
+    MetalakeDTO metalake1 = metalakeResponse.getMetalake();
+    Assertions.assertEquals(metalakeName, metalake1.name());
+    Assertions.assertNull(metalake1.comment());
+    Assertions.assertNull(metalake1.properties());
 
-    // Test when specified lakehouse is not found.
-    doThrow(new NoSuchLakehouseException("Failed to find lakehouse by name " + lakehouseName))
-        .when(lakehousesOperations)
-        .alterLakehouse(any(), any(), any());
+    // Test when specified metalake is not found.
+    doThrow(new NoSuchMetalakeException("Failed to find metalake by name " + metalakeName))
+        .when(metalakesOperations)
+        .alterMetalake(any(), any(), any());
 
     Response resp1 =
-        target("/lakehouses/" + lakehouseName)
+        target("/metalakes/" + metalakeName)
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.graviton.v1+json")
             .put(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
@@ -248,11 +248,11 @@ public class TestLakehousesOperations extends JerseyTest {
 
     // Test with internal error
     doThrow(new RuntimeException("Internal error"))
-        .when(lakehousesOperations)
-        .alterLakehouse(any(), any(), any());
+        .when(metalakesOperations)
+        .alterMetalake(any(), any(), any());
 
     Response resp2 =
-        target("/lakehouses/" + lakehouseName)
+        target("/metalakes/" + metalakeName)
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.graviton.v1+json")
             .put(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
@@ -265,10 +265,10 @@ public class TestLakehousesOperations extends JerseyTest {
   }
 
   @Test
-  public void testDeleteLakehouse() {
-    when(lakehousesOperations.dropLakehouse(any())).thenReturn(true);
+  public void testDeleteMetalake() {
+    when(metalakesOperations.dropMetalake(any())).thenReturn(true);
     Response resp =
-        target("/lakehouses/test")
+        target("/metalakes/test")
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.graviton.v1+json")
             .delete();
@@ -276,10 +276,10 @@ public class TestLakehousesOperations extends JerseyTest {
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
 
     // Test throw an exception when deleting tenant.
-    doThrow(new RuntimeException("Internal error")).when(lakehousesOperations).dropLakehouse(any());
+    doThrow(new RuntimeException("Internal error")).when(metalakesOperations).dropMetalake(any());
 
     Response resp1 =
-        target("/lakehouses/test")
+        target("/metalakes/test")
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.graviton.v1+json")
             .delete();

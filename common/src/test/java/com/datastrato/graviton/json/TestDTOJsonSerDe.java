@@ -3,7 +3,7 @@ package com.datastrato.graviton.json;
 import com.datastrato.graviton.Catalog;
 import com.datastrato.graviton.dto.AuditDTO;
 import com.datastrato.graviton.dto.CatalogDTO;
-import com.datastrato.graviton.dto.LakehouseDTO;
+import com.datastrato.graviton.dto.MetalakeDTO;
 import com.datastrato.graviton.dto.rel.ColumnDTO;
 import com.datastrato.graviton.dto.rel.TableDTO;
 import com.google.common.collect.ImmutableMap;
@@ -18,8 +18,7 @@ public class TestDTOJsonSerDe {
   private final String auditJson =
       "{\"creator\":%s,\"createTime\":%s,\"lastModifier\":%s,\"lastModifiedTime\":%s}";
 
-  private final String lakehouseJson =
-      "{\"name\":%s,\"comment\":%s,\"properties\":%s,\"audit\":%s}";
+  private final String metalakeJson = "{\"name\":%s,\"comment\":%s,\"properties\":%s,\"audit\":%s}";
 
   private final String columnJson = "{\"name\":%s,\"type\":%s,\"comment\":%s}";
 
@@ -69,9 +68,9 @@ public class TestDTOJsonSerDe {
   }
 
   @Test
-  public void testLakehouseDTOSerDe() throws Exception {
+  public void testMetalakeDTOSerDe() throws Exception {
     Long id = 1L;
-    String name = "lakehouse";
+    String name = "metalake";
     String comment = "comment";
     Map<String, String> properties = ImmutableMap.of("k1", "v1", "k2", "v2");
     String creator = "creator";
@@ -79,40 +78,40 @@ public class TestDTOJsonSerDe {
     AuditDTO audit = AuditDTO.builder().withCreator(creator).withCreateTime(now).build();
 
     // Test with required fields
-    LakehouseDTO lakehouse =
-        LakehouseDTO.builder()
+    MetalakeDTO metalake =
+        MetalakeDTO.builder()
             .withName(name)
             .withComment(comment)
             .withProperties(properties)
             .withAudit(audit)
             .build();
 
-    String serJson = JsonUtils.objectMapper().writeValueAsString(lakehouse);
+    String serJson = JsonUtils.objectMapper().writeValueAsString(metalake);
     String expectedJson =
         String.format(
-            lakehouseJson,
+            metalakeJson,
             withQuotes(name),
             withQuotes(comment),
             JsonUtils.objectMapper().writeValueAsString(properties),
             String.format(auditJson, withQuotes(creator), withQuotes(now.toString()), null, null));
     Assertions.assertEquals(expectedJson, serJson);
-    LakehouseDTO deserLakehouse = JsonUtils.objectMapper().readValue(serJson, LakehouseDTO.class);
-    Assertions.assertEquals(lakehouse, deserLakehouse);
+    MetalakeDTO desermetalake = JsonUtils.objectMapper().readValue(serJson, MetalakeDTO.class);
+    Assertions.assertEquals(metalake, desermetalake);
 
     // Test with optional fields
-    LakehouseDTO lakehouse1 = LakehouseDTO.builder().withName(name).withAudit(audit).build();
+    MetalakeDTO metalake1 = MetalakeDTO.builder().withName(name).withAudit(audit).build();
 
-    String serJson1 = JsonUtils.objectMapper().writeValueAsString(lakehouse1);
+    String serJson1 = JsonUtils.objectMapper().writeValueAsString(metalake1);
     String expectedJson1 =
         String.format(
-            lakehouseJson,
+            metalakeJson,
             withQuotes(name),
             null,
             null,
             String.format(auditJson, withQuotes(creator), withQuotes(now.toString()), null, null));
     Assertions.assertEquals(expectedJson1, serJson1);
-    LakehouseDTO deserLakehouse1 = JsonUtils.objectMapper().readValue(serJson1, LakehouseDTO.class);
-    Assertions.assertEquals(lakehouse1, deserLakehouse1);
+    MetalakeDTO desermetalake1 = JsonUtils.objectMapper().readValue(serJson1, MetalakeDTO.class);
+    Assertions.assertEquals(metalake1, desermetalake1);
   }
 
   @Test

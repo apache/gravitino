@@ -11,7 +11,7 @@ import lombok.Getter;
 
 @Getter
 @EqualsAndHashCode
-public class LakehouseCreateRequest implements RESTRequest {
+public class MetalakeCreateRequest implements RESTRequest {
 
   @JsonProperty("name")
   private String name;
@@ -25,11 +25,11 @@ public class LakehouseCreateRequest implements RESTRequest {
   private Map<String, String> properties;
 
   // Only for Jackson deserialization
-  public LakehouseCreateRequest() {
+  public MetalakeCreateRequest() {
     this(null, null, null);
   }
 
-  public LakehouseCreateRequest(String name, String comment, Map<String, String> properties) {
+  public MetalakeCreateRequest(String name, String comment, Map<String, String> properties) {
     super();
 
     this.name = Optional.ofNullable(name).map(String::trim).orElse(null);

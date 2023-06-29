@@ -1,6 +1,6 @@
 package com.datastrato.graviton.dto.requests;
 
-import com.datastrato.graviton.LakehouseChange;
+import com.datastrato.graviton.MetalakeChange;
 import com.datastrato.graviton.dto.RESTRequest;
 import com.fasterxml.jackson.annotation.*;
 import com.google.common.base.Preconditions;
@@ -10,33 +10,33 @@ import lombok.Getter;
 @JsonIgnoreProperties(ignoreUnknown = true)
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY)
 @JsonSubTypes({
-  @JsonSubTypes.Type(value = LakehouseUpdateRequest.RenameLakehouseRequest.class, name = "rename"),
+  @JsonSubTypes.Type(value = MetalakeUpdateRequest.RenameMetalakeRequest.class, name = "rename"),
   @JsonSubTypes.Type(
-      value = LakehouseUpdateRequest.UpdateLakehouseCommentRequest.class,
+      value = MetalakeUpdateRequest.UpdateMetalakeCommentRequest.class,
       name = "updateComment"),
   @JsonSubTypes.Type(
-      value = LakehouseUpdateRequest.SetLakehousePropertyRequest.class,
+      value = MetalakeUpdateRequest.SetMetalakePropertyRequest.class,
       name = "setProperty"),
   @JsonSubTypes.Type(
-      value = LakehouseUpdateRequest.RemoveLakehousePropertyRequest.class,
+      value = MetalakeUpdateRequest.RemoveMetalakePropertyRequest.class,
       name = "removeProperty")
 })
-public interface LakehouseUpdateRequest extends RESTRequest {
+public interface MetalakeUpdateRequest extends RESTRequest {
 
-  LakehouseChange lakehouseChange();
+  MetalakeChange metalakeChange();
 
   @EqualsAndHashCode
-  class RenameLakehouseRequest implements LakehouseUpdateRequest {
+  class RenameMetalakeRequest implements MetalakeUpdateRequest {
 
     @Getter
     @JsonProperty("newName")
     private final String newName;
 
-    public RenameLakehouseRequest(String newName) {
+    public RenameMetalakeRequest(String newName) {
       this.newName = newName;
     }
 
-    public RenameLakehouseRequest() {
+    public RenameMetalakeRequest() {
       this(null);
     }
 
@@ -48,23 +48,23 @@ public interface LakehouseUpdateRequest extends RESTRequest {
     }
 
     @Override
-    public LakehouseChange lakehouseChange() {
-      return LakehouseChange.rename(newName);
+    public MetalakeChange metalakeChange() {
+      return MetalakeChange.rename(newName);
     }
   }
 
   @EqualsAndHashCode
-  class UpdateLakehouseCommentRequest implements LakehouseUpdateRequest {
+  class UpdateMetalakeCommentRequest implements MetalakeUpdateRequest {
 
     @Getter
     @JsonProperty("newComment")
     private final String newComment;
 
-    public UpdateLakehouseCommentRequest(String newComment) {
+    public UpdateMetalakeCommentRequest(String newComment) {
       this.newComment = newComment;
     }
 
-    public UpdateLakehouseCommentRequest() {
+    public UpdateMetalakeCommentRequest() {
       this(null);
     }
 
@@ -76,13 +76,13 @@ public interface LakehouseUpdateRequest extends RESTRequest {
     }
 
     @Override
-    public LakehouseChange lakehouseChange() {
-      return LakehouseChange.updateComment(newComment);
+    public MetalakeChange metalakeChange() {
+      return MetalakeChange.updateComment(newComment);
     }
   }
 
   @EqualsAndHashCode
-  class SetLakehousePropertyRequest implements LakehouseUpdateRequest {
+  class SetMetalakePropertyRequest implements MetalakeUpdateRequest {
 
     @Getter
     @JsonProperty("property")
@@ -91,12 +91,12 @@ public interface LakehouseUpdateRequest extends RESTRequest {
     @JsonProperty("value")
     private final String value;
 
-    public SetLakehousePropertyRequest(String property, String value) {
+    public SetMetalakePropertyRequest(String property, String value) {
       this.property = property;
       this.value = value;
     }
 
-    public SetLakehousePropertyRequest() {
+    public SetMetalakePropertyRequest() {
       this(null, null);
     }
 
@@ -110,23 +110,23 @@ public interface LakehouseUpdateRequest extends RESTRequest {
     }
 
     @Override
-    public LakehouseChange lakehouseChange() {
-      return LakehouseChange.setProperty(property, value);
+    public MetalakeChange metalakeChange() {
+      return MetalakeChange.setProperty(property, value);
     }
   }
 
   @EqualsAndHashCode
-  class RemoveLakehousePropertyRequest implements LakehouseUpdateRequest {
+  class RemoveMetalakePropertyRequest implements MetalakeUpdateRequest {
 
     @Getter
     @JsonProperty("property")
     private final String property;
 
-    public RemoveLakehousePropertyRequest(String property) {
+    public RemoveMetalakePropertyRequest(String property) {
       this.property = property;
     }
 
-    public RemoveLakehousePropertyRequest() {
+    public RemoveMetalakePropertyRequest() {
       this(null);
     }
 
@@ -138,8 +138,8 @@ public interface LakehouseUpdateRequest extends RESTRequest {
     }
 
     @Override
-    public LakehouseChange lakehouseChange() {
-      return LakehouseChange.removeProperty(property);
+    public MetalakeChange metalakeChange() {
+      return MetalakeChange.removeProperty(property);
     }
   }
 }

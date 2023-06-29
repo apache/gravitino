@@ -15,9 +15,9 @@ public class TestEntity {
   private final AuditInfo auditInfo =
       new AuditInfo.Builder().withCreator("test").withCreateTime(now).build();
 
-  // Lakehouse test data
-  private final Long lakehouseId = 1L;
-  private final String lakehouseName = "testLakehouse";
+  // Metalake test data
+  private final Long metalakeId = 1L;
+  private final String metalakeName = "testMetalake";
   private final Map<String, String> map = ImmutableMap.of("k1", "v1", "k2", "v2");
 
   // Catalog test data
@@ -27,23 +27,23 @@ public class TestEntity {
   private final String catalogComment = "testComment";
 
   @Test
-  public void testLakehouse() {
-    BaseLakehouse lakehouse =
-        new BaseLakehouse.Builder()
-            .withId(lakehouseId)
-            .withName(lakehouseName)
+  public void testMetalake() {
+    BaseMetalake metalake =
+        new BaseMetalake.Builder()
+            .withId(metalakeId)
+            .withName(metalakeName)
             .withAuditInfo(auditInfo)
             .withProperties(map)
             .withVersion(version)
             .build();
 
-    Map<Field, Object> fields = lakehouse.fields();
-    Assertions.assertEquals(lakehouseId, fields.get(BaseLakehouse.ID));
-    Assertions.assertEquals(lakehouseName, fields.get(BaseLakehouse.NAME));
-    Assertions.assertEquals(map, fields.get(BaseLakehouse.PROPERTIES));
-    Assertions.assertEquals(auditInfo, fields.get(BaseLakehouse.AUDIT_INFO));
-    Assertions.assertNull(fields.get(BaseLakehouse.COMMENT));
-    Assertions.assertEquals(version, fields.get(BaseLakehouse.SCHEMA_VERSION));
+    Map<Field, Object> fields = metalake.fields();
+    Assertions.assertEquals(metalakeId, fields.get(BaseMetalake.ID));
+    Assertions.assertEquals(metalakeName, fields.get(BaseMetalake.NAME));
+    Assertions.assertEquals(map, fields.get(BaseMetalake.PROPERTIES));
+    Assertions.assertEquals(auditInfo, fields.get(BaseMetalake.AUDIT_INFO));
+    Assertions.assertNull(fields.get(BaseMetalake.COMMENT));
+    Assertions.assertEquals(version, fields.get(BaseMetalake.SCHEMA_VERSION));
   }
 
   @Test
@@ -51,7 +51,7 @@ public class TestEntity {
     TestCatalog testCatalog =
         new TestCatalog.Builder()
             .withId(catalogId)
-            .withLakehouseId(lakehouseId)
+            .withMetalakeId(metalakeId)
             .withName(catalogName)
             .withComment(catalogComment)
             .withType(type)
@@ -61,7 +61,7 @@ public class TestEntity {
 
     Map<Field, Object> fields = testCatalog.fields();
     Assertions.assertEquals(catalogId, fields.get(TestCatalog.ID));
-    Assertions.assertEquals(lakehouseId, fields.get(TestCatalog.LAKEHOUSE_ID));
+    Assertions.assertEquals(metalakeId, fields.get(TestCatalog.METALAKE_ID));
     Assertions.assertEquals(catalogName, fields.get(TestCatalog.NAME));
     Assertions.assertEquals(catalogComment, fields.get(TestCatalog.COMMENT));
     Assertions.assertEquals(type, fields.get(TestCatalog.TYPE));

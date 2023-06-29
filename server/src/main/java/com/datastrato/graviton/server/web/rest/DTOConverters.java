@@ -1,9 +1,9 @@
 package com.datastrato.graviton.server.web.rest;
 
 import com.datastrato.graviton.Audit;
-import com.datastrato.graviton.Lakehouse;
+import com.datastrato.graviton.Metalake;
 import com.datastrato.graviton.dto.AuditDTO;
-import com.datastrato.graviton.dto.LakehouseDTO;
+import com.datastrato.graviton.dto.MetalakeDTO;
 
 public class DTOConverters {
 
@@ -18,12 +18,12 @@ public class DTOConverters {
         .build();
   }
 
-  public static LakehouseDTO toDTO(Lakehouse lakehouse) {
-    return LakehouseDTO.builder()
-        .withName(lakehouse.name())
-        .withComment(lakehouse.comment())
-        .withProperties(lakehouse.properties())
-        .withAudit(toDTO(lakehouse.auditInfo()))
+  public static MetalakeDTO toDTO(Metalake metalake) {
+    return MetalakeDTO.builder()
+        .withName(metalake.name())
+        .withComment(metalake.comment())
+        .withProperties(metalake.properties())
+        .withAudit(toDTO(metalake.auditInfo()))
         .build();
   }
 }

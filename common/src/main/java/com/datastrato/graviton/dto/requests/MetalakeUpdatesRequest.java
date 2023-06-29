@@ -8,16 +8,16 @@ import lombok.Getter;
 
 @Getter
 @EqualsAndHashCode
-public class LakehouseUpdatesRequest implements RESTRequest {
+public class MetalakeUpdatesRequest implements RESTRequest {
 
   @JsonProperty("requests")
-  private final List<LakehouseUpdateRequest> requests;
+  private final List<MetalakeUpdateRequest> requests;
 
-  public LakehouseUpdatesRequest(List<LakehouseUpdateRequest> requests) {
+  public MetalakeUpdatesRequest(List<MetalakeUpdateRequest> requests) {
     this.requests = requests;
   }
 
-  public LakehouseUpdatesRequest() {
+  public MetalakeUpdatesRequest() {
     this(null);
   }
 

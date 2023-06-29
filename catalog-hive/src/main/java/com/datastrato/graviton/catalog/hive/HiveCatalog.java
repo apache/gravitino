@@ -36,7 +36,7 @@ public class HiveCatalog extends BaseCatalog {
     @Override
     protected HiveCatalog internalBuild() {
       hiveCatalog.id = id;
-      hiveCatalog.lakehouseId = lakehouseId;
+      hiveCatalog.metalakeId = metalakeId;
       hiveCatalog.name = name;
       hiveCatalog.namespace = namespace;
       hiveCatalog.type = type;

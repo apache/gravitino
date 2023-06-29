@@ -2,19 +2,19 @@ package com.datastrato.graviton;
 
 import com.datastrato.graviton.exceptions.CatalogAlreadyExistsException;
 import com.datastrato.graviton.exceptions.NoSuchCatalogException;
-import com.datastrato.graviton.exceptions.NoSuchLakehouseException;
+import com.datastrato.graviton.exceptions.NoSuchMetalakeException;
 import java.util.Map;
 
 public interface SupportCatalogs {
 
   /**
-   * List all catalogs in the lakehouse under the namespace {@link Namespace}.
+   * List all catalogs in the metalake under the namespace {@link Namespace}.
    *
    * @param namespace The namespace to list the catalogs under it.
    * @return The list of catalogs.
-   * @throws NoSuchLakehouseException If the lakehouse with namespace does not exist.
+   * @throws NoSuchmetalakeException If the metalake with namespace does not exist.
    */
-  Catalog[] listCatalogs(Namespace namespace) throws NoSuchLakehouseException;
+  Catalog[] listCatalogs(Namespace namespace) throws NoSuchMetalakeException;
 
   /**
    * Load a catalog by its identifier.
@@ -48,12 +48,12 @@ public interface SupportCatalogs {
    * @param comment the comment of the catalog.
    * @param properties the properties of the catalog.
    * @return The created catalog.
-   * @throws NoSuchLakehouseException If the lakehouse does not exist.
+   * @throws NoSuchmetalakeException If the metalake does not exist.
    * @throws CatalogAlreadyExistsException If the catalog already exists.
    */
   Catalog createCatalog(
       NameIdentifier ident, Catalog.Type type, String comment, Map<String, String> properties)
-      throws NoSuchLakehouseException, CatalogAlreadyExistsException;
+      throws NoSuchMetalakeException, CatalogAlreadyExistsException;
 
   /**
    * Alter a catalog with specified identifier.
