@@ -2,6 +2,7 @@ package com.datastrato.graviton;
 
 import com.datastrato.graviton.client.ErrorHandler;
 import com.datastrato.graviton.dto.responses.BaseResponse;
+import com.datastrato.graviton.dto.responses.ErrorConstants;
 import com.datastrato.graviton.dto.responses.ErrorType;
 import com.datastrato.graviton.exceptions.MetalakeAlreadyExistsException;
 import com.datastrato.graviton.exceptions.NoSuchMetalakeException;
@@ -31,11 +32,11 @@ public class ErrorHandlers {
     @Override
     public void accept(BaseResponse baseResponse) {
       switch (baseResponse.getCode()) {
-        case 1001:
+        case ErrorConstants.INVALID_ARGUMENTS_CODE:
           throw new IllegalArgumentException(baseResponse.getMessage());
-        case 1003:
+        case ErrorConstants.NOT_FOUND_CODE:
           throw new NoSuchMetalakeException(baseResponse.getMessage());
-        case 1004:
+        case ErrorConstants.ALREADY_EXISTS_CODE:
           throw new MetalakeAlreadyExistsException(baseResponse.getMessage());
       }
 
