@@ -31,11 +31,11 @@ public class MetalakeResponse extends BaseResponse {
     Preconditions.checkArgument(metalake != null, "metalake must be non-null");
     Preconditions.checkArgument(
         metalake.name() != null && !metalake.name().isEmpty(),
-        "metalake name must be non-null and non-empty");
+        "metalake 'name' must be non-null and non-empty");
     Preconditions.checkArgument(
         metalake.auditInfo().creator() != null && !metalake.auditInfo().creator().isEmpty(),
-        "metalake creator must be non-null and non-empty");
+        "metalake 'audit.creator' must be non-null and non-empty");
     Preconditions.checkArgument(
-        metalake.auditInfo().createTime() != null, "metalake createTime must be non-null");
+        metalake.auditInfo().createTime() != null, "metalake 'audit.createTime' must be non-null");
   }
 }

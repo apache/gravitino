@@ -35,14 +35,14 @@ public class MetalakeListResponse extends BaseResponse {
             metalake -> {
               Preconditions.checkArgument(
                   metalake.name() != null && !metalake.name().isEmpty(),
-                  "metalake name must be non-null and non-empty");
+                  "metalake 'name' must be non-null and non-empty");
               Preconditions.checkArgument(
                   metalake.auditInfo().creator() != null
                       && !metalake.auditInfo().creator().isEmpty(),
-                  "metalake creator must be non-null and non-empty");
+                  "metalake 'audit.creator' must be non-null and non-empty");
               Preconditions.checkArgument(
                   metalake.auditInfo().createTime() != null,
-                  "metalake createTime must be non-null");
+                  "metalake 'audit.createTime' must be non-null");
             });
   }
 }

@@ -192,7 +192,7 @@ public class TestGravitonClient {
     MetalakeUpdatesRequest req =
         new MetalakeUpdatesRequest(
             Arrays.stream(changes)
-                .map(DTOConverts::toMetalakeUpdateRequest)
+                .map(DTOConverters::toMetalakeUpdateRequest)
                 .collect(Collectors.toList()));
 
     MetalakeDTO mockMetalake =

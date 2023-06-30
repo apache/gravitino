@@ -5,8 +5,8 @@ import com.datastrato.graviton.dto.AuditDTO;
 import com.datastrato.graviton.dto.MetalakeDTO;
 import com.datastrato.graviton.dto.requests.MetalakeUpdateRequest;
 
-class DTOConverts {
-  private DTOConverts() {}
+class DTOConverters {
+  private DTOConverters() {}
 
   static GravitonMetaLake toMetaLake(MetalakeDTO metalake, RESTClient client) {
     return new GravitonMetaLake.Builder()
@@ -37,7 +37,8 @@ class DTOConverts {
           ((MetalakeChange.RemoveProperty) change).getProperty());
 
     } else {
-      throw new IllegalArgumentException("Unknown change type: " + change.getClass());
+      throw new IllegalArgumentException(
+          "Unknown change type: " + change.getClass().getSimpleName());
     }
   }
 }

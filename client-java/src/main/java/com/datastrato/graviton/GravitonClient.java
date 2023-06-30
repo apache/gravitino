@@ -10,6 +10,7 @@ import com.datastrato.graviton.dto.responses.MetalakeResponse;
 import com.datastrato.graviton.exceptions.MetalakeAlreadyExistsException;
 import com.datastrato.graviton.exceptions.NoSuchMetalakeException;
 import com.datastrato.graviton.json.JsonUtils;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Preconditions;
 import java.io.Closeable;
 import java.util.Arrays;
@@ -21,16 +22,16 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class GravitonClient implements SupportMetalakes, Closeable {
+
   private static final Logger LOG = LoggerFactory.getLogger(GravitonClient.class);
+
+  private static final ObjectMapper MAPPER = JsonUtils.objectMapper();
 
   private final RESTClient restClient;
 
   private GravitonClient(String uri) {
     this.restClient =
-        HTTPClient.builder(Collections.emptyMap())
-            .uri(uri)
-            .withObjectMapper(JsonUtils.objectMapper())
-            .build();
+        HTTPClient.builder(Collections.emptyMap()).uri(uri).withObjectMapper(MAPPER).build();
   }
 
   @Override
@@ -44,7 +45,7 @@ public class GravitonClient implements SupportMetalakes, Closeable {
     resp.validate();
 
     return Arrays.stream(resp.getMetalakes())
-        .map(o -> DTOConverts.toMetaLake(o, restClient))
+        .map(o -> DTOConverters.toMetaLake(o, restClient))
         .toArray(GravitonMetaLake[]::new);
   }
 
@@ -63,7 +64,7 @@ public class GravitonClient implements SupportMetalakes, Closeable {
             ErrorHandlers.metalakeErrorHandler());
     resp.validate();
 
-    return DTOConverts.toMetaLake(resp.getMetalake(), restClient);
+    return DTOConverters.toMetaLake(resp.getMetalake(), restClient);
   }
 
   @Override
@@ -87,7 +88,7 @@ public class GravitonClient implements SupportMetalakes, Closeable {
             ErrorHandlers.metalakeErrorHandler());
     resp.validate();
 
-    return DTOConverts.toMetaLake(resp.getMetalake(), restClient);
+    return DTOConverters.toMetaLake(resp.getMetalake(), restClient);
   }
 
   @Override
@@ -100,7 +101,7 @@ public class GravitonClient implements SupportMetalakes, Closeable {
 
     List<MetalakeUpdateRequest> reqs =
         Arrays.stream(changes)
-            .map(DTOConverts::toMetalakeUpdateRequest)
+            .map(DTOConverters::toMetalakeUpdateRequest)
             .collect(Collectors.toList());
     MetalakeUpdatesRequest updatesRequest = new MetalakeUpdatesRequest(reqs);
     updatesRequest.validate();
@@ -114,7 +115,7 @@ public class GravitonClient implements SupportMetalakes, Closeable {
             ErrorHandlers.metalakeErrorHandler());
     resp.validate();
 
-    return DTOConverts.toMetaLake(resp.getMetalake(), restClient);
+    return DTOConverters.toMetaLake(resp.getMetalake(), restClient);
   }
 
   @Override
