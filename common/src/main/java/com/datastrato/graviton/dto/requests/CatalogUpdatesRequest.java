@@ -2,24 +2,25 @@ package com.datastrato.graviton.dto.requests;
 
 import com.datastrato.graviton.rest.RESTRequest;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import java.util.List;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
 
+import java.util.List;
+
 @Getter
 @EqualsAndHashCode
 @ToString
-public class MetalakeUpdatesRequest implements RESTRequest {
+public class CatalogUpdatesRequest implements RESTRequest {
 
   @JsonProperty("requests")
-  private final List<MetalakeUpdateRequest> requests;
+  private final List<CatalogUpdateRequest> requests;
 
-  public MetalakeUpdatesRequest(List<MetalakeUpdateRequest> requests) {
+  public CatalogUpdatesRequest(List<CatalogUpdateRequest> requests) {
     this.requests = requests;
   }
 
-  public MetalakeUpdatesRequest() {
+  public CatalogUpdatesRequest() {
     this(null);
   }
 
