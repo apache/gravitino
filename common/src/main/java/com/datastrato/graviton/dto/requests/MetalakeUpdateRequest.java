@@ -1,7 +1,7 @@
 package com.datastrato.graviton.dto.requests;
 
 import com.datastrato.graviton.MetalakeChange;
-import com.datastrato.graviton.dto.RESTRequest;
+import com.datastrato.graviton.rest.RESTRequest;
 import com.fasterxml.jackson.annotation.*;
 import com.google.common.base.Preconditions;
 import lombok.EqualsAndHashCode;
