@@ -22,7 +22,7 @@ public class HiveNamespaceTest extends MiniHiveMetastoreService {
             .withName("catalog")
             .withNamespace(Namespace.of("lakehouse"))
             .withType(HiveCatalog.Type.RELATIONAL)
-            .withLakehouseId(1L)
+            .withMetalakeId(1L)
             .withAuditInfo(auditInfo)
             .withHiveConf(metastore.hiveConf())
             .build();
