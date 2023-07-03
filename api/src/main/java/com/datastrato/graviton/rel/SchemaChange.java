@@ -18,37 +18,37 @@
 // Referred from Apache's connector/catalog implementation
 // sql/catalyst/src/main/java/org/apache/spark/sql/connector/catalog/NamespaceChange.java
 
-package com.datastrato.graviton;
+package com.datastrato.graviton.rel;
 
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 
-public interface NamespaceChange {
+public interface SchemaChange {
 
   /**
-   * NamespaceChange class to set the property and value for the namespace.
+   * SchemaChange class to set the property and value for the schema.
    *
    * @param property the property name to set
    * @param value the property value to set
-   * @return the NamespaceChange object
+   * @return the SchemaChange object
    */
-  static NamespaceChange setProperty(String property, String value) {
+  static SchemaChange setProperty(String property, String value) {
     return new SetProperty(property, value);
   }
 
   /**
-   * NamespaceChange class to remove the property from the namespace.
+   * SchemaChange class to remove the property from the schema.
    *
    * @param property the property name to remove
-   * @return the NamespaceChange object
+   * @return the SchemaChange object
    */
-  static NamespaceChange removeProperty(String property) {
+  static SchemaChange removeProperty(String property) {
     return new RemoveProperty(property);
   }
 
   @Getter
   @EqualsAndHashCode
-  final class SetProperty implements NamespaceChange {
+  final class SetProperty implements SchemaChange {
     private final String property;
     private final String value;
 
@@ -60,7 +60,7 @@ public interface NamespaceChange {
 
   @Getter
   @EqualsAndHashCode
-  final class RemoveProperty implements NamespaceChange {
+  final class RemoveProperty implements SchemaChange {
     private final String property;
 
     private RemoveProperty(String property) {

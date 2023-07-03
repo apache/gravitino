@@ -22,14 +22,14 @@ package com.datastrato.graviton.rel;
 
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
-import com.datastrato.graviton.exceptions.NoSuchNamespaceException;
+import com.datastrato.graviton.exceptions.NoSuchSchemaException;
 import com.datastrato.graviton.exceptions.NoSuchTableException;
 import com.datastrato.graviton.exceptions.TableAlreadyExistsException;
 import java.util.Map;
 
 /**
- * The TableCatalog interface defines the public API for managing tables in a namespace. If the
- * catalog implementation supports tables, it must implement this interface.
+ * The TableCatalog interface defines the public API for managing tables in a schema. If the catalog
+ * implementation supports tables, it must implement this interface.
  */
 public interface TableCatalog {
 
@@ -38,9 +38,9 @@ public interface TableCatalog {
    *
    * @param namespace a namespace
    * @return an array of table identifiers in the namespace
-   * @throws NoSuchNamespaceException if the namespace does not exist
+   * @throws NoSuchSchemaException if the schema does not exist
    */
-  NameIdentifier[] listTables(Namespace namespace) throws NoSuchNamespaceException;
+  NameIdentifier[] listTables(Namespace namespace) throws NoSuchSchemaException;
 
   /**
    * Load table metadata by {@link NameIdentifier} from the catalog.
@@ -73,12 +73,12 @@ public interface TableCatalog {
    * @param comment the table comment
    * @param properties the table properties
    * @return the created table metadata
-   * @throws NoSuchNamespaceException if the namespace does not exist
+   * @throws NoSuchSchemaException if the schema does not exist
    * @throws TableAlreadyExistsException if the table already exists
    */
   Table createTable(
       NameIdentifier ident, Column[] columns, String comment, Map<String, String> properties)
-      throws NoSuchNamespaceException, TableAlreadyExistsException;
+      throws NoSuchSchemaException, TableAlreadyExistsException;
 
   /**
    * Apply the {@link TableChange change} to a table in the catalog.
