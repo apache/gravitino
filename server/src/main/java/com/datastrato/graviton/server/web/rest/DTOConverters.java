@@ -19,7 +19,7 @@ public class DTOConverters {
   }
 
   public static MetalakeDTO toDTO(Metalake metalake) {
-    return MetalakeDTO.builder()
+    return new MetalakeDTO.Builder()
         .withName(metalake.name())
         .withComment(metalake.comment())
         .withProperties(metalake.properties())

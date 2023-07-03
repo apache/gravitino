@@ -51,7 +51,7 @@ public interface SupportMetalakes {
    * @param ident The identifier of the metalake.
    * @param changes The changes to apply.
    * @return The altered metalake.
-   * @throws NoSuchmetalakeException If the metalake does not exist.
+   * @throws NoSuchMetalakeException If the metalake does not exist.
    * @throws IllegalArgumentException If the changes cannot be applied to the metalake.
    */
   Metalake alterMetalake(NameIdentifier ident, MetalakeChange... changes)
