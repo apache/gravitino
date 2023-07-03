@@ -29,7 +29,7 @@ public class TestResponseJsonSerDe {
   @Test
   public void testMetalakeResponseSerDe() throws JsonProcessingException {
     MetalakeDTO metalake =
-        MetalakeDTO.builder()
+        new MetalakeDTO.Builder()
             .withName("metalake")
             .withComment("comment")
             .withProperties(ImmutableMap.of("key", "value"))

@@ -27,9 +27,10 @@ public class MetalakeDTO implements Metalake {
   @JsonProperty("audit")
   private AuditDTO audit;
 
-  private MetalakeDTO() {}
+  protected MetalakeDTO() {}
 
-  private MetalakeDTO(String name, String comment, Map<String, String> properties, AuditDTO audit) {
+  protected MetalakeDTO(
+      String name, String comment, Map<String, String> properties, AuditDTO audit) {
     this.name = name;
     this.comment = comment;
     this.properties = properties;
@@ -54,10 +55,6 @@ public class MetalakeDTO implements Metalake {
   @Override
   public Audit auditInfo() {
     return audit;
-  }
-
-  public static Builder builder() {
-    return new Builder();
   }
 
   public static class Builder<S extends Builder> {

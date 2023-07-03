@@ -79,7 +79,7 @@ public class TestDTOJsonSerDe {
 
     // Test with required fields
     MetalakeDTO metalake =
-        MetalakeDTO.builder()
+        new MetalakeDTO.Builder()
             .withName(name)
             .withComment(comment)
             .withProperties(properties)
@@ -99,7 +99,7 @@ public class TestDTOJsonSerDe {
     Assertions.assertEquals(metalake, desermetalake);
 
     // Test with optional fields
-    MetalakeDTO metalake1 = MetalakeDTO.builder().withName(name).withAudit(audit).build();
+    MetalakeDTO metalake1 = new MetalakeDTO.Builder().withName(name).withAudit(audit).build();
 
     String serJson1 = JsonUtils.objectMapper().writeValueAsString(metalake1);
     String expectedJson1 =

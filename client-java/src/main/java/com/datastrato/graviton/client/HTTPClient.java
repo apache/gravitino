@@ -89,7 +89,7 @@ public class HTTPClient implements RESTClient {
     this.httpClient = clientBuilder.build();
   }
 
-  private static String extractResponseBodyAsString(CloseableHttpResponse response) {
+  private String extractResponseBodyAsString(CloseableHttpResponse response) {
     try {
       if (response.getEntity() == null) {
         return null;
@@ -103,26 +103,26 @@ public class HTTPClient implements RESTClient {
   }
 
   // Per the spec, the only currently defined / used "success" responses are 200 and 202.
-  private static boolean isSuccessful(CloseableHttpResponse response) {
+  private boolean isSuccessful(CloseableHttpResponse response) {
     int code = response.getCode();
     return code == HttpStatus.SC_OK
         || code == HttpStatus.SC_ACCEPTED
         || code == HttpStatus.SC_NO_CONTENT;
   }
 
-  private static BaseResponse buildDefaultErrorResponse(CloseableHttpResponse response) {
+  private BaseResponse buildDefaultErrorResponse(CloseableHttpResponse response) {
     String responseReason = response.getReasonPhrase();
     String message =
         responseReason != null && !responseReason.isEmpty()
             ? responseReason
             : EnglishReasonPhraseCatalog.INSTANCE.getReason(response.getCode(), null /* ignored */);
-    return BaseResponse.error(ErrorType.DEFAULT_ERROR, message);
+    return BaseResponse.error(ErrorType.SYSTEM_ERROR, message);
   }
 
   // Process a failed response through the provided errorHandler, and throw a RESTException.java if
   // the
   // provided error handler doesn't already throw.
-  private static void throwFailure(
+  private void throwFailure(
       CloseableHttpResponse response, String responseBody, Consumer<BaseResponse> errorHandler) {
     BaseResponse errorResponse = null;
 
@@ -130,7 +130,7 @@ public class HTTPClient implements RESTClient {
       try {
         if (errorHandler instanceof ErrorHandler) {
           errorResponse =
-              ((ErrorHandler) errorHandler).parseResponse(response.getCode(), responseBody);
+              ((ErrorHandler) errorHandler).parseResponse(response.getCode(), responseBody, mapper);
         } else {
           LOG.warn(
               "Unknown error handler {}, response body won't be parsed",
@@ -323,6 +323,28 @@ public class HTTPClient implements RESTClient {
       Consumer<Map<String, String>> responseHeaders) {
     return execute(
         Method.POST, path, null, body, responseType, headers, errorHandler, responseHeaders);
+  }
+
+  @Override
+  public <T extends RESTResponse> T put(
+      String path,
+      RESTRequest body,
+      Class<T> responseType,
+      Map<String, String> headers,
+      Consumer<BaseResponse> errorHandler) {
+    return execute(Method.PUT, path, null, body, responseType, headers, errorHandler);
+  }
+
+  @Override
+  public <T extends RESTResponse> T put(
+      String path,
+      RESTRequest body,
+      Class<T> responseType,
+      Map<String, String> headers,
+      Consumer<BaseResponse> errorHandler,
+      Consumer<Map<String, String>> responseHeaders) {
+    return execute(
+        Method.PUT, path, null, body, responseType, headers, errorHandler, responseHeaders);
   }
 
   @Override
