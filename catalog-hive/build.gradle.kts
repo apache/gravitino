@@ -14,17 +14,39 @@ dependencies {
     compileOnly(libs.lombok)
     annotationProcessor(libs.lombok)
 
-    implementation(libs.hive2.metastore)
-    implementation(libs.hive2.exec) {
+    implementation(libs.hive2.metastore) {
+        exclude("org.apache.hbase")
+        exclude("com.google.guava")
+        exclude("com.google.protobuf")
+        exclude("org.apache.thrift")
+        exclude("org.apache.logging.log4j")
         exclude("org.slf4j")
-        exclude("org.pentaho", "pentaho-aggdesigner-algorithm")
     }
-    implementation(libs.guava)
-    implementation(libs.substrait.java.core) {
+
+    // libs.hive2.metastore depends on it.
+    implementation(libs.hadoop2.mapreduce.client.core) {
+        exclude("*")
+    }
+
+    implementation(libs.hive2.exec) {
+        artifact {
+            classifier = "core"
+        }
+        exclude("com.google.guava")
+        exclude("com.google.protobuf")
+        exclude("org.apache.thrift")
+        exclude("org.apache.zookeeper")
+        exclude("org.apache.logging.log4j")
         exclude("org.slf4j")
         exclude("com.fasterxml.jackson.core")
         exclude("com.fasterxml.jackson.datatype")
     }
+
+    implementation(libs.thrift.libfb303) {
+        exclude("org.slf4j")
+    }
+    implementation(libs.slf4j.api)
+    implementation(libs.guava)
 
     testImplementation(libs.slf4j.jdk14)
     testImplementation(libs.junit.jupiter.api)

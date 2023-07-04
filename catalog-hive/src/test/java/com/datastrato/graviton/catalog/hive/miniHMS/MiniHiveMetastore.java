@@ -45,7 +45,7 @@ import org.apache.thrift.server.TServer;
 import org.apache.thrift.server.TThreadPoolServer;
 import org.apache.thrift.transport.TServerSocket;
 import org.apache.thrift.transport.TTransportFactory;
-import org.junit.Assert;
+import org.junit.jupiter.api.Assertions;
 
 // hive-metastore/src/test/java/org/apache/iceberg/hive/TestHiveMetastore.java
 public class MiniHiveMetastore {
@@ -106,7 +106,7 @@ public class MiniHiveMetastore {
                     FileSystem fs = getFs(localDirPath, new Configuration());
                     String errMsg = "Failed to delete " + localDirPath;
                     try {
-                      Assert.assertTrue(errMsg, fs.delete(localDirPath, true));
+                      Assertions.assertTrue(fs.exists(localDirPath), errMsg);
                     } catch (IOException e) {
                       throw new RuntimeException(errMsg, e);
                     }
