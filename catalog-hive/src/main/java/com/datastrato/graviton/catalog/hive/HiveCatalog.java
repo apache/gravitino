@@ -8,10 +8,7 @@ import com.datastrato.graviton.exceptions.NonEmptyNamespaceException;
 import com.datastrato.graviton.meta.BaseCatalog;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import java.util.Arrays;
-import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.api.*;
@@ -41,27 +38,27 @@ public class HiveCatalog extends BaseCatalog implements SupportsNamespaces {
 
   @Override
   public Namespace[] listNamespaces() throws NoSuchNamespaceException {
-    return listNamespaces(Namespace.empty());
+    return listNamespaces(Namespace.of("metalake", this.name));
   }
 
   @Override
   public Namespace[] listNamespaces(Namespace namespace) throws NoSuchNamespaceException {
-    if (!isValidateNamespace(namespace) && !namespace.isEmpty()) {
+    // hive namespace expression is `metalake.catalog.db`
+    if (namespace.levels().length != 2) {
       throw new NoSuchNamespaceException("Namespace does not exist: " + namespace);
     }
 
-    // hive namespace dose not have multi level namespace
-    if (!namespace.isEmpty()) {
-      return new Namespace[0];
-    }
-
     try {
-      List<Namespace> namespaces =
+      Namespace[] namespaces =
           clientPool
-              .run(client -> client.getAllDatabases().stream().map(Namespace::of))
-              .collect(Collectors.toList());
-      LOG.debug("Listing namespace {} returned tables: {}", namespace, namespaces);
-      return namespaces.toArray(new Namespace[0]);
+              .run(
+                  client ->
+                      client.getAllDatabases().stream()
+                          .map(ns -> Namespace.of(namespace.level(0), namespace.level(1), ns)))
+              .toArray(Namespace[]::new);
+
+      LOG.debug("Listing namespace {} returned namespaces: {}", namespace, namespaces);
+      return namespaces;
     } catch (TException e) {
       throw new RuntimeException(
           "Failed to list all namespace: " + namespace + " in Hive Metastore", e);
@@ -72,7 +69,12 @@ public class HiveCatalog extends BaseCatalog implements SupportsNamespaces {
 
   @Override
   public boolean namespaceExists(Namespace namespace) {
-    return Arrays.asList(listNamespaces()).contains(namespace);
+    try {
+      clientPool.run(client -> client.getDatabase(getDbNameFromNamespace(namespace)));
+    } catch (TException | InterruptedException e) {
+      return false;
+    }
+    return true;
   }
 
   @Override
@@ -119,7 +121,8 @@ public class HiveCatalog extends BaseCatalog implements SupportsNamespaces {
     }
 
     try {
-      Database database = clientPool.run(client -> client.getDatabase(namespace.level(0)));
+      Database database =
+          clientPool.run(client -> client.getDatabase(getDbNameFromNamespace(namespace)));
       HiveDatabase hiveDatabase = new HiveDatabase.Builder().withHiveDatabase(database).build();
       Map<String, String> metadata = hiveDatabase.getMetadata();
 
@@ -148,7 +151,8 @@ public class HiveCatalog extends BaseCatalog implements SupportsNamespaces {
 
     try {
       // load the database parameters
-      Database database = clientPool.run(client -> client.getDatabase(namespace.level(0)));
+      Database database =
+          clientPool.run(client -> client.getDatabase(getDbNameFromNamespace(namespace)));
       HiveDatabase hiveDatabase = new HiveDatabase.Builder().withHiveDatabase(database).build();
       Map<String, String> metadata = hiveDatabase.getMetadata();
       LOG.debug("Loaded metadata for namespace {} found {}", namespace, metadata.keySet());
@@ -161,7 +165,7 @@ public class HiveCatalog extends BaseCatalog implements SupportsNamespaces {
         } else if (change instanceof NamespaceChange.RemoveProperty) {
           metadata.remove(((NamespaceChange.RemoveProperty) change).getProperty());
         } else {
-          throw new RuntimeException("Unsupported namespace change type: " + change);
+          throw new IllegalArgumentException("Unsupported namespace change type: " + change);
         }
       }
 
@@ -171,7 +175,7 @@ public class HiveCatalog extends BaseCatalog implements SupportsNamespaces {
 
       clientPool.run(
           client -> {
-            client.alterDatabase(namespace.level(0), alteredDatabase);
+            client.alterDatabase(getDbNameFromNamespace(namespace), alteredDatabase);
             return null;
           });
 
@@ -193,14 +197,14 @@ public class HiveCatalog extends BaseCatalog implements SupportsNamespaces {
     try {
       clientPool.run(
           client -> {
-            client.dropDatabase(namespace.level(0), false, false, cascade);
+            client.dropDatabase(getDbNameFromNamespace(namespace), false, false, cascade);
             return null;
           });
 
       LOG.info("Dropped namespace: {}", namespace);
       return true;
     } catch (InvalidOperationException e) {
-      throw new EntityNotEmptyException(
+      throw new NonEmptyNamespaceException(
           String.format("Namespace %s is not empty. One or more tables exist.", namespace, e));
     } catch (NoSuchObjectException | InterruptedException e) {
       return false;
@@ -210,7 +214,11 @@ public class HiveCatalog extends BaseCatalog implements SupportsNamespaces {
   }
 
   public static boolean isValidateNamespace(Namespace namespace) {
-    return namespace.levels().length == 1;
+    return namespace.levels().length == 3;
+  }
+
+  private String getDbNameFromNamespace(Namespace namespace) {
+    return namespace.level(2);
   }
 
   public static class Builder extends BaseCatalog.BaseCatalogBuilder<Builder, HiveCatalog> {

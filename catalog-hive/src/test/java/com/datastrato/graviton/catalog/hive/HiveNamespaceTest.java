@@ -6,6 +6,7 @@ import com.datastrato.graviton.catalog.hive.miniHMS.MiniHiveMetastoreService;
 import com.datastrato.graviton.meta.AuditInfo;
 import com.google.common.collect.Maps;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.Assert;
@@ -20,7 +21,7 @@ public class HiveNamespaceTest extends MiniHiveMetastoreService {
         new HiveCatalog.Builder()
             .withId(1L)
             .withName("catalog")
-            .withNamespace(Namespace.of("lakehouse"))
+            .withNamespace(Namespace.of("metalake"))
             .withType(HiveCatalog.Type.RELATIONAL)
             .withMetalakeId(1L)
             .withAuditInfo(auditInfo)
@@ -35,19 +36,22 @@ public class HiveNamespaceTest extends MiniHiveMetastoreService {
   public void createNamespaces() {
     HiveCatalog hiveCatalog = initHiveCatalog();
 
-    Namespace namespace = Namespace.of(genRandomName());
+    Namespace namespace = Namespace.of("metalake", hiveCatalog.name(), genRandomName());
     Map<String, String> properties = Maps.newHashMap();
     properties.put("key1", "val1");
     properties.put("key2", "val2");
     hiveCatalog.createNamespace(namespace, properties);
     Assert.assertTrue(hiveCatalog.namespaceExists(namespace));
+
+    Namespace[] namespaces = hiveCatalog.listNamespaces();
+    Arrays.asList(namespaces).contains(namespace);
   }
 
   @Test
   public void alterNamespaces() {
     HiveCatalog hiveCatalog = initHiveCatalog();
 
-    Namespace namespace = Namespace.of(genRandomName());
+    Namespace namespace = Namespace.of("metalake", hiveCatalog.name(), genRandomName());
     Map<String, String> properties = Maps.newHashMap();
     properties.put("key1", "val1");
     properties.put("key2", "val2");
@@ -77,7 +81,7 @@ public class HiveNamespaceTest extends MiniHiveMetastoreService {
   public void dropNamespaces() {
     HiveCatalog hiveCatalog = initHiveCatalog();
 
-    Namespace namespace = Namespace.of(genRandomName());
+    Namespace namespace = Namespace.of("metalake", hiveCatalog.name(), genRandomName());
     Map<String, String> properties = Maps.newHashMap();
     properties.put("key1", "val1");
     properties.put("key2", "val2");

@@ -56,9 +56,9 @@ public class HiveDatabase implements Entity {
 
     Database database = new Database();
     Map<String, String> parameter = Maps.newHashMap();
-
-    database.setName(namespace.level(0));
-    database.setLocationUri(databaseLocation(namespace.level(0)));
+    String dbName = namespace.level(2);
+    database.setName(dbName);
+    database.setLocationUri(databaseLocation(namespace.level(2)));
 
     metadata.forEach(
         (key, value) -> {
