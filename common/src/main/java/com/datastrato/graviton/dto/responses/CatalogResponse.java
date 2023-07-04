@@ -1,7 +1,6 @@
 package com.datastrato.graviton.dto.responses;
 
 import com.datastrato.graviton.dto.CatalogDTO;
-import com.datastrato.graviton.dto.MetalakeDTO;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import lombok.EqualsAndHashCode;
@@ -34,8 +33,7 @@ public class CatalogResponse extends BaseResponse {
         catalog.name() != null && !catalog.name().isEmpty(),
         "catalog 'name' must be non-null and non-empty");
     Preconditions.checkArgument(
-        catalog.type() != null,
-        "catalog 'type' must be non-null and non-empty");
+        catalog.type() != null, "catalog 'type' must be non-null and non-empty");
     Preconditions.checkArgument(
         catalog.auditInfo().creator() != null && !catalog.auditInfo().creator().isEmpty(),
         "catalog 'audit.creator' must be non-null and non-empty");

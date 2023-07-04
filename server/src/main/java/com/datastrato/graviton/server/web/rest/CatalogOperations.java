@@ -15,16 +15,15 @@ import com.datastrato.graviton.exceptions.NoSuchCatalogException;
 import com.datastrato.graviton.exceptions.NoSuchMetalakeException;
 import com.datastrato.graviton.meta.BaseCatalogsOperations;
 import com.datastrato.graviton.server.web.Utils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
+import java.util.Arrays;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.*;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import java.util.Arrays;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Path("/metalakes/{metalake}/catalogs")
 @Consumes(MediaType.APPLICATION_JSON)
@@ -86,8 +85,9 @@ public class CatalogOperations {
 
     try {
       NameIdentifier ident = NameIdentifier.of(metalake, request.getName());
-      Catalog catalog = ops.createCatalog(ident, request.getType(), request.getComment(),
-          request.getProperties());
+      Catalog catalog =
+          ops.createCatalog(
+              ident, request.getType(), request.getComment(), request.getProperties());
       return Utils.ok(new CatalogResponse(DTOConverters.toDTO(catalog)));
 
     } catch (NoSuchMetalakeException ex) {
@@ -96,8 +96,9 @@ public class CatalogOperations {
 
     } catch (CatalogAlreadyExistsException ex) {
       LOG.error("Catalog {} already exists under metalake {}", request.getName(), metalake);
-      return Utils.alreadyExists(String.format(
-          "Catalog %s already exists under metalake %s", request.getName(), metalake));
+      return Utils.alreadyExists(
+          String.format(
+              "Catalog %s already exists under metalake %s", request.getName(), metalake));
 
     } catch (Exception e) {
       LOG.error("Failed to create catalog under metalake {}", metalake, e);
@@ -108,8 +109,8 @@ public class CatalogOperations {
   @GET
   @Path("{catalog}")
   @Produces("application/vnd.graviton.v1+json")
-  public Response loadCatalog(@PathParam("metalake") String metalakeName,
-                              @PathParam("catalog") String catalogName) {
+  public Response loadCatalog(
+      @PathParam("metalake") String metalakeName, @PathParam("catalog") String catalogName) {
     if (metalakeName == null || metalakeName.isEmpty()) {
       LOG.error("Metalake name is null or empty");
       return Utils.illegalArguments("Metalake name is null or empty");
@@ -131,8 +132,8 @@ public class CatalogOperations {
 
     } catch (NoSuchCatalogException ex) {
       LOG.error("Catalog {} does not exist under metalake {}", catalogName, metalakeName);
-      return Utils.notFound(String.format(
-          "Catalog %s does not exist under metalake %s", catalogName, metalakeName));
+      return Utils.notFound(
+          String.format("Catalog %s does not exist under metalake %s", catalogName, metalakeName));
 
     } catch (Exception e) {
       LOG.error("Failed to load catalog {} under metalake {}", catalogName, metalakeName, e);
@@ -141,11 +142,12 @@ public class CatalogOperations {
   }
 
   @PUT
-  @Path("catalog")
+  @Path("{catalog}")
   @Produces("application/vnd.graviton.v1+json")
-  public Response alterCatalog(@PathParam("metalake") String metalakeName,
-                               @PathParam("catalog") String catalogName,
-                               CatalogUpdatesRequest request) {
+  public Response alterCatalog(
+      @PathParam("metalake") String metalakeName,
+      @PathParam("catalog") String catalogName,
+      CatalogUpdatesRequest request) {
     if (metalakeName == null || metalakeName.isEmpty()) {
       LOG.error("Metalake name is null or empty");
       return Utils.illegalArguments("Metalake name is null or empty");
@@ -165,9 +167,10 @@ public class CatalogOperations {
 
     try {
       NameIdentifier ident = NameIdentifier.of(metalakeName, catalogName);
-      CatalogChange[] changes = request.getRequests().stream()
-          .map(CatalogUpdateRequest::catalogChange)
-          .toArray(CatalogChange[]::new);
+      CatalogChange[] changes =
+          request.getRequests().stream()
+              .map(CatalogUpdateRequest::catalogChange)
+              .toArray(CatalogChange[]::new);
 
       Catalog catalog = ops.alterCatalog(ident, changes);
       return Utils.ok(new CatalogResponse(DTOConverters.toDTO(catalog)));
@@ -177,8 +180,11 @@ public class CatalogOperations {
       return Utils.notFound(ex.getMessage());
 
     } catch (IllegalArgumentException ex) {
-      LOG.error("Failed to alter catalog {} under metalake {} with unsupported changes",
-          catalogName, metalakeName, ex);
+      LOG.error(
+          "Failed to alter catalog {} under metalake {} with unsupported changes",
+          catalogName,
+          metalakeName,
+          ex);
       return Utils.illegalArguments(ex.getMessage());
 
     } catch (Exception e) {
@@ -188,10 +194,10 @@ public class CatalogOperations {
   }
 
   @DELETE
-  @Path("catalog")
+  @Path("{catalog}")
   @Produces("application/vnd.graviton.v1+json")
-  public Response dropCatalog(@PathParam("metalake") String metalakeName,
-                              @PathParam("catalog") String catalogName) {
+  public Response dropCatalog(
+      @PathParam("metalake") String metalakeName, @PathParam("catalog") String catalogName) {
     if (metalakeName == null || metalakeName.isEmpty()) {
       LOG.error("Metalake name is null or empty");
       return Utils.illegalArguments("Metalake name is null or empty");
@@ -212,7 +218,7 @@ public class CatalogOperations {
         return Utils.internalError("Failed to drop catalog " + catalogName);
       }
 
-    }  catch (Exception e) {
+    } catch (Exception e) {
       LOG.error("Failed to drop catalog {} under metalake {}", catalogName, metalakeName, e);
       return Utils.internalError(e.getMessage());
     }

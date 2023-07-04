@@ -3,11 +3,10 @@ package com.datastrato.graviton.dto.responses;
 import com.datastrato.graviton.dto.CatalogDTO;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
+import java.util.Arrays;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
-
-import java.util.Arrays;
 
 @Getter
 @EqualsAndHashCode(callSuper = true)
@@ -38,11 +37,9 @@ public class CatalogListResponse extends BaseResponse {
                   catalog.name() != null && !catalog.name().isEmpty(),
                   "catalog 'name' must be non-null and non-empty");
               Preconditions.checkArgument(
-                  catalog.type() != null,
-                  "catalog 'type' must be non-null and non-empty");
+                  catalog.type() != null, "catalog 'type' must be non-null and non-empty");
               Preconditions.checkArgument(
-                  catalog.auditInfo().creator() != null
-                      && !catalog.auditInfo().creator().isEmpty(),
+                  catalog.auditInfo().creator() != null && !catalog.auditInfo().creator().isEmpty(),
                   "catalog 'audit.creator' must be non-null and non-empty");
               Preconditions.checkArgument(
                   catalog.auditInfo().createTime() != null,

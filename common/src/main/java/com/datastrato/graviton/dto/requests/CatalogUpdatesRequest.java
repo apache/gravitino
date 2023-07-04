@@ -2,11 +2,10 @@ package com.datastrato.graviton.dto.requests;
 
 import com.datastrato.graviton.rest.RESTRequest;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.List;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
-
-import java.util.List;
 
 @Getter
 @EqualsAndHashCode

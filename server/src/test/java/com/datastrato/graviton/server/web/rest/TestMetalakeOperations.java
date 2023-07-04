@@ -32,7 +32,7 @@ import org.glassfish.jersey.test.JerseyTest;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-public class TestMetalakesOperations extends JerseyTest {
+public class TestMetalakeOperations extends JerseyTest {
 
   private static class MockServletRequestFactory extends ServletRequestFactoryBase {
     @Override
