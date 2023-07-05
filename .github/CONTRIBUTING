@@ -1,0 +1,83 @@
+# Contributing to Graviton
+
+Welcome! We appreciate your interest in contributing to Graviton. This file provides guidelines and information on how to contribute effectively to the project. Please take a moment to read through this document before getting started. By contributing to this project, you agree to abide by the guidelines outlined below.
+
+## Table of Contents
+
+- [Getting Started](#getting-started)
+- [How to Contribute](#how-to-contribute)
+- [Code Contribution Guidelines](#code-contribution-guidelines)
+- [Bug Reports and Feature Requests](#bug-reports-and-feature-requests)
+- [Community Guidelines](#community-guidelines)
+- [Contact](#contact)
+- [License](#license)
+
+## Getting Started
+
+To get started with Graviton, follow these steps:
+
+1. Fork the repository on GitHub.
+2. Clone the forked repository to your local machine.
+3. Set up the development environment as specified in the project's README.
+4. Create a new branch for your contribution.
+
+## How to Contribute
+
+1. Check the project's issue tracker or the project's documentation for a list of open issues or features that require attention.
+2. If you find an issue or feature you'd like to work on, comment on the issue to let others know you're working on it. This helps prevent duplicate efforts and promotes collaboration.
+3. If you have a new idea or want to suggest a change, create a new issue outlining your proposal. Engage in discussion with the community to gather feedback and refine your ideas.
+4. Fork the repository and create a new branch for your contribution. Make sure to give your branch a descriptive name related to the issue or feature you're working on.
+5. Implement your changes or additions, following the project's code contribution guidelines (mentioned below).
+6. Commit your changes with clear and concise commit messages.
+7. Push your changes to your forked repository.
+8. Open a pull request (PR) to the main repository's corresponding branch.
+9. Engage in the code review process by addressing any review comments and making necessary changes to your code.
+10. Once your changes pass the review process, they will be merged into the main repository.
+
+## Code Contribution Guidelines
+
+To ensure a smooth collaboration and maintain a high-quality codebase, please adhere to the following guidelines when making code contributions:
+
+1. Follow the existing code style and conventions used in the project.
+2. Write clear, concise, and well-documented code. This includes providing inline comments when necessary.
+3. Keep your changes focused and granular. Separate unrelated changes into multiple pull requests.
+4. Write unit tests for your code changes, whenever applicable, and make sure the existing tests pass successfully.
+5. Make sure your code compiles without any errors or warnings.
+6. Avoid introducing unnecessary dependencies. If you need to include a new dependency, justify it and discuss it with the community first.
+7. Be responsive and open to feedback during the code review process.
+
+## Bug Reports and Feature Requests
+
+If you encounter a bug or have a feature request, please follow these steps:
+
+1. Search the project's issue tracker to ensure that the bug or feature hasn't been reported or requested before.
+2. If not found, create a new issue with a descriptive title and provide detailed information about the bug or feature request.
+3. Clearly explain the steps to reproduce the bug, including any relevant error messages or screenshots.
+4. If applicable, include suggestions or ideas on how to fix the bug or implement the requested feature.
+5. Engage in any discussions or clarifications that arise from the issue.
+
+## Community Guidelines
+
+We value and appreciate the diverse contributions and ideas from the community. To maintain a welcoming and inclusive environment, we kindly ask you to adhere to the following guidelines:
+
+1. Be respectful and considerate of other community members. Treat everyone with respect and professionalism.
+2. Refrain from engaging in offensive, discriminatory, or harassing behavior.
+3. Be patient and understanding towards others, especially newcomers who may be learning.
+4. Stay constructive and provide helpful feedback.
+5. Engage in meaningful and relevant discussions related to the project.
+6. Avoid spamming, excessive self-promotion, or advertising unrelated content.
+7. Use clear and concise language to facilitate effective communication.
+
+## Large Contributions and ICLA
+
+For significant contributions to Graviton, we require contributors to sign an Individual Contributor License Agreement (ICLA). This ensures that the project and its community can properly manage and maintain intellectual property rights.
+
+If you plan to make a large contribution, please contact us at [justin@datastrato.com](mailto:justin@datastrato.com) to discuss the ICLA process.
+
+## Contact
+
+If you have any questions or need further assistance, you can reach out to us at [justin@datastrato.com](mailto:justin@datastrato.com).
+
+## License
+
+Graviton is licensed under the Apache License version 2. Please see the [LICENSE](LICENSE) file for more details. By contributing to this project, you agree to license your contributions under the same license.
