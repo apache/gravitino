@@ -6,6 +6,7 @@ import com.fasterxml.jackson.annotation.*;
 import com.google.common.base.Preconditions;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
+import lombok.ToString;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY)
@@ -26,6 +27,7 @@ public interface CatalogUpdateRequest extends RESTRequest {
   CatalogChange catalogChange();
 
   @EqualsAndHashCode
+  @ToString
   class RenameCatalogRequest implements CatalogUpdateRequest {
 
     @Getter
@@ -54,6 +56,7 @@ public interface CatalogUpdateRequest extends RESTRequest {
   }
 
   @EqualsAndHashCode
+  @ToString
   class UpdateCatalogCommentRequest implements CatalogUpdateRequest {
 
     @Getter
@@ -82,6 +85,7 @@ public interface CatalogUpdateRequest extends RESTRequest {
   }
 
   @EqualsAndHashCode
+  @ToString
   class SetCatalogPropertyRequest implements CatalogUpdateRequest {
 
     @Getter
@@ -117,6 +121,7 @@ public interface CatalogUpdateRequest extends RESTRequest {
   }
 
   @EqualsAndHashCode
+  @ToString
   class RemoveCatalogPropertyRequest implements CatalogUpdateRequest {
 
     @Getter

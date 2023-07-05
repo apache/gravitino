@@ -1,8 +1,10 @@
 package com.datastrato.graviton.server.web.rest;
 
 import com.datastrato.graviton.Audit;
+import com.datastrato.graviton.Catalog;
 import com.datastrato.graviton.Metalake;
 import com.datastrato.graviton.dto.AuditDTO;
+import com.datastrato.graviton.dto.CatalogDTO;
 import com.datastrato.graviton.dto.MetalakeDTO;
 
 public class DTOConverters {
@@ -24,6 +26,16 @@ public class DTOConverters {
         .withComment(metalake.comment())
         .withProperties(metalake.properties())
         .withAudit(toDTO(metalake.auditInfo()))
+        .build();
+  }
+
+  public static CatalogDTO toDTO(Catalog catalog) {
+    return new CatalogDTO.Builder()
+        .withName(catalog.name())
+        .withType(catalog.type())
+        .withComment(catalog.comment())
+        .withProperties(catalog.properties())
+        .withAudit(toDTO(catalog.auditInfo()))
         .build();
   }
 }

@@ -10,16 +10,16 @@ import lombok.ToString;
 @Getter
 @EqualsAndHashCode
 @ToString
-public class MetalakeUpdatesRequest implements RESTRequest {
+public class CatalogUpdatesRequest implements RESTRequest {
 
   @JsonProperty("requests")
-  private final List<MetalakeUpdateRequest> requests;
+  private final List<CatalogUpdateRequest> requests;
 
-  public MetalakeUpdatesRequest(List<MetalakeUpdateRequest> requests) {
+  public CatalogUpdatesRequest(List<CatalogUpdateRequest> requests) {
     this.requests = requests;
   }
 
-  public MetalakeUpdatesRequest() {
+  public CatalogUpdatesRequest() {
     this(null);
   }
 
