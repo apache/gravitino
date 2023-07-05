@@ -72,8 +72,8 @@ public class MetalakeOperations {
       return Utils.ok(new MetalakeResponse(DTOConverters.toDTO(metalake)));
 
     } catch (MetalakeAlreadyExistsException exception) {
-      LOG.warn("Metalake with name {} already exists", request.getName(), exception);
-      return Utils.alreadyExists("Metalake with name " + request.getName() + " already exists");
+      LOG.error("Metalake with name {} already exists", request.getName(), exception);
+      return Utils.alreadyExists(exception.getMessage());
 
     } catch (Exception e) {
       LOG.error("Failed to create metalake", e);
@@ -86,6 +86,7 @@ public class MetalakeOperations {
   @Produces("application/vnd.graviton.v1+json")
   public Response loadMetalake(@PathParam("name") String metalakeName) {
     if (metalakeName == null || metalakeName.isEmpty()) {
+      LOG.error("Metalake name is null or empty");
       return Utils.illegalArguments("Metalake name is required");
     }
 
@@ -95,8 +96,8 @@ public class MetalakeOperations {
       return Utils.ok(new MetalakeResponse(DTOConverters.toDTO(metalake)));
 
     } catch (NoSuchMetalakeException e) {
-      LOG.warn("Failed to find metalake by name {}", metalakeName);
-      return Utils.notFound("Failed to find metalake by name " + metalakeName);
+      LOG.error("Failed to find metalake by name {}", metalakeName);
+      return Utils.notFound(e.getMessage());
 
     } catch (Exception e) {
       LOG.error("Failed to get metalake by name {}", metalakeName, e);
@@ -110,13 +111,14 @@ public class MetalakeOperations {
   public Response alterMetalake(
       @PathParam("name") String metalakeName, MetalakeUpdatesRequest updatesRequest) {
     if (metalakeName == null || metalakeName.isEmpty()) {
+      LOG.error("Metalake name is null or empty");
       return Utils.illegalArguments("Metalake name is required");
     }
 
     try {
       updatesRequest.validate();
     } catch (Exception e) {
-      LOG.error("Failed to validate update metalake arguments {}", updatesRequest, e);
+      LOG.error("Failed to validate alter metalake arguments {}", updatesRequest, e);
       return Utils.illegalArguments(e.getMessage());
     }
 
@@ -131,8 +133,12 @@ public class MetalakeOperations {
       return Utils.ok(new MetalakeResponse(DTOConverters.toDTO(updatedMetalake)));
 
     } catch (NoSuchMetalakeException e) {
-      LOG.warn("Failed to find metalake by name {}", metalakeName);
-      return Utils.notFound("Failed to find metalake by name " + metalakeName);
+      LOG.error("Failed to find metalake by name {}", metalakeName);
+      return Utils.notFound(e.getMessage());
+
+    } catch (IllegalArgumentException ex) {
+      LOG.error("Failed to alter metalake by name {} by unsupported change", metalakeName, ex);
+      return Utils.illegalArguments(ex.getMessage());
 
     } catch (Exception e) {
       LOG.error("Failed to update metalake by name {}", metalakeName, e);
@@ -145,6 +151,7 @@ public class MetalakeOperations {
   @Produces("application/vnd.graviton.v1+json")
   public Response dropMetalake(@PathParam("name") String metalakeName) {
     if (metalakeName == null || metalakeName.isEmpty()) {
+      LOG.error("Metalake name is null or empty");
       return Utils.illegalArguments("metalake name is required");
     }
 

@@ -1,5 +1,6 @@
 package com.datastrato.graviton.server;
 
+import com.datastrato.graviton.meta.BaseCatalogsOperations;
 import com.datastrato.graviton.meta.BaseMetalakesOperations;
 import com.datastrato.graviton.server.web.JettyServer;
 import com.datastrato.graviton.server.web.ObjectMapperProvider;
@@ -48,6 +49,7 @@ public class GravitonServer extends ResourceConfig {
           @Override
           protected void configure() {
             bind(BaseMetalakesOperations.class).to(BaseMetalakesOperations.class).ranked(1);
+            bind(BaseCatalogsOperations.class).to(BaseCatalogsOperations.class).ranked(1);
           }
         });
     register(ObjectMapperProvider.class).register(JacksonFeature.class);

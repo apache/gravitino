@@ -40,7 +40,7 @@ public class TestRequestJsonSerDe {
   }
 
   @Test
-  public void testmetalakeUpdateRequestSerDe() throws JsonProcessingException {
+  public void testMetalakeUpdateRequestSerDe() throws JsonProcessingException {
     MetalakeUpdateRequest req = new MetalakeUpdateRequest.RenameMetalakeRequest("newMetalake");
     String serJson = JsonUtils.objectMapper().writeValueAsString(req);
     MetalakeUpdateRequest deserReq =

@@ -6,6 +6,7 @@ import com.fasterxml.jackson.annotation.*;
 import com.google.common.base.Preconditions;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
+import lombok.ToString;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY)
@@ -26,6 +27,7 @@ public interface MetalakeUpdateRequest extends RESTRequest {
   MetalakeChange metalakeChange();
 
   @EqualsAndHashCode
+  @ToString
   class RenameMetalakeRequest implements MetalakeUpdateRequest {
 
     @Getter
@@ -54,6 +56,7 @@ public interface MetalakeUpdateRequest extends RESTRequest {
   }
 
   @EqualsAndHashCode
+  @ToString
   class UpdateMetalakeCommentRequest implements MetalakeUpdateRequest {
 
     @Getter
@@ -116,6 +119,7 @@ public interface MetalakeUpdateRequest extends RESTRequest {
   }
 
   @EqualsAndHashCode
+  @ToString
   class RemoveMetalakePropertyRequest implements MetalakeUpdateRequest {
 
     @Getter
