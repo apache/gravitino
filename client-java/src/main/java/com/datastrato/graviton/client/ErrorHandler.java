@@ -1,10 +1,10 @@
 package com.datastrato.graviton.client;
 
-import com.datastrato.graviton.dto.responses.BaseResponse;
+import com.datastrato.graviton.dto.responses.ErrorResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.function.Consumer;
 
-public abstract class ErrorHandler implements Consumer<BaseResponse> {
+public abstract class ErrorHandler implements Consumer<ErrorResponse> {
 
-  public abstract BaseResponse parseResponse(int code, String json, ObjectMapper mapper);
+  public abstract ErrorResponse parseResponse(int code, String json, ObjectMapper mapper);
 }

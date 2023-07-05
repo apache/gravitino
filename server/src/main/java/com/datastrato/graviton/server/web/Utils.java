@@ -1,7 +1,6 @@
 package com.datastrato.graviton.server.web;
 
-import com.datastrato.graviton.dto.responses.BaseResponse;
-import com.datastrato.graviton.dto.responses.ErrorType;
+import com.datastrato.graviton.dto.responses.ErrorResponse;
 import java.util.Optional;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.core.MediaType;
@@ -26,29 +25,53 @@ public class Utils {
   }
 
   public static Response illegalArguments(String message) {
+    return illegalArguments(message, null);
+  }
+
+  public static Response illegalArguments(String message, Throwable throwable) {
     return Response.status(Response.Status.BAD_REQUEST)
-        .entity(BaseResponse.error(ErrorType.INVALID_ARGUMENTS, message))
+        .entity(ErrorResponse.illegalArguments(message, throwable))
         .type(MediaType.APPLICATION_JSON)
         .build();
   }
 
   public static Response internalError(String message) {
+    return internalError(message, null);
+  }
+
+  public static Response internalError(String message, Throwable throwable) {
     return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
-        .entity(BaseResponse.error(ErrorType.INTERNAL_ERROR, message))
+        .entity(ErrorResponse.internalError(message, throwable))
         .type(MediaType.APPLICATION_JSON)
         .build();
   }
 
-  public static Response notFound(String message) {
+  public static Response notFound(String type, String message) {
+    return notFound(type, message, null);
+  }
+
+  public static Response notFound(String message, Throwable throwable) {
+    return notFound(throwable.getClass().getSimpleName(), message, throwable);
+  }
+
+  public static Response notFound(String type, String message, Throwable throwable) {
     return Response.status(Response.Status.NOT_FOUND)
-        .entity(BaseResponse.error(ErrorType.NOT_FOUND, message))
+        .entity(ErrorResponse.notFound(type, message, throwable))
         .type(MediaType.APPLICATION_JSON)
         .build();
   }
 
-  public static Response alreadyExists(String message) {
+  public static Response alreadyExists(String type, String message) {
+    return alreadyExists(type, message, null);
+  }
+
+  public static Response alreadyExists(String message, Throwable throwable) {
+    return alreadyExists(throwable.getClass().getSimpleName(), message, throwable);
+  }
+
+  public static Response alreadyExists(String type, String message, Throwable throwable) {
     return Response.status(Response.Status.CONFLICT)
-        .entity(BaseResponse.error(ErrorType.ALREADY_EXISTS, message))
+        .entity(ErrorResponse.alreadyExists(type, message, throwable))
         .type(MediaType.APPLICATION_JSON)
         .build();
   }

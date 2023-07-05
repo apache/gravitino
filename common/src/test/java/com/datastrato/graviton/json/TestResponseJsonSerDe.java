@@ -3,7 +3,7 @@ package com.datastrato.graviton.json;
 import com.datastrato.graviton.dto.AuditDTO;
 import com.datastrato.graviton.dto.MetalakeDTO;
 import com.datastrato.graviton.dto.responses.BaseResponse;
-import com.datastrato.graviton.dto.responses.ErrorType;
+import com.datastrato.graviton.dto.responses.ErrorResponse;
 import com.datastrato.graviton.dto.responses.MetalakeResponse;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.collect.ImmutableMap;
@@ -20,9 +20,10 @@ public class TestResponseJsonSerDe {
     BaseResponse deserResponse = JsonUtils.objectMapper().readValue(serJson, BaseResponse.class);
     Assertions.assertEquals(response, deserResponse);
 
-    BaseResponse response1 = BaseResponse.error(ErrorType.INTERNAL_ERROR, "error");
+    ErrorResponse response1 = ErrorResponse.internalError("internal error");
     String serJson1 = JsonUtils.objectMapper().writeValueAsString(response1);
-    BaseResponse deserResponse1 = JsonUtils.objectMapper().readValue(serJson1, BaseResponse.class);
+    ErrorResponse deserResponse1 =
+        JsonUtils.objectMapper().readValue(serJson1, ErrorResponse.class);
     Assertions.assertEquals(response1, deserResponse1);
   }
 

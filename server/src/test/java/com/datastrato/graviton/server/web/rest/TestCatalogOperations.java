@@ -9,10 +9,7 @@ import com.datastrato.graviton.dto.CatalogDTO;
 import com.datastrato.graviton.dto.requests.CatalogCreateRequest;
 import com.datastrato.graviton.dto.requests.CatalogUpdateRequest;
 import com.datastrato.graviton.dto.requests.CatalogUpdatesRequest;
-import com.datastrato.graviton.dto.responses.BaseResponse;
-import com.datastrato.graviton.dto.responses.CatalogListResponse;
-import com.datastrato.graviton.dto.responses.CatalogResponse;
-import com.datastrato.graviton.dto.responses.ErrorType;
+import com.datastrato.graviton.dto.responses.*;
 import com.datastrato.graviton.exceptions.CatalogAlreadyExistsException;
 import com.datastrato.graviton.exceptions.NoSuchCatalogException;
 import com.datastrato.graviton.exceptions.NoSuchMetalakeException;
@@ -79,8 +76,6 @@ public class TestCatalogOperations extends JerseyTest {
 
     CatalogListResponse listResponse = resp.readEntity(CatalogListResponse.class);
     Assertions.assertEquals(0, listResponse.getCode());
-    Assertions.assertNull(listResponse.getType());
-    Assertions.assertNull(listResponse.getMessage());
 
     CatalogDTO[] catalogs = listResponse.getCatalogs();
     Assertions.assertEquals(2, catalogs.length);
@@ -97,9 +92,9 @@ public class TestCatalogOperations extends JerseyTest {
     Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), resp1.getStatus());
     Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp1.getMediaType());
 
-    BaseResponse baseResponse = resp1.readEntity(BaseResponse.class);
-    Assertions.assertEquals(ErrorType.NOT_FOUND.errorCode(), baseResponse.getCode());
-    Assertions.assertEquals(ErrorType.NOT_FOUND.errorType(), baseResponse.getType());
+    ErrorResponse errorResponse = resp1.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResponse.getCode());
+    Assertions.assertEquals(NoSuchMetalakeException.class.getSimpleName(), errorResponse.getType());
   }
 
   @Test
@@ -122,8 +117,6 @@ public class TestCatalogOperations extends JerseyTest {
 
     CatalogResponse catalogResponse = resp.readEntity(CatalogResponse.class);
     Assertions.assertEquals(0, catalogResponse.getCode());
-    Assertions.assertNull(catalogResponse.getType());
-    Assertions.assertNull(catalogResponse.getMessage());
 
     CatalogDTO catalogDTO = catalogResponse.getCatalog();
     Assertions.assertEquals("catalog1", catalogDTO.name());
@@ -144,9 +137,9 @@ public class TestCatalogOperations extends JerseyTest {
     Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), resp1.getStatus());
     Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp1.getMediaType());
 
-    BaseResponse baseResponse = resp1.readEntity(BaseResponse.class);
-    Assertions.assertEquals(ErrorType.NOT_FOUND.errorCode(), baseResponse.getCode());
-    Assertions.assertEquals(ErrorType.NOT_FOUND.errorType(), baseResponse.getType());
+    ErrorResponse errorResponse = resp1.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResponse.getCode());
+    Assertions.assertEquals(NoSuchMetalakeException.class.getSimpleName(), errorResponse.getType());
 
     // Test throw CatalogAlreadyExistsException
     doThrow(new CatalogAlreadyExistsException("mock error"))
@@ -160,9 +153,10 @@ public class TestCatalogOperations extends JerseyTest {
 
     Assertions.assertEquals(Response.Status.CONFLICT.getStatusCode(), resp2.getStatus());
 
-    BaseResponse baseResponse2 = resp2.readEntity(BaseResponse.class);
-    Assertions.assertEquals(ErrorType.ALREADY_EXISTS.errorCode(), baseResponse2.getCode());
-    Assertions.assertEquals(ErrorType.ALREADY_EXISTS.errorType(), baseResponse2.getType());
+    ErrorResponse errorResponse1 = resp2.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.ALREADY_EXISTS_CODE, errorResponse1.getCode());
+    Assertions.assertEquals(
+        CatalogAlreadyExistsException.class.getSimpleName(), errorResponse1.getType());
 
     // Test throw internal RuntimeException
     doThrow(new RuntimeException("mock error")).when(ops).createCatalog(any(), any(), any(), any());
@@ -175,9 +169,9 @@ public class TestCatalogOperations extends JerseyTest {
     Assertions.assertEquals(
         Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), resp3.getStatus());
 
-    BaseResponse baseResponse3 = resp3.readEntity(BaseResponse.class);
-    Assertions.assertEquals(ErrorType.INTERNAL_ERROR.errorCode(), baseResponse3.getCode());
-    Assertions.assertEquals(ErrorType.INTERNAL_ERROR.errorType(), baseResponse3.getType());
+    ErrorResponse errorResponse2 = resp3.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse2.getCode());
+    Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse2.getType());
   }
 
   @Test
@@ -196,8 +190,6 @@ public class TestCatalogOperations extends JerseyTest {
 
     CatalogResponse catalogResponse = resp.readEntity(CatalogResponse.class);
     Assertions.assertEquals(0, catalogResponse.getCode());
-    Assertions.assertNull(catalogResponse.getType());
-    Assertions.assertNull(catalogResponse.getMessage());
 
     CatalogDTO catalogDTO = catalogResponse.getCatalog();
     Assertions.assertEquals("catalog1", catalogDTO.name());
@@ -215,9 +207,9 @@ public class TestCatalogOperations extends JerseyTest {
 
     Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), resp1.getStatus());
 
-    BaseResponse baseResponse = resp1.readEntity(BaseResponse.class);
-    Assertions.assertEquals(ErrorType.NOT_FOUND.errorCode(), baseResponse.getCode());
-    Assertions.assertEquals(ErrorType.NOT_FOUND.errorType(), baseResponse.getType());
+    ErrorResponse errorResponse = resp1.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResponse.getCode());
+    Assertions.assertEquals(NoSuchMetalakeException.class.getSimpleName(), errorResponse.getType());
 
     // Test throw NoSuchCatalogException
     doThrow(new NoSuchCatalogException("mock error")).when(ops).loadCatalog(any());
@@ -229,9 +221,9 @@ public class TestCatalogOperations extends JerseyTest {
 
     Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), resp2.getStatus());
 
-    BaseResponse baseResponse2 = resp2.readEntity(BaseResponse.class);
-    Assertions.assertEquals(ErrorType.NOT_FOUND.errorCode(), baseResponse2.getCode());
-    Assertions.assertEquals(ErrorType.NOT_FOUND.errorType(), baseResponse2.getType());
+    ErrorResponse errorResponse1 = resp2.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResponse1.getCode());
+    Assertions.assertEquals(NoSuchCatalogException.class.getSimpleName(), errorResponse1.getType());
 
     // Test throw internal RuntimeException
     doThrow(new RuntimeException("mock error")).when(ops).loadCatalog(any());
@@ -244,9 +236,9 @@ public class TestCatalogOperations extends JerseyTest {
     Assertions.assertEquals(
         Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), resp3.getStatus());
 
-    BaseResponse baseResponse3 = resp3.readEntity(BaseResponse.class);
-    Assertions.assertEquals(ErrorType.INTERNAL_ERROR.errorCode(), baseResponse3.getCode());
-    Assertions.assertEquals(ErrorType.INTERNAL_ERROR.errorType(), baseResponse3.getType());
+    ErrorResponse errorResponse2 = resp3.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse2.getCode());
+    Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse2.getType());
   }
 
   @Test
@@ -268,8 +260,6 @@ public class TestCatalogOperations extends JerseyTest {
 
     CatalogResponse catalogResponse = resp.readEntity(CatalogResponse.class);
     Assertions.assertEquals(0, catalogResponse.getCode());
-    Assertions.assertNull(catalogResponse.getType());
-    Assertions.assertNull(catalogResponse.getMessage());
 
     CatalogDTO catalogDTO = catalogResponse.getCatalog();
     Assertions.assertEquals("catalog2", catalogDTO.name());
@@ -287,9 +277,9 @@ public class TestCatalogOperations extends JerseyTest {
 
     Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), resp2.getStatus());
 
-    BaseResponse baseResponse = resp2.readEntity(BaseResponse.class);
-    Assertions.assertEquals(ErrorType.NOT_FOUND.errorCode(), baseResponse.getCode());
-    Assertions.assertEquals(ErrorType.NOT_FOUND.errorType(), baseResponse.getType());
+    ErrorResponse errorResponse = resp2.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResponse.getCode());
+    Assertions.assertEquals(NoSuchCatalogException.class.getSimpleName(), errorResponse.getType());
 
     // Test throw IllegalArgumentException
     doThrow(new IllegalArgumentException("mock error")).when(ops).alterCatalog(any(), any());
@@ -301,9 +291,10 @@ public class TestCatalogOperations extends JerseyTest {
 
     Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), resp3.getStatus());
 
-    BaseResponse baseResponse1 = resp3.readEntity(BaseResponse.class);
-    Assertions.assertEquals(ErrorType.INVALID_ARGUMENTS.errorCode(), baseResponse1.getCode());
-    Assertions.assertEquals(ErrorType.INVALID_ARGUMENTS.errorType(), baseResponse1.getType());
+    ErrorResponse errorResponse1 = resp3.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, errorResponse1.getCode());
+    Assertions.assertEquals(
+        IllegalArgumentException.class.getSimpleName(), errorResponse1.getType());
 
     // Test throw internal RuntimeException
     doThrow(new RuntimeException("mock error")).when(ops).alterCatalog(any(), any());
@@ -316,9 +307,9 @@ public class TestCatalogOperations extends JerseyTest {
     Assertions.assertEquals(
         Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), resp4.getStatus());
 
-    BaseResponse baseResponse2 = resp4.readEntity(BaseResponse.class);
-    Assertions.assertEquals(ErrorType.INTERNAL_ERROR.errorCode(), baseResponse2.getCode());
-    Assertions.assertEquals(ErrorType.INTERNAL_ERROR.errorType(), baseResponse2.getType());
+    ErrorResponse errorResponse2 = resp4.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse2.getCode());
+    Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse2.getType());
   }
 
   @Test
@@ -331,7 +322,10 @@ public class TestCatalogOperations extends JerseyTest {
             .accept("application/vnd.graviton.v1+json")
             .delete();
 
-    Assertions.assertEquals(Response.Status.NO_CONTENT.getStatusCode(), resp.getStatus());
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    DropResponse dropResponse = resp.readEntity(DropResponse.class);
+    Assertions.assertEquals(0, dropResponse.getCode());
+    Assertions.assertTrue(dropResponse.dropped());
 
     // Test when failed to drop catalog
     when(ops.dropCatalog(any())).thenReturn(false);
@@ -342,12 +336,10 @@ public class TestCatalogOperations extends JerseyTest {
             .accept("application/vnd.graviton.v1+json")
             .delete();
 
-    Assertions.assertEquals(
-        Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), resp2.getStatus());
-
-    BaseResponse baseResponse = resp2.readEntity(BaseResponse.class);
-    Assertions.assertEquals(ErrorType.INTERNAL_ERROR.errorCode(), baseResponse.getCode());
-    Assertions.assertEquals(ErrorType.INTERNAL_ERROR.errorType(), baseResponse.getType());
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp2.getStatus());
+    DropResponse dropResponse2 = resp2.readEntity(DropResponse.class);
+    Assertions.assertEquals(0, dropResponse2.getCode());
+    Assertions.assertFalse(dropResponse2.dropped());
 
     // Test throw internal RuntimeException
     doThrow(new RuntimeException("mock error")).when(ops).dropCatalog(any());
@@ -360,9 +352,9 @@ public class TestCatalogOperations extends JerseyTest {
     Assertions.assertEquals(
         Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), resp3.getStatus());
 
-    BaseResponse baseResponse1 = resp3.readEntity(BaseResponse.class);
-    Assertions.assertEquals(ErrorType.INTERNAL_ERROR.errorCode(), baseResponse1.getCode());
-    Assertions.assertEquals(ErrorType.INTERNAL_ERROR.errorType(), baseResponse1.getType());
+    ErrorResponse errorResponse = resp3.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse.getCode());
+    Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse.getType());
   }
 
   private static TestCatalog buildCatalog(String metalake, String catalogName) {

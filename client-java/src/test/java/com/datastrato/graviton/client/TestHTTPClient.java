@@ -27,8 +27,8 @@ import static org.mockserver.integration.ClientAndServer.startClientAndServer;
 import static org.mockserver.model.HttpRequest.request;
 import static org.mockserver.model.HttpResponse.response;
 
-import com.datastrato.graviton.dto.responses.BaseResponse;
-import com.datastrato.graviton.dto.responses.ErrorType;
+import com.datastrato.graviton.dto.responses.ErrorResponse;
+import com.datastrato.graviton.exceptions.NotFoundException;
 import com.datastrato.graviton.json.JsonUtils;
 import com.datastrato.graviton.rest.RESTRequest;
 import com.datastrato.graviton.rest.RESTResponse;
@@ -208,7 +208,8 @@ public class TestHTTPClient {
         // Simply return the passed in item in the success case.
         mockResponse = mockResponse.withBody(asJson);
       } else {
-        BaseResponse response = BaseResponse.error(ErrorType.NOT_FOUND, "Not found");
+        ErrorResponse response =
+            ErrorResponse.notFound(NotFoundException.class.getSimpleName(), "Not found");
         mockResponse = mockResponse.withBody(MAPPER.writeValueAsString(response));
       }
     }

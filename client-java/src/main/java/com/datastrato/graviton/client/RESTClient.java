@@ -18,7 +18,7 @@
  */
 package com.datastrato.graviton.client;
 
-import com.datastrato.graviton.dto.responses.BaseResponse;
+import com.datastrato.graviton.dto.responses.ErrorResponse;
 import com.datastrato.graviton.rest.RESTRequest;
 import com.datastrato.graviton.rest.RESTResponse;
 import com.google.common.collect.ImmutableMap;
@@ -35,18 +35,18 @@ import java.util.function.Supplier;
 public interface RESTClient extends Closeable {
 
   default void head(
-      String path, Supplier<Map<String, String>> headers, Consumer<BaseResponse> errorHandler) {
+      String path, Supplier<Map<String, String>> headers, Consumer<ErrorResponse> errorHandler) {
     head(path, headers.get(), errorHandler);
   }
 
-  void head(String path, Map<String, String> headers, Consumer<BaseResponse> errorHandler);
+  void head(String path, Map<String, String> headers, Consumer<ErrorResponse> errorHandler);
 
   default <T extends RESTResponse> T delete(
       String path,
       Map<String, String> queryParams,
       Class<T> responseType,
       Supplier<Map<String, String>> headers,
-      Consumer<BaseResponse> errorHandler) {
+      Consumer<ErrorResponse> errorHandler) {
     return delete(path, queryParams, responseType, headers.get(), errorHandler);
   }
 
@@ -54,7 +54,7 @@ public interface RESTClient extends Closeable {
       String path,
       Class<T> responseType,
       Supplier<Map<String, String>> headers,
-      Consumer<BaseResponse> errorHandler) {
+      Consumer<ErrorResponse> errorHandler) {
     return delete(path, ImmutableMap.of(), responseType, headers.get(), errorHandler);
   }
 
@@ -62,14 +62,14 @@ public interface RESTClient extends Closeable {
       String path,
       Class<T> responseType,
       Map<String, String> headers,
-      Consumer<BaseResponse> errorHandler);
+      Consumer<ErrorResponse> errorHandler);
 
   default <T extends RESTResponse> T delete(
       String path,
       Map<String, String> queryParams,
       Class<T> responseType,
       Map<String, String> headers,
-      Consumer<BaseResponse> errorHandler) {
+      Consumer<ErrorResponse> errorHandler) {
     if (null != queryParams && !queryParams.isEmpty()) {
       throw new UnsupportedOperationException("Query params are not supported");
     }
@@ -81,7 +81,7 @@ public interface RESTClient extends Closeable {
       String path,
       Class<T> responseType,
       Supplier<Map<String, String>> headers,
-      Consumer<BaseResponse> errorHandler) {
+      Consumer<ErrorResponse> errorHandler) {
     return get(path, ImmutableMap.of(), responseType, headers, errorHandler);
   }
 
@@ -89,7 +89,7 @@ public interface RESTClient extends Closeable {
       String path,
       Class<T> responseType,
       Map<String, String> headers,
-      Consumer<BaseResponse> errorHandler) {
+      Consumer<ErrorResponse> errorHandler) {
     return get(path, ImmutableMap.of(), responseType, headers, errorHandler);
   }
 
@@ -98,7 +98,7 @@ public interface RESTClient extends Closeable {
       Map<String, String> queryParams,
       Class<T> responseType,
       Supplier<Map<String, String>> headers,
-      Consumer<BaseResponse> errorHandler) {
+      Consumer<ErrorResponse> errorHandler) {
     return get(path, queryParams, responseType, headers.get(), errorHandler);
   }
 
@@ -107,14 +107,14 @@ public interface RESTClient extends Closeable {
       Map<String, String> queryParams,
       Class<T> responseType,
       Map<String, String> headers,
-      Consumer<BaseResponse> errorHandler);
+      Consumer<ErrorResponse> errorHandler);
 
   default <T extends RESTResponse> T post(
       String path,
       RESTRequest body,
       Class<T> responseType,
       Supplier<Map<String, String>> headers,
-      Consumer<BaseResponse> errorHandler) {
+      Consumer<ErrorResponse> errorHandler) {
     return post(path, body, responseType, headers.get(), errorHandler);
   }
 
@@ -123,7 +123,7 @@ public interface RESTClient extends Closeable {
       RESTRequest body,
       Class<T> responseType,
       Supplier<Map<String, String>> headers,
-      Consumer<BaseResponse> errorHandler,
+      Consumer<ErrorResponse> errorHandler,
       Consumer<Map<String, String>> responseHeaders) {
     return post(path, body, responseType, headers.get(), errorHandler, responseHeaders);
   }
@@ -133,7 +133,7 @@ public interface RESTClient extends Closeable {
       RESTRequest body,
       Class<T> responseType,
       Map<String, String> headers,
-      Consumer<BaseResponse> errorHandler,
+      Consumer<ErrorResponse> errorHandler,
       Consumer<Map<String, String>> responseHeaders) {
     if (null != responseHeaders) {
       throw new UnsupportedOperationException("Returning response headers is not supported");
@@ -147,14 +147,14 @@ public interface RESTClient extends Closeable {
       RESTRequest body,
       Class<T> responseType,
       Map<String, String> headers,
-      Consumer<BaseResponse> errorHandler);
+      Consumer<ErrorResponse> errorHandler);
 
   default <T extends RESTResponse> T put(
       String path,
       RESTRequest body,
       Class<T> responseType,
       Supplier<Map<String, String>> headers,
-      Consumer<BaseResponse> errorHandler) {
+      Consumer<ErrorResponse> errorHandler) {
     return put(path, body, responseType, headers.get(), errorHandler);
   }
 
@@ -163,7 +163,7 @@ public interface RESTClient extends Closeable {
       RESTRequest body,
       Class<T> responseType,
       Supplier<Map<String, String>> headers,
-      Consumer<BaseResponse> errorHandler,
+      Consumer<ErrorResponse> errorHandler,
       Consumer<Map<String, String>> responseHeaders) {
     return put(path, body, responseType, headers.get(), errorHandler, responseHeaders);
   }
@@ -173,7 +173,7 @@ public interface RESTClient extends Closeable {
       RESTRequest body,
       Class<T> responseType,
       Map<String, String> headers,
-      Consumer<BaseResponse> errorHandler,
+      Consumer<ErrorResponse> errorHandler,
       Consumer<Map<String, String>> responseHeaders) {
     if (null != responseHeaders) {
       throw new UnsupportedOperationException("Returning response headers is not supported");
@@ -187,14 +187,14 @@ public interface RESTClient extends Closeable {
       RESTRequest body,
       Class<T> responseType,
       Map<String, String> headers,
-      Consumer<BaseResponse> errorHandler);
+      Consumer<ErrorResponse> errorHandler);
 
   default <T extends RESTResponse> T postForm(
       String path,
       Map<String, String> formData,
       Class<T> responseType,
       Supplier<Map<String, String>> headers,
-      Consumer<BaseResponse> errorHandler) {
+      Consumer<ErrorResponse> errorHandler) {
     return postForm(path, formData, responseType, headers.get(), errorHandler);
   }
 
@@ -203,5 +203,5 @@ public interface RESTClient extends Closeable {
       Map<String, String> formData,
       Class<T> responseType,
       Map<String, String> headers,
-      Consumer<BaseResponse> errorHandler);
+      Consumer<ErrorResponse> errorHandler);
 }
