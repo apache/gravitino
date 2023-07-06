@@ -24,7 +24,6 @@ import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
 import com.datastrato.graviton.exceptions.*;
 import java.util.Map;
-import org.checkerframework.checker.signature.qual.Identifier;
 
 /**
  * The Catalog interface to support schema operations. If the implemented catalog has schema
@@ -40,10 +39,10 @@ public interface SupportsSchemas {
    * listSchemas(a) must return [a.b] in the result array
    *
    * @param namespace the namespace to list
-   * @return an array of schema
+   * @return an array of schema identifier under the namespace
    * @throws NoSuchNamespaceException if the namespace does not exist
    */
-  Schema[] listSchemas(Namespace namespace) throws NoSuchNamespaceException;
+  NameIdentifier[] listSchemas(Namespace namespace) throws NoSuchNamespaceException;
 
   /**
    * Check if a schema exists.
@@ -56,7 +55,7 @@ public interface SupportsSchemas {
    */
   default boolean schemaExists(NameIdentifier ident) {
     try {
-      loadSchemaMetadata(ident);
+      loadSchema(ident);
       return true;
     } catch (NoSuchSchemaException e) {
       return false;
@@ -67,29 +66,32 @@ public interface SupportsSchemas {
    * Create a schema in the catalog.
    *
    * @param ident the name identifier of the schema
+   * @param comment the comment of the schema
    * @param metadata the metadata of the schema
+   * @return the created schema
    * @throws SchemaAlreadyExistsException if the schema already exists
    */
-  void createSchema(NameIdentifier ident, Map<String, String> metadata)
+  Schema createSchema(NameIdentifier ident, String comment, Map<String, String> metadata)
       throws SchemaAlreadyExistsException;
 
   /**
    * Load metadata properties for a schema.
    *
    * @param ident the name identifier of the schema
-   * @return a string map of properties for the given schema
+   * @return a schema
    * @throws NoSuchSchemaException If the schema does not exist (optional)
    */
-  Map<String, String> loadSchemaMetadata(NameIdentifier ident) throws NoSuchSchemaException;
+  Schema loadSchema(NameIdentifier ident) throws NoSuchSchemaException;
 
   /**
    * Apply the metadata change to a schema in the catalog.
    *
    * @param ident the name identifier of the schema
    * @param changes the metadata changes to apply
+   * @return the altered schema
    * @throws NoSuchSchemaException if the schema does not exist
    */
-  void alterSchema(NameIdentifier ident, SchemaChange... changes) throws NoSuchSchemaException;
+  Schema alterSchema(NameIdentifier ident, SchemaChange... changes) throws NoSuchSchemaException;
 
   /**
    * Drop a schema from the catalog with cascade option, recursively dropping all objects within the
@@ -102,8 +104,6 @@ public interface SupportsSchemas {
    * @param cascade if true, recursively drop all objects within the schema
    * @return true if the schema is dropped successfully, false otherwise
    * @throws NonEmptySchemaException if the schema is not empty and cascade is false
-   * @throws NoSuchSchemaException if the schema does not exist
    */
-  boolean dropSchema(Identifier ident, boolean cascade)
-      throws NonEmptySchemaException, NoSuchSchemaException;
+  boolean dropSchema(NameIdentifier ident, boolean cascade) throws NonEmptySchemaException;
 }

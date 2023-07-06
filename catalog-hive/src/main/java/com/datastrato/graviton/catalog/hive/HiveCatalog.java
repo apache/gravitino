@@ -1,22 +1,30 @@
 package com.datastrato.graviton.catalog.hive;
 
 import com.datastrato.graviton.*;
-import com.datastrato.graviton.catalog.hive.json.HiveDatabase;
-import com.datastrato.graviton.exceptions.NamespaceAlreadyExistsException;
+import com.datastrato.graviton.catalog.hive.rel.HiveSchema;
 import com.datastrato.graviton.exceptions.NoSuchNamespaceException;
-import com.datastrato.graviton.exceptions.NonEmptyNamespaceException;
+import com.datastrato.graviton.exceptions.NoSuchSchemaException;
+import com.datastrato.graviton.exceptions.NonEmptySchemaException;
+import com.datastrato.graviton.exceptions.SchemaAlreadyExistsException;
+import com.datastrato.graviton.meta.AuditInfo;
 import com.datastrato.graviton.meta.BaseCatalog;
+import com.datastrato.graviton.rel.SchemaChange;
+import com.datastrato.graviton.rel.SupportsSchemas;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import java.io.IOException;
+import java.time.Instant;
 import java.util.Map;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.api.*;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.thrift.TException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class HiveCatalog extends BaseCatalog implements SupportsNamespaces {
+public class HiveCatalog extends BaseCatalog implements SupportsSchemas {
+  
   public static final Logger LOG = LoggerFactory.getLogger(HiveCatalog.class);
 
   @VisibleForTesting HiveClientPool clientPool;
@@ -27,6 +35,7 @@ public class HiveCatalog extends BaseCatalog implements SupportsNamespaces {
   public void close() {
     if (clientPool != null) {
       clientPool.close();
+      clientPool = null;
     }
   }
 
@@ -37,135 +46,166 @@ public class HiveCatalog extends BaseCatalog implements SupportsNamespaces {
   }
 
   @Override
-  public Namespace[] listNamespaces() throws NoSuchNamespaceException {
-    return listNamespaces(Namespace.of("metalake", this.name));
-  }
-
-  @Override
-  public Namespace[] listNamespaces(Namespace namespace) throws NoSuchNamespaceException {
-    // hive namespace expression is `metalake.catalog.db`
-    if (namespace.levels().length != 2) {
-      throw new NoSuchNamespaceException("Namespace does not exist: " + namespace);
+  public NameIdentifier[] listSchemas(Namespace namespace) throws NoSuchNamespaceException {
+    if (!isValidNamespace(namespace)) {
+      throw new NoSuchNamespaceException("Namespace is invalid " + namespace);
     }
 
     try {
-      Namespace[] namespaces =
-          clientPool
-              .run(
-                  client ->
-                      client.getAllDatabases().stream()
-                          .map(ns -> Namespace.of(namespace.level(0), namespace.level(1), ns)))
-              .toArray(Namespace[]::new);
+      NameIdentifier[] schemas =
+          clientPool.run(
+              c ->
+                  c.getAllDatabases().stream()
+                      .map(db -> NameIdentifier.of(namespace, db))
+                      .toArray(NameIdentifier[]::new));
+      return schemas;
 
-      LOG.debug("Listing namespace {} returned namespaces: {}", namespace, namespaces);
-      return namespaces;
     } catch (TException e) {
       throw new RuntimeException(
-          "Failed to list all namespace: " + namespace + " in Hive Metastore", e);
+          "Failed to list all schemas (database) under namespace : "
+              + namespace
+              + " in Hive Metastore",
+          e);
+
     } catch (InterruptedException e) {
       throw new RuntimeException(e);
     }
   }
 
   @Override
-  public boolean namespaceExists(Namespace namespace) {
-    try {
-      clientPool.run(client -> client.getDatabase(getDbNameFromNamespace(namespace)));
-    } catch (TException | InterruptedException e) {
-      return false;
-    }
-    return true;
-  }
-
-  @Override
-  public void createNamespace(Namespace namespace, Map<String, String> metadata)
-      throws NamespaceAlreadyExistsException {
+  public HiveSchema createSchema(NameIdentifier ident, String comment, Map<String, String> metadata)
+      throws SchemaAlreadyExistsException {
     Preconditions.checkArgument(
-        !namespace.isEmpty(),
-        String.format("Cannot create namespace with invalid name: %s", namespace));
+        !ident.name().isEmpty(),
+        String.format("Cannot create schema with invalid name: %s", ident.name()));
     Preconditions.checkArgument(
-        isValidateNamespace(namespace),
-        String.format("Cannot support multi part namespace in Hive Metastore: %s", namespace));
+        isValidNamespace(ident.namespace()),
+        String.format("Cannot support invalid namespace in Hive Metastore: %s", ident.namespace()));
 
     try {
-      HiveDatabase hiveDatabase =
-          new HiveDatabase.Builder()
+      HiveSchema hiveSchema =
+          new HiveSchema.Builder()
+              .withId(1L /*TODO. Use ID generator*/)
+              .withCatalogId(getId())
+              .withName(ident.name())
+              .withNamespace(ident.namespace())
+              .withComment(comment)
+              .withProperties(metadata)
+              .withAuditInfo(
+                  new AuditInfo.Builder()
+                      .withCreator(currentUser())
+                      .withCreateTime(Instant.now())
+                      .build())
               .withConf(hiveConf)
-              .withNamespace(namespace)
-              .withMetadata(metadata)
               .build();
 
       clientPool.run(
           client -> {
-            client.createDatabase(hiveDatabase.getInnerDatabase());
+            client.createDatabase(hiveSchema.toInnerDB());
             return null;
           });
 
-      LOG.info("Created namespace: {}", namespace);
+      // TODO. We should also store the customized HiveSchema entity fields into our own
+      //  underlying storage, like id, auditInfo, etc.
+
+      LOG.info("Created Hive schema (database) {} in Hive Metastore", ident.name());
+
+      return hiveSchema;
+
     } catch (AlreadyExistsException e) {
-      throw new NamespaceAlreadyExistsException(
-          String.format("Namespace '%s' already exists!", namespace));
+      throw new SchemaAlreadyExistsException(
+          String.format(
+              "Hive schema (database) '%s' already exists in Hive Metastore", ident.name()));
+
     } catch (TException e) {
       throw new RuntimeException(
-          "Failed to create namespace " + namespace + " in Hive Metastore", e);
+          "Failed to create Hive schema (database) " + ident.name() + " in Hive Metastore", e);
+
     } catch (InterruptedException e) {
       throw new RuntimeException(e);
     }
   }
 
   @Override
-  public Map<String, String> loadNamespaceMetadata(Namespace namespace)
-      throws NoSuchNamespaceException {
-    if (!isValidateNamespace(namespace)) {
-      throw new NoSuchNamespaceException(String.format("Namespace does not exist: %s", namespace));
-    }
+  public HiveSchema loadSchema(NameIdentifier ident) throws NoSuchSchemaException {
+    Preconditions.checkArgument(
+        !ident.name().isEmpty(),
+        String.format("Cannot create schema with invalid name: %s", namespace));
+    Preconditions.checkArgument(
+        isValidNamespace(ident.namespace()),
+        String.format("Cannot support invalid namespace in Hive Metastore: %s", namespace));
 
     try {
-      Database database =
-          clientPool.run(client -> client.getDatabase(getDbNameFromNamespace(namespace)));
-      HiveDatabase hiveDatabase = new HiveDatabase.Builder().withHiveDatabase(database).build();
-      Map<String, String> metadata = hiveDatabase.getMetadata();
+      Database database = clientPool.run(client -> client.getDatabase(ident.name()));
+      HiveSchema.Builder builder = new HiveSchema.Builder();
 
-      LOG.debug("Loaded metadata for namespace {} found {}", namespace, metadata.keySet());
-      return metadata;
+      // TODO. We should also fetch the customized HiveSchema entity fields from our own
+      //  underlying storage, like id, auditInfo, etc.
+
+      builder =
+          builder
+              .withId(1L /* TODO. Fetch id from underlying storage */)
+              .withCatalogId(getId())
+              .withNamespace(ident.namespace())
+              .withAuditInfo(
+                  /* TODO. Fetch audit info from underlying storage */
+                  new AuditInfo.Builder()
+                      .withCreator(currentUser())
+                      .withCreateTime(Instant.now())
+                      .build())
+              .withConf(hiveConf);
+      HiveSchema hiveSchema = HiveSchema.fromInnerDB(database, builder);
+
+      LOG.info("Loaded Hive schema (database) {} from Hive Metastore ", ident.name());
+
+      return hiveSchema;
+
     } catch (NoSuchObjectException | UnknownDBException e) {
-      throw new NoSuchNamespaceException(
-          String.format("Namespace does not exist: %s", namespace), e);
+      throw new NoSuchSchemaException(
+          String.format(
+              "Hive schema (database) does not exist: %s in Hive Metastore", ident.name()),
+          e);
+
+      // TODO. We should also delete Hive schema (database) from our own underlying storage
+
     } catch (TException e) {
       throw new RuntimeException(
-          "Failed to list namespace under namespace: " + namespace + " in Hive Metastore", e);
+          "Failed to load Hive schema (database) " + ident.name() + " from Hive Metastore", e);
+
     } catch (InterruptedException e) {
       throw new RuntimeException(e);
     }
   }
 
   @Override
-  public void alterNamespace(Namespace namespace, NamespaceChange... changes)
-      throws NoSuchNamespaceException {
+  public HiveSchema alterSchema(NameIdentifier ident, SchemaChange... changes)
+      throws NoSuchSchemaException {
     Preconditions.checkArgument(
-        !namespace.isEmpty(),
-        String.format("Cannot create namespace with invalid name: %s", namespace));
+        !ident.name().isEmpty(),
+        String.format("Cannot create schema with invalid name: %s", namespace));
     Preconditions.checkArgument(
-        isValidateNamespace(namespace),
-        String.format("Cannot support multi part namespace in Hive Metastore: %s", namespace));
+        isValidNamespace(ident.namespace()),
+        String.format("Cannot support invalid namespace in Hive Metastore: %s", namespace));
 
     try {
       // load the database parameters
-      Database database =
-          clientPool.run(client -> client.getDatabase(getDbNameFromNamespace(namespace)));
-      HiveDatabase hiveDatabase = new HiveDatabase.Builder().withHiveDatabase(database).build();
-      Map<String, String> metadata = hiveDatabase.getMetadata();
-      LOG.debug("Loaded metadata for namespace {} found {}", namespace, metadata.keySet());
+      Database database = clientPool.run(client -> client.getDatabase(ident.name()));
+      Map<String, String> metadata = HiveSchema.convertToMetadata(database);
+      LOG.debug(
+          "Loaded metadata for Hive schema (database) {} found {}",
+          ident.name(),
+          metadata.keySet());
 
-      for (NamespaceChange change : changes) {
-        if (change instanceof NamespaceChange.SetProperty) {
+      for (SchemaChange change : changes) {
+        if (change instanceof SchemaChange.SetProperty) {
           metadata.put(
-              ((NamespaceChange.SetProperty) change).getProperty(),
-              ((NamespaceChange.SetProperty) change).getValue());
-        } else if (change instanceof NamespaceChange.RemoveProperty) {
-          metadata.remove(((NamespaceChange.RemoveProperty) change).getProperty());
+              ((SchemaChange.SetProperty) change).getProperty(),
+              ((SchemaChange.SetProperty) change).getValue());
+        } else if (change instanceof SchemaChange.RemoveProperty) {
+          metadata.remove(((SchemaChange.RemoveProperty) change).getProperty());
         } else {
-          throw new IllegalArgumentException("Unsupported namespace change type: " + change);
+          throw new IllegalArgumentException(
+              "Unsupported schema change type: " + change.getClass().getSimpleName());
         }
       }
 
@@ -175,50 +215,101 @@ public class HiveCatalog extends BaseCatalog implements SupportsNamespaces {
 
       clientPool.run(
           client -> {
-            client.alterDatabase(getDbNameFromNamespace(namespace), alteredDatabase);
+            client.alterDatabase(ident.name(), alteredDatabase);
             return null;
           });
 
-      LOG.info("Altered namespace: {}", alteredDatabase);
+      // TODO. We should also update the customized HiveSchema entity fields into our own if
+      //  necessary
+      HiveSchema.Builder builder = new HiveSchema.Builder();
+      builder =
+          builder
+              .withId(1L /* TODO. Fetch id from underlying storage */)
+              .withCatalogId(getId())
+              .withNamespace(ident.namespace())
+              .withAuditInfo(
+                  /* TODO. Fetch audit info from underlying storage */
+                  new AuditInfo.Builder()
+                      .withCreator(currentUser())
+                      .withCreateTime(Instant.now())
+                      .withLastModifier(currentUser())
+                      .withLastModifiedTime(Instant.now())
+                      .build())
+              .withConf(hiveConf);
+      HiveSchema hiveSchema = HiveSchema.fromInnerDB(alteredDatabase, builder);
+
+      LOG.info("Altered Hive schema (database) {} in Hive Metastore", ident.name());
       // todo(xun): hive dose not support renaming database name directly,
       //  perhaps we can use namespace to mapping the database names indirectly
+
+      return hiveSchema;
+
     } catch (TException | InterruptedException e) {
       throw new RuntimeException(e);
     }
   }
 
   @Override
-  public boolean dropNamespace(Namespace namespace, boolean cascade)
-      throws NonEmptyNamespaceException, NoSuchNamespaceException {
-    if (!isValidateNamespace(namespace)) {
+  public boolean dropSchema(NameIdentifier ident, boolean cascade) throws NonEmptySchemaException {
+    if (ident.name().isEmpty()) {
+      LOG.error("Cannot drop schema with invalid name: {}", ident.name());
+      return false;
+    }
+    if (!isValidNamespace(ident.namespace())) {
+      LOG.error("Cannot support invalid namespace in Hive Metastore: {}", ident.namespace());
       return false;
     }
 
     try {
       clientPool.run(
           client -> {
-            client.dropDatabase(getDbNameFromNamespace(namespace), false, false, cascade);
+            client.dropDatabase(ident.name(), false, false, cascade);
             return null;
           });
 
-      LOG.info("Dropped namespace: {}", namespace);
+      // TODO. we should also delete the Hive schema (database) from our own underlying storage
+
+      LOG.info("Dropped Hive schema (database) {}", ident.name());
       return true;
+
     } catch (InvalidOperationException e) {
-      throw new NonEmptyNamespaceException(
-          String.format("Namespace %s is not empty. One or more tables exist.", namespace, e));
-    } catch (NoSuchObjectException | InterruptedException e) {
+      throw new NonEmptySchemaException(
+          String.format(
+              "Hive schema (database) %s is not empty. One or more tables exist.",
+              ident.name(), e));
+
+    } catch (NoSuchObjectException e) {
+      LOG.warn("Hive schema (database) {} does not exist in Hive Metastore", ident.name());
       return false;
+
     } catch (TException e) {
-      throw new RuntimeException("Failed to drop namespace " + namespace + " in Hive Metastore", e);
+      throw new RuntimeException(
+          "Failed to drop Hive schema (database) " + namespace + " in Hive Metastore", e);
+
+    } catch (InterruptedException e) {
+      throw new RuntimeException(e);
     }
   }
 
-  public static boolean isValidateNamespace(Namespace namespace) {
-    return namespace.levels().length == 3;
+  public boolean isValidNamespace(Namespace namespace) {
+    return namespace.levels().length == 2 && namespace.level(1).equals(name());
   }
 
-  private String getDbNameFromNamespace(Namespace namespace) {
-    return namespace.level(2);
+  // TODO. We should figure out a better way to get the current user from servlet container.
+  private static String currentUser() {
+    String username = null;
+    try {
+      username = UserGroupInformation.getCurrentUser().getShortUserName();
+    } catch (IOException e) {
+      LOG.warn("Failed to get Hadoop user", e);
+    }
+
+    if (username != null) {
+      return username;
+    } else {
+      LOG.warn("Hadoop user is null, defaulting to user.name");
+      return System.getProperty("user.name");
+    }
   }
 
   public static class Builder extends BaseCatalog.BaseCatalogBuilder<Builder, HiveCatalog> {
