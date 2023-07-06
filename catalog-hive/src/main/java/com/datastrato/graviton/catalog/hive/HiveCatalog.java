@@ -24,7 +24,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class HiveCatalog extends BaseCatalog implements SupportsSchemas {
-  
+
   public static final Logger LOG = LoggerFactory.getLogger(HiveCatalog.class);
 
   @VisibleForTesting HiveClientPool clientPool;
@@ -289,6 +289,11 @@ public class HiveCatalog extends BaseCatalog implements SupportsSchemas {
     } catch (InterruptedException e) {
       throw new RuntimeException(e);
     }
+  }
+
+  @Override
+  public SupportsSchemas asSchemas() {
+    return this;
   }
 
   public boolean isValidNamespace(Namespace namespace) {
