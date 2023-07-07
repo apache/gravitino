@@ -1,5 +1,6 @@
 package com.datastrato.graviton;
 
+import com.datastrato.graviton.rel.SupportsSchemas;
 import com.datastrato.graviton.rel.TableCatalog;
 import java.util.Map;
 
@@ -30,12 +31,12 @@ public interface Catalog extends Auditable {
   Map<String, String> properties();
 
   /**
-   * Return the {@link SupportsNamespaces} if the catalog supports namespace operations.
+   * Return the {@link SupportsSchemas} if the catalog supports schema operations.
    *
-   * @throws UnsupportedOperationException if the catalog does not support namespace operations.
+   * @throws UnsupportedOperationException if the catalog does not support schema operations.
    */
-  default SupportsNamespaces asNamespaces() throws UnsupportedOperationException {
-    throw new UnsupportedOperationException("Catalog does not support namespace operations");
+  default SupportsSchemas asSchemas() throws UnsupportedOperationException {
+    throw new UnsupportedOperationException("Catalog does not support schema operations");
   }
 
   /**

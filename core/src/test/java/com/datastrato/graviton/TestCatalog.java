@@ -1,6 +1,6 @@
 package com.datastrato.graviton;
 
-import com.datastrato.graviton.exceptions.NoSuchNamespaceException;
+import com.datastrato.graviton.exceptions.NoSuchSchemaException;
 import com.datastrato.graviton.exceptions.NoSuchTableException;
 import com.datastrato.graviton.exceptions.TableAlreadyExistsException;
 import com.datastrato.graviton.meta.AuditInfo;
@@ -29,7 +29,7 @@ public class TestCatalog extends BaseCatalog implements TableCatalog {
   public void close() throws IOException {}
 
   @Override
-  public NameIdentifier[] listTables(Namespace namespace) throws NoSuchNamespaceException {
+  public NameIdentifier[] listTables(Namespace namespace) throws NoSuchSchemaException {
     return tables.keySet().stream()
         .filter(testTable -> testTable.namespace().equals(namespace))
         .toArray(NameIdentifier[]::new);
@@ -47,7 +47,7 @@ public class TestCatalog extends BaseCatalog implements TableCatalog {
   @Override
   public Table createTable(
       NameIdentifier ident, Column[] columns, String comment, Map<String, String> properties)
-      throws NoSuchNamespaceException, TableAlreadyExistsException {
+      throws NoSuchSchemaException, TableAlreadyExistsException {
     AuditInfo auditInfo =
         new AuditInfo.Builder().withCreator("test").withCreateTime(Instant.now()).build();
 
