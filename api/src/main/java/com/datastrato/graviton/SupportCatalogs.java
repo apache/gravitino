@@ -12,7 +12,7 @@ public interface SupportCatalogs {
    *
    * @param namespace The namespace to list the catalogs under it.
    * @return The list of catalogs.
-   * @throws NoSuchmetalakeException If the metalake with namespace does not exist.
+   * @throws NoSuchMetalakeException If the metalake with namespace does not exist.
    */
   Catalog[] listCatalogs(Namespace namespace) throws NoSuchMetalakeException;
 
@@ -48,7 +48,7 @@ public interface SupportCatalogs {
    * @param comment the comment of the catalog.
    * @param properties the properties of the catalog.
    * @return The created catalog.
-   * @throws NoSuchmetalakeException If the metalake does not exist.
+   * @throws NoSuchMetalakeException If the metalake does not exist.
    * @throws CatalogAlreadyExistsException If the catalog already exists.
    */
   Catalog createCatalog(
