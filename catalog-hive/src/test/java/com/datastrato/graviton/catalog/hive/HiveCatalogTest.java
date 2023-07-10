@@ -29,7 +29,7 @@ public class HiveCatalogTest extends MiniHiveMetastoreService {
 
     hiveCatalog.initialize(null);
 
-    List<String> dbs = hiveCatalog.clientPool.run(client -> client.getAllDatabases());
+    List<String> dbs = hiveCatalog.clientPool.run(IMetaStoreClient::getAllDatabases);
     Assertions.assertEquals(2, dbs.size());
     Assertions.assertTrue(dbs.contains("default"));
     Assertions.assertTrue(dbs.contains(DB_NAME));
