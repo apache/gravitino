@@ -37,6 +37,7 @@ dependencies {
         exclude("org.apache.thrift")
         exclude("org.apache.zookeeper")
         exclude("org.apache.logging.log4j")
+        exclude("org.pentaho", "pentaho-aggdesigner-algorithm")
         exclude("org.slf4j")
         exclude("com.fasterxml.jackson.core")
         exclude("com.fasterxml.jackson.datatype")
