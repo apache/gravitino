@@ -16,14 +16,10 @@ hive2 = "2.3.9"
 hadoop2 = "2.7.3"
 httpclient5 = "5.2.1"
 mockserver = "5.13.2"
-thrift = "0.9.3"
 protobuf-plugin = "0.9.2"
 spotless-plugin = '6.11.0'
 gradle-extensions-plugin = '1.74'
 publish-plugin = '1.1.0'
-commons-collections = "3.2.2"
-commons-configuration = '1.6'
-commons-io = "2.4"
 commons-lang3 = "3.1"
 javax-servlet-api = "2.5"
 
@@ -58,14 +54,7 @@ jersey-test-framework-provider-jetty = { group = "org.glassfish.jersey.test-fram
 mockito-core = { group = "org.mockito", name = "mockito-core", version.ref = "mockito" }
 hive2-metastore = { group = "org.apache.hive", name = "hive-metastore", version.ref = "hive2"}
 hive2-exec = { group = "org.apache.hive", name = "hive-exec", version.ref = "hive2"}
-hive2-serde = { group = "org.apache.hive", name = "hive-serde", version.ref = "hive2"}
-hive2-common = { group = "org.apache.hive", name = "hive-common", version.ref = "hive2"}
-hive2-shims = { group = "org.apache.hive", name = "hive-shims", version.ref = "hive2"}
-hive2-shims-common = { group = "org.apache.hive.shims", name = "hive-shims-common", version.ref = "hive2"}
-hive2-shims023 = { group = "org.apache.hive.shims", name = "hive-shims-0.23", version.ref = "hive2"}
-hadoop2-common = { group = "org.apache.hadoop", name = "hadoop-common", version.ref = "hadoop2"}
 hadoop2-mapreduce-client-core = { group = "org.apache.hadoop", name = "hadoop-mapreduce-client-core", version.ref = "hadoop2"}
-hadoop2-auth = { group = "org.apache.hadoop", name = "hadoop-auth", version.ref = "hadoop2"}
 commons-lang3 = { group = "org.apache.commons", name = "commons-lang3", version.ref = "commons-lang3" }
 javax-servlet-api = { group = "javax.servlet", name = "servlet-api", version.ref = "javax-servlet-api" }
 airlift-units = { group = "io.airlift", name = "units", version.ref = "airlift-units"}
@@ -73,10 +62,6 @@ airlift-log = { group = "io.airlift", name = "log", version.ref = "airlift-log"}
 httpclient5 = { group = "org.apache.httpcomponents.client5", name = "httpclient5", version.ref = "httpclient5" }
 mockserver-netty = { group = "org.mock-server", name = "mockserver-netty", version.ref = "mockserver" }
 mockserver-client-java = { group = "org.mock-server", name = "mockserver-client-java", version.ref = "mockserver" }
-thrift-libfb303 = { group = "org.apache.thrift", name = "libfb303", version.ref = "thrift" }
-commons-collections = { group = "commons-collections", name = "commons-collections", version.ref = "commons-collections" }
-commons-io = { group = "commons-io", name = "commons-io", version.ref = "commons-io" }
-commons-configuration = { group = "commons-configuration", name = "commons-configuration", version.ref = "commons-configuration" }
 
 [bundles]
 log4j = ["slf4j-api", "log4j-slf4j2-impl", "log4j-api", "log4j-core", "log4j-12-api"]
