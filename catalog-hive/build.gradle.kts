@@ -29,6 +29,7 @@ dependencies {
         exclude("javax.transaction", "transaction-api")
         exclude("com.zaxxer", "HikariCP")
         exclude("com.google.code.findbugs", "jsr305")
+        exclude("org.apache.curator")
         exclude("org.slf4j")
     }
 
@@ -44,6 +45,7 @@ dependencies {
         exclude("org.apache.calcite.avatica")
         exclude("com.google.code.findbugs", "jsr305")
         exclude("org.apache.logging.log4j")
+        exclude("org.apache.curator")
         exclude("org.pentaho")
         exclude("org.slf4j")
     }
