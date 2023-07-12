@@ -49,11 +49,14 @@ dependencies {
         exclude("org.apache.logging.log4j")
         exclude("org.apache.curator")
         exclude("org.pentaho")
-        exclude("com.github.joshelser")
+//        exclude("com.github.joshelser")
         exclude("org.slf4j")
     }
 
     implementation(libs.hadoop2.mapreduce.client.core) {
+        exclude("*")
+    }
+    implementation(libs.hadoop2.common) {
         exclude("*")
     }
 
