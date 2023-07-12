@@ -30,6 +30,8 @@ dependencies {
         exclude("com.zaxxer", "HikariCP")
         exclude("com.google.code.findbugs", "jsr305")
         exclude("org.apache.curator")
+        exclude("com.github.joshelser")
+        exclude("io.dropwizard.metricss")
         exclude("org.slf4j")
     }
 
@@ -47,6 +49,7 @@ dependencies {
         exclude("org.apache.logging.log4j")
         exclude("org.apache.curator")
         exclude("org.pentaho")
+        exclude("com.github.joshelser")
         exclude("org.slf4j")
     }
 
