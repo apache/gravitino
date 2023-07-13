@@ -5,6 +5,7 @@ import com.datastrato.graviton.client.RESTClient;
 import com.datastrato.graviton.dto.requests.MetalakeCreateRequest;
 import com.datastrato.graviton.dto.requests.MetalakeUpdateRequest;
 import com.datastrato.graviton.dto.requests.MetalakeUpdatesRequest;
+import com.datastrato.graviton.dto.responses.DropResponse;
 import com.datastrato.graviton.dto.responses.MetalakeListResponse;
 import com.datastrato.graviton.dto.responses.MetalakeResponse;
 import com.datastrato.graviton.exceptions.MetalakeAlreadyExistsException;
@@ -126,17 +127,19 @@ public class GravitonClient implements SupportMetalakes, Closeable {
         "Metalake name identifier is a top-level identifier, namespace should be empty");
 
     try {
-      restClient.delete(
-          "api/metalakes/" + ident.toString(),
-          null,
-          Collections.emptyMap(),
-          ErrorHandlers.metalakeErrorHandler());
+      DropResponse resp =
+          restClient.delete(
+              "api/metalakes/" + ident.toString(),
+              DropResponse.class,
+              Collections.emptyMap(),
+              ErrorHandlers.metalakeErrorHandler());
+      resp.validate();
+      return resp.dropped();
+
     } catch (Exception e) {
       LOG.warn("Failed to drop metadata {}", ident, e);
       return false;
     }
-
-    return true;
   }
 
   @Override

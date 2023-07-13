@@ -16,7 +16,7 @@ public class CatalogResponse extends BaseResponse {
   private final CatalogDTO catalog;
 
   public CatalogResponse(CatalogDTO catalog) {
-    super(0, null, null);
+    super(0);
     this.catalog = catalog;
   }
 
@@ -28,6 +28,8 @@ public class CatalogResponse extends BaseResponse {
 
   @Override
   public void validate() throws IllegalArgumentException {
+    super.validate();
+
     Preconditions.checkArgument(catalog != null, "catalog must be non-null");
     Preconditions.checkArgument(
         catalog.name() != null && !catalog.name().isEmpty(),

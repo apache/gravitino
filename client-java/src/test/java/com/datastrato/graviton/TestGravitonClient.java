@@ -4,8 +4,8 @@ import com.datastrato.graviton.dto.AuditDTO;
 import com.datastrato.graviton.dto.MetalakeDTO;
 import com.datastrato.graviton.dto.requests.MetalakeCreateRequest;
 import com.datastrato.graviton.dto.requests.MetalakeUpdatesRequest;
-import com.datastrato.graviton.dto.responses.BaseResponse;
-import com.datastrato.graviton.dto.responses.ErrorType;
+import com.datastrato.graviton.dto.responses.DropResponse;
+import com.datastrato.graviton.dto.responses.ErrorResponse;
 import com.datastrato.graviton.dto.responses.MetalakeListResponse;
 import com.datastrato.graviton.dto.responses.MetalakeResponse;
 import com.datastrato.graviton.exceptions.MetalakeAlreadyExistsException;
@@ -89,7 +89,7 @@ public class TestGravitonClient {
     Assertions.assertEquals(0, metaLakes1.length);
 
     // Test return internal error
-    BaseResponse errorResp = BaseResponse.error(ErrorType.SYSTEM_ERROR, "mock error");
+    ErrorResponse errorResp = ErrorResponse.internalError("mock error");
     buildMockResource(
         Method.GET, "/api/metalakes", null, errorResp, HttpStatus.SC_INTERNAL_SERVER_ERROR);
     Throwable excep = Assertions.assertThrows(RESTException.class, () -> client.listMetalakes());
@@ -119,7 +119,8 @@ public class TestGravitonClient {
     Assertions.assertEquals("creator", metaLake.auditInfo().creator());
 
     // Test return not found
-    BaseResponse errorResp = BaseResponse.error(ErrorType.NOT_FOUND, "mock error");
+    ErrorResponse errorResp =
+        ErrorResponse.notFound(NoSuchMetalakeException.class.getSimpleName(), "mock error");
     buildMockResource(Method.GET, "/api/metalakes/mock", null, errorResp, HttpStatus.SC_NOT_FOUND);
     Throwable excep =
         Assertions.assertThrows(
@@ -162,7 +163,9 @@ public class TestGravitonClient {
     Assertions.assertEquals("creator", metaLake.auditInfo().creator());
 
     // Test metalake name already exists
-    BaseResponse errorResp = BaseResponse.error(ErrorType.ALREADY_EXISTS, "mock error");
+    ErrorResponse errorResp =
+        ErrorResponse.alreadyExists(
+            MetalakeAlreadyExistsException.class.getSimpleName(), "mock error");
     buildMockResource(Method.POST, "/api/metalakes", req, errorResp, HttpStatus.SC_CONFLICT);
     Throwable excep =
         Assertions.assertThrows(
@@ -211,7 +214,8 @@ public class TestGravitonClient {
     Assertions.assertEquals("creator", metaLake.auditInfo().creator());
 
     // Test return not found
-    BaseResponse errorResp = BaseResponse.error(ErrorType.NOT_FOUND, "mock error");
+    ErrorResponse errorResp =
+        ErrorResponse.notFound(NoSuchMetalakeException.class.getSimpleName(), "mock error");
     buildMockResource(Method.PUT, "/api/metalakes/mock", req, errorResp, HttpStatus.SC_NOT_FOUND);
     Throwable excep =
         Assertions.assertThrows(
@@ -229,11 +233,16 @@ public class TestGravitonClient {
 
   @Test
   public void testDropMetalake() throws JsonProcessingException {
-    buildMockResource(Method.DELETE, "/api/metalakes/mock", null, null, HttpStatus.SC_NO_CONTENT);
+    DropResponse resp = new DropResponse(true);
+    buildMockResource(Method.DELETE, "/api/metalakes/mock", null, resp, HttpStatus.SC_OK);
     Assertions.assertTrue(client.dropMetalake(NameIdentifier.of("mock")));
 
+    DropResponse resp1 = new DropResponse(false);
+    buildMockResource(Method.DELETE, "/api/metalakes/mock", null, resp1, HttpStatus.SC_OK);
+    Assertions.assertFalse(client.dropMetalake(NameIdentifier.of("mock")));
+
     // Test return internal error
-    BaseResponse errorResp = BaseResponse.error(ErrorType.INTERNAL_ERROR, "mock error");
+    ErrorResponse errorResp = ErrorResponse.internalError("mock error");
     buildMockResource(
         Method.DELETE, "/api/metalakes/mock", null, errorResp, HttpStatus.SC_INTERNAL_SERVER_ERROR);
     Assertions.assertFalse(client.dropMetalake(NameIdentifier.of("mock")));
