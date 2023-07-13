@@ -17,7 +17,7 @@ public class MetalakeListResponse extends BaseResponse {
   private final MetalakeDTO[] metalakes;
 
   public MetalakeListResponse(MetalakeDTO[] metalakes) {
-    super(0, null, null);
+    super(0);
     this.metalakes = metalakes;
   }
 
@@ -29,6 +29,8 @@ public class MetalakeListResponse extends BaseResponse {
 
   @Override
   public void validate() throws IllegalArgumentException {
+    super.validate();
+
     Preconditions.checkArgument(metalakes != null, "metalakes must be non-null");
     Arrays.stream(metalakes)
         .forEach(

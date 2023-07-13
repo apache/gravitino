@@ -8,10 +8,7 @@ import com.datastrato.graviton.dto.MetalakeDTO;
 import com.datastrato.graviton.dto.requests.MetalakeCreateRequest;
 import com.datastrato.graviton.dto.requests.MetalakeUpdateRequest;
 import com.datastrato.graviton.dto.requests.MetalakeUpdatesRequest;
-import com.datastrato.graviton.dto.responses.BaseResponse;
-import com.datastrato.graviton.dto.responses.ErrorType;
-import com.datastrato.graviton.dto.responses.MetalakeListResponse;
-import com.datastrato.graviton.dto.responses.MetalakeResponse;
+import com.datastrato.graviton.dto.responses.*;
 import com.datastrato.graviton.exceptions.NoSuchMetalakeException;
 import com.datastrato.graviton.meta.AuditInfo;
 import com.datastrato.graviton.meta.BaseMetalake;
@@ -88,8 +85,6 @@ public class TestMetalakeOperations extends JerseyTest {
 
     MetalakeListResponse metalakeListResponse = resp.readEntity(MetalakeListResponse.class);
     Assertions.assertEquals(0, metalakeListResponse.getCode());
-    Assertions.assertNull(metalakeListResponse.getMessage());
-    Assertions.assertNull(metalakeListResponse.getType());
 
     MetalakeDTO[] metalakes = metalakeListResponse.getMetalakes();
     Assertions.assertEquals(2, metalakes.length);
@@ -127,8 +122,6 @@ public class TestMetalakeOperations extends JerseyTest {
 
     MetalakeResponse metalakeResponse = resp.readEntity(MetalakeResponse.class);
     Assertions.assertEquals(0, metalakeResponse.getCode());
-    Assertions.assertNull(metalakeResponse.getMessage());
-    Assertions.assertNull(metalakeResponse.getType());
 
     MetalakeDTO metalake = metalakeResponse.getMetalake();
     Assertions.assertEquals("metalake", metalake.name());
@@ -143,11 +136,10 @@ public class TestMetalakeOperations extends JerseyTest {
             .post(Entity.entity(req1, MediaType.APPLICATION_JSON_TYPE));
     Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), resp1.getStatus());
 
-    BaseResponse baseResponse = resp1.readEntity(BaseResponse.class);
-    Assertions.assertEquals(ErrorType.INVALID_ARGUMENTS.errorCode(), baseResponse.getCode());
-    Assertions.assertEquals(ErrorType.INVALID_ARGUMENTS.errorType(), baseResponse.getType());
+    ErrorResponse errorResponse = resp1.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, errorResponse.getCode());
     Assertions.assertEquals(
-        "\"name\" field is required and cannot be empty", baseResponse.getMessage());
+        IllegalArgumentException.class.getSimpleName(), errorResponse.getType());
   }
 
   @Test
@@ -177,8 +169,6 @@ public class TestMetalakeOperations extends JerseyTest {
 
     MetalakeResponse metalakeResponse = resp.readEntity(MetalakeResponse.class);
     Assertions.assertEquals(0, metalakeResponse.getCode());
-    Assertions.assertNull(metalakeResponse.getMessage());
-    Assertions.assertNull(metalakeResponse.getType());
 
     MetalakeDTO metalake1 = metalakeResponse.getMetalake();
     Assertions.assertEquals(metalakeName, metalake1.name());
@@ -198,11 +188,11 @@ public class TestMetalakeOperations extends JerseyTest {
 
     Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), resp1.getStatus());
 
-    BaseResponse baseResponse = resp1.readEntity(BaseResponse.class);
-    Assertions.assertEquals(ErrorType.NOT_FOUND.errorCode(), baseResponse.getCode());
-    Assertions.assertEquals(ErrorType.NOT_FOUND.errorType(), baseResponse.getType());
+    ErrorResponse errorResponse = resp1.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResponse.getCode());
+    Assertions.assertEquals(NoSuchMetalakeException.class.getSimpleName(), errorResponse.getType());
     Assertions.assertEquals(
-        "Failed to find metalake by name " + metalakeName, baseResponse.getMessage());
+        "Metalake " + metalakeName + " does not exist", errorResponse.getMessage());
 
     // Test with internal error
     doThrow(new RuntimeException("Internal error")).when(metalakesOperations).loadMetalake(any());
@@ -216,10 +206,10 @@ public class TestMetalakeOperations extends JerseyTest {
     Assertions.assertEquals(
         Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), resp2.getStatus());
 
-    BaseResponse baseResponse1 = resp2.readEntity(BaseResponse.class);
-    Assertions.assertEquals(ErrorType.INTERNAL_ERROR.errorCode(), baseResponse1.getCode());
-    Assertions.assertEquals(ErrorType.INTERNAL_ERROR.errorType(), baseResponse1.getType());
-    Assertions.assertEquals("Internal error", baseResponse1.getMessage());
+    ErrorResponse errorResponse1 = resp2.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse1.getCode());
+    Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse1.getType());
+    Assertions.assertEquals("Failed to load metalake " + metalakeName, errorResponse1.getMessage());
   }
 
   @Test
@@ -259,8 +249,6 @@ public class TestMetalakeOperations extends JerseyTest {
 
     MetalakeResponse metalakeResponse = resp.readEntity(MetalakeResponse.class);
     Assertions.assertEquals(0, metalakeResponse.getCode());
-    Assertions.assertNull(metalakeResponse.getMessage());
-    Assertions.assertNull(metalakeResponse.getType());
 
     MetalakeDTO metalake1 = metalakeResponse.getMetalake();
     Assertions.assertEquals(metalakeName, metalake1.name());
@@ -279,9 +267,9 @@ public class TestMetalakeOperations extends JerseyTest {
             .put(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
 
     Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), resp1.getStatus());
-    BaseResponse baseResponse = resp1.readEntity(BaseResponse.class);
-    Assertions.assertEquals(ErrorType.NOT_FOUND.errorCode(), baseResponse.getCode());
-    Assertions.assertEquals(ErrorType.NOT_FOUND.errorType(), baseResponse.getType());
+    ErrorResponse errorResponse = resp1.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResponse.getCode());
+    Assertions.assertEquals(NoSuchMetalakeException.class.getSimpleName(), errorResponse.getType());
 
     // Test with internal error
     doThrow(new RuntimeException("Internal error"))
@@ -296,9 +284,9 @@ public class TestMetalakeOperations extends JerseyTest {
 
     Assertions.assertEquals(
         Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), resp2.getStatus());
-    BaseResponse baseResponse1 = resp2.readEntity(BaseResponse.class);
-    Assertions.assertEquals(ErrorType.INTERNAL_ERROR.errorCode(), baseResponse1.getCode());
-    Assertions.assertEquals(ErrorType.INTERNAL_ERROR.errorType(), baseResponse1.getType());
+    ErrorResponse errorResponse1 = resp2.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse1.getCode());
+    Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse1.getType());
   }
 
   @Test
@@ -310,7 +298,12 @@ public class TestMetalakeOperations extends JerseyTest {
             .accept("application/vnd.graviton.v1+json")
             .delete();
 
-    Assertions.assertEquals(Response.Status.NO_CONTENT.getStatusCode(), resp.getStatus());
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+
+    DropResponse dropResponse = resp.readEntity(DropResponse.class);
+    Assertions.assertEquals(0, dropResponse.getCode());
+    boolean dropped = dropResponse.dropped();
+    Assertions.assertTrue(dropped);
 
     // Test throw an exception when deleting tenant.
     doThrow(new RuntimeException("Internal error")).when(metalakesOperations).dropMetalake(any());
@@ -324,9 +317,9 @@ public class TestMetalakeOperations extends JerseyTest {
     Assertions.assertEquals(
         Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), resp1.getStatus());
 
-    BaseResponse baseResponse = resp1.readEntity(BaseResponse.class);
-    Assertions.assertEquals(ErrorType.INTERNAL_ERROR.errorCode(), baseResponse.getCode());
-    Assertions.assertEquals(ErrorType.INTERNAL_ERROR.errorType(), baseResponse.getType());
-    Assertions.assertEquals("Internal error", baseResponse.getMessage());
+    ErrorResponse errorResponse = resp1.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse.getCode());
+    Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse.getType());
+    Assertions.assertEquals("Failed to drop metalake test", errorResponse.getMessage());
   }
 }

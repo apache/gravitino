@@ -6,6 +6,7 @@ import com.datastrato.graviton.dto.MetalakeDTO;
 import com.datastrato.graviton.dto.requests.MetalakeCreateRequest;
 import com.datastrato.graviton.dto.requests.MetalakeUpdateRequest;
 import com.datastrato.graviton.dto.requests.MetalakeUpdatesRequest;
+import com.datastrato.graviton.dto.responses.DropResponse;
 import com.datastrato.graviton.dto.responses.MetalakeListResponse;
 import com.datastrato.graviton.dto.responses.MetalakeResponse;
 import com.datastrato.graviton.exceptions.MetalakeAlreadyExistsException;
@@ -50,7 +51,7 @@ public class MetalakeOperations {
 
     } catch (Exception e) {
       LOG.error("Failed to list metalakes", e);
-      return Utils.internalError(e.getMessage());
+      return Utils.internalError("Failed to list metalake", e);
     }
   }
 
@@ -60,9 +61,10 @@ public class MetalakeOperations {
     try {
       request.validate();
     } catch (IllegalArgumentException e) {
-      LOG.error("Failed to validate create Metalake arguments {}", request, e);
+      LOG.error("Failed to validate MetalakeCreateRequest arguments {}", request, e);
 
-      return Utils.illegalArguments(e.getMessage());
+      return Utils.illegalArguments(
+          "Failed to validate MetalakeCreateRequest arguments " + request, e);
     }
 
     try {
@@ -72,12 +74,12 @@ public class MetalakeOperations {
       return Utils.ok(new MetalakeResponse(DTOConverters.toDTO(metalake)));
 
     } catch (MetalakeAlreadyExistsException exception) {
-      LOG.error("Metalake with name {} already exists", request.getName(), exception);
-      return Utils.alreadyExists(exception.getMessage());
+      LOG.warn("Metalake {} already exists", request.getName(), exception);
+      return Utils.alreadyExists("Metalake " + request.getName() + " already exists", exception);
 
     } catch (Exception e) {
       LOG.error("Failed to create metalake", e);
-      return Utils.internalError(e.getMessage());
+      return Utils.internalError("Failed to create metalake", e);
     }
   }
 
@@ -87,7 +89,7 @@ public class MetalakeOperations {
   public Response loadMetalake(@PathParam("name") String metalakeName) {
     if (metalakeName == null || metalakeName.isEmpty()) {
       LOG.error("Metalake name is null or empty");
-      return Utils.illegalArguments("Metalake name is required");
+      return Utils.illegalArguments("Metalake name is illegal");
     }
 
     try {
@@ -96,12 +98,12 @@ public class MetalakeOperations {
       return Utils.ok(new MetalakeResponse(DTOConverters.toDTO(metalake)));
 
     } catch (NoSuchMetalakeException e) {
-      LOG.error("Failed to find metalake by name {}", metalakeName);
-      return Utils.notFound(e.getMessage());
+      LOG.warn("Metalake {} does not exist", metalakeName);
+      return Utils.notFound("Metalake " + metalakeName + " does not exist", e);
 
     } catch (Exception e) {
-      LOG.error("Failed to get metalake by name {}", metalakeName, e);
-      return Utils.internalError(e.getMessage());
+      LOG.error("Failed to load metalake {}", metalakeName, e);
+      return Utils.internalError("Failed to load metalake " + metalakeName, e);
     }
   }
 
@@ -112,14 +114,15 @@ public class MetalakeOperations {
       @PathParam("name") String metalakeName, MetalakeUpdatesRequest updatesRequest) {
     if (metalakeName == null || metalakeName.isEmpty()) {
       LOG.error("Metalake name is null or empty");
-      return Utils.illegalArguments("Metalake name is required");
+      return Utils.illegalArguments("Metalake name is illegal");
     }
 
     try {
       updatesRequest.validate();
     } catch (Exception e) {
-      LOG.error("Failed to validate alter metalake arguments {}", updatesRequest, e);
-      return Utils.illegalArguments(e.getMessage());
+      LOG.error("Failed to validate MetalakeUpdatesRequest arguments {}", updatesRequest, e);
+      return Utils.illegalArguments(
+          "Failed to validate MetalakeUpdatesRequest arguments " + updatesRequest, e);
     }
 
     try {
@@ -133,16 +136,17 @@ public class MetalakeOperations {
       return Utils.ok(new MetalakeResponse(DTOConverters.toDTO(updatedMetalake)));
 
     } catch (NoSuchMetalakeException e) {
-      LOG.error("Failed to find metalake by name {}", metalakeName);
-      return Utils.notFound(e.getMessage());
+      LOG.warn("Metalake {} does not exist", metalakeName);
+      return Utils.notFound("Metalake " + metalakeName + " does not exist", e);
 
     } catch (IllegalArgumentException ex) {
-      LOG.error("Failed to alter metalake by name {} by unsupported change", metalakeName, ex);
-      return Utils.illegalArguments(ex.getMessage());
+      LOG.error("Failed to alter metalake {} by unsupported change", metalakeName, ex);
+      return Utils.illegalArguments(
+          "Failed to alter metalake " + metalakeName + " by unsupported change", ex);
 
     } catch (Exception e) {
-      LOG.error("Failed to update metalake by name {}", metalakeName, e);
-      return Utils.internalError(e.getMessage());
+      LOG.error("Failed to update metalake {}", metalakeName, e);
+      return Utils.internalError("Failed to update metalake " + metalakeName, e);
     }
   }
 
@@ -152,22 +156,21 @@ public class MetalakeOperations {
   public Response dropMetalake(@PathParam("name") String metalakeName) {
     if (metalakeName == null || metalakeName.isEmpty()) {
       LOG.error("Metalake name is null or empty");
-      return Utils.illegalArguments("metalake name is required");
+      return Utils.illegalArguments("Metalake name is illegal");
     }
 
     try {
       NameIdentifier identifier = NameIdentifier.parse(metalakeName);
       boolean dropped = ops.dropMetalake(identifier);
-      if (dropped) {
-        return Utils.ok();
-      } else {
+      if (!dropped) {
         LOG.warn("Failed to drop metalake by name {}", metalakeName);
-        return Utils.internalError("Failed to drop metalake by name " + metalakeName);
       }
 
+      return Utils.ok(new DropResponse(dropped));
+
     } catch (Exception e) {
-      LOG.error("Failed to drop metalake by name {}", metalakeName, e);
-      return Utils.internalError(e.getMessage());
+      LOG.error("Failed to drop metalake {}", metalakeName, e);
+      return Utils.internalError("Failed to drop metalake " + metalakeName, e);
     }
   }
 }

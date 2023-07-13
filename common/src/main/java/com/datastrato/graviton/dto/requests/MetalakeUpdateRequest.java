@@ -85,6 +85,7 @@ public interface MetalakeUpdateRequest extends RESTRequest {
   }
 
   @EqualsAndHashCode
+  @ToString
   class SetMetalakePropertyRequest implements MetalakeUpdateRequest {
 
     @Getter

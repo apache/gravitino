@@ -17,7 +17,7 @@ public class CatalogListResponse extends BaseResponse {
   private final CatalogDTO[] catalogs;
 
   public CatalogListResponse(CatalogDTO[] catalogs) {
-    super(0, null, null);
+    super(0);
     this.catalogs = catalogs;
   }
 
@@ -29,6 +29,8 @@ public class CatalogListResponse extends BaseResponse {
 
   @Override
   public void validate() throws IllegalArgumentException {
+    super.validate();
+
     Preconditions.checkArgument(catalogs != null, "catalogs must be non-null");
     Arrays.stream(catalogs)
         .forEach(

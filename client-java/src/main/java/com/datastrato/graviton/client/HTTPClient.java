@@ -19,8 +19,7 @@
 
 package com.datastrato.graviton.client;
 
-import com.datastrato.graviton.dto.responses.BaseResponse;
-import com.datastrato.graviton.dto.responses.ErrorType;
+import com.datastrato.graviton.dto.responses.ErrorResponse;
 import com.datastrato.graviton.exceptions.RESTException;
 import com.datastrato.graviton.json.JsonUtils;
 import com.datastrato.graviton.rest.RESTRequest;
@@ -110,21 +109,21 @@ public class HTTPClient implements RESTClient {
         || code == HttpStatus.SC_NO_CONTENT;
   }
 
-  private BaseResponse buildDefaultErrorResponse(CloseableHttpResponse response) {
+  private ErrorResponse buildRestErrorResponse(CloseableHttpResponse response) {
     String responseReason = response.getReasonPhrase();
     String message =
         responseReason != null && !responseReason.isEmpty()
             ? responseReason
             : EnglishReasonPhraseCatalog.INSTANCE.getReason(response.getCode(), null /* ignored */);
-    return BaseResponse.error(ErrorType.SYSTEM_ERROR, message);
+    return ErrorResponse.restError(message);
   }
 
   // Process a failed response through the provided errorHandler, and throw a RESTException.java if
   // the
   // provided error handler doesn't already throw.
   private void throwFailure(
-      CloseableHttpResponse response, String responseBody, Consumer<BaseResponse> errorHandler) {
-    BaseResponse errorResponse = null;
+      CloseableHttpResponse response, String responseBody, Consumer<ErrorResponse> errorHandler) {
+    ErrorResponse errorResponse = null;
 
     if (responseBody != null) {
       try {
@@ -135,7 +134,11 @@ public class HTTPClient implements RESTClient {
           LOG.warn(
               "Unknown error handler {}, response body won't be parsed",
               errorHandler.getClass().getName());
-          errorResponse = BaseResponse.error(ErrorType.UNKNOWN, responseBody);
+          errorResponse =
+              ErrorResponse.unknownError(
+                  String.format(
+                      "Unknown error handler %s, response body won't be parsed %s",
+                      errorHandler.getClass().getName(), responseBody));
         }
 
       } catch (UncheckedIOException | IllegalArgumentException e) {
@@ -152,7 +155,7 @@ public class HTTPClient implements RESTClient {
     }
 
     if (errorResponse == null) {
-      errorResponse = buildDefaultErrorResponse(response);
+      errorResponse = buildRestErrorResponse(response);
     }
 
     errorHandler.accept(errorResponse);
@@ -197,7 +200,7 @@ public class HTTPClient implements RESTClient {
       Object requestBody,
       Class<T> responseType,
       Map<String, String> headers,
-      Consumer<BaseResponse> errorHandler) {
+      Consumer<ErrorResponse> errorHandler) {
     return execute(
         method, path, queryParams, requestBody, responseType, headers, errorHandler, h -> {});
   }
@@ -225,7 +228,7 @@ public class HTTPClient implements RESTClient {
       Object requestBody,
       Class<T> responseType,
       Map<String, String> headers,
-      Consumer<BaseResponse> errorHandler,
+      Consumer<ErrorResponse> errorHandler,
       Consumer<Map<String, String>> responseHeaders) {
     if (path.startsWith("/")) {
       throw new RESTException(
@@ -289,7 +292,7 @@ public class HTTPClient implements RESTClient {
   }
 
   @Override
-  public void head(String path, Map<String, String> headers, Consumer<BaseResponse> errorHandler) {
+  public void head(String path, Map<String, String> headers, Consumer<ErrorResponse> errorHandler) {
     execute(Method.HEAD, path, null, null, null, headers, errorHandler);
   }
 
@@ -299,7 +302,7 @@ public class HTTPClient implements RESTClient {
       Map<String, String> queryParams,
       Class<T> responseType,
       Map<String, String> headers,
-      Consumer<BaseResponse> errorHandler) {
+      Consumer<ErrorResponse> errorHandler) {
     return execute(Method.GET, path, queryParams, null, responseType, headers, errorHandler);
   }
 
@@ -309,7 +312,7 @@ public class HTTPClient implements RESTClient {
       RESTRequest body,
       Class<T> responseType,
       Map<String, String> headers,
-      Consumer<BaseResponse> errorHandler) {
+      Consumer<ErrorResponse> errorHandler) {
     return execute(Method.POST, path, null, body, responseType, headers, errorHandler);
   }
 
@@ -319,7 +322,7 @@ public class HTTPClient implements RESTClient {
       RESTRequest body,
       Class<T> responseType,
       Map<String, String> headers,
-      Consumer<BaseResponse> errorHandler,
+      Consumer<ErrorResponse> errorHandler,
       Consumer<Map<String, String>> responseHeaders) {
     return execute(
         Method.POST, path, null, body, responseType, headers, errorHandler, responseHeaders);
@@ -331,7 +334,7 @@ public class HTTPClient implements RESTClient {
       RESTRequest body,
       Class<T> responseType,
       Map<String, String> headers,
-      Consumer<BaseResponse> errorHandler) {
+      Consumer<ErrorResponse> errorHandler) {
     return execute(Method.PUT, path, null, body, responseType, headers, errorHandler);
   }
 
@@ -341,7 +344,7 @@ public class HTTPClient implements RESTClient {
       RESTRequest body,
       Class<T> responseType,
       Map<String, String> headers,
-      Consumer<BaseResponse> errorHandler,
+      Consumer<ErrorResponse> errorHandler,
       Consumer<Map<String, String>> responseHeaders) {
     return execute(
         Method.PUT, path, null, body, responseType, headers, errorHandler, responseHeaders);
@@ -352,7 +355,7 @@ public class HTTPClient implements RESTClient {
       String path,
       Class<T> responseType,
       Map<String, String> headers,
-      Consumer<BaseResponse> errorHandler) {
+      Consumer<ErrorResponse> errorHandler) {
     return execute(Method.DELETE, path, null, null, responseType, headers, errorHandler);
   }
 
@@ -362,7 +365,7 @@ public class HTTPClient implements RESTClient {
       Map<String, String> queryParams,
       Class<T> responseType,
       Map<String, String> headers,
-      Consumer<BaseResponse> errorHandler) {
+      Consumer<ErrorResponse> errorHandler) {
     return execute(Method.DELETE, path, queryParams, null, responseType, headers, errorHandler);
   }
 
@@ -372,7 +375,7 @@ public class HTTPClient implements RESTClient {
       Map<String, String> formData,
       Class<T> responseType,
       Map<String, String> headers,
-      Consumer<BaseResponse> errorHandler) {
+      Consumer<ErrorResponse> errorHandler) {
     return execute(Method.POST, path, null, formData, responseType, headers, errorHandler);
   }
 
