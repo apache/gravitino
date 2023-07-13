@@ -1,7 +1,7 @@
 package com.datastrato.graviton.meta;
 
+import com.datastrato.graviton.Catalog;
 import com.datastrato.graviton.Field;
-import com.datastrato.graviton.TestCatalog;
 import com.google.common.collect.ImmutableMap;
 import java.time.Instant;
 import java.util.Map;
@@ -23,8 +23,7 @@ public class TestEntity {
   // Catalog test data
   private final Long catalogId = 1L;
   private final String catalogName = "testCatalog";
-  private final BaseCatalog.Type type = BaseCatalog.Type.RELATIONAL;
-  private final String catalogComment = "testComment";
+  private final Catalog.Type type = Catalog.Type.RELATIONAL;
 
   @Test
   public void testMetalake() {
@@ -48,8 +47,9 @@ public class TestEntity {
 
   @Test
   public void testCatalog() {
-    TestCatalog testCatalog =
-        new TestCatalog.Builder()
+    String catalogComment = "testComment";
+    CatalogEntity testCatalog =
+        new CatalogEntity.Builder()
             .withId(catalogId)
             .withMetalakeId(metalakeId)
             .withName(catalogName)
@@ -60,12 +60,12 @@ public class TestEntity {
             .build();
 
     Map<Field, Object> fields = testCatalog.fields();
-    Assertions.assertEquals(catalogId, fields.get(TestCatalog.ID));
-    Assertions.assertEquals(metalakeId, fields.get(TestCatalog.METALAKE_ID));
-    Assertions.assertEquals(catalogName, fields.get(TestCatalog.NAME));
-    Assertions.assertEquals(catalogComment, fields.get(TestCatalog.COMMENT));
-    Assertions.assertEquals(type, fields.get(TestCatalog.TYPE));
-    Assertions.assertEquals(map, fields.get(TestCatalog.PROPERTIES));
-    Assertions.assertEquals(auditInfo, fields.get(TestCatalog.AUDIT_INFO));
+    Assertions.assertEquals(catalogId, fields.get(CatalogEntity.ID));
+    Assertions.assertEquals(metalakeId, fields.get(CatalogEntity.METALAKE_ID));
+    Assertions.assertEquals(catalogName, fields.get(CatalogEntity.NAME));
+    Assertions.assertEquals(catalogComment, fields.get(CatalogEntity.COMMENT));
+    Assertions.assertEquals(type, fields.get(CatalogEntity.TYPE));
+    Assertions.assertEquals(map, fields.get(CatalogEntity.PROPERTIES));
+    Assertions.assertEquals(auditInfo, fields.get(CatalogEntity.AUDIT_INFO));
   }
 }

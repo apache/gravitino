@@ -1,4 +1,4 @@
-package com.datastrato.graviton.catalog.hive.rel;
+package com.datastrato.graviton.catalog.hive;
 
 import com.datastrato.graviton.meta.rel.BaseSchema;
 import com.google.common.base.Preconditions;
