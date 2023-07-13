@@ -6,9 +6,9 @@ import java.io.Closeable;
 import java.util.Map;
 
 /**
- * A catalog operation interface that is used to trigger the operations of a catalog. This
- * interface should be mixed with other Catalog interface like {@link SupportsSchemas} to provide
- * schema operation, {@link TableCatalog} to support table operations, etc.
+ * A catalog operation interface that is used to trigger the operations of a catalog. This interface
+ * should be mixed with other Catalog interface like {@link SupportsSchemas} to provide schema
+ * operation, {@link TableCatalog} to support table operations, etc.
  */
 public interface CatalogOperations extends Closeable {
 
