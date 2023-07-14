@@ -7,10 +7,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
-import java.util.Map;
-import java.util.NoSuchElementException;
-import java.util.Optional;
-import java.util.Properties;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import org.slf4j.Logger;
@@ -68,6 +65,27 @@ public abstract class Config {
     }
 
     return entry.readFrom(configMap);
+  }
+
+  public String getRawString(String key) {
+    return configMap.get(key);
+  }
+
+  public String getRawString(String key, String defaultValue) {
+    return configMap.getOrDefault(key, defaultValue);
+  }
+
+  public Map<String, String> getConfigsWithPrefix(String prefix) {
+    Map<String, String> configs = Maps.newHashMap();
+    configMap.forEach(
+        (k, v) -> {
+          if (k.startsWith(prefix)) {
+            String newKey = k.substring(prefix.length());
+            configs.put(newKey, v);
+          }
+        });
+
+    return Collections.unmodifiableMap(configs);
   }
 
   public <T> void set(ConfigEntry<T> entry, T value) {

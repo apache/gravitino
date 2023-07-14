@@ -19,4 +19,11 @@ public interface configs {
           .version("0.1.0")
           .stringConf()
           .createWithDefault("proto");
+
+  ConfigEntry<Long> CATALOG_CACHE_EVICTION_INTERVAL_MS =
+      new ConfigBuilder("graviton.catalog.cache.evictionIntervalMs")
+          .doc("The interval in milliseconds to evict the catalog cache")
+          .version("0.1.0")
+          .longConf()
+          .createWithDefault(60 * 60 * 1000L);
 }

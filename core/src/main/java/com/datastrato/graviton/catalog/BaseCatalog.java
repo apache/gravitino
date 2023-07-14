@@ -5,10 +5,7 @@ import com.datastrato.graviton.Catalog;
 import com.datastrato.graviton.CatalogProvider;
 import com.datastrato.graviton.meta.CatalogEntity;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Maps;
-import java.util.Collections;
 import java.util.Map;
-import java.util.Optional;
 
 /**
  * The abstract base class for Catalog implementations.
@@ -36,7 +33,7 @@ public abstract class BaseCatalog<T extends BaseCatalog> implements Catalog, Cat
         if (ops == null) {
           Preconditions.checkArgument(
               entity != null && conf != null, "entity and conf must be set before calling ops()");
-          ops = newOps(mergeConf(properties(), conf));
+          ops = newOps(conf);
         }
       }
     }
@@ -86,11 +83,5 @@ public abstract class BaseCatalog<T extends BaseCatalog> implements Catalog, Cat
   public Audit auditInfo() {
     Preconditions.checkArgument(entity != null, "entity is not set");
     return entity.auditInfo();
-  }
-
-  private Map<String, String> mergeConf(Map<String, String> properties, Map<String, String> conf) {
-    Map<String, String> mergedConf = conf != null ? Maps.newHashMap(conf) : Maps.newHashMap();
-    Optional.ofNullable(properties).ifPresent(mergedConf::putAll);
-    return Collections.unmodifiableMap(mergedConf);
   }
 }
