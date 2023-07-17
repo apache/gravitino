@@ -56,8 +56,8 @@ public class TestEntityStore {
             .withVersion(SchemaVersion.V_0_1)
             .build();
 
-    TestCatalog catalog =
-        new TestCatalog.Builder()
+    CatalogEntity catalog =
+        new CatalogEntity.Builder()
             .withId(1L)
             .withName("catalog")
             .withNamespace(Namespace.of("metalake"))
@@ -86,7 +86,7 @@ public class TestEntityStore {
     Metalake retrievedMetalake = store.retrieveEntity(metalake);
     Assertions.assertEquals(metalake, retrievedMetalake);
 
-    BaseCatalog retrievedCatalog = store.retrieveEntity(catalog);
+    CatalogEntity retrievedCatalog = store.retrieveEntity(catalog);
     Assertions.assertEquals(catalog, retrievedCatalog);
 
     Table retrievedTable = store.retrieveEntity(table);

@@ -15,9 +15,11 @@ import com.datastrato.graviton.exceptions.NoSuchCatalogException;
 import com.datastrato.graviton.exceptions.NoSuchMetalakeException;
 import com.datastrato.graviton.meta.AuditInfo;
 import com.datastrato.graviton.meta.BaseCatalogsOperations;
+import com.datastrato.graviton.meta.CatalogEntity;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.time.Instant;
+import java.util.Collections;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.Application;
@@ -358,16 +360,22 @@ public class TestCatalogOperations extends JerseyTest {
   }
 
   private static TestCatalog buildCatalog(String metalake, String catalogName) {
-    return new TestCatalog.Builder()
-        .withId(1L)
-        .withMetalakeId(1L)
-        .withName(catalogName)
-        .withComment("comment")
-        .withNamespace(Namespace.of(metalake))
-        .withProperties(ImmutableMap.of("key", "value"))
-        .withType(Catalog.Type.RELATIONAL)
-        .withAuditInfo(
-            new AuditInfo.Builder().withCreator("creator").withCreateTime(Instant.now()).build())
-        .build();
+    CatalogEntity entity =
+        new CatalogEntity.Builder()
+            .withId(1L)
+            .withMetalakeId(1L)
+            .withName(catalogName)
+            .withComment("comment")
+            .withNamespace(Namespace.of(metalake))
+            .withProperties(ImmutableMap.of("key", "value"))
+            .withType(Catalog.Type.RELATIONAL)
+            .withAuditInfo(
+                new AuditInfo.Builder()
+                    .withCreator("creator")
+                    .withCreateTime(Instant.now())
+                    .build())
+            .build();
+
+    return new TestCatalog().withCatalogConf(Collections.emptyMap()).withCatalogEntity(entity);
   }
 }
