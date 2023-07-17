@@ -286,8 +286,8 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     } catch (InvalidOperationException e) {
       throw new NonEmptySchemaException(
           String.format(
-              "Hive schema (database) %s is not empty. One or more tables exist.",
-              ident.name(), e));
+              "Hive schema (database) %s is not empty. One or more tables exist.", ident.name()),
+          e);
 
     } catch (NoSuchObjectException e) {
       LOG.warn("Hive schema (database) {} does not exist in Hive Metastore", ident.name());

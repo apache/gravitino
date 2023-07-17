@@ -30,7 +30,7 @@ public class HiveCatalogTest extends MiniHiveMetastoreService {
             .build();
 
     Map<String, String> conf = Maps.newHashMap();
-    metastore.hiveConf().iterator().forEachRemaining(e -> conf.put(e.getKey(), e.getValue()));
+    metastore.hiveConf().forEach(e -> conf.put(e.getKey(), e.getValue()));
 
     try (HiveCatalogOperations ops = new HiveCatalogOperations(entity)) {
       ops.initialize(conf);
