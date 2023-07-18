@@ -1,7 +1,4 @@
-/*
-* Copyright 2023 Datastrato.
-* This software is licensed under the Apache License version 2.
-*/
+/*·Copyright·2023·Datastrato.·This·software·is·licensed·under·the·Apache·License·version·2.·*/
 
 package com.datastrato.graviton;
 
@@ -24,13 +21,13 @@ public interface Catalog extends Auditable {
   Type type();
 
   /**
-   * The comment of the catalog. Note. this method will return null if the comment is not set for
-   * this catalog.
+   * The comment of the catalog. Note: This method will return null if the comment is not set for a
+   * catalog.
    */
   String comment();
 
   /**
-   * The properties of the catalog. Note, this method will return null if the properties are not
+   * The properties of the catalog. Note: this method will return null if the properties are not
    * set.
    */
   Map<String, String> properties();
@@ -38,16 +35,16 @@ public interface Catalog extends Auditable {
   /**
    * Return the {@link SupportsSchemas} if the catalog supports schema operations.
    *
-   * @throws UnsupportedOperationException if the catalog does not support schema operations.
+   * @throws UnsupportedOperationException If the catalog does not support schema operations.
    */
   default SupportsSchemas asSchemas() throws UnsupportedOperationException {
     throw new UnsupportedOperationException("Catalog does not support schema operations");
   }
 
   /**
-   * return the {@link TableCatalog} if the catalog supports table operations.
+   * Return the {@link TableCatalog} if the catalog supports table operations.
    *
-   * @throws UnsupportedOperationException if the catalog does not support table operations.
+   * @throws UnsupportedOperationException If the catalog does not support table operations.
    */
   default TableCatalog asTableCatalog() throws UnsupportedOperationException {
     throw new UnsupportedOperationException("Catalog does not support table operations");

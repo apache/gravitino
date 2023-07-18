@@ -1,7 +1,4 @@
-/*
-* Copyright 2023 Datastrato.
-* This software is licensed under the Apache License version 2.
-*/
+/*·Copyright·2023·Datastrato.·This·software·is·licensed·under·the·Apache·License·version·2.·*/
 
 package com.datastrato.graviton.rel;
 
@@ -11,25 +8,25 @@ import java.util.Map;
 import javax.annotation.Nullable;
 
 /**
- * An interface representing a schema in the {@link com.datastrato.graviton.Catalog}. Schema is a
- * basic container of relational objects, like tables, views, etc. Schema can be self-nested, which
- * means it can be schema1.schema2.table.
+ * An interface representing a schema in the {@link com.datastrato.graviton.Catalog}. A Schema is a
+ * basic container of relational objects, like tables, views, etc. A Schema can be self-nested,
+ * which means it can be schema1.schema2.table.
  *
- * <p>It defines basic properties of a schema. A catalog implementation with {@link SupportsSchemas}
- * should implement it.
+ * <p>This defines the basic properties of a schema. A catalog implementation with {@link
+ * SupportsSchemas} should implement this interface.
  */
 public interface Schema extends Auditable {
 
-  /** return the name of the Schema. */
+  /** Return the name of the Schema. */
   String name();
 
-  /** return the comment of the Schema. Null is returned if no comment is set. */
+  /** Return the comment of the Schema. Null is returned if the comment is not set. */
   @Nullable
   default String comment() {
     return null;
   }
 
-  /** return the properties of the Schema. Empty map is returned if no properties are set. */
+  /** Return the properties of the Schema. An empty map is returned if no properties are set. */
   default Map<String, String> properties() {
     return Collections.emptyMap();
   }

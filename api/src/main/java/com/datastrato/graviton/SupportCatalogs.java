@@ -1,7 +1,4 @@
-/*
-* Copyright 2023 Datastrato.
-* This software is licensed under the Apache License version 2.
-*/
+/*·Copyright·2023·Datastrato.·This·software·is·licensed·under·the·Apache·License·version·2.·*/
 
 package com.datastrato.graviton;
 
@@ -46,12 +43,12 @@ public interface SupportCatalogs {
   }
 
   /**
-   * Create a catalog with specified identifier.
+   * Create a catalog with a specified identifier.
    *
-   * @param ident the identifier of the catalog.
-   * @param type the type of the catalog.
-   * @param comment the comment of the catalog.
-   * @param properties the properties of the catalog.
+   * @param ident The identifier of the catalog.
+   * @param type The type of the catalog.
+   * @param comment The comment of the catalog.
+   * @param properties The properties of the catalog.
    * @return The created catalog.
    * @throws NoSuchMetalakeException If the metalake does not exist.
    * @throws CatalogAlreadyExistsException If the catalog already exists.
@@ -61,10 +58,10 @@ public interface SupportCatalogs {
       throws NoSuchMetalakeException, CatalogAlreadyExistsException;
 
   /**
-   * Alter a catalog with specified identifier.
+   * Alter a catalog with a specified identifier.
    *
-   * @param ident the identifier of the catalog.
-   * @param changes the changes to apply to the catalog.
+   * @param ident The identifier of the catalog.
+   * @param changes The changes to apply to the catalog.
    * @return The altered catalog.
    * @throws NoSuchCatalogException If the catalog does not exist.
    * @throws IllegalArgumentException If the changes cannot be applied to the catalog.
@@ -73,9 +70,9 @@ public interface SupportCatalogs {
       throws NoSuchCatalogException, IllegalArgumentException;
 
   /**
-   * Drop a catalog with specified identifier.
+   * Drop a catalog with a specified identifier.
    *
-   * @param ident the identifier of the catalog.
+   * @param ident The identifier of the catalog.
    * @return True if the catalog was dropped, false otherwise.
    */
   boolean dropCatalog(NameIdentifier ident);

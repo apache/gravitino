@@ -1,7 +1,4 @@
-/*
-* Copyright 2023 Datastrato.
-* This software is licensed under the Apache License version 2.
-*/
+/*·Copyright·2023·Datastrato.·This·software·is·licensed·under·the·Apache·License·version·2.·*/
 
 package com.datastrato.graviton;
 
@@ -13,8 +10,8 @@ public interface MetalakeChange {
   /**
    * Creates a new metalake change to rename the metalake.
    *
-   * @param newName the new name of the metalake
-   * @return the metalake change
+   * @param newNameTthe New name of the metalake.
+   * @return The metalake change.
    */
   static MetalakeChange rename(String newName) {
     return new RenameMetalake(newName);
@@ -23,29 +20,29 @@ public interface MetalakeChange {
   /**
    * Creates a new metalake change to update the metalake comment.
    *
-   * @param newComment the new comment of the metalake
-   * @return the metalake change
+   * @param newComment The new comment of the metalake.
+   * @return The metalake change.
    */
   static MetalakeChange updateComment(String newComment) {
     return new UpdateMetalakeComment(newComment);
   }
 
   /**
-   * Creates a new metalake change to set the property and value for the metalake.
+   * Creates a new metalake change to set a property and value pair for the metalake.
    *
-   * @param property the property name to set
-   * @param value the property value to set
-   * @return the metalake change
+   * @param property The property name to set.
+   * @param value The value to set the property to.
+   * @return The metalake change.
    */
   static MetalakeChange setProperty(String property, String value) {
     return new SetProperty(property, value);
   }
 
   /**
-   * Creates a new metalake change to remove the property from the metalake.
+   * Creates a new metalake change to remove a property from the metalake.
    *
-   * @param property the property name to remove
-   * @return the metalake change
+   * @param property The property name to remove.
+   * @return The metalake change.
    */
   static MetalakeChange removeProperty(String property) {
     return new RemoveProperty(property);
