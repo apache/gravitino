@@ -46,7 +46,7 @@ public class CatalogManager implements SupportCatalogs {
         throw new UnsupportedOperationException("Catalog does not support schema operations");
       }
 
-      return classLoader.withClassLoader(() -> fn.apply(asSchemas()));
+      return classLoader.withClassLoader(cl -> fn.apply(asSchemas()));
     }
 
     public <R> R doWithTableOps(ThrowableFunction<TableCatalog, R> fn) throws Exception {
@@ -54,13 +54,13 @@ public class CatalogManager implements SupportCatalogs {
         throw new UnsupportedOperationException("Catalog does not support table operations");
       }
 
-      return classLoader.withClassLoader(() -> fn.apply(asTables()));
+      return classLoader.withClassLoader(cl -> fn.apply(asTables()));
     }
 
     public void close() {
       try {
         classLoader.withClassLoader(
-            () -> {
+            cl -> {
               if (catalog != null) {
                 catalog.ops().close();
               }
@@ -192,7 +192,7 @@ public class CatalogManager implements SupportCatalogs {
               .append(File.separator)
               .append("build")
               .append(File.separator)
-              .append("jas")
+              .append("libs")
               .toString();
     }
 
@@ -203,9 +203,10 @@ public class CatalogManager implements SupportCatalogs {
     try {
       catalog =
           classLoader.withClassLoader(
-              () -> {
+              cl -> {
                 try {
-                  Class<? extends CatalogProvider> providerClz = lookupCatalogProvider(provider);
+                  Class<? extends CatalogProvider> providerClz =
+                      lookupCatalogProvider(provider, cl);
                   return (BaseCatalog) providerClz.newInstance();
                 } catch (Exception e) {
                   LOG.error("Failed to load catalog with provider: {}", provider, e);
@@ -261,8 +262,8 @@ public class CatalogManager implements SupportCatalogs {
     return new IsolatedClassLoader(jars, Collections.emptyList(), Collections.emptyList());
   }
 
-  private Class<? extends CatalogProvider> lookupCatalogProvider(String provider) {
-    ServiceLoader<CatalogProvider> loader = ServiceLoader.load(CatalogProvider.class);
+  private Class<? extends CatalogProvider> lookupCatalogProvider(String provider, ClassLoader cl) {
+    ServiceLoader<CatalogProvider> loader = ServiceLoader.load(CatalogProvider.class, cl);
 
     List<Class<? extends CatalogProvider>> providers =
         Streams.stream(loader.iterator())

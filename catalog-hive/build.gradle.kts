@@ -74,7 +74,7 @@ tasks.test {
 
 task("copyDependencies", type = Copy::class) {
     from(configurations.runtimeClasspath)
-    into("build/jars")
+    into("build/libs")
 }
 
 tasks.named("build") {

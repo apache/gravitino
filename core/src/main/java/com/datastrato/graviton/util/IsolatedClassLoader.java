@@ -1,6 +1,5 @@
 package com.datastrato.graviton.util;
 
-import com.datastrato.graviton.catalog.BaseCatalog;
 import com.datastrato.graviton.meta.AuditInfo;
 import com.datastrato.graviton.meta.rel.BaseSchema;
 import java.io.Closeable;
@@ -36,11 +35,11 @@ public class IsolatedClassLoader implements Closeable {
     this.baseClassLoader = Thread.currentThread().getContextClassLoader();
   }
 
-  public <T> T withClassLoader(Executable<T> executable) throws Exception {
+  public <T> T withClassLoader(ThrowableFunction<ClassLoader, T> fn) throws Exception {
     ClassLoader original = Thread.currentThread().getContextClassLoader();
     Thread.currentThread().setContextClassLoader(classLoader());
     try {
-      return executable.execute();
+      return fn.apply(classLoader());
     } finally {
       Thread.currentThread().setContextClassLoader(original);
     }
@@ -63,7 +62,8 @@ public class IsolatedClassLoader implements Closeable {
     }
 
     this.classLoader =
-        new URLClassLoader(execJars.toArray(new URL[0]), getRootClassLoader()) {
+        new URLClassLoader(
+            execJars.toArray(new URL[0]), Thread.currentThread().getContextClassLoader()) {
           @Override
           protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
             Class<?> clazz = findLoadedClass(name);
@@ -83,7 +83,7 @@ public class IsolatedClassLoader implements Closeable {
               return defineClass(name, bytes, 0, bytes.length);
 
             } else if (!isSharedClass(name)) {
-              LOG.debug("hive class: {} - {}", name, getResources(classToPath(name)));
+              LOG.debug("isolated class: {} - {}", name, getResources(classToPath(name)));
               return super.loadClass(name, resolve);
 
             } else {
@@ -107,14 +107,14 @@ public class IsolatedClassLoader implements Closeable {
         || name.startsWith("org.apache.log4j")
         || name.startsWith("org.apache.logging.log4j")
         || name.startsWith("java.")
-        || name.startsWith("com.datastrato.graviton.")
+        || (name.startsWith("com.datastrato.graviton.")
+            && !name.startsWith("com.datastrato.graviton.catalog.hive."))
         || sharedClasses.stream().anyMatch(name::startsWith);
   }
 
   private boolean isBarrierClass(String name) {
     // We need to add more later on when we have more catalog implementations.
-    return name.startsWith(BaseCatalog.class.getName())
-        || name.startsWith(BaseSchema.class.getName())
+    return name.startsWith(BaseSchema.class.getName())
         || name.startsWith(AuditInfo.class.getName())
         || barrierClasses.stream().anyMatch(name::startsWith);
   }
