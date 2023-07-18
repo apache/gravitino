@@ -8,14 +8,14 @@ import com.datastrato.graviton.util.ThrowableFunction;
 import java.util.Map;
 
 /**
- * A catalog dispatcher that dispatches the catalog operations to the underlying catalog
+ * A catalog operation dispatcher that dispatches the catalog operations to the underlying catalog
  * implementation.
  */
-public class CatalogDispatcher implements TableCatalog, SupportsSchemas {
+public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas {
 
   private final CatalogManager catalogManager;
 
-  public CatalogDispatcher(CatalogManager catalogManager) {
+  public CatalogOperationDispatcher(CatalogManager catalogManager) {
     this.catalogManager = catalogManager;
   }
 
