@@ -16,6 +16,27 @@ public interface Catalog extends Auditable {
     STREAM, // Catalog Type for Streaming Data, like kafka://topic
   }
 
+  /**
+   * A reserved property to specify the provider of the catalog. The provider is a string used to
+   * specify the class to create the catalog. The provider can be a short name if the catalog is a
+   * built-in catalog, or it can be a full qualified class name if the catalog is a custom one.
+   *
+   * <p>For example, the provider of a built-in Hive catalog could be "hive", Graviton will figure
+   * out the related class to create the catalog.
+   */
+  String PROPERTY_PROVIDER = "provider";
+
+  /**
+   * A reserved property to specify the package location of the catalog. The "package" is a string
+   * of path to the folder where all the catalog related dependencies is located. The dependencies
+   * under the "package" will be loaded by Graviton to create the catalog.
+   *
+   * <p>The property "package" is not needed if the catalog is a built-in one, Graviton will search
+   * the proper location using "provider" to load the dependencies. Only when the folder is in
+   * different location, the "package" property is needed.
+   */
+  String PROPERTY_PACKAGE = "package";
+
   /** The name of the catalog. */
   String name();
 
