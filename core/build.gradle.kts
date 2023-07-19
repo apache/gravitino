@@ -19,6 +19,9 @@ dependencies {
   }
   implementation(libs.guava)
   implementation(libs.bundles.log4j)
+  implementation(libs.commons.lang3)
+  implementation(libs.commons.io)
+  implementation(libs.caffeine)
 
   compileOnly(libs.lombok)
   annotationProcessor(libs.lombok)
