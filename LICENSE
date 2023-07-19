@@ -199,3 +199,35 @@
    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
    See the License for the specific language governing permissions and
    limitations under the License.
+
+
+
+   This product bundles various third-party components also under the
+   Apache Software Foundation License 2.0
+
+   Gradle Wrapper
+   ./gradlew
+
+   Apache Spark
+   ./api/src/main/java/com/datastrato/graviton/rel/SchemaChange.java
+   ./api/src/main/java/com/datastrato/graviton/rel/SupportsSchemas.java
+   ./api/src/main/java/com/datastrato/graviton/rel/TableCatalog.java
+   ./api/src/main/java/com/datastrato/graviton/rel/TableChange.java
+
+   Apache Iceberg
+   ./catalog-hive/src/main/java/com/datastrato/graviton/catalog/hive/HiveClientPool.java
+   ./catalog-hive/src/main/java/com/datastrato/graviton/catalog/hive/dyn/DynConstructors.java
+   ./catalog-hive/src/main/java/com/datastrato/graviton/catalog/hive/dyn/DynFields.java
+   ./catalog-hive/src/main/java/com/datastrato/graviton/catalog/hive/dyn/DynMethods.java
+   ./catalog-hive/src/test/java/com/datastrato/graviton/catalog/hive/miniHMS/MiniHiveMetastore.java
+   ./catalog-hive/src/test/java/com/datastrato/graviton/catalog/hive/miniHMS/MiniHiveMetastoreService.java
+   ./catalog-hive/src/test/java/com/datastrato/graviton/catalog/hive/miniHMS/ScriptRunner.java
+   ./client-java/src/main/java/com/datastrato/graviton/client/HTTPClient.java
+   ./client-java/src/main/java/com/datastrato/graviton/client/RESTClient.java
+   ./client-java/src/test/java/com/datastrato/graviton/client/TestHTTPClient.java
+   ./core/src/main/java/com/datastrato/graviton/util/ClientPool.java
+   ./core/src/main/java/com/datastrato/graviton/util/ClientPoolImpl.java
+
+   Apache Hive
+   ./catalog-hive/src/test/resources/hive-schema-3.1.0.derby.sql
+
