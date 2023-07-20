@@ -114,6 +114,10 @@ public class CatalogManager implements SupportsCatalogs {
             .build();
   }
 
+  public void close() {
+    catalogCache.invalidateAll();
+  }
+
   @Override
   public NameIdentifier[] listCatalogs(Namespace namespace) throws NoSuchMetalakeException {
     throw new UnsupportedOperationException("Not implemented yet");
@@ -154,10 +158,6 @@ public class CatalogManager implements SupportsCatalogs {
 
   public CatalogWrapper loadCatalogWrapper(NameIdentifier ident) throws NoSuchCatalogException {
     return catalogCache.get(ident, this::loadCatalogInternal);
-  }
-
-  public void close() {
-    catalogCache.invalidateAll();
   }
 
   private CatalogWrapper loadCatalogInternal(NameIdentifier ident) throws NoSuchCatalogException {
