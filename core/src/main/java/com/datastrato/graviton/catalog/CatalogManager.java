@@ -4,22 +4,6 @@
  */
 package com.datastrato.graviton.catalog;
 
-import java.io.File;
-import java.net.MalformedURLException;
-import java.net.URL;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.ServiceLoader;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.datastrato.graviton.Catalog;
 import com.datastrato.graviton.CatalogChange;
 import com.datastrato.graviton.CatalogProvider;
@@ -27,8 +11,8 @@ import com.datastrato.graviton.Config;
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
 import com.datastrato.graviton.SupportCatalogs;
-import com.datastrato.graviton.configs;
 import com.datastrato.graviton.catalog.CatalogManager.CatalogWrapper;
+import com.datastrato.graviton.configs;
 import com.datastrato.graviton.exceptions.CatalogAlreadyExistsException;
 import com.datastrato.graviton.exceptions.NoSuchCatalogException;
 import com.datastrato.graviton.exceptions.NoSuchMetalakeException;
@@ -46,6 +30,20 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.Streams;
 import com.google.common.util.concurrent.AbstractScheduledService.Scheduler;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import java.io.File;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.ServiceLoader;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class CatalogManager implements SupportCatalogs {
 

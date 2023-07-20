@@ -4,8 +4,6 @@
  */
 package com.datastrato.graviton.catalog;
 
-import java.util.Map;
-
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
 import com.datastrato.graviton.exceptions.CatalogAlreadyExistsException;
@@ -24,6 +22,7 @@ import com.datastrato.graviton.rel.Table;
 import com.datastrato.graviton.rel.TableCatalog;
 import com.datastrato.graviton.rel.TableChange;
 import com.datastrato.graviton.util.ThrowableFunction;
+import java.util.Map;
 
 /**
  * A catalog operation dispatcher that dispatches the catalog operations to the underlying catalog

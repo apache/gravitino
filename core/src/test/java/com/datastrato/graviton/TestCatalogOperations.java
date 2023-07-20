@@ -4,10 +4,6 @@
  */
 package com.datastrato.graviton;
 
-import java.io.IOException;
-import java.time.Instant;
-import java.util.Map;
-
 import com.datastrato.graviton.catalog.CatalogOperations;
 import com.datastrato.graviton.exceptions.NoSuchSchemaException;
 import com.datastrato.graviton.exceptions.NoSuchTableException;
@@ -18,6 +14,9 @@ import com.datastrato.graviton.rel.Table;
 import com.datastrato.graviton.rel.TableCatalog;
 import com.datastrato.graviton.rel.TableChange;
 import com.google.common.collect.Maps;
+import java.io.IOException;
+import java.time.Instant;
+import java.util.Map;
 
 public class TestCatalogOperations implements CatalogOperations, TableCatalog {
 

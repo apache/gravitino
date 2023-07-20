@@ -4,12 +4,6 @@
  */
 package com.datastrato.graviton.meta;
 
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
-
-import javax.annotation.Nullable;
-
 import com.datastrato.graviton.Audit;
 import com.datastrato.graviton.Auditable;
 import com.datastrato.graviton.Catalog;
@@ -17,7 +11,10 @@ import com.datastrato.graviton.Entity;
 import com.datastrato.graviton.Field;
 import com.datastrato.graviton.HasIdentifier;
 import com.datastrato.graviton.Namespace;
-
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+import javax.annotation.Nullable;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
