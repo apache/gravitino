@@ -29,8 +29,8 @@ public interface TableChange {
   /**
    * Create a TableChange for renaming a table.
    *
-   * @param newName the new table name
-   * @return a TableChange for the rename
+   * @param newName The new table name.
+   * @return A TableChange for the rename.
    */
   static TableChange rename(String newName) {
     return new RenameTable(newName);
@@ -39,8 +39,8 @@ public interface TableChange {
   /**
    * Create a TableChange for updating the comment.
    *
-   * @param newComment the new comment
-   * @return a TableChange for the update
+   * @param newComment The new comment.
+   * @return A TableChange for the update.
    */
   static TableChange updateComment(String newComment) {
     return new UpdateComment(newComment);
@@ -51,9 +51,9 @@ public interface TableChange {
    *
    * <p>If the property already exists, it will be replaced with the new value.
    *
-   * @param property the property name
-   * @param value the new property value
-   * @return a TableChange for the addition
+   * @param property The property name.
+   * @param value The new property value.
+   * @return A TableChange for the addition.
    */
   static TableChange setProperty(String property, String value) {
     return new SetProperty(property, value);
@@ -64,8 +64,8 @@ public interface TableChange {
    *
    * <p>If the property does not exist, the change will succeed.
    *
-   * @param property the property name
-   * @return a TableChange for the addition
+   * @param property The property name.
+   * @return A TableChange for the addition.
    */
   static TableChange removeProperty(String property) {
     return new RemoveProperty(property);
@@ -78,9 +78,9 @@ public interface TableChange {
    * If the new field is nested and its parent does not exist or is not a struct, the change will
    * result in an {@link IllegalArgumentException}.
    *
-   * @param fieldNames field names of the new column
-   * @param dataType the new column's data type
-   * @return a TableChange for the addition
+   * @param fieldNames The field names of the new column.
+   * @param dataType The new column's data type.
+   * @return A TableChange for the addition.
    */
   static TableChange addColumn(String[] fieldNames, Type dataType) {
     return new AddColumn(fieldNames, dataType, null, null);
@@ -93,10 +93,10 @@ public interface TableChange {
    * If the new field is nested and its parent does not exist or is not a struct, the change will
    * result in an {@link IllegalArgumentException}.
    *
-   * @param fieldNames field names of the new column
-   * @param dataType the new column's data type
-   * @param comment the new field's comment string
-   * @return a TableChange for the addition
+   * @param fieldNames The field names of the new column.
+   * @param dataType The new column's data type.
+   * @param comment The new field's comment string.
+   * @return A TableChange for the addition.
    */
   static TableChange addColumn(String[] fieldNames, Type dataType, String comment) {
     return new AddColumn(fieldNames, dataType, comment, null);
@@ -109,11 +109,11 @@ public interface TableChange {
    * If the new field is nested and its parent does not exist or is not a struct, the change will
    * result in an {@link IllegalArgumentException}.
    *
-   * @param fieldNames field names of the new column
-   * @param dataType the new column's data type
-   * @param comment the new field's comment string
-   * @param position the new columns's position
-   * @return a TableChange for the addition
+   * @param fieldNames Field names of the new column.
+   * @param dataType The new column's data type.
+   * @param comment The new field's comment string.
+   * @param position The new columns's position.
+   * @return A TableChange for the addition.
    */
   static TableChange addColumn(
       String[] fieldNames, Type dataType, String comment, ColumnPosition position) {
@@ -128,9 +128,9 @@ public interface TableChange {
    *
    * <p>If the field does not exist, the change will result in an {@link IllegalArgumentException}.
    *
-   * @param fieldNames the current field names
-   * @param newName the new name
-   * @return a TableChange for the rename
+   * @param fieldNames The current field names.
+   * @param newName The new name.
+   * @return A TableChange for the rename.
    */
   static TableChange renameColumn(String[] fieldNames, String newName) {
     return new RenameColumn(fieldNames, newName);
@@ -143,9 +143,9 @@ public interface TableChange {
    *
    * <p>If the field does not exist, the change will result in an {@link IllegalArgumentException}.
    *
-   * @param fieldNames field names of the column to update
-   * @param newDataType the new data type
-   * @return a TableChange for the update
+   * @param fieldNames The field names of the column to update.
+   * @param newDataType The new data type.
+   * @return A TableChange for the update.
    */
   static TableChange updateColumnType(String[] fieldNames, Type newDataType) {
     return new UpdateColumnType(fieldNames, newDataType);
@@ -158,9 +158,9 @@ public interface TableChange {
    *
    * <p>If the field does not exist, the change will result in an {@link IllegalArgumentException}.
    *
-   * @param fieldNames field names of the column to update
-   * @param newComment the new comment
-   * @return a TableChange for the update
+   * @param fieldNames The field names of the column to update.
+   * @param newComment The new comment.
+   * @return A TableChange for the update.
    */
   static TableChange updateColumnComment(String[] fieldNames, String newComment) {
     return new UpdateColumnComment(fieldNames, newComment);
@@ -173,9 +173,9 @@ public interface TableChange {
    *
    * <p>If the field does not exist, the change will result in an {@link IllegalArgumentException}.
    *
-   * @param fieldNames field names of the column to update
-   * @param newPosition the new position
-   * @return a TableChange for the update
+   * @param fieldNames The field names of the column to update.
+   * @param newPosition The new position.
+   * @return A TableChange for the update.
    */
   static TableChange updateColumnPosition(String[] fieldNames, ColumnPosition newPosition) {
     return new UpdateColumnPosition(fieldNames, newPosition);
@@ -186,9 +186,9 @@ public interface TableChange {
    *
    * <p>If the field does not exist, the change will result in an {@link IllegalArgumentException}.
    *
-   * @param fieldNames field names of the column to delete
-   * @param ifExists silence the error if column doesn't exist during drop
-   * @return a TableChange for the delete
+   * @param fieldNames Field names of the column to delete.
+   * @param ifExists Silence the error if column doesn't exist during drop.
+   * @return A TableChange for the delete.
    */
   static TableChange deleteColumn(String[] fieldNames, Boolean ifExists) {
     return new DeleteColumn(fieldNames, ifExists);

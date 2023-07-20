@@ -26,21 +26,21 @@ import lombok.Getter;
 public interface SchemaChange {
 
   /**
-   * SchemaChange class to set the property and value for the schema.
+   * SchemaChange class to set the property and value pairs for the schema.
    *
-   * @param property the property name to set
-   * @param value the property value to set
-   * @return the SchemaChange object
+   * @param property The property name to set.
+   * @param value The value to set teh property to.
+   * @return The SchemaChange object.
    */
   static SchemaChange setProperty(String property, String value) {
     return new SetProperty(property, value);
   }
 
   /**
-   * SchemaChange class to remove the property from the schema.
+   * SchemaChange class to remove a property from the schema.
    *
-   * @param property the property name to remove
-   * @return the SchemaChange object
+   * @param property The property name to remove.
+   * @return The SchemaChange object.
    */
   static SchemaChange removeProperty(String property) {
     return new RemoveProperty(property);

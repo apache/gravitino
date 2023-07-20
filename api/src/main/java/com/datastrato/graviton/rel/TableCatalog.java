@@ -36,26 +36,26 @@ public interface TableCatalog {
   /**
    * List the tables in a namespace from the catalog.
    *
-   * @param namespace a namespace
-   * @return an array of table identifiers in the namespace
-   * @throws NoSuchSchemaException if the schema does not exist
+   * @param namespace A namespace.
+   * @return An array of table identifiers in the namespace.
+   * @throws NoSuchSchemaException If the schema does not exist.
    */
   NameIdentifier[] listTables(Namespace namespace) throws NoSuchSchemaException;
 
   /**
    * Load table metadata by {@link NameIdentifier} from the catalog.
    *
-   * @param ident a table identifier
-   * @return the table metadata
-   * @throws NoSuchTableException if the table does not exist
+   * @param ident A table identifier.
+   * @return The table metadata.
+   * @throws NoSuchTableException If the table does not exist.
    */
   Table loadTable(NameIdentifier ident) throws NoSuchTableException;
 
   /**
    * Check if a table exists using an {@link NameIdentifier} from the catalog.
    *
-   * @param ident a table identifier
-   * @return true if the table exists, false otherwise
+   * @param ident A table identifier.
+   * @return true If the table exists, false otherwise.
    */
   default boolean tableExists(NameIdentifier ident) {
     try {
@@ -68,13 +68,13 @@ public interface TableCatalog {
   /**
    * Create a table in the catalog.
    *
-   * @param ident a table identifier
-   * @param columns the columns of the new table
-   * @param comment the table comment
-   * @param properties the table properties
-   * @return the created table metadata
-   * @throws NoSuchSchemaException if the schema does not exist
-   * @throws TableAlreadyExistsException if the table already exists
+   * @param ident A table identifier.
+   * @param columns The columns of the new table.
+   * @param comment The table comment.
+   * @param properties The table properties.
+   * @return Fhe created table metadata.
+   * @throws NoSuchSchemaException If the schema does not exist.
+   * @throws TableAlreadyExistsException If the table already exists.
    */
   Table createTable(
       NameIdentifier ident, Column[] columns, String comment, Map<String, String> properties)
@@ -86,11 +86,11 @@ public interface TableCatalog {
    * <p>Implementations may reject the change. If any change is rejected, no changes should be
    * applied to the table.
    *
-   * @param ident a table identifier
-   * @param changes table changes to apply to the table
-   * @return the updated table metadata
-   * @throws NoSuchTableException if the table does not exist
-   * @throws IllegalArgumentException if the change is rejected by the implementation
+   * @param ident A table identifier.
+   * @param changes Table changes to apply to the table.
+   * @return The updated table metadata.
+   * @throws NoSuchTableException If the table does not exist.
+   * @throws IllegalArgumentException If the change is rejected by the implementation.
    */
   Table alterTable(NameIdentifier ident, TableChange... changes)
       throws NoSuchTableException, IllegalArgumentException;
@@ -98,8 +98,8 @@ public interface TableCatalog {
   /**
    * Drop a table from the catalog.
    *
-   * @param ident a table identifier
-   * @return true if the table was dropped, false if the table did not exist
+   * @param ident A table identifier.
+   * @return True if the table was dropped, false if the table did not exist.
    */
   boolean dropTable(NameIdentifier ident);
 
@@ -109,9 +109,9 @@ public interface TableCatalog {
    * <p>If the catalog supports to purge a table, this method should be overridden. The default
    * implementation throws an {@link UnsupportedOperationException}.
    *
-   * @param ident a table identifier
-   * @return true if the table was purged, false if the table did not exist
-   * @throws UnsupportedOperationException if the catalog does not support to purge a table
+   * @param ident A table identifier.
+   * @return True if the table was purged, false if the table did not exist.
+   * @throws UnsupportedOperationException If the catalog does not support to purge a table.
    */
   default boolean purgeTable(NameIdentifier ident) throws UnsupportedOperationException {
     throw new UnsupportedOperationException("purgeTable not supported.");
