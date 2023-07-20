@@ -186,7 +186,7 @@ public interface TableChange {
    *
    * <p>If the field does not exist, the change will result in an {@link IllegalArgumentException}.
    *
-    * @param fieldNames Field names of the column to delete.
+   * @param fieldNames Field names of the column to delete.
    * @param ifExists Silence the error if column doesn't exist during drop.
    * @return A TableChange for the delete.
    */

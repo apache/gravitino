@@ -54,7 +54,7 @@ public interface TableCatalog {
   /**
    * Check if a table exists using an {@link NameIdentifier} from the catalog.
    *
-    * @param ident A table identifier.
+   * @param ident A table identifier.
    * @return true If the table exists, false otherwise.
    */
   default boolean tableExists(NameIdentifier ident) {
@@ -68,7 +68,7 @@ public interface TableCatalog {
   /**
    * Create a table in the catalog.
    *
-    * @param ident A table identifier.
+   * @param ident A table identifier.
    * @param columns The columns of the new table.
    * @param comment The table comment.
    * @param properties The table properties.

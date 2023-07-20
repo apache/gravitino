@@ -22,7 +22,7 @@ public interface CatalogChange {
   /**
    * Creates a new catalog change to update the catalog comment.
    *
-    * @param newComment The new comment for the catalog.
+   * @param newComment The new comment for the catalog.
    * @return The catalog change.
    */
   static CatalogChange updateComment(String newComment) {
