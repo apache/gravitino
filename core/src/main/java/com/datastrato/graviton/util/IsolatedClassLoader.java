@@ -6,14 +6,14 @@ package com.datastrato.graviton.util;
 
 import com.datastrato.graviton.meta.AuditInfo;
 import com.datastrato.graviton.meta.rel.BaseSchema;
-import com.google.gson.internal.JavaVersion;
 import java.io.Closeable;
 import java.io.InputStream;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.util.List;
+import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.JavaVersion;
 import org.apache.commons.lang3.SystemUtils;
-import org.apache.logging.log4j.core.util.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
