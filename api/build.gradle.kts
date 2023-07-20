@@ -3,6 +3,7 @@ plugins {
   id("java")
   id("idea")
   id("com.diffplug.spotless")
+  id("org.nosphere.apache.rat") version "0.8.0"
 }
 
 dependencies {
