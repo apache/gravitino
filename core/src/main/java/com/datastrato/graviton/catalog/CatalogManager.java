@@ -156,6 +156,10 @@ public class CatalogManager implements SupportsCatalogs {
     return catalogCache.get(ident, this::loadCatalogInternal);
   }
 
+  public void close() {
+    catalogCache.invalidateAll();
+  }
+
   private CatalogWrapper loadCatalogInternal(NameIdentifier ident) throws NoSuchCatalogException {
     // Load CatalogEntity from CatalogStore
 

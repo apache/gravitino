@@ -31,13 +31,14 @@ public class CatalogCreateRequest implements RESTRequest {
 
   @Nullable
   @JsonProperty("properties")
-  private Map properties;
+  private Map<String, String> properties;
 
   public CatalogCreateRequest() {
     this(null, null, null, null);
   }
 
-  public CatalogCreateRequest(String name, Catalog.Type type, String comment, Map properties) {
+  public CatalogCreateRequest(
+      String name, Catalog.Type type, String comment, Map<String, String> properties) {
     this.name = name;
     this.type = type;
     this.comment = comment;

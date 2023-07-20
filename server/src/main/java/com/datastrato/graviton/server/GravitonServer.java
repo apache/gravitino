@@ -4,7 +4,8 @@
  */
 package com.datastrato.graviton.server;
 
-import com.datastrato.graviton.meta.BaseCatalogsOperations;
+import com.datastrato.graviton.GravitonEnv;
+import com.datastrato.graviton.catalog.CatalogManager;
 import com.datastrato.graviton.meta.BaseMetalakesOperations;
 import com.datastrato.graviton.server.web.JettyServer;
 import com.datastrato.graviton.server.web.ObjectMapperProvider;
@@ -27,9 +28,12 @@ public class GravitonServer extends ResourceConfig {
 
   private final JettyServer server;
 
+  private final GravitonEnv gravitonEnv;
+
   public GravitonServer() {
     serverConfig = new ServerConfig();
     server = new JettyServer();
+    gravitonEnv = new GravitonEnv();
   }
 
   public void initialize() {
@@ -42,6 +46,9 @@ public class GravitonServer extends ResourceConfig {
 
     server.initialize(serverConfig);
 
+    gravitonEnv.initialize(serverConfig);
+    GravitonEnv.setEnv(gravitonEnv);
+
     // initialize Jersey REST API resources.
     initializeRestApi();
   }
@@ -52,8 +59,8 @@ public class GravitonServer extends ResourceConfig {
         new AbstractBinder() {
           @Override
           protected void configure() {
-            bind(BaseMetalakesOperations.class).to(BaseMetalakesOperations.class).ranked(1);
-            bind(BaseCatalogsOperations.class).to(BaseCatalogsOperations.class).ranked(1);
+            bind(gravitonEnv.metalakesOperations()).to(BaseMetalakesOperations.class).ranked(1);
+            bind(gravitonEnv.catalogManager()).to(CatalogManager.class).ranked(1);
           }
         });
     register(ObjectMapperProvider.class).register(JacksonFeature.class);
@@ -73,6 +80,7 @@ public class GravitonServer extends ResourceConfig {
 
   public void stop() {
     server.stop();
+    gravitonEnv.shutdown();
   }
 
   public static void main(String[] args) throws Exception {
