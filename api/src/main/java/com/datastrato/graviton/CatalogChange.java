@@ -81,6 +81,7 @@ public interface CatalogChange {
     }
   }
 
+  @Getter
   final class RemoveProperty implements CatalogChange {
     private final String property;
 
