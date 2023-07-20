@@ -1,6 +1,16 @@
+/*
+ * Copyright 2023 Datastrato.
+ * This software is licensed under the Apache License version 2.
+ */
 package com.datastrato.graviton.meta;
 
-import com.datastrato.graviton.*;
+import com.datastrato.graviton.Audit;
+import com.datastrato.graviton.Auditable;
+import com.datastrato.graviton.Catalog;
+import com.datastrato.graviton.Entity;
+import com.datastrato.graviton.Field;
+import com.datastrato.graviton.HasIdentifier;
+import com.datastrato.graviton.Namespace;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
