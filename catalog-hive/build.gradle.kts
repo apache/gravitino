@@ -71,3 +71,12 @@ dependencies {
 tasks.test {
     useJUnitPlatform()
 }
+
+task("copyDependencies", type = Copy::class) {
+    from(configurations.runtimeClasspath)
+    into("build/libs")
+}
+
+tasks.named("build") {
+    finalizedBy("copyDependencies")
+}
