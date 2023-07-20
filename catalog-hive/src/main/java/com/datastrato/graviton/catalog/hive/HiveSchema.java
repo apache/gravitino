@@ -1,16 +1,23 @@
+/*
+ * Copyright 2023 Datastrato.
+ * This software is licensed under the Apache License version 2.
+ */
 package com.datastrato.graviton.catalog.hive;
 
-import com.datastrato.graviton.meta.rel.BaseSchema;
-import com.google.common.base.Preconditions;
-import com.google.common.collect.Maps;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Optional;
-import lombok.ToString;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.PrincipalType;
+
+import com.datastrato.graviton.meta.rel.BaseSchema;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.Maps;
+
+import lombok.ToString;
 
 /** A Hive Schema(Database) entity */
 @ToString

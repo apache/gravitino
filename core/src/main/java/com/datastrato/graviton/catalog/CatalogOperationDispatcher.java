@@ -1,11 +1,29 @@
+/*
+ * Copyright 2023 Datastrato.
+ * This software is licensed under the Apache License version 2.
+ */
 package com.datastrato.graviton.catalog;
+
+import java.util.Map;
 
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
-import com.datastrato.graviton.exceptions.*;
-import com.datastrato.graviton.rel.*;
+import com.datastrato.graviton.exceptions.CatalogAlreadyExistsException;
+import com.datastrato.graviton.exceptions.NoSuchCatalogException;
+import com.datastrato.graviton.exceptions.NoSuchNamespaceException;
+import com.datastrato.graviton.exceptions.NoSuchSchemaException;
+import com.datastrato.graviton.exceptions.NoSuchTableException;
+import com.datastrato.graviton.exceptions.NonEmptySchemaException;
+import com.datastrato.graviton.exceptions.SchemaAlreadyExistsException;
+import com.datastrato.graviton.exceptions.TableAlreadyExistsException;
+import com.datastrato.graviton.rel.Column;
+import com.datastrato.graviton.rel.Schema;
+import com.datastrato.graviton.rel.SchemaChange;
+import com.datastrato.graviton.rel.SupportsSchemas;
+import com.datastrato.graviton.rel.Table;
+import com.datastrato.graviton.rel.TableCatalog;
+import com.datastrato.graviton.rel.TableChange;
 import com.datastrato.graviton.util.ThrowableFunction;
-import java.util.Map;
 
 /**
  * A catalog operation dispatcher that dispatches the catalog operations to the underlying catalog

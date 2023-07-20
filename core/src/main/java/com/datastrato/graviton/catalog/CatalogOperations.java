@@ -1,9 +1,14 @@
+/*
+ * Copyright 2023 Datastrato.
+ * This software is licensed under the Apache License version 2.
+ */
 package com.datastrato.graviton.catalog;
+
+import java.io.Closeable;
+import java.util.Map;
 
 import com.datastrato.graviton.rel.SupportsSchemas;
 import com.datastrato.graviton.rel.TableCatalog;
-import java.io.Closeable;
-import java.util.Map;
 
 /**
  * A catalog operation interface that is used to trigger the operations of a catalog. This interface
