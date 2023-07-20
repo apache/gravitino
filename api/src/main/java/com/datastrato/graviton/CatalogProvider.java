@@ -5,9 +5,8 @@
 package com.datastrato.graviton;
 
 /**
- * A Catalog provider is a class that provides a short name for a catalog. This short is used when
- * creating a catalog, Graviton will search the short name and its related class name to create the
- * catalog.
+ * A Catalog provider is a class that provides a short name for a catalog. This short name is used
+ * when creating a catalog.
  */
 public interface CatalogProvider {
 

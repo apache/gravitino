@@ -12,8 +12,8 @@ public interface CatalogChange {
   /**
    * Creates a new catalog change to rename the catalog.
    *
-   * @param newName the new name of the catalog
-   * @return the catalog change
+   * @param newName The new name of the catalog.
+   * @return The catalog change.
    */
   static CatalogChange rename(String newName) {
     return new RenameCatalog(newName);
@@ -22,8 +22,8 @@ public interface CatalogChange {
   /**
    * Creates a new catalog change to update the catalog comment.
    *
-   * @param newComment the new comment of the catalog
-   * @return the catalog change
+    * @param newComment The new comment for the catalog.
+   * @return The catalog change.
    */
   static CatalogChange updateComment(String newComment) {
     return new UpdateCatalogComment(newComment);
@@ -32,19 +32,19 @@ public interface CatalogChange {
   /**
    * Creates a new catalog change to set the property and value for the catalog.
    *
-   * @param property the property name to set
-   * @param value the property value to set
-   * @return the catalog change
+   * @param property The property name to set.
+   * @param value The value to set the property to.
+   * @return The catalog change.
    */
   static CatalogChange setProperty(String property, String value) {
     return new SetProperty(property, value);
   }
 
   /**
-   * Creates a new catalog change to remove the property from the catalog.
+   * Creates a new catalog change to remove a property from the catalog.
    *
-   * @param property the property name to remove
-   * @return the catalog change
+   * @param property The property name to remove.
+   * @return The catalog change.
    */
   static CatalogChange removeProperty(String property) {
     return new RemoveProperty(property);
