@@ -24,6 +24,12 @@ import org.slf4j.LoggerFactory;
 
 public class JsonUtils {
 
+  private static final Logger LOG = LoggerFactory.getLogger(JsonUtils.class);
+
+  private static final String NAMESPACE = "namespace";
+
+  private static final String NAME = "name";
+
   abstract static class JsonArrayIterator<T> implements Iterator<T> {
 
     private final Iterator<JsonNode> elements;
@@ -77,12 +83,6 @@ public class JsonUtils {
           element);
     }
   }
-
-  private static final Logger LOG = LoggerFactory.getLogger(JsonUtils.class);
-
-  private static final String NAMESPACE = "namespace";
-
-  private static final String NAME = "name";
 
   private static ObjectMapper mapper = null;
 
