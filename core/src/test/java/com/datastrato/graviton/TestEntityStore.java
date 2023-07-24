@@ -57,22 +57,21 @@ public class TestEntityStore {
     }
 
     @Override
-    public <E extends Entity & HasIdentifier> void put(NameIdentifier ident, E e)
-        throws IOException {
-      entityMap.put(ident, e);
-    }
-
-    @Override
-    public <E extends Entity & HasIdentifier> void putIfNotExists(NameIdentifier ident, E e)
+    public <E extends Entity & HasIdentifier> void put(
+        NameIdentifier ident, E e, boolean overwritten)
         throws IOException, EntityAlreadyExistsException {
-      executeInTransaction(
-          () -> {
-            if (exists(ident)) {
-              throw new EntityAlreadyExistsException("Entity " + ident + " already exists");
-            }
-            put(ident, e);
-            return null;
-          });
+      if (overwritten) {
+        entityMap.put(ident, e);
+      } else {
+        executeInTransaction(
+            () -> {
+              if (exists(ident)) {
+                throw new EntityAlreadyExistsException("Entity " + ident + " already exists");
+              }
+              entityMap.put(ident, e);
+              return null;
+            });
+      }
     }
 
     @Override
@@ -165,6 +164,6 @@ public class TestEntityStore {
 
     Assertions.assertThrows(
         EntityAlreadyExistsException.class,
-        () -> store.putIfNotExists(catalog.nameIdentifier(), catalog));
+        () -> store.put(catalog.nameIdentifier(), catalog, false));
   }
 }

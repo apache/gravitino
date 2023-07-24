@@ -54,29 +54,35 @@ public interface EntityStore extends Closeable {
   boolean exists(NameIdentifier ident) throws IOException;
 
   /**
-   * Store the entity into the underlying storage.
-   *
-   * <p>Note. The implementation should be transactional, and should be able to handle concurrent
-   * store of entities.
+   * Store the entity into the underlying storage. If the entity already exists, it will overwrite
+   * the existing entity.
    *
    * @param ident the unique identifier of the entity
    * @param e the entity to store
    * @param <E> the type of the entity
    * @throws IOException if the store operation fails
    */
-  <E extends Entity & HasIdentifier> void put(NameIdentifier ident, E e) throws IOException;
+  default <E extends Entity & HasIdentifier> void put(NameIdentifier ident, E e)
+      throws IOException {
+    put(ident, e, false);
+  }
 
   /**
-   * Store the entity into the underlying storage if the entity is not existed.
+   * Store the entity into the underlying storage. According to the {@code overwritten} flag, it
+   * will overwrite the existing entity or throw an {@link EntityAlreadyExistsException}.
    *
-   * <p>Note. The check-and-store process should be in one transaction, otherwise it will cause the
-   * conflicts.
+   * <p>Note. The implementation should be transactional, and should be able to handle concurrent
+   * store of entities.
    *
    * @param ident the unique identifier of the entity
    * @param e the entity to store
+   * @param overwritten whether to overwrite the existing entity
+   * @param <E> the type of the entity
    * @throws IOException if the store operation fails
+   * @throws EntityAlreadyExistsException if the entity already exists and the overwritten flag is
+   *     set to false
    */
-  <E extends Entity & HasIdentifier> void putIfNotExists(NameIdentifier ident, E e)
+  <E extends Entity & HasIdentifier> void put(NameIdentifier ident, E e, boolean overwritten)
       throws IOException, EntityAlreadyExistsException;
 
   /**
