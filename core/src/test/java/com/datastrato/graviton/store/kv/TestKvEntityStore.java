@@ -104,16 +104,6 @@ public class TestKvEntityStore {
           store.get(catalogCopy.nameIdentifier(), CatalogEntity.class);
       Assertions.assertEquals(catalogCopy, retrievedCatalogCopy);
 
-      //      List<BaseMetalake> metalakesByScan = store.list(metalake.namespace(),
-      // BaseMetalake.class);
-      //      Assertions.assertEquals(2, metalakesByScan.size());
-      //      Assertions.assertEquals(metalake, metalakesByScan.get(0));
-      //
-      //      List<CatalogEntity> catalogByScan = store.list(catalog.namespace(),
-      // CatalogEntity.class);
-      //      Assertions.assertEquals(2, catalogByScan.size());
-      //      Assertions.assertEquals(catalog, catalogByScan.get(0));
-
       store.delete(metalake.nameIdentifier());
       Assertions.assertThrows(
           NoSuchEntityException.class,
