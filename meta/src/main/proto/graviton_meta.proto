@@ -6,6 +6,14 @@ option java_multiple_files = true;
 option java_package = "com.datastrato.graviton.proto";
 
 /**
+ * Namespace of the Graviton Metadata Service.
+ */
+
+message Namespace {
+  repeated string levels = 1;
+}
+
+/**
  * The version of schema definition. Schema is backward compatible within the
  * same major version. The minor version is used for schema evolution.
  */
@@ -51,4 +59,5 @@ message Catalog {
   optional string comment = 5;
   map<string, string> properties = 6;
   AuditInfo audit_info = 7;
+  Namespace namespace = 8;
 }
