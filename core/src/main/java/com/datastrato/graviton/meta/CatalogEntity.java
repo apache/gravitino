@@ -51,7 +51,7 @@ public class CatalogEntity implements Entity, Auditable, HasIdentifier {
 
   private AuditInfo auditInfo;
 
-  private Namespace namespace;
+  @Getter private Namespace namespace;
 
   @Override
   public Map<Field, Object> fields() {

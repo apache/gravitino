@@ -7,105 +7,15 @@ package com.datastrato.graviton;
 import com.datastrato.graviton.meta.*;
 import com.datastrato.graviton.rel.Column;
 import com.datastrato.graviton.rel.Table;
-import com.datastrato.graviton.util.Executable;
+import com.datastrato.graviton.store.memory.InMemoryEntityStore;
 import com.google.common.collect.Maps;
 import io.substrait.type.TypeCreator;
-import java.io.IOException;
 import java.time.Instant;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
-import java.util.stream.Collectors;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 public class TestEntityStore {
-
-  public static class InMemoryEntityStore implements EntityStore {
-    private final Map<NameIdentifier, Entity> entityMap;
-
-    private EntitySerDe serde;
-
-    private final Lock lock;
-
-    public InMemoryEntityStore() {
-      this.entityMap = Maps.newConcurrentMap();
-      this.lock = new ReentrantLock();
-    }
-
-    @Override
-    public void initialize(Config config) throws RuntimeException {}
-
-    @Override
-    public void setSerDe(EntitySerDe entitySerDe) {
-      this.serde = entitySerDe;
-    }
-
-    @Override
-    public <E extends Entity & HasIdentifier> List<E> list(Namespace namespace) throws IOException {
-      return entityMap.entrySet().stream()
-          .filter(e -> e.getKey().namespace().equals(namespace))
-          .map(entry -> (E) entry.getValue())
-          .collect(Collectors.toList());
-    }
-
-    @Override
-    public boolean exists(NameIdentifier ident) throws IOException {
-      return entityMap.containsKey(ident);
-    }
-
-    @Override
-    public <E extends Entity & HasIdentifier> void put(
-        NameIdentifier ident, E e, boolean overwritten)
-        throws IOException, EntityAlreadyExistsException {
-      if (overwritten) {
-        entityMap.put(ident, e);
-      } else {
-        executeInTransaction(
-            () -> {
-              if (exists(ident)) {
-                throw new EntityAlreadyExistsException("Entity " + ident + " already exists");
-              }
-              entityMap.put(ident, e);
-              return null;
-            });
-      }
-    }
-
-    @Override
-    public <E extends Entity & HasIdentifier> E get(NameIdentifier ident)
-        throws NoSuchEntityException, IOException {
-      E e = (E) entityMap.get(ident);
-      if (e == null) {
-        throw new NoSuchEntityException("Entity " + ident + " does not exist");
-      }
-
-      return e;
-    }
-
-    @Override
-    public boolean delete(NameIdentifier ident) throws IOException {
-      Entity prev = entityMap.remove(ident);
-      return prev != null;
-    }
-
-    @Override
-    public <R> R executeInTransaction(Executable<R> executable) throws IOException {
-      try {
-        lock.lock();
-        return executable.execute();
-      } finally {
-        lock.unlock();
-      }
-    }
-
-    @Override
-    public void close() throws IOException {
-      entityMap.clear();
-    }
-  }
 
   @Test
   public void testEntityStoreAndRetrieve() throws Exception {
@@ -149,18 +59,19 @@ public class TestEntityStore {
     store.put(catalog.nameIdentifier(), catalog);
     store.put(table.nameIdentifier(), table);
 
-    Metalake retrievedMetalake = store.get(metalake.nameIdentifier());
+    Metalake retrievedMetalake = store.get(metalake.nameIdentifier(), BaseMetalake.class);
     Assertions.assertEquals(metalake, retrievedMetalake);
 
-    CatalogEntity retrievedCatalog = store.get(catalog.nameIdentifier());
+    CatalogEntity retrievedCatalog = store.get(catalog.nameIdentifier(), CatalogEntity.class);
     Assertions.assertEquals(catalog, retrievedCatalog);
 
-    Table retrievedTable = store.get(table.nameIdentifier());
+    Table retrievedTable = store.get(table.nameIdentifier(), TestTable.class);
     Assertions.assertEquals(table, retrievedTable);
 
     store.delete(metalake.nameIdentifier());
     Assertions.assertThrows(
-        NoSuchEntityException.class, () -> store.get(metalake.nameIdentifier()));
+        NoSuchEntityException.class,
+        () -> store.get(metalake.nameIdentifier(), BaseMetalake.class));
 
     Assertions.assertThrows(
         EntityAlreadyExistsException.class,

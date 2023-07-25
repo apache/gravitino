@@ -7,7 +7,12 @@ package com.datastrato.graviton;
 import com.datastrato.graviton.config.ConfigBuilder;
 import com.datastrato.graviton.config.ConfigEntry;
 
-public interface configs {
+public interface Configs {
+  String ENTRY_KV_BACKEND_KEY_NAME = "graviton.entity.backend.kv";
+  String DEFUALT_ENTRY_KV_BACKEND = "rocksdb";
+
+  String KV_BACKEND_PATH_KEY_NAME = "graviton.entity.backend.kv.path";
+  String DEFAULT_KV_BACKEND_PATH = "/tmp/graviton";
 
   ConfigEntry<String> ENTITY_STORE =
       new ConfigBuilder("graviton.entity.store")
@@ -30,4 +35,18 @@ public interface configs {
           .version("0.1.0")
           .longConf()
           .createWithDefault(60 * 60 * 1000L);
+
+  ConfigEntry<String> ENTRY_KV_BACKEND_TYPE =
+      new ConfigBuilder(ENTRY_KV_BACKEND_KEY_NAME)
+          .doc("KV backend to use for entity store")
+          .version("0.1.0")
+          .stringConf()
+          .createWithDefault("rocksdb");
+
+  ConfigEntry<String> ENTRY_KV_BACKEND_PATH =
+      new ConfigBuilder(ENTRY_KV_BACKEND_KEY_NAME)
+          .doc("KV backend path for entity store")
+          .version("0.1.0")
+          .stringConf()
+          .createWithDefault("/tmp/graviton");
 }

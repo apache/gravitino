@@ -17,6 +17,7 @@ dependencies {
     exclude("com.fasterxml.jackson.core")
     exclude("com.fasterxml.jackson.datatype")
   }
+  implementation(libs.rocksdbjni)
   implementation(libs.guava)
   implementation(libs.bundles.log4j)
   implementation(libs.commons.lang3)

@@ -6,6 +6,15 @@ option java_multiple_files = true;
 option java_package = "com.datastrato.graviton.proto";
 
 /**
+ * Namespace of the Graviton Metadata Service.
+ */
+
+message NameSpace {
+  repeated string levels = 1;
+}
+
+
+/**
  * The version of schema definition. Schema is backward compatible within the
  * same major version. The minor version is used for schema evolution.
  */
@@ -39,7 +48,7 @@ message Metalake {
 
 message Catalog {
   enum Type {
-    REL = 0; // Catalog Type for Relational Data Structure, like db.table.
+    RELATIONAL = 0; // Catalog Type for Relational Data Structure, like db.table.
     FILE = 1; // Catalog Type for File System (including HDFS, S3, etc.), like path/to/file.
     STREAM = 2; // Catalog Type for Streaming Data, like kafka://topic.
   }
@@ -51,4 +60,5 @@ message Catalog {
   optional string comment = 5;
   map<string, string> properties = 6;
   AuditInfo audit_info = 7;
+  NameSpace namespace = 8;
 }
