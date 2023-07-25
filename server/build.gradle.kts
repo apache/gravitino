@@ -3,6 +3,7 @@ plugins {
   id("java")
   id("idea")
   id("com.diffplug.spotless")
+  id("org.nosphere.apache.rat") version "0.8.0"
 }
 
 dependencies {
@@ -33,4 +34,15 @@ dependencies {
     exclude(group = "org.junit.jupiter")
   }
   testImplementation(libs.mockito.core)
+}
+
+tasks.processResources { mustRunAfter("rat") }
+tasks.processTestResources { mustRunAfter("rat") }
+tasks.compileJava { mustRunAfter("rat") }
+tasks.spotlessJava { mustRunAfter("rat") }
+
+tasks.rat {
+  substringMatcher("DS", "Datastrato", "Copyright 2023 Datastrato.")
+  approvedLicense("Datastrato")
+  approvedLicense("Apache License Version 2.0")
 }

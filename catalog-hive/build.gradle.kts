@@ -5,6 +5,7 @@ plugins {
     id("java")
     id("idea")
     id("com.diffplug.spotless")
+    id("org.nosphere.apache.rat") version "0.8.0"
 }
 
 dependencies {
@@ -79,4 +80,16 @@ task("copyDependencies", type = Copy::class) {
 
 tasks.named("build") {
     finalizedBy("copyDependencies")
+}
+
+tasks.processResources { mustRunAfter("rat") }
+tasks.processTestResources { mustRunAfter("rat") }
+tasks.compileJava { mustRunAfter("rat") }
+tasks.spotlessJava { mustRunAfter("rat") }
+
+tasks.rat {
+  substringMatcher("DS", "Datastrato", "Copyright 2023 Datastrato.")
+  approvedLicense("Datastrato")
+  approvedLicense("Apache License Version 2.0")
+  excludes.add("**/META-INF/**")
 }

@@ -25,3 +25,14 @@ dependencies {
   testImplementation(libs.junit.jupiter.params)
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
+
+tasks.processResources { mustRunAfter("rat") }
+tasks.processTestResources { mustRunAfter("rat") }
+tasks.compileJava { mustRunAfter("rat") }
+tasks.spotlessJava { mustRunAfter("rat") }
+
+tasks.rat {
+  substringMatcher("DS", "Datastrato", "Copyright 2023 Datastrato.")
+  approvedLicense("Datastrato")
+  approvedLicense("Apache License Version 2.0")
+}
