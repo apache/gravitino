@@ -47,6 +47,8 @@ public class GravitonEnv {
 
     // Initialize EntityStore
     this.entityStore = EntityStoreFactory.createEntityStore(config);
+    entityStore.initialize(config);
+    entityStore.setSerDe(entitySerDe);
 
     // Create and initialize metalake related modules
     this.metalakesOperations = new BaseMetalakesOperations();
