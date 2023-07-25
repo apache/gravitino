@@ -51,7 +51,7 @@ public interface SupportsSchemas {
    * Check if a schema exists.
    *
    * <p>If an entity such as a table, view exists, its parent namespaces must also exist. For
-   * example, if table a.b.t exists, this method invoked as schemaExists(a) must return true.
+   * example, if table a.b.t exists, this method invoked as schemaExists(a.b) must return true.
    *
    * @param ident The name identifier of the schema.
    * @return True if the schema exists, false otherwise.

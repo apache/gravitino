@@ -4,35 +4,36 @@
  */
 package com.datastrato.graviton.catalog.hive;
 
+import static com.datastrato.graviton.catalog.hive.HiveTable.HMS_TABLE_COMMENT;
+
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
 import com.datastrato.graviton.catalog.CatalogOperations;
-import com.datastrato.graviton.exceptions.NoSuchNamespaceException;
-import com.datastrato.graviton.exceptions.NoSuchSchemaException;
-import com.datastrato.graviton.exceptions.NonEmptySchemaException;
-import com.datastrato.graviton.exceptions.SchemaAlreadyExistsException;
+import com.datastrato.graviton.catalog.hive.converter.ToHiveType;
+import com.datastrato.graviton.exceptions.*;
 import com.datastrato.graviton.meta.AuditInfo;
 import com.datastrato.graviton.meta.CatalogEntity;
-import com.datastrato.graviton.rel.SchemaChange;
-import com.datastrato.graviton.rel.SupportsSchemas;
+import com.datastrato.graviton.meta.rel.BaseSchema;
+import com.datastrato.graviton.meta.rel.BaseTable;
+import com.datastrato.graviton.rel.*;
+import com.datastrato.graviton.rel.Table;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.metastore.api.*;
 import org.apache.hadoop.hive.metastore.api.AlreadyExistsException;
-import org.apache.hadoop.hive.metastore.api.Database;
-import org.apache.hadoop.hive.metastore.api.InvalidOperationException;
-import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
-import org.apache.hadoop.hive.metastore.api.UnknownDBException;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.thrift.TException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas {
+public class HiveCatalogOperations
+    implements CatalogOperations, SupportsSchemas, TableCatalog, TableChange {
 
   public static final Logger LOG = LoggerFactory.getLogger(HiveCatalogOperations.class);
 
@@ -149,7 +150,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
   public HiveSchema loadSchema(NameIdentifier ident) throws NoSuchSchemaException {
     Preconditions.checkArgument(
         !ident.name().isEmpty(),
-        String.format("Cannot create schema with invalid name: %s", ident.name()));
+        String.format("Cannot load schema with invalid name: %s", ident.name()));
     Preconditions.checkArgument(
         isValidNamespace(ident.namespace()),
         String.format("Cannot support invalid namespace in Hive Metastore: %s", ident.namespace()));
@@ -258,7 +259,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       HiveSchema hiveSchema = HiveSchema.fromInnerDB(alteredDatabase, builder);
 
       LOG.info("Altered Hive schema (database) {} in Hive Metastore", ident.name());
-      // todo(xun): hive dose not support renaming database name directly,
+      // todo(xun): hive does not support renaming database name directly,
       //  perhaps we can use namespace to mapping the database names indirectly
 
       return hiveSchema;
@@ -310,6 +311,338 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     }
   }
 
+  @Override
+  public NameIdentifier[] listTables(Namespace namespace) throws NoSuchSchemaException {
+    NameIdentifier schemaIdent = NameIdentifier.parse(namespace.toString());
+    if (!schemaExists(schemaIdent)) {
+      throw new NoSuchSchemaException("Schema (database) does not exist " + namespace);
+    }
+
+    try {
+      return clientPool.run(
+          c ->
+              c.getAllTables(schemaIdent.name()).stream()
+                  .map(tb -> NameIdentifier.of(namespace, tb))
+                  .toArray(NameIdentifier[]::new));
+    } catch (TException e) {
+      throw new RuntimeException(
+          "Failed to list all tables under under namespace : " + namespace + " in Hive Metastore",
+          e);
+    } catch (InterruptedException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  @Override
+  public Table loadTable(NameIdentifier tableIdent) throws NoSuchTableException {
+    Preconditions.checkArgument(!tableIdent.name().isEmpty(), "Cannot load table with empty name");
+
+    NameIdentifier schemaIdent = NameIdentifier.parse(tableIdent.namespace().toString());
+    Preconditions.checkArgument(
+        isValidNamespace(schemaIdent.namespace()),
+        String.format(
+            "Cannot support invalid namespace in Hive Metastore: %s", schemaIdent.namespace()));
+
+    HiveSchema schema = loadSchema(schemaIdent);
+    try {
+      org.apache.hadoop.hive.metastore.api.Table hiveTable =
+          clientPool.run(c -> c.getTable(schemaIdent.name(), tableIdent.name()));
+      HiveTable.Builder builder = new HiveTable.Builder();
+
+      // TODO: We should also fetch the customized HiveTable entity fields from our own
+      //  underlying storage, like id, auditInfo, etc.
+
+      builder =
+          builder
+              .withId(1L /* TODO: Fetch id from underlying storage */)
+              .withSchemaId((Long) schema.fields().get(BaseSchema.ID))
+              .withName(tableIdent.name())
+              .withNameSpace(tableIdent.namespace())
+              .withAuditInfo(
+                  /* TODO: Fetch audit info from underlying storage */
+                  new AuditInfo.Builder()
+                      .withCreator(currentUser())
+                      .withCreateTime(Instant.now())
+                      .build());
+      HiveTable table = HiveTable.fromInnerTable(hiveTable, builder);
+
+      LOG.info("Loaded Hive table {} from Hive Metastore ", tableIdent.name());
+
+      return table;
+    } catch (TException e) {
+      throw new NoSuchTableException(
+          String.format("Hive table does not exist: %s in Hive Metastore", tableIdent.name()), e);
+    } catch (InterruptedException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  @Override
+  public Table createTable(
+      NameIdentifier tableIdent, Column[] columns, String comment, Map<String, String> properties)
+      throws NoSuchSchemaException, TableAlreadyExistsException {
+    Preconditions.checkArgument(
+        !tableIdent.name().isEmpty(), "Cannot create table with empty name");
+
+    NameIdentifier schemaIdent = NameIdentifier.parse(tableIdent.namespace().toString());
+    Preconditions.checkArgument(
+        isValidNamespace(schemaIdent.namespace()),
+        String.format(
+            "Cannot support invalid namespace in Hive Metastore: %s", schemaIdent.namespace()));
+
+    if (tableExists(tableIdent)) {
+      throw new TableAlreadyExistsException("Table already exists: " + tableIdent.name());
+    }
+
+    try {
+      HiveSchema schema = loadSchema(schemaIdent);
+
+      HiveTable table =
+          new HiveTable.Builder()
+              .withId(1L /* TODO: Use ID generator*/)
+              .withSchemaId((Long) schema.fields().get(BaseSchema.ID))
+              .withName(tableIdent.name())
+              .withNameSpace(tableIdent.namespace())
+              .withColumns(columns)
+              .withComment(comment)
+              .withProperties(properties)
+              .withAuditInfo(
+                  new AuditInfo.Builder()
+                      .withCreator(currentUser())
+                      .withCreateTime(Instant.now())
+                      .build())
+              .build();
+      clientPool.run(
+          c -> {
+            c.createTable(table.toInnerTable());
+            return null;
+          });
+
+      // TODO. We should also store the customized HiveTable entity fields into our own
+      //  underlying storage, like id, auditInfo, etc.
+
+      LOG.info("Created Hive table {} in Hive Metastore", tableIdent.name());
+
+      return table;
+
+    } catch (TException e) {
+      throw new RuntimeException(
+          "Failed to create Hive table " + tableIdent.name() + " in Hive Metastore", e);
+    } catch (InterruptedException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  @Override
+  public Table alterTable(NameIdentifier tableIdent, TableChange... changes)
+      throws NoSuchTableException, IllegalArgumentException {
+    Preconditions.checkArgument(
+        !tableIdent.name().isEmpty(), "Cannot create table with empty name");
+
+    NameIdentifier schemaIdent = NameIdentifier.parse(tableIdent.namespace().toString());
+    Preconditions.checkArgument(
+        isValidNamespace(schemaIdent.namespace()),
+        String.format(
+            "Cannot support invalid namespace in Hive Metastore: %s", schemaIdent.namespace()));
+
+    try {
+      org.apache.hadoop.hive.metastore.api.Table alteredHiveTable =
+          clientPool.run(c -> c.getTable(schemaIdent.name(), tableIdent.name()));
+      for (TableChange change : changes) {
+        // Table change
+        if (change instanceof RenameTable) {
+          alteredHiveTable.setTableName(((RenameTable) change).getNewName());
+
+        } else if (change instanceof UpdateComment) {
+          Map<String, String> parameters = alteredHiveTable.getParameters();
+          parameters.put(HMS_TABLE_COMMENT, ((UpdateComment) change).getNewComment());
+
+        } else if (change instanceof SetProperty) {
+          Map<String, String> parameters = alteredHiveTable.getParameters();
+          parameters.put(((SetProperty) change).getProperty(), ((SetProperty) change).getValue());
+
+        } else if (change instanceof RemoveProperty) {
+          Map<String, String> parameters = alteredHiveTable.getParameters();
+          parameters.remove(((RemoveProperty) change).getProperty());
+
+        } else if (change instanceof ColumnChange) {
+          // Column change
+          StorageDescriptor sd = alteredHiveTable.getSd();
+          List<FieldSchema> cols = sd.getCols();
+          String columnName = ((ColumnChange) change).fieldNames()[0];
+
+          if (change instanceof AddColumn) {
+            AddColumn addColumn = (AddColumn) change;
+            cols.add(
+                indexOfPosition(cols, addColumn.getPosition()),
+                new FieldSchema(
+                    columnName,
+                    addColumn.getDataType().accept(ToHiveType.INSTANCE),
+                    addColumn.getComment()));
+
+          } else if (change instanceof DeleteColumn) {
+            if (!cols.removeIf(c -> columnName.equals(c.getName()))
+                && !((DeleteColumn) change).getIfExists()) {
+              throw new IllegalArgumentException("DeleteColumn does not exist: " + columnName);
+            }
+
+          } else if (change instanceof RenameColumn) {
+            if (indexOfColumn(cols, columnName) == -1) {
+              throw new IllegalArgumentException("RenameColumn does not exist: " + columnName);
+            }
+
+            String newName = ((RenameColumn) change).getNewName();
+            if (indexOfColumn(cols, newName) != -1) {
+              throw new IllegalArgumentException("Column already exists: " + newName);
+            }
+            cols.get(indexOfColumn(cols, columnName)).setName(newName);
+
+          } else if (change instanceof UpdateColumnComment) {
+            cols.get(indexOfColumn(cols, columnName))
+                .setComment(((UpdateColumnComment) change).getNewComment());
+
+          } else if (change instanceof UpdateColumnPosition) {
+            int sourceIndex = indexOfColumn(cols, columnName);
+            if (sourceIndex == -1) {
+              throw new IllegalArgumentException(
+                  "UpdateColumnPosition does not exist: " + columnName);
+            }
+
+            // update column position: remove then add to given position
+            FieldSchema hiveColumn = cols.remove(sourceIndex);
+            UpdateColumnPosition updateColumnPosition = (UpdateColumnPosition) change;
+            cols.add(indexOfPosition(cols, updateColumnPosition.getPosition()), hiveColumn);
+
+          } else if (change instanceof UpdateColumnType) {
+            int indexOfColumn = indexOfColumn(cols, columnName);
+            if (indexOfColumn == -1) {
+              throw new IllegalArgumentException("UpdateColumnType does not exist: " + columnName);
+            }
+            cols.get(indexOfColumn)
+                .setType(((UpdateColumnType) change).getNewDataType().accept(ToHiveType.INSTANCE));
+
+          } else {
+            throw new IllegalArgumentException(
+                "Unsupported column change type: " + change.getClass().getSimpleName());
+          }
+        } else {
+          throw new IllegalArgumentException(
+              "Unsupported table change type: " + change.getClass().getSimpleName());
+        }
+      }
+
+      clientPool.run(
+          c -> {
+            c.alter_table(schemaIdent.name(), tableIdent.name(), alteredHiveTable);
+            return null;
+          });
+
+      // TODO. We should also update the customized HiveTable entity fields into our own if
+      // necessary
+      HiveTable table =
+          (HiveTable)
+              loadTable(NameIdentifier.of(tableIdent.namespace(), alteredHiveTable.getTableName()));
+
+      HiveTable.Builder builder = new HiveTable.Builder();
+      builder =
+          builder
+              .withId((Long) table.fields().get(BaseTable.ID))
+              .withSchemaId((Long) table.fields().get(BaseTable.SCHEMA_ID))
+              .withName(alteredHiveTable.getTableName())
+              .withNameSpace(tableIdent.namespace())
+              .withAuditInfo(
+                  /* TODO: Fetch audit info from underlying storage */
+                  new AuditInfo.Builder()
+                      .withCreator(currentUser())
+                      .withCreateTime(Instant.now())
+                      .build());
+      HiveTable alteredTable = HiveTable.fromInnerTable(alteredHiveTable, builder);
+      LOG.info("Altered Hive table {} in Hive Metastore", tableIdent.name());
+
+      return alteredTable;
+
+    } catch (TException | InterruptedException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  private int indexOfPosition(List<FieldSchema> columns, TableChange.ColumnPosition position) {
+    if (position == null) {
+      // add to the end by default
+      return columns.size();
+    } else if (position instanceof After) {
+      String afterColumn = ((After) position).getColumn();
+      return indexOfColumn(columns, afterColumn) + 1;
+    }
+    return 0;
+  }
+
+  /**
+   * Returns the index of a column in the given list of FieldSchema objects, based on the field
+   * name.
+   *
+   * @param columns The list of Hive columns.
+   * @param fieldName The name of the field to be searched.
+   * @return The index of the column if found, otherwise -1.
+   */
+  private int indexOfColumn(List<FieldSchema> columns, String fieldName) {
+    for (int i = 0; i < columns.size(); i++) {
+      if (columns.get(i).getName().equals(fieldName)) {
+        return i;
+      }
+    }
+    return -1;
+  }
+
+  @Override
+  public boolean dropTable(NameIdentifier tableIdent) {
+    return dropHiveTable(tableIdent, false);
+  }
+
+  @Override
+  public boolean purgeTable(NameIdentifier tableIdent) throws UnsupportedOperationException {
+    return dropHiveTable(tableIdent, true);
+  }
+
+  private boolean dropHiveTable(NameIdentifier tableIdent, boolean deleteData) {
+    Preconditions.checkArgument(
+        !tableIdent.name().isEmpty(), "Cannot create table with empty name");
+
+    NameIdentifier schemaIdent = NameIdentifier.parse(tableIdent.namespace().toString());
+    Preconditions.checkArgument(
+        isValidNamespace(schemaIdent.namespace()),
+        String.format(
+            "Cannot support invalid namespace in Hive Metastore: %s", schemaIdent.namespace()));
+
+    try {
+      clientPool.run(
+          c -> {
+            c.dropTable(schemaIdent.name(), tableIdent.name(), deleteData, false);
+            return null;
+          });
+
+      // TODO. we should also delete the Hive table from our own underlying storage
+
+      LOG.info("Dropped Hive table {}", tableIdent.name());
+      return true;
+
+    } catch (NoSuchObjectException e) {
+      LOG.warn("Hive table {} does not exist in Hive Metastore", tableIdent.name());
+      return false;
+    } catch (TException e) {
+      throw new RuntimeException(
+          "Failed to drop Hive table " + tableIdent.name() + " in Hive Metastore", e);
+    } catch (InterruptedException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  /**
+   * Valid namespace of Hive schema
+   *
+   * @param namespace of Hive scheme
+   * @return true if catalog name equals current
+   */
   public boolean isValidNamespace(Namespace namespace) {
     return namespace.levels().length == 2 && namespace.level(1).equals(entity.name());
   }
