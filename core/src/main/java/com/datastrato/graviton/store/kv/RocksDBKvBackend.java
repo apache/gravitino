@@ -36,12 +36,12 @@ public class RocksDBKvBackend implements KvBackend {
     options.setCreateIfMissing(true);
 
     String dbPath = config.get(Configs.ENTRY_KV_BACKEND_PATH);
-    File dbDir = new File(dbPath, "instance1");
+    File dbDir = new File(dbPath, "instance");
     try {
-      if (!dbDir.exists()) {
-        dbDir.mkdirs();
+      if (!dbDir.exists() && !dbDir.mkdirs()) {
+        throw new RocksDBException(
+            String.format("Can't create RocksDB path '%s'", dbDir.getAbsolutePath()));
       }
-
       // TODO (yuqi), Use transaction db to do Transaction operation NOT Lock
       return RocksDB.open(options, dbDir.getAbsolutePath());
     } catch (RocksDBException ex) {
