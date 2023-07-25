@@ -4,17 +4,13 @@
  */
 package com.datastrato.graviton.catalog.hive;
 
-import static com.datastrato.graviton.catalog.hive.HiveTable.HMS_TABLE_COMMENT;
-
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
 import com.datastrato.graviton.catalog.CatalogOperations;
-import com.datastrato.graviton.catalog.hive.converter.ToHiveType;
 import com.datastrato.graviton.exceptions.*;
 import com.datastrato.graviton.meta.AuditInfo;
 import com.datastrato.graviton.meta.CatalogEntity;
 import com.datastrato.graviton.meta.rel.BaseSchema;
-import com.datastrato.graviton.meta.rel.BaseTable;
 import com.datastrato.graviton.rel.*;
 import com.datastrato.graviton.rel.Table;
 import com.google.common.annotations.VisibleForTesting;
@@ -32,8 +28,7 @@ import org.apache.thrift.TException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class HiveCatalogOperations
-    implements CatalogOperations, SupportsSchemas, TableCatalog, TableChange {
+public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas, TableCatalog {
 
   public static final Logger LOG = LoggerFactory.getLogger(HiveCatalogOperations.class);
 
@@ -432,147 +427,9 @@ public class HiveCatalogOperations
   }
 
   @Override
-  public Table alterTable(NameIdentifier tableIdent, TableChange... changes)
+  public Table alterTable(NameIdentifier ident, TableChange... changes)
       throws NoSuchTableException, IllegalArgumentException {
-    Preconditions.checkArgument(
-        !tableIdent.name().isEmpty(), "Cannot create table with empty name");
-
-    NameIdentifier schemaIdent = NameIdentifier.of(tableIdent.namespace().levels());
-    Preconditions.checkArgument(
-        isValidNamespace(schemaIdent.namespace()),
-        String.format(
-            "Cannot support invalid namespace in Hive Metastore: %s", schemaIdent.namespace()));
-
-    try {
-      org.apache.hadoop.hive.metastore.api.Table alteredHiveTable =
-          clientPool.run(c -> c.getTable(schemaIdent.name(), tableIdent.name()));
-      for (TableChange change : changes) {
-        // Table change
-        if (change instanceof RenameTable) {
-          alteredHiveTable.setTableName(((RenameTable) change).getNewName());
-
-        } else if (change instanceof UpdateComment) {
-          Map<String, String> parameters = alteredHiveTable.getParameters();
-          parameters.put(HMS_TABLE_COMMENT, ((UpdateComment) change).getNewComment());
-
-        } else if (change instanceof SetProperty) {
-          Map<String, String> parameters = alteredHiveTable.getParameters();
-          parameters.put(((SetProperty) change).getProperty(), ((SetProperty) change).getValue());
-
-        } else if (change instanceof RemoveProperty) {
-          Map<String, String> parameters = alteredHiveTable.getParameters();
-          parameters.remove(((RemoveProperty) change).getProperty());
-
-        } else if (change instanceof ColumnChange) {
-          // Column change
-          StorageDescriptor sd = alteredHiveTable.getSd();
-          List<FieldSchema> cols = sd.getCols();
-          String columnName = ((ColumnChange) change).fieldNames()[0];
-
-          if (change instanceof AddColumn) {
-            AddColumn addColumn = (AddColumn) change;
-            cols.add(
-                indexOfPosition(cols, addColumn.getPosition()),
-                new FieldSchema(
-                    columnName,
-                    addColumn.getDataType().accept(ToHiveType.INSTANCE),
-                    addColumn.getComment()));
-
-          } else if (change instanceof DeleteColumn) {
-            if (!cols.removeIf(c -> columnName.equals(c.getName()))
-                && !((DeleteColumn) change).getIfExists()) {
-              throw new IllegalArgumentException("DeleteColumn does not exist: " + columnName);
-            }
-
-          } else if (change instanceof RenameColumn) {
-            if (indexOfColumn(cols, columnName) == -1) {
-              throw new IllegalArgumentException("RenameColumn does not exist: " + columnName);
-            }
-
-            String newName = ((RenameColumn) change).getNewName();
-            if (indexOfColumn(cols, newName) != -1) {
-              throw new IllegalArgumentException("Column already exists: " + newName);
-            }
-            cols.get(indexOfColumn(cols, columnName)).setName(newName);
-
-          } else if (change instanceof UpdateColumnComment) {
-            cols.get(indexOfColumn(cols, columnName))
-                .setComment(((UpdateColumnComment) change).getNewComment());
-
-          } else if (change instanceof UpdateColumnPosition) {
-            int sourceIndex = indexOfColumn(cols, columnName);
-            if (sourceIndex == -1) {
-              throw new IllegalArgumentException(
-                  "UpdateColumnPosition does not exist: " + columnName);
-            }
-
-            // update column position: remove then add to given position
-            FieldSchema hiveColumn = cols.remove(sourceIndex);
-            UpdateColumnPosition updateColumnPosition = (UpdateColumnPosition) change;
-            cols.add(indexOfPosition(cols, updateColumnPosition.getPosition()), hiveColumn);
-
-          } else if (change instanceof UpdateColumnType) {
-            int indexOfColumn = indexOfColumn(cols, columnName);
-            if (indexOfColumn == -1) {
-              throw new IllegalArgumentException("UpdateColumnType does not exist: " + columnName);
-            }
-            cols.get(indexOfColumn)
-                .setType(((UpdateColumnType) change).getNewDataType().accept(ToHiveType.INSTANCE));
-
-          } else {
-            throw new IllegalArgumentException(
-                "Unsupported column change type: " + change.getClass().getSimpleName());
-          }
-        } else {
-          throw new IllegalArgumentException(
-              "Unsupported table change type: " + change.getClass().getSimpleName());
-        }
-      }
-
-      clientPool.run(
-          c -> {
-            c.alter_table(schemaIdent.name(), tableIdent.name(), alteredHiveTable);
-            return null;
-          });
-
-      // TODO. We should also update the customized HiveTable entity fields into our own if
-      // necessary
-      HiveTable table =
-          (HiveTable)
-              loadTable(NameIdentifier.of(tableIdent.namespace(), alteredHiveTable.getTableName()));
-
-      HiveTable.Builder builder = new HiveTable.Builder();
-      builder =
-          builder
-              .withId((Long) table.fields().get(BaseTable.ID))
-              .withSchemaId((Long) table.fields().get(BaseTable.SCHEMA_ID))
-              .withName(alteredHiveTable.getTableName())
-              .withNameSpace(tableIdent.namespace())
-              .withAuditInfo(
-                  /* TODO: Fetch audit info from underlying storage */
-                  new AuditInfo.Builder()
-                      .withCreator(currentUser())
-                      .withCreateTime(Instant.now())
-                      .build());
-      HiveTable alteredTable = HiveTable.fromInnerTable(alteredHiveTable, builder);
-      LOG.info("Altered Hive table {} in Hive Metastore", tableIdent.name());
-
-      return alteredTable;
-
-    } catch (TException | InterruptedException e) {
-      throw new RuntimeException(e);
-    }
-  }
-
-  private int indexOfPosition(List<FieldSchema> columns, TableChange.ColumnPosition position) {
-    if (position == null) {
-      // add to the end by default
-      return columns.size();
-    } else if (position instanceof After) {
-      String afterColumn = ((After) position).getColumn();
-      return indexOfColumn(columns, afterColumn) + 1;
-    }
-    return 0;
+    throw new UnsupportedOperationException("Not support alter Hive table yet");
   }
 
   /**
