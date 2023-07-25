@@ -33,7 +33,7 @@ public class GravitonServer extends ResourceConfig {
   public GravitonServer() {
     serverConfig = new ServerConfig();
     server = new JettyServer();
-    gravitonEnv = new GravitonEnv();
+    gravitonEnv = GravitonEnv.getInstance();
   }
 
   public void initialize() {
@@ -47,7 +47,6 @@ public class GravitonServer extends ResourceConfig {
     server.initialize(serverConfig);
 
     gravitonEnv.initialize(serverConfig);
-    GravitonEnv.setEnv(gravitonEnv);
 
     // initialize Jersey REST API resources.
     initializeRestApi();

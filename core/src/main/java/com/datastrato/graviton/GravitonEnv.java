@@ -7,15 +7,12 @@ package com.datastrato.graviton;
 import com.datastrato.graviton.catalog.CatalogManager;
 import com.datastrato.graviton.catalog.CatalogOperationDispatcher;
 import com.datastrato.graviton.meta.BaseMetalakesOperations;
-import com.google.common.base.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class GravitonEnv {
 
   private static final Logger LOG = LoggerFactory.getLogger(GravitonEnv.class);
-
-  private static volatile GravitonEnv INSTANCE;
 
   private Config config;
 
@@ -30,15 +27,14 @@ public class GravitonEnv {
   // TODO. We should refactor the BaseMetalakesOperations to align with other class names. @jerry
   private BaseMetalakesOperations metalakesOperations;
 
-  public GravitonEnv() {}
+  private GravitonEnv() {}
 
-  public static GravitonEnv env() {
-    Preconditions.checkNotNull(INSTANCE, "GravitonEnv is not initialized.");
-    return INSTANCE;
+  private static class InstanceHolder {
+    private static final GravitonEnv INSTANCE = new GravitonEnv();
   }
 
-  public static void setEnv(GravitonEnv env) {
-    INSTANCE = env;
+  public static GravitonEnv getInstance() {
+    return InstanceHolder.INSTANCE;
   }
 
   public void initialize(Config config) {
