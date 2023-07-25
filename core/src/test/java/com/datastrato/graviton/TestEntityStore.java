@@ -44,7 +44,8 @@ public class TestEntityStore {
     }
 
     @Override
-    public <E extends Entity & HasIdentifier> List<E> list(Namespace namespace) throws IOException {
+    public <E extends Entity & HasIdentifier> List<E> list(Namespace namespace, Class<E> type)
+        throws IOException {
       return entityMap.entrySet().stream()
           .filter(e -> e.getKey().namespace().equals(namespace))
           .map(entry -> (E) entry.getValue())
@@ -75,7 +76,7 @@ public class TestEntityStore {
     }
 
     @Override
-    public <E extends Entity & HasIdentifier> E get(NameIdentifier ident)
+    public <E extends Entity & HasIdentifier> E get(NameIdentifier ident, Class<E> type)
         throws NoSuchEntityException, IOException {
       E e = (E) entityMap.get(ident);
       if (e == null) {
@@ -149,18 +150,19 @@ public class TestEntityStore {
     store.put(catalog.nameIdentifier(), catalog);
     store.put(table.nameIdentifier(), table);
 
-    Metalake retrievedMetalake = store.get(metalake.nameIdentifier());
+    Metalake retrievedMetalake = store.get(metalake.nameIdentifier(), BaseMetalake.class);
     Assertions.assertEquals(metalake, retrievedMetalake);
 
-    CatalogEntity retrievedCatalog = store.get(catalog.nameIdentifier());
+    CatalogEntity retrievedCatalog = store.get(catalog.nameIdentifier(), CatalogEntity.class);
     Assertions.assertEquals(catalog, retrievedCatalog);
 
-    Table retrievedTable = store.get(table.nameIdentifier());
+    Table retrievedTable = store.get(table.nameIdentifier(), TestTable.class);
     Assertions.assertEquals(table, retrievedTable);
 
     store.delete(metalake.nameIdentifier());
     Assertions.assertThrows(
-        NoSuchEntityException.class, () -> store.get(metalake.nameIdentifier()));
+        NoSuchEntityException.class,
+        () -> store.get(metalake.nameIdentifier(), BaseMetalake.class));
 
     Assertions.assertThrows(
         EntityAlreadyExistsException.class,
