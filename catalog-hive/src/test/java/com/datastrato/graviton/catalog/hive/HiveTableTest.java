@@ -80,7 +80,7 @@ public class HiveTableTest extends MiniHiveMetastoreService {
     Long tableId = 1L;
     String hiveTableName = "test_hive_table";
     NameIdentifier tableIdentifier =
-        NameIdentifier.of(hiveSchema.nameIdentifier().toString(), hiveTableName);
+        NameIdentifier.of(META_LAKE_NAME, hiveCatalog.name(), hiveSchema.name(), hiveTableName);
     Map<String, String> properties = Maps.newHashMap();
     properties.put("key1", "val1");
     properties.put("key2", "val2");
@@ -137,7 +137,7 @@ public class HiveTableTest extends MiniHiveMetastoreService {
   public void testDropHiveTable() {
     Long tableId = 1L;
     NameIdentifier tableIdentifier =
-        NameIdentifier.of(hiveSchema.nameIdentifier().toString(), genRandomName());
+        NameIdentifier.of(META_LAKE_NAME, hiveCatalog.name(), hiveSchema.name(), genRandomName());
     Map<String, String> properties = Maps.newHashMap();
     properties.put("key1", "val1");
     properties.put("key2", "val2");
@@ -185,7 +185,7 @@ public class HiveTableTest extends MiniHiveMetastoreService {
   public void testAlterHiveTable() {
     Long tableId = 1L;
     NameIdentifier tableIdentifier =
-        NameIdentifier.of(hiveSchema.nameIdentifier().toString(), genRandomName());
+        NameIdentifier.of(META_LAKE_NAME, hiveCatalog.name(), hiveSchema.name(), genRandomName());
     Map<String, String> properties = Maps.newHashMap();
     properties.put("key1", "val1");
     properties.put("key2", "val2");

@@ -313,7 +313,7 @@ public class HiveCatalogOperations
 
   @Override
   public NameIdentifier[] listTables(Namespace namespace) throws NoSuchSchemaException {
-    NameIdentifier schemaIdent = NameIdentifier.parse(namespace.toString());
+    NameIdentifier schemaIdent = NameIdentifier.of(namespace.levels());
     if (!schemaExists(schemaIdent)) {
       throw new NoSuchSchemaException("Schema (database) does not exist " + namespace);
     }
@@ -337,7 +337,7 @@ public class HiveCatalogOperations
   public Table loadTable(NameIdentifier tableIdent) throws NoSuchTableException {
     Preconditions.checkArgument(!tableIdent.name().isEmpty(), "Cannot load table with empty name");
 
-    NameIdentifier schemaIdent = NameIdentifier.parse(tableIdent.namespace().toString());
+    NameIdentifier schemaIdent = NameIdentifier.of(tableIdent.namespace().levels());
     Preconditions.checkArgument(
         isValidNamespace(schemaIdent.namespace()),
         String.format(
@@ -384,15 +384,11 @@ public class HiveCatalogOperations
     Preconditions.checkArgument(
         !tableIdent.name().isEmpty(), "Cannot create table with empty name");
 
-    NameIdentifier schemaIdent = NameIdentifier.parse(tableIdent.namespace().toString());
+    NameIdentifier schemaIdent = NameIdentifier.of(tableIdent.namespace().levels());
     Preconditions.checkArgument(
         isValidNamespace(schemaIdent.namespace()),
         String.format(
             "Cannot support invalid namespace in Hive Metastore: %s", schemaIdent.namespace()));
-
-    if (tableExists(tableIdent)) {
-      throw new TableAlreadyExistsException("Table already exists: " + tableIdent.name());
-    }
 
     try {
       HiveSchema schema = loadSchema(schemaIdent);
@@ -425,6 +421,8 @@ public class HiveCatalogOperations
 
       return table;
 
+    } catch (AlreadyExistsException e) {
+      throw new TableAlreadyExistsException("Table already exists: " + tableIdent.name(), e);
     } catch (TException e) {
       throw new RuntimeException(
           "Failed to create Hive table " + tableIdent.name() + " in Hive Metastore", e);
@@ -439,7 +437,7 @@ public class HiveCatalogOperations
     Preconditions.checkArgument(
         !tableIdent.name().isEmpty(), "Cannot create table with empty name");
 
-    NameIdentifier schemaIdent = NameIdentifier.parse(tableIdent.namespace().toString());
+    NameIdentifier schemaIdent = NameIdentifier.of(tableIdent.namespace().levels());
     Preconditions.checkArgument(
         isValidNamespace(schemaIdent.namespace()),
         String.format(
@@ -608,7 +606,7 @@ public class HiveCatalogOperations
     Preconditions.checkArgument(
         !tableIdent.name().isEmpty(), "Cannot create table with empty name");
 
-    NameIdentifier schemaIdent = NameIdentifier.parse(tableIdent.namespace().toString());
+    NameIdentifier schemaIdent = NameIdentifier.of(tableIdent.namespace().levels());
     Preconditions.checkArgument(
         isValidNamespace(schemaIdent.namespace()),
         String.format(

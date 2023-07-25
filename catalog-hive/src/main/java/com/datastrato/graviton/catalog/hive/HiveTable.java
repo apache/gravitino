@@ -92,7 +92,7 @@ public class HiveTable extends BaseTable {
   }
 
   public NameIdentifier schemaIdentifier() {
-    return NameIdentifier.parse(nameIdentifier().namespace().toString());
+    return NameIdentifier.of(nameIdentifier().namespace().levels());
   }
 
   public static class Builder extends BaseTableBuilder<Builder, HiveTable> {

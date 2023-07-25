@@ -6,7 +6,6 @@ package com.datastrato.graviton.meta.rel;
 
 import com.datastrato.graviton.Entity;
 import com.datastrato.graviton.Field;
-import com.datastrato.graviton.HasIdentifier;
 import com.datastrato.graviton.rel.Column;
 import com.google.common.collect.Maps;
 import io.substrait.type.Type;
@@ -17,7 +16,7 @@ import lombok.ToString;
 
 @EqualsAndHashCode
 @ToString
-public abstract class BaseColumn implements Column, Entity, HasIdentifier {
+public abstract class BaseColumn implements Column, Entity {
   public static final Field NAME = Field.required("name", String.class, "The name of the column");
   public static final Field COMMENT =
       Field.optional("comment", String.class, "The comment of the column");
