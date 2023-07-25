@@ -22,8 +22,9 @@ dependencies {
   implementation(libs.commons.lang3)
   implementation(libs.commons.io)
   implementation(libs.caffeine)
+    testImplementation(project(mapOf("path" to ":storage")))
 
-  compileOnly(libs.lombok)
+    compileOnly(libs.lombok)
   annotationProcessor(libs.lombok)
   testCompileOnly(libs.lombok)
   testAnnotationProcessor(libs.lombok)

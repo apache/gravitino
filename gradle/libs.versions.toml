@@ -19,6 +19,7 @@ mockserver = "5.13.2"
 commons-lang3 = "3.12.0"
 commons-io = "2.11.0"
 caffeine = "2.9.3"
+rocksdbjni = "7.7.3"
 
 protobuf-plugin = "0.9.2"
 spotless-plugin = '6.11.0'
@@ -66,6 +67,7 @@ mockserver-client-java = { group = "org.mock-server", name = "mockserver-client-
 commons-lang3 = { group = "org.apache.commons", name = "commons-lang3", version.ref = "commons-lang3" }
 commons-io = { group = "commons-io", name = "commons-io", version.ref = "commons-io" }
 caffeine = { group = "com.github.ben-manes.caffeine", name = "caffeine", version.ref = "caffeine" }
+rocksdbjni = { group = "org.rocksdb", name = "rocksdbjni", version.ref = "rocksdbjni" }
 
 [bundles]
 log4j = ["slf4j-api", "log4j-slf4j2-impl", "log4j-api", "log4j-core", "log4j-12-api"]

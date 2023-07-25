@@ -2,9 +2,13 @@
  * Copyright 2023 Datastrato.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.graviton;
+package com.datastrato.graviton.storage;
 
-import com.google.common.collect.ImmutableMap;
+import com.datastrato.graviton.Config;
+import com.datastrato.graviton.Configs;
+import com.datastrato.graviton.EntityStore;
+import com.datastrato.graviton.storage.kv.KvEntityStore;
+import java.util.HashMap;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -15,7 +19,12 @@ public class EntityStoreFactory {
 
   // Register EntityStore's short name to its full qualified class name in the map. So that user
   // don't need to specify the full qualified class name when creating an EntityStore.
-  private static final Map<String, String> ENTITY_STORES = ImmutableMap.of();
+  private static final Map<String, String> ENTITY_STORES =
+      new HashMap<String, String>() {
+        {
+          put("kv", KvEntityStore.class.getCanonicalName());
+        }
+      };
 
   private EntityStoreFactory() {}
 

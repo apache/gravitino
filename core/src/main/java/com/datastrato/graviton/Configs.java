@@ -8,14 +8,35 @@ import com.datastrato.graviton.config.ConfigBuilder;
 import com.datastrato.graviton.config.ConfigEntry;
 
 public interface Configs {
+  String DEFUALT_ENTITY_STORE = "kv";
+  String ENTITY_STORE_KEY = "graviton.entity.store";
+
+  String DEFUALT_ENTITY_KV_STORE = "rocksdb";
+  String ENTITY_KV_STORE_KEY = "graviton.entity.store.kv";
+
+  String ENTITY_KV_ROCKSDB_BACKEND_PATH_KEY = "graviton.entity.store.kv.rocskdb.path";
+  String DEFAULT_KV_ROCKSDB_BACKEND_PATH = "/tmp/graviton";
 
   ConfigEntry<String> ENTITY_STORE =
-      new ConfigBuilder("graviton.entity.store")
+      new ConfigBuilder(ENTITY_STORE_KEY)
           .doc("The entity store to use")
           .version("0.1.0")
           .stringConf()
-          // TODO. Change this when we have a EntityStore implementation. @Jerry
-          .createWithDefault("in-memory");
+          .createWithDefault(DEFUALT_ENTITY_STORE);
+
+  ConfigEntry<String> ENTITY_KV_STORE =
+      new ConfigBuilder(ENTITY_KV_STORE_KEY)
+          .doc("The kv entity store to use")
+          .version("0.1.0")
+          .stringConf()
+          .createWithDefault(DEFUALT_ENTITY_KV_STORE);
+
+  ConfigEntry<String> ENTRY_KV_ROCKSDB_BACKEND_PATH =
+      new ConfigBuilder(ENTITY_KV_ROCKSDB_BACKEND_PATH_KEY)
+          .doc("The RocksDB backend path for entity store")
+          .version("0.1.0")
+          .stringConf()
+          .createWithDefault(DEFAULT_KV_ROCKSDB_BACKEND_PATH);
 
   ConfigEntry<String> ENTITY_SERDE =
       new ConfigBuilder("graviton.entity.serde")
