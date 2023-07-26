@@ -14,7 +14,7 @@ plugins {
   alias(libs.plugins.spotless)
   alias(libs.plugins.publish)
   // Apply one top level rat plugin to perform any required license enforcement analysis
-  id("org.nosphere.apache.rat") version "0.8.0"
+  alias(libs.plugins.rat)
 }
 
 repositories { mavenCentral() }
