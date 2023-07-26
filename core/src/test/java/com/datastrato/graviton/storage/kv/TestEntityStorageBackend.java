@@ -3,26 +3,26 @@
  * This software is licensed under the Apache License version 2.
  */
 
-package com.datastrato.graviton.storage;
+package com.datastrato.graviton.storage.kv;
 
 import static com.datastrato.graviton.Configs.DEFUALT_ENTITY_KV_STORE;
 import static com.datastrato.graviton.Configs.ENTITY_KV_STORE;
 import static com.datastrato.graviton.Configs.ENTITY_STORE;
 import static com.datastrato.graviton.Configs.ENTRY_KV_ROCKSDB_BACKEND_PATH;
 
+import com.datastrato.graviton.Catalog.Type;
 import com.datastrato.graviton.Config;
 import com.datastrato.graviton.Configs;
 import com.datastrato.graviton.EntityAlreadyExistsException;
 import com.datastrato.graviton.EntityStore;
+import com.datastrato.graviton.EntityStoreFactory;
 import com.datastrato.graviton.Metalake;
 import com.datastrato.graviton.Namespace;
 import com.datastrato.graviton.NoSuchEntityException;
-import com.datastrato.graviton.TestCatalog;
 import com.datastrato.graviton.meta.AuditInfo;
 import com.datastrato.graviton.meta.BaseMetalake;
 import com.datastrato.graviton.meta.CatalogEntity;
 import com.datastrato.graviton.meta.SchemaVersion;
-import com.datastrato.graviton.storage.kv.KvEntityStore;
 import java.time.Instant;
 import org.apache.commons.io.FileUtils;
 import org.junit.jupiter.api.AfterEach;
@@ -79,7 +79,7 @@ public class TestEntityStorageBackend {
               .withId(1L)
               .withName("catalog")
               .withNamespace(Namespace.of("metalake"))
-              .withType(TestCatalog.Type.RELATIONAL)
+              .withType(Type.RELATIONAL)
               .withMetalakeId(1L)
               .withAuditInfo(auditInfo)
               .build();
@@ -89,7 +89,7 @@ public class TestEntityStorageBackend {
               .withId(1L)
               .withName("catalogCopy")
               .withNamespace(Namespace.of("metalake"))
-              .withType(TestCatalog.Type.RELATIONAL)
+              .withType(Type.RELATIONAL)
               .withMetalakeId(1L)
               .withAuditInfo(auditInfo)
               .build();

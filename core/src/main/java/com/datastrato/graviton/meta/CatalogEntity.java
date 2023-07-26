@@ -11,15 +11,14 @@ import com.datastrato.graviton.Entity;
 import com.datastrato.graviton.Field;
 import com.datastrato.graviton.HasIdentifier;
 import com.datastrato.graviton.Namespace;
+import com.google.common.base.Objects;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
-import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
 
-@EqualsAndHashCode
 @ToString
 public class CatalogEntity implements Entity, Auditable, HasIdentifier {
 
@@ -134,5 +133,28 @@ public class CatalogEntity implements Entity, Auditable, HasIdentifier {
       catalog.validate();
       return catalog;
     }
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+    CatalogEntity that = (CatalogEntity) o;
+    return Objects.equal(id, that.id)
+        && Objects.equal(metalakeId, that.metalakeId)
+        && Objects.equal(name, that.name)
+        && type == that.type
+        && Objects.equal(comment, that.comment)
+        && Objects.equal(properties, that.properties)
+        && Objects.equal(auditInfo, that.auditInfo);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hashCode(id, metalakeId, name, type, comment, properties, auditInfo);
   }
 }

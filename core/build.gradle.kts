@@ -22,7 +22,7 @@ dependencies {
   implementation(libs.commons.lang3)
   implementation(libs.commons.io)
   implementation(libs.caffeine)
-    testImplementation(project(mapOf("path" to ":storage")))
+  implementation(libs.rocksdbjni)
 
     compileOnly(libs.lombok)
   annotationProcessor(libs.lombok)

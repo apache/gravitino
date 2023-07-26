@@ -5,8 +5,7 @@
 
 package com.datastrato.graviton.storage.kv;
 
-import static com.datastrato.graviton.Configs.DEFUALT_ENTITY_STORE;
-import static com.datastrato.graviton.Configs.ENTITY_STORE;
+import static com.datastrato.graviton.EntityStoreFactory.createKvEntityBackend;
 
 import com.datastrato.graviton.Config;
 import com.datastrato.graviton.Configs;
@@ -19,7 +18,7 @@ import com.datastrato.graviton.HasIdentifier;
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
 import com.datastrato.graviton.NoSuchEntityException;
-import com.datastrato.graviton.storage.utils.Bytes;
+import com.datastrato.graviton.util.Bytes;
 import com.datastrato.graviton.util.Executable;
 import com.google.common.collect.Lists;
 import java.io.IOException;
@@ -44,12 +43,8 @@ public class KvEntityStore implements EntityStore {
   @Override
   public void initialize(Config config) throws RuntimeException {
     try {
-      if (DEFUALT_ENTITY_STORE.equals(config.get(ENTITY_STORE))) {
-        backend = new RocksDBKvBackend();
-        backend.initialize(config);
-      } else {
-        throw new RuntimeException("Unsupported backend type...");
-      }
+      backend = createKvEntityBackend(config);
+      backend.initialize(config);
       serDe = EntitySerDeFactory.createEntitySerDe(config.get(Configs.ENTITY_SERDE));
       this.setSerDe(serDe);
       lock = new ReentrantLock();
@@ -70,7 +65,8 @@ public class KvEntityStore implements EntityStore {
     byte[] startKey = entityKeyEncoder.encode(namespace);
     byte[] endKey = Bytes.increment(Bytes.wrap(startKey)).get();
     List<Pair<byte[], byte[]>> kvs =
-        backend.scan(new KvRangeScan.KvRangeScanBuilder()
+        backend.scan(
+            new KvRangeScan.KvRangeScanBuilder()
                 .start(startKey)
                 .end(endKey)
                 .startInclusive(true)

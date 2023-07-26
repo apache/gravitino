@@ -7,7 +7,6 @@ package com.datastrato.graviton.proto;
 
 import com.datastrato.graviton.meta.AuditInfo;
 import com.datastrato.graviton.meta.CatalogEntity;
-import com.google.common.collect.ImmutableList;
 
 public class CatalogEntitySerDe implements ProtoSerDe<CatalogEntity, Catalog> {
   @Override
@@ -29,14 +28,8 @@ public class CatalogEntitySerDe implements ProtoSerDe<CatalogEntity, Catalog> {
     com.datastrato.graviton.proto.Catalog.Type type =
         com.datastrato.graviton.proto.Catalog.Type.valueOf(catalogEntity.getType().name());
     builder.setType(type);
-
     builder.setMetalakeId(catalogEntity.getMetalakeId());
 
-    com.datastrato.graviton.proto.Namespace namespace =
-        Namespace.newBuilder()
-            .addAllLevels(ImmutableList.copyOf(catalogEntity.namespace().levels()))
-            .build();
-    builder.setNamespace(namespace);
     return builder.build();
   }
 
@@ -58,9 +51,6 @@ public class CatalogEntitySerDe implements ProtoSerDe<CatalogEntity, Catalog> {
 
     builder.withType(com.datastrato.graviton.Catalog.Type.valueOf(p.getType().name()));
     builder.withMetalakeId(p.getMetalakeId());
-    builder.withNamespace(
-        com.datastrato.graviton.Namespace.of(
-            p.getNamespace().getLevelsList().toArray(new String[0])));
     return builder.build();
   }
 }

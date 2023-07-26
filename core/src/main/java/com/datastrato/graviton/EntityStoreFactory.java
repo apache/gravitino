@@ -2,14 +2,14 @@
  * Copyright 2023 Datastrato.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.graviton.storage;
+package com.datastrato.graviton;
 
-import com.datastrato.graviton.Config;
-import com.datastrato.graviton.Configs;
-import com.datastrato.graviton.EntityStore;
-import com.datastrato.graviton.storage.kv.KvEntityStore;
+import static com.datastrato.graviton.Configs.ENTITY_KV_STORE;
+
+import com.datastrato.graviton.storage.kv.KvBackend;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -22,7 +22,14 @@ public class EntityStoreFactory {
   private static final Map<String, String> ENTITY_STORES =
       new HashMap<String, String>() {
         {
-          put("kv", KvEntityStore.class.getCanonicalName());
+          put("kv", "com.datastrato.graviton.storage.kv.KvEntityStore");
+        }
+      };
+
+  public static final Map<String, String> KV_BACKENDS =
+      new HashMap<String, String>() {
+        {
+          put("rocksdb", "com.datastrato.graviton.storage.kv.RocksDBKvBackend");
         }
       };
 
@@ -39,6 +46,22 @@ public class EntityStoreFactory {
     } catch (Exception e) {
       LOG.error("Failed to create and initialize EntityStore by name {}.", name, e);
       throw new RuntimeException("Failed to create and initialize EntityStore: " + name, e);
+    }
+  }
+
+  public static KvBackend createKvEntityBackend(Config config) {
+    String backendName = config.get(ENTITY_KV_STORE);
+    String className = KV_BACKENDS.get(backendName);
+    if (Objects.isNull(className)) {
+      throw new RuntimeException("Unsupported backend type..." + backendName);
+    }
+
+    try {
+      return (KvBackend) Class.forName(className).newInstance();
+    } catch (Exception e) {
+      LOG.error("Failed to create and initialize KvBackend by name '{}'.", backendName, e);
+      throw new RuntimeException(
+          "Failed to create and initialize KvBackend by name: " + backendName, e);
     }
   }
 }

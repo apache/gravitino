@@ -19,7 +19,9 @@ public interface KvBackend extends Closeable {
    */
   void initialize(Config config) throws IOException;
 
-  /** Store key value pair ignoring any existing value
+  /**
+   * Store key value pair ignoring any existing value
+   *
    * @param key key of the pair
    * @param value value of the pair
    */

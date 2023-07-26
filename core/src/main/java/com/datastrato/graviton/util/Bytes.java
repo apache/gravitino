@@ -1,4 +1,9 @@
-package com.datastrato.graviton.storage.utils;
+/*
+ * Copyright 2023 Datastrato.
+ * This software is licensed under the Apache License version 2.
+ */
+
+package com.datastrato.graviton.util;
 
 import java.io.Serializable;
 import java.util.Arrays;
@@ -9,7 +14,7 @@ public class Bytes implements Comparable<byte[]> {
   public static final byte[] EMPTY = new byte[0];
 
   private static final char[] HEX_CHARS_UPPER = {
-      '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'
+    '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'
   };
 
   private final byte[] bytes;

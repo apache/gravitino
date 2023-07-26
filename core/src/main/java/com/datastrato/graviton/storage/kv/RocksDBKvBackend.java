@@ -5,10 +5,9 @@
 
 package com.datastrato.graviton.storage.kv;
 
-
 import com.datastrato.graviton.Config;
 import com.datastrato.graviton.Configs;
-import com.datastrato.graviton.storage.utils.Bytes;
+import com.datastrato.graviton.util.Bytes;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
@@ -130,5 +129,4 @@ public class RocksDBKvBackend implements KvBackend {
   public void close() throws IOException {
     db.close();
   }
-
 }
