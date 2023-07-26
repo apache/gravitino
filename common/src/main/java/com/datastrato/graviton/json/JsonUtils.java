@@ -52,13 +52,10 @@ public class JsonUtils {
     @Override
     public T next() {
       JsonNode element = elements.next();
-      validate(element);
       return convert(element);
     }
 
     abstract T convert(JsonNode element);
-
-    abstract void validate(JsonNode element);
   }
 
   static class JsonStringArrayIterator extends JsonArrayIterator<String> {
@@ -71,16 +68,7 @@ public class JsonUtils {
 
     @Override
     String convert(JsonNode element) {
-      return element.asText();
-    }
-
-    @Override
-    void validate(JsonNode element) {
-      Preconditions.checkArgument(
-          element.isTextual(),
-          "Cannot parse string from non-text value in %s: %s",
-          property,
-          element);
+      return convertToString(property, element);
     }
   }
 
@@ -114,9 +102,13 @@ public class JsonUtils {
   public static String getString(String property, JsonNode node) {
     Preconditions.checkArgument(node.has(property), "Cannot parse missing string: %s", property);
     JsonNode pNode = node.get(property);
+    return convertToString(property, pNode);
+  }
+
+  private static String convertToString(String property, JsonNode pNode) {
     Preconditions.checkArgument(
         pNode != null && !pNode.isNull() && pNode.isTextual(),
-        "Cannot parse to a string value: %s: %s",
+        "Cannot parse to a string value %s: %s",
         property,
         pNode);
     return pNode.asText();
