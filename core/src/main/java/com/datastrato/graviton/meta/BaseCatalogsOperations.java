@@ -10,10 +10,10 @@ import com.datastrato.graviton.exceptions.NoSuchCatalogException;
 import com.datastrato.graviton.exceptions.NoSuchMetalakeException;
 import java.util.Map;
 
-public class BaseCatalogsOperations implements SupportCatalogs {
+public class BaseCatalogsOperations implements SupportsCatalogs {
 
   @Override
-  public Catalog[] listCatalogs(Namespace namespace) throws NoSuchMetalakeException {
+  public NameIdentifier[] listCatalogs(Namespace namespace) throws NoSuchMetalakeException {
     throw new UnsupportedOperationException("Not implemented yet");
   }
 

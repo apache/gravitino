@@ -8,6 +8,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 import com.datastrato.graviton.Catalog;
+import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
 import com.datastrato.graviton.dto.CatalogDTO;
 import com.datastrato.graviton.dto.requests.CatalogCreateRequest;
@@ -66,10 +67,10 @@ public class TestCatalogOperations extends JerseyTest {
 
   @Test
   public void testListCatalogs() {
-    TestCatalog catalog1 = buildCatalog("metalake1", "catalog1");
-    TestCatalog catalog2 = buildCatalog("metalake1", "catalog2");
+    NameIdentifier ident1 = NameIdentifier.of("metalake1", "catalog1");
+    NameIdentifier ident2 = NameIdentifier.of("metalake1", "catalog2");
 
-    when(ops.listCatalogs(any())).thenReturn(new Catalog[] {catalog1, catalog2});
+    when(ops.listCatalogs(any())).thenReturn(new NameIdentifier[] {ident1, ident2});
 
     Response resp =
         target("/metalakes/metalake1/catalogs")
@@ -83,10 +84,10 @@ public class TestCatalogOperations extends JerseyTest {
     CatalogListResponse listResponse = resp.readEntity(CatalogListResponse.class);
     Assertions.assertEquals(0, listResponse.getCode());
 
-    CatalogDTO[] catalogs = listResponse.getCatalogs();
-    Assertions.assertEquals(2, catalogs.length);
-    Assertions.assertEquals("catalog1", catalogs[0].name());
-    Assertions.assertEquals("catalog2", catalogs[1].name());
+    NameIdentifier[] idents = listResponse.getCatalogs();
+    Assertions.assertEquals(2, idents.length);
+    Assertions.assertEquals(ident1, idents[0]);
+    Assertions.assertEquals(ident2, idents[1]);
 
     doThrow(new NoSuchMetalakeException("mock error")).when(ops).listCatalogs(any());
     Response resp1 =

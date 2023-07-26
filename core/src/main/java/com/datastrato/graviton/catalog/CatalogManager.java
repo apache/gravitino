@@ -32,7 +32,7 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class CatalogManager implements SupportCatalogs {
+public class CatalogManager implements SupportsCatalogs {
 
   private static final Logger LOG = LoggerFactory.getLogger(CatalogManager.class);
 
@@ -115,7 +115,7 @@ public class CatalogManager implements SupportCatalogs {
   }
 
   @Override
-  public Catalog[] listCatalogs(Namespace namespace) throws NoSuchMetalakeException {
+  public NameIdentifier[] listCatalogs(Namespace namespace) throws NoSuchMetalakeException {
     throw new UnsupportedOperationException("Not implemented yet");
   }
 
