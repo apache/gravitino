@@ -11,7 +11,7 @@ import org.slf4j.LoggerFactory;
 
 public class EntityStoreFactory {
 
-  private static final Logger LOG = LoggerFactory.getLogger(EntityStore.class);
+  private static final Logger LOG = LoggerFactory.getLogger(EntityStoreFactory.class);
 
   // Register EntityStore's short name to its full qualified class name in the map. So that user
   // don't need to specify the full qualified class name when creating an EntityStore.

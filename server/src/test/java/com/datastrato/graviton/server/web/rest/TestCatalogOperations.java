@@ -10,6 +10,7 @@ import static org.mockito.Mockito.*;
 import com.datastrato.graviton.Catalog;
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
+import com.datastrato.graviton.catalog.CatalogManager;
 import com.datastrato.graviton.dto.CatalogDTO;
 import com.datastrato.graviton.dto.requests.CatalogCreateRequest;
 import com.datastrato.graviton.dto.requests.CatalogUpdateRequest;
@@ -19,7 +20,6 @@ import com.datastrato.graviton.exceptions.CatalogAlreadyExistsException;
 import com.datastrato.graviton.exceptions.NoSuchCatalogException;
 import com.datastrato.graviton.exceptions.NoSuchMetalakeException;
 import com.datastrato.graviton.meta.AuditInfo;
-import com.datastrato.graviton.meta.BaseCatalogsOperations;
 import com.datastrato.graviton.meta.CatalogEntity;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -47,7 +47,7 @@ public class TestCatalogOperations extends JerseyTest {
     }
   }
 
-  private BaseCatalogsOperations ops = mock(BaseCatalogsOperations.class);
+  private CatalogManager manager = mock(CatalogManager.class);
 
   @Override
   protected Application configure() {
@@ -57,7 +57,7 @@ public class TestCatalogOperations extends JerseyTest {
         new AbstractBinder() {
           @Override
           protected void configure() {
-            bind(ops).to(BaseCatalogsOperations.class).ranked(2);
+            bind(manager).to(CatalogManager.class).ranked(2);
             bindFactory(MockServletRequestFactory.class).to(HttpServletRequest.class);
           }
         });
@@ -70,7 +70,7 @@ public class TestCatalogOperations extends JerseyTest {
     NameIdentifier ident1 = NameIdentifier.of("metalake1", "catalog1");
     NameIdentifier ident2 = NameIdentifier.of("metalake1", "catalog2");
 
-    when(ops.listCatalogs(any())).thenReturn(new NameIdentifier[] {ident1, ident2});
+    when(manager.listCatalogs(any())).thenReturn(new NameIdentifier[] {ident1, ident2});
 
     Response resp =
         target("/metalakes/metalake1/catalogs")
@@ -89,7 +89,7 @@ public class TestCatalogOperations extends JerseyTest {
     Assertions.assertEquals(ident1, idents[0]);
     Assertions.assertEquals(ident2, idents[1]);
 
-    doThrow(new NoSuchMetalakeException("mock error")).when(ops).listCatalogs(any());
+    doThrow(new NoSuchMetalakeException("mock error")).when(manager).listCatalogs(any());
     Response resp1 =
         target("/metalakes/metalake1/catalogs")
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -111,7 +111,7 @@ public class TestCatalogOperations extends JerseyTest {
             "catalog1", Catalog.Type.RELATIONAL, "comment", ImmutableMap.of("key", "value"));
     TestCatalog catalog = buildCatalog("metalake1", "catalog1");
 
-    when(ops.createCatalog(any(), any(), any(), any())).thenReturn(catalog);
+    when(manager.createCatalog(any(), any(), any(), any())).thenReturn(catalog);
 
     Response resp =
         target("/metalakes/metalake1/catalogs")
@@ -133,7 +133,7 @@ public class TestCatalogOperations extends JerseyTest {
 
     // Test throw NoSuchMetalakeException
     doThrow(new NoSuchMetalakeException("mock error"))
-        .when(ops)
+        .when(manager)
         .createCatalog(any(), any(), any(), any());
     Response resp1 =
         target("/metalakes/metalake1/catalogs")
@@ -150,7 +150,7 @@ public class TestCatalogOperations extends JerseyTest {
 
     // Test throw CatalogAlreadyExistsException
     doThrow(new CatalogAlreadyExistsException("mock error"))
-        .when(ops)
+        .when(manager)
         .createCatalog(any(), any(), any(), any());
     Response resp2 =
         target("/metalakes/metalake1/catalogs")
@@ -166,7 +166,9 @@ public class TestCatalogOperations extends JerseyTest {
         CatalogAlreadyExistsException.class.getSimpleName(), errorResponse1.getType());
 
     // Test throw internal RuntimeException
-    doThrow(new RuntimeException("mock error")).when(ops).createCatalog(any(), any(), any(), any());
+    doThrow(new RuntimeException("mock error"))
+        .when(manager)
+        .createCatalog(any(), any(), any(), any());
     Response resp3 =
         target("/metalakes/metalake1/catalogs")
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -185,7 +187,7 @@ public class TestCatalogOperations extends JerseyTest {
   public void testLoadCatalog() {
     TestCatalog catalog = buildCatalog("metalake1", "catalog1");
 
-    when(ops.loadCatalog(any())).thenReturn(catalog);
+    when(manager.loadCatalog(any())).thenReturn(catalog);
 
     Response resp =
         target("/metalakes/metalake1/catalogs/catalog1")
@@ -205,7 +207,7 @@ public class TestCatalogOperations extends JerseyTest {
     Assertions.assertEquals(ImmutableMap.of("key", "value"), catalogDTO.properties());
 
     // Test throw NoSuchMetalakeException
-    doThrow(new NoSuchMetalakeException("mock error")).when(ops).loadCatalog(any());
+    doThrow(new NoSuchMetalakeException("mock error")).when(manager).loadCatalog(any());
     Response resp1 =
         target("/metalakes/metalake1/catalogs/catalog1")
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -219,7 +221,7 @@ public class TestCatalogOperations extends JerseyTest {
     Assertions.assertEquals(NoSuchMetalakeException.class.getSimpleName(), errorResponse.getType());
 
     // Test throw NoSuchCatalogException
-    doThrow(new NoSuchCatalogException("mock error")).when(ops).loadCatalog(any());
+    doThrow(new NoSuchCatalogException("mock error")).when(manager).loadCatalog(any());
     Response resp2 =
         target("/metalakes/metalake1/catalogs/catalog1")
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -233,7 +235,7 @@ public class TestCatalogOperations extends JerseyTest {
     Assertions.assertEquals(NoSuchCatalogException.class.getSimpleName(), errorResponse1.getType());
 
     // Test throw internal RuntimeException
-    doThrow(new RuntimeException("mock error")).when(ops).loadCatalog(any());
+    doThrow(new RuntimeException("mock error")).when(manager).loadCatalog(any());
     Response resp3 =
         target("/metalakes/metalake1/catalogs/catalog1")
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -252,7 +254,7 @@ public class TestCatalogOperations extends JerseyTest {
   public void testAlterCatalog() {
     TestCatalog catalog = buildCatalog("metalake1", "catalog2");
 
-    when(ops.alterCatalog(any(), any())).thenReturn(catalog);
+    when(manager.alterCatalog(any(), any())).thenReturn(catalog);
 
     CatalogUpdateRequest updateRequest = new CatalogUpdateRequest.RenameCatalogRequest("catalog2");
     CatalogUpdatesRequest req = new CatalogUpdatesRequest(ImmutableList.of(updateRequest));
@@ -275,7 +277,7 @@ public class TestCatalogOperations extends JerseyTest {
     Assertions.assertEquals(ImmutableMap.of("key", "value"), catalogDTO.properties());
 
     // Test throw NoSuchCatalogException
-    doThrow(new NoSuchCatalogException("mock error")).when(ops).alterCatalog(any(), any());
+    doThrow(new NoSuchCatalogException("mock error")).when(manager).alterCatalog(any(), any());
     Response resp2 =
         target("/metalakes/metalake1/catalogs/catalog1")
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -289,7 +291,7 @@ public class TestCatalogOperations extends JerseyTest {
     Assertions.assertEquals(NoSuchCatalogException.class.getSimpleName(), errorResponse.getType());
 
     // Test throw IllegalArgumentException
-    doThrow(new IllegalArgumentException("mock error")).when(ops).alterCatalog(any(), any());
+    doThrow(new IllegalArgumentException("mock error")).when(manager).alterCatalog(any(), any());
     Response resp3 =
         target("/metalakes/metalake1/catalogs/catalog1")
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -304,7 +306,7 @@ public class TestCatalogOperations extends JerseyTest {
         IllegalArgumentException.class.getSimpleName(), errorResponse1.getType());
 
     // Test throw internal RuntimeException
-    doThrow(new RuntimeException("mock error")).when(ops).alterCatalog(any(), any());
+    doThrow(new RuntimeException("mock error")).when(manager).alterCatalog(any(), any());
     Response resp4 =
         target("/metalakes/metalake1/catalogs/catalog1")
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -321,7 +323,7 @@ public class TestCatalogOperations extends JerseyTest {
 
   @Test
   public void testDropCatalog() {
-    when(ops.dropCatalog(any())).thenReturn(true);
+    when(manager.dropCatalog(any())).thenReturn(true);
 
     Response resp =
         target("/metalakes/metalake1/catalogs/catalog1")
@@ -335,7 +337,7 @@ public class TestCatalogOperations extends JerseyTest {
     Assertions.assertTrue(dropResponse.dropped());
 
     // Test when failed to drop catalog
-    when(ops.dropCatalog(any())).thenReturn(false);
+    when(manager.dropCatalog(any())).thenReturn(false);
 
     Response resp2 =
         target("/metalakes/metalake1/catalogs/catalog1")
@@ -349,7 +351,7 @@ public class TestCatalogOperations extends JerseyTest {
     Assertions.assertFalse(dropResponse2.dropped());
 
     // Test throw internal RuntimeException
-    doThrow(new RuntimeException("mock error")).when(ops).dropCatalog(any());
+    doThrow(new RuntimeException("mock error")).when(manager).dropCatalog(any());
     Response resp3 =
         target("/metalakes/metalake1/catalogs/catalog1")
             .request(MediaType.APPLICATION_JSON_TYPE)
