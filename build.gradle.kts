@@ -10,6 +10,7 @@ plugins {
   `maven-publish`
   id("java")
   id("idea")
+  id("jacoco")
   alias(libs.plugins.gradle.extensions)
   alias(libs.plugins.spotless)
   alias(libs.plugins.publish)
@@ -28,6 +29,8 @@ java {
 }
 
 allprojects {
+  apply(plugin = "jacoco")
+
   repositories {
     mavenCentral()
     mavenLocal()
@@ -35,6 +38,7 @@ allprojects {
 
   tasks.configureEach<Test> {
     useJUnitPlatform()
+    finalizedBy(tasks.getByName("jacocoTestReport"))
   }
 
   group = "com.datastrato.graviton"
@@ -103,3 +107,8 @@ tasks.rat {
   setExcludes(exclusions)
 }
 tasks.check.get().dependsOn(tasks.rat)
+
+jacoco {
+  toolVersion = "0.8.10"
+  reportsDirectory.set(layout.buildDirectory.dir("JacocoReport"))
+}
