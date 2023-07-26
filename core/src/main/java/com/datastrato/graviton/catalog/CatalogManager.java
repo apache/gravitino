@@ -93,7 +93,7 @@ public class CatalogManager implements SupportCatalogs {
 
   public CatalogManager(Config config) {
     this.config = config;
-    long cacheEvictionIntervalInMs = config.get(configs.CATALOG_CACHE_EVICTION_INTERVAL_MS);
+    long cacheEvictionIntervalInMs = config.get(Configs.CATALOG_CACHE_EVICTION_INTERVAL_MS);
 
     this.catalogCache =
         Caffeine.newBuilder()

@@ -22,7 +22,7 @@ public class EntitySerDeFactory {
   private EntitySerDeFactory() {}
 
   public static EntitySerDe createEntitySerDe(Config config) {
-    String name = config.get(configs.ENTITY_SERDE);
+    String name = config.get(Configs.ENTITY_SERDE);
     return createEntitySerDe(name);
   }
 

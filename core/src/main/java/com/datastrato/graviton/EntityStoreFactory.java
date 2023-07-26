@@ -20,7 +20,7 @@ public class EntityStoreFactory {
   private EntityStoreFactory() {}
 
   public static EntityStore createEntityStore(Config config) {
-    String name = config.get(configs.ENTITY_STORE);
+    String name = config.get(Configs.ENTITY_STORE);
     String className = ENTITY_STORES.getOrDefault(name, name);
 
     try {

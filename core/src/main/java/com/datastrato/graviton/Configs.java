@@ -7,7 +7,7 @@ package com.datastrato.graviton;
 import com.datastrato.graviton.config.ConfigBuilder;
 import com.datastrato.graviton.config.ConfigEntry;
 
-public interface configs {
+public interface Configs {
 
   ConfigEntry<String> ENTITY_STORE =
       new ConfigBuilder("graviton.entity.store")
