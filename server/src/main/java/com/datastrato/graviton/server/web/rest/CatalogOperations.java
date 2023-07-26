@@ -8,6 +8,7 @@ import com.datastrato.graviton.Catalog;
 import com.datastrato.graviton.CatalogChange;
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
+import com.datastrato.graviton.catalog.CatalogManager;
 import com.datastrato.graviton.dto.requests.CatalogCreateRequest;
 import com.datastrato.graviton.dto.requests.CatalogUpdateRequest;
 import com.datastrato.graviton.dto.requests.CatalogUpdatesRequest;
@@ -17,7 +18,6 @@ import com.datastrato.graviton.dto.responses.DropResponse;
 import com.datastrato.graviton.exceptions.CatalogAlreadyExistsException;
 import com.datastrato.graviton.exceptions.NoSuchCatalogException;
 import com.datastrato.graviton.exceptions.NoSuchMetalakeException;
-import com.datastrato.graviton.meta.BaseCatalogsOperations;
 import com.datastrato.graviton.server.web.Utils;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
@@ -35,13 +35,13 @@ public class CatalogOperations {
 
   private static final Logger LOG = LoggerFactory.getLogger(CatalogOperations.class);
 
-  private final BaseCatalogsOperations ops;
+  private final CatalogManager manager;
 
   @Context private HttpServletRequest httpRequest;
 
   @Inject
-  public CatalogOperations(BaseCatalogsOperations ops) {
-    this.ops = ops;
+  public CatalogOperations(CatalogManager manager) {
+    this.manager = manager;
   }
 
   @GET
@@ -54,7 +54,7 @@ public class CatalogOperations {
 
     try {
       Namespace metalakeNS = Namespace.of(metalake);
-      NameIdentifier[] idents = ops.listCatalogs(metalakeNS);
+      NameIdentifier[] idents = manager.listCatalogs(metalakeNS);
       return Utils.ok(new CatalogListResponse(idents));
 
     } catch (NoSuchMetalakeException ex) {
@@ -87,7 +87,7 @@ public class CatalogOperations {
     try {
       NameIdentifier ident = NameIdentifier.of(metalake, request.getName());
       Catalog catalog =
-          ops.createCatalog(
+          manager.createCatalog(
               ident, request.getType(), request.getComment(), request.getProperties());
       return Utils.ok(new CatalogResponse(DTOConverters.toDTO(catalog)));
 
@@ -124,7 +124,7 @@ public class CatalogOperations {
 
     try {
       NameIdentifier ident = NameIdentifier.of(metalakeName, catalogName);
-      Catalog catalog = ops.loadCatalog(ident);
+      Catalog catalog = manager.loadCatalog(ident);
       return Utils.ok(new CatalogResponse(DTOConverters.toDTO(catalog)));
 
     } catch (NoSuchMetalakeException ex) {
@@ -176,7 +176,7 @@ public class CatalogOperations {
               .map(CatalogUpdateRequest::catalogChange)
               .toArray(CatalogChange[]::new);
 
-      Catalog catalog = ops.alterCatalog(ident, changes);
+      Catalog catalog = manager.alterCatalog(ident, changes);
       return Utils.ok(new CatalogResponse(DTOConverters.toDTO(catalog)));
 
     } catch (NoSuchCatalogException ex) {
@@ -222,7 +222,7 @@ public class CatalogOperations {
 
     try {
       NameIdentifier ident = NameIdentifier.of(metalakeName, catalogName);
-      boolean dropped = ops.dropCatalog(ident);
+      boolean dropped = manager.dropCatalog(ident);
       if (!dropped) {
         LOG.warn("Failed to drop catalog {} under metalake {}", catalogName, metalakeName);
       }
