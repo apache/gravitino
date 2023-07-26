@@ -14,7 +14,7 @@ import com.datastrato.graviton.exceptions.NoSuchMetalakeException;
 import com.google.common.base.Preconditions;
 import java.util.Map;
 
-public class GravitonMetaLake extends MetalakeDTO implements SupportCatalogs {
+public class GravitonMetaLake extends MetalakeDTO implements SupportsCatalogs {
 
   private final RESTClient restClient;
 
@@ -29,7 +29,7 @@ public class GravitonMetaLake extends MetalakeDTO implements SupportCatalogs {
   }
 
   @Override
-  public Catalog[] listCatalogs(Namespace namespace) throws NoSuchMetalakeException {
+  public NameIdentifier[] listCatalogs(Namespace namespace) throws NoSuchMetalakeException {
     throw new UnsupportedOperationException("Not implemented yet");
   }
 
