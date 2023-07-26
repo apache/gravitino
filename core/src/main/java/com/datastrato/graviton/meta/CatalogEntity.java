@@ -135,6 +135,10 @@ public class CatalogEntity implements Entity, Auditable, HasIdentifier {
     }
   }
 
+
+  /**
+   * Attention, this method ignores the namespace field in the comparison
+   */
   @Override
   public boolean equals(Object o) {
     if (this == o) {
