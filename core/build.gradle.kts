@@ -1,3 +1,7 @@
+/*
+ * Copyright 2023 Datastrato.
+ * This software is licensed under the Apache License version 2.
+ */
 plugins {
   `maven-publish`
   id("java")
@@ -44,10 +48,4 @@ tasks.rat {
   substringMatcher("DS", "Datastrato", "Copyright 2023 Datastrato.")
   approvedLicense("Datastrato")
   approvedLicense("Apache License Version 2.0")
-  excludes.add("**/*.md")
-  excludes.add(".github/**")
-  excludes.add("gradle/**")
-  excludes.add("**/META-INF/**")
-  excludes.add("**/build.gradle.kts")
-  excludes.add("**/settings.gradle.kts")
 }
