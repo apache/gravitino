@@ -39,10 +39,11 @@ public interface EntityStore extends Closeable {
    *
    * @param namespace the namespace of the entities
    * @return the list of entities
-   * @param <E> the type of the entity
+   * @param type the type of the entity
    * @throws IOException if the list operation fails
    */
-  <E extends Entity & HasIdentifier> List<E> list(Namespace namespace) throws IOException;
+  <E extends Entity & HasIdentifier> List<E> list(Namespace namespace, Class<E> type)
+      throws IOException;
 
   /**
    * Check if the entity with the specified {@link NameIdentifier} exists.
@@ -93,11 +94,11 @@ public interface EntityStore extends Closeable {
    *
    * @param ident the unique identifier of the entity
    * @return the entity retrieved from the underlying storage
-   * @param <E> the type of the entity
+   * @param type the type of the entity
    * @throws NoSuchEntityException if the entity does not exist
    * @throws IOException if the retrieve operation fails
    */
-  <E extends Entity & HasIdentifier> E get(NameIdentifier ident)
+  <E extends Entity & HasIdentifier> E get(NameIdentifier ident, Class<E> type)
       throws NoSuchEntityException, IOException;
 
   /**
