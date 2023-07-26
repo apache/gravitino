@@ -23,15 +23,12 @@ public class ProtoEntitySerDe implements EntitySerDe {
           "com.datastrato.graviton.meta.AuditInfo",
           "com.datastrato.graviton.proto.AuditInfoSerDe",
           "com.datastrato.graviton.meta.BaseMetalake",
-          "com.datastrato.graviton.proto.BaseMetalakeSerDe",
-          "com.datastrato.graviton.meta.CatalogEntity",
-          "com.datastrato.graviton.proto.CatalogEntitySerDe");
+          "com.datastrato.graviton.proto.BaseMetalakeSerDe");
 
   private static final Map<String, String> ENTITY_TO_PROTO =
       ImmutableMap.of(
           "com.datastrato.graviton.meta.AuditInfo", "com.datastrato.graviton.proto.AuditInfo",
-          "com.datastrato.graviton.meta.BaseMetalake", "com.datastrato.graviton.proto.Metalake",
-          "com.datastrato.graviton.meta.CatalogEntity", "com.datastrato.graviton.proto.Catalog");
+          "com.datastrato.graviton.meta.BaseMetalake", "com.datastrato.graviton.proto.Metalake");
 
   private final Map<Class<? extends Entity>, ProtoSerDe<? extends Entity, ? extends Message>>
       entityToSerDe;

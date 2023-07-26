@@ -21,8 +21,8 @@ import java.util.concurrent.locks.Lock;
 
 /**
  * KV store to store entities. This means we can store entities in a key value store. i.e. RocksDB,
- * Cassandra, etc. If you want to use a different backend, you can implement the {@link KvBackend}
- * interface
+ * Cassandra, etc. If you want to use a different backend, you can implement the {@link
+ * com.datastrato.graviton.storage.kv.KvBackend} interface
  */
 public class KvEntityStore implements EntityStore {
   private KvBackend backend;
@@ -34,7 +34,7 @@ public class KvEntityStore implements EntityStore {
 
   @Override
   public void initialize(Config config) throws RuntimeException {
-    //TODO
+    // TODO
   }
 
   @Override
@@ -45,7 +45,7 @@ public class KvEntityStore implements EntityStore {
   @Override
   public <E extends Entity & HasIdentifier> List<E> list(Namespace namespace, Class<E> e)
       throws IOException {
-    //TODO
+    // TODO
     return null;
   }
 
@@ -57,13 +57,13 @@ public class KvEntityStore implements EntityStore {
   @Override
   public <E extends Entity & HasIdentifier> void put(NameIdentifier ident, E e, boolean overwritten)
       throws IOException, EntityAlreadyExistsException {
-    //TODO
+    // TODO
   }
 
   @Override
   public <E extends Entity & HasIdentifier> E get(NameIdentifier ident, Class<E> type)
       throws NoSuchEntityException, IOException {
-    //TODO
+    // TODO
     return null;
   }
 
