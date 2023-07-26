@@ -4,6 +4,10 @@
  */
 package com.datastrato.graviton.catalog.hive;
 
+import static com.datastrato.graviton.catalog.hive.HiveTable.SUPPORT_TABLE_TYPES;
+import static org.apache.hadoop.hive.metastore.TableType.EXTERNAL_TABLE;
+import static org.apache.hadoop.hive.metastore.TableType.MANAGED_TABLE;
+
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
 import com.datastrato.graviton.catalog.CatalogOperations;
@@ -15,12 +19,15 @@ import com.datastrato.graviton.rel.*;
 import com.datastrato.graviton.rel.Table;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.*;
 import org.apache.hadoop.hive.metastore.api.AlreadyExistsException;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -314,11 +321,19 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     }
 
     try {
-      return clientPool.run(
-          c ->
-              c.getAllTables(schemaIdent.name()).stream()
-                  .map(tb -> NameIdentifier.of(namespace, tb))
-                  .toArray(NameIdentifier[]::new));
+      List<NameIdentifier> tables = Lists.newArrayList();
+
+      for (TableType tableType : SUPPORT_TABLE_TYPES) {
+        List<String> run = clientPool.run(c -> c.getTables(schemaIdent.name(), "*", MANAGED_TABLE));
+        tables.addAll(
+            clientPool.run(
+                c ->
+                    c.getTables(schemaIdent.name(), "*", tableType).stream()
+                        .map(tb -> NameIdentifier.of(namespace, tb))
+                        .collect(Collectors.toList())));
+      }
+
+      return tables.toArray(new NameIdentifier[0]);
     } catch (TException e) {
       throw new RuntimeException(
           "Failed to list all tables under under namespace : " + namespace + " in Hive Metastore",
@@ -432,36 +447,22 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     throw new UnsupportedOperationException("Not support alter Hive table yet");
   }
 
-  /**
-   * Returns the index of a column in the given list of FieldSchema objects, based on the field
-   * name.
-   *
-   * @param columns The list of Hive columns.
-   * @param fieldName The name of the field to be searched.
-   * @return The index of the column if found, otherwise -1.
-   */
-  private int indexOfColumn(List<FieldSchema> columns, String fieldName) {
-    for (int i = 0; i < columns.size(); i++) {
-      if (columns.get(i).getName().equals(fieldName)) {
-        return i;
-      }
-    }
-    return -1;
-  }
-
   @Override
   public boolean dropTable(NameIdentifier tableIdent) {
-    return dropHiveTable(tableIdent, false);
+    return dropHiveTable(tableIdent, false, false);
   }
 
   @Override
   public boolean purgeTable(NameIdentifier tableIdent) throws UnsupportedOperationException {
-    return dropHiveTable(tableIdent, true);
+    HiveTable table = (HiveTable) loadTable(tableIdent);
+    if (EXTERNAL_TABLE == table.getTableType()) {
+      throw new UnsupportedOperationException("Cannot purge Hive table with type EXTERNAL_TABLE");
+    }
+    return dropHiveTable(tableIdent, true, true);
   }
 
-  private boolean dropHiveTable(NameIdentifier tableIdent, boolean deleteData) {
-    Preconditions.checkArgument(
-        !tableIdent.name().isEmpty(), "Cannot create table with empty name");
+  private boolean dropHiveTable(NameIdentifier tableIdent, boolean deleteData, boolean ifPurge) {
+    Preconditions.checkArgument(!tableIdent.name().isEmpty(), "Cannot drop table with empty name");
 
     NameIdentifier schemaIdent = NameIdentifier.of(tableIdent.namespace().levels());
     Preconditions.checkArgument(
@@ -472,7 +473,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     try {
       clientPool.run(
           c -> {
-            c.dropTable(schemaIdent.name(), tableIdent.name(), deleteData, false);
+            c.dropTable(schemaIdent.name(), tableIdent.name(), deleteData, false, ifPurge);
             return null;
           });
 
