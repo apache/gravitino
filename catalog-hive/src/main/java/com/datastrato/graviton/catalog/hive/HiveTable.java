@@ -80,7 +80,9 @@ public class HiveTable extends BaseTable {
             .map(
                 c ->
                     new FieldSchema(
-                        c.name(), c.dataType().accept(ToHiveType.INSTANCE), c.comment()))
+                        c.name(),
+                        c.dataType().accept(ToHiveType.INSTANCE).getQualifiedName(),
+                        c.comment()))
             .collect(Collectors.toList()));
     sd.setInputFormat(inputFormat);
     sd.setOutputFormat(outputFormat);
