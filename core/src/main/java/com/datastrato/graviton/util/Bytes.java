@@ -48,6 +48,7 @@ public class Bytes implements Comparable<byte[]> {
     return this.bytes;
   }
 
+  /** Concat two byte arrays into one. */
   public static byte[] concat(byte[] one, byte[] two) {
     int totalLen = one.length + two.length;
     byte[] res = new byte[totalLen];
