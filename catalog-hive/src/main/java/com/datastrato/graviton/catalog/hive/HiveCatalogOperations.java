@@ -6,7 +6,6 @@ package com.datastrato.graviton.catalog.hive;
 
 import static com.datastrato.graviton.catalog.hive.HiveTable.SUPPORT_TABLE_TYPES;
 import static org.apache.hadoop.hive.metastore.TableType.EXTERNAL_TABLE;
-import static org.apache.hadoop.hive.metastore.TableType.MANAGED_TABLE;
 
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
@@ -336,7 +335,6 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       List<NameIdentifier> tables = Lists.newArrayList();
 
       for (TableType tableType : SUPPORT_TABLE_TYPES) {
-        List<String> run = clientPool.run(c -> c.getTables(schemaIdent.name(), "*", MANAGED_TABLE));
         tables.addAll(
             clientPool.run(
                 c ->

@@ -30,7 +30,7 @@ public class HiveCatalog extends BaseCatalog<HiveCatalog> {
   }
 
   @Override
-  public TableCatalog asTableCatalog() throws UnsupportedOperationException {
+  public TableCatalog asTableCatalog() {
     return (HiveCatalogOperations) ops();
   }
 }
