@@ -43,11 +43,12 @@ public class KvEntityStore implements EntityStore {
   @Override
   public void initialize(Config config) throws RuntimeException {
     try {
-      backend = createKvEntityBackend(config);
-      backend.initialize(config);
-      serDe = EntitySerDeFactory.createEntitySerDe(config.get(Configs.ENTITY_SERDE));
+      this.backend = createKvEntityBackend(config);
+      this.backend.initialize(config);
+
+      EntitySerDe serDe = EntitySerDeFactory.createEntitySerDe(config.get(Configs.ENTITY_SERDE));
       this.setSerDe(serDe);
-      lock = new ReentrantLock();
+      this.lock = new ReentrantLock();
       this.entityKeyEncoder = new CustomEntityKeyEncoder();
     } catch (IOException e) {
       throw new RuntimeException(e);
@@ -78,12 +79,13 @@ public class KvEntityStore implements EntityStore {
     for (Pair<byte[], byte[]> pairs : kvs) {
       entities.add(serDe.deserialize(pairs.getRight(), e));
     }
+    // TODO (yuqi), if the list is too large, we need to do pagination or streaming
     return entities;
   }
 
   @Override
   public boolean exists(NameIdentifier ident) throws IOException {
-    return false;
+    return backend.get(entityKeyEncoder.encode(ident)) != null;
   }
 
   @Override

@@ -30,6 +30,7 @@ public class CatalogEntitySerDe implements ProtoSerDe<CatalogEntity, Catalog> {
     builder.setType(type);
     builder.setMetalakeId(catalogEntity.getMetalakeId());
 
+    // Attention we have ignored namespace field here
     return builder.build();
   }
 
