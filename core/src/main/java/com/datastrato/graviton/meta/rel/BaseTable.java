@@ -4,7 +4,11 @@
  */
 package com.datastrato.graviton.meta.rel;
 
-import com.datastrato.graviton.*;
+import com.datastrato.graviton.Audit;
+import com.datastrato.graviton.Entity;
+import com.datastrato.graviton.Field;
+import com.datastrato.graviton.HasIdentifier;
+import com.datastrato.graviton.Namespace;
 import com.datastrato.graviton.meta.AuditInfo;
 import com.datastrato.graviton.rel.Column;
 import com.datastrato.graviton.rel.Table;
