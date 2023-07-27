@@ -6,7 +6,10 @@ package com.datastrato.graviton.dto.requests;
 
 import com.datastrato.graviton.MetalakeChange;
 import com.datastrato.graviton.rest.RESTRequest;
-import com.fasterxml.jackson.annotation.*;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonSubTypes;
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.google.common.base.Preconditions;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;

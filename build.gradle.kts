@@ -46,6 +46,11 @@ allprojects {
         googleJavaFormat()
         removeUnusedImports()
         trimTrailingWhitespace()
+        replaceRegex(
+                "Remove wildcard imports",
+                "import\\s+[^\\*\\s]+\\*;(\\r\\n|\\r|\\n)",
+                "$1"
+        )
         targetExclude("**/build/**")
       }
     }

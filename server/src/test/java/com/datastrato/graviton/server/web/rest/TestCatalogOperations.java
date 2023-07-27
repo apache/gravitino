@@ -5,7 +5,9 @@
 package com.datastrato.graviton.server.web.rest;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import com.datastrato.graviton.Catalog;
 import com.datastrato.graviton.NameIdentifier;
@@ -15,7 +17,11 @@ import com.datastrato.graviton.dto.CatalogDTO;
 import com.datastrato.graviton.dto.requests.CatalogCreateRequest;
 import com.datastrato.graviton.dto.requests.CatalogUpdateRequest;
 import com.datastrato.graviton.dto.requests.CatalogUpdatesRequest;
-import com.datastrato.graviton.dto.responses.*;
+import com.datastrato.graviton.dto.responses.CatalogListResponse;
+import com.datastrato.graviton.dto.responses.CatalogResponse;
+import com.datastrato.graviton.dto.responses.DropResponse;
+import com.datastrato.graviton.dto.responses.ErrorConstants;
+import com.datastrato.graviton.dto.responses.ErrorResponse;
 import com.datastrato.graviton.exceptions.CatalogAlreadyExistsException;
 import com.datastrato.graviton.exceptions.NoSuchCatalogException;
 import com.datastrato.graviton.exceptions.NoSuchMetalakeException;
