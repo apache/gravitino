@@ -64,6 +64,12 @@ dependencies {
         exclude("*")
     }
 
+    implementation(libs.substrait.java.core) {
+        exclude("org.slf4j")
+        exclude("com.fasterxml.jackson.core")
+        exclude("com.fasterxml.jackson.datatype")
+    }
+
     implementation(libs.slf4j.api)
     implementation(libs.guava)
 

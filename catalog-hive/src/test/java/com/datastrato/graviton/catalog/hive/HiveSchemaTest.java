@@ -15,7 +15,6 @@ import com.google.common.collect.Maps;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Map;
-import java.util.UUID;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -125,9 +124,5 @@ public class HiveSchemaTest extends MiniHiveMetastoreService {
     Assertions.assertTrue(hiveCatalog.asSchemas().schemaExists(ident));
     hiveCatalog.asSchemas().dropSchema(ident, true);
     Assertions.assertFalse(hiveCatalog.asSchemas().schemaExists(ident));
-  }
-
-  private static String genRandomName() {
-    return UUID.randomUUID().toString().replace("-", "");
   }
 }

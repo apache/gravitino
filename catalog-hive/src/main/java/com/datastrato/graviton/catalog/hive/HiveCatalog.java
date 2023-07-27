@@ -7,6 +7,7 @@ package com.datastrato.graviton.catalog.hive;
 import com.datastrato.graviton.catalog.BaseCatalog;
 import com.datastrato.graviton.catalog.CatalogOperations;
 import com.datastrato.graviton.rel.SupportsSchemas;
+import com.datastrato.graviton.rel.TableCatalog;
 import java.util.Map;
 
 public class HiveCatalog extends BaseCatalog<HiveCatalog> {
@@ -25,6 +26,11 @@ public class HiveCatalog extends BaseCatalog<HiveCatalog> {
 
   @Override
   public SupportsSchemas asSchemas() {
+    return (HiveCatalogOperations) ops();
+  }
+
+  @Override
+  public TableCatalog asTableCatalog() {
     return (HiveCatalogOperations) ops();
   }
 }
