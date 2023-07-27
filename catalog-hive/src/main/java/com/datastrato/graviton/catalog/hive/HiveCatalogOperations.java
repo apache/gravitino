@@ -30,6 +30,7 @@ import com.datastrato.graviton.rel.TableCatalog;
 import com.datastrato.graviton.rel.TableChange;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Iterators;
 import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.time.Instant;
@@ -555,7 +556,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
             "Cannot support invalid namespace in Hive Metastore: %s", schemaIdent.namespace()));
 
     try {
-      // TODO: require a table lock to avoid race condition
+      // TODO(@Minghuang): require a table lock to avoid race condition
       org.apache.hadoop.hive.metastore.api.Table alteredHiveTable =
           clientPool.run(c -> c.getTable(schemaIdent.name(), tableIdent.name()));
 
@@ -655,8 +656,8 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
             return null;
           });
 
-      // TODO. We should also update the customized HiveTable entity fields into our own if
-      //  necessary
+      // TODO(@Minghuang). We should also update the customized HiveTable entity fields into our own
+      //  if necessary
       HiveTable table =
           (HiveTable)
               loadTable(NameIdentifier.of(tableIdent.namespace(), alteredHiveTable.getTableName()));
@@ -669,7 +670,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
               .withName(alteredHiveTable.getTableName())
               .withNameSpace(tableIdent.namespace())
               .withAuditInfo(
-                  /* TODO: Fetch audit info from underlying storage */
+                  /* TODO(@Minghuang): Fetch audit info from underlying storage */
                   new AuditInfo.Builder()
                       .withCreator(currentUser())
                       .withCreateTime(Instant.now())
@@ -707,12 +708,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
    * @return The index of the column if found, otherwise -1.
    */
   private int indexOfColumn(List<FieldSchema> columns, String fieldName) {
-    for (int i = 0; i < columns.size(); i++) {
-      if (columns.get(i).getName().equals(fieldName)) {
-        return i;
-      }
-    }
-    return -1;
+    return Iterators.indexOf(columns.iterator(), c -> c.getName().equals(fieldName));
   }
 
   /**
