@@ -1,3 +1,7 @@
+/*
+ * Copyright 2023 Datastrato.
+ * This software is licensed under the Apache License version 2.
+ */
 import com.diffplug.gradle.spotless.SpotlessExtension
 import com.diffplug.gradle.spotless.SpotlessPlugin
 import com.github.vlsi.gradle.dsl.configureEach
@@ -9,6 +13,8 @@ plugins {
   alias(libs.plugins.gradle.extensions)
   alias(libs.plugins.spotless)
   alias(libs.plugins.publish)
+  // Apply one top level rat plugin to perform any required license enforcement analysis
+  alias(libs.plugins.rat)
 }
 
 repositories { mavenCentral() }
@@ -40,6 +46,11 @@ allprojects {
         googleJavaFormat()
         removeUnusedImports()
         trimTrailingWhitespace()
+        replaceRegex(
+                "Remove wildcard imports",
+                "import\\s+[^\\*\\s]+\\*;(\\r\\n|\\r|\\n)",
+                "$1"
+        )
         targetExclude("**/build/**")
       }
     }
@@ -63,3 +74,32 @@ nexusPublishing {
     }
   }
 }
+
+tasks.rat {
+  substringMatcher("DS", "Datastrato", "Copyright 2023 Datastrato.")
+  approvedLicense("Datastrato")
+  approvedLicense("Apache License Version 2.0")
+
+  // Set input directory to that of the root project instead of the CWD. This
+  // makes .gitignore rules (added below) work properly.
+  inputDir.set(project.rootDir)
+
+  val exclusions = mutableListOf(
+          // Ignore files we track but do not distribute
+          "**/.github/**/*",
+  )
+
+  // Add .gitignore excludes to the Apache Rat exclusion list.
+  val gitIgnore = project(":").file(".gitignore")
+  if (gitIgnore.exists()) {
+    val gitIgnoreExcludes = gitIgnore.readLines().filter {
+      it.isNotEmpty() && !it.startsWith("#")
+    }
+    exclusions.addAll(gitIgnoreExcludes)
+  }
+
+  verbose.set(true)
+  failOnError.set(true)
+  setExcludes(exclusions)
+}
+tasks.check.get().dependsOn(tasks.rat)

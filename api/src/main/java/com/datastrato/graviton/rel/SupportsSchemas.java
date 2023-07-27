@@ -22,7 +22,10 @@ package com.datastrato.graviton.rel;
 
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
-import com.datastrato.graviton.exceptions.*;
+import com.datastrato.graviton.exceptions.NoSuchNamespaceException;
+import com.datastrato.graviton.exceptions.NoSuchSchemaException;
+import com.datastrato.graviton.exceptions.NonEmptySchemaException;
+import com.datastrato.graviton.exceptions.SchemaAlreadyExistsException;
 import java.util.Map;
 
 /**

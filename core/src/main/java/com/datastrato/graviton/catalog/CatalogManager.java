@@ -4,7 +4,14 @@
  */
 package com.datastrato.graviton.catalog;
 
-import com.datastrato.graviton.*;
+import com.datastrato.graviton.Catalog;
+import com.datastrato.graviton.CatalogChange;
+import com.datastrato.graviton.CatalogProvider;
+import com.datastrato.graviton.Config;
+import com.datastrato.graviton.Configs;
+import com.datastrato.graviton.NameIdentifier;
+import com.datastrato.graviton.Namespace;
+import com.datastrato.graviton.SupportsCatalogs;
 import com.datastrato.graviton.exceptions.CatalogAlreadyExistsException;
 import com.datastrato.graviton.exceptions.NoSuchCatalogException;
 import com.datastrato.graviton.exceptions.NoSuchMetalakeException;
@@ -25,14 +32,19 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.File;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.util.*;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.ServiceLoader;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class CatalogManager implements SupportCatalogs {
+public class CatalogManager implements SupportsCatalogs {
 
   private static final Logger LOG = LoggerFactory.getLogger(CatalogManager.class);
 
@@ -114,8 +126,12 @@ public class CatalogManager implements SupportCatalogs {
             .build();
   }
 
+  public void close() {
+    catalogCache.invalidateAll();
+  }
+
   @Override
-  public Catalog[] listCatalogs(Namespace namespace) throws NoSuchMetalakeException {
+  public NameIdentifier[] listCatalogs(Namespace namespace) throws NoSuchMetalakeException {
     throw new UnsupportedOperationException("Not implemented yet");
   }
 

@@ -9,16 +9,16 @@ import com.datastrato.graviton.exceptions.NoSuchCatalogException;
 import com.datastrato.graviton.exceptions.NoSuchMetalakeException;
 import java.util.Map;
 
-public interface SupportCatalogs {
+public interface SupportsCatalogs {
 
   /**
    * List all catalogs in the metalake under the namespace {@link Namespace}.
    *
    * @param namespace The namespace to list the catalogs under it.
-   * @return The list of catalogs.
+   * @return The list of catalog's name identifiers.
    * @throws NoSuchMetalakeException If the metalake with namespace does not exist.
    */
-  Catalog[] listCatalogs(Namespace namespace) throws NoSuchMetalakeException;
+  NameIdentifier[] listCatalogs(Namespace namespace) throws NoSuchMetalakeException;
 
   /**
    * Load a catalog by its identifier.
