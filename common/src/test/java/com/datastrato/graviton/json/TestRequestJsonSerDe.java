@@ -5,7 +5,11 @@
 package com.datastrato.graviton.json;
 
 import com.datastrato.graviton.Catalog;
-import com.datastrato.graviton.dto.requests.*;
+import com.datastrato.graviton.dto.requests.CatalogCreateRequest;
+import com.datastrato.graviton.dto.requests.CatalogUpdateRequest;
+import com.datastrato.graviton.dto.requests.MetalakeCreateRequest;
+import com.datastrato.graviton.dto.requests.MetalakeUpdateRequest;
+import com.datastrato.graviton.dto.requests.MetalakeUpdatesRequest;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;

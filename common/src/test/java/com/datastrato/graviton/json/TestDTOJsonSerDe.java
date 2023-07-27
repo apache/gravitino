@@ -15,7 +15,8 @@ import io.substrait.type.StringTypeVisitor;
 import io.substrait.type.TypeCreator;
 import java.time.Instant;
 import java.util.Map;
-import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 public class TestDTOJsonSerDe {
 

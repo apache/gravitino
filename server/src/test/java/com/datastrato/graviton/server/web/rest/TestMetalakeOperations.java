@@ -5,14 +5,20 @@
 package com.datastrato.graviton.server.web.rest;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import com.datastrato.graviton.MetalakeChange;
 import com.datastrato.graviton.dto.MetalakeDTO;
 import com.datastrato.graviton.dto.requests.MetalakeCreateRequest;
 import com.datastrato.graviton.dto.requests.MetalakeUpdateRequest;
 import com.datastrato.graviton.dto.requests.MetalakeUpdatesRequest;
-import com.datastrato.graviton.dto.responses.*;
+import com.datastrato.graviton.dto.responses.DropResponse;
+import com.datastrato.graviton.dto.responses.ErrorConstants;
+import com.datastrato.graviton.dto.responses.ErrorResponse;
+import com.datastrato.graviton.dto.responses.MetalakeListResponse;
+import com.datastrato.graviton.dto.responses.MetalakeResponse;
 import com.datastrato.graviton.exceptions.NoSuchMetalakeException;
 import com.datastrato.graviton.meta.AuditInfo;
 import com.datastrato.graviton.meta.BaseMetalake;
