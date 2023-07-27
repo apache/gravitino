@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -76,6 +77,27 @@ public class TestEntityStore {
               return null;
             });
       }
+    }
+
+    @Override
+    public <E extends Entity & HasIdentifier> E update(
+        NameIdentifier ident, Class<E> type, Function<E, E> updater)
+        throws IOException, NoSuchEntityException {
+      return executeInTransaction(
+          () -> {
+            E e = (E) entityMap.get(ident);
+            if (e == null) {
+              throw new NoSuchEntityException("Entity " + ident + " does not exist");
+            }
+
+            E newE = updater.apply(e);
+            NameIdentifier newIdent = NameIdentifier.of(newE.namespace(), newE.name());
+            if (!newIdent.equals(ident)) {
+              delete(ident);
+            }
+            entityMap.put(newIdent, newE);
+            return newE;
+          });
     }
 
     @Override

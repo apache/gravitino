@@ -51,4 +51,11 @@ public interface Configs {
           .version("0.1.0")
           .longConf()
           .createWithDefault(60 * 60 * 1000L);
+
+  ConfigEntry<Boolean> CATALOG_LOAD_ISOLATED =
+      new ConfigBuilder("graviton.catalog.classloader.isolated")
+          .doc("Whether to load the catalog in an isolated classloader")
+          .version("0.1.0")
+          .booleanConf()
+          .createWithDefault(true);
 }

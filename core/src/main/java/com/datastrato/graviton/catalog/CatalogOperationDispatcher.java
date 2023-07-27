@@ -142,7 +142,7 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
   private <R, E extends Throwable> R doWithCatalog(
       NameIdentifier ident, ThrowableFunction<CatalogManager.CatalogWrapper, R> fn, Class<E> ex)
       throws E {
-    CatalogManager.CatalogWrapper c = catalogManager.loadCatalogWrapper(ident);
+    CatalogManager.CatalogWrapper c = catalogManager.loadCatalogAndWrap(ident);
 
     try {
       return fn.apply(c);
@@ -160,7 +160,7 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
       Class<E1> ex1,
       Class<E2> ex2)
       throws E1, E2 {
-    CatalogManager.CatalogWrapper c = catalogManager.loadCatalogWrapper(ident);
+    CatalogManager.CatalogWrapper c = catalogManager.loadCatalogAndWrap(ident);
 
     try {
       return fn.apply(c);

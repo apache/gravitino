@@ -65,9 +65,9 @@ public class IsolatedClassLoader implements Closeable {
       return classLoader;
     }
 
+    ClassLoader parent = Thread.currentThread().getContextClassLoader();
     this.classLoader =
-        new URLClassLoader(
-            execJars.toArray(new URL[0]), Thread.currentThread().getContextClassLoader()) {
+        new URLClassLoader(execJars.toArray(new URL[0]), parent) {
           @Override
           protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
             Class<?> clazz = findLoadedClass(name);
