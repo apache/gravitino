@@ -6,6 +6,7 @@
 package com.datastrato.graviton.storage.kv;
 
 import com.datastrato.graviton.Config;
+import com.datastrato.graviton.EntityAlreadyExistsException;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.List;
@@ -24,8 +25,10 @@ public interface KvBackend extends Closeable {
    *
    * @param key key of the pair
    * @param value value of the pair
+   * @param overwrite if true, overwrite existing value
    */
-  void put(byte[] key, byte[] value) throws IOException;
+  void put(byte[] key, byte[] value, boolean overwrite)
+      throws IOException, EntityAlreadyExistsException;
 
   /** Get value pair for key, Null if the key does not exist */
   byte[] get(byte[] key) throws IOException;

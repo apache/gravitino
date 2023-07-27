@@ -5,14 +5,12 @@
 
 package com.datastrato.graviton.storage.kv;
 
-import static com.datastrato.graviton.EntityStoreFactory.createKvEntityBackend;
+import static com.datastrato.graviton.Configs.ENTITY_KV_STORE;
 
 import com.datastrato.graviton.Config;
-import com.datastrato.graviton.Configs;
 import com.datastrato.graviton.Entity;
 import com.datastrato.graviton.EntityAlreadyExistsException;
 import com.datastrato.graviton.EntitySerDe;
-import com.datastrato.graviton.EntitySerDeFactory;
 import com.datastrato.graviton.EntityStore;
 import com.datastrato.graviton.HasIdentifier;
 import com.datastrato.graviton.NameIdentifier;
@@ -20,12 +18,14 @@ import com.datastrato.graviton.Namespace;
 import com.datastrato.graviton.NoSuchEntityException;
 import com.datastrato.graviton.util.Bytes;
 import com.datastrato.graviton.util.Executable;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.util.List;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
+import java.util.Objects;
 import org.apache.commons.lang3.tuple.Pair;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * KV store to store entities. This means we can store entities in a key value store. i.e. RocksDB,
@@ -33,26 +33,18 @@ import org.apache.commons.lang3.tuple.Pair;
  * interface
  */
 public class KvEntityStore implements EntityStore {
+  public static final Logger LOGGER = LoggerFactory.getLogger(KvEntityStore.class);
+  public static final ImmutableMap<String, String> KV_BACKENDS =
+      ImmutableMap.of("rocksdb", RocksDBKvBackend.class.getCanonicalName());
+
   private KvBackend backend;
   private EntityKeyEncoder entityKeyEncoder;
   private EntitySerDe serDe;
 
-  // TODO replaced with rocksdb transaction
-  private Lock lock;
-
   @Override
   public void initialize(Config config) throws RuntimeException {
-    try {
-      this.backend = createKvEntityBackend(config);
-      this.backend.initialize(config);
-
-      EntitySerDe serDe = EntitySerDeFactory.createEntitySerDe(config.get(Configs.ENTITY_SERDE));
-      this.setSerDe(serDe);
-      this.lock = new ReentrantLock();
-      this.entityKeyEncoder = new CustomEntityKeyEncoder();
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    }
+    this.backend = createKvEntityBackend(config);
+    this.entityKeyEncoder = new CustomEntityKeyEncoder();
   }
 
   @Override
@@ -94,21 +86,7 @@ public class KvEntityStore implements EntityStore {
     // Simple implementation, just use the entity's identifier as the key
     byte[] key = entityKeyEncoder.encode(ident);
     byte[] value = serDe.serialize(e);
-
-    executeInTransaction(
-        () -> {
-          if (overwritten) {
-            backend.put(key, value);
-          } else {
-            byte[] origin = backend.get(key);
-            if (origin == null) {
-              backend.put(key, value);
-            } else {
-              throw new EntityAlreadyExistsException(ident.toString());
-            }
-          }
-          return null;
-        });
+    backend.put(key, value, overwritten);
   }
 
   @Override
@@ -124,25 +102,34 @@ public class KvEntityStore implements EntityStore {
 
   @Override
   public boolean delete(NameIdentifier ident) throws IOException {
-    return executeInTransaction(
-        () -> {
-          byte[] key = entityKeyEncoder.encode(ident);
-          return backend.delete(key);
-        });
+    return backend.delete(entityKeyEncoder.encode(ident));
   }
 
   @Override
   public <R> R executeInTransaction(Executable<R> executable) throws IOException {
-    lock.lock();
-    try {
-      return executable.execute();
-    } finally {
-      lock.unlock();
-    }
+    return executable.execute();
   }
 
   @Override
   public void close() throws IOException {
     backend.close();
+  }
+
+  private static KvBackend createKvEntityBackend(Config config) {
+    String backendName = config.get(ENTITY_KV_STORE);
+    String className = KV_BACKENDS.get(backendName);
+    if (Objects.isNull(className)) {
+      throw new RuntimeException("Unsupported backend type..." + backendName);
+    }
+
+    try {
+      KvBackend kvBackend = (KvBackend) Class.forName(className).newInstance();
+      kvBackend.initialize(config);
+      return kvBackend;
+    } catch (Exception e) {
+      LOGGER.error("Failed to create and initialize KvBackend by name '{}'.", backendName, e);
+      throw new RuntimeException(
+          "Failed to create and initialize KvBackend by name: " + backendName, e);
+    }
   }
 }

@@ -7,6 +7,7 @@ package com.datastrato.graviton.storage.kv;
 
 import com.datastrato.graviton.Config;
 import com.datastrato.graviton.Configs;
+import com.datastrato.graviton.EntityAlreadyExistsException;
 import com.datastrato.graviton.util.Bytes;
 import com.google.common.collect.Lists;
 import java.io.File;
@@ -14,9 +15,14 @@ import java.io.IOException;
 import java.util.List;
 import org.apache.commons.lang3.tuple.Pair;
 import org.rocksdb.Options;
+import org.rocksdb.ReadOptions;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 import org.rocksdb.RocksIterator;
+import org.rocksdb.Transaction;
+import org.rocksdb.TransactionDB;
+import org.rocksdb.TransactionDBOptions;
+import org.rocksdb.WriteOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -27,9 +33,9 @@ import org.slf4j.LoggerFactory;
  */
 public class RocksDBKvBackend implements KvBackend {
   public static final Logger LOGGER = LoggerFactory.getLogger(RocksDBKvBackend.class);
-  private RocksDB db;
+  private TransactionDB db;
 
-  private RocksDB initRocksDB(Config config) throws RocksDBException {
+  private TransactionDB initRocksDB(Config config) throws RocksDBException {
     RocksDB.loadLibrary();
     final Options options = new Options();
     options.setCreateIfMissing(true);
@@ -41,8 +47,9 @@ public class RocksDBKvBackend implements KvBackend {
         throw new RocksDBException(
             String.format("Can't create RocksDB path '%s'", dbDir.getAbsolutePath()));
       }
-      // TODO (yuqi), Use transaction db to do Transaction operation NOT Lock
-      return RocksDB.open(options, dbDir.getAbsolutePath());
+      // TODO (yuqi), make options and transactionDBOptions configurable
+      TransactionDBOptions transactionDBOptions = new TransactionDBOptions();
+      return TransactionDB.open(options, transactionDBOptions, dbDir.getAbsolutePath());
     } catch (RocksDBException ex) {
       LOGGER.error(
           "Error initializng RocksDB, check configurations and permissions, exception: {}, message: {}, stackTrace: {}",
@@ -63,10 +70,42 @@ public class RocksDBKvBackend implements KvBackend {
   }
 
   @Override
-  public void put(byte[] key, byte[] value) throws IOException {
+  public void put(byte[] key, byte[] value, boolean overwrite) throws IOException {
+    Transaction tx = db.beginTransaction(new WriteOptions());
     try {
-      db.put(key, value);
-    } catch (RocksDBException e) {
+      if (overwrite) {
+        tx.put(key, value);
+        tx.commit();
+        return;
+      }
+
+      byte[] existKey = tx.get(new ReadOptions(), key);
+      if (existKey != null) {
+        throw new EntityAlreadyExistsException(
+            String.format(
+                "Key %s already xists in the database, please use overwrite option to overwrite it",
+                key));
+      }
+      tx.put(key, value);
+
+    } catch (EntityAlreadyExistsException e) {
+      throw e;
+    } catch (Exception e) {
+      try {
+        tx.rollback();
+      } catch (RocksDBException ex) {
+        LOGGER.error(
+            "Error rolling back transaction, exception: {}, message: {}, stackTrace: {}",
+            ex.getCause(),
+            ex.getMessage(),
+            ex.getStackTrace());
+      }
+      throw new IOException(e);
+    }
+
+    try {
+      tx.commit();
+    } catch (Exception e) {
       throw new IOException(e);
     }
   }
@@ -84,7 +123,6 @@ public class RocksDBKvBackend implements KvBackend {
 
   @Override
   public List<Pair<byte[], byte[]>> scan(KvRangeScan scanRange) throws IOException {
-
     RocksIterator rocksIterator = db.newIterator();
     rocksIterator.seek(scanRange.getStart());
 

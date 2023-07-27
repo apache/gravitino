@@ -28,7 +28,7 @@ dependencies {
   implementation(libs.caffeine)
   implementation(libs.rocksdbjni)
 
-    compileOnly(libs.lombok)
+  compileOnly(libs.lombok)
   annotationProcessor(libs.lombok)
   testCompileOnly(libs.lombok)
   testAnnotationProcessor(libs.lombok)
