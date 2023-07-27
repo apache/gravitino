@@ -82,6 +82,11 @@ public final class AuditInfo implements Audit, Entity {
     return lastModifiedTime;
   }
 
+  @Override
+  public EntityType type() {
+    return EntityType.AUDIT;
+  }
+
   public static class Builder {
     private AuditInfo auditInfo;
 

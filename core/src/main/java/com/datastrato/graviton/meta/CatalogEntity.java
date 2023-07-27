@@ -82,6 +82,11 @@ public class CatalogEntity implements Entity, Auditable, HasIdentifier {
     return namespace;
   }
 
+  @Override
+  public EntityType type() {
+    return EntityType.CATALOG;
+  }
+
   public static class Builder {
 
     private final CatalogEntity catalog;

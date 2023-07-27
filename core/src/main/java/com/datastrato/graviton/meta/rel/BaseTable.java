@@ -97,6 +97,11 @@ public abstract class BaseTable implements Table, Entity, HasIdentifier {
     return namespace;
   }
 
+  @Override
+  public EntityType type() {
+    return EntityType.TABLE;
+  }
+
   interface Builder<SELF extends Builder<SELF, T>, T extends BaseTable> {
     SELF withId(Long id);
 

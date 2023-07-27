@@ -85,6 +85,11 @@ public abstract class BaseSchema implements Schema, Entity, HasIdentifier {
     return auditInfo;
   }
 
+  @Override
+  public EntityType type() {
+    return EntityType.SCHEMA;
+  }
+
   interface Builder<SELF extends Builder<SELF, T>, T extends BaseSchema> {
     SELF withId(Long id);
 

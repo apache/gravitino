@@ -64,4 +64,9 @@ public class TestColumn implements Column, Entity, HasIdentifier {
   public String comment() {
     return comment;
   }
+
+  @Override
+  public EntityType type() {
+    return EntityType.COLUMN;
+  }
 }
