@@ -21,6 +21,7 @@ package com.datastrato.graviton.catalog.hive.miniHMS;
 import com.google.common.collect.Maps;
 import java.util.Collections;
 import java.util.Map;
+import java.util.UUID;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.Database;
@@ -70,5 +71,9 @@ public abstract class MiniHiveMetastoreService {
 
     metastore.stop();
     MiniHiveMetastoreService.metastore = null;
+  }
+
+  protected static String genRandomName() {
+    return UUID.randomUUID().toString().replace("-", "");
   }
 }
