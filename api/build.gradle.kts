@@ -11,13 +11,13 @@ plugins {
 
 dependencies {
   implementation(libs.substrait.java.core) {
-    exclude("org.slf4j")
     exclude("com.fasterxml.jackson.core")
     exclude("com.fasterxml.jackson.datatype")
     exclude("com.fasterxml.jackson.dataformat")
     exclude("com.google.protobuf")
   }
   implementation(libs.guava)
+  implementation(libs.slf4j.api)
 
   compileOnly(libs.lombok)
   annotationProcessor(libs.lombok)
