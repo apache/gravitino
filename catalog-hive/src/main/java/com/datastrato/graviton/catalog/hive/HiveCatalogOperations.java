@@ -4,12 +4,14 @@
  */
 package com.datastrato.graviton.catalog.hive;
 
+import static com.datastrato.graviton.catalog.hive.HiveTable.HMS_TABLE_COMMENT;
 import static com.datastrato.graviton.catalog.hive.HiveTable.SUPPORT_TABLE_TYPES;
 import static org.apache.hadoop.hive.metastore.TableType.EXTERNAL_TABLE;
 
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
 import com.datastrato.graviton.catalog.CatalogOperations;
+import com.datastrato.graviton.catalog.hive.converter.ToHiveType;
 import com.datastrato.graviton.exceptions.NoSuchNamespaceException;
 import com.datastrato.graviton.exceptions.NoSuchSchemaException;
 import com.datastrato.graviton.exceptions.NoSuchTableException;
@@ -19,6 +21,7 @@ import com.datastrato.graviton.exceptions.TableAlreadyExistsException;
 import com.datastrato.graviton.meta.AuditInfo;
 import com.datastrato.graviton.meta.CatalogEntity;
 import com.datastrato.graviton.meta.rel.BaseSchema;
+import com.datastrato.graviton.meta.rel.BaseTable;
 import com.datastrato.graviton.rel.Column;
 import com.datastrato.graviton.rel.SchemaChange;
 import com.datastrato.graviton.rel.SupportsSchemas;
@@ -38,8 +41,10 @@ import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.AlreadyExistsException;
 import org.apache.hadoop.hive.metastore.api.Database;
+import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.InvalidOperationException;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
+import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.UnknownDBException;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.thrift.TException;
@@ -538,9 +543,176 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
    * @throws IllegalArgumentException This exception will not be thrown in this method.
    */
   @Override
-  public Table alterTable(NameIdentifier ident, TableChange... changes)
+  public Table alterTable(NameIdentifier tableIdent, TableChange... changes)
       throws NoSuchTableException, IllegalArgumentException {
-    throw new UnsupportedOperationException("Not support alter Hive table yet");
+    Preconditions.checkArgument(
+        !tableIdent.name().isEmpty(), "Cannot create table with empty name");
+
+    NameIdentifier schemaIdent = NameIdentifier.of(tableIdent.namespace().levels());
+    Preconditions.checkArgument(
+        isValidNamespace(schemaIdent.namespace()),
+        String.format(
+            "Cannot support invalid namespace in Hive Metastore: %s", schemaIdent.namespace()));
+
+    try {
+      // TODO: require a table lock to avoid race condition
+      org.apache.hadoop.hive.metastore.api.Table alteredHiveTable =
+          clientPool.run(c -> c.getTable(schemaIdent.name(), tableIdent.name()));
+
+      for (TableChange change : changes) {
+        // Table change
+        if (change instanceof TableChange.RenameTable) {
+          alteredHiveTable.setTableName(((TableChange.RenameTable) change).getNewName());
+
+        } else if (change instanceof TableChange.UpdateComment) {
+          Map<String, String> parameters = alteredHiveTable.getParameters();
+          parameters.put(HMS_TABLE_COMMENT, ((TableChange.UpdateComment) change).getNewComment());
+
+        } else if (change instanceof TableChange.SetProperty) {
+          Map<String, String> parameters = alteredHiveTable.getParameters();
+          parameters.put(
+              ((TableChange.SetProperty) change).getProperty(),
+              ((TableChange.SetProperty) change).getValue());
+
+        } else if (change instanceof TableChange.RemoveProperty) {
+          Map<String, String> parameters = alteredHiveTable.getParameters();
+          parameters.remove(((TableChange.RemoveProperty) change).getProperty());
+
+        } else if (change instanceof TableChange.ColumnChange) {
+          // Column change
+          StorageDescriptor sd = alteredHiveTable.getSd();
+          List<FieldSchema> cols = sd.getCols();
+          String columnName = ((TableChange.ColumnChange) change).fieldNames()[0];
+
+          if (change instanceof TableChange.AddColumn) {
+            TableChange.AddColumn addColumn = (TableChange.AddColumn) change;
+            cols.add(
+                indexOfPosition(cols, addColumn.getPosition()),
+                new FieldSchema(
+                    columnName,
+                    addColumn.getDataType().accept(ToHiveType.INSTANCE).getQualifiedName(),
+                    addColumn.getComment()));
+
+          } else if (change instanceof TableChange.DeleteColumn) {
+            if (!cols.removeIf(c -> columnName.equals(c.getName()))
+                && !((TableChange.DeleteColumn) change).getIfExists()) {
+              throw new IllegalArgumentException("DeleteColumn does not exist: " + columnName);
+            }
+
+          } else if (change instanceof TableChange.RenameColumn) {
+            if (indexOfColumn(cols, columnName) == -1) {
+              throw new IllegalArgumentException("RenameColumn does not exist: " + columnName);
+            }
+
+            String newName = ((TableChange.RenameColumn) change).getNewName();
+            if (indexOfColumn(cols, newName) != -1) {
+              throw new IllegalArgumentException("Column already exists: " + newName);
+            }
+            cols.get(indexOfColumn(cols, columnName)).setName(newName);
+
+          } else if (change instanceof TableChange.UpdateColumnComment) {
+            cols.get(indexOfColumn(cols, columnName))
+                .setComment(((TableChange.UpdateColumnComment) change).getNewComment());
+
+          } else if (change instanceof TableChange.UpdateColumnPosition) {
+            int sourceIndex = indexOfColumn(cols, columnName);
+            if (sourceIndex == -1) {
+              throw new IllegalArgumentException(
+                  "UpdateColumnPosition does not exist: " + columnName);
+            }
+
+            // update column position: remove then add to given position
+            FieldSchema hiveColumn = cols.remove(sourceIndex);
+            TableChange.UpdateColumnPosition updateColumnPosition =
+                (TableChange.UpdateColumnPosition) change;
+            cols.add(indexOfPosition(cols, updateColumnPosition.getPosition()), hiveColumn);
+
+          } else if (change instanceof TableChange.UpdateColumnType) {
+            int indexOfColumn = indexOfColumn(cols, columnName);
+            if (indexOfColumn == -1) {
+              throw new IllegalArgumentException("UpdateColumnType does not exist: " + columnName);
+            }
+            cols.get(indexOfColumn)
+                .setType(
+                    ((TableChange.UpdateColumnType) change)
+                        .getNewDataType()
+                        .accept(ToHiveType.INSTANCE)
+                        .getQualifiedName());
+
+          } else {
+            throw new IllegalArgumentException(
+                "Unsupported column change type: " + change.getClass().getSimpleName());
+          }
+        } else {
+          throw new IllegalArgumentException(
+              "Unsupported table change type: " + change.getClass().getSimpleName());
+        }
+      }
+
+      clientPool.run(
+          c -> {
+            c.alter_table(schemaIdent.name(), tableIdent.name(), alteredHiveTable);
+            return null;
+          });
+
+      // TODO. We should also update the customized HiveTable entity fields into our own if
+      //  necessary
+      HiveTable table =
+          (HiveTable)
+              loadTable(NameIdentifier.of(tableIdent.namespace(), alteredHiveTable.getTableName()));
+
+      HiveTable.Builder builder = new HiveTable.Builder();
+      builder =
+          builder
+              .withId((Long) table.fields().get(BaseTable.ID))
+              .withSchemaId((Long) table.fields().get(BaseTable.SCHEMA_ID))
+              .withName(alteredHiveTable.getTableName())
+              .withNameSpace(tableIdent.namespace())
+              .withAuditInfo(
+                  /* TODO: Fetch audit info from underlying storage */
+                  new AuditInfo.Builder()
+                      .withCreator(currentUser())
+                      .withCreateTime(Instant.now())
+                      .build());
+      HiveTable alteredTable = HiveTable.fromInnerTable(alteredHiveTable, builder);
+      LOG.info("Altered Hive table {} in Hive Metastore", tableIdent.name());
+
+      return alteredTable;
+
+    } catch (NoSuchObjectException e) {
+      throw new NoSuchTableException(
+          String.format("Hive table does not exist: %s in Hive Metastore", tableIdent.name()), e);
+    } catch (TException | InterruptedException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  private int indexOfPosition(List<FieldSchema> columns, TableChange.ColumnPosition position) {
+    if (position == null) {
+      // add to the end by default
+      return columns.size();
+    } else if (position instanceof TableChange.After) {
+      String afterColumn = ((TableChange.After) position).getColumn();
+      return indexOfColumn(columns, afterColumn) + 1;
+    }
+    return 0;
+  }
+
+  /**
+   * Returns the index of a column in the given list of FieldSchema objects, based on the field
+   * name.
+   *
+   * @param columns The list of Hive columns.
+   * @param fieldName The name of the field to be searched.
+   * @return The index of the column if found, otherwise -1.
+   */
+  private int indexOfColumn(List<FieldSchema> columns, String fieldName) {
+    for (int i = 0; i < columns.size(); i++) {
+      if (columns.get(i).getName().equals(fieldName)) {
+        return i;
+      }
+    }
+    return -1;
   }
 
   /**
