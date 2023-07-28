@@ -35,6 +35,10 @@ public class RocksDBKvBackend implements KvBackend {
   public static final Logger LOGGER = LoggerFactory.getLogger(RocksDBKvBackend.class);
   private TransactionDB db;
 
+  /**
+   * Initialize the RocksDB backend instace. We have use the {@link TransactionDB} to support
+   * transaction instead of {@link RocksDB} instance.
+   */
   private TransactionDB initRocksDB(Config config) throws RocksDBException {
     RocksDB.loadLibrary();
     final Options options = new Options();
@@ -87,7 +91,6 @@ public class RocksDBKvBackend implements KvBackend {
                 key));
       }
       tx.put(key, value);
-
     } catch (EntityAlreadyExistsException e) {
       throw e;
     } catch (Exception e) {
