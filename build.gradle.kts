@@ -44,7 +44,7 @@ allprojects {
     tasks.withType<JacocoReport> {
     reports {
       csv.required.set(true)
-      xml.required.set(false)
+      xml.required.set(true)
       html.required.set(true)
     }
   }

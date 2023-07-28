@@ -26,5 +26,21 @@ jobs:
 
       - name: Setup Gradle
         uses: gradle/gradle-build-action@v2
+
       - name: Build with Gradle
         run: gradle build
+
+      # jacoco report
+      - name: Jacoco Report to PR
+        id: jacoco
+        uses: madrapps/jacoco-report@v1.5
+        with:
+          paths: ${{ github.workspace }}/**/build/reports/jacoco/test/jacocoTestReport.xml
+          token: ${{ secrets.GITHUB_TOKEN }}
+          min-coverage-overall: 40
+          min-coverage-changed-files: 60
+          title: 'Code Coverage Report'
+          pass-emoji: ':green_circle:'
+          fail-emoji: ':red_circle:'
+          debug-mode: true
+          update-comment: true
