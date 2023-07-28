@@ -32,6 +32,8 @@ import org.apache.thrift.TException;
 import org.apache.thrift.transport.TTransportException;
 
 // hive-metastore/src/main/java/org/apache/iceberg/hive/HiveClientPool.java
+
+/** Represents a client pool for managing connections to the Hive Metastore service. */
 public class HiveClientPool extends ClientPoolImpl<IMetaStoreClient, TException> {
 
   private static final DynMethods.StaticMethod GET_CLIENT =
@@ -50,6 +52,12 @@ public class HiveClientPool extends ClientPoolImpl<IMetaStoreClient, TException>
 
   private final HiveConf hiveConf;
 
+  /**
+   * Creates a new HiveClientPool with the specified pool size and configuration.
+   *
+   * @param poolSize The number of clients in the pool.
+   * @param conf The configuration used to initialize the Hive Metastore clients.
+   */
   public HiveClientPool(int poolSize, Configuration conf) {
     // Do not allow retry by default as we rely on RetryingHiveClient
     super(poolSize, TTransportException.class, false);
@@ -111,6 +119,11 @@ public class HiveClientPool extends ClientPoolImpl<IMetaStoreClient, TException>
     client.close();
   }
 
+  /**
+   * Gets the HiveConf object used in this HiveClientPool.
+   *
+   * @return The HiveConf object used in this HiveClientPool.
+   */
   @VisibleForTesting
   HiveConf hiveConf() {
     return hiveConf;

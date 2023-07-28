@@ -23,13 +23,16 @@ import org.apache.hadoop.hive.metastore.api.SerDeInfo;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.Table;
 
-/** A Hive Table entity */
+/** Represents a Hive Table entity in the Hive Metastore catalog. */
 @ToString
 @Getter
 public class HiveTable extends BaseTable {
 
+  // A set of supported Hive table types.
   public static final Set<TableType> SUPPORT_TABLE_TYPES =
       Sets.newHashSet(MANAGED_TABLE, EXTERNAL_TABLE);
+
+  // The key to store the Hive table comment in the parameters map.
   public static final String HMS_TABLE_COMMENT = "comment";
 
   private String inputFormat;
@@ -42,6 +45,13 @@ public class HiveTable extends BaseTable {
 
   private HiveTable() {}
 
+  /**
+   * Creates a new HiveTable instance from a Table and a Builder.
+   *
+   * @param table The inner Table representing the HiveTable.
+   * @param builder The Builder used to construct the HiveTable.
+   * @return A new HiveTable instance.
+   */
   public static HiveTable fromInnerTable(Table table, Builder builder) {
 
     return builder
@@ -61,6 +71,11 @@ public class HiveTable extends BaseTable {
         .build();
   }
 
+  /**
+   * Converts this HiveTable to its corresponding Table in the Hive Metastore.
+   *
+   * @return The converted Table.
+   */
   public Table toInnerTable() {
     Table hiveTable = new Table();
 
@@ -97,10 +112,16 @@ public class HiveTable extends BaseTable {
     return serDeInfo;
   }
 
+  /**
+   * Gets the schema identifier for this HiveTable.
+   *
+   * @return The schema identifier.
+   */
   public NameIdentifier schemaIdentifier() {
     return NameIdentifier.of(nameIdentifier().namespace().levels());
   }
 
+  /** A builder class for constructing HiveTable instances. */
   public static class Builder extends BaseTableBuilder<Builder, HiveTable> {
     private String inputFormat;
 
@@ -110,11 +131,23 @@ public class HiveTable extends BaseTable {
 
     private TableType tableType;
 
+    /**
+     * Sets the input format for the HiveTable.
+     *
+     * @param inputFormat The input format to set.
+     * @return The Builder instance.
+     */
     public Builder withInputFormat(String inputFormat) {
       this.inputFormat = inputFormat;
       return this;
     }
 
+    /**
+     * Sets the output format for the HiveTable.
+     *
+     * @param outputFormat The output format to set.
+     * @return The Builder instance.
+     */
     public Builder withOutputFormat(String outputFormat) {
       this.outputFormat = outputFormat;
       return this;
@@ -125,11 +158,22 @@ public class HiveTable extends BaseTable {
       return this;
     }
 
+    /**
+     * Sets the table type for the HiveTable.
+     *
+     * @param tableType The table type to set.
+     * @return The Builder instance.
+     */
     public Builder withTableType(TableType tableType) {
       this.tableType = tableType;
       return this;
     }
 
+    /**
+     * Internal method to build a HiveTable instance using the provided values.
+     *
+     * @return A new HiveTable instance with the configured values.
+     */
     @Override
     protected HiveTable internalBuild() {
       HiveTable hiveTable = new HiveTable();

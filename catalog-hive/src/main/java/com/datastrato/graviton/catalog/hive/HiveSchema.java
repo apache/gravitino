@@ -16,7 +16,7 @@ import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.PrincipalType;
 
-/** A Hive Schema(Database) entity */
+/** Represents a Hive Schema (Database) entity in the Hive Metastore catalog. */
 @ToString
 public class HiveSchema extends BaseSchema {
   private static final String HMS_DB_OWNER = "hive.metastore.database.owner";
@@ -28,6 +28,13 @@ public class HiveSchema extends BaseSchema {
 
   private HiveSchema() {}
 
+  /**
+   * Creates a new HiveSchema instance from a Database and a Builder.
+   *
+   * @param db The Database representing the HiveSchema.
+   * @param builder The Builder used to construct the HiveSchema.
+   * @return A new HiveSchema instance.
+   */
   public static HiveSchema fromInnerDB(Database db, Builder builder) {
     Map<String, String> properties = convertToMetadata(db);
 
@@ -38,6 +45,12 @@ public class HiveSchema extends BaseSchema {
         .build();
   }
 
+  /**
+   * Converts a Database to metadata represented as a map of key-value pairs.
+   *
+   * @param database The Database to be converted to metadata.
+   * @return A map containing the metadata key-value pairs.
+   */
   public static Map<String, String> convertToMetadata(Database database) {
     Map<String, String> meta = Maps.newHashMap();
 
@@ -56,6 +69,11 @@ public class HiveSchema extends BaseSchema {
     return meta;
   }
 
+  /**
+   * Converts this HiveSchema to its corresponding Database.
+   *
+   * @return The converted Database object.
+   */
   public Database toInnerDB() {
     if (innerDb != null) {
       return innerDb;
@@ -115,15 +133,27 @@ public class HiveSchema extends BaseSchema {
     return result;
   }
 
+  /** A builder class for constructing HiveSchema instances. */
   public static class Builder extends BaseSchemaBuilder<Builder, HiveSchema> {
 
     protected Configuration conf;
 
+    /**
+     * Sets the Configuration to be used for building the HiveSchema.
+     *
+     * @param conf The Configuration.
+     * @return The Builder instance.
+     */
     public Builder withConf(Configuration conf) {
       this.conf = conf;
       return this;
     }
 
+    /**
+     * Internal method to build a HiveSchema instance using the provided values.
+     *
+     * @return A new HiveSchema instance with the configured values.
+     */
     @Override
     protected HiveSchema internalBuild() {
       HiveSchema hiveSchema = new HiveSchema();

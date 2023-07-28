@@ -46,6 +46,7 @@ import org.apache.thrift.TException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/** Operations for interacting with the Hive catalog in Graviton. */
 public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas, TableCatalog {
 
   public static final Logger LOG = LoggerFactory.getLogger(HiveCatalogOperations.class);
@@ -56,10 +57,21 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
   private final CatalogEntity entity;
 
+  /**
+   * Constructs a new instance of HiveCatalogOperations.
+   *
+   * @param entity The catalog entity associated with this operations instance.
+   */
   public HiveCatalogOperations(CatalogEntity entity) {
     this.entity = entity;
   }
 
+  /**
+   * Initializes the Hive catalog operations with the provided configuration.
+   *
+   * @param conf The configuration map for the Hive catalog operations.
+   * @throws RuntimeException if initialization fails.
+   */
   @Override
   public void initialize(Map<String, String> conf) throws RuntimeException {
     Configuration hadoopConf = new Configuration();
@@ -70,6 +82,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     this.clientPool = new HiveClientPool(1, hiveConf);
   }
 
+  /** Closes the Hive catalog and releases the associated client pool. */
   @Override
   public void close() {
     if (clientPool != null) {
@@ -78,6 +91,13 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     }
   }
 
+  /**
+   * Lists the schemas under the given namespace.
+   *
+   * @param namespace The namespace to list the schemas for.
+   * @return An array of {@link NameIdentifier} representing the schemas.
+   * @throws NoSuchNamespaceException If the provided namespace is invalid or does not exist.
+   */
   @Override
   public NameIdentifier[] listSchemas(Namespace namespace) throws NoSuchNamespaceException {
     if (!isValidNamespace(namespace)) {
@@ -105,6 +125,15 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     }
   }
 
+  /**
+   * Creates a new schema with the provided identifier, comment, and metadata.
+   *
+   * @param ident The identifier of the schema to create.
+   * @param comment The comment for the schema.
+   * @param metadata The metadata properties for the schema.
+   * @return The created {@link HiveSchema}.
+   * @throws SchemaAlreadyExistsException If a schema with the same name already exists.
+   */
   @Override
   public HiveSchema createSchema(NameIdentifier ident, String comment, Map<String, String> metadata)
       throws SchemaAlreadyExistsException {
@@ -159,6 +188,13 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     }
   }
 
+  /**
+   * Loads the schema with the provided identifier.
+   *
+   * @param ident The identifier of the schema to load.
+   * @return The loaded {@link HiveSchema}.
+   * @throws NoSuchSchemaException If the schema with the provided identifier does not exist.
+   */
   @Override
   public HiveSchema loadSchema(NameIdentifier ident) throws NoSuchSchemaException {
     Preconditions.checkArgument(
@@ -210,6 +246,14 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     }
   }
 
+  /**
+   * Alters the schema with the provided identifier according to the specified changes.
+   *
+   * @param ident The identifier of the schema to alter.
+   * @param changes The changes to apply to the schema.
+   * @return The altered {@link HiveSchema}.
+   * @throws NoSuchSchemaException If the schema with the provided identifier does not exist.
+   */
   @Override
   public HiveSchema alterSchema(NameIdentifier ident, SchemaChange... changes)
       throws NoSuchSchemaException {
@@ -282,6 +326,14 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     }
   }
 
+  /**
+   * Drops the schema with the provided identifier.
+   *
+   * @param ident The identifier of the schema to drop.
+   * @param cascade If set to true, drops all the tables in the schema as well.
+   * @return true if the schema was dropped successfully, false otherwise.
+   * @throws NonEmptySchemaException If the schema is not empty and 'cascade' is set to false.
+   */
   @Override
   public boolean dropSchema(NameIdentifier ident, boolean cascade) throws NonEmptySchemaException {
     if (ident.name().isEmpty()) {
@@ -324,6 +376,13 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     }
   }
 
+  /**
+   * Lists all the tables under the specified namespace.
+   *
+   * @param namespace The namespace to list tables for.
+   * @return An array of {@link NameIdentifier} representing the tables in the namespace.
+   * @throws NoSuchSchemaException If the schema with the provided namespace does not exist.
+   */
   @Override
   public NameIdentifier[] listTables(Namespace namespace) throws NoSuchSchemaException {
     NameIdentifier schemaIdent = NameIdentifier.of(namespace.levels());
@@ -353,6 +412,13 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     }
   }
 
+  /**
+   * Loads a table from the Hive Metastore.
+   *
+   * @param tableIdent The identifier of the table to load.
+   * @return The loaded HiveTable instance representing the table.
+   * @throws NoSuchTableException If the specified table does not exist in the Hive Metastore.
+   */
   @Override
   public Table loadTable(NameIdentifier tableIdent) throws NoSuchTableException {
     Preconditions.checkArgument(!tableIdent.name().isEmpty(), "Cannot load table with empty name");
@@ -397,6 +463,17 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     }
   }
 
+  /**
+   * Creates a new table in the Hive Metastore.
+   *
+   * @param tableIdent The identifier of the table to create.
+   * @param columns The array of columns for the new table.
+   * @param comment The comment for the new table.
+   * @param properties The properties for the new table.
+   * @return The newly created HiveTable instance.
+   * @throws NoSuchSchemaException If the schema for the table does not exist.
+   * @throws TableAlreadyExistsException If the table with the same name already exists.
+   */
   @Override
   public Table createTable(
       NameIdentifier tableIdent, Column[] columns, String comment, Map<String, String> properties)
@@ -451,17 +528,39 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     }
   }
 
+  /**
+   * Not supported in this implementation. Throws UnsupportedOperationException.
+   *
+   * @param ident The identifier of the table to alter.
+   * @param changes The changes to apply to the table.
+   * @return This method always throws UnsupportedOperationException.
+   * @throws NoSuchTableException This exception will not be thrown in this method.
+   * @throws IllegalArgumentException This exception will not be thrown in this method.
+   */
   @Override
   public Table alterTable(NameIdentifier ident, TableChange... changes)
       throws NoSuchTableException, IllegalArgumentException {
     throw new UnsupportedOperationException("Not support alter Hive table yet");
   }
 
+  /**
+   * Drops a table from the Hive Metastore.
+   *
+   * @param tableIdent The identifier of the table to drop.
+   * @return true if the table is successfully dropped; false if the table does not exist.
+   */
   @Override
   public boolean dropTable(NameIdentifier tableIdent) {
     return dropHiveTable(tableIdent, false, false);
   }
 
+  /**
+   * Purges a table from the Hive Metastore.
+   *
+   * @param tableIdent The identifier of the table to purge.
+   * @return true if the table is successfully purged; false if the table does not exist.
+   * @throws UnsupportedOperationException If the table type is EXTERNAL_TABLE, it cannot be purged.
+   */
   @Override
   public boolean purgeTable(NameIdentifier tableIdent) throws UnsupportedOperationException {
     HiveTable table = (HiveTable) loadTable(tableIdent);
@@ -471,6 +570,12 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     return dropHiveTable(tableIdent, true, true);
   }
 
+  /**
+   * Checks if the given namespace is a valid namespace for the Hive schema.
+   *
+   * @param namespace The namespace to validate.
+   * @return true if the namespace is valid; otherwise, false.
+   */
   private boolean dropHiveTable(NameIdentifier tableIdent, boolean deleteData, boolean ifPurge) {
     Preconditions.checkArgument(!tableIdent.name().isEmpty(), "Cannot drop table with empty name");
 
@@ -504,10 +609,10 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
   }
 
   /**
-   * Valid namespace of Hive schema
+   * Checks if the given namespace is a valid namespace for the Hive schema.
    *
-   * @param namespace of Hive scheme
-   * @return true if catalog name equals current
+   * @param namespace The namespace to validate.
+   * @return true if the namespace is valid; otherwise, false.
    */
   public boolean isValidNamespace(Namespace namespace) {
     return namespace.levels().length == 2 && namespace.level(1).equals(entity.name());
