@@ -27,8 +27,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * {@link RocksDBKvBackend} is a RocksDB implementatioxn of KvBackend interface. If we want to use
- * other kv implementation, We can just implement {@link KvBackend} interface and use it in the
+ * {@link RocksDBKvBackend} is a RocksDB implementation of KvBackend interface. If we want to use
+ * another kv implementation, We can just implement {@link KvBackend} interface and use it in the
  * Graviton.
  */
 public class RocksDBKvBackend implements KvBackend {
@@ -36,7 +36,7 @@ public class RocksDBKvBackend implements KvBackend {
   private TransactionDB db;
 
   /**
-   * Initialize the RocksDB backend instace. We have use the {@link TransactionDB} to support
+   * Initialize the RocksDB backend instance. We have used the {@link TransactionDB} to support
    * transaction instead of {@link RocksDB} instance.
    */
   private TransactionDB initRocksDB(Config config) throws RocksDBException {
@@ -56,7 +56,7 @@ public class RocksDBKvBackend implements KvBackend {
       return TransactionDB.open(options, transactionDBOptions, dbDir.getAbsolutePath());
     } catch (RocksDBException ex) {
       LOGGER.error(
-          "Error initializng RocksDB, check configurations and permissions, exception: {}, message: {}, stackTrace: {}",
+          "Error initializing RocksDB, check configurations and permissions, exception: {}, message: {}, stackTrace: {}",
           ex.getCause(),
           ex.getMessage(),
           ex.getStackTrace());
@@ -87,7 +87,7 @@ public class RocksDBKvBackend implements KvBackend {
       if (existKey != null) {
         throw new EntityAlreadyExistsException(
             String.format(
-                "Key %s already xists in the database, please use overwrite option to overwrite it",
+                "Key %s already exists in the database, please use overwrite option to overwrite it",
                 key));
       }
       tx.put(key, value);

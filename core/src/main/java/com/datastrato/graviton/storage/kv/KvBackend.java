@@ -21,7 +21,7 @@ public interface KvBackend extends Closeable {
   void initialize(Config config) throws IOException;
 
   /**
-   * Store key value pair ignoring any existing value
+   * Store a key value pair ignoring any existing value
    *
    * @param key key of the pair
    * @param value value of the pair
@@ -30,7 +30,7 @@ public interface KvBackend extends Closeable {
   void put(byte[] key, byte[] value, boolean overwrite)
       throws IOException, EntityAlreadyExistsException;
 
-  /** Get value pair for key, Null if the key does not exist */
+  /** Get a value pair for a key, Null if the key does not exist */
   byte[] get(byte[] key) throws IOException;
 
   /** Delete key value pair */
