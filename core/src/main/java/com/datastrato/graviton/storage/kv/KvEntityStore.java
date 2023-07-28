@@ -107,7 +107,7 @@ public class KvEntityStore implements EntityStore {
 
   @Override
   public <R> R executeInTransaction(Executable<R> executable) throws IOException {
-    return executable.execute();
+    return backend.executeInTransaction(executable);
   }
 
   @Override

@@ -14,7 +14,7 @@ public class EntityStoreFactory {
   private static final Logger LOG = LoggerFactory.getLogger(EntityStoreFactory.class);
 
   // Register EntityStore's short name to its full qualified class name in the map. So that user
-  // don't need to specify the full qualified class name when creating an EntityStore.
+  // doesn't need to specify the full qualified class name when creating an EntityStore.
   public static final ImmutableMap<String, String> ENTITY_STORES =
       ImmutableMap.of("kv", KvEntityStore.class.getCanonicalName());
 

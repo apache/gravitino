@@ -9,6 +9,7 @@ import com.datastrato.graviton.Config;
 import com.datastrato.graviton.Configs;
 import com.datastrato.graviton.EntityAlreadyExistsException;
 import com.datastrato.graviton.util.Bytes;
+import com.datastrato.graviton.util.Executable;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
@@ -34,6 +35,8 @@ import org.slf4j.LoggerFactory;
 public class RocksDBKvBackend implements KvBackend {
   public static final Logger LOGGER = LoggerFactory.getLogger(RocksDBKvBackend.class);
   private TransactionDB db;
+
+  public static final ThreadLocal<Transaction> TX_LOCAL = new ThreadLocal<>();
 
   /**
    * Initialize the RocksDB backend instance. We have used the {@link TransactionDB} to support
@@ -75,30 +78,25 @@ public class RocksDBKvBackend implements KvBackend {
 
   @Override
   public void put(byte[] key, byte[] value, boolean overwrite) throws IOException {
-    Transaction tx = db.beginTransaction(new WriteOptions());
+    Transaction tx = TX_LOCAL.get();
     try {
-      if (overwrite) {
-        tx.put(key, value);
-        tx.commit();
+      // Do without transaction if not in transaction
+      if (tx == null) {
+        handlePutWithoutTransaction(key, value, overwrite);
         return;
       }
 
-      byte[] existKey = tx.get(new ReadOptions(), key);
-      if (existKey != null) {
-        throw new EntityAlreadyExistsException(
-            String.format(
-                "Key %s already exists in the database, please use overwrite option to overwrite it",
-                key));
-      }
-      tx.put(key, value);
-      tx.commit();
+      // Now try with transaction
+      handlePutWithTransaction(key, value, overwrite, tx);
     } catch (Throwable e) {
       if (e instanceof EntityAlreadyExistsException) {
         throw (EntityAlreadyExistsException) e;
       }
 
       try {
-        tx.rollback();
+        if (tx != null) {
+          tx.rollback();
+        }
       } catch (RocksDBException ex) {
         LOGGER.error(
             "Error rolling back transaction, exception: {}, message: {}, stackTrace: {}",
@@ -110,10 +108,48 @@ public class RocksDBKvBackend implements KvBackend {
     }
   }
 
+  private void handlePutWithTransaction(byte[] key, byte[] value, boolean overwrite, Transaction tx)
+      throws RocksDBException {
+    if (overwrite) {
+      tx.put(key, value);
+      return;
+    }
+
+    byte[] existKey = tx.get(new ReadOptions(), key);
+    if (existKey != null) {
+      throw new EntityAlreadyExistsException(
+          String.format(
+              "Key %s already exists in the database, please use overwrite option to overwrite it",
+              key));
+    }
+    tx.put(key, value);
+  }
+
+  private void handlePutWithoutTransaction(byte[] key, byte[] value, boolean overwrite)
+      throws RocksDBException {
+    if (overwrite) {
+      db.put(key, value);
+      return;
+    }
+    byte[] existKey = db.get(key);
+    if (existKey != null) {
+      throw new EntityAlreadyExistsException(
+          String.format(
+              "Key %s already exists in the database, please use overwrite option to overwrite it",
+              key));
+    }
+    db.put(key, value);
+  }
+
   @Override
   public byte[] get(byte[] key) throws IOException {
     byte[] value;
     try {
+      if (TX_LOCAL.get() != null) {
+        value = TX_LOCAL.get().get(new ReadOptions(), key);
+        return value;
+      }
+
       value = db.get(key);
     } catch (RocksDBException e) {
       throw new IOException(e);
@@ -123,7 +159,9 @@ public class RocksDBKvBackend implements KvBackend {
 
   @Override
   public List<Pair<byte[], byte[]>> scan(KvRangeScan scanRange) throws IOException {
-    RocksIterator rocksIterator = db.newIterator();
+    Transaction tx = TX_LOCAL.get();
+    RocksIterator rocksIterator =
+        TX_LOCAL.get() == null ? db.newIterator() : tx.getIterator(new ReadOptions());
     rocksIterator.seek(scanRange.getStart());
 
     List<Pair<byte[], byte[]>> result = Lists.newArrayList();
@@ -156,6 +194,11 @@ public class RocksDBKvBackend implements KvBackend {
   @Override
   public boolean delete(byte[] key) throws IOException {
     try {
+      if (TX_LOCAL.get() != null) {
+        TX_LOCAL.get().delete(key);
+        return true;
+      }
+
       db.delete(key);
     } catch (RocksDBException e) {
       throw new IOException(e);
@@ -166,5 +209,35 @@ public class RocksDBKvBackend implements KvBackend {
   @Override
   public void close() throws IOException {
     db.close();
+  }
+
+  @Override
+  public <R> R executeInTransaction(Executable<R> executable) throws IOException {
+    Transaction tx = db.beginTransaction(new WriteOptions());
+    TX_LOCAL.set(tx);
+    try {
+      R r = executable.execute();
+      tx.commit();
+      return r;
+    } catch (Exception e) {
+      LOGGER.error(
+          "Error executing transaction, exception: {}, message: {}, stackTrace: {}",
+          e.getCause(),
+          e.getMessage(),
+          e.getStackTrace());
+      try {
+        tx.rollback();
+      } catch (Exception e1) {
+        LOGGER.error(
+            "Error rolling back transaction, exception: {}, message: {}, stackTrace: {}",
+            e1.getCause(),
+            e1.getMessage(),
+            e1.getStackTrace());
+      }
+      throw new IOException(e);
+    } finally {
+      tx.close();
+      TX_LOCAL.remove();
+    }
   }
 }

@@ -24,6 +24,7 @@ import com.datastrato.graviton.meta.AuditInfo;
 import com.datastrato.graviton.meta.BaseMetalake;
 import com.datastrato.graviton.meta.CatalogEntity;
 import com.datastrato.graviton.meta.SchemaVersion;
+import java.io.IOException;
 import java.time.Instant;
 import org.apache.commons.io.FileUtils;
 import org.junit.jupiter.api.AfterEach;
@@ -95,6 +96,25 @@ public class TestEntityStorageBackend {
               .withMetalakeId(1L)
               .withAuditInfo(auditInfo)
               .build();
+
+      // First, we try to test transactional is OK
+
+      try {
+        store.executeInTransaction(
+            () -> {
+              store.put(metalake.nameIdentifier(), metalake);
+              // Try to mock an exception
+              double a = 1 / 0;
+              store.put(catalog.nameIdentifier(), catalog);
+              return null;
+            });
+      } catch (Exception e) {
+        Assertions.assertTrue(e instanceof IOException);
+      }
+
+      Assertions.assertThrows(
+          NoSuchEntityException.class,
+          () -> store.get(metalake.nameIdentifier(), BaseMetalake.class));
 
       store.put(metalake.nameIdentifier(), metalake);
       store.put(catalog.nameIdentifier(), catalog);

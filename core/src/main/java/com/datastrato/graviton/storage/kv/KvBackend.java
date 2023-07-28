@@ -7,6 +7,7 @@ package com.datastrato.graviton.storage.kv;
 
 import com.datastrato.graviton.Config;
 import com.datastrato.graviton.EntityAlreadyExistsException;
+import com.datastrato.graviton.util.Executable;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.List;
@@ -47,4 +48,12 @@ public interface KvBackend extends Closeable {
    * @throws IOException if exectiopn occurs
    */
   List<Pair<byte[], byte[]>> scan(KvRangeScan scanRange) throws IOException;
+
+  /**
+   * Do a transactional operation on the backend
+   *
+   * @param executable
+   * @throws IOException
+   */
+  <R> R executeInTransaction(Executable<R> executable) throws IOException;
 }
