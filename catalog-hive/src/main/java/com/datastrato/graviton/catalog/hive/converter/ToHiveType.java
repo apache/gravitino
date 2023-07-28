@@ -32,6 +32,7 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
 
+/** Converts Substrait data types to corresponding Hive data types. */
 public class ToHiveType
     extends ParameterizedTypeVisitor.ParameterizedTypeThrowsVisitor<TypeInfo, RuntimeException> {
 
@@ -41,6 +42,7 @@ public class ToHiveType
     super("Only support type literals and parameterized types.");
   }
 
+  // Visit methods for each Substrait data type
   @Override
   public TypeInfo visit(Type.Bool type) throws RuntimeException {
     return getPrimitiveTypeInfo(BOOLEAN_TYPE_NAME);

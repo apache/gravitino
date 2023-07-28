@@ -82,10 +82,10 @@ public class DynFields {
     /**
      * Returns this method as a BoundMethod for the given receiver.
      *
-     * @param target an Object on which to get or set this field
-     * @return a {@link BoundField} for this field and the target
-     * @throws IllegalStateException if the method is static
-     * @throws IllegalArgumentException if the receiver's class is incompatible
+     * @param target An Object on which to get or set this field.
+     * @return a {@link BoundField} For this field and the target.
+     * @throws IllegalStateException If the method is static.
+     * @throws IllegalArgumentException If the receiver's class is incompatible.
      */
     public BoundField<T> bind(Object target) {
       Preconditions.checkState(
@@ -102,8 +102,8 @@ public class DynFields {
     /**
      * Returns this field as a StaticField.
      *
-     * @return a {@link StaticField} for this field
-     * @throws IllegalStateException if the method is not static
+     * @return A {@link StaticField} for this field.
+     * @throws IllegalStateException If the method is not static.
      */
     public StaticField<T> asStatic() {
       Preconditions.checkState(isStatic(), "Field %s is not static", name);
@@ -199,8 +199,8 @@ public class DynFields {
      *
      * <p>If not set, the current thread's ClassLoader is used.
      *
-     * @param newLoader a ClassLoader
-     * @return this Builder for method chaining
+     * @param newLoader A ClassLoader.
+     * @return This Builder for method chaining.
      */
     public Builder loader(ClassLoader newLoader) {
       this.loader = newLoader;
@@ -210,7 +210,7 @@ public class DynFields {
     /**
      * Instructs this builder to return AlwaysNull if no implementation is found.
      *
-     * @return this Builder for method chaining
+     * @return This Builder for method chaining.
      */
     public Builder defaultAlwaysNull() {
       this.defaultAlwaysNull = true;
@@ -220,9 +220,9 @@ public class DynFields {
     /**
      * Checks for an implementation, first finding the class by name.
      *
-     * @param className name of a class
-     * @param fieldName name of the field
-     * @return this Builder for method chaining
+     * @param className The name of a class.
+     * @param fieldName The name of the field.
+     * @return This Builder for method chaining.
      * @see Class#forName(String)
      * @see Class#getField(String)
      */
@@ -245,9 +245,9 @@ public class DynFields {
     /**
      * Checks for an implementation.
      *
-     * @param targetClass a class instance
-     * @param fieldName name of a field (different from constructor)
-     * @return this Builder for method chaining
+     * @param targetClass A class instance.
+     * @param fieldName The name of a field (different from constructor).
+     * @return This Builder for method chaining.
      * @see Class#forName(String)
      * @see Class#getField(String)
      */
@@ -269,9 +269,9 @@ public class DynFields {
     /**
      * Checks for a hidden implementation, first finding the class by name.
      *
-     * @param className name of a class
-     * @param fieldName name of a field (different from constructor)
-     * @return this Builder for method chaining
+     * @param className The name of a class.
+     * @param fieldName The name of a field (different from constructor).
+     * @return This Builder for method chaining.
      * @see Class#forName(String)
      * @see Class#getField(String)
      */
@@ -294,9 +294,9 @@ public class DynFields {
     /**
      * Checks for a hidden implementation.
      *
-     * @param targetClass a class instance
-     * @param fieldName name of a field (different from constructor)
-     * @return this Builder for method chaining
+     * @param targetClass A class instance.
+     * @param fieldName The name of a field (different from constructor).
+     * @return This Builder for method chaining.
      * @see Class#forName(String)
      * @see Class#getField(String)
      */
@@ -321,9 +321,9 @@ public class DynFields {
      * Returns the first valid implementation as a UnboundField or throws a NoSuchFieldException if
      * there is none.
      *
-     * @param <T> Java class stored in the field
-     * @return a {@link UnboundField} with a valid implementation
-     * @throws NoSuchFieldException if no implementation was found
+     * @param <T> Java class stored in the field.
+     * @return A {@link UnboundField} with a valid implementation.
+     * @throws NoSuchFieldException If no implementation was found.
      */
     @SuppressWarnings("unchecked")
     public <T> UnboundField<T> buildChecked() throws NoSuchFieldException {
@@ -341,12 +341,12 @@ public class DynFields {
      * Returns the first valid implementation as a BoundMethod or throws a NoSuchMethodException if
      * there is none.
      *
-     * @param target an Object on which to get and set the field
-     * @param <T> Java class stored in the field
-     * @return a {@link BoundField} with a valid implementation and target
-     * @throws IllegalStateException if the method is static
-     * @throws IllegalArgumentException if the receiver's class is incompatible
-     * @throws NoSuchFieldException if no implementation was found
+     * @param target An Object on which to get and set the field.
+     * @param <T> Java class stored in the field.
+     * @return A {@link BoundField} with a valid implementation and target.
+     * @throws IllegalStateException If the method is static.
+     * @throws IllegalArgumentException If the receiver's class is incompatible.
+     * @throws NoSuchFieldException If no implementation was found.
      */
     public <T> BoundField<T> buildChecked(Object target) throws NoSuchFieldException {
       return this.<T>buildChecked().bind(target);
@@ -356,9 +356,9 @@ public class DynFields {
      * Returns the first valid implementation as a UnboundField or throws a NoSuchFieldException if
      * there is none.
      *
-     * @param <T> Java class stored in the field
-     * @return a {@link UnboundField} with a valid implementation
-     * @throws RuntimeException if no implementation was found
+     * @param <T> Java class stored in the field.
+     * @return A {@link UnboundField} with a valid implementation.
+     * @throws RuntimeException if no implementation was found.
      */
     @SuppressWarnings("unchecked")
     public <T> UnboundField<T> build() {
@@ -376,12 +376,12 @@ public class DynFields {
      * Returns the first valid implementation as a BoundMethod or throws a RuntimeException if there
      * is none.
      *
-     * @param target an Object on which to get and set the field
-     * @param <T> Java class stored in the field
-     * @return a {@link BoundField} with a valid implementation and target
-     * @throws IllegalStateException if the method is static
-     * @throws IllegalArgumentException if the receiver's class is incompatible
-     * @throws RuntimeException if no implementation was found
+     * @param target an Object on which to get and set the field.
+     * @param <T> Java class stored in the field.
+     * @return A {@link BoundField} with a valid implementation and target.
+     * @throws IllegalStateException If the method is static.
+     * @throws IllegalArgumentException If the receiver's class is incompatible.
+     * @throws RuntimeException If no implementation was found.
      */
     public <T> BoundField<T> build(Object target) {
       return this.<T>build().bind(target);
@@ -391,10 +391,10 @@ public class DynFields {
      * Returns the first valid implementation as a StaticField or throws a NoSuchFieldException if
      * there is none.
      *
-     * @param <T> Java class stored in the field
-     * @return a {@link StaticField} with a valid implementation
-     * @throws IllegalStateException if the method is not static
-     * @throws NoSuchFieldException if no implementation was found
+     * @param <T> Java class stored in the field.
+     * @return A {@link StaticField} with a valid implementation.
+     * @throws IllegalStateException If the method is not static.
+     * @throws NoSuchFieldException If no implementation was found.
      */
     public <T> StaticField<T> buildStaticChecked() throws NoSuchFieldException {
       return this.<T>buildChecked().asStatic();
@@ -404,10 +404,10 @@ public class DynFields {
      * Returns the first valid implementation as a StaticField or throws a RuntimeException if there
      * is none.
      *
-     * @param <T> Java class stored in the field
-     * @return a {@link StaticField} with a valid implementation
-     * @throws IllegalStateException if the method is not static
-     * @throws RuntimeException if no implementation was found
+     * @param <T> Java class stored in the field.
+     * @return A {@link StaticField} with a valid implementation.
+     * @throws IllegalStateException If the method is not static.
+     * @throws RuntimeException If no implementation was found.
      */
     public <T> StaticField<T> buildStatic() {
       return this.<T>build().asStatic();

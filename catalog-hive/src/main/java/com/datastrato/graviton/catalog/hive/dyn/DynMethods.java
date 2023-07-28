@@ -34,8 +34,8 @@ public class DynMethods {
   /**
    * Constructs a new builder for calling methods dynamically.
    *
-   * @param methodName name of the method the builder will locate
-   * @return a Builder for finding a method
+   * @param methodName The Name of the method the builder will locate.
+   * @return A Builder for finding a method.
    */
   public static Builder builder(String methodName) {
     return new Builder(methodName);
@@ -117,10 +117,10 @@ public class DynMethods {
     /**
      * Returns this method as a BoundMethod for the given receiver.
      *
-     * @param receiver an Object to receive the method invocation
-     * @return a {@link BoundMethod} for this method and the receiver
-     * @throws IllegalStateException if the method is static
-     * @throws IllegalArgumentException if the receiver's class is incompatible
+     * @param receiver An Object to receive the method invocation.
+     * @return A {@link BoundMethod} for this method and the receiver.
+     * @throws IllegalStateException If the method is static.
+     * @throws IllegalArgumentException If the receiver's class is incompatible.
      */
     public BoundMethod bind(Object receiver) {
       Preconditions.checkState(
@@ -147,8 +147,8 @@ public class DynMethods {
     /**
      * Returns this method as a StaticMethod.
      *
-     * @return a {@link StaticMethod} for this method
-     * @throws IllegalStateException if the method is not static
+     * @return A {@link StaticMethod} for this method.
+     * @throws IllegalStateException If the method is not static.
      */
     public StaticMethod asStatic() {
       Preconditions.checkState(isStatic(), "Method is not static");
@@ -209,8 +209,8 @@ public class DynMethods {
      *
      * <p>If not set, the current thread's ClassLoader is used.
      *
-     * @param newLoader a ClassLoader
-     * @return this Builder for method chaining
+     * @param newLoader A ClassLoader.
+     * @return This Builder for method chaining.
      */
     public Builder loader(ClassLoader newLoader) {
       this.loader = newLoader;
@@ -222,7 +222,7 @@ public class DynMethods {
      *
      * <p>Note: calls to impl will not match after this method is called!
      *
-     * @return this Builder for method chaining
+     * @return This Builder for method chaining.
      */
     public Builder orNoop() {
       if (method == null) {
@@ -234,10 +234,10 @@ public class DynMethods {
     /**
      * Checks for an implementation, first finding the given class by name.
      *
-     * @param className name of a class
-     * @param methodName name of a method (different from constructor)
-     * @param argClasses argument classes for the method
-     * @return this Builder for method chaining
+     * @param className The name of a class.
+     * @param methodName The name of a method (different from constructor).
+     * @param argClasses Argument classes for the method.
+     * @return This Builder for method chaining.
      * @see Class#forName(String)
      * @see Class#getMethod(String, Class[])
      */
@@ -261,9 +261,9 @@ public class DynMethods {
      *
      * <p>The name passed to the constructor is the method name used.
      *
-     * @param className name of a class
-     * @param argClasses argument classes for the method
-     * @return this Builder for method chaining
+     * @param className The name of a class.
+     * @param argClasses Argument classes for the method.
+     * @return This Builder for method chaining.
      * @see Class#forName(String)
      * @see Class#getMethod(String, Class[])
      */
@@ -275,10 +275,10 @@ public class DynMethods {
     /**
      * Checks for a method implementation.
      *
-     * @param targetClass a class instance
-     * @param methodName name of a method (different from constructor)
-     * @param argClasses argument classes for the method
-     * @return this Builder for method chaining
+     * @param targetClass A class instance.
+     * @param methodName The name of a method (different from constructor).
+     * @param argClasses Argument classes for the method.
+     * @return This Builder for method chaining.
      * @see Class#forName(String)
      * @see Class#getMethod(String, Class[])
      */
@@ -301,9 +301,9 @@ public class DynMethods {
      *
      * <p>The name passed to the constructor is the method name used.
      *
-     * @param targetClass a class instance
-     * @param argClasses argument classes for the method
-     * @return this Builder for method chaining
+     * @param targetClass A class instance.
+     * @param argClasses Argument classes for the method.
+     * @return This Builder for method chaining.
      * @see Class#forName(String)
      * @see Class#getMethod(String, Class[])
      */
@@ -343,10 +343,10 @@ public class DynMethods {
     /**
      * Checks for an implementation, first finding the given class by name.
      *
-     * @param className name of a class
-     * @param methodName name of a method (different from constructor)
-     * @param argClasses argument classes for the method
-     * @return this Builder for method chaining
+     * @param className The name of a class.
+     * @param methodName The name of a method (different from constructor).
+     * @param argClasses Argument classes for the method.
+     * @return This Builder for method chaining.
      * @see Class#forName(String)
      * @see Class#getMethod(String, Class[])
      */
@@ -370,9 +370,9 @@ public class DynMethods {
      *
      * <p>The name passed to the constructor is the method name used.
      *
-     * @param className name of a class
-     * @param argClasses argument classes for the method
-     * @return this Builder for method chaining
+     * @param className The name of a class.
+     * @param argClasses Argument classes for the method.
+     * @return This Builder for method chaining.
      * @see Class#forName(String)
      * @see Class#getMethod(String, Class[])
      */
@@ -384,10 +384,10 @@ public class DynMethods {
     /**
      * Checks for a method implementation.
      *
-     * @param targetClass a class instance
-     * @param methodName name of a method (different from constructor)
-     * @param argClasses argument classes for the method
-     * @return this Builder for method chaining
+     * @param targetClass A class instance.
+     * @param methodName The name of a method (different from constructor).
+     * @param argClasses Argument classes for the method.
+     * @return This Builder for method chaining.
      * @see Class#forName(String)
      * @see Class#getMethod(String, Class[])
      */
@@ -412,9 +412,9 @@ public class DynMethods {
      *
      * <p>The name passed to the constructor is the method name used.
      *
-     * @param targetClass a class instance
-     * @param argClasses argument classes for the method
-     * @return this Builder for method chaining
+     * @param targetClass A class instance.
+     * @param argClasses Argument classes for the method.
+     * @return This Builder for method chaining.
      * @see Class#forName(String)
      * @see Class#getMethod(String, Class[])
      */
@@ -427,8 +427,8 @@ public class DynMethods {
      * Returns the first valid implementation as a UnboundMethod or throws a RuntimeError if there
      * is none.
      *
-     * @return a {@link UnboundMethod} with a valid implementation
-     * @throws RuntimeException if no implementation was found
+     * @return A {@link UnboundMethod} with a valid implementation.
+     * @throws RuntimeException If no implementation was found.
      */
     public UnboundMethod build() {
       if (method != null) {
@@ -442,11 +442,11 @@ public class DynMethods {
      * Returns the first valid implementation as a BoundMethod or throws a RuntimeError if there is
      * none.
      *
-     * @param receiver an Object to receive the method invocation
-     * @return a {@link BoundMethod} with a valid implementation and receiver
-     * @throws IllegalStateException if the method is static
-     * @throws IllegalArgumentException if the receiver's class is incompatible
-     * @throws RuntimeException if no implementation was found
+     * @param receiver An Object to receive the method invocation.
+     * @return A {@link BoundMethod} with a valid implementation and receiver.
+     * @throws IllegalStateException If the method is static.
+     * @throws IllegalArgumentException If the receiver's class is incompatible.
+     * @throws RuntimeException If no implementation was found.
      */
     public BoundMethod build(Object receiver) {
       return build().bind(receiver);
@@ -471,11 +471,11 @@ public class DynMethods {
      * Returns the first valid implementation as a BoundMethod or throws a NoSuchMethodException if
      * there is none.
      *
-     * @param receiver an Object to receive the method invocation
-     * @return a {@link BoundMethod} with a valid implementation and receiver
-     * @throws IllegalStateException if the method is static
-     * @throws IllegalArgumentException if the receiver's class is incompatible
-     * @throws NoSuchMethodException if no implementation was found
+     * @param receiver An Object to receive the method invocation.
+     * @return A {@link BoundMethod} with a valid implementation and receiver.
+     * @throws IllegalStateException If the method is static.
+     * @throws IllegalArgumentException If the receiver's class is incompatible.
+     * @throws NoSuchMethodException If no implementation was found.
      */
     public BoundMethod buildChecked(Object receiver) throws NoSuchMethodException {
       return buildChecked().bind(receiver);
@@ -485,9 +485,9 @@ public class DynMethods {
      * Returns the first valid implementation as a StaticMethod or throws a NoSuchMethodException if
      * there is none.
      *
-     * @return a {@link StaticMethod} with a valid implementation
-     * @throws IllegalStateException if the method is not static
-     * @throws NoSuchMethodException if no implementation was found
+     * @return a {@link StaticMethod} With a valid implementation.
+     * @throws IllegalStateException If the method is not static.
+     * @throws NoSuchMethodException If no implementation was found.
      */
     public StaticMethod buildStaticChecked() throws NoSuchMethodException {
       return buildChecked().asStatic();
@@ -497,9 +497,9 @@ public class DynMethods {
      * Returns the first valid implementation as a StaticMethod or throws a RuntimeException if
      * there is none.
      *
-     * @return a {@link StaticMethod} with a valid implementation
-     * @throws IllegalStateException if the method is not static
-     * @throws RuntimeException if no implementation was found
+     * @return A {@link StaticMethod} with a valid implementation.
+     * @throws IllegalStateException If the method is not static.
+     * @throws RuntimeException If no implementation was found.
      */
     public StaticMethod buildStatic() {
       return build().asStatic();

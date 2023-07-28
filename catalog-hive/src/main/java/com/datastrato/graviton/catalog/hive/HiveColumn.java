@@ -6,12 +6,19 @@ package com.datastrato.graviton.catalog.hive;
 
 import com.datastrato.graviton.meta.rel.BaseColumn;
 
+/** Represents a column in the Hive Metastore catalog. */
 public class HiveColumn extends BaseColumn {
 
   private HiveColumn() {}
 
+  /** A builder class for constructing HiveColumn instances. */
   public static class Builder extends BaseColumnBuilder<Builder, HiveColumn> {
 
+    /**
+     * Internal method to build a HiveColumn instance using the provided values.
+     *
+     * @return A new HiveColumn instance with the configured values.
+     */
     @Override
     protected HiveColumn internalBuild() {
       HiveColumn hiveColumn = new HiveColumn();
