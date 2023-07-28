@@ -21,7 +21,8 @@ public interface KvBackend extends Closeable {
   void initialize(Config config) throws IOException;
 
   /**
-   * Store a key value pair ignoring any existing value
+   * Store a key value pair ignoring any existing value if overwrite is true. Once the value is
+   * false, it will throw {@link EntityAlreadyExistsException} if the key already exists
    *
    * @param key key of the pair
    * @param value value of the pair
