@@ -30,7 +30,7 @@ import java.sql.Statement;
 
 // hive-metastore/src/test/java/org/apache/iceberg/hive/ScriptRunner.java
 
-/** Tool to run database scripts */
+/** Tool to run database scripts. */
 public class ScriptRunner {
 
   private static final String DEFAULT_DELIMITER = ";";
@@ -46,22 +46,37 @@ public class ScriptRunner {
   private String delimiter = DEFAULT_DELIMITER;
   private boolean fullLineDelimiter = false;
 
-  /** Default constructor */
+  /**
+   * Constructs a new ScriptRunner instance.
+   *
+   * @param connection The database connection to use for script execution.
+   * @param autoCommit True if auto-commit should be enabled; otherwise, false.
+   * @param stopOnError True if script execution should stop on errors; otherwise, false.
+   */
   public ScriptRunner(Connection connection, boolean autoCommit, boolean stopOnError) {
     this.connection = connection;
     this.autoCommit = autoCommit;
     this.stopOnError = stopOnError;
   }
 
+  /**
+   * Sets a new delimiter for SQL statements and whether to treat it as a full-line delimiter.
+   *
+   * @param newDelimiter The new delimiter to use.
+   * @param newFullLineDelimiter True if the delimiter should be treated as a full-line delimiter;
+   *     otherwise, false.
+   */
   public void setDelimiter(String newDelimiter, boolean newFullLineDelimiter) {
     this.delimiter = newDelimiter;
     this.fullLineDelimiter = newFullLineDelimiter;
   }
 
   /**
-   * Runs an SQL script (read in using the Reader parameter)
+   * Runs an SQL script using the provided Reader as the script source.
    *
-   * @param reader - the source of the script
+   * @param reader The source of the SQL script.
+   * @throws IOException If there is an error reading from the Reader.
+   * @throws SQLException If any SQL errors occur.
    */
   public void runScript(Reader reader) throws IOException, SQLException {
     try {
@@ -82,12 +97,12 @@ public class ScriptRunner {
   }
 
   /**
-   * Runs an SQL script (read in using the Reader parameter) using the connection passed in
+   * Runs an SQL script using the provided Reader as the script source and the given connection.
    *
-   * @param conn - the connection to use for the script
-   * @param reader - the source of the script
-   * @throws SQLException if any SQL errors occur
-   * @throws IOException if there is an error reading from the Reader
+   * @param conn The connection to use for executing the script.
+   * @param reader The source of the SQL script.
+   * @throws IOException If there is an error reading from the Reader.
+   * @throws SQLException If any SQL errors occur.
    */
   @SuppressWarnings("checkstyle:CyclomaticComplexity")
   private void runScript(Connection conn, Reader reader) throws IOException, SQLException {

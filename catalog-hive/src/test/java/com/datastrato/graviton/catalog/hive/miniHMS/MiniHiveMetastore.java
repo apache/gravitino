@@ -71,17 +71,18 @@ public class MiniHiveMetastore {
           .impl(RetryingHMSHandler.class, HiveConf.class, IHMSHandler.class, boolean.class)
           .buildStatic();
 
-  // Hive3 introduces background metastore tasks (MetastoreTaskThread) for performing various
-  // cleanup duties. These
-  // threads are scheduled and executed in a static thread pool
+  // In Hive3, background metastore tasks (MetastoreTaskThread) are introduced to handle various
+  // cleanup duties.
+  // These threads are scheduled and executed in a static thread pool
   // (org.apache.hadoop.hive.metastore.ThreadPool).
-  // This thread pool is shut down normally as part of the JVM shutdown hook, but since we're
-  // creating and tearing down
-  // multiple metastore instances within the same JVM, we have to call this cleanup method manually,
-  // otherwise
-  // threads from our previous test suite will be stuck in the pool with stale config, and keep on
-  // being scheduled.
-  // This can lead to issues, e.g. accidental Persistence Manager closure by
+  // The thread pool is normally shut down as part of the JVM shutdown hook. However, in scenarios
+  // where multiple
+  // metastore instances are created and torn down within the same JVM, manual cleanup becomes
+  // necessary.
+  // If we fail to perform this cleanup, threads from previous test suites may remain stuck in the
+  // pool with stale configurations
+  // and continue to be scheduled.
+  // This situation can lead to issues, such as accidental closure of the Persistence Manager by
   // ScheduledQueryExecutionsMaintTask.
   private static final DynMethods.StaticMethod METASTORE_THREADS_SHUTDOWN =
       DynMethods.builder("shutdown")
@@ -89,8 +90,9 @@ public class MiniHiveMetastore {
           .orNoop()
           .buildStatic();
 
-  // It's tricky to clear all static fields in an HMS instance in order to switch derby root dir.
-  // Therefore, we reuse the same derby root between tests and remove it after JVM exits.
+  // Managing static fields in a Hive Metastore instance to switch the Derby root directory is
+  // complex.
+  // To simplify testing, we reuse the same Derby root across tests and remove it after JVM exits.
   private static final File HIVE_LOCAL_DIR;
   private static final String DERBY_PATH;
 
@@ -146,27 +148,28 @@ public class MiniHiveMetastore {
   }
 
   /**
-   * Starts a TestHiveMetastore with the default connection pool size (5) and the default HiveConf.
+   * Starts a TestHiveMetastore with the default connection pool size (5) with the default Hive
+   * configuration.
    */
   public void start() {
     start(new HiveConf(new Configuration(), MiniHiveMetastore.class), DEFAULT_POOL_SIZE);
   }
 
   /**
-   * Starts a TestHiveMetastore with the default connection pool size (5) with the provided
-   * HiveConf.
+   * Starts a TestHiveMetastore with the default connection pool size (5) with the provided Hive
+   * configuration.
    *
-   * @param conf The hive configuration to use
+   * @param conf The hive configuration to use.
    */
   public void start(HiveConf conf) {
     start(conf, DEFAULT_POOL_SIZE);
   }
 
   /**
-   * Starts a TestHiveMetastore with a provided connection pool size and HiveConf.
+   * Starts a TestHiveMetastore with a provided connection pool size and Hive configuration.
    *
-   * @param conf The hive configuration to use
-   * @param poolSize The number of threads in the executor pool
+   * @param conf The hive configuration to use.
+   * @param poolSize The number of threads in the executor pool.
    */
   public void start(HiveConf conf, int poolSize) {
     try {
@@ -179,8 +182,8 @@ public class MiniHiveMetastore {
       this.executorService = Executors.newSingleThreadExecutor();
       this.executorService.submit(() -> server.serve());
 
-      // in Hive3, setting this as a system prop ensures that it will be picked up
-      // whenever a new HiveConf is created
+      // In Hive3, by setting this as a system property, we ensure that
+      // it gets picked up whenever a new HiveConf is created.
       System.setProperty(
           HiveConf.ConfVars.METASTOREURIS.varname,
           hiveConf.getVar(HiveConf.ConfVars.METASTOREURIS));

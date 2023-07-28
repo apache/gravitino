@@ -31,12 +31,28 @@ import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.UnionTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.VarcharTypeInfo;
 
+/** Converts Hive data types to corresponding Substrait data types. */
 public class FromHiveType {
+
+  /**
+   * Converts a Hive data type string to the corresponding Substrait data type.
+   *
+   * @param hiveType The Hive data type string to convert.
+   * @return The equivalent Substrait data type.
+   * @throws IllegalArgumentException If the Hive data type is unknown or unsupported.
+   */
   public static Type convert(String hiveType) throws IllegalArgumentException {
     TypeInfo hiveTypeInfo = getTypeInfoFromTypeString(hiveType);
     return toSubstraitType(hiveTypeInfo);
   }
 
+  /**
+   * Converts a Hive TypeInfo object to the corresponding Substrait Type.
+   *
+   * @param hiveTypeInfo The Hive TypeInfo object to convert.
+   * @return The equivalent Substrait Type.
+   * @throws IllegalArgumentException if the Hive data type category is unknown or unsupported.
+   */
   private static Type toSubstraitType(TypeInfo hiveTypeInfo) throws IllegalArgumentException {
     switch (hiveTypeInfo.getCategory()) {
       case PRIMITIVE:
