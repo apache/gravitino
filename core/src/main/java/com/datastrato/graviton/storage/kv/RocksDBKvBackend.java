@@ -91,9 +91,12 @@ public class RocksDBKvBackend implements KvBackend {
                 key));
       }
       tx.put(key, value);
-    } catch (EntityAlreadyExistsException e) {
-      throw e;
-    } catch (Exception e) {
+      tx.commit();
+    } catch (Throwable e) {
+      if (e instanceof EntityAlreadyExistsException) {
+        throw (EntityAlreadyExistsException) e;
+      }
+
       try {
         tx.rollback();
       } catch (RocksDBException ex) {
@@ -103,12 +106,6 @@ public class RocksDBKvBackend implements KvBackend {
             ex.getMessage(),
             ex.getStackTrace());
       }
-      throw new IOException(e);
-    }
-
-    try {
-      tx.commit();
-    } catch (Exception e) {
       throw new IOException(e);
     }
   }

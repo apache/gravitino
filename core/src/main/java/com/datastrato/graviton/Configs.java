@@ -11,7 +11,7 @@ public interface Configs {
   String DEFUALT_ENTITY_STORE = "kv";
   String ENTITY_STORE_KEY = "graviton.entity.store";
 
-  String DEFUALT_ENTITY_KV_STORE = "rocksdb";
+  String DEFUALT_ENTITY_KV_STORE = "RocksDBKvBackend";
   String ENTITY_KV_STORE_KEY = "graviton.entity.store.kv";
 
   String ENTITY_KV_ROCKSDB_BACKEND_PATH_KEY = "graviton.entity.store.kv.rocskdb.path";

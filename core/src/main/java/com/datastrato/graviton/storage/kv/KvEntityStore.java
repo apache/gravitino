@@ -35,7 +35,7 @@ import org.slf4j.LoggerFactory;
 public class KvEntityStore implements EntityStore {
   public static final Logger LOGGER = LoggerFactory.getLogger(KvEntityStore.class);
   public static final ImmutableMap<String, String> KV_BACKENDS =
-      ImmutableMap.of("rocksdb", RocksDBKvBackend.class.getCanonicalName());
+      ImmutableMap.of("RocksDBKvBackend", RocksDBKvBackend.class.getCanonicalName());
 
   private KvBackend backend;
   private EntityKeyEncoder entityKeyEncoder;
@@ -117,7 +117,7 @@ public class KvEntityStore implements EntityStore {
 
   private static KvBackend createKvEntityBackend(Config config) {
     String backendName = config.get(ENTITY_KV_STORE);
-    String className = KV_BACKENDS.get(backendName);
+    String className = KV_BACKENDS.getOrDefault(backendName, backendName);
     if (Objects.isNull(className)) {
       throw new RuntimeException("Unsupported backend type..." + backendName);
     }
