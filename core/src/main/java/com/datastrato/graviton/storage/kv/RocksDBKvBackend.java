@@ -130,18 +130,15 @@ public class RocksDBKvBackend implements KvBackend {
 
   @Override
   public byte[] get(byte[] key) throws IOException {
-    byte[] value;
     try {
       if (TX_LOCAL.get() != null) {
-        value = TX_LOCAL.get().get(new ReadOptions(), key);
-        return value;
+        return TX_LOCAL.get().get(new ReadOptions(), key);
       }
 
-      value = db.get(key);
+      return db.get(key);
     } catch (RocksDBException e) {
       throw new IOException(e);
     }
-    return value;
   }
 
   @Override
@@ -187,10 +184,10 @@ public class RocksDBKvBackend implements KvBackend {
       }
 
       db.delete(key);
+      return true;
     } catch (RocksDBException e) {
       throw new IOException(e);
     }
-    return true;
   }
 
   @Override
