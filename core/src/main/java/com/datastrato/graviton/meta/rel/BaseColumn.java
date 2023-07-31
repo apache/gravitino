@@ -45,6 +45,11 @@ public abstract class BaseColumn implements Column, Entity {
   }
 
   @Override
+  public EntityType type() {
+    return EntityType.COLUMN;
+  }
+
+  @Override
   public Map<Field, Object> fields() {
     Map<Field, Object> fields = Maps.newHashMap();
     fields.put(NAME, name);

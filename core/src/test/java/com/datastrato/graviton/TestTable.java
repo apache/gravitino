@@ -95,4 +95,9 @@ public class TestTable implements Table, Entity, HasIdentifier, Auditable {
   public Map<String, String> properties() {
     return properties;
   }
+
+  @Override
+  public EntityType type() {
+    return EntityType.TABLE;
+  }
 }
