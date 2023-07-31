@@ -6,6 +6,8 @@
 package com.datastrato.graviton.storage.kv;
 
 import com.datastrato.graviton.Config;
+import com.datastrato.graviton.EntityAlreadyExistsException;
+import com.datastrato.graviton.util.Executable;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.List;
@@ -20,14 +22,17 @@ public interface KvBackend extends Closeable {
   void initialize(Config config) throws IOException;
 
   /**
-   * Store key value pair ignoring any existing value
+   * Store a key value pair ignoring any existing value if overwrite is true. Once the value is
+   * false, it will throw {@link EntityAlreadyExistsException} if the key already exists
    *
    * @param key key of the pair
    * @param value value of the pair
+   * @param overwrite if true, overwrite existing value
    */
-  void put(byte[] key, byte[] value) throws IOException;
+  void put(byte[] key, byte[] value, boolean overwrite)
+      throws IOException, EntityAlreadyExistsException;
 
-  /** Get value pair for key, Null if the key does not exist */
+  /** Get a value pair for a key, Null if the key does not exist */
   byte[] get(byte[] key) throws IOException;
 
   /** Delete key value pair */
@@ -43,4 +48,12 @@ public interface KvBackend extends Closeable {
    * @throws IOException if exectiopn occurs
    */
   List<Pair<byte[], byte[]>> scan(KvRangeScan scanRange) throws IOException;
+
+  /**
+   * Do a transactional operation on the backend
+   *
+   * @param executable
+   * @throws IOException
+   */
+  <R> R executeInTransaction(Executable<R> executable) throws IOException;
 }

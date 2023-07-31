@@ -26,6 +26,7 @@ dependencies {
   implementation(libs.commons.lang3)
   implementation(libs.commons.io)
   implementation(libs.caffeine)
+  implementation(libs.rocksdbjni)
 
   compileOnly(libs.lombok)
   annotationProcessor(libs.lombok)
