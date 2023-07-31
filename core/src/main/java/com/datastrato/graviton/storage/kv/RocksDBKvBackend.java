@@ -88,22 +88,9 @@ public class RocksDBKvBackend implements KvBackend {
 
       // Now try with transaction
       handlePutWithTransaction(key, value, overwrite, tx);
+    } catch (EntityAlreadyExistsException e) {
+      throw e;
     } catch (Throwable e) {
-      if (e instanceof EntityAlreadyExistsException) {
-        throw (EntityAlreadyExistsException) e;
-      }
-
-      try {
-        if (tx != null) {
-          tx.rollback();
-        }
-      } catch (RocksDBException ex) {
-        LOGGER.error(
-            "Error rolling back transaction, exception: {}, message: {}, stackTrace: {}",
-            ex.getCause(),
-            ex.getMessage(),
-            ex.getStackTrace());
-      }
       throw new IOException(e);
     }
   }
@@ -214,6 +201,7 @@ public class RocksDBKvBackend implements KvBackend {
   @Override
   public <R> R executeInTransaction(Executable<R> executable) throws IOException {
     Transaction tx = db.beginTransaction(new WriteOptions());
+    LOGGER.info("Starting transaction: {}", tx);
     TX_LOCAL.set(tx);
     try {
       R r = executable.execute();
@@ -237,6 +225,7 @@ public class RocksDBKvBackend implements KvBackend {
       throw new IOException(e);
     } finally {
       tx.close();
+      LOGGER.info("Transaction close: {}", tx);
       TX_LOCAL.remove();
     }
   }
