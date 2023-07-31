@@ -42,6 +42,7 @@ public interface Entity extends Serializable {
    * @return Map of Field to Object to represent the schema of the entity with values.
    */
   Map<Field, Object> fields();
+
   /** Return type of the entity, plase see {@link EntityType} to see all types */
   EntityType type();
 }
