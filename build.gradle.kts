@@ -41,6 +41,14 @@ allprojects {
     finalizedBy(tasks.getByName("jacocoTestReport"))
   }
 
+    tasks.withType<JacocoReport> {
+    reports {
+      csv.required.set(true)
+      xml.required.set(true)
+      html.required.set(true)
+    }
+  }
+
   group = "com.datastrato.graviton"
   version = "${version}"
 
