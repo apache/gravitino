@@ -11,6 +11,7 @@ import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.catalog.hive.converter.FromHiveType;
 import com.datastrato.graviton.catalog.hive.converter.ToHiveType;
 import com.datastrato.graviton.meta.rel.BaseTable;
+import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import java.util.Arrays;
 import java.util.Set;
@@ -43,6 +44,10 @@ public class HiveTable extends BaseTable {
 
   private TableType tableType;
 
+  private String location;
+
+  private int createTime;
+
   private HiveTable() {}
 
   /**
@@ -68,6 +73,11 @@ public class HiveTable extends BaseTable {
                             .withComment(f.getComment())
                             .build())
                 .toArray(HiveColumn[]::new))
+        .withOutputFormat(table.getSd().getOutputFormat())
+        .withInputFormat(table.getSd().getInputFormat())
+        .withSerLib(table.getSd().getSerdeInfo().getSerializationLib())
+        .withLocation(table.getSd().getLocation())
+        .withCreateTime(table.getCreateTime())
         .build();
   }
 
@@ -84,6 +94,9 @@ public class HiveTable extends BaseTable {
     hiveTable.setOwner(auditInfo.creator());
     hiveTable.setSd(buildStorageDescriptor());
     hiveTable.setTableType(String.valueOf(tableType));
+    hiveTable.setParameters(properties);
+    hiveTable.setCreateTime(createTime);
+    hiveTable.setPartitionKeys(Lists.newArrayList() /* TODO(Minghuang): Add partition support */);
 
     return hiveTable;
   }
@@ -99,6 +112,7 @@ public class HiveTable extends BaseTable {
                         c.dataType().accept(ToHiveType.INSTANCE).getQualifiedName(),
                         c.comment()))
             .collect(Collectors.toList()));
+    sd.setLocation(location);
     sd.setInputFormat(inputFormat);
     sd.setOutputFormat(outputFormat);
     sd.setSerdeInfo(buildSerDeInfo());
@@ -130,6 +144,10 @@ public class HiveTable extends BaseTable {
     private String serLib;
 
     private TableType tableType;
+
+    private String location;
+
+    private int createTime;
 
     /**
      * Sets the input format for the HiveTable.
@@ -169,6 +187,16 @@ public class HiveTable extends BaseTable {
       return this;
     }
 
+    public Builder withLocation(String location) {
+      this.location = location;
+      return this;
+    }
+
+    public Builder withCreateTime(int createTime) {
+      this.createTime = createTime;
+      return this;
+    }
+
     /**
      * Internal method to build a HiveTable instance using the provided values.
      *
@@ -188,6 +216,8 @@ public class HiveTable extends BaseTable {
       hiveTable.inputFormat = inputFormat;
       hiveTable.outputFormat = outputFormat;
       hiveTable.serLib = serLib;
+      hiveTable.location = location;
+      hiveTable.createTime = createTime;
       hiveTable.tableType = tableType == null ? MANAGED_TABLE : tableType;
 
       // HMS put table comment in parameters
