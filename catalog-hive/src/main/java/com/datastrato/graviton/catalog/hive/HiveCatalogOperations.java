@@ -556,8 +556,8 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
     try {
       // TODO(@Minghuang): require a table lock to avoid race condition
-      org.apache.hadoop.hive.metastore.api.Table alteredHiveTable =
-          clientPool.run(c -> c.getTable(schemaIdent.name(), tableIdent.name()));
+      HiveTable table = (HiveTable) loadTable(tableIdent);
+      org.apache.hadoop.hive.metastore.api.Table alteredHiveTable = table.toInnerTable();
 
       for (TableChange change : changes) {
         // Table change
@@ -614,10 +614,6 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
       // TODO(@Minghuang). We should also update the customized HiveTable entity fields into our own
       //  if necessary
-      HiveTable table =
-          (HiveTable)
-              loadTable(NameIdentifier.of(tableIdent.namespace(), alteredHiveTable.getTableName()));
-
       HiveTable.Builder builder = new HiveTable.Builder();
       builder =
           builder
