@@ -77,6 +77,11 @@ public class BaseMetalake implements Metalake, Entity, Auditable, HasIdentifier 
   }
 
   @Override
+  public EntityType type() {
+    return EntityType.METALAKE;
+  }
+
+  @Override
   public Map<String, String> properties() {
     return properties;
   }
