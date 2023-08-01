@@ -27,7 +27,7 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class GravitonClient implements SupportMetalakes, Closeable {
+public class GravitonClient implements SupportsMetalakes, Closeable {
 
   private static final Logger LOG = LoggerFactory.getLogger(GravitonClient.class);
 

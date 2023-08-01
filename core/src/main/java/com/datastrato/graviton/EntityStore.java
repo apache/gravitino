@@ -99,6 +99,7 @@ public interface EntityStore extends Closeable {
    * <p>Note: the whole update operation should be in one transaction.
    *
    * @param ident the name identifier of the entity
+   * @param type the type of the entity
    * @param updater the updater function to update the entity
    * @param <E> the type of the entity
    * @return E the updated entity

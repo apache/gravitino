@@ -6,7 +6,7 @@ package com.datastrato.graviton;
 
 import com.datastrato.graviton.catalog.CatalogManager;
 import com.datastrato.graviton.catalog.CatalogOperationDispatcher;
-import com.datastrato.graviton.meta.BaseMetalakesOperations;
+import com.datastrato.graviton.meta.MetalakeManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -24,8 +24,7 @@ public class GravitonEnv {
 
   private CatalogOperationDispatcher catalogOperationDispatcher;
 
-  // TODO. We should refactor the BaseMetalakesOperations to align with other class names. @jerry
-  private BaseMetalakesOperations metalakesOperations;
+  private MetalakeManager metalakeManager;
 
   private GravitonEnv() {}
 
@@ -55,7 +54,7 @@ public class GravitonEnv {
     entityStore.setSerDeFacade(entitySeDeFacade);
 
     // Create and initialize metalake related modules
-    this.metalakesOperations = new BaseMetalakesOperations();
+    this.metalakeManager = new MetalakeManager(entityStore);
 
     // Create and initialize Catalog related modules
     this.catalogManager = new CatalogManager(config, entityStore);
@@ -84,8 +83,8 @@ public class GravitonEnv {
     return catalogOperationDispatcher;
   }
 
-  public BaseMetalakesOperations metalakesOperations() {
-    return metalakesOperations;
+  public MetalakeManager metalakesManager() {
+    return metalakeManager;
   }
 
   public void shutdown() {
