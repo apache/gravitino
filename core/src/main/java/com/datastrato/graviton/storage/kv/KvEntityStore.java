@@ -94,7 +94,23 @@ public class KvEntityStore implements EntityStore {
   public <E extends Entity & HasIdentifier> E update(
       NameIdentifier ident, Class<E> type, Function<E, E> updater)
       throws IOException, NoSuchEntityException {
-    return null;
+    return executeInTransaction(
+        () -> {
+          byte[] key = entityKeyEncoder.encode(ident);
+          byte[] value = backend.get(key);
+          if (value == null) {
+            throw new NoSuchEntityException(ident.toString());
+          }
+
+          E e = serDe.deserialize(value, type);
+          E updatedE = updater.apply(e);
+          if (!updatedE.nameIdentifier().equals(ident)) {
+            delete(ident);
+          }
+
+          put(updatedE.nameIdentifier(), updatedE, true /* overwritten */);
+          return updatedE;
+        });
   }
 
   @Override

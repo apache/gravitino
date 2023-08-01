@@ -148,7 +148,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
   public NameIdentifier[] listCatalogs(Namespace namespace) throws NoSuchMetalakeException {
     NameIdentifier metalakeIdent = NameIdentifier.of(namespace.levels());
 
-    boolean metalakeExists = false;
+    boolean metalakeExists;
     try {
       metalakeExists = store.exists(metalakeIdent);
     } catch (IOException e) {
