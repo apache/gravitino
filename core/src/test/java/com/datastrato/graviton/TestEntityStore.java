@@ -48,8 +48,7 @@ public class TestEntityStore {
     }
 
     @Override
-    public <E extends Entity & HasIdentifier> List<E> list(Namespace namespace, Class<E> type)
-        throws IOException {
+    public <E extends Entity & HasIdentifier> List<E> list(Namespace namespace) throws IOException {
       return entityMap.entrySet().stream()
           .filter(e -> e.getKey().namespace().equals(namespace))
           .map(entry -> (E) entry.getValue())
@@ -80,8 +79,7 @@ public class TestEntityStore {
     }
 
     @Override
-    public <E extends Entity & HasIdentifier> E update(
-        NameIdentifier ident, Class<E> type, Function<E, E> updater)
+    public <E extends Entity & HasIdentifier> E update(NameIdentifier ident, Function<E, E> updater)
         throws IOException, NoSuchEntityException {
       return executeInTransaction(
           () -> {
@@ -101,7 +99,7 @@ public class TestEntityStore {
     }
 
     @Override
-    public <E extends Entity & HasIdentifier> E get(NameIdentifier ident, Class<E> type)
+    public <E extends Entity & HasIdentifier> E get(NameIdentifier ident)
         throws NoSuchEntityException, IOException {
       E e = (E) entityMap.get(ident);
       if (e == null) {
@@ -175,19 +173,18 @@ public class TestEntityStore {
     store.put(catalog.nameIdentifier(), catalog);
     store.put(table.nameIdentifier(), table);
 
-    Metalake retrievedMetalake = store.get(metalake.nameIdentifier(), BaseMetalake.class);
+    Metalake retrievedMetalake = store.get(metalake.nameIdentifier());
     Assertions.assertEquals(metalake, retrievedMetalake);
 
-    CatalogEntity retrievedCatalog = store.get(catalog.nameIdentifier(), CatalogEntity.class);
+    CatalogEntity retrievedCatalog = store.get(catalog.nameIdentifier());
     Assertions.assertEquals(catalog, retrievedCatalog);
 
-    Table retrievedTable = store.get(table.nameIdentifier(), TestTable.class);
+    Table retrievedTable = store.get(table.nameIdentifier());
     Assertions.assertEquals(table, retrievedTable);
 
     store.delete(metalake.nameIdentifier());
     Assertions.assertThrows(
-        NoSuchEntityException.class,
-        () -> store.get(metalake.nameIdentifier(), BaseMetalake.class));
+        NoSuchEntityException.class, () -> store.get(metalake.nameIdentifier()));
 
     Assertions.assertThrows(
         EntityAlreadyExistsException.class,

@@ -62,8 +62,7 @@ public class TestEntityProtoSerDe {
 
     // Test from/to bytes
     byte[] bytes = entitySerDe.serialize(auditInfo1);
-    com.datastrato.graviton.meta.AuditInfo auditInfoFromBytes =
-        entitySerDe.deserialize(bytes, com.datastrato.graviton.meta.AuditInfo.class);
+    com.datastrato.graviton.meta.AuditInfo auditInfoFromBytes = entitySerDe.deserialize(bytes);
     Assertions.assertEquals(auditInfo1, auditInfoFromBytes);
   }
 
@@ -102,8 +101,7 @@ public class TestEntityProtoSerDe {
 
     byte[] metalakeBytes = protoEntitySerDe.serialize(metalake);
     com.datastrato.graviton.meta.BaseMetalake metalakeFromBytes =
-        protoEntitySerDe.deserialize(
-            metalakeBytes, com.datastrato.graviton.meta.BaseMetalake.class);
+        protoEntitySerDe.deserialize(metalakeBytes);
     Assertions.assertEquals(metalake, metalakeFromBytes);
 
     // Test metalake without props map
@@ -123,7 +121,7 @@ public class TestEntityProtoSerDe {
 
     byte[] metalakeBytes1 = entitySerDe.serialize(metalake1);
     com.datastrato.graviton.meta.BaseMetalake metalakeFromBytes1 =
-        entitySerDe.deserialize(metalakeBytes1, com.datastrato.graviton.meta.BaseMetalake.class);
+        entitySerDe.deserialize(metalakeBytes1);
     Assertions.assertEquals(metalake1, metalakeFromBytes1);
 
     // Test CatalogEntity
@@ -148,8 +146,7 @@ public class TestEntityProtoSerDe {
 
     byte[] catalogBytes = protoEntitySerDe.serialize(catalogEntity);
     com.datastrato.graviton.meta.CatalogEntity catalogEntityFromBytes =
-        protoEntitySerDe.deserialize(
-            catalogBytes, com.datastrato.graviton.meta.CatalogEntity.class);
+        protoEntitySerDe.deserialize(catalogBytes);
     Assertions.assertEquals(catalogEntity, catalogEntityFromBytes);
   }
 }

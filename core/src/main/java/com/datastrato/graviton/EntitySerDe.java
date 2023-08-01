@@ -23,28 +23,25 @@ public interface EntitySerDe {
    * Deserializes the entity from a byte array.
    *
    * @param bytes the byte array to deserialize
-   * @param clazz the class of the entity
    * @return the deserialized entity
    * @param <T> The type of entity
    * @throws IOException if the deserialization fails
    */
-  default <T extends Entity> T deserialize(byte[] bytes, Class<T> clazz) throws IOException {
+  default <T extends Entity> T deserialize(byte[] bytes) throws IOException {
     ClassLoader loader =
         Optional.ofNullable(Thread.currentThread().getContextClassLoader())
             .orElse(getClass().getClassLoader());
-    return deserialize(bytes, clazz, loader);
+    return deserialize(bytes, loader);
   }
 
   /**
    * Deserializes the entity from a byte array.
    *
    * @param bytes the byte array to deserialize
-   * @param clazz the class of the entity
    * @param classLoader the class loader to use
    * @return the deserialized entity
    * @param <T> The type of entity
    * @throws IOException if the deserialization fails
    */
-  <T extends Entity> T deserialize(byte[] bytes, Class<T> clazz, ClassLoader classLoader)
-      throws IOException;
+  <T extends Entity> T deserialize(byte[] bytes, ClassLoader classLoader) throws IOException;
 }

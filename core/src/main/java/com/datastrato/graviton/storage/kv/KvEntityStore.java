@@ -54,8 +54,7 @@ public class KvEntityStore implements EntityStore {
   }
 
   @Override
-  public <E extends Entity & HasIdentifier> List<E> list(Namespace namespace, Class<E> e)
-      throws IOException {
+  public <E extends Entity & HasIdentifier> List<E> list(Namespace namespace) throws IOException {
     byte[] startKey = entityKeyEncoder.encode(namespace);
     byte[] endKey = Bytes.increment(Bytes.wrap(startKey)).get();
     List<Pair<byte[], byte[]>> kvs =
@@ -70,7 +69,7 @@ public class KvEntityStore implements EntityStore {
 
     List<E> entities = Lists.newArrayList();
     for (Pair<byte[], byte[]> pairs : kvs) {
-      entities.add(serDe.deserialize(pairs.getRight(), e));
+      entities.add(serDe.deserialize(pairs.getRight()));
     }
     // TODO (yuqi), if the list is too large, we need to do pagination or streaming
     return entities;
@@ -91,8 +90,7 @@ public class KvEntityStore implements EntityStore {
   }
 
   @Override
-  public <E extends Entity & HasIdentifier> E update(
-      NameIdentifier ident, Class<E> type, Function<E, E> updater)
+  public <E extends Entity & HasIdentifier> E update(NameIdentifier ident, Function<E, E> updater)
       throws IOException, NoSuchEntityException {
     return executeInTransaction(
         () -> {
@@ -102,7 +100,7 @@ public class KvEntityStore implements EntityStore {
             throw new NoSuchEntityException(ident.toString());
           }
 
-          E e = serDe.deserialize(value, type);
+          E e = serDe.deserialize(value);
           E updatedE = updater.apply(e);
           if (!updatedE.nameIdentifier().equals(ident)) {
             delete(ident);
@@ -114,14 +112,14 @@ public class KvEntityStore implements EntityStore {
   }
 
   @Override
-  public <E extends Entity & HasIdentifier> E get(NameIdentifier ident, Class<E> type)
+  public <E extends Entity & HasIdentifier> E get(NameIdentifier ident)
       throws NoSuchEntityException, IOException {
     byte[] key = entityKeyEncoder.encode(ident);
     byte[] value = backend.get(key);
     if (value == null) {
       throw new NoSuchEntityException(ident.toString());
     }
-    return serDe.deserialize(value, type);
+    return serDe.deserialize(value);
   }
 
   @Override

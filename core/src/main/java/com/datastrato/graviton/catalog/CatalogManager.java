@@ -161,7 +161,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
     }
 
     try {
-      return store.list(namespace, CatalogEntity.class).stream()
+      return store.list(namespace).stream()
           .map(entity -> NameIdentifier.of(namespace, entity.name()))
           .toArray(NameIdentifier[]::new);
 
@@ -185,7 +185,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
           store.executeInTransaction(
               () -> {
                 NameIdentifier metalakeIdent = NameIdentifier.of(ident.namespace().levels());
-                BaseMetalake metalake = store.get(metalakeIdent, BaseMetalake.class);
+                BaseMetalake metalake = store.get(metalakeIdent);
 
                 CatalogEntity e =
                     new CatalogEntity.Builder()
@@ -233,7 +233,6 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
       CatalogEntity updatedCatalog =
           store.update(
               ident,
-              CatalogEntity.class,
               catalog -> {
                 CatalogEntity.Builder newCatalogBuilder =
                     new CatalogEntity.Builder()
@@ -299,7 +298,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
 
   private CatalogWrapper loadCatalogInternal(NameIdentifier ident) throws NoSuchCatalogException {
     try {
-      CatalogEntity entity = store.get(ident, CatalogEntity.class);
+      CatalogEntity entity = store.get(ident);
       return createCatalogWrapper(entity);
 
     } catch (NoSuchEntityException ne) {
