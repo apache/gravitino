@@ -88,39 +88,37 @@ public class MetalakeManager implements SupportsMetalakes {
   public BaseMetalake alterMetalake(NameIdentifier ident, MetalakeChange... changes)
       throws NoSuchMetalakeException, IllegalArgumentException {
     try {
-      BaseMetalake updatedMetalake =
-          store.update(
-              ident,
-              BaseMetalake.class,
-              metalake -> {
-                BaseMetalake.Builder builder =
-                    new BaseMetalake.Builder()
-                        .withId(metalake.getId())
-                        .withName(metalake.name())
-                        .withComment(metalake.comment())
-                        .withProperties(metalake.properties())
-                        .withVersion(metalake.getVersion());
+      return store.update(
+          ident,
+          BaseMetalake.class,
+          metalake -> {
+            BaseMetalake.Builder builder =
+                new BaseMetalake.Builder()
+                    .withId(metalake.getId())
+                    .withName(metalake.name())
+                    .withComment(metalake.comment())
+                    .withProperties(metalake.properties())
+                    .withVersion(metalake.getVersion());
 
-                AuditInfo newInfo =
-                    new AuditInfo.Builder()
-                        .withCreator(metalake.auditInfo().creator())
-                        .withCreateTime(metalake.auditInfo().createTime())
-                        .withLastModifier(
-                            metalake.auditInfo().creator()) /*TODO. we should real user later on*/
-                        .withLastModifiedTime(Instant.now())
-                        .build();
-                builder.withAuditInfo(newInfo);
+            AuditInfo newInfo =
+                new AuditInfo.Builder()
+                    .withCreator(metalake.auditInfo().creator())
+                    .withCreateTime(metalake.auditInfo().createTime())
+                    .withLastModifier(
+                        metalake.auditInfo().creator()) /*TODO. we should real user later on*/
+                    .withLastModifiedTime(Instant.now())
+                    .build();
+            builder.withAuditInfo(newInfo);
 
-                Map<String, String> newProps =
-                    metalake.properties() == null
-                        ? Maps.newHashMap()
-                        : Maps.newHashMap(metalake.properties());
-                builder = updateEntity(builder, newProps, changes);
+            Map<String, String> newProps =
+                metalake.properties() == null
+                    ? Maps.newHashMap()
+                    : Maps.newHashMap(metalake.properties());
+            builder = updateEntity(builder, newProps, changes);
 
-                return builder.build();
-              });
+            return builder.build();
+          });
 
-      return updatedMetalake;
     } catch (NoSuchEntityException ne) {
       LOG.warn("Metalake {} does not exist", ident, ne);
       throw new NoSuchMetalakeException("Metalake " + ident + " does not exist");
