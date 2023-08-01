@@ -6,7 +6,7 @@ package com.datastrato.graviton.server;
 
 import com.datastrato.graviton.GravitonEnv;
 import com.datastrato.graviton.catalog.CatalogManager;
-import com.datastrato.graviton.meta.BaseMetalakesOperations;
+import com.datastrato.graviton.meta.MetalakeManager;
 import com.datastrato.graviton.server.web.JettyServer;
 import com.datastrato.graviton.server.web.ObjectMapperProvider;
 import com.datastrato.graviton.server.web.VersioningFilter;
@@ -58,7 +58,7 @@ public class GravitonServer extends ResourceConfig {
         new AbstractBinder() {
           @Override
           protected void configure() {
-            bind(gravitonEnv.metalakesOperations()).to(BaseMetalakesOperations.class).ranked(1);
+            bind(gravitonEnv.metalakesManager()).to(MetalakeManager.class).ranked(1);
             bind(gravitonEnv.catalogManager()).to(CatalogManager.class).ranked(1);
           }
         });
