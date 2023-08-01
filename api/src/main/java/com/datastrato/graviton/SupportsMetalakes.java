@@ -8,7 +8,7 @@ import com.datastrato.graviton.exceptions.MetalakeAlreadyExistsException;
 import com.datastrato.graviton.exceptions.NoSuchMetalakeException;
 import java.util.Map;
 
-public interface SupportMetalakes {
+public interface SupportsMetalakes {
 
   /** List all metalakes. */
   Metalake[] listMetalakes();
