@@ -23,6 +23,7 @@ import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Function;
 import org.apache.commons.lang3.tuple.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -87,6 +88,29 @@ public class KvEntityStore implements EntityStore {
     byte[] key = entityKeyEncoder.encode(ident);
     byte[] value = serDe.serialize(e);
     backend.put(key, value, overwritten);
+  }
+
+  @Override
+  public <E extends Entity & HasIdentifier> E update(
+      NameIdentifier ident, Class<E> type, Function<E, E> updater)
+      throws IOException, NoSuchEntityException {
+    return executeInTransaction(
+        () -> {
+          byte[] key = entityKeyEncoder.encode(ident);
+          byte[] value = backend.get(key);
+          if (value == null) {
+            throw new NoSuchEntityException(ident.toString());
+          }
+
+          E e = serDe.deserialize(value, type);
+          E updatedE = updater.apply(e);
+          if (!updatedE.nameIdentifier().equals(ident)) {
+            delete(ident);
+          }
+
+          put(updatedE.nameIdentifier(), updatedE, true /* overwritten */);
+          return updatedE;
+        });
   }
 
   @Override

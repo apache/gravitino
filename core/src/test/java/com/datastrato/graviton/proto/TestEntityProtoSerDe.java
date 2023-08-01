@@ -71,7 +71,6 @@ public class TestEntityProtoSerDe {
   public void testEntitiesSerDe() throws IOException {
     Instant now = Instant.now();
     String creator = "creator";
-    Integer tenantId = 1;
     SchemaVersion version = SchemaVersion.V_0_1;
     Long metalakeId = 1L;
     String metalakeName = "metalake";
@@ -126,5 +125,31 @@ public class TestEntityProtoSerDe {
     com.datastrato.graviton.meta.BaseMetalake metalakeFromBytes1 =
         entitySerDe.deserialize(metalakeBytes1, com.datastrato.graviton.meta.BaseMetalake.class);
     Assertions.assertEquals(metalake1, metalakeFromBytes1);
+
+    // Test CatalogEntity
+    Long catalogId = 1L;
+    String catalogName = "catalog";
+    String comment = "comment";
+
+    com.datastrato.graviton.meta.CatalogEntity catalogEntity =
+        new com.datastrato.graviton.meta.CatalogEntity.Builder()
+            .withId(catalogId)
+            .withMetalakeId(metalakeId)
+            .withName(catalogName)
+            .withComment(comment)
+            .withType(com.datastrato.graviton.Catalog.Type.RELATIONAL)
+            .withAuditInfo(auditInfo)
+            .build();
+
+    Catalog catalogProto = protoEntitySerDe.toProto(catalogEntity);
+    com.datastrato.graviton.meta.CatalogEntity catalogEntityFromProto =
+        protoEntitySerDe.fromProto(catalogProto);
+    Assertions.assertEquals(catalogEntity, catalogEntityFromProto);
+
+    byte[] catalogBytes = protoEntitySerDe.serialize(catalogEntity);
+    com.datastrato.graviton.meta.CatalogEntity catalogEntityFromBytes =
+        protoEntitySerDe.deserialize(
+            catalogBytes, com.datastrato.graviton.meta.CatalogEntity.class);
+    Assertions.assertEquals(catalogEntity, catalogEntityFromBytes);
   }
 }

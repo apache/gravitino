@@ -54,7 +54,7 @@ public class GravitonEnv {
     this.metalakesOperations = new BaseMetalakesOperations();
 
     // Create and initialize Catalog related modules
-    this.catalogManager = new CatalogManager(config);
+    this.catalogManager = new CatalogManager(config, entityStore);
     this.catalogOperationDispatcher = new CatalogOperationDispatcher(catalogManager);
 
     LOG.info("Graviton Environment is initialized.");
