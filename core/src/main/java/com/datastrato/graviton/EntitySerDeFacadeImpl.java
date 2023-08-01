@@ -25,6 +25,10 @@ public class EntitySerDeFacadeImpl implements EntitySerDeFacade {
     ENTITY_TO_PROTO_ID.put(com.datastrato.graviton.meta.AuditInfo.class.getCanonicalName(), 2);
   }
 
+  /**
+   * Length of Header added to the serialized byte array object, more information please refer to
+   * {@link #serializeClassInfo(Class, byte[])}
+   */
   public static final int HEADER_LEN = 20;
 
   private EntitySerDe entitySerDe;
