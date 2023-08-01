@@ -36,7 +36,7 @@ public interface EntityStore extends Closeable {
    * List all the entities with the specified {@link Namespace}, and deserialize them into the
    * specified {@link Entity} object.
    *
-   * <p>Note. Depends on the isolation levels provided by the underlying storage, the returned list
+   * <p>Note. Depends on the isolation levels provided by the underlying storage; the returned list
    * may not be consistent.
    *
    * @param namespace the namespace of the entities
@@ -99,7 +99,6 @@ public interface EntityStore extends Closeable {
    * <p>Note: the whole update operation should be in one transaction.
    *
    * @param ident the name identifier of the entity
-   * @param type the type of the entity
    * @param updater the updater function to update the entity
    * @param <E> the type of the entity
    * @return E the updated entity

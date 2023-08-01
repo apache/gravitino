@@ -35,7 +35,7 @@ public class TestMetalakeManager {
 
     entityStore = new TestEntityStore.InMemoryEntityStore();
     entityStore.initialize(config);
-    entityStore.setSerDe(null);
+    entityStore.setSerDeFacade(null);
 
     metalakeManager = new MetalakeManager(entityStore);
   }

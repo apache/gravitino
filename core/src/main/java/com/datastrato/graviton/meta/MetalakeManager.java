@@ -33,7 +33,7 @@ public class MetalakeManager implements SupportsMetalakes {
   @Override
   public BaseMetalake[] listMetalakes() {
     try {
-      return store.list(Namespace.empty(), BaseMetalake.class).toArray(new BaseMetalake[0]);
+      return store.list(Namespace.empty()).toArray(new BaseMetalake[0]);
     } catch (IOException ioe) {
       LOG.error("Failed to list metalakes due to storage issues", ioe);
       throw new RuntimeException(ioe);
@@ -43,7 +43,7 @@ public class MetalakeManager implements SupportsMetalakes {
   @Override
   public BaseMetalake loadMetalake(NameIdentifier ident) throws NoSuchMetalakeException {
     try {
-      return store.get(ident, BaseMetalake.class);
+      return store.get(ident);
     } catch (NoSuchEntityException e) {
       LOG.warn("Metalake {} does not exist", ident, e);
       throw new NoSuchMetalakeException("Metalake " + ident + " does not exist");
@@ -90,7 +90,6 @@ public class MetalakeManager implements SupportsMetalakes {
     try {
       return store.update(
           ident,
-          BaseMetalake.class,
           metalake -> {
             BaseMetalake.Builder builder =
                 new BaseMetalake.Builder()
