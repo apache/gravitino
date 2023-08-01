@@ -45,6 +45,9 @@ public class ProtoEntitySerDe implements EntitySerDe {
         Optional.ofNullable(Thread.currentThread().getContextClassLoader())
             .orElse(getClass().getClassLoader());
 
+    // TODO. This potentially has issues in creating serde objects, because the class load here
+    //  may have no context for entities which are implemented in the specific catalog module. We
+    //  should lazily create the serde class in the classloader when serializing and deserializing.
     this.entityToSerDe = Maps.newHashMap();
     for (Map.Entry<String, String> entry : ENTITY_TO_SERDE.entrySet()) {
       String key = entry.getKey();

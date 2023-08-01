@@ -9,12 +9,17 @@ import com.datastrato.graviton.CatalogChange;
 import com.datastrato.graviton.CatalogProvider;
 import com.datastrato.graviton.Config;
 import com.datastrato.graviton.Configs;
+import com.datastrato.graviton.EntityAlreadyExistsException;
+import com.datastrato.graviton.EntityStore;
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
+import com.datastrato.graviton.NoSuchEntityException;
 import com.datastrato.graviton.SupportsCatalogs;
 import com.datastrato.graviton.exceptions.CatalogAlreadyExistsException;
 import com.datastrato.graviton.exceptions.NoSuchCatalogException;
 import com.datastrato.graviton.exceptions.NoSuchMetalakeException;
+import com.datastrato.graviton.meta.AuditInfo;
+import com.datastrato.graviton.meta.BaseMetalake;
 import com.datastrato.graviton.meta.CatalogEntity;
 import com.datastrato.graviton.rel.SupportsSchemas;
 import com.datastrato.graviton.rel.TableCatalog;
@@ -23,17 +28,22 @@ import com.datastrato.graviton.util.ThrowableFunction;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.Scheduler;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Streams;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import java.io.Closeable;
 import java.io.File;
+import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -44,7 +54,7 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class CatalogManager implements SupportsCatalogs {
+public class CatalogManager implements SupportsCatalogs, Closeable {
 
   private static final Logger LOG = LoggerFactory.getLogger(CatalogManager.class);
 
@@ -101,12 +111,15 @@ public class CatalogManager implements SupportsCatalogs {
 
   private final Config config;
 
-  private final Cache<NameIdentifier, CatalogWrapper> catalogCache;
+  @VisibleForTesting final Cache<NameIdentifier, CatalogWrapper> catalogCache;
 
-  public CatalogManager(Config config) {
+  private final EntityStore store;
+
+  public CatalogManager(Config config, EntityStore store) {
     this.config = config;
-    long cacheEvictionIntervalInMs = config.get(Configs.CATALOG_CACHE_EVICTION_INTERVAL_MS);
+    this.store = store;
 
+    long cacheEvictionIntervalInMs = config.get(Configs.CATALOG_CACHE_EVICTION_INTERVAL_MS);
     this.catalogCache =
         Caffeine.newBuilder()
             .expireAfterAccess(cacheEvictionIntervalInMs, TimeUnit.MILLISECONDS)
@@ -126,97 +139,199 @@ public class CatalogManager implements SupportsCatalogs {
             .build();
   }
 
+  @Override
   public void close() {
     catalogCache.invalidateAll();
   }
 
   @Override
   public NameIdentifier[] listCatalogs(Namespace namespace) throws NoSuchMetalakeException {
-    throw new UnsupportedOperationException("Not implemented yet");
+    NameIdentifier metalakeIdent = NameIdentifier.of(namespace.levels());
+
+    boolean metalakeExists;
+    try {
+      metalakeExists = store.exists(metalakeIdent);
+    } catch (IOException e) {
+      LOG.error("Failed to do storage operation", e);
+      throw new RuntimeException(e);
+    }
+
+    if (!metalakeExists) {
+      throw new NoSuchMetalakeException("Metalake " + metalakeIdent + " does not exist");
+    }
+
+    try {
+      return store.list(namespace, CatalogEntity.class).stream()
+          .map(entity -> NameIdentifier.of(namespace, entity.name()))
+          .toArray(NameIdentifier[]::new);
+
+    } catch (IOException ioe) {
+      LOG.error("Failed to list catalogs in metalake {}", metalakeIdent, ioe);
+      throw new RuntimeException(ioe);
+    }
   }
 
   @Override
   public Catalog loadCatalog(NameIdentifier ident) throws NoSuchCatalogException {
-    return loadCatalogWrapper(ident).catalog;
+    return loadCatalogAndWrap(ident).catalog;
   }
 
   @Override
   public Catalog createCatalog(
       NameIdentifier ident, Catalog.Type type, String comment, Map<String, String> properties)
       throws NoSuchMetalakeException, CatalogAlreadyExistsException {
-    // Check if the metalake is existed, throw NoSuchMetalakeException if it is not existed.
+    try {
+      CatalogEntity entity =
+          store.executeInTransaction(
+              () -> {
+                NameIdentifier metalakeIdent = NameIdentifier.of(ident.namespace().levels());
+                BaseMetalake metalake = store.get(metalakeIdent, BaseMetalake.class);
 
-    // Build CatalogEntity
+                CatalogEntity e =
+                    new CatalogEntity.Builder()
+                        .withId(1L /* TODO. use ID generator */)
+                        .withMetalakeId(metalake.getId())
+                        .withName(ident.name())
+                        .withNamespace(ident.namespace())
+                        .withType(type)
+                        .withComment(comment)
+                        .withProperties(properties)
+                        .withAuditInfo(
+                            new AuditInfo.Builder()
+                                .withCreator("graviton") /* TODO. Should change to real user */
+                                .withCreateTime(Instant.now())
+                                .build())
+                        .build();
 
-    // Check and store CatalogEntity
+                store.put(ident, e, false /* overwrite */);
+                return e;
+              });
+      return catalogCache.get(ident, id -> createCatalogWrapper(entity)).catalog;
 
-    // Create CatalogWrapper and put it into catalogCache
+    } catch (NoSuchEntityException ne) {
+      LOG.warn("Metalake {} does not exist", ident.namespace(), ne);
+      throw new NoSuchMetalakeException("Metalake " + ident.namespace() + " does not exist");
 
-    // return the created catalog
+    } catch (EntityAlreadyExistsException ee) {
+      LOG.warn("Catalog {} already exists", ident, ee);
+      throw new CatalogAlreadyExistsException("Catalog " + ident + " already exists");
 
-    throw new UnsupportedOperationException("Not implemented yet");
+    } catch (IOException ioe) {
+      LOG.error("Failed to create catalog {}", ident, ioe);
+      throw new RuntimeException(ioe);
+    }
   }
 
   @Override
   public Catalog alterCatalog(NameIdentifier ident, CatalogChange... changes)
       throws NoSuchCatalogException, IllegalArgumentException {
-    throw new UnsupportedOperationException("Not implemented yet");
+    // There could be a race issue that someone is using the catalog from cache while we are
+    // updating it.
+    catalogCache.invalidate(ident);
+
+    try {
+      CatalogEntity updatedCatalog =
+          store.update(
+              ident,
+              CatalogEntity.class,
+              catalog -> {
+                CatalogEntity.Builder newCatalogBuilder =
+                    new CatalogEntity.Builder()
+                        .withId(catalog.getId())
+                        .withMetalakeId(catalog.getMetalakeId())
+                        .withName(catalog.name())
+                        .withNamespace(ident.namespace())
+                        .withType(catalog.getType())
+                        .withComment(catalog.getComment());
+
+                AuditInfo newInfo =
+                    new AuditInfo.Builder()
+                        .withCreator(catalog.auditInfo().creator())
+                        .withCreateTime(catalog.auditInfo().createTime())
+                        .withLastModifier(
+                            catalog.auditInfo().creator()) /* TODO. We should use real user */
+                        .withLastModifiedTime(Instant.now())
+                        .build();
+                newCatalogBuilder.withAuditInfo(newInfo);
+
+                Map<String, String> newProps =
+                    catalog.getProperties() == null
+                        ? new HashMap<>()
+                        : new HashMap<>(catalog.getProperties());
+                newCatalogBuilder = updateEntity(newCatalogBuilder, newProps, changes);
+
+                return newCatalogBuilder.build();
+              });
+      return catalogCache.get(
+              updatedCatalog.nameIdentifier(), id -> createCatalogWrapper(updatedCatalog))
+          .catalog;
+
+    } catch (NoSuchEntityException ne) {
+      LOG.warn("Catalog {} does not exist", ident, ne);
+      throw new NoSuchCatalogException("Catalog " + ident + " does not exist");
+
+    } catch (IllegalArgumentException iae) {
+      LOG.warn("Failed to alter catalog {} with unknown change", ident, iae);
+      throw iae;
+
+    } catch (IOException ioe) {
+      LOG.error("Failed to alter catalog {}", ident, ioe);
+      throw new RuntimeException(ioe);
+    }
   }
 
   @Override
   public boolean dropCatalog(NameIdentifier ident) {
-    throw new UnsupportedOperationException("Not implemented yet");
+    // There could be a race issue that someone is using the catalog while we are dropping it.
+    catalogCache.invalidate(ident);
+
+    try {
+      return store.delete(ident);
+    } catch (IOException ioe) {
+      LOG.error("Failed to drop catalog {}", ident, ioe);
+      throw new RuntimeException(ioe);
+    }
   }
 
-  public CatalogWrapper loadCatalogWrapper(NameIdentifier ident) throws NoSuchCatalogException {
+  public CatalogWrapper loadCatalogAndWrap(NameIdentifier ident) throws NoSuchCatalogException {
     return catalogCache.get(ident, this::loadCatalogInternal);
   }
 
   private CatalogWrapper loadCatalogInternal(NameIdentifier ident) throws NoSuchCatalogException {
-    // Load CatalogEntity from CatalogStore
+    try {
+      CatalogEntity entity = store.get(ident, CatalogEntity.class);
+      return createCatalogWrapper(entity);
 
-    // Create CatalogWrapper
+    } catch (NoSuchEntityException ne) {
+      LOG.warn("Catalog {} does not exist", ident, ne);
+      throw new NoSuchCatalogException("Catalog " + ident + " does not exist");
 
-    // return CatalogWrapper
-
-    throw new UnsupportedOperationException("Not implemented yet");
+    } catch (IOException ioe) {
+      LOG.error("Failed to load catalog {}", ident, ioe);
+      throw new RuntimeException(ioe);
+    }
   }
 
   private CatalogWrapper createCatalogWrapper(CatalogEntity entity) {
     Map<String, String> mergedConf =
         mergeConf(entity.getProperties(), catalogConf(entity.name(), config));
 
-    // Building package path and class loader
     String provider = mergedConf.get(Catalog.PROPERTY_PROVIDER);
     Preconditions.checkArgument(
         provider != null,
         "'provider' not set in catalog properties or conf via "
             + "'graviton.catalog.<name>.provider'");
 
-    String pkg = mergedConf.get(Catalog.PROPERTY_PACKAGE);
-    String gravitonHome = System.getenv("GRAVITON_HOME");
-    Preconditions.checkArgument(gravitonHome != null, "GRAVITON_HOME not set");
-    boolean testEnv = System.getenv("GRAVITON_TEST") != null;
-    String pkgPath;
-    if (pkg != null) {
-      pkgPath = pkg;
-    } else if (!testEnv) {
-      pkgPath = gravitonHome + File.separator + "catalogs" + File.separator + provider;
+    IsolatedClassLoader classLoader;
+    if (config.get(Configs.CATALOG_LOAD_ISOLATED)) {
+      String pkgPath = buildPkgPath(mergedConf, provider);
+      classLoader = buildClassLoader(pkgPath);
     } else {
-      pkgPath =
-          new StringBuilder()
-              .append(gravitonHome)
-              .append(File.separator)
-              .append("catalog-")
-              .append(provider)
-              .append(File.separator)
-              .append("build")
-              .append(File.separator)
-              .append("libs")
-              .toString();
+      // This will use the current class loader, it is mainly used for test.
+      classLoader =
+          new IsolatedClassLoader(
+              Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
     }
-
-    IsolatedClassLoader classLoader = buildClassLoader(pkgPath);
 
     // Load Catalog class instance
     BaseCatalog catalog;
@@ -258,6 +373,35 @@ public class CatalogManager implements SupportsCatalogs {
     return config.getConfigsWithPrefix(confPrefix);
   }
 
+  private String buildPkgPath(Map<String, String> conf, String provider) {
+    String pkg = conf.get(Catalog.PROPERTY_PACKAGE);
+
+    String gravitonHome = System.getenv("GRAVITON_HOME");
+    Preconditions.checkArgument(gravitonHome != null, "GRAVITON_HOME not set");
+    boolean testEnv = System.getenv("GRAVITON_TEST") != null;
+
+    String pkgPath;
+    if (pkg != null) {
+      pkgPath = pkg;
+    } else if (!testEnv) {
+      pkgPath = gravitonHome + File.separator + "catalogs" + File.separator + provider;
+    } else {
+      pkgPath =
+          new StringBuilder()
+              .append(gravitonHome)
+              .append(File.separator)
+              .append("catalog-")
+              .append(provider)
+              .append(File.separator)
+              .append("build")
+              .append(File.separator)
+              .append("libs")
+              .toString();
+    }
+
+    return pkgPath;
+  }
+
   private IsolatedClassLoader buildClassLoader(String pkgPath) {
     // Listing all the jars under the package path and build the isolated class loader.
     File pkgFolder = new File(pkgPath);
@@ -288,7 +432,7 @@ public class CatalogManager implements SupportsCatalogs {
     List<Class<? extends CatalogProvider>> providers =
         Streams.stream(loader.iterator())
             .filter(p -> p.shortName().equalsIgnoreCase(provider))
-            .map(p -> p.getClass())
+            .map(CatalogProvider::getClass)
             .collect(Collectors.toList());
 
     if (providers.size() == 0) {
@@ -298,5 +442,34 @@ public class CatalogManager implements SupportsCatalogs {
     } else {
       return Iterables.getOnlyElement(providers);
     }
+  }
+
+  private CatalogEntity.Builder updateEntity(
+      CatalogEntity.Builder builder, Map<String, String> newProps, CatalogChange... changes) {
+    for (CatalogChange change : changes) {
+      if (change instanceof CatalogChange.RenameCatalog) {
+        CatalogChange.RenameCatalog rename = (CatalogChange.RenameCatalog) change;
+        builder.withName(rename.getNewName());
+
+      } else if (change instanceof CatalogChange.UpdateCatalogComment) {
+        CatalogChange.UpdateCatalogComment updateComment =
+            (CatalogChange.UpdateCatalogComment) change;
+        builder.withComment(updateComment.getNewComment());
+
+      } else if (change instanceof CatalogChange.SetProperty) {
+        CatalogChange.SetProperty setProperty = (CatalogChange.SetProperty) change;
+        newProps.put(setProperty.getProperty(), setProperty.getValue());
+
+      } else if (change instanceof CatalogChange.RemoveProperty) {
+        CatalogChange.RemoveProperty removeProperty = (CatalogChange.RemoveProperty) change;
+        newProps.remove(removeProperty.getProperty());
+
+      } else {
+        throw new IllegalArgumentException(
+            "Unsupported catalog change: " + change.getClass().getSimpleName());
+      }
+    }
+
+    return builder.withProperties(newProps);
   }
 }

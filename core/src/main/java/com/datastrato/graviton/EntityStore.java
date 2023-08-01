@@ -8,6 +8,7 @@ import com.datastrato.graviton.util.Executable;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.List;
+import java.util.function.Function;
 
 public interface EntityStore extends Closeable {
 
@@ -85,6 +86,29 @@ public interface EntityStore extends Closeable {
    */
   <E extends Entity & HasIdentifier> void put(NameIdentifier ident, E e, boolean overwritten)
       throws IOException, EntityAlreadyExistsException;
+
+  /**
+   * Update the entity into the underlying storage.
+   *
+   * <p>Note: the {@link NameIdentifier} of the updated entity may be changed. Based on the design
+   * of the storage key, the implementation may have two implementations.
+   *
+   * <p>1) if the storage key is name relevant, it needs to delete the old entity and store the new
+   * entity with the new key. 2) or if the storage key is name irrelevant, it can just store the new
+   * entity with the current key.
+   *
+   * <p>Note: the whole update operation should be in one transaction.
+   *
+   * @param ident the name identifier of the entity
+   * @param updater the updater function to update the entity
+   * @param <E> the type of the entity
+   * @return E the updated entity
+   * @throws IOException if the store operation fails
+   * @throws NoSuchEntityException if the entity does not exist
+   */
+  <E extends Entity & HasIdentifier> E update(
+      NameIdentifier ident, Class<E> type, Function<E, E> updater)
+      throws IOException, NoSuchEntityException;
 
   /**
    * Get the entity from the underlying storage.

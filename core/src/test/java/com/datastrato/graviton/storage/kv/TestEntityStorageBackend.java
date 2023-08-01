@@ -143,6 +143,23 @@ public class TestEntityStorageBackend {
       Assertions.assertThrows(
           NoSuchEntityException.class,
           () -> store.get(catalog.nameIdentifier(), CatalogEntity.class));
+
+      // Test update
+      BaseMetalake updatedMetalake =
+          new BaseMetalake.Builder()
+              .withId(metalake.getId())
+              .withName("updatedMetalake")
+              .withAuditInfo(auditInfo)
+              .withVersion(SchemaVersion.V_0_1)
+              .build();
+      store.put(metalake.nameIdentifier(), metalake);
+      store.update(metalake.nameIdentifier(), BaseMetalake.class, l -> updatedMetalake);
+      Assertions.assertEquals(
+          updatedMetalake, store.get(updatedMetalake.nameIdentifier(), BaseMetalake.class));
+      Assertions.assertThrows(
+          NoSuchEntityException.class,
+          () -> store.get(metalake.nameIdentifier(), BaseMetalake.class));
+
     } catch (Exception e) {
       Assertions.fail(e.getMessage());
     }

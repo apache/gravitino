@@ -2,7 +2,6 @@
  * Copyright 2023 Datastrato.
  * This software is licensed under the Apache License version 2.
  */
-
 package com.datastrato.graviton.proto;
 
 import com.datastrato.graviton.meta.AuditInfo;
@@ -14,6 +13,7 @@ public class CatalogEntitySerDe implements ProtoSerDe<CatalogEntity, Catalog> {
     Catalog.Builder builder =
         Catalog.newBuilder()
             .setId(catalogEntity.getId())
+            .setMetalakeId(catalogEntity.getMetalakeId())
             .setName(catalogEntity.name())
             .setAuditInfo(new AuditInfoSerDe().serialize((AuditInfo) catalogEntity.auditInfo()));
 
@@ -28,7 +28,6 @@ public class CatalogEntitySerDe implements ProtoSerDe<CatalogEntity, Catalog> {
     com.datastrato.graviton.proto.Catalog.Type type =
         com.datastrato.graviton.proto.Catalog.Type.valueOf(catalogEntity.getType().name());
     builder.setType(type);
-    builder.setMetalakeId(catalogEntity.getMetalakeId());
 
     // Attention we have ignored namespace field here
     return builder.build();
@@ -40,6 +39,7 @@ public class CatalogEntitySerDe implements ProtoSerDe<CatalogEntity, Catalog> {
     builder
         .withId(p.getId())
         .withName(p.getName())
+        .withMetalakeId(p.getMetalakeId())
         .withAuditInfo(new AuditInfoSerDe().deserialize(p.getAuditInfo()));
 
     if (p.hasComment()) {
@@ -51,7 +51,6 @@ public class CatalogEntitySerDe implements ProtoSerDe<CatalogEntity, Catalog> {
     }
 
     builder.withType(com.datastrato.graviton.Catalog.Type.valueOf(p.getType().name()));
-    builder.withMetalakeId(p.getMetalakeId());
     return builder.build();
   }
 }
