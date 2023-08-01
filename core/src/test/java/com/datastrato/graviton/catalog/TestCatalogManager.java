@@ -45,7 +45,7 @@ public class TestCatalogManager {
 
     entityStore = new TestEntityStore.InMemoryEntityStore();
     entityStore.initialize(config);
-    entityStore.setSerDe(null);
+    entityStore.setSerDeFacade(null);
 
     BaseMetalake metalakeEntity =
         new BaseMetalake.Builder()

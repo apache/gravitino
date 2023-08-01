@@ -27,9 +27,10 @@ public interface EntityStore extends Closeable {
    * Set the {@link EntitySerDe} for the entity store. {@link EntitySerDe} will be used to serialize
    * and deserialize the entities to the target format, and vice versa.
    *
-   * @param entitySerDe the entity serde to set
+   * @param entitySerDeFacade the entity serde facade to set, default is {@link
+   *     EntitySerDeFacadeImpl}
    */
-  void setSerDe(EntitySerDe entitySerDe);
+  void setSerDeFacade(EntitySerDeFacade entitySerDeFacade);
 
   /**
    * List all the entities with the specified {@link Namespace}, and deserialize them into the

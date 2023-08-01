@@ -30,7 +30,7 @@ public class TestEntityStore {
   public static class InMemoryEntityStore implements EntityStore {
     private final Map<NameIdentifier, Entity> entityMap;
 
-    private EntitySerDe serde;
+    private EntitySerDeFacade serDeFacade;
 
     private final Lock lock;
 
@@ -43,8 +43,8 @@ public class TestEntityStore {
     public void initialize(Config config) throws RuntimeException {}
 
     @Override
-    public void setSerDe(EntitySerDe entitySerDe) {
-      this.serde = entitySerDe;
+    public void setSerDeFacade(EntitySerDeFacade entitySerDeFacade) {
+      this.serDeFacade = serDeFacade;
     }
 
     @Override
@@ -167,7 +167,7 @@ public class TestEntityStore {
 
     InMemoryEntityStore store = new InMemoryEntityStore();
     store.initialize(Mockito.mock(Config.class));
-    store.setSerDe(Mockito.mock(EntitySerDe.class));
+    store.setSerDeFacade(Mockito.mock(EntitySerDeFacade.class));
 
     store.put(metalake.nameIdentifier(), metalake);
     store.put(catalog.nameIdentifier(), catalog);

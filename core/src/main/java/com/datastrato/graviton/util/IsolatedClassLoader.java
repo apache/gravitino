@@ -7,6 +7,7 @@ package com.datastrato.graviton.util;
 import com.datastrato.graviton.meta.AuditInfo;
 import com.datastrato.graviton.meta.rel.BaseSchema;
 import java.io.Closeable;
+import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 import java.net.URLClassLoader;
@@ -146,5 +147,13 @@ public class IsolatedClassLoader implements Closeable {
 
   private String classToPath(String name) {
     return name.replaceAll("\\.", "/") + ".class";
+  }
+
+  public static Class<?> loadClass(String className, ClassLoader classLoader) throws IOException {
+    try {
+      return Class.forName(className, true, classLoader);
+    } catch (Exception e) {
+      throw new IOException("Failed to load class " + className, e);
+    }
   }
 }

@@ -10,7 +10,7 @@ import static com.datastrato.graviton.Configs.ENTITY_KV_STORE;
 import com.datastrato.graviton.Config;
 import com.datastrato.graviton.Entity;
 import com.datastrato.graviton.EntityAlreadyExistsException;
-import com.datastrato.graviton.EntitySerDe;
+import com.datastrato.graviton.EntitySerDeFacade;
 import com.datastrato.graviton.EntityStore;
 import com.datastrato.graviton.HasIdentifier;
 import com.datastrato.graviton.NameIdentifier;
@@ -40,7 +40,7 @@ public class KvEntityStore implements EntityStore {
 
   private KvBackend backend;
   private EntityKeyEncoder entityKeyEncoder;
-  private EntitySerDe serDe;
+  private EntitySerDeFacade serDe;
 
   @Override
   public void initialize(Config config) throws RuntimeException {
@@ -49,7 +49,7 @@ public class KvEntityStore implements EntityStore {
   }
 
   @Override
-  public void setSerDe(EntitySerDe entitySerDe) {
+  public void setSerDeFacade(EntitySerDeFacade entitySerDe) {
     this.serDe = entitySerDe;
   }
 

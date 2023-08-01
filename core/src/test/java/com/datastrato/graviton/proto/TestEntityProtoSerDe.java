@@ -6,6 +6,8 @@ package com.datastrato.graviton.proto;
 
 import com.datastrato.graviton.EntitySerDe;
 import com.datastrato.graviton.EntitySerDeFactory;
+import com.datastrato.graviton.meta.BaseMetalake;
+import com.datastrato.graviton.meta.CatalogEntity;
 import com.datastrato.graviton.meta.SchemaVersion;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
@@ -62,7 +64,8 @@ public class TestEntityProtoSerDe {
 
     // Test from/to bytes
     byte[] bytes = entitySerDe.serialize(auditInfo1);
-    com.datastrato.graviton.meta.AuditInfo auditInfoFromBytes = entitySerDe.deserialize(bytes);
+    com.datastrato.graviton.meta.AuditInfo auditInfoFromBytes =
+        entitySerDe.deserialize(bytes, com.datastrato.graviton.meta.AuditInfo.class);
     Assertions.assertEquals(auditInfo1, auditInfoFromBytes);
   }
 
@@ -101,10 +104,10 @@ public class TestEntityProtoSerDe {
 
     byte[] metalakeBytes = protoEntitySerDe.serialize(metalake);
     com.datastrato.graviton.meta.BaseMetalake metalakeFromBytes =
-        protoEntitySerDe.deserialize(metalakeBytes);
+        protoEntitySerDe.deserialize(metalakeBytes, BaseMetalake.class);
     Assertions.assertEquals(metalake, metalakeFromBytes);
 
-    // Test metalake without props map
+    // Test metalake without a property map
     com.datastrato.graviton.meta.BaseMetalake metalake1 =
         new com.datastrato.graviton.meta.BaseMetalake.Builder()
             .withId(metalakeId)
@@ -121,7 +124,7 @@ public class TestEntityProtoSerDe {
 
     byte[] metalakeBytes1 = entitySerDe.serialize(metalake1);
     com.datastrato.graviton.meta.BaseMetalake metalakeFromBytes1 =
-        entitySerDe.deserialize(metalakeBytes1);
+        entitySerDe.deserialize(metalakeBytes1, BaseMetalake.class);
     Assertions.assertEquals(metalake1, metalakeFromBytes1);
 
     // Test CatalogEntity
@@ -146,7 +149,7 @@ public class TestEntityProtoSerDe {
 
     byte[] catalogBytes = protoEntitySerDe.serialize(catalogEntity);
     com.datastrato.graviton.meta.CatalogEntity catalogEntityFromBytes =
-        protoEntitySerDe.deserialize(catalogBytes);
+        protoEntitySerDe.deserialize(catalogBytes, CatalogEntity.class);
     Assertions.assertEquals(catalogEntity, catalogEntityFromBytes);
   }
 }

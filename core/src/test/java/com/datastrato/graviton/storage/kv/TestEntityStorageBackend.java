@@ -14,6 +14,9 @@ import com.datastrato.graviton.Catalog.Type;
 import com.datastrato.graviton.Config;
 import com.datastrato.graviton.Configs;
 import com.datastrato.graviton.EntityAlreadyExistsException;
+import com.datastrato.graviton.EntitySerDe;
+import com.datastrato.graviton.EntitySerDeFacade;
+import com.datastrato.graviton.EntitySerDeFacadeImpl;
 import com.datastrato.graviton.EntitySerDeFactory;
 import com.datastrato.graviton.EntityStore;
 import com.datastrato.graviton.EntityStoreFactory;
@@ -56,7 +59,11 @@ public class TestEntityStorageBackend {
 
     try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
       Assertions.assertTrue(store instanceof KvEntityStore);
-      store.setSerDe(EntitySerDeFactory.createEntitySerDe(config.get(Configs.ENTITY_SERDE)));
+
+      EntitySerDe serDe = EntitySerDeFactory.createEntitySerDe(config);
+      EntitySerDeFacade serDeFacade = new EntitySerDeFacadeImpl();
+      serDeFacade.setEntitySeDe(serDe);
+      store.setSerDeFacade(serDeFacade);
 
       AuditInfo auditInfo =
           new AuditInfo.Builder().withCreator("creator").withCreateTime(Instant.now()).build();
