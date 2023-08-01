@@ -8,10 +8,18 @@ package com.datastrato.graviton;
 import java.io.IOException;
 import java.util.Optional;
 
+/**
+ * EntitySerDeFacade is a facade of {@link EntitySerDe}. It is used to serialize and deserialize
+ * entites in Graviton.
+ *
+ * <p>Underlying implementation of {@link EntitySerDeFacade} can be changed in the future, now the
+ * default implementation is {@link com.datastrato.graviton.proto.ProtoEntitySerDe}
+ */
 public interface EntitySerDeFacade {
 
   /**
-   * Set the detailed entity ser/de. {@link EntitySerDe} will be used to serialize and deserialize
+   * Set the underlying entity ser/de implementation. {@link EntitySerDe} will be used to serialize
+   * and deserialize
    *
    * @param serDe The detailed implementation of {@link EntitySerDe}
    */

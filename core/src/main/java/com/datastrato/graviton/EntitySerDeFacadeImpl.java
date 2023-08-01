@@ -5,6 +5,7 @@
 
 package com.datastrato.graviton;
 
+import com.datastrato.graviton.meta.AuditInfo;
 import com.datastrato.graviton.meta.BaseMetalake;
 import com.datastrato.graviton.meta.CatalogEntity;
 import com.datastrato.graviton.util.Bytes;
@@ -19,10 +20,13 @@ import org.apache.commons.lang3.tuple.Pair;
 public class EntitySerDeFacadeImpl implements EntitySerDeFacade {
   private static final BiMap<String, Integer> ENTITY_TO_PROTO_ID = HashBiMap.create();
 
+  // TODO (yuqi) Support register entity to serde class dynamically
+  //  maybe we need to save this information in the perisistent storage or once restart, all
+  // registered entity will be lost
   static {
     ENTITY_TO_PROTO_ID.put(BaseMetalake.class.getCanonicalName(), 0);
     ENTITY_TO_PROTO_ID.put(CatalogEntity.class.getCanonicalName(), 1);
-    ENTITY_TO_PROTO_ID.put(com.datastrato.graviton.meta.AuditInfo.class.getCanonicalName(), 2);
+    ENTITY_TO_PROTO_ID.put(AuditInfo.class.getCanonicalName(), 2);
   }
 
   /**
@@ -32,18 +36,19 @@ public class EntitySerDeFacadeImpl implements EntitySerDeFacade {
   public static final int HEADER_LEN = 20;
 
   private EntitySerDe entitySerDe;
+
   /**
-   * This method will also header information like a class type to a byte array that is to say it
-   * contains the class type and the object content
+   * This method will add header information like class informaton to the byte array. That is to
+   * say, it contains the class type and the object content
    *
    * <pre>The final content will be:
    * --------------------------
-   * |Header | object content |
+   * |Header | Object content |
    * --------------------------
    *
    * And the `Header` will be(total 20 bytes, See {@link #HEADER_LEN})
    * ---------------------------
-   * | class type | reserverd  |
+   * | Class type | Reserved  |
    * ---------------------------
    *     4 byte      16 byte
    * </pre>
