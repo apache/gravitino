@@ -25,9 +25,7 @@ public class EntityStoreFactory {
     String className = ENTITY_STORES.getOrDefault(name, name);
 
     try {
-      EntityStore store = (EntityStore) Class.forName(className).newInstance();
-      store.initialize(config);
-      return store;
+      return (EntityStore) Class.forName(className).newInstance();
     } catch (Exception e) {
       LOG.error("Failed to create and initialize EntityStore by name {}.", name, e);
       throw new RuntimeException("Failed to create and initialize EntityStore: " + name, e);
