@@ -22,7 +22,8 @@ public class EntitySerDeFacadeImpl implements EntitySerDeFacade {
 
   // TODO (yuqi) Support register entity to serde class dynamically
   //  maybe we need to save this information in the perisistent storage or once restart, all
-  //  registered entity will be lost
+  //  registered entity will be lost;
+  //  Another things is that we need to change the magic number to a more meaningful one
   static {
     ENTITY_TO_PROTO_ID.put(BaseMetalake.class.getCanonicalName(), 0);
     ENTITY_TO_PROTO_ID.put(CatalogEntity.class.getCanonicalName(), 1);
