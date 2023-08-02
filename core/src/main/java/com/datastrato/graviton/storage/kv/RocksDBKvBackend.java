@@ -10,6 +10,7 @@ import com.datastrato.graviton.Configs;
 import com.datastrato.graviton.EntityAlreadyExistsException;
 import com.datastrato.graviton.util.Bytes;
 import com.datastrato.graviton.util.Executable;
+import com.google.common.base.Throwables;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
@@ -152,6 +153,12 @@ public class RocksDBKvBackend implements KvBackend {
     int count = 0;
     while (count < scanRange.getLimit() && rocksIterator.isValid()) {
       byte[] key = rocksIterator.key();
+
+      // Break if the key is out of the scan range
+      if (Bytes.wrap(key).compareTo(scanRange.getEnd()) > 0) {
+        break;
+      }
+
       if (Bytes.wrap(key).compareTo(scanRange.getStart()) == 0) {
         if (scanRange.isStartInclusive()) {
           result.add(Pair.of(key, rocksIterator.value()));
@@ -161,7 +168,6 @@ public class RocksDBKvBackend implements KvBackend {
         if (scanRange.isEndInclusive()) {
           result.add(Pair.of(key, rocksIterator.value()));
         }
-
         break;
       } else {
         result.add(Pair.of(key, rocksIterator.value()));
@@ -209,7 +215,7 @@ public class RocksDBKvBackend implements KvBackend {
           "Error executing transaction, exception: {}, message: {}, stackTrace: {}",
           e.getCause(),
           e.getMessage(),
-          e.getStackTrace());
+          Throwables.getStackTraceAsString(e));
       try {
         tx.rollback();
       } catch (Exception e1) {

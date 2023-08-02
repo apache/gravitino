@@ -6,8 +6,10 @@ package com.datastrato.graviton;
 
 import java.io.Serializable;
 import java.util.Map;
+import lombok.Getter;
 
 public interface Entity extends Serializable {
+  @Getter
   enum EntityType {
     METALAKE("ml", 0),
     CATALOG("ca", 1),
@@ -15,7 +17,7 @@ public interface Entity extends Serializable {
     TABLE("tb", 3),
     COLUMN("co", 4),
 
-    AUDIT("au", 9999999);
+    AUDIT("au", 65534);
 
     // Short name can be used to identify the entity type in the logs, peristent storage, etc.
     private final String shortName;
