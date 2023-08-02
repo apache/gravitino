@@ -22,7 +22,7 @@ import com.datastrato.graviton.dto.responses.MetalakeResponse;
 import com.datastrato.graviton.exceptions.NoSuchMetalakeException;
 import com.datastrato.graviton.meta.AuditInfo;
 import com.datastrato.graviton.meta.BaseMetalake;
-import com.datastrato.graviton.meta.BaseMetalakesOperations;
+import com.datastrato.graviton.meta.MetalakeManager;
 import com.datastrato.graviton.meta.SchemaVersion;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
@@ -50,7 +50,7 @@ public class TestMetalakeOperations extends JerseyTest {
     }
   }
 
-  private BaseMetalakesOperations metalakesOperations = mock(BaseMetalakesOperations.class);
+  private MetalakeManager metalakeManager = mock(MetalakeManager.class);
 
   @Override
   protected Application configure() {
@@ -60,7 +60,7 @@ public class TestMetalakeOperations extends JerseyTest {
         new AbstractBinder() {
           @Override
           protected void configure() {
-            bind(metalakesOperations).to(BaseMetalakesOperations.class).ranked(2);
+            bind(metalakeManager).to(MetalakeManager.class).ranked(2);
             bindFactory(MockServletRequestFactory.class).to(HttpServletRequest.class);
           }
         });
@@ -82,7 +82,7 @@ public class TestMetalakeOperations extends JerseyTest {
             .withVersion(SchemaVersion.V_0_1)
             .build();
 
-    when(metalakesOperations.listMetalakes()).thenReturn(new BaseMetalake[] {metalake, metalake});
+    when(metalakeManager.listMetalakes()).thenReturn(new BaseMetalake[] {metalake, metalake});
 
     Response resp =
         target("/metalakes")
@@ -119,7 +119,7 @@ public class TestMetalakeOperations extends JerseyTest {
             .withVersion(SchemaVersion.V_0_1)
             .build();
 
-    when(metalakesOperations.createMetalake(any(), any(), any())).thenReturn(mockMetalake);
+    when(metalakeManager.createMetalake(any(), any(), any())).thenReturn(mockMetalake);
 
     Response resp =
         target("/metalakes")
@@ -166,7 +166,7 @@ public class TestMetalakeOperations extends JerseyTest {
             .withVersion(SchemaVersion.V_0_1)
             .build();
 
-    when(metalakesOperations.loadMetalake(any())).thenReturn(metalake);
+    when(metalakeManager.loadMetalake(any())).thenReturn(metalake);
 
     Response resp =
         target("/metalakes/" + metalakeName)
@@ -187,7 +187,7 @@ public class TestMetalakeOperations extends JerseyTest {
 
     // Test when specified metalake is not found.
     doThrow(new NoSuchMetalakeException("Failed to find metalake by name " + metalakeName))
-        .when(metalakesOperations)
+        .when(metalakeManager)
         .loadMetalake(any());
 
     Response resp1 =
@@ -205,7 +205,7 @@ public class TestMetalakeOperations extends JerseyTest {
         "Metalake " + metalakeName + " does not exist", errorResponse.getMessage());
 
     // Test with internal error
-    doThrow(new RuntimeException("Internal error")).when(metalakesOperations).loadMetalake(any());
+    doThrow(new RuntimeException("Internal error")).when(metalakeManager).loadMetalake(any());
 
     Response resp2 =
         target("/metalakes/" + metalakeName)
@@ -245,7 +245,7 @@ public class TestMetalakeOperations extends JerseyTest {
             .map(MetalakeUpdateRequest::metalakeChange)
             .toArray(MetalakeChange[]::new);
 
-    when(metalakesOperations.alterMetalake(any(), any(), any())).thenReturn(metalake);
+    when(metalakeManager.alterMetalake(any(), any(), any())).thenReturn(metalake);
 
     MetalakeUpdatesRequest req = new MetalakeUpdatesRequest(updateRequests);
 
@@ -267,7 +267,7 @@ public class TestMetalakeOperations extends JerseyTest {
 
     // Test when specified metalake is not found.
     doThrow(new NoSuchMetalakeException("Failed to find metalake by name " + metalakeName))
-        .when(metalakesOperations)
+        .when(metalakeManager)
         .alterMetalake(any(), any(), any());
 
     Response resp1 =
@@ -283,7 +283,7 @@ public class TestMetalakeOperations extends JerseyTest {
 
     // Test with internal error
     doThrow(new RuntimeException("Internal error"))
-        .when(metalakesOperations)
+        .when(metalakeManager)
         .alterMetalake(any(), any(), any());
 
     Response resp2 =
@@ -301,7 +301,7 @@ public class TestMetalakeOperations extends JerseyTest {
 
   @Test
   public void testDropMetalake() {
-    when(metalakesOperations.dropMetalake(any())).thenReturn(true);
+    when(metalakeManager.dropMetalake(any())).thenReturn(true);
     Response resp =
         target("/metalakes/test")
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -316,7 +316,7 @@ public class TestMetalakeOperations extends JerseyTest {
     Assertions.assertTrue(dropped);
 
     // Test throw an exception when deleting tenant.
-    doThrow(new RuntimeException("Internal error")).when(metalakesOperations).dropMetalake(any());
+    doThrow(new RuntimeException("Internal error")).when(metalakeManager).dropMetalake(any());
 
     Response resp1 =
         target("/metalakes/test")

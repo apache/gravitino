@@ -16,7 +16,7 @@ import com.datastrato.graviton.dto.responses.MetalakeResponse;
 import com.datastrato.graviton.exceptions.MetalakeAlreadyExistsException;
 import com.datastrato.graviton.exceptions.NoSuchMetalakeException;
 import com.datastrato.graviton.meta.BaseMetalake;
-import com.datastrato.graviton.meta.BaseMetalakesOperations;
+import com.datastrato.graviton.meta.MetalakeManager;
 import com.datastrato.graviton.server.web.Utils;
 import java.util.Arrays;
 import javax.inject.Inject;
@@ -42,20 +42,20 @@ public class MetalakeOperations {
 
   private static final Logger LOG = LoggerFactory.getLogger(MetalakeOperations.class);
 
-  private final BaseMetalakesOperations ops;
+  private final MetalakeManager manager;
 
   @Context private HttpServletRequest httpRequest;
 
   @Inject
-  public MetalakeOperations(BaseMetalakesOperations ops) {
-    this.ops = ops;
+  public MetalakeOperations(MetalakeManager manager) {
+    this.manager = manager;
   }
 
   @GET
   @Produces("application/vnd.graviton.v1+json")
   public Response listMetalakes() {
     try {
-      BaseMetalake[] metalakes = ops.listMetalakes();
+      BaseMetalake[] metalakes = manager.listMetalakes();
       MetalakeDTO[] metalakeDTOS =
           Arrays.stream(metalakes).map(DTOConverters::toDTO).toArray(MetalakeDTO[]::new);
       return Utils.ok(new MetalakeListResponse(metalakeDTOS));
@@ -81,7 +81,7 @@ public class MetalakeOperations {
     try {
       NameIdentifier ident = NameIdentifier.parse(request.getName());
       BaseMetalake metalake =
-          ops.createMetalake(ident, request.getComment(), request.getProperties());
+          manager.createMetalake(ident, request.getComment(), request.getProperties());
       return Utils.ok(new MetalakeResponse(DTOConverters.toDTO(metalake)));
 
     } catch (MetalakeAlreadyExistsException exception) {
@@ -105,7 +105,7 @@ public class MetalakeOperations {
 
     try {
       NameIdentifier identifier = NameIdentifier.parse(metalakeName);
-      BaseMetalake metalake = ops.loadMetalake(identifier);
+      BaseMetalake metalake = manager.loadMetalake(identifier);
       return Utils.ok(new MetalakeResponse(DTOConverters.toDTO(metalake)));
 
     } catch (NoSuchMetalakeException e) {
@@ -143,7 +143,7 @@ public class MetalakeOperations {
               .map(MetalakeUpdateRequest::metalakeChange)
               .toArray(MetalakeChange[]::new);
 
-      BaseMetalake updatedMetalake = ops.alterMetalake(identifier, changes);
+      BaseMetalake updatedMetalake = manager.alterMetalake(identifier, changes);
       return Utils.ok(new MetalakeResponse(DTOConverters.toDTO(updatedMetalake)));
 
     } catch (NoSuchMetalakeException e) {
@@ -172,7 +172,7 @@ public class MetalakeOperations {
 
     try {
       NameIdentifier identifier = NameIdentifier.parse(metalakeName);
-      boolean dropped = ops.dropMetalake(identifier);
+      boolean dropped = manager.dropMetalake(identifier);
       if (!dropped) {
         LOG.warn("Failed to drop metalake by name {}", metalakeName);
       }
