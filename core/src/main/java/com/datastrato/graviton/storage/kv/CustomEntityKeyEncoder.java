@@ -50,10 +50,11 @@ public class CustomEntityKeyEncoder implements EntityKeyEncoder {
   //       id_2 -> metalake2
   private static final byte[] ID_PREFIX = "id_".getBytes();
 
-  // Store next usable id, 0 if not exists, e.g., next_usable_id -> 1
-  @VisibleForTesting public static final byte[] NEXT_USABLE_ID = "next_usable_id".getBytes();
+  // Store current max id, -1 if not exists, e.g., if current_max_id is 0, that means only one
+  // ID has been created, and the next id should be 1.
+  private static final byte[] CURRENT_MAX_ID = "current_max_id".getBytes();
 
-  @VisibleForTesting public static final byte[] NAMESPACE_SEPARATOR = "_".getBytes();
+  @VisibleForTesting static final byte[] NAMESPACE_SEPARATOR = "_".getBytes();
 
   private final KvBackend backend;
 
@@ -62,7 +63,7 @@ public class CustomEntityKeyEncoder implements EntityKeyEncoder {
   }
 
   /**
-   * Get or greate id for name. If the name is not in the storage, create a new id for it. The id is
+   * Get or create id for name. If the name is not in the storage, create a new id for it. The id is
    * the current max id + 1.
    *
    * <p>Attention, this method should be called in transaction. What's more, we should also consider
@@ -76,12 +77,11 @@ public class CustomEntityKeyEncoder implements EntityKeyEncoder {
       return ByteUtils.byteToLong(idByte);
     }
 
-    byte[] maxByte = backend.get(NEXT_USABLE_ID);
-    long id = maxByte == null ? 0 : ByteUtils.byteToLong(maxByte) + 1;
-    maxByte = ByteUtils.longToByte(id);
+    long id = getNextUsableId();
+    byte[] maxByte = ByteUtils.longToByte(id);
 
     // Write current max id to storage
-    backend.put(NEXT_USABLE_ID, maxByte, true);
+    backend.put(CURRENT_MAX_ID, maxByte, true);
 
     // Write name_metalake1 -> 1
     backend.put(nameByte, maxByte, false);
@@ -194,7 +194,7 @@ public class CustomEntityKeyEncoder implements EntityKeyEncoder {
   }
 
   public long getNextUsableId() throws IOException {
-    byte[] maxByte = backend.get(NEXT_USABLE_ID);
+    byte[] maxByte = backend.get(CURRENT_MAX_ID);
     return maxByte == null ? 0 : ByteUtils.byteToLong(maxByte) + 1;
   }
 
