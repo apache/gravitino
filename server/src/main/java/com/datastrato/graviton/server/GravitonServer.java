@@ -86,7 +86,6 @@ public class GravitonServer extends ResourceConfig {
     GravitonServer server = new GravitonServer();
     server.initialize();
 
-    LOG.info("Starting Graviton server");
     try {
       server.start();
       server.join();
