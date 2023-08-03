@@ -152,7 +152,6 @@ public class CustomEntityKeyEncoder implements EntityKeyEncoder {
    * @param namespaceType type of entity under the current namespace to scan, if the namespace is
    *     catalog and type is schema, we will scan all schemas under the catalog
    * @return start key to scan
-   * @throws IOException
    */
   private byte[] encodeNamespace(Namespace namespace, EntityType namespaceType) throws IOException {
     // First, we try to get the id from backend
