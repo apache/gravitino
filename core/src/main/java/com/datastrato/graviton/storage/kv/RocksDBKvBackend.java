@@ -10,6 +10,7 @@ import com.datastrato.graviton.Configs;
 import com.datastrato.graviton.EntityAlreadyExistsException;
 import com.datastrato.graviton.util.Bytes;
 import com.datastrato.graviton.util.Executable;
+import com.google.common.base.Throwables;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
@@ -196,7 +197,8 @@ public class RocksDBKvBackend implements KvBackend {
   }
 
   @Override
-  public <R> R executeInTransaction(Executable<R> executable) throws IOException {
+  public <R, E extends Exception> R executeInTransaction(Executable<R, E> executable)
+      throws E, IOException {
     Transaction tx = db.beginTransaction(new WriteOptions());
     LOGGER.info("Starting transaction: {}", tx);
     TX_LOCAL.set(tx);
@@ -204,26 +206,34 @@ public class RocksDBKvBackend implements KvBackend {
       R r = executable.execute();
       tx.commit();
       return r;
-    } catch (Exception e) {
-      LOGGER.error(
-          "Error executing transaction, exception: {}, message: {}, stackTrace: {}",
-          e.getCause(),
-          e.getMessage(),
-          e.getStackTrace());
-      try {
-        tx.rollback();
-      } catch (Exception e1) {
-        LOGGER.error(
-            "Error rolling back transaction, exception: {}, message: {}, stackTrace: {}",
-            e1.getCause(),
-            e1.getMessage(),
-            e1.getStackTrace());
-      }
+    } catch (RocksDBException e) {
+      rollback(tx, e);
       throw new IOException(e);
+    } catch (Exception e) {
+      rollback(tx, e);
+      throw e;
     } finally {
       tx.close();
       LOGGER.info("Transaction close: {}", tx);
       TX_LOCAL.remove();
+    }
+  }
+
+  private void rollback(Transaction tx, Exception e) {
+    LOGGER.error(
+        "Error executing transaction, exception: {}, message: {}, stackTrace: \n{}",
+        e.getCause(),
+        e.getMessage(),
+        Throwables.getStackTraceAsString(e));
+
+    try {
+      tx.rollback();
+    } catch (Exception e1) {
+      LOGGER.error(
+          "Error rolling back transaction, exception: {}, message: {}, stackTrace: \n{}",
+          e1.getCause(),
+          e1.getMessage(),
+          Throwables.getStackTraceAsString(e));
     }
   }
 }
