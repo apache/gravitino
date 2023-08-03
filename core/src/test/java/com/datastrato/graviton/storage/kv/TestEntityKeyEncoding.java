@@ -167,7 +167,7 @@ public class TestEntityKeyEncoding {
     // Assert next useable id
     Assertions.assertEquals(10, ENCODER.getNextUsableId());
 
-    // test error
+    // Unsupported operation
     Assertions.assertThrows(
         UnsupportedOperationException.class,
         () -> {
@@ -228,10 +228,10 @@ public class TestEntityKeyEncoding {
             ByteUtils.longToByte(2L),
             NAMESPACE_SEPARATOR);
     Assertions.assertArrayEquals(expenctKey, realKey);
-    // Assert max id
+    // Assert next useable id
     Assertions.assertEquals(3, ENCODER.getNextUsableId());
 
-    // test error
+    // Unsupported operation
     Assertions.assertThrows(
         UnsupportedOperationException.class,
         () -> {
