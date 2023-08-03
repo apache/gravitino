@@ -10,6 +10,7 @@ import com.datastrato.graviton.Configs;
 import com.datastrato.graviton.EntityAlreadyExistsException;
 import com.datastrato.graviton.util.Bytes;
 import com.datastrato.graviton.util.Executable;
+import com.google.common.base.Throwables;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
@@ -220,19 +221,19 @@ public class RocksDBKvBackend implements KvBackend {
 
   private void rollback(Transaction tx, Exception e) {
     LOGGER.error(
-        "Error executing transaction, exception: {}, message: {}, stackTrace: {}",
+        "Error executing transaction, exception: {}, message: {}, stackTrace: \n{}",
         e.getCause(),
         e.getMessage(),
-        e.getStackTrace());
+        Throwables.getStackTraceAsString(e));
 
     try {
       tx.rollback();
     } catch (Exception e1) {
       LOGGER.error(
-          "Error rolling back transaction, exception: {}, message: {}, stackTrace: {}",
+          "Error rolling back transaction, exception: {}, message: {}, stackTrace: \n{}",
           e1.getCause(),
           e1.getMessage(),
-          e1.getStackTrace());
+          Throwables.getStackTraceAsString(e));
     }
   }
 }
