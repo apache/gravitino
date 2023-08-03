@@ -27,6 +27,13 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Graviton Client for interacting with the Graviton API, allowing the client to list, load, create,
+ * and alter Metalakes.
+ *
+ * <p>It uses an underlying {@link RESTClient} to send HTTP requests and receive responses from the
+ * API.
+ */
 public class GravitonClient implements SupportsMetalakes, Closeable {
 
   private static final Logger LOG = LoggerFactory.getLogger(GravitonClient.class);
@@ -35,11 +42,21 @@ public class GravitonClient implements SupportsMetalakes, Closeable {
 
   private final RESTClient restClient;
 
+  /**
+   * Constructs a new GravitonClient with the given URI.
+   *
+   * @param uri The base URI for the Graviton API.
+   */
   private GravitonClient(String uri) {
     this.restClient =
         HTTPClient.builder(Collections.emptyMap()).uri(uri).withObjectMapper(MAPPER).build();
   }
 
+  /**
+   * Retrieves a list of Metalakes from the Graviton API.
+   *
+   * @return An array of GravitonMetaLake objects representing the Metalakes.
+   */
   @Override
   public GravitonMetaLake[] listMetalakes() {
     MetalakeListResponse resp =
@@ -55,6 +72,13 @@ public class GravitonClient implements SupportsMetalakes, Closeable {
         .toArray(GravitonMetaLake[]::new);
   }
 
+  /**
+   * Loads a specific Metalake from the Graviton API.
+   *
+   * @param ident The identifier of the Metalake to be loaded.
+   * @return A GravitonMetaLake instance representing the loaded Metalake.
+   * @throws NoSuchMetalakeException If the specified Metalake does not exist.
+   */
   @Override
   public GravitonMetaLake loadMetalake(NameIdentifier ident) throws NoSuchMetalakeException {
     Preconditions.checkArgument(ident != null, "Metalake name identifier cannot be null");
@@ -73,6 +97,16 @@ public class GravitonClient implements SupportsMetalakes, Closeable {
     return DTOConverters.toMetaLake(resp.getMetalake(), restClient);
   }
 
+  /**
+   * Creates a new Metalake using the Graviton API.
+   *
+   * @param ident The identifier of the new Metalake.
+   * @param comment The comment for the new Metalake.
+   * @param properties The properties of the new Metalake.
+   * @return A GravitonMetaLake instance representing the newly created Metalake.
+   * @throws MetalakeAlreadyExistsException If a Metalake with the specified identifier already
+   *     exists.
+   */
   @Override
   public GravitonMetaLake createMetalake(
       NameIdentifier ident, String comment, Map<String, String> properties)
@@ -97,6 +131,15 @@ public class GravitonClient implements SupportsMetalakes, Closeable {
     return DTOConverters.toMetaLake(resp.getMetalake(), restClient);
   }
 
+  /**
+   * Alters a specific Metalake using the Graviton API.
+   *
+   * @param ident The identifier of the Metalake to be altered.
+   * @param changes The changes to be applied to the Metalake.
+   * @return A GravitonMetaLake instance representing the updated Metalake.
+   * @throws NoSuchMetalakeException If the specified Metalake does not exist.
+   * @throws IllegalArgumentException If the provided changes are invalid or not applicable.
+   */
   @Override
   public GravitonMetaLake alterMetalake(NameIdentifier ident, MetalakeChange... changes)
       throws NoSuchMetalakeException, IllegalArgumentException {
@@ -124,6 +167,12 @@ public class GravitonClient implements SupportsMetalakes, Closeable {
     return DTOConverters.toMetaLake(resp.getMetalake(), restClient);
   }
 
+  /**
+   * Drops a specific Metalake using the Graviton API.
+   *
+   * @param ident The identifier of the Metalake to be dropped.
+   * @return True if the Metalake was successfully dropped, false otherwise.
+   */
   @Override
   public boolean dropMetalake(NameIdentifier ident) {
     Preconditions.checkArgument(ident != null, "Metalake name identifier cannot be null");
@@ -147,6 +196,7 @@ public class GravitonClient implements SupportsMetalakes, Closeable {
     }
   }
 
+  /** Closes the GravitonClient and releases any underlying resources. */
   @Override
   public void close() {
     if (restClient != null) {
@@ -159,18 +209,36 @@ public class GravitonClient implements SupportsMetalakes, Closeable {
     }
   }
 
+  /**
+   * Creates a new builder for constructing a GravitonClient.
+   *
+   * @param uri The base URI for the Graviton API.
+   * @return A new instance of the Builder class for constructing a GravitonClient.
+   */
   public static Builder builder(String uri) {
     return new Builder(uri);
   }
 
+  /** Builder class for constructing a GravitonClient. */
   public static class Builder {
 
     private String uri;
 
+    /**
+     * Private constructor for the Builder class.
+     *
+     * @param uri The base URI for the Graviton API.
+     */
     private Builder(String uri) {
       this.uri = uri;
     }
 
+    /**
+     * Builds a new GravitonClient instance.
+     *
+     * @return A new instance of GravitonClient with the specified base URI.
+     * @throws IllegalArgumentException If the base URI is null or empty.
+     */
     public GravitonClient build() {
       Preconditions.checkArgument(
           uri != null && !uri.isEmpty(), "The argument 'uri' must be a valid URI");
