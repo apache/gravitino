@@ -58,6 +58,7 @@ public class TestEntityStorageBackend {
     Mockito.when(config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)).thenReturn("/tmp/graviton");
 
     try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
+      store.initialize(config);
       Assertions.assertTrue(store instanceof KvEntityStore);
 
       EntitySerDe serDe = EntitySerDeFactory.createEntitySerDe(config);

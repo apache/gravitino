@@ -60,6 +60,10 @@ import org.slf4j.LoggerFactory;
 /**
  * An HttpClient for usage with the REST catalog.
  *
+ * <p>This class provides functionality for making HTTP requests to a REST API and processing the
+ * corresponding responses. It supports common HTTP methods like GET, POST, PUT, DELETE, and HEAD.
+ * Additionally, it allows handling server error responses using a custom error handler.
+ *
  * <p>Referred from core/src/main/java/org/apache/iceberg/rest/HTTPClient.java
  */
 public class HTTPClient implements RESTClient {
@@ -72,6 +76,13 @@ public class HTTPClient implements RESTClient {
   private final CloseableHttpClient httpClient;
   private final ObjectMapper mapper;
 
+  /**
+   * Constructs an instance of HTTPClient with the provided information.
+   *
+   * @param uri The base URI of the REST API.
+   * @param baseHeaders A map of base headers to be included in all HTTP requests.
+   * @param objectMapper The ObjectMapper used for JSON serialization and deserialization.
+   */
   private HTTPClient(String uri, Map<String, String> baseHeaders, ObjectMapper objectMapper) {
     this.uri = uri;
     this.mapper = objectMapper;
@@ -88,6 +99,13 @@ public class HTTPClient implements RESTClient {
     this.httpClient = clientBuilder.build();
   }
 
+  /**
+   * Extracts the response body as a string from the provided HTTP response.
+   *
+   * @param response The HTTP response from which the response body will be extracted.
+   * @return The response body as a string.
+   * @throws RESTException If an error occurs during conversion of the response body to a string.
+   */
   private String extractResponseBodyAsString(CloseableHttpResponse response) {
     try {
       if (response.getEntity() == null) {
@@ -101,7 +119,14 @@ public class HTTPClient implements RESTClient {
     }
   }
 
-  // Per the spec, the only currently defined / used "success" responses are 200 and 202.
+  /**
+   * Checks if the response indicates a successful response.
+   *
+   * <p>According to the spec, the only currently defined/used "success" responses are 200 and 202.
+   *
+   * @param response The reponse to check for success.
+   * @return True if the response is successful, false otherwise.
+   */
   private boolean isSuccessful(CloseableHttpResponse response) {
     int code = response.getCode();
     return code == HttpStatus.SC_OK
@@ -109,6 +134,16 @@ public class HTTPClient implements RESTClient {
         || code == HttpStatus.SC_NO_CONTENT;
   }
 
+  /**
+   * Builds an error reponse based on the provided HTTP response.
+   *
+   * <p>This method extracts the reason phrase from the response and uses it as the message for the
+   * ErrorResponse. If the reason phrase doesn't exist, it retrieves the standard reason phrase from
+   * teh English phrase catalog.
+   *
+   * @param response The response from which the ErrorResponse is built.
+   * @return An ErrorResponse object representing the REST error response.
+   */
   private ErrorResponse buildRestErrorResponse(CloseableHttpResponse response) {
     String responseReason = response.getReasonPhrase();
     String message =
@@ -118,9 +153,18 @@ public class HTTPClient implements RESTClient {
     return ErrorResponse.restError(message);
   }
 
-  // Process a failed response through the provided errorHandler, and throw a RESTException.java if
-  // the
-  // provided error handler doesn't already throw.
+  /**
+   * Processes a failed response through the provided error.
+   *
+   * <p>This method takes a response representing a failed response from an HTTP request. It tries
+   * to parse the response body using the provided parseResponse method.
+   *
+   * @param response The failed response from the HTTP request.
+   * @param responseBody The response body as a string (can be null).
+   * @param errorHandler The error handler (as a Consumer) used to handle the error response.
+   * @throws RESTException If the error handler does not throw an exception or an error occurs
+   *     during parsing.
+   */
   private void throwFailure(
       CloseableHttpResponse response, String responseBody, Consumer<ErrorResponse> errorHandler) {
     ErrorResponse errorResponse = null;
@@ -143,13 +187,11 @@ public class HTTPClient implements RESTClient {
 
       } catch (UncheckedIOException | IllegalArgumentException e) {
         // It's possible to receive a non-successful response that isn't a properly defined
-        // BaseResponse
-        // without any bugs in the server implementation. So we ignore this exception and build an
-        // error response for the user.
-        //
-        // For example, the connection could time out before every reaching the server, in which
-        // case we'll
-        // likely get a 5xx with the load balancers default 5xx response.
+        // BaseResponse due to various reasons, such as server misconfiguration or
+        // unanticipated external factors.
+        // In such cases, we handle the situation by building an error response for the user.
+        // Examples of such scenarios include network timeouts or load balancers returning default
+        // 5xx responses.
         LOG.error("Failed to parse an error response. Will create one instead.", e);
       }
     }
@@ -164,6 +206,19 @@ public class HTTPClient implements RESTClient {
     throw new RESTException("Unhandled error: %s", errorResponse);
   }
 
+  /**
+   * Builds a URI for the HTTP request using the given path and query parameters.
+   *
+   * <p>This method constructs a URI by combining the base URI (stored in the "uri" field) with the
+   * provided path. If query parameters are provided in the "params" map, they are added to the URI,
+   * ensuring proper encoding of query parameters and that the URI is well-formed.
+   *
+   * @param path The URL path to append to the base URI.
+   * @param params A map of query parameters (key-value pairs) to include in the URI (can be null).
+   * @return The constructed URI for the HTTP request.
+   * @throws RESTException If there is an issue building the URI from the base URI and query
+   *     parameters.
+   */
   private URI buildUri(String path, Map<String, String> params) {
     String baseUri = String.format("%s/%s", uri, path);
     try {
@@ -179,19 +234,24 @@ public class HTTPClient implements RESTClient {
   }
 
   /**
-   * Method to execute an HTTP request and process the corresponding response.
+   * Executes an HTTP request and processes the corresponding response.
    *
-   * @param method - HTTP method, such as GET, POST, HEAD, etc.
-   * @param queryParams - A map of query parameters
-   * @param path - URL path to send the request to
-   * @param requestBody - Content to place in the request body
-   * @param responseType - Class of the Response type. Needs to have serializer registered with
-   *     ObjectMapper
-   * @param errorHandler - Error handler delegated for HTTP responses which handles server error
-   *     responses
-   * @param <T> - Class type of the response for deserialization. Must be registered with the
-   *     ObjectMapper.
-   * @return The response entity, parsed and converted to its type T
+   * <p>This method is a helper function to execute HTTP requests.
+   *
+   * @param method The HTTP method to use (e.g., GET, POST, PUT, DELETE).
+   * @param path The URL path to send the request to.
+   * @param queryParams A map of query parameters (key-value pairs) to include in the request URL
+   *     (can be null).
+   * @param requestBody The content to place in the request body (can be null).
+   * @param responseType The class type of the response for deserialization (Must be registered with
+   *     the ObjectMapper).
+   * @param headers A map of request headers (key-value pairs) to include in the request (can be
+   *     null).
+   * @param errorHandler The error handler delegated for HTTP responses, which handles server error
+   *     responses.
+   * @param <T> The class type of the response for deserialization. (Must be registered with the
+   *     ObjectMapper).
+   * @return The response entity parsed and converted to its type T.
    */
   private <T> T execute(
       Method method,
@@ -220,6 +280,37 @@ public class HTTPClient implements RESTClient {
    * @param <T> - Class type of the response for deserialization. Must be registered with the
    *     ObjectMapper.
    * @return The response entity, parsed and converted to its type T
+   */
+
+  /**
+   * Executes an HTTP request and processes the corresponding response with support for response
+   * headers.
+   *
+   * <p>The method constructs the HTTP request using the provided parameters and sends it to the
+   * server. It then processes the server's response, handling successful responses and server error
+   * responses accordingly.
+   *
+   * <p>Response headers from the server are extracted and passed to the responseHeaders Consumer
+   * for further processing by the caller.
+   *
+   * @param method The HTTP method to use (e.g., GET, POST, PUT, DELETE).
+   * @param path The URL path to send the request to.
+   * @param queryParams A map of query parameters (key-value pairs) to include in the request URL
+   *     (can be null).
+   * @param requestBody The content to place in the request body (can be null).
+   * @param responseType The class type of the response for deserialization (Must be registered with
+   *     the ObjectMapper).
+   * @param headers A map of request headers (key-value pairs) to include in the request (can be
+   *     null).
+   * @param errorHandler The error handler delegated for HTTP responses, which handles server error
+   *     responses.
+   * @param responseHeaders The consumer of the response headers for further processing.
+   * @param <T> The class type of the response for deserialization. (Must be registered with the
+   *     ObjectMapper).
+   * @return The response entity parsed and converted to its type T.
+   * @throws RESTException If the provided path is malformed, if there is an issue with the HTTP
+   *     request or response processing, or if the errorHandler does not throw an exception for
+   *     server error responses.
    */
   private <T> T execute(
       Method method,
@@ -291,11 +382,35 @@ public class HTTPClient implements RESTClient {
     }
   }
 
+  /**
+   * Sends an HTTP HEAD request to the specified path and processes the response.
+   *
+   * @param path The URL path to send the HEAD request to.
+   * @param headers A map of request headers (key-value pairs) to include in the request (can be
+   *     null).
+   * @param errorHandler The error handler delegated for HTTP responses, which handles server error
+   *     responses.
+   */
   @Override
   public void head(String path, Map<String, String> headers, Consumer<ErrorResponse> errorHandler) {
     execute(Method.HEAD, path, null, null, null, headers, errorHandler);
   }
 
+  /**
+   * Sends an HTTP GET request to the specified path and processes the response.
+   *
+   * @param path The URL path to send the GET request to.
+   * @param queryParams A map of query parameters (key-value pairs) to include in the request URL
+   *     (can be null).
+   * @param responseType The class type of the response for deserialization (Must be registered with
+   *     the ObjectMapper).
+   * @param headers A map of request headers (key-value pairs) to include in the request (can be
+   *     null).
+   * @param errorHandler The error handler delegated for HTTP responses, which handles server error
+   *     responses.
+   * @param <T> The class type of the response for deserialization.
+   * @return The response entity parsed and converted to its type T.
+   */
   @Override
   public <T extends RESTResponse> T get(
       String path,
@@ -306,6 +421,21 @@ public class HTTPClient implements RESTClient {
     return execute(Method.GET, path, queryParams, null, responseType, headers, errorHandler);
   }
 
+  /**
+   * Sends an HTTP POST request to the specified path with the provided request body and processes
+   * the response.
+   *
+   * @param path The URL path to send the POST request to.
+   * @param body The REST body to place in the request body.
+   * @param responseType The class type of the response for deserialization (Must be registered with
+   *     the ObjectMapper).
+   * @param headers A map of request headers (key-value pairs) to include in the request (can be
+   *     null).
+   * @param errorHandler The error handler delegated for HTTP responses, which handles server error
+   *     responses.
+   * @param <T> The class type of the response for deserialization.
+   * @return The response entity parsed and converted to its type T.
+   */
   @Override
   public <T extends RESTResponse> T post(
       String path,
@@ -316,6 +446,22 @@ public class HTTPClient implements RESTClient {
     return execute(Method.POST, path, null, body, responseType, headers, errorHandler);
   }
 
+  /**
+   * Sends an HTTP POST request to the specified path with the provided request body and processes
+   * the response with support for response headers.
+   *
+   * @param path The URL path to send the POST request to.
+   * @param body The REST request to place in the request body.
+   * @param responseType The class type of the response for deserialization (Must be registered with
+   *     the ObjectMapper).
+   * @param headers A map of request headers (key-value pairs) to include in the request (can be
+   *     null).
+   * @param errorHandler The error handler delegated for HTTP responses, which handles server error
+   *     responses.
+   * @param responseHeaders The consumer of the response headers for further processing.
+   * @param <T> The class type of the response for deserialization.
+   * @return The response entity parsed and converted to its type T.
+   */
   @Override
   public <T extends RESTResponse> T post(
       String path,
@@ -328,6 +474,21 @@ public class HTTPClient implements RESTClient {
         Method.POST, path, null, body, responseType, headers, errorHandler, responseHeaders);
   }
 
+  /**
+   * Sends an HTTP PUT request to the specified path with the provided request body and processes
+   * the response.
+   *
+   * @param path The URL path to send the PUT request to.
+   * @param body The REST request to place in the request body.
+   * @param responseType The class type of the response for deserialization (Must be registered with
+   *     the ObjectMapper).
+   * @param headers A map of request headers (key-value pairs) to include in the request (can be
+   *     null).
+   * @param errorHandler The error handler delegated for HTTP responses, which handles server error
+   *     responses.
+   * @param <T> The class type of the response for deserialization.
+   * @return The response entity parsed and converted to its type T.
+   */
   @Override
   public <T extends RESTResponse> T put(
       String path,
@@ -338,6 +499,22 @@ public class HTTPClient implements RESTClient {
     return execute(Method.PUT, path, null, body, responseType, headers, errorHandler);
   }
 
+  /**
+   * Sends an HTTP PUT request to the specified path with the provided request body and processes
+   * the response with support for response headers.
+   *
+   * @param path The URL path to send the PUT request to.
+   * @param body The REST request to place in the request body.
+   * @param responseType The class type of the response for deserialization (Must be registered with
+   *     the ObjectMapper).
+   * @param headers A map of request headers (key-value pairs) to include in the request (can be
+   *     null).
+   * @param errorHandler The error handler delegated for HTTP responses, which handles server error
+   *     responses.
+   * @param responseHeaders The consumer of the response headers for further processing.
+   * @param <T> The class type of the response for deserialization.
+   * @return The response entity parsed and converted to its type T.
+   */
   @Override
   public <T extends RESTResponse> T put(
       String path,
@@ -350,6 +527,20 @@ public class HTTPClient implements RESTClient {
         Method.PUT, path, null, body, responseType, headers, errorHandler, responseHeaders);
   }
 
+  /**
+   * Sends an HTTP DELETE request to the specified path without query parameters and processes the
+   * response.
+   *
+   * @param path The URL path to send the DELETE request to.
+   * @param responseType The class type of the response for deserialization (Must be registered with
+   *     the ObjectMapper).
+   * @param headers A map of request headers (key-value pairs) to include in the request (can be
+   *     null).
+   * @param errorHandler The error handler delegated for HTTP responses, which handles server error
+   *     responses.
+   * @param <T> The class type of the response for deserialization.
+   * @return The response entity parsed and converted to its type T.
+   */
   @Override
   public <T extends RESTResponse> T delete(
       String path,
@@ -359,6 +550,22 @@ public class HTTPClient implements RESTClient {
     return execute(Method.DELETE, path, null, null, responseType, headers, errorHandler);
   }
 
+  /**
+   * Sends an HTTP DELETE request to the specified path with the provided query parameters and
+   * processes the response.
+   *
+   * @param path The URL path to send the DELETE request to.
+   * @param queryParams A map of query parameters (key-value pairs) to include in the request (can
+   *     be null).
+   * @param responseType The class type of the response for deserialization (Must be registered with
+   *     the ObjectMapper).
+   * @param headers A map of request headers (key-value pairs) to include in the request (can be
+   *     null).
+   * @param errorHandler The error handler delegated for HTTP responses, which handles server error
+   *     responses.
+   * @param <T> The class type of the response for deserialization.
+   * @return The response entity parsed and converted to its type T.
+   */
   @Override
   public <T extends RESTResponse> T delete(
       String path,
@@ -379,24 +586,55 @@ public class HTTPClient implements RESTClient {
     return execute(Method.POST, path, null, formData, responseType, headers, errorHandler);
   }
 
+  /**
+   * Sends an HTTP POST request with form data to the specified path and processes the response.
+   *
+   * @param path The URL path to send the POST request to.
+   * @param formData A map of form data (key-value pairs) to include in the request body.
+   * @param responseType The class type of the response for deserialization (Must be registered with
+   *     the ObjectMapper).
+   * @param headers A map of request headers (key-value pairs) to include in the request (can be
+   *     null).
+   * @param errorHandler The error handler delegated for HTTP responses, which handles server error
+   *     responses.
+   * @param <T> The class type of the response for deserialization.
+   * @return The response entity parsed and converted to its type T.
+   */
   private void addRequestHeaders(
       HttpUriRequest request, Map<String, String> requestHeaders, String bodyMimeType) {
-    // Many systems require that content type is set regardless and will fail, even on an empty
-    // bodied request.
+    // Some systems require the Content-Type header to be set even for empty-bodied requests to
+    // avoid failures.
     request.setHeader(HttpHeaders.CONTENT_TYPE, bodyMimeType);
     request.setHeader(HttpHeaders.ACCEPT, VERSION_HEADER);
     requestHeaders.forEach(request::setHeader);
   }
 
+  /**
+   * Closes the underlying HTTP client gracefully.
+   *
+   * @throws IOException If an I/O error occurs while closing the HTTP client.
+   */
   @Override
   public void close() throws IOException {
     httpClient.close(CloseMode.GRACEFUL);
   }
 
+  /**
+   * Creates a new instance of the HTTPClient.Builder with the specified properties.
+   *
+   * @param properties A map of properties (key-value pairs) used to configure the HTTP client.
+   * @return A new instance of HTTPClient.Builder with the provided properties.
+   */
   public static Builder builder(Map<String, String> properties) {
     return new Builder(properties);
   }
 
+  /**
+   * Builder class for configuring and creating instances of HTTPClient.
+   *
+   * <p>This class allows for setting various configuration options for the HTTP client such as base
+   * URI, request headers, and ObjectMapper.
+   */
   public static class Builder {
     private final Map<String, String> properties;
     private final Map<String, String> baseHeaders = Maps.newHashMap();
@@ -407,27 +645,58 @@ public class HTTPClient implements RESTClient {
       this.properties = properties;
     }
 
+    /**
+     * Sets the base URI for the HTTP client.
+     *
+     * @param baseUri The base URI to be used for all HTTP requests.
+     * @return This Builder instance for method chaining.
+     */
     public Builder uri(String baseUri) {
       Preconditions.checkNotNull(baseUri, "Invalid uri for http client: null");
       this.uri = RESTUtils.stripTrailingSlash(baseUri);
       return this;
     }
 
+    /**
+     * Adds a single request header to the HTTP client.
+     *
+     * @param key The header name.
+     * @param value The header value.
+     * @return This Builder instance for method chaining.
+     */
     public Builder withHeader(String key, String value) {
       baseHeaders.put(key, value);
       return this;
     }
 
+    /**
+     * Adds multiple request headers to the HTTP client.
+     *
+     * @param headers A map of request headers (key-value pairs) to be included in all HTTP
+     *     requests.
+     * @return This Builder instance for method chaining.
+     */
     public Builder withHeaders(Map<String, String> headers) {
       baseHeaders.putAll(headers);
       return this;
     }
 
+    /**
+     * Sets the custom ObjectMapper for the HTTP client.
+     *
+     * @param objectMapper The custom ObjectMapper to be used for request/response serialization.
+     * @return This Builder instance for method chaining.
+     */
     public Builder withObjectMapper(ObjectMapper objectMapper) {
       this.mapper = objectMapper;
       return this;
     }
 
+    /**
+     * Builds and returns an instance of the HTTPClient with the configured options.
+     *
+     * @return An instance of HTTPClient with the configured options.
+     */
     public HTTPClient build() {
       return new HTTPClient(uri, baseHeaders, mapper);
     }
