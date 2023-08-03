@@ -44,6 +44,7 @@ public class TestEntityKeyEncoding {
   public void createEntityEncoderInstance() {
     ENTITY_STORE_INSTANCE = EntityStoreFactory.createEntityStore(config);
     Assertions.assertTrue(ENTITY_STORE_INSTANCE instanceof KvEntityStore);
+    ENTITY_STORE_INSTANCE.initialize(config);
     ENTITY_STORE_INSTANCE.setSerDe(
         EntitySerDeFactory.createEntitySerDe(config.get(Configs.ENTITY_SERDE)));
     ENCODER = new CustomEntityKeyEncoder(((KvEntityStore) ENTITY_STORE_INSTANCE).getBackend());
