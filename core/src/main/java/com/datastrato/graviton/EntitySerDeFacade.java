@@ -5,6 +5,7 @@
 
 package com.datastrato.graviton;
 
+import com.datastrato.graviton.proto.ProtoEntitySerDe;
 import java.io.IOException;
 import java.util.Optional;
 
@@ -12,8 +13,14 @@ import java.util.Optional;
  * EntitySerDeFacade is a facade of {@link EntitySerDe}. It is used to serialize and deserialize
  * entites in Graviton.
  *
+ * <p>{@link EntitySerDeFacade} will add some extra information to the serialized byte array, such
+ * as the entity class name. Other information can also be added in the future. All the extra
+ * messages will be organized as header block in the serialized byte array. Currently, The size of
+ * header block is 20 bytes. For more, Please refer to
+ * EntitySerDeFacadeImpl#serializeClassInfo(Class, byte[]) for more details.
+ *
  * <p>Underlying implementation of {@link EntitySerDeFacade} can be changed in the future, now the
- * default implementation is {@link com.datastrato.graviton.proto.ProtoEntitySerDe}
+ * default implementation is {@link ProtoEntitySerDe}
  */
 public interface EntitySerDeFacade {
 
