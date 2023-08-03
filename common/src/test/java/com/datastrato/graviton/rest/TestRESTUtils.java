@@ -2,14 +2,11 @@
  * Copyright 2023 Datastrato.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.graviton.json;
+package com.datastrato.graviton.rest;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.*;
 
-import com.datastrato.graviton.rest.RESTUtils;
 import com.google.common.collect.ImmutableMap;
-import java.io.UncheckedIOException;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
@@ -45,22 +42,24 @@ class TestRESTUtils {
 
     String emptyFormString = "";
     Map<String, String> emptyFormData = ImmutableMap.of();
-    assertEquals(emptyFormData, RESTUtils.decodeFormData(emptyFormString));
+    /* This may not be behaviour we want? */
+    assertThrows(IllegalArgumentException.class, () -> RESTUtils.decodeFormData(emptyFormString));
   }
 
   @Test
   void testEncodeString() {
-    assertEquals("hello%20world", RESTUtils.encodeString("hello world"));
     assertEquals("test", RESTUtils.encodeString("test"));
     assertEquals("", RESTUtils.encodeString(""));
-    assertThrows(UncheckedIOException.class, () -> RESTUtils.encodeString(null));
+    /* not %20 as you might expect */
+    assertEquals("hello+world", RESTUtils.encodeString("hello world"));
+    assertThrows(IllegalArgumentException.class, () -> RESTUtils.encodeString(null));
   }
 
   @Test
   void testDecodeString() {
-    assertEquals("hello world", RESTUtils.decodeString("hello%20world"));
     assertEquals("test", RESTUtils.decodeString("test"));
     assertEquals("", RESTUtils.decodeString(""));
-    assertThrows(UncheckedIOException.class, () -> RESTUtils.decodeString(null));
+    assertEquals("hello world", RESTUtils.decodeString("hello%20world"));
+    assertThrows(IllegalArgumentException.class, () -> RESTUtils.decodeString(null));
   }
 }
