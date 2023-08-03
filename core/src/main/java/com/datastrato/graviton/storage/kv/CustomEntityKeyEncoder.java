@@ -19,7 +19,7 @@ import java.io.IOException;
 
 /**
  * Encode entity key for KV backend, e.g., RocksDB. The key is used to store the entity in the
- * backend.
+ * backend. The final key will be:
  *
  * <pre>
  *     Key                                Value
@@ -50,8 +50,7 @@ public class CustomEntityKeyEncoder implements EntityKeyEncoder {
   //       id_2 -> metalake2
   private static final byte[] ID_PREFIX = "id_".getBytes();
 
-  // Store current max id
-  // e.g., current_max_id -> 2
+  // Store next usable id, 0 if not exists, e.g., next_usable_id -> 1
   @VisibleForTesting public static final byte[] NEXT_USABLE_ID = "next_usable_id".getBytes();
 
   @VisibleForTesting public static final byte[] NAMESPACE_SEPARATOR = "_".getBytes();
@@ -149,9 +148,10 @@ public class CustomEntityKeyEncoder implements EntityKeyEncoder {
    * list(scan) entities in the backend. For example, We want to list all catalogs in the backend,
    * we can use the prefix "ca_" to scan
    *
-   * @param namespace
-   * @param namespaceType
-   * @return
+   * @param namespace namespace of current entity
+   * @param namespaceType type of entity under the current namespace to scan, if the namespace is
+   *     catalog and type is schema, we will scan all schemas under the catalog
+   * @return start key to scan
    * @throws IOException
    */
   private byte[] encodeNamespace(Namespace namespace, EntityType namespaceType) throws IOException {

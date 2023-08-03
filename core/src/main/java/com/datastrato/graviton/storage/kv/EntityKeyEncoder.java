@@ -28,9 +28,13 @@ public interface EntityKeyEncoder {
 
   /**
    * Encode entity key, This is for range scan. For example, if we want to scan all the metalakes.
-   * then the value of type is EntityType.METALAKE and namespace is empty. If we want to scan all
-   * catalog in a metalake, then the value of type is EntityType.CATALOG and namespace is metalake
+   * Then the value of type is EntityType.METALAKE and namespace are empty. If we want to scan all
+   * catalogs in a metalake, then the value of type is EntityType.CATALOG and namespace are metalake
    * name.
+   *
+   * @param namespace namespace of current entity
+   * @param type type of entity under the current namespace to scan, if the namespace is catalog and
+   *     type is schema, we will scan all schemas under the catalog
    */
   byte[] encode(Namespace namespace, EntityType type) throws IOException;
 }
