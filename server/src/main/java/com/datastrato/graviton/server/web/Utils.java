@@ -79,4 +79,19 @@ public class Utils {
         .type(MediaType.APPLICATION_JSON)
         .build();
   }
+
+  public static Response nonEmpty(String type, String message) {
+    return nonEmpty(type, message, null);
+  }
+
+  public static Response nonEmpty(String message, Throwable throwable) {
+    return nonEmpty(throwable.getClass().getSimpleName(), message, throwable);
+  }
+
+  public static Response nonEmpty(String type, String message, Throwable throwable) {
+    return Response.status(Response.Status.CONFLICT)
+        .entity(ErrorResponse.nonEmpty(type, message, throwable))
+        .type(MediaType.APPLICATION_JSON)
+        .build();
+  }
 }

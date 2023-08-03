@@ -117,6 +117,15 @@ public class ErrorResponse extends BaseResponse {
         ErrorConstants.ALREADY_EXISTS_CODE, type, message, getStackTrace(throwable));
   }
 
+  public static ErrorResponse nonEmpty(String type, String message) {
+    return nonEmpty(type, message, null);
+  }
+
+  public static ErrorResponse nonEmpty(String type, String message, Throwable throwable) {
+    return new ErrorResponse(
+        ErrorConstants.NON_EMPTY_CODE, type, message, getStackTrace(throwable));
+  }
+
   public static ErrorResponse unknownError(String message) {
     return new ErrorResponse(
         ErrorConstants.UNKNOWN_ERROR_CODE, RuntimeException.class.getSimpleName(), message, null);

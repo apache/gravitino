@@ -22,7 +22,7 @@ package com.datastrato.graviton.rel;
 
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
-import com.datastrato.graviton.exceptions.NoSuchNamespaceException;
+import com.datastrato.graviton.exceptions.NoSuchCatalogException;
 import com.datastrato.graviton.exceptions.NoSuchSchemaException;
 import com.datastrato.graviton.exceptions.NonEmptySchemaException;
 import com.datastrato.graviton.exceptions.SchemaAlreadyExistsException;
@@ -43,9 +43,9 @@ public interface SupportsSchemas {
    *
    * @param namespace The namespace to list.
    * @return An array of schema identifier under the namespace.
-   * @throws NoSuchNamespaceException If the namespace does not exist.
+   * @throws NoSuchCatalogException If the catalog does not exist.
    */
-  NameIdentifier[] listSchemas(Namespace namespace) throws NoSuchNamespaceException;
+  NameIdentifier[] listSchemas(Namespace namespace) throws NoSuchCatalogException;
 
   /**
    * Check if a schema exists.
@@ -72,10 +72,11 @@ public interface SupportsSchemas {
    * @param comment The comment of the schema.
    * @param metadata The metadata of the schema.
    * @return The created schema.
+   * @throws NoSuchCatalogException If the catalog does not exist.
    * @throws SchemaAlreadyExistsException If the schema already exists.
    */
   Schema createSchema(NameIdentifier ident, String comment, Map<String, String> metadata)
-      throws SchemaAlreadyExistsException;
+      throws NoSuchCatalogException, SchemaAlreadyExistsException;
 
   /**
    * Load metadata properties for a schema.
