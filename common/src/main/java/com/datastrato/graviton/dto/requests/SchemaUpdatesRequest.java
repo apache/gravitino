@@ -14,16 +14,16 @@ import lombok.ToString;
 @Getter
 @EqualsAndHashCode
 @ToString
-public class MetalakeUpdatesRequest implements RESTRequest {
+public class SchemaUpdatesRequest implements RESTRequest {
 
   @JsonProperty("updates")
-  private final List<MetalakeUpdateRequest> updates;
+  private final List<SchemaUpdateRequest> updates;
 
-  public MetalakeUpdatesRequest(List<MetalakeUpdateRequest> updates) {
+  public SchemaUpdatesRequest(List<SchemaUpdateRequest> updates) {
     this.updates = updates;
   }
 
-  public MetalakeUpdatesRequest() {
+  public SchemaUpdatesRequest() {
     this(null);
   }
 

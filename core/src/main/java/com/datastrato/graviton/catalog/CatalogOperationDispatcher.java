@@ -6,9 +6,7 @@ package com.datastrato.graviton.catalog;
 
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
-import com.datastrato.graviton.exceptions.CatalogAlreadyExistsException;
 import com.datastrato.graviton.exceptions.NoSuchCatalogException;
-import com.datastrato.graviton.exceptions.NoSuchNamespaceException;
 import com.datastrato.graviton.exceptions.NoSuchSchemaException;
 import com.datastrato.graviton.exceptions.NoSuchTableException;
 import com.datastrato.graviton.exceptions.NonEmptySchemaException;
@@ -37,7 +35,7 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
   }
 
   @Override
-  public NameIdentifier[] listSchemas(Namespace namespace) throws NoSuchNamespaceException {
+  public NameIdentifier[] listSchemas(Namespace namespace) throws NoSuchCatalogException {
     NameIdentifier catalogIdent = NameIdentifier.of(namespace.levels());
 
     return doWithCatalog(
@@ -48,13 +46,14 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
 
   @Override
   public Schema createSchema(NameIdentifier ident, String comment, Map<String, String> metadata)
-      throws SchemaAlreadyExistsException {
+      throws NoSuchCatalogException, SchemaAlreadyExistsException {
     NameIdentifier catalogIdent = NameIdentifier.of(ident.namespace().levels());
 
     return doWithCatalog(
         catalogIdent,
         c -> c.doWithSchemaOps(s -> s.createSchema(ident, comment, metadata)),
-        CatalogAlreadyExistsException.class);
+        NoSuchCatalogException.class,
+        SchemaAlreadyExistsException.class);
   }
 
   @Override
@@ -85,7 +84,7 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
     return doWithCatalog(
         catalogIdent,
         c -> c.doWithSchemaOps(s -> s.dropSchema(ident, cascade)),
-        NoSuchSchemaException.class);
+        NonEmptySchemaException.class);
   }
 
   @Override
@@ -142,9 +141,8 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
   private <R, E extends Throwable> R doWithCatalog(
       NameIdentifier ident, ThrowableFunction<CatalogManager.CatalogWrapper, R> fn, Class<E> ex)
       throws E {
-    CatalogManager.CatalogWrapper c = catalogManager.loadCatalogAndWrap(ident);
-
     try {
+      CatalogManager.CatalogWrapper c = catalogManager.loadCatalogAndWrap(ident);
       return fn.apply(c);
     } catch (Throwable throwable) {
       if (ex.isInstance(throwable)) {
@@ -160,9 +158,8 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
       Class<E1> ex1,
       Class<E2> ex2)
       throws E1, E2 {
-    CatalogManager.CatalogWrapper c = catalogManager.loadCatalogAndWrap(ident);
-
     try {
+      CatalogManager.CatalogWrapper c = catalogManager.loadCatalogAndWrap(ident);
       return fn.apply(c);
     } catch (Throwable throwable) {
       if (ex1.isInstance(throwable)) {
