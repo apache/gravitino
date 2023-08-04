@@ -4,7 +4,6 @@
  */
 package com.datastrato.graviton.dto.requests;
 
-import com.datastrato.graviton.Catalog;
 import com.datastrato.graviton.rest.RESTRequest;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
@@ -17,13 +16,10 @@ import lombok.ToString;
 @Getter
 @EqualsAndHashCode
 @ToString
-public class CatalogCreateRequest implements RESTRequest {
+public class SchemaCreateRequest implements RESTRequest {
 
   @JsonProperty("name")
   private final String name;
-
-  @JsonProperty("type")
-  private final Catalog.Type type;
 
   @Nullable
   @JsonProperty("comment")
@@ -33,14 +29,12 @@ public class CatalogCreateRequest implements RESTRequest {
   @JsonProperty("properties")
   private final Map<String, String> properties;
 
-  public CatalogCreateRequest() {
-    this(null, null, null, null);
+  public SchemaCreateRequest() {
+    this(null, null, null);
   }
 
-  public CatalogCreateRequest(
-      String name, Catalog.Type type, String comment, Map<String, String> properties) {
+  public SchemaCreateRequest(String name, String comment, Map<String, String> properties) {
     this.name = name;
-    this.type = type;
     this.comment = comment;
     this.properties = properties;
   }
@@ -49,6 +43,5 @@ public class CatalogCreateRequest implements RESTRequest {
   public void validate() throws IllegalArgumentException {
     Preconditions.checkArgument(
         name != null && !name.isEmpty(), "\"name\" field is required and cannot be empty");
-    Preconditions.checkArgument(type != null, "\"type\" field is required and cannot be empty");
   }
 }

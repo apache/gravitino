@@ -17,7 +17,7 @@ import lombok.ToString;
 public class BaseResponse implements RESTResponse {
 
   @JsonProperty("code")
-  private int code;
+  private final int code;
 
   public BaseResponse(int code) {
     this.code = code;

@@ -140,5 +140,6 @@ public interface EntityStore extends Closeable {
    * @return the return value of the executable
    * @throws IOException if the execution fails
    */
-  <R> R executeInTransaction(Executable<R> executable) throws IOException;
+  <R, E extends Exception> R executeInTransaction(Executable<R, E> executable)
+      throws E, IOException;
 }

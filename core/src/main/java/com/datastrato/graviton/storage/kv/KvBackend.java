@@ -55,5 +55,6 @@ public interface KvBackend extends Closeable {
    * @param executable
    * @throws IOException
    */
-  <R> R executeInTransaction(Executable<R> executable) throws IOException;
+  <R, E extends Exception> R executeInTransaction(Executable<R, E> executable)
+      throws E, IOException;
 }

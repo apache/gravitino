@@ -12,7 +12,7 @@ import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
 import com.datastrato.graviton.catalog.CatalogOperations;
 import com.datastrato.graviton.catalog.hive.converter.ToHiveType;
-import com.datastrato.graviton.exceptions.NoSuchNamespaceException;
+import com.datastrato.graviton.exceptions.NoSuchCatalogException;
 import com.datastrato.graviton.exceptions.NoSuchSchemaException;
 import com.datastrato.graviton.exceptions.NoSuchTableException;
 import com.datastrato.graviton.exceptions.NonEmptySchemaException;
@@ -101,12 +101,12 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
    *
    * @param namespace The namespace to list the schemas for.
    * @return An array of {@link NameIdentifier} representing the schemas.
-   * @throws NoSuchNamespaceException If the provided namespace is invalid or does not exist.
+   * @throws NoSuchCatalogException If the provided namespace is invalid or does not exist.
    */
   @Override
-  public NameIdentifier[] listSchemas(Namespace namespace) throws NoSuchNamespaceException {
+  public NameIdentifier[] listSchemas(Namespace namespace) throws NoSuchCatalogException {
     if (!isValidNamespace(namespace)) {
-      throw new NoSuchNamespaceException("Namespace is invalid " + namespace);
+      throw new NoSuchCatalogException("Namespace is invalid " + namespace);
     }
 
     try {
@@ -137,11 +137,12 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
    * @param comment The comment for the schema.
    * @param metadata The metadata properties for the schema.
    * @return The created {@link HiveSchema}.
+   * @throws NoSuchCatalogException If the provided namespace is invalid or does not exist.
    * @throws SchemaAlreadyExistsException If a schema with the same name already exists.
    */
   @Override
   public HiveSchema createSchema(NameIdentifier ident, String comment, Map<String, String> metadata)
-      throws SchemaAlreadyExistsException {
+      throws NoSuchCatalogException, SchemaAlreadyExistsException {
     Preconditions.checkArgument(
         !ident.name().isEmpty(),
         String.format("Cannot create schema with invalid name: %s", ident.name()));

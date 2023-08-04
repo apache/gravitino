@@ -13,7 +13,7 @@ import lombok.ToString;
 public class DropResponse extends BaseResponse {
 
   @JsonProperty("dropped")
-  private boolean dropped;
+  private final boolean dropped;
 
   public DropResponse(boolean dropped) {
     super(0);
@@ -22,6 +22,7 @@ public class DropResponse extends BaseResponse {
 
   public DropResponse() {
     super();
+    this.dropped = false;
   }
 
   public boolean dropped() {

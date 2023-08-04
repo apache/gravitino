@@ -16,11 +16,11 @@ import lombok.ToString;
 @ToString
 public class CatalogUpdatesRequest implements RESTRequest {
 
-  @JsonProperty("requests")
-  private final List<CatalogUpdateRequest> requests;
+  @JsonProperty("updates")
+  private final List<CatalogUpdateRequest> updates;
 
-  public CatalogUpdatesRequest(List<CatalogUpdateRequest> requests) {
-    this.requests = requests;
+  public CatalogUpdatesRequest(List<CatalogUpdateRequest> updates) {
+    this.updates = updates;
   }
 
   public CatalogUpdatesRequest() {
@@ -29,6 +29,6 @@ public class CatalogUpdatesRequest implements RESTRequest {
 
   @Override
   public void validate() throws IllegalArgumentException {
-    requests.forEach(RESTRequest::validate);
+    updates.forEach(RESTRequest::validate);
   }
 }

@@ -10,6 +10,8 @@ import com.datastrato.graviton.Metalake;
 import com.datastrato.graviton.dto.AuditDTO;
 import com.datastrato.graviton.dto.CatalogDTO;
 import com.datastrato.graviton.dto.MetalakeDTO;
+import com.datastrato.graviton.dto.rel.SchemaDTO;
+import com.datastrato.graviton.rel.Schema;
 
 public class DTOConverters {
 
@@ -40,6 +42,15 @@ public class DTOConverters {
         .withComment(catalog.comment())
         .withProperties(catalog.properties())
         .withAudit(toDTO(catalog.auditInfo()))
+        .build();
+  }
+
+  public static SchemaDTO toDTO(Schema schema) {
+    return new SchemaDTO.Builder()
+        .withName(schema.name())
+        .withComment(schema.comment())
+        .withProperties(schema.properties())
+        .withAudit(toDTO(schema.auditInfo()))
         .build();
   }
 }
