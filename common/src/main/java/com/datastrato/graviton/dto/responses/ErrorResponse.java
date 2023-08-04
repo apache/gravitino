@@ -38,6 +38,9 @@ public class ErrorResponse extends BaseResponse {
 
   private ErrorResponse() {
     super();
+    this.type = null;
+    this.message = null;
+    this.stack = null;
   }
 
   @Override
@@ -115,6 +118,15 @@ public class ErrorResponse extends BaseResponse {
   public static ErrorResponse alreadyExists(String type, String message, Throwable throwable) {
     return new ErrorResponse(
         ErrorConstants.ALREADY_EXISTS_CODE, type, message, getStackTrace(throwable));
+  }
+
+  public static ErrorResponse nonEmpty(String type, String message) {
+    return nonEmpty(type, message, null);
+  }
+
+  public static ErrorResponse nonEmpty(String type, String message, Throwable throwable) {
+    return new ErrorResponse(
+        ErrorConstants.NON_EMPTY_CODE, type, message, getStackTrace(throwable));
   }
 
   public static ErrorResponse unknownError(String message) {
