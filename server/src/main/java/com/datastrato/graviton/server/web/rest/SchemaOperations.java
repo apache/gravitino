@@ -20,6 +20,7 @@ import com.datastrato.graviton.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.graviton.rel.Schema;
 import com.datastrato.graviton.rel.SchemaChange;
 import com.datastrato.graviton.server.web.Utils;
+import com.google.common.base.Preconditions;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.Consumes;
@@ -35,6 +36,7 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.eclipse.jetty.util.StringUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -58,28 +60,22 @@ public class SchemaOperations {
   @Produces("application/vnd.graviton.v1+json")
   public Response listSchemas(
       @PathParam("metalake") String metalake, @PathParam("catalog") String catalog) {
-    if (metalake == null || metalake.isEmpty()) {
-      LOG.error("Metalake name is null or empty");
-      return Utils.illegalArguments("Metalake name is illegal");
-    }
-
-    if (catalog == null || catalog.isEmpty()) {
-      LOG.error("Catalog name is null or empty");
-      return Utils.illegalArguments("Catalog name is illegal");
-    }
-
-    Namespace ns = Namespace.of(metalake, catalog);
     try {
+      Namespace ns = schemaNS(metalake, catalog);
       NameIdentifier[] idents = dispatcher.listSchemas(ns);
       return Utils.ok(new SchemaListResponse(idents));
 
+    } catch (IllegalArgumentException e) {
+      LOG.error("Failed to validate arguments", e);
+      return Utils.illegalArguments("Failed to validate arguments", e);
+
     } catch (NoSuchCatalogException e) {
-      LOG.error("Catalog {} does not exist, fail to list schemas", ns);
-      return Utils.notFound("catalog " + ns + " does not exist", e);
+      LOG.error("Catalog {} does not exist, fail to list schema", catalog);
+      return Utils.notFound("catalog " + catalog + " does not exist", e);
 
     } catch (Exception e) {
-      LOG.error("Fail to list schemas under namespace {}", ns, e);
-      return Utils.internalError("Fail to list schemas under namespace " + ns, e);
+      LOG.error("Fail to list schemas under catalog {}", catalog, e);
+      return Utils.internalError("Fail to list schemas under catalog " + catalog, e);
     }
   }
 
@@ -89,16 +85,6 @@ public class SchemaOperations {
       @PathParam("metalake") String metalake,
       @PathParam("catalog") String catalog,
       SchemaCreateRequest request) {
-    if (metalake == null || metalake.isEmpty()) {
-      LOG.error("Metalake name is null or empty");
-      return Utils.illegalArguments("Metalake name is illegal");
-    }
-
-    if (catalog == null || catalog.isEmpty()) {
-      LOG.error("Catalog name is null or empty");
-      return Utils.illegalArguments("Catalog name is illegal");
-    }
-
     try {
       request.validate();
     } catch (IllegalArgumentException e) {
@@ -107,29 +93,30 @@ public class SchemaOperations {
           "Failed to validate CreateSchemaRequest arguments " + request, e);
     }
 
-    NameIdentifier ident = NameIdentifier.of(metalake, catalog, request.getName());
     try {
+      NameIdentifier ident = schemaIdentifier(metalake, catalog, request.getName());
       Schema schema = dispatcher.createSchema(ident, request.getComment(), request.getProperties());
       return Utils.ok(new SchemaResponse(DTOConverters.toDTO(schema)));
 
+    } catch (IllegalArgumentException e) {
+      LOG.error("Failed to validate arguments", e);
+      return Utils.illegalArguments("Failed to validate arguments", e);
+
     } catch (NoSuchCatalogException e) {
       LOG.error(
-          "Catalog {} does not exist, fail to create schema {}",
-          ident.namespace(),
-          ident.name(),
-          e);
+          "Catalog {} does not exist, fail to create schema {}", catalog, request.getName(), e);
       return Utils.notFound(
-          "Catalog " + ident.namespace() + " does not exist, fail to create schema " + ident.name(),
-          e);
+          "Catalog " + catalog + " does not exist, fail to create schema " + request.getName(), e);
 
     } catch (SchemaAlreadyExistsException e) {
-      LOG.error("Schema {} already exists under {}", ident.name(), ident.namespace(), e);
+      LOG.error("Schema {} already exists under {}", request.getComment(), catalog, e);
       return Utils.alreadyExists(
-          "Schema " + ident.name() + " already exists under " + ident.namespace(), e);
+          "Schema " + request.getName() + " already exists under catalog " + catalog, e);
 
     } catch (Exception e) {
-      LOG.error("Fail to create schema {} under namespace {}", ident, request, e);
-      return Utils.internalError("Fail to create schema " + ident + " under namespace " + ident, e);
+      LOG.error("Fail to create schema {} under catalog {}", request.getName(), catalog, e);
+      return Utils.internalError(
+          "Fail to create schema " + request.getName() + " under catalog " + catalog, e);
     }
   }
 
@@ -140,35 +127,22 @@ public class SchemaOperations {
       @PathParam("metalake") String metalake,
       @PathParam("catalog") String catalog,
       @PathParam("schema") String schema) {
-    if (metalake == null || metalake.isEmpty()) {
-      LOG.error("Metalake name is null or empty");
-      return Utils.illegalArguments("Metalake name is illegal");
-    }
-
-    if (catalog == null || catalog.isEmpty()) {
-      LOG.error("Catalog name is null or empty");
-      return Utils.illegalArguments("Catalog name is illegal");
-    }
-
-    if (schema == null || schema.isEmpty()) {
-      LOG.error("Schema name is null or empty");
-      return Utils.illegalArguments("Schema name is illegal");
-    }
-
-    NameIdentifier ident = NameIdentifier.of(metalake, catalog, schema);
     try {
+      NameIdentifier ident = schemaIdentifier(metalake, catalog, schema);
       Schema s = dispatcher.loadSchema(ident);
       return Utils.ok(new SchemaResponse(DTOConverters.toDTO(s)));
 
+    } catch (IllegalArgumentException e) {
+      LOG.error("Failed to validate arguments", e);
+      return Utils.illegalArguments("Failed to validate arguments", e);
+
     } catch (NoSuchSchemaException e) {
-      LOG.error("Schema {} does not exist under namespace {}", schema, ident.namespace());
-      return Utils.notFound(
-          "Schema " + schema + " does not exist under namespace " + ident.namespace(), e);
+      LOG.error("Schema {} does not exist under catalog {}", schema, catalog);
+      return Utils.notFound("Schema " + schema + " does not exist under catalog " + catalog, e);
 
     } catch (Exception e) {
-      LOG.error("Fail to load schema {} under namespace {}", schema, ident.namespace(), e);
-      return Utils.internalError(
-          "Fail to load schema " + schema + " under namespace " + ident.namespace(), e);
+      LOG.error("Fail to load schema {} under catalog {}", schema, catalog, e);
+      return Utils.internalError("Fail to load schema " + schema + " under catalog " + catalog, e);
     }
   }
 
@@ -180,19 +154,12 @@ public class SchemaOperations {
       @PathParam("catalog") String catalog,
       @PathParam("schema") String schema,
       SchemaUpdatesRequest request) {
-    if (metalake == null || metalake.isEmpty()) {
-      LOG.error("Metalake name is null or empty");
-      return Utils.illegalArguments("Metalake name is illegal");
-    }
-
-    if (catalog == null || catalog.isEmpty()) {
-      LOG.error("Catalog name is null or empty");
-      return Utils.illegalArguments("Catalog name is illegal");
-    }
-
-    if (schema == null || schema.isEmpty()) {
-      LOG.error("Schema name is null or empty");
-      return Utils.illegalArguments("Schema name is illegal");
+    NameIdentifier ident;
+    try {
+      ident = schemaIdentifier(metalake, catalog, schema);
+    } catch (IllegalArgumentException e) {
+      LOG.error("Failed to validate arguments", e);
+      return Utils.illegalArguments("Failed to validate arguments", e);
     }
 
     try {
@@ -203,7 +170,6 @@ public class SchemaOperations {
           "Failed to validate SchemaUpdatesRequest arguments " + request, e);
     }
 
-    NameIdentifier ident = NameIdentifier.of(metalake, catalog, schema);
     SchemaChange[] changes =
         request.getUpdates().stream()
             .map(SchemaUpdateRequest::schemaChange)
@@ -232,47 +198,54 @@ public class SchemaOperations {
       @PathParam("catalog") String catalog,
       @PathParam("schema") String schema,
       @DefaultValue("false") @QueryParam("cascade") boolean cascade) {
-    if (metalake == null || metalake.isEmpty()) {
-      LOG.error("Metalake name is null or empty");
-      return Utils.illegalArguments("Metalake name is illegal");
-    }
-
-    if (catalog == null || catalog.isEmpty()) {
-      LOG.error("Catalog name is null or empty");
-      return Utils.illegalArguments("Catalog name is illegal");
-    }
-
-    if (schema == null || schema.isEmpty()) {
-      LOG.error("Schema name is null or empty");
-      return Utils.illegalArguments("Schema name is illegal");
-    }
-
-    NameIdentifier ident = NameIdentifier.of(metalake, catalog, schema);
     try {
+      NameIdentifier ident = NameIdentifier.of(metalake, catalog, schema);
       boolean dropped = dispatcher.dropSchema(ident, cascade);
       if (!dropped) {
         LOG.warn("Fail to drop schema {} under namespace {}", schema, ident.namespace());
       }
 
       return Utils.ok(new DropResponse(dropped));
+    } catch (IllegalArgumentException e) {
+      LOG.error("Failed to validate arguments {} {} {}", metalake, catalog, schema, e);
+      return Utils.illegalArguments(
+          "Failed to validate arguments " + metalake + " " + catalog + " " + schema, e);
+
     } catch (NonEmptySchemaException e) {
       LOG.error(
-          "Schema {} is not empty under namespace {}, but cascade is set to true",
-          schema,
-          ident.namespace());
+          "Schema {} is not empty under catalog {}, but cascade is set to true", schema, catalog);
       return Utils.nonEmpty(
           "Schema "
               + schema
-              + " is not empty under namespace "
-              + ident.namespace()
+              + " is not empty under catalog "
+              + catalog
               + " , but "
               + "cascade is set to true",
           e);
 
     } catch (Exception e) {
-      LOG.error("Fail to drop schema {} under namespace {}", schema, ident.namespace(), e);
-      return Utils.internalError(
-          "Fail to drop schema " + schema + " under namespace " + ident.namespace(), e);
+      LOG.error("Fail to drop schema {} under catalog {}", schema, catalog, e);
+      return Utils.internalError("Fail to drop schema " + schema + " under catalog " + catalog, e);
     }
+  }
+
+  private static Namespace schemaNS(String metalake, String catalog) {
+    Preconditions.checkArgument(
+        StringUtil.isNotBlank(metalake), "metalake name: %s is illegal", metalake);
+    Preconditions.checkArgument(
+        StringUtil.isNotBlank(catalog), "catalog name: %s is illegal", catalog);
+
+    return Namespace.of(metalake, catalog);
+  }
+
+  private static NameIdentifier schemaIdentifier(String metalake, String catalog, String schema) {
+    Preconditions.checkArgument(
+        StringUtil.isNotBlank(metalake), "metalake name: %s is illegal", metalake);
+    Preconditions.checkArgument(
+        StringUtil.isNotBlank(catalog), "catalog name: %s is illegal", catalog);
+    Preconditions.checkArgument(
+        StringUtil.isNotBlank(schema), "schema name: %s is illegal", schema);
+
+    return NameIdentifier.of(metalake, catalog, schema);
   }
 }

@@ -20,18 +20,18 @@ import lombok.ToString;
 public class CatalogCreateRequest implements RESTRequest {
 
   @JsonProperty("name")
-  private String name;
+  private final String name;
 
   @JsonProperty("type")
-  private Catalog.Type type;
+  private final Catalog.Type type;
 
   @Nullable
   @JsonProperty("comment")
-  private String comment;
+  private final String comment;
 
   @Nullable
   @JsonProperty("properties")
-  private Map<String, String> properties;
+  private final Map<String, String> properties;
 
   public CatalogCreateRequest() {
     this(null, null, null, null);

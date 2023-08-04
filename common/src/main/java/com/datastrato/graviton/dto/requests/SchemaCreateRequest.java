@@ -19,15 +19,15 @@ import lombok.ToString;
 public class SchemaCreateRequest implements RESTRequest {
 
   @JsonProperty("name")
-  private String name;
+  private final String name;
 
   @Nullable
   @JsonProperty("comment")
-  private String comment;
+  private final String comment;
 
   @Nullable
   @JsonProperty("properties")
-  private Map<String, String> properties;
+  private final Map<String, String> properties;
 
   public SchemaCreateRequest() {
     this(null, null, null);

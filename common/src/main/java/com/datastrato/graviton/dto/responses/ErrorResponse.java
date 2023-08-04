@@ -38,6 +38,9 @@ public class ErrorResponse extends BaseResponse {
 
   private ErrorResponse() {
     super();
+    this.type = null;
+    this.message = null;
+    this.stack = null;
   }
 
   @Override
