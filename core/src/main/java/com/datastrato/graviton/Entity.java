@@ -6,7 +6,9 @@ package com.datastrato.graviton;
 
 import java.io.Serializable;
 import java.util.Map;
+import lombok.AllArgsConstructor;
 import lombok.Getter;
+import lombok.ToString;
 
 public interface Entity extends Serializable {
   @Getter
@@ -14,7 +16,7 @@ public interface Entity extends Serializable {
     METALAKE("ml", 0),
     CATALOG("ca", 1),
     SCHEMA("sc", 2),
-    TABLE("tb", 3),
+    TABLE("ta", 3),
     COLUMN("co", 4),
 
     AUDIT("au", 65534);
@@ -26,6 +28,18 @@ public interface Entity extends Serializable {
     EntityType(String shortName, int index) {
       this.shortName = shortName;
       this.index = index;
+    }
+  }
+
+  @Getter
+  @AllArgsConstructor
+  @ToString
+  class EntityIdentifer {
+    private NameIdentifier nameIdentifier;
+    private EntityType entityType;
+
+    public static EntityIdentifer of(NameIdentifier name, EntityType entityType) {
+      return new EntityIdentifer(name, entityType);
     }
   }
 
