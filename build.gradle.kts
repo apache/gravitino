@@ -55,7 +55,7 @@ allprojects {
 
   tasks.withType<Jar> {
     archiveFileName.set("${rootProject.name.lowercase(Locale.getDefault())}-${project.name}-$version.jar")
-    exclude("log4j.properties")
+    exclude("log4j2.properties")
     exclude("test/**")
   }
 
