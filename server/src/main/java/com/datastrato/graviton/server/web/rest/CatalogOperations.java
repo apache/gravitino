@@ -179,7 +179,7 @@ public class CatalogOperations {
     try {
       NameIdentifier ident = NameIdentifier.of(metalakeName, catalogName);
       CatalogChange[] changes =
-          request.getRequests().stream()
+          request.getUpdates().stream()
               .map(CatalogUpdateRequest::catalogChange)
               .toArray(CatalogChange[]::new);
 

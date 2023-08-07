@@ -14,7 +14,7 @@ import lombok.ToString;
 public class DropResponse extends BaseResponse {
 
   @JsonProperty("dropped")
-  private boolean dropped;
+  private final boolean dropped;
 
   /**
    * Constructor for DropResponse.
@@ -29,6 +29,7 @@ public class DropResponse extends BaseResponse {
   /** Default constructor for DropResponse (used by Jackson deserializer). */
   public DropResponse() {
     super();
+    this.dropped = false;
   }
 
   /**

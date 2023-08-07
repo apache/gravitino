@@ -17,8 +17,8 @@ import lombok.ToString;
 @ToString
 public class MetalakeUpdatesRequest implements RESTRequest {
 
-  @JsonProperty("requests")
-  private final List<MetalakeUpdateRequest> requests;
+  @JsonProperty("updates")
+  private final List<MetalakeUpdateRequest> updates;
 
   /**
    * Constructor for MetalakeUpdatesRequest.
@@ -41,6 +41,6 @@ public class MetalakeUpdatesRequest implements RESTRequest {
    */
   @Override
   public void validate() throws IllegalArgumentException {
-    requests.forEach(RESTRequest::validate);
+    updates.forEach(RESTRequest::validate);
   }
 }
