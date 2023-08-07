@@ -25,8 +25,8 @@ public class CatalogUpdatesRequest implements RESTRequest {
    *
    * @param requests The list of catalog update requests.
    */
-  public CatalogUpdatesRequest(List<CatalogUpdateRequest> requests) {
-    this.requests = requests;
+  public CatalogUpdatesRequest(List<CatalogUpdateRequest> updates) {
+    this.updates = updates;
   }
 
   /** Default constructor for CatalogUpdatesRequest. */

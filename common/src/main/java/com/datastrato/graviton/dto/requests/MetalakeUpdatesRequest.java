@@ -25,8 +25,8 @@ public class MetalakeUpdatesRequest implements RESTRequest {
    *
    * @param requests The list of Metalake update requests.
    */
-  public MetalakeUpdatesRequest(List<MetalakeUpdateRequest> requests) {
-    this.requests = requests;
+  public MetalakeUpdatesRequest(List<MetalakeUpdateRequest> updates) {
+    this.updates = updates;
   }
 
   /** Default constructor for MetalakeUpdatesRequest. */
