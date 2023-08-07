@@ -15,6 +15,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
 
+/** Represents an interface for catalog update requests. */
 @JsonIgnoreProperties(ignoreUnknown = true)
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY)
 @JsonSubTypes({
@@ -31,6 +32,11 @@ import lombok.ToString;
 })
 public interface CatalogUpdateRequest extends RESTRequest {
 
+  /**
+   * Returns the catalog change associated with this request.
+   *
+   * @return The catalog change.
+   */
   CatalogChange catalogChange();
 
   @EqualsAndHashCode
@@ -41,14 +47,25 @@ public interface CatalogUpdateRequest extends RESTRequest {
     @JsonProperty("newName")
     private final String newName;
 
+    /** Default constructor for RenameCatalogRequest. */
     public RenameCatalogRequest() {
       this(null);
     }
 
+    /**
+     * Constructor for RenameCatalogRequest.
+     *
+     * @param newName The new name for the catalog.
+     */
     public RenameCatalogRequest(String newName) {
       this.newName = newName;
     }
 
+    /**
+     * Validates the fields of the request.
+     *
+     * @throws IllegalArgumentException if the new name is not set.
+     */
     @Override
     public void validate() throws IllegalArgumentException {
       Preconditions.checkArgument(
@@ -70,14 +87,25 @@ public interface CatalogUpdateRequest extends RESTRequest {
     @JsonProperty("newComment")
     private final String newComment;
 
+    /**
+     * Constructor for UpdateCatalogCommentRequest.
+     *
+     * @param newComment The new comment for the catalog.
+     */
     public UpdateCatalogCommentRequest(String newComment) {
       this.newComment = newComment;
     }
 
+    /** Default constructor for UpdateCatalogCommentRequest. */
     public UpdateCatalogCommentRequest() {
       this(null);
     }
 
+    /**
+     * Validates the fields of the request.
+     *
+     * @throws IllegalArgumentException if the new comment is not set.
+     */
     @Override
     public void validate() throws IllegalArgumentException {
       Preconditions.checkArgument(
@@ -103,15 +131,27 @@ public interface CatalogUpdateRequest extends RESTRequest {
     @JsonProperty("value")
     private final String value;
 
+    /**
+     * Constructor for SetCatalogPropertyRequest.
+     *
+     * @param property The property to set.
+     * @param value The value of the property.
+     */
     public SetCatalogPropertyRequest(String property, String value) {
       this.property = property;
       this.value = value;
     }
 
+    /** Default constructor for SetCatalogPropertyRequest. */
     public SetCatalogPropertyRequest() {
       this(null, null);
     }
 
+    /**
+     * Validates the fields of the request.
+     *
+     * @throws IllegalArgumentException if the property or value is not set.
+     */
     @Override
     public void validate() throws IllegalArgumentException {
       Preconditions.checkArgument(
@@ -135,14 +175,25 @@ public interface CatalogUpdateRequest extends RESTRequest {
     @JsonProperty("property")
     private final String property;
 
+    /**
+     * Constructor for RemoveCatalogPropertyRequest.
+     *
+     * @param property The property to remove.
+     */
     public RemoveCatalogPropertyRequest(String property) {
       this.property = property;
     }
 
+    /** Default constructor for RemoveCatalogPropertyRequest. */
     public RemoveCatalogPropertyRequest() {
       this(null);
     }
 
+    /**
+     * Validates the fields of the request.
+     *
+     * @throws IllegalArgumentException if property is not set.
+     */
     @Override
     public void validate() throws IllegalArgumentException {
       Preconditions.checkArgument(

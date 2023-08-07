@@ -11,6 +11,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
 
+/** Represents a response containing catalog information. */
 @Getter
 @ToString
 @EqualsAndHashCode(callSuper = true)
@@ -19,17 +20,27 @@ public class CatalogResponse extends BaseResponse {
   @JsonProperty("catalog")
   private final CatalogDTO catalog;
 
+  /**
+   * Constructor for CatalogResponse.
+   *
+   * @param catalog The catalog data transfer object.
+   */
   public CatalogResponse(CatalogDTO catalog) {
     super(0);
     this.catalog = catalog;
   }
 
-  // This is the constructor that is used by Jackson deserializer
+  /** Default constructor for CatalogResponse. (Used for Jackson deserialization.) */
   public CatalogResponse() {
     super();
     this.catalog = null;
   }
 
+  /**
+   * Validates the response data.
+   *
+   * @throws IllegalArgumentException if teh catalog name, type or audit is not set.
+   */
   @Override
   public void validate() throws IllegalArgumentException {
     super.validate();
