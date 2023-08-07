@@ -5,7 +5,7 @@
 import com.diffplug.gradle.spotless.SpotlessExtension
 import com.diffplug.gradle.spotless.SpotlessPlugin
 import com.github.vlsi.gradle.dsl.configureEach
-import java.util.*
+import java.util.Locale
 
 plugins {
   `maven-publish`

@@ -12,7 +12,6 @@ import com.datastrato.graviton.server.web.JettyServer;
 import com.datastrato.graviton.server.web.ObjectMapperProvider;
 import com.datastrato.graviton.server.web.VersioningFilter;
 import javax.servlet.Servlet;
-import org.apache.log4j.PropertyConfigurator;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.jackson.JacksonFeature;
 import org.glassfish.jersey.server.ResourceConfig;
@@ -88,7 +87,6 @@ public class GravitonServer extends ResourceConfig {
   }
 
   public static void main(String[] args) throws Exception {
-    PropertyConfigurator.configure(ClassLoader.getSystemResource("log4j.properties"));
     LOG.info("Starting Graviton Server");
 
     GravitonServer server = new GravitonServer();
