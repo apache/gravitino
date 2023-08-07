@@ -398,7 +398,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       // although Hive treats it as a `MANAGED_TABLE`, it cannot be queried through the `getTable`
       // interface in HMS with the specified `tableType`. This is because when creating a table
       // without  specifying the `tableType`, the underlying engine of HMS does not store the
-      // information of  `tableType`. However, once the `getTable` interface specifies a
+      // information of `tableType`. However, once the `getTable` interface specifies a
       // `tableType`, HMS will use it as a filter condition to query its underlying storage and
       // these types of tables will be  filtered out.
       // Therefore, in order to avoid missing these types of tables, we need to query HMS twice. The
