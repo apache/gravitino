@@ -46,11 +46,6 @@ public class Namespace {
     return levels[pos];
   }
 
-  public String lastLevel() {
-    Preconditions.checkArgument(levels.length > 0, "Invalid level position");
-    return levels[levels.length - 1];
-  }
-
   public int length() {
     return levels.length;
   }

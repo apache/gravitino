@@ -139,8 +139,9 @@ public class CustomEntityKeyEncoder implements EntityKeyEncoder {
     String[] nameSpace = entityIdentifer.getNameIdentifier().namespace().levels();
     long[] namespaceIds = new long[nameSpace.length];
     for (int i = 0; i < nameSpace.length; i++) {
-      namespaceIds[i] = getOrCreateId(nameSpace[i], i == 0);
+      namespaceIds[i] = getOrCreateId(nameSpace[i], i == 0 /* is metalake or not */);
     }
+
     NameIdentifier identifier = entityIdentifer.getNameIdentifier();
     // If the name is a wild card, we only need to encode the namespace.
     if (WILD_CARD.equals(identifier.name())) {
@@ -151,20 +152,23 @@ public class CustomEntityKeyEncoder implements EntityKeyEncoder {
       return formatNamespaceTemplateToByte(namespaceTemplate, namespaceIds);
     }
 
-    long[] fullIds = new long[namespaceIds.length + 1];
-    System.arraycopy(namespaceIds, 0, fullIds, 0, namespaceIds.length);
-    fullIds[namespaceIds.length] = getOrCreateId(identifier.name(), namespaceIds.length == 0);
+    // This is for point query and need to use specific name
+    long[] namespaceAndNameIds = new long[namespaceIds.length + 1];
+    System.arraycopy(namespaceIds, 0, namespaceAndNameIds, 0, namespaceIds.length);
+    namespaceAndNameIds[namespaceIds.length] =
+        getOrCreateId(identifier.name(), namespaceIds.length == 0);
 
     String nameIdentifierTemplate = ENTITY_TYPE_TO_NAME_IDENTIFIER.get(entityType);
     if (nameIdentifierTemplate == null) {
       throw new UnsupportedOperationException("Unsupported entity type: " + entityType);
     }
-    return formatNameIdentiferTemplateToByte(nameIdentifierTemplate, fullIds);
+    return formatNameIdentiferTemplateToByte(nameIdentifierTemplate, namespaceAndNameIds);
   }
 
   /**
    * Format the name space template to a byte array. For example, if the name space template is
-   * "ca_{}_{}" and the ids is [1, 2], the result is "ca_1_2"
+   * "ca_{}_" and the ids is [1], the result is "ca_1_" which means we want to get all catalogs in
+   * metalake '1'
    *
    * @param namespaceTemptalte the name space template, please see {@link #ENTITY_TYPE_TO_NAMESPACE}
    * @param ids the ids that namespace names map to
@@ -187,7 +191,8 @@ public class CustomEntityKeyEncoder implements EntityKeyEncoder {
 
   /**
    * Format the name identifer to a byte array. For example, if the name space template is
-   * "ca_{}_{}" and the ids is [1, 2], the result is "ca_1_2"
+   * "ca_{}_{}" and the ids is [1, 2], the result is "ca_1_2" which means we want to get the
+   * specific catalog '2'
    *
    * @param nameIdentierTemplate the name space template, please see {@link
    *     #ENTITY_TYPE_TO_NAMESPACE}
