@@ -67,22 +67,13 @@ public class CustomEntityKeyEncoder implements EntityKeyEncoder {
 
   private final KvBackend backend;
 
-  // This is for range query, e.g., get all metalakes, get all catalogs in a metalake, etc.
-  public static final Map<EntityType, String> ENTITY_TYPE_TO_NAMESPACE =
+  // Key format template. please the comment of the class for more details.
+  public static final Map<EntityType, String[]> ENTITY_TYPE_TO_NAME_IDENTIFIER =
       ImmutableMap.of(
-          METALAKE, METALAKE.getShortName() + "_",
-          CATALOG, CATALOG.getShortName() + "_{}_",
-          SCHEMA, SCHEMA.getShortName() + "_{}_{}_",
-          TABLE, TABLE.getShortName() + "_{}_{}_{}_");
-
-  // This is for point query. E.g., get a specific metalake, get a specific catalog in a metalake,
-  // etc.
-  public static final Map<EntityType, String> ENTITY_TYPE_TO_NAME_IDENTIFIER =
-      ImmutableMap.of(
-          METALAKE, METALAKE.getShortName() + "_{}",
-          CATALOG, CATALOG.getShortName() + "_{}_{}",
-          SCHEMA, SCHEMA.getShortName() + "_{}_{}_{}",
-          TABLE, TABLE.getShortName() + "_{}_{}_{}_{}");
+          METALAKE, new String[] {METALAKE.getShortName() + "_"},
+          CATALOG, new String[] {CATALOG.getShortName() + "_", "_"},
+          SCHEMA, new String[] {SCHEMA.getShortName() + "_", "_", "_"},
+          TABLE, new String[] {TABLE.getShortName() + "_", "_", "_", "_"});
 
   public CustomEntityKeyEncoder(KvBackend backend) {
     this.backend = backend;
@@ -112,7 +103,8 @@ public class CustomEntityKeyEncoder implements EntityKeyEncoder {
     byte[] maxByte = ByteUtils.longToByte(id);
     LOG.info("Create new id '{}' for name '{}', isMetaLake '{}'", id, name, isMetalake);
 
-    // Write current max id to storage, For metalake as it's generated from UUID, NO need to sort it
+    // Write current max id to storage, For metalake as it's generated from UUID, No need to store
+    // it
     if (!isMetalake) {
       backend.put(CURRENT_MAX_ID, maxByte, true);
     }
@@ -145,7 +137,7 @@ public class CustomEntityKeyEncoder implements EntityKeyEncoder {
     NameIdentifier identifier = entityIdentifer.getNameIdentifier();
     // If the name is a wild card, we only need to encode the namespace.
     if (WILD_CARD.equals(identifier.name())) {
-      String namespaceTemplate = ENTITY_TYPE_TO_NAMESPACE.get(entityType);
+      String[] namespaceTemplate = ENTITY_TYPE_TO_NAME_IDENTIFIER.get(entityType);
       if (namespaceTemplate == null) {
         throw new UnsupportedOperationException("Unsupported entity type: " + entityType);
       }
@@ -158,7 +150,7 @@ public class CustomEntityKeyEncoder implements EntityKeyEncoder {
     namespaceAndNameIds[namespaceIds.length] =
         getOrCreateId(identifier.name(), namespaceIds.length == 0);
 
-    String nameIdentifierTemplate = ENTITY_TYPE_TO_NAME_IDENTIFIER.get(entityType);
+    String[] nameIdentifierTemplate = ENTITY_TYPE_TO_NAME_IDENTIFIER.get(entityType);
     if (nameIdentifierTemplate == null) {
       throw new UnsupportedOperationException("Unsupported entity type: " + entityType);
     }
@@ -170,19 +162,19 @@ public class CustomEntityKeyEncoder implements EntityKeyEncoder {
    * "ca_{}_" and the ids is [1], the result is "ca_1_" which means we want to get all catalogs in
    * metalake '1'
    *
-   * @param namespaceTemptalte the name space template, please see {@link #ENTITY_TYPE_TO_NAMESPACE}
+   * @param namespaceTemptalte the name space template, please see {@link
+   *     #ENTITY_TYPE_TO_NAME_IDENTIFIER}
    * @param ids the ids that namespace names map to
    */
-  private byte[] formatNamespaceTemplateToByte(String namespaceTemptalte, long[] ids) {
-    String[] parts = namespaceTemptalte.split("\\{\\}");
-    Preconditions.checkArgument(parts.length == ids.length + 1);
+  private byte[] formatNamespaceTemplateToByte(String[] namespaceTemptalte, long[] ids) {
+    Preconditions.checkArgument(namespaceTemptalte.length == ids.length + 1);
 
     byte[] bytes = new byte[0];
-    for (int i = 0; i < parts.length; i++) {
-      if (i != parts.length - 1) {
-        bytes = Bytes.concat(bytes, parts[i].getBytes(), ByteUtils.longToByte(ids[i]));
+    for (int i = 0; i < namespaceTemptalte.length; i++) {
+      if (i != namespaceTemptalte.length - 1) {
+        bytes = Bytes.concat(bytes, namespaceTemptalte[i].getBytes(), ByteUtils.longToByte(ids[i]));
       } else {
-        bytes = Bytes.concat(bytes, parts[i].getBytes());
+        bytes = Bytes.concat(bytes, namespaceTemptalte[i].getBytes());
       }
     }
 
@@ -195,16 +187,15 @@ public class CustomEntityKeyEncoder implements EntityKeyEncoder {
    * specific catalog '2'
    *
    * @param nameIdentierTemplate the name space template, please see {@link
-   *     #ENTITY_TYPE_TO_NAMESPACE}
+   *     #ENTITY_TYPE_TO_NAME_IDENTIFIER}
    * @param ids the ids that name identifier map to
    */
-  private byte[] formatNameIdentiferTemplateToByte(String nameIdentierTemplate, long[] ids) {
-    String[] parts = nameIdentierTemplate.split("\\{\\}");
-    Preconditions.checkArgument(parts.length == ids.length);
+  private byte[] formatNameIdentiferTemplateToByte(String[] nameIdentierTemplate, long[] ids) {
+    Preconditions.checkArgument(nameIdentierTemplate.length == ids.length);
 
     byte[] bytes = new byte[0];
     for (int i = 0; i < ids.length; i++) {
-      bytes = Bytes.concat(bytes, parts[i].getBytes(), ByteUtils.longToByte(ids[i]));
+      bytes = Bytes.concat(bytes, nameIdentierTemplate[i].getBytes(), ByteUtils.longToByte(ids[i]));
     }
 
     return bytes;
