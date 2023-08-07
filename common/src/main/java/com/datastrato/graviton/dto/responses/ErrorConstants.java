@@ -4,6 +4,7 @@
  */
 package com.datastrato.graviton.dto.responses;
 
+/** Constants representing error codes for responses. */
 public class ErrorConstants {
   public static final int REST_ERROR_CODE = 1000;
   public static final int ILLEGAL_ARGUMENTS_CODE = 1001;

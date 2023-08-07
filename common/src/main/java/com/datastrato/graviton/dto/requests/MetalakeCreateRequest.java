@@ -14,6 +14,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
 
+/** Represents a request to create a Metalake. */
 @Getter
 @EqualsAndHashCode
 @ToString
@@ -30,11 +31,18 @@ public class MetalakeCreateRequest implements RESTRequest {
   @JsonProperty("properties")
   private Map<String, String> properties;
 
-  // Only for Jackson deserialization
+  /** Default constructor for MetalakeCreateRequest. (Used for Jackson deserialization.) */
   public MetalakeCreateRequest() {
     this(null, null, null);
   }
 
+  /**
+   * Constructor for MetalakeCreateRequest.
+   *
+   * @param name The name of the Metalake.
+   * @param comment The comment for the Metalake.
+   * @param properties The properties for the Metalake.
+   */
   public MetalakeCreateRequest(String name, String comment, Map<String, String> properties) {
     super();
 
@@ -43,6 +51,11 @@ public class MetalakeCreateRequest implements RESTRequest {
     this.properties = properties;
   }
 
+  /**
+   * Validates the fields of the request.
+   *
+   * @throws IllegalArgumentException if the name is not set.
+   */
   @Override
   public void validate() throws IllegalArgumentException {
     Preconditions.checkArgument(

@@ -28,6 +28,7 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/** Utility class for working with JSON data. */
 public class JsonUtils {
 
   private static final Logger LOG = LoggerFactory.getLogger(JsonUtils.class);
@@ -36,10 +37,21 @@ public class JsonUtils {
 
   private static final String NAME = "name";
 
+  /**
+   * Abstract iterator class for iterating over elements of a JSON array.
+   *
+   * @param <T> The type of elements to convert and iterate.
+   */
   abstract static class JsonArrayIterator<T> implements Iterator<T> {
 
     private final Iterator<JsonNode> elements;
 
+    /**
+     * Constructor for the JSON array iterator.
+     *
+     * @param property The property name of the JSON array.
+     * @param node The JSON node containing the array.
+     */
     JsonArrayIterator(String property, JsonNode node) {
       JsonNode pNode = node.get(property);
       Preconditions.checkArgument(
@@ -61,9 +73,16 @@ public class JsonUtils {
       return convert(element);
     }
 
+    /**
+     * Convert a JSON node to the desired element type.
+     *
+     * @param element The JSON node to convert.
+     * @return The converted element.
+     */
     abstract T convert(JsonNode element);
   }
 
+  /** Iterator for JSON arrays containing strings. */
   static class JsonStringArrayIterator extends JsonArrayIterator<String> {
     private final String property;
 
@@ -80,6 +99,11 @@ public class JsonUtils {
 
   private static ObjectMapper mapper = null;
 
+  /**
+   * Get the shared ObjectMapper instance for JSON serialization/deserialization.
+   *
+   * @return The ObjectMapper instance.
+   */
   public static ObjectMapper objectMapper() {
     if (mapper == null) {
       synchronized (JsonUtils.class) {
@@ -95,6 +119,13 @@ public class JsonUtils {
     return mapper;
   }
 
+  /**
+   * Get a list of strings from a JSON node property.
+   *
+   * @param property The property name.
+   * @param node The JSON node.
+   * @return The list of strings or null if property is missing or null.
+   */
   public static List<String> getStringListOrNull(String property, JsonNode node) {
     if (!node.has(property) || node.get(property).isNull()) {
       return null;
@@ -105,6 +136,14 @@ public class JsonUtils {
         .build();
   }
 
+  /**
+   * Get a string value from a JSON node property.
+   *
+   * @param property The property name.
+   * @param node The JSON node.
+   * @return The string value.
+   * @throws IllegalArgumentException if the property is missing in the JSON node.
+   */
   public static String getString(String property, JsonNode node) {
     Preconditions.checkArgument(node.has(property), "Cannot parse missing string: %s", property);
     JsonNode pNode = node.get(property);
@@ -120,6 +159,9 @@ public class JsonUtils {
     return pNode.asText();
   }
 
+  // Nested classes for custom serialization and deserialization
+
+  /** Custom JSON serializer for Substrait Type objects. */
   public static class TypeSerializer extends JsonSerializer<io.substrait.type.Type> {
 
     private final StringTypeVisitor visitor = new StringTypeVisitor();
@@ -136,6 +178,7 @@ public class JsonUtils {
     }
   }
 
+  /** Custom JSON deserializer for Substrait Type objects. */
   public static class TypeDeserializer extends JsonDeserializer<io.substrait.type.Type> {
 
     @Override
@@ -150,6 +193,7 @@ public class JsonUtils {
     }
   }
 
+  /** Custom JSON serializer for NameIdentifier objects. */
   public static class NameIdentifierSerializer extends JsonSerializer<NameIdentifier> {
 
     @Override
@@ -163,6 +207,7 @@ public class JsonUtils {
     }
   }
 
+  /** Custom JSON deserializer for NameIdentifier objects. */
   public static class NameIdentifierDeserializer extends JsonDeserializer<NameIdentifier> {
 
     @Override

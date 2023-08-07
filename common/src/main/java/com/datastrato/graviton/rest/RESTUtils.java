@@ -15,6 +15,7 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 
+/** Utility class for working with REST related operations. */
 public class RESTUtils {
 
   private static final Joiner.MapJoiner FORM_JOINER = Joiner.on("&").withKeyValueSeparator("=");
@@ -23,6 +24,12 @@ public class RESTUtils {
 
   private RESTUtils() {}
 
+  /**
+   * Remove trailing slashes from a path.
+   *
+   * @param path The path to strip trailing slashes from.
+   * @return The path with trailing slashes removed.
+   */
   public static String stripTrailingSlash(String path) {
     if (path == null) {
       return null;
@@ -35,6 +42,12 @@ public class RESTUtils {
     return result;
   }
 
+  /**
+   * Encode a map of form data into an URL encoded string.
+   *
+   * @param formData The form data to encode.
+   * @return The URL encoded form data string.
+   */
   public static String encodeFormData(Map<?, ?> formData) {
     ImmutableMap.Builder<String, String> builder = ImmutableMap.builder();
     formData.forEach(
@@ -43,6 +56,12 @@ public class RESTUtils {
     return FORM_JOINER.join(builder.build());
   }
 
+  /**
+   * Decode an URL encoded form data string into a map.
+   *
+   * @param formString The URL encoded form data string.
+   * @return The decoded form data map.
+   */
   public static Map<String, String> decodeFormData(String formString) {
     return FORM_SPLITTER.split(formString).entrySet().stream()
         .collect(
@@ -50,6 +69,14 @@ public class RESTUtils {
                 e -> decodeString(e.getKey()), e -> decodeString(e.getValue())));
   }
 
+  /**
+   * URL encode a string.
+   *
+   * @param toEncode The string to encode.
+   * @return The URL encoded string.
+   * @throws IllegalArgumentException If the input string is null.
+   * @throws UncheckedIOException If URL encoding fails.
+   */
   public static String encodeString(String toEncode) {
     Preconditions.checkArgument(toEncode != null, "Invalid string to encode: null");
     try {
@@ -60,6 +87,14 @@ public class RESTUtils {
     }
   }
 
+  /**
+   * Decode an URL encoded string.
+   *
+   * @param encoded The URL encoded string to decode.
+   * @return The decoded string.
+   * @throws IllegalArgumentException if the input string is null.
+   * @throws UncheckedIOException if URL decoding fails.
+   */
   public static String decodeString(String encoded) {
     Preconditions.checkArgument(encoded != null, "Invalid string to decode: null");
     try {

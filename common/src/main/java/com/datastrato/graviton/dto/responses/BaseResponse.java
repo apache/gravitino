@@ -11,6 +11,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
 
+/** Represents a base response for REST API calls. */
 @Getter
 @EqualsAndHashCode
 @ToString
@@ -19,15 +20,25 @@ public class BaseResponse implements RESTResponse {
   @JsonProperty("code")
   private int code;
 
+  /**
+   * Constructor for BaseResponse.
+   *
+   * @param code The response code.
+   */
   public BaseResponse(int code) {
     this.code = code;
   }
 
-  // This is the constructor that is used by Jackson deserializer
+  /** Default constructor for BaseResponse. (Used for Jackson deserialization.) */
   public BaseResponse() {
     this.code = 0;
   }
 
+  /**
+   * Validates the response code.
+   *
+   * @throws IllegalArgumentException if code value is negative.
+   */
   @Override
   public void validate() throws IllegalArgumentException {
     Preconditions.checkArgument(code >= 0, "code must be >= 0");

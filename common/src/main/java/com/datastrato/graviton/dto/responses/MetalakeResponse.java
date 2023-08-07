@@ -11,6 +11,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
 
+/** Represents a response containing metalake information. */
 @Getter
 @ToString
 @EqualsAndHashCode(callSuper = true)
@@ -19,17 +20,27 @@ public class MetalakeResponse extends BaseResponse {
   @JsonProperty("metalake")
   private final MetalakeDTO metalake;
 
+  /**
+   * Constructor for MetalakeResponse.
+   *
+   * @param metalake The metalake DTO.
+   */
   public MetalakeResponse(MetalakeDTO metalake) {
     super(0);
     this.metalake = metalake;
   }
 
-  // This is the constructor that is used by Jackson deserializer
+  /** Default constructor for MetalakeResponse. (Used for Jackson deserialization.) */
   public MetalakeResponse() {
     super();
     this.metalake = null;
   }
 
+  /**
+   * Validates the response data.
+   *
+   * @throws IllegalArgumentException if the metalake, name or audit information is not set.
+   */
   @Override
   public void validate() throws IllegalArgumentException {
     super.validate();

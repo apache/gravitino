@@ -13,6 +13,7 @@ import com.google.common.base.Preconditions;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
 
+/** Represents a response containing a list of catalogs. */
 @EqualsAndHashCode(callSuper = true)
 @ToString
 public class CatalogListResponse extends BaseResponse {
@@ -22,21 +23,36 @@ public class CatalogListResponse extends BaseResponse {
   @JsonProperty("catalogs")
   private final NameIdentifier[] idents;
 
+  /**
+   * Constructor for CatalogListResponse. (Used for Jackson deserialization.)
+   *
+   * @param idents The array of catalog identifiers.
+   */
   public CatalogListResponse(NameIdentifier[] idents) {
     super(0);
     this.idents = idents;
   }
 
-  // This is the constructor that is used by Jackson deserializer
+  /** Default constructor for CatalogListResponse. */
   public CatalogListResponse() {
     super();
     this.idents = null;
   }
 
+  /**
+   * Returns the array of catalog identifiers.
+   *
+   * @return The array of identifiers.
+   */
   public NameIdentifier[] getCatalogs() {
     return idents;
   }
 
+  /**
+   * Validates the response data.
+   *
+   * @throws IllegalArgumentException if catalog identifiers are not set.
+   */
   @Override
   public void validate() throws IllegalArgumentException {
     super.validate();
