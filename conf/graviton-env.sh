@@ -4,7 +4,7 @@
 #
 
 # Debug Graviton server
- export GRAVITON_DEBUG_OPTS="-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=8000"
+# export GRAVITON_DEBUG_OPTS="-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=8000 -Dlog4j2.debug=true"
 
 # export JAVA_HOME
 # export GRAVITON_HOME
