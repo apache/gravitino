@@ -105,10 +105,10 @@ public class CustomEntityKeyEncoder implements EntityKeyEncoder {
     }
 
     // Matalake use UUID as id, other entities use incremental id
-    long id =
-        isMetalake
-            ? (UUID.randomUUID().getMostSignificantBits() & Long.MAX_VALUE)
-            : getNextUsableId();
+    // According to
+    // https://stackoverflow.com/questions/325443/likelihood-of-collision-using-most-significant-bits-of-a-uuid-in-java
+    // UUID.randomUUID().getLeastSignificantBits() is a good choice for id
+    long id = isMetalake ? UUID.randomUUID().getLeastSignificantBits() : getNextUsableId();
     byte[] maxByte = ByteUtils.longToByte(id);
     LOG.info("Create new id '{}' for name '{}', isMetaLake '{}'", id, name, isMetalake);
 
