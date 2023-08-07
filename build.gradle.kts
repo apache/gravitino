@@ -5,6 +5,7 @@
 import com.diffplug.gradle.spotless.SpotlessExtension
 import com.diffplug.gradle.spotless.SpotlessPlugin
 import com.github.vlsi.gradle.dsl.configureEach
+import java.util.Locale
 
 plugins {
   `maven-publish`
@@ -52,6 +53,12 @@ allprojects {
   group = "com.datastrato.graviton"
   version = "${version}"
 
+  tasks.withType<Jar> {
+    archiveFileName.set("${rootProject.name.lowercase(Locale.getDefault())}-${project.name}-$version.jar")
+    exclude("log4j2.properties")
+    exclude("test/**")
+  }
+
   plugins.withType<SpotlessPlugin>().configureEach {
     configure<SpotlessExtension> {
       java {
@@ -63,6 +70,12 @@ allprojects {
                 "import\\s+[^\\*\\s]+\\*;(\\r\\n|\\r|\\n)",
                 "$1"
         )
+        replaceRegex(
+                "Remove static wildcard imports",
+                "import\\s+(?:static\\s+)?[^*\\s]+\\*;(\\r\\n|\\r|\\n)",
+                "$1"
+        )
+
         targetExclude("**/build/**")
       }
     }

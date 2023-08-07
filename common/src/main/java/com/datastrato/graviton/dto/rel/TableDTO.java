@@ -11,6 +11,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import java.util.Map;
 
+/** Represents a Table DTO (Data Transfer Object). */
 public class TableDTO implements Table {
 
   @JsonProperty("name")
@@ -30,6 +31,15 @@ public class TableDTO implements Table {
 
   private TableDTO() {}
 
+  /**
+   * Constructs a Table DTO.
+   *
+   * @param name The name of the table.
+   * @param comment The comment associated with the table.
+   * @param columns The columns of the table.
+   * @param properties The properties associated with the table.
+   * @param audit The audit information for the table.
+   */
   private TableDTO(
       String name,
       String comment,
@@ -68,10 +78,20 @@ public class TableDTO implements Table {
     return audit;
   }
 
+  /**
+   * Creates a new Builder to build a Table DTO.
+   *
+   * @return A new Builder instance.
+   */
   public static Builder builder() {
     return new Builder();
   }
 
+  /**
+   * Builder class for constructing TableDTO instances.
+   *
+   * @param <S> The type of the builder subclass.
+   */
   public static class Builder<S extends Builder> {
     protected String name;
     protected String comment;
@@ -81,31 +101,67 @@ public class TableDTO implements Table {
 
     public Builder() {}
 
+    /**
+     * Sets the name of the table.
+     *
+     * @param name The name of the table.
+     * @return The Builder instance.
+     */
     public S withName(String name) {
       this.name = name;
       return (S) this;
     }
 
+    /**
+     * Sets the comment associated with the table.
+     *
+     * @param comment The comment associated with the table.
+     * @return The Builder instance.
+     */
     public S withComment(String comment) {
       this.comment = comment;
       return (S) this;
     }
 
+    /**
+     * Sets the columns of the table.
+     *
+     * @param columns The columns of the table.
+     * @return The Builder instance.
+     */
     public S withColumns(ColumnDTO[] columns) {
       this.columns = columns;
       return (S) this;
     }
 
+    /**
+     * Sets the properties associated with the table.
+     *
+     * @param properties The properties associated with the table.
+     * @return The Builder instance.
+     */
     public S withProperties(Map<String, String> properties) {
       this.properties = properties;
       return (S) this;
     }
 
+    /**
+     * Sets the audit information for the table.
+     *
+     * @param audit The audit information for the table.
+     * @return The Builder instance.
+     */
     public S withAudit(AuditDTO audit) {
       this.audit = audit;
       return (S) this;
     }
 
+    /**
+     * Builds a Table DTO based on the provided builder parameters.
+     *
+     * @return A new TableDTO instance.
+     * @throws IllegalArgumentException If required fields name, columns and audit are not set.
+     */
     public TableDTO build() {
       Preconditions.checkArgument(name != null && !name.isEmpty(), "name cannot be null or empty");
       Preconditions.checkArgument(

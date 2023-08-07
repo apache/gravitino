@@ -139,7 +139,7 @@ public class MetalakeOperations {
     try {
       NameIdentifier identifier = NameIdentifier.parse(metalakeName);
       MetalakeChange[] changes =
-          updatesRequest.getRequests().stream()
+          updatesRequest.getUpdates().stream()
               .map(MetalakeUpdateRequest::metalakeChange)
               .toArray(MetalakeChange[]::new);
 
