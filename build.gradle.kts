@@ -55,11 +55,6 @@ allprojects {
   plugins.withType<SpotlessPlugin>().configureEach {
     configure<SpotlessExtension> {
       java {
-        target(fileTree(".") {
-          include("src/**/*.java")
-          exclude("**/build/**", "**/build-*/**", ".gradle/**", ".idea/**", ".git/**")
-        })
-
         googleJavaFormat()
         removeUnusedImports()
         trimTrailingWhitespace()
