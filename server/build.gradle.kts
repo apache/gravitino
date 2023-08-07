@@ -21,6 +21,11 @@ dependencies {
   implementation(libs.bundles.log4j)
   implementation(libs.bundles.jetty)
   implementation(libs.bundles.jersey)
+  implementation(libs.substrait.java.core) {
+    exclude("org.slf4j")
+    exclude("com.fasterxml.jackson.core")
+    exclude("com.fasterxml.jackson.datatype")
+  }
 
   compileOnly(libs.lombok)
   annotationProcessor(libs.lombok)

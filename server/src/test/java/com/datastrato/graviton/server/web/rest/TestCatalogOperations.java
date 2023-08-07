@@ -17,9 +17,9 @@ import com.datastrato.graviton.dto.CatalogDTO;
 import com.datastrato.graviton.dto.requests.CatalogCreateRequest;
 import com.datastrato.graviton.dto.requests.CatalogUpdateRequest;
 import com.datastrato.graviton.dto.requests.CatalogUpdatesRequest;
-import com.datastrato.graviton.dto.responses.CatalogListResponse;
 import com.datastrato.graviton.dto.responses.CatalogResponse;
 import com.datastrato.graviton.dto.responses.DropResponse;
+import com.datastrato.graviton.dto.responses.EntityListResponse;
 import com.datastrato.graviton.dto.responses.ErrorConstants;
 import com.datastrato.graviton.dto.responses.ErrorResponse;
 import com.datastrato.graviton.exceptions.CatalogAlreadyExistsException;
@@ -87,10 +87,10 @@ public class TestCatalogOperations extends JerseyTest {
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
     Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
 
-    CatalogListResponse listResponse = resp.readEntity(CatalogListResponse.class);
+    EntityListResponse listResponse = resp.readEntity(EntityListResponse.class);
     Assertions.assertEquals(0, listResponse.getCode());
 
-    NameIdentifier[] idents = listResponse.getCatalogs();
+    NameIdentifier[] idents = listResponse.identifiers();
     Assertions.assertEquals(2, idents.length);
     Assertions.assertEquals(ident1, idents[0]);
     Assertions.assertEquals(ident2, idents[1]);

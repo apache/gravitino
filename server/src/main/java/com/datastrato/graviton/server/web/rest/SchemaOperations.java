@@ -11,7 +11,7 @@ import com.datastrato.graviton.dto.requests.SchemaCreateRequest;
 import com.datastrato.graviton.dto.requests.SchemaUpdateRequest;
 import com.datastrato.graviton.dto.requests.SchemaUpdatesRequest;
 import com.datastrato.graviton.dto.responses.DropResponse;
-import com.datastrato.graviton.dto.responses.SchemaListResponse;
+import com.datastrato.graviton.dto.responses.EntityListResponse;
 import com.datastrato.graviton.dto.responses.SchemaResponse;
 import com.datastrato.graviton.exceptions.NoSuchCatalogException;
 import com.datastrato.graviton.exceptions.NoSuchSchemaException;
@@ -63,14 +63,14 @@ public class SchemaOperations {
     try {
       Namespace ns = schemaNS(metalake, catalog);
       NameIdentifier[] idents = dispatcher.listSchemas(ns);
-      return Utils.ok(new SchemaListResponse(idents));
+      return Utils.ok(new EntityListResponse(idents));
 
     } catch (IllegalArgumentException e) {
       LOG.error("Failed to validate arguments", e);
       return Utils.illegalArguments("Failed to validate arguments", e);
 
     } catch (NoSuchCatalogException e) {
-      LOG.error("Catalog {} does not exist, fail to list schema", catalog);
+      LOG.error("Catalog {} does not exist, fail to list schemas", catalog);
       return Utils.notFound("catalog " + catalog + " does not exist", e);
 
     } catch (Exception e) {
@@ -206,6 +206,7 @@ public class SchemaOperations {
       }
 
       return Utils.ok(new DropResponse(dropped));
+
     } catch (IllegalArgumentException e) {
       LOG.error("Failed to validate arguments {} {} {}", metalake, catalog, schema, e);
       return Utils.illegalArguments(

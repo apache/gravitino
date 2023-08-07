@@ -12,9 +12,9 @@ import com.datastrato.graviton.catalog.CatalogManager;
 import com.datastrato.graviton.dto.requests.CatalogCreateRequest;
 import com.datastrato.graviton.dto.requests.CatalogUpdateRequest;
 import com.datastrato.graviton.dto.requests.CatalogUpdatesRequest;
-import com.datastrato.graviton.dto.responses.CatalogListResponse;
 import com.datastrato.graviton.dto.responses.CatalogResponse;
 import com.datastrato.graviton.dto.responses.DropResponse;
+import com.datastrato.graviton.dto.responses.EntityListResponse;
 import com.datastrato.graviton.exceptions.CatalogAlreadyExistsException;
 import com.datastrato.graviton.exceptions.NoSuchCatalogException;
 import com.datastrato.graviton.exceptions.NoSuchMetalakeException;
@@ -62,7 +62,7 @@ public class CatalogOperations {
     try {
       Namespace metalakeNS = Namespace.of(metalake);
       NameIdentifier[] idents = manager.listCatalogs(metalakeNS);
-      return Utils.ok(new CatalogListResponse(idents));
+      return Utils.ok(new EntityListResponse(idents));
 
     } catch (NoSuchMetalakeException ex) {
       LOG.error("Metalake {} does not exist, fail to list catalogs", metalake);
