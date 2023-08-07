@@ -10,6 +10,7 @@ import static com.datastrato.graviton.Configs.ENTITY_KV_STORE;
 import static com.datastrato.graviton.Configs.ENTITY_STORE;
 import static com.datastrato.graviton.Configs.ENTRY_KV_ROCKSDB_BACKEND_PATH;
 import static com.datastrato.graviton.storage.kv.CustomEntityKeyEncoder.NAMESPACE_SEPARATOR;
+import static com.datastrato.graviton.storage.kv.CustomEntityKeyEncoder.WILD_CARD;
 
 import com.datastrato.graviton.Config;
 import com.datastrato.graviton.Configs;
@@ -205,7 +206,7 @@ public class TestEntityKeyEncoding {
     Mockito.doReturn(1000000L)
         .when(mockEncoder)
         .getOrCreateId(Mockito.eq("metalake1"), Mockito.eq(true));
-    NameIdentifier metalakeIdentifier = NameIdentifier.of(namespace, "*");
+    NameIdentifier metalakeIdentifier = NameIdentifier.of(namespace, WILD_CARD);
     byte[] realKey =
         mockEncoder.encode(EntityIdentifer.of(metalakeIdentifier, EntityType.METALAKE));
     byte[] expenctKey =
@@ -215,7 +216,7 @@ public class TestEntityKeyEncoding {
     // Scan all catalog in metalake1
     // metalake1 --> 1000000L
     Namespace catalogNamespace = Namespace.of("metalake1");
-    NameIdentifier catalogIdentifier = NameIdentifier.of(catalogNamespace, "*");
+    NameIdentifier catalogIdentifier = NameIdentifier.of(catalogNamespace, WILD_CARD);
     realKey = mockEncoder.encode(EntityIdentifer.of(catalogIdentifier, EntityType.CATALOG));
     expenctKey =
         Bytes.concat(
@@ -230,7 +231,7 @@ public class TestEntityKeyEncoding {
     // Scan all sc in metalake1.catalog2
     // catalog2 --> 0
     Namespace schemaNameSpace = Namespace.of("metalake1", "catalog2");
-    NameIdentifier schemaIdentifier = NameIdentifier.of(schemaNameSpace, "*");
+    NameIdentifier schemaIdentifier = NameIdentifier.of(schemaNameSpace, WILD_CARD);
     realKey = mockEncoder.encode(EntityIdentifer.of(schemaIdentifier, EntityType.SCHEMA));
     expenctKey =
         Bytes.concat(
@@ -247,7 +248,7 @@ public class TestEntityKeyEncoding {
     // Scan all table in metalake1.catalog2.schema3
     // schema3 --> 1
     Namespace tableNameSpace = Namespace.of("metalake1", "catalog2", "schema3");
-    NameIdentifier tableIdentifier = NameIdentifier.of(tableNameSpace, "*");
+    NameIdentifier tableIdentifier = NameIdentifier.of(tableNameSpace, WILD_CARD);
     realKey = mockEncoder.encode(EntityIdentifer.of(tableIdentifier, EntityType.TABLE));
     expenctKey =
         Bytes.concat(
@@ -270,7 +271,7 @@ public class TestEntityKeyEncoding {
           mockEncoder.encode(
               EntityIdentifer.of(
                   NameIdentifier.of(
-                      Namespace.of("metalake1", "catalog2", "schema3", "table1"), "*"),
+                      Namespace.of("metalake1", "catalog2", "schema3", "table1"), WILD_CARD),
                   EntityType.COLUMN));
         });
   }

@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.util.Map;
 import java.util.UUID;
 import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Encode entity key for KV backend, e.g., RocksDB. The key is used to store the entity in the
@@ -44,7 +45,7 @@ import org.slf4j.Logger;
  * </pre>
  */
 public class CustomEntityKeyEncoder implements EntityKeyEncoder {
-  public static final Logger LOG = org.slf4j.LoggerFactory.getLogger(CustomEntityKeyEncoder.class);
+  public static final Logger LOG = LoggerFactory.getLogger(CustomEntityKeyEncoder.class);
 
   // name prefix of name in name to id mapping,
   // e.g., name_metalake1 -> 1
@@ -62,7 +63,7 @@ public class CustomEntityKeyEncoder implements EntityKeyEncoder {
 
   @VisibleForTesting static final byte[] NAMESPACE_SEPARATOR = "_".getBytes();
 
-  private static final String WILD_CARD = "*";
+  @VisibleForTesting static final String WILD_CARD = "*";
 
   private final KvBackend backend;
 
@@ -111,7 +112,7 @@ public class CustomEntityKeyEncoder implements EntityKeyEncoder {
     byte[] maxByte = ByteUtils.longToByte(id);
     LOG.info("Create new id '{}' for name '{}', isMetaLake '{}'", id, name, isMetalake);
 
-    // Write current max id to storage
+    // Write current max id to storage, For metalake as it's generated from UUID, NO need to sort it
     if (!isMetalake) {
       backend.put(CURRENT_MAX_ID, maxByte, true);
     }
