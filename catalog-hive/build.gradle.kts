@@ -77,16 +77,3 @@ dependencies {
     testImplementation(libs.junit.jupiter.api)
     testRuntimeOnly(libs.junit.jupiter.engine)
 }
-
-tasks.test {
-    useJUnitPlatform()
-}
-
-task("copyDependencies", type = Copy::class) {
-    from(configurations.runtimeClasspath)
-    into("build/libs")
-}
-
-tasks.named("build") {
-    finalizedBy("copyDependencies")
-}
