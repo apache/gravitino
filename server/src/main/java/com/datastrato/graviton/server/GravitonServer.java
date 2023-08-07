@@ -87,6 +87,8 @@ public class GravitonServer extends ResourceConfig {
   }
 
   public static void main(String[] args) throws Exception {
+    LOG.info("Starting Graviton Server");
+
     GravitonServer server = new GravitonServer();
     server.initialize();
 
