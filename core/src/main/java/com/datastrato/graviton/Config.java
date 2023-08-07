@@ -132,8 +132,17 @@ public abstract class Config {
     Properties properties = new Properties();
     try (InputStream in = Files.newInputStream(file.toPath())) {
       properties.load(in);
-      return properties;
 
+      // Remove comments (comments are lines starting with `# `)
+      for (String key : properties.stringPropertyNames()) {
+        String value = properties.getProperty(key);
+        String[] splits = value.split("# ");
+        if (splits.length == 2) {
+          properties.setProperty(key, splits[0].trim());
+        }
+      }
+
+      return properties;
     } catch (Exception e) {
       LOG.error("Failed to load properties from " + file.getAbsolutePath(), e);
       throw new IOException("Failed to load properties from " + file.getAbsolutePath(), e);

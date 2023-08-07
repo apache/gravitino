@@ -32,3 +32,5 @@ gen
 *.iml
 out/**
 *.iws
+
+distribution
