@@ -58,8 +58,6 @@ function check_if_process_is_alive() {
 }
 
 function start() {
-  echo "start"
-
   local pid
 
   if [[ -f "${GRAVITON_PID}" ]]; then
@@ -72,9 +70,7 @@ function start() {
 
   initialize_default_directories
 
-#  echo "ZEPPELIN_CLASSPATH: ${ZEPPELIN_CLASSPATH_OVERRIDES}:${ZEPPELIN_CLASSPATH}" >> "${GRAVITON_OUTFILE}"
-
-  nohup nice -n ${JAVA_RUNNER} ${JAVA_OPTS} ${GRAVITON_DEBUG_OPTS} -cp ${GRAVITON_CLASSPATH} ${GRAVITON_SERVER_NAME} >> "${GRAVITON_OUTFILE}" 2>&1 < /dev/null &
+  nohup ${JAVA_RUNNER} ${JAVA_OPTS} ${GRAVITON_DEBUG_OPTS} -cp ${GRAVITON_CLASSPATH} ${GRAVITON_SERVER_NAME} >> "${GRAVITON_OUTFILE}" 2>&1 < /dev/null &
 
   pid=$!
   if [[ -z "${pid}" ]]; then
@@ -82,11 +78,11 @@ function start() {
     return 1;
   else
     echo "Graviton Server start success!"
-    echo ${pid} > ${GRAVITON_PID  }
+    echo ${pid} > ${GRAVITON_PID}
   fi
 
   wait_zeppelin_is_up_for_ci
-  sleep 2
+  sleep 3
   check_if_process_is_alive
 }
 
@@ -104,6 +100,23 @@ function version() {
 
 function getGravitonVersion() {
     echo "getGravitonVersion"
+}
+
+function find_graviton_process() {
+  local pid
+
+  if [[ -f "${GRAVITON_PID}" ]]; then
+    pid=$(cat ${GRAVITON_PID})
+    if ! kill -0 ${pid} > /dev/null 2>&1; then
+      echo "Graviton Server running but process is dead!"
+      return 1
+    else
+      echo "Graviton Server is running[$pid]"
+    fi
+  else
+    echo "Graviton Server is not running"
+    return 1
+  fi
 }
 
 GRAVITON_SERVER_NAME=com.datastrato.graviton.server.GravitonServer
@@ -153,7 +166,7 @@ case "${1}" in
     start
     ;;
   status)
-    find_zeppelin_process
+    find_graviton_process
     ;;
   -v | --version)
     getGravitonVersion
