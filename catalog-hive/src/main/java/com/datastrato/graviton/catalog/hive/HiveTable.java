@@ -18,7 +18,6 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.Getter;
 import lombok.ToString;
-import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.SerDeInfo;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
@@ -30,23 +29,13 @@ import org.apache.hadoop.hive.metastore.api.Table;
 public class HiveTable extends BaseTable {
 
   // A set of supported Hive table types.
-  public static final Set<TableType> SUPPORT_TABLE_TYPES =
-      Sets.newHashSet(MANAGED_TABLE, EXTERNAL_TABLE);
+  public static final Set<String> SUPPORT_TABLE_TYPES =
+      Sets.newHashSet(MANAGED_TABLE.name(), EXTERNAL_TABLE.name());
 
   // The key to store the Hive table comment in the parameters map.
   public static final String HMS_TABLE_COMMENT = "comment";
 
-  private String inputFormat;
-
-  private String outputFormat;
-
-  private String serLib;
-
-  private TableType tableType;
-
   private String location;
-
-  private int createTime;
 
   private HiveTable() {}
 
@@ -62,7 +51,6 @@ public class HiveTable extends BaseTable {
     return builder
         .withComment(table.getParameters().get(HMS_TABLE_COMMENT))
         .withProperties(table.getParameters())
-        .withTableType(TableType.valueOf(table.getTableType()))
         .withColumns(
             table.getSd().getCols().stream()
                 .map(
@@ -73,11 +61,7 @@ public class HiveTable extends BaseTable {
                             .withComment(f.getComment())
                             .build())
                 .toArray(HiveColumn[]::new))
-        .withOutputFormat(table.getSd().getOutputFormat())
-        .withInputFormat(table.getSd().getInputFormat())
-        .withSerLib(table.getSd().getSerdeInfo().getSerializationLib())
         .withLocation(table.getSd().getLocation())
-        .withCreateTime(table.getCreateTime())
         .build();
   }
 
@@ -91,11 +75,8 @@ public class HiveTable extends BaseTable {
 
     hiveTable.setTableName(name);
     hiveTable.setDbName(schemaIdentifier().name());
-    hiveTable.setOwner(auditInfo.creator());
     hiveTable.setSd(buildStorageDescriptor());
-    hiveTable.setTableType(String.valueOf(tableType));
     hiveTable.setParameters(properties);
-    hiveTable.setCreateTime(createTime);
     hiveTable.setPartitionKeys(Lists.newArrayList() /* TODO(Minghuang): Add partition support */);
 
     return hiveTable;
@@ -112,18 +93,16 @@ public class HiveTable extends BaseTable {
                         c.dataType().accept(ToHiveType.INSTANCE).getQualifiedName(),
                         c.comment()))
             .collect(Collectors.toList()));
-    sd.setLocation(location);
-    sd.setInputFormat(inputFormat);
-    sd.setOutputFormat(outputFormat);
     sd.setSerdeInfo(buildSerDeInfo());
+    // `location` must not be null, otherwise it will result in an NPE when calling HMS `alterTable`
+    // interface
+    sd.setLocation(location);
     return sd;
   }
 
   private SerDeInfo buildSerDeInfo() {
-    SerDeInfo serDeInfo = new SerDeInfo();
-    serDeInfo.setName(name);
-    serDeInfo.setSerializationLib(serLib);
-    return serDeInfo;
+    // TODO(minghuang): Build SerDeInfo object based on user specifications.
+    return new SerDeInfo();
   }
 
   /**
@@ -137,63 +116,13 @@ public class HiveTable extends BaseTable {
 
   /** A builder class for constructing HiveTable instances. */
   public static class Builder extends BaseTableBuilder<Builder, HiveTable> {
-    private String inputFormat;
 
-    private String outputFormat;
-
-    private String serLib;
-
-    private TableType tableType;
-
+    // currently, load from HMS only
+    // TODO(minghuang): Support user specify`location` property
     private String location;
-
-    private int createTime;
-
-    /**
-     * Sets the input format for the HiveTable.
-     *
-     * @param inputFormat The input format to set.
-     * @return The Builder instance.
-     */
-    public Builder withInputFormat(String inputFormat) {
-      this.inputFormat = inputFormat;
-      return this;
-    }
-
-    /**
-     * Sets the output format for the HiveTable.
-     *
-     * @param outputFormat The output format to set.
-     * @return The Builder instance.
-     */
-    public Builder withOutputFormat(String outputFormat) {
-      this.outputFormat = outputFormat;
-      return this;
-    }
-
-    public Builder withSerLib(String serLib) {
-      this.serLib = serLib;
-      return this;
-    }
-
-    /**
-     * Sets the table type for the HiveTable.
-     *
-     * @param tableType The table type to set.
-     * @return The Builder instance.
-     */
-    public Builder withTableType(TableType tableType) {
-      this.tableType = tableType;
-      return this;
-    }
 
     public Builder withLocation(String location) {
       this.location = location;
-      return this;
-    }
-
-    public Builder withCreateTime(int createTime) {
-      this.createTime = createTime;
       return this;
     }
 
@@ -213,12 +142,7 @@ public class HiveTable extends BaseTable {
       hiveTable.properties = properties;
       hiveTable.auditInfo = auditInfo;
       hiveTable.columns = columns;
-      hiveTable.inputFormat = inputFormat;
-      hiveTable.outputFormat = outputFormat;
-      hiveTable.serLib = serLib;
       hiveTable.location = location;
-      hiveTable.createTime = createTime;
-      hiveTable.tableType = tableType == null ? MANAGED_TABLE : tableType;
 
       // HMS put table comment in parameters
       hiveTable.properties.put(HMS_TABLE_COMMENT, comment);

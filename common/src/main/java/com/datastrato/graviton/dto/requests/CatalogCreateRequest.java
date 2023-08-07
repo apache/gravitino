@@ -14,6 +14,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
 
+/** Represents a request to create a catalog. */
 @Getter
 @EqualsAndHashCode
 @ToString
@@ -33,10 +34,19 @@ public class CatalogCreateRequest implements RESTRequest {
   @JsonProperty("properties")
   private final Map<String, String> properties;
 
+  /** Default constructor for CatalogCreateRequest. */
   public CatalogCreateRequest() {
     this(null, null, null, null);
   }
 
+  /**
+   * Constructor for CatalogCreateRequest.
+   *
+   * @param name The name of the catalog.
+   * @param type The type of the catalog.
+   * @param comment The comment for the catalog.
+   * @param properties The properties for the catalog.
+   */
   public CatalogCreateRequest(
       String name, Catalog.Type type, String comment, Map<String, String> properties) {
     this.name = name;
@@ -45,6 +55,11 @@ public class CatalogCreateRequest implements RESTRequest {
     this.properties = properties;
   }
 
+  /**
+   * Validates the fields of the request.
+   *
+   * @throws IllegalArgumentException if name or type are not set.
+   */
   @Override
   public void validate() throws IllegalArgumentException {
     Preconditions.checkArgument(

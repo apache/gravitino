@@ -63,6 +63,12 @@ allprojects {
                 "import\\s+[^\\*\\s]+\\*;(\\r\\n|\\r|\\n)",
                 "$1"
         )
+        replaceRegex(
+                "Remove static wildcard imports",
+                "import\\s+(?:static\\s+)?[^*\\s]+\\*;(\\r\\n|\\r|\\n)",
+                "$1"
+        )
+
         targetExclude("**/build/**")
       }
     }
