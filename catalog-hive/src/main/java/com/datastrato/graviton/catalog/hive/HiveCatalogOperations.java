@@ -6,7 +6,6 @@ package com.datastrato.graviton.catalog.hive;
 
 import static com.datastrato.graviton.catalog.hive.HiveTable.HMS_TABLE_COMMENT;
 import static com.datastrato.graviton.catalog.hive.HiveTable.SUPPORT_TABLE_TYPES;
-import static org.apache.hadoop.hive.metastore.TableType.EXTERNAL_TABLE;
 
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
@@ -30,7 +29,6 @@ import com.datastrato.graviton.rel.TableCatalog;
 import com.datastrato.graviton.rel.TableChange;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
@@ -38,7 +36,6 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.conf.HiveConf;
-import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.AlreadyExistsException;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
@@ -397,22 +394,30 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     }
 
     try {
-      List<NameIdentifier> tables = Lists.newArrayList();
-
-      for (TableType tableType : SUPPORT_TABLE_TYPES) {
-        tables.addAll(
-            clientPool.run(
-                c ->
-                    c.getTables(schemaIdent.name(), "*", tableType).stream()
-                        .map(tb -> NameIdentifier.of(namespace, tb))
-                        .collect(Collectors.toList())));
-      }
-
-      return tables.toArray(new NameIdentifier[0]);
+      // When a table is created using the HMS interface without specifying the `tableType`,
+      // although Hive treats it as a `MANAGED_TABLE`, it cannot be queried through the `getTable`
+      // interface in HMS with the specified `tableType`. This is because when creating a table
+      // without  specifying the `tableType`, the underlying engine of HMS does not store the
+      // information of  `tableType`. However, once the `getTable` interface specifies a
+      // `tableType`, HMS will use it as a filter condition to query its underlying storage and
+      // these types of tables will be  filtered out.
+      // Therefore, in order to avoid missing these types of tables, we need to query HMS twice. The
+      // first time is to retrieve all types of table names (including the missing type tables), and
+      // then based on
+      // those names we can obtain metadata for each individual table and get the type we needed.
+      List<String> allTables = clientPool.run(c -> c.getAllTables(schemaIdent.name()));
+      return clientPool.run(
+          c ->
+              c.getTableObjectsByName(schemaIdent.name(), allTables).stream()
+                  .filter(tb -> SUPPORT_TABLE_TYPES.contains(tb.getTableType()))
+                  .map(tb -> NameIdentifier.of(namespace, tb.getTableName()))
+                  .toArray(NameIdentifier[]::new));
+    } catch (UnknownDBException e) {
+      throw new NoSuchSchemaException(
+          "Schema (database) does not exist " + namespace + " in Hive Metastore");
     } catch (TException e) {
       throw new RuntimeException(
-          "Failed to list all tables under under namespace : " + namespace + " in Hive Metastore",
-          e);
+          "Failed to list all tables under the namespace : " + namespace + " in Hive Metastore", e);
     } catch (InterruptedException e) {
       throw new RuntimeException(e);
     }
@@ -768,9 +773,8 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
   @Override
   public boolean purgeTable(NameIdentifier tableIdent) throws UnsupportedOperationException {
     HiveTable table = (HiveTable) loadTable(tableIdent);
-    if (EXTERNAL_TABLE == table.getTableType()) {
-      throw new UnsupportedOperationException("Cannot purge Hive table with type EXTERNAL_TABLE");
-    }
+    // TODO(minghuang): HiveTable support specify `tableType`, then reject purge Hive table with
+    //  `tableType` EXTERNAL_TABLE
     return dropHiveTable(tableIdent, true, true);
   }
 
