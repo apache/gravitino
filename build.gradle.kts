@@ -55,6 +55,11 @@ allprojects {
   plugins.withType<SpotlessPlugin>().configureEach {
     configure<SpotlessExtension> {
       java {
+        target(fileTree(".") {
+          include("src/**/*.java")
+          exclude("**/build/**", "**/build-*/**", ".gradle/**", ".idea/**", ".git/**")
+        })
+
         googleJavaFormat()
         removeUnusedImports()
         trimTrailingWhitespace()
@@ -63,6 +68,12 @@ allprojects {
                 "import\\s+[^\\*\\s]+\\*;(\\r\\n|\\r|\\n)",
                 "$1"
         )
+        replaceRegex(
+                "Remove static wildcard imports",
+                "import\\s+(?:static\\s+)?[^*\\s]+\\*;(\\r\\n|\\r|\\n)",
+                "$1"
+        )
+
         targetExclude("**/build/**")
       }
     }
