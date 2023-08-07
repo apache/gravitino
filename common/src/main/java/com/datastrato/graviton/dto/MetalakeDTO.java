@@ -13,6 +13,7 @@ import javax.annotation.Nullable;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
 
+/** Represents a Metalake Data Transfer Object (DTO) that implements the Metalake interface. */
 @EqualsAndHashCode
 @ToString
 public class MetalakeDTO implements Metalake {
@@ -61,6 +62,11 @@ public class MetalakeDTO implements Metalake {
     return audit;
   }
 
+  /**
+   * A builder class for constructing instances of MetalakeDTO.
+   *
+   * @param <S> The type of the builder subclass.
+   */
   public static class Builder<S extends Builder> {
 
     protected String name;
@@ -70,26 +76,56 @@ public class MetalakeDTO implements Metalake {
 
     public Builder() {}
 
+    /**
+     * Sets the name of the Metalake DTO.
+     *
+     * @param name The name of the Metalake DTO.
+     * @return The builder instance.
+     */
     public S withName(String name) {
       this.name = name;
       return (S) this;
     }
 
+    /**
+     * Sets the comment of the Metalake DTO.
+     *
+     * @param comment The comment of the Metalake DTO.
+     * @return The builder instance.
+     */
     public S withComment(String comment) {
       this.comment = comment;
       return (S) this;
     }
 
+    /**
+     * Sets the properties of the Metalake DTO.
+     *
+     * @param properties The properties of the Metalake DTO.
+     * @return The builder instance.
+     */
     public S withProperties(Map<String, String> properties) {
       this.properties = properties;
       return (S) this;
     }
 
+    /**
+     * Sets the audit information of the Metalake DTO.
+     *
+     * @param audit The audit information of the Metalake DTO.
+     * @return The builder instance.
+     */
     public S withAudit(AuditDTO audit) {
       this.audit = audit;
       return (S) this;
     }
 
+    /**
+     * Builds an instance of MetalakeDTO using the builder's properties.
+     *
+     * @return An instance of MetalakeDTO.
+     * @throws IllegalArgumentException If the name or audit are not set.
+     */
     public MetalakeDTO build() {
       Preconditions.checkArgument(name != null && !name.isEmpty(), "name cannot be null or empty");
       Preconditions.checkArgument(audit != null, "audit cannot be null");

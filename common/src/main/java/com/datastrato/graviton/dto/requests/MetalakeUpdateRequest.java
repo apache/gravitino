@@ -15,6 +15,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
 
+/** Represents an interface for Metalake update requests. */
 @JsonIgnoreProperties(ignoreUnknown = true)
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY)
 @JsonSubTypes({
@@ -31,6 +32,11 @@ import lombok.ToString;
 })
 public interface MetalakeUpdateRequest extends RESTRequest {
 
+  /**
+   * Returns the Metalake change associated with this request.
+   *
+   * @return The Metalake change.
+   */
   MetalakeChange metalakeChange();
 
   @EqualsAndHashCode
@@ -41,14 +47,25 @@ public interface MetalakeUpdateRequest extends RESTRequest {
     @JsonProperty("newName")
     private final String newName;
 
+    /**
+     * Constructor for RenameMetalakeRequest.
+     *
+     * @param newName The new name for the Metalake.
+     */
     public RenameMetalakeRequest(String newName) {
       this.newName = newName;
     }
 
+    /** Default constructor for RenameMetalakeRequest. */
     public RenameMetalakeRequest() {
       this(null);
     }
 
+    /**
+     * Validates the fields of the request.
+     *
+     * @throws IllegalArgumentException if the new name is not set.
+     */
     @Override
     public void validate() throws IllegalArgumentException {
       Preconditions.checkArgument(
@@ -70,14 +87,25 @@ public interface MetalakeUpdateRequest extends RESTRequest {
     @JsonProperty("newComment")
     private final String newComment;
 
+    /**
+     * Constructor for UpdateMetalakeCommentRequest.
+     *
+     * @param newComment The new comment for the Metalake.
+     */
     public UpdateMetalakeCommentRequest(String newComment) {
       this.newComment = newComment;
     }
 
+    /** Default constructor for UpdateMetalakeCommentRequest. */
     public UpdateMetalakeCommentRequest() {
       this(null);
     }
 
+    /**
+     * Validates the fields of the request.
+     *
+     * @throws IllegalArgumentException if the new comment is not set.
+     */
     @Override
     public void validate() throws IllegalArgumentException {
       Preconditions.checkArgument(
@@ -102,15 +130,27 @@ public interface MetalakeUpdateRequest extends RESTRequest {
     @JsonProperty("value")
     private final String value;
 
+    /**
+     * Constructor for SetMetalakePropertyRequest.
+     *
+     * @param property The property to set.
+     * @param value The value of the property.
+     */
     public SetMetalakePropertyRequest(String property, String value) {
       this.property = property;
       this.value = value;
     }
 
+    /** Default constructor for SetMetalakePropertyRequest. */
     public SetMetalakePropertyRequest() {
       this(null, null);
     }
 
+    /**
+     * Validates the fields of the request.
+     *
+     * @throws IllegalArgumentException if property or value are not set.
+     */
     @Override
     public void validate() throws IllegalArgumentException {
       Preconditions.checkArgument(
@@ -134,14 +174,25 @@ public interface MetalakeUpdateRequest extends RESTRequest {
     @JsonProperty("property")
     private final String property;
 
+    /**
+     * Constructor for RemoveMetalakePropertyRequest.
+     *
+     * @param property The property to remove.
+     */
     public RemoveMetalakePropertyRequest(String property) {
       this.property = property;
     }
 
+    /** Default constructor for RemoveMetalakePropertyRequest. */
     public RemoveMetalakePropertyRequest() {
       this(null);
     }
 
+    /**
+     * Validates the fields of the request.
+     *
+     * @throws IllegalArgumentException if property is not set.
+     */
     @Override
     public void validate() throws IllegalArgumentException {
       Preconditions.checkArgument(
