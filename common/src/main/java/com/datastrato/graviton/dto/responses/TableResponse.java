@@ -10,6 +10,7 @@ import com.google.common.base.Preconditions;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
+import org.apache.commons.lang3.StringUtils;
 
 @Getter
 @ToString
@@ -34,14 +35,15 @@ public class TableResponse extends BaseResponse {
   public void validate() throws IllegalArgumentException {
     super.validate();
 
-    Preconditions.checkArgument(table != null, "table must be non-null");
+    Preconditions.checkArgument(table != null, "table must not be null");
     Preconditions.checkArgument(
-        table.name() != null && !table.name().isEmpty(), "table 'name' must not be null and empty");
+        StringUtils.isNotBlank(table.name()), "table 'name' must not be null and empty");
     Preconditions.checkArgument(
-        table.columns() != null && table.columns().length == 0,
+        table.columns() != null && table.columns().length > 0,
         "table 'columns' must not be null and empty");
+    Preconditions.checkArgument(table.auditInfo() != null, "table 'audit' must not be null");
     Preconditions.checkArgument(
-        table.auditInfo().creator() != null && !table.auditInfo().creator().isEmpty(),
+        StringUtils.isNotBlank(table.auditInfo().creator()),
         "table 'audit.creator' must not be null and empty");
     Preconditions.checkArgument(
         table.auditInfo().createTime() != null, "table 'audit.createTime' must not be null");

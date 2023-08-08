@@ -34,7 +34,6 @@ public class EntityListResponse extends BaseResponse {
   }
 
   /** Default constructor for EntityListResponse. (Used for Jackson deserialization.) */
-  // This is the constructor that is used by Jackson deserializer
   public EntityListResponse() {
     super();
     this.idents = null;
