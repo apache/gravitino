@@ -153,6 +153,12 @@ public class RocksDBKvBackend implements KvBackend {
     int count = 0;
     while (count < scanRange.getLimit() && rocksIterator.isValid()) {
       byte[] key = rocksIterator.key();
+
+      // Break if the key is out of the scan range
+      if (Bytes.wrap(key).compareTo(scanRange.getEnd()) > 0) {
+        break;
+      }
+
       if (Bytes.wrap(key).compareTo(scanRange.getStart()) == 0) {
         if (scanRange.isStartInclusive()) {
           result.add(Pair.of(key, rocksIterator.value()));
@@ -162,7 +168,6 @@ public class RocksDBKvBackend implements KvBackend {
         if (scanRange.isEndInclusive()) {
           result.add(Pair.of(key, rocksIterator.value()));
         }
-
         break;
       } else {
         result.add(Pair.of(key, rocksIterator.value()));
@@ -235,5 +240,13 @@ public class RocksDBKvBackend implements KvBackend {
           e1.getMessage(),
           Throwables.getStackTraceAsString(e));
     }
+  }
+
+  @Override
+  public boolean isInTransaction() {
+    // TODO (yuqi), check if the transaction is still valid and We do not allow transaction nesting
+    //  That is, A transaction can not be started inside another transaction when outer transaction
+    //  is still active
+    return TX_LOCAL.get() != null;
   }
 }

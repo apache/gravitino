@@ -4,6 +4,7 @@
  */
 package com.datastrato.graviton;
 
+import com.datastrato.graviton.Entity.EntityType;
 import com.datastrato.graviton.util.Executable;
 import java.io.Closeable;
 import java.io.IOException;
@@ -43,8 +44,8 @@ public interface EntityStore extends Closeable {
    * @param type the type of the entity
    * @throws IOException if the list operation fails
    */
-  <E extends Entity & HasIdentifier> List<E> list(Namespace namespace, Class<E> type)
-      throws IOException;
+  <E extends Entity & HasIdentifier> List<E> list(
+      Namespace namespace, Class<E> type, EntityType entityType) throws IOException;
 
   /**
    * Check if the entity with the specified {@link NameIdentifier} exists.
@@ -53,20 +54,18 @@ public interface EntityStore extends Closeable {
    * @return true if the entity exists, false otherwise
    * @throws IOException if the check operation fails
    */
-  boolean exists(NameIdentifier ident) throws IOException;
+  boolean exists(NameIdentifier ident, EntityType entityType) throws IOException;
 
   /**
    * Store the entity into the underlying storage. If the entity already exists, it will overwrite
    * the existing entity.
    *
-   * @param ident the unique identifier of the entity
    * @param e the entity to store
    * @param <E> the type of the entity
    * @throws IOException if the store operation fails
    */
-  default <E extends Entity & HasIdentifier> void put(NameIdentifier ident, E e)
-      throws IOException {
-    put(ident, e, false);
+  default <E extends Entity & HasIdentifier> void put(E e) throws IOException {
+    put(e, false);
   }
 
   /**
@@ -76,7 +75,6 @@ public interface EntityStore extends Closeable {
    * <p>Note. The implementation should be transactional, and should be able to handle concurrent
    * store of entities.
    *
-   * @param ident the unique identifier of the entity
    * @param e the entity to store
    * @param overwritten whether to overwrite the existing entity
    * @param <E> the type of the entity
@@ -84,7 +82,7 @@ public interface EntityStore extends Closeable {
    * @throws EntityAlreadyExistsException if the entity already exists and the overwritten flag is
    *     set to false
    */
-  <E extends Entity & HasIdentifier> void put(NameIdentifier ident, E e, boolean overwritten)
+  <E extends Entity & HasIdentifier> void put(E e, boolean overwritten)
       throws IOException, EntityAlreadyExistsException;
 
   /**
@@ -108,7 +106,7 @@ public interface EntityStore extends Closeable {
    * @throws NoSuchEntityException if the entity does not exist
    */
   <E extends Entity & HasIdentifier> E update(
-      NameIdentifier ident, Class<E> type, Function<E, E> updater)
+      NameIdentifier ident, Class<E> type, EntityType entityType, Function<E, E> updater)
       throws IOException, NoSuchEntityException;
 
   /**
@@ -119,11 +117,10 @@ public interface EntityStore extends Closeable {
    *
    * @param ident the unique identifier of the entity
    * @return the entity retrieved from the underlying storage
-   * @param type the type of the entity
    * @throws NoSuchEntityException if the entity does not exist
    * @throws IOException if the retrieve operation fails
    */
-  <E extends Entity & HasIdentifier> E get(NameIdentifier ident, Class<E> type)
+  <E extends Entity & HasIdentifier> E get(NameIdentifier ident, EntityType entityType, Class<E> e)
       throws NoSuchEntityException, IOException;
 
   /**
@@ -133,7 +130,7 @@ public interface EntityStore extends Closeable {
    * @return true if the entity is deleted, false otherwise
    * @throws IOException if the delete operation fails
    */
-  boolean delete(NameIdentifier ident) throws IOException;
+  boolean delete(NameIdentifier ident, EntityType entityType) throws IOException;
 
   /**
    * Execute the specified {@link Executable} in a transaction.
