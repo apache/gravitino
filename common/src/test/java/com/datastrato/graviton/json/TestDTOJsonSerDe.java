@@ -124,7 +124,7 @@ public class TestDTOJsonSerDe {
     AuditDTO audit =
         AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build();
     CatalogDTO catalog =
-        CatalogDTO.builder()
+        new CatalogDTO.Builder()
             .withName("catalog")
             .withType(Catalog.Type.RELATIONAL)
             .withComment("comment")
@@ -138,7 +138,7 @@ public class TestDTOJsonSerDe {
 
     // test with optional fields
     CatalogDTO catalog1 =
-        CatalogDTO.builder()
+        new CatalogDTO.Builder()
             .withName("catalog")
             .withType(Catalog.Type.RELATIONAL)
             .withAudit(audit)
