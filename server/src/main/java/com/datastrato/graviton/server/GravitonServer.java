@@ -92,7 +92,7 @@ public class GravitonServer extends ResourceConfig {
     server.initialize();
 
     try {
-      // Instantiates SubmarineServer
+      // Instantiates GravitonServer
       server.start();
     } catch (Exception e) {
       LOG.error("Error while running jettyServer", e);
@@ -113,7 +113,7 @@ public class GravitonServer extends ResourceConfig {
                   } catch (Exception e) {
                     LOG.error("Error while stopping servlet container", e);
                   }
-                  LOG.info("Done, Shutting down Graviton Server.");
+                  LOG.info("Graviton Server has shut down.");
                 }));
 
     server.join();

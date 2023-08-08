@@ -3,10 +3,9 @@
 # Copyright 2023 Datastrato.
 # This software is licensed under the Apache License version 2.
 #
-set -ex
+#set -ex
 USAGE="-e Usage: bin/graviton.sh [--config <conf-dir>]\n\t
-        {start|stop|restart|status}\n\t
-        [--version | -v]"
+        {start|stop|restart|status}"
 
 if [[ "$1" == "--config" ]]; then
   shift
