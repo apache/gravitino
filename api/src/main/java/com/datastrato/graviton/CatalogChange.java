@@ -71,6 +71,7 @@ public interface CatalogChange {
   }
 
   @Getter
+  @EqualsAndHashCode
   final class SetProperty implements CatalogChange {
     private final String property;
     private final String value;
@@ -82,6 +83,7 @@ public interface CatalogChange {
   }
 
   @Getter
+  @EqualsAndHashCode
   final class RemoveProperty implements CatalogChange {
     private final String property;
 

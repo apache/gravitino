@@ -3,10 +3,11 @@
  * This software is licensed under the Apache License version 2.
  */
 
-package com.datastrato.graviton;
+package com.datastrato.graviton.client;
 
-import com.datastrato.graviton.client.HTTPClient;
-import com.datastrato.graviton.client.RESTClient;
+import com.datastrato.graviton.MetalakeChange;
+import com.datastrato.graviton.NameIdentifier;
+import com.datastrato.graviton.SupportsMetalakes;
 import com.datastrato.graviton.dto.requests.MetalakeCreateRequest;
 import com.datastrato.graviton.dto.requests.MetalakeUpdateRequest;
 import com.datastrato.graviton.dto.requests.MetalakeUpdatesRequest;
@@ -88,7 +89,7 @@ public class GravitonClient implements SupportsMetalakes, Closeable {
 
     MetalakeResponse resp =
         restClient.get(
-            "api/metalakes/" + ident.toString(),
+            "api/metalakes/" + ident.name(),
             MetalakeResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.metalakeErrorHandler());
@@ -116,7 +117,7 @@ public class GravitonClient implements SupportsMetalakes, Closeable {
         !ident.hasNamespace(),
         "Metalake name identifier is a top-level identifier, namespace should be empty");
 
-    MetalakeCreateRequest req = new MetalakeCreateRequest(ident.toString(), comment, properties);
+    MetalakeCreateRequest req = new MetalakeCreateRequest(ident.name(), comment, properties);
     req.validate();
 
     MetalakeResponse resp =
@@ -157,7 +158,7 @@ public class GravitonClient implements SupportsMetalakes, Closeable {
 
     MetalakeResponse resp =
         restClient.put(
-            "api/metalakes/" + ident.toString(),
+            "api/metalakes/" + ident.name(),
             updatesRequest,
             MetalakeResponse.class,
             Collections.emptyMap(),
@@ -183,7 +184,7 @@ public class GravitonClient implements SupportsMetalakes, Closeable {
     try {
       DropResponse resp =
           restClient.delete(
-              "api/metalakes/" + ident.toString(),
+              "api/metalakes/" + ident.name(),
               DropResponse.class,
               Collections.emptyMap(),
               ErrorHandlers.metalakeErrorHandler());
