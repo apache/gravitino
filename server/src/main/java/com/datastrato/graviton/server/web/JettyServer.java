@@ -7,6 +7,7 @@ package com.datastrato.graviton.server.web;
 import com.datastrato.graviton.Config;
 import com.datastrato.graviton.server.GravitonServerException;
 import com.datastrato.graviton.server.ServerConfig;
+import com.datastrato.graviton.server.web.rest.HealthCheck;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.net.BindException;
 import java.util.EnumSet;
@@ -53,12 +54,14 @@ public final class JettyServer {
   public synchronized void initialize(Config config) {
     int coreThreads = config.get(ServerConfig.WEBSERVER_CORE_THREADS);
     int maxThreads = config.get(ServerConfig.WEBSERVER_MAX_THREADS);
-    ExecutorThreadPool threadPool = createThreadPool(coreThreads, maxThreads);
+    long idleTimeout = config.get(ServerConfig.WEBSERVER_STOP_IDLE_TIMEOUT);
+    // ExecutorThreadPool threadPool2 = createThreadPool(coreThreads, maxThreads);
+    ThreadPool threadPool2 = new QueuedThreadPool(maxThreads, coreThreads, (int) idleTimeout);
 
     // Create and config Jetty Server
-    server = new Server(threadPool);
+    server = new Server(threadPool2);
     server.setStopAtShutdown(true);
-    server.setStopTimeout(config.get(ServerConfig.WEBSERVER_STOP_IDLE_TIMEOUT));
+    server.setStopTimeout(idleTimeout);
 
     // Set error handler for Jetty Server
     ErrorHandler errorHandler = new ErrorHandler();
@@ -146,6 +149,7 @@ public final class JettyServer {
     this.servletContextHandler = new ServletContextHandler();
     servletContextHandler.setContextPath("/");
     servletContextHandler.addServlet(DefaultServlet.class, "/");
+    servletContextHandler.addServlet(HealthCheck.class, "/health");
 
     HandlerCollection handlers = new HandlerCollection();
     handlers.addHandler(servletContextHandler);

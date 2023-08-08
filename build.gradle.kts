@@ -150,6 +150,12 @@ tasks {
         from(projectDir.dir("conf")) { into("package/conf") }
         from(projectDir.dir("bin")) { into("package/bin") }
         into(outputDir)
+        rename { fileName ->
+          // a simple way is to remove the "-$version" from the jar filename
+          // but you can customize the filename replacement rule as you wish.
+          fileName.replace(".template", "")
+        }
+        fileMode = 0b111101101
       }
     }
   }
@@ -160,7 +166,7 @@ tasks {
     from(compileDistribution.map { it.outputs.files.single() })
     archiveBaseName.set("datastrato")
     archiveAppendix.set(rootProject.name.lowercase())
-    archiveVersion.set("${version}")// .set(version)
+    archiveVersion.set("${version}")
     archiveClassifier.set("bin")
     destinationDirectory.set(outputDir)
   }
@@ -184,12 +190,13 @@ tasks {
   val cleanDistribution by registering(Delete::class) {
     group = "graviton distribution"
     delete(outputDir)
+    delete("/tmp/graviton")
   }
 
   val copyRuntimeClass by registering(Copy::class) {
     subprojects.forEach() {
       if (it.name != "catalog-hive") {
-        println("copyRuntimeClass: ${it.name}")
+        // println("copyRuntimeClass: ${it.name}")
         from(it.configurations.runtimeClasspath)
         into("distribution/package/lib")
       }
@@ -199,7 +206,7 @@ tasks {
   val copyCatalogRuntimeClass by registering(Copy::class) {
     subprojects.forEach() {
       if (it.name == "catalog-hive") {
-        println("copyCatalogRuntimeClass: ${it.name}")
+        // println("copyCatalogRuntimeClass: ${it.name}")
         from(it.configurations.runtimeClasspath)
         into("distribution/package/catalog/catalog-hive/lib")
       }
@@ -208,8 +215,7 @@ tasks {
 
   val copySubmoduleClass by registering(Copy::class) {
     subprojects.forEach() {
-      println("copySubmoduleClass: ${it.name}")
-//    from(it.configurations.runtimeClasspath)
+      // println("copySubmoduleClass: ${it.name}")
       from("${it.name}/build/libs")
       into("distribution/package/lib")
       include("*.jar")
@@ -217,6 +223,7 @@ tasks {
     }
   }
 
+  // Print all dependencies of all subprojects, `./gradlew allDeps`
   task("allDeps") {
     doLast {
       subprojects.forEach { project ->
