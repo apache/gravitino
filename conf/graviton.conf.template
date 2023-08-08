@@ -6,8 +6,8 @@
 # The configuration for Graviton Server
 graviton.server.webserver.host                127.0.0.1 # The host name of the built-in web server
 graviton.server.webserver.httpPort            8090      # The http port number of the built-in web server
-graviton.server.webserver.coreThreads         2         # The core thread size of the built-in web server
-graviton.server.webserver.maxThreads          4         # The max thread size of the built-in web server
+graviton.server.webserver.coreThreads         24        # The core thread size of the built-in web server
+graviton.server.webserver.maxThreads          200       # The max thread size of the built-in web server
 graviton.server.webserver.stopIdleTimeout     30000     # The stop idle timeout of the built-in web server
 graviton.server.webserver.requestHeaderSize   131072    # The request header size of the built-in web server
 graviton.server.webserver.responseHeaderSize  131072    # The response header size of the built-in web server
