@@ -56,10 +56,9 @@ public final class JettyServer {
     int maxThreads = config.get(ServerConfig.WEBSERVER_MAX_THREADS);
     long idleTimeout = config.get(ServerConfig.WEBSERVER_STOP_IDLE_TIMEOUT);
     ExecutorThreadPool threadPool = createThreadPool(coreThreads, maxThreads);
-    ThreadPool threadPool2 = new QueuedThreadPool(maxThreads, coreThreads, (int) idleTimeout);
 
     // Create and config Jetty Server
-    server = new Server(threadPool2);
+    server = new Server(threadPool);
     server.setStopAtShutdown(true);
     server.setStopTimeout(idleTimeout);
 
