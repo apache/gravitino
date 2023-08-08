@@ -24,10 +24,6 @@ if [[ -z "${GRAVITON_LOG_DIR}" ]]; then
   export GRAVITON_LOG_DIR="${GRAVITON_HOME}/logs"
 fi
 
-if [[ -z "${GRAVITON_PID_DIR}" ]]; then
-  export GRAVITON_PID_DIR="${GRAVITON_HOME}/run"
-fi
-
 if [[ -f "${GRAVITON_CONF_DIR}/graviton-env.sh" ]]; then
   . "${GRAVITON_CONF_DIR}/graviton-env.sh"
 fi
