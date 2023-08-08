@@ -20,12 +20,11 @@ public class TestByteUtils {
     assert v == v2;
   }
 
-
   @Test
   public void testLongToByte() {
     long v = 259;
     byte[] b = ByteUtils.longToByte(v);
-    Assertions.assertArrayEquals(new byte[] {0x00, 0x00, 0x00, 0x00, 0x00, 0x00 ,0x01, 0x03}, b);
+    Assertions.assertArrayEquals(new byte[] {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x03}, b);
     long v2 = ByteUtils.byteToLong(b);
     assert v == v2;
   }
