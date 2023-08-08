@@ -17,10 +17,10 @@ import lombok.ToString;
 @EqualsAndHashCode
 @ToString
 public abstract class BaseColumn implements Column, Entity {
-  public static final Field NAME = Field.required("name", String.class, "The name of the column");
+  public static final Field NAME = Field.required("name", String.class, "The column's name");
   public static final Field COMMENT =
-      Field.optional("comment", String.class, "The comment of the column");
-  public static final Field TYPE = Field.required("dataType", Type.class, "The type of the column");
+      Field.optional("comment", String.class, "The comment or description for the column");
+  public static final Field TYPE = Field.required("dataType", Type.class, "The data type of the column");
 
   protected String name;
 

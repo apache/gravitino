@@ -23,18 +23,18 @@ import lombok.ToString;
 public abstract class BaseTable implements Table, Entity, HasIdentifier {
 
   public static final Field ID =
-      Field.required("id", Long.class, "The unique identifier of the table");
+      Field.required("id", Long.class, "The table's unique identifier");
   public static final Field SCHEMA_ID =
-      Field.required("schema_id", Long.class, "The unique identifier of the schema");
-  public static final Field NAME = Field.required("name", String.class, "The name of the table");
+      Field.required("schema_id", Long.class, "The schema's unique identifier");
+  public static final Field NAME = Field.required("name", String.class, "The table's name");
   public static final Field COMMENT =
-      Field.optional("comment", String.class, "The comment of the table");
+      Field.optional("comment", String.class, "The comment or description for the table");
   public static final Field PROPERTIES =
-      Field.optional("properties", Map.class, "The properties of the table");
+      Field.optional("properties", Map.class, "The associated properties of the table");
   public static final Field AUDIT_INFO =
-      Field.required("audit_info", AuditInfo.class, "The audit info of the table");
+      Field.required("audit_info", AuditInfo.class, "The audit details of the table");
   public static final Field COLUMNS =
-      Field.required("columns", Column[].class, "The columns of the table");
+      Field.required("columns", Column[].class, "The columns that make up the table");
 
   protected Long id;
 

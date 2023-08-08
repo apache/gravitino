@@ -22,16 +22,16 @@ import lombok.ToString;
 public abstract class BaseSchema implements Schema, Entity, HasIdentifier {
 
   public static final Field ID =
-      Field.required("id", Long.class, "The unique identifier of the schema");
+      Field.required("id", Long.class, "The schema's unique identifier");
   public static final Field CATALOG_ID =
-      Field.required("catalog_id", Long.class, "The unique identifier of the catalog");
-  public static final Field NAME = Field.required("name", String.class, "The name of the schema");
+      Field.required("catalog_id", Long.class, "The catalog's unique identifier");
+  public static final Field NAME = Field.required("name", String.class, "The schema's anme");
   public static final Field COMMENT =
-      Field.optional("comment", String.class, "The comment of the schema");
+      Field.optional("comment", String.class, "The comment or description for the schema");
   public static final Field PROPERTIES =
-      Field.optional("properties", Map.class, "The properties of the schema");
+      Field.optional("properties", Map.class, "The associated properties of the schema");
   public static final Field AUDIT_INFO =
-      Field.required("audit_info", AuditInfo.class, "The audit info of the schema");
+      Field.required("audit_info", AuditInfo.class, "The audit details of the schema");
 
   protected Long id;
 

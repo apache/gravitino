@@ -54,10 +54,12 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/** Manages the catalog instances and operations. */
 public class CatalogManager implements SupportsCatalogs, Closeable {
 
   private static final Logger LOG = LoggerFactory.getLogger(CatalogManager.class);
 
+  /** Wrapper class for a catalog instance and its class loader. */
   public static class CatalogWrapper {
     private BaseCatalog catalog;
     private IsolatedClassLoader classLoader;
@@ -115,6 +117,12 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
 
   private final EntityStore store;
 
+  /**
+   * Constructs a CatalogManager instance.
+   *
+   * @param config The configuration for the manager.
+   * @param store The entity store to use.
+   */
   public CatalogManager(Config config, EntityStore store) {
     this.config = config;
     this.store = store;
@@ -139,11 +147,22 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
             .build();
   }
 
+  /**
+   * Closes the CatalogManager and releases any resources associated with it. This method
+   * invalidates all cached catalog instances and clears the cache.
+   */
   @Override
   public void close() {
     catalogCache.invalidateAll();
   }
 
+  /**
+   * Lists the catalogs within the specified namespace.
+   *
+   * @param namespace The namespace for which to list catalogs.
+   * @return An array of NameIdentifier objects representing the catalogs.
+   * @throws NoSuchMetalakeException If the specified metalake does not exist.
+   */
   @Override
   public NameIdentifier[] listCatalogs(Namespace namespace) throws NoSuchMetalakeException {
     NameIdentifier metalakeIdent = NameIdentifier.of(namespace.levels());
@@ -171,11 +190,29 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
     }
   }
 
+  /**
+   * Loads the catalog with the specified identifier.
+   *
+   * @param ident The identifier of the catalog to load.
+   * @return The loaded catalog.
+   * @throws NoSuchCatalogException If the specified catalog does not exist.
+   */
   @Override
   public Catalog loadCatalog(NameIdentifier ident) throws NoSuchCatalogException {
     return loadCatalogAndWrap(ident).catalog;
   }
 
+  /**
+   * Creates a new catalog with the provided details.
+   *
+   * @param ident The identifier of the new catalog.
+   * @param type The type of the new catalog.
+   * @param comment The comment for the new catalog.
+   * @param properties The properties of the new catalog.
+   * @return The created catalog.
+   * @throws NoSuchMetalakeException If the specified metalake does not exist.
+   * @throws CatalogAlreadyExistsException If a catalog with the same identifier already exists.
+   */
   @Override
   public Catalog createCatalog(
       NameIdentifier ident, Catalog.Type type, String comment, Map<String, String> properties)
@@ -222,6 +259,15 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
     }
   }
 
+  /**
+   * Alters an existing catalog with the specified changes.
+   *
+   * @param ident The identifier of the catalog to alter.
+   * @param changes The changes to apply to the catalog.
+   * @return The altered catalog.
+   * @throws NoSuchCatalogException If the specified catalog does not exist.
+   * @throws IllegalArgumentException If an unsupported catalog change is provided.
+   */
   @Override
   public Catalog alterCatalog(NameIdentifier ident, CatalogChange... changes)
       throws NoSuchCatalogException, IllegalArgumentException {
@@ -280,6 +326,12 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
     }
   }
 
+  /**
+   * Drops (deletes) the catalog with the specified identifier.
+   *
+   * @param ident The identifier of the catalog to drop.
+   * @return {@code true} if the catalog was successfully dropped, {@code false} otherwise.
+   */
   @Override
   public boolean dropCatalog(NameIdentifier ident) {
     // There could be a race issue that someone is using the catalog while we are dropping it.
@@ -293,6 +345,14 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
     }
   }
 
+  /**
+   * Loads the catalog with the specified identifier, wraps it in a CatalogWrapper, and caches the
+   * wrapper for reuse.
+   *
+   * @param ident The identifier of the catalog to load.
+   * @return The wrapped CatalogWrapper containing the loaded catalog.
+   * @throws NoSuchCatalogException If the specified catalog does not exist.
+   */
   public CatalogWrapper loadCatalogAndWrap(NameIdentifier ident) throws NoSuchCatalogException {
     return catalogCache.get(ident, this::loadCatalogInternal);
   }
