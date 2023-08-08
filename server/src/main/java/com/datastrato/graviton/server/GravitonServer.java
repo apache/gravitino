@@ -6,6 +6,7 @@ package com.datastrato.graviton.server;
 
 import com.datastrato.graviton.GravitonEnv;
 import com.datastrato.graviton.catalog.CatalogManager;
+import com.datastrato.graviton.catalog.CatalogOperationDispatcher;
 import com.datastrato.graviton.meta.MetalakeManager;
 import com.datastrato.graviton.server.web.JettyServer;
 import com.datastrato.graviton.server.web.ObjectMapperProvider;
@@ -60,6 +61,9 @@ public class GravitonServer extends ResourceConfig {
           protected void configure() {
             bind(gravitonEnv.metalakesManager()).to(MetalakeManager.class).ranked(1);
             bind(gravitonEnv.catalogManager()).to(CatalogManager.class).ranked(1);
+            bind(gravitonEnv.catalogOperationDispatcher())
+                .to(CatalogOperationDispatcher.class)
+                .ranked(1);
           }
         });
     register(ObjectMapperProvider.class).register(JacksonFeature.class);
@@ -83,6 +87,8 @@ public class GravitonServer extends ResourceConfig {
   }
 
   public static void main(String[] args) throws Exception {
+    LOG.info("Starting Graviton Server");
+
     GravitonServer server = new GravitonServer();
     server.initialize();
 

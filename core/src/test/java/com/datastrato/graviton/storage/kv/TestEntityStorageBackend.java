@@ -24,7 +24,6 @@ import com.datastrato.graviton.meta.AuditInfo;
 import com.datastrato.graviton.meta.BaseMetalake;
 import com.datastrato.graviton.meta.CatalogEntity;
 import com.datastrato.graviton.meta.SchemaVersion;
-import java.io.IOException;
 import java.time.Instant;
 import org.apache.commons.io.FileUtils;
 import org.junit.jupiter.api.AfterEach;
@@ -110,7 +109,7 @@ public class TestEntityStorageBackend {
               return null;
             });
       } catch (Exception e) {
-        Assertions.assertTrue(e instanceof IOException);
+        Assertions.assertTrue(e instanceof ArithmeticException);
       }
 
       Assertions.assertThrows(

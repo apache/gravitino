@@ -130,7 +130,8 @@ public class KvEntityStore implements EntityStore {
   }
 
   @Override
-  public <R> R executeInTransaction(Executable<R> executable) throws IOException {
+  public <R, E extends Exception> R executeInTransaction(Executable<R, E> executable)
+      throws E, IOException {
     return backend.executeInTransaction(executable);
   }
 

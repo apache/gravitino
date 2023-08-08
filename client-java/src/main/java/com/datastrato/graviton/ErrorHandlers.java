@@ -17,20 +17,41 @@ import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Utility class providing error handling for REST requests and specific to Metalake errors.
+ *
+ * <p>It also includes utility methods to format error messages and convert stack traces to strings.
+ */
 public class ErrorHandlers {
 
   private static final Logger LOG = LoggerFactory.getLogger(ErrorHandlers.class);
 
+  /**
+   * Creates an error handler specific to Metalake operations.
+   *
+   * @return A Consumer representing the Metalake error handler.
+   */
   public static Consumer<ErrorResponse> metalakeErrorHandler() {
     return MetalakeErrorHandler.INSTANCE;
   }
 
+  /**
+   * Creates a generic error handler for REST requests.
+   *
+   * @return A Consumer representing the generic REST error handler.
+   */
   public static Consumer<ErrorResponse> restErrorHandler() {
     return RestErrorHandler.INSTANCE;
   }
 
   private ErrorHandlers() {}
 
+  /**
+   * Converts a list of stack trace elements to a formatted string with line breaks.
+   *
+   * @param stack The list of stack trace elements to be converted.
+   * @return A formatted string representing the stack trace.
+   */
   private static String getStackString(List<String> stack) {
     if (stack == null || stack.isEmpty()) {
       return "";
@@ -40,6 +61,12 @@ public class ErrorHandlers {
     }
   }
 
+  /**
+   * Formats the error message along with the stack trace, if available.
+   *
+   * @param errorResponse The ErrorResponse object containing the error message and stack trace.
+   * @return A formatted error message string.
+   */
   private static String formatErrorMessage(ErrorResponse errorResponse) {
     String message = errorResponse.getMessage();
     String stack = getStackString(errorResponse.getStack());
@@ -50,6 +77,7 @@ public class ErrorHandlers {
     }
   }
 
+  /** Error handler specific to Metalake operations. */
   private static class MetalakeErrorHandler extends RestErrorHandler {
     private static final ErrorHandler INSTANCE = new MetalakeErrorHandler();
 
@@ -68,6 +96,7 @@ public class ErrorHandlers {
     }
   }
 
+  /** Generic error handler for REST requests. */
   private static class RestErrorHandler extends ErrorHandler {
     private static final ErrorHandler INSTANCE = new RestErrorHandler();
 
