@@ -12,6 +12,7 @@ import static com.datastrato.graviton.Entity.EntityType.TABLE;
 import com.datastrato.graviton.Entity.EntityIdentifer;
 import com.datastrato.graviton.Entity.EntityType;
 import com.datastrato.graviton.NameIdentifier;
+import com.datastrato.graviton.NoSuchEntityException;
 import com.datastrato.graviton.util.ByteUtils;
 import com.datastrato.graviton.util.Bytes;
 import com.google.common.annotations.VisibleForTesting;
@@ -88,11 +89,23 @@ public class CustomEntityKeyEncoder implements EntityKeyEncoder {
    * the result is not deterministic if we do not use synchronization.
    */
   @VisibleForTesting
-  synchronized long getOrCreateId(String name, boolean isMetalake) throws IOException {
+  synchronized long getOrCreateId(String name, boolean isMetalake, boolean createIdIfNotExists)
+      throws IOException {
     byte[] nameByte = Bytes.concat(NAME_PREFIX, name.getBytes());
     byte[] idByte = backend.get(nameByte);
     if (idByte != null) {
       return ByteUtils.byteToLong(idByte);
+    }
+
+    // Create if not exists
+    if (!createIdIfNotExists) {
+      throw new NoSuchEntityException("No such entity with name " + name);
+    }
+
+    // Now we need to create a new id for the name, So if this is not in transaction, throw an
+    // Exception
+    if (!backend.isInTransaction()) {
+      throw new IOException("getOrCreateId should be called in transaction");
     }
 
     // Matalake use UUID as id, other entities use incremental id
@@ -126,12 +139,14 @@ public class CustomEntityKeyEncoder implements EntityKeyEncoder {
    * @param entityIdentifer the entity identifier to encode
    * @return the encoded key for key-value storage
    */
-  private byte[] encodeEntity(EntityIdentifer entityIdentifer) throws IOException {
+  private byte[] encodeEntity(EntityIdentifer entityIdentifer, boolean createIdIfNotExists)
+      throws IOException {
     EntityType entityType = entityIdentifer.getEntityType();
     String[] nameSpace = entityIdentifer.getNameIdentifier().namespace().levels();
     long[] namespaceIds = new long[nameSpace.length];
     for (int i = 0; i < nameSpace.length; i++) {
-      namespaceIds[i] = getOrCreateId(nameSpace[i], i == 0 /* is metalake or not */);
+      namespaceIds[i] =
+          getOrCreateId(nameSpace[i], i == 0 /* is metalake or not */, createIdIfNotExists);
     }
 
     NameIdentifier identifier = entityIdentifer.getNameIdentifier();
@@ -148,7 +163,7 @@ public class CustomEntityKeyEncoder implements EntityKeyEncoder {
     long[] namespaceAndNameIds = new long[namespaceIds.length + 1];
     System.arraycopy(namespaceIds, 0, namespaceAndNameIds, 0, namespaceIds.length);
     namespaceAndNameIds[namespaceIds.length] =
-        getOrCreateId(identifier.name(), namespaceIds.length == 0);
+        getOrCreateId(identifier.name(), namespaceIds.length == 0, createIdIfNotExists);
 
     String[] nameIdentifierTemplate = ENTITY_TYPE_TO_NAME_IDENTIFIER.get(entityType);
     if (nameIdentifierTemplate == null) {
@@ -208,7 +223,8 @@ public class CustomEntityKeyEncoder implements EntityKeyEncoder {
   }
 
   @Override
-  public byte[] encode(EntityIdentifer entityIdentifer) throws IOException {
-    return encodeEntity(entityIdentifer);
+  public byte[] encode(EntityIdentifer entityIdentifer, boolean createIdIfNotExists)
+      throws IOException {
+    return encodeEntity(entityIdentifer, createIdIfNotExists);
   }
 }
