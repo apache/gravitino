@@ -67,7 +67,7 @@ function wait_for_graviton_server_to_die() {
       break
     fi
 
-    $(kill -15 ${pid} > /dev/null 2> /dev/null)
+    $(kill ${pid} > /dev/null 2> /dev/null)
     if kill -0 ${pid} > /dev/null 2>&1; then
       sleep 3
     else
