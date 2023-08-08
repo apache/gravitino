@@ -141,20 +141,20 @@ public class CustomEntityKeyEncoder implements EntityKeyEncoder {
    * Encode entity key for KV backend, e.g., RocksDB. The key is used to store the entity in the
    * backend.
    *
-   * @param entityIdentifer the entity identifier to encode
+   * @param entityIdentifier the entity identifier to encode
    * @return the encoded key for key-value storage
    */
-  private byte[] encodeEntity(EntityIdentifer entityIdentifer, boolean createIdIfNotExists)
+  private byte[] encodeEntity(EntityIdentifer entityIdentifier, boolean createIdIfNotExists)
       throws IOException {
-    EntityType entityType = entityIdentifer.getEntityType();
-    String[] nameSpace = entityIdentifer.getNameIdentifier().namespace().levels();
+    EntityType entityType = entityIdentifier.getEntityType();
+    String[] nameSpace = entityIdentifier.getNameIdentifier().namespace().levels();
     long[] namespaceIds = new long[nameSpace.length];
     for (int i = 0; i < nameSpace.length; i++) {
       namespaceIds[i] =
           getOrCreateId(nameSpace[i], i <= 1 /* is metalake or catalog */, createIdIfNotExists);
     }
 
-    NameIdentifier identifier = entityIdentifer.getNameIdentifier();
+    NameIdentifier identifier = entityIdentifier.getNameIdentifier();
     // If the name is a wild card, we only need to encode the namespace.
     if (WILD_CARD.equals(identifier.name())) {
       String[] namespaceTemplate = ENTITY_TYPE_TO_NAME_IDENTIFIER.get(entityType);
@@ -174,7 +174,7 @@ public class CustomEntityKeyEncoder implements EntityKeyEncoder {
     if (nameIdentifierTemplate == null) {
       throw new UnsupportedOperationException("Unsupported entity type: " + entityType);
     }
-    return formatNameIdentiferTemplateToByte(nameIdentifierTemplate, namespaceAndNameIds);
+    return formatNameIdentifierTemplateToByte(nameIdentifierTemplate, namespaceAndNameIds);
   }
 
   /**
@@ -182,19 +182,19 @@ public class CustomEntityKeyEncoder implements EntityKeyEncoder {
    * "ca_{}_" and the ids are [1], the result is "ca_1_" which means we want to get all catalogs in
    * metalake '1'
    *
-   * @param namespaceTemptalte the name space template, please see {@link
+   * @param namespaceTemplate the name space template, please see {@link
    *     #ENTITY_TYPE_TO_NAME_IDENTIFIER}
    * @param ids the ids that namespace names map to
    */
-  private byte[] formatNamespaceTemplateToByte(String[] namespaceTemptalte, long[] ids) {
-    Preconditions.checkArgument(namespaceTemptalte.length == ids.length + 1);
+  private byte[] formatNamespaceTemplateToByte(String[] namespaceTemplate, long[] ids) {
+    Preconditions.checkArgument(namespaceTemplate.length == ids.length + 1);
 
     byte[] bytes = new byte[0];
-    for (int i = 0; i < namespaceTemptalte.length; i++) {
-      if (i != namespaceTemptalte.length - 1) {
-        bytes = Bytes.concat(bytes, namespaceTemptalte[i].getBytes(), ByteUtils.longToByte(ids[i]));
+    for (int i = 0; i < namespaceTemplate.length; i++) {
+      if (i != namespaceTemplate.length - 1) {
+        bytes = Bytes.concat(bytes, namespaceTemplate[i].getBytes(), ByteUtils.longToByte(ids[i]));
       } else {
-        bytes = Bytes.concat(bytes, namespaceTemptalte[i].getBytes());
+        bytes = Bytes.concat(bytes, namespaceTemplate[i].getBytes());
       }
     }
 
@@ -202,20 +202,21 @@ public class CustomEntityKeyEncoder implements EntityKeyEncoder {
   }
 
   /**
-   * Format the name identifer to a byte array. For example, if the name space template is
+   * Format the name identifier to a byte array. For example, if the name space template is
    * "ca_{}_{}" and the ids is [1, 2], the result is "ca_1_2" which means we want to get the
    * specific catalog '2'
    *
-   * @param nameIdentierTemplate the name space template, please see {@link
+   * @param nameIdentifierTemplate the name space template, please see {@link
    *     #ENTITY_TYPE_TO_NAME_IDENTIFIER}
    * @param ids the ids that name identifier map to
    */
-  private byte[] formatNameIdentiferTemplateToByte(String[] nameIdentierTemplate, long[] ids) {
-    Preconditions.checkArgument(nameIdentierTemplate.length == ids.length);
+  private byte[] formatNameIdentifierTemplateToByte(String[] nameIdentifierTemplate, long[] ids) {
+    Preconditions.checkArgument(nameIdentifierTemplate.length == ids.length);
 
     byte[] bytes = new byte[0];
     for (int i = 0; i < ids.length; i++) {
-      bytes = Bytes.concat(bytes, nameIdentierTemplate[i].getBytes(), ByteUtils.longToByte(ids[i]));
+      bytes =
+          Bytes.concat(bytes, nameIdentifierTemplate[i].getBytes(), ByteUtils.longToByte(ids[i]));
     }
 
     return bytes;
