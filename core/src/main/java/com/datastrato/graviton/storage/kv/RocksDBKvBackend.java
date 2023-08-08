@@ -246,8 +246,7 @@ public class RocksDBKvBackend implements KvBackend {
   public boolean isInTransaction() {
     // TODO (yuqi), check if the transaction is still valid and We do not allow transaction nesting
     //  That is, A transaction can not be started inside another transaction when outer transaction
-    // is
-    //  still active
+    //  is still active
     return TX_LOCAL.get() != null;
   }
 }

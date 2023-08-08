@@ -68,7 +68,7 @@ public class CustomEntityKeyEncoder implements EntityKeyEncoder {
 
   private final KvBackend backend;
 
-  // Key format template. please the comment of the class for more details.
+  // Key format template. Please the comment of the class for more details.
   public static final Map<EntityType, String[]> ENTITY_TYPE_TO_NAME_IDENTIFIER =
       ImmutableMap.of(
           METALAKE, new String[] {METALAKE.getShortName() + "_"},
@@ -179,7 +179,7 @@ public class CustomEntityKeyEncoder implements EntityKeyEncoder {
 
   /**
    * Format the name space template to a byte array. For example, if the name space template is
-   * "ca_{}_" and the ids is [1], the result is "ca_1_" which means we want to get all catalogs in
+   * "ca_{}_" and the ids are [1], the result is "ca_1_" which means we want to get all catalogs in
    * metalake '1'
    *
    * @param namespaceTemptalte the name space template, please see {@link
