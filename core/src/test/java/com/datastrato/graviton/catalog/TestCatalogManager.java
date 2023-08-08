@@ -55,7 +55,7 @@ public class TestCatalogManager {
                 new AuditInfo.Builder().withCreator("test").withCreateTime(Instant.now()).build())
             .withVersion(SchemaVersion.V_0_1)
             .build();
-    entityStore.put(metalakeEntity.nameIdentifier(), metalakeEntity, true);
+    entityStore.put(metalakeEntity, true);
 
     catalogManager = new CatalogManager(config, entityStore);
   }
