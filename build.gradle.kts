@@ -214,6 +214,7 @@ tasks {
   }
 
   val copySubmoduleClass by registering(Copy::class) {
+    dependsOn("copyRuntimeClass", "copyCatalogRuntimeClass")
     subprojects.forEach() {
       // println("copySubmoduleClass: ${it.name}")
       from("${it.name}/build/libs")
