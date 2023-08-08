@@ -4,9 +4,9 @@
  */
 package com.datastrato.graviton.catalog.dyn;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.fail;
 
-import com.datastrato.graviton.catalog.dyn.TestDynFields.TestObject;
 import com.datastrato.graviton.catalog.hive.dyn.DynFields;
 import com.datastrato.graviton.catalog.hive.dyn.DynFields.UnboundField;
 import org.junit.jupiter.api.Test;
