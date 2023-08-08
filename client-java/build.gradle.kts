@@ -28,6 +28,7 @@ dependencies {
   implementation(libs.guava)
   implementation(libs.bundles.log4j)
   implementation(libs.httpclient5)
+  implementation(libs.commons.lang3)
 
   compileOnly(libs.lombok)
   annotationProcessor(libs.lombok)

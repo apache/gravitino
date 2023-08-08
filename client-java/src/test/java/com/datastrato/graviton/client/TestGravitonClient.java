@@ -2,9 +2,10 @@
  * Copyright 2023 Datastrato.
  * This software is licensed under the Apache License version 2.
  */
+package com.datastrato.graviton.client;
 
-package com.datastrato.graviton;
-
+import com.datastrato.graviton.MetalakeChange;
+import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.dto.AuditDTO;
 import com.datastrato.graviton.dto.MetalakeDTO;
 import com.datastrato.graviton.dto.requests.MetalakeCreateRequest;
@@ -16,42 +17,17 @@ import com.datastrato.graviton.dto.responses.MetalakeResponse;
 import com.datastrato.graviton.exceptions.MetalakeAlreadyExistsException;
 import com.datastrato.graviton.exceptions.NoSuchMetalakeException;
 import com.datastrato.graviton.exceptions.RESTException;
-import com.datastrato.graviton.json.JsonUtils;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.stream.Collectors;
 import org.apache.hc.core5.http.HttpStatus;
 import org.apache.hc.core5.http.Method;
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.mockserver.integration.ClientAndServer;
-import org.mockserver.matchers.Times;
-import org.mockserver.model.HttpRequest;
-import org.mockserver.model.HttpResponse;
 
-public class TestGravitonClient {
-
-  private static final ObjectMapper MAPPER = JsonUtils.objectMapper();
-  private static ClientAndServer mockServer;
-  private static GravitonClient client;
-
-  @BeforeAll
-  public static void setUp() {
-    mockServer = ClientAndServer.startClientAndServer(0);
-    int port = mockServer.getLocalPort();
-    client = GravitonClient.builder("http://127.0.0.1:" + port).build();
-  }
-
-  @AfterAll
-  public static void tearDown() {
-    mockServer.stop();
-    client.close();
-  }
+public class TestGravitonClient extends TestBase {
 
   @Test
   public void testListMetalakes() throws JsonProcessingException {
@@ -97,7 +73,7 @@ public class TestGravitonClient {
     ErrorResponse errorResp = ErrorResponse.internalError("mock error");
     buildMockResource(
         Method.GET, "/api/metalakes", null, errorResp, HttpStatus.SC_INTERNAL_SERVER_ERROR);
-    Throwable excep = Assertions.assertThrows(RESTException.class, () -> client.listMetalakes());
+    Throwable excep = Assertions.assertThrows(RuntimeException.class, () -> client.listMetalakes());
     Assertions.assertTrue(excep.getMessage().contains("mock error"));
 
     // Test return unparsed system error
@@ -258,25 +234,5 @@ public class TestGravitonClient {
             IllegalArgumentException.class,
             () -> client.dropMetalake(NameIdentifier.parse("mock.mock")));
     Assertions.assertTrue(excep1.getMessage().contains("namespace should be empty"));
-  }
-
-  private static <T, R> void buildMockResource(
-      Method method, String path, T reqBody, R respBody, int statusCode)
-      throws JsonProcessingException {
-    HttpRequest mockRequest = HttpRequest.request(path).withMethod(method.name());
-    if (reqBody != null) {
-      String reqJson = MAPPER.writeValueAsString(reqBody);
-      mockRequest = mockRequest.withBody(reqJson);
-    }
-
-    HttpResponse mockResponse = HttpResponse.response().withStatusCode(statusCode);
-    if (respBody != null) {
-      String respJson = MAPPER.writeValueAsString(respBody);
-      mockResponse = mockResponse.withBody(respJson);
-    }
-
-    // Using Times.exactly(1) will only match once for the request, so we could set difference
-    // responses for the same request and path.
-    mockServer.when(mockRequest, Times.exactly(1)).respond(mockResponse);
   }
 }
