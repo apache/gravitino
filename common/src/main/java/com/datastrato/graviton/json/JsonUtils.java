@@ -6,6 +6,7 @@ package com.datastrato.graviton.json;
 
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
+import com.datastrato.graviton.rel.TableChange;
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.DeserializationContext;
@@ -36,6 +37,10 @@ public class JsonUtils {
   private static final String NAMESPACE = "namespace";
 
   private static final String NAME = "name";
+
+  private static final String POSITION_FIRST = "first";
+
+  private static final String POSITION_LAST = "last";
 
   /**
    * Abstract iterator class for iterating over elements of a JSON array.
@@ -224,6 +229,48 @@ public class JsonUtils {
       Namespace namespace =
           levels == null ? Namespace.empty() : Namespace.of(levels.toArray(new String[0]));
       return NameIdentifier.of(namespace, name);
+    }
+  }
+
+  public static class ColumnPositionSerializer extends JsonSerializer<TableChange.ColumnPosition> {
+    @Override
+    public void serialize(
+        TableChange.ColumnPosition value, JsonGenerator gen, SerializerProvider serializers)
+        throws IOException {
+      if (value instanceof TableChange.First) {
+        gen.writeString(POSITION_FIRST);
+
+      } else if (value instanceof TableChange.After) {
+        gen.writeStartObject();
+        TableChange.After after = (TableChange.After) value;
+        gen.writeStringField(POSITION_LAST, after.getColumn());
+        gen.writeEndObject();
+
+      } else {
+        throw new IOException("Unknown column position: " + value);
+      }
+    }
+  }
+
+  public static class ColumnPositionDeserializer
+      extends JsonDeserializer<TableChange.ColumnPosition> {
+
+    @Override
+    public TableChange.ColumnPosition deserialize(JsonParser p, DeserializationContext ctxt)
+        throws IOException {
+      JsonNode node = p.getCodec().readTree(p);
+      Preconditions.checkArgument(
+          node != null && !node.isNull(),
+          "Cannot parse column position from invalid JSON: %s",
+          node);
+      if (node.isTextual() && node.asText().equals(POSITION_FIRST)) {
+        return TableChange.ColumnPosition.first();
+      } else if (node.isObject()) {
+        String afterColumn = getString(POSITION_LAST, node);
+        return TableChange.ColumnPosition.after(afterColumn);
+      } else {
+        throw new IOException("Unknown json column position: " + node.toString());
+      }
     }
   }
 }

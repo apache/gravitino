@@ -16,35 +16,35 @@ import lombok.ToString;
 /** Represents a response containing a list of catalogs. */
 @EqualsAndHashCode(callSuper = true)
 @ToString
-public class CatalogListResponse extends BaseResponse {
+public class EntityListResponse extends BaseResponse {
 
   @JsonSerialize(contentUsing = JsonUtils.NameIdentifierSerializer.class)
   @JsonDeserialize(contentUsing = JsonUtils.NameIdentifierDeserializer.class)
-  @JsonProperty("catalogs")
+  @JsonProperty("identifiers")
   private final NameIdentifier[] idents;
 
   /**
-   * Constructor for CatalogListResponse. (Used for Jackson deserialization.)
+   * Constructor for EntityListResponse.
    *
-   * @param idents The array of catalog identifiers.
+   * @param idents The array of entity identifiers.
    */
-  public CatalogListResponse(NameIdentifier[] idents) {
+  public EntityListResponse(NameIdentifier[] idents) {
     super(0);
     this.idents = idents;
   }
 
-  /** Default constructor for CatalogListResponse. */
-  public CatalogListResponse() {
+  /** Default constructor for EntityListResponse. (Used for Jackson deserialization.) */
+  public EntityListResponse() {
     super();
     this.idents = null;
   }
 
   /**
-   * Returns the array of catalog identifiers.
+   * Returns the array of entity identifiers.
    *
    * @return The array of identifiers.
    */
-  public NameIdentifier[] getCatalogs() {
+  public NameIdentifier[] identifiers() {
     return idents;
   }
 
@@ -56,6 +56,6 @@ public class CatalogListResponse extends BaseResponse {
   @Override
   public void validate() throws IllegalArgumentException {
     super.validate();
-    Preconditions.checkArgument(idents != null, "catalogs must be non-null");
+    Preconditions.checkArgument(idents != null, "identifiers must not be null");
   }
 }

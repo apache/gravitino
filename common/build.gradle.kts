@@ -25,6 +25,7 @@ dependencies {
   implementation(libs.jackson.datatype.jsr310)
   implementation(libs.guava)
   implementation(libs.bundles.log4j)
+  implementation(libs.commons.lang3)
 
   compileOnly(libs.lombok)
   annotationProcessor(libs.lombok)
