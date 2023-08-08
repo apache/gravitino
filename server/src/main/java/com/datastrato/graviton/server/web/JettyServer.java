@@ -7,7 +7,7 @@ package com.datastrato.graviton.server.web;
 import com.datastrato.graviton.Config;
 import com.datastrato.graviton.server.GravitonServerException;
 import com.datastrato.graviton.server.ServerConfig;
-import com.datastrato.graviton.server.web.rest.HealthCheck;
+import com.datastrato.graviton.server.web.rest.ProjectVersion;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.net.BindException;
 import java.util.EnumSet;
@@ -148,7 +148,7 @@ public final class JettyServer {
     this.servletContextHandler = new ServletContextHandler();
     servletContextHandler.setContextPath("/");
     servletContextHandler.addServlet(DefaultServlet.class, "/");
-    servletContextHandler.addServlet(HealthCheck.class, "/health");
+    servletContextHandler.addServlet(ProjectVersion.class, "/version");
 
     HandlerCollection handlers = new HandlerCollection();
     handlers.addHandler(servletContextHandler);
@@ -188,7 +188,7 @@ public final class JettyServer {
             maxThreads,
             60,
             TimeUnit.SECONDS,
-            new LinkedBlockingQueue<>(),
+            new LinkedBlockingQueue<>(100),
             new ThreadFactoryBuilder()
                 .setDaemon(true)
                 .setNameFormat("jetty-webserver-%d")
