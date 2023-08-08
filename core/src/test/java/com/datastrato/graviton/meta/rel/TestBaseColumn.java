@@ -4,7 +4,8 @@
  */
 package com.datastrato.graviton.meta.rel;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
 import com.datastrato.graviton.Entity;
 import com.datastrato.graviton.Field;
