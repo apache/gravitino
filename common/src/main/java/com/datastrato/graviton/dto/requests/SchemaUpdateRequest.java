@@ -6,6 +6,7 @@ package com.datastrato.graviton.dto.requests;
 
 import com.datastrato.graviton.rel.SchemaChange;
 import com.datastrato.graviton.rest.RESTRequest;
+import com.datastrato.graviton.util.StringUtils;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
@@ -53,10 +54,9 @@ public interface SchemaUpdateRequest extends RESTRequest {
     @Override
     public void validate() throws IllegalArgumentException {
       Preconditions.checkArgument(
-          property != null && !property.isEmpty(),
-          "\"property\" field is required and cannot be empty");
+          StringUtils.isNotBlank(property), "\"property\" field is required and cannot be empty");
       Preconditions.checkArgument(
-          value != null && !value.isEmpty(), "\"value\" field is required and cannot be empty");
+          StringUtils.isNotBlank(value), "\"value\" field is required and cannot be empty");
     }
 
     @Override
@@ -84,8 +84,7 @@ public interface SchemaUpdateRequest extends RESTRequest {
     @Override
     public void validate() throws IllegalArgumentException {
       Preconditions.checkArgument(
-          property != null && !property.isEmpty(),
-          "\"property\" field is required and cannot be empty");
+          StringUtils.isNotBlank(property), "\"property\" field is required and cannot be empty");
     }
 
     @Override

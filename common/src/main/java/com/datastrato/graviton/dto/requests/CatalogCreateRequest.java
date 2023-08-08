@@ -6,6 +6,7 @@ package com.datastrato.graviton.dto.requests;
 
 import com.datastrato.graviton.Catalog;
 import com.datastrato.graviton.rest.RESTRequest;
+import com.datastrato.graviton.util.StringUtils;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import java.util.Map;
@@ -63,7 +64,7 @@ public class CatalogCreateRequest implements RESTRequest {
   @Override
   public void validate() throws IllegalArgumentException {
     Preconditions.checkArgument(
-        name != null && !name.isEmpty(), "\"name\" field is required and cannot be empty");
+        StringUtils.isNotBlank(name), "\"name\" field is required and cannot be empty");
     Preconditions.checkArgument(type != null, "\"type\" field is required and cannot be empty");
   }
 }

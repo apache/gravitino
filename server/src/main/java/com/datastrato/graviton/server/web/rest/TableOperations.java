@@ -222,14 +222,8 @@ public class TableOperations {
 
   private static NameIdentifier tableIdentifier(
       String metalake, String catalog, String schema, String table) {
-    Preconditions.checkArgument(
-        StringUtil.isNotBlank(metalake), "metalake name: %s is illegal", metalake);
-    Preconditions.checkArgument(
-        StringUtil.isNotBlank(catalog), "catalog name: %s is illegal", catalog);
-    Preconditions.checkArgument(
-        StringUtil.isNotBlank(schema), "schema name: %s is illegal", schema);
+    Namespace ns = tableNS(metalake, catalog, schema);
     Preconditions.checkArgument(StringUtil.isNotBlank(table), "table name: %s is illegal", table);
-
-    return NameIdentifier.of(metalake, catalog, schema, table);
+    return NameIdentifier.of(ns, table);
   }
 }

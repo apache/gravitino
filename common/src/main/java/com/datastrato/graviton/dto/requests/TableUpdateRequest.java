@@ -7,6 +7,7 @@ package com.datastrato.graviton.dto.requests;
 import com.datastrato.graviton.json.JsonUtils;
 import com.datastrato.graviton.rel.TableChange;
 import com.datastrato.graviton.rest.RESTRequest;
+import com.datastrato.graviton.util.StringUtils;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
@@ -15,6 +16,7 @@ import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.google.common.base.Preconditions;
 import io.substrait.type.Type;
+import java.util.Arrays;
 import javax.annotation.Nullable;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -73,8 +75,7 @@ public interface TableUpdateRequest extends RESTRequest {
     @Override
     public void validate() throws IllegalArgumentException {
       Preconditions.checkArgument(
-          newName != null && !newName.isEmpty(),
-          "\"newName\" field is required and cannot be empty");
+          StringUtils.isNotBlank(newName), "\"newName\" field is required and cannot be empty");
     }
 
     @Override
@@ -102,7 +103,7 @@ public interface TableUpdateRequest extends RESTRequest {
     @Override
     public void validate() throws IllegalArgumentException {
       Preconditions.checkArgument(
-          newComment != null && !newComment.isEmpty(),
+          StringUtils.isNotBlank(newComment),
           "\"newComment\" field is required and cannot be empty");
     }
 
@@ -136,10 +137,9 @@ public interface TableUpdateRequest extends RESTRequest {
     @Override
     public void validate() throws IllegalArgumentException {
       Preconditions.checkArgument(
-          property != null && !property.isEmpty(),
-          "\"property\" field is required and cannot be empty");
+          StringUtils.isNotBlank(property), "\"property\" field is required and cannot be empty");
       Preconditions.checkArgument(
-          value != null && !value.isEmpty(), "\"value\" field is required and cannot be empty");
+          StringUtils.isNotBlank(value), "\"value\" field is required and cannot be empty");
     }
 
     @Override
@@ -167,8 +167,7 @@ public interface TableUpdateRequest extends RESTRequest {
     @Override
     public void validate() throws IllegalArgumentException {
       Preconditions.checkArgument(
-          property != null && !property.isEmpty(),
-          "\"property\" field is required and cannot be empty");
+          StringUtils.isNotBlank(property), "\"property\" field is required and cannot be empty");
     }
 
     @Override
@@ -218,7 +217,9 @@ public interface TableUpdateRequest extends RESTRequest {
     @Override
     public void validate() throws IllegalArgumentException {
       Preconditions.checkArgument(
-          fieldNames != null && fieldNames.length > 0,
+          fieldNames != null
+              && fieldNames.length > 0
+              && Arrays.stream(fieldNames).allMatch(StringUtils::isNotBlank),
           "\"name\" field is required and cannot be empty");
       Preconditions.checkArgument(
           dataType != null, "\"type\" field is required and cannot be empty");
@@ -254,11 +255,12 @@ public interface TableUpdateRequest extends RESTRequest {
     @Override
     public void validate() throws IllegalArgumentException {
       Preconditions.checkArgument(
-          oldName != null && oldName.length > 0,
+          oldName != null
+              && oldName.length > 0
+              && Arrays.stream(oldName).allMatch(StringUtils::isNotBlank),
           "\"oldName\" field is required and cannot be empty");
       Preconditions.checkArgument(
-          newName != null && !newName.isEmpty(),
-          "\"newName\" field is required and cannot be empty");
+          StringUtils.isNotBlank(newName), "\"newName\" field is required and cannot be empty");
     }
 
     @Override
@@ -293,7 +295,8 @@ public interface TableUpdateRequest extends RESTRequest {
     @Override
     public void validate() throws IllegalArgumentException {
       Preconditions.checkArgument(
-          name != null && name.length > 0, "\"name\" field is required and cannot be empty");
+          name != null && name.length > 0 && Arrays.stream(name).allMatch(StringUtils::isNotBlank),
+          "\"name\" field is required and cannot be empty");
       Preconditions.checkArgument(
           newType != null, "\"newType\" field is required and cannot be empty");
     }
@@ -328,9 +331,10 @@ public interface TableUpdateRequest extends RESTRequest {
     @Override
     public void validate() throws IllegalArgumentException {
       Preconditions.checkArgument(
-          name != null && name.length > 0, "\"name\" field is required and cannot be empty");
+          name != null && name.length > 0 && Arrays.stream(name).allMatch(StringUtils::isNotBlank),
+          "\"name\" field is required and cannot be empty");
       Preconditions.checkArgument(
-          newComment != null && !newComment.isEmpty(),
+          StringUtils.isNotBlank(newComment),
           "\"newComment\" field is required and cannot be empty");
     }
 
@@ -366,7 +370,8 @@ public interface TableUpdateRequest extends RESTRequest {
     @Override
     public void validate() throws IllegalArgumentException {
       Preconditions.checkArgument(
-          name != null && name.length > 0, "\"name\" field is required and cannot be empty");
+          name != null && name.length > 0 && Arrays.stream(name).allMatch(StringUtils::isNotBlank),
+          "\"name\" field is required and cannot be empty");
       Preconditions.checkArgument(
           newPosition != null, "\"newPosition\" field is required and cannot be empty");
     }
@@ -401,7 +406,8 @@ public interface TableUpdateRequest extends RESTRequest {
     @Override
     public void validate() throws IllegalArgumentException {
       Preconditions.checkArgument(
-          name != null && name.length > 0, "\"name\" field is required and cannot be empty");
+          name != null && name.length > 0 && Arrays.stream(name).allMatch(StringUtils::isNotBlank),
+          "\"name\" field is required and cannot be empty");
     }
 
     @Override
