@@ -88,15 +88,34 @@ public class GravitonServer extends ResourceConfig {
 
   public static void main(String[] args) throws Exception {
     LOG.info("Starting Graviton Server");
-
     GravitonServer server = new GravitonServer();
     server.initialize();
 
     try {
+      // Instantiates SubmarineServer
       server.start();
-      server.join();
-    } finally {
-      server.stop();
+    } catch (Exception e) {
+      LOG.error("Error while running jettyServer", e);
+      System.exit(-1);
     }
+    LOG.info("Done, Graviton server started.");
+
+    Runtime.getRuntime()
+        .addShutdownHook(
+            new Thread(
+                () -> {
+                  LOG.info("Shutting down Graviton Server ... ");
+                  try {
+                    server.stop();
+                    Thread.sleep(3000);
+                  } catch (InterruptedException e) {
+                    LOG.error("Interrupted exception:", e);
+                  } catch (Exception e) {
+                    LOG.error("Error while stopping servlet container", e);
+                  }
+                  LOG.info("Done, Shutting down Graviton Server.");
+                }));
+
+    server.join();
   }
 }

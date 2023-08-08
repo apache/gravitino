@@ -5,7 +5,7 @@
 #
 set -ex
 USAGE="-e Usage: bin/graviton.sh [--config <conf-dir>]\n\t
-        {start|stop|status}\n\t
+        {start|stop|restart|status}\n\t
         [--version | -v]"
 
 if [[ "$1" == "--config" ]]; then
@@ -145,6 +145,10 @@ case "${1}" in
     ;;
   stop)
     stop
+    ;;
+  restart)
+    stop
+    start
     ;;
   status)
     check_process_status
