@@ -23,7 +23,7 @@ public class CatalogUpdatesRequest implements RESTRequest {
   /**
    * Constructor for CatalogUpdatesRequest.
    *
-   * @param requests The list of catalog update requests.
+   * @param updates The list of catalog update requests.
    */
   public CatalogUpdatesRequest(List<CatalogUpdateRequest> updates) {
     this.updates = updates;

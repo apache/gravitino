@@ -7,7 +7,6 @@ package com.datastrato.graviton.dto.requests;
 import com.datastrato.graviton.json.JsonUtils;
 import com.datastrato.graviton.rel.TableChange;
 import com.datastrato.graviton.rest.RESTRequest;
-import com.datastrato.graviton.util.StringUtils;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
@@ -21,6 +20,7 @@ import javax.annotation.Nullable;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
+import org.apache.commons.lang3.StringUtils;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY)

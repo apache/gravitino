@@ -6,7 +6,6 @@ package com.datastrato.graviton.dto.requests;
 
 import com.datastrato.graviton.Catalog;
 import com.datastrato.graviton.rest.RESTRequest;
-import com.datastrato.graviton.util.StringUtils;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import java.util.Map;
@@ -14,6 +13,7 @@ import javax.annotation.Nullable;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
+import org.apache.commons.lang3.StringUtils;
 
 /** Represents a request to create a catalog. */
 @Getter
