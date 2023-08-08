@@ -100,6 +100,16 @@ public class TestEntityKeyEncoding {
         .when(mockEncoder)
         .getOrCreateId(Mockito.eq("metalake1"), Mockito.eq(true), Mockito.eq(true));
 
+    Mockito.doReturn(1000010L)
+        .when(mockEncoder)
+        .getOrCreateId(Mockito.eq("catalog1"), Mockito.eq(true), Mockito.eq(true));
+    Mockito.doReturn(1000011L)
+        .when(mockEncoder)
+        .getOrCreateId(Mockito.eq("catalog2"), Mockito.eq(true), Mockito.eq(true));
+    Mockito.doReturn(1000012L)
+        .when(mockEncoder)
+        .getOrCreateId(Mockito.eq("catalog3"), Mockito.eq(true), Mockito.eq(true));
+
     NameIdentifier mateLakeIdentifier1 = NameIdentifier.of(namespace, "metalake1");
     byte[] realKey =
         mockEncoder.encode(EntityIdentifer.of(mateLakeIdentifier1, EntityType.METALAKE), true);
@@ -111,9 +121,9 @@ public class TestEntityKeyEncoding {
     Assertions.assertArrayEquals(expenctKey, realKey);
 
     // name ---> id
-    // catalog1 --> 0
-    // catalog2 --> 1
-    // catalog3 --> 2
+    // catalog1 --> 1000010
+    // catalog2 --> 1000011
+    // catalog3 --> 1000012
     Namespace catalogNamespace = Namespace.of("metalake1");
     NameIdentifier catalogIdentifier1 = NameIdentifier.of(catalogNamespace, "catalog1");
     NameIdentifier catalogIdentifier2 = NameIdentifier.of(catalogNamespace, "catalog2");
@@ -130,16 +140,16 @@ public class TestEntityKeyEncoding {
               NAMESPACE_SEPARATOR,
               ByteUtils.longToByte(1000000L),
               NAMESPACE_SEPARATOR,
-              ByteUtils.longToByte(i));
+              ByteUtils.longToByte(1000010L + i));
       Assertions.assertArrayEquals(expenctKey, realKey);
     }
     // Assert next useable id
-    Assertions.assertEquals(3, ENCODER.getNextUsableId());
+    Assertions.assertEquals(0, ENCODER.getNextUsableId());
 
     // name ---> id
-    // schema1 --> 3
-    // schema2 --> 4
-    // schema3 --> 5
+    // schema1 --> 0
+    // schema2 --> 1
+    // schema3 --> 2
     Namespace schemaNameSpace = Namespace.of("metalake1", "catalog2");
     NameIdentifier schemaIdentifier1 = NameIdentifier.of(schemaNameSpace, "schema1");
     NameIdentifier schemaIdentifier2 = NameIdentifier.of(schemaNameSpace, "schema2");
@@ -156,18 +166,18 @@ public class TestEntityKeyEncoding {
               NAMESPACE_SEPARATOR,
               ByteUtils.longToByte(1000000L),
               NAMESPACE_SEPARATOR,
-              ByteUtils.longToByte(1L),
+              ByteUtils.longToByte(1000011L),
               NAMESPACE_SEPARATOR,
-              ByteUtils.longToByte(i + 3L));
+              ByteUtils.longToByte(i));
       Assertions.assertArrayEquals(expenctKey, realKey);
     }
     // Assert next useable id
-    Assertions.assertEquals(6, ENCODER.getNextUsableId());
+    Assertions.assertEquals(3, ENCODER.getNextUsableId());
 
     // name ---> id
-    // table1 --> 6
-    // table2 --> 7
-    // table3 --> 8
+    // table1 --> 3
+    // table2 --> 4
+    // table3 --> 5
     Namespace tableNameSpace = Namespace.of("metalake1", "catalog2", "schema3");
     NameIdentifier tableIdentifier1 = NameIdentifier.of(tableNameSpace, "table1");
     NameIdentifier tableIdentifier2 = NameIdentifier.of(tableNameSpace, "table2");
@@ -184,15 +194,15 @@ public class TestEntityKeyEncoding {
               NAMESPACE_SEPARATOR,
               ByteUtils.longToByte(1000000L),
               NAMESPACE_SEPARATOR,
-              ByteUtils.longToByte(1L),
+              ByteUtils.longToByte(1000011L),
               NAMESPACE_SEPARATOR,
-              ByteUtils.longToByte(5L),
+              ByteUtils.longToByte(2L),
               NAMESPACE_SEPARATOR,
-              ByteUtils.longToByte(i + 6L));
+              ByteUtils.longToByte(i + 3L));
       Assertions.assertArrayEquals(expenctKey, realKey);
     }
     // Assert next useable id
-    Assertions.assertEquals(9, ENCODER.getNextUsableId());
+    Assertions.assertEquals(6, ENCODER.getNextUsableId());
 
     // Unsupported operation
     Assertions.assertThrows(
@@ -243,6 +253,10 @@ public class TestEntityKeyEncoding {
         .when(mockEncoder)
         .getOrCreateId(Mockito.eq("metalake1"), Mockito.eq(true), Mockito.eq(true));
 
+    Mockito.doReturn(1000001L)
+        .when(mockEncoder)
+        .getOrCreateId(Mockito.eq("catalog2"), Mockito.eq(true), Mockito.eq(true));
+
     NameIdentifier metalakeIdentifier = NameIdentifier.of(namespace, WILD_CARD);
     byte[] realKey =
         mockEncoder.encode(EntityIdentifer.of(metalakeIdentifier, EntityType.METALAKE), true);
@@ -276,11 +290,11 @@ public class TestEntityKeyEncoding {
             NAMESPACE_SEPARATOR,
             ByteUtils.longToByte(1000000L),
             NAMESPACE_SEPARATOR,
-            ByteUtils.longToByte(0L),
+            ByteUtils.longToByte(1000001L),
             NAMESPACE_SEPARATOR);
     Assertions.assertArrayEquals(expenctKey, realKey);
     // Assert next useable id
-    Assertions.assertEquals(1, ENCODER.getNextUsableId());
+    Assertions.assertEquals(0, ENCODER.getNextUsableId());
 
     // Scan all table in metalake1.catalog2.schema3
     // schema3 --> 1
@@ -293,13 +307,13 @@ public class TestEntityKeyEncoding {
             NAMESPACE_SEPARATOR,
             ByteUtils.longToByte(1000000L),
             NAMESPACE_SEPARATOR,
-            ByteUtils.longToByte(0L),
+            ByteUtils.longToByte(1000001L),
             NAMESPACE_SEPARATOR,
-            ByteUtils.longToByte(1L),
+            ByteUtils.longToByte(0L),
             NAMESPACE_SEPARATOR);
     Assertions.assertArrayEquals(expenctKey, realKey);
     // Assert next useable id
-    Assertions.assertEquals(2, ENCODER.getNextUsableId());
+    Assertions.assertEquals(1, ENCODER.getNextUsableId());
 
     // Unsupported operation
     Assertions.assertThrows(

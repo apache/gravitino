@@ -82,15 +82,16 @@ public class CustomEntityKeyEncoder implements EntityKeyEncoder {
 
   /**
    * Get or create id for name. If the name is not in the storage, create a new id for it. The id is
-   * the current max id + 1.
+   * the current max id + 1. Matalake and catalog will directly use UUID as id, other entities use
+   * incremental id
    *
    * <p>Attention, this method should be called in transaction. What's more, we should also consider
    * the concurrency issue. For example, if two threads want to create a new id for the same name,
    * the result is not deterministic if we do not use synchronization.
    */
   @VisibleForTesting
-  synchronized long getOrCreateId(String name, boolean isMetalake, boolean createIdIfNotExists)
-      throws IOException {
+  synchronized long getOrCreateId(
+      String name, boolean isMetalakeOrCatalog, boolean createIdIfNotExists) throws IOException {
     byte[] nameByte = Bytes.concat(NAME_PREFIX, name.getBytes());
     byte[] idByte = backend.get(nameByte);
     if (idByte != null) {
@@ -108,17 +109,21 @@ public class CustomEntityKeyEncoder implements EntityKeyEncoder {
       throw new IOException("getOrCreateId should be called in transaction");
     }
 
-    // Matalake use UUID as id, other entities use incremental id
+    // Matalake and catalog use UUID as id, other entities use incremental id
     // According to
     // https://stackoverflow.com/questions/325443/likelihood-of-collision-using-most-significant-bits-of-a-uuid-in-java
     // UUID.randomUUID().getLeastSignificantBits() is a good choice for id
-    long id = isMetalake ? UUID.randomUUID().getLeastSignificantBits() : getNextUsableId();
+    long id = isMetalakeOrCatalog ? UUID.randomUUID().getLeastSignificantBits() : getNextUsableId();
     byte[] maxByte = ByteUtils.longToByte(id);
-    LOG.info("Create new id '{}' for name '{}', isMetaLake '{}'", id, name, isMetalake);
+    LOG.info(
+        "Create new id '{}' for name '{}',  isMetalakeOrCatalog '{}'",
+        id,
+        name,
+        isMetalakeOrCatalog);
 
     // Write current max id to storage, For metalake as it's generated from UUID, No need to store
     // it
-    if (!isMetalake) {
+    if (!isMetalakeOrCatalog) {
       backend.put(CURRENT_MAX_ID, maxByte, true);
     }
 
@@ -146,7 +151,7 @@ public class CustomEntityKeyEncoder implements EntityKeyEncoder {
     long[] namespaceIds = new long[nameSpace.length];
     for (int i = 0; i < nameSpace.length; i++) {
       namespaceIds[i] =
-          getOrCreateId(nameSpace[i], i == 0 /* is metalake or not */, createIdIfNotExists);
+          getOrCreateId(nameSpace[i], i <= 1 /* is metalake or catalog */, createIdIfNotExists);
     }
 
     NameIdentifier identifier = entityIdentifer.getNameIdentifier();
@@ -163,7 +168,7 @@ public class CustomEntityKeyEncoder implements EntityKeyEncoder {
     long[] namespaceAndNameIds = new long[namespaceIds.length + 1];
     System.arraycopy(namespaceIds, 0, namespaceAndNameIds, 0, namespaceIds.length);
     namespaceAndNameIds[namespaceIds.length] =
-        getOrCreateId(identifier.name(), namespaceIds.length == 0, createIdIfNotExists);
+        getOrCreateId(identifier.name(), namespaceIds.length <= 1, createIdIfNotExists);
 
     String[] nameIdentifierTemplate = ENTITY_TYPE_TO_NAME_IDENTIFIER.get(entityType);
     if (nameIdentifierTemplate == null) {
