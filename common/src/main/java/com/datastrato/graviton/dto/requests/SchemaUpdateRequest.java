@@ -14,6 +14,7 @@ import com.google.common.base.Preconditions;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
+import org.apache.commons.lang3.StringUtils;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY)
@@ -53,10 +54,9 @@ public interface SchemaUpdateRequest extends RESTRequest {
     @Override
     public void validate() throws IllegalArgumentException {
       Preconditions.checkArgument(
-          property != null && !property.isEmpty(),
-          "\"property\" field is required and cannot be empty");
+          StringUtils.isNotBlank(property), "\"property\" field is required and cannot be empty");
       Preconditions.checkArgument(
-          value != null && !value.isEmpty(), "\"value\" field is required and cannot be empty");
+          StringUtils.isNotBlank(value), "\"value\" field is required and cannot be empty");
     }
 
     @Override
@@ -84,8 +84,7 @@ public interface SchemaUpdateRequest extends RESTRequest {
     @Override
     public void validate() throws IllegalArgumentException {
       Preconditions.checkArgument(
-          property != null && !property.isEmpty(),
-          "\"property\" field is required and cannot be empty");
+          StringUtils.isNotBlank(property), "\"property\" field is required and cannot be empty");
     }
 
     @Override

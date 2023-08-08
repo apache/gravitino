@@ -11,34 +11,22 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
 
-/** Represents a request containing multiple catalog updates. */
 @Getter
 @EqualsAndHashCode
 @ToString
-public class CatalogUpdatesRequest implements RESTRequest {
+public class TableUpdatesRequest implements RESTRequest {
 
   @JsonProperty("updates")
-  private final List<CatalogUpdateRequest> updates;
+  private final List<TableUpdateRequest> updates;
 
-  /**
-   * Constructor for CatalogUpdatesRequest.
-   *
-   * @param updates The list of catalog update requests.
-   */
-  public CatalogUpdatesRequest(List<CatalogUpdateRequest> updates) {
+  public TableUpdatesRequest(List<TableUpdateRequest> updates) {
     this.updates = updates;
   }
 
-  /** Default constructor for CatalogUpdatesRequest. */
-  public CatalogUpdatesRequest() {
+  public TableUpdatesRequest() {
     this(null);
   }
 
-  /**
-   * Validates each request in the list.
-   *
-   * @throws IllegalArgumentException if validation of any request fails.
-   */
   @Override
   public void validate() throws IllegalArgumentException {
     updates.forEach(RESTRequest::validate);

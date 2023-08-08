@@ -10,6 +10,7 @@ import com.google.common.base.Preconditions;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
+import org.apache.commons.lang3.StringUtils;
 
 /** Represents a response containing catalog information. */
 @Getter
@@ -45,16 +46,15 @@ public class CatalogResponse extends BaseResponse {
   public void validate() throws IllegalArgumentException {
     super.validate();
 
-    Preconditions.checkArgument(catalog != null, "catalog must be non-null");
+    Preconditions.checkArgument(catalog != null, "catalog must not be null");
     Preconditions.checkArgument(
-        catalog.name() != null && !catalog.name().isEmpty(),
-        "catalog 'name' must be non-null and non-empty");
+        StringUtils.isNotBlank(catalog.name()), "catalog 'name' must not be null and empty");
+    Preconditions.checkArgument(catalog.type() != null, "catalog 'type' must not be null");
+    Preconditions.checkArgument(catalog.auditInfo() != null, "catalog 'audit' must not be null");
     Preconditions.checkArgument(
-        catalog.type() != null, "catalog 'type' must be non-null and non-empty");
+        StringUtils.isNotBlank(catalog.auditInfo().creator()),
+        "catalog 'audit.creator' must not be null and empty");
     Preconditions.checkArgument(
-        catalog.auditInfo().creator() != null && !catalog.auditInfo().creator().isEmpty(),
-        "catalog 'audit.creator' must be non-null and non-empty");
-    Preconditions.checkArgument(
-        catalog.auditInfo().createTime() != null, "catalog 'audit.createTime' must be non-null");
+        catalog.auditInfo().createTime() != null, "catalog 'audit.createTime' must not be null");
   }
 }
