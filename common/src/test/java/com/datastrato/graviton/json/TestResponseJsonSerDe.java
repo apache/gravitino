@@ -7,9 +7,9 @@ package com.datastrato.graviton.json;
 import com.datastrato.graviton.dto.AuditDTO;
 import com.datastrato.graviton.dto.MetalakeDTO;
 import com.datastrato.graviton.dto.responses.BaseResponse;
-import com.datastrato.graviton.dto.responses.CatalogListResponse;
 import com.datastrato.graviton.dto.responses.CatalogResponse;
 import com.datastrato.graviton.dto.responses.DropResponse;
+import com.datastrato.graviton.dto.responses.EntityListResponse;
 import com.datastrato.graviton.dto.responses.ErrorResponse;
 import com.datastrato.graviton.dto.responses.MetalakeListResponse;
 import com.datastrato.graviton.dto.responses.MetalakeResponse;
@@ -44,11 +44,11 @@ public class TestResponseJsonSerDe {
   }
 
   @Test
-  public void testCatalogListResponseSerDe() throws JsonProcessingException {
-    CatalogListResponse response = new CatalogListResponse();
+  public void testEntityListResponseSerDe() throws JsonProcessingException {
+    EntityListResponse response = new EntityListResponse();
     String serJson = JsonUtils.objectMapper().writeValueAsString(response);
-    CatalogListResponse deserResponse =
-        JsonUtils.objectMapper().readValue(serJson, CatalogListResponse.class);
+    EntityListResponse deserResponse =
+        JsonUtils.objectMapper().readValue(serJson, EntityListResponse.class);
     Assertions.assertEquals(response, deserResponse);
   }
 
