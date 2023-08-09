@@ -86,7 +86,7 @@ public class ProtoEntitySerDe implements EntitySerDe {
                         (Class<? extends ProtoSerDe<? extends Entity, ? extends Message>>)
                             loadClass(
                                 ENTITY_TO_SERDE.get(entityClazz.getCanonicalName()),
-                                clazz.getClass().getClassLoader());
+                                clazz.getClassLoader());
                     return serdeClazz.newInstance();
                   } catch (Exception e) {
                     throw new RuntimeException(
