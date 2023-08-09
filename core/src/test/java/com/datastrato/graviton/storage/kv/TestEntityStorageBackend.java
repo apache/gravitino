@@ -189,6 +189,16 @@ public class TestEntityStorageBackend {
           NoSuchEntityException.class,
           () -> store.get(metalake.nameIdentifier(), EntityType.METALAKE, BaseMetalake.class));
 
+      // Add new updateMetaLake.
+      // 'updatedMetalake2' is a new name, which will trigger id allocation
+      BaseMetalake updatedMetalake2 =
+          new BaseMetalake.Builder()
+              .withId(metalake.getId())
+              .withName("updatedMetalake2")
+              .withAuditInfo(auditInfo)
+              .withVersion(SchemaVersion.V_0_1)
+              .build();
+      store.put(updatedMetalake2);
     } catch (Exception e) {
       Assertions.fail(e.getMessage());
     }

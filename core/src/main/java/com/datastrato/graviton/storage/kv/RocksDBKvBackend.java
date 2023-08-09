@@ -204,6 +204,11 @@ public class RocksDBKvBackend implements KvBackend {
   @Override
   public <R, E extends Exception> R executeInTransaction(Executable<R, E> executable)
       throws E, IOException {
+    // Already in tx, directly execute it without creating a new tx
+    if (TX_LOCAL.get() != null) {
+      return executable.execute();
+    }
+
     Transaction tx = db.beginTransaction(new WriteOptions());
     LOGGER.info("Starting transaction: {}", tx);
     TX_LOCAL.set(tx);
