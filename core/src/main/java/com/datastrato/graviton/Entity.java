@@ -34,12 +34,12 @@ public interface Entity extends Serializable {
   @Getter
   @AllArgsConstructor
   @ToString
-  class EntityIdentifer {
+  class EntityIdentifier {
     private NameIdentifier nameIdentifier;
     private EntityType entityType;
 
-    public static EntityIdentifer of(NameIdentifier name, EntityType entityType) {
-      return new EntityIdentifer(name, entityType);
+    public static EntityIdentifier of(NameIdentifier name, EntityType entityType) {
+      return new EntityIdentifier(name, entityType);
     }
   }
 

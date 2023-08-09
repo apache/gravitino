@@ -13,7 +13,7 @@ import static com.datastrato.graviton.Configs.ENTRY_KV_ROCKSDB_BACKEND_PATH;
 import com.datastrato.graviton.Catalog.Type;
 import com.datastrato.graviton.Config;
 import com.datastrato.graviton.Configs;
-import com.datastrato.graviton.Entity.EntityIdentifer;
+import com.datastrato.graviton.Entity.EntityIdentifier;
 import com.datastrato.graviton.Entity.EntityType;
 import com.datastrato.graviton.EntityAlreadyExistsException;
 import com.datastrato.graviton.EntitySerDeFactory;
@@ -115,7 +115,7 @@ public class TestEntityStorageBackend {
           NoSuchEntityException.class,
           () ->
               store.get(
-                  EntityIdentifer.of(metalake.nameIdentifier(), EntityType.METALAKE),
+                  EntityIdentifier.of(metalake.nameIdentifier(), EntityType.METALAKE),
                   BaseMetalake.class));
       try {
         store.executeInTransaction(
@@ -134,7 +134,7 @@ public class TestEntityStorageBackend {
           NoSuchEntityException.class,
           () ->
               store.get(
-                  EntityIdentifer.of(metalake.nameIdentifier(), EntityType.METALAKE),
+                  EntityIdentifier.of(metalake.nameIdentifier(), EntityType.METALAKE),
                   BaseMetalake.class));
 
       store.executeInTransaction(
@@ -149,50 +149,50 @@ public class TestEntityStorageBackend {
 
       Metalake retrievedMetalake =
           store.get(
-              EntityIdentifer.of(metalake.nameIdentifier(), EntityType.METALAKE),
+              EntityIdentifier.of(metalake.nameIdentifier(), EntityType.METALAKE),
               BaseMetalake.class);
       Assertions.assertEquals(metalake, retrievedMetalake);
       CatalogEntity retrievedCatalog =
           store.get(
-              EntityIdentifer.of(catalog.nameIdentifier(), EntityType.CATALOG),
+              EntityIdentifier.of(catalog.nameIdentifier(), EntityType.CATALOG),
               CatalogEntity.class);
       Assertions.assertEquals(catalog, retrievedCatalog);
       Metalake retrievedMetalakeCopy =
           store.get(
-              EntityIdentifer.of(metalakeCopy.nameIdentifier(), EntityType.METALAKE),
+              EntityIdentifier.of(metalakeCopy.nameIdentifier(), EntityType.METALAKE),
               BaseMetalake.class);
       Assertions.assertEquals(metalakeCopy, retrievedMetalakeCopy);
       CatalogEntity retrievedCatalogCopy =
           store.get(
-              EntityIdentifer.of(catalogCopy.nameIdentifier(), EntityType.CATALOG),
+              EntityIdentifier.of(catalogCopy.nameIdentifier(), EntityType.CATALOG),
               CatalogEntity.class);
       Assertions.assertEquals(catalogCopy, retrievedCatalogCopy);
 
       // Test scan and store list interface
       List<CatalogEntity> catalogEntityList =
           store.list(
-              EntityIdentifer.of(NameIdentifier.of(catalog.namespace(), "*"), EntityType.CATALOG),
+              EntityIdentifier.of(NameIdentifier.of(catalog.namespace(), "*"), EntityType.CATALOG),
               CatalogEntity.class);
       Assertions.assertEquals(3, catalogEntityList.size());
       Assertions.assertTrue(catalogEntityList.contains(catalog));
       Assertions.assertTrue(catalogEntityList.contains(catalogCopy));
       Assertions.assertTrue(catalogEntityList.contains(catalogCopyAgain));
 
-      store.delete(EntityIdentifer.of(metalake.nameIdentifier(), EntityType.METALAKE));
+      store.delete(EntityIdentifier.of(metalake.nameIdentifier(), EntityType.METALAKE));
       Assertions.assertThrows(
           NoSuchEntityException.class,
           () ->
               store.get(
-                  EntityIdentifer.of(metalake.nameIdentifier(), EntityType.METALAKE),
+                  EntityIdentifier.of(metalake.nameIdentifier(), EntityType.METALAKE),
                   BaseMetalake.class));
 
       Assertions.assertThrows(EntityAlreadyExistsException.class, () -> store.put(catalog, false));
-      store.delete(EntityIdentifer.of(catalog.nameIdentifier(), EntityType.CATALOG));
+      store.delete(EntityIdentifier.of(catalog.nameIdentifier(), EntityType.CATALOG));
       Assertions.assertThrows(
           NoSuchEntityException.class,
           () ->
               store.get(
-                  EntityIdentifer.of(catalog.nameIdentifier(), EntityType.CATALOG),
+                  EntityIdentifier.of(catalog.nameIdentifier(), EntityType.CATALOG),
                   CatalogEntity.class));
 
       // Test update
@@ -205,19 +205,19 @@ public class TestEntityStorageBackend {
               .build();
       store.put(metalake);
       store.update(
-          EntityIdentifer.of(metalake.nameIdentifier(), EntityType.METALAKE),
+          EntityIdentifier.of(metalake.nameIdentifier(), EntityType.METALAKE),
           BaseMetalake.class,
           l -> updatedMetalake);
       Assertions.assertEquals(
           updatedMetalake,
           store.get(
-              EntityIdentifer.of(updatedMetalake.nameIdentifier(), EntityType.METALAKE),
+              EntityIdentifier.of(updatedMetalake.nameIdentifier(), EntityType.METALAKE),
               BaseMetalake.class));
       Assertions.assertThrows(
           NoSuchEntityException.class,
           () ->
               store.get(
-                  EntityIdentifer.of(metalake.nameIdentifier(), EntityType.METALAKE),
+                  EntityIdentifier.of(metalake.nameIdentifier(), EntityType.METALAKE),
                   BaseMetalake.class));
 
     } catch (Exception e) {

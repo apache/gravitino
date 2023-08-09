@@ -4,7 +4,7 @@
  */
 package com.datastrato.graviton.meta;
 
-import com.datastrato.graviton.Entity.EntityIdentifer;
+import com.datastrato.graviton.Entity.EntityIdentifier;
 import com.datastrato.graviton.Entity.EntityType;
 import com.datastrato.graviton.EntityAlreadyExistsException;
 import com.datastrato.graviton.EntityStore;
@@ -39,7 +39,7 @@ public class MetalakeManager implements SupportsMetalakes {
       NameIdentifier nameIdentifier =
           NameIdentifier.of(Namespace.empty(), NameIdentifier.WILDCARD_FLAG);
       return store
-          .list(EntityIdentifer.of(nameIdentifier, EntityType.METALAKE), BaseMetalake.class)
+          .list(EntityIdentifier.of(nameIdentifier, EntityType.METALAKE), BaseMetalake.class)
           .toArray(new BaseMetalake[0]);
     } catch (IOException ioe) {
       LOG.error("Failed to list metalakes due to storage issues", ioe);
@@ -50,7 +50,7 @@ public class MetalakeManager implements SupportsMetalakes {
   @Override
   public BaseMetalake loadMetalake(NameIdentifier ident) throws NoSuchMetalakeException {
     try {
-      return store.get(EntityIdentifer.of(ident, EntityType.METALAKE), BaseMetalake.class);
+      return store.get(EntityIdentifier.of(ident, EntityType.METALAKE), BaseMetalake.class);
     } catch (NoSuchEntityException e) {
       LOG.warn("Metalake {} does not exist", ident, e);
       throw new NoSuchMetalakeException("Metalake " + ident + " does not exist");
@@ -94,9 +94,9 @@ public class MetalakeManager implements SupportsMetalakes {
   public BaseMetalake alterMetalake(NameIdentifier ident, MetalakeChange... changes)
       throws NoSuchMetalakeException, IllegalArgumentException {
     try {
-      EntityIdentifer entityIdentifer = EntityIdentifer.of(ident, EntityType.METALAKE);
+      EntityIdentifier entityIdentifier = EntityIdentifier.of(ident, EntityType.METALAKE);
       return store.update(
-          entityIdentifer,
+          entityIdentifier,
           BaseMetalake.class,
           metalake -> {
             BaseMetalake.Builder builder =
@@ -143,7 +143,7 @@ public class MetalakeManager implements SupportsMetalakes {
   @Override
   public boolean dropMetalake(NameIdentifier ident) {
     try {
-      return store.delete(EntityIdentifer.of(ident, EntityType.METALAKE));
+      return store.delete(EntityIdentifier.of(ident, EntityType.METALAKE));
     } catch (IOException ioe) {
       LOG.error("Failed to delete metalake {} due to storage issues", ident, ioe);
       throw new RuntimeException(ioe);

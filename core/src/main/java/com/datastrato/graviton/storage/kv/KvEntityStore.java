@@ -9,7 +9,7 @@ import static com.datastrato.graviton.Configs.ENTITY_KV_STORE;
 
 import com.datastrato.graviton.Config;
 import com.datastrato.graviton.Entity;
-import com.datastrato.graviton.Entity.EntityIdentifer;
+import com.datastrato.graviton.Entity.EntityIdentifier;
 import com.datastrato.graviton.EntityAlreadyExistsException;
 import com.datastrato.graviton.EntitySerDe;
 import com.datastrato.graviton.EntityStore;
@@ -56,8 +56,8 @@ public class KvEntityStore implements EntityStore {
 
   @Override
   public <E extends Entity & HasIdentifier> List<E> list(
-      EntityIdentifer entityIdentifer, Class<E> e) throws IOException {
-    byte[] startKey = entityKeyEncoder.encode(entityIdentifer, false);
+      EntityIdentifier entityIdentifier, Class<E> e) throws IOException {
+    byte[] startKey = entityKeyEncoder.encode(entityIdentifier, false);
     byte[] endKey = Bytes.increment(Bytes.wrap(startKey)).get();
     List<Pair<byte[], byte[]>> kvs =
         backend.scan(
@@ -78,35 +78,35 @@ public class KvEntityStore implements EntityStore {
   }
 
   @Override
-  public boolean exists(EntityIdentifer entityIdentifer) throws IOException {
-    return backend.get(entityKeyEncoder.encode(entityIdentifer, false)) != null;
+  public boolean exists(EntityIdentifier entityIdentifier) throws IOException {
+    return backend.get(entityKeyEncoder.encode(entityIdentifier, false)) != null;
   }
 
   @Override
   public <E extends Entity & HasIdentifier> void put(E e, boolean overwritten)
       throws IOException, EntityAlreadyExistsException {
     // Simple implementation, just use the entity's identifier as the key
-    byte[] key = entityKeyEncoder.encode(EntityIdentifer.of(e.nameIdentifier(), e.type()), true);
+    byte[] key = entityKeyEncoder.encode(EntityIdentifier.of(e.nameIdentifier(), e.type()), true);
     byte[] value = serDe.serialize(e);
     backend.put(key, value, overwritten);
   }
 
   @Override
   public <E extends Entity & HasIdentifier> E update(
-      EntityIdentifer entityIdentifer, Class<E> type, Function<E, E> updater)
+      EntityIdentifier entityIdentifier, Class<E> type, Function<E, E> updater)
       throws IOException, NoSuchEntityException {
     return executeInTransaction(
         () -> {
-          byte[] key = entityKeyEncoder.encode(entityIdentifer, false);
+          byte[] key = entityKeyEncoder.encode(entityIdentifier, false);
           byte[] value = backend.get(key);
           if (value == null) {
-            throw new NoSuchEntityException(entityIdentifer.toString());
+            throw new NoSuchEntityException(entityIdentifier.toString());
           }
 
           E e = serDe.deserialize(value, type);
           E updatedE = updater.apply(e);
-          if (!updatedE.nameIdentifier().equals(entityIdentifer.getNameIdentifier())) {
-            delete(entityIdentifer);
+          if (!updatedE.nameIdentifier().equals(entityIdentifier.getNameIdentifier())) {
+            delete(entityIdentifier);
           }
 
           put(updatedE, true /* overwritten */);
@@ -115,20 +115,20 @@ public class KvEntityStore implements EntityStore {
   }
 
   @Override
-  public <E extends Entity & HasIdentifier> E get(EntityIdentifer entityIdentifer, Class<E> e)
+  public <E extends Entity & HasIdentifier> E get(EntityIdentifier entityIdentifier, Class<E> e)
       throws NoSuchEntityException, IOException {
-    byte[] key = entityKeyEncoder.encode(entityIdentifer, false);
+    byte[] key = entityKeyEncoder.encode(entityIdentifier, false);
     // refer type from key;
     byte[] value = backend.get(key);
     if (value == null) {
-      throw new NoSuchEntityException(entityIdentifer.getNameIdentifier().toString());
+      throw new NoSuchEntityException(entityIdentifier.getNameIdentifier().toString());
     }
     return serDe.deserialize(value, e);
   }
 
   @Override
-  public boolean delete(EntityIdentifer entityIdentifer) throws IOException {
-    return backend.delete(entityKeyEncoder.encode(entityIdentifer, false));
+  public boolean delete(EntityIdentifier entityIdentifier) throws IOException {
+    return backend.delete(entityKeyEncoder.encode(entityIdentifier, false));
   }
 
   @Override

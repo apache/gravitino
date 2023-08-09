@@ -4,7 +4,7 @@
  */
 package com.datastrato.graviton;
 
-import com.datastrato.graviton.Entity.EntityIdentifer;
+import com.datastrato.graviton.Entity.EntityIdentifier;
 import com.datastrato.graviton.util.Executable;
 import java.io.Closeable;
 import java.io.IOException;
@@ -39,22 +39,22 @@ public interface EntityStore extends Closeable {
    * <p>Note. Depends on the isolation levels provided by the underlying storage, the returned list
    * may not be consistent.
    *
-   * @param entityIdentifer the identifier of an entity
+   * @param entityIdentifier the identifier of an entity
    * @return the list of entities
    * @param type the type of the entity
    * @throws IOException if the list operation fails
    */
-  <E extends Entity & HasIdentifier> List<E> list(EntityIdentifer entityIdentifer, Class<E> type)
+  <E extends Entity & HasIdentifier> List<E> list(EntityIdentifier entityIdentifier, Class<E> type)
       throws IOException;
 
   /**
    * Check if the entity with the specified {@link NameIdentifier} exists.
    *
-   * @param entityIdentifer the identifier of an entity
+   * @param entityIdentifier the identifier of an entity
    * @return true if the entity exists, false otherwise
    * @throws IOException if the check operation fails
    */
-  boolean exists(EntityIdentifer entityIdentifer) throws IOException;
+  boolean exists(EntityIdentifier entityIdentifier) throws IOException;
 
   /**
    * Store the entity into the underlying storage. If the entity already exists, it will overwrite
@@ -97,7 +97,7 @@ public interface EntityStore extends Closeable {
    *
    * <p>Note: the whole update operation should be in one transaction.
    *
-   * @param entityIdentifer the identifier of an entity
+   * @param entityIdentifier the identifier of an entity
    * @param type the type of the entity
    * @param updater the updater function to update the entity
    * @param <E> the type of the entity
@@ -106,7 +106,7 @@ public interface EntityStore extends Closeable {
    * @throws NoSuchEntityException if the entity does not exist
    */
   <E extends Entity & HasIdentifier> E update(
-      EntityIdentifer entityIdentifer, Class<E> type, Function<E, E> updater)
+      EntityIdentifier entityIdentifier, Class<E> type, Function<E, E> updater)
       throws IOException, NoSuchEntityException;
 
   /**
@@ -115,22 +115,22 @@ public interface EntityStore extends Closeable {
    * <p>Note. The implementation should be thread-safe, and should be able to handle concurrent
    * retrieve of entities.
    *
-   * @param entityIdentifer the identifier of an entity
+   * @param entityIdentifier the identifier of an entity
    * @return the entity retrieved from the underlying storage
    * @throws NoSuchEntityException if the entity does not exist
    * @throws IOException if the retrieve operation fails
    */
-  <E extends Entity & HasIdentifier> E get(EntityIdentifer entityIdentifer, Class<E> e)
+  <E extends Entity & HasIdentifier> E get(EntityIdentifier entityIdentifier, Class<E> e)
       throws NoSuchEntityException, IOException;
 
   /**
    * Delete the entity from the underlying storage by the specified {@link NameIdentifier}.
    *
-   * @param entityIdentifer the identifier of an entity
+   * @param entityIdentifier the identifier of an entity
    * @return true if the entity is deleted, false otherwise
    * @throws IOException if the delete operation fails
    */
-  boolean delete(EntityIdentifer entityIdentifer) throws IOException;
+  boolean delete(EntityIdentifier entityIdentifier) throws IOException;
 
   /**
    * Execute the specified {@link Executable} in a transaction.
