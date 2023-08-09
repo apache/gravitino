@@ -129,7 +129,8 @@ public class ProtoEntitySerDe implements EntitySerDe {
     try {
       return Class.forName(className, true, classLoader);
     } catch (Exception e) {
-      throw new IOException("Failed to load class " + className, e);
+      throw new IOException(
+          "Failed to load class " + className + " with classLoader " + classLoader, e);
     }
   }
 }
