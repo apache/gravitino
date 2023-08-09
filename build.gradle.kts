@@ -160,7 +160,7 @@ tasks {
     }
   }
 
-  val assembleDistribution by registering(Zip::class) {
+  val assembleDistribution by registering(Tar::class) {
     group = "graviton distribution"
     finalizedBy("checksumDistribution")
     from(compileDistribution.map { it.outputs.files.single() })
