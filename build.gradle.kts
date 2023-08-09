@@ -40,8 +40,10 @@ subprojects {
   }
 
   tasks.configureEach<Test> {
-    useJUnitPlatform()
-    finalizedBy(tasks.getByName("jacocoTestReport"))
+    if (project.name != "integration") {
+      useJUnitPlatform()
+      finalizedBy(tasks.getByName("jacocoTestReport"))
+    }
   }
 
   tasks.withType<JacocoReport> {
@@ -57,8 +59,10 @@ subprojects {
 
   tasks.withType<Jar> {
     archiveFileName.set("${rootProject.name.lowercase(Locale.getDefault())}-${project.name}-$version.jar")
-    exclude("log4j2.properties")
-    exclude("test/**")
+    if (project.name != "integration") {
+      exclude("log4j2.properties")
+      exclude("test/**")
+    }
   }
 
   plugins.withType<SpotlessPlugin>().configureEach {
@@ -239,9 +243,64 @@ tasks {
     }
   }
 
+//  task("runSubmoduleTests") {
+////    group = "custom"
+////    description = "Runs tests in the submodules"
+////
+////    doLast {
+////      subprojects {
+////        tasks.getByName("test"). .execute()
+////      }
+////    }
+//  }
+
+//  task("integrationTest") {
+//    doLast {
+//      subprojects.forEach { project ->
+//
+//        if (project.name == "integration") {
+//          println("integrationTest for project: ${project.name}")
+//          project.tasks.getByName<Test>("test").useJUnitPlatform()
+//        }
+//      }
+//    }
+//  }
+
+
+//      project(":integration").tasks.getByName<Test>("test").useJUnitPlatform()
+//      project.tasks.getByName<Test>("test").useJUnitPlatform()
+//  }
+
+//  task("integrationTest") {
+//    project(":integration").tasks.create("Test") {
+////      useJUnitPlatform()
+//    }
+//
+////    project(":integration").tasks.create(Test) .getByName("test") {
+////        useJUnitPlatform()
+////    }
+////    project()tasks.test {
+////      useJUnitPlatform()
+////    }
+////    dependsOn("integration:test")
+//  }
+
 //  assemble {
 //    finalizedBy(assembleDistribution)
 //  }
+
+//  test {
+//    doLast {
+//      subprojects.forEach { project ->
+//        println("Test for project: ${project.name}")
+//        project.tasks.getByName<Test>("test").useJUnitPlatform()
+//      }
+//    }
+//  }
+
+  task("integrationTest") {
+    dependsOn(":integration:integrationTest")
+  }
 
   clean {
     dependsOn(cleanDistribution)
