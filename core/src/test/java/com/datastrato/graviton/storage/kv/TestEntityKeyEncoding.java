@@ -230,7 +230,8 @@ public class TestEntityKeyEncoding {
     Assertions.assertThrows(
         IOException.class,
         () ->
-            mockEncoder.encode(EntityIdentifier.of(mateLakeIdentifier1, EntityType.METALAKE), true));
+            mockEncoder.encode(
+                EntityIdentifier.of(mateLakeIdentifier1, EntityType.METALAKE), true));
   }
 
   @Test

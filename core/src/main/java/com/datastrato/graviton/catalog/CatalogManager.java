@@ -165,7 +165,8 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
     try {
       // Start means we want to list all catalogs in the metalake
       NameIdentifier nameIdentifier = NameIdentifier.of(namespace, NameIdentifier.WILDCARD_FLAG);
-      return store.list(EntityIdentifier.of(nameIdentifier, EntityType.CATALOG), CatalogEntity.class)
+      return store
+          .list(EntityIdentifier.of(nameIdentifier, EntityType.CATALOG), CatalogEntity.class)
           .stream()
           .map(entity -> NameIdentifier.of(namespace, entity.name()))
           .toArray(NameIdentifier[]::new);
@@ -192,7 +193,8 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
                 NameIdentifier metalakeIdent = NameIdentifier.of(ident.namespace().levels());
                 BaseMetalake metalake =
                     store.get(
-                        EntityIdentifier.of(metalakeIdent, EntityType.METALAKE), BaseMetalake.class);
+                        EntityIdentifier.of(metalakeIdent, EntityType.METALAKE),
+                        BaseMetalake.class);
 
                 CatalogEntity e =
                     new CatalogEntity.Builder()

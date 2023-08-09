@@ -183,7 +183,8 @@ public class TestEntityStore {
 
     Metalake retrievedMetalake =
         store.get(
-            EntityIdentifier.of(metalake.nameIdentifier(), EntityType.METALAKE), BaseMetalake.class);
+            EntityIdentifier.of(metalake.nameIdentifier(), EntityType.METALAKE),
+            BaseMetalake.class);
     Assertions.assertEquals(metalake, retrievedMetalake);
 
     CatalogEntity retrievedCatalog =
