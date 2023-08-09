@@ -30,6 +30,11 @@ import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Graviton Metalake is the top-level metadata repository for users. It contains a list of catalogs
+ * as sub-level metadata collections. With {@link GravitonMetaLake}, users can list, create, load,
+ * alter and drop a catalog with specified identifier.
+ */
 public class GravitonMetaLake extends MetalakeDTO implements SupportsCatalogs {
 
   private static final Logger LOG = LoggerFactory.getLogger(GravitonMetaLake.class);
@@ -46,6 +51,13 @@ public class GravitonMetaLake extends MetalakeDTO implements SupportsCatalogs {
     this.restClient = restClient;
   }
 
+  /**
+   * List all the catalogs under this metalake with specified namespace.
+   *
+   * @param namespace The namespace to list the catalogs under it.
+   * @return A list of {@link NameIdentifier} of the catalogs under the specified namespace.
+   * @throws NoSuchMetalakeException if the metalake with specified namespace does not exist.
+   */
   @Override
   public NameIdentifier[] listCatalogs(Namespace namespace) throws NoSuchMetalakeException {
     validateCatalogNamespace(namespace);
@@ -61,6 +73,13 @@ public class GravitonMetaLake extends MetalakeDTO implements SupportsCatalogs {
     return resp.identifiers();
   }
 
+  /**
+   * Load the catalog with specified identifier.
+   *
+   * @param ident The identifier of the catalog to load.
+   * @return The {@link Catalog} with specified identifier.
+   * @throws NoSuchCatalogException if the catalog with specified identifier does not exist.
+   */
   @Override
   public Catalog loadCatalog(NameIdentifier ident) throws NoSuchCatalogException {
     validateCatalogIdentifier(ident);
@@ -76,6 +95,17 @@ public class GravitonMetaLake extends MetalakeDTO implements SupportsCatalogs {
     return DTOConverters.toCatalog(resp.getCatalog(), restClient);
   }
 
+  /**
+   * Create a new catalog with specified identifier, type, comment and properties.
+   *
+   * @param ident The identifier of the catalog.
+   * @param type The type of the catalog.
+   * @param comment The comment of the catalog.
+   * @param properties The properties of the catalog.
+   * @return The created {@link Catalog}.
+   * @throws NoSuchMetalakeException if the metalake with specified namespace does not exist.
+   * @throws CatalogAlreadyExistsException if the catalog with specified identifier already exists.
+   */
   @Override
   public Catalog createCatalog(
       NameIdentifier ident, Catalog.Type type, String comment, Map<String, String> properties)
@@ -97,6 +127,15 @@ public class GravitonMetaLake extends MetalakeDTO implements SupportsCatalogs {
     return DTOConverters.toCatalog(resp.getCatalog(), restClient);
   }
 
+  /**
+   * Alter the catalog with specified identifier by applying the changes.
+   *
+   * @param ident the identifier of the catalog.
+   * @param changes the changes to apply to the catalog.
+   * @return the altered {@link Catalog}.
+   * @throws NoSuchCatalogException if the catalog with specified identifier does not exist.
+   * @throws IllegalArgumentException if the changes are invalid.
+   */
   @Override
   public Catalog alterCatalog(NameIdentifier ident, CatalogChange... changes)
       throws NoSuchCatalogException, IllegalArgumentException {
@@ -121,6 +160,12 @@ public class GravitonMetaLake extends MetalakeDTO implements SupportsCatalogs {
     return DTOConverters.toCatalog(resp.getCatalog(), restClient);
   }
 
+  /**
+   * Drop the catalog with specified identifier.
+   *
+   * @param ident the identifier of the catalog.
+   * @return true if the catalog is dropped successfully, false otherwise.
+   */
   @Override
   public boolean dropCatalog(NameIdentifier ident) {
     validateCatalogIdentifier(ident);

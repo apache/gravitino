@@ -10,8 +10,13 @@ import com.datastrato.graviton.exceptions.CatalogAlreadyExistsException;
 import com.datastrato.graviton.exceptions.MetalakeAlreadyExistsException;
 import com.datastrato.graviton.exceptions.NoSuchCatalogException;
 import com.datastrato.graviton.exceptions.NoSuchMetalakeException;
+import com.datastrato.graviton.exceptions.NoSuchSchemaException;
+import com.datastrato.graviton.exceptions.NoSuchTableException;
+import com.datastrato.graviton.exceptions.NonEmptySchemaException;
 import com.datastrato.graviton.exceptions.NotFoundException;
 import com.datastrato.graviton.exceptions.RESTException;
+import com.datastrato.graviton.exceptions.SchemaAlreadyExistsException;
+import com.datastrato.graviton.exceptions.TableAlreadyExistsException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Joiner;
 import java.util.List;
@@ -39,6 +44,24 @@ public class ErrorHandlers {
 
   public static Consumer<ErrorResponse> catalogErrorHandler() {
     return CatalogErrorHandler.INSTANCE;
+  }
+
+  /**
+   * Creates an error handler specific to Schema operations.
+   *
+   * @return A Consumer representing the Schema error handler.
+   */
+  public static Consumer<ErrorResponse> schemaErrorHandler() {
+    return SchemaErrorHandler.INSTANCE;
+  }
+
+  /**
+   * Creates an error handler specific to Table operations.
+   *
+   * @return A Consumer representing the Table error handler.
+   */
+  public static Consumer<ErrorResponse> tableErrorHandler() {
+    return TableErrorHandler.INSTANCE;
   }
 
   /**
@@ -80,6 +103,69 @@ public class ErrorHandlers {
       return message;
     } else {
       return String.format("%s\n%s", message, stack);
+    }
+  }
+
+  /** Error handler specific to Table operations. */
+  private static class TableErrorHandler extends RestErrorHandler {
+    private static final ErrorHandler INSTANCE = new TableErrorHandler();
+
+    @Override
+    public void accept(ErrorResponse errorResponse) {
+      switch (errorResponse.getCode()) {
+        case ErrorConstants.ILLEGAL_ARGUMENTS_CODE:
+          throw new IllegalArgumentException(formatErrorMessage(errorResponse));
+
+        case ErrorConstants.NOT_FOUND_CODE:
+          if (errorResponse.getType().equals(NoSuchSchemaException.class.getSimpleName())) {
+            throw new NoSuchSchemaException(formatErrorMessage(errorResponse));
+          } else if (errorResponse.getType().equals(NoSuchTableException.class.getSimpleName())) {
+            throw new NoSuchTableException(formatErrorMessage(errorResponse));
+          } else {
+            throw new NotFoundException(formatErrorMessage(errorResponse));
+          }
+
+        case ErrorConstants.ALREADY_EXISTS_CODE:
+          throw new TableAlreadyExistsException(formatErrorMessage(errorResponse));
+
+        case ErrorConstants.INTERNAL_ERROR_CODE:
+          throw new RuntimeException(formatErrorMessage(errorResponse));
+      }
+
+      super.accept(errorResponse);
+    }
+  }
+
+  /** Error handler specific to Schema operations. */
+  private static class SchemaErrorHandler extends RestErrorHandler {
+    private static final ErrorHandler INSTANCE = new SchemaErrorHandler();
+
+    @Override
+    public void accept(ErrorResponse errorResponse) {
+      switch (errorResponse.getCode()) {
+        case ErrorConstants.ILLEGAL_ARGUMENTS_CODE:
+          throw new IllegalArgumentException(formatErrorMessage(errorResponse));
+
+        case ErrorConstants.NOT_FOUND_CODE:
+          if (errorResponse.getType().equals(NoSuchCatalogException.class.getSimpleName())) {
+            throw new NoSuchCatalogException(formatErrorMessage(errorResponse));
+          } else if (errorResponse.getType().equals(NoSuchSchemaException.class.getSimpleName())) {
+            throw new NoSuchSchemaException(formatErrorMessage(errorResponse));
+          } else {
+            throw new NotFoundException(formatErrorMessage(errorResponse));
+          }
+
+        case ErrorConstants.ALREADY_EXISTS_CODE:
+          throw new SchemaAlreadyExistsException(formatErrorMessage(errorResponse));
+
+        case ErrorConstants.NON_EMPTY_CODE:
+          throw new NonEmptySchemaException(formatErrorMessage(errorResponse));
+
+        case ErrorConstants.INTERNAL_ERROR_CODE:
+          throw new RuntimeException(formatErrorMessage(errorResponse));
+      }
+
+      super.accept(errorResponse);
     }
   }
 
