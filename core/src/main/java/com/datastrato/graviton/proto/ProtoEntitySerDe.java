@@ -44,7 +44,7 @@ public class ProtoEntitySerDe implements EntitySerDe {
 
   @Override
   public <T extends Entity> byte[] serialize(T t) throws IOException {
-    Any any = Any.pack(toProto(t));
+    Any any = Any.pack(toProto(t, Thread.currentThread().getContextClassLoader()));
     return any.toByteArray();
   }
 
@@ -52,15 +52,14 @@ public class ProtoEntitySerDe implements EntitySerDe {
   public <T extends Entity> T deserialize(byte[] bytes, Class<T> clazz, ClassLoader classLoader)
       throws IOException {
     Any any = Any.parseFrom(bytes);
-    Class<? extends Message> protoClass =
-        getProtoClass(clazz, Thread.currentThread().getContextClassLoader());
+    Class<? extends Message> protoClass = getProtoClass(clazz, classLoader);
 
     if (!any.is(protoClass)) {
       throw new IOException("Invalid proto for entity " + clazz.getName());
     }
 
     Message anyMessage = any.unpack(protoClass);
-    return fromProto(anyMessage, clazz);
+    return fromProto(anyMessage, clazz, classLoader);
   }
 
   private <T extends Entity, M extends Message> ProtoSerDe<T, M> getProtoSerde(
@@ -103,17 +102,15 @@ public class ProtoEntitySerDe implements EntitySerDe {
         });
   }
 
-  private <T extends Entity, M extends Message> M toProto(T t) throws IOException {
-    ProtoSerDe<T, M> protoSerDe =
-        (ProtoSerDe<T, M>)
-            getProtoSerde(t.getClass(), Thread.currentThread().getContextClassLoader());
+  private <T extends Entity, M extends Message> M toProto(T t, ClassLoader classLoader)
+      throws IOException {
+    ProtoSerDe<T, M> protoSerDe = (ProtoSerDe<T, M>) getProtoSerde(t.getClass(), classLoader);
     return protoSerDe.serialize(t);
   }
 
-  private <T extends Entity, M extends Message> T fromProto(M m, Class<T> entityClass)
-      throws IOException {
-    ProtoSerDe<T, Message> protoSerDe =
-        getProtoSerde(entityClass, Thread.currentThread().getContextClassLoader());
+  private <T extends Entity, M extends Message> T fromProto(
+      M m, Class<T> entityClass, ClassLoader classLoader) throws IOException {
+    ProtoSerDe<T, Message> protoSerDe = getProtoSerde(entityClass, classLoader);
     return protoSerDe.deserialize(m);
   }
 
