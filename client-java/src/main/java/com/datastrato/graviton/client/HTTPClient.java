@@ -266,23 +266,6 @@ public class HTTPClient implements RESTClient {
   }
 
   /**
-   * Method to execute an HTTP request and process the corresponding response.
-   *
-   * @param method - HTTP method, such as GET, POST, HEAD, etc.
-   * @param queryParams - A map of query parameters
-   * @param path - URL path to send the request to
-   * @param requestBody - Content to place in the request body
-   * @param responseType - Class of the Response type. Needs to have serializer registered with
-   *     ObjectMapper
-   * @param errorHandler - Error handler delegated for HTTP responses which handles server error
-   *     responses
-   * @param responseHeaders The consumer of the response headers
-   * @param <T> - Class type of the response for deserialization. Must be registered with the
-   *     ObjectMapper.
-   * @return The response entity, parsed and converted to its type T
-   */
-
-  /**
    * Executes an HTTP request and processes the corresponding response with support for response
    * headers.
    *
@@ -576,16 +559,6 @@ public class HTTPClient implements RESTClient {
     return execute(Method.DELETE, path, queryParams, null, responseType, headers, errorHandler);
   }
 
-  @Override
-  public <T extends RESTResponse> T postForm(
-      String path,
-      Map<String, String> formData,
-      Class<T> responseType,
-      Map<String, String> headers,
-      Consumer<ErrorResponse> errorHandler) {
-    return execute(Method.POST, path, null, formData, responseType, headers, errorHandler);
-  }
-
   /**
    * Sends an HTTP POST request with form data to the specified path and processes the response.
    *
@@ -599,6 +572,24 @@ public class HTTPClient implements RESTClient {
    *     responses.
    * @param <T> The class type of the response for deserialization.
    * @return The response entity parsed and converted to its type T.
+   */
+  @Override
+  public <T extends RESTResponse> T postForm(
+      String path,
+      Map<String, String> formData,
+      Class<T> responseType,
+      Map<String, String> headers,
+      Consumer<ErrorResponse> errorHandler) {
+    return execute(Method.POST, path, null, formData, responseType, headers, errorHandler);
+  }
+
+  /**
+   * Adds the specified request headers to the given HTTP request along with a specified body MIME
+   * type.
+   *
+   * @param request The HTTP request to which headers are to be added.
+   * @param requestHeaders A map of headers to be added to the request.
+   * @param bodyMimeType The MIME type of the request body.
    */
   private void addRequestHeaders(
       HttpUriRequest request, Map<String, String> requestHeaders, String bodyMimeType) {
