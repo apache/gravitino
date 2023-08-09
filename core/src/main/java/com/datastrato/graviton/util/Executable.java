@@ -4,10 +4,8 @@
  */
 package com.datastrato.graviton.util;
 
-import java.io.IOException;
-
 @FunctionalInterface
 public interface Executable<R, E extends Exception> {
 
-  R execute() throws E, IOException;
+  R execute() throws E;
 }
