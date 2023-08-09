@@ -13,6 +13,9 @@ public class NameIdentifier {
 
   private static final Splitter DOT = Splitter.on('.');
 
+  // Any NameIdentifier with this name is considered a wildcard.
+  public static final String WILDCARD_FLAG = "*";
+
   private final Namespace namespace;
 
   private final String name;

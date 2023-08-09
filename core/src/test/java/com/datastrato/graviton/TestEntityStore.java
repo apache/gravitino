@@ -4,6 +4,7 @@
  */
 package com.datastrato.graviton;
 
+import com.datastrato.graviton.Entity.EntityIdentifer;
 import com.datastrato.graviton.Entity.EntityType;
 import com.datastrato.graviton.meta.AuditInfo;
 import com.datastrato.graviton.meta.BaseMetalake;
@@ -50,16 +51,17 @@ public class TestEntityStore {
 
     @Override
     public <E extends Entity & HasIdentifier> List<E> list(
-        Namespace namespace, Class<E> cl, EntityType entityType) throws IOException {
+        EntityIdentifer entityIdentifer, Class<E> cl) throws IOException {
       return entityMap.entrySet().stream()
-          .filter(e -> e.getKey().namespace().equals(namespace))
+          .filter(
+              e -> e.getKey().namespace().equals(entityIdentifer.getNameIdentifier().namespace()))
           .map(entry -> (E) entry.getValue())
           .collect(Collectors.toList());
     }
 
     @Override
-    public boolean exists(NameIdentifier nameIdentifier, EntityType type) throws IOException {
-      return entityMap.containsKey(nameIdentifier);
+    public boolean exists(EntityIdentifer entityIdentifer) throws IOException {
+      return entityMap.containsKey(entityIdentifer.getNameIdentifier());
     }
 
     @Override
@@ -71,7 +73,7 @@ public class TestEntityStore {
       } else {
         executeInTransaction(
             () -> {
-              if (exists(e.nameIdentifier(), e.type())) {
+              if (exists(EntityIdentifer.of(e.nameIdentifier(), e.type()))) {
                 throw new EntityAlreadyExistsException("Entity " + ident + " already exists");
               }
               entityMap.put(ident, e);
@@ -82,10 +84,11 @@ public class TestEntityStore {
 
     @Override
     public <E extends Entity & HasIdentifier> E update(
-        NameIdentifier ident, Class<E> type, EntityType entityType, Function<E, E> updater)
+        EntityIdentifer entityIdentifer, Class<E> type, Function<E, E> updater)
         throws IOException, NoSuchEntityException {
       return executeInTransaction(
           () -> {
+            NameIdentifier ident = entityIdentifer.getNameIdentifier();
             E e = (E) entityMap.get(ident);
             if (e == null) {
               throw new NoSuchEntityException("Entity " + ident + " does not exist");
@@ -94,7 +97,7 @@ public class TestEntityStore {
             E newE = updater.apply(e);
             NameIdentifier newIdent = NameIdentifier.of(newE.namespace(), newE.name());
             if (!newIdent.equals(ident)) {
-              delete(ident, entityType);
+              delete(entityIdentifer);
             }
             entityMap.put(newIdent, newE);
             return newE;
@@ -102,20 +105,20 @@ public class TestEntityStore {
     }
 
     @Override
-    public <E extends Entity & HasIdentifier> E get(
-        NameIdentifier ident, EntityType entityType, Class<E> cl)
+    public <E extends Entity & HasIdentifier> E get(EntityIdentifer entityIdentifer, Class<E> cl)
         throws NoSuchEntityException, IOException {
-      E e = (E) entityMap.get(ident);
+      E e = (E) entityMap.get(entityIdentifer.getNameIdentifier());
       if (e == null) {
-        throw new NoSuchEntityException("Entity " + ident + " does not exist");
+        throw new NoSuchEntityException(
+            "Entity " + entityIdentifer.getNameIdentifier() + " does not exist");
       }
 
       return e;
     }
 
     @Override
-    public boolean delete(NameIdentifier ident, EntityType entityType) throws IOException {
-      Entity prev = entityMap.remove(ident);
+    public boolean delete(EntityIdentifer entityIdentifer) throws IOException {
+      Entity prev = entityMap.remove(entityIdentifer.getNameIdentifier());
       return prev != null;
     }
 
@@ -179,20 +182,26 @@ public class TestEntityStore {
     store.put(table);
 
     Metalake retrievedMetalake =
-        store.get(metalake.nameIdentifier(), EntityType.METALAKE, BaseMetalake.class);
+        store.get(
+            EntityIdentifer.of(metalake.nameIdentifier(), EntityType.METALAKE), BaseMetalake.class);
     Assertions.assertEquals(metalake, retrievedMetalake);
 
     CatalogEntity retrievedCatalog =
-        store.get(catalog.nameIdentifier(), EntityType.CATALOG, CatalogEntity.class);
+        store.get(
+            EntityIdentifer.of(catalog.nameIdentifier(), EntityType.CATALOG), CatalogEntity.class);
     Assertions.assertEquals(catalog, retrievedCatalog);
 
-    Table retrievedTable = store.get(table.nameIdentifier(), EntityType.TABLE, TestTable.class);
+    Table retrievedTable =
+        store.get(EntityIdentifer.of(table.nameIdentifier(), EntityType.TABLE), TestTable.class);
     Assertions.assertEquals(table, retrievedTable);
 
-    store.delete(metalake.nameIdentifier(), EntityType.METALAKE);
+    store.delete(EntityIdentifer.of(metalake.nameIdentifier(), EntityType.METALAKE));
     Assertions.assertThrows(
         NoSuchEntityException.class,
-        () -> store.get(metalake.nameIdentifier(), EntityType.METALAKE, BaseMetalake.class));
+        () ->
+            store.get(
+                EntityIdentifer.of(metalake.nameIdentifier(), EntityType.METALAKE),
+                BaseMetalake.class));
 
     Assertions.assertThrows(EntityAlreadyExistsException.class, () -> store.put(catalog, false));
   }
