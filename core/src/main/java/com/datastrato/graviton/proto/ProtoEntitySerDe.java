@@ -67,7 +67,8 @@ public class ProtoEntitySerDe implements EntitySerDe {
                     loadClass(
                         ENTITY_TO_PROTO.get(k.getCanonicalName()), getClass().getClassLoader());
               } catch (Exception e) {
-                throw new RuntimeException("Failed to create proto class " + k.getName(), e);
+                throw new RuntimeException(
+                    "Failed to create proto class " + k.getCanonicalName(), e);
               }
             });
 
@@ -89,7 +90,7 @@ public class ProtoEntitySerDe implements EntitySerDe {
                     return serdeClazz.newInstance();
                   } catch (Exception e) {
                     throw new RuntimeException(
-                        "Failed to instantiate serde class " + entityClazz.getName(), e);
+                        "Failed to instantiate serde class " + entityClazz.getCanonicalName(), e);
                   }
                 });
     Message anyMessage = any.unpack(protoClass);
