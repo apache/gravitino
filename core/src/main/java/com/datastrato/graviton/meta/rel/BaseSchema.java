@@ -16,6 +16,7 @@ import java.util.Collections;
 import java.util.Map;
 import javax.annotation.Nullable;
 import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import lombok.ToString;
 
 /** An abstract class representing a base schema in a relational database. */
@@ -34,15 +35,15 @@ public abstract class BaseSchema implements Schema, Entity, HasIdentifier {
   public static final Field AUDIT_INFO =
       Field.required("audit_info", AuditInfo.class, "The audit details of the schema");
 
-  protected Long id;
+  @Getter protected Long id;
 
-  protected Long catalogId;
+  @Getter protected Long catalogId;
 
   protected String name;
 
-  @Nullable protected String comment;
+  @Nullable @Getter protected String comment;
 
-  @Nullable protected Map<String, String> properties;
+  @Nullable @Getter protected Map<String, String> properties;
 
   protected AuditInfo auditInfo;
 
@@ -268,5 +269,25 @@ public abstract class BaseSchema implements Schema, Entity, HasIdentifier {
     }
 
     protected abstract T internalBuild();
+  }
+
+  // For Serde only, ignore namespace
+  public static class CommonSchema extends BaseSchema {}
+
+  public static class CommonSchemaBuilder
+      extends BaseSchemaBuilder<CommonSchemaBuilder, CommonSchema> {
+
+    @Override
+    protected CommonSchema internalBuild() {
+      CommonSchema commonSchema = new CommonSchema();
+      commonSchema.id = id;
+      commonSchema.catalogId = catalogId;
+      commonSchema.name = name;
+      commonSchema.comment = comment;
+      commonSchema.properties = properties;
+      commonSchema.auditInfo = auditInfo;
+
+      return commonSchema;
+    }
   }
 }
