@@ -52,77 +52,69 @@ public class ProtoEntitySerDe implements EntitySerDe {
   public <T extends Entity> T deserialize(byte[] bytes, Class<T> clazz, ClassLoader classLoader)
       throws IOException {
     Any any = Any.parseFrom(bytes);
-
-    if (!ENTITY_TO_SERDE.containsKey(clazz.getCanonicalName())
-        || !ENTITY_TO_PROTO.containsKey(clazz.getCanonicalName())) {
-      throw new IOException("No proto and serde class found for entity " + clazz.getName());
-    }
-
     Class<? extends Message> protoClass =
-        entityToProto.computeIfAbsent(
-            clazz,
-            k -> {
-              try {
-                return (Class<? extends Message>)
-                    loadClass(
-                        ENTITY_TO_PROTO.get(k.getCanonicalName()), getClass().getClassLoader());
-              } catch (Exception e) {
-                throw new RuntimeException(
-                    "Failed to create proto class " + k.getCanonicalName(), e);
-              }
-            });
+        getProtoClass(clazz, Thread.currentThread().getContextClassLoader());
 
     if (!any.is(protoClass)) {
       throw new IOException("Invalid proto for entity " + clazz.getName());
     }
 
-    ProtoSerDe<T, Message> protoSerDe =
-        (ProtoSerDe<T, Message>)
-            entityToSerDe.computeIfAbsent(
-                clazz,
-                entityClazz -> {
-                  try {
-                    Class<? extends ProtoSerDe<? extends Entity, ? extends Message>> serdeClazz =
-                        (Class<? extends ProtoSerDe<? extends Entity, ? extends Message>>)
-                            loadClass(
-                                ENTITY_TO_SERDE.get(entityClazz.getCanonicalName()),
-                                clazz.getClassLoader());
-                    return serdeClazz.newInstance();
-                  } catch (Exception e) {
-                    throw new RuntimeException(
-                        "Failed to instantiate serde class " + entityClazz.getCanonicalName(), e);
-                  }
-                });
     Message anyMessage = any.unpack(protoClass);
-    return protoSerDe.deserialize(anyMessage);
+    return fromProto(anyMessage, clazz);
+  }
+
+  private <T extends Entity, M extends Message> ProtoSerDe<T, M> getProtoSerde(
+      Class<T> entityClass, ClassLoader classLoader) throws IOException {
+    if (!ENTITY_TO_SERDE.containsKey(entityClass.getCanonicalName())
+        || ENTITY_TO_SERDE.get(entityClass.getCanonicalName()) == null) {
+      throw new IOException("No serde found for entity " + entityClass.getCanonicalName());
+    }
+    return (ProtoSerDe<T, M>)
+        entityToSerDe.computeIfAbsent(
+            entityClass,
+            k -> {
+              try {
+                Class<? extends ProtoSerDe<? extends Entity, ? extends Message>> serdeClazz =
+                    (Class<? extends ProtoSerDe<? extends Entity, ? extends Message>>)
+                        loadClass(ENTITY_TO_SERDE.get(k.getCanonicalName()), classLoader);
+                return serdeClazz.newInstance();
+              } catch (Exception e) {
+                throw new RuntimeException(
+                    "Failed to instantiate serde class " + k.getCanonicalName(), e);
+              }
+            });
+  }
+
+  private Class<? extends Message> getProtoClass(
+      Class<? extends Entity> entityClass, ClassLoader classLoader) throws IOException {
+    if (!ENTITY_TO_PROTO.containsKey(entityClass.getCanonicalName())
+        || ENTITY_TO_PROTO.get(entityClass.getCanonicalName()) == null) {
+      throw new IOException("No proto class found for entity " + entityClass.getCanonicalName());
+    }
+    return entityToProto.computeIfAbsent(
+        entityClass,
+        k -> {
+          try {
+            return (Class<? extends Message>)
+                loadClass(ENTITY_TO_PROTO.get(k.getCanonicalName()), classLoader);
+          } catch (Exception e) {
+            throw new RuntimeException("Failed to create proto class " + k.getCanonicalName(), e);
+          }
+        });
   }
 
   private <T extends Entity, M extends Message> M toProto(T t) throws IOException {
-    if (!ENTITY_TO_SERDE.containsKey(t.getClass().getCanonicalName())
-        || ENTITY_TO_SERDE.get(t.getClass().getCanonicalName()) == null) {
-      throw new IOException("No serde found for entity " + t.getClass().getName());
-    }
-
     ProtoSerDe<T, M> protoSerDe =
         (ProtoSerDe<T, M>)
-            entityToSerDe.computeIfAbsent(
-                t.getClass(),
-                entityClazz -> {
-                  try {
-                    Class<? extends ProtoSerDe<? extends Entity, ? extends Message>> serdeClazz =
-                        (Class<? extends ProtoSerDe<? extends Entity, ? extends Message>>)
-                            loadClass(
-                                ENTITY_TO_SERDE.get(t.getClass().getCanonicalName()),
-                                t.getClass().getClassLoader());
-                    return serdeClazz.newInstance();
-                  } catch (Exception e) {
-                    throw new RuntimeException(
-                        "Failed to instantiate serde class "
-                            + ENTITY_TO_SERDE.get(t.getClass().getCanonicalName()),
-                        e);
-                  }
-                });
+            getProtoSerde(t.getClass(), Thread.currentThread().getContextClassLoader());
     return protoSerDe.serialize(t);
+  }
+
+  private <T extends Entity, M extends Message> T fromProto(M m, Class<T> entityClass)
+      throws IOException {
+    ProtoSerDe<T, Message> protoSerDe =
+        getProtoSerde(entityClass, Thread.currentThread().getContextClassLoader());
+    return protoSerDe.deserialize(m);
   }
 
   private Class<?> loadClass(String className, ClassLoader classLoader) throws IOException {
