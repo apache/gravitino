@@ -18,9 +18,9 @@ import com.datastrato.graviton.dto.requests.SchemaCreateRequest;
 import com.datastrato.graviton.dto.requests.SchemaUpdateRequest;
 import com.datastrato.graviton.dto.requests.SchemaUpdatesRequest;
 import com.datastrato.graviton.dto.responses.DropResponse;
+import com.datastrato.graviton.dto.responses.EntityListResponse;
 import com.datastrato.graviton.dto.responses.ErrorConstants;
 import com.datastrato.graviton.dto.responses.ErrorResponse;
-import com.datastrato.graviton.dto.responses.SchemaListResponse;
 import com.datastrato.graviton.dto.responses.SchemaResponse;
 import com.datastrato.graviton.exceptions.NoSuchCatalogException;
 import com.datastrato.graviton.exceptions.NoSuchSchemaException;
@@ -90,10 +90,10 @@ public class TestSchemaOperations extends JerseyTest {
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
     Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
 
-    SchemaListResponse listResp = resp.readEntity(SchemaListResponse.class);
+    EntityListResponse listResp = resp.readEntity(EntityListResponse.class);
     Assertions.assertEquals(0, listResp.getCode());
 
-    NameIdentifier[] idents = listResp.schemas();
+    NameIdentifier[] idents = listResp.identifiers();
     Assertions.assertEquals(2, idents.length);
     Assertions.assertEquals(ident1, idents[0]);
     Assertions.assertEquals(ident2, idents[1]);

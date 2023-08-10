@@ -4,8 +4,9 @@
  */
 package com.datastrato.graviton.server.web;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.mock;
 
 import com.datastrato.graviton.server.GravitonServerException;
 import com.datastrato.graviton.server.ServerConfig;

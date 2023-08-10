@@ -9,6 +9,7 @@ import com.datastrato.graviton.CatalogChange;
 import com.datastrato.graviton.CatalogProvider;
 import com.datastrato.graviton.Config;
 import com.datastrato.graviton.Configs;
+import com.datastrato.graviton.Entity.EntityType;
 import com.datastrato.graviton.EntityAlreadyExistsException;
 import com.datastrato.graviton.EntityStore;
 import com.datastrato.graviton.NameIdentifier;
@@ -169,7 +170,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
 
     boolean metalakeExists;
     try {
-      metalakeExists = store.exists(metalakeIdent);
+      metalakeExists = store.exists(metalakeIdent, EntityType.CATALOG);
     } catch (IOException e) {
       LOG.error("Failed to do storage operation", e);
       throw new RuntimeException(e);
@@ -180,7 +181,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
     }
 
     try {
-      return store.list(namespace, CatalogEntity.class).stream()
+      return store.list(namespace, CatalogEntity.class, EntityType.METALAKE).stream()
           .map(entity -> NameIdentifier.of(namespace, entity.name()))
           .toArray(NameIdentifier[]::new);
 
@@ -222,7 +223,8 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
           store.executeInTransaction(
               () -> {
                 NameIdentifier metalakeIdent = NameIdentifier.of(ident.namespace().levels());
-                BaseMetalake metalake = store.get(metalakeIdent, BaseMetalake.class);
+                BaseMetalake metalake =
+                    store.get(metalakeIdent, EntityType.METALAKE, BaseMetalake.class);
 
                 CatalogEntity e =
                     new CatalogEntity.Builder()
@@ -240,7 +242,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
                                 .build())
                         .build();
 
-                store.put(ident, e, false /* overwrite */);
+                store.put(e, false /* overwrite */);
                 return e;
               });
       return catalogCache.get(ident, id -> createCatalogWrapper(entity)).catalog;
@@ -280,6 +282,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
           store.update(
               ident,
               CatalogEntity.class,
+              EntityType.CATALOG,
               catalog -> {
                 CatalogEntity.Builder newCatalogBuilder =
                     new CatalogEntity.Builder()
@@ -338,7 +341,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
     catalogCache.invalidate(ident);
 
     try {
-      return store.delete(ident);
+      return store.delete(ident, EntityType.CATALOG);
     } catch (IOException ioe) {
       LOG.error("Failed to drop catalog {}", ident, ioe);
       throw new RuntimeException(ioe);
@@ -359,7 +362,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
 
   private CatalogWrapper loadCatalogInternal(NameIdentifier ident) throws NoSuchCatalogException {
     try {
-      CatalogEntity entity = store.get(ident, CatalogEntity.class);
+      CatalogEntity entity = store.get(ident, EntityType.CATALOG, CatalogEntity.class);
       return createCatalogWrapper(entity);
 
     } catch (NoSuchEntityException ne) {

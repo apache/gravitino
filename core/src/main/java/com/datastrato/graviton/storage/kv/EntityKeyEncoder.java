@@ -5,8 +5,8 @@
 
 package com.datastrato.graviton.storage.kv;
 
-import com.datastrato.graviton.NameIdentifier;
-import com.datastrato.graviton.Namespace;
+import com.datastrato.graviton.Entity.EntityIdentifer;
+import java.io.IOException;
 
 /** Interface for encoding entity keys for use with KV backends, such as RocksDB. */
 public interface EntityKeyEncoder {
@@ -26,4 +26,13 @@ public interface EntityKeyEncoder {
    * @return The byte array representing the encoded key.
    */
   byte[] encode(Namespace namespace);
+  /**
+   * Construct the key for key-value store from the entity NameIdentifier and EntityType.
+   *
+   * @param entityIdentifer entity identifier
+   * @param createIdIfNotExists create the id mapping for name if not exists
+   * @return encoded key for key-value store
+   * @throws IOException
+   */
+  byte[] encode(EntityIdentifer entityIdentifer, boolean createIdIfNotExists) throws IOException;
 }

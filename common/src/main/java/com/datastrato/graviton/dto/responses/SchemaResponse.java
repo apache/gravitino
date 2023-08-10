@@ -10,6 +10,7 @@ import com.google.common.base.Preconditions;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
+import org.apache.commons.lang3.StringUtils;
 
 @Getter
 @ToString
@@ -36,12 +37,12 @@ public class SchemaResponse extends BaseResponse {
 
     Preconditions.checkArgument(schema != null, "schema must be non-null");
     Preconditions.checkArgument(
-        schema.name() != null && !schema.name().isEmpty(),
-        "schema 'name' must be non-null and non-empty");
+        StringUtils.isNotBlank(schema.name()), "schema 'name' must not be null and empty");
+    Preconditions.checkArgument(schema.auditInfo() != null, "schema 'audit' must not be null");
     Preconditions.checkArgument(
-        schema.auditInfo().creator() != null && !schema.auditInfo().creator().isEmpty(),
-        "schema 'audit.creator' must be non-null and non-empty");
+        StringUtils.isNotBlank(schema.auditInfo().creator()),
+        "schema 'audit.creator' must not be null and empty");
     Preconditions.checkArgument(
-        schema.auditInfo().createTime() != null, "schema 'audit.createTime' must be non-null");
+        schema.auditInfo().createTime() != null, "schema 'audit.createTime' must not be null");
   }
 }

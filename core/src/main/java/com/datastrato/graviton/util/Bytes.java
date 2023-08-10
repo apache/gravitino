@@ -65,8 +65,11 @@ public class Bytes implements Comparable<byte[]> {
   public static byte[] concat(byte[] one, byte[] two) {
     int totalLen = one.length + two.length;
     byte[] res = new byte[totalLen];
-    System.arraycopy(one, 0, res, 0, one.length);
-    System.arraycopy(two, 0, res, one.length, two.length);
+    int currentPos = 0;
+    for (int i = 0; i < values.length; i++) {
+      System.arraycopy(values[i], 0, res, currentPos, values[i].length);
+      currentPos += values[i].length;
+    }
     return res;
   }
 

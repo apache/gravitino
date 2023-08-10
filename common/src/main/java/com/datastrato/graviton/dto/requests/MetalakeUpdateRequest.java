@@ -14,6 +14,7 @@ import com.google.common.base.Preconditions;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
+import org.apache.commons.lang3.StringUtils;
 
 /** Represents an interface for Metalake update requests. */
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -69,8 +70,7 @@ public interface MetalakeUpdateRequest extends RESTRequest {
     @Override
     public void validate() throws IllegalArgumentException {
       Preconditions.checkArgument(
-          newName != null && !newName.isEmpty(),
-          "\"newName\" field is required and cannot be empty");
+          StringUtils.isNotBlank(newName), "\"newName\" field is required and cannot be empty");
     }
 
     @Override
@@ -109,7 +109,7 @@ public interface MetalakeUpdateRequest extends RESTRequest {
     @Override
     public void validate() throws IllegalArgumentException {
       Preconditions.checkArgument(
-          newComment != null && !newComment.isEmpty(),
+          StringUtils.isNotBlank(newComment),
           "\"newComment\" field is required and cannot be empty");
     }
 
@@ -154,10 +154,9 @@ public interface MetalakeUpdateRequest extends RESTRequest {
     @Override
     public void validate() throws IllegalArgumentException {
       Preconditions.checkArgument(
-          property != null && !property.isEmpty(),
-          "\"property\" field is required and cannot be empty");
+          StringUtils.isNotBlank(property), "\"property\" field is required and cannot be empty");
       Preconditions.checkArgument(
-          value != null && !value.isEmpty(), "\"value\" field is required and cannot be empty");
+          StringUtils.isNotBlank(value), "\"value\" field is required and cannot be empty");
     }
 
     @Override
@@ -196,8 +195,7 @@ public interface MetalakeUpdateRequest extends RESTRequest {
     @Override
     public void validate() throws IllegalArgumentException {
       Preconditions.checkArgument(
-          property != null && !property.isEmpty(),
-          "\"property\" field is required and cannot be empty");
+          StringUtils.isNotBlank(property), "\"property\" field is required and cannot be empty");
     }
 
     @Override

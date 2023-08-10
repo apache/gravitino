@@ -7,7 +7,11 @@ package com.datastrato.graviton.json;
 import com.datastrato.graviton.dto.AuditDTO;
 import com.datastrato.graviton.dto.MetalakeDTO;
 import com.datastrato.graviton.dto.responses.BaseResponse;
+import com.datastrato.graviton.dto.responses.CatalogResponse;
+import com.datastrato.graviton.dto.responses.DropResponse;
+import com.datastrato.graviton.dto.responses.EntityListResponse;
 import com.datastrato.graviton.dto.responses.ErrorResponse;
+import com.datastrato.graviton.dto.responses.MetalakeListResponse;
 import com.datastrato.graviton.dto.responses.MetalakeResponse;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.collect.ImmutableMap;
@@ -32,7 +36,51 @@ public class TestResponseJsonSerDe {
   }
 
   @Test
+  public void testDropResponseSerDe() throws JsonProcessingException {
+    DropResponse response = new DropResponse();
+    String serJson = JsonUtils.objectMapper().writeValueAsString(response);
+    DropResponse deserResponse = JsonUtils.objectMapper().readValue(serJson, DropResponse.class);
+    Assertions.assertEquals(response, deserResponse);
+  }
+
+  @Test
+  public void testEntityListResponseSerDe() throws JsonProcessingException {
+    EntityListResponse response = new EntityListResponse();
+    String serJson = JsonUtils.objectMapper().writeValueAsString(response);
+    EntityListResponse deserResponse =
+        JsonUtils.objectMapper().readValue(serJson, EntityListResponse.class);
+    Assertions.assertEquals(response, deserResponse);
+  }
+
+  @Test
   public void testMetalakeResponseSerDe() throws JsonProcessingException {
+    MetalakeResponse response = new MetalakeResponse();
+    String serJson = JsonUtils.objectMapper().writeValueAsString(response);
+    MetalakeResponse deserResponse =
+        JsonUtils.objectMapper().readValue(serJson, MetalakeResponse.class);
+    Assertions.assertEquals(response, deserResponse);
+  }
+
+  @Test
+  public void testMetalakeListResponseSerDe() throws JsonProcessingException {
+    MetalakeListResponse response = new MetalakeListResponse();
+    String serJson = JsonUtils.objectMapper().writeValueAsString(response);
+    MetalakeListResponse deserResponse =
+        JsonUtils.objectMapper().readValue(serJson, MetalakeListResponse.class);
+    Assertions.assertEquals(response, deserResponse);
+  }
+
+  @Test
+  public void testCatalogResponseSerDe() throws JsonProcessingException {
+    CatalogResponse response = new CatalogResponse();
+    String serJson = JsonUtils.objectMapper().writeValueAsString(response);
+    CatalogResponse deserResponse =
+        JsonUtils.objectMapper().readValue(serJson, CatalogResponse.class);
+    Assertions.assertEquals(response, deserResponse);
+  }
+
+  @Test
+  public void testMetalakeResponseBuilderSerDe() throws JsonProcessingException {
     MetalakeDTO metalake =
         new MetalakeDTO.Builder()
             .withName("metalake")

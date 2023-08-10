@@ -35,9 +35,9 @@ public class CatalogDTO implements Catalog {
   @JsonProperty("audit")
   private AuditDTO audit;
 
-  private CatalogDTO() {}
+  protected CatalogDTO() {}
 
-  private CatalogDTO(
+  protected CatalogDTO(
       String name, Type type, String comment, Map<String, String> properties, AuditDTO audit) {
     this.name = name;
     this.type = type;
@@ -133,7 +133,7 @@ public class CatalogDTO implements Catalog {
      * @param properties The properties of the catalog.
      * @return The builder instance.
      */
-    public Builder withProperties(Map<String, String> properties) {
+    public S withProperties(Map<String, String> properties) {
       this.properties = properties;
       return (S) this;
     }
@@ -144,7 +144,7 @@ public class CatalogDTO implements Catalog {
      * @param audit The audit information of the catalog.
      * @return The builder instance.
      */
-    public Builder withAudit(AuditDTO audit) {
+    public S withAudit(AuditDTO audit) {
       this.audit = audit;
       return (S) this;
     }

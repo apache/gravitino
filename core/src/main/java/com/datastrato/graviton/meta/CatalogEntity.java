@@ -225,6 +225,8 @@ public class CatalogEntity implements Entity, Auditable, HasIdentifier {
    * Compares this object to the specified object for equality. Note: This method ignores comparing
    * the namespace field.
    *
+   * <p>Note: This method ignores the namespace field in the comparison
+   *
    * @param o the object to compare to.
    * @return {@code true} if the objects are equal, {@code false} otherwise.
    */

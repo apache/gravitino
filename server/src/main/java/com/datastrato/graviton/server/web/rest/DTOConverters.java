@@ -10,8 +10,13 @@ import com.datastrato.graviton.Metalake;
 import com.datastrato.graviton.dto.AuditDTO;
 import com.datastrato.graviton.dto.CatalogDTO;
 import com.datastrato.graviton.dto.MetalakeDTO;
+import com.datastrato.graviton.dto.rel.ColumnDTO;
 import com.datastrato.graviton.dto.rel.SchemaDTO;
+import com.datastrato.graviton.dto.rel.TableDTO;
+import com.datastrato.graviton.rel.Column;
 import com.datastrato.graviton.rel.Schema;
+import com.datastrato.graviton.rel.Table;
+import java.util.Arrays;
 
 public class DTOConverters {
 
@@ -51,6 +56,25 @@ public class DTOConverters {
         .withComment(schema.comment())
         .withProperties(schema.properties())
         .withAudit(toDTO(schema.auditInfo()))
+        .build();
+  }
+
+  public static ColumnDTO toDTO(Column column) {
+    return new ColumnDTO.Builder()
+        .withName(column.name())
+        .withDataType(column.dataType())
+        .withComment(column.comment())
+        .build();
+  }
+
+  public static TableDTO toDTO(Table table) {
+    return new TableDTO.Builder()
+        .withName(table.name())
+        .withComment(table.comment())
+        .withColumns(
+            Arrays.stream(table.columns()).map(DTOConverters::toDTO).toArray(ColumnDTO[]::new))
+        .withProperties(table.properties())
+        .withAudit(toDTO(table.auditInfo()))
         .build();
   }
 }

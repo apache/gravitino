@@ -13,6 +13,7 @@ import javax.annotation.Nullable;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
+import org.apache.commons.lang3.StringUtils;
 
 /** Represents a request to create a Metalake. */
 @Getter
@@ -59,6 +60,6 @@ public class MetalakeCreateRequest implements RESTRequest {
   @Override
   public void validate() throws IllegalArgumentException {
     Preconditions.checkArgument(
-        name != null && !name.isEmpty(), "\"name\" field is required and cannot be empty");
+        StringUtils.isNotBlank(name), "\"name\" field is required and cannot be empty");
   }
 }

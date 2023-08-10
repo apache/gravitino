@@ -10,6 +10,7 @@ import com.google.common.base.Preconditions;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
+import org.apache.commons.lang3.StringUtils;
 
 /** Represents a response containing metalake information. */
 @Getter
@@ -45,14 +46,14 @@ public class MetalakeResponse extends BaseResponse {
   public void validate() throws IllegalArgumentException {
     super.validate();
 
-    Preconditions.checkArgument(metalake != null, "metalake must be non-null");
+    Preconditions.checkArgument(metalake != null, "metalake must not be null");
     Preconditions.checkArgument(
-        metalake.name() != null && !metalake.name().isEmpty(),
-        "metalake 'name' must be non-null and non-empty");
+        StringUtils.isNotBlank(metalake.name()), "metalake 'name' must not be null and empty");
+    Preconditions.checkArgument(metalake.auditInfo() != null, "metalake 'audit' must not be null");
     Preconditions.checkArgument(
-        metalake.auditInfo().creator() != null && !metalake.auditInfo().creator().isEmpty(),
-        "metalake 'audit.creator' must be non-null and non-empty");
+        StringUtils.isNotBlank(metalake.auditInfo().creator()),
+        "metalake 'audit.creator' must not be null and empty");
     Preconditions.checkArgument(
-        metalake.auditInfo().createTime() != null, "metalake 'audit.createTime' must be non-null");
+        metalake.auditInfo().createTime() != null, "metalake 'audit.createTime' must not be null");
   }
 }

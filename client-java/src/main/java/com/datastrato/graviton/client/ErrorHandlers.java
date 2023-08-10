@@ -2,13 +2,15 @@
  * Copyright 2023 Datastrato.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.graviton;
+package com.datastrato.graviton.client;
 
-import com.datastrato.graviton.client.ErrorHandler;
 import com.datastrato.graviton.dto.responses.ErrorConstants;
 import com.datastrato.graviton.dto.responses.ErrorResponse;
+import com.datastrato.graviton.exceptions.CatalogAlreadyExistsException;
 import com.datastrato.graviton.exceptions.MetalakeAlreadyExistsException;
+import com.datastrato.graviton.exceptions.NoSuchCatalogException;
 import com.datastrato.graviton.exceptions.NoSuchMetalakeException;
+import com.datastrato.graviton.exceptions.NotFoundException;
 import com.datastrato.graviton.exceptions.RESTException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Joiner;
@@ -33,6 +35,10 @@ public class ErrorHandlers {
    */
   public static Consumer<ErrorResponse> metalakeErrorHandler() {
     return MetalakeErrorHandler.INSTANCE;
+  }
+
+  public static Consumer<ErrorResponse> catalogErrorHandler() {
+    return CatalogErrorHandler.INSTANCE;
   }
 
   /**
@@ -77,6 +83,36 @@ public class ErrorHandlers {
     }
   }
 
+  /** Error handler specific to Catalog operations. */
+  private static class CatalogErrorHandler extends RestErrorHandler {
+    private static final ErrorHandler INSTANCE = new CatalogErrorHandler();
+
+    @Override
+    public void accept(ErrorResponse errorResponse) {
+      switch (errorResponse.getCode()) {
+        case ErrorConstants.ILLEGAL_ARGUMENTS_CODE:
+          throw new IllegalArgumentException(formatErrorMessage(errorResponse));
+
+        case ErrorConstants.NOT_FOUND_CODE:
+          if (errorResponse.getType().equals(NoSuchMetalakeException.class.getSimpleName())) {
+            throw new NoSuchMetalakeException(formatErrorMessage(errorResponse));
+          } else if (errorResponse.getType().equals(NoSuchCatalogException.class.getSimpleName())) {
+            throw new NoSuchCatalogException(formatErrorMessage(errorResponse));
+          } else {
+            throw new NotFoundException(formatErrorMessage(errorResponse));
+          }
+
+        case ErrorConstants.ALREADY_EXISTS_CODE:
+          throw new CatalogAlreadyExistsException(formatErrorMessage(errorResponse));
+
+        case ErrorConstants.INTERNAL_ERROR_CODE:
+          throw new RuntimeException(formatErrorMessage(errorResponse));
+      }
+
+      super.accept(errorResponse);
+    }
+  }
+
   /** Error handler specific to Metalake operations. */
   private static class MetalakeErrorHandler extends RestErrorHandler {
     private static final ErrorHandler INSTANCE = new MetalakeErrorHandler();
@@ -86,10 +122,15 @@ public class ErrorHandlers {
       switch (errorResponse.getCode()) {
         case ErrorConstants.ILLEGAL_ARGUMENTS_CODE:
           throw new IllegalArgumentException(formatErrorMessage(errorResponse));
+
         case ErrorConstants.NOT_FOUND_CODE:
           throw new NoSuchMetalakeException(formatErrorMessage(errorResponse));
+
         case ErrorConstants.ALREADY_EXISTS_CODE:
           throw new MetalakeAlreadyExistsException(formatErrorMessage(errorResponse));
+
+        case ErrorConstants.INTERNAL_ERROR_CODE:
+          throw new RuntimeException(formatErrorMessage(errorResponse));
       }
 
       super.accept(errorResponse);
@@ -114,7 +155,7 @@ public class ErrorHandlers {
 
     @Override
     public void accept(ErrorResponse errorResponse) {
-      throw new RESTException("Unable to process: %s", errorResponse.getMessage());
+      throw new RESTException("Unable to process: %s", formatErrorMessage(errorResponse));
     }
   }
 }
