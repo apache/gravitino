@@ -34,15 +34,10 @@ public class TestEntityProtoSerDe {
 
     ProtoEntitySerDe protoEntitySerDe = (ProtoEntitySerDe) entitySerDe;
 
-    AuditInfo auditInfoProto = protoEntitySerDe.toProto(auditInfo);
-    Assertions.assertEquals(creator, auditInfoProto.getCreator());
-    Assertions.assertEquals(now, ProtoUtils.toInstant(auditInfoProto.getCreateTime()));
-    Assertions.assertEquals(modifier, auditInfoProto.getLastModifier());
-    Assertions.assertEquals(now, ProtoUtils.toInstant(auditInfoProto.getLastModifiedTime()));
-
-    com.datastrato.graviton.meta.AuditInfo auditInfoFromProto =
-        protoEntitySerDe.fromProto(auditInfoProto);
-    Assertions.assertEquals(auditInfo, auditInfoFromProto);
+    byte[] bytes = protoEntitySerDe.serialize(auditInfo);
+    com.datastrato.graviton.meta.AuditInfo auditInfoFromBytes =
+        protoEntitySerDe.deserialize(bytes, com.datastrato.graviton.meta.AuditInfo.class);
+    Assertions.assertEquals(auditInfo, auditInfoFromBytes);
 
     // Test with optional fields
     com.datastrato.graviton.meta.AuditInfo auditInfo1 =
@@ -51,19 +46,10 @@ public class TestEntityProtoSerDe {
             .withCreateTime(now)
             .build();
 
-    AuditInfo auditInfoProto1 = protoEntitySerDe.toProto(auditInfo1);
-
-    Assertions.assertEquals(creator, auditInfoProto1.getCreator());
-    Assertions.assertEquals(now, ProtoUtils.toInstant(auditInfoProto1.getCreateTime()));
-
-    com.datastrato.graviton.meta.AuditInfo auditInfoFromProto1 =
-        protoEntitySerDe.fromProto(auditInfoProto1);
-    Assertions.assertEquals(auditInfo1, auditInfoFromProto1);
-
     // Test from/to bytes
-    byte[] bytes = entitySerDe.serialize(auditInfo1);
-    com.datastrato.graviton.meta.AuditInfo auditInfoFromBytes =
-        entitySerDe.deserialize(bytes, com.datastrato.graviton.meta.AuditInfo.class);
+    bytes = protoEntitySerDe.serialize(auditInfo1);
+    auditInfoFromBytes =
+        protoEntitySerDe.deserialize(bytes, com.datastrato.graviton.meta.AuditInfo.class);
     Assertions.assertEquals(auditInfo1, auditInfoFromBytes);
   }
 
@@ -94,12 +80,6 @@ public class TestEntityProtoSerDe {
 
     ProtoEntitySerDe protoEntitySerDe = (ProtoEntitySerDe) entitySerDe;
 
-    Metalake metalakeProto = protoEntitySerDe.toProto(metalake);
-    Assertions.assertEquals(props, metalakeProto.getPropertiesMap());
-    com.datastrato.graviton.meta.BaseMetalake metalakeFromProto =
-        protoEntitySerDe.fromProto(metalakeProto);
-    Assertions.assertEquals(metalake, metalakeFromProto);
-
     byte[] metalakeBytes = protoEntitySerDe.serialize(metalake);
     com.datastrato.graviton.meta.BaseMetalake metalakeFromBytes =
         protoEntitySerDe.deserialize(
@@ -115,15 +95,10 @@ public class TestEntityProtoSerDe {
             .withVersion(version)
             .build();
 
-    Metalake metalakeProto1 = protoEntitySerDe.toProto(metalake1);
-    Assertions.assertEquals(0, metalakeProto1.getPropertiesCount());
-    com.datastrato.graviton.meta.BaseMetalake metalakeFromProto1 =
-        protoEntitySerDe.fromProto(metalakeProto1);
-    Assertions.assertEquals(metalake1, metalakeFromProto1);
-
-    byte[] metalakeBytes1 = entitySerDe.serialize(metalake1);
+    byte[] metalakeBytes1 = protoEntitySerDe.serialize(metalake1);
     com.datastrato.graviton.meta.BaseMetalake metalakeFromBytes1 =
-        entitySerDe.deserialize(metalakeBytes1, com.datastrato.graviton.meta.BaseMetalake.class);
+        protoEntitySerDe.deserialize(
+            metalakeBytes1, com.datastrato.graviton.meta.BaseMetalake.class);
     Assertions.assertEquals(metalake1, metalakeFromBytes1);
 
     // Test CatalogEntity
@@ -140,11 +115,6 @@ public class TestEntityProtoSerDe {
             .withType(com.datastrato.graviton.Catalog.Type.RELATIONAL)
             .withAuditInfo(auditInfo)
             .build();
-
-    Catalog catalogProto = protoEntitySerDe.toProto(catalogEntity);
-    com.datastrato.graviton.meta.CatalogEntity catalogEntityFromProto =
-        protoEntitySerDe.fromProto(catalogProto);
-    Assertions.assertEquals(catalogEntity, catalogEntityFromProto);
 
     byte[] catalogBytes = protoEntitySerDe.serialize(catalogEntity);
     com.datastrato.graviton.meta.CatalogEntity catalogEntityFromBytes =
