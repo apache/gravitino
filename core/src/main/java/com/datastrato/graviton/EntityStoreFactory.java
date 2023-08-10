@@ -9,6 +9,10 @@ import com.google.common.collect.ImmutableMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * This class is responsible for creating instances of EntityStore implementations. EntityStore
+ * implementations are used to store and manage entities within the Graviton framework.
+ */
 public class EntityStoreFactory {
 
   private static final Logger LOG = LoggerFactory.getLogger(EntityStoreFactory.class);
@@ -18,8 +22,15 @@ public class EntityStoreFactory {
   public static final ImmutableMap<String, String> ENTITY_STORES =
       ImmutableMap.of("kv", KvEntityStore.class.getCanonicalName());
 
+  // Private constructor to prevent instantiation of this factory class.
   private EntityStoreFactory() {}
 
+  /**
+   * Creates an instance of EntityStore based on the configuration settings.
+   *
+   * @param config The configuration object containing settings for EntityStore.
+   * @return An instance of EntityStore.
+   */
   public static EntityStore createEntityStore(Config config) {
     String name = config.get(Configs.ENTITY_STORE);
     String className = ENTITY_STORES.getOrDefault(name, name);
