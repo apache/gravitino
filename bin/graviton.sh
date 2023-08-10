@@ -96,7 +96,7 @@ function start() {
     mkdir -p "${GRAVITON_LOG_DIR}"
   fi
 
-  nohup ${JAVA_RUNNER} ${JAVA_OPTS} ${GRAVITON_DEBUG_OPTS} -cp ${GRAVITON_CLASSPATH} ${GRAVITON_SERVER_NAME} >> "${GRAVITON_OUTFILE}" 2>&1 < /dev/null &
+  nohup ${JAVA_RUNNER} ${JAVA_OPTS} ${GRAVITON_DEBUG_OPTS} -cp ${GRAVITON_CLASSPATH} ${GRAVITON_SERVER_NAME} >> "${GRAVITON_OUTFILE}" 2>&1 &
 
   pid=$!
   if [[ -z "${pid}" ]]; then
