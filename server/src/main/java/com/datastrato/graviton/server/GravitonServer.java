@@ -107,7 +107,7 @@ public class GravitonServer extends ResourceConfig {
                   LOG.info("Shutting down Graviton Server ... ");
                   try {
                     server.stop();
-                    Thread.sleep(3000);
+                    Thread.sleep(server.serverConfig.get(ServerConfig.SERVER_SHUTDOWN_TIMEOUT));
                   } catch (InterruptedException e) {
                     LOG.error("Interrupted exception:", e);
                   } catch (Exception e) {

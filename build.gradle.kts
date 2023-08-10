@@ -208,7 +208,7 @@ tasks {
       if (it.name == "catalog-hive") {
         // println("copyCatalogRuntimeClass: ${it.name}")
         from(it.configurations.runtimeClasspath)
-        into("distribution/package/catalog/catalog-hive/lib")
+        into("distribution/package/catalogs/catalog-hive/lib")
       }
     }
   }

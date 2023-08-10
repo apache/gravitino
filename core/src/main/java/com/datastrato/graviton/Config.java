@@ -133,6 +133,7 @@ public abstract class Config {
     try (InputStream in = Files.newInputStream(file.toPath())) {
       properties.load(in);
       return properties;
+
     } catch (Exception e) {
       LOG.error("Failed to load properties from " + file.getAbsolutePath(), e);
       throw new IOException("Failed to load properties from " + file.getAbsolutePath(), e);
