@@ -59,6 +59,13 @@ public class ServerConfig extends Config {
           .intConf()
           .createWithDefault(128 * 1024);
 
+  public static final ConfigEntry<Integer> WEBSERVER_EXECUTOR_THREAD_POOL_SIZE =
+      new ConfigBuilder("graviton.server.webserver.executorThreadPoolSize")
+          .doc("The executor thread pool size of the built-in web server")
+          .version("0.1.0")
+          .intConf()
+          .createWithDefault(100);
+
   public static final ConfigEntry<Integer> SERVER_SHUTDOWN_TIMEOUT =
       new ConfigBuilder("graviton.server.shutdown.timeout")
           .doc("The stop idle timeout(millis) of the Graviton Server")

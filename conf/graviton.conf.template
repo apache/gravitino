@@ -4,6 +4,9 @@
 #
 
 # THE CONFIGURATION FOR GRAVITON SERVER
+graviton.server.shutdown.timeout = 3000
+
+# THE CONFIGURATION FOR GRAVITON WEB SERVER
 # The host name of the built-in web server
 graviton.server.webserver.host = 127.0.0.1
 # The http port number of the built-in web server
@@ -14,6 +17,8 @@ graviton.server.webserver.coreThreads = 24
 graviton.server.webserver.maxThreads = 200
 # The stop idle timeout of the built-in web server
 graviton.server.webserver.stopIdleTimeout = 30000
+# The executor thread pool size of the built-in web server
+graviton.server.webserver.executorThreadPoolSize = 100
 # The request header size of the built-in web server
 graviton.server.webserver.requestHeaderSize = 131072
 # The response header size of the built-in web server

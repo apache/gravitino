@@ -52,6 +52,8 @@ subprojects {
     }
   }
 
+  val allDeps by tasks.registering(DependencyReportTask::class)
+
   group = "com.datastrato.graviton"
   version = "${version}"
 

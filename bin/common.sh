@@ -50,7 +50,7 @@ function check_java_version() {
 function addEachJarInDir(){
   if [[ -d "${1}" ]]; then
     for jar in "${1}"/*.jar ; do
-      GRAVITON_CLASSPATH="$jar:$GRAVITON_CLASSPATH"
+      GRAVITON_CLASSPATH="${jar}:${GRAVITON_CLASSPATH}"
     done
   fi
 }
@@ -58,7 +58,7 @@ function addEachJarInDir(){
 function addEachJarInDirRecursive(){
   if [[ -d "${1}" ]]; then
     for jar in "${1}"/**/*.jar ; do
-      GRAVITON_CLASSPATH="$jar:$GRAVITON_CLASSPATH"
+      GRAVITON_CLASSPATH="${jar}:${GRAVITON_CLASSPATH}"
     done
   fi
 }
