@@ -3,13 +3,12 @@
  * This software is licensed under the Apache License version 2.
  */
 
-package com.datastrato.graviton.utils;
+package com.datastrato.graviton.util;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.datastrato.graviton.util.Bytes;
 import org.junit.jupiter.api.Test;
 
 public class TestBytes {
