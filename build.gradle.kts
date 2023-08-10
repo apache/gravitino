@@ -191,6 +191,7 @@ tasks {
     group = "graviton distribution"
     delete(outputDir)
     delete("/tmp/graviton")
+    delete("server/src/main/resources/project.properties")
   }
 
   val copyRuntimeClass by registering(Copy::class) {
