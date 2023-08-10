@@ -131,17 +131,7 @@ JAVA_OPTS+=" -Dfile.encoding=UTF-8"
 JAVA_OPTS+=" -Dlog4j2.configurationFile=file://${GRAVITON_CONF_DIR}/log4j2.properties"
 JAVA_OPTS+=" -Dgraviton.log.path=${GRAVITON_LOG_DIR} ${GRAVITON_MEM}"
 
-# construct classpath
-if [[ -d "${GRAVITON_HOME}/catalog-hive/target/classes" ]]; then
-  GRAVITON_CLASSPATH+=":${GRAVITON_HOME}/catalog-hive/target/classes"
-fi
-
-if [[ -d "${GRAVITON_HOME}/graviton-server/target/classes" ]]; then
-  GRAVITON_CLASSPATH+=":${GRAVITON_HOME}/graviton-server/target/classes"
-fi
-
 addJarInDir "${GRAVITON_HOME}/lib"
-GRAVITON_CLASSPATH="${CLASSPATH}:${GRAVITON_CLASSPATH}"
 
 case "${1}" in
   start)
