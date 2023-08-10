@@ -70,5 +70,5 @@ tasks.register("writeProjectPropertiesFile") {
 }
 
 tasks.named("build") {
-  finalizedBy("writeProjectPropertiesFile")
+  dependsOn("writeProjectPropertiesFile")
 }
