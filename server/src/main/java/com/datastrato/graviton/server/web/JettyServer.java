@@ -55,9 +55,9 @@ public final class JettyServer {
     int coreThreads = config.get(ServerConfig.WEBSERVER_CORE_THREADS);
     int maxThreads = config.get(ServerConfig.WEBSERVER_MAX_THREADS);
     long idleTimeout = config.get(ServerConfig.WEBSERVER_STOP_IDLE_TIMEOUT);
-    int executorThreadPoolSize = config.get(ServerConfig.WEBSERVER_EXECUTOR_THREAD_POOL_SIZE);
+    int threadPoolWorkQueueSize = config.get(ServerConfig.WEBSERVER_THREAD_POOL_WORK_QUEUE_SIZE);
     ExecutorThreadPool threadPool =
-        createThreadPool(coreThreads, maxThreads, executorThreadPoolSize);
+        createThreadPool(coreThreads, maxThreads, threadPoolWorkQueueSize);
 
     // Create and config Jetty Server
     server = new Server(threadPool);
@@ -184,14 +184,14 @@ public final class JettyServer {
   }
 
   private ExecutorThreadPool createThreadPool(
-      int coreThreads, int maxThreads, int executorThreadPoolSize) {
+      int coreThreads, int maxThreads, int threadPoolWorkQueueSize) {
     return new ExecutorThreadPool(
         new ThreadPoolExecutor(
             coreThreads,
             maxThreads,
             60,
             TimeUnit.SECONDS,
-            new LinkedBlockingQueue<>(executorThreadPoolSize),
+            new LinkedBlockingQueue<>(threadPoolWorkQueueSize),
             new ThreadFactoryBuilder()
                 .setDaemon(true)
                 .setNameFormat("jetty-webserver-%d")

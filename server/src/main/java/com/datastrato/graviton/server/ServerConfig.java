@@ -59,9 +59,9 @@ public class ServerConfig extends Config {
           .intConf()
           .createWithDefault(128 * 1024);
 
-  public static final ConfigEntry<Integer> WEBSERVER_EXECUTOR_THREAD_POOL_SIZE =
-      new ConfigBuilder("graviton.server.webserver.executorThreadPoolSize")
-          .doc("The executor thread pool size of the built-in web server")
+  public static final ConfigEntry<Integer> WEBSERVER_THREAD_POOL_WORK_QUEUE_SIZE =
+      new ConfigBuilder("graviton.server.webserver.threadPoolWorkQueueSize")
+          .doc("The executor thread pool work queue size of the built-in web server")
           .version("0.1.0")
           .intConf()
           .createWithDefault(100);
