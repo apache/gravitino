@@ -154,7 +154,7 @@ public abstract class BaseTable implements Table, Entity, HasIdentifier {
 
     SELF withSchemaId(Long schemaId);
 
-    SELF withNamespace(Namespace namespace);
+    SELF withNameSpace(Namespace namespace);
 
     SELF withName(String name);
 
@@ -217,7 +217,7 @@ public abstract class BaseTable implements Table, Entity, HasIdentifier {
      * @return The builder instance.
      */
     @Override
-    public SELF withNamespace(Namespace namespace) {
+    public SELF withNameSpace(Namespace namespace) {
       this.namespace = namespace;
       return self();
     }
