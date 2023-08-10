@@ -29,9 +29,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * {@link RocksDBKvBackend} is a RocksDB implementation of KvBackend interface. If we want to use
- * another kv implementation, We can just implement {@link KvBackend} interface and use it in the
- * Graviton.
+ * {@link RocksDBKvBackend} is a RocksDB implementation of the KvBackend interface. If we want to
+ * use another kv implementation, We can just implement the {@link KvBackend} interface and use it
+ * in Graviton.
  */
 public class RocksDBKvBackend implements KvBackend {
   public static final Logger LOGGER = LoggerFactory.getLogger(RocksDBKvBackend.class);
@@ -42,6 +42,10 @@ public class RocksDBKvBackend implements KvBackend {
   /**
    * Initialize the RocksDB backend instance. We have used the {@link TransactionDB} to support
    * transaction instead of {@link RocksDB} instance.
+   *
+   * @param config The configuration for the backend.
+   * @return The initialized RocksDB backend instance.
+   * @throws RocksDBException If there's an issue initializing RocksDB.
    */
   private TransactionDB initRocksDB(Config config) throws RocksDBException {
     RocksDB.loadLibrary();
@@ -68,6 +72,12 @@ public class RocksDBKvBackend implements KvBackend {
     }
   }
 
+  /**
+   * Initializes the RocksDB backend instance.
+   *
+   * @param config The configuration containing settings for the backend initialization.
+   * @throws IOException If an I/O error occurs during the initialization process.
+   */
   @Override
   public void initialize(Config config) throws IOException {
     try {
@@ -77,6 +87,15 @@ public class RocksDBKvBackend implements KvBackend {
     }
   }
 
+  /**
+   * Stores a key-value pair in the RocksDB database.
+   *
+   * @param key The key to store the value under.
+   * @param value The value to be stored.
+   * @param overwrite If true, overwrite the value if the key already exists.
+   * @throws IOException If an I/O error occurs during the put operation.
+   * @throws EntityAlreadyExistsException If the key already exists and overwrite is false.
+   */
   @Override
   public void put(byte[] key, byte[] value, boolean overwrite) throws IOException {
     Transaction tx = TX_LOCAL.get();
@@ -129,6 +148,13 @@ public class RocksDBKvBackend implements KvBackend {
     db.put(key, value);
   }
 
+  /**
+   * Retrieves the value associated with the given key from the RocksDB database.
+   *
+   * @param key The key for which to retrieve the value.
+   * @return The value associated with the given key, or null if the key does not exist.
+   * @throws IOException If an I/O error occurs during the get operation.
+   */
   @Override
   public byte[] get(byte[] key) throws IOException {
     try {
@@ -142,6 +168,13 @@ public class RocksDBKvBackend implements KvBackend {
     }
   }
 
+  /**
+   * Scans the range of key-value pairs within the specified {@link KvRangeScan} parameters.
+   *
+   * @param scanRange The {@link KvRangeScan} object specifying the scan range and other options.
+   * @return A list of {@link Pair} objects representing key-value pairs within the scan range.
+   * @throws IOException If an I/O error occurs during the scan operation.
+   */
   @Override
   public List<Pair<byte[], byte[]>> scan(KvRangeScan scanRange) throws IOException {
     Transaction tx = TX_LOCAL.get();
@@ -176,6 +209,13 @@ public class RocksDBKvBackend implements KvBackend {
     return result;
   }
 
+  /**
+   * Deletes the key-value pair associated with the given key from the RocksDB database.
+   *
+   * @param key The key of the key-value pair to delete.
+   * @return True if the key-value pair was deleted, false if the key does not exist.
+   * @throws IOException If an I/O error occurs during the delete operation.
+   */
   @Override
   public boolean delete(byte[] key) throws IOException {
     try {
@@ -191,11 +231,26 @@ public class RocksDBKvBackend implements KvBackend {
     }
   }
 
+  /**
+   * Closes the RocksDB database.
+   *
+   * @throws IOException If an I/O error occurs during the closing process.
+   */
   @Override
   public void close() throws IOException {
     db.close();
   }
 
+  /**
+   * Executes a transactional operation within the context of a RocksDB transaction.
+   *
+   * @param executable The {@link Executable} instance representing the transactional operation.
+   * @param <R> The type of result returned by the executable.
+   * @param <E> The type of exception that the executable might throw.
+   * @return The result of the transactional operation.
+   * @throws E If the executable throws an exception of type E.
+   * @throws IOException If an I/O error occurs during the transactional operation.
+   */
   @Override
   public <R, E extends Exception> R executeInTransaction(Executable<R, E> executable)
       throws E, IOException {

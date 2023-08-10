@@ -7,18 +7,36 @@ package com.datastrato.graviton.storage.kv;
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
 
+/**
+ * CustomEntityKeyEncoder is an implementation of the EntityKeyEncoder interface that provides
+ * methods to encode NameIdentifier and Namespace objects into byte arrays for use as keys in a
+ * key-value store.
+ */
 public class CustomEntityKeyEncoder implements EntityKeyEncoder {
 
+  /**
+   * Encodes a NameIdentifier object into a byte array for use as a key in a key-value store.
+   *
+   * @param entity The NameIdentifier object to be encoded.
+   * @return The byte array representing the encoded key.
+   */
   @Override
   public byte[] encode(NameIdentifier entity) {
-    // Simple implementation, just use the entity's identifier as the key
-    // We will change this in next PR
-    // TODO (yuqi) Information of NameIdentifier may not enough for key encoding, we need to infer
-    // object
-    //  class from key and then deserialize it when try to get it from kv store.
+    // A simple approach is taken, utilizing the identifier
+    // of the entity as the key. However. This will be improved in future PRs.
+    // TODO (yuqi) While the NameIdentifier provides key information, it may
+    // be insufficient for key encoding. An improvement
+    // involves inferring the object's class from the key, which would help
+    //  deserialization when retrieving it from the key-value store.
     return entity.toString().getBytes();
   }
 
+  /**
+   * Encodes a Namespace object into a byte array for use as a key in a key-value store.
+   *
+   * @param namespace The Namespace object to be encoded.
+   * @return The byte array representing the encoded key.
+   */
   @Override
   public byte[] encode(Namespace namespace) {
     return namespace.toString().getBytes();

@@ -5,6 +5,7 @@
 
 package com.datastrato.graviton.util;
 
+import com.datastrato.graviton.util.Bytes.ByteArrayComparator;
 import java.io.Serializable;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -19,18 +20,24 @@ public class Bytes implements Comparable<byte[]> {
 
   private final byte[] bytes;
 
-  // cache the hash code for the string, default to 0
+  // Cache the hash code for the byte array.
   private int hashCode;
 
+  /**
+   * Wraps an existing byte array into a Bytes object.
+   *
+   * @param bytes The byte array to wrap.
+   * @return A new Bytes object wrapping the given byte array.
+   */
   public static Bytes wrap(byte[] bytes) {
     if (bytes == null) return null;
     return new Bytes(bytes);
   }
 
   /**
-   * Create a Bytes using the byte array.
+   * Constructs a Bytes object using the provided byte array.
    *
-   * @param bytes This array becomes the backing storage for the object.
+   * @param bytes The byte array to use as backing storage.
    */
   public Bytes(byte[] bytes) {
     this.bytes = bytes;
@@ -40,15 +47,21 @@ public class Bytes implements Comparable<byte[]> {
   }
 
   /**
-   * Get the data from the Bytes.
+   * Retrieves the underlying byte array.
    *
-   * @return The underlying byte array
+   * @return The underlying byte array.
    */
   public byte[] get() {
     return this.bytes;
   }
 
-  /** Concat two byte arrays into one. */
+  /**
+   * Concatenates two byte arrays into a single array.
+   *
+   * @param one The first byte array.
+   * @param two The second byte array.
+   * @return A new byte array containing the concatenated data.
+   */
   public static byte[] concat(byte[] one, byte[] two) {
     int totalLen = one.length + two.length;
     byte[] res = new byte[totalLen];
@@ -58,53 +71,65 @@ public class Bytes implements Comparable<byte[]> {
   }
 
   /**
-   * The hashcode is cached except for the case where it is computed as 0, in which case we compute
-   * the hashcode on every call.
+   * Computes the hash code for the byte array.
    *
-   * @return the hashcode
+   * <p>The hashcode is cached except for the case where it is computed as 0, in which case we
+   * compute the hashcode on every call.
+   *
+   * @return The hash code.
    */
   @Override
   public int hashCode() {
     if (hashCode == 0) {
       hashCode = Arrays.hashCode(bytes);
     }
-
     return hashCode;
   }
 
+  /**
+   * Checks if this Bytes object is equal to another object.
+   *
+   * @param other The object to compare with.
+   * @return true if the objects are equal, false otherwise.
+   */
   @Override
   public boolean equals(Object other) {
     if (this == other) return true;
     if (other == null) return false;
-
-    // we intentionally use the function to compute hashcode here
     if (this.hashCode() != other.hashCode()) return false;
-
     if (other instanceof Bytes) return Arrays.equals(this.bytes, ((Bytes) other).get());
-
     return false;
   }
 
+  /**
+   * Compares this Bytes object to a given byte array lexicographically.
+   *
+   * @param o The byte array to compare with.
+   * @return A negative integer, zero, or a positive integer if this object is less than, equal to,
+   *     or greater than the specified byte array.
+   */
   @Override
   public int compareTo(byte[] o) {
     return BYTES_LEXICO_COMPARATOR.compare(this.bytes, o);
   }
 
+  /**
+   * Returns a string representation of the Bytes object.
+   *
+   * @return A string representation of the byte array.
+   */
   @Override
   public String toString() {
     return Bytes.toString(bytes, 0, bytes.length);
   }
 
   /**
-   * Write a printable representation of a byte array. Non-printable characters are hex escaped in
-   * the format \\x%02X, eg: \x00 \x05 etc.
+   * Converts a byte array to a printable string, escaping non-printable characters.
    *
-   * <p>This function is brought from org.apache.hadoop.hbase.util.Bytes
-   *
-   * @param b array to write out
-   * @param off offset to start at
-   * @param len length to write
-   * @return string output
+   * @param b The byte array to convert.
+   * @param off The starting offset within the array.
+   * @param len The length of data to convert.
+   * @return A printable representation of the byte array.
    */
   private static String toString(final byte[] b, int off, int len) {
     StringBuilder result = new StringBuilder();
@@ -130,11 +155,11 @@ public class Bytes implements Comparable<byte[]> {
   }
 
   /**
-   * Increment the underlying byte array by adding 1. Throws an IndexOutOfBoundsException if
-   * incrementing would cause the underlying input byte array to overflow.
+   * Increments a byte array by 1, throwing an exception on overflow.
    *
-   * @param input - The byte array to increment
-   * @return A new copy of the incremented byte array.
+   * @param input The byte array to increment.
+   * @return A new Bytes object containing the incremented byte array.
+   * @throws IndexOutOfBoundsException If incrementing would cause overflow.
    */
   public static Bytes increment(Bytes input) throws IndexOutOfBoundsException {
     byte[] inputArr = input.get();
@@ -155,10 +180,11 @@ public class Bytes implements Comparable<byte[]> {
     }
   }
 
-  /** A byte array comparator based on lexicograpic ordering. */
+  /** A byte array comparator based on lexicographic ordering. */
   public static final ByteArrayComparator BYTES_LEXICO_COMPARATOR =
       new LexicographicByteArrayComparator();
 
+  /** Interface for comparing byte arrays lexicographically. */
   public interface ByteArrayComparator extends Comparator<byte[]>, Serializable {
 
     int compare(
@@ -170,6 +196,7 @@ public class Bytes implements Comparable<byte[]> {
         int length2);
   }
 
+  /** A byte array comparator based on lexicographic ordering. */
   private static class LexicographicByteArrayComparator implements ByteArrayComparator {
 
     @Override
@@ -185,12 +212,12 @@ public class Bytes implements Comparable<byte[]> {
         int offset2,
         int length2) {
 
-      // short circuit equal case
+      // Short circuit equal case
       if (buffer1 == buffer2 && offset1 == offset2 && length1 == length2) {
         return 0;
       }
 
-      // similar to Arrays.compare() but considers offset and length
+      // Similar to Arrays.compare() but considers offset and length
       int end1 = offset1 + length1;
       int end2 = offset2 + length2;
       for (int i = offset1, j = offset2; i < end1 && j < end2; i++, j++) {

@@ -8,12 +8,22 @@ package com.datastrato.graviton.storage.kv;
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
 
-/**
- * Interface for encoding entity key for KV backend, e.g., RocksDB. The key is used to store the
- * entity in the backend.
- */
+/** Interface for encoding entity keys for use with KV backends, such as RocksDB. */
 public interface EntityKeyEncoder {
+
+  /**
+   * Encodes a NameIdentifier into a byte array representing the entity key.
+   *
+   * @param identifier The NameIdentifier to be encoded.
+   * @return The byte array representing the encoded key.
+   */
   byte[] encode(NameIdentifier identifier);
 
+  /**
+   * Encodes a Namespace into a byte array representing the key.
+   *
+   * @param namespace The Namespace to be encoded.
+   * @return The byte array representing the encoded key.
+   */
   byte[] encode(Namespace namespace);
 }
