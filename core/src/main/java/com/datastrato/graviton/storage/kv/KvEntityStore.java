@@ -91,10 +91,14 @@ public class KvEntityStore implements EntityStore {
   @Override
   public <E extends Entity & HasIdentifier> void put(E e, boolean overwritten)
       throws IOException, EntityAlreadyExistsException {
-    // Simple implementation, just use the entity's identifier as the key
-    byte[] key = entityKeyEncoder.encode(EntityIdentifer.of(e.nameIdentifier(), e.type()), true);
-    byte[] value = serDe.serialize(e);
-    backend.put(key, value, overwritten);
+    executeInTransaction(
+        () -> {
+          byte[] key =
+              entityKeyEncoder.encode(EntityIdentifer.of(e.nameIdentifier(), e.type()), true);
+          byte[] value = serDe.serialize(e);
+          backend.put(key, value, overwritten);
+          return null;
+        });
   }
 
   @Override
