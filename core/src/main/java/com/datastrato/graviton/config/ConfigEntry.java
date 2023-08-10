@@ -13,6 +13,7 @@ import lombok.Getter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/** Defines configuration properties. */
 public class ConfigEntry<T> {
 
   private static final Logger LOG = LoggerFactory.getLogger(ConfigEntry.class);
@@ -37,6 +38,16 @@ public class ConfigEntry<T> {
 
   private boolean isOptional;
 
+  /**
+   * Creates a new ConfigEntry instance.
+   *
+   * @param key The key of the configuration.
+   * @param version The version of the configuration.
+   * @param doc The documentation of the configuration.
+   * @param alternatives Alternative keys for the configuration.
+   * @param isPublic Whether the configuration is public.
+   * @param isDeprecated Whether the configuration is deprecated.
+   */
   ConfigEntry(
       String key,
       String version,
@@ -53,22 +64,49 @@ public class ConfigEntry<T> {
     this.isOptional = false;
   }
 
+  /**
+   * Sets a custom value converter function for this configuration.
+   *
+   * @param valueConverter The function that converts a configuration value string to the desired
+   *     type.
+   */
   void setValueConverter(Function<String, T> valueConverter) {
     this.valueConverter = valueConverter;
   }
 
+  /**
+   * Sets a custom string converter function for this configuration.
+   *
+   * @param stringConverter The function that converts a configuration value to its string
+   *     representation.
+   */
   void setStringConverter(Function<T, String> stringConverter) {
     this.stringConverter = stringConverter;
   }
 
+  /**
+   * Sets the default value for this configuration.
+   *
+   * @param t The default value to be used when no value is provided.
+   */
   void setDefaultValue(T t) {
     this.defaultValue = t;
   }
 
+  /**
+   * Marks this configuration as optional. An optional entry can be absent in the configuration
+   * properties without raising an exception.
+   */
   void setOptional() {
     this.isOptional = true;
   }
 
+  /**
+   * Creates a new ConfigEntry instance based on this configuration entry with a default value.
+   *
+   * @param t The default value to be used when no value is provided.
+   * @return A new ConfigEntry instance with the specified default value.
+   */
   public ConfigEntry<T> createWithDefault(T t) {
     ConfigEntry<T> conf =
         new ConfigEntry<>(key, version, doc, alternatives, isPublic, isDeprecated);
@@ -79,17 +117,30 @@ public class ConfigEntry<T> {
     return conf;
   }
 
+  /**
+   * Creates a new ConfigEntry instance based on this configuration entry with optional value
+   * handling.
+   *
+   * @return A new ConfigEntry instance that works with optional values.
+   */
   public ConfigEntry<Optional<T>> createWithOptional() {
     ConfigEntry<Optional<T>> conf =
         new ConfigEntry<>(key, version, doc, alternatives, isPublic, isDeprecated);
     conf.setValueConverter(s -> Optional.ofNullable(valueConverter.apply(s)));
-    // null value should not be possible unless the user explicitly sets it
+    // Unless explicitly set by the user, null values are not expected to occur.
     conf.setStringConverter(t -> t.map(stringConverter).orElse(null));
     conf.setOptional();
 
     return conf;
   }
 
+  /**
+   * Reads the configuration value.
+   *
+   * @param properties The map containing the configuration properties.
+   * @return The value of the configuration entry.
+   * @throws NoSuchElementException If the configuration value is not found.
+   */
   public T readFrom(Map<String, String> properties) throws NoSuchElementException {
     String value = properties.get(key);
     if (value == null) {
@@ -112,10 +163,16 @@ public class ConfigEntry<T> {
     return valueConverter.apply(value);
   }
 
+  /**
+   * Writes the provided value to the specified properties map.
+   *
+   * @param properties The map to write the configuration property to.
+   * @param value The value of the configuration entry.
+   */
   public void writeTo(Map<String, String> properties, T value) {
     String stringValue = stringConverter.apply(value);
     if (stringValue == null) {
-      // We don't want user to set a null value to config, so this basically will not happen;
+      // To ensure that a null value is not set in the configuration
       LOG.warn("Config {} value to set is null, ignore setting to Config.", stringValue);
       return;
     }

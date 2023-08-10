@@ -9,7 +9,7 @@ import static com.datastrato.graviton.Configs.ENTITY_KV_STORE;
 
 import com.datastrato.graviton.Config;
 import com.datastrato.graviton.Entity;
-import com.datastrato.graviton.Entity.EntityIdentifer;
+import com.datastrato.graviton.Entity.EntityIdentifier;
 import com.datastrato.graviton.Entity.EntityType;
 import com.datastrato.graviton.EntityAlreadyExistsException;
 import com.datastrato.graviton.EntitySerDe;
@@ -62,7 +62,7 @@ public class KvEntityStore implements EntityStore {
       Namespace namespace, Class<E> e, EntityType type) throws IOException {
     // Star means it's a wildcard
     NameIdentifier identifier = NameIdentifier.of(namespace, "*");
-    byte[] startKey = entityKeyEncoder.encode(EntityIdentifer.of(identifier, type), false);
+    byte[] startKey = entityKeyEncoder.encode(EntityIdentifier.of(identifier, type), false);
     byte[] endKey = Bytes.increment(Bytes.wrap(startKey)).get();
     List<Pair<byte[], byte[]>> kvs =
         backend.scan(
@@ -84,17 +84,18 @@ public class KvEntityStore implements EntityStore {
 
   @Override
   public boolean exists(NameIdentifier ident, EntityType entityType) throws IOException {
-    return backend.get(entityKeyEncoder.encode(EntityIdentifer.of(ident, entityType), false))
+    return backend.get(entityKeyEncoder.encode(EntityIdentifier.of(ident, entityType), false))
         != null;
   }
 
   @Override
   public <E extends Entity & HasIdentifier> void put(E e, boolean overwritten)
       throws IOException, EntityAlreadyExistsException {
+    // Simple implementation, just use the entity's identifier as the key
     executeInTransaction(
         () -> {
           byte[] key =
-              entityKeyEncoder.encode(EntityIdentifer.of(e.nameIdentifier(), e.type()), true);
+              entityKeyEncoder.encode(EntityIdentifier.of(e.nameIdentifier(), e.type()), true);
           byte[] value = serDe.serialize(e);
           backend.put(key, value, overwritten);
           return null;
@@ -107,7 +108,7 @@ public class KvEntityStore implements EntityStore {
       throws IOException, NoSuchEntityException {
     return executeInTransaction(
         () -> {
-          byte[] key = entityKeyEncoder.encode(EntityIdentifer.of(ident, entityType), false);
+          byte[] key = entityKeyEncoder.encode(EntityIdentifier.of(ident, entityType), false);
           byte[] value = backend.get(key);
           if (value == null) {
             throw new NoSuchEntityException(ident.toString());
@@ -128,7 +129,7 @@ public class KvEntityStore implements EntityStore {
   public <E extends Entity & HasIdentifier> E get(
       NameIdentifier ident, EntityType entityType, Class<E> e)
       throws NoSuchEntityException, IOException {
-    byte[] key = entityKeyEncoder.encode(EntityIdentifer.of(ident, entityType), false);
+    byte[] key = entityKeyEncoder.encode(EntityIdentifier.of(ident, entityType), false);
     // refer type from key;
     byte[] value = backend.get(key);
     if (value == null) {
@@ -139,7 +140,7 @@ public class KvEntityStore implements EntityStore {
 
   @Override
   public boolean delete(NameIdentifier ident, EntityType entityType) throws IOException {
-    return backend.delete(entityKeyEncoder.encode(EntityIdentifer.of(ident, entityType), false));
+    return backend.delete(entityKeyEncoder.encode(EntityIdentifier.of(ident, entityType), false));
   }
 
   @Override

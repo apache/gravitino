@@ -10,7 +10,10 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.ToString;
 
+/** This interface defines an entity within the Graviton framework. */
 public interface Entity extends Serializable {
+
+  /** Enumeration defining the types of entities in the Graviton framework. */
   @Getter
   enum EntityType {
     METALAKE("ml", 0),
@@ -31,34 +34,46 @@ public interface Entity extends Serializable {
     }
   }
 
+  /** Class representing an identifier for an entity. */
   @Getter
   @AllArgsConstructor
   @ToString
-  class EntityIdentifer {
+  class EntityIdentifier {
     private NameIdentifier nameIdentifier;
     private EntityType entityType;
 
-    public static EntityIdentifer of(NameIdentifier name, EntityType entityType) {
-      return new EntityIdentifer(name, entityType);
+    /**
+     * Create an instance of EntityIdentifier.
+     *
+     * @param name The name identifier of the entity.
+     * @param entityType The type of the entity.
+     * @return The created EntityIdentifier instance.
+     */
+    public static EntityIdentifier of(NameIdentifier name, EntityType entityType) {
+      return new EntityIdentifier(name, entityType);
     }
   }
 
   /**
-   * Validates the entity if the field arguments are valid.
+   * Validates the entity by ensuring the validity of its field arguments.
    *
-   * @throws IllegalArgumentException throws IllegalArgumentException if the validation is failed.
+   * @throws IllegalArgumentException If the validation fails.
    */
   default void validate() throws IllegalArgumentException {
     fields().forEach(Field::validate);
   }
 
   /**
-   * Returns the schema of the entity with values.
+   * Retrieves the fields and their associated values of the entity.
    *
-   * @return Map of Field to Object to represent the schema of the entity with values.
+   * @return A map of Field to Object representing the entity's schema with values.
    */
   Map<Field, Object> fields();
 
-  /** Return type of the entity, plase see {@link EntityType} to see all types */
+  /**
+   * Retrieves the type of the entity.
+   *
+   * @return The type of the entity as defined by {@link EntityType}.
+   */
   EntityType type();
 }

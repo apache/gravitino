@@ -10,6 +10,11 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * This class is responsible for creating instances of EntitySerDe implementations. EntitySerDe
+ * (Entity Serialization/Deserialization) implementations are used to serialize and deserialize
+ * entities within the Graviton framework.
+ */
 public class EntitySerDeFactory {
 
   private static final Logger LOG = LoggerFactory.getLogger(EntitySerDe.class);
@@ -21,11 +26,24 @@ public class EntitySerDeFactory {
 
   private EntitySerDeFactory() {}
 
+  /**
+   * Creates an instance of EntitySerDe.
+   *
+   * @param config The configuration object containing settings for EntitySerDe.
+   * @return An instance of EntitySerDe.
+   */
   public static EntitySerDe createEntitySerDe(Config config) {
     String name = config.get(Configs.ENTITY_SERDE);
     return createEntitySerDe(name);
   }
 
+  /**
+   * Creates an instance of EntitySerDe.
+   *
+   * @param name The short name identifying the EntitySerDe implementation.
+   * @return An instance of EntitySerDe.
+   * @throws RuntimeException If the EntitySerDe creation fails.
+   */
   public static EntitySerDe createEntitySerDe(String name) {
     String className = ENTITY_SERDES.getOrDefault(name, name);
 

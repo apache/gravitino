@@ -542,7 +542,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
   /**
    * Not supported in this implementation. Throws UnsupportedOperationException.
    *
-   * @param ident The identifier of the table to alter.
+   * @param tableIdent The identifier of the table to alter.
    * @param changes The changes to apply to the table.
    * @return This method always throws UnsupportedOperationException.
    * @throws NoSuchTableException This exception will not be thrown in this method.
@@ -781,7 +781,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
   /**
    * Checks if the given namespace is a valid namespace for the Hive schema.
    *
-   * @param namespace The namespace to validate.
+   * @param tableIdent The namespace to validate.
    * @return true if the namespace is valid; otherwise, false.
    */
   private boolean dropHiveTable(NameIdentifier tableIdent, boolean deleteData, boolean ifPurge) {
