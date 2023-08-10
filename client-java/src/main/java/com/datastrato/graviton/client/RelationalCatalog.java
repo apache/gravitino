@@ -40,6 +40,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Relational catalog is a catalog implementation that supports relational database like metadata
@@ -47,6 +49,8 @@ import org.apache.commons.lang3.StringUtils;
  * catalog is under the metalake.
  */
 public class RelationalCatalog extends CatalogDTO implements TableCatalog, SupportsSchemas {
+
+  private static final Logger LOG = LoggerFactory.getLogger(RelationalCatalog.class);
 
   private final RESTClient restClient;
 
@@ -202,6 +206,7 @@ public class RelationalCatalog extends CatalogDTO implements TableCatalog, Suppo
       return resp.dropped();
 
     } catch (Exception e) {
+      LOG.warn("Failed to drop table {}", ident, e);
       return false;
     }
   }
@@ -338,6 +343,7 @@ public class RelationalCatalog extends CatalogDTO implements TableCatalog, Suppo
     } catch (NonEmptySchemaException e) {
       throw e;
     } catch (Exception e) {
+      LOG.warn("Failed to drop schema {}", ident, e);
       return false;
     }
   }
@@ -369,6 +375,7 @@ public class RelationalCatalog extends CatalogDTO implements TableCatalog, Suppo
     Namespace schemaNs = Namespace.of(ns.level(0), ns.level(1));
     return new StringBuilder()
         .append(formatSchemaRequestPath(schemaNs))
+        .append("/")
         .append(ns.level(2))
         .append("/tables")
         .toString();

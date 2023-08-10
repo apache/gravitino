@@ -112,24 +112,26 @@ public class ErrorHandlers {
 
     @Override
     public void accept(ErrorResponse errorResponse) {
+      String errorMessage = formatErrorMessage(errorResponse);
+
       switch (errorResponse.getCode()) {
         case ErrorConstants.ILLEGAL_ARGUMENTS_CODE:
-          throw new IllegalArgumentException(formatErrorMessage(errorResponse));
+          throw new IllegalArgumentException(errorMessage);
 
         case ErrorConstants.NOT_FOUND_CODE:
           if (errorResponse.getType().equals(NoSuchSchemaException.class.getSimpleName())) {
-            throw new NoSuchSchemaException(formatErrorMessage(errorResponse));
+            throw new NoSuchSchemaException(errorMessage);
           } else if (errorResponse.getType().equals(NoSuchTableException.class.getSimpleName())) {
-            throw new NoSuchTableException(formatErrorMessage(errorResponse));
+            throw new NoSuchTableException(errorMessage);
           } else {
-            throw new NotFoundException(formatErrorMessage(errorResponse));
+            throw new NotFoundException(errorMessage);
           }
 
         case ErrorConstants.ALREADY_EXISTS_CODE:
-          throw new TableAlreadyExistsException(formatErrorMessage(errorResponse));
+          throw new TableAlreadyExistsException(errorMessage);
 
         case ErrorConstants.INTERNAL_ERROR_CODE:
-          throw new RuntimeException(formatErrorMessage(errorResponse));
+          throw new RuntimeException(errorMessage);
       }
 
       super.accept(errorResponse);
@@ -142,27 +144,29 @@ public class ErrorHandlers {
 
     @Override
     public void accept(ErrorResponse errorResponse) {
+      String errorMessage = formatErrorMessage(errorResponse);
+
       switch (errorResponse.getCode()) {
         case ErrorConstants.ILLEGAL_ARGUMENTS_CODE:
-          throw new IllegalArgumentException(formatErrorMessage(errorResponse));
+          throw new IllegalArgumentException(errorMessage);
 
         case ErrorConstants.NOT_FOUND_CODE:
           if (errorResponse.getType().equals(NoSuchCatalogException.class.getSimpleName())) {
-            throw new NoSuchCatalogException(formatErrorMessage(errorResponse));
+            throw new NoSuchCatalogException(errorMessage);
           } else if (errorResponse.getType().equals(NoSuchSchemaException.class.getSimpleName())) {
-            throw new NoSuchSchemaException(formatErrorMessage(errorResponse));
+            throw new NoSuchSchemaException(errorMessage);
           } else {
-            throw new NotFoundException(formatErrorMessage(errorResponse));
+            throw new NotFoundException(errorMessage);
           }
 
         case ErrorConstants.ALREADY_EXISTS_CODE:
-          throw new SchemaAlreadyExistsException(formatErrorMessage(errorResponse));
+          throw new SchemaAlreadyExistsException(errorMessage);
 
         case ErrorConstants.NON_EMPTY_CODE:
-          throw new NonEmptySchemaException(formatErrorMessage(errorResponse));
+          throw new NonEmptySchemaException(errorMessage);
 
         case ErrorConstants.INTERNAL_ERROR_CODE:
-          throw new RuntimeException(formatErrorMessage(errorResponse));
+          throw new RuntimeException(errorMessage);
       }
 
       super.accept(errorResponse);
@@ -175,24 +179,26 @@ public class ErrorHandlers {
 
     @Override
     public void accept(ErrorResponse errorResponse) {
+      String errorMessage = formatErrorMessage(errorResponse);
+
       switch (errorResponse.getCode()) {
         case ErrorConstants.ILLEGAL_ARGUMENTS_CODE:
-          throw new IllegalArgumentException(formatErrorMessage(errorResponse));
+          throw new IllegalArgumentException(errorMessage);
 
         case ErrorConstants.NOT_FOUND_CODE:
           if (errorResponse.getType().equals(NoSuchMetalakeException.class.getSimpleName())) {
-            throw new NoSuchMetalakeException(formatErrorMessage(errorResponse));
+            throw new NoSuchMetalakeException(errorMessage);
           } else if (errorResponse.getType().equals(NoSuchCatalogException.class.getSimpleName())) {
-            throw new NoSuchCatalogException(formatErrorMessage(errorResponse));
+            throw new NoSuchCatalogException(errorMessage);
           } else {
-            throw new NotFoundException(formatErrorMessage(errorResponse));
+            throw new NotFoundException(errorMessage);
           }
 
         case ErrorConstants.ALREADY_EXISTS_CODE:
-          throw new CatalogAlreadyExistsException(formatErrorMessage(errorResponse));
+          throw new CatalogAlreadyExistsException(errorMessage);
 
         case ErrorConstants.INTERNAL_ERROR_CODE:
-          throw new RuntimeException(formatErrorMessage(errorResponse));
+          throw new RuntimeException(errorMessage);
       }
 
       super.accept(errorResponse);
@@ -205,18 +211,20 @@ public class ErrorHandlers {
 
     @Override
     public void accept(ErrorResponse errorResponse) {
+      String errorMessage = formatErrorMessage(errorResponse);
+
       switch (errorResponse.getCode()) {
         case ErrorConstants.ILLEGAL_ARGUMENTS_CODE:
-          throw new IllegalArgumentException(formatErrorMessage(errorResponse));
+          throw new IllegalArgumentException(errorMessage);
 
         case ErrorConstants.NOT_FOUND_CODE:
-          throw new NoSuchMetalakeException(formatErrorMessage(errorResponse));
+          throw new NoSuchMetalakeException(errorMessage);
 
         case ErrorConstants.ALREADY_EXISTS_CODE:
-          throw new MetalakeAlreadyExistsException(formatErrorMessage(errorResponse));
+          throw new MetalakeAlreadyExistsException(errorMessage);
 
         case ErrorConstants.INTERNAL_ERROR_CODE:
-          throw new RuntimeException(formatErrorMessage(errorResponse));
+          throw new RuntimeException(errorMessage);
       }
 
       super.accept(errorResponse);
