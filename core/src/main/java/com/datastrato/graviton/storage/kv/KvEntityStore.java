@@ -130,7 +130,7 @@ public class KvEntityStore implements EntityStore {
     executeInTransaction(
         () -> {
           byte[] key =
-              entityKeyEncoder.encode(EntityIdentifer.of(e.nameIdentifier(), e.type()), true);
+              entityKeyEncoder.encode(EntityIdentifier.of(e.nameIdentifier(), e.type()), true);
           byte[] value = serDe.serialize(e);
           backend.put(key, value, overwritten);
           return null;

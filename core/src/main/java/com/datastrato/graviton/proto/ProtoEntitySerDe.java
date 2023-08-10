@@ -37,7 +37,6 @@ public class ProtoEntitySerDe implements EntitySerDe {
 
   private final Map<Class<? extends Entity>, Class<? extends Message>> entityToProto;
 
-
   public ProtoEntitySerDe() {
     this.entityToSerDe = Maps.newHashMap();
     this.entityToProto = Maps.newHashMap();
