@@ -13,8 +13,6 @@ import java.util.function.Consumer;
  * The ErrorHandler class is an abstract class specialized for handling ErrorResponse objects.
  * Subclasses of ErrorHandler must implement the parseResponse method to provide custom parsing
  * logic for different types of errors.
- *
- * @param <ErrorResponse> The type of ErrorResponse that this ErrorHandler handles.
  */
 public abstract class ErrorHandler implements Consumer<ErrorResponse> {
 
