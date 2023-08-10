@@ -195,7 +195,7 @@ tasks {
 
   val copyRuntimeClass by registering(Copy::class) {
     subprojects.forEach() {
-      if (it.name != "catalog-hive") {
+      if (it.name != "catalog-hive" && it.name != "client-java") {
         // println("copyRuntimeClass: ${it.name}")
         from(it.configurations.runtimeClasspath)
         into("distribution/package/lib")
@@ -217,10 +217,12 @@ tasks {
     dependsOn("copyRuntimeClass", "copyCatalogRuntimeClass")
     subprojects.forEach() {
       // println("copySubmoduleClass: ${it.name}")
-      from("${it.name}/build/libs")
-      into("distribution/package/lib")
-      include("*.jar")
-      setDuplicatesStrategy(DuplicatesStrategy.INCLUDE)
+      if (it.name != "client-java") {
+        from("${it.name}/build/libs")
+        into("distribution/package/lib")
+        include("*.jar")
+        setDuplicatesStrategy(DuplicatesStrategy.INCLUDE)
+      }
     }
   }
 
