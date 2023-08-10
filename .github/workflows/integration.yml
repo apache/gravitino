@@ -1,4 +1,4 @@
-name: build
+name: integration
 
 # Controls when the workflow will run
 on:
