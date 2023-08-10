@@ -55,15 +55,18 @@ public class Bytes implements Comparable<byte[]> {
     return this.bytes;
   }
 
-  /**
-   * Concatenates two byte arrays into a single array.
-   *
-   * @param one The first byte array.
-   * @param two The second byte array.
-   * @return A new byte array containing the concatenated data.
-   */
-  public static byte[] concat(byte[] one, byte[] two) {
-    int totalLen = one.length + two.length;
+/**
+ * Concatenates multiple byte arrays into a single byte array.
+ *
+ * @param values An array of byte arrays to be concatenated.
+ * @return A new byte array containing the concatenated data.
+ */
+  public static byte[] concat(byte[]... values) {
+    int totalLen = 0;
+    for (byte[] b : values) {
+      totalLen += b.length;
+    }
+
     byte[] res = new byte[totalLen];
     int currentPos = 0;
     for (int i = 0; i < values.length; i++) {
