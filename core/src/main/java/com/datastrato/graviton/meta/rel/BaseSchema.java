@@ -2,6 +2,7 @@
  * Copyright 2023 Datastrato.
  * This software is licensed under the Apache License version 2.
  */
+
 package com.datastrato.graviton.meta.rel;
 
 import com.datastrato.graviton.Entity;
@@ -17,21 +18,21 @@ import javax.annotation.Nullable;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
 
+/** An abstract class representing a base schema in a relational database. */
 @EqualsAndHashCode
 @ToString
 public abstract class BaseSchema implements Schema, Entity, HasIdentifier {
 
-  public static final Field ID =
-      Field.required("id", Long.class, "The unique identifier of the schema");
+  public static final Field ID = Field.required("id", Long.class, "The schema's unique identifier");
   public static final Field CATALOG_ID =
-      Field.required("catalog_id", Long.class, "The unique identifier of the catalog");
-  public static final Field NAME = Field.required("name", String.class, "The name of the schema");
+      Field.required("catalog_id", Long.class, "The catalog's unique identifier");
+  public static final Field NAME = Field.required("name", String.class, "The schema's name");
   public static final Field COMMENT =
-      Field.optional("comment", String.class, "The comment of the schema");
+      Field.optional("comment", String.class, "The comment or description for the schema");
   public static final Field PROPERTIES =
-      Field.optional("properties", Map.class, "The properties of the schema");
+      Field.optional("properties", Map.class, "The associated properties of the schema");
   public static final Field AUDIT_INFO =
-      Field.required("audit_info", AuditInfo.class, "The audit info of the schema");
+      Field.required("audit_info", AuditInfo.class, "The audit details of the schema");
 
   protected Long id;
 
@@ -47,6 +48,11 @@ public abstract class BaseSchema implements Schema, Entity, HasIdentifier {
 
   protected Namespace namespace;
 
+  /**
+   * Returns an unmodifiable map of the fields and their corresponding values for this schema.
+   *
+   * @return An unmodifiable map of the fields and values.
+   */
   @Override
   public Map<Field, Object> fields() {
     Map<Field, Object> fields = Maps.newHashMap();
@@ -60,36 +66,72 @@ public abstract class BaseSchema implements Schema, Entity, HasIdentifier {
     return Collections.unmodifiableMap(fields);
   }
 
+  /**
+   * Returns the name of the schema.
+   *
+   * @return The name of the schema.
+   */
   @Override
   public String name() {
     return name;
   }
 
+  /**
+   * Returns the namespace of the schema.
+   *
+   * @return The namespace of the schema.
+   */
   @Override
   public Namespace namespace() {
     return namespace;
   }
 
+  /**
+   * Returns the comment or description for the schema.
+   *
+   * @return The comment or description for the schema.
+   */
   @Override
   public String comment() {
     return comment;
   }
 
+  /**
+   * Returns the associated properties of the schema.
+   *
+   * @return The associated properties of the schema.
+   */
   @Override
   public Map<String, String> properties() {
     return properties;
   }
 
+  /**
+   * Returns the audit details of the schema.
+   *
+   * @return The audit details of the schema.
+   */
   @Override
   public AuditInfo auditInfo() {
     return auditInfo;
   }
 
+  /**
+   * Returns the type of the entity, which is {@link EntityType#SCHEMA}.
+   *
+   * @return The type of the entity.
+   */
   @Override
   public EntityType type() {
     return EntityType.SCHEMA;
   }
 
+  /**
+   * Builder interface for creating instances of {@link BaseSchema}.
+   *
+   * @param <SELF> The type of the builder.
+   * @param <T> The type of the schema being built.
+   */
   interface Builder<SELF extends Builder<SELF, T>, T extends BaseSchema> {
     SELF withId(Long id);
 
@@ -108,6 +150,12 @@ public abstract class BaseSchema implements Schema, Entity, HasIdentifier {
     T build();
   }
 
+  /**
+   * An abstract class implementing the builder interface for {@link BaseSchema}.
+   *
+   * @param <SELF> The type of the builder.
+   * @param <T> The type of the schema being built.
+   */
   public abstract static class BaseSchemaBuilder<
           SELF extends Builder<SELF, T>, T extends BaseSchema>
       implements Builder<SELF, T> {
@@ -119,48 +167,95 @@ public abstract class BaseSchema implements Schema, Entity, HasIdentifier {
     protected Map<String, String> properties;
     protected AuditInfo auditInfo;
 
+    /**
+     * Sets the unique identifier of the schema.
+     *
+     * @param id The unique identifier of the schema.
+     * @return The builder instance.
+     */
     @Override
     public SELF withId(Long id) {
       this.id = id;
       return self();
     }
 
+    /**
+     * Sets the unique identifier of the catalog.
+     *
+     * @param catalogId The unique identifier of the catalog.
+     * @return The builder instance.
+     */
     @Override
     public SELF withCatalogId(Long catalogId) {
       this.catalogId = catalogId;
       return self();
     }
 
+    /**
+     * Sets the name of the schema.
+     *
+     * @param name The name of the schema.
+     * @return The builder instance.
+     */
     @Override
     public SELF withName(String name) {
       this.name = name;
       return self();
     }
 
+    /**
+     * Sets the namespace of the schema.
+     *
+     * @param namespace The namespace of the schema.
+     * @return The builder instance.
+     */
     @Override
     public SELF withNamespace(Namespace namespace) {
       this.namespace = namespace;
       return self();
     }
 
+    /**
+     * Sets the comment of the schema.
+     *
+     * @param comment The comment or description for the schema.
+     * @return The builder instance.
+     */
     @Override
     public SELF withComment(String comment) {
       this.comment = comment;
       return self();
     }
 
+    /**
+     * Sets the associated properties of the schema.
+     *
+     * @param properties The associated properties of the schema.
+     * @return The builder instance.
+     */
     @Override
     public SELF withProperties(Map<String, String> properties) {
       this.properties = properties;
       return self();
     }
 
+    /**
+     * Sets the audit details of the schema.
+     *
+     * @param auditInfo The audit details of the schema.
+     * @return The builder instance.
+     */
     @Override
     public SELF withAuditInfo(AuditInfo auditInfo) {
       this.auditInfo = auditInfo;
       return self();
     }
 
+    /**
+     * Builds the instance of the schema with the provided attributes.
+     *
+     * @return The built schema instance.
+     */
     @Override
     public T build() {
       T t = internalBuild();

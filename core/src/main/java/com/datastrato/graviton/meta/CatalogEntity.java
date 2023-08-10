@@ -19,22 +19,23 @@ import javax.annotation.Nullable;
 import lombok.Getter;
 import lombok.ToString;
 
+/** An entity within a catalog. */
 @ToString
 public class CatalogEntity implements Entity, Auditable, HasIdentifier {
 
   public static final Field ID =
-      Field.required("id", Long.class, "The unique identifier of the catalog");
+      Field.required("id", Long.class, "The catalog's unique identifier");
   public static final Field METALAKE_ID =
-      Field.required("metalake_id", Long.class, "The unique identifier of the metalake");
-  public static final Field NAME = Field.required("name", String.class, "The name of the catalog");
+      Field.required("metalake_id", Long.class, "The associated metalake's unique identifier");
+  public static final Field NAME = Field.required("name", String.class, "The catalog's name");
   public static final Field TYPE =
       Field.required("type", Catalog.Type.class, "The type of the catalog");
   public static final Field COMMENT =
-      Field.optional("comment", String.class, "The comment of the catalog");
+      Field.optional("comment", String.class, "The comment or description of the catalog");
   public static final Field PROPERTIES =
-      Field.optional("properties", Map.class, "The properties of the catalog");
+      Field.optional("properties", Map.class, "The properties associated with the catalog");
   public static final Field AUDIT_INFO =
-      Field.required("audit_info", AuditInfo.class, "The audit info of the catalog");
+      Field.required("audit_info", AuditInfo.class, "The audit details of the catalog");
 
   @Getter private Long id;
 
@@ -52,6 +53,11 @@ public class CatalogEntity implements Entity, Auditable, HasIdentifier {
 
   private Namespace namespace;
 
+  /**
+   * A map of fields and their corresponding values.
+   *
+   * @return An unmodifiable map containing the entity's fields and values.
+   */
   @Override
   public Map<Field, Object> fields() {
     Map<Field, Object> fields = new HashMap<>();
@@ -66,81 +72,162 @@ public class CatalogEntity implements Entity, Auditable, HasIdentifier {
     return Collections.unmodifiableMap(fields);
   }
 
+  /**
+   * The audit information of the catalog.
+   *
+   * @return the audit information as an {@link Audit} instance.
+   */
   @Override
   public Audit auditInfo() {
     return auditInfo;
   }
 
+  /**
+   * The name of the catalog entity.
+   *
+   * @return The name of the catalog entity.
+   */
   @Override
   public String name() {
     return name;
   }
 
+  /**
+   * The namespace of the catalog entity.
+   *
+   * @return The namespace as a {@link Namespace} instance.
+   */
   @Override
   public Namespace namespace() {
     return namespace;
   }
 
+  /**
+   * The type of the entity.
+   *
+   * @return The {@link EntityType#CATALOG} value.
+   */
   @Override
   public EntityType type() {
     return EntityType.CATALOG;
   }
 
+  /** Builder class for creating instances of {@link CatalogEntity}. */
   public static class Builder {
 
     private final CatalogEntity catalog;
 
+    /** Constructs a new {@link Builder}. */
     public Builder() {
       catalog = new CatalogEntity();
     }
 
+    /**
+     * Sets the unique identifier of the catalog.
+     *
+     * @param id the unique identifier of the catalog.
+     * @return the builder instance.
+     */
     public Builder withId(Long id) {
       catalog.id = id;
       return this;
     }
 
+    /**
+     * Sets the unique identifier of the associated metalake.
+     *
+     * @param metalakeId the unique identifier of the metalake.
+     * @return the builder instance.
+     */
     public Builder withMetalakeId(Long metalakeId) {
       catalog.metalakeId = metalakeId;
       return this;
     }
 
+    /**
+     * Sets the name of the catalog.
+     *
+     * @param name the name of the catalog.
+     * @return the builder instance.
+     */
     public Builder withName(String name) {
       catalog.name = name;
       return this;
     }
 
+    /**
+     * Sets the namespace of the catalog.
+     *
+     * @param namespace the namespace as a {@link Namespace} instance.
+     * @return the builder instance.
+     */
     public Builder withNamespace(Namespace namespace) {
       catalog.namespace = namespace;
       return this;
     }
 
+    /**
+     * Sets the type of the catalog.
+     *
+     * @param type the type of the catalog.
+     * @return the builder instance.
+     */
     public Builder withType(Catalog.Type type) {
       catalog.type = type;
       return this;
     }
 
+    /**
+     * Sets the comment or description of the catalog.
+     *
+     * @param comment the comment of the catalog.
+     * @return the builder instance.
+     */
     public Builder withComment(String comment) {
       catalog.comment = comment;
       return this;
     }
 
+    /**
+     * Sets the properties of the catalog.
+     *
+     * @param properties the properties as a map of key-value pairs.
+     * @return the builder instance.
+     */
     public Builder withProperties(Map<String, String> properties) {
       catalog.properties = properties;
       return this;
     }
 
+    /**
+     * Sets the audit information of the catalog.
+     *
+     * @param auditInfo the audit information as an {@link AuditInfo} instance.
+     * @return the builder instance.
+     */
     public Builder withAuditInfo(AuditInfo auditInfo) {
       catalog.auditInfo = auditInfo;
       return this;
     }
 
+    /**
+     * Builds the {@link CatalogEntity} instance after validation.
+     *
+     * @return the constructed and validated {@link CatalogEntity} instance.
+     */
     public CatalogEntity build() {
       catalog.validate();
       return catalog;
     }
   }
 
-  /** Attention, this method ignores the namespace field in the comparison */
+  /**
+   * Compares this object to the specified object for equality. Note: This method ignores comparing
+   * the namespace field.
+   *
+   * @param o the object to compare to.
+   * @return {@code true} if the objects are equal, {@code false} otherwise.
+   */
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -159,6 +246,11 @@ public class CatalogEntity implements Entity, Auditable, HasIdentifier {
         && Objects.equal(auditInfo, that.auditInfo);
   }
 
+  /**
+   * Generates a hash code value for this object based on its attributes.
+   *
+   * @return the hash code value for this object.
+   */
   @Override
   public int hashCode() {
     return Objects.hashCode(id, metalakeId, name, type, comment, properties, auditInfo);
