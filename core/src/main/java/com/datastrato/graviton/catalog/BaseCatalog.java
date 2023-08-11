@@ -20,6 +20,8 @@ import java.util.Map;
  *
  * <p>For example, a hive catalog has a {@link CatalogEntity} metadata and a {@link
  * CatalogOperations} which manipulates Hive DBs and tables.
+ *
+ * @param <T> The type of the concrete subclass of BaseCatalog.
  */
 public abstract class BaseCatalog<T extends BaseCatalog> implements Catalog, CatalogProvider {
 
@@ -29,8 +31,21 @@ public abstract class BaseCatalog<T extends BaseCatalog> implements Catalog, Cat
 
   private volatile CatalogOperations ops;
 
+  /**
+   * Creates a new instance of CatalogOperations.
+   *
+   * @param config The configuration parameters for creating CatalogOperations.
+   * @return A new instance of CatalogOperations.
+   */
   protected abstract CatalogOperations newOps(Map<String, String> config);
 
+  /**
+   * Retrieves the CatalogOperations instance associated with this catalog. Lazily initializes the
+   * instance if not already created.
+   *
+   * @return The CatalogOperations instance.
+   * @throws IllegalArgumentException If the entity or configuration is not set.
+   */
   public CatalogOperations ops() {
     if (ops == null) {
       synchronized (this) {
@@ -45,16 +60,33 @@ public abstract class BaseCatalog<T extends BaseCatalog> implements Catalog, Cat
     return ops;
   }
 
+  /**
+   * Sets the CatalogEntity for this catalog.
+   *
+   * @param entity The CatalogEntity representing the metadata of the catalog.
+   * @return The instance of the concrete subclass of BaseCatalog.
+   */
   public T withCatalogEntity(CatalogEntity entity) {
     this.entity = entity;
     return (T) this;
   }
 
+  /**
+   * Sets the configuration for this catalog.
+   *
+   * @param conf The configuration parameters as a map.
+   * @return The instance of the concrete subclass of BaseCatalog.
+   */
   public T withCatalogConf(Map<String, String> conf) {
     this.conf = conf;
     return (T) this;
   }
 
+  /**
+   * Retrieves the CatalogEntity associated with this catalog.
+   *
+   * @return The CatalogEntity instance.
+   */
   public CatalogEntity entity() {
     return entity;
   }

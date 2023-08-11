@@ -61,7 +61,7 @@ public class TestAuditInfo {
                   .build();
             });
     Assertions.assertEquals(
-        "last_modifier and last_modified_time must be both set or both not set",
+        "last_modifier and last_modified_time must be both set or both left unset",
         exception1.getMessage());
   }
 }

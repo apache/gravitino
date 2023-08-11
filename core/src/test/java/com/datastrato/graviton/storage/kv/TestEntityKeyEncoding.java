@@ -14,7 +14,7 @@ import static com.datastrato.graviton.storage.kv.CustomEntityKeyEncoder.WILD_CAR
 
 import com.datastrato.graviton.Config;
 import com.datastrato.graviton.Configs;
-import com.datastrato.graviton.Entity.EntityIdentifer;
+import com.datastrato.graviton.Entity.EntityIdentifier;
 import com.datastrato.graviton.Entity.EntityType;
 import com.datastrato.graviton.EntitySerDeFactory;
 import com.datastrato.graviton.EntityStore;
@@ -112,7 +112,7 @@ public class TestEntityKeyEncoding {
 
     NameIdentifier mateLakeIdentifier1 = NameIdentifier.of(namespace, "metalake1");
     byte[] realKey =
-        mockEncoder.encode(EntityIdentifer.of(mateLakeIdentifier1, EntityType.METALAKE), true);
+        mockEncoder.encode(EntityIdentifier.of(mateLakeIdentifier1, EntityType.METALAKE), true);
     byte[] expenctKey =
         Bytes.concat(
             EntityType.METALAKE.getShortName().getBytes(),
@@ -133,7 +133,7 @@ public class TestEntityKeyEncoding {
 
     for (int i = 0; i < catalogIdentifiers.length; i++) {
       NameIdentifier identifier = catalogIdentifiers[i];
-      realKey = mockEncoder.encode(EntityIdentifer.of(identifier, EntityType.CATALOG), true);
+      realKey = mockEncoder.encode(EntityIdentifier.of(identifier, EntityType.CATALOG), true);
       expenctKey =
           Bytes.concat(
               EntityType.CATALOG.getShortName().getBytes(),
@@ -159,7 +159,7 @@ public class TestEntityKeyEncoding {
 
     for (int i = 0; i < schemaIdentifiers.length; i++) {
       NameIdentifier identifier = schemaIdentifiers[i];
-      realKey = mockEncoder.encode(EntityIdentifer.of(identifier, EntityType.SCHEMA), true);
+      realKey = mockEncoder.encode(EntityIdentifier.of(identifier, EntityType.SCHEMA), true);
       expenctKey =
           Bytes.concat(
               EntityType.SCHEMA.getShortName().getBytes(),
@@ -187,7 +187,7 @@ public class TestEntityKeyEncoding {
 
     for (int i = 0; i < tableIdentifiers.length; i++) {
       NameIdentifier identifier = tableIdentifiers[i];
-      realKey = mockEncoder.encode(EntityIdentifer.of(identifier, EntityType.TABLE), true);
+      realKey = mockEncoder.encode(EntityIdentifier.of(identifier, EntityType.TABLE), true);
       expenctKey =
           Bytes.concat(
               EntityType.TABLE.getShortName().getBytes(),
@@ -209,7 +209,7 @@ public class TestEntityKeyEncoding {
         UnsupportedOperationException.class,
         () -> {
           mockEncoder.encode(
-              EntityIdentifer.of(
+              EntityIdentifier.of(
                   NameIdentifier.of(
                       Namespace.of("metalake1", "catalog2", "schema3", "table1"), "column1"),
                   EntityType.COLUMN),
@@ -230,7 +230,8 @@ public class TestEntityKeyEncoding {
     Assertions.assertThrows(
         IOException.class,
         () ->
-            mockEncoder.encode(EntityIdentifer.of(mateLakeIdentifier1, EntityType.METALAKE), true));
+            mockEncoder.encode(
+                EntityIdentifier.of(mateLakeIdentifier1, EntityType.METALAKE), true));
   }
 
   @Test
@@ -259,7 +260,7 @@ public class TestEntityKeyEncoding {
 
     NameIdentifier metalakeIdentifier = NameIdentifier.of(namespace, WILD_CARD);
     byte[] realKey =
-        mockEncoder.encode(EntityIdentifer.of(metalakeIdentifier, EntityType.METALAKE), true);
+        mockEncoder.encode(EntityIdentifier.of(metalakeIdentifier, EntityType.METALAKE), true);
     byte[] expenctKey =
         Bytes.concat(EntityType.METALAKE.getShortName().getBytes(), NAMESPACE_SEPARATOR);
     Assertions.assertArrayEquals(expenctKey, realKey);
@@ -268,7 +269,7 @@ public class TestEntityKeyEncoding {
     // metalake1 --> 1000000L
     Namespace catalogNamespace = Namespace.of("metalake1");
     NameIdentifier catalogIdentifier = NameIdentifier.of(catalogNamespace, WILD_CARD);
-    realKey = mockEncoder.encode(EntityIdentifer.of(catalogIdentifier, EntityType.CATALOG), true);
+    realKey = mockEncoder.encode(EntityIdentifier.of(catalogIdentifier, EntityType.CATALOG), true);
     expenctKey =
         Bytes.concat(
             EntityType.CATALOG.getShortName().getBytes(),
@@ -283,7 +284,7 @@ public class TestEntityKeyEncoding {
     // catalog2 --> 0
     Namespace schemaNameSpace = Namespace.of("metalake1", "catalog2");
     NameIdentifier schemaIdentifier = NameIdentifier.of(schemaNameSpace, WILD_CARD);
-    realKey = mockEncoder.encode(EntityIdentifer.of(schemaIdentifier, EntityType.SCHEMA), true);
+    realKey = mockEncoder.encode(EntityIdentifier.of(schemaIdentifier, EntityType.SCHEMA), true);
     expenctKey =
         Bytes.concat(
             EntityType.SCHEMA.getShortName().getBytes(),
@@ -300,7 +301,7 @@ public class TestEntityKeyEncoding {
     // schema3 --> 1
     Namespace tableNameSpace = Namespace.of("metalake1", "catalog2", "schema3");
     NameIdentifier tableIdentifier = NameIdentifier.of(tableNameSpace, WILD_CARD);
-    realKey = mockEncoder.encode(EntityIdentifer.of(tableIdentifier, EntityType.TABLE), true);
+    realKey = mockEncoder.encode(EntityIdentifier.of(tableIdentifier, EntityType.TABLE), true);
     expenctKey =
         Bytes.concat(
             EntityType.TABLE.getShortName().getBytes(),
@@ -320,7 +321,7 @@ public class TestEntityKeyEncoding {
         UnsupportedOperationException.class,
         () -> {
           mockEncoder.encode(
-              EntityIdentifer.of(
+              EntityIdentifier.of(
                   NameIdentifier.of(
                       Namespace.of("metalake1", "catalog2", "schema3", "table1"), WILD_CARD),
                   EntityType.COLUMN),
