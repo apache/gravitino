@@ -61,7 +61,5 @@ message Schema {
   uint64 id = 1;
   uint64 catalog_id = 2;
   string name = 3;
-  optional string comment = 4;
-  map<string, string> properties = 5;
-  AuditInfo audit_info = 6;
+  AuditInfo audit_info = 4;
 }

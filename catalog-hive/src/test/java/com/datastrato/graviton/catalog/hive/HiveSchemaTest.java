@@ -20,7 +20,6 @@ import com.datastrato.graviton.catalog.hive.miniHMS.MiniHiveMetastoreService;
 import com.datastrato.graviton.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.graviton.meta.AuditInfo;
 import com.datastrato.graviton.meta.CatalogEntity;
-import com.datastrato.graviton.meta.rel.BaseSchema;
 import com.datastrato.graviton.rel.Schema;
 import com.datastrato.graviton.rel.SchemaChange;
 import com.google.common.collect.Maps;
@@ -128,7 +127,7 @@ public class HiveSchemaTest extends MiniHiveMetastoreService {
   }
 
   @Test
-  public void testAlterSchema() throws IOException {
+  public void testAlterSchema() {
     HiveCatalog hiveCatalog = initHiveCatalog();
 
     NameIdentifier ident = NameIdentifier.of("metalake", hiveCatalog.name(), genRandomName());
@@ -154,12 +153,6 @@ public class HiveSchemaTest extends MiniHiveMetastoreService {
     Assertions.assertFalse(properties2.containsKey("key1"));
     Assertions.assertEquals("val2-alter", properties2.get("key2"));
 
-    Map<String, String> storeProps =
-        store.get(ident, SCHEMA, BaseSchema.CommonSchema.class).getProperties();
-    Assertions.assertNotNull(storeProps);
-    Assertions.assertFalse(storeProps.containsKey("key1"));
-    Assertions.assertEquals("val2-alter", storeProps.get("key2"));
-
     hiveCatalog
         .asSchemas()
         .alterSchema(
@@ -169,11 +162,6 @@ public class HiveSchemaTest extends MiniHiveMetastoreService {
     Map<String, String> properties3 = hiveCatalog.asSchemas().loadSchema(ident).properties();
     Assertions.assertEquals("val3", properties3.get("key3"));
     Assertions.assertEquals("val4", properties3.get("key4"));
-
-    storeProps = store.get(ident, SCHEMA, BaseSchema.CommonSchema.class).getProperties();
-    Assertions.assertNotNull(storeProps);
-    Assertions.assertEquals("val3", storeProps.get("key3"));
-    Assertions.assertEquals("val4", storeProps.get("key4"));
   }
 
   @Test

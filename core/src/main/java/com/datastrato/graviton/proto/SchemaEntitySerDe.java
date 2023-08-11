@@ -13,9 +13,7 @@ public class SchemaEntitySerDe implements ProtoSerDe<BaseSchema, Schema> {
         .setId(schemaEntity.getId())
         .setCatalogId(schemaEntity.getCatalogId())
         .setName(schemaEntity.name())
-        .setAuditInfo(AuditInfoSerDe.ser(schemaEntity.auditInfo()))
-        .setComment(schemaEntity.getComment())
-        .putAllProperties(schemaEntity.getProperties())
+        .setAuditInfo(new AuditInfoSerDe().serialize(schemaEntity.auditInfo()))
         .build();
   }
 
@@ -25,9 +23,7 @@ public class SchemaEntitySerDe implements ProtoSerDe<BaseSchema, Schema> {
         .withId(p.getId())
         .withCatalogId(p.getCatalogId())
         .withName(p.getName())
-        .withComment(p.getComment())
-        .withProperties(p.getPropertiesMap())
-        .withAuditInfo(AuditInfoSerDe.de(p.getAuditInfo()))
+        .withAuditInfo(new AuditInfoSerDe().deserialize(p.getAuditInfo()))
         .build();
   }
 }
