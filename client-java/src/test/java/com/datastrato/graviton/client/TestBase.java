@@ -7,6 +7,10 @@ package com.datastrato.graviton.client;
 import com.datastrato.graviton.json.JsonUtils;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 import org.apache.hc.core5.http.Method;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -14,6 +18,7 @@ import org.mockserver.integration.ClientAndServer;
 import org.mockserver.matchers.Times;
 import org.mockserver.model.HttpRequest;
 import org.mockserver.model.HttpResponse;
+import org.mockserver.model.Parameter;
 
 public abstract class TestBase {
 
@@ -37,9 +42,20 @@ public abstract class TestBase {
   }
 
   protected static <T, R> void buildMockResource(
-      Method method, String path, T reqBody, R respBody, int statusCode)
+      Method method,
+      String path,
+      Map<String, String> queryParams,
+      T reqBody,
+      R respBody,
+      int statusCode)
       throws JsonProcessingException {
-    HttpRequest mockRequest = HttpRequest.request(path).withMethod(method.name());
+    List<Parameter> parameters =
+        queryParams.entrySet().stream()
+            .map(kv -> new Parameter(kv.getKey(), kv.getValue()))
+            .collect(Collectors.toList());
+
+    HttpRequest mockRequest =
+        HttpRequest.request(path).withMethod(method.name()).withQueryStringParameters(parameters);
     if (reqBody != null) {
       String reqJson = MAPPER.writeValueAsString(reqBody);
       mockRequest = mockRequest.withBody(reqJson);
@@ -54,5 +70,11 @@ public abstract class TestBase {
     // Using Times.exactly(1) will only match once for the request, so we could set difference
     // responses for the same request and path.
     mockServer.when(mockRequest, Times.exactly(1)).respond(mockResponse);
+  }
+
+  protected static <T, R> void buildMockResource(
+      Method method, String path, T reqBody, R respBody, int statusCode)
+      throws JsonProcessingException {
+    buildMockResource(method, path, Collections.emptyMap(), reqBody, respBody, statusCode);
   }
 }

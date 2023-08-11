@@ -46,43 +46,13 @@ public class TestGravitonMetalake extends TestBase {
   public static void setUp() throws Exception {
     TestBase.setUp();
 
-    MetalakeDTO mockMetalake =
-        new MetalakeDTO.Builder()
-            .withName(metalakeName)
-            .withComment("comment")
-            .withAudit(
-                new AuditDTO.Builder().withCreator("creator").withCreateTime(Instant.now()).build())
-            .build();
-    MetalakeCreateRequest req =
-        new MetalakeCreateRequest(metalakeName, "comment", Collections.emptyMap());
-    MetalakeResponse resp = new MetalakeResponse(mockMetalake);
-    buildMockResource(Method.POST, "/api/metalakes", req, resp, HttpStatus.SC_OK);
-
-    metalake =
-        client.createMetalake(
-            NameIdentifier.parse(metalakeName), "comment", Collections.emptyMap());
+    metalake = createMetalake(client, metalakeName);
   }
 
   @Test
   public void testListCatalogs() throws JsonProcessingException {
     String path = "/api/metalakes/" + metalakeName + "/catalogs";
 
-    CatalogDTO mockCatalog =
-        new CatalogDTO.Builder()
-            .withName("mock")
-            .withComment("comment")
-            .withType(Catalog.Type.RELATIONAL)
-            .withAudit(
-                new AuditDTO.Builder().withCreator("creator").withCreateTime(Instant.now()).build())
-            .build();
-    CatalogDTO mockCatalog2 =
-        new CatalogDTO.Builder()
-            .withName("mock2")
-            .withComment("comment")
-            .withType(Catalog.Type.RELATIONAL)
-            .withAudit(
-                new AuditDTO.Builder().withCreator("creator").withCreateTime(Instant.now()).build())
-            .build();
     NameIdentifier ident1 = NameIdentifier.of(metalakeName, "mock");
     NameIdentifier ident2 = NameIdentifier.of(metalakeName, "mock2");
 
@@ -359,5 +329,23 @@ public class TestGravitonMetalake extends TestBase {
     buildMockResource(Method.DELETE, path, null, resp1, HttpStatus.SC_OK);
     boolean dropped1 = metalake.dropCatalog(NameIdentifier.of(metalakeName, catalogName));
     Assertions.assertFalse(dropped1);
+  }
+
+  static GravitonMetaLake createMetalake(GravitonClient client, String metalakeName)
+      throws JsonProcessingException {
+    MetalakeDTO mockMetalake =
+        new MetalakeDTO.Builder()
+            .withName(metalakeName)
+            .withComment("comment")
+            .withAudit(
+                new AuditDTO.Builder().withCreator("creator").withCreateTime(Instant.now()).build())
+            .build();
+    MetalakeCreateRequest req =
+        new MetalakeCreateRequest(metalakeName, "comment", Collections.emptyMap());
+    MetalakeResponse resp = new MetalakeResponse(mockMetalake);
+    buildMockResource(Method.POST, "/api/metalakes", req, resp, HttpStatus.SC_OK);
+
+    return client.createMetalake(
+        NameIdentifier.parse(metalakeName), "comment", Collections.emptyMap());
   }
 }

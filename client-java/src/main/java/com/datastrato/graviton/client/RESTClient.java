@@ -69,8 +69,7 @@ public interface RESTClient extends Closeable {
   }
 
   /**
-   * Perform a DELETE request on the specified path with with given information and no query
-   * parameters.
+   * Perform a DELETE request on the specified path with given information and no query parameters.
    *
    * @param path The path to be requested.
    * @param responseType The class representing the type of the response.
@@ -87,11 +86,23 @@ public interface RESTClient extends Closeable {
     return delete(path, ImmutableMap.of(), responseType, headers.get(), errorHandler);
   }
 
-  <T extends RESTResponse> T delete(
+  /**
+   * Perform a DELETE request on the specified path with given information.
+   *
+   * @param path The path to be requested.
+   * @param responseType The class representing the type of the response.
+   * @param headers The headers to be included in the request.
+   * @param errorHandler The consumer for handling error responses.
+   * @param <T> The type of the response.
+   * @return The response of the DELETE request.
+   */
+  default <T extends RESTResponse> T delete(
       String path,
       Class<T> responseType,
       Map<String, String> headers,
-      Consumer<ErrorResponse> errorHandler);
+      Consumer<ErrorResponse> errorHandler) {
+    return delete(path, ImmutableMap.of(), responseType, headers, errorHandler);
+  }
 
   /**
    * Perform a DELETE request on the specified path with given information.
@@ -103,21 +114,13 @@ public interface RESTClient extends Closeable {
    * @param errorHandler The consumer for handling error responses.
    * @param <T> The type of the response.
    * @return The response of the DELETE request.
-   * @throws UnsupportedOperationException If query parameters are provided, as they are not
-   *     supported for DELETE requests.
    */
-  default <T extends RESTResponse> T delete(
+  <T extends RESTResponse> T delete(
       String path,
       Map<String, String> queryParams,
       Class<T> responseType,
       Map<String, String> headers,
-      Consumer<ErrorResponse> errorHandler) {
-    if (null != queryParams && !queryParams.isEmpty()) {
-      throw new UnsupportedOperationException("Query params are not supported");
-    }
-
-    return delete(path, responseType, headers, errorHandler);
-  }
+      Consumer<ErrorResponse> errorHandler);
 
   /**
    * Perform a GET request on the specified path with given information and no query parameters.

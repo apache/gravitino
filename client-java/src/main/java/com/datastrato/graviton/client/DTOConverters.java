@@ -12,6 +12,10 @@ import com.datastrato.graviton.dto.CatalogDTO;
 import com.datastrato.graviton.dto.MetalakeDTO;
 import com.datastrato.graviton.dto.requests.CatalogUpdateRequest;
 import com.datastrato.graviton.dto.requests.MetalakeUpdateRequest;
+import com.datastrato.graviton.dto.requests.SchemaUpdateRequest;
+import com.datastrato.graviton.dto.requests.TableUpdateRequest;
+import com.datastrato.graviton.rel.SchemaChange;
+import com.datastrato.graviton.rel.TableChange;
 
 class DTOConverters {
   private DTOConverters() {}
@@ -90,6 +94,85 @@ class DTOConverters {
     } else {
       throw new IllegalArgumentException(
           "Unknown change type: " + change.getClass().getSimpleName());
+    }
+  }
+
+  static SchemaUpdateRequest toSchemaUpdateRequest(SchemaChange change) {
+    if (change instanceof SchemaChange.SetProperty) {
+      return new SchemaUpdateRequest.SetSchemaPropertyRequest(
+          ((SchemaChange.SetProperty) change).getProperty(),
+          ((SchemaChange.SetProperty) change).getValue());
+
+    } else if (change instanceof SchemaChange.RemoveProperty) {
+      return new SchemaUpdateRequest.RemoveSchemaPropertyRequest(
+          ((SchemaChange.RemoveProperty) change).getProperty());
+
+    } else {
+      throw new IllegalArgumentException(
+          "Unknown change type: " + change.getClass().getSimpleName());
+    }
+  }
+
+  static TableUpdateRequest toTableUpdateRequest(TableChange change) {
+    if (change instanceof TableChange.RenameTable) {
+      return new TableUpdateRequest.RenameTableRequest(
+          ((TableChange.RenameTable) change).getNewName());
+
+    } else if (change instanceof TableChange.UpdateComment) {
+      return new TableUpdateRequest.UpdateTableCommentRequest(
+          ((TableChange.UpdateComment) change).getNewComment());
+
+    } else if (change instanceof TableChange.SetProperty) {
+      return new TableUpdateRequest.SetTablePropertyRequest(
+          ((TableChange.SetProperty) change).getProperty(),
+          ((TableChange.SetProperty) change).getValue());
+
+    } else if (change instanceof TableChange.RemoveProperty) {
+      return new TableUpdateRequest.RemoveTablePropertyRequest(
+          ((TableChange.RemoveProperty) change).getProperty());
+
+    } else if (change instanceof TableChange.ColumnChange) {
+      return toColumnUpdateRequest((TableChange.ColumnChange) change);
+
+    } else {
+      throw new IllegalArgumentException(
+          "Unknown change type: " + change.getClass().getSimpleName());
+    }
+  }
+
+  private static TableUpdateRequest toColumnUpdateRequest(TableChange.ColumnChange change) {
+    if (change instanceof TableChange.AddColumn) {
+      TableChange.AddColumn addColumn = (TableChange.AddColumn) change;
+      return new TableUpdateRequest.AddTableColumnRequest(
+          addColumn.fieldNames(),
+          addColumn.getDataType(),
+          addColumn.getComment(),
+          addColumn.getPosition());
+
+    } else if (change instanceof TableChange.RenameColumn) {
+      TableChange.RenameColumn renameColumn = (TableChange.RenameColumn) change;
+      return new TableUpdateRequest.RenameTableColumnRequest(
+          renameColumn.fieldNames(), renameColumn.getNewName());
+
+    } else if (change instanceof TableChange.UpdateColumnType) {
+      return new TableUpdateRequest.UpdateTableColumnTypeRequest(
+          change.fieldNames(), ((TableChange.UpdateColumnType) change).getNewDataType());
+
+    } else if (change instanceof TableChange.UpdateColumnComment) {
+      return new TableUpdateRequest.UpdateTableColumnCommentRequest(
+          change.fieldNames(), ((TableChange.UpdateColumnComment) change).getNewComment());
+
+    } else if (change instanceof TableChange.UpdateColumnPosition) {
+      return new TableUpdateRequest.UpdateTableColumnPositionRequest(
+          change.fieldNames(), ((TableChange.UpdateColumnPosition) change).getPosition());
+
+    } else if (change instanceof TableChange.DeleteColumn) {
+      return new TableUpdateRequest.DeleteTableColumnRequest(
+          change.fieldNames(), ((TableChange.DeleteColumn) change).getIfExists());
+
+    } else {
+      throw new IllegalArgumentException(
+          "Unknown column change type: " + change.getClass().getSimpleName());
     }
   }
 }

@@ -410,6 +410,7 @@ public class TestSchemaOperations extends JerseyTest {
 
     DropResponse dropResp2 = resp3.readEntity(DropResponse.class);
     Assertions.assertEquals(0, dropResp2.getCode());
+    Assertions.assertTrue(dropResp2.dropped());
 
     // Test throw RuntimeException
     doThrow(new RuntimeException("mock error")).when(dispatcher).dropSchema(any(), eq(false));
