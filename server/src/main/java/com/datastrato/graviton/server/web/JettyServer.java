@@ -7,6 +7,7 @@ package com.datastrato.graviton.server.web;
 import com.datastrato.graviton.Config;
 import com.datastrato.graviton.server.GravitonServerException;
 import com.datastrato.graviton.server.ServerConfig;
+import com.datastrato.graviton.server.web.rest.ProjectVersion;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.net.BindException;
 import java.util.EnumSet;
@@ -53,12 +54,15 @@ public final class JettyServer {
   public synchronized void initialize(Config config) {
     int coreThreads = config.get(ServerConfig.WEBSERVER_CORE_THREADS);
     int maxThreads = config.get(ServerConfig.WEBSERVER_MAX_THREADS);
-    ExecutorThreadPool threadPool = createThreadPool(coreThreads, maxThreads);
+    long idleTimeout = config.get(ServerConfig.WEBSERVER_STOP_IDLE_TIMEOUT);
+    int threadPoolWorkQueueSize = config.get(ServerConfig.WEBSERVER_THREAD_POOL_WORK_QUEUE_SIZE);
+    ExecutorThreadPool threadPool =
+        createThreadPool(coreThreads, maxThreads, threadPoolWorkQueueSize);
 
     // Create and config Jetty Server
     server = new Server(threadPool);
     server.setStopAtShutdown(true);
-    server.setStopTimeout(config.get(ServerConfig.WEBSERVER_STOP_IDLE_TIMEOUT));
+    server.setStopTimeout(idleTimeout);
 
     // Set error handler for Jetty Server
     ErrorHandler errorHandler = new ErrorHandler();
@@ -146,6 +150,7 @@ public final class JettyServer {
     this.servletContextHandler = new ServletContextHandler();
     servletContextHandler.setContextPath("/");
     servletContextHandler.addServlet(DefaultServlet.class, "/");
+    servletContextHandler.addServlet(ProjectVersion.class, "/version");
 
     HandlerCollection handlers = new HandlerCollection();
     handlers.addHandler(servletContextHandler);
@@ -178,14 +183,15 @@ public final class JettyServer {
     return new ServerConnector(server, null, serverExecutor, null, -1, -1, connectionFactories);
   }
 
-  private ExecutorThreadPool createThreadPool(int coreThreads, int maxThreads) {
+  private ExecutorThreadPool createThreadPool(
+      int coreThreads, int maxThreads, int threadPoolWorkQueueSize) {
     return new ExecutorThreadPool(
         new ThreadPoolExecutor(
             coreThreads,
             maxThreads,
             60,
             TimeUnit.SECONDS,
-            new LinkedBlockingQueue<>(),
+            new LinkedBlockingQueue<>(threadPoolWorkQueueSize),
             new ThreadFactoryBuilder()
                 .setDaemon(true)
                 .setNameFormat("jetty-webserver-%d")

@@ -6,6 +6,8 @@ import com.diffplug.gradle.spotless.SpotlessExtension
 import com.diffplug.gradle.spotless.SpotlessPlugin
 import com.github.vlsi.gradle.dsl.configureEach
 import java.util.Locale
+import org.gradle.internal.hash.ChecksumService
+import org.gradle.kotlin.dsl.support.serviceOf
 
 plugins {
   `maven-publish`
@@ -29,7 +31,7 @@ java {
   }
 }
 
-allprojects {
+subprojects {
   apply(plugin = "jacoco")
 
   repositories {
@@ -42,13 +44,15 @@ allprojects {
     finalizedBy(tasks.getByName("jacocoTestReport"))
   }
 
-    tasks.withType<JacocoReport> {
+  tasks.withType<JacocoReport> {
     reports {
       csv.required.set(true)
       xml.required.set(true)
       html.required.set(true)
     }
   }
+
+  val allDeps by tasks.registering(DependencyReportTask::class)
 
   group = "com.datastrato.graviton"
   version = "${version}"
@@ -132,4 +136,119 @@ tasks.check.get().dependsOn(tasks.rat)
 jacoco {
   toolVersion = "0.8.10"
   reportsDirectory.set(layout.buildDirectory.dir("JacocoReport"))
+}
+
+tasks {
+  val projectDir = layout.projectDirectory
+  val outputDir = projectDir.dir("distribution")
+
+  val compileDistribution by registering {
+    dependsOn("copyRuntimeClass", "copyCatalogRuntimeClass", "copySubmoduleClass")
+
+    group = "graviton distribution"
+    outputs.dir(projectDir.dir("distribution/package"))
+    doLast {
+      copy {
+        from(projectDir.dir("conf")) { into("package/conf") }
+        from(projectDir.dir("bin")) { into("package/bin") }
+        into(outputDir)
+        rename { fileName ->
+          // a simple way is to remove the "-$version" from the jar filename
+          // but you can customize the filename replacement rule as you wish.
+          fileName.replace(".template", "")
+        }
+        fileMode = 0b111101101
+      }
+    }
+  }
+
+  val assembleDistribution by registering(Tar::class) {
+    group = "graviton distribution"
+    finalizedBy("checksumDistribution")
+    from(compileDistribution.map { it.outputs.files.single() })
+    archiveBaseName.set("datastrato")
+    archiveAppendix.set(rootProject.name.lowercase())
+    archiveVersion.set("${version}")
+    archiveClassifier.set("bin")
+    destinationDirectory.set(outputDir)
+  }
+
+  register("checksumDistribution") {
+    group = "graviton distribution"
+    dependsOn(assembleDistribution)
+    val archiveFile = assembleDistribution.flatMap { it.archiveFile }
+    val checksumFile = archiveFile.map { archive ->
+      archive.asFile.let { it.resolveSibling("${it.name}.sha256") }
+    }
+    inputs.file(archiveFile)
+    outputs.file(checksumFile)
+    doLast {
+      checksumFile.get().writeText(
+        serviceOf<ChecksumService>().sha256(archiveFile.get().asFile).toString()
+      )
+    }
+  }
+
+  val cleanDistribution by registering(Delete::class) {
+    group = "graviton distribution"
+    delete(outputDir)
+    delete("/tmp/graviton")
+    delete("server/src/main/resources/project.properties")
+  }
+
+  val copyRuntimeClass by registering(Copy::class) {
+    subprojects.forEach() {
+      if (it.name != "catalog-hive" && it.name != "client-java") {
+        // println("copyRuntimeClass: ${it.name}")
+        from(it.configurations.runtimeClasspath)
+        into("distribution/package/lib")
+      }
+    }
+  }
+
+  val copyCatalogRuntimeClass by registering(Copy::class) {
+    subprojects.forEach() {
+      if (it.name == "catalog-hive") {
+        // println("copyCatalogRuntimeClass: ${it.name}")
+        from(it.configurations.runtimeClasspath)
+        into("distribution/package/catalogs/catalog-hive/lib")
+      }
+    }
+  }
+
+  val copySubmoduleClass by registering(Copy::class) {
+    dependsOn("copyRuntimeClass", "copyCatalogRuntimeClass")
+    subprojects.forEach() {
+      // println("copySubmoduleClass: ${it.name}")
+      if (it.name != "client-java") {
+        from("${it.name}/build/libs")
+        into("distribution/package/lib")
+        include("*.jar")
+        setDuplicatesStrategy(DuplicatesStrategy.INCLUDE)
+      }
+    }
+  }
+
+  // Print all dependencies of all subprojects, `./gradlew allDeps`
+  task("allDeps") {
+    doLast {
+      subprojects.forEach { project ->
+        println("Dependencies for project: ${project.name}")
+        project.configurations.forEach { configuration ->
+          configuration.allDependencies.forEach { dependency ->
+            println("- ${dependency.group}:${dependency.name}:${dependency.version}")
+          }
+        }
+        println()
+      }
+    }
+  }
+
+//  assemble {
+//    finalizedBy(assembleDistribution)
+//  }
+
+  clean {
+    dependsOn(cleanDistribution)
+  }
 }

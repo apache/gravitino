@@ -1,0 +1,37 @@
+#
+# Copyright 2023 Datastrato.
+# This software is licensed under the Apache License version 2.
+#
+
+# THE CONFIGURATION FOR GRAVITON SERVER
+graviton.server.shutdown.timeout = 3000
+
+# THE CONFIGURATION FOR GRAVITON WEB SERVER
+# The host name of the built-in web server
+graviton.server.webserver.host = 127.0.0.1
+# The http port number of the built-in web server
+graviton.server.webserver.httpPort = 8090
+# The core thread size of the built-in web server
+graviton.server.webserver.coreThreads = 24
+# The max thread size of the built-in web server
+graviton.server.webserver.maxThreads = 200
+# The stop idle timeout of the built-in web server
+graviton.server.webserver.stopIdleTimeout = 30000
+# The executor thread pool work queue size of the built-in web server
+graviton.server.webserver.threadPoolWorkQueueSize = 100
+# The request header size of the built-in web server
+graviton.server.webserver.requestHeaderSize = 131072
+# The response header size of the built-in web server
+graviton.server.webserver.responseHeaderSize = 131072
+
+# THE CONFIGURATION FOR GRAVITON ENTITY STORE
+# The entity store to use
+graviton.entity.store = kv
+# The RocksDB entity store
+graviton.entity.store.kv = RocksDBKvBackend
+# The RocksDB backend path for entity store
+graviton.entity.store.kv.rocskdb.path = /tmp/graviton
+
+# THE CONFIGURATION FOR GRAVITON CATALOG
+# The interval in milliseconds to evict the catalog cache
+graviton.catalog.cache.evictionIntervalMs = 3600000

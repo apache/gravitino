@@ -2,6 +2,10 @@
  * Copyright 2023 Datastrato.
  * This software is licensed under the Apache License version 2.
  */
+
+import java.text.SimpleDateFormat
+import java.util.Date
+
 plugins {
   `maven-publish`
   id("java")
@@ -42,4 +46,29 @@ dependencies {
     exclude(group = "org.junit.jupiter")
   }
   testImplementation(libs.mockito.core)
+}
+
+tasks.register("writeProjectPropertiesFile") {
+  val propertiesFile = file("src/main/resources/project.properties")
+  val dateFormat = SimpleDateFormat("dd/MM/yyyy HH:mm:ss")
+
+  doLast {
+    val compileDate = dateFormat.format(Date())
+    val projectVersion = project.version.toString()
+
+    propertiesFile.parentFile.mkdirs()
+    propertiesFile.createNewFile()
+    propertiesFile.writer().use { writer ->
+      writer.write("#\n" +
+              "# Copyright 2023 Datastrato.\n" +
+              "# This software is licensed under the Apache License version 2.\n" +
+              "#\n")
+      writer.write("compileDate=$compileDate\n")
+      writer.write("version=$projectVersion")
+    }
+  }
+}
+
+tasks.named("build") {
+  dependsOn("writeProjectPropertiesFile")
 }
