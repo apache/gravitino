@@ -4,11 +4,27 @@
  */
 package com.datastrato.graviton;
 
+/**
+ * Exception class indicating that an entity already exists. This exception is thrown when an
+ * attempt is made to create an entity that already exists within the Graviton framework.
+ */
 public class EntityAlreadyExistsException extends RuntimeException {
+
+  /**
+   * Constructs an EntityAlreadyExistsException.
+   *
+   * @param message The detail message explaining the exception.
+   */
   public EntityAlreadyExistsException(String message) {
     super(message);
   }
 
+  /**
+   * Constructs an EntityAlreadyExistsException.
+   *
+   * @param message The detail message explaining the exception.
+   * @param cause The cause of the exception.
+   */
   public EntityAlreadyExistsException(String message, Throwable cause) {
     super(message, cause);
   }

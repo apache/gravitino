@@ -21,16 +21,28 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/** Manages Metalakes within the Graviton system. */
 public class MetalakeManager implements SupportsMetalakes {
 
   private static final Logger LOG = LoggerFactory.getLogger(MetalakeManager.class);
 
   private final EntityStore store;
 
+  /**
+   * Constructs a MetalakeManager instance.
+   *
+   * @param store The EntityStore to use for managing Metalakes.
+   */
   public MetalakeManager(EntityStore store) {
     this.store = store;
   }
 
+  /**
+   * Lists all available Metalakes.
+   *
+   * @return An array of Metalake instances representing the available Metalakes.
+   * @throws RuntimeException If listing Metalakes encounters storage issues.
+   */
   @Override
   public BaseMetalake[] listMetalakes() {
     try {
@@ -38,11 +50,19 @@ public class MetalakeManager implements SupportsMetalakes {
           .list(Namespace.empty(), BaseMetalake.class, EntityType.METALAKE)
           .toArray(new BaseMetalake[0]);
     } catch (IOException ioe) {
-      LOG.error("Failed to list metalakes due to storage issues", ioe);
+      LOG.error("Listing Metalakes failed due to storage issues.", ioe);
       throw new RuntimeException(ioe);
     }
   }
 
+  /**
+   * Loads a Metalake.
+   *
+   * @param ident The identifier of the Metalake to load.
+   * @return The loaded Metalake instance.
+   * @throws NoSuchMetalakeException If the Metalake with the given identifier does not exist.
+   * @throws RuntimeException If loading the Metalake encounters storage issues.
+   */
   @Override
   public BaseMetalake loadMetalake(NameIdentifier ident) throws NoSuchMetalakeException {
     try {
@@ -51,25 +71,35 @@ public class MetalakeManager implements SupportsMetalakes {
       LOG.warn("Metalake {} does not exist", ident, e);
       throw new NoSuchMetalakeException("Metalake " + ident + " does not exist");
     } catch (IOException ioe) {
-      LOG.error("Failed to load metalake {} due to storage issues", ident, ioe);
+      LOG.error("Loading Metalake {} failed due to storage issues", ident, ioe);
       throw new RuntimeException(ioe);
     }
   }
 
+  /**
+   * Creates a new Metalake.
+   *
+   * @param ident The identifier of the new Metalake.
+   * @param comment A comment or description for the Metalake.
+   * @param properties Additional properties for the Metalake.
+   * @return The created Metalake instance.
+   * @throws MetalakeAlreadyExistsException If a Metalake with the same identifier already exists.
+   * @throws RuntimeException If creating the Metalake encounters storage issues.
+   */
   @Override
   public BaseMetalake createMetalake(
       NameIdentifier ident, String comment, Map<String, String> properties)
       throws MetalakeAlreadyExistsException {
     BaseMetalake metalake =
         new BaseMetalake.Builder()
-            .withId(1L /* TODO. use ID generator */)
+            .withId(1L /* TODO: Use ID generator */)
             .withName(ident.name())
             .withComment(comment)
             .withProperties(properties)
             .withVersion(SchemaVersion.V_0_1)
             .withAuditInfo(
                 new AuditInfo.Builder()
-                    .withCreator("graviton") /*TODO. we should real user later on*/
+                    .withCreator("graviton") /*TODO: Use real user later on.  */
                     .withCreateTime(Instant.now())
                     .build())
             .build();
@@ -81,11 +111,21 @@ public class MetalakeManager implements SupportsMetalakes {
       LOG.warn("Metalake {} already exists", ident, e);
       throw new MetalakeAlreadyExistsException("Metalake " + ident + " already exists");
     } catch (IOException ioe) {
-      LOG.error("Failed to create metalake {} due to storage issues", ident, ioe);
+      LOG.error("Loading Metalake {} failed due to storage issues", ident, ioe);
       throw new RuntimeException(ioe);
     }
   }
 
+  /**
+   * Alters a Metalake by applying specified changes.
+   *
+   * @param ident The identifier of the Metalake to be altered.
+   * @param changes The array of MetalakeChange objects representing the changes to apply.
+   * @return The altered Metalake instance after applying the changes.
+   * @throws NoSuchMetalakeException If the Metalake with the given identifier does not exist.
+   * @throws IllegalArgumentException If the provided changes are invalid.
+   * @throws RuntimeException If altering the Metalake encounters storage issues.
+   */
   @Override
   public BaseMetalake alterMetalake(NameIdentifier ident, MetalakeChange... changes)
       throws NoSuchMetalakeException, IllegalArgumentException {
@@ -108,7 +148,7 @@ public class MetalakeManager implements SupportsMetalakes {
                     .withCreator(metalake.auditInfo().creator())
                     .withCreateTime(metalake.auditInfo().createTime())
                     .withLastModifier(
-                        metalake.auditInfo().creator()) /*TODO. we should real user later on*/
+                        metalake.auditInfo().creator()) /*TODO: Use real user later on.  */
                     .withLastModifiedTime(Instant.now())
                     .build();
             builder.withAuditInfo(newInfo);
@@ -127,25 +167,41 @@ public class MetalakeManager implements SupportsMetalakes {
       throw new NoSuchMetalakeException("Metalake " + ident + " does not exist");
 
     } catch (IllegalArgumentException iae) {
-      LOG.warn("Failed to alter metalake {} due to invalid changes", ident, iae);
+      LOG.warn("Altering Metalake {} failed due to invalid changes", ident, iae);
       throw iae;
 
     } catch (IOException ioe) {
-      LOG.error("Failed to alter metalake {} due to storage issues", ident, ioe);
+      LOG.error("Loading Metalake {} failed due to storage issues", ident, ioe);
       throw new RuntimeException(ioe);
     }
   }
 
+  /**
+   * Deletes a Metalake.
+   *
+   * @param ident The identifier of the Metalake to be deleted.
+   * @return `true` if the Metalake was successfully deleted, `false` otherwise.
+   * @throws RuntimeException If deleting the Metalake encounters storage issues.
+   */
   @Override
   public boolean dropMetalake(NameIdentifier ident) {
     try {
       return store.delete(ident, EntityType.METALAKE);
     } catch (IOException ioe) {
-      LOG.error("Failed to delete metalake {} due to storage issues", ident, ioe);
+      LOG.error("Deletinf metalake {} failed due to storage issues", ident, ioe);
       throw new RuntimeException(ioe);
     }
   }
 
+  /**
+   * Updates an entity with the provided changes.
+   *
+   * @param builder The builder for the entity.
+   * @param newProps The new properties to apply.
+   * @param changes The changes to apply.
+   * @return The updated entity builder.
+   * @throws IllegalArgumentException If an unknown MetalakeChange is encountered.
+   */
   private BaseMetalake.Builder updateEntity(
       BaseMetalake.Builder builder, Map<String, String> newProps, MetalakeChange... changes) {
     for (MetalakeChange change : changes) {
@@ -167,7 +223,7 @@ public class MetalakeManager implements SupportsMetalakes {
         newProps.remove(removeProperty.getProperty());
 
       } else {
-        throw new IllegalArgumentException("Unknown metalake change: " + change);
+        throw new IllegalArgumentException("Unknown metalake change type: " + change);
       }
     }
 

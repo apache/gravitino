@@ -2,6 +2,7 @@
  * Copyright 2023 Datastrato.
  * This software is licensed under the Apache License version 2.
  */
+
 package com.datastrato.graviton.meta;
 
 import com.datastrato.graviton.Audit;
@@ -16,19 +17,21 @@ import javax.annotation.Nullable;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
 
+/** Audit information associated with an entity. */
 @EqualsAndHashCode
 @ToString
 public final class AuditInfo implements Audit, Entity {
+
   public static final Field CREATOR =
-      Field.required("creator", String.class, "The name of user who creates the entity");
+      Field.required("creator", String.class, "The name of the user who created the entity");
   public static final Field CREATE_TIME =
-      Field.required("create_time", Instant.class, "The time when the entity is created");
+      Field.required("create_time", Instant.class, "The time when the entity was created");
   public static final Field LAST_MODIFIER =
       Field.optional(
-          "last_modifier", String.class, "The name of user who last modifies the entity");
+          "last_modifier", String.class, "The name of the user who last modified the entity");
   public static final Field LAST_MODIFIED_TIME =
       Field.optional(
-          "last_modified_time", Instant.class, "The time when the entity is last modified");
+          "last_modified_time", Instant.class, "The time when the entity was last modified");
 
   private String creator;
 
@@ -40,6 +43,11 @@ public final class AuditInfo implements Audit, Entity {
 
   private AuditInfo() {}
 
+  /**
+   * Validates the audit information.
+   *
+   * @throws IllegalArgumentException If the validation fails.
+   */
   @Override
   public void validate() throws IllegalArgumentException {
     CREATOR.validate(creator);
@@ -48,9 +56,14 @@ public final class AuditInfo implements Audit, Entity {
     Preconditions.checkArgument(
         lastModifier == null && lastModifiedTime == null
             || lastModifier != null && lastModifiedTime != null,
-        "last_modifier and last_modified_time must be both set or both not set");
+        "last_modifier and last_modified_time must be both set or both left unset");
   }
 
+  /**
+   * Retrieves a map of fields.
+   *
+   * @return An unmodifiable map containing the entity's fields and values.
+   */
   @Override
   public Map<Field, Object> fields() {
     Map<Field, Object> fields = new HashMap<>();
@@ -62,58 +75,114 @@ public final class AuditInfo implements Audit, Entity {
     return Collections.unmodifiableMap(fields);
   }
 
+  /**
+   * Retrieves the creator's name.
+   *
+   * @return The name of the creator.
+   */
   @Override
   public String creator() {
     return creator;
   }
 
+  /**
+   * Retrieves the creation time.
+   *
+   * @return the creation time as an {@link Instant}.
+   */
   @Override
   public Instant createTime() {
     return createTime;
   }
 
+  /**
+   * Retrieves the last modifier's name.
+   *
+   * @return the name of the last modifier, or null if not set.
+   */
   @Override
   public String lastModifier() {
     return lastModifier;
   }
 
+  /**
+   * Retrieves the last modified time.
+   *
+   * @return the last modified time as an {@link Instant}, or null if not set.
+   */
   @Override
   public Instant lastModifiedTime() {
     return lastModifiedTime;
   }
 
+  /**
+   * Retrieves the type of the entity.
+   *
+   * @return the {@link EntityType#AUDIT} value.
+   */
   @Override
   public EntityType type() {
     return EntityType.AUDIT;
   }
 
+  /** Builder class for creating instances of {@link AuditInfo}. */
   public static class Builder {
     private AuditInfo auditInfo;
 
+    /** Constructs a new {@link Builder}. */
     public Builder() {
       this.auditInfo = new AuditInfo();
     }
 
+    /**
+     * Sets the creator's name.
+     *
+     * @param creator the name of the creator.
+     * @return the builder instance.
+     */
     public Builder withCreator(String creator) {
       this.auditInfo.creator = creator;
       return this;
     }
 
+    /**
+     * Sets the creation time.
+     *
+     * @param createTime the creation time as an {@link Instant}.
+     * @return the builder instance.
+     */
     public Builder withCreateTime(Instant createTime) {
       this.auditInfo.createTime = createTime;
       return this;
     }
 
+    /**
+     * Sets the modifier's name.
+     *
+     * @param lastModifier the name of the modifier.
+     * @return the builder instance.
+     */
     public Builder withLastModifier(String lastModifier) {
       this.auditInfo.lastModifier = lastModifier;
       return this;
     }
 
+    /**
+     * Sets the last modified time.
+     *
+     * @param lastModifiedTime the last modified time as an {@link Instant}.
+     * @return the builder instance.
+     */
     public Builder withLastModifiedTime(Instant lastModifiedTime) {
       this.auditInfo.lastModifiedTime = lastModifiedTime;
       return this;
     }
 
+    /**
+     * Builds the {@link AuditInfo} instance after validation.
+     *
+     * @return the constructed and validated {@link AuditInfo} instance.
+     */
     public AuditInfo build() {
       auditInfo.validate();
       return auditInfo;
