@@ -32,3 +32,6 @@ gen
 *.iml
 out/**
 *.iws
+
+distribution
+server/src/main/resources/project.properties
