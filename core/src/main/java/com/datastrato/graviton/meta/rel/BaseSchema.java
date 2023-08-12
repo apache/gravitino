@@ -22,7 +22,7 @@ import lombok.ToString;
 /** An abstract class representing a base schema in a relational database. */
 @EqualsAndHashCode
 @ToString
-public abstract class BaseSchema implements Schema, Entity, HasIdentifier {
+public class BaseSchema implements Schema, Entity, HasIdentifier {
 
   public static final Field ID = Field.required("id", Long.class, "The schema's unique identifier");
   public static final Field CATALOG_ID =
@@ -271,23 +271,19 @@ public abstract class BaseSchema implements Schema, Entity, HasIdentifier {
     protected abstract T internalBuild();
   }
 
-  // For Serde only, ignore namespace
-  public static class CommonSchema extends BaseSchema {}
-
-  public static class CommonSchemaBuilder
-      extends BaseSchemaBuilder<CommonSchemaBuilder, CommonSchema> {
+  public static class SchemaBuilder extends BaseSchemaBuilder<SchemaBuilder, BaseSchema> {
 
     @Override
-    protected CommonSchema internalBuild() {
-      CommonSchema commonSchema = new CommonSchema();
-      commonSchema.id = id;
-      commonSchema.catalogId = catalogId;
-      commonSchema.name = name;
-      commonSchema.comment = comment;
-      commonSchema.properties = properties;
-      commonSchema.auditInfo = auditInfo;
+    protected BaseSchema internalBuild() {
+      BaseSchema baseSchema = new BaseSchema();
+      baseSchema.id = id;
+      baseSchema.catalogId = catalogId;
+      baseSchema.name = name;
+      baseSchema.comment = comment;
+      baseSchema.properties = properties;
+      baseSchema.auditInfo = auditInfo;
 
-      return commonSchema;
+      return baseSchema;
     }
   }
 }

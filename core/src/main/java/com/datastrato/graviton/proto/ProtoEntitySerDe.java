@@ -25,8 +25,6 @@ public class ProtoEntitySerDe implements EntitySerDe {
           "com.datastrato.graviton.proto.BaseMetalakeSerDe",
           "com.datastrato.graviton.meta.CatalogEntity",
           "com.datastrato.graviton.proto.CatalogEntitySerDe",
-          "com.datastrato.graviton.meta.rel.BaseSchema.CommonSchema",
-          "com.datastrato.graviton.proto.SchemaEntitySerDe",
           "com.datastrato.graviton.catalog.hive.HiveSchema",
           "com.datastrato.graviton.proto.SchemaEntitySerDe");
 
@@ -38,8 +36,6 @@ public class ProtoEntitySerDe implements EntitySerDe {
           "com.datastrato.graviton.proto.Metalake",
           "com.datastrato.graviton.meta.CatalogEntity",
           "com.datastrato.graviton.proto.Catalog",
-          "com.datastrato.graviton.meta.rel.BaseSchema.CommonSchema",
-          "com.datastrato.graviton.proto.Schema",
           "com.datastrato.graviton.catalog.hive.HiveSchema",
           "com.datastrato.graviton.proto.Schema");
 

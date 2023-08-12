@@ -19,7 +19,7 @@ public class SchemaEntitySerDe implements ProtoSerDe<BaseSchema, Schema> {
 
   @Override
   public BaseSchema deserialize(Schema p) {
-    return new BaseSchema.CommonSchemaBuilder()
+    return new BaseSchema.SchemaBuilder()
         .withId(p.getId())
         .withCatalogId(p.getCatalogId())
         .withName(p.getName())
