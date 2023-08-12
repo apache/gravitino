@@ -5,6 +5,7 @@
 package com.datastrato.graviton.catalog.hive;
 
 import static com.datastrato.graviton.Entity.EntityType.SCHEMA;
+import static com.datastrato.graviton.Entity.EntityType.TABLE;
 import static com.datastrato.graviton.catalog.hive.HiveTable.HMS_TABLE_COMMENT;
 import static com.datastrato.graviton.catalog.hive.HiveTable.SUPPORT_TABLE_TYPES;
 
@@ -389,9 +390,9 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     }
 
     EntityStore store = GravitonEnv.getInstance().entityStore();
+    Namespace schemaNamespace =
+        Namespace.of(ArrayUtils.add(ident.namespace().levels(), ident.name()));
     if (!cascade) {
-      Namespace schemaNamespace =
-          Namespace.of(ArrayUtils.add(ident.namespace().levels(), ident.name()));
       if (listTables(schemaNamespace).length > 0) {
         throw new NonEmptySchemaException(
             String.format(
@@ -406,6 +407,13 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       store.executeInTransaction(
           () -> {
             store.delete(ident, SCHEMA);
+            for (BaseTable t :
+                store.list(
+                    Namespace.of(ArrayUtils.add(ident.namespace().levels(), ident.name())),
+                    HiveTable.class,
+                    TABLE)) {
+              store.delete(NameIdentifier.of(schemaNamespace, t.name()), TABLE);
+            }
             clientPool.run(
                 client -> {
                   client.dropDatabase(ident.name(), false, false, cascade);
