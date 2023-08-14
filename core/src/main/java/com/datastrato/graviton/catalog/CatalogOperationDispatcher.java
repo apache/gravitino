@@ -30,10 +30,23 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
 
   private final CatalogManager catalogManager;
 
+  /**
+   * Creates a new CatalogOperationDispatcher instance.
+   *
+   * @param catalogManager The CatalogManager instance to be used for catalog operations.
+   */
   public CatalogOperationDispatcher(CatalogManager catalogManager) {
     this.catalogManager = catalogManager;
   }
 
+  /**
+   * Lists the schemas within the specified namespace.
+   *
+   * @param namespace The namespace in which to list schemas.
+   * @return An array of NameIdentifier objects representing the schemas within the specified
+   *     namespace.
+   * @throws NoSuchCatalogException If the catalog namespace does not exist.
+   */
   @Override
   public NameIdentifier[] listSchemas(Namespace namespace) throws NoSuchCatalogException {
     NameIdentifier catalogIdent = NameIdentifier.of(namespace.levels());
@@ -44,6 +57,17 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
         NoSuchCatalogException.class);
   }
 
+  /**
+   * Creates a new schema.
+   *
+   * @param ident The identifier for the schema to be created.
+   * @param comment The comment for the new schema.
+   * @param metadata Additional metadata for the new schema.
+   * @return The created Schema object.
+   * @throws NoSuchCatalogException If the catalog corresponding to the provided identifier does not
+   *     exist.
+   * @throws SchemaAlreadyExistsException If a schema with the same identifier already exists.
+   */
   @Override
   public Schema createSchema(NameIdentifier ident, String comment, Map<String, String> metadata)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
@@ -56,6 +80,13 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
         SchemaAlreadyExistsException.class);
   }
 
+  /**
+   * Loads and retrieves a schema.
+   *
+   * @param ident The identifier of the schema to be loaded.
+   * @return The loaded Schema object.
+   * @throws NoSuchSchemaException If the schema does not exist.
+   */
   @Override
   public Schema loadSchema(NameIdentifier ident) throws NoSuchSchemaException {
     NameIdentifier catalogIdent = NameIdentifier.of(ident.namespace().levels());
@@ -66,6 +97,15 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
         NoSuchSchemaException.class);
   }
 
+  /**
+   * Alters the schema by applying the provided schema changes.
+   *
+   * @param ident The identifier of the schema to be altered.
+   * @param changes The array of SchemaChange objects representing the alterations to apply.
+   * @return The altered Schema object.
+   * @throws NoSuchSchemaException If the schema corresponding to the provided identifier does not
+   *     exist.
+   */
   @Override
   public Schema alterSchema(NameIdentifier ident, SchemaChange... changes)
       throws NoSuchSchemaException {
@@ -77,6 +117,14 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
         NoSuchSchemaException.class);
   }
 
+  /**
+   * Drops a schema.
+   *
+   * @param ident The identifier of the schema to be dropped.
+   * @param cascade If true, drops all tables within the schema as well.
+   * @return True if the schema was successfully dropped, false otherwise.
+   * @throws NonEmptySchemaException If the schema contains tables and cascade is set to false.
+   */
   @Override
   public boolean dropSchema(NameIdentifier ident, boolean cascade) throws NonEmptySchemaException {
     NameIdentifier catalogIdent = NameIdentifier.of(ident.namespace().levels());
@@ -87,6 +135,14 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
         NonEmptySchemaException.class);
   }
 
+  /**
+   * Lists the tables within a schema.
+   *
+   * @param namespace The namespace of the schema containing the tables.
+   * @return An array of {@link NameIdentifier} objects representing the identifiers of the tables
+   *     in the schema.
+   * @throws NoSuchSchemaException If the specified schema does not exist.
+   */
   @Override
   public NameIdentifier[] listTables(Namespace namespace) throws NoSuchSchemaException {
     NameIdentifier catalogIdent = NameIdentifier.of(namespace.levels());
@@ -97,6 +153,13 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
         NoSuchSchemaException.class);
   }
 
+  /**
+   * Loads a table.
+   *
+   * @param ident The identifier of the table to load.
+   * @return The loaded {@link Table} object representing the requested table.
+   * @throws NoSuchTableException If the specified table does not exist.
+   */
   @Override
   public Table loadTable(NameIdentifier ident) throws NoSuchTableException {
     NameIdentifier catalogIdent = NameIdentifier.of(ident.namespace().levels());
@@ -105,6 +168,17 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
         catalogIdent, c -> c.doWithTableOps(t -> t.loadTable(ident)), NoSuchTableException.class);
   }
 
+  /**
+   * Creates a new table in a schema.
+   *
+   * @param ident The identifier of the table to create.
+   * @param columns An array of {@link Column} objects representing the columns of the table.
+   * @param comment A description or comment associated with the table.
+   * @param properties Additional properties to set for the table.
+   * @return The newly created {@link Table} object.
+   * @throws NoSuchSchemaException If the schema in which to create the table does not exist.
+   * @throws TableAlreadyExistsException If a table with the same name already exists in the schema.
+   */
   @Override
   public Table createTable(
       NameIdentifier ident, Column[] columns, String comment, Map<String, String> properties)
@@ -118,6 +192,16 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
         TableAlreadyExistsException.class);
   }
 
+  /**
+   * Alters an existing table.
+   *
+   * @param ident The identifier of the table to alter.
+   * @param changes An array of {@link TableChange} objects representing the changes to apply to the
+   *     table.
+   * @return The altered {@link Table} object after applying the changes.
+   * @throws NoSuchTableException If the table to alter does not exist.
+   * @throws IllegalArgumentException If an unsupported or invalid change is specified.
+   */
   @Override
   public Table alterTable(NameIdentifier ident, TableChange... changes)
       throws NoSuchTableException, IllegalArgumentException {
@@ -130,6 +214,14 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
         IllegalArgumentException.class);
   }
 
+  /**
+   * Drops a table from the catalog.
+   *
+   * @param ident The identifier of the table to drop.
+   * @return {@code true} if the table was successfully dropped, {@code false} if the table does not
+   *     exist.
+   * @throws NoSuchTableException If the table to drop does not exist.
+   */
   @Override
   public boolean dropTable(NameIdentifier ident) {
     NameIdentifier catalogIdent = NameIdentifier.of(ident.namespace().levels());

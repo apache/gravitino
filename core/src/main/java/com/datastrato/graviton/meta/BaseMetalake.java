@@ -19,21 +19,24 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
 
+/** Base implementation of a Metalake entity. */
 @EqualsAndHashCode
 @ToString
 public class BaseMetalake implements Metalake, Entity, Auditable, HasIdentifier {
 
   public static final Field ID =
-      Field.required("id", Long.class, "The unique identifier of the metalake");
-  public static final Field NAME = Field.required("name", String.class, "The name of the metalake");
+      Field.required("id", Long.class, "The metalake's unique identifier");
+  public static final Field NAME = Field.required("name", String.class, "The metalake's name");
   public static final Field COMMENT =
-      Field.optional("comment", String.class, "The comment of the metalake");
+      Field.optional("comment", String.class, "The metalake's comment or description");
   public static final Field PROPERTIES =
-      Field.optional("properties", Map.class, "The properties of the metalake");
+      Field.optional("properties", Map.class, "The properties associated with the metalake");
   public static final Field AUDIT_INFO =
-      Field.required("audit_info", AuditInfo.class, "The audit info of the metalake");
+      Field.required("audit_info", AuditInfo.class, "The audit details of the metalake");
+
+  /** The required field for the schema version of the metalake. */
   public static final Field SCHEMA_VERSION =
-      Field.required("version", SchemaVersion.class, "The schema version of the metalake");
+      Field.required("version", SchemaVersion.class, "The version of the schema for the metalake");
 
   @Getter private Long id;
 
@@ -49,6 +52,11 @@ public class BaseMetalake implements Metalake, Entity, Auditable, HasIdentifier 
 
   private BaseMetalake() {}
 
+  /**
+   * A map of fields and their corresponding values.
+   *
+   * @return An unmodifiable map containing the entity's fields and values.
+   */
   @Override
   public Map<Field, Object> fields() {
     Map<Field, Object> fields = new HashMap<>();
@@ -62,26 +70,51 @@ public class BaseMetalake implements Metalake, Entity, Auditable, HasIdentifier 
     return Collections.unmodifiableMap(fields);
   }
 
+  /**
+   * The audit information of the metalake.
+   *
+   * @return The audit information as an {@link Audit} instance.
+   */
   @Override
   public Audit auditInfo() {
     return auditInfo;
   }
 
+  /**
+   * The name of the metalake.
+   *
+   * @return The name of the metalake.
+   */
   @Override
   public String name() {
     return name;
   }
 
+  /**
+   * The comment of the metalake.
+   *
+   * @return The comment of the metalake, or null if not set.
+   */
   @Override
   public String comment() {
     return comment;
   }
 
+  /**
+   * Retrieves the type of the entity.
+   *
+   * @return the {@link EntityType#METALAKE} value.
+   */
   @Override
   public EntityType type() {
     return EntityType.METALAKE;
   }
 
+  /**
+   * Retrieves the properties of the metalake.
+   *
+   * @return the properties as a map of key-value pairs.
+   */
   @Override
   public Map<String, String> properties() {
     return properties;
@@ -93,18 +126,32 @@ public class BaseMetalake implements Metalake, Entity, Auditable, HasIdentifier 
     return new byte[0];
   }
 
+  /** Builder class for creating instances of {@link BaseMetalake}. */
   public static class Builder {
     private final BaseMetalake metalake;
 
+    /** Constructs a new {@link Builder}. */
     public Builder() {
       metalake = new BaseMetalake();
     }
 
+    /**
+     * Sets the unique identifier of the metalake.
+     *
+     * @param id the unique identifier of the metalake.
+     * @return the builder instance.
+     */
     public Builder withId(Long id) {
       metalake.id = id;
       return this;
     }
 
+    /**
+     * Sets the name of the metalake.
+     *
+     * @param name the name of the metalake.
+     * @return the builder instance.
+     */
     public Builder withName(String name) {
       metalake.name = name;
       try {
@@ -116,26 +163,55 @@ public class BaseMetalake implements Metalake, Entity, Auditable, HasIdentifier 
       return this;
     }
 
+    /**
+     * Sets the comment of the metalake.
+     *
+     * @param comment the comment of the metalake.
+     * @return the builder instance.
+     */
     public Builder withComment(String comment) {
       metalake.comment = comment;
       return this;
     }
 
+    /**
+     * Sets the properties of the metalake.
+     *
+     * @param properties the properties as a map of key-value pairs.
+     * @return the builder instance.
+     */
     public Builder withProperties(Map<String, String> properties) {
       metalake.properties = properties;
       return this;
     }
 
+    /**
+     * Sets the audit information of the metalake.
+     *
+     * @param auditInfo the audit information as an {@link AuditInfo} instance.
+     * @return the builder instance.
+     */
     public Builder withAuditInfo(AuditInfo auditInfo) {
       metalake.auditInfo = auditInfo;
       return this;
     }
 
+    /**
+     * Sets the schema version of the metalake.
+     *
+     * @param version the schema version as a {@link SchemaVersion} instance.
+     * @return the builder instance.
+     */
     public Builder withVersion(SchemaVersion version) {
       metalake.version = version;
       return this;
     }
 
+    /**
+     * Builds the {@link BaseMetalake} instance after validation.
+     *
+     * @return the constructed and validated {@link BaseMetalake} instance.
+     */
     public BaseMetalake build() {
       metalake.validate();
       return metalake;

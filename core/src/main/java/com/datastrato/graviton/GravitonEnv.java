@@ -14,6 +14,9 @@ import lombok.Getter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/*
+ * This class manages the Graviton environment.
+ */
 public class GravitonEnv {
 
   private static final Logger LOG = LoggerFactory.getLogger(GravitonEnv.class);
@@ -40,10 +43,20 @@ public class GravitonEnv {
     private static final GravitonEnv INSTANCE = new GravitonEnv();
   }
 
+  /**
+   * Get the singleton instance of the GravitonEnv.
+   *
+   * @return The singleton instance of the GravitonEnv.
+   */
   public static GravitonEnv getInstance() {
     return InstanceHolder.INSTANCE;
   }
 
+  /**
+   * Initialize the Graviton environment.
+   *
+   * @param config The configuration object to initialize the environment.
+   */
   public void initialize(Config config) {
     LOG.info("Initializing Graviton Environment...");
 
@@ -67,30 +80,61 @@ public class GravitonEnv {
     LOG.info("Graviton Environment is initialized.");
   }
 
+  /**
+   * Get the configuration object associated with the Graviton environment.
+   *
+   * @return The configuration object.
+   */
   public Config config() {
     return config;
   }
 
+  /**
+   * Get the EntitySerDe associated with the Graviton environment.
+   *
+   * @return The EntitySerDe instance.
+   */
   public EntitySerDe entitySerDe() {
     return entitySerDe;
   }
 
+  /**
+   * Get the EntityStore associated with the Graviton environment.
+   *
+   * @return The EntityStore instance.
+   */
   public EntityStore entityStore() {
     return entityStore;
   }
 
+  /**
+   * Get the CatalogManager associated with the Graviton environment.
+   *
+   * @return The CatalogManager instance.
+   */
   public CatalogManager catalogManager() {
     return catalogManager;
   }
 
+  /**
+   * Get the CatalogOperationDispatcher associated with the Graviton environment.
+   *
+   * @return The CatalogOperationDispatcher instance.
+   */
   public CatalogOperationDispatcher catalogOperationDispatcher() {
     return catalogOperationDispatcher;
   }
 
+  /**
+   * Get the MetalakeManager associated with the Graviton environment.
+   *
+   * @return The MetalakeManager instance.
+   */
   public MetalakeManager metalakesManager() {
     return metalakeManager;
   }
 
+  /** Shutdown the Graviton environment. */
   public void shutdown() {
     LOG.info("Shutting down Graviton Environment...");
 

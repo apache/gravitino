@@ -9,7 +9,7 @@ import static com.datastrato.graviton.Entity.EntityType.METALAKE;
 import static com.datastrato.graviton.Entity.EntityType.SCHEMA;
 import static com.datastrato.graviton.Entity.EntityType.TABLE;
 
-import com.datastrato.graviton.Entity.EntityIdentifer;
+import com.datastrato.graviton.Entity.EntityIdentifier;
 import com.datastrato.graviton.Entity.EntityType;
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.NoSuchEntityException;
@@ -53,14 +53,6 @@ public class CustomEntityKeyEncoder implements EntityKeyEncoder {
   // TODO(yuqi) should be configuratable;
   private static final NameMappingService NAME_MAPPING_SERVICE =
       InMemoryNameMappingService.INSTANCE;
-
-  @Override
-  public byte[] encode(NameIdentifier identifier, EntityType type, boolean createIdIfNotExists)
-      throws IOException {
-    // TODO(yuqi)
-    // Using NAME_MAPPING_SERVICE to implement EntityKeyEncoder without using KvBackend directly.
-    return new byte[0];
-  }
 
   // name prefix of name in name to id mapping,
   // e.g., name_metalake1 -> 1
@@ -158,7 +150,7 @@ public class CustomEntityKeyEncoder implements EntityKeyEncoder {
    * @param entityIdentifier the entity identifier to encode
    * @return the encoded key for key-value storage
    */
-  private byte[] encodeEntity(EntityIdentifer entityIdentifier, boolean createIdIfNotExists)
+  private byte[] encodeEntity(EntityIdentifier entityIdentifier, boolean createIdIfNotExists)
       throws IOException {
     EntityType entityType = entityIdentifier.getEntityType();
     String[] nameSpace = entityIdentifier.getNameIdentifier().namespace().levels();
@@ -242,9 +234,15 @@ public class CustomEntityKeyEncoder implements EntityKeyEncoder {
     return maxByte == null ? 0 : ByteUtils.byteToLong(maxByte) + 1;
   }
 
+  /**
+   * Encodes an entity object into a byte array for use as a key in a key-value store.
+   *
+   * @param entityIdentifier The entity object to be encoded.
+   * @return The byte array representing the encoded key.
+   */
   @Override
-  public byte[] encode(EntityIdentifer entityIdentifer, boolean createIdIfNotExists)
+  public byte[] encode(EntityIdentifier entityIdentifier, boolean createIdIfNotExists)
       throws IOException {
-    return encodeEntity(entityIdentifer, createIdIfNotExists);
+    return encodeEntity(entityIdentifier, createIdIfNotExists);
   }
 }

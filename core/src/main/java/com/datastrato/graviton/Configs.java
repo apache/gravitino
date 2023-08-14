@@ -40,7 +40,7 @@ public interface Configs {
 
   ConfigEntry<String> ENTITY_SERDE =
       new ConfigBuilder("graviton.entity.serde")
-          .doc("The entity serde to use")
+          .doc("The entity SerDe to use")
           .version("0.1.0")
           .stringConf()
           .createWithDefault("proto");

@@ -21,6 +21,7 @@ import java.util.concurrent.ConcurrentMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/** The Config class is responsible for managing configuration settings. */
 public abstract class Config {
 
   private static final Logger LOG = LoggerFactory.getLogger(Config.class);
@@ -29,6 +30,11 @@ public abstract class Config {
 
   private final ConcurrentMap<String, String> configMap;
 
+  /**
+   * Constructs a Config instance.
+   *
+   * @param loadDefaults Set to true if default configurations should be loaded.
+   */
   public Config(boolean loadDefaults) {
     configMap = new ConcurrentHashMap<>();
     if (loadDefaults) {
@@ -36,10 +42,18 @@ public abstract class Config {
     }
   }
 
+  /** Constructs a Config instance and loads default configurations. */
   public Config() {
     this(true);
   }
 
+  /**
+   * Loads configurations from a properties file.
+   *
+   * @param name The name of the properties file.
+   * @return The Config instance.
+   * @throws Exception If there's an issue loading the properties.
+   */
   public Config loadFromFile(String name) throws Exception {
     String confDir =
         Optional.ofNullable(System.getenv("GRAVITON_CONF_DIR"))
@@ -64,6 +78,14 @@ public abstract class Config {
     return this;
   }
 
+  /**
+   * Gets the value of a configuration entry.
+   *
+   * @param entry The configuration entry to retrieve.
+   * @param <T> The type of the configuration value.
+   * @return The value of the configuration entry.
+   * @throws NoSuchElementException If the configuration entry is not found.
+   */
   public <T> T get(ConfigEntry<T> entry) throws NoSuchElementException {
     if (entry.isDeprecated()) {
       LOG.warn("Config {} is deprecated.", entry.getKey());
@@ -75,14 +97,36 @@ public abstract class Config {
     return entry.readFrom(configMap);
   }
 
+  /**
+   * Retrieves the raw string value associated with the specified configuration key.
+   *
+   * @param key The configuration key for which the raw string value is requested.
+   * @return The raw string value associated with the given configuration key, or null if the key is
+   *     not found.
+   */
   public String getRawString(String key) {
     return configMap.get(key);
   }
 
+  /**
+   * Retrieves the raw string value associated with the specified configuration key, providing a
+   * default value if the key is not found.
+   *
+   * @param key The configuration key for which the raw string value is requested.
+   * @param defaultValue The default value to be returned if the key is not found.
+   * @return The raw string value associated with the given configuration key, or the provided
+   *     default value if the key is not found.
+   */
   public String getRawString(String key, String defaultValue) {
     return configMap.getOrDefault(key, defaultValue);
   }
 
+  /**
+   * Retrieves a map containing configuration entries that have keys with the specified prefix.
+   *
+   * @param prefix The prefix that configuration keys should start with.
+   * @return An unmodifiable map containing configuration entries with keys matching the prefix.
+   */
   public Map<String, String> getConfigsWithPrefix(String prefix) {
     Map<String, String> configs = Maps.newHashMap();
     configMap.forEach(
@@ -96,6 +140,13 @@ public abstract class Config {
     return Collections.unmodifiableMap(configs);
   }
 
+  /**
+   * Sets the value of a configuration entry.
+   *
+   * @param entry The configuration entry for which the value needs to be set.
+   * @param value The new value to be assigned to the configuration entry.
+   * @param <T> The type of the configuration value.
+   */
   public <T> void set(ConfigEntry<T> entry, T value) {
     if (entry.isDeprecated()) {
       LOG.warn("Config {} is deprecated.", entry.getKey());
@@ -111,6 +162,11 @@ public abstract class Config {
     entry.writeTo(configMap, value);
   }
 
+  /**
+   * Loads configurations from a map.
+   *
+   * @param map The map containing configuration key-value pairs.
+   */
   private void loadFromMap(Map<String, String> map) {
     map.forEach(
         (k, v) -> {
@@ -122,11 +178,23 @@ public abstract class Config {
         });
   }
 
+  /**
+   * Loads configurations from properties.
+   *
+   * @param properties The properties object containing configuration key-value pairs.
+   */
   @VisibleForTesting
   void loadFromProperties(Properties properties) {
     loadFromMap(Maps.fromProperties(properties));
   }
 
+  /**
+   * Loads properties from a file.
+   *
+   * @param file The properties file to load from.
+   * @return The loaded properties.
+   * @throws IOException If there's an issue loading the properties.
+   */
   @VisibleForTesting
   Properties loadPropertiesFromFile(File file) throws IOException {
     Properties properties = new Properties();

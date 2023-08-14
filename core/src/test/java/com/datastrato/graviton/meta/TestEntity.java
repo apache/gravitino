@@ -41,7 +41,6 @@ public class TestEntity {
             .build();
 
     Map<Field, Object> fields = metalake.fields();
-    Assertions.assertEquals(metalakeId, fields.get(BaseMetalake.ID));
     Assertions.assertEquals(metalakeName, fields.get(BaseMetalake.NAME));
     Assertions.assertEquals(map, fields.get(BaseMetalake.PROPERTIES));
     Assertions.assertEquals(auditInfo, fields.get(BaseMetalake.AUDIT_INFO));
@@ -64,7 +63,6 @@ public class TestEntity {
             .build();
 
     Map<Field, Object> fields = testCatalog.fields();
-    Assertions.assertEquals(catalogId, fields.get(CatalogEntity.ID));
     Assertions.assertEquals(metalakeId, fields.get(CatalogEntity.METALAKE_ID));
     Assertions.assertEquals(catalogName, fields.get(CatalogEntity.NAME));
     Assertions.assertEquals(catalogComment, fields.get(CatalogEntity.COMMENT));

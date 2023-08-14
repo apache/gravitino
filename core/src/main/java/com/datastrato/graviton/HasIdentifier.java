@@ -4,21 +4,39 @@
  */
 package com.datastrato.graviton;
 
+/** This interface represents entities that have identifiers. */
 public interface HasIdentifier {
 
-  /** Return the name of the entity. */
+  /**
+   * Get the name of the entity.
+   *
+   * @return The name of the entity.
+   */
   String name();
 
-  /** Returns the namespace of the entity. */
+  /**
+   * Get the namespace of the entity.
+   *
+   * @return The namespace of the entity.
+   */
   default Namespace namespace() {
     return Namespace.empty();
   }
 
-  /** Returns the name identifier of the entity. */
+  /**
+   * Get the name identifier of the entity.
+   *
+   * @return The name identifier of the entity.
+   */
   default NameIdentifier nameIdentifier() {
     return NameIdentifier.of(namespace(), name());
   }
 
+  /**
+   * Returns a binary compact unique identifier of the entity.
+   *
+   * @return The binary compact unique identifier of the entity.
+   */
   default byte[] binaryNameIdentifier() {
     return new byte[0];
   }

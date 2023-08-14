@@ -33,13 +33,14 @@ public class InMemoryNameMappingService implements NameMappingService {
 
   @Override
   public synchronized Long create(String name) {
+    // Should handle race condition.
     long nextId = idGenerator.nextId();
     nameToId.put(name, nextId);
     return nextId;
   }
 
   @Override
-  public boolean update(String name, long id) {
+  public synchronized boolean update(String name, long id) {
     Preconditions.checkState(nameToId.containsKey(name), "Name %s does not exist", name);
     nameToId.put(name, id);
     return true;

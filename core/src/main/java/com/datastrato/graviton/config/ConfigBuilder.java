@@ -23,6 +23,11 @@ public class ConfigBuilder {
 
   private boolean isDeprecated;
 
+  /**
+   * Constructs a ConfigBuilder with the given key.
+   *
+   * @param key The key for the configuration.
+   */
   public ConfigBuilder(String key) {
     this.key = key;
 
@@ -33,31 +38,64 @@ public class ConfigBuilder {
     this.isDeprecated = false;
   }
 
+  /**
+   * Sets the alternatives for the configuration.
+   *
+   * @param alternatives The list of alternative keys.
+   * @return The current ConfigBuilder instance.
+   */
   public ConfigBuilder alternatives(List<String> alternatives) {
     this.alternatives = alternatives;
     return this;
   }
 
+  /**
+   * Sets the documentation for the configuration.
+   *
+   * @param doc The documentation string.
+   * @return The current ConfigBuilder instance.
+   */
   public ConfigBuilder doc(String doc) {
     this.doc = doc;
     return this;
   }
 
+  /**
+   * Sets the version for the configuration.
+   *
+   * @param version The version string.
+   * @return The current ConfigBuilder instance.
+   */
   public ConfigBuilder version(String version) {
     this.version = version;
     return this;
   }
 
+  /**
+   * Marks the configuration entry as internal (non-public).
+   *
+   * @return The current ConfigBuilder instance.
+   */
   public ConfigBuilder internal() {
     this.isPublic = false;
     return this;
   }
 
+  /**
+   * Marks the configuration entry as deprecated.
+   *
+   * @return The current ConfigBuilder instance.
+   */
   public ConfigBuilder deprecated() {
     this.isDeprecated = true;
     return this;
   }
 
+  /**
+   * Creates a configuration entry for String data type.
+   *
+   * @return The created ConfigEntry instance for String data type.
+   */
   public ConfigEntry<String> stringConf() {
     ConfigEntry<String> conf =
         new ConfigEntry<>(key, version, doc, alternatives, isPublic, isDeprecated);
@@ -67,6 +105,11 @@ public class ConfigBuilder {
     return conf;
   }
 
+  /**
+   * Creates a configuration entry for Integer data type.
+   *
+   * @return The created ConfigEntry instance for Integer data type.
+   */
   public ConfigEntry<Integer> intConf() {
     ConfigEntry<Integer> conf =
         new ConfigEntry<>(key, version, doc, alternatives, isPublic, isDeprecated);
@@ -87,6 +130,11 @@ public class ConfigBuilder {
     return conf;
   }
 
+  /**
+   * Creates a configuration entry for Long data type.
+   *
+   * @return The created ConfigEntry instance for Long data type.
+   */
   public ConfigEntry<Long> longConf() {
     ConfigEntry<Long> conf =
         new ConfigEntry<>(key, version, doc, alternatives, isPublic, isDeprecated);
@@ -107,6 +155,11 @@ public class ConfigBuilder {
     return conf;
   }
 
+  /**
+   * Creates a configuration entry for Boolean data type.
+   *
+   * @return The created ConfigEntry instance for Boolean data type.
+   */
   public ConfigEntry<Boolean> booleanConf() {
     ConfigEntry<Boolean> conf =
         new ConfigEntry<>(key, version, doc, alternatives, isPublic, isDeprecated);
