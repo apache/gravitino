@@ -16,10 +16,10 @@ public interface EntityKeyEncoder {
   /**
    * Construct the key for key-value store from the entity NameIdentifier and EntityType.
    *
-   * @param entityIdentifer entity identifier to encode
+   * @param entityIdentifier entity identifier to encode
    * @param createIdIfNotExists create the id mapping for name if not exists
    * @return encoded key for key-value store
    * @throws IOException
    */
-  byte[] encode(EntityIdentifier entityIdentifer, boolean createIdIfNotExists) throws IOException;
+  byte[] encode(EntityIdentifier entityIdentifier, boolean createIdIfNotExists) throws IOException;
 }
