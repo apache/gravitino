@@ -19,6 +19,7 @@ import javax.annotation.concurrent.ThreadSafe;
 @ThreadSafe
 public class KvNameMappingService implements NameMappingService {
 
+  // TODO(yuqi) Make this configurable
   private final IdGenerator idGenerator = new RandomIdGenerator();
   private final KvBackend backend;
 
