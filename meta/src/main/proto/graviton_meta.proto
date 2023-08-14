@@ -63,3 +63,10 @@ message Schema {
   string name = 3;
   AuditInfo audit_info = 4;
 }
+
+message Table {
+  uint64 id = 1;
+  uint64 schema_id = 2;
+  string name = 3;
+  AuditInfo audit_info = 4;
+}
