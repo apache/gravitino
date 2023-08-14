@@ -190,12 +190,15 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     } catch (AlreadyExistsException e) {
       throw new SchemaAlreadyExistsException(
           String.format(
-              "Hive schema (database) '%s' already exists in Hive Metastore", ident.name()));
+              "Hive schema (database) '%s' already exists in Hive Metastore", ident.name()),
+          e);
 
     } catch (EntityAlreadyExistsException e) {
       throw new SchemaAlreadyExistsException(
           String.format(
-              "Hive schema (database) '%s' already exists in Graviton store", ident.name()));
+              "Hive schema (database) '%s' already exists in Graviton store", ident.name()),
+          e);
+
     } catch (TException e) {
       throw new RuntimeException(
           "Failed to create Hive schema (database) " + ident.name() + " in Hive Metastore", e);
@@ -203,6 +206,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     } catch (IOException e) {
       throw new RuntimeException(
           "Failed to create Hive schema (database) " + ident.name() + " in Graviton store", e);
+
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
@@ -256,12 +260,14 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
           String.format(
               "Hive schema (database) does not exist: %s in Graviton store", ident.name()),
           e);
+
     } catch (TException e) {
       throw new RuntimeException(
           "Failed to load Hive schema (database) " + ident.name() + " from Hive Metastore", e);
 
     } catch (InterruptedException e) {
       throw new RuntimeException(e);
+
     } catch (IOException ioe) {
       LOG.error("Failed to load hive schema {}", ident, ioe);
       throw new RuntimeException(ioe);
@@ -356,15 +362,19 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       throw new NoSuchSchemaException(
           String.format("Hive schema (database) %s does not exist in Hive Metastore", ident.name()),
           e);
+
     } catch (EntityAlreadyExistsException e) {
       throw new NoSuchSchemaException(
           "The new Hive schema (database) name already exist in Graviton store", e);
+
     } catch (TException | InterruptedException e) {
       throw new RuntimeException(
           "Failed to alter Hive schema (database) " + ident.name() + " in Hive metastore", e);
+
     } catch (IOException e) {
       throw new RuntimeException(
           "Failed to alter Hive schema (database) " + ident.name() + " in Graviton store", e);
+
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
@@ -443,6 +453,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     } catch (IOException e) {
       throw new RuntimeException(
           "Failed to drop Hive schema (database) " + ident.name() + " in Graviton store", e);
+
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
@@ -493,9 +504,11 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     } catch (UnknownDBException e) {
       throw new NoSuchSchemaException(
           "Schema (database) does not exist " + namespace + " in Hive Metastore");
+
     } catch (TException e) {
       throw new RuntimeException(
           "Failed to list all tables under the namespace : " + namespace + " in Hive Metastore", e);
+
     } catch (InterruptedException e) {
       throw new RuntimeException(e);
     }
@@ -547,6 +560,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     } catch (TException e) {
       throw new NoSuchTableException(
           String.format("Hive table does not exist: %s in Hive Metastore", tableIdent.name()), e);
+
     } catch (InterruptedException e) {
       throw new RuntimeException(e);
     }
