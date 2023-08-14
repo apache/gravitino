@@ -233,7 +233,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       HiveSchema.Builder builder = new HiveSchema.Builder();
 
       EntityStore store = GravitonEnv.getInstance().entityStore();
-      BaseSchema baseSchema = store.get(ident, SCHEMA, HiveSchema.class);
+      BaseSchema baseSchema = store.get(ident, SCHEMA, BaseSchema.class);
 
       builder =
           builder
@@ -323,7 +323,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       HiveSchema alteredHiveSchema =
           store.executeInTransaction(
               () -> {
-                BaseSchema oldSchema = store.get(ident, SCHEMA, HiveSchema.class);
+                BaseSchema oldSchema = store.get(ident, SCHEMA, BaseSchema.class);
                 HiveSchema.Builder builder = new HiveSchema.Builder();
                 builder =
                     builder
