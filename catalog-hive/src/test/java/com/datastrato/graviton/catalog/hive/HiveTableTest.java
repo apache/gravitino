@@ -4,6 +4,16 @@
  */
 package com.datastrato.graviton.catalog.hive;
 
+import static com.datastrato.graviton.Configs.DEFUALT_ENTITY_KV_STORE;
+import static com.datastrato.graviton.Configs.ENTITY_KV_STORE;
+import static com.datastrato.graviton.Configs.ENTITY_STORE;
+import static com.datastrato.graviton.Configs.ENTRY_KV_ROCKSDB_BACKEND_PATH;
+import static com.datastrato.graviton.Entity.EntityType.TABLE;
+
+import com.datastrato.graviton.Config;
+import com.datastrato.graviton.Configs;
+import com.datastrato.graviton.EntityStore;
+import com.datastrato.graviton.GravitonEnv;
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
 import com.datastrato.graviton.catalog.hive.miniHMS.MiniHiveMetastoreService;
@@ -15,13 +25,17 @@ import com.datastrato.graviton.rel.Table;
 import com.datastrato.graviton.rel.TableChange;
 import com.google.common.collect.Maps;
 import io.substrait.type.TypeCreator;
+import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Map;
+import org.apache.commons.io.FileUtils;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 public class HiveTableTest extends MiniHiveMetastoreService {
 
@@ -30,19 +44,45 @@ public class HiveTableTest extends MiniHiveMetastoreService {
   private static final String HIVE_CATALOG_NAME = "test_catalog";
   private static final String HIVE_SCHEMA_NAME = "test_schema";
   private static final String HIVE_COMMENT = "test_comment";
+  private static final String ROCKS_DB_STORE_PATH = "/tmp/graviton/test_hive_table";
   private static HiveCatalog hiveCatalog;
   private static HiveSchema hiveSchema;
 
+  private static EntityStore store;
+
   @BeforeAll
   private static void setup() {
+    mockStore();
     initHiveCatalog();
     initHiveSchema();
+  }
+
+  @AfterAll
+  private static void tearDown() {
+    try {
+      FileUtils.deleteDirectory(FileUtils.getFile(ROCKS_DB_STORE_PATH));
+    } catch (Exception e) {
+      // Ignore
+    }
   }
 
   @AfterEach
   private void resetSchema() {
     hiveCatalog.asSchemas().dropSchema(hiveSchema.nameIdentifier(), true);
     initHiveSchema();
+  }
+
+  private static void mockStore() {
+    Config config = Mockito.mock(Config.class);
+    Mockito.when(config.get(ENTITY_STORE)).thenReturn("kv");
+    Mockito.when(config.get(ENTITY_KV_STORE)).thenReturn(DEFUALT_ENTITY_KV_STORE);
+    Mockito.when(config.get(Configs.ENTITY_SERDE)).thenReturn("proto");
+    Mockito.when(config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)).thenReturn(ROCKS_DB_STORE_PATH);
+    Mockito.when(config.get(Configs.CATALOG_CACHE_EVICTION_INTERVAL_MS))
+        .thenReturn(Configs.CATALOG_CACHE_EVICTION_INTERVAL_MS.getDefaultValue());
+
+    GravitonEnv.getInstance().initialize(config);
+    store = GravitonEnv.getInstance().entityStore();
   }
 
   private static void initHiveSchema() {
@@ -76,8 +116,7 @@ public class HiveTableTest extends MiniHiveMetastoreService {
   }
 
   @Test
-  public void testCreateHiveTable() {
-    Long tableId = 1L;
+  public void testCreateHiveTable() throws IOException {
     String hiveTableName = "test_hive_table";
     NameIdentifier tableIdentifier =
         NameIdentifier.of(META_LAKE_NAME, hiveCatalog.name(), hiveSchema.name(), hiveTableName);
@@ -111,6 +150,7 @@ public class HiveTableTest extends MiniHiveMetastoreService {
     NameIdentifier[] tableIdents =
         hiveCatalog.asTableCatalog().listTables(tableIdentifier.namespace());
     Assertions.assertTrue(Arrays.asList(tableIdents).contains(tableIdentifier));
+    Assertions.assertTrue(store.exists(tableIdentifier, TABLE));
 
     // Test exception
     Throwable exception =
@@ -134,8 +174,7 @@ public class HiveTableTest extends MiniHiveMetastoreService {
   }
 
   @Test
-  public void testDropHiveTable() {
-    Long tableId = 1L;
+  public void testDropHiveTable() throws IOException {
     NameIdentifier tableIdentifier =
         NameIdentifier.of(META_LAKE_NAME, hiveCatalog.name(), hiveSchema.name(), genRandomName());
     Map<String, String> properties = Maps.newHashMap();
@@ -161,6 +200,7 @@ public class HiveTableTest extends MiniHiveMetastoreService {
     Assertions.assertTrue(hiveCatalog.asTableCatalog().tableExists(tableIdentifier));
     hiveCatalog.asTableCatalog().dropTable(tableIdentifier);
     Assertions.assertFalse(hiveCatalog.asTableCatalog().tableExists(tableIdentifier));
+    Assertions.assertFalse(store.exists(tableIdentifier, TABLE));
   }
 
   @Test
@@ -182,7 +222,7 @@ public class HiveTableTest extends MiniHiveMetastoreService {
   }
 
   @Test
-  public void testAlterHiveTable() {
+  public void testAlterHiveTable() throws IOException {
     // create a table with random name
     NameIdentifier tableIdentifier =
         NameIdentifier.of(META_LAKE_NAME, hiveCatalog.name(), hiveSchema.name(), genRandomName());
@@ -239,6 +279,9 @@ public class HiveTableTest extends MiniHiveMetastoreService {
     Assertions.assertEquals(HIVE_COMMENT + "_new", alteredTable.comment());
     Assertions.assertFalse(alteredTable.properties().containsKey("key1"));
     Assertions.assertEquals(alteredTable.properties().get("key2"), "val2_new");
+
+    Assertions.assertFalse(store.exists(tableIdentifier, TABLE));
+    Assertions.assertTrue(store.exists(((HiveTable) alteredTable).nameIdentifier(), TABLE));
 
     Column[] expected =
         new Column[] {
