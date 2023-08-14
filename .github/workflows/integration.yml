@@ -41,3 +41,9 @@ jobs:
         run: |
           gradle build
           gradle compileDistribution
+
+      - name: Graviton Integration Tests
+        run: |
+            ls -lt ./
+            ls -lt distribution/package
+            gradle integrationTest

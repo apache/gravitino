@@ -40,8 +40,11 @@ subprojects {
   }
 
   tasks.configureEach<Test> {
-    useJUnitPlatform()
-    finalizedBy(tasks.getByName("jacocoTestReport"))
+    // Integration test module are tested sepatately
+    if (project.name != "integration") {
+      useJUnitPlatform()
+      finalizedBy(tasks.getByName("jacocoTestReport"))
+    }
   }
 
   tasks.withType<JacocoReport> {
@@ -59,8 +62,10 @@ subprojects {
 
   tasks.withType<Jar> {
     archiveFileName.set("${rootProject.name.lowercase(Locale.getDefault())}-${project.name}-$version.jar")
-    exclude("log4j2.properties")
-    exclude("test/**")
+    if (project.name != "integration") {
+      exclude("log4j2.properties")
+      exclude("test/**")
+    }
   }
 
   plugins.withType<SpotlessPlugin>().configureEach {
@@ -229,24 +234,9 @@ tasks {
     }
   }
 
-  // Print all dependencies of all subprojects, `./gradlew allDeps`
-  task("allDeps") {
-    doLast {
-      subprojects.forEach { project ->
-        println("Dependencies for project: ${project.name}")
-        project.configurations.forEach { configuration ->
-          configuration.allDependencies.forEach { dependency ->
-            println("- ${dependency.group}:${dependency.name}:${dependency.version}")
-          }
-        }
-        println()
-      }
-    }
+  task("integrationTest") {
+    dependsOn(":integration:integrationTest")
   }
-
-//  assemble {
-//    finalizedBy(assembleDistribution)
-//  }
 
   clean {
     dependsOn(cleanDistribution)
