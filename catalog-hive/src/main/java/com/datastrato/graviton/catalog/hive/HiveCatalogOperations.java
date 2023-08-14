@@ -413,7 +413,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       }
 
       try {
-        tables = store.list(schemaNamespace, BaseTable.class, TABLE);
+        tables.addAll(store.list(schemaNamespace, BaseTable.class, TABLE));
       } catch (IOException e) {
         throw new RuntimeException("Failed to list table from Graviton store", e);
       }
@@ -426,11 +426,10 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     }
 
     try {
-      List<BaseTable> finalTables = tables;
       store.executeInTransaction(
           () -> {
             store.delete(ident, SCHEMA);
-            for (BaseTable t : finalTables) {
+            for (BaseTable t : tables) {
               store.delete(NameIdentifier.of(schemaNamespace, t.name()), TABLE);
             }
             clientPool.run(
