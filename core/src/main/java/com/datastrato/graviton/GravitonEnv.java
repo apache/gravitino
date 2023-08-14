@@ -10,6 +10,7 @@ import com.datastrato.graviton.meta.MetalakeManager;
 import com.datastrato.graviton.storage.InMemoryNameMappingService;
 import com.datastrato.graviton.storage.NameMappingService;
 import com.datastrato.graviton.storage.kv.EntityKeyEncoder;
+import com.google.common.base.Preconditions;
 import lombok.Getter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -104,6 +105,7 @@ public class GravitonEnv {
    * @return The EntityStore instance.
    */
   public EntityStore entityStore() {
+    Preconditions.checkNotNull(entityStore, "GravitonEnv is not initialized.");
     return entityStore;
   }
 

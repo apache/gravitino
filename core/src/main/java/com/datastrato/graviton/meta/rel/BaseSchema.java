@@ -16,12 +16,13 @@ import java.util.Collections;
 import java.util.Map;
 import javax.annotation.Nullable;
 import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import lombok.ToString;
 
 /** An abstract class representing a base schema in a relational database. */
 @EqualsAndHashCode
 @ToString
-public abstract class BaseSchema implements Schema, Entity, HasIdentifier {
+public class BaseSchema implements Schema, Entity, HasIdentifier {
 
   public static final Field ID = Field.required("id", Long.class, "The schema's unique identifier");
   public static final Field CATALOG_ID =
@@ -34,15 +35,15 @@ public abstract class BaseSchema implements Schema, Entity, HasIdentifier {
   public static final Field AUDIT_INFO =
       Field.required("audit_info", AuditInfo.class, "The audit details of the schema");
 
-  protected Long id;
+  @Getter protected Long id;
 
-  protected Long catalogId;
+  @Getter protected Long catalogId;
 
   protected String name;
 
-  @Nullable protected String comment;
+  @Nullable @Getter protected String comment;
 
-  @Nullable protected Map<String, String> properties;
+  @Nullable @Getter protected Map<String, String> properties;
 
   protected AuditInfo auditInfo;
 
@@ -268,5 +269,21 @@ public abstract class BaseSchema implements Schema, Entity, HasIdentifier {
     }
 
     protected abstract T internalBuild();
+  }
+
+  public static class SchemaBuilder extends BaseSchemaBuilder<SchemaBuilder, BaseSchema> {
+
+    @Override
+    protected BaseSchema internalBuild() {
+      BaseSchema baseSchema = new BaseSchema();
+      baseSchema.id = id;
+      baseSchema.catalogId = catalogId;
+      baseSchema.name = name;
+      baseSchema.comment = comment;
+      baseSchema.properties = properties;
+      baseSchema.auditInfo = auditInfo;
+
+      return baseSchema;
+    }
   }
 }
