@@ -13,13 +13,14 @@ import com.datastrato.graviton.dto.requests.TableUpdatesRequest;
 import com.datastrato.graviton.dto.responses.DropResponse;
 import com.datastrato.graviton.dto.responses.EntityListResponse;
 import com.datastrato.graviton.dto.responses.TableResponse;
+import com.datastrato.graviton.exceptions.IllegalNameIdentifierException;
+import com.datastrato.graviton.exceptions.IllegalNamespaceException;
 import com.datastrato.graviton.exceptions.NoSuchSchemaException;
 import com.datastrato.graviton.exceptions.NoSuchTableException;
 import com.datastrato.graviton.exceptions.TableAlreadyExistsException;
 import com.datastrato.graviton.rel.Table;
 import com.datastrato.graviton.rel.TableChange;
 import com.datastrato.graviton.server.web.Utils;
-import com.google.common.base.Preconditions;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.DELETE;
@@ -31,7 +32,6 @@ import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
-import org.eclipse.jetty.util.StringUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -56,13 +56,13 @@ public class TableOperations {
       @PathParam("catalog") String catalog,
       @PathParam("schema") String schema) {
     try {
-      Namespace ns = tableNS(metalake, catalog, schema);
+      Namespace ns = Namespace.ofTable(metalake, catalog, schema);
       NameIdentifier[] idents = dispatcher.listTables(ns);
       return Utils.ok(new EntityListResponse(idents));
 
-    } catch (IllegalArgumentException e) {
-      LOG.error("Failed to validate arguments", e);
-      return Utils.illegalArguments("Failed to validate arguments", e);
+    } catch (IllegalNamespaceException e) {
+      LOG.error("Failed to list tables with invalid arguments", e);
+      return Utils.illegalArguments("Failed to list tables with invalid arguments", e);
 
     } catch (NoSuchSchemaException e) {
       LOG.error("Schema {} does not exist, fail to list tables", schema);
@@ -89,15 +89,16 @@ public class TableOperations {
     }
 
     try {
-      NameIdentifier ident = tableIdentifier(metalake, catalog, schema, request.getName());
+      NameIdentifier ident = NameIdentifier.ofTable(metalake, catalog, schema, request.getName());
       Table table =
           dispatcher.createTable(
               ident, request.getColumns(), request.getComment(), request.getProperties());
       return Utils.ok(new TableResponse(DTOConverters.toDTO(table)));
 
-    } catch (IllegalArgumentException e) {
-      LOG.error("Failed to validate arguments", e);
-      return Utils.illegalArguments("Failed to validate arguments", e);
+    } catch (IllegalNamespaceException | IllegalNameIdentifierException e) {
+      LOG.warn("Failed to create table {} with invalid arguments", request.getName(), e);
+      return Utils.illegalArguments(
+          "Failed to create table " + request.getName() + " with invalid arguments", e);
 
     } catch (NoSuchSchemaException e) {
       LOG.error("Schema {} does not exist, fail to create table {}", schema, request.getName());
@@ -125,13 +126,13 @@ public class TableOperations {
       @PathParam("schema") String schema,
       @PathParam("table") String table) {
     try {
-      NameIdentifier ident = tableIdentifier(metalake, catalog, schema, table);
+      NameIdentifier ident = NameIdentifier.ofTable(metalake, catalog, schema, table);
       Table t = dispatcher.loadTable(ident);
       return Utils.ok(new TableResponse(DTOConverters.toDTO(t)));
 
-    } catch (IllegalArgumentException e) {
-      LOG.error("Failed to validate arguments", e);
-      return Utils.illegalArguments("Failed to validate arguments", e);
+    } catch (IllegalNamespaceException | IllegalNameIdentifierException e) {
+      LOG.warn("Failed to load table {} with invalid arguments", table, e);
+      return Utils.illegalArguments("Failed to load table " + table + " with invalid arguments", e);
 
     } catch (NoSuchTableException e) {
       LOG.error("Table {} does not exist under schema {}", table, schema);
@@ -160,7 +161,7 @@ public class TableOperations {
     }
 
     try {
-      NameIdentifier ident = tableIdentifier(metalake, catalog, schema, table);
+      NameIdentifier ident = NameIdentifier.ofTable(metalake, catalog, schema, table);
       TableChange[] changes =
           request.getUpdates().stream()
               .map(TableUpdateRequest::tableChange)
@@ -168,9 +169,10 @@ public class TableOperations {
       Table t = dispatcher.alterTable(ident, changes);
       return Utils.ok(new TableResponse(DTOConverters.toDTO(t)));
 
-    } catch (IllegalArgumentException e) {
-      LOG.error("Failed to validate arguments", e);
-      return Utils.illegalArguments("Failed to validate arguments", e);
+    } catch (IllegalNameIdentifierException | IllegalNamespaceException e) {
+      LOG.warn("Failed to alter table {} with invalid arguments", table, e);
+      return Utils.illegalArguments(
+          "Failed to alter table " + table + " with invalid arguments", e);
 
     } catch (NoSuchTableException e) {
       LOG.error("Table {} does not exist under schema {}", table, schema);
@@ -191,7 +193,7 @@ public class TableOperations {
       @PathParam("schema") String schema,
       @PathParam("table") String table) {
     try {
-      NameIdentifier ident = tableIdentifier(metalake, catalog, schema, table);
+      NameIdentifier ident = NameIdentifier.ofTable(metalake, catalog, schema, table);
       boolean dropped = dispatcher.dropTable(ident);
       if (!dropped) {
         LOG.warn("Failed to drop table {} under schema {}", table, schema);
@@ -199,31 +201,13 @@ public class TableOperations {
 
       return Utils.ok(new DropResponse(dropped));
 
-    } catch (IllegalArgumentException e) {
-      LOG.error("Failed to validate arguments", e);
-      return Utils.illegalArguments("Failed to validate arguments", e);
+    } catch (IllegalNamespaceException | IllegalNameIdentifierException e) {
+      LOG.warn("Failed to drop table {} with invalid arguments", table, e);
+      return Utils.illegalArguments("Failed to drop table " + table + " with invalid arguments", e);
 
     } catch (Exception e) {
       LOG.error("Failed to drop table {} under schema {}", table, schema, e);
       return Utils.internalError("Failed to drop table " + table + " under schema " + schema, e);
     }
-  }
-
-  private static Namespace tableNS(String metalake, String catalog, String schema) {
-    Preconditions.checkArgument(
-        StringUtil.isNotBlank(metalake), "metalake name: %s is illegal", metalake);
-    Preconditions.checkArgument(
-        StringUtil.isNotBlank(catalog), "catalog name: %s is illegal", catalog);
-    Preconditions.checkArgument(
-        StringUtil.isNotBlank(schema), "schema name: %s is illegal", schema);
-
-    return Namespace.of(metalake, catalog, schema);
-  }
-
-  private static NameIdentifier tableIdentifier(
-      String metalake, String catalog, String schema, String table) {
-    Namespace ns = tableNS(metalake, catalog, schema);
-    Preconditions.checkArgument(StringUtil.isNotBlank(table), "table name: %s is illegal", table);
-    return NameIdentifier.of(ns, table);
   }
 }

@@ -60,7 +60,7 @@ public class GravitonMetaLake extends MetalakeDTO implements SupportsCatalogs {
    */
   @Override
   public NameIdentifier[] listCatalogs(Namespace namespace) throws NoSuchMetalakeException {
-    validateCatalogNamespace(namespace);
+    Namespace.checkCatalog(namespace);
 
     EntityListResponse resp =
         restClient.get(
@@ -82,7 +82,7 @@ public class GravitonMetaLake extends MetalakeDTO implements SupportsCatalogs {
    */
   @Override
   public Catalog loadCatalog(NameIdentifier ident) throws NoSuchCatalogException {
-    validateCatalogIdentifier(ident);
+    NameIdentifier.checkCatalog(ident);
 
     CatalogResponse resp =
         restClient.get(
@@ -110,7 +110,7 @@ public class GravitonMetaLake extends MetalakeDTO implements SupportsCatalogs {
   public Catalog createCatalog(
       NameIdentifier ident, Catalog.Type type, String comment, Map<String, String> properties)
       throws NoSuchMetalakeException, CatalogAlreadyExistsException {
-    validateCatalogIdentifier(ident);
+    NameIdentifier.checkCatalog(ident);
 
     CatalogCreateRequest req = new CatalogCreateRequest(ident.name(), type, comment, properties);
     req.validate();
@@ -139,7 +139,7 @@ public class GravitonMetaLake extends MetalakeDTO implements SupportsCatalogs {
   @Override
   public Catalog alterCatalog(NameIdentifier ident, CatalogChange... changes)
       throws NoSuchCatalogException, IllegalArgumentException {
-    validateCatalogIdentifier(ident);
+    NameIdentifier.checkCatalog(ident);
 
     List<CatalogUpdateRequest> reqs =
         Arrays.stream(changes)
@@ -168,7 +168,7 @@ public class GravitonMetaLake extends MetalakeDTO implements SupportsCatalogs {
    */
   @Override
   public boolean dropCatalog(NameIdentifier ident) {
-    validateCatalogIdentifier(ident);
+    NameIdentifier.checkCatalog(ident);
 
     try {
       DropResponse resp =
@@ -185,17 +185,6 @@ public class GravitonMetaLake extends MetalakeDTO implements SupportsCatalogs {
       LOG.warn("Failed to drop catalog {}", ident, e);
       return false;
     }
-  }
-
-  private static void validateCatalogNamespace(Namespace ns) {
-    Preconditions.checkArgument(
-        ns != null && ns.length() == 1, "namespace must not be null and have exactly one level");
-  }
-
-  private static void validateCatalogIdentifier(NameIdentifier ident) {
-    validateCatalogNamespace(ident.namespace());
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(ident.name()), "name must not be null or empty");
   }
 
   static class Builder extends MetalakeDTO.Builder<Builder> {

@@ -82,10 +82,7 @@ public class GravitonClient implements SupportsMetalakes, Closeable {
    */
   @Override
   public GravitonMetaLake loadMetalake(NameIdentifier ident) throws NoSuchMetalakeException {
-    Preconditions.checkArgument(ident != null, "Metalake name identifier cannot be null");
-    Preconditions.checkArgument(
-        !ident.hasNamespace(),
-        "Metalake name identifier is a top-level identifier, namespace should be empty");
+    NameIdentifier.checkMetalake(ident);
 
     MetalakeResponse resp =
         restClient.get(
@@ -112,10 +109,7 @@ public class GravitonClient implements SupportsMetalakes, Closeable {
   public GravitonMetaLake createMetalake(
       NameIdentifier ident, String comment, Map<String, String> properties)
       throws MetalakeAlreadyExistsException {
-    Preconditions.checkArgument(ident != null, "Metalake name identifier cannot be null");
-    Preconditions.checkArgument(
-        !ident.hasNamespace(),
-        "Metalake name identifier is a top-level identifier, namespace should be empty");
+    NameIdentifier.checkMetalake(ident);
 
     MetalakeCreateRequest req = new MetalakeCreateRequest(ident.name(), comment, properties);
     req.validate();
@@ -144,10 +138,7 @@ public class GravitonClient implements SupportsMetalakes, Closeable {
   @Override
   public GravitonMetaLake alterMetalake(NameIdentifier ident, MetalakeChange... changes)
       throws NoSuchMetalakeException, IllegalArgumentException {
-    Preconditions.checkArgument(ident != null, "Metalake name identifier cannot be null");
-    Preconditions.checkArgument(
-        !ident.hasNamespace(),
-        "Metalake name identifier is a top-level identifier, namespace should be empty");
+    NameIdentifier.checkMetalake(ident);
 
     List<MetalakeUpdateRequest> reqs =
         Arrays.stream(changes)
@@ -176,10 +167,7 @@ public class GravitonClient implements SupportsMetalakes, Closeable {
    */
   @Override
   public boolean dropMetalake(NameIdentifier ident) {
-    Preconditions.checkArgument(ident != null, "Metalake name identifier cannot be null");
-    Preconditions.checkArgument(
-        !ident.hasNamespace(),
-        "Metalake name identifier is a top-level identifier, namespace should be empty");
+    NameIdentifier.checkMetalake(ident);
 
     try {
       DropResponse resp =

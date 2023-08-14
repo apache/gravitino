@@ -13,6 +13,8 @@ import com.datastrato.graviton.dto.requests.MetalakeUpdatesRequest;
 import com.datastrato.graviton.dto.responses.DropResponse;
 import com.datastrato.graviton.dto.responses.MetalakeListResponse;
 import com.datastrato.graviton.dto.responses.MetalakeResponse;
+import com.datastrato.graviton.exceptions.IllegalNameIdentifierException;
+import com.datastrato.graviton.exceptions.IllegalNamespaceException;
 import com.datastrato.graviton.exceptions.MetalakeAlreadyExistsException;
 import com.datastrato.graviton.exceptions.NoSuchMetalakeException;
 import com.datastrato.graviton.meta.BaseMetalake;
@@ -79,10 +81,14 @@ public class MetalakeOperations {
     }
 
     try {
-      NameIdentifier ident = NameIdentifier.parse(request.getName());
+      NameIdentifier ident = NameIdentifier.ofMetalake(request.getName());
       BaseMetalake metalake =
           manager.createMetalake(ident, request.getComment(), request.getProperties());
       return Utils.ok(new MetalakeResponse(DTOConverters.toDTO(metalake)));
+
+    } catch (IllegalNamespaceException | IllegalNameIdentifierException e) {
+      LOG.warn("Failed to create metalake with invalid arguments", e);
+      return Utils.illegalArguments("Failed to create metalake with invalid arguments", e);
 
     } catch (MetalakeAlreadyExistsException exception) {
       LOG.warn("Metalake {} already exists", request.getName(), exception);
@@ -98,15 +104,14 @@ public class MetalakeOperations {
   @Path("{name}")
   @Produces("application/vnd.graviton.v1+json")
   public Response loadMetalake(@PathParam("name") String metalakeName) {
-    if (metalakeName == null || metalakeName.isEmpty()) {
-      LOG.error("Metalake name is null or empty");
-      return Utils.illegalArguments("Metalake name is illegal");
-    }
-
     try {
-      NameIdentifier identifier = NameIdentifier.parse(metalakeName);
+      NameIdentifier identifier = NameIdentifier.ofMetalake(metalakeName);
       BaseMetalake metalake = manager.loadMetalake(identifier);
       return Utils.ok(new MetalakeResponse(DTOConverters.toDTO(metalake)));
+
+    } catch (IllegalNamespaceException | IllegalNameIdentifierException e) {
+      LOG.warn("Failed to load metalake with invalid arguments", e);
+      return Utils.illegalArguments("Failed to load metalake with invalid arguments", e);
 
     } catch (NoSuchMetalakeException e) {
       LOG.warn("Metalake {} does not exist", metalakeName);
@@ -123,11 +128,6 @@ public class MetalakeOperations {
   @Produces("application/vnd.graviton.v1+json")
   public Response alterMetalake(
       @PathParam("name") String metalakeName, MetalakeUpdatesRequest updatesRequest) {
-    if (metalakeName == null || metalakeName.isEmpty()) {
-      LOG.error("Metalake name is null or empty");
-      return Utils.illegalArguments("Metalake name is illegal");
-    }
-
     try {
       updatesRequest.validate();
     } catch (Exception e) {
@@ -137,7 +137,7 @@ public class MetalakeOperations {
     }
 
     try {
-      NameIdentifier identifier = NameIdentifier.parse(metalakeName);
+      NameIdentifier identifier = NameIdentifier.ofMetalake(metalakeName);
       MetalakeChange[] changes =
           updatesRequest.getUpdates().stream()
               .map(MetalakeUpdateRequest::metalakeChange)
@@ -145,6 +145,10 @@ public class MetalakeOperations {
 
       BaseMetalake updatedMetalake = manager.alterMetalake(identifier, changes);
       return Utils.ok(new MetalakeResponse(DTOConverters.toDTO(updatedMetalake)));
+
+    } catch (IllegalNamespaceException | IllegalNameIdentifierException e) {
+      LOG.warn("Failed to alter metalake with invalid arguments", e);
+      return Utils.illegalArguments("Failed to alter metalake with invalid arguments", e);
 
     } catch (NoSuchMetalakeException e) {
       LOG.warn("Metalake {} does not exist", metalakeName);
@@ -165,19 +169,18 @@ public class MetalakeOperations {
   @Path("{name}")
   @Produces("application/vnd.graviton.v1+json")
   public Response dropMetalake(@PathParam("name") String metalakeName) {
-    if (metalakeName == null || metalakeName.isEmpty()) {
-      LOG.error("Metalake name is null or empty");
-      return Utils.illegalArguments("Metalake name is illegal");
-    }
-
     try {
-      NameIdentifier identifier = NameIdentifier.parse(metalakeName);
+      NameIdentifier identifier = NameIdentifier.ofMetalake(metalakeName);
       boolean dropped = manager.dropMetalake(identifier);
       if (!dropped) {
         LOG.warn("Failed to drop metalake by name {}", metalakeName);
       }
 
       return Utils.ok(new DropResponse(dropped));
+
+    } catch (IllegalNamespaceException | IllegalNameIdentifierException e) {
+      LOG.warn("Failed to drop metalake with invalid arguments", e);
+      return Utils.illegalArguments("Failed to drop metalake with invalid arguments", e);
 
     } catch (Exception e) {
       LOG.error("Failed to drop metalake {}", metalakeName, e);
