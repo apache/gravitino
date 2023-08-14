@@ -8,6 +8,7 @@ package com.datastrato.graviton.storage;
 import com.datastrato.graviton.util.Executable;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
+import java.io.IOException;
 import java.util.Map;
 
 /**
@@ -40,9 +41,11 @@ public class InMemoryNameMappingService implements NameMappingService {
   }
 
   @Override
-  public synchronized boolean update(String name, long id) {
-    Preconditions.checkState(nameToId.containsKey(name), "Name %s does not exist", name);
-    nameToId.put(name, id);
+  public synchronized boolean update(String oldName, String newName) {
+    Preconditions.checkState(nameToId.containsKey(oldName), "Name %s does not exist", oldName);
+    long originId = nameToId.get(oldName);
+    nameToId.remove(oldName, originId);
+    nameToId.put(newName, originId);
     return true;
   }
 
@@ -54,5 +57,11 @@ public class InMemoryNameMappingService implements NameMappingService {
   @Override
   public <R, E extends Exception> R executeInTransaction(Executable<R, E> executable) throws E {
     return null;
+  }
+
+  @Override
+  public boolean delete(String name) throws IOException {
+    nameToId.remove(name);
+    return true;
   }
 }

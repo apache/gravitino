@@ -13,12 +13,13 @@ import java.util.UUID;
  */
 public class RandomIdGenerator implements IdGenerator {
 
-  private final UUID uuid = UUID.randomUUID();
-
   public static final RandomIdGenerator INSTACNE = new RandomIdGenerator();
+
+  public static final long MAX_ID = 0x7fffffffffffffffL;
 
   @Override
   public long nextId() {
-    return uuid.getLeastSignificantBits();
+    // Make sure this is a postive number.
+    return UUID.randomUUID().getLeastSignificantBits() & MAX_ID;
   }
 }
