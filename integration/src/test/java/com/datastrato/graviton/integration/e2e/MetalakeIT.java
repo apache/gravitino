@@ -58,7 +58,7 @@ public class MetalakeIT extends AbstractIT {
         doExecuteRequest(Method.POST, reqPath, reqBody, MetalakeResponse.class, onError, h -> {});
     LOG.info(successResponse.toString());
     Assertions.assertEquals(successResponse.getMetalake().name(), newMetalakeNameRESTful);
-    Assertions.assertEquals(successResponse.getMetalake().comment(), "comment");
+    Assertions.assertEquals("comment", successResponse.getMetalake().comment());
   }
 
   @Order(2)
@@ -75,7 +75,7 @@ public class MetalakeIT extends AbstractIT {
     Assertions.assertEquals(result.size(), 1);
 
     Assertions.assertEquals(result.get(0).name(), newMetalakeNameRESTful);
-    Assertions.assertEquals(result.get(0).comment(), "comment");
+    Assertions.assertEquals("comment", result.get(0).comment());
   }
 
   @Order(3)
@@ -98,7 +98,7 @@ public class MetalakeIT extends AbstractIT {
         doExecuteRequest(
             Method.PUT, putReqPath, reqUpdates1, MetalakeResponse.class, onError, h -> {});
     Assertions.assertEquals(responseUpdates.getMetalake().name(), putMetalakeName);
-    Assertions.assertEquals(responseUpdates.getMetalake().comment(), "newComment");
+    Assertions.assertEquals("newComment", responseUpdates.getMetalake().comment());
 
     // Restore test record
     putReqPath = reqPath + File.separator + putMetalakeName;
