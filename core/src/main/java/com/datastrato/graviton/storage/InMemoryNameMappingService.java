@@ -15,9 +15,9 @@ import java.util.Map;
  * please do not use it in production.
  */
 public class InMemoryNameMappingService implements NameMappingService {
-  private Map<String, Long> nameToId = Maps.newHashMap();
+  private final Map<String, Long> nameToId = Maps.newHashMap();
 
-  private IdGenerator idGenerator;
+  private final IdGenerator idGenerator;
 
   public static final InMemoryNameMappingService INSTANCE = new InMemoryNameMappingService();
 

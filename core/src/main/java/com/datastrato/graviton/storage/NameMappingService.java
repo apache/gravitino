@@ -18,23 +18,21 @@ public interface NameMappingService {
   /**
    * Get id from name.
    *
-   * @param name
-   * @return
+   * @param name the name of the entity
    */
   Long get(String name) throws IOException;
 
   /**
    * If we do not find the id of the name, we create a new id for the name.
    *
-   * @param name
+   * @param name the name of the entity
    */
   Long create(String name);
 
   /**
    * Get the id of the name. If we do not find the id of the name, we create a new id for the name.
    *
-   * @param name
-   * @return
+   * @param name the name of the entity
    */
   default Long getOrCreateId(String name) throws IOException {
     Long id = get(name);
@@ -47,12 +45,16 @@ public interface NameMappingService {
   /**
    * Update the mapping btw name and id.
    *
-   * @param name
-   * @param id
-   * @return
+   * @param name name of the entity
+   * @param id new id for the name
    */
   boolean update(String name, long id);
 
+  /**
+   * Get the id generator used by NameMappingService
+   *
+   * @return the id generator
+   */
   IdGenerator getIdGenerator();
 
   // Execute some operation in transaction.

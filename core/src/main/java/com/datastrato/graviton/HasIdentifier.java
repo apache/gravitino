@@ -33,7 +33,8 @@ public interface HasIdentifier {
   }
 
   /**
-   * Returns a binary compact unique identifier of the entity.
+   * Returns a binary compact unique identifier of the entity. Note. This binary identifier is used
+   * to store the entity in the backend.
    *
    * @return The binary compact unique identifier of the entity.
    */

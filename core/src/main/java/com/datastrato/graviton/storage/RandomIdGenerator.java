@@ -7,6 +7,10 @@ package com.datastrato.graviton.storage;
 
 import java.util.UUID;
 
+/**
+ * Random id generator. This is used to generate random id for entities. Please see {@link
+ * com.datastrato.graviton.meta.BaseMetalake#ID} for more details.
+ */
 public class RandomIdGenerator implements IdGenerator {
 
   private final UUID uuid = UUID.randomUUID();

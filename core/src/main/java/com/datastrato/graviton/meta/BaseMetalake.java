@@ -8,7 +8,6 @@ import com.datastrato.graviton.Audit;
 import com.datastrato.graviton.Auditable;
 import com.datastrato.graviton.Entity;
 import com.datastrato.graviton.Field;
-import com.datastrato.graviton.GravitonEnv;
 import com.datastrato.graviton.HasIdentifier;
 import com.datastrato.graviton.Metalake;
 import java.util.Collections;
@@ -18,6 +17,8 @@ import javax.annotation.Nullable;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** Base implementation of a Metalake entity. */
 @EqualsAndHashCode
@@ -120,14 +121,9 @@ public class BaseMetalake implements Metalake, Entity, Auditable, HasIdentifier 
     return properties;
   }
 
-  @Override
-  public byte[] binaryNameIdentifier() {
-    // TODO implement, maybe use key encoder
-    return new byte[0];
-  }
-
   /** Builder class for creating instances of {@link BaseMetalake}. */
   public static class Builder {
+    public static final Logger LOGGER = LoggerFactory.getLogger(Builder.class);
     private final BaseMetalake metalake;
 
     /** Constructs a new {@link Builder}. */
@@ -154,12 +150,6 @@ public class BaseMetalake implements Metalake, Entity, Auditable, HasIdentifier 
      */
     public Builder withName(String name) {
       metalake.name = name;
-      try {
-        metalake.id = GravitonEnv.getInstance().getNameMappingService().getOrCreateId(name);
-      } catch (Exception e) {
-        // throw exception here...
-        throw new RuntimeException(e);
-      }
       return this;
     }
 
