@@ -62,7 +62,7 @@ public class KvNameMappingService implements NameMappingService {
     byte[] nameByte = Bytes.concat(NAME_PREFIX, oldName.getBytes());
     byte[] oldIdValue = backend.get(nameByte);
 
-    // Old mapping been deleted, no need to do it;
+    // Old mapping has been deleted, no need to do it;
     if (oldIdValue == null) {
       return true;
     }
