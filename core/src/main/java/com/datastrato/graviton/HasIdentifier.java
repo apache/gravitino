@@ -19,5 +19,7 @@ public interface HasIdentifier {
     return NameIdentifier.of(namespace(), name());
   }
 
-  // TODO. Returns a binary compact unique identifier of the entity. @Jerry
+  default byte[] binaryNameIdentifier() {
+    return new byte[0];
+  }
 }

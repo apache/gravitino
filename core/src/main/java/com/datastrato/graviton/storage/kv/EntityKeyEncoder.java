@@ -6,6 +6,8 @@
 package com.datastrato.graviton.storage.kv;
 
 import com.datastrato.graviton.Entity.EntityIdentifer;
+import com.datastrato.graviton.Entity.EntityType;
+import com.datastrato.graviton.NameIdentifier;
 import java.io.IOException;
 
 /**
@@ -23,4 +25,8 @@ public interface EntityKeyEncoder {
    * @throws IOException
    */
   byte[] encode(EntityIdentifer entityIdentifer, boolean createIdIfNotExists) throws IOException;
+
+  // TODO: Complete this method and remove the former one;
+  byte[] encode(NameIdentifier identifier, EntityType type, boolean createIdIfNotExists)
+      throws IOException;
 }

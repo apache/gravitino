@@ -13,6 +13,8 @@ import com.datastrato.graviton.Entity.EntityIdentifer;
 import com.datastrato.graviton.Entity.EntityType;
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.NoSuchEntityException;
+import com.datastrato.graviton.storage.InMemoryNameMappingService;
+import com.datastrato.graviton.storage.NameMappingService;
 import com.datastrato.graviton.util.ByteUtils;
 import com.datastrato.graviton.util.Bytes;
 import com.google.common.annotations.VisibleForTesting;
@@ -47,6 +49,18 @@ import org.slf4j.LoggerFactory;
  */
 public class CustomEntityKeyEncoder implements EntityKeyEncoder {
   public static final Logger LOG = LoggerFactory.getLogger(CustomEntityKeyEncoder.class);
+
+  // TODO(yuqi) should be configuratable;
+  private static final NameMappingService NAME_MAPPING_SERVICE =
+      InMemoryNameMappingService.INSTANCE;
+
+  @Override
+  public byte[] encode(NameIdentifier identifier, EntityType type, boolean createIdIfNotExists)
+      throws IOException {
+    // TODO(yuqi)
+    // Using NAME_MAPPING_SERVICE to implement EntityKeyEncoder without using KvBackend directly.
+    return new byte[0];
+  }
 
   // name prefix of name in name to id mapping,
   // e.g., name_metalake1 -> 1

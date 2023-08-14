@@ -8,6 +8,7 @@ import com.datastrato.graviton.Audit;
 import com.datastrato.graviton.Auditable;
 import com.datastrato.graviton.Entity;
 import com.datastrato.graviton.Field;
+import com.datastrato.graviton.GravitonEnv;
 import com.datastrato.graviton.HasIdentifier;
 import com.datastrato.graviton.Metalake;
 import java.util.Collections;
@@ -86,6 +87,12 @@ public class BaseMetalake implements Metalake, Entity, Auditable, HasIdentifier 
     return properties;
   }
 
+  @Override
+  public byte[] binaryNameIdentifier() {
+    // TODO implement, maybe use key encoder
+    return new byte[0];
+  }
+
   public static class Builder {
     private final BaseMetalake metalake;
 
@@ -100,6 +107,12 @@ public class BaseMetalake implements Metalake, Entity, Auditable, HasIdentifier 
 
     public Builder withName(String name) {
       metalake.name = name;
+      try {
+        metalake.id = GravitonEnv.getInstance().getNameMappingService().getOrCreateId(name);
+      } catch (Exception e) {
+        // throw exception here...
+        throw new RuntimeException(e);
+      }
       return this;
     }
 
