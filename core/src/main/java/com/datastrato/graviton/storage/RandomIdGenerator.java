@@ -13,12 +13,10 @@ import java.util.UUID;
  */
 public class RandomIdGenerator implements IdGenerator {
 
-  private final UUID uuid = UUID.randomUUID();
-
   public static final RandomIdGenerator INSTACNE = new RandomIdGenerator();
 
   @Override
   public long nextId() {
-    return uuid.getLeastSignificantBits();
+    return UUID.randomUUID().getLeastSignificantBits();
   }
 }
