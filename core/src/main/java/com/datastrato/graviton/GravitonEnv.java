@@ -7,6 +7,7 @@ package com.datastrato.graviton;
 import com.datastrato.graviton.catalog.CatalogManager;
 import com.datastrato.graviton.catalog.CatalogOperationDispatcher;
 import com.datastrato.graviton.meta.MetalakeManager;
+import com.google.common.base.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -96,6 +97,7 @@ public class GravitonEnv {
    * @return The EntityStore instance.
    */
   public EntityStore entityStore() {
+    Preconditions.checkNotNull(entityStore, "GravitonEnv is not initialized.");
     return entityStore;
   }
 

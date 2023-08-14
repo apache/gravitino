@@ -76,4 +76,5 @@ dependencies {
     testImplementation(libs.slf4j.jdk14)
     testImplementation(libs.junit.jupiter.api)
     testRuntimeOnly(libs.junit.jupiter.engine)
+    testImplementation(libs.mockito.core)
 }
