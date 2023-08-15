@@ -18,17 +18,29 @@ public class ProtoEntitySerDe implements EntitySerDe {
   // The implementation of different entities should also register its class to this map,
   // otherwise ProtoEntitySerDe will not be able to deserialize the entity.
   private static final Map<String, String> ENTITY_TO_SERDE =
-      ImmutableMap.of(
-          "com.datastrato.graviton.meta.AuditInfo",
-          "com.datastrato.graviton.proto.AuditInfoSerDe",
-          "com.datastrato.graviton.meta.BaseMetalake",
-          "com.datastrato.graviton.proto.BaseMetalakeSerDe",
-          "com.datastrato.graviton.meta.CatalogEntity",
-          "com.datastrato.graviton.proto.CatalogEntitySerDe",
-          "com.datastrato.graviton.meta.rel.BaseSchema",
-          "com.datastrato.graviton.proto.SchemaEntitySerDe",
-          "com.datastrato.graviton.catalog.hive.HiveSchema",
-          "com.datastrato.graviton.proto.SchemaEntitySerDe");
+      ImmutableMap.<String, String>builder()
+          .put(
+              "com.datastrato.graviton.meta.AuditInfo",
+              "com.datastrato.graviton.proto.AuditInfoSerDe")
+          .put(
+              "com.datastrato.graviton.meta.BaseMetalake",
+              "com.datastrato.graviton.proto.BaseMetalakeSerDe")
+          .put(
+              "com.datastrato.graviton.meta.CatalogEntity",
+              "com.datastrato.graviton.proto.CatalogEntitySerDe")
+          .put(
+              "com.datastrato.graviton.meta.rel.BaseSchema",
+              "com.datastrato.graviton.proto.SchemaEntitySerDe")
+          .put(
+              "com.datastrato.graviton.catalog.hive.HiveSchema",
+              "com.datastrato.graviton.proto.SchemaEntitySerDe")
+          .put(
+              "com.datastrato.graviton.meta.rel.BaseTable",
+              "com.datastrato.graviton.proto.TableEntitySerde")
+          .put(
+              "com.datastrato.graviton.catalog.hive.HiveTable",
+              "com.datastrato.graviton.proto.TableEntitySerde")
+          .build();
 
   private static final Map<String, String> ENTITY_TO_PROTO =
       ImmutableMap.of(
@@ -39,7 +51,9 @@ public class ProtoEntitySerDe implements EntitySerDe {
           "com.datastrato.graviton.meta.CatalogEntity",
           "com.datastrato.graviton.proto.Catalog",
           "com.datastrato.graviton.meta.rel.BaseSchema",
-          "com.datastrato.graviton.proto.Schema");
+          "com.datastrato.graviton.proto.Schema",
+          "com.datastrato.graviton.meta.rel.BaseTable",
+          "com.datastrato.graviton.proto.Table");
 
   private final Map<Class<? extends Entity>, ProtoSerDe<? extends Entity, ? extends Message>>
       entityToSerDe;
