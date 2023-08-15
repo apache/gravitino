@@ -7,11 +7,7 @@ package com.datastrato.graviton;
 import com.datastrato.graviton.catalog.CatalogManager;
 import com.datastrato.graviton.catalog.CatalogOperationDispatcher;
 import com.datastrato.graviton.meta.MetalakeManager;
-import com.datastrato.graviton.storage.InMemoryNameMappingService;
-import com.datastrato.graviton.storage.NameMappingService;
-import com.datastrato.graviton.storage.kv.EntityKeyEncoder;
 import com.google.common.base.Preconditions;
-import lombok.Getter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,10 +29,6 @@ public class GravitonEnv {
   private CatalogOperationDispatcher catalogOperationDispatcher;
 
   private MetalakeManager metalakeManager;
-
-  @Getter private NameMappingService nameMappingService = new InMemoryNameMappingService();
-
-  @Getter private EntityKeyEncoder entityKeyEncoder;
 
   private GravitonEnv() {}
 

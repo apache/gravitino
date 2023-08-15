@@ -44,18 +44,16 @@ public interface NameMappingService {
   }
 
   /**
-   * Update the mapping of the name to id; Before:
+   * Update the mapping of the name to id;
    *
    * <pre>
+   * Before:
    *   oldname -> 1
    *   1       -> oldname
-   * </pre>
    *
    * After:
-   *
-   * <pre>
-   * newname -> 1
-   * 1       -> newname
+   *  newname -> 1
+   *  1       -> newname
    * </pre>
    *
    * @param oldName name to be updated

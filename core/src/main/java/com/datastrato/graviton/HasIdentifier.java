@@ -31,14 +31,4 @@ public interface HasIdentifier {
   default NameIdentifier nameIdentifier() {
     return NameIdentifier.of(namespace(), name());
   }
-
-  /**
-   * Returns a binary compact unique identifier of the entity. Note. This binary identifier is used
-   * to store the entity in the backend.
-   *
-   * @return The binary compact unique identifier of the entity.
-   */
-  default byte[] binaryNameIdentifier() {
-    return new byte[0];
-  }
 }
