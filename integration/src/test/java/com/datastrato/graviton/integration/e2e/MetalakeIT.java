@@ -39,8 +39,8 @@ import org.junit.jupiter.api.TestMethodOrder;
 
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class MetalakeIT extends AbstractIT {
-  public static String newMetalakeNameRESTful = GravitonITUtils.genRandomName();
-  public static String newMetalakeNameAPI = GravitonITUtils.genRandomName();
+  public static String metalakeName_RESTful = GravitonITUtils.genRandomName();
+  public static String metalakeName_API = GravitonITUtils.genRandomName();
 
   static String reqPath = "api/metalakes";
 
@@ -57,8 +57,8 @@ public class MetalakeIT extends AbstractIT {
 
   @BeforeAll
   private static void startup() {
-    MetalakeResponse successResponse = createDefMetalake(newMetalakeNameRESTful);
-    Assertions.assertEquals(successResponse.getMetalake().name(), newMetalakeNameRESTful);
+    MetalakeResponse successResponse = createDefMetalake(metalakeName_RESTful);
+    Assertions.assertEquals(successResponse.getMetalake().name(), metalakeName_RESTful);
   }
 
   @AfterAll
@@ -66,7 +66,7 @@ public class MetalakeIT extends AbstractIT {
     DropResponse response =
         doExecuteRequest(
             Method.DELETE,
-            reqPath + File.separator + newMetalakeNameRESTful,
+            reqPath + File.separator + metalakeName_RESTful,
             null,
             DropResponse.class,
             onError,
@@ -82,12 +82,12 @@ public class MetalakeIT extends AbstractIT {
 
     List<MetalakeDTO> result =
         Arrays.stream(listResponse.getMetalakes())
-            .filter(metalakeDTO -> metalakeDTO.name().equals(newMetalakeNameRESTful))
+            .filter(metalakeDTO -> metalakeDTO.name().equals(metalakeName_RESTful))
             .collect(Collectors.toList());
 
     Assertions.assertEquals(result.size(), 1);
 
-    Assertions.assertEquals(result.get(0).name(), newMetalakeNameRESTful);
+    Assertions.assertEquals(result.get(0).name(), metalakeName_RESTful);
     Assertions.assertEquals("comment", result.get(0).comment());
   }
 
@@ -95,7 +95,7 @@ public class MetalakeIT extends AbstractIT {
   @Test
   public void testPutMetalakeRestful() {
     String putMetalakeName = GravitonITUtils.genRandomName();
-    String putReqPath = reqPath + File.separator + newMetalakeNameRESTful;
+    String putReqPath = reqPath + File.separator + metalakeName_RESTful;
     MetalakeChange[] changes1 =
         new MetalakeChange[] {
           MetalakeChange.rename(putMetalakeName), MetalakeChange.updateComment("newComment")
@@ -115,8 +115,7 @@ public class MetalakeIT extends AbstractIT {
 
     // Restore test record
     putReqPath = reqPath + File.separator + putMetalakeName;
-    MetalakeChange[] changes2 =
-        new MetalakeChange[] {MetalakeChange.rename(newMetalakeNameRESTful)};
+    MetalakeChange[] changes2 = new MetalakeChange[] {MetalakeChange.rename(metalakeName_RESTful)};
 
     MetalakeUpdatesRequest reqUpdates2 =
         new MetalakeUpdatesRequest(
@@ -132,8 +131,8 @@ public class MetalakeIT extends AbstractIT {
   public void testCreateMetalakeAPI() {
     GravitonMetaLake metaLake =
         client.createMetalake(
-            NameIdentifier.parse(newMetalakeNameAPI), "comment", Collections.emptyMap());
-    Assertions.assertEquals(newMetalakeNameAPI, metaLake.name());
+            NameIdentifier.parse(metalakeName_API), "comment", Collections.emptyMap());
+    Assertions.assertEquals(metalakeName_API, metaLake.name());
     Assertions.assertEquals("comment", metaLake.comment());
     Assertions.assertEquals("graviton", metaLake.auditInfo().creator());
 
@@ -143,7 +142,7 @@ public class MetalakeIT extends AbstractIT {
             MetalakeAlreadyExistsException.class,
             () ->
                 client.createMetalake(
-                    NameIdentifier.parse(newMetalakeNameAPI), "comment", Collections.emptyMap()));
+                    NameIdentifier.parse(metalakeName_API), "comment", Collections.emptyMap()));
     Assertions.assertTrue(excep.getMessage().contains("already exists"));
   }
 
@@ -153,7 +152,7 @@ public class MetalakeIT extends AbstractIT {
     GravitonMetaLake[] metaLakes = client.listMetalakes();
     List<MetalakeDTO> result =
         Arrays.stream(metaLakes)
-            .filter(metalakeDTO -> metalakeDTO.name().equals(newMetalakeNameAPI))
+            .filter(metalakeDTO -> metalakeDTO.name().equals(metalakeName_API))
             .collect(Collectors.toList());
 
     Assertions.assertEquals(result.size(), 1);
@@ -162,8 +161,8 @@ public class MetalakeIT extends AbstractIT {
   @Order(6)
   @Test
   public void testLoadMetalakeAPI() {
-    GravitonMetaLake metaLake = client.loadMetalake(NameIdentifier.of(newMetalakeNameAPI));
-    Assertions.assertEquals(metaLake.name(), newMetalakeNameAPI);
+    GravitonMetaLake metaLake = client.loadMetalake(NameIdentifier.of(metalakeName_API));
+    Assertions.assertEquals(metaLake.name(), metalakeName_API);
   }
 
   @Order(7)
@@ -175,8 +174,7 @@ public class MetalakeIT extends AbstractIT {
         new MetalakeChange[] {
           MetalakeChange.rename(alterMetalakeName), MetalakeChange.updateComment("newComment")
         };
-    GravitonMetaLake metaLake =
-        client.alterMetalake(NameIdentifier.of(newMetalakeNameAPI), changes1);
+    GravitonMetaLake metaLake = client.alterMetalake(NameIdentifier.of(metalakeName_API), changes1);
     Assertions.assertEquals(alterMetalakeName, metaLake.name());
     Assertions.assertEquals("newComment", metaLake.comment());
     Assertions.assertEquals("graviton", metaLake.auditInfo().creator());
@@ -185,18 +183,18 @@ public class MetalakeIT extends AbstractIT {
     Throwable excep =
         Assertions.assertThrows(
             NoSuchMetalakeException.class,
-            () -> client.alterMetalake(NameIdentifier.of(newMetalakeNameAPI + "mock"), changes1));
+            () -> client.alterMetalake(NameIdentifier.of(metalakeName_API + "mock"), changes1));
     Assertions.assertTrue(excep.getMessage().contains("does not exist"));
 
     // Restore test record
-    MetalakeChange[] changes2 = new MetalakeChange[] {MetalakeChange.rename(newMetalakeNameAPI)};
+    MetalakeChange[] changes2 = new MetalakeChange[] {MetalakeChange.rename(metalakeName_API)};
     client.alterMetalake(NameIdentifier.of(alterMetalakeName), changes2);
   }
 
   @Order(8)
   @Test
   public void testDropMetalakeAPI() {
-    Assertions.assertTrue(client.dropMetalake(NameIdentifier.of(newMetalakeNameAPI)));
+    Assertions.assertTrue(client.dropMetalake(NameIdentifier.of(metalakeName_API)));
 
     // Test illegal metalake name identifier
     Throwable excep1 =
@@ -204,7 +202,7 @@ public class MetalakeIT extends AbstractIT {
             IllegalArgumentException.class,
             () ->
                 client.dropMetalake(
-                    NameIdentifier.parse(newMetalakeNameAPI + "." + newMetalakeNameAPI)));
+                    NameIdentifier.parse(metalakeName_API + "." + metalakeName_API)));
     Assertions.assertTrue(excep1.getMessage().contains("namespace should be empty"));
   }
 }
