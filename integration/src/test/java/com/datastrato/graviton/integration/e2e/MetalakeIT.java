@@ -22,13 +22,16 @@ import com.datastrato.graviton.integration.util.AbstractIT;
 import com.datastrato.graviton.integration.util.GravitonITUtils;
 import com.google.common.collect.ImmutableMap;
 import java.io.File;
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import org.apache.hc.core5.http.Method;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
@@ -47,21 +50,39 @@ public class MetalakeIT extends AbstractIT {
 
   static Consumer<ErrorResponse> onError = ErrorHandlers.restErrorHandler();
 
-  @Order(1)
-  @Test
-  public void testCreateMetalakeRestful() {
+  public static MetalakeResponse createDefMetalake(String metalakeName) {
     MetalakeCreateRequest reqBody =
-        new MetalakeCreateRequest(
-            newMetalakeNameRESTful, "comment", ImmutableMap.of("key", "value"));
+        new MetalakeCreateRequest(metalakeName, "comment", ImmutableMap.of("key", "value"));
 
     MetalakeResponse successResponse =
         doExecuteRequest(Method.POST, reqPath, reqBody, MetalakeResponse.class, onError, h -> {});
-    LOG.info(successResponse.toString());
-    Assertions.assertEquals(successResponse.getMetalake().name(), newMetalakeNameRESTful);
-    Assertions.assertEquals("comment", successResponse.getMetalake().comment());
+    return successResponse;
   }
 
-  @Order(2)
+  @BeforeAll
+  public static void startUp() {
+    AbstractIT.startUp();
+
+    MetalakeResponse successResponse = createDefMetalake(newMetalakeNameRESTful);
+    Assertions.assertEquals(successResponse.getMetalake().name(), newMetalakeNameRESTful);
+  }
+
+  @AfterAll
+  public static void tearDown() throws IOException {
+    DropResponse response =
+        doExecuteRequest(
+            Method.DELETE,
+            reqPath + File.separator + newMetalakeNameRESTful,
+            null,
+            DropResponse.class,
+            onError,
+            h -> {});
+    Assertions.assertEquals(response.dropped(), true);
+
+    AbstractIT.tearDown();
+  }
+
+  @Order(1)
   @Test
   public void testListMetalakeRestful() {
     MetalakeListResponse listResponse =
@@ -78,7 +99,7 @@ public class MetalakeIT extends AbstractIT {
     Assertions.assertEquals("comment", result.get(0).comment());
   }
 
-  @Order(3)
+  @Order(2)
   @Test
   public void testPutMetalakeRestful() {
     String putMetalakeName = GravitonITUtils.genRandomName();
@@ -116,20 +137,6 @@ public class MetalakeIT extends AbstractIT {
 
   @Order(4)
   @Test
-  public void testDropMetalakeRestful() {
-    DropResponse response =
-        doExecuteRequest(
-            Method.DELETE,
-            reqPath + File.separator + newMetalakeNameRESTful,
-            null,
-            DropResponse.class,
-            onError,
-            h -> {});
-    Assertions.assertEquals(response.dropped(), true);
-  }
-
-  @Order(5)
-  @Test
   public void testCreateMetalakeAPI() {
     GravitonMetaLake metaLake =
         client.createMetalake(
@@ -148,7 +155,7 @@ public class MetalakeIT extends AbstractIT {
     Assertions.assertTrue(excep.getMessage().contains("already exists"));
   }
 
-  @Order(6)
+  @Order(5)
   @Test
   public void testListMetalakeAPI() {
     GravitonMetaLake[] metaLakes = client.listMetalakes();
@@ -160,14 +167,14 @@ public class MetalakeIT extends AbstractIT {
     Assertions.assertEquals(result.size(), 1);
   }
 
-  @Order(7)
+  @Order(6)
   @Test
   public void testLoadMetalakeAPI() {
     GravitonMetaLake metaLake = client.loadMetalake(NameIdentifier.of(newMetalakeNameAPI));
     Assertions.assertEquals(metaLake.name(), newMetalakeNameAPI);
   }
 
-  @Order(8)
+  @Order(7)
   @Test
   public void testAlterMetalakeAPI() {
     String alterMetalakeName = GravitonITUtils.genRandomName();
@@ -194,7 +201,7 @@ public class MetalakeIT extends AbstractIT {
     client.alterMetalake(NameIdentifier.of(alterMetalakeName), changes2);
   }
 
-  @Order(9)
+  @Order(8)
   @Test
   public void testDropMetalakeAPI() {
     Assertions.assertTrue(client.dropMetalake(NameIdentifier.of(newMetalakeNameAPI)));
