@@ -60,15 +60,13 @@ public class MetalakeIT extends AbstractIT {
   }
 
   @BeforeAll
-  public static void startUp() {
-    AbstractIT.startUp();
-
+  private static void startup() {
     MetalakeResponse successResponse = createDefMetalake(newMetalakeNameRESTful);
     Assertions.assertEquals(successResponse.getMetalake().name(), newMetalakeNameRESTful);
   }
 
   @AfterAll
-  public static void tearDown() throws IOException {
+  private static void teardown() throws IOException {
     DropResponse response =
         doExecuteRequest(
             Method.DELETE,
@@ -78,8 +76,6 @@ public class MetalakeIT extends AbstractIT {
             onError,
             h -> {});
     Assertions.assertEquals(response.dropped(), true);
-
-    AbstractIT.tearDown();
   }
 
   @Order(1)
