@@ -6,7 +6,6 @@
 package com.datastrato.graviton.storage;
 
 import com.datastrato.graviton.storage.kv.KvEntityStore;
-import com.datastrato.graviton.util.Executable;
 import java.io.IOException;
 
 /**
@@ -26,6 +25,7 @@ public interface NameMappingService {
    * If we do not find the id of the name, we create a new id for the name.
    *
    * @param name the name of the entity
+   * @return the id of the name, or null if the name does not exist
    */
   Long create(String name);
 
@@ -33,6 +33,7 @@ public interface NameMappingService {
    * Get the id of the name. If we do not find the id of the name, we create a new id for the name.
    *
    * @param name the name of the entity
+   * @return the id of the name
    */
   default Long getOrCreateId(String name) throws IOException {
     Long id = get(name);
@@ -43,12 +44,32 @@ public interface NameMappingService {
   }
 
   /**
-   * Update the mapping btw name and id.
+   * Update the mapping of the name to id; Before:
    *
-   * @param name name of the entity
-   * @param id new id for the name
+   * <pre>
+   *   oldname -> 1
+   *   1       -> oldname
+   * </pre>
+   *
+   * After:
+   *
+   * <pre>
+   * newname -> 1
+   * 1       -> newname
+   * </pre>
+   *
+   * @param oldName name to be updated
+   * @param newName new name
    */
-  boolean update(String name, long id);
+  boolean update(String oldName, String newName);
+
+  /**
+   * Delete id mapping for name. Ignore if the name does not exist.
+   *
+   * @param name name to be deleted
+   * @return true if the name exists and is deleted successfully, false if the name does not exist
+   */
+  boolean delete(String name);
 
   /**
    * Get the id generator used by NameMappingService
@@ -56,7 +77,4 @@ public interface NameMappingService {
    * @return the id generator
    */
   IdGenerator getIdGenerator();
-
-  // Execute some operation in transaction.
-  <R, E extends Exception> R executeInTransaction(Executable<R, E> executable) throws E;
 }
