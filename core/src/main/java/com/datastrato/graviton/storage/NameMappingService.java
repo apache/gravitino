@@ -12,7 +12,7 @@ import java.io.IOException;
  * {@link NameMappingService} mangers name to id mappings when using {@link KvEntityStore} to store
  * entity.
  *
- * <p> Note. Implementations of this interface should be thread-safe.
+ * <p>Note. Implementations of this interface should be thread-safe.
  */
 public interface NameMappingService {
 
