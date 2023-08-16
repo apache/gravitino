@@ -28,4 +28,11 @@ public class TestByteUtils {
     long v2 = ByteUtils.byteToLong(b);
     assert v == v2;
   }
+
+  @Test
+  public void testFormatByteArray() {
+    byte[] b = new byte[] {0x00, 0x01, 0x02, 0x03};
+    String s = ByteUtils.formatByteArray(b);
+    Assertions.assertEquals("0x00010203", s);
+  }
 }
