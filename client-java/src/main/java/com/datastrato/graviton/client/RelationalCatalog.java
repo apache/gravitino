@@ -39,7 +39,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
-import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -84,7 +83,7 @@ public class RelationalCatalog extends CatalogDTO implements TableCatalog, Suppo
    */
   @Override
   public NameIdentifier[] listTables(Namespace namespace) throws NoSuchSchemaException {
-    validateTableNamespace(namespace);
+    Namespace.checkTable(namespace);
 
     EntityListResponse resp =
         restClient.get(
@@ -106,7 +105,7 @@ public class RelationalCatalog extends CatalogDTO implements TableCatalog, Suppo
    */
   @Override
   public Table loadTable(NameIdentifier ident) throws NoSuchTableException {
-    validateTableIdentifier(ident);
+    NameIdentifier.checkTable(ident);
 
     TableResponse resp =
         restClient.get(
@@ -134,7 +133,7 @@ public class RelationalCatalog extends CatalogDTO implements TableCatalog, Suppo
   public Table createTable(
       NameIdentifier ident, Column[] columns, String comment, Map<String, String> properties)
       throws NoSuchSchemaException, TableAlreadyExistsException {
-    validateTableIdentifier(ident);
+    NameIdentifier.checkTable(ident);
 
     TableCreateRequest req =
         new TableCreateRequest(ident.name(), comment, (ColumnDTO[]) columns, properties);
@@ -164,7 +163,7 @@ public class RelationalCatalog extends CatalogDTO implements TableCatalog, Suppo
   @Override
   public Table alterTable(NameIdentifier ident, TableChange... changes)
       throws NoSuchTableException, IllegalArgumentException {
-    validateTableIdentifier(ident);
+    NameIdentifier.checkTable(ident);
 
     List<TableUpdateRequest> reqs =
         Arrays.stream(changes)
@@ -193,7 +192,7 @@ public class RelationalCatalog extends CatalogDTO implements TableCatalog, Suppo
    */
   @Override
   public boolean dropTable(NameIdentifier ident) {
-    validateTableIdentifier(ident);
+    NameIdentifier.checkTable(ident);
 
     try {
       DropResponse resp =
@@ -220,7 +219,7 @@ public class RelationalCatalog extends CatalogDTO implements TableCatalog, Suppo
    */
   @Override
   public NameIdentifier[] listSchemas(Namespace namespace) throws NoSuchCatalogException {
-    validateSchemaNamespace(namespace);
+    Namespace.checkSchema(namespace);
 
     EntityListResponse resp =
         restClient.get(
@@ -246,7 +245,7 @@ public class RelationalCatalog extends CatalogDTO implements TableCatalog, Suppo
   @Override
   public Schema createSchema(NameIdentifier ident, String comment, Map<String, String> metadata)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
-    validateSchemaIdentifier(ident);
+    NameIdentifier.checkSchema(ident);
 
     SchemaCreateRequest req = new SchemaCreateRequest(ident.name(), comment, metadata);
     req.validate();
@@ -272,7 +271,7 @@ public class RelationalCatalog extends CatalogDTO implements TableCatalog, Suppo
    */
   @Override
   public Schema loadSchema(NameIdentifier ident) throws NoSuchSchemaException {
-    validateSchemaIdentifier(ident);
+    NameIdentifier.checkSchema(ident);
 
     SchemaResponse resp =
         restClient.get(
@@ -296,7 +295,7 @@ public class RelationalCatalog extends CatalogDTO implements TableCatalog, Suppo
   @Override
   public Schema alterSchema(NameIdentifier ident, SchemaChange... changes)
       throws NoSuchSchemaException {
-    validateSchemaIdentifier(ident);
+    NameIdentifier.checkSchema(ident);
 
     List<SchemaUpdateRequest> reqs =
         Arrays.stream(changes)
@@ -327,7 +326,7 @@ public class RelationalCatalog extends CatalogDTO implements TableCatalog, Suppo
    */
   @Override
   public boolean dropSchema(NameIdentifier ident, boolean cascade) throws NonEmptySchemaException {
-    validateSchemaIdentifier(ident);
+    NameIdentifier.checkSchema(ident);
 
     try {
       DropResponse resp =
@@ -346,28 +345,6 @@ public class RelationalCatalog extends CatalogDTO implements TableCatalog, Suppo
       LOG.warn("Failed to drop schema {}", ident, e);
       return false;
     }
-  }
-
-  private static void validateSchemaNamespace(Namespace ns) {
-    Preconditions.checkArgument(
-        ns != null && ns.length() == 2,
-        "Schema namespace must not be null and have exactly two level");
-  }
-
-  private static void validateSchemaIdentifier(NameIdentifier ident) {
-    validateSchemaNamespace(ident.namespace());
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(ident.name()), "Schema name must not be null or empty");
-  }
-
-  private static void validateTableNamespace(Namespace ns) {
-    validateSchemaIdentifier(NameIdentifier.of(ns.levels()));
-  }
-
-  private static void validateTableIdentifier(NameIdentifier ident) {
-    validateTableNamespace(ident.namespace());
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(ident.name()), "Table name must not be null or empty");
   }
 
   @VisibleForTesting

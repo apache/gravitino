@@ -113,7 +113,8 @@ public class TestGravitonClient extends TestBase {
         Assertions.assertThrows(
             IllegalArgumentException.class,
             () -> client.loadMetalake(NameIdentifier.parse("mock.mock")));
-    Assertions.assertTrue(excep1.getMessage().contains("namespace should be empty"));
+    Assertions.assertTrue(
+        excep1.getMessage().contains("Metalake namespace must be non-null and empty"));
 
     // Test return unparsed system error
     buildMockResource(Method.GET, "/api/metalakes/mock", null, null, HttpStatus.SC_CONFLICT);
@@ -209,7 +210,8 @@ public class TestGravitonClient extends TestBase {
         Assertions.assertThrows(
             IllegalArgumentException.class,
             () -> client.alterMetalake(NameIdentifier.parse("mock.mock"), changes));
-    Assertions.assertTrue(excep1.getMessage().contains("namespace should be empty"));
+    Assertions.assertTrue(
+        excep1.getMessage().contains("Metalake namespace must be non-null and empty"));
   }
 
   @Test
@@ -233,6 +235,7 @@ public class TestGravitonClient extends TestBase {
         Assertions.assertThrows(
             IllegalArgumentException.class,
             () -> client.dropMetalake(NameIdentifier.parse("mock.mock")));
-    Assertions.assertTrue(excep1.getMessage().contains("namespace should be empty"));
+    Assertions.assertTrue(
+        excep1.getMessage().contains("Metalake namespace must be non-null and empty"));
   }
 }

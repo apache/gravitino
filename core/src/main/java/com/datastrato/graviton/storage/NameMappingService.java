@@ -26,8 +26,9 @@ public interface NameMappingService {
   Long get(String name) throws IOException;
 
   /**
-   * If we do not find the id of the name, we create a new id for the name. Note, this method should
-   * be called in transaction.
+   * If we do not find the id of the name, we create a new id for the name.
+   *
+   * <p>Note, this method should be called in transaction.
    *
    * @param name the name of the entity
    * @return the id of the name, or null if the name does not exist

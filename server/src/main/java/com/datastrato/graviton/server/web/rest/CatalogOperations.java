@@ -16,6 +16,8 @@ import com.datastrato.graviton.dto.responses.CatalogResponse;
 import com.datastrato.graviton.dto.responses.DropResponse;
 import com.datastrato.graviton.dto.responses.EntityListResponse;
 import com.datastrato.graviton.exceptions.CatalogAlreadyExistsException;
+import com.datastrato.graviton.exceptions.IllegalNameIdentifierException;
+import com.datastrato.graviton.exceptions.IllegalNamespaceException;
 import com.datastrato.graviton.exceptions.NoSuchCatalogException;
 import com.datastrato.graviton.exceptions.NoSuchMetalakeException;
 import com.datastrato.graviton.server.web.Utils;
@@ -54,15 +56,14 @@ public class CatalogOperations {
   @GET
   @Produces("application/vnd.graviton.v1+json")
   public Response listCatalogs(@PathParam("metalake") String metalake) {
-    if (metalake == null || metalake.isEmpty()) {
-      LOG.error("Metalake name is null or empty");
-      return Utils.illegalArguments("Metalake name is illegal");
-    }
-
     try {
-      Namespace metalakeNS = Namespace.of(metalake);
-      NameIdentifier[] idents = manager.listCatalogs(metalakeNS);
+      Namespace catalogNS = Namespace.ofCatalog(metalake);
+      NameIdentifier[] idents = manager.listCatalogs(catalogNS);
       return Utils.ok(new EntityListResponse(idents));
+
+    } catch (IllegalNamespaceException e) {
+      LOG.warn("Failed to list catalogs with invalid namespace", e);
+      return Utils.illegalArguments("Failed to list catalogs with invalid namespace", e);
 
     } catch (NoSuchMetalakeException ex) {
       LOG.error("Metalake {} does not exist, fail to list catalogs", metalake);
@@ -78,11 +79,6 @@ public class CatalogOperations {
   @Produces("application/vnd.graviton.v1+json")
   public Response createCatalog(
       @PathParam("metalake") String metalake, CatalogCreateRequest request) {
-    if (metalake == null || metalake.isEmpty()) {
-      LOG.error("Metalake name is null or empty");
-      return Utils.illegalArguments("Metalake name is illegal");
-    }
-
     try {
       request.validate();
     } catch (IllegalArgumentException e) {
@@ -92,11 +88,15 @@ public class CatalogOperations {
     }
 
     try {
-      NameIdentifier ident = NameIdentifier.of(metalake, request.getName());
+      NameIdentifier ident = NameIdentifier.ofCatalog(metalake, request.getName());
       Catalog catalog =
           manager.createCatalog(
               ident, request.getType(), request.getComment(), request.getProperties());
       return Utils.ok(new CatalogResponse(DTOConverters.toDTO(catalog)));
+
+    } catch (IllegalNamespaceException | IllegalNameIdentifierException e) {
+      LOG.warn("Failed to create catalog with invalid name identifier", e);
+      return Utils.illegalArguments("Failed to create catalog with invalid name identifier", e);
 
     } catch (NoSuchMetalakeException ex) {
       LOG.error("Metalake {} does not exist, fail to create catalog", metalake);
@@ -119,20 +119,14 @@ public class CatalogOperations {
   @Produces("application/vnd.graviton.v1+json")
   public Response loadCatalog(
       @PathParam("metalake") String metalakeName, @PathParam("catalog") String catalogName) {
-    if (metalakeName == null || metalakeName.isEmpty()) {
-      LOG.error("Metalake name is null or empty");
-      return Utils.illegalArguments("Metalake name is illegal");
-    }
-
-    if (catalogName == null || catalogName.isEmpty()) {
-      LOG.error("Catalog name is null or empty");
-      return Utils.illegalArguments("Catalog name is illegal");
-    }
-
     try {
-      NameIdentifier ident = NameIdentifier.of(metalakeName, catalogName);
+      NameIdentifier ident = NameIdentifier.ofCatalog(metalakeName, catalogName);
       Catalog catalog = manager.loadCatalog(ident);
       return Utils.ok(new CatalogResponse(DTOConverters.toDTO(catalog)));
+
+    } catch (IllegalNamespaceException | IllegalNameIdentifierException e) {
+      LOG.warn("Failed to load catalog with invalid name identifier", e);
+      return Utils.illegalArguments("Failed to load catalog with invalid name identifier", e);
 
     } catch (NoSuchMetalakeException ex) {
       LOG.error("Metalake {} does not exist, fail to load catalog {}", metalakeName, catalogName);
@@ -158,16 +152,6 @@ public class CatalogOperations {
       @PathParam("metalake") String metalakeName,
       @PathParam("catalog") String catalogName,
       CatalogUpdatesRequest request) {
-    if (metalakeName == null || metalakeName.isEmpty()) {
-      LOG.error("Metalake name is null or empty");
-      return Utils.illegalArguments("Metalake name is illegal");
-    }
-
-    if (catalogName == null || catalogName.isEmpty()) {
-      LOG.error("Catalog name is null or empty");
-      return Utils.illegalArguments("Catalog name is illegal");
-    }
-
     try {
       request.validate();
     } catch (IllegalArgumentException e) {
@@ -177,7 +161,7 @@ public class CatalogOperations {
     }
 
     try {
-      NameIdentifier ident = NameIdentifier.of(metalakeName, catalogName);
+      NameIdentifier ident = NameIdentifier.ofCatalog(metalakeName, catalogName);
       CatalogChange[] changes =
           request.getUpdates().stream()
               .map(CatalogUpdateRequest::catalogChange)
@@ -185,6 +169,10 @@ public class CatalogOperations {
 
       Catalog catalog = manager.alterCatalog(ident, changes);
       return Utils.ok(new CatalogResponse(DTOConverters.toDTO(catalog)));
+
+    } catch (IllegalNamespaceException | IllegalNameIdentifierException e) {
+      LOG.warn("Failed to alter catalog with invalid name identifier", e);
+      return Utils.illegalArguments("Failed to alter catalog with invalid name identifier", e);
 
     } catch (NoSuchCatalogException ex) {
       LOG.error("Catalog {} does not exist under metalake {}", catalogName, metalakeName);
@@ -217,24 +205,18 @@ public class CatalogOperations {
   @Produces("application/vnd.graviton.v1+json")
   public Response dropCatalog(
       @PathParam("metalake") String metalakeName, @PathParam("catalog") String catalogName) {
-    if (metalakeName == null || metalakeName.isEmpty()) {
-      LOG.error("Metalake name is null or empty");
-      return Utils.illegalArguments("Metalake name is illegal");
-    }
-
-    if (catalogName == null || catalogName.isEmpty()) {
-      LOG.error("Catalog name is null or empty");
-      return Utils.illegalArguments("Catalog name is illegal");
-    }
-
     try {
-      NameIdentifier ident = NameIdentifier.of(metalakeName, catalogName);
+      NameIdentifier ident = NameIdentifier.ofCatalog(metalakeName, catalogName);
       boolean dropped = manager.dropCatalog(ident);
       if (!dropped) {
         LOG.warn("Failed to drop catalog {} under metalake {}", catalogName, metalakeName);
       }
 
       return Utils.ok(new DropResponse(dropped));
+
+    } catch (IllegalNamespaceException | IllegalNameIdentifierException e) {
+      LOG.warn("Failed to drop catalog with invalid name identifier", e);
+      return Utils.illegalArguments("Failed to drop catalog with invalid name identifier", e);
 
     } catch (Exception e) {
       LOG.error("Failed to drop catalog {} under metalake {}", catalogName, metalakeName, e);
