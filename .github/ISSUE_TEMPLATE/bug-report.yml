@@ -1,0 +1,37 @@
+name: Bug Report
+title: "[Bug report] "
+description: A bug report issue
+labels: [ "kind:bug" ]
+body:
+
+  - type: textarea
+    attributes:
+      label: Describe what's wrong
+      description: >
+        A clear and concise description of what works not as it is supposed to.
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Error message and/or stacktrace
+      description: >
+        If applicable, add screenshots to help explain your problem.
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: How to reproduce
+      placeholder: >
+        + Which Graviton version to use
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Additional context
+      placeholder: >
+        Any other context about the problem here.
+    validations:
+      required: false

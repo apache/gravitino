@@ -170,7 +170,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
 
     boolean metalakeExists;
     try {
-      metalakeExists = store.exists(metalakeIdent, EntityType.CATALOG);
+      metalakeExists = store.exists(metalakeIdent, EntityType.METALAKE);
     } catch (IOException e) {
       LOG.error("Failed to do storage operation", e);
       throw new RuntimeException(e);
@@ -181,7 +181,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
     }
 
     try {
-      return store.list(namespace, CatalogEntity.class, EntityType.METALAKE).stream()
+      return store.list(namespace, CatalogEntity.class, EntityType.CATALOG).stream()
           .map(entity -> NameIdentifier.of(namespace, entity.name()))
           .toArray(NameIdentifier[]::new);
 

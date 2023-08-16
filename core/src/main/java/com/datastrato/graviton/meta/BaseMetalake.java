@@ -17,8 +17,6 @@ import javax.annotation.Nullable;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /** Base implementation of a Metalake entity. */
 @EqualsAndHashCode
@@ -123,7 +121,6 @@ public class BaseMetalake implements Metalake, Entity, Auditable, HasIdentifier 
 
   /** Builder class for creating instances of {@link BaseMetalake}. */
   public static class Builder {
-    public static final Logger LOGGER = LoggerFactory.getLogger(Builder.class);
     private final BaseMetalake metalake;
 
     /** Constructs a new {@link Builder}. */

@@ -5,15 +5,15 @@
 
 package com.datastrato.graviton.storage;
 
-import com.datastrato.graviton.util.Executable;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.util.Map;
 
 /**
- * In memory implemention for {@link NameMappingService} Note, This class is only for test usage,
- * please do not use it in production.
+ * In memory implemention for {@link NameMappingService}
+ *
+ * <p>Note, This class is only for test usage, please do not use it in production.
  */
 public class InMemoryNameMappingService implements NameMappingService {
   private final Map<String, Long> nameToId = Maps.newHashMap();
@@ -55,13 +55,7 @@ public class InMemoryNameMappingService implements NameMappingService {
   }
 
   @Override
-  public <R, E extends Exception> R executeInTransaction(Executable<R, E> executable) throws E {
-    return null;
-  }
-
-  @Override
   public boolean delete(String name) throws IOException {
-    nameToId.remove(name);
-    return true;
+    return nameToId.remove(name) != null;
   }
 }

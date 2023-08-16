@@ -6,12 +6,13 @@
 package com.datastrato.graviton.storage;
 
 import com.datastrato.graviton.storage.kv.KvEntityStore;
-import com.datastrato.graviton.util.Executable;
 import java.io.IOException;
 
 /**
- * {@link NameMappingService} mangers name to id mappings when using {@link KvEntityStore} to store
+ * {@link NameMappingService} manages name to id mappings when using {@link KvEntityStore} to store
  * entity.
+ *
+ * <p>Note. Implementations of this interface should be thread-safe.
  */
 public interface NameMappingService {
 
@@ -27,6 +28,7 @@ public interface NameMappingService {
    * be called in transaction.
    *
    * @param name the name of the entity
+   * @return the id of the name, or null if the name does not exist
    */
   Long create(String name) throws IOException;
 
@@ -34,6 +36,7 @@ public interface NameMappingService {
    * Get the id of the name. If we do not find the id of the name, we create a new id for the name.
    *
    * @param name the name of the entity
+   * @return the id of the name
    */
   default Long getOrCreateId(String name) throws IOException {
     Long id = get(name);
@@ -44,20 +47,29 @@ public interface NameMappingService {
   }
 
   /**
-   * Update the mapping btw name and id.
+   * Update the mapping of the name to id. This method is used to update the mapping when we rename
+   * an entity. Please see the example
    *
-   * <p>For example, if we have the following mapping: name_a ---> 1 id_1 ---> a If we want to
-   * change to mapping to b --> 1, then name_b ---> 1 id_1 ---> b
+   * <pre>
+   * Before:
+   *   oldname -> 1
+   *   1       -> oldname
    *
-   * @param oldName old name of entity
-   * @param newName new name of entity
+   * After:
+   *  newname -> 1
+   *  1       -> newname
+   * </pre>
+   *
+   * @param oldName name to be updated
+   * @param newName new name
    */
   boolean update(String oldName, String newName) throws IOException;
 
   /**
-   * Delete related mapping of the name.
+   * Delete id mapping for name. Ignore if the name does not exist.
    *
-   * @param name name to delete
+   * @param name name to be deleted
+   * @return true if the name exists and is deleted successfully, false if the name does not exist
    */
   boolean delete(String name) throws IOException;
 
@@ -67,8 +79,4 @@ public interface NameMappingService {
    * @return the id generator
    */
   IdGenerator getIdGenerator();
-
-  // Execute some operation in transaction.
-  <R, E extends Exception> R executeInTransaction(Executable<R, E> executable)
-      throws E, IOException;
 }

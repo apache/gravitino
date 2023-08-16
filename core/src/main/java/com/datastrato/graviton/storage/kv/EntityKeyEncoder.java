@@ -22,4 +22,7 @@ public interface EntityKeyEncoder {
    * @throws IOException
    */
   byte[] encode(EntityIdentifier entityIdentifier, boolean createIdIfNotExists) throws IOException;
+
+  // TODO, Use id generator to generate id for name and use name mapping service to store the
+  //  mapping between name and id. Still we can resue the method `encode` to encode the key.;
 }

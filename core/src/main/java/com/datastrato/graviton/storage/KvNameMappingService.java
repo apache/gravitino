@@ -8,7 +8,6 @@ package com.datastrato.graviton.storage;
 import com.datastrato.graviton.storage.kv.KvBackend;
 import com.datastrato.graviton.util.ByteUtils;
 import com.datastrato.graviton.util.Bytes;
-import com.datastrato.graviton.util.Executable;
 import java.io.IOException;
 import javax.annotation.concurrent.ThreadSafe;
 
@@ -51,40 +50,38 @@ public class KvNameMappingService implements NameMappingService {
   public synchronized Long create(String name) throws IOException {
     long id = idGenerator.nextId();
     byte[] nameByte = Bytes.concat(NAME_PREFIX, name.getBytes());
-    // Use false to avoid overwrite.
-    backend.put(nameByte, ByteUtils.longToByte(id), false);
-    byte[] idByte = Bytes.concat(ID_PREFIX, ByteUtils.longToByte(id));
-    backend.put(idByte, name.getBytes(), false);
-    return id;
+    return backend.executeInTransaction(
+        () -> {
+          backend.put(nameByte, ByteUtils.longToByte(id), false);
+          byte[] idByte = Bytes.concat(ID_PREFIX, ByteUtils.longToByte(id));
+          backend.put(idByte, name.getBytes(), false);
+          return id;
+        });
   }
 
   @Override
   public synchronized boolean update(String oldName, String newName) throws IOException {
-    byte[] nameByte = Bytes.concat(NAME_PREFIX, oldName.getBytes());
-    byte[] oldIdValue = backend.get(nameByte);
+    return backend.executeInTransaction(
+        () -> {
+          byte[] nameByte = Bytes.concat(NAME_PREFIX, oldName.getBytes());
+          byte[] oldIdValue = backend.get(nameByte);
 
-    // Old mapping has been deleted, no need to do it;
-    if (oldIdValue == null) {
-      return true;
-    }
+          // Old mapping has been deleted, no need to do it;
+          if (oldIdValue == null) {
+            return true;
+          }
+          // Delete old name --> id mapping
+          backend.delete(nameByte);
 
-    // Delete old name --> id mapping
-    backend.delete(nameByte);
-
-    backend.put(Bytes.concat(NAME_PREFIX, newName.getBytes()), oldIdValue, false);
-    backend.put(Bytes.concat(ID_PREFIX, oldIdValue), newName.getBytes(), true);
-    return true;
+          backend.put(Bytes.concat(NAME_PREFIX, newName.getBytes()), oldIdValue, false);
+          backend.put(Bytes.concat(ID_PREFIX, oldIdValue), newName.getBytes(), true);
+          return true;
+        });
   }
 
   @Override
   public IdGenerator getIdGenerator() {
     return idGenerator;
-  }
-
-  @Override
-  public <R, E extends Exception> R executeInTransaction(Executable<R, E> executable)
-      throws E, IOException {
-    return backend.executeInTransaction(executable);
   }
 
   @Override

@@ -76,23 +76,17 @@ public class TestKvNameMappingService {
     nameMappingService.delete("name4");
     Assertions.assertNull(nameMappingService.get("name4"));
 
-    // Test execute in transaction
+    KvBackend spyKvBackend = Mockito.spy(backend);
+    Mockito.doThrow(new ArithmeticException()).when(spyKvBackend).delete(Mockito.any());
+    KvNameMappingService mockNameMappingService = new KvNameMappingService(spyKvBackend);
+
+    // Now we try to use update. It should fail.
+
     Assertions.assertThrowsExactly(
-        ArithmeticException.class,
-        () ->
-            nameMappingService.executeInTransaction(
-                () -> {
-                  nameMappingService.create("name5");
-                  nameMappingService.create("name6");
-                  // Mock exception
-                  int d = 1 / 0;
-                  nameMappingService.create("name7");
-                  return null;
-                }));
+        ArithmeticException.class, () -> mockNameMappingService.update("name3", "name4"));
+    Assertions.assertNull(mockNameMappingService.get("name4"));
+    Assertions.assertNotNull(mockNameMappingService.get("name3"));
 
-    Assertions.assertNull(nameMappingService.get("name5"));
-    Assertions.assertNull(nameMappingService.get("name6"));
-
-    Assertions.assertTrue(nameMappingService.getIdGenerator().nextId() > 0);
+    Assertions.assertTrue(mockNameMappingService.getIdGenerator().nextId() > 0);
   }
 }

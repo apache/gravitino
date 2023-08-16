@@ -5,7 +5,6 @@
 
 package com.datastrato.graviton.meta.rel;
 
-import com.datastrato.graviton.Audit;
 import com.datastrato.graviton.Entity;
 import com.datastrato.graviton.Field;
 import com.datastrato.graviton.HasIdentifier;
@@ -17,12 +16,13 @@ import com.google.common.collect.Maps;
 import java.util.Map;
 import javax.annotation.Nullable;
 import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import lombok.ToString;
 
 /** An abstract class representing a base table in a relational database. */
 @EqualsAndHashCode
 @ToString
-public abstract class BaseTable implements Table, Entity, HasIdentifier {
+public class BaseTable implements Table, Entity, HasIdentifier {
 
   public static final Field ID = Field.required("id", Long.class, "The table's unique identifier");
   public static final Field SCHEMA_ID =
@@ -34,12 +34,14 @@ public abstract class BaseTable implements Table, Entity, HasIdentifier {
       Field.optional("properties", Map.class, "The associated properties of the table");
   public static final Field AUDIT_INFO =
       Field.required("audit_info", AuditInfo.class, "The audit details of the table");
+
+  // we do not save columns in Graviton store, so it is an optional field
   public static final Field COLUMNS =
-      Field.required("columns", Column[].class, "The columns that make up the table");
+      Field.optional("columns", Column[].class, "The columns that make up the table");
 
-  protected Long id;
+  @Getter protected Long id;
 
-  protected Long schemaId;
+  @Getter protected Long schemaId;
 
   protected String name;
 
@@ -78,7 +80,7 @@ public abstract class BaseTable implements Table, Entity, HasIdentifier {
    * @return The audit details of the table.
    */
   @Override
-  public Audit auditInfo() {
+  public AuditInfo auditInfo() {
     return auditInfo;
   }
 
@@ -299,5 +301,19 @@ public abstract class BaseTable implements Table, Entity, HasIdentifier {
     }
 
     protected abstract T internalBuild();
+  }
+
+  public static class TableBuilder extends BaseTableBuilder<TableBuilder, BaseTable> {
+    @Override
+    protected BaseTable internalBuild() {
+      BaseTable table = new BaseTable();
+      table.id = id;
+      table.schemaId = schemaId;
+      table.name = name;
+      table.comment = comment;
+      table.properties = properties;
+      table.auditInfo = auditInfo;
+      return table;
+    }
   }
 }
