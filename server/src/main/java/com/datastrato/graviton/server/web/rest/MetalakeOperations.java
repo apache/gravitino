@@ -6,6 +6,7 @@ package com.datastrato.graviton.server.web.rest;
 
 import com.datastrato.graviton.MetalakeChange;
 import com.datastrato.graviton.NameIdentifier;
+import com.datastrato.graviton.Namespace;
 import com.datastrato.graviton.dto.MetalakeDTO;
 import com.datastrato.graviton.dto.requests.MetalakeCreateRequest;
 import com.datastrato.graviton.dto.requests.MetalakeUpdateRequest;
@@ -13,10 +14,6 @@ import com.datastrato.graviton.dto.requests.MetalakeUpdatesRequest;
 import com.datastrato.graviton.dto.responses.DropResponse;
 import com.datastrato.graviton.dto.responses.MetalakeListResponse;
 import com.datastrato.graviton.dto.responses.MetalakeResponse;
-import com.datastrato.graviton.exceptions.IllegalNameIdentifierException;
-import com.datastrato.graviton.exceptions.IllegalNamespaceException;
-import com.datastrato.graviton.exceptions.MetalakeAlreadyExistsException;
-import com.datastrato.graviton.exceptions.NoSuchMetalakeException;
 import com.datastrato.graviton.meta.BaseMetalake;
 import com.datastrato.graviton.meta.MetalakeManager;
 import com.datastrato.graviton.server.web.Utils;
@@ -63,8 +60,7 @@ public class MetalakeOperations {
       return Utils.ok(new MetalakeListResponse(metalakeDTOS));
 
     } catch (Exception e) {
-      LOG.error("Failed to list metalakes", e);
-      return Utils.internalError("Failed to list metalake", e);
+      return ExceptionHandlers.handleMetalakeException("LIST", Namespace.empty().toString(), e);
     }
   }
 
@@ -73,30 +69,13 @@ public class MetalakeOperations {
   public Response createMetalake(MetalakeCreateRequest request) {
     try {
       request.validate();
-    } catch (IllegalArgumentException e) {
-      LOG.error("Failed to validate MetalakeCreateRequest arguments {}", request, e);
-
-      return Utils.illegalArguments(
-          "Failed to validate MetalakeCreateRequest arguments " + request, e);
-    }
-
-    try {
       NameIdentifier ident = NameIdentifier.ofMetalake(request.getName());
       BaseMetalake metalake =
           manager.createMetalake(ident, request.getComment(), request.getProperties());
       return Utils.ok(new MetalakeResponse(DTOConverters.toDTO(metalake)));
 
-    } catch (IllegalNamespaceException | IllegalNameIdentifierException e) {
-      LOG.warn("Failed to create metalake with invalid arguments", e);
-      return Utils.illegalArguments("Failed to create metalake with invalid arguments", e);
-
-    } catch (MetalakeAlreadyExistsException exception) {
-      LOG.warn("Metalake {} already exists", request.getName(), exception);
-      return Utils.alreadyExists("Metalake " + request.getName() + " already exists", exception);
-
     } catch (Exception e) {
-      LOG.error("Failed to create metalake", e);
-      return Utils.internalError("Failed to create metalake", e);
+      return ExceptionHandlers.handleMetalakeException("CREATE", request.getName(), e);
     }
   }
 
@@ -109,17 +88,8 @@ public class MetalakeOperations {
       BaseMetalake metalake = manager.loadMetalake(identifier);
       return Utils.ok(new MetalakeResponse(DTOConverters.toDTO(metalake)));
 
-    } catch (IllegalNamespaceException | IllegalNameIdentifierException e) {
-      LOG.warn("Failed to load metalake with invalid arguments", e);
-      return Utils.illegalArguments("Failed to load metalake with invalid arguments", e);
-
-    } catch (NoSuchMetalakeException e) {
-      LOG.warn("Metalake {} does not exist", metalakeName);
-      return Utils.notFound("Metalake " + metalakeName + " does not exist", e);
-
     } catch (Exception e) {
-      LOG.error("Failed to load metalake {}", metalakeName, e);
-      return Utils.internalError("Failed to load metalake " + metalakeName, e);
+      return ExceptionHandlers.handleMetalakeException("LOAD", metalakeName, e);
     }
   }
 
@@ -130,13 +100,6 @@ public class MetalakeOperations {
       @PathParam("name") String metalakeName, MetalakeUpdatesRequest updatesRequest) {
     try {
       updatesRequest.validate();
-    } catch (Exception e) {
-      LOG.error("Failed to validate MetalakeUpdatesRequest arguments {}", updatesRequest, e);
-      return Utils.illegalArguments(
-          "Failed to validate MetalakeUpdatesRequest arguments " + updatesRequest, e);
-    }
-
-    try {
       NameIdentifier identifier = NameIdentifier.ofMetalake(metalakeName);
       MetalakeChange[] changes =
           updatesRequest.getUpdates().stream()
@@ -146,22 +109,8 @@ public class MetalakeOperations {
       BaseMetalake updatedMetalake = manager.alterMetalake(identifier, changes);
       return Utils.ok(new MetalakeResponse(DTOConverters.toDTO(updatedMetalake)));
 
-    } catch (IllegalNamespaceException | IllegalNameIdentifierException e) {
-      LOG.warn("Failed to alter metalake with invalid arguments", e);
-      return Utils.illegalArguments("Failed to alter metalake with invalid arguments", e);
-
-    } catch (NoSuchMetalakeException e) {
-      LOG.warn("Metalake {} does not exist", metalakeName);
-      return Utils.notFound("Metalake " + metalakeName + " does not exist", e);
-
-    } catch (IllegalArgumentException ex) {
-      LOG.error("Failed to alter metalake {} by unsupported change", metalakeName, ex);
-      return Utils.illegalArguments(
-          "Failed to alter metalake " + metalakeName + " by unsupported change", ex);
-
     } catch (Exception e) {
-      LOG.error("Failed to update metalake {}", metalakeName, e);
-      return Utils.internalError("Failed to update metalake " + metalakeName, e);
+      return ExceptionHandlers.handleMetalakeException("ALTER", metalakeName, e);
     }
   }
 
@@ -178,13 +127,8 @@ public class MetalakeOperations {
 
       return Utils.ok(new DropResponse(dropped));
 
-    } catch (IllegalNamespaceException | IllegalNameIdentifierException e) {
-      LOG.warn("Failed to drop metalake with invalid arguments", e);
-      return Utils.illegalArguments("Failed to drop metalake with invalid arguments", e);
-
     } catch (Exception e) {
-      LOG.error("Failed to drop metalake {}", metalakeName, e);
-      return Utils.internalError("Failed to drop metalake " + metalakeName, e);
+      return ExceptionHandlers.handleMetalakeException("DROP", metalakeName, e);
     }
   }
 }
