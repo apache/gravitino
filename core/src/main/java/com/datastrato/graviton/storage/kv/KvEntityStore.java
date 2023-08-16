@@ -17,7 +17,7 @@ import com.datastrato.graviton.EntityStore;
 import com.datastrato.graviton.HasIdentifier;
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
-import com.datastrato.graviton.NoSuchEntityException;
+import com.datastrato.graviton.exceptions.NoSuchEntityException;
 import com.datastrato.graviton.storage.EntityKeyEncoder;
 import com.datastrato.graviton.util.Bytes;
 import com.datastrato.graviton.util.Executable;
