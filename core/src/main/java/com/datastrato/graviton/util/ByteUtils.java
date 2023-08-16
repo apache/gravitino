@@ -64,4 +64,12 @@ public class ByteUtils {
     buffer.flip();
     return buffer.getLong();
   }
+
+  public static String formatByteArray(byte[] bytes) {
+    StringBuilder sb = new StringBuilder("0x");
+    for (byte b : bytes) {
+      sb.append(String.format("%02X", b));
+    }
+    return sb.toString();
+  }
 }

@@ -102,7 +102,7 @@ public class JsonUtils {
     }
   }
 
-  private static ObjectMapper mapper = null;
+  private static volatile ObjectMapper mapper = null;
 
   /**
    * Get the shared ObjectMapper instance for JSON serialization/deserialization.
@@ -269,7 +269,7 @@ public class JsonUtils {
         String afterColumn = getString(POSITION_LAST, node);
         return TableChange.ColumnPosition.after(afterColumn);
       } else {
-        throw new IOException("Unknown json column position: " + node.toString());
+        throw new IOException("Unknown json column position: " + node);
       }
     }
   }
