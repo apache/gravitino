@@ -13,6 +13,7 @@ import com.datastrato.graviton.Entity.EntityIdentifier;
 import com.datastrato.graviton.Entity.EntityType;
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.NoSuchEntityException;
+import com.datastrato.graviton.storage.EntityKeyEncoder;
 import com.datastrato.graviton.util.ByteUtils;
 import com.datastrato.graviton.util.Bytes;
 import com.google.common.annotations.VisibleForTesting;
@@ -45,8 +46,8 @@ import org.slf4j.LoggerFactory;
  * to_{ml_id}_{ca_id}_{br_id}_{to_id}       ----->    topic_info
  * </pre>
  */
-public class CustomEntityKeyEncoder implements EntityKeyEncoder {
-  public static final Logger LOG = LoggerFactory.getLogger(CustomEntityKeyEncoder.class);
+public class BinaryEntityKeyEncoder implements EntityKeyEncoder<byte[]> {
+  public static final Logger LOG = LoggerFactory.getLogger(BinaryEntityKeyEncoder.class);
 
   // name prefix of name in name to id mapping,
   // e.g., name_metalake1 -> 1
@@ -76,7 +77,7 @@ public class CustomEntityKeyEncoder implements EntityKeyEncoder {
           SCHEMA, new String[] {SCHEMA.getShortName() + "_", "_", "_"},
           TABLE, new String[] {TABLE.getShortName() + "_", "_", "_", "_"});
 
-  public CustomEntityKeyEncoder(KvBackend backend) {
+  public BinaryEntityKeyEncoder(KvBackend backend) {
     this.backend = backend;
   }
 

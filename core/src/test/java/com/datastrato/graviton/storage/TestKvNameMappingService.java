@@ -69,7 +69,7 @@ public class TestKvNameMappingService {
 
     // Test or create
     Assertions.assertNull(nameMappingService.get("name4"));
-    Long name4Id = nameMappingService.getOrCreateId("name4");
+    Long name4Id = nameMappingService.create("name4");
     Assertions.assertNotEquals(name4Id, name1Id);
 
     // Test delete
@@ -87,6 +87,6 @@ public class TestKvNameMappingService {
     Assertions.assertNull(mockNameMappingService.get("name4"));
     Assertions.assertNotNull(mockNameMappingService.get("name3"));
 
-    Assertions.assertTrue(mockNameMappingService.getIdGenerator().nextId() > 0);
+    Assertions.assertTrue(mockNameMappingService.idGenerator.nextId() > 0);
   }
 }

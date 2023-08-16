@@ -8,6 +8,7 @@ package com.datastrato.graviton.storage;
 import com.datastrato.graviton.storage.kv.KvBackend;
 import com.datastrato.graviton.util.ByteUtils;
 import com.datastrato.graviton.util.Bytes;
+import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import javax.annotation.concurrent.ThreadSafe;
 
@@ -19,7 +20,7 @@ import javax.annotation.concurrent.ThreadSafe;
 public class KvNameMappingService implements NameMappingService {
 
   // TODO(yuqi) Make this configurable
-  private final IdGenerator idGenerator = new RandomIdGenerator();
+  @VisibleForTesting final IdGenerator idGenerator = new RandomIdGenerator();
   private final KvBackend backend;
 
   // name prefix of name in name to id mapping,
@@ -77,11 +78,6 @@ public class KvNameMappingService implements NameMappingService {
           backend.put(Bytes.concat(ID_PREFIX, oldIdValue), newName.getBytes(), true);
           return true;
         });
-  }
-
-  @Override
-  public IdGenerator getIdGenerator() {
-    return idGenerator;
   }
 
   @Override
