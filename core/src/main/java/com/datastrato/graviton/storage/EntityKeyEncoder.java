@@ -23,14 +23,15 @@ public interface EntityKeyEncoder<T> {
   byte[] encode(EntityIdentifier entityIdentifier, boolean createIdIfNotExists) throws IOException;
 
   /**
-   * Construct the key for key-value store from the entity NameIdentifier and EntityType. Note, This
-   * method is the replacement of {@link #encode(EntityIdentifier, boolean)}. When we implement this
-   * method, we should mark {@link #encode(EntityIdentifier, boolean)} as deprecated and remove it
-   * later.
+   * Construct the key for key-value store from the entity NameIdentifier and EntityType.
+   *
+   * <p>Note, This method is the replacement of {@link #encode(EntityIdentifier, boolean)}. When we
+   * implement this method, we should mark {@link #encode(EntityIdentifier, boolean)} as deprecated
+   * and remove it later.
    *
    * @param ident entity identifier to encode
    * @param type entity type to encode
-   * @return encoded key for key-value store
+   * @return encoded key for key-value stored
    * @throws IOException, Exception if error occurs
    */
   default T encode(NameIdentifier ident, EntityType type) throws IOException {
