@@ -18,6 +18,7 @@ import com.datastrato.graviton.HasIdentifier;
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
 import com.datastrato.graviton.exceptions.NoSuchEntityException;
+import com.datastrato.graviton.storage.EntityKeyEncoder;
 import com.datastrato.graviton.util.Bytes;
 import com.datastrato.graviton.util.Executable;
 import com.google.common.annotations.VisibleForTesting;
@@ -49,7 +50,7 @@ public class KvEntityStore implements EntityStore {
   @Override
   public void initialize(Config config) throws RuntimeException {
     this.backend = createKvEntityBackend(config);
-    this.entityKeyEncoder = new CustomEntityKeyEncoder(backend);
+    this.entityKeyEncoder = new BinaryEntityKeyEncoder(backend);
   }
 
   @Override
