@@ -6,6 +6,8 @@
 package com.datastrato.graviton.storage.kv;
 
 import com.datastrato.graviton.Entity.EntityIdentifier;
+import com.datastrato.graviton.Entity.EntityType;
+import com.datastrato.graviton.NameIdentifier;
 import java.io.IOException;
 
 /**
@@ -23,6 +25,18 @@ public interface EntityKeyEncoder {
    */
   byte[] encode(EntityIdentifier entityIdentifier, boolean createIdIfNotExists) throws IOException;
 
-  // TODO, Use id generator to generate id for name and use name mapping service to store the
-  //  mapping between name and id. Still we can resue the method `encode` to encode the key.;
+  /**
+   * Construct the key for key-value store from the entity NameIdentifier and EntityType. Note, This
+   * method is the replacement of {@link #encode(EntityIdentifier, boolean)}. When we implement this
+   * method, we should mark {@link #encode(EntityIdentifier, boolean)} as deprecated and remove it
+   * later.
+   *
+   * @param ident entity identifier to encode
+   * @param type entity type to encode
+   * @return encoded key for key-value store
+   * @throws IOException, Exception if error occurs
+   */
+  default byte[] encode(NameIdentifier ident, EntityType type) throws IOException {
+    return new byte[0];
+  }
 }

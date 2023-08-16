@@ -48,11 +48,6 @@ public class InMemoryNameMappingService implements NameMappingService {
   }
 
   @Override
-  public IdGenerator getIdGenerator() {
-    return idGenerator;
-  }
-
-  @Override
   public boolean delete(String name) {
     return nameToId.remove(name) != null;
   }

@@ -49,7 +49,7 @@ public class KvEntityStore implements EntityStore {
   @Override
   public void initialize(Config config) throws RuntimeException {
     this.backend = createKvEntityBackend(config);
-    this.entityKeyEncoder = new CustomEntityKeyEncoder(backend);
+    this.entityKeyEncoder = new BinaryEntityKeyEncoder(backend);
   }
 
   @Override

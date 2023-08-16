@@ -9,8 +9,8 @@ import static com.datastrato.graviton.Configs.DEFUALT_ENTITY_KV_STORE;
 import static com.datastrato.graviton.Configs.ENTITY_KV_STORE;
 import static com.datastrato.graviton.Configs.ENTITY_STORE;
 import static com.datastrato.graviton.Configs.ENTRY_KV_ROCKSDB_BACKEND_PATH;
-import static com.datastrato.graviton.storage.kv.CustomEntityKeyEncoder.NAMESPACE_SEPARATOR;
-import static com.datastrato.graviton.storage.kv.CustomEntityKeyEncoder.WILD_CARD;
+import static com.datastrato.graviton.storage.kv.BinaryEntityKeyEncoder.NAMESPACE_SEPARATOR;
+import static com.datastrato.graviton.storage.kv.BinaryEntityKeyEncoder.WILD_CARD;
 
 import com.datastrato.graviton.Config;
 import com.datastrato.graviton.Configs;
@@ -45,7 +45,7 @@ public class TestEntityKeyEncoding {
   private static Config config;
 
   public static EntityStore ENTITY_STORE_INSTANCE;
-  private static CustomEntityKeyEncoder ENCODER;
+  private static BinaryEntityKeyEncoder ENCODER;
 
   @BeforeEach
   public void createEntityEncoderInstance() {
@@ -54,7 +54,7 @@ public class TestEntityKeyEncoding {
     ENTITY_STORE_INSTANCE.initialize(config);
     ENTITY_STORE_INSTANCE.setSerDe(
         EntitySerDeFactory.createEntitySerDe(config.get(Configs.ENTITY_SERDE)));
-    ENCODER = new CustomEntityKeyEncoder(((KvEntityStore) ENTITY_STORE_INSTANCE).getBackend());
+    ENCODER = new BinaryEntityKeyEncoder(((KvEntityStore) ENTITY_STORE_INSTANCE).getBackend());
   }
 
   @AfterEach
@@ -87,8 +87,8 @@ public class TestEntityKeyEncoding {
     // Metalake
     // metalake1 --> 1000000
     Namespace namespace = Namespace.of();
-    CustomEntityKeyEncoder mockEncoder = Mockito.spy(ENCODER);
-    Field f = CustomEntityKeyEncoder.class.getDeclaredField("backend");
+    BinaryEntityKeyEncoder mockEncoder = Mockito.spy(ENCODER);
+    Field f = BinaryEntityKeyEncoder.class.getDeclaredField("backend");
     f.setAccessible(true);
     KvBackend backend = (KvBackend) f.get(mockEncoder);
 
@@ -220,7 +220,7 @@ public class TestEntityKeyEncoding {
   @Test
   public void testTransaction() throws IOException {
     Namespace namespace = Namespace.of();
-    CustomEntityKeyEncoder mockEncoder = Mockito.spy(ENCODER);
+    BinaryEntityKeyEncoder mockEncoder = Mockito.spy(ENCODER);
 
     Mockito.doReturn(1000000L)
         .when(mockEncoder)
@@ -240,9 +240,9 @@ public class TestEntityKeyEncoding {
       throws IOException, IllegalAccessException, NoSuchFieldException {
     // Scan all Metalake
     Namespace namespace = Namespace.of();
-    CustomEntityKeyEncoder mockEncoder = Mockito.spy(ENCODER);
+    BinaryEntityKeyEncoder mockEncoder = Mockito.spy(ENCODER);
 
-    Field f = CustomEntityKeyEncoder.class.getDeclaredField("backend");
+    Field f = BinaryEntityKeyEncoder.class.getDeclaredField("backend");
     f.setAccessible(true);
     KvBackend backend = (KvBackend) f.get(mockEncoder);
 
