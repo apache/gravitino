@@ -62,10 +62,14 @@ public class TestKvNameMappingService {
     Assertions.assertNotEquals(name1Id, name2Id);
 
     // Test update
-    nameMappingService.update("name1", "name3");
+    boolean result = nameMappingService.update("name1", "name3");
+    Assertions.assertTrue(result);
     Long name3Id = nameMappingService.get("name3");
     Assertions.assertEquals(name1Id, name3Id);
     Assertions.assertNull(nameMappingService.get("name1"));
+
+    result = nameMappingService.update("name1", "name1_");
+    Assertions.assertFalse(result);
 
     // Test or create
     Assertions.assertNull(nameMappingService.get("name4"));

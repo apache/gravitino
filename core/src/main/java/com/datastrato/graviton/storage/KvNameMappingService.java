@@ -69,7 +69,7 @@ public class KvNameMappingService implements NameMappingService {
 
           // Old mapping has been deleted, no need to do it;
           if (oldIdValue == null) {
-            return true;
+            return false;
           }
           // Delete old name --> id mapping
           backend.delete(nameByte);

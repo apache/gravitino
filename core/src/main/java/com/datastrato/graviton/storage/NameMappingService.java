@@ -52,6 +52,7 @@ public interface NameMappingService {
    *
    * @param oldName name to be updated
    * @param newName new name
+   * @return true if the name exists and is updated successfully, false if the name does not exist
    * @throws IOException if the underlying storage failed
    */
   boolean update(String oldName, String newName) throws IOException;
