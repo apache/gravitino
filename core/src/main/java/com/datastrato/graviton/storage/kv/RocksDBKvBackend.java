@@ -8,6 +8,7 @@ package com.datastrato.graviton.storage.kv;
 import com.datastrato.graviton.Config;
 import com.datastrato.graviton.Configs;
 import com.datastrato.graviton.EntityAlreadyExistsException;
+import com.datastrato.graviton.util.ByteUtils;
 import com.datastrato.graviton.util.Bytes;
 import com.datastrato.graviton.util.Executable;
 import com.google.common.base.Throwables;
@@ -108,7 +109,7 @@ public class RocksDBKvBackend implements KvBackend {
       throw new EntityAlreadyExistsException(
           String.format(
               "Key %s already exists in the database, please use overwrite option to overwrite it",
-              key));
+              ByteUtils.formatByteArray(key)));
     }
     tx.put(key, value);
   }
@@ -124,7 +125,7 @@ public class RocksDBKvBackend implements KvBackend {
       throw new EntityAlreadyExistsException(
           String.format(
               "Key %s already exists in the database, please use overwrite option to overwrite it",
-              key));
+              ByteUtils.formatByteArray(key)));
     }
     db.put(key, value);
   }

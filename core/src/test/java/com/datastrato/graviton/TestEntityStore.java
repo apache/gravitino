@@ -5,6 +5,7 @@
 package com.datastrato.graviton;
 
 import com.datastrato.graviton.Entity.EntityType;
+import com.datastrato.graviton.exceptions.NoSuchEntityException;
 import com.datastrato.graviton.meta.AuditInfo;
 import com.datastrato.graviton.meta.BaseMetalake;
 import com.datastrato.graviton.meta.CatalogEntity;

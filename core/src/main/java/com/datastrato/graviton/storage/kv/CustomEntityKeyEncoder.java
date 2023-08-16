@@ -12,7 +12,7 @@ import static com.datastrato.graviton.Entity.EntityType.TABLE;
 import com.datastrato.graviton.Entity.EntityIdentifier;
 import com.datastrato.graviton.Entity.EntityType;
 import com.datastrato.graviton.NameIdentifier;
-import com.datastrato.graviton.NoSuchEntityException;
+import com.datastrato.graviton.exceptions.NoSuchEntityException;
 import com.datastrato.graviton.util.ByteUtils;
 import com.datastrato.graviton.util.Bytes;
 import com.google.common.annotations.VisibleForTesting;
