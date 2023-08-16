@@ -61,8 +61,8 @@ public class SchemaOperations {
   public Response listSchemas(
       @PathParam("metalake") String metalake, @PathParam("catalog") String catalog) {
     try {
-      Namespace ns = Namespace.ofSchema(metalake, catalog);
-      NameIdentifier[] idents = dispatcher.listSchemas(ns);
+      Namespace schemaNS = Namespace.ofSchema(metalake, catalog);
+      NameIdentifier[] idents = dispatcher.listSchemas(schemaNS);
       return Utils.ok(new EntityListResponse(idents));
 
     } catch (IllegalNamespaceException e) {

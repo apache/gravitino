@@ -57,8 +57,8 @@ public class CatalogOperations {
   @Produces("application/vnd.graviton.v1+json")
   public Response listCatalogs(@PathParam("metalake") String metalake) {
     try {
-      Namespace metalakeNS = Namespace.ofCatalog(metalake);
-      NameIdentifier[] idents = manager.listCatalogs(metalakeNS);
+      Namespace catalogNS = Namespace.ofCatalog(metalake);
+      NameIdentifier[] idents = manager.listCatalogs(catalogNS);
       return Utils.ok(new EntityListResponse(idents));
 
     } catch (IllegalNamespaceException e) {

@@ -56,8 +56,8 @@ public class TableOperations {
       @PathParam("catalog") String catalog,
       @PathParam("schema") String schema) {
     try {
-      Namespace ns = Namespace.ofTable(metalake, catalog, schema);
-      NameIdentifier[] idents = dispatcher.listTables(ns);
+      Namespace tableNS = Namespace.ofTable(metalake, catalog, schema);
+      NameIdentifier[] idents = dispatcher.listTables(tableNS);
       return Utils.ok(new EntityListResponse(idents));
 
     } catch (IllegalNamespaceException e) {
