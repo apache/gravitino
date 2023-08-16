@@ -22,6 +22,11 @@ public interface Table extends Auditable {
   /** Return the columns of the table. */
   Column[] columns();
 
+  /** Returns the physical partitioning of the table. */
+  default Transform[] partitioning() {
+    return new Transform[0];
+  }
+
   /** Return the comment of the table. Null is returned if no comment is set. */
   @Nullable
   default String comment() {
