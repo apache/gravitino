@@ -46,7 +46,8 @@ public interface NameMappingService {
   }
 
   /**
-   * Update the mapping of the name to id;
+   * Update the mapping of the name to id. This method is used to update the mapping when we rename
+   * an entity. Please see the example
    *
    * <pre>
    * Before:
