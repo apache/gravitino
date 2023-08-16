@@ -9,7 +9,7 @@ import com.datastrato.graviton.storage.kv.KvEntityStore;
 import java.io.IOException;
 
 /**
- * {@link NameMappingService} mangers name to id mappings when using {@link KvEntityStore} to store
+ * {@link NameMappingService} manages name to id mappings when using {@link KvEntityStore} to store
  * entity.
  *
  * <p>Note. Implementations of this interface should be thread-safe.
