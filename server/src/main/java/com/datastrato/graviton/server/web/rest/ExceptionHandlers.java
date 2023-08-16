@@ -26,22 +26,22 @@ public class ExceptionHandlers {
   private ExceptionHandlers() {}
 
   public static Response handleTableException(
-      String operation, String table, String schema, Exception e) {
-    return TableExceptionHandler.INSTANCE.handle(operation, table, schema, e);
+      OperationType op, String table, String schema, Exception e) {
+    return TableExceptionHandler.INSTANCE.handle(op, table, schema, e);
   }
 
   public static Response handleSchemaException(
-      String operation, String schema, String catalog, Exception e) {
-    return SchemaExceptionHandler.INSTANCE.handle(operation, schema, catalog, e);
+      OperationType op, String schema, String catalog, Exception e) {
+    return SchemaExceptionHandler.INSTANCE.handle(op, schema, catalog, e);
   }
 
   public static Response handleCatalogException(
-      String operation, String catalog, String metalake, Exception e) {
-    return CatalogExceptionHandler.INSTANCE.handle(operation, catalog, metalake, e);
+      OperationType op, String catalog, String metalake, Exception e) {
+    return CatalogExceptionHandler.INSTANCE.handle(op, catalog, metalake, e);
   }
 
-  public static Response handleMetalakeException(String operation, String metalake, Exception e) {
-    return MetalakeExceptionHandler.INSTANCE.handle(operation, metalake, "", e);
+  public static Response handleMetalakeException(OperationType op, String metalake, Exception e) {
+    return MetalakeExceptionHandler.INSTANCE.handle(op, metalake, "", e);
   }
 
   private static class TableExceptionHandler extends BaseExceptionHandler {
@@ -52,11 +52,11 @@ public class ExceptionHandlers {
         "Failed to operate table(s)%s operation [%s] under schema [%s], reason [%s]";
 
     @Override
-    public Response handle(String operation, String table, String schema, Exception e) {
+    public Response handle(OperationType op, String table, String schema, Exception e) {
       String formatted = table.isEmpty() ? "" : " [" + table + "]";
       String errorMsg =
           String.format(
-              TABLE_MSG_TEMPLATE, formatted, operation, schema, e.getClass().getSimpleName());
+              TABLE_MSG_TEMPLATE, formatted, op.name(), schema, e.getClass().getSimpleName());
       LOG.warn(errorMsg, e);
 
       if (e instanceof IllegalArgumentException) {
@@ -72,7 +72,7 @@ public class ExceptionHandlers {
         return Utils.alreadyExists(errorMsg, e);
 
       } else {
-        return super.handle(operation, table, schema, e);
+        return super.handle(op, table, schema, e);
       }
     }
   }
@@ -85,11 +85,11 @@ public class ExceptionHandlers {
         "Failed to operate schema(s)%s operation [%s] under catalog [%s], reason [%s]";
 
     @Override
-    public Response handle(String operation, String schema, String catalog, Exception e) {
+    public Response handle(OperationType op, String schema, String catalog, Exception e) {
       String formatted = schema.isEmpty() ? "" : " [" + schema + "]";
       String errorMsg =
           String.format(
-              SCHEMA_MSG_TEMPLATE, formatted, operation, catalog, e.getClass().getSimpleName());
+              SCHEMA_MSG_TEMPLATE, formatted, op.name(), catalog, e.getClass().getSimpleName());
       LOG.warn(errorMsg, e);
 
       if (e instanceof IllegalArgumentException) {
@@ -108,7 +108,7 @@ public class ExceptionHandlers {
         return Utils.nonEmpty(errorMsg, e);
 
       } else {
-        return super.handle(operation, schema, catalog, e);
+        return super.handle(op, schema, catalog, e);
       }
     }
   }
@@ -121,11 +121,11 @@ public class ExceptionHandlers {
         "Failed to operate catalog(s)%s operation [%s] under metalake [%s], reason [%s]";
 
     @Override
-    public Response handle(String operation, String catalog, String metalake, Exception e) {
+    public Response handle(OperationType op, String catalog, String metalake, Exception e) {
       String formatted = catalog.isEmpty() ? "" : " [" + catalog + "]";
       String errorMsg =
           String.format(
-              CATALOG_MSG_TEMPLATE, formatted, operation, metalake, e.getClass().getSimpleName());
+              CATALOG_MSG_TEMPLATE, formatted, op.name(), metalake, e.getClass().getSimpleName());
       LOG.warn(errorMsg, e);
 
       if (e instanceof IllegalArgumentException) {
@@ -141,7 +141,7 @@ public class ExceptionHandlers {
         return Utils.alreadyExists(errorMsg, e);
 
       } else {
-        return super.handle(operation, catalog, metalake, e);
+        return super.handle(op, catalog, metalake, e);
       }
     }
   }
@@ -154,10 +154,10 @@ public class ExceptionHandlers {
         "Failed to operate metalake(s)%s operation [%s], reason [%s]";
 
     @Override
-    public Response handle(String operation, String metalake, String parent, Exception e) {
+    public Response handle(OperationType op, String metalake, String parent, Exception e) {
       String formatted = StringUtil.isBlank(metalake) ? "" : " [" + metalake + "]";
       String errorMsg =
-          String.format(METALAKE_MSG_TEMPLATE, formatted, operation, e.getClass().getSimpleName());
+          String.format(METALAKE_MSG_TEMPLATE, formatted, op.name(), e.getClass().getSimpleName());
       LOG.warn(errorMsg, e);
 
       if (e instanceof IllegalArgumentException) {
@@ -170,7 +170,7 @@ public class ExceptionHandlers {
         return Utils.notFound(errorMsg, e);
 
       } else {
-        return super.handle(operation, metalake, parent, e);
+        return super.handle(op, metalake, parent, e);
       }
     }
   }
@@ -183,7 +183,7 @@ public class ExceptionHandlers {
         "Failed to operate object%s operation [%s]%s, reason [%s]";
 
     @Override
-    public Response handle(String operation, String object, String parent, Exception e) {
+    public Response handle(OperationType op, String object, String parent, Exception e) {
       String formattedObject = StringUtil.isBlank(object) ? "" : " [" + object + "]";
       String formattedParent = StringUtil.isBlank(parent) ? "" : " under [" + parent + "]";
 
@@ -191,7 +191,7 @@ public class ExceptionHandlers {
           String.format(
               BASE_MSG_TEMPLATE,
               formattedObject,
-              operation,
+              op.name(),
               formattedParent,
               e.getClass().getSimpleName());
       LOG.error(errorMsg, e);

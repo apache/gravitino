@@ -60,7 +60,8 @@ public class MetalakeOperations {
       return Utils.ok(new MetalakeListResponse(metalakeDTOS));
 
     } catch (Exception e) {
-      return ExceptionHandlers.handleMetalakeException("LIST", Namespace.empty().toString(), e);
+      return ExceptionHandlers.handleMetalakeException(
+          OperationType.LIST, Namespace.empty().toString(), e);
     }
   }
 
@@ -75,7 +76,7 @@ public class MetalakeOperations {
       return Utils.ok(new MetalakeResponse(DTOConverters.toDTO(metalake)));
 
     } catch (Exception e) {
-      return ExceptionHandlers.handleMetalakeException("CREATE", request.getName(), e);
+      return ExceptionHandlers.handleMetalakeException(OperationType.CREATE, request.getName(), e);
     }
   }
 
@@ -89,7 +90,7 @@ public class MetalakeOperations {
       return Utils.ok(new MetalakeResponse(DTOConverters.toDTO(metalake)));
 
     } catch (Exception e) {
-      return ExceptionHandlers.handleMetalakeException("LOAD", metalakeName, e);
+      return ExceptionHandlers.handleMetalakeException(OperationType.LOAD, metalakeName, e);
     }
   }
 
@@ -110,7 +111,7 @@ public class MetalakeOperations {
       return Utils.ok(new MetalakeResponse(DTOConverters.toDTO(updatedMetalake)));
 
     } catch (Exception e) {
-      return ExceptionHandlers.handleMetalakeException("ALTER", metalakeName, e);
+      return ExceptionHandlers.handleMetalakeException(OperationType.ALTER, metalakeName, e);
     }
   }
 
@@ -128,7 +129,7 @@ public class MetalakeOperations {
       return Utils.ok(new DropResponse(dropped));
 
     } catch (Exception e) {
-      return ExceptionHandlers.handleMetalakeException("DROP", metalakeName, e);
+      return ExceptionHandlers.handleMetalakeException(OperationType.DROP, metalakeName, e);
     }
   }
 }

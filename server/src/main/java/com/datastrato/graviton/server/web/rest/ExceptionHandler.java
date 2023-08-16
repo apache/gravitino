@@ -9,8 +9,8 @@ import javax.ws.rs.core.Response;
 /**
  * The ExceptionHandler class is an abstract class specialized for handling Exceptions and returning
  * the appropriate Response.Subclasses of ExceptionHandler must implement {@link
- * ExceptionHandler#handle(String, String, Exception)} to provide the {@link Response} related to
- * the exception.
+ * ExceptionHandler#handle(OperationType, String, String, Exception)} to provide the {@link
+ * Response} related to the exception.
  */
 public abstract class ExceptionHandler {
 
@@ -18,11 +18,11 @@ public abstract class ExceptionHandler {
    * Handles the exception and returns the appropriate Response. The implementation will use the
    * provided parameters to form a standard error response.
    *
-   * @param operation The operation that was attempted
+   * @param op The operation that was attempted
    * @param object The object name that was being operated on
    * @param parent The parent object name that was being operated on
    * @param e The exception that was thrown
    * @return The Response object representing the error response
    */
-  public abstract Response handle(String operation, String object, String parent, Exception e);
+  public abstract Response handle(OperationType op, String object, String parent, Exception e);
 }

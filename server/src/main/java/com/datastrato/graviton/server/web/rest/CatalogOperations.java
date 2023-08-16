@@ -57,7 +57,7 @@ public class CatalogOperations {
       return Utils.ok(new EntityListResponse(idents));
 
     } catch (Exception e) {
-      return ExceptionHandlers.handleCatalogException("LIST", "", metalake, e);
+      return ExceptionHandlers.handleCatalogException(OperationType.LIST, "", metalake, e);
     }
   }
 
@@ -73,7 +73,8 @@ public class CatalogOperations {
       return Utils.ok(new CatalogResponse(DTOConverters.toDTO(catalog)));
 
     } catch (Exception e) {
-      return ExceptionHandlers.handleCatalogException("CREATE", request.getName(), metalake, e);
+      return ExceptionHandlers.handleCatalogException(
+          OperationType.CREATE, request.getName(), metalake, e);
     }
   }
 
@@ -88,7 +89,8 @@ public class CatalogOperations {
       return Utils.ok(new CatalogResponse(DTOConverters.toDTO(catalog)));
 
     } catch (Exception e) {
-      return ExceptionHandlers.handleCatalogException("LOAD", catalogName, metalakeName, e);
+      return ExceptionHandlers.handleCatalogException(
+          OperationType.LOAD, catalogName, metalakeName, e);
     }
   }
 
@@ -110,7 +112,8 @@ public class CatalogOperations {
       return Utils.ok(new CatalogResponse(DTOConverters.toDTO(catalog)));
 
     } catch (Exception e) {
-      return ExceptionHandlers.handleCatalogException("ALTER", catalogName, metalakeName, e);
+      return ExceptionHandlers.handleCatalogException(
+          OperationType.ALTER, catalogName, metalakeName, e);
     }
   }
 
@@ -129,7 +132,8 @@ public class CatalogOperations {
       return Utils.ok(new DropResponse(dropped));
 
     } catch (Exception e) {
-      return ExceptionHandlers.handleCatalogException("DROP", catalogName, metalakeName, e);
+      return ExceptionHandlers.handleCatalogException(
+          OperationType.DROP, catalogName, metalakeName, e);
     }
   }
 }

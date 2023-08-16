@@ -56,7 +56,7 @@ public class TableOperations {
       return Utils.ok(new EntityListResponse(idents));
 
     } catch (Exception e) {
-      return ExceptionHandlers.handleTableException("LIST", "", schema, e);
+      return ExceptionHandlers.handleTableException(OperationType.LIST, "", schema, e);
     }
   }
 
@@ -76,7 +76,8 @@ public class TableOperations {
       return Utils.ok(new TableResponse(DTOConverters.toDTO(table)));
 
     } catch (Exception e) {
-      return ExceptionHandlers.handleTableException("CREATE", request.getName(), schema, e);
+      return ExceptionHandlers.handleTableException(
+          OperationType.CREATE, request.getName(), schema, e);
     }
   }
 
@@ -94,7 +95,7 @@ public class TableOperations {
       return Utils.ok(new TableResponse(DTOConverters.toDTO(t)));
 
     } catch (Exception e) {
-      return ExceptionHandlers.handleTableException("LOAD", table, schema, e);
+      return ExceptionHandlers.handleTableException(OperationType.LOAD, table, schema, e);
     }
   }
 
@@ -118,7 +119,7 @@ public class TableOperations {
       return Utils.ok(new TableResponse(DTOConverters.toDTO(t)));
 
     } catch (Exception e) {
-      return ExceptionHandlers.handleTableException("ALTER", table, schema, e);
+      return ExceptionHandlers.handleTableException(OperationType.ALTER, table, schema, e);
     }
   }
 
@@ -140,7 +141,7 @@ public class TableOperations {
       return Utils.ok(new DropResponse(dropped));
 
     } catch (Exception e) {
-      return ExceptionHandlers.handleTableException("DROP", table, schema, e);
+      return ExceptionHandlers.handleTableException(OperationType.DROP, table, schema, e);
     }
   }
 }

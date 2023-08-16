@@ -60,7 +60,7 @@ public class SchemaOperations {
       return Utils.ok(new EntityListResponse(idents));
 
     } catch (Exception e) {
-      return ExceptionHandlers.handleSchemaException("LIST", "", catalog, e);
+      return ExceptionHandlers.handleSchemaException(OperationType.LIST, "", catalog, e);
     }
   }
 
@@ -77,7 +77,8 @@ public class SchemaOperations {
       return Utils.ok(new SchemaResponse(DTOConverters.toDTO(schema)));
 
     } catch (Exception e) {
-      return ExceptionHandlers.handleSchemaException("CREATE", request.getName(), catalog, e);
+      return ExceptionHandlers.handleSchemaException(
+          OperationType.CREATE, request.getName(), catalog, e);
     }
   }
 
@@ -94,7 +95,7 @@ public class SchemaOperations {
       return Utils.ok(new SchemaResponse(DTOConverters.toDTO(s)));
 
     } catch (Exception e) {
-      return ExceptionHandlers.handleSchemaException("LOAD", schema, catalog, e);
+      return ExceptionHandlers.handleSchemaException(OperationType.LOAD, schema, catalog, e);
     }
   }
 
@@ -117,7 +118,7 @@ public class SchemaOperations {
       return Utils.ok(new SchemaResponse(DTOConverters.toDTO(s)));
 
     } catch (Exception e) {
-      return ExceptionHandlers.handleSchemaException("ALTER", schema, catalog, e);
+      return ExceptionHandlers.handleSchemaException(OperationType.ALTER, schema, catalog, e);
     }
   }
 
@@ -139,7 +140,7 @@ public class SchemaOperations {
       return Utils.ok(new DropResponse(dropped));
 
     } catch (Exception e) {
-      return ExceptionHandlers.handleSchemaException("DROP", schema, catalog, e);
+      return ExceptionHandlers.handleSchemaException(OperationType.DROP, schema, catalog, e);
     }
   }
 }
