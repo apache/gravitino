@@ -115,8 +115,6 @@ public class DynConstructors {
         } else {
           return ctor.newInstance(args);
         }
-      } catch (InstantiationException | IllegalAccessException e) {
-        throw e;
       } catch (InvocationTargetException e) {
         Throwables.propagateIfInstanceOf(e.getCause(), Exception.class);
         Throwables.propagateIfInstanceOf(e.getCause(), RuntimeException.class);

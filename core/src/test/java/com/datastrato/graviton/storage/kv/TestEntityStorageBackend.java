@@ -20,7 +20,7 @@ import com.datastrato.graviton.EntityStore;
 import com.datastrato.graviton.EntityStoreFactory;
 import com.datastrato.graviton.Metalake;
 import com.datastrato.graviton.Namespace;
-import com.datastrato.graviton.NoSuchEntityException;
+import com.datastrato.graviton.exceptions.NoSuchEntityException;
 import com.datastrato.graviton.meta.AuditInfo;
 import com.datastrato.graviton.meta.BaseMetalake;
 import com.datastrato.graviton.meta.CatalogEntity;
