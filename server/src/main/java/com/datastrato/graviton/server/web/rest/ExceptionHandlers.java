@@ -6,11 +6,9 @@ package com.datastrato.graviton.server.web.rest;
 
 import com.datastrato.graviton.exceptions.CatalogAlreadyExistsException;
 import com.datastrato.graviton.exceptions.MetalakeAlreadyExistsException;
-import com.datastrato.graviton.exceptions.NoSuchCatalogException;
 import com.datastrato.graviton.exceptions.NoSuchMetalakeException;
-import com.datastrato.graviton.exceptions.NoSuchSchemaException;
-import com.datastrato.graviton.exceptions.NoSuchTableException;
 import com.datastrato.graviton.exceptions.NonEmptySchemaException;
+import com.datastrato.graviton.exceptions.NotFoundException;
 import com.datastrato.graviton.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.graviton.exceptions.TableAlreadyExistsException;
 import com.datastrato.graviton.server.web.Utils;
@@ -53,7 +51,7 @@ public class ExceptionHandlers {
 
     @Override
     public Response handle(OperationType op, String table, String schema, Exception e) {
-      String formatted = table.isEmpty() ? "" : " [" + table + "]";
+      String formatted = StringUtil.isBlank(table) ? "" : " [" + table + "]";
       String errorMsg =
           String.format(
               TABLE_MSG_TEMPLATE, formatted, op.name(), schema, e.getClass().getSimpleName());
@@ -62,10 +60,7 @@ public class ExceptionHandlers {
       if (e instanceof IllegalArgumentException) {
         return Utils.illegalArguments(errorMsg, e);
 
-      } else if (e instanceof NoSuchSchemaException) {
-        return Utils.notFound(errorMsg, e);
-
-      } else if (e instanceof NoSuchTableException) {
+      } else if (e instanceof NotFoundException) {
         return Utils.notFound(errorMsg, e);
 
       } else if (e instanceof TableAlreadyExistsException) {
@@ -86,7 +81,7 @@ public class ExceptionHandlers {
 
     @Override
     public Response handle(OperationType op, String schema, String catalog, Exception e) {
-      String formatted = schema.isEmpty() ? "" : " [" + schema + "]";
+      String formatted = StringUtil.isBlank(schema) ? "" : " [" + schema + "]";
       String errorMsg =
           String.format(
               SCHEMA_MSG_TEMPLATE, formatted, op.name(), catalog, e.getClass().getSimpleName());
@@ -95,10 +90,7 @@ public class ExceptionHandlers {
       if (e instanceof IllegalArgumentException) {
         return Utils.illegalArguments(errorMsg, e);
 
-      } else if (e instanceof NoSuchCatalogException) {
-        return Utils.notFound(errorMsg, e);
-
-      } else if (e instanceof NoSuchSchemaException) {
+      } else if (e instanceof NotFoundException) {
         return Utils.notFound(errorMsg, e);
 
       } else if (e instanceof SchemaAlreadyExistsException) {
@@ -122,7 +114,7 @@ public class ExceptionHandlers {
 
     @Override
     public Response handle(OperationType op, String catalog, String metalake, Exception e) {
-      String formatted = catalog.isEmpty() ? "" : " [" + catalog + "]";
+      String formatted = StringUtil.isBlank(catalog) ? "" : " [" + catalog + "]";
       String errorMsg =
           String.format(
               CATALOG_MSG_TEMPLATE, formatted, op.name(), metalake, e.getClass().getSimpleName());
@@ -131,10 +123,7 @@ public class ExceptionHandlers {
       if (e instanceof IllegalArgumentException) {
         return Utils.illegalArguments(errorMsg, e);
 
-      } else if (e instanceof NoSuchMetalakeException) {
-        return Utils.notFound(errorMsg, e);
-
-      } else if (e instanceof NoSuchCatalogException) {
+      } else if (e instanceof NotFoundException) {
         return Utils.notFound(errorMsg, e);
 
       } else if (e instanceof CatalogAlreadyExistsException) {
