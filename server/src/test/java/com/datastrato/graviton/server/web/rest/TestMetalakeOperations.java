@@ -201,8 +201,10 @@ public class TestMetalakeOperations extends JerseyTest {
     ErrorResponse errorResponse = resp1.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResponse.getCode());
     Assertions.assertEquals(NoSuchMetalakeException.class.getSimpleName(), errorResponse.getType());
-    Assertions.assertEquals(
-        "Metalake " + metalakeName + " does not exist", errorResponse.getMessage());
+    Assertions.assertTrue(
+        errorResponse
+            .getMessage()
+            .contains("Failed to operate metalake(s) [" + metalakeName + "] operation [LOAD]"));
 
     // Test with internal error
     doThrow(new RuntimeException("Internal error")).when(metalakeManager).loadMetalake(any());
@@ -219,7 +221,10 @@ public class TestMetalakeOperations extends JerseyTest {
     ErrorResponse errorResponse1 = resp2.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse1.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse1.getType());
-    Assertions.assertEquals("Failed to load metalake " + metalakeName, errorResponse1.getMessage());
+    Assertions.assertTrue(
+        errorResponse1
+            .getMessage()
+            .contains("Failed to operate object [" + metalakeName + "] operation [LOAD]"));
   }
 
   @Test
@@ -330,6 +335,7 @@ public class TestMetalakeOperations extends JerseyTest {
     ErrorResponse errorResponse = resp1.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse.getType());
-    Assertions.assertEquals("Failed to drop metalake test", errorResponse.getMessage());
+    Assertions.assertTrue(
+        errorResponse.getMessage().contains("Failed to operate object [test] operation [DROP]"));
   }
 }

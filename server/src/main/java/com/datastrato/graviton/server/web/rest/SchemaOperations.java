@@ -13,12 +13,6 @@ import com.datastrato.graviton.dto.requests.SchemaUpdatesRequest;
 import com.datastrato.graviton.dto.responses.DropResponse;
 import com.datastrato.graviton.dto.responses.EntityListResponse;
 import com.datastrato.graviton.dto.responses.SchemaResponse;
-import com.datastrato.graviton.exceptions.IllegalNameIdentifierException;
-import com.datastrato.graviton.exceptions.IllegalNamespaceException;
-import com.datastrato.graviton.exceptions.NoSuchCatalogException;
-import com.datastrato.graviton.exceptions.NoSuchSchemaException;
-import com.datastrato.graviton.exceptions.NonEmptySchemaException;
-import com.datastrato.graviton.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.graviton.rel.Schema;
 import com.datastrato.graviton.rel.SchemaChange;
 import com.datastrato.graviton.server.web.Utils;
@@ -65,17 +59,8 @@ public class SchemaOperations {
       NameIdentifier[] idents = dispatcher.listSchemas(schemaNS);
       return Utils.ok(new EntityListResponse(idents));
 
-    } catch (IllegalNamespaceException e) {
-      LOG.error("Failed to list schemas with invalid namespace", e);
-      return Utils.illegalArguments("Failed to list schemas with invalid namespace", e);
-
-    } catch (NoSuchCatalogException e) {
-      LOG.error("Catalog {} does not exist, fail to list schemas", catalog);
-      return Utils.notFound("catalog " + catalog + " does not exist", e);
-
     } catch (Exception e) {
-      LOG.error("Fail to list schemas under catalog {}", catalog, e);
-      return Utils.internalError("Fail to list schemas under catalog " + catalog, e);
+      return ExceptionHandlers.handleSchemaException(OperationType.LIST, "", catalog, e);
     }
   }
 
@@ -87,36 +72,13 @@ public class SchemaOperations {
       SchemaCreateRequest request) {
     try {
       request.validate();
-    } catch (IllegalArgumentException e) {
-      LOG.error("Failed to validate CreateSchemaRequest arguments {}", request, e);
-      return Utils.illegalArguments(
-          "Failed to validate CreateSchemaRequest arguments " + request, e);
-    }
-
-    try {
       NameIdentifier ident = NameIdentifier.ofSchema(metalake, catalog, request.getName());
       Schema schema = dispatcher.createSchema(ident, request.getComment(), request.getProperties());
       return Utils.ok(new SchemaResponse(DTOConverters.toDTO(schema)));
 
-    } catch (IllegalNamespaceException | IllegalNameIdentifierException e) {
-      LOG.warn("Failed to create schema with invalid namespace", e);
-      return Utils.illegalArguments("Failed to create schema with invalid namespace", e);
-
-    } catch (NoSuchCatalogException e) {
-      LOG.error(
-          "Catalog {} does not exist, fail to create schema {}", catalog, request.getName(), e);
-      return Utils.notFound(
-          "Catalog " + catalog + " does not exist, fail to create schema " + request.getName(), e);
-
-    } catch (SchemaAlreadyExistsException e) {
-      LOG.error("Schema {} already exists under {}", request.getComment(), catalog, e);
-      return Utils.alreadyExists(
-          "Schema " + request.getName() + " already exists under catalog " + catalog, e);
-
     } catch (Exception e) {
-      LOG.error("Fail to create schema {} under catalog {}", request.getName(), catalog, e);
-      return Utils.internalError(
-          "Fail to create schema " + request.getName() + " under catalog " + catalog, e);
+      return ExceptionHandlers.handleSchemaException(
+          OperationType.CREATE, request.getName(), catalog, e);
     }
   }
 
@@ -132,17 +94,8 @@ public class SchemaOperations {
       Schema s = dispatcher.loadSchema(ident);
       return Utils.ok(new SchemaResponse(DTOConverters.toDTO(s)));
 
-    } catch (IllegalNamespaceException | IllegalNameIdentifierException e) {
-      LOG.warn("Failed to load schema with invalid namespace", e);
-      return Utils.illegalArguments("Failed to load schema with invalid namespace", e);
-
-    } catch (NoSuchSchemaException e) {
-      LOG.error("Schema {} does not exist under catalog {}", schema, catalog);
-      return Utils.notFound("Schema " + schema + " does not exist under catalog " + catalog, e);
-
     } catch (Exception e) {
-      LOG.error("Fail to load schema {} under catalog {}", schema, catalog, e);
-      return Utils.internalError("Fail to load schema " + schema + " under catalog " + catalog, e);
+      return ExceptionHandlers.handleSchemaException(OperationType.LOAD, schema, catalog, e);
     }
   }
 
@@ -156,32 +109,16 @@ public class SchemaOperations {
       SchemaUpdatesRequest request) {
     try {
       request.validate();
-    } catch (IllegalArgumentException e) {
-      LOG.error("Failed to validate SchemaUpdatesRequest arguments {}", request, e);
-      return Utils.illegalArguments(
-          "Failed to validate SchemaUpdatesRequest arguments " + request, e);
-    }
-
-    SchemaChange[] changes =
-        request.getUpdates().stream()
-            .map(SchemaUpdateRequest::schemaChange)
-            .toArray(SchemaChange[]::new);
-    try {
       NameIdentifier ident = NameIdentifier.ofSchema(metalake, catalog, schema);
+      SchemaChange[] changes =
+          request.getUpdates().stream()
+              .map(SchemaUpdateRequest::schemaChange)
+              .toArray(SchemaChange[]::new);
       Schema s = dispatcher.alterSchema(ident, changes);
       return Utils.ok(new SchemaResponse(DTOConverters.toDTO(s)));
 
-    } catch (IllegalNamespaceException | IllegalNameIdentifierException e) {
-      LOG.warn("Failed to alter schema with invalid namespace", e);
-      return Utils.illegalArguments("Failed to alter schema with invalid namespace", e);
-
-    } catch (NoSuchSchemaException e) {
-      LOG.error("Schema {} does not exist under catalog {}", schema, catalog);
-      return Utils.notFound("Schema " + schema + " does not exist under catalog " + catalog, e);
-
     } catch (Exception e) {
-      LOG.error("Fail to alter schema {} under catalog {}", schema, catalog, e);
-      return Utils.internalError("Fail to alter schema " + schema + " under catalog " + catalog, e);
+      return ExceptionHandlers.handleSchemaException(OperationType.ALTER, schema, catalog, e);
     }
   }
 
@@ -202,25 +139,8 @@ public class SchemaOperations {
 
       return Utils.ok(new DropResponse(dropped));
 
-    } catch (IllegalNamespaceException | IllegalNameIdentifierException e) {
-      LOG.warn("Failed to drop schema with invalid namespace", e);
-      return Utils.illegalArguments("Failed to drop schema with invalid namespace", e);
-
-    } catch (NonEmptySchemaException e) {
-      LOG.error(
-          "Schema {} is not empty under catalog {}, but cascade is set to true", schema, catalog);
-      return Utils.nonEmpty(
-          "Schema "
-              + schema
-              + " is not empty under catalog "
-              + catalog
-              + " , but "
-              + "cascade is set to true",
-          e);
-
     } catch (Exception e) {
-      LOG.error("Fail to drop schema {} under catalog {}", schema, catalog, e);
-      return Utils.internalError("Fail to drop schema " + schema + " under catalog " + catalog, e);
+      return ExceptionHandlers.handleSchemaException(OperationType.DROP, schema, catalog, e);
     }
   }
 }

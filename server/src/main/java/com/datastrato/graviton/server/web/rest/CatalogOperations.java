@@ -15,11 +15,6 @@ import com.datastrato.graviton.dto.requests.CatalogUpdatesRequest;
 import com.datastrato.graviton.dto.responses.CatalogResponse;
 import com.datastrato.graviton.dto.responses.DropResponse;
 import com.datastrato.graviton.dto.responses.EntityListResponse;
-import com.datastrato.graviton.exceptions.CatalogAlreadyExistsException;
-import com.datastrato.graviton.exceptions.IllegalNameIdentifierException;
-import com.datastrato.graviton.exceptions.IllegalNamespaceException;
-import com.datastrato.graviton.exceptions.NoSuchCatalogException;
-import com.datastrato.graviton.exceptions.NoSuchMetalakeException;
 import com.datastrato.graviton.server.web.Utils;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
@@ -61,17 +56,8 @@ public class CatalogOperations {
       NameIdentifier[] idents = manager.listCatalogs(catalogNS);
       return Utils.ok(new EntityListResponse(idents));
 
-    } catch (IllegalNamespaceException e) {
-      LOG.warn("Failed to list catalogs with invalid namespace", e);
-      return Utils.illegalArguments("Failed to list catalogs with invalid namespace", e);
-
-    } catch (NoSuchMetalakeException ex) {
-      LOG.error("Metalake {} does not exist, fail to list catalogs", metalake);
-      return Utils.notFound("Metalake " + metalake + " does not exist", ex);
-
     } catch (Exception e) {
-      LOG.error("Failed to list catalogs under metalake {}", metalake, e);
-      return Utils.internalError("Failed to list catalogs under metalake " + metalake, e);
+      return ExceptionHandlers.handleCatalogException(OperationType.LIST, "", metalake, e);
     }
   }
 
@@ -81,36 +67,15 @@ public class CatalogOperations {
       @PathParam("metalake") String metalake, CatalogCreateRequest request) {
     try {
       request.validate();
-    } catch (IllegalArgumentException e) {
-      LOG.error("Failed to validate CreateCatalogRequest arguments {}", request, e);
-      return Utils.illegalArguments(
-          "Failed to validate CreateCatalogRequest arguments " + request, e);
-    }
-
-    try {
       NameIdentifier ident = NameIdentifier.ofCatalog(metalake, request.getName());
       Catalog catalog =
           manager.createCatalog(
               ident, request.getType(), request.getComment(), request.getProperties());
       return Utils.ok(new CatalogResponse(DTOConverters.toDTO(catalog)));
 
-    } catch (IllegalNamespaceException | IllegalNameIdentifierException e) {
-      LOG.warn("Failed to create catalog with invalid name identifier", e);
-      return Utils.illegalArguments("Failed to create catalog with invalid name identifier", e);
-
-    } catch (NoSuchMetalakeException ex) {
-      LOG.error("Metalake {} does not exist, fail to create catalog", metalake);
-      return Utils.notFound("Metalake " + metalake + " does not exist", ex);
-
-    } catch (CatalogAlreadyExistsException ex) {
-      LOG.error("Catalog {} already exists under metalake {}", request.getName(), metalake);
-      return Utils.alreadyExists(
-          String.format("Catalog %s already exists under metalake %s", request.getName(), metalake),
-          ex);
-
     } catch (Exception e) {
-      LOG.error("Failed to create catalog under metalake {}", metalake, e);
-      return Utils.internalError("Failed to create catalog under metalake " + metalake, e);
+      return ExceptionHandlers.handleCatalogException(
+          OperationType.CREATE, request.getName(), metalake, e);
     }
   }
 
@@ -124,24 +89,9 @@ public class CatalogOperations {
       Catalog catalog = manager.loadCatalog(ident);
       return Utils.ok(new CatalogResponse(DTOConverters.toDTO(catalog)));
 
-    } catch (IllegalNamespaceException | IllegalNameIdentifierException e) {
-      LOG.warn("Failed to load catalog with invalid name identifier", e);
-      return Utils.illegalArguments("Failed to load catalog with invalid name identifier", e);
-
-    } catch (NoSuchMetalakeException ex) {
-      LOG.error("Metalake {} does not exist, fail to load catalog {}", metalakeName, catalogName);
-      return Utils.notFound("Metalake " + metalakeName + " does not exist", ex);
-
-    } catch (NoSuchCatalogException ex) {
-      LOG.error("Catalog {} does not exist under metalake {}", catalogName, metalakeName);
-      return Utils.notFound(
-          String.format("Catalog %s does not exist under metalake %s", catalogName, metalakeName),
-          ex);
-
     } catch (Exception e) {
-      LOG.error("Failed to load catalog {} under metalake {}", catalogName, metalakeName, e);
-      return Utils.internalError(
-          "Failed to load catalog " + catalogName + " under metalake " + metalakeName, e);
+      return ExceptionHandlers.handleCatalogException(
+          OperationType.LOAD, catalogName, metalakeName, e);
     }
   }
 
@@ -154,13 +104,6 @@ public class CatalogOperations {
       CatalogUpdatesRequest request) {
     try {
       request.validate();
-    } catch (IllegalArgumentException e) {
-      LOG.error("Failed to validate CatalogUpdatesRequest arguments {}", request, e);
-      return Utils.illegalArguments(
-          "Failed to validate CatalogUpdatesRequest arguments " + request, e);
-    }
-
-    try {
       NameIdentifier ident = NameIdentifier.ofCatalog(metalakeName, catalogName);
       CatalogChange[] changes =
           request.getUpdates().stream()
@@ -170,33 +113,9 @@ public class CatalogOperations {
       Catalog catalog = manager.alterCatalog(ident, changes);
       return Utils.ok(new CatalogResponse(DTOConverters.toDTO(catalog)));
 
-    } catch (IllegalNamespaceException | IllegalNameIdentifierException e) {
-      LOG.warn("Failed to alter catalog with invalid name identifier", e);
-      return Utils.illegalArguments("Failed to alter catalog with invalid name identifier", e);
-
-    } catch (NoSuchCatalogException ex) {
-      LOG.error("Catalog {} does not exist under metalake {}", catalogName, metalakeName);
-      return Utils.notFound(
-          "Catalog " + catalogName + " does not exist under metalake " + metalakeName, ex);
-
-    } catch (IllegalArgumentException ex) {
-      LOG.error(
-          "Failed to alter catalog {} under metalake {} with unsupported changes",
-          catalogName,
-          metalakeName,
-          ex);
-      return Utils.illegalArguments(
-          "Failed to alter catalog "
-              + catalogName
-              + " under metalake "
-              + metalakeName
-              + " with unsupported changes",
-          ex);
-
     } catch (Exception e) {
-      LOG.error("Failed to alter catalog {} under metalake {}", catalogName, metalakeName, e);
-      return Utils.internalError(
-          "Failed to alter catalog " + catalogName + " under metalake " + metalakeName, e);
+      return ExceptionHandlers.handleCatalogException(
+          OperationType.ALTER, catalogName, metalakeName, e);
     }
   }
 
@@ -214,14 +133,9 @@ public class CatalogOperations {
 
       return Utils.ok(new DropResponse(dropped));
 
-    } catch (IllegalNamespaceException | IllegalNameIdentifierException e) {
-      LOG.warn("Failed to drop catalog with invalid name identifier", e);
-      return Utils.illegalArguments("Failed to drop catalog with invalid name identifier", e);
-
     } catch (Exception e) {
-      LOG.error("Failed to drop catalog {} under metalake {}", catalogName, metalakeName, e);
-      return Utils.internalError(
-          "Failed to drop catalog " + catalogName + " under metalake " + metalakeName, e);
+      return ExceptionHandlers.handleCatalogException(
+          OperationType.DROP, catalogName, metalakeName, e);
     }
   }
 }
