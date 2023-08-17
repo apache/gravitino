@@ -37,6 +37,15 @@ public class TestKvNameMappingService {
   }
 
   @Test
+  public void testIdGeneratorFactory() {
+    Config config = Mockito.mock(Config.class);
+    Mockito.when(config.get(Configs.ID_GERNERATOR)).thenReturn(null);
+    IdGenerator idGenerator = IdGeneratorFactory.getIdGeneratorByName(config);
+    Assertions.assertNotNull(idGenerator);
+    Assertions.assertTrue(idGenerator instanceof RandomIdGenerator);
+  }
+
+  @Test
   public void testNameMappingService() throws IOException {
     Config config = Mockito.mock(Config.class);
     Mockito.when(config.get(ENTITY_STORE)).thenReturn("kv");
