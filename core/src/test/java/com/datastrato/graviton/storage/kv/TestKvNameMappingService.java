@@ -54,43 +54,47 @@ public class TestKvNameMappingService {
 
   @Test
   @Order(1)
-  public void testGetIdByName() throws IOException {
+  public void testGetIdByName() throws Exception {
     IdGenerator idGenerator = new RandomIdGenerator();
-    NameMappingService nameMappingService = createNameMappingService(ROCKS_DB_STORE_PATH + "/1");
-    Assertions.assertNull(nameMappingService.getIdByName("name1"));
-    long name1Id = idGenerator.nextId();
-    nameMappingService.bindNameAndId("name1", name1Id);
-    Long name1IdRead = nameMappingService.getIdByName("name1");
-    Assertions.assertEquals(name1Id, name1IdRead);
+    try (NameMappingService nameMappingService =
+        createNameMappingService(ROCKS_DB_STORE_PATH + "/1")) {
+      Assertions.assertNull(nameMappingService.getIdByName("name1"));
+      long name1Id = idGenerator.nextId();
+      nameMappingService.bindNameAndId("name1", name1Id);
+      Long name1IdRead = nameMappingService.getIdByName("name1");
+      Assertions.assertEquals(name1Id, name1IdRead);
 
-    Assertions.assertNull(nameMappingService.getIdByName("name2"));
-    long name2Id = idGenerator.nextId();
-    nameMappingService.bindNameAndId("name2", name2Id);
-    Long name2IdRead = nameMappingService.getIdByName("name2");
-    Assertions.assertEquals(name2Id, name2IdRead);
+      Assertions.assertNull(nameMappingService.getIdByName("name2"));
+      long name2Id = idGenerator.nextId();
+      nameMappingService.bindNameAndId("name2", name2Id);
+      Long name2IdRead = nameMappingService.getIdByName("name2");
+      Assertions.assertEquals(name2Id, name2IdRead);
+    }
   }
 
   @Test
   @Order(2)
-  public void testUpdateName() throws IOException {
+  public void testUpdateName() throws Exception {
     long name1Id = idGenerator.nextId();
-    NameMappingService nameMappingService = createNameMappingService(ROCKS_DB_STORE_PATH + "/2");
-    nameMappingService.bindNameAndId("name1", name1Id);
-    Assertions.assertNotNull(nameMappingService.getIdByName("name1"));
+    try (NameMappingService nameMappingService =
+        createNameMappingService(ROCKS_DB_STORE_PATH + "/2")) {
+      nameMappingService.bindNameAndId("name1", name1Id);
+      Assertions.assertNotNull(nameMappingService.getIdByName("name1"));
 
-    long name2Id = idGenerator.nextId();
-    nameMappingService.bindNameAndId("name2", name2Id);
-    Assertions.assertNotNull(nameMappingService.getIdByName("name1"));
-    Assertions.assertNotEquals(name1Id, name2Id);
+      long name2Id = idGenerator.nextId();
+      nameMappingService.bindNameAndId("name2", name2Id);
+      Assertions.assertNotNull(nameMappingService.getIdByName("name1"));
+      Assertions.assertNotEquals(name1Id, name2Id);
 
-    boolean result = nameMappingService.updateName("name1", "name3");
-    Assertions.assertTrue(result);
+      boolean result = nameMappingService.updateName("name1", "name3");
+      Assertions.assertTrue(result);
 
-    Long name3Id = nameMappingService.getIdByName("name3");
-    Assertions.assertEquals(name1Id, name3Id);
-    Assertions.assertNull(nameMappingService.getIdByName("name1"));
+      Long name3Id = nameMappingService.getIdByName("name3");
+      Assertions.assertEquals(name1Id, name3Id);
+      Assertions.assertNull(nameMappingService.getIdByName("name1"));
 
-    Assertions.assertFalse(nameMappingService.updateName("name1", "name4"));
+      Assertions.assertFalse(nameMappingService.updateName("name1", "name4"));
+    }
   }
 
   @Test
