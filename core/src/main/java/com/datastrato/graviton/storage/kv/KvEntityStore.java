@@ -20,7 +20,7 @@ import com.datastrato.graviton.Namespace;
 import com.datastrato.graviton.exceptions.NoSuchEntityException;
 import com.datastrato.graviton.storage.EntityKeyEncoder;
 import com.datastrato.graviton.storage.IdGenerator;
-import com.datastrato.graviton.storage.IdGeneratorFactory;
+import com.datastrato.graviton.storage.RandomIdGenerator;
 import com.datastrato.graviton.util.Bytes;
 import com.datastrato.graviton.util.Executable;
 import com.google.common.annotations.VisibleForTesting;
@@ -52,7 +52,8 @@ public class KvEntityStore implements EntityStore {
   @Override
   public void initialize(Config config) throws RuntimeException {
     this.backend = createKvEntityBackend(config);
-    IdGenerator idGenerator = IdGeneratorFactory.getIdGeneratorByName(config);
+    // TODO (yuqi) Make idGenerator this configurable
+    IdGenerator idGenerator = new RandomIdGenerator();
     this.entityKeyEncoder = new BinaryEntityKeyEncoder(backend, idGenerator);
   }
 
