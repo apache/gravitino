@@ -14,6 +14,7 @@ import com.datastrato.graviton.Entity.EntityType;
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.exceptions.NoSuchEntityException;
 import com.datastrato.graviton.storage.EntityKeyEncoder;
+import com.datastrato.graviton.storage.IdGenerator;
 import com.datastrato.graviton.util.ByteUtils;
 import com.datastrato.graviton.util.Bytes;
 import com.google.common.annotations.VisibleForTesting;
@@ -77,8 +78,11 @@ public class BinaryEntityKeyEncoder implements EntityKeyEncoder<byte[]> {
           SCHEMA, new String[] {SCHEMA.getShortName() + "_", "_", "_"},
           TABLE, new String[] {TABLE.getShortName() + "_", "_", "_", "_"});
 
-  public BinaryEntityKeyEncoder(KvBackend backend) {
+  private IdGenerator idGenerator;
+
+  public BinaryEntityKeyEncoder(KvBackend backend, IdGenerator idGenerator) {
     this.backend = backend;
+    this.idGenerator = idGenerator;
   }
 
   /**

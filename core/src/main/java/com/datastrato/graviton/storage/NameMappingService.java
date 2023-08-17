@@ -23,7 +23,7 @@ public interface NameMappingService {
    * @return the id of the name, or null if the name does not exist
    * @throws IOException if the underlying storage failed
    */
-  Long get(String name) throws IOException;
+  Long getIdByName(String name) throws IOException;
 
   /**
    * If we do not find the id of the name, we create a new id for the name.
@@ -31,10 +31,11 @@ public interface NameMappingService {
    * <p>Note, this method should be called in transaction.
    *
    * @param name the name of the entity
+   * @param id the id of the name to be binded
    * @return the id of the name, or null if the name does not exist
    * @throws IOException if the underlying storage failed
    */
-  Long create(String name) throws IOException;
+  void addBinding(String name, long id) throws IOException;
 
   /**
    * Update the mapping of the name to id. This method is used to update the mapping when we rename
@@ -64,5 +65,5 @@ public interface NameMappingService {
    * @return true if the name exists and is deleted successfully, false if the name does not exist
    * @throws IOException if the underlying storage failed
    */
-  boolean delete(String name) throws IOException;
+  boolean removeBinding(String name) throws IOException;
 }

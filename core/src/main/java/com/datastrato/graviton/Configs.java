@@ -17,6 +17,9 @@ public interface Configs {
   String ENTITY_KV_ROCKSDB_BACKEND_PATH_KEY = "graviton.entity.store.kv.rocskdb.path";
   String DEFAULT_KV_ROCKSDB_BACKEND_PATH = "/tmp/graviton";
 
+  String ID_GENERATOR_KEY = "graviton.id.generator";
+  String DEFAULT_ID_GENERATOR = "random";
+
   ConfigEntry<String> ENTITY_STORE =
       new ConfigBuilder(ENTITY_STORE_KEY)
           .doc("The entity store to use")
@@ -58,4 +61,11 @@ public interface Configs {
           .version("0.1.0")
           .booleanConf()
           .createWithDefault(true);
+
+  ConfigEntry<String> ID_GERNERATOR =
+      new ConfigBuilder("graviton.id.generator")
+          .doc("The id generator to use")
+          .version("0.1.0")
+          .stringConf()
+          .createWithDefault("random");
 }
