@@ -52,7 +52,7 @@ public class KvEntityStore implements EntityStore {
   @Override
   public void initialize(Config config) throws RuntimeException {
     this.backend = createKvEntityBackend(config);
-    // TODO (yuqi) Make idGenerator this configurable
+    // TODO (yuqi) Make idGenerator configurable
     IdGenerator idGenerator = new RandomIdGenerator();
     this.entityKeyEncoder = new BinaryEntityKeyEncoder(backend, idGenerator);
   }
