@@ -20,6 +20,7 @@ public interface EntityKeyEncoder<T> {
    * @return encoded key for key-value store
    * @throws IOException Exception if error occurs
    */
+  @Deprecated
   default byte[] encode(EntityIdentifier entityIdentifier, boolean createIdIfNotExists)
       throws IOException {
     return null;

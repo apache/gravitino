@@ -69,6 +69,24 @@ public class BinaryEntityKeyEncoder implements EntityKeyEncoder<byte[]> {
   }
 
   /**
+   * Get the id of the name from the name to id mapping. If the name does not exist, we will create
+   * and store new binding in the name to id mapping.
+   *
+   * @param name the name to get id
+   * @return the id of the name
+   * @throws IOException if we can't get or create the binding
+   */
+  private long getOrCreateIdFromBinding(String name) throws IOException {
+    Long id = nameMappingService.getIdFromBinding(name);
+    if (id == null) {
+      id = idGenerator.nextId();
+      nameMappingService.addBinding(name, id);
+    }
+
+    return id;
+  }
+
+  /**
    * Encode entity key for KV backend, e.g., RocksDB. The key is used to store the entity in the
    * backend.
    *
@@ -80,15 +98,10 @@ public class BinaryEntityKeyEncoder implements EntityKeyEncoder<byte[]> {
     String[] nameSpace = identifier.namespace().levels();
     long[] namespaceIds = new long[nameSpace.length];
     for (int i = 0; i < nameSpace.length; i++) {
-      Long id = nameMappingService.getIdFromBinding(nameSpace[i]);
-      if (id == null) {
-        id = idGenerator.nextId();
-        nameMappingService.addBinding(nameSpace[i], id);
-      }
-      namespaceIds[i] = id;
+      namespaceIds[i] = getOrCreateIdFromBinding(nameSpace[i]);
     }
 
-    // If the name is a wild card, we only need to encode the namespace.
+    // If the name is a wildcard, We only need to encode the namespace.
     if (WILD_CARD.equals(identifier.name())) {
       String[] namespaceTemplate = ENTITY_TYPE_TO_NAME_IDENTIFIER.get(entityType);
       if (namespaceTemplate == null) {
@@ -100,13 +113,7 @@ public class BinaryEntityKeyEncoder implements EntityKeyEncoder<byte[]> {
     // This is for point query and need to use specific name
     long[] namespaceAndNameIds = new long[namespaceIds.length + 1];
     System.arraycopy(namespaceIds, 0, namespaceAndNameIds, 0, namespaceIds.length);
-
-    Long nameId = nameMappingService.getIdFromBinding(identifier.name());
-    if (nameId == null) {
-      nameId = idGenerator.nextId();
-      nameMappingService.addBinding(identifier.name(), nameId);
-    }
-    namespaceAndNameIds[namespaceIds.length] = nameId;
+    namespaceAndNameIds[namespaceIds.length] = getOrCreateIdFromBinding(identifier.name());
 
     String[] nameIdentifierTemplate = ENTITY_TYPE_TO_NAME_IDENTIFIER.get(entityType);
     if (nameIdentifierTemplate == null) {
