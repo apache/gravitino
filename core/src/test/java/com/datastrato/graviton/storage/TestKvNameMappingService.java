@@ -50,16 +50,16 @@ public class TestKvNameMappingService {
     NameMappingService nameMappingService = new KvNameMappingService(backend);
 
     // First test read and write
-    Assertions.assertNull(nameMappingService.getIdByName("name1"));
+    Assertions.assertNull(nameMappingService.getIdFromBinding("name1"));
     long name1Id = idGenerator.nextId();
     nameMappingService.addBinding("name1", name1Id);
-    Long name1IdRead = nameMappingService.getIdByName("name1");
+    Long name1IdRead = nameMappingService.getIdFromBinding("name1");
     Assertions.assertEquals(name1Id, name1IdRead);
 
-    Assertions.assertNull(nameMappingService.getIdByName("name2"));
+    Assertions.assertNull(nameMappingService.getIdFromBinding("name2"));
     long name2Id = idGenerator.nextId();
     nameMappingService.addBinding("name2", name2Id);
-    Long name2IdRead = nameMappingService.getIdByName("name2");
+    Long name2IdRead = nameMappingService.getIdFromBinding("name2");
     Assertions.assertEquals(name2Id, name2IdRead);
 
     Assertions.assertNotEquals(name1Id, name2Id);
@@ -67,22 +67,23 @@ public class TestKvNameMappingService {
     // Test update
     boolean result = nameMappingService.update("name1", "name3");
     Assertions.assertTrue(result);
-    Long name3Id = nameMappingService.getIdByName("name3");
+    Long name3Id = nameMappingService.getIdFromBinding("name3");
     Assertions.assertEquals(name1Id, name3Id);
-    Assertions.assertNull(nameMappingService.getIdByName("name1"));
+    Assertions.assertNull(nameMappingService.getIdFromBinding("name1"));
 
     result = nameMappingService.update("name1", "name1_");
     Assertions.assertFalse(result);
 
     // Test or create
-    Assertions.assertNull(nameMappingService.getIdByName("name4"));
+    Assertions.assertNull(nameMappingService.getIdFromBinding("name4"));
     long name4Id = idGenerator.nextId();
     nameMappingService.addBinding("name4", name4Id);
     Assertions.assertNotEquals(name4Id, name1Id);
 
     // Test delete
-    nameMappingService.removeBinding("name4");
-    Assertions.assertNull(nameMappingService.getIdByName("name4"));
+    boolean r = nameMappingService.removeBinding("name4");
+    Assertions.assertTrue(r);
+    Assertions.assertNull(nameMappingService.getIdFromBinding("name4"));
 
     KvBackend spyKvBackend = Mockito.spy(backend);
     Mockito.doThrow(new ArithmeticException()).when(spyKvBackend).delete(Mockito.any());
@@ -91,7 +92,7 @@ public class TestKvNameMappingService {
     // Now we try to use update. It should fail.
     Assertions.assertThrowsExactly(
         ArithmeticException.class, () -> mockNameMappingService.update("name3", "name4"));
-    Assertions.assertNull(mockNameMappingService.getIdByName("name4"));
-    Assertions.assertNotNull(mockNameMappingService.getIdByName("name3"));
+    Assertions.assertNull(mockNameMappingService.getIdFromBinding("name4"));
+    Assertions.assertNotNull(mockNameMappingService.getIdFromBinding("name3"));
   }
 }

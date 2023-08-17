@@ -23,16 +23,16 @@ public interface NameMappingService {
    * @return the id of the name, or null if the name does not exist
    * @throws IOException if the underlying storage failed
    */
-  Long getIdByName(String name) throws IOException;
+  Long getIdFromBinding(String name) throws IOException;
 
   /**
-   * If we do not find the id of the name, we create a new id for the name.
+   * If we do not find the id of the name in the name mapping service. We will add a new id for the
+   * name mapping
    *
    * <p>Note, this method should be called in transaction.
    *
    * @param name the name of the entity
    * @param id the id of the name to be binded
-   * @return the id of the name, or null if the name does not exist
    * @throws IOException if the underlying storage failed
    */
   void addBinding(String name, long id) throws IOException;

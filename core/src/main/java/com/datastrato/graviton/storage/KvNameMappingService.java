@@ -38,7 +38,7 @@ public class KvNameMappingService implements NameMappingService {
   }
 
   @Override
-  public Long getIdByName(String name) throws IOException {
+  public Long getIdFromBinding(String name) throws IOException {
     lock.readLock().lock();
     try {
       byte[] nameByte = Bytes.concat(NAME_PREFIX, name.getBytes());
