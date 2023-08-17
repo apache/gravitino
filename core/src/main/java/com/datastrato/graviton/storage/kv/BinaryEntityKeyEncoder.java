@@ -77,10 +77,10 @@ public class BinaryEntityKeyEncoder implements EntityKeyEncoder<byte[]> {
    * @throws IOException if we can't get or create the binding
    */
   private long getOrCreateIdFromBinding(String name) throws IOException {
-    Long id = nameMappingService.getIdFromBinding(name);
+    Long id = nameMappingService.getIdByName(name);
     if (id == null) {
       id = idGenerator.nextId();
-      nameMappingService.addBinding(name, id);
+      nameMappingService.bindNameAndId(name, id);
     }
 
     return id;

@@ -21,9 +21,8 @@ import com.datastrato.graviton.EntityStoreFactory;
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
 import com.datastrato.graviton.storage.IdGenerator;
-import com.datastrato.graviton.storage.IdGeneratorFactory;
-import com.datastrato.graviton.storage.KvNameMappingService;
 import com.datastrato.graviton.storage.NameMappingService;
+import com.datastrato.graviton.storage.RandomIdGenerator;
 import com.datastrato.graviton.util.ByteUtils;
 import com.datastrato.graviton.util.Bytes;
 import java.io.IOException;
@@ -59,9 +58,7 @@ public class TestEntityKeyEncoding {
         EntitySerDeFactory.createEntitySerDe(config.get(Configs.ENTITY_SERDE)));
     NameMappingService nameMappingService =
         new KvNameMappingService(((KvEntityStore) ENTITY_STORE_INSTANCE).getBackend());
-    ENCODER =
-        new BinaryEntityKeyEncoder(
-            nameMappingService, IdGeneratorFactory.getIdGeneratorByName(config));
+    ENCODER = new BinaryEntityKeyEncoder(nameMappingService, new RandomIdGenerator());
   }
 
   @AfterEach
