@@ -20,8 +20,10 @@ public interface EntityKeyEncoder<T> {
    * @return encoded key for key-value store
    * @throws IOException Exception if error occurs
    */
-  byte[] encode(EntityIdentifier entityIdentifier, boolean createIdIfNotExists) throws IOException;
-
+  default byte[] encode(EntityIdentifier entityIdentifier, boolean createIdIfNotExists)
+      throws IOException {
+    return null;
+  }
   /**
    * Construct the key for key-value store from the entity NameIdentifier and EntityType.
    *
