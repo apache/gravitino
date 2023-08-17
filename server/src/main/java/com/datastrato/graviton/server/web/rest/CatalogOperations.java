@@ -66,6 +66,7 @@ public class CatalogOperations {
   public Response createCatalog(
       @PathParam("metalake") String metalake, CatalogCreateRequest request) {
     try {
+      request.validate();
       NameIdentifier ident = NameIdentifier.ofCatalog(metalake, request.getName());
       Catalog catalog =
           manager.createCatalog(
@@ -102,6 +103,7 @@ public class CatalogOperations {
       @PathParam("catalog") String catalogName,
       CatalogUpdatesRequest request) {
     try {
+      request.validate();
       NameIdentifier ident = NameIdentifier.ofCatalog(metalakeName, catalogName);
       CatalogChange[] changes =
           request.getUpdates().stream()
