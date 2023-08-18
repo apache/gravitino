@@ -22,7 +22,6 @@ import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
 import com.datastrato.graviton.storage.IdGenerator;
 import com.datastrato.graviton.storage.NameMappingService;
-import com.datastrato.graviton.storage.RandomIdGenerator;
 import com.datastrato.graviton.util.ByteUtils;
 import com.datastrato.graviton.util.Bytes;
 import java.io.IOException;
@@ -58,7 +57,20 @@ public class TestEntityKeyEncoding {
         EntitySerDeFactory.createEntitySerDe(config.get(Configs.ENTITY_SERDE)));
     NameMappingService nameMappingService =
         new KvNameMappingService(((KvEntityStore) ENTITY_STORE_INSTANCE).getBackend());
-    ENCODER = new BinaryEntityKeyEncoder(nameMappingService, new RandomIdGenerator());
+    ENCODER = new BinaryEntityKeyEncoder(nameMappingService);
+  }
+
+  private IdGenerator getIdGeneratorAndSpy(BinaryEntityKeyEncoder entityKeyEncoder)
+      throws IllegalAccessException, NoSuchFieldException {
+    KvNameMappingService nameMappingService =
+        (KvNameMappingService) entityKeyEncoder.nameMappingService;
+
+    Field field = nameMappingService.getClass().getDeclaredField("idGenerator");
+    field.setAccessible(true);
+    IdGenerator idGenerator = (IdGenerator) field.get(nameMappingService);
+    IdGenerator spyIdGenerator = Mockito.spy(idGenerator);
+    field.set(nameMappingService, spyIdGenerator);
+    return spyIdGenerator;
   }
 
   @AfterEach
@@ -91,11 +103,7 @@ public class TestEntityKeyEncoding {
     // Metalake
     // metalake1 --> 0
     Namespace namespace = Namespace.of();
-    Field f = BinaryEntityKeyEncoder.class.getDeclaredField("idGenerator");
-    f.setAccessible(true);
-    IdGenerator orginalIdGenerator = (IdGenerator) f.get(ENCODER);
-    IdGenerator mockIdGenerator = Mockito.spy(orginalIdGenerator);
-    f.set(ENCODER, mockIdGenerator);
+    IdGenerator mockIdGenerator = getIdGeneratorAndSpy(ENCODER);
 
     Mockito.doReturn(0L).when(mockIdGenerator).nextId();
     NameIdentifier mateLakeIdentifier1 = NameIdentifier.of(namespace, "metalake1");
@@ -206,11 +214,7 @@ public class TestEntityKeyEncoding {
       throws IOException, IllegalAccessException, NoSuchFieldException {
     // Scan all Metalake
     Namespace namespace = Namespace.of();
-    Field f = BinaryEntityKeyEncoder.class.getDeclaredField("idGenerator");
-    f.setAccessible(true);
-    IdGenerator orginalIdGenerator = (IdGenerator) f.get(ENCODER);
-    IdGenerator mockIdGenerator = Mockito.spy(orginalIdGenerator);
-    f.set(ENCODER, mockIdGenerator);
+    IdGenerator mockIdGenerator = getIdGeneratorAndSpy(ENCODER);
 
     NameIdentifier metalakeIdentifier = NameIdentifier.of(namespace, WILD_CARD);
     byte[] realKey = ENCODER.encode(metalakeIdentifier, EntityType.METALAKE);

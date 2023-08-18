@@ -16,6 +16,7 @@ import com.datastrato.graviton.storage.IdGenerator;
 import com.datastrato.graviton.storage.NameMappingService;
 import com.datastrato.graviton.storage.RandomIdGenerator;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import org.apache.commons.io.FileUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -52,21 +53,33 @@ public class TestKvNameMappingService {
     return new KvNameMappingService(backend);
   }
 
+  private IdGenerator getIdGeneratorByRefection(NameMappingService nameMappingService)
+      throws Exception {
+    Field field = nameMappingService.getClass().getDeclaredField("idGenerator");
+    field.setAccessible(true);
+    IdGenerator idGenerator = (IdGenerator) field.get(nameMappingService);
+    IdGenerator spyIdGenerator = Mockito.spy(idGenerator);
+    field.set(nameMappingService, spyIdGenerator);
+    return spyIdGenerator;
+  }
+
   @Test
   @Order(1)
   public void testGetIdByName() throws Exception {
-    IdGenerator idGenerator = new RandomIdGenerator();
     try (NameMappingService nameMappingService =
         createNameMappingService(ROCKS_DB_STORE_PATH + "/1")) {
       Assertions.assertNull(nameMappingService.getIdByName("name1"));
-      long name1Id = idGenerator.nextId();
-      nameMappingService.bindNameAndId("name1", name1Id);
+
+      IdGenerator spyIdGenerator = getIdGeneratorByRefection(nameMappingService);
+      Mockito.doReturn(1L).when(spyIdGenerator).nextId();
+
+      long name1Id = nameMappingService.bindNameAndId("name1");
       Long name1IdRead = nameMappingService.getIdByName("name1");
       Assertions.assertEquals(name1Id, name1IdRead);
 
       Assertions.assertNull(nameMappingService.getIdByName("name2"));
-      long name2Id = idGenerator.nextId();
-      nameMappingService.bindNameAndId("name2", name2Id);
+      Mockito.doReturn(2L).when(spyIdGenerator).nextId();
+      long name2Id = nameMappingService.bindNameAndId("name2");
       Long name2IdRead = nameMappingService.getIdByName("name2");
       Assertions.assertEquals(name2Id, name2IdRead);
     }
@@ -75,22 +88,23 @@ public class TestKvNameMappingService {
   @Test
   @Order(2)
   public void testUpdateName() throws Exception {
-    long name1Id = idGenerator.nextId();
     try (NameMappingService nameMappingService =
         createNameMappingService(ROCKS_DB_STORE_PATH + "/2")) {
-      nameMappingService.bindNameAndId("name1", name1Id);
+      IdGenerator idGenerator = getIdGeneratorByRefection(nameMappingService);
+      Mockito.doReturn(1L).when(idGenerator).nextId();
+      long name1IdRead = nameMappingService.bindNameAndId("name1");
       Assertions.assertNotNull(nameMappingService.getIdByName("name1"));
 
-      long name2Id = idGenerator.nextId();
-      nameMappingService.bindNameAndId("name2", name2Id);
+      Mockito.doReturn(2L).when(idGenerator).nextId();
+      long name2IdRead = nameMappingService.bindNameAndId("name2");
       Assertions.assertNotNull(nameMappingService.getIdByName("name1"));
-      Assertions.assertNotEquals(name1Id, name2Id);
+      Assertions.assertNotEquals(name1IdRead, name2IdRead);
 
       boolean result = nameMappingService.updateName("name1", "name3");
       Assertions.assertTrue(result);
 
       Long name3Id = nameMappingService.getIdByName("name3");
-      Assertions.assertEquals(name1Id, name3Id);
+      Assertions.assertEquals(name1IdRead, name3Id);
       Assertions.assertNull(nameMappingService.getIdByName("name1"));
 
       Assertions.assertFalse(nameMappingService.updateName("name1", "name4"));
@@ -99,18 +113,21 @@ public class TestKvNameMappingService {
 
   @Test
   @Order(3)
-  public void testBindAndUnBind() throws IOException {
-    long name1Id = idGenerator.nextId();
+  public void testBindAndUnBind() throws Exception {
+    idGenerator.nextId();
     NameMappingService nameMappingService = createNameMappingService(ROCKS_DB_STORE_PATH + "/3");
-    nameMappingService.bindNameAndId("name1", name1Id);
+    IdGenerator idGenerator = getIdGeneratorByRefection(nameMappingService);
+
+    Mockito.doReturn(1L).when(idGenerator).nextId();
+    nameMappingService.bindNameAndId("name1");
     Assertions.assertNotNull(nameMappingService.getIdByName("name1"));
 
     boolean result = nameMappingService.unbindNameAndId("name1");
     Assertions.assertTrue(result);
     Assertions.assertNull(nameMappingService.getIdByName("name1"));
 
-    long name2Id = idGenerator.nextId();
-    nameMappingService.bindNameAndId("name2", name2Id);
+    Mockito.doReturn(2L).when(idGenerator).nextId();
+    nameMappingService.bindNameAndId("name2");
 
     KvBackend spyKvBackend = Mockito.spy(((KvNameMappingService) nameMappingService).backend);
     Mockito.doThrow(new ArithmeticException()).when(spyKvBackend).delete(Mockito.any());

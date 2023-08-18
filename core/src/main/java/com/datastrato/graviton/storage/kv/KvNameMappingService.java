@@ -5,7 +5,9 @@
 
 package com.datastrato.graviton.storage.kv;
 
+import com.datastrato.graviton.storage.IdGenerator;
 import com.datastrato.graviton.storage.NameMappingService;
+import com.datastrato.graviton.storage.RandomIdGenerator;
 import com.datastrato.graviton.util.ByteUtils;
 import com.datastrato.graviton.util.Bytes;
 import com.google.common.annotations.VisibleForTesting;
@@ -23,6 +25,7 @@ public class KvNameMappingService implements NameMappingService {
   // TODO(yuqi) Make this configurable
   @VisibleForTesting final KvBackend backend;
   private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
+  @VisibleForTesting final IdGenerator idGenerator = new RandomIdGenerator();
 
   // name prefix of name in name to id mapping,
   // e.g., name_metalake1 -> 1
@@ -51,17 +54,17 @@ public class KvNameMappingService implements NameMappingService {
   }
 
   @Override
-  public void bindNameAndId(String name, long id) throws IOException {
+  public long bindNameAndId(String name) throws IOException {
     byte[] nameByte = Bytes.concat(NAME_PREFIX, name.getBytes());
-
+    long id = idGenerator.nextId();
     lock.writeLock().lock();
     try {
-      backend.executeInTransaction(
+      return backend.executeInTransaction(
           () -> {
             backend.put(nameByte, ByteUtils.longToByte(id), false);
             byte[] idByte = Bytes.concat(ID_PREFIX, ByteUtils.longToByte(id));
             backend.put(idByte, name.getBytes(), false);
-            return null;
+            return id;
           });
     } finally {
       lock.writeLock().unlock();
@@ -108,5 +111,19 @@ public class KvNameMappingService implements NameMappingService {
   @Override
   public void close() throws Exception {
     backend.close();
+  }
+
+  @Override
+  public Long getOrCreateIdFromName(String name) throws IOException {
+    Long id = getIdByName(name);
+    if (id == null) {
+      synchronized (this) {
+        if ((id = getIdByName(name)) == null) {
+          id = bindNameAndId(name);
+        }
+      }
+    }
+
+    return id;
   }
 }

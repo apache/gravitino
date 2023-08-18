@@ -18,9 +18,7 @@ import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
 import com.datastrato.graviton.exceptions.NoSuchEntityException;
 import com.datastrato.graviton.storage.EntityKeyEncoder;
-import com.datastrato.graviton.storage.IdGenerator;
 import com.datastrato.graviton.storage.NameMappingService;
-import com.datastrato.graviton.storage.RandomIdGenerator;
 import com.datastrato.graviton.util.Bytes;
 import com.datastrato.graviton.util.Executable;
 import com.google.common.annotations.VisibleForTesting;
@@ -55,8 +53,7 @@ public class KvEntityStore implements EntityStore {
     // TODO(yuqi) Currently, KvNameMappingSerivice and KvEntityStore shares the same backend
     //  instance, We should make it configurable in the future.
     NameMappingService nameMappingService = new KvNameMappingService(backend);
-    IdGenerator idGenerator = new RandomIdGenerator();
-    this.entityKeyEncoder = new BinaryEntityKeyEncoder(nameMappingService, idGenerator);
+    this.entityKeyEncoder = new BinaryEntityKeyEncoder(nameMappingService);
   }
 
   @Override

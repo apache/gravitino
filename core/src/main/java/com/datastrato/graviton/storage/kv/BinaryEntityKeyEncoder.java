@@ -12,7 +12,6 @@ import static com.datastrato.graviton.Entity.EntityType.TABLE;
 import com.datastrato.graviton.Entity.EntityType;
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.storage.EntityKeyEncoder;
-import com.datastrato.graviton.storage.IdGenerator;
 import com.datastrato.graviton.storage.NameMappingService;
 import com.datastrato.graviton.util.ByteUtils;
 import com.datastrato.graviton.util.Bytes;
@@ -60,30 +59,10 @@ public class BinaryEntityKeyEncoder implements EntityKeyEncoder<byte[]> {
           SCHEMA, new String[] {SCHEMA.getShortName() + "_", "_", "_"},
           TABLE, new String[] {TABLE.getShortName() + "_", "_", "_", "_"});
 
-  @VisibleForTesting final IdGenerator idGenerator;
-  private final NameMappingService nameMappingService;
+  @VisibleForTesting final NameMappingService nameMappingService;
 
-  public BinaryEntityKeyEncoder(NameMappingService nameMappingService, IdGenerator idGenerator) {
-    this.idGenerator = idGenerator;
+  public BinaryEntityKeyEncoder(NameMappingService nameMappingService) {
     this.nameMappingService = nameMappingService;
-  }
-
-  /**
-   * Get the id of the name from the name to id mapping. If the name does not exist, we will create
-   * and store new binding in the name to id mapping.
-   *
-   * @param name the name to get id
-   * @return the id of the name
-   * @throws IOException if we can't get or create the binding
-   */
-  private long getOrCreateIdFromBinding(String name) throws IOException {
-    Long id = nameMappingService.getIdByName(name);
-    if (id == null) {
-      id = idGenerator.nextId();
-      nameMappingService.bindNameAndId(name, id);
-    }
-
-    return id;
   }
 
   /**
@@ -98,7 +77,7 @@ public class BinaryEntityKeyEncoder implements EntityKeyEncoder<byte[]> {
     String[] nameSpace = identifier.namespace().levels();
     long[] namespaceIds = new long[nameSpace.length];
     for (int i = 0; i < nameSpace.length; i++) {
-      namespaceIds[i] = getOrCreateIdFromBinding(nameSpace[i]);
+      namespaceIds[i] = nameMappingService.getOrCreateIdFromName(nameSpace[i]);
     }
 
     // If the name is a wildcard, We only need to encode the namespace.
@@ -113,7 +92,8 @@ public class BinaryEntityKeyEncoder implements EntityKeyEncoder<byte[]> {
     // This is for point query and need to use specific name
     long[] namespaceAndNameIds = new long[namespaceIds.length + 1];
     System.arraycopy(namespaceIds, 0, namespaceAndNameIds, 0, namespaceIds.length);
-    namespaceAndNameIds[namespaceIds.length] = getOrCreateIdFromBinding(identifier.name());
+    namespaceAndNameIds[namespaceIds.length] =
+        nameMappingService.getOrCreateIdFromName(identifier.name());
 
     String[] nameIdentifierTemplate = ENTITY_TYPE_TO_NAME_IDENTIFIER.get(entityType);
     if (nameIdentifierTemplate == null) {
