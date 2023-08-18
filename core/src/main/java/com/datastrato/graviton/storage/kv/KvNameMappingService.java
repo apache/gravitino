@@ -53,7 +53,7 @@ public class KvNameMappingService implements NameMappingService {
     }
   }
 
-  public long bindNameAndId(String name) throws IOException {
+  private long bindNameAndId(String name) throws IOException {
     byte[] nameByte = Bytes.concat(NAME_PREFIX, name.getBytes());
     long id = idGenerator.nextId();
     lock.writeLock().lock();
