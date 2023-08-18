@@ -205,13 +205,8 @@ public class RocksDBKvBackend implements KvBackend {
   @Override
   public <R, E extends Exception> R executeInTransaction(Executable<R, E> executable)
       throws E, IOException {
-    // Already in tx, directly execute it without creating a new tx
-    if (TX_LOCAL.get() != null) {
-      return executable.execute();
-    }
-
     Transaction tx = db.beginTransaction(new WriteOptions());
-    LOGGER.info("Starting transaction: {}", tx);
+    LOGGER.info("Starting transaction: id: '{}'", tx.getID());
     TX_LOCAL.set(tx);
     try {
       R r = executable.execute();
@@ -224,15 +219,16 @@ public class RocksDBKvBackend implements KvBackend {
       rollback(tx, e);
       throw e;
     } finally {
+      LOGGER.info("Transaction close, tx id: '{}', tx state: '{}'", tx.getID(), tx.getState());
       tx.close();
-      LOGGER.info("Transaction close: {}", tx);
       TX_LOCAL.remove();
     }
   }
 
   private void rollback(Transaction tx, Exception e) {
     LOGGER.error(
-        "Error executing transaction, exception: {}, message: {}, stackTrace: \n{}",
+        "Error executing transaction, tx id: '{}', exception: {}, message: {}, stackTrace: \n{}",
+        tx.getID(),
         e.getCause(),
         e.getMessage(),
         Throwables.getStackTraceAsString(e));
@@ -241,7 +237,8 @@ public class RocksDBKvBackend implements KvBackend {
       tx.rollback();
     } catch (Exception e1) {
       LOGGER.error(
-          "Error rolling back transaction, exception: {}, message: {}, stackTrace: \n{}",
+          "Error rolling back transaction, tx id: '{}', exception: {}, message: {}, stackTrace: \n{}",
+          tx.getID(),
           e1.getCause(),
           e1.getMessage(),
           Throwables.getStackTraceAsString(e));
