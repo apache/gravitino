@@ -53,7 +53,6 @@ public class KvNameMappingService implements NameMappingService {
     }
   }
 
-  @Override
   public long bindNameAndId(String name) throws IOException {
     byte[] nameByte = Bytes.concat(NAME_PREFIX, name.getBytes());
     long id = idGenerator.nextId();
@@ -114,7 +113,7 @@ public class KvNameMappingService implements NameMappingService {
   }
 
   @Override
-  public Long getOrCreateIdFromName(String name) throws IOException {
+  public long getOrCreateIdFromName(String name) throws IOException {
     Long id = getIdByName(name);
     if (id == null) {
       synchronized (this) {
