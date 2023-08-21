@@ -13,11 +13,6 @@ import com.datastrato.graviton.dto.requests.TableUpdatesRequest;
 import com.datastrato.graviton.dto.responses.DropResponse;
 import com.datastrato.graviton.dto.responses.EntityListResponse;
 import com.datastrato.graviton.dto.responses.TableResponse;
-import com.datastrato.graviton.exceptions.IllegalNameIdentifierException;
-import com.datastrato.graviton.exceptions.IllegalNamespaceException;
-import com.datastrato.graviton.exceptions.NoSuchSchemaException;
-import com.datastrato.graviton.exceptions.NoSuchTableException;
-import com.datastrato.graviton.exceptions.TableAlreadyExistsException;
 import com.datastrato.graviton.rel.Table;
 import com.datastrato.graviton.rel.TableChange;
 import com.datastrato.graviton.server.web.Utils;
@@ -60,17 +55,8 @@ public class TableOperations {
       NameIdentifier[] idents = dispatcher.listTables(tableNS);
       return Utils.ok(new EntityListResponse(idents));
 
-    } catch (IllegalNamespaceException e) {
-      LOG.error("Failed to list tables with invalid arguments", e);
-      return Utils.illegalArguments("Failed to list tables with invalid arguments", e);
-
-    } catch (NoSuchSchemaException e) {
-      LOG.error("Schema {} does not exist, fail to list tables", schema);
-      return Utils.notFound("Schema " + schema + " does not exist, fail to list tables", e);
-
     } catch (Exception e) {
-      LOG.error("Failed to list tables under schema {}", schema, e);
-      return Utils.internalError("Failed to list tables under schema " + schema, e);
+      return ExceptionHandlers.handleTableException(OperationType.LIST, "", schema, e);
     }
   }
 
@@ -83,37 +69,15 @@ public class TableOperations {
       TableCreateRequest request) {
     try {
       request.validate();
-    } catch (IllegalArgumentException e) {
-      LOG.error("Failed to validate TableCreateRequest arguments {}", request, e);
-      return Utils.illegalArguments("Failed to validate TableCreateRequest arguments", e);
-    }
-
-    try {
       NameIdentifier ident = NameIdentifier.ofTable(metalake, catalog, schema, request.getName());
       Table table =
           dispatcher.createTable(
               ident, request.getColumns(), request.getComment(), request.getProperties());
       return Utils.ok(new TableResponse(DTOConverters.toDTO(table)));
 
-    } catch (IllegalNamespaceException | IllegalNameIdentifierException e) {
-      LOG.warn("Failed to create table {} with invalid arguments", request.getName(), e);
-      return Utils.illegalArguments(
-          "Failed to create table " + request.getName() + " with invalid arguments", e);
-
-    } catch (NoSuchSchemaException e) {
-      LOG.error("Schema {} does not exist, fail to create table {}", schema, request.getName());
-      return Utils.notFound(
-          "Schema " + schema + " does not exist, fail to create table " + request.getName(), e);
-
-    } catch (TableAlreadyExistsException e) {
-      LOG.error("Table {} already exists under schema {}", request.getName(), schema);
-      return Utils.alreadyExists(
-          "Table " + request.getName() + " already exists under schema " + schema, e);
-
     } catch (Exception e) {
-      LOG.error("Failed to create table {} under schema {}", request.getName(), schema, e);
-      return Utils.internalError(
-          "Failed to create table " + request.getName() + " under schema " + schema, e);
+      return ExceptionHandlers.handleTableException(
+          OperationType.CREATE, request.getName(), schema, e);
     }
   }
 
@@ -130,17 +94,8 @@ public class TableOperations {
       Table t = dispatcher.loadTable(ident);
       return Utils.ok(new TableResponse(DTOConverters.toDTO(t)));
 
-    } catch (IllegalNamespaceException | IllegalNameIdentifierException e) {
-      LOG.warn("Failed to load table {} with invalid arguments", table, e);
-      return Utils.illegalArguments("Failed to load table " + table + " with invalid arguments", e);
-
-    } catch (NoSuchTableException e) {
-      LOG.error("Table {} does not exist under schema {}", table, schema);
-      return Utils.notFound("Table " + table + " does not exist under schema " + schema, e);
-
     } catch (Exception e) {
-      LOG.error("Failed to load table {} under schema {}", table, schema, e);
-      return Utils.internalError("Failed to load table " + table + " under schema " + schema, e);
+      return ExceptionHandlers.handleTableException(OperationType.LOAD, table, schema, e);
     }
   }
 
@@ -155,12 +110,6 @@ public class TableOperations {
       TableUpdatesRequest request) {
     try {
       request.validate();
-    } catch (IllegalArgumentException e) {
-      LOG.error("Failed to validate Request arguments {}", request, e);
-      return Utils.illegalArguments("Failed to validate TableAlterRequest arguments", e);
-    }
-
-    try {
       NameIdentifier ident = NameIdentifier.ofTable(metalake, catalog, schema, table);
       TableChange[] changes =
           request.getUpdates().stream()
@@ -169,18 +118,8 @@ public class TableOperations {
       Table t = dispatcher.alterTable(ident, changes);
       return Utils.ok(new TableResponse(DTOConverters.toDTO(t)));
 
-    } catch (IllegalNameIdentifierException | IllegalNamespaceException e) {
-      LOG.warn("Failed to alter table {} with invalid arguments", table, e);
-      return Utils.illegalArguments(
-          "Failed to alter table " + table + " with invalid arguments", e);
-
-    } catch (NoSuchTableException e) {
-      LOG.error("Table {} does not exist under schema {}", table, schema);
-      return Utils.notFound("Table " + table + " does not exist under schema " + schema, e);
-
     } catch (Exception e) {
-      LOG.error("Failed to alter table {} under schema {}", table, schema, e);
-      return Utils.internalError("Failed to alter table " + table + " under schema " + schema, e);
+      return ExceptionHandlers.handleTableException(OperationType.ALTER, table, schema, e);
     }
   }
 
@@ -201,13 +140,8 @@ public class TableOperations {
 
       return Utils.ok(new DropResponse(dropped));
 
-    } catch (IllegalNamespaceException | IllegalNameIdentifierException e) {
-      LOG.warn("Failed to drop table {} with invalid arguments", table, e);
-      return Utils.illegalArguments("Failed to drop table " + table + " with invalid arguments", e);
-
     } catch (Exception e) {
-      LOG.error("Failed to drop table {} under schema {}", table, schema, e);
-      return Utils.internalError("Failed to drop table " + table + " under schema " + schema, e);
+      return ExceptionHandlers.handleTableException(OperationType.DROP, table, schema, e);
     }
   }
 }
