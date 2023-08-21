@@ -65,6 +65,13 @@ public class ByteUtils {
     return buffer.getLong();
   }
 
+  /**
+   * Format a byte array to a human-readable string. For example, if the byte array is [0x00, 0x01,
+   * 0x02, 0x03], the result is '0x00010203'
+   *
+   * @param bytes Bytes to be formatted
+   * @return A human-readable string
+   */
   public static String formatByteArray(byte[] bytes) {
     StringBuilder sb = new StringBuilder("0x");
     for (byte b : bytes) {
