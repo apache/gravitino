@@ -97,12 +97,18 @@ public class HiveTable extends BaseTable {
     // `location` must not be null, otherwise it will result in an NPE when calling HMS `alterTable`
     // interface
     sd.setLocation(location);
+    // TODO(minghuang): Remove hard coding below after supporting the specified Hive table
+    //  properties
+    sd.setInputFormat("org.apache.hadoop.mapred.TextInputFormat");
+    sd.setOutputFormat("org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat");
     return sd;
   }
 
   private SerDeInfo buildSerDeInfo() {
     // TODO(minghuang): Build SerDeInfo object based on user specifications.
-    return new SerDeInfo();
+    SerDeInfo serDeInfo = new SerDeInfo();
+    serDeInfo.setSerializationLib("org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe");
+    return serDeInfo;
   }
 
   /**
