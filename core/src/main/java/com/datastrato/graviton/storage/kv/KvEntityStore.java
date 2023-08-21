@@ -94,22 +94,18 @@ public class KvEntityStore implements EntityStore {
   @Override
   public <E extends Entity & HasIdentifier> void put(E e, boolean overwritten)
       throws IOException, EntityAlreadyExistsException {
-    executeInTransaction(
-        () -> {
-          byte[] key = entityKeyEncoder.encode(e.nameIdentifier(), e.type());
-          byte[] value = serDe.serialize(e);
-          backend.put(key, value, overwritten);
-          return null;
-        });
+    byte[] key = entityKeyEncoder.encode(e.nameIdentifier(), e.type());
+    byte[] value = serDe.serialize(e);
+    backend.put(key, value, overwritten);
   }
 
   @Override
   public <E extends Entity & HasIdentifier> E update(
       NameIdentifier ident, Class<E> type, EntityType entityType, Function<E, E> updater)
       throws IOException, NoSuchEntityException {
+    byte[] key = entityKeyEncoder.encode(ident, entityType);
     return executeInTransaction(
         () -> {
-          byte[] key = entityKeyEncoder.encode(ident, entityType);
           byte[] value = backend.get(key);
           if (value == null) {
             throw new NoSuchEntityException(ident.toString());
