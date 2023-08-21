@@ -17,7 +17,7 @@ import java.io.IOException;
 public interface NameMappingService extends AutoCloseable {
 
   /**
-   * Get id from name.
+   * Get id by name in the mapping service.
    *
    * @param name the name of the entity
    * @return the id of the name, or null if the name does not exist
@@ -26,16 +26,14 @@ public interface NameMappingService extends AutoCloseable {
   Long getIdByName(String name) throws IOException;
 
   /**
-   * If we do not find the id of the name in the name mapping service. We will add a new id for the
-   * name mapping
-   *
-   * <p>Note, this method should be called in transaction.
+   * Get id from name. If the name does not exist, we will create a new id for the name and bind the
+   * mapping between them
    *
    * @param name the name of the entity
-   * @param id the id of the name to be binded
+   * @return the id of the name
    * @throws IOException if the underlying storage failed
    */
-  void bindNameAndId(String name, long id) throws IOException;
+  long getOrCreateIdFromName(String name) throws IOException;
 
   /**
    * Update the mapping of the name to id. This method is used to update the mapping when we rename

@@ -9,7 +9,6 @@ import static com.datastrato.graviton.Configs.ENTITY_KV_STORE;
 
 import com.datastrato.graviton.Config;
 import com.datastrato.graviton.Entity;
-import com.datastrato.graviton.Entity.EntityIdentifier;
 import com.datastrato.graviton.Entity.EntityType;
 import com.datastrato.graviton.EntityAlreadyExistsException;
 import com.datastrato.graviton.EntitySerDe;
@@ -19,8 +18,7 @@ import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
 import com.datastrato.graviton.exceptions.NoSuchEntityException;
 import com.datastrato.graviton.storage.EntityKeyEncoder;
-import com.datastrato.graviton.storage.IdGenerator;
-import com.datastrato.graviton.storage.RandomIdGenerator;
+import com.datastrato.graviton.storage.NameMappingService;
 import com.datastrato.graviton.util.Bytes;
 import com.datastrato.graviton.util.Executable;
 import com.google.common.annotations.VisibleForTesting;
@@ -46,15 +44,16 @@ public class KvEntityStore implements EntityStore {
       ImmutableMap.of("RocksDBKvBackend", RocksDBKvBackend.class.getCanonicalName());
 
   @Getter @VisibleForTesting private KvBackend backend;
-  private EntityKeyEncoder entityKeyEncoder;
+  private EntityKeyEncoder<byte[]> entityKeyEncoder;
   private EntitySerDe serDe;
 
   @Override
   public void initialize(Config config) throws RuntimeException {
     this.backend = createKvEntityBackend(config);
-    // TODO (yuqi) Make idGenerator configurable
-    IdGenerator idGenerator = new RandomIdGenerator();
-    this.entityKeyEncoder = new BinaryEntityKeyEncoder(backend, idGenerator);
+    // TODO(yuqi) Currently, KvNameMappingSerivice and KvEntityStore shares the same backend
+    //  instance, We should make it configurable in the future.
+    NameMappingService nameMappingService = new KvNameMappingService(backend);
+    this.entityKeyEncoder = new BinaryEntityKeyEncoder(nameMappingService);
   }
 
   @Override
@@ -67,7 +66,7 @@ public class KvEntityStore implements EntityStore {
       Namespace namespace, Class<E> e, EntityType type) throws IOException {
     // Star means it's a wildcard
     NameIdentifier identifier = NameIdentifier.of(namespace, "*");
-    byte[] startKey = entityKeyEncoder.encode(EntityIdentifier.of(identifier, type), false);
+    byte[] startKey = entityKeyEncoder.encode(identifier, type);
     byte[] endKey = Bytes.increment(Bytes.wrap(startKey)).get();
     List<Pair<byte[], byte[]>> kvs =
         backend.scan(
@@ -89,18 +88,15 @@ public class KvEntityStore implements EntityStore {
 
   @Override
   public boolean exists(NameIdentifier ident, EntityType entityType) throws IOException {
-    return backend.get(entityKeyEncoder.encode(EntityIdentifier.of(ident, entityType), false))
-        != null;
+    return backend.get(entityKeyEncoder.encode(ident, entityType)) != null;
   }
 
   @Override
   public <E extends Entity & HasIdentifier> void put(E e, boolean overwritten)
       throws IOException, EntityAlreadyExistsException {
-    // Simple implementation, just use the entity's identifier as the key
     executeInTransaction(
         () -> {
-          byte[] key =
-              entityKeyEncoder.encode(EntityIdentifier.of(e.nameIdentifier(), e.type()), true);
+          byte[] key = entityKeyEncoder.encode(e.nameIdentifier(), e.type());
           byte[] value = serDe.serialize(e);
           backend.put(key, value, overwritten);
           return null;
@@ -113,7 +109,7 @@ public class KvEntityStore implements EntityStore {
       throws IOException, NoSuchEntityException {
     return executeInTransaction(
         () -> {
-          byte[] key = entityKeyEncoder.encode(EntityIdentifier.of(ident, entityType), false);
+          byte[] key = entityKeyEncoder.encode(ident, entityType);
           byte[] value = backend.get(key);
           if (value == null) {
             throw new NoSuchEntityException(ident.toString());
@@ -134,8 +130,7 @@ public class KvEntityStore implements EntityStore {
   public <E extends Entity & HasIdentifier> E get(
       NameIdentifier ident, EntityType entityType, Class<E> e)
       throws NoSuchEntityException, IOException {
-    byte[] key = entityKeyEncoder.encode(EntityIdentifier.of(ident, entityType), false);
-    // refer type from key;
+    byte[] key = entityKeyEncoder.encode(ident, entityType);
     byte[] value = backend.get(key);
     if (value == null) {
       throw new NoSuchEntityException(ident.toString());
@@ -145,7 +140,7 @@ public class KvEntityStore implements EntityStore {
 
   @Override
   public boolean delete(NameIdentifier ident, EntityType entityType) throws IOException {
-    return backend.delete(entityKeyEncoder.encode(EntityIdentifier.of(ident, entityType), false));
+    return backend.delete(entityKeyEncoder.encode(ident, entityType));
   }
 
   @Override

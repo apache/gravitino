@@ -76,8 +76,4 @@ public interface KvBackend extends Closeable {
    */
   <R, E extends Exception> R executeInTransaction(Executable<R, E> executable)
       throws E, IOException;
-
-  default boolean isInTransaction() {
-    return false;
-  }
 }
