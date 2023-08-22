@@ -20,6 +20,8 @@ import com.datastrato.graviton.rel.Table;
 import com.datastrato.graviton.rel.TableCatalog;
 import com.datastrato.graviton.rel.TableChange;
 import com.datastrato.graviton.util.ThrowableFunction;
+import com.google.common.annotations.VisibleForTesting;
+
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -270,12 +272,16 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
     }
   }
 
+  @VisibleForTesting
   // TODO(xun): Remove this method when we implement a better way to get the catalog identifier
   //  [#257] Add an explicit get catalog functions in NameIdentifier
-  private static NameIdentifier getCatalogIdentifier(NameIdentifier ident) {
+  NameIdentifier getCatalogIdentifier(NameIdentifier ident) {
     NameIdentifier.check(
         ident.name() != null, "The name variable in the NameIdentifier must have value.");
-    Namespace.checkMetalake(ident.namespace());
+    Namespace.check(ident.namespace() != null && ident.namespace().length() > 0,
+        String.format(
+            "Catalog namespace must be non-null and have 1 level, the input namespace is %s",
+            ident.namespace()));
 
     List<String> allElems =
         Stream.concat(Arrays.stream(ident.namespace().levels()), Stream.of(ident.name()))
