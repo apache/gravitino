@@ -6,6 +6,7 @@ package com.datastrato.graviton.catalog;
 
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
+import com.datastrato.graviton.exceptions.IllegalNameIdentifierException;
 import com.datastrato.graviton.exceptions.NoSuchCatalogException;
 import com.datastrato.graviton.exceptions.NoSuchSchemaException;
 import com.datastrato.graviton.exceptions.NoSuchTableException;
@@ -286,6 +287,10 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
     List<String> allElems =
         Stream.concat(Arrays.stream(ident.namespace().levels()), Stream.of(ident.name()))
             .collect(Collectors.toList());
+    if (allElems.size() < 2) {
+      throw new IllegalNameIdentifierException(
+          "Cannot create a catalog NameIdentifier less than two elements.");
+    }
     return NameIdentifier.of(allElems.get(0), allElems.get(1));
   }
 }
