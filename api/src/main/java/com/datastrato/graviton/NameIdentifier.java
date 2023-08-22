@@ -167,9 +167,6 @@ public class NameIdentifier {
    * @return The created catalog identifier {@link NameIdentifier}
    */
   public NameIdentifier catalog() {
-    check(name != null, "The name variable in the NameIdentifier must have value.");
-    Namespace.checkMetalake(namespace);
-
     List<String> list =
         Stream.concat(Arrays.stream(namespace.levels()), Stream.of(name))
             .collect(Collectors.toList());

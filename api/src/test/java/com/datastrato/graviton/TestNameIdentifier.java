@@ -126,4 +126,16 @@ public class TestNameIdentifier {
             () -> NameIdentifier.checkTable(NameIdentifier.of("a", "b", "c")));
     assertTrue(excep3.getMessage().contains("Table namespace must be non-null and have 3 levels"));
   }
+
+  @Test
+  public void testCatalogFuncNameIdentifier() {
+    NameIdentifier id1 = NameIdentifier.of("a", "b", "c");
+    assertEquals(id1.catalog(), NameIdentifier.of("a", "b"));
+
+    NameIdentifier id2 = NameIdentifier.of("a", "b", "c", "d");
+    assertEquals(id2.catalog(), NameIdentifier.of("a", "b"));
+
+    NameIdentifier id3 = NameIdentifier.of("a", "b", "c", "d", "e");
+    assertEquals(id3.catalog(), NameIdentifier.of("a", "b"));
+  }
 }
