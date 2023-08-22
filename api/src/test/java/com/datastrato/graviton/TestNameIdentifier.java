@@ -129,6 +129,9 @@ public class TestNameIdentifier {
 
   @Test
   public void testCatalogFuncNameIdentifier() {
+    NameIdentifier id0 = NameIdentifier.of("a", "b");
+    assertEquals(id0.catalog(), NameIdentifier.of("a", "b"));
+
     NameIdentifier id1 = NameIdentifier.of("a", "b", "c");
     assertEquals(id1.catalog(), NameIdentifier.of("a", "b"));
 
