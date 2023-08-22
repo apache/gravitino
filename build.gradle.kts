@@ -19,7 +19,7 @@ plugins {
   alias(libs.plugins.publish)
   // Apply one top level rat plugin to perform any required license enforcement analysis
   alias(libs.plugins.rat)
-  id("org.cyclonedx.bom") version "1.6.0"
+  id("org.cyclonedx.bom") version "1.6.1"
 }
 
 repositories { mavenCentral() }
