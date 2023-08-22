@@ -20,7 +20,13 @@ import com.datastrato.graviton.rel.Table;
 import com.datastrato.graviton.rel.TableCatalog;
 import com.datastrato.graviton.rel.TableChange;
 import com.datastrato.graviton.util.ThrowableFunction;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * A catalog operation dispatcher that dispatches the catalog operations to the underlying catalog
@@ -251,7 +257,9 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
       Class<E2> ex2)
       throws E1, E2 {
     try {
-      CatalogManager.CatalogWrapper c = catalogManager.loadCatalogAndWrap(ident);
+      NameIdentifier catalogIdent = getCatalogIdentifier(ident);
+
+      CatalogManager.CatalogWrapper c = catalogManager.loadCatalogAndWrap(catalogIdent);
       return fn.apply(c);
     } catch (Throwable throwable) {
       if (ex1.isInstance(throwable)) {
@@ -262,5 +270,27 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
 
       throw new RuntimeException(throwable);
     }
+  }
+
+  @VisibleForTesting
+  // TODO(xun): Remove this method when we implement a better way to get the catalog identifier
+  //  [#257] Add an explicit get catalog functions in NameIdentifier
+  NameIdentifier getCatalogIdentifier(NameIdentifier ident) {
+    Preconditions.checkArgument(
+        ident.name() != null, "The name variable in the NameIdentifier must have value.");
+    Preconditions.checkArgument(
+        ident.namespace() != null && ident.namespace().length() > 0,
+        String.format(
+            "Catalog namespace must be non-null and have 1 level, the input namespace is %s",
+            ident.namespace()));
+
+    List<String> allElems =
+        Stream.concat(Arrays.stream(ident.namespace().levels()), Stream.of(ident.name()))
+            .collect(Collectors.toList());
+    if (allElems.size() < 2) {
+      throw new IllegalArgumentException(
+          "Cannot create a catalog NameIdentifier less than two elements.");
+    }
+    return NameIdentifier.of(allElems.get(0), allElems.get(1));
   }
 }
