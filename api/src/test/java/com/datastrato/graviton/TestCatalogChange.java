@@ -95,9 +95,9 @@ public class TestCatalogChange {
     String commentB = "a new comment";
     UpdateCatalogComment update2 = (UpdateCatalogComment) CatalogChange.updateComment(commentB);
 
-    assertFalse(commentA.equals(null));
-    assertFalse(commentA.equals(commentB));
-    assertFalse(commentB.equals(commentA));
-    assertNotEquals(commentA.hashCode(), commentB.hashCode());
+    assertFalse(update1.equals(null));
+    assertFalse(update1.equals(update2));
+    assertFalse(update2.equals(update1));
+    assertNotEquals(update1.hashCode(), update2.hashCode());
   }
 }
