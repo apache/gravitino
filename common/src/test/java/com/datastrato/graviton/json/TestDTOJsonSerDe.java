@@ -74,7 +74,6 @@ public class TestDTOJsonSerDe {
 
   @Test
   public void testMetalakeDTOSerDe() throws Exception {
-    Long id = 1L;
     String name = "metalake";
     String comment = "comment";
     Map<String, String> properties = ImmutableMap.of("k1", "v1", "k2", "v2");
@@ -154,7 +153,6 @@ public class TestDTOJsonSerDe {
     String name = "column";
     io.substrait.type.Type type = TypeCreator.NULLABLE.I8;
     String comment = "comment";
-    Instant now = Instant.now();
 
     // Test required fields
     ColumnDTO column =
