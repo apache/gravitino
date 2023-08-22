@@ -1,0 +1,17 @@
+#
+# Copyright 2023 Datastrato.
+# This software is licensed under the Apache License version 2.
+#
+# .bashrc
+
+alias ls="ls --color=auto"
+LS_COLORS='di=1;33:fi=0:ln=31:pi=5:so=5:bd=5:cd=5:or=31:mi=0:ex=35:*.rpm=90'
+export LS_COLORS
+alias ll="ls -l"
+alias la="ls -lGa"
+
+# PATH and CLASSPATH
+export HADOOP_CLASSPATH=$JAVA_HOME/lib/tools.jar
+
+# export PS1
+export PS1="\[\033[1;36m\][\u@Hadoop2:\W]$\[\033[0m\] "
