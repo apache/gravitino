@@ -196,5 +196,6 @@ public class TestEntityStore {
         () -> store.get(metalake.nameIdentifier(), EntityType.METALAKE, BaseMetalake.class));
 
     Assertions.assertThrows(EntityAlreadyExistsException.class, () -> store.put(catalog, false));
+    store.close();
   }
 }

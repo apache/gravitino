@@ -28,8 +28,6 @@ public class TestGravitonServer {
 
   @Test
   public void testInitialize() {
-    ServerConfig config = new ServerConfig();
-
     gravitonServer.initialize();
   }
 
