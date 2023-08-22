@@ -20,7 +20,11 @@ import com.datastrato.graviton.rel.Table;
 import com.datastrato.graviton.rel.TableCatalog;
 import com.datastrato.graviton.rel.TableChange;
 import com.datastrato.graviton.util.ThrowableFunction;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * A catalog operation dispatcher that dispatches the catalog operations to the underlying catalog
@@ -251,7 +255,9 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
       Class<E2> ex2)
       throws E1, E2 {
     try {
-      CatalogManager.CatalogWrapper c = catalogManager.loadCatalogAndWrap(ident);
+      NameIdentifier catalogIdent = getCatalogIdentifier(ident);
+
+      CatalogManager.CatalogWrapper c = catalogManager.loadCatalogAndWrap(catalogIdent);
       return fn.apply(c);
     } catch (Throwable throwable) {
       if (ex1.isInstance(throwable)) {
@@ -262,5 +268,18 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
 
       throw new RuntimeException(throwable);
     }
+  }
+
+  // TODO(xun): Remove this method when we implement a better way to get the catalog identifier
+  //  [#257] Add an explicit get catalog functions in NameIdentifier
+  private static NameIdentifier getCatalogIdentifier(NameIdentifier ident) {
+    NameIdentifier.check(
+        ident.name() != null, "The name variable in the NameIdentifier must have value.");
+    Namespace.checkMetalake(ident.namespace());
+
+    List<String> allElems =
+        Stream.concat(Arrays.stream(ident.namespace().levels()), Stream.of(ident.name()))
+            .collect(Collectors.toList());
+    return NameIdentifier.of(allElems.get(0), allElems.get(1));
   }
 }
