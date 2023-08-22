@@ -1,0 +1,207 @@
+/*
+ * Copyright 2023 Datastrato.
+ * This software is licensed under the Apache License version 2.
+ */
+package com.datastrato.graviton.responses;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import com.datastrato.graviton.Catalog;
+import com.datastrato.graviton.NameIdentifier;
+import com.datastrato.graviton.dto.AuditDTO;
+import com.datastrato.graviton.dto.CatalogDTO;
+import com.datastrato.graviton.dto.MetalakeDTO;
+import com.datastrato.graviton.dto.rel.ColumnDTO;
+import com.datastrato.graviton.dto.rel.SchemaDTO;
+import com.datastrato.graviton.dto.rel.TableDTO;
+import com.datastrato.graviton.dto.responses.BaseResponse;
+import com.datastrato.graviton.dto.responses.CatalogResponse;
+import com.datastrato.graviton.dto.responses.DropResponse;
+import com.datastrato.graviton.dto.responses.EntityListResponse;
+import com.datastrato.graviton.dto.responses.ErrorResponse;
+import com.datastrato.graviton.dto.responses.MetalakeListResponse;
+import com.datastrato.graviton.dto.responses.MetalakeResponse;
+import com.datastrato.graviton.dto.responses.SchemaResponse;
+import com.datastrato.graviton.dto.responses.TableResponse;
+import io.substrait.type.TypeCreator;
+import java.time.Instant;
+import org.junit.jupiter.api.Test;
+
+public class TestResponses {
+  @Test
+  void testBaseDefaultCode() throws IllegalArgumentException {
+    BaseResponse base = new BaseResponse();
+    assertEquals(0, base.getCode());
+  }
+
+  @Test
+  void testBaseValidateNegativeNumber() throws IllegalArgumentException {
+    BaseResponse base = new BaseResponse(-1);
+    assertThrows(IllegalArgumentException.class, () -> base.validate());
+  }
+
+  @Test
+  void testBaseValidate() throws IllegalArgumentException {
+    BaseResponse base = new BaseResponse();
+    base.validate(); // No exception thrown
+  }
+
+  @Test
+  void testDropped() throws IllegalArgumentException {
+    DropResponse drop = new DropResponse();
+
+    assertFalse(drop.dropped());
+  }
+
+  @Test
+  void testDroppedTrue() throws IllegalArgumentException {
+    DropResponse drop = new DropResponse(true);
+
+    assertTrue(drop.dropped());
+  }
+
+  @Test
+  void testEntityListResponse() throws IllegalArgumentException {
+    NameIdentifier[] identsA = {NameIdentifier.parse("TableA")};
+    EntityListResponse entityList = new EntityListResponse(identsA);
+    entityList.validate(); // No exception thrown
+    NameIdentifier[] identsB = entityList.identifiers();
+    assertEquals(1, identsB.length);
+    assertEquals(identsB[0].name(), "TableA");
+  }
+
+  @Test
+  void testEntityListResponseException() throws IllegalArgumentException {
+    EntityListResponse entityList = new EntityListResponse();
+    assertThrows(IllegalArgumentException.class, () -> entityList.validate());
+  }
+
+  @Test
+  void testMetalakeResponse() throws IllegalArgumentException {
+    AuditDTO audit =
+        new AuditDTO.Builder().withCreator("creator").withCreateTime(Instant.now()).build();
+    MetalakeDTO metalake = new MetalakeDTO.Builder().withName("Metalake").withAudit(audit).build();
+    MetalakeResponse response = new MetalakeResponse(metalake);
+    response.validate(); // No exception thrown
+  }
+
+  @Test
+  void testMetalakeResponseException() throws IllegalArgumentException {
+    MetalakeResponse reponse = new MetalakeResponse();
+    assertThrows(IllegalArgumentException.class, () -> reponse.validate());
+  }
+
+  @Test
+  void testMetalakeListResponse() throws IllegalArgumentException {
+    AuditDTO audit =
+        new AuditDTO.Builder().withCreator("creator").withCreateTime(Instant.now()).build();
+    MetalakeDTO metalake = new MetalakeDTO.Builder().withName("Metalake").withAudit(audit).build();
+    MetalakeListResponse response = new MetalakeListResponse(new MetalakeDTO[] {metalake});
+    response.validate(); // No exception thrown
+  }
+
+  @Test
+  void testMetalakeListResponseException() throws IllegalArgumentException {
+    MetalakeListResponse reponse = new MetalakeListResponse();
+    assertThrows(IllegalArgumentException.class, () -> reponse.validate());
+  }
+
+  @Test
+  void testCatalogResponse() throws IllegalArgumentException {
+    AuditDTO audit =
+        new AuditDTO.Builder().withCreator("creator").withCreateTime(Instant.now()).build();
+    CatalogDTO catalog =
+        new CatalogDTO.Builder()
+            .withName("CatalogA")
+            .withComment("comment")
+            .withType(Catalog.Type.RELATIONAL)
+            .withAudit(audit)
+            .build();
+    CatalogResponse catalogResponse = new CatalogResponse(catalog);
+    catalogResponse.validate(); // No exception thrown
+  }
+
+  @Test
+  void testCatalogException() throws IllegalArgumentException {
+    CatalogResponse catalog = new CatalogResponse();
+    assertThrows(IllegalArgumentException.class, () -> catalog.validate());
+  }
+
+  @Test
+  void testSchemaResponse() throws IllegalArgumentException {
+    AuditDTO audit =
+        new AuditDTO.Builder().withCreator("creator").withCreateTime(Instant.now()).build();
+    SchemaDTO schema =
+        new SchemaDTO.Builder().withName("SchemaA").withComment("comment").withAudit(audit).build();
+    SchemaResponse schemaResponse = new SchemaResponse(schema);
+    schemaResponse.validate(); // No exception thrown
+  }
+
+  @Test
+  void testSchemaException() throws IllegalArgumentException {
+    SchemaResponse schema = new SchemaResponse();
+    assertThrows(IllegalArgumentException.class, () -> schema.validate());
+  }
+
+  @Test
+  void testTableResponse() throws IllegalArgumentException {
+    AuditDTO audit =
+        new AuditDTO.Builder().withCreator("creator").withCreateTime(Instant.now()).build();
+    ColumnDTO column =
+        new ColumnDTO.Builder().withName("ColumnA").withDataType(TypeCreator.NULLABLE.I8).build();
+    TableDTO table =
+        new TableDTO.Builder()
+            .withName("TableA")
+            .withComment("comment")
+            .withColumns(new ColumnDTO[] {column})
+            .withAudit(audit)
+            .build();
+    TableResponse tableResponse = new TableResponse(table);
+    tableResponse.validate(); // No exception thrown
+  }
+
+  @Test
+  void testTableException() throws IllegalArgumentException {
+    TableResponse table = new TableResponse();
+    assertThrows(IllegalArgumentException.class, () -> table.validate());
+  }
+
+  @Test
+  void testRestErrorResponse() throws IllegalArgumentException {
+    ErrorResponse error = ErrorResponse.restError("Rest error");
+    error.validate(); // No exception thrown
+  }
+
+  @Test
+  void testIllegalArgumentsErrorResponse() throws IllegalArgumentException {
+    ErrorResponse error = ErrorResponse.illegalArguments("illegal arguments error");
+    error.validate(); // No exception thrown
+  }
+
+  @Test
+  void testNotFoundErrorResponse() throws IllegalArgumentException {
+    ErrorResponse error = ErrorResponse.notFound("error type", "not found error");
+    error.validate(); // No exception thrown
+  }
+
+  @Test
+  void testAlreadyExistsErrorResponse() throws IllegalArgumentException {
+    ErrorResponse error = ErrorResponse.alreadyExists("error type", "already exists error");
+    error.validate(); // No exception thrown
+  }
+
+  @Test
+  void testNonEmptyErrorResponse() throws IllegalArgumentException {
+    ErrorResponse error = ErrorResponse.nonEmpty("error type", "non empty error");
+    error.validate(); // No exception thrown
+  }
+
+  @Test
+  void testUnknownErrorResponse() throws IllegalArgumentException {
+    ErrorResponse error = ErrorResponse.unknownError("unknown error");
+    error.validate(); // No exception thrown
+  }
+}
