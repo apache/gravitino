@@ -8,6 +8,9 @@ import com.datastrato.graviton.exceptions.IllegalNameIdentifierException;
 import com.google.common.base.Splitter;
 import com.google.common.collect.Iterables;
 import java.util.Arrays;
+import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public class NameIdentifier {
 
@@ -156,6 +159,21 @@ public class NameIdentifier {
 
     this.namespace = namespace;
     this.name = name;
+  }
+
+  /**
+   * Get catalog identifier {@link NameIdentifier} from the NameIdentifier object.
+   *
+   * @return The created catalog identifier {@link NameIdentifier}
+   */
+  public NameIdentifier catalog() {
+    check(name != null, "The name variable in the NameIdentifier must have value.");
+    Namespace.checkMetalake(namespace);
+
+    List<String> list =
+        Stream.concat(Arrays.stream(namespace.levels()), Stream.of(name))
+            .collect(Collectors.toList());
+    return new NameIdentifier(Namespace.of(list.get(0)), list.get(1));
   }
 
   /** Check if the {@link NameIdentifier} has a namespace. */

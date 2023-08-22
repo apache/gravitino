@@ -49,7 +49,7 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
    */
   @Override
   public NameIdentifier[] listSchemas(Namespace namespace) throws NoSuchCatalogException {
-    NameIdentifier catalogIdent = NameIdentifier.of(namespace.levels());
+    NameIdentifier catalogIdent = NameIdentifier.of(namespace.levels()).catalog();
 
     return doWithCatalog(
         catalogIdent,
@@ -71,10 +71,8 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
   @Override
   public Schema createSchema(NameIdentifier ident, String comment, Map<String, String> metadata)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
-    NameIdentifier catalogIdent = NameIdentifier.of(ident.namespace().levels());
-
     return doWithCatalog(
-        catalogIdent,
+        ident.catalog(),
         c -> c.doWithSchemaOps(s -> s.createSchema(ident, comment, metadata)),
         NoSuchCatalogException.class,
         SchemaAlreadyExistsException.class);
@@ -89,10 +87,8 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
    */
   @Override
   public Schema loadSchema(NameIdentifier ident) throws NoSuchSchemaException {
-    NameIdentifier catalogIdent = NameIdentifier.of(ident.namespace().levels());
-
     return doWithCatalog(
-        catalogIdent,
+        ident.catalog(),
         c -> c.doWithSchemaOps(s -> s.loadSchema(ident)),
         NoSuchSchemaException.class);
   }
@@ -109,10 +105,8 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
   @Override
   public Schema alterSchema(NameIdentifier ident, SchemaChange... changes)
       throws NoSuchSchemaException {
-    NameIdentifier catalogIdent = NameIdentifier.of(ident.namespace().levels());
-
     return doWithCatalog(
-        catalogIdent,
+        ident.catalog(),
         c -> c.doWithSchemaOps(s -> s.alterSchema(ident, changes)),
         NoSuchSchemaException.class);
   }
@@ -127,10 +121,8 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
    */
   @Override
   public boolean dropSchema(NameIdentifier ident, boolean cascade) throws NonEmptySchemaException {
-    NameIdentifier catalogIdent = NameIdentifier.of(ident.namespace().levels());
-
     return doWithCatalog(
-        catalogIdent,
+        ident.catalog(),
         c -> c.doWithSchemaOps(s -> s.dropSchema(ident, cascade)),
         NonEmptySchemaException.class);
   }
@@ -145,7 +137,7 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
    */
   @Override
   public NameIdentifier[] listTables(Namespace namespace) throws NoSuchSchemaException {
-    NameIdentifier catalogIdent = NameIdentifier.of(namespace.levels());
+    NameIdentifier catalogIdent = NameIdentifier.of(namespace.levels()).catalog();
 
     return doWithCatalog(
         catalogIdent,
@@ -162,10 +154,8 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
    */
   @Override
   public Table loadTable(NameIdentifier ident) throws NoSuchTableException {
-    NameIdentifier catalogIdent = NameIdentifier.of(ident.namespace().levels());
-
     return doWithCatalog(
-        catalogIdent, c -> c.doWithTableOps(t -> t.loadTable(ident)), NoSuchTableException.class);
+        ident.catalog(), c -> c.doWithTableOps(t -> t.loadTable(ident)), NoSuchTableException.class);
   }
 
   /**
@@ -183,7 +173,7 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
   public Table createTable(
       NameIdentifier ident, Column[] columns, String comment, Map<String, String> properties)
       throws NoSuchSchemaException, TableAlreadyExistsException {
-    NameIdentifier catalogIdent = NameIdentifier.of(ident.namespace().levels());
+    NameIdentifier catalogIdent = NameIdentifier.of(ident.namespace().levels()).catalog();
 
     return doWithCatalog(
         catalogIdent,
@@ -205,10 +195,8 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
   @Override
   public Table alterTable(NameIdentifier ident, TableChange... changes)
       throws NoSuchTableException, IllegalArgumentException {
-    NameIdentifier catalogIdent = NameIdentifier.of(ident.namespace().levels());
-
     return doWithCatalog(
-        catalogIdent,
+        ident.catalog(),
         c -> c.doWithTableOps(t -> t.alterTable(ident, changes)),
         NoSuchTableException.class,
         IllegalArgumentException.class);
@@ -224,10 +212,8 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
    */
   @Override
   public boolean dropTable(NameIdentifier ident) {
-    NameIdentifier catalogIdent = NameIdentifier.of(ident.namespace().levels());
-
     return doWithCatalog(
-        catalogIdent, c -> c.doWithTableOps(t -> t.dropTable(ident)), NoSuchTableException.class);
+        ident.catalog(), c -> c.doWithTableOps(t -> t.dropTable(ident)), NoSuchTableException.class);
   }
 
   private <R, E extends Throwable> R doWithCatalog(
