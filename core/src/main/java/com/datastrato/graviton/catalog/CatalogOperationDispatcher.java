@@ -155,7 +155,9 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
   @Override
   public Table loadTable(NameIdentifier ident) throws NoSuchTableException {
     return doWithCatalog(
-        ident.catalog(), c -> c.doWithTableOps(t -> t.loadTable(ident)), NoSuchTableException.class);
+        ident.catalog(),
+        c -> c.doWithTableOps(t -> t.loadTable(ident)),
+        NoSuchTableException.class);
   }
 
   /**
@@ -213,7 +215,9 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
   @Override
   public boolean dropTable(NameIdentifier ident) {
     return doWithCatalog(
-        ident.catalog(), c -> c.doWithTableOps(t -> t.dropTable(ident)), NoSuchTableException.class);
+        ident.catalog(),
+        c -> c.doWithTableOps(t -> t.dropTable(ident)),
+        NoSuchTableException.class);
   }
 
   private <R, E extends Throwable> R doWithCatalog(
