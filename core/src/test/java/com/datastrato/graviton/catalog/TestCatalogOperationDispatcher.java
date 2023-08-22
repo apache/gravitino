@@ -1,12 +1,15 @@
+/*
+ * Copyright 2023 Datastrato.
+ * This software is licensed under the Apache License version 2.
+ */
 package com.datastrato.graviton.catalog;
 
-import com.datastrato.graviton.NameIdentifier;
-import com.datastrato.graviton.exceptions.IllegalNameIdentifierException;
-import com.datastrato.graviton.exceptions.IllegalNamespaceException;
-import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import com.datastrato.graviton.NameIdentifier;
+import com.datastrato.graviton.exceptions.IllegalNamespaceException;
+import org.junit.jupiter.api.Test;
 
 public class TestCatalogOperationDispatcher {
   @Test

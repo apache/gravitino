@@ -21,7 +21,6 @@ import com.datastrato.graviton.rel.TableCatalog;
 import com.datastrato.graviton.rel.TableChange;
 import com.datastrato.graviton.util.ThrowableFunction;
 import com.google.common.annotations.VisibleForTesting;
-
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -278,7 +277,8 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
   NameIdentifier getCatalogIdentifier(NameIdentifier ident) {
     NameIdentifier.check(
         ident.name() != null, "The name variable in the NameIdentifier must have value.");
-    Namespace.check(ident.namespace() != null && ident.namespace().length() > 0,
+    Namespace.check(
+        ident.namespace() != null && ident.namespace().length() > 0,
         String.format(
             "Catalog namespace must be non-null and have 1 level, the input namespace is %s",
             ident.namespace()));
