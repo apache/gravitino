@@ -19,6 +19,7 @@ plugins {
   alias(libs.plugins.publish)
   // Apply one top level rat plugin to perform any required license enforcement analysis
   alias(libs.plugins.rat)
+  id("org.cyclonedx.bom") version "1.6.0"
 }
 
 repositories { mavenCentral() }
@@ -141,6 +142,12 @@ jacoco {
 tasks {
   val projectDir = layout.projectDirectory
   val outputDir = projectDir.dir("distribution")
+
+  cyclonedxBom {
+      setIncludeConfigs(listOf("runtimeClasspath"))
+      setSkipConfigs(listOf("compileClasspath", "testCompileClasspath"))
+      setProjectType("application")
+  }
 
   val compileDistribution by registering {
     dependsOn("copyRuntimeClass", "copyCatalogRuntimeClass", "copySubmoduleClass")
