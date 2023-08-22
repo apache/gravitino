@@ -197,7 +197,7 @@ public class NameIdentifier {
     }
   }
 
-  private static void check(boolean condition, String message, Object... args) {
+  public static void check(boolean condition, String message, Object... args) {
     if (!condition) {
       throw new IllegalNameIdentifierException(String.format(message, args));
     }
