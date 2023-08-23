@@ -4,9 +4,9 @@ name: build
 on:
   # Triggers the workflow on push or pull request events but only for the "main" branch
   push:
-    branches: [ "branch-0.1" ]
+    branches: [ "main", "branch-*" ]
   pull_request:
-    branches: [ "branch-0.1" ]
+    branches: [ "main", "branch-*" ]
 
 concurrency:
   group: ${{ github.worklfow }}-${{ github.event.pull_request.number || github.ref }}
