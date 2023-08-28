@@ -44,6 +44,4 @@ jobs:
 
       - name: Graviton Integration Tests
         run: |
-            ls -lt ./
-            ls -lt distribution/package
-            gradle integrationTest
+          gradle integrationTest
