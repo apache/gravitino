@@ -13,7 +13,9 @@ plugins {
 dependencies {
   implementation(project(":api"))
   implementation(project(":common"))
+  implementation(project(":core"))
   implementation(project(":client-java"))
+  implementation(project(":server"))
 
   testCompileOnly(libs.lombok)
   testAnnotationProcessor(libs.lombok)
