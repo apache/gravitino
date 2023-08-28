@@ -27,6 +27,7 @@ dependencies {
 
 tasks {
   val integrationTest by creating(Test::class) {
+    environment("GRAVITON_HOME", rootDir.path + "/distribution/package")
     useJUnitPlatform()
   }
 }

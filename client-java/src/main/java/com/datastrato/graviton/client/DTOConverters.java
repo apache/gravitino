@@ -30,7 +30,7 @@ public class DTOConverters {
         .build();
   }
 
-  public static MetalakeUpdateRequest toMetalakeUpdateRequest(MetalakeChange change) {
+  static MetalakeUpdateRequest toMetalakeUpdateRequest(MetalakeChange change) {
     if (change instanceof MetalakeChange.RenameMetalake) {
       return new MetalakeUpdateRequest.RenameMetalakeRequest(
           ((MetalakeChange.RenameMetalake) change).getNewName());

@@ -38,29 +38,29 @@ public class ProcessData {
 
   public static final Logger LOG = LoggerFactory.getLogger(ProcessData.class);
 
-  private Process checked_process;
+  private Process checkedProcess;
   private boolean printToConsole = false;
 
   public ProcessData(
       Process connected_process, boolean printToConsole, int silenceTimeout, TimeUnit timeUnit) {
-    this.checked_process = connected_process;
+    this.checkedProcess = connected_process;
     this.printToConsole = printToConsole;
     this.silenceTimeout = TimeUnit.MILLISECONDS.convert(silenceTimeout, timeUnit);
   }
 
   public ProcessData(Process connected_process, boolean printToConsole, int silenceTimeoutSec) {
-    this.checked_process = connected_process;
+    this.checkedProcess = connected_process;
     this.printToConsole = printToConsole;
     this.silenceTimeout = TimeUnit.MILLISECONDS.convert(silenceTimeoutSec, TimeUnit.SECONDS);
   }
 
   public ProcessData(Process connected_process, boolean printToConsole) {
-    this.checked_process = connected_process;
+    this.checkedProcess = connected_process;
     this.printToConsole = printToConsole;
   }
 
-  public ProcessData(Process connected_process) {
-    this.checked_process = connected_process;
+  public ProcessData(Process connectedProcess) {
+    this.checkedProcess = connectedProcess;
     this.printToConsole = true;
   }
 
@@ -115,14 +115,14 @@ public class ProcessData {
   public int getExitCodeValue() {
     try {
       if (!returnCodeRetrieved) {
-        this.checked_process.waitFor();
-        this.returnCode = this.checked_process.exitValue();
+        this.checkedProcess.waitFor();
+        this.returnCode = this.checkedProcess.exitValue();
         this.returnCodeRetrieved = true;
-        this.checked_process.destroy();
+        this.checkedProcess.destroy();
       }
     } catch (Exception inter) {
       throw new RuntimeException(
-          "Couldn't finish waiting for process " + this.checked_process + " termination", inter);
+          "Couldn't finish waiting for process " + this.checkedProcess + " termination", inter);
     }
     return this.returnCode;
   }
@@ -133,7 +133,7 @@ public class ProcessData {
         buildOutputAndErrorStreamData();
       } catch (Exception e) {
         throw new RuntimeException(
-            "Couldn't retrieve Output Stream data from process: " + this.checked_process.toString(),
+            "Couldn't retrieve Output Stream data from process: " + this.checkedProcess.toString(),
             e);
       }
     }
@@ -152,7 +152,7 @@ public class ProcessData {
         buildOutputAndErrorStreamData();
       } catch (Exception e) {
         throw new RuntimeException(
-            "Couldn't retrieve Error Stream data from process: " + this.checked_process.toString(),
+            "Couldn't retrieve Error Stream data from process: " + this.checkedProcess.toString(),
             e);
       }
     }
@@ -176,12 +176,11 @@ public class ProcessData {
     StringBuilder sbErrorStream = new StringBuilder();
 
     try {
-      InputStream in = this.checked_process.getInputStream();
-      InputStream inErrors = this.checked_process.getErrorStream();
+      InputStream in = this.checkedProcess.getInputStream();
+      InputStream inErrors = this.checkedProcess.getErrorStream();
       BufferedReader inReader = new BufferedReader(new InputStreamReader(in));
       BufferedReader inReaderErrors = new BufferedReader(new InputStreamReader(inErrors));
-      LOG.trace(
-          "Started retrieving data from streams of attached process: " + this.checked_process);
+      LOG.trace("Started retrieving data from streams of attached process: " + this.checkedProcess);
 
       // Store start time to be able to finish method if command hangs
       long lastStreamDataTime = System.currentTimeMillis();
@@ -197,7 +196,7 @@ public class ProcessData {
 
       // Continue if process is alive or some output was produced on previous iteration
       // and there may be still some data to read.
-      while (isRunning(this.checked_process) || outputProduced) {
+      while (isRunning(this.checkedProcess) || outputProduced) {
         outputProduced = false;
 
         // Some local commands can exit fast, but immediate stream reading will give no output and
@@ -268,7 +267,7 @@ public class ProcessData {
                   + (System.currentTimeMillis() - lastStreamDataTime > silenceTimeout)
                   + " "
                   + (System.currentTimeMillis() > unconditionalExitTime));
-          this.checked_process.destroy();
+          this.checkedProcess.destroy();
           try {
             if ((System.currentTimeMillis() > unconditionalExitTime)) {
               LOG.error(

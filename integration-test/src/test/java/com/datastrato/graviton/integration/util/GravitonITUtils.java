@@ -13,14 +13,18 @@ public class GravitonITUtils {
 
   public static void startGravitonServer() {
     CommandExecutor.executeCommandLocalHost(
-        "../distribution/package/bin/graviton.sh start", false, ProcessData.TypesOfData.OUTPUT);
+        System.getenv("GRAVITON_HOME") + "/bin/graviton.sh start",
+        false,
+        ProcessData.TypesOfData.OUTPUT);
     // wait for server to start.
     sleep(100, false);
   }
 
   public static void stopGravitonServer() {
     CommandExecutor.executeCommandLocalHost(
-        "../distribution/package/bin/graviton.sh stop", false, ProcessData.TypesOfData.OUTPUT);
+        System.getenv("GRAVITON_HOME") + "/bin/graviton.sh stop",
+        false,
+        ProcessData.TypesOfData.OUTPUT);
     // wait for server to stop.
     sleep(100, false);
   }

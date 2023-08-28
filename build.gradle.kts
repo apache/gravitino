@@ -41,7 +41,7 @@ subprojects {
 
   tasks.configureEach<Test> {
     // Integration test module are tested sepatately
-    if (project.name != "integration") {
+    if (project.name != "integration-test") {
       useJUnitPlatform()
       finalizedBy(tasks.getByName("jacocoTestReport"))
     }
@@ -62,7 +62,7 @@ subprojects {
 
   tasks.withType<Jar> {
     archiveFileName.set("${rootProject.name.lowercase(Locale.getDefault())}-${project.name}-$version.jar")
-    if (project.name != "integration") {
+    if (project.name != "integration-test") {
       exclude("log4j2.properties")
       exclude("test/**")
     }
@@ -235,7 +235,7 @@ tasks {
   }
 
   task("integrationTest") {
-    dependsOn(":integration:integrationTest")
+    dependsOn(":integration-test:integrationTest")
   }
 
   clean {
