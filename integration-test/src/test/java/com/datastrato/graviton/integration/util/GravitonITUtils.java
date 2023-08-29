@@ -31,7 +31,7 @@ public class GravitonITUtils {
 
   public static void sleep(long millis, boolean logOutput) {
     if (logOutput) {
-      LOG.info("Starting sleeping for " + (millis / 1000) + " seconds...");
+      LOG.info("Starting sleeping for " + millis + " milliseconds...");
       LOG.info("Caller: " + Thread.currentThread().getStackTrace()[2]);
     }
     try {
