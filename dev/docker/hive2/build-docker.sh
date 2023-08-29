@@ -10,7 +10,7 @@ bin="$(cd "${bin}">/dev/null; pwd)"
 # Environment variables definition
 IMAGE_NAME="datastrato/hive2:0.1.0"
 HADOOP_VERSION="2.7.3"
-hive_version="2.3.9"
+HIVE_VERSION="2.3.9"
 
 HADOOP_PACKAGE_NAME="hadoop-${HADOOP_VERSION}.tar.gz"
 HADOOP_DOWNLOAD_URL="http://archive.apache.org/dist/hadoop/core/hadoop-${HADOOP_VERSION}/${HADOOP_PACKAGE_NAME}"
