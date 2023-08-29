@@ -7,23 +7,28 @@ set -ex
 bin="$(dirname "${BASH_SOURCE-$0}")"
 bin="$(cd "${bin}">/dev/null; pwd)"
 
+# Environment variables definition
+IMAGE_NAME="datastrato/hive2:0.1.0"
+HADOOP_VERSION="2.7.3"
+hive_version="2.3.9"
+
+HADOOP_PACKAGE_NAME="hadoop-${HADOOP_VERSION}.tar.gz"
+HADOOP_DOWNLOAD_URL="http://archive.apache.org/dist/hadoop/core/hadoop-${HADOOP_VERSION}/${HADOOP_PACKAGE_NAME}"
+
+HIVE_PACKAGE_NAME="apache-hive-${HIVE_VERSION}-bin.tar.gz"
+HIVE_DOWNLOAD_URL="https://archive.apache.org/dist/hive/hive-${HIVE_VERSION}/${HIVE_PACKAGE_NAME}"
+
 # Prepare download packages
-hadoop_package_name="hadoop-2.7.3.tar.gz"
-hadoop_download_url="http://archive.apache.org/dist/hadoop/core/hadoop-2.7.3/${hadoop_package_name}"
-
-hive_package_name="apache-hive-2.3.9-bin.tar.gz"
-hive_download_url="https://archive.apache.org/dist/hive/hive-2.3.9/${hive_package_name}"
-
 if [[ ! -d "${bin}/packages" ]]; then
   mkdir -p "${bin}/packages"
 fi
 
-if [ ! -f "${bin}/packages/${hadoop_package_name}" ]; then
-  curl -s -o "${bin}/packages/${hadoop_package_name}" ${hadoop_download_url}
+if [ ! -f "${bin}/packages/${HADOOP_PACKAGE_NAME}" ]; then
+  curl -s -o "${bin}/packages/${HADOOP_PACKAGE_NAME}" ${HADOOP_DOWNLOAD_URL}
 fi
 
-if [ ! -f "${bin}/packages/${hive_package_name}" ]; then
-  curl -s -o "${bin}/packages/${hive_package_name}" ${hive_download_url}
+if [ ! -f "${bin}/packages/${HIVE_PACKAGE_NAME}" ]; then
+  curl -s -o "${bin}/packages/${HIVE_PACKAGE_NAME}" ${HIVE_DOWNLOAD_URL}
 fi
 
 # Create multi-arch builder
@@ -37,4 +42,4 @@ else
 fi
 
 # Option params --no-cache --push
-docker buildx build --platform=linux/amd64,linux/arm64 --output type=docker --progress plain -t datastrato/hive2:0.1.1 .
+docker buildx build --platform=linux/amd64,linux/arm64 --build-arg HADOOP_PACKAGE_NAME=${HADOOP_PACKAGE_NAME} --build-arg HIVE_PACKAGE_NAME=${HIVE_PACKAGE_NAME} --output type=docker --progress plain -t ${IMAGE_NAME} .

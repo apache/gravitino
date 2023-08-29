@@ -6,6 +6,9 @@
 FROM ubuntu:16.04
 LABEL maintainer="dev@datastrato.com"
 
+ARG HADOOP_PACKAGE_NAME
+ARG HIVE_PACKAGE_NAME
+
 WORKDIR /
 
 ################################################################################
@@ -76,6 +79,7 @@ RUN echo "HADOOP_MAPRED_HOME=${HADOOP_MAPRED_HOME}" >> /etc/environment
 RUN echo "HADOOP_COMMON_HOME=${HADOOP_COMMON_HOME}" >> /etc/environment
 RUN echo "HADOOP_HDFS_HOME=${HADOOP_HDFS_HOME}" >> /etc/environment
 RUN echo "HADOOP_CONF_DIR=${HADOOP_CONF_DIR}" >> /etc/environment
+RUN echo "HADOOP_CLASSPATH=${JAVA_HOME}/lib/tools.jar" >> /etc/environment
 RUN echo "YARN_HOME=${YARN_HOME}" >> /etc/environment
 RUN echo "HIVE_HOME=${HIVE_HOME}" >> /etc/environment
 RUN echo "PATH=${PATH}" >> /etc/environment
@@ -85,7 +89,7 @@ RUN echo "LD_LIBRARY_PATH=${LD_LIBRARY_PATH}" >> /etc/environment
 ################################################################################
 # install hadoop
 RUN mkdir ${HADOOP_HOME}
-RUN tar -xz -C ${HADOOP_HOME} --strip-components 1 -f /tmp/packages/hadoop-2.7.3.tar.gz
+RUN tar -xz -C ${HADOOP_HOME} --strip-components 1 -f /tmp/packages/${HADOOP_PACKAGE_NAME}
 
 # replace configuration templates
 RUN rm -f ${HADOOP_CONF_DIR}/core-site.xml
@@ -106,7 +110,7 @@ RUN ${HADOOP_HOME}/bin/hdfs namenode -format -nonInteractive
 ################################################################################
 # install hive
 RUN mkdir ${HIVE_HOME}
-RUN tar -xz -C ${HIVE_HOME} --strip-components 1 -f /tmp/packages/apache-hive-2.3.9-bin.tar.gz
+RUN tar -xz -C ${HIVE_HOME} --strip-components 1 -f /tmp/packages/${HIVE_PACKAGE_NAME}
 ADD hive-site.xml ${HIVE_HOME}/conf/hive-site.xml
 
 ################################################################################
@@ -140,9 +144,6 @@ RUN usermod -a -G mapred datastrato
 
 RUN mkdir /home/datastrato
 RUN chown -R datastrato:hadoop /home/datastrato
-RUN echo "source /home/datastrato/.bashrc" > /home/datastrato/.profile
-ADD bashrc /home/datastrato/.bashrc
-RUN chown datastrato:hadoop /home/datastrato/.bashrc /home/datastrato/.profile
 
 ################################################################################
 # removed install packages
