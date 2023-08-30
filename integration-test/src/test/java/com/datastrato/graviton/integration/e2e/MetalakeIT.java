@@ -30,11 +30,17 @@ public class MetalakeIT extends AbstractIT {
 
   @BeforeAll
   private static void start() {
+    // Prepare create a metalake test record,
+    // This way it can support `Run all tests` or `Run test in separated` to test `list`, `load`,
+    // `alter`, `drop` methods.
     createMetalake();
   }
 
   @AfterAll
   private static void stop() {
+    // Always drop the test record here.
+    // This allows metalake to be safe deleted metalake when `Run all tests` or `Run test in
+    // separated`
     dropMetalake();
   }
 
