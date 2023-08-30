@@ -23,7 +23,7 @@ public class GravitonServer extends ResourceConfig {
 
   private static final Logger LOG = LoggerFactory.getLogger(GravitonServer.class);
 
-  private static final String CONF_FILE = "graviton.conf";
+  public static final String CONF_FILE = "graviton.conf";
 
   private final ServerConfig serverConfig;
 
