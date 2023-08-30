@@ -17,6 +17,7 @@ dependencies {
   implementation(project(":client-java"))
   implementation(project(":server"))
 
+  testCompileOnly(libs.commons.io)
   testCompileOnly(libs.lombok)
   testAnnotationProcessor(libs.lombok)
   testImplementation(libs.guava)

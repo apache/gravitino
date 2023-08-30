@@ -68,6 +68,7 @@ public class MetalakeIT extends AbstractIT {
   public void testAlterMetalake() {
     String alterMetalakeName = GravitonITUtils.genRandomName();
 
+    // TODO: Add more test cases for alter metalake
     MetalakeChange[] changes1 =
         new MetalakeChange[] {
           MetalakeChange.rename(alterMetalakeName), MetalakeChange.updateComment("newComment")
@@ -76,6 +77,12 @@ public class MetalakeIT extends AbstractIT {
     Assertions.assertEquals(alterMetalakeName, metaLake.name());
     Assertions.assertEquals("newComment", metaLake.comment());
     Assertions.assertEquals("graviton", metaLake.auditInfo().creator());
+
+    // Reload metatada from backend to check if the changes are applied
+    GravitonMetaLake metaLake1 = client.loadMetalake(NameIdentifier.of(alterMetalakeName));
+    Assertions.assertEquals(alterMetalakeName, metaLake1.name());
+    Assertions.assertEquals("newComment", metaLake1.comment());
+    Assertions.assertEquals("graviton", metaLake1.auditInfo().creator());
 
     // Test return not found
     Throwable excep =
@@ -110,9 +117,8 @@ public class MetalakeIT extends AbstractIT {
   public static void dropMetalake() {
     Assertions.assertTrue(client.dropMetalake(NameIdentifier.of(metalakeName)));
 
-    // Test illegal metalake name identifier
+    // Reload metatada from backend to check if the drop are applied
     Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> client.dropMetalake(NameIdentifier.parse(metalakeName + "." + metalakeName)));
+        NoSuchMetalakeException.class, () -> client.loadMetalake(NameIdentifier.of(metalakeName)));
   }
 }
