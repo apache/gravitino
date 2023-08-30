@@ -7,7 +7,7 @@ package com.datastrato.graviton.storage.kv;
 
 import com.datastrato.graviton.Config;
 import com.datastrato.graviton.EntityAlreadyExistsException;
-import com.datastrato.graviton.util.Executable;
+import com.datastrato.graviton.utils.Executable;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.List;

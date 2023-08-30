@@ -3,7 +3,7 @@
  * This software is licensed under the Apache License version 2.
  */
 
-package com.datastrato.graviton.util;
+package com.datastrato.graviton.utils;
 
 import java.io.Serializable;
 import java.util.Arrays;

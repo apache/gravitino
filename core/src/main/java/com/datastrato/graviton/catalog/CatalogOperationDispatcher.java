@@ -20,7 +20,7 @@ import com.datastrato.graviton.rel.SupportsSchemas;
 import com.datastrato.graviton.rel.Table;
 import com.datastrato.graviton.rel.TableCatalog;
 import com.datastrato.graviton.rel.TableChange;
-import com.datastrato.graviton.util.ThrowableFunction;
+import com.datastrato.graviton.utils.ThrowableFunction;
 import com.google.common.annotations.VisibleForTesting;
 import java.util.Arrays;
 import java.util.List;

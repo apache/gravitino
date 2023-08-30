@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.datastrato.graviton.util;
+package com.datastrato.graviton.utils;
 
 // core/src/main/java/org/apache/iceberg/ClientPool.java
 public interface ClientPool<C, E extends Exception> {
