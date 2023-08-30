@@ -12,7 +12,7 @@ import com.datastrato.graviton.meta.CatalogEntity;
 import com.datastrato.graviton.meta.SchemaVersion;
 import com.datastrato.graviton.rel.Column;
 import com.datastrato.graviton.rel.Table;
-import com.datastrato.graviton.util.Executable;
+import com.datastrato.graviton.utils.Executable;
 import com.google.common.collect.Maps;
 import io.substrait.type.TypeCreator;
 import java.io.IOException;

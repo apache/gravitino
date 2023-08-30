@@ -3,9 +3,8 @@
  * This software is licensed under the Apache License version 2.
  */
 
-package com.datastrato.util;
+package com.datastrato.graviton.utils;
 
-import com.datastrato.graviton.util.ByteUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
