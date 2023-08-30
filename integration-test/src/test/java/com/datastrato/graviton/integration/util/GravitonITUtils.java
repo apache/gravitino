@@ -37,7 +37,7 @@ public class GravitonITUtils {
     try {
       Thread.sleep(millis);
     } catch (InterruptedException e) {
-      LOG.error("Exception in WebDriverManager while getWebDriver ", e);
+      LOG.error("Exception in sleep() ", e);
     }
     if (logOutput) {
       LOG.info("Finished.");

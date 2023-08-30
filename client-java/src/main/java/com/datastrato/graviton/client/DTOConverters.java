@@ -17,7 +17,7 @@ import com.datastrato.graviton.dto.requests.TableUpdateRequest;
 import com.datastrato.graviton.rel.SchemaChange;
 import com.datastrato.graviton.rel.TableChange;
 
-public class DTOConverters {
+class DTOConverters {
   private DTOConverters() {}
 
   static GravitonMetaLake toMetaLake(MetalakeDTO metalake, RESTClient client) {
