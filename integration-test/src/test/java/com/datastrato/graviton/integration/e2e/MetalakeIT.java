@@ -23,10 +23,13 @@ import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class MetalakeIT extends AbstractIT {
-  public static String metalakeName = GravitonITUtils.genRandomName();
+  public static final Logger LOG = LoggerFactory.getLogger(MetalakeIT.class);
+  public static String metalakeName = GravitonITUtils.genRandomName("metalake");
 
   @BeforeAll
   private static void start() {
@@ -47,6 +50,7 @@ public class MetalakeIT extends AbstractIT {
   @Order(1)
   @Test
   public void testListMetalake() {
+    LOG.info("testListMetalake metaLakeName: {}", metalakeName);
     GravitonMetaLake[] metaLakes = client.listMetalakes();
     List<MetalakeDTO> result =
         Arrays.stream(metaLakes)
@@ -59,6 +63,7 @@ public class MetalakeIT extends AbstractIT {
   @Order(2)
   @Test
   public void testLoadMetalake() {
+    LOG.info("testLoadMetalake metaLakeName: {}", metalakeName);
     GravitonMetaLake metaLake = client.loadMetalake(NameIdentifier.of(metalakeName));
     Assertions.assertEquals(metaLake.name(), metalakeName);
   }
@@ -66,7 +71,8 @@ public class MetalakeIT extends AbstractIT {
   @Order(3)
   @Test
   public void testAlterMetalake() {
-    String alterMetalakeName = GravitonITUtils.genRandomName();
+    LOG.info("testAlterMetalake metaLakeName: {}", metalakeName);
+    String alterMetalakeName = GravitonITUtils.genRandomName("metalake");
 
     // TODO: Add more test cases for alter metalake
     MetalakeChange[] changes1 =
@@ -97,6 +103,7 @@ public class MetalakeIT extends AbstractIT {
   }
 
   public static void createMetalake() {
+    LOG.info("Create metalake: {}", metalakeName);
     GravitonMetaLake metaLake =
         client.createMetalake(
             NameIdentifier.parse(metalakeName), "comment", Collections.emptyMap());
@@ -115,6 +122,7 @@ public class MetalakeIT extends AbstractIT {
   }
 
   public static void dropMetalake() {
+    LOG.info("Drop metalake: {}", metalakeName);
     Assertions.assertTrue(client.dropMetalake(NameIdentifier.of(metalakeName)));
 
     // Reload metatada from backend to check if the drop are applied

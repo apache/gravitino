@@ -30,12 +30,14 @@ import org.apache.hadoop.hive.metastore.RetryingMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.thrift.TException;
 import org.apache.thrift.transport.TTransportException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 // hive-metastore/src/main/java/org/apache/iceberg/hive/HiveClientPool.java
 
 /** Represents a client pool for managing connections to the Hive Metastore service. */
 public class HiveClientPool extends ClientPoolImpl<IMetaStoreClient, TException> {
-
+  public static final Logger LOG = LoggerFactory.getLogger(HiveClientPool.class);
   private static final DynMethods.StaticMethod GET_CLIENT =
       DynMethods.builder("getProxy")
           .impl(
@@ -96,6 +98,7 @@ public class HiveClientPool extends ClientPoolImpl<IMetaStoreClient, TException>
 
   @Override
   protected IMetaStoreClient reconnect(IMetaStoreClient client) {
+    LOG.warn("Reconnecting to Hive Metastore");
     try {
       client.close();
       client.reconnect();
@@ -116,6 +119,7 @@ public class HiveClientPool extends ClientPoolImpl<IMetaStoreClient, TException>
 
   @Override
   protected void close(IMetaStoreClient client) {
+    LOG.info("Closing Hive Metastore client");
     client.close();
   }
 

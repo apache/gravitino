@@ -4,8 +4,6 @@
  */
 package com.datastrato.graviton.utils;
 
-import com.datastrato.graviton.meta.AuditInfo;
-import com.datastrato.graviton.meta.rel.BaseSchema;
 import java.io.Closeable;
 import java.io.InputStream;
 import java.net.URL;
@@ -151,9 +149,7 @@ public class IsolatedClassLoader implements Closeable {
    */
   private boolean isBarrierClass(String name) {
     // We need to add more later on when we have more catalog implementations.
-    return name.startsWith(BaseSchema.class.getName())
-        || name.startsWith(AuditInfo.class.getName())
-        || barrierClasses.stream().anyMatch(name::startsWith);
+    return barrierClasses.stream().anyMatch(name::startsWith);
   }
 
   private ClassLoader getRootClassLoader() throws Exception {

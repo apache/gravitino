@@ -88,6 +88,12 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     conf.forEach(hadoopConf::set);
     hiveConf = new HiveConf(hadoopConf, HiveCatalogOperations.class);
 
+    // The specify Hadoop user name that will be used when accessing Hadoop
+    // Distributed File System (HDFS).
+    if (conf.containsKey(HiveCatalogConfig.HADOOP_USER_NAME.getKey())) {
+      System.setProperty("HADOOP_USER_NAME", conf.get(HiveCatalogConfig.HADOOP_USER_NAME.getKey()));
+    }
+
     // todo(xun): add hive client pool size in config
     this.clientPool = new HiveClientPool(1, hiveConf);
   }
