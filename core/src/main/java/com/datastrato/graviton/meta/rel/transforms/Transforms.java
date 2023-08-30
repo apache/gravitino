@@ -4,12 +4,31 @@
  */
 package com.datastrato.graviton.meta.rel.transforms;
 
+import com.datastrato.graviton.rel.Column;
 import com.datastrato.graviton.rel.Transform;
 import com.google.common.annotations.VisibleForTesting;
 import io.substrait.expression.Expression;
 import lombok.EqualsAndHashCode;
 
+/** Helper methods to create logical transforms to pass into Graviton. */
 public class Transforms {
+
+  public static LiteralTransform literal(Expression.Literal value) {
+    return new Transforms.LiteralReference(value);
+  }
+
+  public static FieldTransform field(String[] fieldName) {
+    return new Transforms.NamedReference(fieldName);
+  }
+
+  public static FieldTransform field(Column column) {
+    return field(new String[] {column.name()});
+  }
+
+  public static FunctionTransform function(String name, Transform[] args) {
+    return new Transforms.FunctionTrans(name, args);
+  }
+
   @VisibleForTesting
   @EqualsAndHashCode(callSuper = false)
   public static final class NamedReference extends FieldTransform {

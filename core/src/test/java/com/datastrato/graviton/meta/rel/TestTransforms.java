@@ -2,11 +2,11 @@
  * Copyright 2023 Datastrato.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.graviton.util;
+package com.datastrato.graviton.meta.rel;
 
-import static com.datastrato.graviton.util.TransformUtils.field;
-import static com.datastrato.graviton.util.TransformUtils.function;
-import static com.datastrato.graviton.util.TransformUtils.literal;
+import static com.datastrato.graviton.meta.rel.transforms.Transforms.field;
+import static com.datastrato.graviton.meta.rel.transforms.Transforms.function;
+import static com.datastrato.graviton.meta.rel.transforms.Transforms.literal;
 
 import com.datastrato.graviton.meta.rel.transforms.FieldTransform;
 import com.datastrato.graviton.meta.rel.transforms.LiteralTransform;
@@ -19,8 +19,7 @@ import io.substrait.type.TypeCreator;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-public class TestTransformUtils {
-
+public class TestTransforms {
   @Test
   public void testNamedReference() {
     Column column =
