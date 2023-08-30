@@ -6,7 +6,7 @@ package com.datastrato.graviton;
 
 import com.datastrato.graviton.Entity.EntityType;
 import com.datastrato.graviton.exceptions.NoSuchEntityException;
-import com.datastrato.graviton.util.Executable;
+import com.datastrato.graviton.utils.Executable;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.List;
