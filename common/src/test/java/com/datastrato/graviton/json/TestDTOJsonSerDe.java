@@ -9,6 +9,11 @@ import com.datastrato.graviton.dto.AuditDTO;
 import com.datastrato.graviton.dto.CatalogDTO;
 import com.datastrato.graviton.dto.MetalakeDTO;
 import com.datastrato.graviton.dto.rel.ColumnDTO;
+import com.datastrato.graviton.dto.rel.ExpressionPartitionDTO;
+import com.datastrato.graviton.dto.rel.ListPartitionDTO;
+import com.datastrato.graviton.dto.rel.Partition;
+import com.datastrato.graviton.dto.rel.RangePartitionDTO;
+import com.datastrato.graviton.dto.rel.SimplePartitionDTO;
 import com.datastrato.graviton.dto.rel.TableDTO;
 import com.google.common.collect.ImmutableMap;
 import io.substrait.type.StringTypeVisitor;
@@ -207,5 +212,85 @@ public class TestDTOJsonSerDe {
             JsonUtils.objectMapper().writeValueAsString(properties),
             String.format(auditJson, withQuotes(creator), withQuotes(now.toString()), null, null));
     Assertions.assertEquals(expectedJson, serJson);
+  }
+
+  @Test
+  public void testPartitionDTOSerDe() throws Exception {
+
+    String[] field1 = new String[] {"dt"};
+    String[] field2 = new String[] {"city"};
+
+    // construct simple partition
+    Partition identity =
+        new SimplePartitionDTO.Builder()
+            .withStrategy(Partition.Strategy.IDENTITY)
+            .withFieldName(field1)
+            .build();
+    Partition hourPart =
+        new SimplePartitionDTO.Builder()
+            .withStrategy(Partition.Strategy.HOUR)
+            .withFieldName(field1)
+            .build();
+    Partition dayPart =
+        new SimplePartitionDTO.Builder()
+            .withStrategy(Partition.Strategy.DAY)
+            .withFieldName(field1)
+            .build();
+    Partition monthPart =
+        new SimplePartitionDTO.Builder()
+            .withStrategy(Partition.Strategy.MONTH)
+            .withFieldName(field1)
+            .build();
+    Partition yearPart =
+        new SimplePartitionDTO.Builder()
+            .withStrategy(Partition.Strategy.YEAR)
+            .withFieldName(field1)
+            .build();
+
+    // construct list partition
+    String[][] p1Value = {{"2023-04-01", "San Francisco"}, {"2023-04-01", "San Francisco"}};
+    String[][] p2Value = {{"2023-04-01", "Houston"}, {"2023-04-01", "Dallas"}};
+    Partition listPart =
+        new ListPartitionDTO.Builder()
+            .withFieldNames(new String[][] {field1, field2})
+            .withAssignment("p202304_California", p1Value)
+            .withAssignment("p202304_Texas", p2Value)
+            .build();
+
+    // construct range partition
+    Partition rangePart =
+        new RangePartitionDTO.Builder()
+            .withFieldName(field1)
+            .withRange("p20230101", "2023-01-01T00:00:00", "2023-01-02T00:00:00")
+            .withRange("p20230102", "2023-01-01T00:00:00", null)
+            .build();
+
+    // construct expression partition, toYYYYMM(toDate(ts, ‘Asia/Shanghai’))
+    ExpressionPartitionDTO.Expr arg1 =
+        new ExpressionPartitionDTO.FieldExpr.Builder().withFieldName(field1).build();
+    ExpressionPartitionDTO.Expr arg2 =
+        new ExpressionPartitionDTO.LiteralExpr.Builder()
+            .withType(TypeCreator.REQUIRED.STRING)
+            .withValue("Asia/Shanghai")
+            .build();
+    ExpressionPartitionDTO.Expr toDateFunc =
+        new ExpressionPartitionDTO.FunctionExpr.Builder()
+            .withFuncName("toDate")
+            .withArgs(new ExpressionPartitionDTO.Expr[] {arg1, arg2})
+            .build();
+    ExpressionPartitionDTO.Expr monthFunc =
+        new ExpressionPartitionDTO.FunctionExpr.Builder()
+            .withFuncName("toYYYYMM")
+            .withArgs(new ExpressionPartitionDTO.Expr[] {toDateFunc})
+            .build();
+    Partition expressionPart = new ExpressionPartitionDTO.Builder(monthFunc).build();
+
+    Partition[] partitions = {
+      identity, hourPart, dayPart, monthPart, yearPart, listPart, rangePart, expressionPart
+    };
+    String serJson = JsonUtils.objectMapper().writeValueAsString(partitions);
+    Partition[] desPartitions = JsonUtils.objectMapper().readValue(serJson, Partition[].class);
+
+    Assertions.assertArrayEquals(partitions, desPartitions);
   }
 }
