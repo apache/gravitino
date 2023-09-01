@@ -16,10 +16,15 @@ import com.datastrato.graviton.storage.NameMappingService;
 import com.datastrato.graviton.utils.ByteUtils;
 import com.datastrato.graviton.utils.Bytes;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Map;
+import java.util.stream.Collectors;
+import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,22 +52,68 @@ import org.slf4j.LoggerFactory;
 public class BinaryEntityKeyEncoder implements EntityKeyEncoder<byte[]> {
   public static final Logger LOG = LoggerFactory.getLogger(BinaryEntityKeyEncoder.class);
 
-  @VisibleForTesting static final byte[] NAMESPACE_SEPARATOR = "_".getBytes();
+  public static final String NAMESPACE_SEPARATOR = "/";
 
-  @VisibleForTesting static final String WILD_CARD = "*";
+  @VisibleForTesting
+  static final byte[] BYTABLE_NAMESPACE_SEPARATOR = NAMESPACE_SEPARATOR.getBytes();
+
+  static final String WILD_CARD = "*";
 
   // Key format template. Please the comment of the class for more details.
   public static final Map<EntityType, String[]> ENTITY_TYPE_TO_NAME_IDENTIFIER =
       ImmutableMap.of(
-          METALAKE, new String[] {METALAKE.getShortName() + "_"},
-          CATALOG, new String[] {CATALOG.getShortName() + "_", "_"},
-          SCHEMA, new String[] {SCHEMA.getShortName() + "_", "_", "_"},
-          TABLE, new String[] {TABLE.getShortName() + "_", "_", "_", "_"});
+          METALAKE, new String[] {METALAKE.getShortName() + "/"},
+          CATALOG, new String[] {CATALOG.getShortName() + "/", "/"},
+          SCHEMA, new String[] {SCHEMA.getShortName() + "/", "/", "/"},
+          TABLE, new String[] {TABLE.getShortName() + "/", "/", "/", "/"});
 
   @VisibleForTesting final NameMappingService nameMappingService;
 
   public BinaryEntityKeyEncoder(NameMappingService nameMappingService) {
     this.nameMappingService = nameMappingService;
+  }
+
+  private String nameContext(long[] namespace) {
+    return Joiner.on(NAMESPACE_SEPARATOR)
+        .join(Arrays.stream(namespace).mapToObj(String::valueOf).collect(Collectors.toList()));
+  }
+
+  /**
+   * Generate the key for name to id mapping. Currently, the mapping is as following.
+   *
+   * <pre>
+   *   Assume we have the following entities:
+   *   metalake: a1        ----> 1
+   *   catalog : a1.b1     ----> 2
+   *   schema  : a1.b1.c   ----> 3
+   *
+   *   metalake: a2        ----> 4
+   *   catalog : a2.b2     ----> 5
+   *   schema  : a2.b2.c   ----> 6
+   *   schema  : a2.b2.c1  ----> 7
+   *
+   *   metalake: a1        ----> 1 means the name of metalake is a1 and the corresponding id is 1
+   * </pre>
+   *
+   * Then we will store the name to id mapping as follows
+   *
+   * <pre>
+   *  a1         --> 1
+   * 	1/b1       --> 2
+   * 	1/2/c      --> 3
+   * 	a2         --> 4
+   * 	4/b2       --> 5
+   * 	4/5/c      --> 6
+   * 	4/5/c1     --> 7
+   * </pre>
+   *
+   * @param namespaceIds namespace of a specific entity
+   * @param name name of a specific entity
+   * @return key that maps to the id of a specific entity
+   */
+  private String generateKeyForNameMapping(long[] namespaceIds, String name) {
+    String context = nameContext(namespaceIds);
+    return StringUtils.isBlank(context) ? name : context + NAMESPACE_SEPARATOR + name;
   }
 
   /**
@@ -77,7 +128,9 @@ public class BinaryEntityKeyEncoder implements EntityKeyEncoder<byte[]> {
     String[] nameSpace = identifier.namespace().levels();
     long[] namespaceIds = new long[nameSpace.length];
     for (int i = 0; i < nameSpace.length; i++) {
-      namespaceIds[i] = nameMappingService.getOrCreateIdFromName(nameSpace[i]);
+      String nameKey =
+          generateKeyForNameMapping(ArrayUtils.subarray(namespaceIds, 0, i), nameSpace[i]);
+      namespaceIds[i] = nameMappingService.getOrCreateIdFromName(nameKey);
     }
 
     // If the name is a wildcard, We only need to encode the namespace.
@@ -92,8 +145,8 @@ public class BinaryEntityKeyEncoder implements EntityKeyEncoder<byte[]> {
     // This is for point query and need to use specific name
     long[] namespaceAndNameIds = new long[namespaceIds.length + 1];
     System.arraycopy(namespaceIds, 0, namespaceAndNameIds, 0, namespaceIds.length);
-    namespaceAndNameIds[namespaceIds.length] =
-        nameMappingService.getOrCreateIdFromName(identifier.name());
+    String nameKey = generateKeyForNameMapping(namespaceIds, identifier.name());
+    namespaceAndNameIds[namespaceIds.length] = nameMappingService.getOrCreateIdFromName(nameKey);
 
     String[] nameIdentifierTemplate = ENTITY_TYPE_TO_NAME_IDENTIFIER.get(entityType);
     if (nameIdentifierTemplate == null) {
@@ -104,7 +157,7 @@ public class BinaryEntityKeyEncoder implements EntityKeyEncoder<byte[]> {
 
   /**
    * Format the name space template to a byte array. For example, if the name space template is
-   * "ca_{}_" and the ids are [1], the result is "ca_1_" which means we want to get all catalogs in
+   * "ca/{}/" and the ids are [1], the result is "ca/1/" which means we want to get all catalogs in
    * metalake '1'
    *
    * @param namespaceTemplate the name space template, please see {@link
@@ -128,7 +181,7 @@ public class BinaryEntityKeyEncoder implements EntityKeyEncoder<byte[]> {
 
   /**
    * Format the name identifier to a byte array. For example, if the name space template is
-   * "ca_{}_{}" and the ids is [1, 2], the result is "ca_1_2" which means we want to get the
+   * "ca/{}/{}" and the ids is [1, 2], the result is "ca/1/2" which means we want to get the
    * specific catalog '2'
    *
    * @param nameIdentifierTemplate the name space template, please see {@link

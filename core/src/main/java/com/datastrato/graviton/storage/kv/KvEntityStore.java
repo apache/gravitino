@@ -65,7 +65,7 @@ public class KvEntityStore implements EntityStore {
   public <E extends Entity & HasIdentifier> List<E> list(
       Namespace namespace, Class<E> e, EntityType type) throws IOException {
     // Star means it's a wildcard
-    NameIdentifier identifier = NameIdentifier.of(namespace, "*");
+    NameIdentifier identifier = NameIdentifier.of(namespace, BinaryEntityKeyEncoder.WILD_CARD);
     byte[] startKey = entityKeyEncoder.encode(identifier, type);
     byte[] endKey = Bytes.increment(Bytes.wrap(startKey)).get();
     List<Pair<byte[], byte[]>> kvs =
