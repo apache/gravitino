@@ -17,6 +17,7 @@ dependencies {
     exclude("com.fasterxml.jackson.datatype")
     exclude("com.fasterxml.jackson.dataformat")
     exclude("com.google.protobuf")
+    exclude("com.google.code.findbugs")
   }
 
   implementation(libs.jackson.databind)
