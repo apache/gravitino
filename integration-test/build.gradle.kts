@@ -11,12 +11,12 @@ plugins {
 }
 
 dependencies {
-  implementation(project(":api"))
-  implementation(project(":core"))
-  implementation(project(":common"))
-  implementation(project(":client-java"))
-  implementation(project(":catalog-hive"))
-  implementation(project(":server"))
+  testImplementation(project(":api"))
+  testImplementation(project(":core"))
+  testImplementation(project(":common"))
+  testImplementation(project(":client-java"))
+  testImplementation(project(":catalog-hive"))
+  testImplementation(project(":server"))
 
   testImplementation(libs.hive2.metastore) {
     exclude("org.apache.hbase")

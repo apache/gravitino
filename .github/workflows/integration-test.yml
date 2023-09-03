@@ -1,12 +1,12 @@
-name: integration
+name: Integration Test
 
 # Controls when the workflow will run
 on:
   # Triggers the workflow on push or pull request events but only for the "main" branch
   push:
-    branches: [ "main" ]
+    branches: [ "main", "branch-*" ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ "main", "branch-*" ]
 
 env:
   HIVE2_IMAGE_NAME: datastrato/hive2

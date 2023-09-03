@@ -2,29 +2,30 @@
   Copyright 2023 Datastrato.
   This software is licensed under the Apache License version 2.
 -->
-# How to Run Integration Test
+# How to Run Integration Tests
 
 ## Introduction
-The test cases under the `integration-test` module are integration tests to ensure the correctness of the Graviton Server, and API and Client.
-You can run these tests either locally or on GitHub Actions.
+The `integration-test` module contains test cases that serve as integration tests to ensure the correctness of the Graviton Server, API, and Client. 
+You can run these tests locally or on GitHub Actions.
 
-## Run on GitHub Actions
-When you submit a pull request to branch of `main`, GitHub Actions will automatically run the integration test.
-You can check the test results in the `Actions` tab of the pull request page.
-The Github Acitons will run the integration test in the following steps:
-1. If you set `build docker image` label in the pull request, Then Github Acitons will trigger build the all docker image under the `./dev/docker/` directory, 
-normal this step need about 10 minutes. If you modify the code of the dockerfile, you need to set `build docker image` label in the pull request.
-2. If you not set `build docker image` label in the pull request, Then Github Acitons will pull docker image `datastrato/hive2:latest` from docker hub repository, normal this step need about 15 seconds.
-3. Run the docker image in the Github Acitons environment.
-4. Execute `./gradlew integrationTest` command to compile and package the Graviton project in `distribution` directory.
-5. Run the integration test cases in the `integration-test` module.
-6. Stop the docker image. 
-7. Clean up the test environment.
+## Running on GitHub Actions
+When you submit a pull request to the `main` branch, GitHub Actions will automatically run the integration tests. 
+You can view the test results in the `Actions` tab of the pull request page. 
+The integration tests are executed in the following steps:
 
-## Run on Locally
-Before running the tests, Docker must be installed.
-Then, execute `./gradlew build compileDistribution integrationTest` command to compile and package the Graviton project in `distribution` directory.
-In addition, Graviton Server and third-part data source docker runtime environment will use some port. Please make sure these ports are not occupied.
+1. If you set the `build docker image` label in the pull request, GitHub Actions will trigger the build of all Docker images under the `./dev/docker/` directory. This step usually takes around 10 minutes. If you have made changes to the Dockerfile, you need to set the `build docker image` label in the pull request.
+2. If you do not set the `build docker image` label in the pull request, GitHub Actions will pull the Docker image `datastrato/hive2:latest` from the Docker Hub repository. This step usually takes around 15 seconds.
+3. The Docker image is then run in the GitHub Actions environment.
+4. If you set the `debug action` label in the pull request, GitHub Actions will run an SSH server with `csexton/debugger-action@master`, allowing you to remotely log in to the Actions environment for debugging purposes.
+5. The Graviton project is compiled and packaged in the `distribution` directory using the `./gradlew integrationTest` command.
+6. The integration test cases in the `integration-test` module are executed.
+7. The Docker image is stopped.
+8. The test environment is cleaned up.
 
-+ Graviton Server: `8088` port.
-+ Hive Docker runtime environment: `50070`, `50075`, `10002`, `10000`, `8888`, `9083`, `7180`, and `22` port.
+## Running Locally
+Before running the tests, make sure Docker is installed. 
+Then, execute the `./gradlew build compileDistribution integrationTest` command to compile and package the Graviton project in the `distribution` directory. 
+Additionally, the Graviton Server and third-party data source Docker runtime environments will use certain ports. Ensure that these ports are not already in use:
+
+- Graviton Server: Port `8088`
+- Hive Docker runtime environment: Ports `50070`, `50075`, `10002`, `10000`, `8888`, `9083`, `7180`, and `22`
