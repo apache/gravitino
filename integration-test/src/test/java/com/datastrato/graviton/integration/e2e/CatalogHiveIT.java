@@ -36,7 +36,6 @@ import org.slf4j.LoggerFactory;
 
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class CatalogHiveIT extends AbstractIT {
-  public static final Logger LOG = LoggerFactory.getLogger(MetalakeIT.class);
   public static String metalakeName = GravitonITUtils.genRandomName("CatalogHiveIT_metalake");
   public static String catalogName = GravitonITUtils.genRandomName("CatalogHiveIT_catalog");
   public static String schemaName = GravitonITUtils.genRandomName("CatalogHiveIT_schema");
