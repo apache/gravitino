@@ -54,7 +54,6 @@ public class CatalogHiveIT extends AbstractIT {
 
   @BeforeAll
   public static void startup() throws Exception {
-    LOG.info("Starting up");
     System.setProperty("HADOOP_USER_NAME", HADOOP_USER_NAME);
 
     HiveConf hiveConf = new HiveConf();
@@ -62,14 +61,13 @@ public class CatalogHiveIT extends AbstractIT {
 
     GravitonMetaLake[] gravitonMetaLakes = client.listMetalakes();
 
-    hiveClientPool = new HiveClientPool(5, hiveConf);
+    hiveClientPool = new HiveClientPool(1, hiveConf);
     client.createMetalake(NameIdentifier.of(metalakeName), "comment", Collections.emptyMap());
     createHiveTable();
   }
 
   @AfterAll
   public static void stop() {
-    LOG.info("drop metalake {}", metalakeName);
     client.dropMetalake(NameIdentifier.of(metalakeName));
     if (hiveClientPool != null) {
       hiveClientPool.close();
@@ -77,12 +75,6 @@ public class CatalogHiveIT extends AbstractIT {
   }
 
   public static void createHiveTable() throws TException, InterruptedException {
-    LOG.info(
-        "createHiveTable metalakeName = {}, catalogName = {}, schemaName = {}, tableName = {}",
-        metalakeName,
-        catalogName,
-        schemaName,
-        tableName);
     GravitonMetaLake metalake = client.loadMetalake(NameIdentifier.of(metalakeName));
 
     // Create catalog from Graviton API
@@ -165,13 +157,6 @@ public class CatalogHiveIT extends AbstractIT {
   @Order(1)
   @Test
   public void testAlterHiveTable() throws TException, InterruptedException {
-    LOG.info(
-        "testAlterHiveTable metalakeName = {}, catalogName = {}, schemaName = {}, tableName = {}",
-        metalakeName,
-        catalogName,
-        schemaName,
-        tableName);
-
     GravitonMetaLake metalake = client.loadMetalake(NameIdentifier.of(metalakeName));
     Catalog catalog = metalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
     catalog
@@ -214,12 +199,6 @@ public class CatalogHiveIT extends AbstractIT {
   @Order(2)
   @Test
   public void testDropHiveTable() {
-    LOG.info(
-        "testDropHiveTable metalakeName = {}, catalogName = {}, schemaName = {}, tableName = {}",
-        metalakeName,
-        catalogName,
-        schemaName,
-        tableName);
     GravitonMetaLake metalake = client.loadMetalake(NameIdentifier.of(metalakeName));
     Catalog catalog = metalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
     catalog
@@ -267,12 +246,6 @@ public class CatalogHiveIT extends AbstractIT {
   @Order(4)
   @Test
   public void testDropHiveDB() {
-    LOG.info(
-        "testDropHiveDb metalakeName = {}, catalogName = {}, schemaName = {}, tableName = {}",
-        metalakeName,
-        catalogName,
-        schemaName,
-        tableName);
     GravitonMetaLake metalake = client.loadMetalake(NameIdentifier.of(metalakeName));
     Catalog catalog = metalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
     catalog.asSchemas().dropSchema(NameIdentifier.of(metalakeName, catalogName, schemaName), true);
