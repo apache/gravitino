@@ -149,7 +149,6 @@ tasks {
   val outputDir = projectDir.dir("distribution")
 
   val compileDistribution by registering {
-//    dependsOn("copyRuntimeClass", "copyCatalogRuntimeClass", "copySubmoduleClass")
     dependsOn("copyRuntimeClass", "copyCatalogRuntimeClass", "copySubmoduleClass", "copyCatalogModuleClass")
 
     group = "graviton distribution"
@@ -205,7 +204,7 @@ tasks {
   val copyRuntimeClass by registering(Copy::class) {
     subprojects.forEach() {
       if (it.name != "catalog-hive" && it.name != "client-java" && it.name != "integration-test") {
-         println("copyRuntimeClass: ${it.name}")
+        println("copyRuntimeClass: ${it.name}")
         from(it.configurations.runtimeClasspath)
         into("distribution/package/libs")
       }
@@ -225,8 +224,6 @@ tasks {
   val copySubmoduleClass by registering(Copy::class) {
     dependsOn("copyRuntimeClass", "copyCatalogRuntimeClass")
     subprojects.forEach() {
-      // println("copySubmoduleClass: ${it.name}")
-      // if (it.name != "client-java") {
       if (it.name != "client-java" && it.name != "integration-test" && it.name != "catalog-hive") {
         from("${it.name}/build/libs")
         into("distribution/package/libs")
@@ -237,7 +234,6 @@ tasks {
   }
 
   val copyCatalogModuleClass by registering(Copy::class) {
-    //    dependsOn("copyCatalogModuleClass")
     subprojects.forEach() {
       if (it.name == "catalog-hive") {
         from("${it.name}/build/libs")

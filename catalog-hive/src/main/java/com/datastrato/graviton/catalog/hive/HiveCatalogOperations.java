@@ -88,6 +88,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     conf.forEach(hadoopConf::set);
     hiveConf = new HiveConf(hadoopConf, HiveCatalogOperations.class);
 
+    // TODO(xun): Wait add Graviton User Account System to manage user and group
     // The specify Hadoop user name that will be used when accessing Hadoop
     // Distributed File System (HDFS).
     if (conf.containsKey(HiveCatalogConfig.HADOOP_USER_NAME.getKey())) {

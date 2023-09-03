@@ -37,7 +37,8 @@ import org.slf4j.LoggerFactory;
 
 /** Represents a client pool for managing connections to the Hive Metastore service. */
 public class HiveClientPool extends ClientPoolImpl<IMetaStoreClient, TException> {
-  public static final Logger LOG = LoggerFactory.getLogger(HiveClientPool.class);
+
+  private static final Logger LOG = LoggerFactory.getLogger(HiveClientPool.class);
   private static final DynMethods.StaticMethod GET_CLIENT =
       DynMethods.builder("getProxy")
           .impl(

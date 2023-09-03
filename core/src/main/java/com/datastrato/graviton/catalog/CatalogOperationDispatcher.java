@@ -259,6 +259,7 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
       throws E1, E2 {
     try {
       NameIdentifier catalogIdent = getCatalogIdentifier(ident);
+
       CatalogManager.CatalogWrapper c = catalogManager.loadCatalogAndWrap(catalogIdent);
       return fn.apply(c);
     } catch (Throwable throwable) {
