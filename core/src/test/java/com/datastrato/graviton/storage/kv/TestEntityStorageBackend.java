@@ -546,12 +546,11 @@ public class TestEntityStorageBackend {
       Assertions.assertThrowsExactly(
           NoSuchEntityException.class,
           () -> store.get(schema2.nameIdentifier(), EntityType.SCHEMA, CatalogEntity.class));
-
     }
   }
 
   @Test
-  public void testCreateKvEntityStore() {
+  void testCreateKvEntityStore() {
     Config config = Mockito.mock(Config.class);
     Mockito.when(config.get(ENTITY_STORE)).thenReturn("kv");
     Mockito.when(config.get(ENTITY_KV_STORE)).thenReturn(DEFUALT_ENTITY_KV_STORE);
