@@ -6,7 +6,7 @@
 junit = "5.8.1"
 protoc = "3.17.3"
 substrait = "0.9.0"
-jackson = "2.14.1"
+jackson = "2.15.2"
 guava = "29.0-jre"
 lombok = "1.18.20"
 slf4j = "2.0.7"
