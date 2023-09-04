@@ -266,22 +266,22 @@ public class TestDTOJsonSerDe {
             .build();
 
     // construct expression partition, toYYYYMM(toDate(ts, ‘Asia/Shanghai’))
-    ExpressionPartitionDTO.Expr arg1 =
-        new ExpressionPartitionDTO.FieldExpr.Builder().withFieldName(field1).build();
-    ExpressionPartitionDTO.Expr arg2 =
-        new ExpressionPartitionDTO.LiteralExpr.Builder()
+    ExpressionPartitionDTO.Expression arg1 =
+        new ExpressionPartitionDTO.FieldExpression.Builder().withFieldName(field1).build();
+    ExpressionPartitionDTO.Expression arg2 =
+        new ExpressionPartitionDTO.LiteralExpression.Builder()
             .withType(TypeCreator.REQUIRED.STRING)
             .withValue("Asia/Shanghai")
             .build();
-    ExpressionPartitionDTO.Expr toDateFunc =
-        new ExpressionPartitionDTO.FunctionExpr.Builder()
+    ExpressionPartitionDTO.Expression toDateFunc =
+        new ExpressionPartitionDTO.FunctionExpression.Builder()
             .withFuncName("toDate")
-            .withArgs(new ExpressionPartitionDTO.Expr[] {arg1, arg2})
+            .withArgs(new ExpressionPartitionDTO.Expression[] {arg1, arg2})
             .build();
-    ExpressionPartitionDTO.Expr monthFunc =
-        new ExpressionPartitionDTO.FunctionExpr.Builder()
+    ExpressionPartitionDTO.Expression monthFunc =
+        new ExpressionPartitionDTO.FunctionExpression.Builder()
             .withFuncName("toYYYYMM")
-            .withArgs(new ExpressionPartitionDTO.Expr[] {toDateFunc})
+            .withArgs(new ExpressionPartitionDTO.Expression[] {toDateFunc})
             .build();
     Partition expressionPart = new ExpressionPartitionDTO.Builder(monthFunc).build();
 

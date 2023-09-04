@@ -16,7 +16,7 @@ import org.apache.logging.log4j.util.Strings;
 @EqualsAndHashCode(callSuper = false)
 public class RangePartitionDTO implements Partition {
 
-  @JsonProperty("field_name")
+  @JsonProperty("fieldName")
   private final String[] fieldName;
 
   @JsonProperty("ranges")
@@ -25,7 +25,7 @@ public class RangePartitionDTO implements Partition {
   @JsonCreator
   private RangePartitionDTO(
       @JsonProperty("strategy") String strategy,
-      @JsonProperty("field_name") String[] fieldName,
+      @JsonProperty("fieldName") String[] fieldName,
       @JsonProperty("ranges") Range[] ranges) {
     Preconditions.checkArgument(
         fieldName != null && fieldName.length != 0, "fieldName cannot be null or empty");

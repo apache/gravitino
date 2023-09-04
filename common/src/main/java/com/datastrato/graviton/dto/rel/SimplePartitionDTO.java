@@ -15,13 +15,13 @@ public class SimplePartitionDTO implements Partition {
 
   private final Strategy strategy;
 
-  @JsonProperty("field_name")
+  @JsonProperty("fieldName")
   private final String[] fieldName;
 
   @JsonCreator
   private SimplePartitionDTO(
       @JsonProperty(value = "strategy", required = true) String strategy,
-      @JsonProperty("field_name") String[] fieldName) {
+      @JsonProperty("fieldName") String[] fieldName) {
 
     Preconditions.checkArgument(!Strings.isBlank(strategy), "strategy cannot be null");
     Preconditions.checkArgument(

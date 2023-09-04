@@ -15,7 +15,7 @@ import org.apache.logging.log4j.util.Strings;
 
 @EqualsAndHashCode(callSuper = false)
 public class ListPartitionDTO implements Partition {
-  @JsonProperty("field_names")
+  @JsonProperty("fieldNames")
   private final String[][] fieldNames;
 
   @JsonProperty("assignments")
@@ -24,10 +24,10 @@ public class ListPartitionDTO implements Partition {
   @JsonCreator
   private ListPartitionDTO(
       @JsonProperty("strategy") String strategy,
-      @JsonProperty("field_names") String[][] fieldNames,
+      @JsonProperty("fieldNames") String[][] fieldNames,
       @JsonProperty("assignments") Assignment[] assignments) {
     Preconditions.checkArgument(
-        fieldNames != null && fieldNames.length != 0, "fieldName cannot be null or empty");
+        fieldNames != null && fieldNames.length != 0, "fieldNames cannot be null or empty");
 
     if (assignments != null && assignments.length != 0) {
       Preconditions.checkArgument(

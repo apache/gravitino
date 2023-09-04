@@ -4,7 +4,9 @@
  */
 package com.datastrato.graviton.dto.rel;
 
-import static com.datastrato.graviton.dto.rel.ExpressionPartitionDTO.ExprType.FILED;
+import static com.datastrato.graviton.dto.rel.ExpressionPartitionDTO.ExpressionType.FIELD;
+import static com.datastrato.graviton.dto.rel.ExpressionPartitionDTO.ExpressionType.FUNCTION;
+import static com.datastrato.graviton.dto.rel.ExpressionPartitionDTO.ExpressionType.LITERAL;
 
 import com.datastrato.graviton.json.JsonUtils;
 import com.fasterxml.jackson.annotation.JsonCreator;
@@ -21,8 +23,8 @@ import org.apache.logging.log4j.util.Strings;
 @EqualsAndHashCode(callSuper = false)
 public class ExpressionPartitionDTO implements Partition {
 
-  @JsonProperty("expr")
-  private final Expr expr;
+  @JsonProperty("expression")
+  private final Expression expression;
 
   @Override
   public Strategy strategy() {
@@ -31,58 +33,59 @@ public class ExpressionPartitionDTO implements Partition {
 
   @JsonCreator
   private ExpressionPartitionDTO(
-      @JsonProperty("strategy") String strategy, @JsonProperty("expr") Expr expr) {
-    Preconditions.checkArgument(expr != null, "expr cannot be null");
-    this.expr = expr;
+      @JsonProperty("strategy") String strategy,
+      @JsonProperty("expression") Expression expression) {
+    Preconditions.checkArgument(expression != null, "expression cannot be null");
+    this.expression = expression;
   }
 
   public static class Builder {
-    private Expr expr;
+    private Expression expression;
 
-    public Builder(Expr expr) {
-      this.expr = expr;
+    public Builder(Expression expression) {
+      this.expression = expression;
     }
 
     public ExpressionPartitionDTO build() {
-      return new ExpressionPartitionDTO(Strategy.EXPRESSION.name(), expr);
+      return new ExpressionPartitionDTO(Strategy.EXPRESSION.name(), expression);
     }
   }
 
-  enum ExprType {
-    FILED,
+  enum ExpressionType {
+    FIELD,
     LITERAL,
     FUNCTION,
   }
 
   @JsonTypeInfo(use = JsonTypeInfo.Id.DEDUCTION)
   @JsonSubTypes({
-    @JsonSubTypes.Type(value = ExpressionPartitionDTO.FieldExpr.class),
-    @JsonSubTypes.Type(value = ExpressionPartitionDTO.LiteralExpr.class),
-    @JsonSubTypes.Type(value = ExpressionPartitionDTO.FunctionExpr.class),
+    @JsonSubTypes.Type(value = ExpressionPartitionDTO.FieldExpression.class),
+    @JsonSubTypes.Type(value = ExpressionPartitionDTO.LiteralExpression.class),
+    @JsonSubTypes.Type(value = ExpressionPartitionDTO.FunctionExpression.class),
   })
-  public interface Expr {
-    @JsonProperty("expr_type")
-    ExprType exprType();
+  public interface Expression {
+    @JsonProperty("expressionType")
+    ExpressionType expressionType();
   }
 
   @EqualsAndHashCode
-  public static class FieldExpr implements Expr {
+  public static class FieldExpression implements Expression {
 
-    @JsonProperty("field_name")
+    @JsonProperty("fieldName")
     private final String[] fieldName;
 
     @JsonCreator
-    private FieldExpr(
-        @JsonProperty("expr_type") String exprType,
-        @JsonProperty("field_name") String[] fieldName) {
+    private FieldExpression(
+        @JsonProperty("expressionType") String expressionType,
+        @JsonProperty("fieldName") String[] fieldName) {
       Preconditions.checkArgument(
           fieldName != null && fieldName.length != 0, "fieldName cannot be null or empty");
       this.fieldName = fieldName;
     }
 
     @Override
-    public ExprType exprType() {
-      return FILED;
+    public ExpressionType expressionType() {
+      return FIELD;
     }
 
     public static class Builder {
@@ -93,36 +96,35 @@ public class ExpressionPartitionDTO implements Partition {
         return this;
       }
 
-      public FieldExpr build() {
-        return new FieldExpr(FILED.name(), fieldName);
+      public FieldExpression build() {
+        return new FieldExpression(FIELD.name(), fieldName);
       }
     }
   }
 
   @EqualsAndHashCode
-  public static class LiteralExpr implements Expr {
+  public static class LiteralExpression implements Expression {
 
     @JsonProperty("type")
+    @JsonSerialize(using = JsonUtils.TypeSerializer.class)
+    @JsonDeserialize(using = JsonUtils.TypeDeserializer.class)
     private final Type type;
 
     @JsonProperty("value")
     private final String value;
 
     @JsonCreator
-    private LiteralExpr(
-        @JsonProperty("expr_type") String exprType,
-        @JsonProperty("type")
-            @JsonSerialize(using = JsonUtils.TypeSerializer.class)
-            @JsonDeserialize(using = JsonUtils.TypeDeserializer.class)
-            Type type,
+    private LiteralExpression(
+        @JsonProperty("expressionType") String expressionType,
+        @JsonProperty("type") Type type,
         @JsonProperty("value") String value) {
       this.type = type;
       this.value = value;
     }
 
     @Override
-    public ExprType exprType() {
-      return ExprType.LITERAL;
+    public ExpressionType expressionType() {
+      return LITERAL;
     }
 
     public static class Builder {
@@ -139,52 +141,52 @@ public class ExpressionPartitionDTO implements Partition {
         return this;
       }
 
-      public LiteralExpr build() {
-        return new LiteralExpr(ExprType.LITERAL.name(), type, value);
+      public LiteralExpression build() {
+        return new LiteralExpression(LITERAL.name(), type, value);
       }
     }
   }
 
   @EqualsAndHashCode
-  public static class FunctionExpr implements Expr {
+  public static class FunctionExpression implements Expression {
 
-    @JsonProperty("func_name")
+    @JsonProperty("funcName")
     private final String funcName;
 
     @JsonProperty("args")
-    private final Expr[] args;
+    private final Expression[] args;
 
     @JsonCreator
-    private FunctionExpr(
-        @JsonProperty("expr_type") String exprType,
-        @JsonProperty("func_name") String funcName,
-        @JsonProperty("args") Expr[] args) {
-      Preconditions.checkArgument(!Strings.isBlank(funcName), "funcName cannot be null or empty");
+    private FunctionExpression(
+        @JsonProperty("expressionType") String expressionType,
+        @JsonProperty("funcName") String funcName,
+        @JsonProperty("args") Expression[] args) {
+      Preconditions.checkArgument(Strings.isNotBlank(funcName), "funcName cannot be null or empty");
       this.funcName = funcName;
       this.args = args;
     }
 
     @Override
-    public ExprType exprType() {
-      return ExprType.FUNCTION;
+    public ExpressionType expressionType() {
+      return FUNCTION;
     }
 
     public static class Builder {
       private String funcName;
-      private Expr[] args;
+      private Expression[] args;
 
       public Builder withFuncName(String funcName) {
         this.funcName = funcName;
         return this;
       }
 
-      public Builder withArgs(Expr[] args) {
+      public Builder withArgs(Expression[] args) {
         this.args = args;
         return this;
       }
 
-      public FunctionExpr build() {
-        return new FunctionExpr(ExprType.FUNCTION.name(), funcName, args);
+      public FunctionExpression build() {
+        return new FunctionExpression(FUNCTION.name(), funcName, args);
       }
     }
   }
