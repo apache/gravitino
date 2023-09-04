@@ -6,6 +6,10 @@
 package com.datastrato.graviton.storage.kv;
 
 import static com.datastrato.graviton.Configs.ENTITY_KV_STORE;
+import static com.datastrato.graviton.Entity.EntityType.CATALOG;
+import static com.datastrato.graviton.Entity.EntityType.SCHEMA;
+import static com.datastrato.graviton.Entity.EntityType.TABLE;
+import static com.datastrato.graviton.storage.kv.BinaryEntityKeyEncoder.NAMESPACE_SEPARATOR;
 
 import com.datastrato.graviton.Config;
 import com.datastrato.graviton.Entity;
@@ -24,14 +28,20 @@ import com.datastrato.graviton.storage.NameMappingService;
 import com.datastrato.graviton.utils.Bytes;
 import com.datastrato.graviton.utils.Executable;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 import lombok.Getter;
+import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -142,13 +152,70 @@ public class KvEntityStore implements EntityStore {
 
           // Update the name mapping
           nameMappingService.updateName(
-              entityKeyEncoder.generateIdNameMappingKey(ident),
-              entityKeyEncoder.generateIdNameMappingKey(updatedE.nameIdentifier()));
+              generateIdNameMappingKey(ident), generateIdNameMappingKey(updatedE.nameIdentifier()));
 
           // Update the entity to store
           backend.put(key, serDe.serialize(updatedE), true);
           return updatedE;
         });
+  }
+
+  /**
+   * Generate the key for name to id mapping. Currently, the mapping is as following.
+   *
+   * <pre>
+   *   Assume we have the following entities:
+   *   metalake: a1        ----> 1
+   *   catalog : a1.b1     ----> 2
+   *   schema  : a1.b1.c   ----> 3
+   *
+   *   metalake: a2        ----> 4
+   *   catalog : a2.b2     ----> 5
+   *   schema  : a2.b2.c   ----> 6
+   *   schema  : a2.b2.c1  ----> 7
+   *
+   *   metalake: a1        ----> 1 means the name of metalake is a1 and the corresponding id is 1
+   * </pre>
+   *
+   * Then we will store the name to id mapping as follows
+   *
+   * <pre>
+   *  a1         --> 1
+   * 	1/b1       --> 2
+   * 	1/2/c      --> 3
+   * 	a2         --> 4
+   * 	4/b2       --> 5
+   * 	4/5/c      --> 6
+   * 	4/5/c1     --> 7
+   * </pre>
+   *
+   * @param namespaceIds namespace of a specific entity
+   * @param name name of a specific entity
+   * @return key that maps to the id of a specific entity
+   */
+  private String generateKeyForNameMapping(long[] namespaceIds, String name) {
+    String context =
+        Joiner.on(NAMESPACE_SEPARATOR)
+            .join(
+                Arrays.stream(namespaceIds).mapToObj(String::valueOf).collect(Collectors.toList()));
+    return StringUtils.isBlank(context) ? name : context + NAMESPACE_SEPARATOR + name;
+  }
+
+  public String generateIdNameMappingKey(NameIdentifier nameIdentifier) throws IOException {
+    if (nameIdentifier.namespace().isEmpty()) {
+      return nameIdentifier.name();
+    }
+    Namespace namespace = nameIdentifier.namespace();
+    String name = nameIdentifier.name();
+
+    long[] ids = new long[namespace.length()];
+    for (int i = 0; i < ids.length; i++) {
+      ids[i] =
+          nameMappingService.getIdByName(
+              generateKeyForNameMapping(ArrayUtils.subarray(ids, 0, i), namespace.level(i)));
+    }
+
+    return generateKeyForNameMapping(ids, name);
   }
 
   @Override
@@ -167,6 +234,54 @@ public class KvEntityStore implements EntityStore {
     return serDe.deserialize(value, e);
   }
 
+  /**
+   * Get key prefix of all sub-entities under a specific entities. For example, as a metalake will
+   * start with `ml_{metalake_id}`, sub-entities under this metalake will have the prefix
+   *
+   * <pre>
+   *   catalog: ca_{metalake_id}
+   *   schema:  sc_{metalake_id}
+   *   table:   ta_{metalake_id}
+   * </pre>
+   *
+   * @param ident identifier of an entity
+   * @param type type of entity
+   * @return list of sub-entities prefix
+   * @throws IOException if error occurs
+   */
+  private List<byte[]> getSubEntitiesPrefix(NameIdentifier ident, EntityType type)
+      throws IOException {
+    List<byte[]> prefixs = Lists.newArrayList();
+    byte[] encode = entityKeyEncoder.encode(ident, type, true);
+    switch (type) {
+      case METALAKE:
+        prefixs.add(replacePrefixTypeInfo(encode, CATALOG.getShortName()));
+        prefixs.add(replacePrefixTypeInfo(encode, SCHEMA.getShortName()));
+        prefixs.add(replacePrefixTypeInfo(encode, TABLE.getShortName()));
+        break;
+      case CATALOG:
+        prefixs.add(replacePrefixTypeInfo(encode, SCHEMA.getShortName()));
+        prefixs.add(replacePrefixTypeInfo(encode, TABLE.getShortName()));
+        break;
+      case SCHEMA:
+        prefixs.add(replacePrefixTypeInfo(encode, TABLE.getShortName()));
+        break;
+      default:
+    }
+    Collections.reverse(prefixs);
+    return prefixs;
+  }
+
+  private byte[] replacePrefixTypeInfo(byte[] encode, String subTypePrefix) {
+    byte[] result = new byte[encode.length];
+    System.arraycopy(encode, 0, result, 0, encode.length);
+    byte[] bytes = subTypePrefix.getBytes();
+    result[0] = bytes[0];
+    result[1] = bytes[1];
+
+    return result;
+  }
+
   @Override
   public boolean delete(NameIdentifier ident, EntityType entityType, boolean cascade)
       throws IOException {
@@ -175,7 +290,7 @@ public class KvEntityStore implements EntityStore {
       return true;
     }
 
-    List<byte[]> subEntityPrefix = entityKeyEncoder.encodeSubEntityPrefix(ident, entityType);
+    List<byte[]> subEntityPrefix = getSubEntitiesPrefix(ident, entityType);
     if (subEntityPrefix.isEmpty()) {
       // has no sub-entities
       return backend.delete(dataKey);
