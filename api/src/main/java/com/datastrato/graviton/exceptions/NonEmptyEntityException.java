@@ -5,13 +5,13 @@
 
 package com.datastrato.graviton.exceptions;
 
-public class SubEntitiesNoEmptyException extends GravitonRuntimeException {
+public class NonEmptyEntityException extends GravitonRuntimeException {
 
-  public SubEntitiesNoEmptyException(String message) {
+  public NonEmptyEntityException(String message) {
     super(message);
   }
 
-  public SubEntitiesNoEmptyException(String message, Throwable cause) {
+  public NonEmptyEntityException(String message, Throwable cause) {
     super(message, cause);
   }
 }

@@ -144,7 +144,7 @@ public class BaseTable implements Table, Entity, HasIdentifier {
     return EntityType.TABLE;
   }
 
-  // Ignore field namespace and columns
+  // Ignore field namespace, columns and comment
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -158,14 +158,13 @@ public class BaseTable implements Table, Entity, HasIdentifier {
     return Objects.equal(id, baseTable.id)
         && Objects.equal(schemaId, baseTable.schemaId)
         && Objects.equal(name, baseTable.name)
-        && Objects.equal(comment, baseTable.comment)
         && Objects.equal(properties, baseTable.properties)
         && Objects.equal(auditInfo, baseTable.auditInfo);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hashCode(id, schemaId, name, comment, properties, auditInfo);
+    return Objects.hashCode(id, schemaId, name, properties, auditInfo);
   }
 
   /**

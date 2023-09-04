@@ -14,7 +14,6 @@ public class TableEntitySerde implements ProtoSerDe<BaseTable, Table> {
         .setSchemaId(tableEntity.getSchemaId())
         .setName(tableEntity.name())
         .setAuditInfo(new AuditInfoSerDe().serialize(tableEntity.auditInfo()))
-        .setComment(tableEntity.comment())
         .build();
   }
 
@@ -25,7 +24,6 @@ public class TableEntitySerde implements ProtoSerDe<BaseTable, Table> {
         .withSchemaId(p.getSchemaId())
         .withName(p.getName())
         .withAuditInfo(new AuditInfoSerDe().deserialize(p.getAuditInfo()))
-        .withComment(p.getComment())
         .build();
   }
 }

@@ -18,7 +18,7 @@ import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
 import com.datastrato.graviton.exceptions.AlreadyExistsException;
 import com.datastrato.graviton.exceptions.NoSuchEntityException;
-import com.datastrato.graviton.exceptions.SubEntitiesNoEmptyException;
+import com.datastrato.graviton.exceptions.NonEmptyEntityException;
 import com.datastrato.graviton.storage.EntityKeyEncoder;
 import com.datastrato.graviton.storage.NameMappingService;
 import com.datastrato.graviton.utils.Bytes;
@@ -194,7 +194,7 @@ public class KvEntityStore implements EntityStore {
                 .build());
 
     if (!cascade && !kvs.isEmpty()) {
-      throw new SubEntitiesNoEmptyException(
+      throw new NonEmptyEntityException(
           String.format("Entity %s has sub-entities, you should remove sub-entities first", ident));
     }
 

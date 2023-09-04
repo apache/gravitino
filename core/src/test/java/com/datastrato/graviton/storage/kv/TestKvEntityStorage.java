@@ -22,7 +22,7 @@ import com.datastrato.graviton.Metalake;
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
 import com.datastrato.graviton.exceptions.NoSuchEntityException;
-import com.datastrato.graviton.exceptions.SubEntitiesNoEmptyException;
+import com.datastrato.graviton.exceptions.NonEmptyEntityException;
 import com.datastrato.graviton.meta.AuditInfo;
 import com.datastrato.graviton.meta.BaseMetalake;
 import com.datastrato.graviton.meta.CatalogEntity;
@@ -467,7 +467,7 @@ public class TestKvEntityStorage {
 
       // Delete the schema 'metalake.catalog.schema1' but failed, because it ha sub-entities;
       Assertions.assertThrowsExactly(
-          SubEntitiesNoEmptyException.class,
+          NonEmptyEntityException.class,
           () -> store.delete(schema1.nameIdentifier(), EntityType.SCHEMA));
       // Make sure schema 'metalake.catalog.schema1' and table 'metalake.catalog.schema1.table1'
       // has not been deleted yet;
@@ -490,7 +490,7 @@ public class TestKvEntityStorage {
 
       // Now try to delete all schemas under catalog;
       Assertions.assertThrowsExactly(
-          SubEntitiesNoEmptyException.class,
+          NonEmptyEntityException.class,
           () -> store.delete(catalog.nameIdentifier(), EntityType.CATALOG));
       store.delete(table1.nameIdentifier(), EntityType.TABLE);
       store.delete(schema1.nameIdentifier(), EntityType.SCHEMA);
@@ -502,7 +502,7 @@ public class TestKvEntityStorage {
 
       // Now delete catalog 'catalogCopy' and metalake
       Assertions.assertThrowsExactly(
-          SubEntitiesNoEmptyException.class,
+          NonEmptyEntityException.class,
           () -> store.delete(metalake.nameIdentifier(), EntityType.METALAKE));
       store.delete(catalogCopy.nameIdentifier(), EntityType.CATALOG);
       Assertions.assertFalse(store.exists(catalogCopy.nameIdentifier(), EntityType.CATALOG));
@@ -520,7 +520,7 @@ public class TestKvEntityStorage {
       store.put(table1InSchema2);
 
       Assertions.assertThrowsExactly(
-          SubEntitiesNoEmptyException.class,
+          NonEmptyEntityException.class,
           () -> store.delete(schema1.nameIdentifier(), EntityType.SCHEMA));
 
       Assertions.assertEquals(
@@ -536,7 +536,7 @@ public class TestKvEntityStorage {
       }
 
       Assertions.assertThrowsExactly(
-          SubEntitiesNoEmptyException.class,
+          NonEmptyEntityException.class,
           () -> store.delete(catalog.nameIdentifier(), EntityType.CATALOG));
       store.delete(catalog.nameIdentifier(), EntityType.CATALOG, true);
       Assertions.assertThrowsExactly(
@@ -638,7 +638,7 @@ public class TestKvEntityStorage {
           () -> store.get(catalogCopy.nameIdentifier(), EntityType.CATALOG, CatalogEntity.class));
 
       Assertions.assertThrowsExactly(
-          SubEntitiesNoEmptyException.class,
+          NonEmptyEntityException.class,
           () -> store.delete(metalake.nameIdentifier(), EntityType.METALAKE));
       store.delete(catalogCopyAgain.nameIdentifier(), EntityType.CATALOG);
       Assertions.assertTrue(store.delete(metalake.nameIdentifier(), EntityType.METALAKE));

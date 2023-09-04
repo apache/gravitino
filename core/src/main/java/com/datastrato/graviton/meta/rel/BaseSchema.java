@@ -126,7 +126,7 @@ public class BaseSchema implements Schema, Entity, HasIdentifier {
     return EntityType.SCHEMA;
   }
 
-  // Ignore field namespace
+  // Ignore field namespace and comment
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -139,14 +139,13 @@ public class BaseSchema implements Schema, Entity, HasIdentifier {
     return Objects.equal(id, schema.id)
         && Objects.equal(catalogId, schema.catalogId)
         && Objects.equal(name, schema.name)
-        && Objects.equal(comment, schema.comment)
         && Objects.equal(properties, schema.properties)
         && Objects.equal(auditInfo, schema.auditInfo);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hashCode(id, catalogId, name, comment, properties, auditInfo);
+    return Objects.hashCode(id, catalogId, name, properties, auditInfo);
   }
 
   /**
