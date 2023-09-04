@@ -565,7 +565,7 @@ public class TestKvEntityStorage {
       AuditInfo auditInfo =
           new AuditInfo.Builder().withCreator("creator").withCreateTime(Instant.now()).build();
 
-      BaseMetalake metalake = createBaseMakeLake( "metalake", auditInfo);
+      BaseMetalake metalake = createBaseMakeLake("metalake", auditInfo);
       BaseMetalake metalakeCopy = createBaseMakeLake("metalakeCopy", auditInfo);
       CatalogEntity catalog = createCatalog(Namespace.of("metalake"), "catalog", auditInfo);
       CatalogEntity catalogCopy = createCatalog(Namespace.of("metalake"), "catalogCopy", auditInfo);
@@ -647,8 +647,7 @@ public class TestKvEntityStorage {
           () -> store.get(metalake.nameIdentifier(), EntityType.METALAKE, BaseMetalake.class));
 
       // Test update
-      BaseMetalake updatedMetalake =
-          createBaseMakeLake("updatedMetalake", auditInfo);
+      BaseMetalake updatedMetalake = createBaseMakeLake("updatedMetalake", auditInfo);
       store.put(metalake);
       store.update(
           metalake.nameIdentifier(), BaseMetalake.class, EntityType.METALAKE, l -> updatedMetalake);
@@ -661,8 +660,7 @@ public class TestKvEntityStorage {
 
       // Add new updateMetaLake.
       // 'updatedMetalake2' is a new name, which will trigger id allocation
-      BaseMetalake updatedMetalake2 =
-          createBaseMakeLake("updatedMetalake2", auditInfo);
+      BaseMetalake updatedMetalake2 = createBaseMakeLake("updatedMetalake2", auditInfo);
       store.put(updatedMetalake2);
     } catch (Exception e) {
       Assertions.fail(e.getMessage());
