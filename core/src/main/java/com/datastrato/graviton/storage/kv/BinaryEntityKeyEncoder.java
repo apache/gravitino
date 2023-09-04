@@ -220,9 +220,9 @@ public class BinaryEntityKeyEncoder implements EntityKeyEncoder<byte[]> {
    * @return The byte array representing the encoded key.
    */
   @Override
-  public byte[] encode(NameIdentifier ident, EntityType type, boolean returnNullIfEntityNotFound)
+  public byte[] encode(NameIdentifier ident, EntityType type, boolean nullIfMissing)
       throws IOException {
-    return encodeEntity(ident, type, returnNullIfEntityNotFound);
+    return encodeEntity(ident, type, nullIfMissing);
   }
 
   @Override

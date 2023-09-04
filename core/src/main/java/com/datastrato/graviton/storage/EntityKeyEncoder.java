@@ -24,8 +24,14 @@ public interface EntityKeyEncoder<T> {
     return encode(ident, type, false);
   }
 
-  T encode(NameIdentifier ident, EntityType type, boolean returnNullIfEntityNotFound)
-      throws IOException;
+  /**
+   * Construct the key for key-value store from the entity NameIdentifier and EntityType.
+   *
+   * @param nullIfMissing return null if the specific entity no found
+   * @return encoded key for key-value stored
+   * @throws IOException, Exception if error occurs
+   */
+  T encode(NameIdentifier ident, EntityType type, boolean nullIfMissing) throws IOException;
 
   /**
    * Get key prefix of all sub-entities under a specific entities. For example, if we use {@link
@@ -35,7 +41,7 @@ public interface EntityKeyEncoder<T> {
    * <pre>
    *   catalog: ca_{metalake_id}
    *   schema:  sc_{metalake_id}
-   *   table:   ta_{table_id}
+   *   table:   ta_{metalake_id}
    * </pre>
    *
    * @param identifier
@@ -48,7 +54,7 @@ public interface EntityKeyEncoder<T> {
   /**
    * Generate the key of name-id mapping. If we use {@link
    * com.datastrato.graviton.storage.kv.BinaryEntityKeyEncoder} Assuming we have a name identifier
-   * 'a.b.c.d' that represent a table, the defualt key-value encoding are as followings
+   * 'a.b.c.d' that represent a table, the default key-value encoding are as followings
    *
    * <pre>
    *              key      value
