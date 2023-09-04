@@ -8,7 +8,6 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import lombok.EqualsAndHashCode;
-import org.apache.logging.log4j.util.Strings;
 
 @EqualsAndHashCode(callSuper = false)
 public class SimplePartitionDTO implements Partition {
@@ -22,8 +21,6 @@ public class SimplePartitionDTO implements Partition {
   private SimplePartitionDTO(
       @JsonProperty(value = "strategy", required = true) String strategy,
       @JsonProperty("fieldName") String[] fieldName) {
-
-    Preconditions.checkArgument(!Strings.isBlank(strategy), "strategy cannot be null");
     Preconditions.checkArgument(
         fieldName != null && fieldName.length != 0, "fieldName cannot be null or empty");
 

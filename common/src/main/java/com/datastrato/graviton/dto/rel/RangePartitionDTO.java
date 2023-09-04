@@ -46,17 +46,17 @@ public class RangePartitionDTO implements Partition {
     private final String name;
 
     @JsonProperty("lower")
-    private final String lower; // use Substrait LiteralType
+    private final String lower;
 
     @JsonProperty("upper")
-    private final String upper; // datetime literal should be in ISO 8601 format
+    private final String upper;
 
     @JsonCreator
     private Range(
         @JsonProperty("name") String name,
         @JsonProperty("lower") String lower,
         @JsonProperty("upper") String upper) {
-      Preconditions.checkArgument(!Strings.isBlank(name), "Range name cannot be null or empty");
+      Preconditions.checkArgument(Strings.isNotBlank(name), "Range name cannot be null or empty");
       Preconditions.checkArgument(
           validateDatetimeLiteral(lower),
           "Range boundary(lower) only supports ISO date-time format literal");

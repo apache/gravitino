@@ -15,6 +15,10 @@ import com.datastrato.graviton.dto.rel.Partition;
 import com.datastrato.graviton.dto.rel.RangePartitionDTO;
 import com.datastrato.graviton.dto.rel.SimplePartitionDTO;
 import com.datastrato.graviton.dto.rel.TableDTO;
+import com.fasterxml.jackson.databind.cfg.EnumFeature;
+import com.fasterxml.jackson.databind.exc.InvalidTypeIdException;
+import com.fasterxml.jackson.databind.exc.ValueInstantiationException;
+import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.google.common.collect.ImmutableMap;
 import io.substrait.type.StringTypeVisitor;
 import io.substrait.type.TypeCreator;
@@ -288,9 +292,96 @@ public class TestDTOJsonSerDe {
     Partition[] partitions = {
       identity, hourPart, dayPart, monthPart, yearPart, listPart, rangePart, expressionPart
     };
-    String serJson = JsonUtils.objectMapper().writeValueAsString(partitions);
+    String serJson =
+        JsonMapper.builder()
+            .configure(EnumFeature.WRITE_ENUMS_TO_LOWERCASE, true)
+            .build()
+            .writeValueAsString(partitions);
     Partition[] desPartitions = JsonUtils.objectMapper().readValue(serJson, Partition[].class);
 
     Assertions.assertArrayEquals(partitions, desPartitions);
+  }
+
+  @Test
+  public void testPartitionDTOSerDeFail() throws Exception {
+    // test `strategy` value null
+    String wrongJson1 = "{\"strategy\": null,\"fieldName\":[\"dt\"]}";
+    InvalidTypeIdException invalidTypeIdException =
+        Assertions.assertThrows(
+            InvalidTypeIdException.class,
+            () -> JsonUtils.objectMapper().readValue(wrongJson1, Partition.class));
+    Assertions.assertTrue(
+        invalidTypeIdException.getMessage().contains("missing type id property 'strategy'"));
+
+    // test `fieldName` value empty
+    String wrongJson2 = "{\"strategy\": \"day\",\"fieldName\":[]}";
+    ValueInstantiationException valueInstantiationException =
+        Assertions.assertThrows(
+            ValueInstantiationException.class,
+            () -> JsonUtils.objectMapper().readValue(wrongJson2, Partition.class));
+    Assertions.assertTrue(
+        valueInstantiationException.getMessage().contains("fieldName cannot be null or empty"));
+
+    // test listPartition assignment values missing
+    String wrongJson3 =
+        "{\"strategy\": \"list\",\"fieldNames\":[[\"dt\"],[\"city\"]],"
+            + "\"assignments\":["
+            + "{\"name\":\"p202304_California\", "
+            + "\"values\":[[\"2023-04-01\",\"San Francisco\"], [\"2023-04-01\"]]}]}";
+    valueInstantiationException =
+        Assertions.assertThrows(
+            ValueInstantiationException.class,
+            () -> JsonUtils.objectMapper().readValue(wrongJson3, Partition.class));
+    Assertions.assertTrue(
+        valueInstantiationException
+            .getMessage()
+            .contains("Assignment values length must be equal to field number"));
+
+    // test rangePartition range name missing
+    String wrongJson4 =
+        "{\"strategy\": \"range\",\"fieldName\":[\"dt\"],"
+            + "\"ranges\":["
+            + "{\"lower\":null, \"upper\":\"2023-01-02T00:00:00\"},"
+            + "{\"lower\":\"2023-01-01T00:00:00\", \"upper\":null}]}";
+    valueInstantiationException =
+        Assertions.assertThrows(
+            ValueInstantiationException.class,
+            () -> JsonUtils.objectMapper().readValue(wrongJson4, Partition.class));
+    Assertions.assertTrue(
+        valueInstantiationException.getMessage().contains("Range name cannot be null or empty"));
+
+    // test rangePartition range bound literal format wrong
+    String wrongJson5 =
+        "{\"strategy\": \"range\",\"fieldName\":[\"dt\"],"
+            + "\"ranges\":["
+            + "{\"name\":\"p20230101\", \"lower\":\"2023-01-01T00:00:00\", \"upper\":\"2023-01-02\"},"
+            + "{\"name\":\"p20230102\", \"lower\":\"2023-01-01T00:00:00\", \"upper\":null}]}";
+    valueInstantiationException =
+        Assertions.assertThrows(
+            ValueInstantiationException.class,
+            () -> JsonUtils.objectMapper().readValue(wrongJson5, Partition.class));
+    Assertions.assertTrue(
+        valueInstantiationException
+            .getMessage()
+            .contains("only supports ISO date-time format literal"));
+
+    // test expressionPartition `expression` value null
+    String wrongJson6 = "{\"strategy\": \"expression\", \"expression\": null}";
+    valueInstantiationException =
+        Assertions.assertThrows(
+            ValueInstantiationException.class,
+            () -> JsonUtils.objectMapper().readValue(wrongJson6, Partition.class));
+    Assertions.assertTrue(
+        valueInstantiationException.getMessage().contains("expression cannot be null"));
+
+    // test expressionPartition with FunctionExpression `funcName` value empty
+    String wrongJson7 =
+        "{\"strategy\": \"expression\", \"expression\": {\"funcName\": \"\", \"args\": []}}";
+    valueInstantiationException =
+        Assertions.assertThrows(
+            ValueInstantiationException.class,
+            () -> JsonUtils.objectMapper().readValue(wrongJson7, Partition.class));
+    Assertions.assertTrue(
+        valueInstantiationException.getMessage().contains("funcName cannot be null or empty"));
   }
 }
