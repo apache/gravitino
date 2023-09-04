@@ -37,7 +37,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * KV store to store entities. This means we can store entities in a key value store. I.e. RocksDB,
+ * KV store to store entities. This means we can store entities in a key value store. I.e., RocksDB,
  * Cassandra, etc. If you want to use a different backend, you can implement the {@link KvBackend}
  * interface
  */

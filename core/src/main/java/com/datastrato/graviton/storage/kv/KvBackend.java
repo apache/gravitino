@@ -56,7 +56,7 @@ public interface KvBackend extends Closeable {
   }
 
   /**
-   * Delete the key-value pair associated with the give prefix
+   * Delete the key-value pair associated with the given {@link KvRangeScan}
    *
    * @param kvRangeScan kv range to to delete
    * @return True if the key-value pair was successfully deleted.
