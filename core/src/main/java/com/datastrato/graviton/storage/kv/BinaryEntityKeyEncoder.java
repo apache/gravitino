@@ -235,11 +235,14 @@ public class BinaryEntityKeyEncoder implements EntityKeyEncoder<byte[]> {
         prefixs.add(replacePrefixTypeInfo(encode, CATALOG.getShortName()));
         prefixs.add(replacePrefixTypeInfo(encode, SCHEMA.getShortName()));
         prefixs.add(replacePrefixTypeInfo(encode, TABLE.getShortName()));
+        break;
       case CATALOG:
         prefixs.add(replacePrefixTypeInfo(encode, SCHEMA.getShortName()));
         prefixs.add(replacePrefixTypeInfo(encode, TABLE.getShortName()));
+        break;
       case SCHEMA:
         prefixs.add(replacePrefixTypeInfo(encode, TABLE.getShortName()));
+        break;
       default:
     }
     Collections.reverse(prefixs);
