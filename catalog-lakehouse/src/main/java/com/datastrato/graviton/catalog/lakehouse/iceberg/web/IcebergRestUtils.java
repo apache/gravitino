@@ -17,8 +17,16 @@ public class IcebergRestUtils {
     return Response.status(Response.Status.OK).entity(t).type(MediaType.APPLICATION_JSON).build();
   }
 
+  public static <T> Response okWithoutContent() {
+    return Response.status(Response.Status.OK).build();
+  }
+
   public static <T> Response noContent() {
     return Response.status(Status.NO_CONTENT).build();
+  }
+
+  public static <T> Response notExists() {
+    return Response.status(Status.NOT_FOUND).build();
   }
 
   public static Response errorResponse(Exception ex, int httpStatus) {

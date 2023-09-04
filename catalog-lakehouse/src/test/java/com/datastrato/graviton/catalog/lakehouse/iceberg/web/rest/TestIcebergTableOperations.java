@@ -1,0 +1,246 @@
+/*
+ * Copyright 2023 Datastrato.
+ * This software is licensed under the Apache License version 2.
+ */
+
+package com.datastrato.graviton.catalog.lakehouse.iceberg.web.rest;
+
+import com.google.common.collect.ImmutableSet;
+import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
+import javax.ws.rs.client.Entity;
+import javax.ws.rs.core.Application;
+import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
+import javax.ws.rs.core.Response.Status;
+import org.apache.iceberg.MetadataUpdate;
+import org.apache.iceberg.MetadataUpdate.AddSchema;
+import org.apache.iceberg.MetadataUpdate.SetCurrentSchema;
+import org.apache.iceberg.Schema;
+import org.apache.iceberg.TableMetadata;
+import org.apache.iceberg.catalog.Namespace;
+import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.rest.requests.CreateTableRequest;
+import org.apache.iceberg.rest.requests.RenameTableRequest;
+import org.apache.iceberg.rest.requests.UpdateTableRequest;
+import org.apache.iceberg.rest.responses.ListTablesResponse;
+import org.apache.iceberg.rest.responses.LoadTableResponse;
+import org.apache.iceberg.types.Types.NestedField;
+import org.apache.iceberg.types.Types.StringType;
+import org.glassfish.jersey.server.ResourceConfig;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+public class TestIcebergTableOperations extends TestIcebergNamespaceOperations {
+
+  @Override
+  protected Application configure() {
+    ResourceConfig resourceConfig =
+        IcebergRestTestUtil.getIcebergResourceConfig(IcebergTableOperations.class);
+    // create namespace before each table test
+    resourceConfig.register(IcebergNamespaceOperations.class);
+    resourceConfig.register(IcebergTableRenameOperations.class);
+
+    return resourceConfig;
+  }
+
+  private static final Schema tableSchema =
+      new Schema(NestedField.of(1, false, "foo_string", StringType.get()));
+
+  private static final Schema newTableSchema =
+      new Schema(NestedField.of(2, false, "foo_string1", StringType.get()));
+
+  private Response doCreateTable(String name) {
+    CreateTableRequest createTableRequest =
+        CreateTableRequest.builder().withName(name).withSchema(tableSchema).build();
+    return getTableClientBuilder()
+        .post(Entity.entity(createTableRequest, MediaType.APPLICATION_JSON_TYPE));
+  }
+
+  private Response doRenameTable(String source, String dest) {
+    RenameTableRequest renameTableRequest =
+        RenameTableRequest.builder()
+            .withSource(
+                TableIdentifier.of(Namespace.of(IcebergRestTestUtil.TEST_NAMESPACE_NAME), source))
+            .withDestination(
+                TableIdentifier.of(Namespace.of(IcebergRestTestUtil.TEST_NAMESPACE_NAME), dest))
+            .build();
+    return getRenameTableClientBuilder()
+        .post(Entity.entity(renameTableRequest, MediaType.APPLICATION_JSON_TYPE));
+  }
+
+  private Response doListTable() {
+    return getTableClientBuilder().get();
+  }
+
+  private Response doDropTable(String name) {
+    return getTableClientBuilder(Optional.of(name)).delete();
+  }
+
+  private Response doTableExists(String name) {
+    return getTableClientBuilder(Optional.of(name)).head();
+  }
+
+  private Response doLoadTable(String name) {
+    return getTableClientBuilder(Optional.of(name)).get();
+  }
+
+  private Response doUpdateTable(String name) {
+    TableMetadata base = doGetTableMetaData(name);
+    MetadataUpdate addSchema = new AddSchema(newTableSchema, base.lastColumnId());
+    MetadataUpdate setCurrentSchema = new SetCurrentSchema(1);
+    UpdateTableRequest updateTableRequest =
+        UpdateTableRequest.builderFor(base).update(addSchema).update(setCurrentSchema).build();
+    return getTableClientBuilder(Optional.of(name))
+        .post(Entity.entity(updateTableRequest, MediaType.APPLICATION_JSON_TYPE));
+  }
+
+  private void verifyUpdateSucc(String name) {
+    Response response = doUpdateTable(name);
+    Assertions.assertEquals(Status.OK.getStatusCode(), response.getStatus());
+    LoadTableResponse loadTableResponse = response.readEntity(LoadTableResponse.class);
+    Assertions.assertEquals(
+        newTableSchema.columns(), loadTableResponse.tableMetadata().schema().columns());
+  }
+
+  private TableMetadata doGetTableMetaData(String name) {
+    Response response = doLoadTable(name);
+    LoadTableResponse loadTableResponse = response.readEntity(LoadTableResponse.class);
+    return loadTableResponse.tableMetadata();
+  }
+
+  private void verifyLoadTableFail(String name, int status) {
+    Response response = doLoadTable(name);
+    Assertions.assertEquals(status, response.getStatus());
+  }
+
+  private void verifyLoadTableSucc(String name) {
+    Response response = doLoadTable(name);
+    Assertions.assertEquals(Status.OK.getStatusCode(), response.getStatus());
+
+    LoadTableResponse loadTableResponse = response.readEntity(LoadTableResponse.class);
+    Assertions.assertEquals(
+        tableSchema.columns(), loadTableResponse.tableMetadata().schema().columns());
+  }
+
+  private void verifyDropTableSucc(String name) {
+    Response response = doDropTable(name);
+    Assertions.assertEquals(Status.NO_CONTENT.getStatusCode(), response.getStatus());
+  }
+
+  private void verifyTableExistsStatusCode(String name, int status) {
+    Response response = doTableExists(name);
+    Assertions.assertEquals(status, response.getStatus());
+  }
+
+  private void verifyDropTableFail(String name, int status) {
+    Response response = doDropTable(name);
+    Assertions.assertEquals(status, response.getStatus());
+  }
+
+  private void verifyCreateTableSucc(String name) {
+    Response response = doCreateTable(name);
+    Assertions.assertEquals(Status.OK.getStatusCode(), response.getStatus());
+    LoadTableResponse loadTableResponse = response.readEntity(LoadTableResponse.class);
+    Schema schema = loadTableResponse.tableMetadata().schema();
+    Assertions.assertEquals(schema.columns(), tableSchema.columns());
+  }
+
+  private void verifyRenameTableSucc(String source, String dest) {
+    Response response = doRenameTable(source, dest);
+    System.out.println(response);
+    System.out.flush();
+    Assertions.assertEquals(Status.OK.getStatusCode(), response.getStatus());
+  }
+
+  private void verifyRenameTableFail(String source, String dest, int status) {
+    Response response = doRenameTable(source, dest);
+    Assertions.assertEquals(status, response.getStatus());
+  }
+
+  private void verifyListTableSucc(Set<String> expectedTableNames) {
+    Response response = doListTable();
+    Assertions.assertEquals(Status.OK.getStatusCode(), response.getStatus());
+    ListTablesResponse listTablesResponse = response.readEntity(ListTablesResponse.class);
+    Set<String> tableNames =
+        listTablesResponse.identifiers().stream()
+            .map(identifier -> identifier.name())
+            .collect(Collectors.toSet());
+    Assertions.assertEquals(expectedTableNames, tableNames);
+  }
+
+  private void verifyCreateTableFail(String name, int status) {
+    Response response = doCreateTable(name);
+    Assertions.assertEquals(status, response.getStatus());
+  }
+
+  @BeforeEach
+  void beforeTest() {
+    verifyCreateNamespaceSucc(IcebergRestTestUtil.TEST_NAMESPACE_NAME);
+  }
+
+  @Test
+  void testCreateTable() {
+    verifyCreateTableSucc("create_foo1");
+
+    verifyCreateTableFail("create_foo1", 409);
+    verifyCreateTableFail("", 400);
+  }
+
+  @Test
+  void testLoadTable() {
+    verifyCreateTableSucc("load_foo1");
+    verifyLoadTableSucc("load_foo1");
+
+    verifyLoadTableFail("load_foo2", 404);
+  }
+
+  @Test
+  void testDropTable() {
+    verifyCreateTableSucc("drop_foo1");
+    verifyDropTableSucc("drop_foo1");
+
+    verifyDropTableFail("drop_foo1", 404);
+  }
+
+  @Test
+  void testUpdateTable() {
+    verifyCreateTableSucc("update_foo1");
+    verifyUpdateSucc("update_foo1");
+  }
+
+  @Test
+  void testListTables() {
+    verifyListTableSucc(ImmutableSet.of());
+    verifyCreateTableSucc("list_foo1");
+    verifyCreateTableSucc("list_foo2");
+    verifyListTableSucc(ImmutableSet.of("list_foo1", "list_foo2"));
+  }
+
+  @Test
+  void testTableExits() {
+    verifyCreateTableSucc("exists_foo1");
+    verifyTableExistsStatusCode("exists_foo1", Status.OK.getStatusCode());
+    verifyLoadTableSucc("exists_foo1");
+
+    verifyTableExistsStatusCode("exists_foo2", Status.NOT_FOUND.getStatusCode());
+  }
+
+  @Test
+  void testRenameTable() {
+    verifyCreateTableSucc("rename_foo1");
+    // rename
+    verifyRenameTableSucc("rename_foo1", "rename_foo2");
+    verifyLoadTableFail("rename_foo1", 404);
+    verifyLoadTableSucc("rename_foo2");
+
+    // source table not exists
+    verifyRenameTableFail("rename_foo1", "rename_foo3", 404);
+
+    // dest table exists
+    verifyCreateTableSucc("rename_foo3");
+    verifyRenameTableFail("rename_foo2", "rename_foo3", 409);
+  }
+}
