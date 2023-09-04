@@ -62,6 +62,7 @@ message Schema {
   uint64 catalog_id = 2;
   string name = 3;
   AuditInfo audit_info = 4;
+  string comment = 5;
 }
 
 message Table {
@@ -69,4 +70,5 @@ message Table {
   uint64 schema_id = 2;
   string name = 3;
   AuditInfo audit_info = 4;
+  string comment = 5;
 }

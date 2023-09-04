@@ -12,15 +12,14 @@ import com.datastrato.graviton.Namespace;
 import com.datastrato.graviton.meta.AuditInfo;
 import com.datastrato.graviton.rel.Column;
 import com.datastrato.graviton.rel.Table;
+import com.google.common.base.Objects;
 import com.google.common.collect.Maps;
 import java.util.Map;
 import javax.annotation.Nullable;
-import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
 
 /** An abstract class representing a base table in a relational database. */
-@EqualsAndHashCode
 @ToString
 public class BaseTable implements Table, Entity, HasIdentifier {
 
@@ -143,6 +142,30 @@ public class BaseTable implements Table, Entity, HasIdentifier {
   @Override
   public EntityType type() {
     return EntityType.TABLE;
+  }
+
+  // Ignore field namespace and columns
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+
+    BaseTable baseTable = (BaseTable) o;
+    return Objects.equal(id, baseTable.id)
+        && Objects.equal(schemaId, baseTable.schemaId)
+        && Objects.equal(name, baseTable.name)
+        && Objects.equal(comment, baseTable.comment)
+        && Objects.equal(properties, baseTable.properties)
+        && Objects.equal(auditInfo, baseTable.auditInfo);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hashCode(id, schemaId, name, comment, properties, auditInfo);
   }
 
   /**

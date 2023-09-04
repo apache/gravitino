@@ -11,6 +11,7 @@ import static com.datastrato.graviton.Entity.EntityType.TABLE;
 
 import com.datastrato.graviton.Entity.EntityType;
 import com.datastrato.graviton.NameIdentifier;
+import com.datastrato.graviton.Namespace;
 import com.datastrato.graviton.storage.EntityKeyEncoder;
 import com.datastrato.graviton.storage.NameMappingService;
 import com.datastrato.graviton.utils.ByteUtils;
@@ -19,8 +20,11 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.ArrayUtils;
@@ -73,11 +77,6 @@ public class BinaryEntityKeyEncoder implements EntityKeyEncoder<byte[]> {
     this.nameMappingService = nameMappingService;
   }
 
-  private String nameContext(long[] namespace) {
-    return Joiner.on(NAMESPACE_SEPARATOR)
-        .join(Arrays.stream(namespace).mapToObj(String::valueOf).collect(Collectors.toList()));
-  }
-
   /**
    * Generate the key for name to id mapping. Currently, the mapping is as following.
    *
@@ -112,7 +111,10 @@ public class BinaryEntityKeyEncoder implements EntityKeyEncoder<byte[]> {
    * @return key that maps to the id of a specific entity
    */
   private String generateKeyForNameMapping(long[] namespaceIds, String name) {
-    String context = nameContext(namespaceIds);
+    String context =
+        Joiner.on(NAMESPACE_SEPARATOR)
+            .join(
+                Arrays.stream(namespaceIds).mapToObj(String::valueOf).collect(Collectors.toList()));
     return StringUtils.isBlank(context) ? name : context + NAMESPACE_SEPARATOR + name;
   }
 
@@ -122,14 +124,21 @@ public class BinaryEntityKeyEncoder implements EntityKeyEncoder<byte[]> {
    *
    * @param identifier NameIdentifier of the entity
    * @param entityType the entity identifier to encode
-   * @return the encoded key for key-value storage
+   * @return the encoded key for key-value storage. null if returnIfEntityNotFound is true and the
+   *     entity the identifier represents does not exist;
    */
-  private byte[] encodeEntity(NameIdentifier identifier, EntityType entityType) throws IOException {
+  private byte[] encodeEntity(
+      NameIdentifier identifier, EntityType entityType, boolean returnNullIfEntityNotFound)
+      throws IOException {
     String[] nameSpace = identifier.namespace().levels();
     long[] namespaceIds = new long[nameSpace.length];
     for (int i = 0; i < nameSpace.length; i++) {
       String nameKey =
           generateKeyForNameMapping(ArrayUtils.subarray(namespaceIds, 0, i), nameSpace[i]);
+      if (returnNullIfEntityNotFound && null == nameMappingService.getIdByName(nameKey)) {
+        return null;
+      }
+
       namespaceIds[i] = nameMappingService.getOrCreateIdFromName(nameKey);
     }
 
@@ -146,6 +155,10 @@ public class BinaryEntityKeyEncoder implements EntityKeyEncoder<byte[]> {
     long[] namespaceAndNameIds = new long[namespaceIds.length + 1];
     System.arraycopy(namespaceIds, 0, namespaceAndNameIds, 0, namespaceIds.length);
     String nameKey = generateKeyForNameMapping(namespaceIds, identifier.name());
+    if (returnNullIfEntityNotFound && null == nameMappingService.getIdByName(nameKey)) {
+      return null;
+    }
+
     namespaceAndNameIds[namespaceIds.length] = nameMappingService.getOrCreateIdFromName(nameKey);
 
     String[] nameIdentifierTemplate = ENTITY_TYPE_TO_NAME_IDENTIFIER.get(entityType);
@@ -207,7 +220,57 @@ public class BinaryEntityKeyEncoder implements EntityKeyEncoder<byte[]> {
    * @return The byte array representing the encoded key.
    */
   @Override
-  public byte[] encode(NameIdentifier ident, EntityType type) throws IOException {
-    return encodeEntity(ident, type);
+  public byte[] encode(NameIdentifier ident, EntityType type, boolean returnNullIfEntityNotFound)
+      throws IOException {
+    return encodeEntity(ident, type, returnNullIfEntityNotFound);
+  }
+
+  @Override
+  public List<byte[]> encodeSubEntityPrefix(NameIdentifier identifier, EntityType type)
+      throws IOException {
+    List<byte[]> prefixs = Lists.newArrayList();
+    byte[] encode = encodeEntity(identifier, type, true);
+    switch (type) {
+      case METALAKE:
+        prefixs.add(replacePrefixTypeInfo(encode, CATALOG.getShortName()));
+        prefixs.add(replacePrefixTypeInfo(encode, SCHEMA.getShortName()));
+        prefixs.add(replacePrefixTypeInfo(encode, TABLE.getShortName()));
+      case CATALOG:
+        prefixs.add(replacePrefixTypeInfo(encode, SCHEMA.getShortName()));
+        prefixs.add(replacePrefixTypeInfo(encode, TABLE.getShortName()));
+      case SCHEMA:
+        prefixs.add(replacePrefixTypeInfo(encode, TABLE.getShortName()));
+      default:
+    }
+    Collections.reverse(prefixs);
+    return prefixs;
+  }
+
+  private byte[] replacePrefixTypeInfo(byte[] encode, String subTypePrefix) {
+    byte[] result = new byte[encode.length];
+    System.arraycopy(encode, 0, result, 0, encode.length);
+    byte[] bytes = subTypePrefix.getBytes();
+    result[0] = bytes[0];
+    result[1] = bytes[1];
+
+    return result;
+  }
+
+  @Override
+  public String generateIdNameMappingKey(NameIdentifier nameIdentifier) throws IOException {
+    if (nameIdentifier.namespace().isEmpty()) {
+      return nameIdentifier.name();
+    }
+    Namespace namespace = nameIdentifier.namespace();
+    String name = nameIdentifier.name();
+
+    long[] ids = new long[namespace.length()];
+    for (int i = 0; i < ids.length; i++) {
+      ids[i] =
+          nameMappingService.getIdByName(
+              generateKeyForNameMapping(ArrayUtils.subarray(ids, 0, i), namespace.level(i)));
+    }
+
+    return generateKeyForNameMapping(ids, name);
   }
 }

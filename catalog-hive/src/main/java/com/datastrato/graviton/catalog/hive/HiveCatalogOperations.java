@@ -428,10 +428,10 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     try {
       store.executeInTransaction(
           () -> {
-            store.delete(ident, SCHEMA);
             for (BaseTable t : tables) {
               store.delete(NameIdentifier.of(schemaNamespace, t.name()), TABLE);
             }
+            store.delete(ident, SCHEMA, true);
             clientPool.run(
                 client -> {
                   client.dropDatabase(ident.name(), false, false, cascade);
