@@ -42,7 +42,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
-public class TestEntityStorageBackend {
+public class TestKvEntityStorage {
   public static final String ROCKS_DB_STORE_PATH = "/tmp/graviton";
 
   @BeforeEach
@@ -110,7 +110,7 @@ public class TestEntityStorageBackend {
     }
   }
 
-  public BaseMetalake createBaseMakeLake(Namespace namespace, String name, AuditInfo auditInfo) {
+  public BaseMetalake createBaseMakeLake(String name, AuditInfo auditInfo) {
     return new BaseMetalake.Builder()
         .withId(1L)
         .withName(name)
@@ -187,7 +187,7 @@ public class TestEntityStorageBackend {
       Assertions.assertTrue(store instanceof KvEntityStore);
       store.setSerDe(EntitySerDeFactory.createEntitySerDe(config.get(Configs.ENTITY_SERDE)));
 
-      BaseMetalake metalake = createBaseMakeLake(Namespace.of(), "metalake", auditInfo);
+      BaseMetalake metalake = createBaseMakeLake("metalake", auditInfo);
       CatalogEntity catalog = createCatalog(Namespace.of("metalake"), "catalog", auditInfo);
       CatalogEntity catalogCopy = createCatalog(Namespace.of("metalake"), "catalogCopy", auditInfo);
       BaseSchema schema1 =
@@ -220,10 +220,10 @@ public class TestEntityStorageBackend {
                     .withCreator("creator1")
                     .withCreateTime(Instant.now())
                     .build();
-            return createBaseMakeLake(Namespace.of(), "metalakeChanged", auditInfo1);
+            return createBaseMakeLake("metalakeChanged", auditInfo1);
           });
 
-      // check metalake entity and subenties are already changed.
+      // Check metalake entity and subenties are already changed.
       BaseMetalake updatedMetalake =
           store.get(NameIdentifier.of("metalakeChanged"), EntityType.METALAKE, BaseMetalake.class);
       Assertions.assertEquals("creator1", updatedMetalake.auditInfo().creator());
@@ -257,7 +257,7 @@ public class TestEntityStorageBackend {
               EntityType.TABLE,
               BaseTable.class));
 
-      // check catalog entitis and sub-entities are already changed.
+      // Check catalog entitis and sub-entities are already changed.
       store.update(
           NameIdentifier.of("metalakeChanged", "catalog"),
           CatalogEntity.class,
@@ -304,7 +304,7 @@ public class TestEntityStorageBackend {
               EntityType.TABLE,
               BaseTable.class));
 
-      // check schema entitis and sub-entities are already changed.
+      // Check schema entitis and sub-entities are already changed.
       store.update(
           NameIdentifier.of("metalakeChanged", "catalogChanged", "schema1"),
           BaseSchema.class,
@@ -354,7 +354,7 @@ public class TestEntityStorageBackend {
               EntityType.TABLE,
               BaseTable.class));
 
-      // check table entitis
+      // Check table entities
       store.update(
           NameIdentifier.of("metalakeChanged", "catalogChanged", "schemaChanged", "table1"),
           BaseTable.class,
@@ -411,7 +411,7 @@ public class TestEntityStorageBackend {
       Assertions.assertTrue(store instanceof KvEntityStore);
       store.setSerDe(EntitySerDeFactory.createEntitySerDe(config.get(Configs.ENTITY_SERDE)));
 
-      BaseMetalake metalake = createBaseMakeLake(Namespace.of(), "metalake", auditInfo);
+      BaseMetalake metalake = createBaseMakeLake("metalake", auditInfo);
       CatalogEntity catalog = createCatalog(Namespace.of("metalake"), "catalog", auditInfo);
       CatalogEntity catalogCopy = createCatalog(Namespace.of("metalake"), "catalogCopy", auditInfo);
 
@@ -565,8 +565,8 @@ public class TestEntityStorageBackend {
       AuditInfo auditInfo =
           new AuditInfo.Builder().withCreator("creator").withCreateTime(Instant.now()).build();
 
-      BaseMetalake metalake = createBaseMakeLake(Namespace.of(), "metalake", auditInfo);
-      BaseMetalake metalakeCopy = createBaseMakeLake(Namespace.of(), "metalakeCopy", auditInfo);
+      BaseMetalake metalake = createBaseMakeLake( "metalake", auditInfo);
+      BaseMetalake metalakeCopy = createBaseMakeLake("metalakeCopy", auditInfo);
       CatalogEntity catalog = createCatalog(Namespace.of("metalake"), "catalog", auditInfo);
       CatalogEntity catalogCopy = createCatalog(Namespace.of("metalake"), "catalogCopy", auditInfo);
       CatalogEntity catalogCopyAgain =
@@ -648,7 +648,7 @@ public class TestEntityStorageBackend {
 
       // Test update
       BaseMetalake updatedMetalake =
-          createBaseMakeLake(Namespace.of(), "updatedMetalake", auditInfo);
+          createBaseMakeLake("updatedMetalake", auditInfo);
       store.put(metalake);
       store.update(
           metalake.nameIdentifier(), BaseMetalake.class, EntityType.METALAKE, l -> updatedMetalake);
@@ -662,7 +662,7 @@ public class TestEntityStorageBackend {
       // Add new updateMetaLake.
       // 'updatedMetalake2' is a new name, which will trigger id allocation
       BaseMetalake updatedMetalake2 =
-          createBaseMakeLake(Namespace.of(), "updatedMetalake2", auditInfo);
+          createBaseMakeLake("updatedMetalake2", auditInfo);
       store.put(updatedMetalake2);
     } catch (Exception e) {
       Assertions.fail(e.getMessage());
