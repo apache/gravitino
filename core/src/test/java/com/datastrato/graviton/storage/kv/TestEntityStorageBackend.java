@@ -525,14 +525,28 @@ public class TestEntityStorageBackend {
 
       Assertions.assertEquals(
           schema1, store.get(schema1.nameIdentifier(), EntityType.SCHEMA, BaseSchema.class));
-      store.delete(schema1.nameIdentifier(), EntityType.SCHEMA, true);
 
+      // Test cascade delete
+      store.delete(schema1.nameIdentifier(), EntityType.SCHEMA, true);
       try {
         store.get(table1.nameIdentifier(), EntityType.TABLE, BaseTable.class);
       } catch (Exception e) {
         Assertions.assertTrue(e instanceof NoSuchEntityException);
         Assertions.assertTrue(e.getMessage().contains("metalake.catalog.schema1"));
       }
+
+      Assertions.assertThrowsExactly(
+          SubEntitiesNoEmptyException.class,
+          () -> store.delete(catalog.nameIdentifier(), EntityType.CATALOG));
+      store.delete(catalog.nameIdentifier(), EntityType.CATALOG, true);
+      Assertions.assertThrowsExactly(
+          NoSuchEntityException.class,
+          () -> store.get(catalog.nameIdentifier(), EntityType.CATALOG, CatalogEntity.class));
+
+      Assertions.assertThrowsExactly(
+          NoSuchEntityException.class,
+          () -> store.get(schema2.nameIdentifier(), EntityType.SCHEMA, CatalogEntity.class));
+
     }
   }
 
