@@ -10,8 +10,7 @@ on:
 
 env:
   HIVE2_IMAGE_NAME: datastrato/hive2
-  HIVE2_IMAGE_VERSION: 0.1.0
-  HIVE2_IMAGE_LATEST: latest
+  HIVE2_IMAGE_VERSION: integration-test
 
 concurrency:
   group: ${{ github.worklfow }}-${{ github.event.pull_request.number || github.ref }}
@@ -44,11 +43,11 @@ jobs:
 
       - name: Build the hive2 Docker image for AMD64
         if: ${{ contains(github.event.pull_request.labels.*.name, 'build docker image') }}
-        run: ./dev/docker/hive2/build-docker.sh --platform ${PLATFORM} --image ${HIVE2_IMAGE_NAME}:${HIVE2_IMAGE_LATEST}
+        run: ./dev/docker/hive2/build-docker.sh --platform ${PLATFORM} --image ${HIVE2_IMAGE_NAME}:${HIVE2_IMAGE_VERSION}
 
       - name: Run AMD64 container
         run: |
-          docker run --rm --name ${DOCKER_RUN_NAME} --platform ${PLATFORM} -d -p 8088:8088 -p 50070:50070 -p 50075:50075 -p 10000:10000 -p 10002:10002 -p 8888:8888 -p 9083:9083 -p 8022:22 ${HIVE2_IMAGE_NAME}:${HIVE2_IMAGE_LATEST}
+          docker run --rm --name ${DOCKER_RUN_NAME} --platform ${PLATFORM} -d -p 8088:8088 -p 50070:50070 -p 50075:50075 -p 10000:10000 -p 10002:10002 -p 8888:8888 -p 9083:9083 -p 8022:22 ${HIVE2_IMAGE_NAME}:${HIVE2_IMAGE_VERSION}
           docker ps -a
 
       - name: Setup Gradle
@@ -87,4 +86,4 @@ jobs:
           docker stop ${DOCKER_RUN_NAME}
           sleep 3
           docker ps -a
-          docker rmi ${HIVE2_IMAGE_NAME}:${HIVE2_IMAGE_LATEST}
+          docker rmi ${HIVE2_IMAGE_NAME}:${HIVE2_IMAGE_VERSION}

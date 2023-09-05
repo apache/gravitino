@@ -8,7 +8,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.datastrato.graviton.Catalog;
 import com.datastrato.graviton.NameIdentifier;
-import com.datastrato.graviton.catalog.hive.HiveCatalogConfig;
 import com.datastrato.graviton.catalog.hive.HiveClientPool;
 import com.datastrato.graviton.client.GravitonMetaLake;
 import com.datastrato.graviton.dto.rel.ColumnDTO;
@@ -51,8 +50,6 @@ public class CatalogHiveIT extends AbstractIT {
 
   @BeforeAll
   public static void startup() throws Exception {
-    System.setProperty("HADOOP_USER_NAME", HADOOP_USER_NAME);
-
     HiveConf hiveConf = new HiveConf();
     hiveConf.set(HiveConf.ConfVars.METASTOREURIS.varname, HIVE_METASTORE_URIS);
 
@@ -78,7 +75,6 @@ public class CatalogHiveIT extends AbstractIT {
     Map<String, String> properties = Maps.newHashMap();
     properties.put("provider", "hive");
     properties.put(HiveConf.ConfVars.METASTOREURIS.varname, HIVE_METASTORE_URIS);
-    properties.put(HiveCatalogConfig.HADOOP_USER_NAME.getKey(), HADOOP_USER_NAME);
 
     Catalog catalog =
         metalake.createCatalog(
