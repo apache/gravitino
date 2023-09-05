@@ -53,7 +53,6 @@ dependencies {
     exclude("org.apache.logging.log4j")
     exclude("org.apache.curator")
     exclude("org.pentaho")
-//        exclude("com.github.joshelser")
     exclude("org.slf4j")
   }
 
