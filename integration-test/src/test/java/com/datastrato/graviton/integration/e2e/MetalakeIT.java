@@ -23,13 +23,17 @@ import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class MetalakeIT extends AbstractIT {
+  private static final Logger LOG = LoggerFactory.getLogger(MetalakeIT.class);
   public static String metalakeName = GravitonITUtils.genRandomName("metalake");
 
   @BeforeAll
   private static void start() {
+    LOG.info("Start MetalakeIT");
     // Prepare create a metalake test record,
     // This way it can support `Run all tests` or `Run test in separated` to test `list`, `load`,
     // `alter`, `drop` methods.
@@ -42,6 +46,7 @@ public class MetalakeIT extends AbstractIT {
     // This allows metalake to be safe deleted metalake when `Run all tests` or `Run test in
     // separated`
     dropMetalake();
+    LOG.info("Stop MetalakeIT");
   }
 
   @Order(1)

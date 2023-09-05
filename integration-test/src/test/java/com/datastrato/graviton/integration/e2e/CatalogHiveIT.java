@@ -30,9 +30,13 @@ import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class CatalogHiveIT extends AbstractIT {
+  private static final Logger LOG = LoggerFactory.getLogger(CatalogHiveIT.class);
+
   public static String metalakeName = GravitonITUtils.genRandomName("CatalogHiveIT_metalake");
   public static String catalogName = GravitonITUtils.genRandomName("CatalogHiveIT_catalog");
   public static String schemaName = GravitonITUtils.genRandomName("CatalogHiveIT_schema");
@@ -44,12 +48,12 @@ public class CatalogHiveIT extends AbstractIT {
   public static String HIVE_COL_NAME3 = "hive_col_name3";
 
   static String HIVE_METASTORE_URIS = "thrift://localhost:9083";
-  static String HADOOP_USER_NAME = "hive";
 
   private static HiveClientPool hiveClientPool;
 
   @BeforeAll
   public static void startup() throws Exception {
+    LOG.info("Starting up CatalogHiveIT");
     HiveConf hiveConf = new HiveConf();
     hiveConf.set(HiveConf.ConfVars.METASTOREURIS.varname, HIVE_METASTORE_URIS);
 
@@ -66,6 +70,7 @@ public class CatalogHiveIT extends AbstractIT {
     if (hiveClientPool != null) {
       hiveClientPool.close();
     }
+    LOG.info("Stopped CatalogHiveIT");
   }
 
   public static void createHiveTable() throws TException, InterruptedException {
@@ -75,6 +80,9 @@ public class CatalogHiveIT extends AbstractIT {
     Map<String, String> properties = Maps.newHashMap();
     properties.put("provider", "hive");
     properties.put(HiveConf.ConfVars.METASTOREURIS.varname, HIVE_METASTORE_URIS);
+    properties.put(HiveConf.ConfVars.METASTORETHRIFTCONNECTIONRETRIES.varname, "10");
+    properties.put(HiveConf.ConfVars.METASTORETHRIFTFAILURERETRIES.varname, "10");
+    properties.put(HiveConf.ConfVars.METASTORE_CLIENT_CONNECT_RETRY_DELAY.varname, "3");
 
     Catalog catalog =
         metalake.createCatalog(

@@ -17,7 +17,7 @@ public class GravitonITUtils {
         false,
         ProcessData.TypesOfData.OUTPUT);
     // wait for server to start.
-    sleep(100, false);
+    sleep(3000, false);
   }
 
   public static void stopGravitonServer() {
@@ -26,7 +26,7 @@ public class GravitonITUtils {
         false,
         ProcessData.TypesOfData.OUTPUT);
     // wait for server to stop.
-    sleep(100, false);
+    sleep(1000, false);
   }
 
   public static void sleep(long millis, boolean logOutput) {
