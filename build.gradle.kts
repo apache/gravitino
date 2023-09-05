@@ -149,7 +149,7 @@ tasks {
   val outputDir = projectDir.dir("distribution")
 
   val compileDistribution by registering {
-    dependsOn("copyRuntimeClass", "copyCatalogRuntimeClass", "copySubmoduleClass")
+    dependsOn("copyRuntimeClass", "copyCatalogRuntimeClass", "copySubmoduleClass", "copyCatalogModuleClass")
 
     group = "graviton distribution"
     outputs.dir(projectDir.dir("distribution/package"))
@@ -172,8 +172,7 @@ tasks {
     group = "graviton distribution"
     finalizedBy("checksumDistribution")
     from(compileDistribution.map { it.outputs.files.single() })
-    archiveBaseName.set("datastrato")
-    archiveAppendix.set(rootProject.name.lowercase())
+    archiveBaseName.set(rootProject.name.lowercase())
     archiveVersion.set("${version}")
     archiveClassifier.set("bin")
     destinationDirectory.set(outputDir)
@@ -204,10 +203,10 @@ tasks {
 
   val copyRuntimeClass by registering(Copy::class) {
     subprojects.forEach() {
-      if (it.name != "catalog-hive" && it.name != "client-java") {
-        // println("copyRuntimeClass: ${it.name}")
+      if (it.name != "catalog-hive" && it.name != "client-java" && it.name != "integration-test") {
+        println("copyRuntimeClass: ${it.name}")
         from(it.configurations.runtimeClasspath)
-        into("distribution/package/lib")
+        into("distribution/package/libs")
       }
     }
   }
@@ -217,7 +216,7 @@ tasks {
       if (it.name == "catalog-hive") {
         // println("copyCatalogRuntimeClass: ${it.name}")
         from(it.configurations.runtimeClasspath)
-        into("distribution/package/catalogs/catalog-hive/lib")
+        into("distribution/package/catalogs/hive/libs")
       }
     }
   }
@@ -225,12 +224,20 @@ tasks {
   val copySubmoduleClass by registering(Copy::class) {
     dependsOn("copyRuntimeClass", "copyCatalogRuntimeClass")
     subprojects.forEach() {
-      // println("copySubmoduleClass: ${it.name}")
-      if (it.name != "client-java") {
+      if (it.name != "client-java" && it.name != "integration-test" && it.name != "catalog-hive") {
         from("${it.name}/build/libs")
-        into("distribution/package/lib")
+        into("distribution/package/libs")
         include("*.jar")
         setDuplicatesStrategy(DuplicatesStrategy.INCLUDE)
+      }
+    }
+  }
+
+  val copyCatalogModuleClass by registering(Copy::class) {
+    subprojects.forEach() {
+      if (it.name == "catalog-hive") {
+        from("${it.name}/build/libs")
+        into("distribution/package/catalogs/hive/libs")
       }
     }
   }
