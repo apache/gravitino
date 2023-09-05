@@ -5,6 +5,7 @@
 package com.datastrato.graviton;
 
 import com.datastrato.graviton.Entity.EntityType;
+import com.datastrato.graviton.exceptions.AlreadyExistsException;
 import com.datastrato.graviton.exceptions.NoSuchEntityException;
 import com.datastrato.graviton.utils.Executable;
 import java.io.Closeable;
@@ -105,10 +106,11 @@ public interface EntityStore extends Closeable {
    * @return E the updated entity
    * @throws IOException if the store operation fails
    * @throws NoSuchEntityException if the entity does not exist
+   * @throws AlreadyExistsException if the updated entity already exitsed.
    */
   <E extends Entity & HasIdentifier> E update(
       NameIdentifier ident, Class<E> type, EntityType entityType, Function<E, E> updater)
-      throws IOException, NoSuchEntityException;
+      throws IOException, NoSuchEntityException, AlreadyExistsException;
 
   /**
    * Get the entity from the underlying storage.
@@ -128,10 +130,24 @@ public interface EntityStore extends Closeable {
    * Delete the entity from the underlying storage by the specified {@link NameIdentifier}.
    *
    * @param ident the name identifier of the entity
+   * @param entityType the type of the entity to be deleted
    * @return true if the entity is deleted, false otherwise
    * @throws IOException if the delete operation fails
    */
-  boolean delete(NameIdentifier ident, EntityType entityType) throws IOException;
+  default boolean delete(NameIdentifier ident, EntityType entityType) throws IOException {
+    return delete(ident, entityType, false);
+  }
+
+  /**
+   * Delete the entity from the underlying storage by the specified {@link NameIdentifier}.
+   *
+   * @param ident the name identifier of the entity
+   * @param entityType the type of the entity to be deleted
+   * @param cascade support cacade detele or not
+   * @return true if the entity is deleted, false otherwise
+   * @throws IOException if the delete operation fails
+   */
+  boolean delete(NameIdentifier ident, EntityType entityType, boolean cascade) throws IOException;
 
   /**
    * Execute the specified {@link Executable} in a transaction.

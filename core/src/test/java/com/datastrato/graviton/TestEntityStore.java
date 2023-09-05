@@ -115,7 +115,8 @@ public class TestEntityStore {
     }
 
     @Override
-    public boolean delete(NameIdentifier ident, EntityType entityType) throws IOException {
+    public boolean delete(NameIdentifier ident, EntityType entityType, boolean cascade)
+        throws IOException {
       Entity prev = entityMap.remove(ident);
       return prev != null;
     }

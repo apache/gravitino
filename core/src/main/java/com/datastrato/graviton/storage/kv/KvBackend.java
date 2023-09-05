@@ -56,6 +56,15 @@ public interface KvBackend extends Closeable {
   }
 
   /**
+   * Delete the key-value pair associated with the given {@link KvRangeScan}
+   *
+   * @param kvRangeScan kv range to to delete
+   * @return True if the key-value pair was successfully deleted.
+   * @throws IOException If an I/O exception occurs during deletion.
+   */
+  boolean deleteRange(KvRangeScan kvRangeScan) throws IOException;
+
+  /**
    * Scans the specified range using the provided KvRangeScan and returns a list of key-value pairs.
    *
    * @param scanRange The range to scan.

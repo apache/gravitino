@@ -9,7 +9,7 @@ import static com.datastrato.graviton.Configs.DEFUALT_ENTITY_KV_STORE;
 import static com.datastrato.graviton.Configs.ENTITY_KV_STORE;
 import static com.datastrato.graviton.Configs.ENTITY_STORE;
 import static com.datastrato.graviton.Configs.ENTRY_KV_ROCKSDB_BACKEND_PATH;
-import static com.datastrato.graviton.storage.kv.BinaryEntityKeyEncoder.NAMESPACE_SEPARATOR;
+import static com.datastrato.graviton.storage.kv.BinaryEntityKeyEncoder.BYTABLE_NAMESPACE_SEPARATOR;
 import static com.datastrato.graviton.storage.kv.BinaryEntityKeyEncoder.WILD_CARD;
 
 import com.datastrato.graviton.Config;
@@ -111,7 +111,7 @@ public class TestEntityKeyEncoding {
     byte[] expenctKey =
         Bytes.concat(
             EntityType.METALAKE.getShortName().getBytes(),
-            NAMESPACE_SEPARATOR,
+            BYTABLE_NAMESPACE_SEPARATOR,
             ByteUtils.longToByte(0L));
     Assertions.assertArrayEquals(expenctKey, realKey);
 
@@ -133,9 +133,9 @@ public class TestEntityKeyEncoding {
       expenctKey =
           Bytes.concat(
               EntityType.CATALOG.getShortName().getBytes(),
-              NAMESPACE_SEPARATOR,
+              BYTABLE_NAMESPACE_SEPARATOR,
               ByteUtils.longToByte(0L),
-              NAMESPACE_SEPARATOR,
+              BYTABLE_NAMESPACE_SEPARATOR,
               ByteUtils.longToByte(1L + i));
       Assertions.assertArrayEquals(expenctKey, realKey);
     }
@@ -158,11 +158,11 @@ public class TestEntityKeyEncoding {
       expenctKey =
           Bytes.concat(
               EntityType.SCHEMA.getShortName().getBytes(),
-              NAMESPACE_SEPARATOR,
+              BYTABLE_NAMESPACE_SEPARATOR,
               ByteUtils.longToByte(0L),
-              NAMESPACE_SEPARATOR,
+              BYTABLE_NAMESPACE_SEPARATOR,
               ByteUtils.longToByte(2L),
-              NAMESPACE_SEPARATOR,
+              BYTABLE_NAMESPACE_SEPARATOR,
               ByteUtils.longToByte(4L + i));
       Assertions.assertArrayEquals(expenctKey, realKey);
     }
@@ -185,13 +185,13 @@ public class TestEntityKeyEncoding {
       expenctKey =
           Bytes.concat(
               EntityType.TABLE.getShortName().getBytes(),
-              NAMESPACE_SEPARATOR,
+              BYTABLE_NAMESPACE_SEPARATOR,
               ByteUtils.longToByte(0L),
-              NAMESPACE_SEPARATOR,
+              BYTABLE_NAMESPACE_SEPARATOR,
               ByteUtils.longToByte(2L),
-              NAMESPACE_SEPARATOR,
+              BYTABLE_NAMESPACE_SEPARATOR,
               ByteUtils.longToByte(6L),
-              NAMESPACE_SEPARATOR,
+              BYTABLE_NAMESPACE_SEPARATOR,
               ByteUtils.longToByte(i + 7L));
       Assertions.assertArrayEquals(expenctKey, realKey);
     }
@@ -219,7 +219,7 @@ public class TestEntityKeyEncoding {
     NameIdentifier metalakeIdentifier = NameIdentifier.of(namespace, WILD_CARD);
     byte[] realKey = ENCODER.encode(metalakeIdentifier, EntityType.METALAKE);
     byte[] expenctKey =
-        Bytes.concat(EntityType.METALAKE.getShortName().getBytes(), NAMESPACE_SEPARATOR);
+        Bytes.concat(EntityType.METALAKE.getShortName().getBytes(), BYTABLE_NAMESPACE_SEPARATOR);
     Assertions.assertArrayEquals(expenctKey, realKey);
 
     // Scan all catalog in metalake1
@@ -231,9 +231,9 @@ public class TestEntityKeyEncoding {
     expenctKey =
         Bytes.concat(
             EntityType.CATALOG.getShortName().getBytes(),
-            NAMESPACE_SEPARATOR,
+            BYTABLE_NAMESPACE_SEPARATOR,
             ByteUtils.longToByte(0L),
-            NAMESPACE_SEPARATOR);
+            BYTABLE_NAMESPACE_SEPARATOR);
     Assertions.assertArrayEquals(expenctKey, realKey);
 
     // Scan all sc in metalake1.catalog2
@@ -245,11 +245,11 @@ public class TestEntityKeyEncoding {
     expenctKey =
         Bytes.concat(
             EntityType.SCHEMA.getShortName().getBytes(),
-            NAMESPACE_SEPARATOR,
+            BYTABLE_NAMESPACE_SEPARATOR,
             ByteUtils.longToByte(0L),
-            NAMESPACE_SEPARATOR,
+            BYTABLE_NAMESPACE_SEPARATOR,
             ByteUtils.longToByte(1L),
-            NAMESPACE_SEPARATOR);
+            BYTABLE_NAMESPACE_SEPARATOR);
     Assertions.assertArrayEquals(expenctKey, realKey);
 
     // Scan all table in metalake1.catalog2.schema3
@@ -261,13 +261,13 @@ public class TestEntityKeyEncoding {
     expenctKey =
         Bytes.concat(
             EntityType.TABLE.getShortName().getBytes(),
-            NAMESPACE_SEPARATOR,
+            BYTABLE_NAMESPACE_SEPARATOR,
             ByteUtils.longToByte(0L),
-            NAMESPACE_SEPARATOR,
+            BYTABLE_NAMESPACE_SEPARATOR,
             ByteUtils.longToByte(1L),
-            NAMESPACE_SEPARATOR,
+            BYTABLE_NAMESPACE_SEPARATOR,
             ByteUtils.longToByte(2L),
-            NAMESPACE_SEPARATOR);
+            BYTABLE_NAMESPACE_SEPARATOR);
     Assertions.assertArrayEquals(expenctKey, realKey);
 
     Mockito.doReturn(3L).when(mockIdGenerator).nextId();
