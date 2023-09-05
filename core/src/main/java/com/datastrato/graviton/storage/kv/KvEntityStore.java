@@ -9,6 +9,7 @@ import static com.datastrato.graviton.Configs.ENTITY_KV_STORE;
 import static com.datastrato.graviton.Entity.EntityType.CATALOG;
 import static com.datastrato.graviton.Entity.EntityType.SCHEMA;
 import static com.datastrato.graviton.Entity.EntityType.TABLE;
+import static com.datastrato.graviton.storage.kv.BinaryEntityKeyEncoder.LOG;
 import static com.datastrato.graviton.storage.kv.BinaryEntityKeyEncoder.NAMESPACE_SEPARATOR;
 
 import com.datastrato.graviton.Config;
@@ -137,7 +138,7 @@ public class KvEntityStore implements EntityStore {
           E e = serDe.deserialize(value, type);
           E updatedE = updater.apply(e);
           if (updatedE.nameIdentifier().equals(ident)) {
-            put(updatedE, true);
+            backend.put(key, serDe.serialize(updatedE), true);
             return updatedE;
           }
 
@@ -152,12 +153,20 @@ public class KvEntityStore implements EntityStore {
 
           // Update the name mapping
           nameMappingService.updateName(
-              generateIdNameMappingKey(ident), generateIdNameMappingKey(updatedE.nameIdentifier()));
+              generateKeyForMapping(ident), generateKeyForMapping(updatedE.nameIdentifier()));
 
           // Update the entity to store
           backend.put(key, serDe.serialize(updatedE), true);
           return updatedE;
         });
+  }
+
+  private String concatIdAndName(long[] namespaceIds, String name) {
+    String context =
+        Joiner.on(NAMESPACE_SEPARATOR)
+            .join(
+                Arrays.stream(namespaceIds).mapToObj(String::valueOf).collect(Collectors.toList()));
+    return StringUtils.isBlank(context) ? name : context + NAMESPACE_SEPARATOR + name;
   }
 
   /**
@@ -189,19 +198,10 @@ public class KvEntityStore implements EntityStore {
    * 	4/5/c1     --> 7
    * </pre>
    *
-   * @param namespaceIds namespace of a specific entity
-   * @param name name of a specific entity
-   * @return key that maps to the id of a specific entity
+   * @param nameIdentifier name of a specific entity
+   * @return key that maps to the id of a specific entity. See above, The key maybe like '4/5/c1'
    */
-  private String generateKeyForNameMapping(long[] namespaceIds, String name) {
-    String context =
-        Joiner.on(NAMESPACE_SEPARATOR)
-            .join(
-                Arrays.stream(namespaceIds).mapToObj(String::valueOf).collect(Collectors.toList()));
-    return StringUtils.isBlank(context) ? name : context + NAMESPACE_SEPARATOR + name;
-  }
-
-  public String generateIdNameMappingKey(NameIdentifier nameIdentifier) throws IOException {
+  public String generateKeyForMapping(NameIdentifier nameIdentifier) throws IOException {
     if (nameIdentifier.namespace().isEmpty()) {
       return nameIdentifier.name();
     }
@@ -212,10 +212,10 @@ public class KvEntityStore implements EntityStore {
     for (int i = 0; i < ids.length; i++) {
       ids[i] =
           nameMappingService.getIdByName(
-              generateKeyForNameMapping(ArrayUtils.subarray(ids, 0, i), namespace.level(i)));
+              concatIdAndName(ArrayUtils.subarray(ids, 0, i), namespace.level(i)));
     }
 
-    return generateKeyForNameMapping(ids, name);
+    return concatIdAndName(ids, name);
   }
 
   @Override
@@ -244,6 +244,9 @@ public class KvEntityStore implements EntityStore {
    *   table:   ta_{metalake_id}
    * </pre>
    *
+   * Why the sub-entities under this metalake start with those prefixes, please see {@link
+   * KvEntityStore} java class doc.
+   *
    * @param ident identifier of an entity
    * @param type type of entity
    * @return list of sub-entities prefix
@@ -266,7 +269,10 @@ public class KvEntityStore implements EntityStore {
       case SCHEMA:
         prefixs.add(replacePrefixTypeInfo(encode, TABLE.getShortName()));
         break;
+      case TABLE:
+        break;
       default:
+        LOG.warn("Currently unknow type: {}, please check it", type);
     }
     Collections.reverse(prefixs);
     return prefixs;

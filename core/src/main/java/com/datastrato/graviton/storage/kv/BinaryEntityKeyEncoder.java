@@ -73,7 +73,7 @@ public class BinaryEntityKeyEncoder implements EntityKeyEncoder<byte[]> {
     this.nameMappingService = nameMappingService;
   }
 
-  private String generateKeyForNameMapping(long[] namespaceIds, String name) {
+  private String generateMappingKey(long[] namespaceIds, String name) {
     String context =
         Joiner.on(NAMESPACE_SEPARATOR)
             .join(
@@ -87,18 +87,17 @@ public class BinaryEntityKeyEncoder implements EntityKeyEncoder<byte[]> {
    *
    * @param identifier NameIdentifier of the entity
    * @param entityType the entity identifier to encode
+   * @param nullIfMissing reutrn null if name-id mapping does not contain the mapping of identifier
    * @return the encoded key for key-value storage. null if returnIfEntityNotFound is true and the
    *     entity the identifier represents does not exist;
    */
   private byte[] encodeEntity(
-      NameIdentifier identifier, EntityType entityType, boolean returnNullIfEntityNotFound)
-      throws IOException {
+      NameIdentifier identifier, EntityType entityType, boolean nullIfMissing) throws IOException {
     String[] nameSpace = identifier.namespace().levels();
     long[] namespaceIds = new long[nameSpace.length];
     for (int i = 0; i < nameSpace.length; i++) {
-      String nameKey =
-          generateKeyForNameMapping(ArrayUtils.subarray(namespaceIds, 0, i), nameSpace[i]);
-      if (returnNullIfEntityNotFound && null == nameMappingService.getIdByName(nameKey)) {
+      String nameKey = generateMappingKey(ArrayUtils.subarray(namespaceIds, 0, i), nameSpace[i]);
+      if (nullIfMissing && null == nameMappingService.getIdByName(nameKey)) {
         return null;
       }
 
@@ -117,8 +116,8 @@ public class BinaryEntityKeyEncoder implements EntityKeyEncoder<byte[]> {
     // This is for point query and need to use specific name
     long[] namespaceAndNameIds = new long[namespaceIds.length + 1];
     System.arraycopy(namespaceIds, 0, namespaceAndNameIds, 0, namespaceIds.length);
-    String nameKey = generateKeyForNameMapping(namespaceIds, identifier.name());
-    if (returnNullIfEntityNotFound && null == nameMappingService.getIdByName(nameKey)) {
+    String nameKey = generateMappingKey(namespaceIds, identifier.name());
+    if (nullIfMissing && null == nameMappingService.getIdByName(nameKey)) {
       return null;
     }
 
