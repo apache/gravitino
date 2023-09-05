@@ -10,7 +10,7 @@ on:
 
 env:
   HIVE2_IMAGE_NAME: datastrato/hive2
-  HIVE2_IMAGE_TAG_NAME: integration-test
+  HIVE2_IMAGE_TAG_NAME: 0.1.0
 
 concurrency:
   group: ${{ github.worklfow }}-${{ github.event.pull_request.number || github.ref }}
