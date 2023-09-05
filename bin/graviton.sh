@@ -124,14 +124,14 @@ function stop() {
 }
 
 HOSTNAME=$(hostname)
-GRAVITON_OUTFILE="${GRAVITON_LOG_DIR}/graviton-${HOSTNAME}.out"
+GRAVITON_OUTFILE="${GRAVITON_LOG_DIR}/graviton-server.out"
 GRAVITON_SERVER_NAME=com.datastrato.graviton.server.GravitonServer
 
 JAVA_OPTS+=" -Dfile.encoding=UTF-8"
 JAVA_OPTS+=" -Dlog4j2.configurationFile=file://${GRAVITON_CONF_DIR}/log4j2.properties"
 JAVA_OPTS+=" -Dgraviton.log.path=${GRAVITON_LOG_DIR} ${GRAVITON_MEM}"
 
-addJarInDir "${GRAVITON_HOME}/lib"
+addJarInDir "${GRAVITON_HOME}/libs"
 
 case "${1}" in
   start)

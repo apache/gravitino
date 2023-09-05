@@ -44,7 +44,7 @@ public class GravitonITUtils {
     }
   }
 
-  public static String genRandomName() {
-    return UUID.randomUUID().toString().replace("-", "");
+  public static String genRandomName(String prefix) {
+    return prefix + "_" + UUID.randomUUID().toString().replace("-", "");
   }
 }
