@@ -21,6 +21,7 @@ import com.datastrato.graviton.EntityStoreFactory;
 import com.datastrato.graviton.Metalake;
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
+import com.datastrato.graviton.exceptions.AlreadyExistsException;
 import com.datastrato.graviton.exceptions.NoSuchEntityException;
 import com.datastrato.graviton.exceptions.NonEmptyEntityException;
 import com.datastrato.graviton.meta.AuditInfo;
@@ -391,6 +392,61 @@ public class TestKvEntityStorage {
               NameIdentifier.of("metalakeChanged", "catalogChanged", "schema2", "table1"),
               EntityType.TABLE,
               BaseTable.class));
+
+      store.delete(
+          NameIdentifier.of("metalakeChanged", "catalogChanged", "schema2", "table1"),
+          EntityType.TABLE);
+      // Update a deleted entities
+      Assertions.assertThrowsExactly(
+          NoSuchEntityException.class,
+          () ->
+              store.update(
+                  NameIdentifier.of("metalakeChanged", "catalogChanged", "schema2", "table1"),
+                  BaseTable.class,
+                  EntityType.TABLE,
+                  (e) -> e));
+      // The updated entities already existed, should throw exception
+      Assertions.assertThrowsExactly(
+          AlreadyExistsException.class,
+          () ->
+              store.update(
+                  NameIdentifier.of("metalakeChanged", "catalogChanged", "schema2"),
+                  BaseSchema.class,
+                  EntityType.SCHEMA,
+                  e -> {
+                    AuditInfo auditInfo1 =
+                        new AuditInfo.Builder()
+                            .withCreator("creator5")
+                            .withCreateTime(Instant.now())
+                            .build();
+                    return createBaseschema(
+                        Namespace.of("metalakeChanged", "catalogChanged"),
+                        "schemaChanged",
+                        auditInfo1);
+                  }));
+      // Update operations do not conatin any changes in name
+      store.update(
+          NameIdentifier.of("metalakeChanged", "catalogChanged", "schema2"),
+          BaseSchema.class,
+          EntityType.SCHEMA,
+          e -> {
+            AuditInfo auditInfo1 =
+                new AuditInfo.Builder()
+                    .withCreator("creator6")
+                    .withCreateTime(Instant.now())
+                    .build();
+            return createBaseschema(
+                Namespace.of("metalakeChanged", "catalogChanged"), "schema2", auditInfo1);
+          });
+      Assertions.assertEquals(
+          "creator6",
+          store
+              .get(
+                  NameIdentifier.of("metalakeChanged", "catalogChanged", "schema2"),
+                  EntityType.SCHEMA,
+                  BaseSchema.class)
+              .auditInfo()
+              .creator());
     }
   }
 
