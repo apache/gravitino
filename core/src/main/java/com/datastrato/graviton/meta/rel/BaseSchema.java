@@ -11,16 +11,15 @@ import com.datastrato.graviton.HasIdentifier;
 import com.datastrato.graviton.Namespace;
 import com.datastrato.graviton.meta.AuditInfo;
 import com.datastrato.graviton.rel.Schema;
+import com.google.common.base.Objects;
 import com.google.common.collect.Maps;
 import java.util.Collections;
 import java.util.Map;
 import javax.annotation.Nullable;
-import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
 
 /** An abstract class representing a base schema in a relational database. */
-@EqualsAndHashCode
 @ToString
 public class BaseSchema implements Schema, Entity, HasIdentifier {
 
@@ -125,6 +124,28 @@ public class BaseSchema implements Schema, Entity, HasIdentifier {
   @Override
   public EntityType type() {
     return EntityType.SCHEMA;
+  }
+
+  // Ignore field namespace and comment
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+    BaseSchema schema = (BaseSchema) o;
+    return Objects.equal(id, schema.id)
+        && Objects.equal(catalogId, schema.catalogId)
+        && Objects.equal(name, schema.name)
+        && Objects.equal(properties, schema.properties)
+        && Objects.equal(auditInfo, schema.auditInfo);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hashCode(id, catalogId, name, properties, auditInfo);
   }
 
   /**

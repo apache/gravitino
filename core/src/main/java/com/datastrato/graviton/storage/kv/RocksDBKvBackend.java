@@ -189,12 +189,44 @@ public class RocksDBKvBackend implements KvBackend {
         TX_LOCAL.get().delete(key);
         return true;
       }
-
       db.delete(key);
       return true;
     } catch (RocksDBException e) {
       throw new IOException(e);
     }
+  }
+
+  @Override
+  public boolean deleteRange(KvRangeScan deleteRange) throws IOException {
+    Transaction tx = TX_LOCAL.get();
+    RocksIterator rocksIterator = tx == null ? db.newIterator() : tx.getIterator(new ReadOptions());
+    rocksIterator.seek(deleteRange.getStart());
+
+    while (rocksIterator.isValid()) {
+      byte[] key = rocksIterator.key();
+      // Break if the key is out of the scan range
+      if (Bytes.wrap(key).compareTo(deleteRange.getEnd()) > 0) {
+        break;
+      }
+
+      if (Bytes.wrap(key).compareTo(deleteRange.getStart()) == 0) {
+        if (deleteRange.isStartInclusive()) {
+          delete(key);
+        }
+      } else if (Bytes.wrap(key).compareTo(deleteRange.getEnd()) == 0) {
+        if (deleteRange.isEndInclusive()) {
+          delete(key);
+        }
+        break;
+      } else {
+        delete(key);
+      }
+
+      rocksIterator.next();
+    }
+
+    rocksIterator.close();
+    return true;
   }
 
   @Override
@@ -205,7 +237,14 @@ public class RocksDBKvBackend implements KvBackend {
   @Override
   public <R, E extends Exception> R executeInTransaction(Executable<R, E> executable)
       throws E, IOException {
-    Transaction tx = db.beginTransaction(new WriteOptions());
+    // TODO (yuqi) Name mapping service and storage should use separtately backend, or we should
+    //  handle nested transaction
+    Transaction tx = TX_LOCAL.get();
+    if (tx != null) {
+      return executable.execute();
+    }
+
+    tx = db.beginTransaction(new WriteOptions());
     LOGGER.info("Starting transaction: id: '{}'", tx.getID());
     TX_LOCAL.set(tx);
     try {
