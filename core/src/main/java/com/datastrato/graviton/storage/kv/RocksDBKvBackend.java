@@ -237,7 +237,7 @@ public class RocksDBKvBackend implements KvBackend {
   @Override
   public <R, E extends Exception> R executeInTransaction(Executable<R, E> executable)
       throws E, IOException {
-    // TODO (yuqi) Name mapping service and storage should use separtately backend, or we should
+    // TODO (yuqi) Name mapping service and storage should use separately backend, or we should
     //  handle nested transaction
     Transaction tx = TX_LOCAL.get();
     if (tx != null) {

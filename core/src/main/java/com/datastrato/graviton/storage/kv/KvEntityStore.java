@@ -65,7 +65,7 @@ public class KvEntityStore implements EntityStore {
   @Override
   public void initialize(Config config) throws RuntimeException {
     this.backend = createKvEntityBackend(config);
-    // TODO(yuqi) Currently, KvNameMappingSerivice and KvEntityStore shares the same backend
+    // TODO(yuqi) Currently, KvNameMappingService and KvEntityStore shares the same backend
     //  instance, We should make it configurable in the future.
     this.nameMappingService = new KvNameMappingService(backend);
     this.entityKeyEncoder = new BinaryEntityKeyEncoder(nameMappingService);
@@ -143,7 +143,7 @@ public class KvEntityStore implements EntityStore {
           }
 
           // If we have changed the name of the entity, We would do the following steps:
-          // Check whether the new entities already exitsed
+          // Check whether the new entities already existed
           boolean newEntityExist = exists(updatedE.nameIdentifier(), entityType);
           if (newEntityExist) {
             throw new AlreadyExistsException(
@@ -272,7 +272,7 @@ public class KvEntityStore implements EntityStore {
       case TABLE:
         break;
       default:
-        LOG.warn("Currently unknow type: {}, please check it", type);
+        LOG.warn("Currently unknown type: {}, please check it", type);
     }
     Collections.reverse(prefixs);
     return prefixs;
