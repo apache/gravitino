@@ -1,0 +1,52 @@
+name: Docker Image
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Docker tag to apply to this image'
+        required: true
+        type: string
+      token:
+        description: 'Publish Docker token'
+        required: true
+        type: string
+env:
+  HIVE_IMAGE_NAME: datastrato/graviton-ci-hive
+
+jobs:
+  publish-docker-image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      input_token: ${{ github.event.inputs.token }}
+      secrets_token: ${{ secrets.PUBLISH_DOCKER_TOKEN }}
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Check release token
+        run: |
+          if [[ "${secrets_token}" != "${input_token}" ]]; then
+            echo "The token you entered is incorrect. Please try again."
+            exit 1
+          fi
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v1
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: datastrato
+          password: ${{ secrets.DOCKER_REPOSITORY_PASSWORD }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Build and Push the main branch Docker image
+        if: ${{ github.ref_name == 'main' }}
+        run: ./dev/docker/hive/build-docker.sh --platform all --image ${HIVE_IMAGE_NAME}:${{ github.event.inputs.tag }} --tag ${HIVE_IMAGE_NAME}:latest
+
+      - name: Build and Push the other branch Docker image
+        if: ${{ github.ref_name != 'main' }}
+        run: ./dev/docker/hive/build-docker.sh --platform all --image ${HIVE_IMAGE_NAME}:${{ github.event.inputs.tag }}

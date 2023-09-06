@@ -36,4 +36,4 @@ out/**
 distribution
 server/src/main/resources/project.properties
 
-dev/docker/hive2/packages
+dev/docker/hive/packages

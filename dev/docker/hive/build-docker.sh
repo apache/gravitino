@@ -8,9 +8,9 @@ bin="$(dirname "${BASH_SOURCE-$0}")"
 bin="$(cd "${bin}">/dev/null; pwd)"
 
 # Environment variables definition
-IMAGE_NAME="datastrato/hive2:0.1.0"
 HADOOP_VERSION="2.7.3"
 HIVE_VERSION="2.3.9"
+IMAGE_NAME="datastrato/hive:0.1.0"
 
 HADOOP_PACKAGE_NAME="hadoop-${HADOOP_VERSION}.tar.gz"
 HADOOP_DOWNLOAD_URL="http://archive.apache.org/dist/hadoop/core/hadoop-${HADOOP_VERSION}/${HADOOP_PACKAGE_NAME}"
@@ -69,13 +69,13 @@ if [ ! -f "${bin}/packages/${HIVE_PACKAGE_NAME}" ]; then
 fi
 
 # Create multi-arch builder
-BUILDER_NAME="hive2"
+BUILDER_NAME="hive-builder"
 builders=$(docker buildx ls)
 if echo "${builders}" | grep -q "${BUILDER_NAME}"; then
   echo "BuildKit builder '${BUILDER_NAME}' already exists."
 else
   echo "BuildKit builder '${BUILDER_NAME}' does not exist."
-  docker buildx create --platform linux/amd64,linux/arm64 --use --name hive2
+  docker buildx create --platform linux/amd64,linux/arm64 --use --name ${BUILDER_NAME}
 fi
 
 cd ${bin}
