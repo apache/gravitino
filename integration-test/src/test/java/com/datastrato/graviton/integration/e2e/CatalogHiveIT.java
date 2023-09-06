@@ -44,7 +44,6 @@ public class CatalogHiveIT extends AbstractIT {
   public static String HIVE_COL_NAME3 = "hive_col_name3";
 
   static String HIVE_METASTORE_URIS = "thrift://localhost:9083";
-  static String HADOOP_USER_NAME = "hive";
 
   private static HiveClientPool hiveClientPool;
 
@@ -75,6 +74,9 @@ public class CatalogHiveIT extends AbstractIT {
     Map<String, String> properties = Maps.newHashMap();
     properties.put("provider", "hive");
     properties.put(HiveConf.ConfVars.METASTOREURIS.varname, HIVE_METASTORE_URIS);
+    properties.put(HiveConf.ConfVars.METASTORETHRIFTCONNECTIONRETRIES.varname, "10");
+    properties.put(HiveConf.ConfVars.METASTORETHRIFTFAILURERETRIES.varname, "10");
+    properties.put(HiveConf.ConfVars.METASTORE_CLIENT_CONNECT_RETRY_DELAY.varname, "3");
 
     Catalog catalog =
         metalake.createCatalog(
