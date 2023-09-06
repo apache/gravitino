@@ -124,8 +124,9 @@ public final class AuditInfo implements Audit, Entity {
 
   /**
    * Merges the audit information with another audit information. If the {@code overwrite} flag is
-   * set to {@code true}, the values from the other audit information will overwrite the values of
-   * this audit information. Otherwise, the values of this audit information will be preserved.
+   * set to {@code true} or the field is null, the values from the other audit information will
+   * overwrite the values of this audit information, otherwise the values of this audit
+   * information will be preserved.
    *
    * @param other the other audit information.
    * @param overwrite the overwrite flag.
