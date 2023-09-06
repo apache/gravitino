@@ -9,8 +9,8 @@ on:
     branches: [ "main", "branch-*" ]
 
 env:
-  HIVE2_IMAGE_NAME: datastrato/hive2
-  HIVE2_IMAGE_TAG_NAME: 0.1.0
+  HIVE_IMAGE_NAME: datastrato/graviton-ci-hive
+  HIVE_IMAGE_TAG_NAME: 0.1.0
 
 concurrency:
   group: ${{ github.worklfow }}-${{ github.event.pull_request.number || github.ref }}
@@ -25,7 +25,7 @@ jobs:
       matrix:
         architecture: [linux/amd64]
     env:
-      DOCKER_RUN_NAME: hive2-amd64
+      DOCKER_RUN_NAME: hive-amd64
       PLATFORM: ${{ matrix.architecture }}
     steps:
       - uses: actions/checkout@v3
@@ -41,13 +41,13 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v1
 
-      - name: Build the hive2 Docker image for AMD64
+      - name: Build the hive Docker image for AMD64
         if: ${{ contains(github.event.pull_request.labels.*.name, 'build docker image') }}
-        run: ./dev/docker/hive2/build-docker.sh --platform ${PLATFORM} --image ${HIVE2_IMAGE_NAME}:${HIVE2_IMAGE_TAG_NAME}
+        run: ./dev/docker/hive/build-docker.sh --platform ${PLATFORM} --image ${HIVE_IMAGE_NAME}:${HIVE_IMAGE_TAG_NAME}
 
       - name: Run AMD64 container
         run: |
-          docker run --rm --name ${DOCKER_RUN_NAME} --platform ${PLATFORM} -d -p 8088:8088 -p 50070:50070 -p 50075:50075 -p 10000:10000 -p 10002:10002 -p 8888:8888 -p 9083:9083 -p 8022:22 ${HIVE2_IMAGE_NAME}:${HIVE2_IMAGE_TAG_NAME}
+          docker run --rm --name ${DOCKER_RUN_NAME} --platform ${PLATFORM} -d -p 8088:8088 -p 50070:50070 -p 50075:50075 -p 10000:10000 -p 10002:10002 -p 8888:8888 -p 9083:9083 -p 8022:22 ${HIVE_IMAGE_NAME}:${HIVE_IMAGE_TAG_NAME}
           docker ps -a
 
       - name: Setup Gradle
@@ -86,4 +86,4 @@ jobs:
           docker stop ${DOCKER_RUN_NAME}
           sleep 3
           docker ps -a
-          docker rmi ${HIVE2_IMAGE_NAME}:${HIVE2_IMAGE_TAG_NAME}
+          docker rmi ${HIVE_IMAGE_NAME}:${HIVE_IMAGE_TAG_NAME}
