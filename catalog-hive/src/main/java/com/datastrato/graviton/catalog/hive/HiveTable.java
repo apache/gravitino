@@ -93,7 +93,6 @@ public class HiveTable extends BaseTable {
     // Set AuditInfo to Hive's Table object. Hive's Table doesn't support setting last modifier
     // and last modified time, so we only set creator and create time.
     hiveTable.setOwner(auditInfo.creator());
-    hiveTable.setCreateTimeIsSet(true);
     hiveTable.setCreateTime(Math.toIntExact(auditInfo.createTime().getEpochSecond()));
 
     return hiveTable;
