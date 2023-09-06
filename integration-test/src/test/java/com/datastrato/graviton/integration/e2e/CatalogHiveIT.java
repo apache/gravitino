@@ -192,6 +192,28 @@ public class CatalogHiveIT extends AbstractIT {
     catalog
         .asTableCatalog()
         .loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, alertTableName));
+
+    catalog
+        .asTableCatalog()
+        .alterTable(
+            NameIdentifier.of(metalakeName, catalogName, schemaName, alertTableName),
+            TableChange.rename(alertTableName.toUpperCase()));
+
+    catalog
+        .asTableCatalog()
+        .loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, alertTableName));
+
+    catalog
+        .asTableCatalog()
+        .alterTable(
+            NameIdentifier.of(metalakeName, catalogName, schemaName, alertTableName),
+            TableChange.rename(alertTableName.toUpperCase() + "_new"));
+
+    catalog
+        .asTableCatalog()
+        .loadTable(
+            NameIdentifier.of(
+                metalakeName, catalogName, schemaName, alertTableName.toUpperCase() + "_new"));
   }
 
   @Order(2)
@@ -201,12 +223,16 @@ public class CatalogHiveIT extends AbstractIT {
     Catalog catalog = metalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
     catalog
         .asTableCatalog()
-        .dropTable(NameIdentifier.of(metalakeName, catalogName, schemaName, alertTableName));
+        .dropTable(
+            NameIdentifier.of(
+                metalakeName, catalogName, schemaName, alertTableName.toUpperCase() + "_new"));
 
     // Directly get table from hive metastore to check if the table is dropped successfully.
     assertThrows(
         NoSuchObjectException.class,
-        () -> hiveClientPool.run(client -> client.getTable(schemaName, alertTableName)));
+        () ->
+            hiveClientPool.run(
+                client -> client.getTable(schemaName, alertTableName.toUpperCase() + "_new")));
   }
 
   @Order(3)
