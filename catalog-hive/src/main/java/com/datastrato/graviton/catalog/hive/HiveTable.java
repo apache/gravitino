@@ -10,10 +10,13 @@ import static org.apache.hadoop.hive.metastore.TableType.MANAGED_TABLE;
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.catalog.hive.converter.FromHiveType;
 import com.datastrato.graviton.catalog.hive.converter.ToHiveType;
+import com.datastrato.graviton.meta.AuditInfo;
 import com.datastrato.graviton.meta.rel.BaseTable;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
+import java.time.Instant;
 import java.util.Arrays;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.Getter;
@@ -47,6 +50,13 @@ public class HiveTable extends BaseTable {
    * @return A new HiveTable instance.
    */
   public static HiveTable fromInnerTable(Table table, Builder builder) {
+    // Get audit info from Hive's Table object. Because Hive's table doesn't store last modifier
+    // and last modified time, we only get creator and create time from Hive's table.
+    AuditInfo.Builder auditInfoBuilder = new AuditInfo.Builder();
+    Optional.ofNullable(table.getOwner()).ifPresent(auditInfoBuilder::withCreator);
+    if (table.isSetCreateTime()) {
+      auditInfoBuilder.withCreateTime(Instant.ofEpochSecond(table.getCreateTime()));
+    }
 
     return builder
         .withComment(table.getParameters().get(HMS_TABLE_COMMENT))
@@ -62,6 +72,7 @@ public class HiveTable extends BaseTable {
                             .build())
                 .toArray(HiveColumn[]::new))
         .withLocation(table.getSd().getLocation())
+        .withAuditInfo(auditInfoBuilder.build())
         .build();
   }
 
@@ -78,6 +89,12 @@ public class HiveTable extends BaseTable {
     hiveTable.setSd(buildStorageDescriptor());
     hiveTable.setParameters(properties);
     hiveTable.setPartitionKeys(Lists.newArrayList() /* TODO(Minghuang): Add partition support */);
+
+    // Set AuditInfo to Hive's Table object. Hive's Table doesn't support setting last modifier
+    // and last modified time, so we only set creator and create time.
+    hiveTable.setOwner(auditInfo.creator());
+    hiveTable.setCreateTimeIsSet(true);
+    hiveTable.setCreateTime(Math.toIntExact(auditInfo.createTime().getEpochSecond()));
 
     return hiveTable;
   }

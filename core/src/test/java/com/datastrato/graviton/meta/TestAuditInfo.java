@@ -44,24 +44,17 @@ public class TestAuditInfo {
     Assertions.assertNull(auditInfo.lastModifier());
     Assertions.assertNull(auditInfo.lastModifiedTime());
 
-    Throwable exception =
-        Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () -> new AuditInfo.Builder().withCreator(creator).build());
-    Assertions.assertEquals("Field create_time is required", exception.getMessage());
+    AuditInfo auditInfo1 =
+        new AuditInfo.Builder().withLastModifier(lastModifier).withLastModifiedTime(now).build();
+    auditInfo1.validate();
+    Assertions.assertNull(auditInfo1.creator());
+    Assertions.assertNull(auditInfo1.createTime());
 
-    Throwable exception1 =
-        Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () -> {
-              new AuditInfo.Builder()
-                  .withCreator(creator)
-                  .withCreateTime(now)
-                  .withLastModifier(lastModifier)
-                  .build();
-            });
-    Assertions.assertEquals(
-        "last_modifier and last_modified_time must be both set or both left unset",
-        exception1.getMessage());
+    AuditInfo auditInfo2 = new AuditInfo.Builder().build();
+    auditInfo2.validate();
+    Assertions.assertNull(auditInfo2.creator());
+    Assertions.assertNull(auditInfo2.createTime());
+    Assertions.assertNull(auditInfo2.lastModifier());
+    Assertions.assertNull(auditInfo2.lastModifiedTime());
   }
 }

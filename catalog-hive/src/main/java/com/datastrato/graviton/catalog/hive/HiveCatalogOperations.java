@@ -241,9 +241,11 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
               .withId(baseSchema.getId())
               .withCatalogId(baseSchema.getCatalogId())
               .withNamespace(ident.namespace())
-              .withAuditInfo(baseSchema.auditInfo())
               .withConf(hiveConf);
       HiveSchema hiveSchema = HiveSchema.fromInnerDB(database, builder);
+
+      // Merge audit info from Graviton store
+      hiveSchema.auditInfo().merge(baseSchema.auditInfo(), true /*overwrite*/);
 
       LOG.info("Loaded Hive schema (database) {} from Hive Metastore ", ident.name());
 
@@ -331,15 +333,17 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
                         .withId(oldSchema.getId())
                         .withCatalogId(oldSchema.getCatalogId())
                         .withNamespace(ident.namespace())
-                        .withAuditInfo(
-                            new AuditInfo.Builder()
-                                .withCreator(oldSchema.auditInfo().creator())
-                                .withCreateTime(oldSchema.auditInfo().createTime())
-                                .withLastModifier(currentUser())
-                                .withLastModifiedTime(Instant.now())
-                                .build())
                         .withConf(hiveConf);
                 HiveSchema hiveSchema = HiveSchema.fromInnerDB(alteredDatabase, builder);
+
+                AuditInfo newAudit =
+                    new AuditInfo.Builder()
+                        .withCreator(oldSchema.auditInfo().creator())
+                        .withCreateTime(oldSchema.auditInfo().createTime())
+                        .withLastModifier(currentUser())
+                        .withLastModifiedTime(Instant.now())
+                        .build();
+                hiveSchema.auditInfo().merge(newAudit, true /*overwrite*/);
 
                 // To be on the safe side, here uses delete before put (although  hive schema does
                 // not support rename yet)
@@ -552,9 +556,11 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
               .withId(baseTable.getId())
               .withSchemaId(baseTable.getSchemaId())
               .withName(tableIdent.name())
-              .withNameSpace(tableIdent.namespace())
-              .withAuditInfo(baseTable.auditInfo());
+              .withNameSpace(tableIdent.namespace());
       HiveTable table = HiveTable.fromInnerTable(hiveTable, builder);
+
+      // Merge the audit info from Graviton store.
+      table.auditInfo().merge(baseTable.auditInfo(), true /* overwrite */);
 
       LOG.info("Loaded Hive table {} from Hive Metastore ", tableIdent.name());
 
@@ -728,15 +734,19 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
                         .withId(table.getId())
                         .withSchemaId(table.getSchemaId())
                         .withName(alteredHiveTable.getTableName())
-                        .withNameSpace(tableIdent.namespace())
-                        .withAuditInfo(
-                            new AuditInfo.Builder()
-                                .withCreator(table.auditInfo().creator())
-                                .withCreateTime(table.auditInfo().createTime())
-                                .withLastModifier(currentUser())
-                                .withLastModifiedTime(Instant.now())
-                                .build());
+                        .withNameSpace(tableIdent.namespace());
+
                 HiveTable alteredTable = HiveTable.fromInnerTable(alteredHiveTable, builder);
+
+                AuditInfo newAudit =
+                    new AuditInfo.Builder()
+                        .withCreator(table.auditInfo().creator())
+                        .withCreateTime(table.auditInfo().createTime())
+                        .withLastModifier(currentUser())
+                        .withLastModifiedTime(Instant.now())
+                        .build();
+                alteredTable.auditInfo().merge(newAudit, true /* overwrite */);
+
                 store.delete(tableIdent, TABLE);
                 store.put(alteredTable, false);
                 clientPool.run(
