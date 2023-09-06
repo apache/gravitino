@@ -54,8 +54,6 @@ public class MetalakeIT extends AbstractIT {
             .collect(Collectors.toList());
 
     Assertions.assertEquals(result.size(), 1);
-
-    LOG.info("start to log files");
   }
 
   @Order(2)
