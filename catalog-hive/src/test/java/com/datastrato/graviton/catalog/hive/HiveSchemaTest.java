@@ -105,6 +105,9 @@ public class HiveSchemaTest extends MiniHiveMetastoreService {
     Assertions.assertTrue(Arrays.asList(idents).contains(ident));
     Assertions.assertTrue(store.exists(ident, SCHEMA));
 
+    Schema loadedSchema = hiveCatalog.asSchemas().loadSchema(ident);
+    Assertions.assertEquals(schema.auditInfo(), loadedSchema.auditInfo());
+
     // Test illegal identifier
     NameIdentifier ident1 = NameIdentifier.of("metalake", hiveCatalog.name());
     Throwable exception =
@@ -136,7 +139,7 @@ public class HiveSchemaTest extends MiniHiveMetastoreService {
     properties.put("key2", "val2");
     String comment = "comment";
 
-    hiveCatalog.asSchemas().createSchema(ident, comment, properties);
+    Schema createdSchema = hiveCatalog.asSchemas().createSchema(ident, comment, properties);
     Assertions.assertTrue(hiveCatalog.asSchemas().schemaExists(ident));
 
     Map<String, String> properties1 = hiveCatalog.asSchemas().loadSchema(ident).properties();
@@ -149,9 +152,17 @@ public class HiveSchemaTest extends MiniHiveMetastoreService {
             ident,
             SchemaChange.removeProperty("key1"),
             SchemaChange.setProperty("key2", "val2-alter"));
-    Map<String, String> properties2 = hiveCatalog.asSchemas().loadSchema(ident).properties();
+    Schema alteredSchema = hiveCatalog.asSchemas().loadSchema(ident);
+    Map<String, String> properties2 = alteredSchema.properties();
     Assertions.assertFalse(properties2.containsKey("key1"));
     Assertions.assertEquals("val2-alter", properties2.get("key2"));
+
+    Assertions.assertEquals(
+        createdSchema.auditInfo().creator(), alteredSchema.auditInfo().creator());
+    Assertions.assertEquals(
+        createdSchema.auditInfo().createTime(), alteredSchema.auditInfo().createTime());
+    Assertions.assertNotNull(alteredSchema.auditInfo().lastModifier());
+    Assertions.assertNotNull(alteredSchema.auditInfo().lastModifiedTime());
 
     hiveCatalog
         .asSchemas()
@@ -159,9 +170,17 @@ public class HiveSchemaTest extends MiniHiveMetastoreService {
             ident,
             SchemaChange.setProperty("key3", "val3"),
             SchemaChange.setProperty("key4", "val4"));
-    Map<String, String> properties3 = hiveCatalog.asSchemas().loadSchema(ident).properties();
+    Schema alteredSchema1 = hiveCatalog.asSchemas().loadSchema(ident);
+    Map<String, String> properties3 = alteredSchema1.properties();
     Assertions.assertEquals("val3", properties3.get("key3"));
     Assertions.assertEquals("val4", properties3.get("key4"));
+
+    Assertions.assertEquals(
+        createdSchema.auditInfo().creator(), alteredSchema1.auditInfo().creator());
+    Assertions.assertEquals(
+        createdSchema.auditInfo().createTime(), alteredSchema1.auditInfo().createTime());
+    Assertions.assertNotNull(alteredSchema1.auditInfo().lastModifier());
+    Assertions.assertNotNull(alteredSchema1.auditInfo().lastModifiedTime());
   }
 
   @Test

@@ -51,6 +51,15 @@ public class TestEntityProtoSerDe {
     auditInfoFromBytes =
         protoEntitySerDe.deserialize(bytes, com.datastrato.graviton.meta.AuditInfo.class);
     Assertions.assertEquals(auditInfo1, auditInfoFromBytes);
+
+    // Test with empty field
+    com.datastrato.graviton.meta.AuditInfo auditInfo2 =
+        new com.datastrato.graviton.meta.AuditInfo.Builder().build();
+
+    byte[] bytes1 = protoEntitySerDe.serialize(auditInfo2);
+    com.datastrato.graviton.meta.AuditInfo auditInfoFromBytes1 =
+        protoEntitySerDe.deserialize(bytes1, com.datastrato.graviton.meta.AuditInfo.class);
+    Assertions.assertEquals(auditInfo2, auditInfoFromBytes1);
   }
 
   @Test

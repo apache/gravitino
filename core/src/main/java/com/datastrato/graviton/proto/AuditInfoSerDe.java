@@ -5,6 +5,8 @@
 
 package com.datastrato.graviton.proto;
 
+import java.util.Optional;
+
 /** A class for serializing and deserializing AuditInfo objects. */
 class AuditInfoSerDe implements ProtoSerDe<com.datastrato.graviton.meta.AuditInfo, AuditInfo> {
 
@@ -17,16 +19,16 @@ class AuditInfoSerDe implements ProtoSerDe<com.datastrato.graviton.meta.AuditInf
    */
   @Override
   public AuditInfo serialize(com.datastrato.graviton.meta.AuditInfo auditInfo) {
-    AuditInfo.Builder builder =
-        AuditInfo.newBuilder()
-            .setCreator(auditInfo.creator())
-            .setCreateTime(ProtoUtils.fromInstant(auditInfo.createTime()));
+    AuditInfo.Builder builder = AuditInfo.newBuilder();
 
-    if (auditInfo.lastModifier() != null && auditInfo.lastModifiedTime() != null) {
-      builder
-          .setLastModifier(auditInfo.lastModifier())
-          .setLastModifiedTime(ProtoUtils.fromInstant(auditInfo.lastModifiedTime()));
-    }
+    Optional.ofNullable(auditInfo.creator()).ifPresent(builder::setCreator);
+    Optional.ofNullable(auditInfo.createTime())
+        .map(ProtoUtils::fromInstant)
+        .ifPresent(builder::setCreateTime);
+    Optional.ofNullable(auditInfo.lastModifier()).ifPresent(builder::setLastModifier);
+    Optional.ofNullable(auditInfo.lastModifiedTime())
+        .map(ProtoUtils::fromInstant)
+        .ifPresent(builder::setLastModifiedTime);
 
     return builder.build();
   }
@@ -41,14 +43,13 @@ class AuditInfoSerDe implements ProtoSerDe<com.datastrato.graviton.meta.AuditInf
   @Override
   public com.datastrato.graviton.meta.AuditInfo deserialize(AuditInfo p) {
     com.datastrato.graviton.meta.AuditInfo.Builder builder =
-        new com.datastrato.graviton.meta.AuditInfo.Builder()
-            .withCreator(p.getCreator())
-            .withCreateTime(ProtoUtils.toInstant(p.getCreateTime()));
+        new com.datastrato.graviton.meta.AuditInfo.Builder();
 
-    if (p.hasLastModifier() && p.hasLastModifiedTime()) {
-      builder
-          .withLastModifier(p.getLastModifier())
-          .withLastModifiedTime(ProtoUtils.toInstant(p.getLastModifiedTime()));
+    if (p.hasCreator()) builder.withCreator(p.getCreator());
+    if (p.hasCreateTime()) builder.withCreateTime(ProtoUtils.toInstant(p.getCreateTime()));
+    if (p.hasLastModifier()) builder.withLastModifier(p.getLastModifier());
+    if (p.hasLastModifiedTime()) {
+      builder.withLastModifiedTime(ProtoUtils.toInstant(p.getLastModifiedTime()));
     }
 
     return builder.build();

@@ -146,6 +146,9 @@ public class HiveTableTest extends MiniHiveMetastoreService {
     Assertions.assertEquals(HIVE_COMMENT, table.comment());
     Assertions.assertArrayEquals(columns, table.columns());
 
+    Table loadedTable = hiveCatalog.asTableCatalog().loadTable(tableIdentifier);
+    Assertions.assertEquals(table.auditInfo(), loadedTable.auditInfo());
+
     Assertions.assertTrue(hiveCatalog.asTableCatalog().tableExists(tableIdentifier));
     NameIdentifier[] tableIdents =
         hiveCatalog.asTableCatalog().listTables(tableIdentifier.namespace());
@@ -244,7 +247,10 @@ public class HiveTableTest extends MiniHiveMetastoreService {
             .build();
     Column[] columns = new Column[] {col1, col2};
 
-    hiveCatalog.asTableCatalog().createTable(tableIdentifier, columns, HIVE_COMMENT, properties);
+    Table createdTable =
+        hiveCatalog
+            .asTableCatalog()
+            .createTable(tableIdentifier, columns, HIVE_COMMENT, properties);
     Assertions.assertTrue(hiveCatalog.asTableCatalog().tableExists(tableIdentifier));
 
     // test alter
@@ -283,6 +289,12 @@ public class HiveTableTest extends MiniHiveMetastoreService {
     Assertions.assertFalse(store.exists(tableIdentifier, TABLE));
     Assertions.assertTrue(store.exists(((HiveTable) alteredTable).nameIdentifier(), TABLE));
 
+    Assertions.assertEquals(createdTable.auditInfo().creator(), alteredTable.auditInfo().creator());
+    Assertions.assertEquals(
+        createdTable.auditInfo().createTime(), alteredTable.auditInfo().createTime());
+    Assertions.assertNotNull(alteredTable.auditInfo().lastModifier());
+    Assertions.assertNotNull(alteredTable.auditInfo().lastModifiedTime());
+
     Column[] expected =
         new Column[] {
           new HiveColumn.Builder()
@@ -309,12 +321,19 @@ public class HiveTableTest extends MiniHiveMetastoreService {
         .alterTable(
             NameIdentifier.of(tableIdentifier.namespace(), "test_hive_table_new"),
             TableChange.deleteColumn(new String[] {"col_1"}, false));
-    alteredTable =
+    Table alteredTable1 =
         hiveCatalog
             .asTableCatalog()
             .loadTable(NameIdentifier.of(tableIdentifier.namespace(), "test_hive_table_new"));
     expected =
         Arrays.stream(expected).filter(c -> !"col_1".equals(c.name())).toArray(Column[]::new);
-    Assertions.assertArrayEquals(expected, alteredTable.columns());
+    Assertions.assertArrayEquals(expected, alteredTable1.columns());
+
+    Assertions.assertEquals(
+        createdTable.auditInfo().creator(), alteredTable1.auditInfo().creator());
+    Assertions.assertEquals(
+        createdTable.auditInfo().createTime(), alteredTable1.auditInfo().createTime());
+    Assertions.assertNotNull(alteredTable1.auditInfo().lastModifier());
+    Assertions.assertNotNull(alteredTable1.auditInfo().lastModifiedTime());
   }
 }
