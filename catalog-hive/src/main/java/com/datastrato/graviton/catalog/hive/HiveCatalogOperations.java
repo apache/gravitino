@@ -339,8 +339,12 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
                                 .withLastModifiedTime(Instant.now())
                                 .build())
                         .withConf(hiveConf);
+                // Note: Hive will ignore case, if the name(ident.name()) of the schame is
+                // upper-case,
+                // then the name hiveSchema will be lower-case, Which will cause a problem, we need
+                // to set the name of the hiveSchema to the same as the name of the ident.
+                alteredDatabase.setName(ident.name());
                 HiveSchema hiveSchema = HiveSchema.fromInnerDB(alteredDatabase, builder);
-
                 // To be on the safe side, here uses delete before put (although  hive schema does
                 // not support rename yet)
                 store.delete(ident, SCHEMA);
@@ -793,6 +797,11 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
   private void doRenameTable(
       org.apache.hadoop.hive.metastore.api.Table hiveTable, TableChange.RenameTable change) {
+    // Hive tables Ignore cases
+    if (hiveTable.getTableName().equalsIgnoreCase(change.getNewName())) {
+      return;
+    }
+
     hiveTable.setTableName(change.getNewName());
   }
 

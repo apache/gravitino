@@ -187,6 +187,11 @@ public class CatalogHiveIT extends AbstractIT {
     Assertions.assertEquals("col_4", hiveTab.getSd().getCols().get(3).getName());
     Assertions.assertEquals("string", hiveTab.getSd().getCols().get(3).getType());
     Assertions.assertEquals(null, hiveTab.getSd().getCols().get(3).getComment());
+
+    // If we do not add changes HiveCatalogOperations#alterTable, the following test case will fail
+    catalog
+        .asTableCatalog()
+        .loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, alertTableName));
   }
 
   @Order(2)
@@ -204,10 +209,8 @@ public class CatalogHiveIT extends AbstractIT {
         () -> hiveClientPool.run(client -> client.getTable(schemaName, alertTableName)));
   }
 
-  // TODO (xun) enable this test waiting for fixed [#316] [Bug report] alterSchema throw
-  // NoSuchSchemaException
-  //  @Order(3)
-  //  @Test
+  @Order(3)
+  @Test
   public void testAlterSchema() throws TException, InterruptedException {
     NameIdentifier ident = NameIdentifier.of(metalakeName, catalogName, schemaName);
     Map<String, String> properties = Maps.newHashMap();
@@ -223,8 +226,6 @@ public class CatalogHiveIT extends AbstractIT {
             ident,
             SchemaChange.removeProperty("key1"),
             SchemaChange.setProperty("key2", "val2-alter"));
-
-    NameIdentifier[] nameIdentifiers = catalog.asSchemas().listSchemas(ident.namespace());
 
     Map<String, String> properties2 = catalog.asSchemas().loadSchema(ident).properties();
     Assertions.assertFalse(properties2.containsKey("key1"));
