@@ -12,7 +12,7 @@ on:
         required: true
         type: string
 env:
-  HIVE2_IMAGE_NAME: datastrato/hive2
+  HIVE_IMAGE_NAME: datastrato/graviton-ci-hive
 
 jobs:
   publish-docker-image:
@@ -45,8 +45,8 @@ jobs:
 
       - name: Build and Push the main branch Docker image
         if: ${{ github.ref_name == 'main' }}
-        run: ./dev/docker/hive2/build-docker.sh --platform all --image ${HIVE2_IMAGE_NAME}:${{ github.event.inputs.tag }} --tag ${HIVE2_IMAGE_NAME}:latest
+        run: ./dev/docker/hive/build-docker.sh --platform all --image ${HIVE_IMAGE_NAME}:${{ github.event.inputs.tag }} --tag ${HIVE_IMAGE_NAME}:latest
 
       - name: Build and Push the other branch Docker image
         if: ${{ github.ref_name != 'main' }}
-        run: ./dev/docker/hive2/build-docker.sh --platform all --image ${HIVE2_IMAGE_NAME}:${{ github.event.inputs.tag }}
+        run: ./dev/docker/hive/build-docker.sh --platform all --image ${HIVE_IMAGE_NAME}:${{ github.event.inputs.tag }}

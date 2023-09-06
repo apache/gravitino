@@ -21,10 +21,15 @@ We use Github Actions to publish the docker images to the DockerHub repository.
 
 4. Input the `tag name`, for example: `0.1.0`, Then build and push the docker image name is `datastrato/{image-name}:0.1.0`.
 
-   + Currently, we only support publishing the `hive2` docker image, for example: `datastrato/hive2:0.1.0`.
+   + Currently, we only support publishing the `hive` docker image, for example: `datastrato/graviton-ci-hive:0.1.0`.
    + We will support publishing other data sources, for example, `Iecberg` docker image in the future.
 
 5. You must enter the correct `publish docker token` before you can execute run `Publish Docker Image` workflow.
 6. Wait for the workflow to complete. You can see a new docker image shown in the [datastrato](https://hub.docker.com/u/datastrato) DockerHub repository.
 
 [<img src="assets/publish-docker-image.png" width="400"/>](assets/publish-docker-image.png)
+
+## The version of the Data source in the Docker image
+| Docker image name | Docker image tag | Data source version      |
+|-------------------|------------------|--------------------------|
+| graviton-ci-hive  | 0.1.0            | hadoop-2.7.3, hive-2.3.9 |
