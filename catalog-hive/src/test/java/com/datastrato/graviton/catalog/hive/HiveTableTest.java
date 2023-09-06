@@ -4,7 +4,7 @@
  */
 package com.datastrato.graviton.catalog.hive;
 
-import static com.datastrato.graviton.Configs.DEFUALT_ENTITY_KV_STORE;
+import static com.datastrato.graviton.Configs.DEFAULT_ENTITY_KV_STORE;
 import static com.datastrato.graviton.Configs.ENTITY_KV_STORE;
 import static com.datastrato.graviton.Configs.ENTITY_STORE;
 import static com.datastrato.graviton.Configs.ENTRY_KV_ROCKSDB_BACKEND_PATH;
@@ -75,7 +75,7 @@ public class HiveTableTest extends MiniHiveMetastoreService {
   private static void mockStore() {
     Config config = Mockito.mock(Config.class);
     Mockito.when(config.get(ENTITY_STORE)).thenReturn("kv");
-    Mockito.when(config.get(ENTITY_KV_STORE)).thenReturn(DEFUALT_ENTITY_KV_STORE);
+    Mockito.when(config.get(ENTITY_KV_STORE)).thenReturn(DEFAULT_ENTITY_KV_STORE);
     Mockito.when(config.get(Configs.ENTITY_SERDE)).thenReturn("proto");
     Mockito.when(config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)).thenReturn(ROCKS_DB_STORE_PATH);
     Mockito.when(config.get(Configs.CATALOG_CACHE_EVICTION_INTERVAL_MS))
