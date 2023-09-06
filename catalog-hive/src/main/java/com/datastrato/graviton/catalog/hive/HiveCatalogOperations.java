@@ -674,6 +674,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       // TODO(@Minghuang): require a table lock to avoid race condition
       HiveTable table = (HiveTable) loadTable(tableIdent);
       org.apache.hadoop.hive.metastore.api.Table alteredHiveTable = table.toInnerTable();
+      String oldName = alteredHiveTable.getTableName();
 
       for (TableChange change : changes) {
         // Table change
@@ -740,6 +741,12 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
                                 .withLastModifier(currentUser())
                                 .withLastModifiedTime(Instant.now())
                                 .build());
+
+                if (oldName.equals(alteredHiveTable.getTableName())) {
+                  // The Table has not been changed. "zhangSan" and 'ZhangSan' are the same in Hive
+                  alteredHiveTable.setTableName(tableIdent.name());
+                }
+
                 HiveTable alteredTable = HiveTable.fromInnerTable(alteredHiveTable, builder);
                 store.delete(tableIdent, TABLE);
                 store.put(alteredTable, false);
