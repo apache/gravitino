@@ -22,6 +22,7 @@ httpclient5 = "5.2.1"
 mockserver = "5.13.2"
 commons-lang3 = "3.12.0"
 commons-io = "2.11.0"
+commons-collections4 = "4.4"
 caffeine = "2.9.3"
 rocksdbjni = "7.7.3"
 
@@ -75,6 +76,7 @@ commons-lang3 = { group = "org.apache.commons", name = "commons-lang3", version.
 commons-io = { group = "commons-io", name = "commons-io", version.ref = "commons-io" }
 caffeine = { group = "com.github.ben-manes.caffeine", name = "caffeine", version.ref = "caffeine" }
 rocksdbjni = { group = "org.rocksdb", name = "rocksdbjni", version.ref = "rocksdbjni" }
+commons-collections4 = { group = "org.apache.commons", name = "commons-collections4", version.ref = "commons-collections4" }
 
 [bundles]
 log4j = ["slf4j-api", "log4j-slf4j2-impl", "log4j-api", "log4j-core", "log4j-12-api"]
