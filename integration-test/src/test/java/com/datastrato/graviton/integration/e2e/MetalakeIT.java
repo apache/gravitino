@@ -26,7 +26,7 @@ import org.junit.jupiter.api.TestMethodOrder;
 
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class MetalakeIT extends AbstractIT {
-  public static String metalakeName = GravitonITUtils.genRandomName();
+  public static String metalakeName = GravitonITUtils.genRandomName("metalake");
 
   @BeforeAll
   private static void start() {
@@ -66,7 +66,7 @@ public class MetalakeIT extends AbstractIT {
   @Order(3)
   @Test
   public void testAlterMetalake() {
-    String alterMetalakeName = GravitonITUtils.genRandomName();
+    String alterMetalakeName = GravitonITUtils.genRandomName("metalake");
 
     // TODO: Add more test cases for alter metalake
     MetalakeChange[] changes1 =

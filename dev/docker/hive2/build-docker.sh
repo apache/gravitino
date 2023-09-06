@@ -18,6 +18,43 @@ HADOOP_DOWNLOAD_URL="http://archive.apache.org/dist/hadoop/core/hadoop-${HADOOP_
 HIVE_PACKAGE_NAME="apache-hive-${HIVE_VERSION}-bin.tar.gz"
 HIVE_DOWNLOAD_URL="https://archive.apache.org/dist/hive/hive-${HIVE_VERSION}/${HIVE_PACKAGE_NAME}"
 
+# Build docker image for multi-arch
+USAGE="-e Usage: ./build-docker.sh --platform [all|linux/amd64|linux/arm64] --image {image_name} --tag {tag_name}"
+
+# Get platform type
+if [[ "$1" == "--platform" ]]; then
+  shift
+  platform_type="$1"
+  if [[ "${platform_type}" == "linux/amd64" || "${platform_type}" == "linux/arm64" || "${platform_type}" == "all" ]]; then
+    echo "INFO : platform type is ${platform_type}"
+  else
+    echo "ERROR : ${platform_type} is not a valid platform type"
+    echo ${USAGE}
+    exit 1
+  fi
+  shift
+else
+  platform_type="all"
+fi
+
+# Get docker image name
+if [[ "$1" == "--image" ]]; then
+  shift
+  image_name="$1"
+  shift
+else
+  echo "ERROR : must specify image name"
+  echo ${USAGE}
+  exit 1
+fi
+
+# Get docker image tag
+if [[ "$1" == "--tag" ]]; then
+  shift
+  tag_name="$1"
+  shift
+fi
+
 # Prepare download packages
 if [[ ! -d "${bin}/packages" ]]; then
   mkdir -p "${bin}/packages"
@@ -41,5 +78,13 @@ else
   docker buildx create --platform linux/amd64,linux/arm64 --use --name hive2
 fi
 
-# Option params --no-cache --push
-docker buildx build --platform=linux/amd64,linux/arm64 --build-arg HADOOP_PACKAGE_NAME=${HADOOP_PACKAGE_NAME} --build-arg HIVE_PACKAGE_NAME=${HIVE_PACKAGE_NAME} --output type=docker --progress plain -t ${IMAGE_NAME} .
+cd ${bin}
+if [[ "${platform_type}" == "all" ]]; then
+  if [[ "${tag_name}" == "" ]]; then
+    docker buildx build --platform=linux/amd64,linux/arm64 --build-arg HADOOP_PACKAGE_NAME=${HADOOP_PACKAGE_NAME} --build-arg HIVE_PACKAGE_NAME=${HIVE_PACKAGE_NAME} --push --progress plain -f Dockerfile -t ${image_name} .
+  else
+    docker buildx build --platform=linux/amd64,linux/arm64 --build-arg HADOOP_PACKAGE_NAME=${HADOOP_PACKAGE_NAME} --build-arg HIVE_PACKAGE_NAME=${HIVE_PACKAGE_NAME} --push --tag ${tag_name} --progress plain -f Dockerfile -t ${image_name} .
+  fi
+else
+  docker buildx build --platform=${platform_type} --build-arg HADOOP_PACKAGE_NAME=${HADOOP_PACKAGE_NAME} --build-arg HIVE_PACKAGE_NAME=${HIVE_PACKAGE_NAME} --output type=docker --progress plain -f Dockerfile -t ${image_name} .
+fi

@@ -71,19 +71,23 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
     }
 
     public <R> R doWithSchemaOps(ThrowableFunction<SupportsSchemas, R> fn) throws Exception {
-      if (asSchemas() == null) {
-        throw new UnsupportedOperationException("Catalog does not support schema operations");
-      }
-
-      return classLoader.withClassLoader(cl -> fn.apply(asSchemas()));
+      return classLoader.withClassLoader(
+          cl -> {
+            if (asSchemas() == null) {
+              throw new UnsupportedOperationException("Catalog does not support schema operations");
+            }
+            return fn.apply(asSchemas());
+          });
     }
 
     public <R> R doWithTableOps(ThrowableFunction<TableCatalog, R> fn) throws Exception {
-      if (asTables() == null) {
-        throw new UnsupportedOperationException("Catalog does not support table operations");
-      }
-
-      return classLoader.withClassLoader(cl -> fn.apply(asTables()));
+      return classLoader.withClassLoader(
+          cl -> {
+            if (asTables() == null) {
+              throw new UnsupportedOperationException("Catalog does not support table operations");
+            }
+            return fn.apply(asTables());
+          });
     }
 
     public void close() {
@@ -447,7 +451,14 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
     if (pkg != null) {
       pkgPath = pkg;
     } else if (!testEnv) {
-      pkgPath = gravitonHome + File.separator + "catalogs" + File.separator + provider;
+      pkgPath =
+          gravitonHome
+              + File.separator
+              + "catalogs"
+              + File.separator
+              + provider
+              + File.separator
+              + "libs";
     } else {
       pkgPath =
           new StringBuilder()
