@@ -30,13 +30,9 @@ import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class CatalogHiveIT extends AbstractIT {
-  private static final Logger LOG = LoggerFactory.getLogger(CatalogHiveIT.class);
-
   public static String metalakeName = GravitonITUtils.genRandomName("CatalogHiveIT_metalake");
   public static String catalogName = GravitonITUtils.genRandomName("CatalogHiveIT_catalog");
   public static String schemaName = GravitonITUtils.genRandomName("CatalogHiveIT_schema");
@@ -53,7 +49,6 @@ public class CatalogHiveIT extends AbstractIT {
 
   @BeforeAll
   public static void startup() throws Exception {
-    LOG.info("Starting up CatalogHiveIT");
     HiveConf hiveConf = new HiveConf();
     hiveConf.set(HiveConf.ConfVars.METASTOREURIS.varname, HIVE_METASTORE_URIS);
 
@@ -70,7 +65,6 @@ public class CatalogHiveIT extends AbstractIT {
     if (hiveClientPool != null) {
       hiveClientPool.close();
     }
-    LOG.info("Stopped CatalogHiveIT");
   }
 
   public static void createHiveTable() throws TException, InterruptedException {
