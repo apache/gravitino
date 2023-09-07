@@ -11,11 +11,13 @@ import com.google.common.collect.Lists;
 import java.time.LocalDateTime;
 import java.util.List;
 import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import org.apache.logging.log4j.util.Strings;
 
 @EqualsAndHashCode(callSuper = false)
 public class RangePartitionDTO implements Partition {
 
+  @Getter
   @JsonProperty("fieldName")
   private final String[] fieldName;
 

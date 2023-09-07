@@ -2,16 +2,52 @@
  * Copyright 2023 Datastrato.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.graviton.meta.rel.transforms;
+package com.datastrato.graviton.rel.transforms;
 
 import com.datastrato.graviton.rel.Column;
-import com.datastrato.graviton.rel.Transform;
 import com.google.common.annotations.VisibleForTesting;
 import io.substrait.expression.Expression;
+import java.util.Arrays;
 import lombok.EqualsAndHashCode;
 
 /** Helper methods to create logical transforms to pass into Graviton. */
 public class Transforms {
+
+  public static final String YEAR = "year";
+  public static final String MONTH = "month";
+  public static final String DAY = "day";
+  public static final String HOUR = "hour";
+  public static final String LIST = "list";
+  public static final String RANGE = "range";
+
+  public static FieldTransform identity(String[] fieldName) {
+    return field(fieldName);
+  }
+
+  public static FunctionTransform year(String[] fieldName) {
+    return function(YEAR, new Transform[] {field(fieldName)});
+  }
+
+  public static FunctionTransform month(String[] fieldName) {
+    return function(MONTH, new Transform[] {field(fieldName)});
+  }
+
+  public static FunctionTransform day(String[] fieldName) {
+    return function(DAY, new Transform[] {field(fieldName)});
+  }
+
+  public static FunctionTransform hour(String[] fieldName) {
+    return function(HOUR, new Transform[] {field(fieldName)});
+  }
+
+  public static FunctionTransform list(String[][] fieldNames) {
+    Transform[] args = Arrays.stream(fieldNames).map(Transforms::field).toArray(Transform[]::new);
+    return function(LIST, args);
+  }
+
+  public static FunctionTransform range(String[] fieldName) {
+    return function(RANGE, new Transform[] {field(fieldName)});
+  }
 
   public static LiteralTransform literal(Expression.Literal value) {
     return new Transforms.LiteralReference(value);

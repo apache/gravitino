@@ -18,11 +18,13 @@ import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.google.common.base.Preconditions;
 import io.substrait.type.Type;
 import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import org.apache.logging.log4j.util.Strings;
 
 @EqualsAndHashCode(callSuper = false)
 public class ExpressionPartitionDTO implements Partition {
 
+  @Getter
   @JsonProperty("expression")
   private final Expression expression;
 
@@ -71,6 +73,7 @@ public class ExpressionPartitionDTO implements Partition {
   @EqualsAndHashCode
   public static class FieldExpression implements Expression {
 
+    @Getter
     @JsonProperty("fieldName")
     private final String[] fieldName;
 
@@ -105,11 +108,13 @@ public class ExpressionPartitionDTO implements Partition {
   @EqualsAndHashCode
   public static class LiteralExpression implements Expression {
 
+    @Getter
     @JsonProperty("type")
     @JsonSerialize(using = JsonUtils.TypeSerializer.class)
     @JsonDeserialize(using = JsonUtils.TypeDeserializer.class)
     private final Type type;
 
+    @Getter
     @JsonProperty("value")
     private final String value;
 
@@ -150,9 +155,11 @@ public class ExpressionPartitionDTO implements Partition {
   @EqualsAndHashCode
   public static class FunctionExpression implements Expression {
 
+    @Getter
     @JsonProperty("funcName")
     private final String funcName;
 
+    @Getter
     @JsonProperty("args")
     private final Expression[] args;
 
