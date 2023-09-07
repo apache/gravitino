@@ -108,7 +108,9 @@ public final class JettyServer {
     try {
       server.join();
     } catch (InterruptedException e) {
-      LOG.info("Interrupted while web server is joining.");
+      LOG.warn("Interrupted while web server is joining.", e);
+      stop();
+      Thread.currentThread().interrupt();
     }
   }
 
