@@ -3,10 +3,10 @@
  * This software is licensed under the Apache License version 2.
  */
 
-package com.datastrato.graviton.lakehouse.iceberg.web.rest;
+package com.datastrato.graviton.catalog.lakehouse.iceberg.web.rest;
 
-import com.datastrato.graviton.catalog.lakehouse.iceberg.iceberg.web.IcebergExceptionMapper;
-import com.datastrato.graviton.catalog.lakehouse.iceberg.iceberg.web.IcebergObjectMapperProvider;
+import com.datastrato.graviton.catalog.lakehouse.iceberg.web.IcebergExceptionMapper;
+import com.datastrato.graviton.catalog.lakehouse.iceberg.web.IcebergObjectMapperProvider;
 import org.glassfish.jersey.jackson.JacksonFeature;
 import org.glassfish.jersey.server.ResourceConfig;
 
