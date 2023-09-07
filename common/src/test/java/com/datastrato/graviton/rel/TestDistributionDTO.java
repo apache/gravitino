@@ -5,7 +5,8 @@
 
 package com.datastrato.graviton.rel;
 
-import com.datastrato.graviton.dto.rel.BucketDTO;
+import com.datastrato.graviton.dto.rel.DistributionDTO;
+import com.datastrato.graviton.dto.rel.DistributionDTO.DistributionMethod;
 import com.datastrato.graviton.dto.rel.ExpressionPartitionDTO.Expression;
 import com.datastrato.graviton.dto.rel.ExpressionPartitionDTO.FieldExpression;
 import com.datastrato.graviton.dto.rel.ExpressionPartitionDTO.FunctionExpression;
@@ -15,19 +16,19 @@ import com.google.common.collect.Lists;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-public class TestBucketDTO {
+public class TestDistributionDTO {
   @Test
   void test() throws JsonProcessingException {
-    BucketDTO bucketDTO =
-        new BucketDTO.Builder()
-            .withBucketNum(10)
-            .withBucketMethod(BucketDTO.BucketMethod.HASH)
+    DistributionDTO distributionDTO =
+        new DistributionDTO.Builder()
+            .withDistNum(10)
+            .withDistMethod(DistributionMethod.HASH)
             .withExpressions(
                 Lists.newArrayList(
                     new FieldExpression.Builder().withFieldName(new String[] {"a"}).build()))
             .build();
 
-    String stringValue = JsonUtils.objectMapper().writeValueAsString(bucketDTO);
+    String stringValue = JsonUtils.objectMapper().writeValueAsString(distributionDTO);
     String expected =
         "{\n"
             + "  \"expressions\": [\n"
@@ -38,16 +39,16 @@ public class TestBucketDTO {
             + "      ]\n"
             + "    }\n"
             + "  ],\n"
-            + "  \"bucket_num\": 10,\n"
-            + "  \"bucket_method\": \"hash\"\n"
+            + "  \"distNum\": 10,\n"
+            + "  \"distMethod\": \"hash\"\n"
             + "}";
 
     Assertions.assertEquals(
         JsonUtils.objectMapper().readTree(expected),
         JsonUtils.objectMapper().readTree(stringValue));
 
-    bucketDTO =
-        new BucketDTO.Builder()
+    distributionDTO =
+        new DistributionDTO.Builder()
             .withExpressions(
                 Lists.newArrayList(
                     new FunctionExpression.Builder()
@@ -62,8 +63,10 @@ public class TestBucketDTO {
             .build();
 
     Assertions.assertEquals(
-        bucketDTO,
+        distributionDTO,
         JsonUtils.objectMapper()
-            .readValue(JsonUtils.objectMapper().writeValueAsString(bucketDTO), BucketDTO.class));
+            .readValue(
+                JsonUtils.objectMapper().writeValueAsString(distributionDTO),
+                DistributionDTO.class));
   }
 }

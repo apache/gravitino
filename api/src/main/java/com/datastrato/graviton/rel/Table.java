@@ -35,7 +35,7 @@ public interface Table extends Auditable {
   }
 
   /** Return the bucketing of the table. If no bucketing is specified, null is returned. */
-  default Bucket bucket() {
+  default Distribution distribution() {
     return null;
   }
 

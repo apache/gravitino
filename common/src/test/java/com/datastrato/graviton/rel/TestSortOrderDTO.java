@@ -40,7 +40,7 @@ public class TestSortOrderDTO {
             + "    ]\n"
             + "  },\n"
             + "  \"direction\": \"asc\",\n"
-            + "  \"null_order\": \"first\"\n"
+            + "  \"nullOrder\": \"first\"\n"
             + "}";
 
     JsonNode expected = JsonUtils.objectMapper().readTree(expectedValue);

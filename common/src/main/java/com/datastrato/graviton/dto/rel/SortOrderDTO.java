@@ -14,7 +14,7 @@ import com.google.common.base.Preconditions;
 import lombok.EqualsAndHashCode;
 
 @EqualsAndHashCode
-@JsonPropertyOrder({"expression", "direction", "null_order"})
+@JsonPropertyOrder({"expression", "direction", "nullOrder"})
 public class SortOrderDTO {
   public enum Direction {
     ASC,
@@ -54,14 +54,14 @@ public class SortOrderDTO {
   @JsonProperty("direction")
   private final Direction direction;
 
-  @JsonProperty("null_order")
+  @JsonProperty("nullOrder")
   private final NullOrder nullOrder;
 
   @JsonCreator
   private SortOrderDTO(
       @JsonProperty("expression") Expression expression,
       @JsonProperty("direction") Direction direction,
-      @JsonProperty("null_order") NullOrder nullOrder) {
+      @JsonProperty("nullOrder") NullOrder nullOrder) {
     this.expression = expression;
     this.direction = direction;
     this.nullOrder = nullOrder;

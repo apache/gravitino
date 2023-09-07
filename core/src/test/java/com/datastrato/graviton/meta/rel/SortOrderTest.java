@@ -3,7 +3,7 @@
  * This software is licensed under the Apache License version 2.
  */
 
-package com.datastrato.graviton.catalog.hive;
+package com.datastrato.graviton.meta.rel;
 
 import com.datastrato.graviton.meta.rel.transforms.Transforms;
 import com.datastrato.graviton.rel.SortOrder.Direction;
@@ -12,23 +12,24 @@ import com.datastrato.graviton.rel.Transform;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-class HiveSortOrderTest {
+class SortOrderTest {
 
   @Test
   void testSortOrder() {
-    HiveSortOrder.Builder builder = new HiveSortOrder.Builder();
-    builder.withNullOrder(NullOrder.FIRST);
-    builder.withDirection(Direction.ASC);
-    builder.withTransform(Transforms.field(new String[] {"a"}));
-    HiveSortOrder sortOrder = builder.build();
+    GenericSortOrder.GenericSortOrderBuilder builder =
+        new GenericSortOrder.GenericSortOrderBuilder();
+    builder.nullOrder(NullOrder.FIRST);
+    builder.direction(Direction.ASC);
+    builder.transform(Transforms.field(new String[] {"a"}));
+    GenericSortOrder sortOrder = builder.build();
 
     Assertions.assertEquals(NullOrder.FIRST, sortOrder.nullOrder());
     Assertions.assertEquals(Direction.ASC, sortOrder.direction());
     Assertions.assertEquals(Transforms.field(new String[] {"a"}), sortOrder.transform());
 
-    builder.withNullOrder(NullOrder.LAST);
-    builder.withDirection(Direction.DESC);
-    builder.withTransform(
+    builder.nullOrder(NullOrder.LAST);
+    builder.direction(Direction.DESC);
+    builder.transform(
         Transforms.function("data", new Transform[] {Transforms.field(new String[] {"a"})}));
     sortOrder = builder.build();
 

@@ -17,16 +17,16 @@ import lombok.NonNull;
 import org.apache.commons.collections4.CollectionUtils;
 
 @EqualsAndHashCode
-@JsonPropertyOrder({"expressions", "bucket_num", "bucket_method"})
-public class BucketDTO {
+@JsonPropertyOrder({"expressions", "distNum", "distMethod"})
+public class DistributionDTO {
 
-  public enum BucketMethod {
+  public enum DistributionMethod {
     HASH,
     EVEN;
 
     @JsonCreator
-    public static BucketMethod fromString(String value) {
-      return BucketMethod.valueOf(value.toUpperCase());
+    public static DistributionMethod fromString(String value) {
+      return DistributionMethod.valueOf(value.toUpperCase());
     }
 
     @JsonValue
@@ -40,25 +40,25 @@ public class BucketDTO {
   @NonNull
   private final List<Expression> expressions;
 
-  @JsonProperty("bucket_num")
-  private final int bucketNum;
+  @JsonProperty("distNum")
+  private final int distNum;
 
-  @JsonProperty("bucket_method")
-  private final BucketMethod bucketMethod;
+  @JsonProperty("distMethod")
+  private final DistributionMethod distributionMethod;
 
-  private BucketDTO(
+  private DistributionDTO(
       @JsonProperty("expressions") List<Expression> expressions,
-      @JsonProperty("bucket_num") int bucketNum,
-      @JsonProperty("bucket_method") BucketMethod bucketMethod) {
+      @JsonProperty("distNum") int distNum,
+      @JsonProperty("distMethod") DistributionMethod distributionMethod) {
     this.expressions = expressions;
-    this.bucketNum = bucketNum;
-    this.bucketMethod = bucketMethod;
+    this.distNum = distNum;
+    this.distributionMethod = distributionMethod;
   }
 
   public static class Builder {
     private List<Expression> expressions;
     private int bucketNum;
-    private BucketMethod bucketMethod;
+    private DistributionMethod distributionMethod;
 
     public Builder() {}
 
@@ -67,24 +67,25 @@ public class BucketDTO {
       return this;
     }
 
-    public Builder withBucketNum(int bucketNum) {
+    public Builder withDistNum(int bucketNum) {
       this.bucketNum = bucketNum;
       return this;
     }
 
-    public Builder withBucketMethod(BucketMethod bucketMethod) {
-      this.bucketMethod = bucketMethod;
+    public Builder withDistMethod(DistributionMethod distributionMethod) {
+      this.distributionMethod = distributionMethod;
       return this;
     }
 
-    public BucketDTO build() {
+    public DistributionDTO build() {
       // Defualt bucket method is HASH
-      bucketMethod = bucketMethod == null ? BucketMethod.HASH : bucketMethod;
+      distributionMethod =
+          distributionMethod == null ? DistributionMethod.HASH : distributionMethod;
 
       Preconditions.checkState(
           CollectionUtils.isNotEmpty(expressions), "expressions cannot be null or empty");
       Preconditions.checkState(bucketNum >= 0, "bucketNum must be greater than 0");
-      return new BucketDTO(expressions, bucketNum, bucketMethod);
+      return new DistributionDTO(expressions, bucketNum, distributionMethod);
     }
   }
 }
