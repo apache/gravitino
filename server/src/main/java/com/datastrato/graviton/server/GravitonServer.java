@@ -86,7 +86,7 @@ public class GravitonServer extends ResourceConfig {
     gravitonEnv.shutdown();
   }
 
-  public static void main(String[] args) throws Exception {
+  public static void main(String[] args) {
     LOG.info("Starting Graviton Server");
     GravitonServer server = new GravitonServer();
     server.initialize();
@@ -117,5 +117,6 @@ public class GravitonServer extends ResourceConfig {
                 }));
 
     server.join();
+    server.stop();
   }
 }
