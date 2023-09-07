@@ -3,9 +3,8 @@
  * This software is licensed under the Apache License version 2.
  */
 
-package com.datastrato.graviton.lakehouse.iceberg.utils;
+package com.datastrato.graviton.catalog.lakehouse.iceberg.utils;
 
-import com.datastrato.graviton.catalog.lakehouse.iceberg.iceberg.utils.IcebergCatalogUtil;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.inmemory.InMemoryCatalog;
 import org.junit.jupiter.api.Assertions;

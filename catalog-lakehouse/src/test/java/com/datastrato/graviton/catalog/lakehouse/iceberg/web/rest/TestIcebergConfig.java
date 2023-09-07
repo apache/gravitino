@@ -3,10 +3,9 @@
  * This software is licensed under the Apache License version 2.
  */
 
-package com.datastrato.graviton.lakehouse.iceberg.web.rest;
+package com.datastrato.graviton.catalog.lakehouse.iceberg.web.rest;
 
-import com.datastrato.graviton.catalog.lakehouse.iceberg.iceberg.web.IcebergObjectMapperProvider;
-import com.datastrato.graviton.catalog.lakehouse.iceberg.iceberg.web.rest.IcebergConfig;
+import com.datastrato.graviton.catalog.lakehouse.iceberg.web.IcebergObjectMapperProvider;
 import javax.ws.rs.core.Application;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;

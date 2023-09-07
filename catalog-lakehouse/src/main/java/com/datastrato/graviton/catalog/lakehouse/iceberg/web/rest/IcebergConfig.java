@@ -2,9 +2,9 @@
  * Copyright 2023 Datastrato.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.graviton.catalog.lakehouse.iceberg.iceberg.web.rest;
+package com.datastrato.graviton.catalog.lakehouse.iceberg.web.rest;
 
-import com.datastrato.graviton.catalog.lakehouse.iceberg.iceberg.web.IcebergRestUtils;
+import com.datastrato.graviton.catalog.lakehouse.iceberg.web.IcebergRestUtils;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.GET;
