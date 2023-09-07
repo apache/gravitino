@@ -25,8 +25,6 @@ public class CatalogEntity implements Entity, Auditable, HasIdentifier {
 
   public static final Field ID =
       Field.required("id", Long.class, "The catalog's unique identifier");
-  public static final Field METALAKE_ID =
-      Field.required("metalake_id", Long.class, "The associated metalake's unique identifier");
   public static final Field NAME = Field.required("name", String.class, "The catalog's name");
   public static final Field TYPE =
       Field.required("type", Catalog.Type.class, "The type of the catalog");
@@ -37,9 +35,7 @@ public class CatalogEntity implements Entity, Auditable, HasIdentifier {
   public static final Field AUDIT_INFO =
       Field.required("audit_info", AuditInfo.class, "The audit details of the catalog");
 
-  @Getter private Long id;
-
-  @Getter private Long metalakeId;
+  private Long id;
 
   private String name;
 
@@ -62,7 +58,6 @@ public class CatalogEntity implements Entity, Auditable, HasIdentifier {
   public Map<Field, Object> fields() {
     Map<Field, Object> fields = new HashMap<>();
     fields.put(ID, id);
-    fields.put(METALAKE_ID, metalakeId);
     fields.put(NAME, name);
     fields.put(COMMENT, comment);
     fields.put(TYPE, type);
@@ -90,6 +85,11 @@ public class CatalogEntity implements Entity, Auditable, HasIdentifier {
   @Override
   public String name() {
     return name;
+  }
+
+  @Override
+  public Long id() {
+    return id;
   }
 
   /**
@@ -130,17 +130,6 @@ public class CatalogEntity implements Entity, Auditable, HasIdentifier {
      */
     public Builder withId(Long id) {
       catalog.id = id;
-      return this;
-    }
-
-    /**
-     * Sets the unique identifier of the associated metalake.
-     *
-     * @param metalakeId the unique identifier of the metalake.
-     * @return the builder instance.
-     */
-    public Builder withMetalakeId(Long metalakeId) {
-      catalog.metalakeId = metalakeId;
       return this;
     }
 
@@ -238,7 +227,6 @@ public class CatalogEntity implements Entity, Auditable, HasIdentifier {
     }
     CatalogEntity that = (CatalogEntity) o;
     return Objects.equal(id, that.id)
-        && Objects.equal(metalakeId, that.metalakeId)
         && Objects.equal(name, that.name)
         && type == that.type
         && Objects.equal(comment, that.comment)
@@ -253,6 +241,6 @@ public class CatalogEntity implements Entity, Auditable, HasIdentifier {
    */
   @Override
   public int hashCode() {
-    return Objects.hashCode(id, metalakeId, name, type, comment, properties, auditInfo);
+    return Objects.hashCode(id, name, type, comment, properties, auditInfo);
   }
 }

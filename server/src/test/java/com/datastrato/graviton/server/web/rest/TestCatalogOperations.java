@@ -376,7 +376,6 @@ public class TestCatalogOperations extends JerseyTest {
     CatalogEntity entity =
         new CatalogEntity.Builder()
             .withId(1L)
-            .withMetalakeId(1L)
             .withName(catalogName)
             .withComment("comment")
             .withNamespace(Namespace.of(metalake))

@@ -28,7 +28,6 @@ class BaseTableTest {
   void testTableFields() {
     BaseTable table = new BaseTableExtension();
     table.id = 1L;
-    table.schemaId = 2L;
     table.name = "testTableName";
     table.comment = "testTableComment";
     table.properties = new HashMap<>();
@@ -40,7 +39,6 @@ class BaseTableTest {
 
     Map<Field, Object> expectedFields = Maps.newHashMap();
     expectedFields.put(BaseTable.ID, 1L);
-    expectedFields.put(BaseTable.SCHEMA_ID, 2L);
     expectedFields.put(BaseTable.NAME, "testTableName");
     expectedFields.put(BaseTable.COMMENT, "testTableComment");
     expectedFields.put(BaseTable.PROPERTIES, table.properties);
@@ -48,7 +46,6 @@ class BaseTableTest {
     expectedFields.put(BaseTable.COLUMNS, table.columns);
 
     assertEquals(1L, table.fields().get(BaseTable.ID));
-    assertEquals(2L, table.fields().get(BaseTable.SCHEMA_ID));
     assertEquals("testTableName", table.fields().get(BaseTable.NAME));
     assertEquals("testTableComment", table.fields().get(BaseTable.COMMENT));
     assertEquals(table.properties, table.fields().get(BaseTable.PROPERTIES));
@@ -68,7 +65,6 @@ class BaseTableTest {
     Instant now = Instant.now();
     BaseTable table1 = new BaseTableExtension();
     table1.id = 1L;
-    table1.schemaId = 2L;
     table1.name = "testTableName";
     table1.comment = "testTableComment";
     table1.properties = new HashMap<>();
@@ -79,7 +75,6 @@ class BaseTableTest {
 
     BaseTable table2 = new BaseTableExtension();
     table2.id = 1L;
-    table2.schemaId = 2L;
     table2.name = "testTableName";
     table2.comment = "testTableComment";
     table2.properties = new HashMap<>();

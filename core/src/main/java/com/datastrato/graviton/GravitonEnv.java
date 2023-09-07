@@ -7,6 +7,8 @@ package com.datastrato.graviton;
 import com.datastrato.graviton.catalog.CatalogManager;
 import com.datastrato.graviton.catalog.CatalogOperationDispatcher;
 import com.datastrato.graviton.meta.MetalakeManager;
+import com.datastrato.graviton.storage.IdGenerator;
+import com.datastrato.graviton.storage.RandomIdGenerator;
 import com.google.common.base.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,6 +31,8 @@ public class GravitonEnv {
   private CatalogOperationDispatcher catalogOperationDispatcher;
 
   private MetalakeManager metalakeManager;
+
+  private IdGenerator idGenerator;
 
   private GravitonEnv() {}
 
@@ -63,11 +67,14 @@ public class GravitonEnv {
     entityStore.initialize(config);
     entityStore.setSerDe(entitySerDe);
 
+    // create and initialize a random id generator
+    this.idGenerator = new RandomIdGenerator();
+
     // Create and initialize metalake related modules
-    this.metalakeManager = new MetalakeManager(entityStore);
+    this.metalakeManager = new MetalakeManager(entityStore, idGenerator);
 
     // Create and initialize Catalog related modules
-    this.catalogManager = new CatalogManager(config, entityStore);
+    this.catalogManager = new CatalogManager(config, entityStore, idGenerator);
     this.catalogOperationDispatcher = new CatalogOperationDispatcher(catalogManager);
 
     LOG.info("Graviton Environment is initialized.");
@@ -126,6 +133,15 @@ public class GravitonEnv {
    */
   public MetalakeManager metalakesManager() {
     return metalakeManager;
+  }
+
+  /**
+   * Get the IdGenerator associated with the Graviton environment.
+   *
+   * @return The IdGenerator instance.
+   */
+  public IdGenerator idGenerator() {
+    return idGenerator;
   }
 
   /** Shutdown the Graviton environment. */
