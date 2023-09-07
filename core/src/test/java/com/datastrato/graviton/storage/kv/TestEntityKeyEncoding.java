@@ -5,7 +5,7 @@
 
 package com.datastrato.graviton.storage.kv;
 
-import static com.datastrato.graviton.Configs.DEFUALT_ENTITY_KV_STORE;
+import static com.datastrato.graviton.Configs.DEFAULT_ENTITY_KV_STORE;
 import static com.datastrato.graviton.Configs.ENTITY_KV_STORE;
 import static com.datastrato.graviton.Configs.ENTITY_STORE;
 import static com.datastrato.graviton.Configs.ENTRY_KV_ROCKSDB_BACKEND_PATH;
@@ -91,7 +91,7 @@ public class TestEntityKeyEncoding {
   public void prepare() {
     config = Mockito.mock(Config.class);
     Mockito.when(config.get(ENTITY_STORE)).thenReturn("kv");
-    Mockito.when(config.get(ENTITY_KV_STORE)).thenReturn(DEFUALT_ENTITY_KV_STORE);
+    Mockito.when(config.get(ENTITY_KV_STORE)).thenReturn(DEFAULT_ENTITY_KV_STORE);
     Mockito.when(config.get(Configs.ENTITY_SERDE)).thenReturn("proto");
     Mockito.when(config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)).thenReturn(ROCKS_DB_STORE_PATH);
   }

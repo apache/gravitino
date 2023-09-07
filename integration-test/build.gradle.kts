@@ -85,6 +85,7 @@ tasks {
   val integrationTest by creating(Test::class) {
     environment("GRAVITON_HOME", rootDir.path + "/distribution/package")
     environment("HADOOP_USER_NAME", "hive")
+    environment("HADOOP_HOME", "/tmp")
     useJUnitPlatform()
   }
 }

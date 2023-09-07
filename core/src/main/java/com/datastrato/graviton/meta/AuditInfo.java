@@ -8,7 +8,6 @@ package com.datastrato.graviton.meta;
 import com.datastrato.graviton.Audit;
 import com.datastrato.graviton.Entity;
 import com.datastrato.graviton.Field;
-import com.google.common.base.Preconditions;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.HashMap;
@@ -23,9 +22,9 @@ import lombok.ToString;
 public final class AuditInfo implements Audit, Entity {
 
   public static final Field CREATOR =
-      Field.required("creator", String.class, "The name of the user who created the entity");
+      Field.optional("creator", String.class, "The name of the user who created the entity");
   public static final Field CREATE_TIME =
-      Field.required("create_time", Instant.class, "The time when the entity was created");
+      Field.optional("create_time", Instant.class, "The time when the entity was created");
   public static final Field LAST_MODIFIER =
       Field.optional(
           "last_modifier", String.class, "The name of the user who last modified the entity");
@@ -33,9 +32,9 @@ public final class AuditInfo implements Audit, Entity {
       Field.optional(
           "last_modified_time", Instant.class, "The time when the entity was last modified");
 
-  private String creator;
+  @Nullable private String creator;
 
-  private Instant createTime;
+  @Nullable private Instant createTime;
 
   @Nullable private String lastModifier;
 
@@ -53,10 +52,8 @@ public final class AuditInfo implements Audit, Entity {
     CREATOR.validate(creator);
     CREATE_TIME.validate(createTime);
 
-    Preconditions.checkArgument(
-        lastModifier == null && lastModifiedTime == null
-            || lastModifier != null && lastModifiedTime != null,
-        "last_modifier and last_modified_time must be both set or both left unset");
+    LAST_MODIFIER.validate(lastModifier);
+    LAST_MODIFIED_TIME.validate(lastModifiedTime);
   }
 
   /**
@@ -123,6 +120,30 @@ public final class AuditInfo implements Audit, Entity {
   @Override
   public EntityType type() {
     return EntityType.AUDIT;
+  }
+
+  /**
+   * Merges the audit information with another audit information. If the {@code overwrite} flag is
+   * set to {@code true} or the field is null, the values from the other audit information will
+   * overwrite the values of this audit information, otherwise the values of this audit information
+   * will be preserved.
+   *
+   * @param other the other audit information.
+   * @param overwrite the overwrite flag.
+   * @return the merged audit information.
+   */
+  public AuditInfo merge(AuditInfo other, boolean overwrite) {
+    if (other == null) {
+      return this;
+    }
+
+    this.creator = overwrite || this.creator == null ? other.creator : creator;
+    this.createTime = overwrite || this.createTime == null ? other.createTime : createTime;
+    this.lastModifier = overwrite || this.lastModifier == null ? other.lastModifier : lastModifier;
+    this.lastModifiedTime =
+        overwrite || this.lastModifiedTime == null ? other.lastModifiedTime : lastModifiedTime;
+
+    return this;
   }
 
   /** Builder class for creating instances of {@link AuditInfo}. */

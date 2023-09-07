@@ -4,6 +4,7 @@
  */
 package com.datastrato.graviton.catalog.hive;
 
+import com.datastrato.graviton.meta.AuditInfo;
 import com.datastrato.graviton.meta.rel.BaseSchema;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
@@ -38,10 +39,16 @@ public class HiveSchema extends BaseSchema {
   public static HiveSchema fromInnerDB(Database db, Builder builder) {
     Map<String, String> properties = convertToMetadata(db);
 
+    // Get audit info from Hive's Database object. Because Hive's database doesn't store create
+    // time, last modifier and last modified time, we only get creator from Hive's database.
+    AuditInfo.Builder auditInfoBuilder = new AuditInfo.Builder();
+    Optional.ofNullable(db.getOwnerName()).ifPresent(auditInfoBuilder::withCreator);
+
     return builder
         .withName(db.getName())
         .withComment(db.getDescription())
         .withProperties(properties)
+        .withAuditInfo(auditInfoBuilder.build())
         .build();
   }
 

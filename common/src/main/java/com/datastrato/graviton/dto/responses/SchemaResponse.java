@@ -39,10 +39,5 @@ public class SchemaResponse extends BaseResponse {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(schema.name()), "schema 'name' must not be null and empty");
     Preconditions.checkArgument(schema.auditInfo() != null, "schema 'audit' must not be null");
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(schema.auditInfo().creator()),
-        "schema 'audit.creator' must not be null and empty");
-    Preconditions.checkArgument(
-        schema.auditInfo().createTime() != null, "schema 'audit.createTime' must not be null");
   }
 }

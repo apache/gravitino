@@ -8,10 +8,10 @@ import com.datastrato.graviton.config.ConfigBuilder;
 import com.datastrato.graviton.config.ConfigEntry;
 
 public interface Configs {
-  String DEFUALT_ENTITY_STORE = "kv";
+  String DEFAULT_ENTITY_STORE = "kv";
   String ENTITY_STORE_KEY = "graviton.entity.store";
 
-  String DEFUALT_ENTITY_KV_STORE = "RocksDBKvBackend";
+  String DEFAULT_ENTITY_KV_STORE = "RocksDBKvBackend";
   String ENTITY_KV_STORE_KEY = "graviton.entity.store.kv";
 
   String ENTITY_KV_ROCKSDB_BACKEND_PATH_KEY = "graviton.entity.store.kv.rocskdb.path";
@@ -22,14 +22,14 @@ public interface Configs {
           .doc("The entity store to use")
           .version("0.1.0")
           .stringConf()
-          .createWithDefault(DEFUALT_ENTITY_STORE);
+          .createWithDefault(DEFAULT_ENTITY_STORE);
 
   ConfigEntry<String> ENTITY_KV_STORE =
       new ConfigBuilder(ENTITY_KV_STORE_KEY)
           .doc("The kv entity store to use")
           .version("0.1.0")
           .stringConf()
-          .createWithDefault(DEFUALT_ENTITY_KV_STORE);
+          .createWithDefault(DEFAULT_ENTITY_KV_STORE);
 
   ConfigEntry<String> ENTRY_KV_ROCKSDB_BACKEND_PATH =
       new ConfigBuilder(ENTITY_KV_ROCKSDB_BACKEND_PATH_KEY)

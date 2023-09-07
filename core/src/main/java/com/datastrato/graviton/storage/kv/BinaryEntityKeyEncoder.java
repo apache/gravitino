@@ -87,7 +87,7 @@ public class BinaryEntityKeyEncoder implements EntityKeyEncoder<byte[]> {
    *
    * @param identifier NameIdentifier of the entity
    * @param entityType the entity identifier to encode
-   * @param nullIfMissing reutrn null if name-id mapping does not contain the mapping of identifier
+   * @param nullIfMissing return null if name-id mapping does not contain the mapping of identifier
    * @return the encoded key for key-value storage. null if returnIfEntityNotFound is true and the
    *     entity the identifier represents does not exist;
    */
