@@ -417,6 +417,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
               });
     } catch (Exception e) {
       LOG.error("Failed to load catalog with class loader", e);
+
       throw new RuntimeException(e);
     }
 
