@@ -11,9 +11,9 @@ import lombok.Builder;
 
 @Builder
 public class GenericDistribution implements Distribution {
-  protected Transform[] transforms;
-  protected int distNum;
-  protected DistributionMethod distMethod;
+  private final Transform[] transforms;
+  private final int distNum;
+  private final DistributionMethod distMethod;
 
   @Override
   public Transform[] transforms() {

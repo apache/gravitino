@@ -14,9 +14,9 @@ public class GenericSortOrder implements SortOrder {
 
   private final Transform transform;
 
-  protected final Direction direction;
+  private final Direction direction;
 
-  protected final NullOrder nullOrder;
+  private final NullOrder nullOrder;
 
   @Override
   public Transform transform() {
