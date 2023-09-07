@@ -3,11 +3,10 @@
  * This software is licensed under the Apache License version 2.
  */
 
-package com.datastrato.graviton.lakehouse.iceberg.web.rest;
+package com.datastrato.graviton.catalog.lakehouse.iceberg.web.rest;
 
-import com.datastrato.graviton.catalog.lakehouse.iceberg.iceberg.ops.IcebergTableOps;
-import com.datastrato.graviton.catalog.lakehouse.iceberg.iceberg.web.IcebergObjectMapperProvider;
-import com.datastrato.graviton.catalog.lakehouse.iceberg.iceberg.web.rest.IcebergNamespaceOperations;
+import com.datastrato.graviton.catalog.lakehouse.iceberg.ops.IcebergTableOps;
+import com.datastrato.graviton.catalog.lakehouse.iceberg.web.IcebergObjectMapperProvider;
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableMap;
 import java.util.Arrays;

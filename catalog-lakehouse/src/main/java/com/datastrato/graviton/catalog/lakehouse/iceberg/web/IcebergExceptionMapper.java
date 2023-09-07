@@ -3,7 +3,7 @@
  * This software is licensed under the Apache License version 2.
  */
 
-package com.datastrato.graviton.catalog.lakehouse.iceberg.iceberg.web;
+package com.datastrato.graviton.catalog.lakehouse.iceberg.web;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
