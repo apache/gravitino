@@ -295,6 +295,10 @@ public class IcebergTableOpsHelper {
     return icebergTableChange;
   }
 
+  public static Namespace getIcebergNamespace(String... level) {
+    return Namespace.of(level);
+  }
+
   @VisibleForTesting
   static String getParentName(String[] fields) {
     if (fields.length > 1) {
