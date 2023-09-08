@@ -5,6 +5,8 @@
 
 package com.datastrato.graviton.rel;
 
+import com.datastrato.graviton.rel.transforms.Transform;
+
 // This interface may not need it
 public interface SortOrder {
 

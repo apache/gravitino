@@ -5,10 +5,10 @@
 
 package com.datastrato.graviton.meta.rel;
 
-import com.datastrato.graviton.meta.rel.transforms.Transforms;
-import com.datastrato.graviton.meta.rel.transforms.Transforms.NamedReference;
 import com.datastrato.graviton.rel.Distribution.DistributionMethod;
-import com.datastrato.graviton.rel.Transform;
+import com.datastrato.graviton.rel.transforms.Transform;
+import com.datastrato.graviton.rel.transforms.Transforms;
+import com.datastrato.graviton.rel.transforms.Transforms.NamedReference;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 

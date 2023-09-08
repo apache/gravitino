@@ -5,10 +5,10 @@
 
 package com.datastrato.graviton.meta.rel;
 
-import com.datastrato.graviton.meta.rel.transforms.Transforms;
 import com.datastrato.graviton.rel.SortOrder.Direction;
 import com.datastrato.graviton.rel.SortOrder.NullOrder;
-import com.datastrato.graviton.rel.Transform;
+import com.datastrato.graviton.rel.transforms.Transform;
+import com.datastrato.graviton.rel.transforms.Transforms;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 

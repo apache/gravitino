@@ -6,7 +6,7 @@
 package com.datastrato.graviton.meta.rel;
 
 import com.datastrato.graviton.rel.Distribution;
-import com.datastrato.graviton.rel.Transform;
+import com.datastrato.graviton.rel.transforms.Transform;
 import lombok.Builder;
 
 @Builder

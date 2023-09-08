@@ -5,6 +5,8 @@
 
 package com.datastrato.graviton.rel;
 
+import com.datastrato.graviton.rel.transforms.Transform;
+
 public interface Distribution {
 
   /**

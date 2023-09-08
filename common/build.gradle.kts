@@ -28,6 +28,7 @@ dependencies {
   implementation(libs.bundles.log4j)
   implementation(libs.commons.lang3)
   implementation(libs.commons.collections4)
+  implementation(libs.protobuf.java)
 
   compileOnly(libs.lombok)
   annotationProcessor(libs.lombok)
