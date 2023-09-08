@@ -6,9 +6,7 @@ package com.datastrato.graviton;
 
 import java.io.Serializable;
 import java.util.Map;
-import lombok.AllArgsConstructor;
 import lombok.Getter;
-import lombok.ToString;
 
 /** This interface defines an entity within the Graviton framework. */
 public interface Entity extends Serializable {
@@ -31,26 +29,6 @@ public interface Entity extends Serializable {
     EntityType(String shortName, int index) {
       this.shortName = shortName;
       this.index = index;
-    }
-  }
-
-  /** Class representing an identifier for an entity. */
-  @Getter
-  @AllArgsConstructor
-  @ToString
-  class EntityIdentifier {
-    private NameIdentifier nameIdentifier;
-    private EntityType entityType;
-
-    /**
-     * Create an instance of EntityIdentifier.
-     *
-     * @param name The name identifier of the entity.
-     * @param entityType The type of the entity.
-     * @return The created EntityIdentifier instance.
-     */
-    public static EntityIdentifier of(NameIdentifier name, EntityType entityType) {
-      return new EntityIdentifier(name, entityType);
     }
   }
 

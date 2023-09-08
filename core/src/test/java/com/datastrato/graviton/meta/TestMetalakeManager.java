@@ -11,6 +11,7 @@ import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.TestEntityStore;
 import com.datastrato.graviton.exceptions.MetalakeAlreadyExistsException;
 import com.datastrato.graviton.exceptions.NoSuchMetalakeException;
+import com.datastrato.graviton.storage.RandomIdGenerator;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Sets;
 import java.io.IOException;
@@ -37,7 +38,7 @@ public class TestMetalakeManager {
     entityStore.initialize(config);
     entityStore.setSerDe(null);
 
-    metalakeManager = new MetalakeManager(entityStore);
+    metalakeManager = new MetalakeManager(entityStore, new RandomIdGenerator());
   }
 
   @AfterAll

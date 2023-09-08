@@ -10,8 +10,7 @@ public class SchemaEntitySerDe implements ProtoSerDe<BaseSchema, Schema> {
   @Override
   public Schema serialize(BaseSchema schemaEntity) {
     return Schema.newBuilder()
-        .setId(schemaEntity.getId())
-        .setCatalogId(schemaEntity.getCatalogId())
+        .setId(schemaEntity.id())
         .setName(schemaEntity.name())
         .setAuditInfo(new AuditInfoSerDe().serialize(schemaEntity.auditInfo()))
         .build();
@@ -21,7 +20,6 @@ public class SchemaEntitySerDe implements ProtoSerDe<BaseSchema, Schema> {
   public BaseSchema deserialize(Schema p) {
     return new BaseSchema.SchemaBuilder()
         .withId(p.getId())
-        .withCatalogId(p.getCatalogId())
         .withName(p.getName())
         .withAuditInfo(new AuditInfoSerDe().deserialize(p.getAuditInfo()))
         .build();

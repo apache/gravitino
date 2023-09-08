@@ -10,8 +10,7 @@ public class TableEntitySerde implements ProtoSerDe<BaseTable, Table> {
   @Override
   public Table serialize(BaseTable tableEntity) {
     return Table.newBuilder()
-        .setId(tableEntity.getId())
-        .setSchemaId(tableEntity.getSchemaId())
+        .setId(tableEntity.id())
         .setName(tableEntity.name())
         .setAuditInfo(new AuditInfoSerDe().serialize(tableEntity.auditInfo()))
         .build();
@@ -21,7 +20,6 @@ public class TableEntitySerde implements ProtoSerDe<BaseTable, Table> {
   public BaseTable deserialize(Table p) {
     return new BaseTable.TableBuilder()
         .withId(p.getId())
-        .withSchemaId(p.getSchemaId())
         .withName(p.getName())
         .withAuditInfo(new AuditInfoSerDe().deserialize(p.getAuditInfo()))
         .build();

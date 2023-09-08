@@ -157,7 +157,6 @@ public class HiveTable extends BaseTable {
     protected HiveTable internalBuild() {
       HiveTable hiveTable = new HiveTable();
       hiveTable.id = id;
-      hiveTable.schemaId = schemaId;
       hiveTable.namespace = namespace;
       hiveTable.name = name;
       hiveTable.comment = comment;
