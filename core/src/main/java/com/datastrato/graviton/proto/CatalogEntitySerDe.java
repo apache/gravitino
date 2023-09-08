@@ -21,8 +21,7 @@ public class CatalogEntitySerDe implements ProtoSerDe<CatalogEntity, Catalog> {
   public Catalog serialize(CatalogEntity catalogEntity) {
     Catalog.Builder builder =
         Catalog.newBuilder()
-            .setId(catalogEntity.getId())
-            .setMetalakeId(catalogEntity.getMetalakeId())
+            .setId(catalogEntity.id())
             .setName(catalogEntity.name())
             .setAuditInfo(new AuditInfoSerDe().serialize((AuditInfo) catalogEntity.auditInfo()));
 
@@ -54,7 +53,6 @@ public class CatalogEntitySerDe implements ProtoSerDe<CatalogEntity, Catalog> {
     builder
         .withId(p.getId())
         .withName(p.getName())
-        .withMetalakeId(p.getMetalakeId())
         .withAuditInfo(new AuditInfoSerDe().deserialize(p.getAuditInfo()));
 
     if (p.hasComment()) {

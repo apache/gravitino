@@ -21,7 +21,7 @@ class BaseMetalakeSerDe implements ProtoSerDe<com.datastrato.graviton.meta.BaseM
   public Metalake serialize(com.datastrato.graviton.meta.BaseMetalake baseMetalake) {
     Metalake.Builder builder =
         Metalake.newBuilder()
-            .setId(baseMetalake.getId())
+            .setId(baseMetalake.id())
             .setName(baseMetalake.name())
             .setAuditInfo(new AuditInfoSerDe().serialize((AuditInfo) baseMetalake.auditInfo()));
 

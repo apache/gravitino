@@ -5,39 +5,50 @@
 package com.datastrato.graviton;
 
 import com.datastrato.graviton.meta.AuditInfo;
+import com.datastrato.graviton.meta.rel.BaseTable;
 import com.datastrato.graviton.rel.Column;
-import com.datastrato.graviton.rel.Table;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import lombok.EqualsAndHashCode;
 
-@EqualsAndHashCode
-public class TestTable implements Table, Entity, HasIdentifier, Auditable {
+@EqualsAndHashCode(callSuper = true)
+public class TestTable extends BaseTable {
 
-  public static final Field NAME = Field.required("name", String.class, "The name of the table");
-  public static final Field COMMENT =
-      Field.optional("comment", String.class, "The comment of the table");
-  public static final Field PROPERTIES =
-      Field.optional("properties", Map.class, "The properties of the table");
-  public static final Field AUDIT_INFO =
-      Field.required("audit_info", AuditInfo.class, "The audit info of the table");
+  protected Distribution distribution;
 
-  private String name;
+  protected SortOrder[] sortOrders;
 
-  private Namespace namespace;
+  public static class Builder extends BaseTable.BaseTableBuilder<Builder, TestTable> {
+    private Distribution distribution;
 
-  private String comment;
+    private SortOrder[] sortOrders;
 
-  private Map<String, String> properties;
+    public Builder withDistribution(Distribution distribution) {
+      this.distribution = distribution;
+      return this;
+    }
 
-  private AuditInfo auditInfo;
+    public Builder withSortOrders(SortOrder[] sortOrders) {
+      this.sortOrders = sortOrders;
+      return this;
+    }
 
-  private Column[] columns;
-
-  private Distribution distribution;
-
-  private SortOrder[] sortOrders;
+    @Override
+    protected TestTable internalBuild() {
+      TestTable table = new TestTable();
+      table.id = id;
+      table.name = name;
+      table.comment = comment;
+      table.namespace = namespace;
+      table.properties = properties;
+      table.columns = columns;
+      table.auditInfo = auditInfo;
+      table.distribution = distribution;
+      table.sortOrders = sortOrders;
+      return table;
+    }
+  }
 
   public TestTable(
       String name,

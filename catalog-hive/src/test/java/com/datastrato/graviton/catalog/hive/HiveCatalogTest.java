@@ -29,7 +29,6 @@ public class HiveCatalogTest extends MiniHiveMetastoreService {
             .withName("catalog")
             .withNamespace(Namespace.of("metalake"))
             .withType(HiveCatalog.Type.RELATIONAL)
-            .withMetalakeId(1L)
             .withAuditInfo(auditInfo)
             .build();
 

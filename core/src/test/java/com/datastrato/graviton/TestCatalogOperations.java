@@ -61,15 +61,18 @@ public class TestCatalogOperations implements CatalogOperations, TableCatalog {
         new AuditInfo.Builder().withCreator("test").withCreateTime(Instant.now()).build();
 
     TestTable table =
-        new TestTable(
-            ident.name(),
-            ident.namespace(),
-            comment,
-            properties,
-            auditInfo,
-            columns,
-            distribution,
-            sortOrders);
+        new TestTable.Builder()
+            .withId(1L)
+            .withName(ident.name())
+            .withNameSpace(ident.namespace())
+            .withComment(comment)
+            .withProperties(properties)
+            .withAuditInfo(auditInfo)
+            .withColumns(columns)
+            .withDistribution(distribution)
+            .withSortOrders(sortOrders)
+            .build();
+
     if (tables.containsKey(ident)) {
       throw new TableAlreadyExistsException("Table " + ident + " already exists");
     } else {

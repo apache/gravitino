@@ -17,6 +17,7 @@ import com.datastrato.graviton.exceptions.NoSuchMetalakeException;
 import com.datastrato.graviton.meta.AuditInfo;
 import com.datastrato.graviton.meta.BaseMetalake;
 import com.datastrato.graviton.meta.SchemaVersion;
+import com.datastrato.graviton.storage.RandomIdGenerator;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Sets;
 import java.io.IOException;
@@ -57,7 +58,7 @@ public class TestCatalogManager {
             .build();
     entityStore.put(metalakeEntity, true);
 
-    catalogManager = new CatalogManager(config, entityStore);
+    catalogManager = new CatalogManager(config, entityStore, new RandomIdGenerator());
   }
 
   @AfterAll

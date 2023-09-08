@@ -55,7 +55,6 @@ public class TestEntity {
     CatalogEntity testCatalog =
         new CatalogEntity.Builder()
             .withId(catalogId)
-            .withMetalakeId(metalakeId)
             .withName(catalogName)
             .withComment(catalogComment)
             .withType(type)
@@ -65,7 +64,6 @@ public class TestEntity {
 
     Map<Field, Object> fields = testCatalog.fields();
     Assertions.assertEquals(catalogId, fields.get(CatalogEntity.ID));
-    Assertions.assertEquals(metalakeId, fields.get(CatalogEntity.METALAKE_ID));
     Assertions.assertEquals(catalogName, fields.get(CatalogEntity.NAME));
     Assertions.assertEquals(catalogComment, fields.get(CatalogEntity.COMMENT));
     Assertions.assertEquals(type, fields.get(CatalogEntity.TYPE));

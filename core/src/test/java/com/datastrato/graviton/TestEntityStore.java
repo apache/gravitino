@@ -157,22 +157,28 @@ public class TestEntityStore {
             .withName("catalog")
             .withNamespace(Namespace.of("metalake"))
             .withType(TestCatalog.Type.RELATIONAL)
-            .withMetalakeId(1L)
             .withAuditInfo(auditInfo)
             .build();
 
-    TestColumn column = new TestColumn("column", "comment", TypeCreator.NULLABLE.I8);
+    TestColumn column =
+        new TestColumn.Builder()
+            .withName("column")
+            .withComment("comment")
+            .withType(TypeCreator.NULLABLE.I8)
+            .build();
 
     TestTable table =
-        new TestTable(
-            "table",
-            Namespace.of("metalake", "catalog", "db"),
-            "comment",
-            Maps.newHashMap(),
-            auditInfo,
-            new Column[] {column},
-            null,
-            null);
+        new TestTable.Builder()
+            .withId(1L)
+            .withName("table")
+            .withNameSpace(Namespace.of("metalake", "catalog", "db"))
+            .withComment("comment")
+            .withProperties(Maps.newHashMap())
+            .withColumns(new Column[] {column})
+            .withAuditInfo(auditInfo)
+            .withDistribution(null)
+            .withSortOrders(null)
+            .build();
 
     InMemoryEntityStore store = new InMemoryEntityStore();
     store.initialize(Mockito.mock(Config.class));

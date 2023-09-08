@@ -20,10 +20,10 @@ import com.datastrato.graviton.exceptions.NoSuchCatalogException;
 import com.datastrato.graviton.exceptions.NoSuchEntityException;
 import com.datastrato.graviton.exceptions.NoSuchMetalakeException;
 import com.datastrato.graviton.meta.AuditInfo;
-import com.datastrato.graviton.meta.BaseMetalake;
 import com.datastrato.graviton.meta.CatalogEntity;
 import com.datastrato.graviton.rel.SupportsSchemas;
 import com.datastrato.graviton.rel.TableCatalog;
+import com.datastrato.graviton.storage.IdGenerator;
 import com.datastrato.graviton.utils.IsolatedClassLoader;
 import com.datastrato.graviton.utils.ThrowableFunction;
 import com.github.benmanes.caffeine.cache.Cache;
@@ -122,15 +122,19 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
 
   private final EntityStore store;
 
+  private final IdGenerator idGenerator;
+
   /**
    * Constructs a CatalogManager instance.
    *
    * @param config The configuration for the manager.
    * @param store The entity store to use.
+   * @param idGenerator The id generator to use.
    */
-  public CatalogManager(Config config, EntityStore store) {
+  public CatalogManager(Config config, EntityStore store, IdGenerator idGenerator) {
     this.config = config;
     this.store = store;
+    this.idGenerator = idGenerator;
 
     long cacheEvictionIntervalInMs = config.get(Configs.CATALOG_CACHE_EVICTION_INTERVAL_MS);
     this.catalogCache =
@@ -227,13 +231,15 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
           store.executeInTransaction(
               () -> {
                 NameIdentifier metalakeIdent = NameIdentifier.of(ident.namespace().levels());
-                BaseMetalake metalake =
-                    store.get(metalakeIdent, EntityType.METALAKE, BaseMetalake.class);
+                if (!store.exists(metalakeIdent, EntityType.METALAKE)) {
+                  LOG.warn("Metalake {} does not exist", metalakeIdent);
+                  throw new NoSuchMetalakeException(
+                      "Metalake " + metalakeIdent + " does not exist");
+                }
 
                 CatalogEntity e =
                     new CatalogEntity.Builder()
-                        .withId(1L /* TODO. use ID generator */)
-                        .withMetalakeId(metalake.getId())
+                        .withId(idGenerator.nextId())
                         .withName(ident.name())
                         .withNamespace(ident.namespace())
                         .withType(type)
@@ -250,10 +256,6 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
                 return e;
               });
       return catalogCache.get(ident, id -> createCatalogWrapper(entity)).catalog;
-
-    } catch (NoSuchEntityException ne) {
-      LOG.warn("Metalake {} does not exist", ident.namespace(), ne);
-      throw new NoSuchMetalakeException("Metalake " + ident.namespace() + " does not exist");
 
     } catch (EntityAlreadyExistsException ee) {
       LOG.warn("Catalog {} already exists", ident, ee);
@@ -290,8 +292,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
               catalog -> {
                 CatalogEntity.Builder newCatalogBuilder =
                     new CatalogEntity.Builder()
-                        .withId(catalog.getId())
-                        .withMetalakeId(catalog.getMetalakeId())
+                        .withId(catalog.id())
                         .withName(catalog.name())
                         .withNamespace(ident.namespace())
                         .withType(catalog.getType())
