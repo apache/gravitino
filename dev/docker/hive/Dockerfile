@@ -105,6 +105,7 @@ ADD yarn-env.sh ${HADOOP_CONF_DIR}/yarn-env.sh
 ADD hdfs-site.xml ${HADOOP_CONF_DIR}/hdfs-site.xml
 ADD mapred-site.xml ${HADOOP_CONF_DIR}/mapred-site.xml
 ADD yarn-site.xml ${HADOOP_CONF_DIR}/yarn-site.xml
+ADD check-status.sh /tmp/check-status.sh
 
 # format HFS
 RUN ${HADOOP_HOME}/bin/hdfs namenode -format -nonInteractive

@@ -69,7 +69,15 @@ jobs:
 
       - name: Integration Test
         run: |
-          gradle integrationTest
+          docker exec -it ${DOCKER_RUN_NAME} bash /tmp/check-status.sh 300
+          check_result=$?
+          if [[ ${check_result} -eq 0 ]]; then
+            echo "Hive server ready"
+            gradle integrationTest
+          else
+            echo "Hive server not ready"
+            exit 1
+          fi
 
       - name: Print logs when Graviton integration tests failure
         if: ${{ failure() }}
