@@ -104,19 +104,24 @@ public class GravitonServer extends ResourceConfig {
         .addShutdownHook(
             new Thread(
                 () -> {
-                  LOG.info("Shutting down Graviton Server ... ");
                   try {
-                    server.stop();
+                    // Register some clean-up tasks that need to be done before shutting down
                     Thread.sleep(server.serverConfig.get(ServerConfig.SERVER_SHUTDOWN_TIMEOUT));
                   } catch (InterruptedException e) {
                     LOG.error("Interrupted exception:", e);
                   } catch (Exception e) {
-                    LOG.error("Error while stopping servlet container", e);
+                    LOG.error("Error while running clean-up tasks in shutdown hook", e);
                   }
-                  LOG.info("Graviton Server has shut down.");
                 }));
 
     server.join();
-    server.stop();
+
+    LOG.info("Shutting down Graviton Server ... ");
+    try {
+      server.stop();
+      LOG.info("Graviton Server has shut down.");
+    } catch (Exception e) {
+      LOG.error("Error while stopping Graviton Server", e);
+    }
   }
 }
