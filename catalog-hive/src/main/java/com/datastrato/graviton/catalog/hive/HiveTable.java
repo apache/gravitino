@@ -13,6 +13,7 @@ import com.datastrato.graviton.catalog.hive.converter.ToHiveType;
 import com.datastrato.graviton.meta.AuditInfo;
 import com.datastrato.graviton.meta.rel.BaseTable;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import java.time.Instant;
 import java.util.Arrays;
@@ -160,13 +161,15 @@ public class HiveTable extends BaseTable {
       hiveTable.namespace = namespace;
       hiveTable.name = name;
       hiveTable.comment = comment;
-      hiveTable.properties = properties;
+      hiveTable.properties = properties != null ? Maps.newHashMap(properties) : Maps.newHashMap();
       hiveTable.auditInfo = auditInfo;
       hiveTable.columns = columns;
       hiveTable.location = location;
 
       // HMS put table comment in parameters
-      hiveTable.properties.put(HMS_TABLE_COMMENT, comment);
+      if (comment != null) {
+        hiveTable.properties.put(HMS_TABLE_COMMENT, comment);
+      }
 
       return hiveTable;
     }

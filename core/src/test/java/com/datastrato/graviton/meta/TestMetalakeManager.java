@@ -8,6 +8,7 @@ import com.datastrato.graviton.Config;
 import com.datastrato.graviton.EntityStore;
 import com.datastrato.graviton.MetalakeChange;
 import com.datastrato.graviton.NameIdentifier;
+import com.datastrato.graviton.StringIdentifier;
 import com.datastrato.graviton.TestEntityStore;
 import com.datastrato.graviton.exceptions.MetalakeAlreadyExistsException;
 import com.datastrato.graviton.exceptions.NoSuchMetalakeException;
@@ -57,7 +58,7 @@ public class TestMetalakeManager {
     BaseMetalake metalake = metalakeManager.createMetalake(ident, "comment", props);
     Assertions.assertEquals("test1", metalake.name());
     Assertions.assertEquals("comment", metalake.comment());
-    Assertions.assertEquals(props, metalake.properties());
+    testProperties(props, metalake.properties());
 
     // Test with MetalakeAlreadyExistsException
     Assertions.assertThrows(
@@ -87,12 +88,12 @@ public class TestMetalakeManager {
     BaseMetalake metalake = metalakeManager.createMetalake(ident, "comment", props);
     Assertions.assertEquals("test21", metalake.name());
     Assertions.assertEquals("comment", metalake.comment());
-    Assertions.assertEquals(props, metalake.properties());
+    testProperties(props, metalake.properties());
 
     BaseMetalake loadedMetalake = metalakeManager.loadMetalake(ident);
     Assertions.assertEquals("test21", loadedMetalake.name());
     Assertions.assertEquals("comment", loadedMetalake.comment());
-    Assertions.assertEquals(props, loadedMetalake.properties());
+    testProperties(props, loadedMetalake.properties());
 
     // Test with NoSuchMetalakeException
     Throwable exception =
@@ -110,14 +111,14 @@ public class TestMetalakeManager {
     BaseMetalake metalake = metalakeManager.createMetalake(ident, "comment", props);
     Assertions.assertEquals("test31", metalake.name());
     Assertions.assertEquals("comment", metalake.comment());
-    Assertions.assertEquals(props, metalake.properties());
+    testProperties(props, metalake.properties());
 
     // Test alter name;
     MetalakeChange change = MetalakeChange.rename("test32");
     BaseMetalake alteredMetalake = metalakeManager.alterMetalake(ident, change);
     Assertions.assertEquals("test32", alteredMetalake.name());
     Assertions.assertEquals("comment", alteredMetalake.comment());
-    Assertions.assertEquals(props, alteredMetalake.properties());
+    testProperties(props, alteredMetalake.properties());
 
     // Test alter comment;
     NameIdentifier ident1 = NameIdentifier.of("test32");
@@ -125,7 +126,7 @@ public class TestMetalakeManager {
     BaseMetalake alteredMetalake1 = metalakeManager.alterMetalake(ident1, change1);
     Assertions.assertEquals("test32", alteredMetalake1.name());
     Assertions.assertEquals("comment2", alteredMetalake1.comment());
-    Assertions.assertEquals(props, alteredMetalake1.properties());
+    testProperties(props, alteredMetalake1.properties());
 
     // test alter properties;
     MetalakeChange change2 = MetalakeChange.setProperty("key2", "value2");
@@ -137,7 +138,7 @@ public class TestMetalakeManager {
     Assertions.assertEquals("test32", alteredMetalake2.name());
     Assertions.assertEquals("comment2", alteredMetalake2.comment());
     Map<String, String> expectedProps = ImmutableMap.of("key1", "value1", "key2", "value2");
-    Assertions.assertEquals(expectedProps, alteredMetalake2.properties());
+    testProperties(expectedProps, alteredMetalake2.properties());
 
     // Test with NoSuchMetalakeException
     Throwable exception =
@@ -155,7 +156,7 @@ public class TestMetalakeManager {
     BaseMetalake metalake = metalakeManager.createMetalake(ident, "comment", props);
     Assertions.assertEquals("test41", metalake.name());
     Assertions.assertEquals("comment", metalake.comment());
-    Assertions.assertEquals(props, metalake.properties());
+    testProperties(props, metalake.properties());
 
     boolean dropped = metalakeManager.dropMetalake(ident);
     Assertions.assertTrue(dropped);
@@ -164,5 +165,16 @@ public class TestMetalakeManager {
     NameIdentifier ident1 = NameIdentifier.of("test42");
     boolean dropped1 = metalakeManager.dropMetalake(ident1);
     Assertions.assertFalse(dropped1);
+  }
+
+  private void testProperties(Map<String, String> expectedProps, Map<String, String> testProps) {
+    expectedProps.forEach(
+        (k, v) -> {
+          Assertions.assertEquals(v, testProps.get(k));
+        });
+
+    Assertions.assertTrue(testProps.containsKey(StringIdentifier.ID_KEY));
+    StringIdentifier StringId = StringIdentifier.fromString(testProps.get(StringIdentifier.ID_KEY));
+    Assertions.assertEquals(StringId.toString(), testProps.get(StringIdentifier.ID_KEY));
   }
 }

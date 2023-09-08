@@ -14,6 +14,7 @@ import com.datastrato.graviton.EntityStore;
 import com.datastrato.graviton.GravitonEnv;
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
+import com.datastrato.graviton.StringIdentifier;
 import com.datastrato.graviton.catalog.CatalogOperations;
 import com.datastrato.graviton.catalog.hive.converter.ToHiveType;
 import com.datastrato.graviton.exceptions.NoSuchCatalogException;
@@ -157,16 +158,19 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
     try {
       EntityStore store = GravitonEnv.getInstance().entityStore();
+      long uid = GravitonEnv.getInstance().idGenerator().nextId();
+      StringIdentifier stringId = StringIdentifier.fromId(uid);
+
       HiveSchema hiveSchema =
           store.executeInTransaction(
               () -> {
                 HiveSchema createdSchema =
                     new HiveSchema.Builder()
-                        .withId(GravitonEnv.getInstance().idGenerator().nextId())
+                        .withId(uid)
                         .withName(ident.name())
                         .withNamespace(ident.namespace())
                         .withComment(comment)
-                        .withProperties(metadata)
+                        .withProperties(StringIdentifier.addToProperties(stringId, metadata))
                         .withAuditInfo(
                             new AuditInfo.Builder()
                                 .withCreator(currentUser())
@@ -599,17 +603,20 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       HiveSchema schema = loadSchema(schemaIdent);
 
       EntityStore store = GravitonEnv.getInstance().entityStore();
+      long uid = GravitonEnv.getInstance().idGenerator().nextId();
+      StringIdentifier stringId = StringIdentifier.fromId(uid);
+
       HiveTable hiveTable =
           store.executeInTransaction(
               () -> {
                 HiveTable createdTable =
                     new HiveTable.Builder()
-                        .withId(GravitonEnv.getInstance().idGenerator().nextId())
+                        .withId(uid)
                         .withName(tableIdent.name())
                         .withNameSpace(tableIdent.namespace())
                         .withColumns(columns)
                         .withComment(comment)
-                        .withProperties(properties)
+                        .withProperties(StringIdentifier.addToProperties(stringId, properties))
                         .withAuditInfo(
                             new AuditInfo.Builder()
                                 .withCreator(currentUser())
