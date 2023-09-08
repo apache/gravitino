@@ -146,14 +146,16 @@ public class TestTableOperations extends JerseyTest {
           mockColumn("col2", TypeCreator.NULLABLE.I8)
         };
     Table table = mockTable("table1", columns, "mock comment", ImmutableMap.of("k1", "v1"));
-    when(dispatcher.createTable(any(), any(), any(), any())).thenReturn(table);
+    when(dispatcher.createTable(any(), any(), any(), any(), any(), any())).thenReturn(table);
 
     TableCreateRequest req =
         new TableCreateRequest(
             "table1",
             "mock comment",
             Arrays.stream(columns).map(DTOConverters::toDTO).toArray(ColumnDTO[]::new),
-            ImmutableMap.of("k1", "v1"));
+            ImmutableMap.of("k1", "v1"),
+            null,
+            null);
 
     Response resp =
         target(tablePath(metalake, catalog, schema))
@@ -184,7 +186,7 @@ public class TestTableOperations extends JerseyTest {
     // Test throw NoSuchSchemaException
     doThrow(new NoSuchSchemaException("mock error"))
         .when(dispatcher)
-        .createTable(any(), any(), any(), any());
+        .createTable(any(), any(), any(), any(), any(), any());
 
     Response resp1 =
         target(tablePath(metalake, catalog, schema))
@@ -201,7 +203,7 @@ public class TestTableOperations extends JerseyTest {
     // Test throw TableAlreadyExistsException
     doThrow(new TableAlreadyExistsException("mock error"))
         .when(dispatcher)
-        .createTable(any(), any(), any(), any());
+        .createTable(any(), any(), any(), any(), any(), any());
 
     Response resp2 =
         target(tablePath(metalake, catalog, schema))
@@ -219,7 +221,7 @@ public class TestTableOperations extends JerseyTest {
     // Test throw RuntimeException
     doThrow(new RuntimeException("mock error"))
         .when(dispatcher)
-        .createTable(any(), any(), any(), any());
+        .createTable(any(), any(), any(), any(), any(), any());
 
     Response resp3 =
         target(tablePath(metalake, catalog, schema))

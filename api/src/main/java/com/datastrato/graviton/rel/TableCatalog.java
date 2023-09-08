@@ -20,8 +20,10 @@
 
 package com.datastrato.graviton.rel;
 
+import com.datastrato.graviton.Distribution;
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
+import com.datastrato.graviton.SortOrder;
 import com.datastrato.graviton.exceptions.NoSuchSchemaException;
 import com.datastrato.graviton.exceptions.NoSuchTableException;
 import com.datastrato.graviton.exceptions.TableAlreadyExistsException;
@@ -72,12 +74,19 @@ public interface TableCatalog {
    * @param columns The columns of the new table.
    * @param comment The table comment.
    * @param properties The table properties.
+   * @param distribution The distribution of the table
+   * @param sortOrders The sort orders of the table
    * @return Fhe created table metadata.
    * @throws NoSuchSchemaException If the schema does not exist.
    * @throws TableAlreadyExistsException If the table already exists.
    */
   Table createTable(
-      NameIdentifier ident, Column[] columns, String comment, Map<String, String> properties)
+      NameIdentifier ident,
+      Column[] columns,
+      String comment,
+      Map<String, String> properties,
+      Distribution distribution,
+      SortOrder[] sortOrders)
       throws NoSuchSchemaException, TableAlreadyExistsException;
 
   /**

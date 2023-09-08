@@ -4,8 +4,10 @@
  */
 package com.datastrato.graviton.server.web.rest;
 
+import com.datastrato.graviton.Distribution;
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
+import com.datastrato.graviton.SortOrder;
 import com.datastrato.graviton.catalog.CatalogOperationDispatcher;
 import com.datastrato.graviton.dto.requests.TableCreateRequest;
 import com.datastrato.graviton.dto.requests.TableUpdateRequest;
@@ -16,6 +18,7 @@ import com.datastrato.graviton.dto.responses.TableResponse;
 import com.datastrato.graviton.rel.Table;
 import com.datastrato.graviton.rel.TableChange;
 import com.datastrato.graviton.server.web.Utils;
+import java.util.Arrays;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.DELETE;
@@ -70,9 +73,27 @@ public class TableOperations {
     try {
       request.validate();
       NameIdentifier ident = NameIdentifier.ofTable(metalake, catalog, schema, request.getName());
+
+      SortOrder[] sortOrders =
+          request.getSortOrders() == null
+              ? null
+              : Arrays.stream(request.getSortOrders())
+                  .map(com.datastrato.graviton.dto.util.DTOConverters::toDTO)
+                  .toArray(SortOrder[]::new);
+      Distribution distribution =
+          request.getDistribution() == null
+              ? null
+              : com.datastrato.graviton.dto.util.DTOConverters.toDTO(request.getDistribution());
+
       Table table =
           dispatcher.createTable(
-              ident, request.getColumns(), request.getComment(), request.getProperties());
+              ident,
+              request.getColumns(),
+              request.getComment(),
+              request.getProperties(),
+              distribution,
+              sortOrders);
+
       return Utils.ok(new TableResponse(DTOConverters.toDTO(table)));
 
     } catch (Exception e) {

@@ -50,13 +50,26 @@ public class TestCatalogOperations implements CatalogOperations, TableCatalog {
 
   @Override
   public Table createTable(
-      NameIdentifier ident, Column[] columns, String comment, Map<String, String> properties)
+      NameIdentifier ident,
+      Column[] columns,
+      String comment,
+      Map<String, String> properties,
+      Distribution distribution,
+      SortOrder[] sortOrders)
       throws NoSuchSchemaException, TableAlreadyExistsException {
     AuditInfo auditInfo =
         new AuditInfo.Builder().withCreator("test").withCreateTime(Instant.now()).build();
 
     TestTable table =
-        new TestTable(ident.name(), ident.namespace(), comment, properties, auditInfo, columns);
+        new TestTable(
+            ident.name(),
+            ident.namespace(),
+            comment,
+            properties,
+            auditInfo,
+            columns,
+            distribution,
+            sortOrders);
     if (tables.containsKey(ident)) {
       throw new TableAlreadyExistsException("Table " + ident + " already exists");
     } else {

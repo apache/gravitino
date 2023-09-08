@@ -5,19 +5,25 @@
 package com.datastrato.graviton.dto.requests;
 
 import com.datastrato.graviton.dto.rel.ColumnDTO;
+import com.datastrato.graviton.dto.rel.DistributionDTO;
+import com.datastrato.graviton.dto.rel.SortOrderDTO;
 import com.datastrato.graviton.rest.RESTRequest;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import java.util.Map;
 import javax.annotation.Nullable;
+import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
+import lombok.extern.jackson.Jacksonized;
 import org.apache.commons.lang3.StringUtils;
 
 @Getter
 @EqualsAndHashCode
 @ToString
+@Builder
+@Jacksonized
 public class TableCreateRequest implements RESTRequest {
 
   @JsonProperty("name")
@@ -34,16 +40,23 @@ public class TableCreateRequest implements RESTRequest {
   @JsonProperty("properties")
   private final Map<String, String> properties;
 
-  public TableCreateRequest() {
-    this(null, null, null, null);
-  }
+  @Nullable private final SortOrderDTO[] sortOrders;
+
+  @Nullable private final DistributionDTO distribution;
 
   public TableCreateRequest(
-      String name, String comment, ColumnDTO[] columns, Map<String, String> properties) {
+      String name,
+      String comment,
+      ColumnDTO[] columns,
+      Map<String, String> properties,
+      SortOrderDTO[] sortOrders,
+      DistributionDTO distribution) {
     this.name = name;
     this.columns = columns;
     this.comment = comment;
     this.properties = properties;
+    this.sortOrders = sortOrders;
+    this.distribution = distribution;
   }
 
   @Override

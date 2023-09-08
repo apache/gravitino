@@ -170,7 +170,9 @@ public class TestEntityStore {
             "comment",
             Maps.newHashMap(),
             auditInfo,
-            new Column[] {column});
+            new Column[] {column},
+            null,
+            null);
 
     InMemoryEntityStore store = new InMemoryEntityStore();
     store.initialize(Mockito.mock(Config.class));

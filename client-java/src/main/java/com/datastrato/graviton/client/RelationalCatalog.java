@@ -4,11 +4,14 @@
  */
 package com.datastrato.graviton.client;
 
+import com.datastrato.graviton.Distribution;
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
+import com.datastrato.graviton.SortOrder;
 import com.datastrato.graviton.dto.AuditDTO;
 import com.datastrato.graviton.dto.CatalogDTO;
 import com.datastrato.graviton.dto.rel.ColumnDTO;
+import com.datastrato.graviton.dto.rel.SortOrderDTO;
 import com.datastrato.graviton.dto.requests.SchemaCreateRequest;
 import com.datastrato.graviton.dto.requests.SchemaUpdateRequest;
 import com.datastrato.graviton.dto.requests.SchemaUpdatesRequest;
@@ -131,12 +134,27 @@ public class RelationalCatalog extends CatalogDTO implements TableCatalog, Suppo
    */
   @Override
   public Table createTable(
-      NameIdentifier ident, Column[] columns, String comment, Map<String, String> properties)
+      NameIdentifier ident,
+      Column[] columns,
+      String comment,
+      Map<String, String> properties,
+      Distribution distribution,
+      SortOrder[] sortOrders)
       throws NoSuchSchemaException, TableAlreadyExistsException {
     NameIdentifier.checkTable(ident);
 
+    SortOrderDTO[] sortOrderDTOS =
+        Arrays.stream(sortOrders)
+            .map(com.datastrato.graviton.dto.util.DTOConverters::fromSortOrder)
+            .toArray(SortOrderDTO[]::new);
     TableCreateRequest req =
-        new TableCreateRequest(ident.name(), comment, (ColumnDTO[]) columns, properties);
+        new TableCreateRequest(
+            ident.name(),
+            comment,
+            (ColumnDTO[]) columns,
+            properties,
+            sortOrderDTOS,
+            com.datastrato.graviton.dto.util.DTOConverters.fromDistrition(distribution));
     req.validate();
 
     TableResponse resp =

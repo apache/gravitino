@@ -29,6 +29,12 @@ public class TableDTO implements Table {
   @JsonProperty("audit")
   private AuditDTO audit;
 
+  @JsonProperty("distribution")
+  private DistributionDTO distribution;
+
+  @JsonProperty("sortOrders")
+  private SortOrderDTO[] sortOrders;
+
   private TableDTO() {}
 
   /**
@@ -45,12 +51,16 @@ public class TableDTO implements Table {
       String comment,
       ColumnDTO[] columns,
       Map<String, String> properties,
-      AuditDTO audit) {
+      AuditDTO audit,
+      DistributionDTO distribution,
+      SortOrderDTO[] sortOrderDTOS) {
     this.name = name;
     this.comment = comment;
     this.columns = columns;
     this.properties = properties;
     this.audit = audit;
+    this.distribution = distribution;
+    this.sortOrders = sortOrderDTOS;
   }
 
   @Override
@@ -98,6 +108,8 @@ public class TableDTO implements Table {
     protected ColumnDTO[] columns;
     protected Map<String, String> properties;
     protected AuditDTO audit;
+    protected SortOrderDTO[] sortOrderDTOS;
+    protected DistributionDTO distributionDTO;
 
     public Builder() {}
 
@@ -156,6 +168,16 @@ public class TableDTO implements Table {
       return (S) this;
     }
 
+    public S withDistribution(DistributionDTO distributionDTO) {
+      this.distributionDTO = distributionDTO;
+      return (S) this;
+    }
+
+    public S withSortOrders(SortOrderDTO[] sortOrderDTOS) {
+      this.sortOrderDTOS = sortOrderDTOS;
+      return (S) this;
+    }
+
     /**
      * Builds a Table DTO based on the provided builder parameters.
      *
@@ -168,7 +190,8 @@ public class TableDTO implements Table {
           columns != null && columns.length > 0, "columns cannot be null or empty");
       Preconditions.checkArgument(audit != null, "audit cannot be null");
 
-      return new TableDTO(name, comment, columns, properties, audit);
+      return new TableDTO(
+          name, comment, columns, properties, audit, distributionDTO, sortOrderDTOS);
     }
   }
 }

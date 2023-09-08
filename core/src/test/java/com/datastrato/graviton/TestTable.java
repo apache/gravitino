@@ -35,19 +35,27 @@ public class TestTable implements Table, Entity, HasIdentifier, Auditable {
 
   private Column[] columns;
 
+  private Distribution distribution;
+
+  private SortOrder[] sortOrders;
+
   public TestTable(
       String name,
       Namespace namespace,
       String comment,
       Map<String, String> properties,
       AuditInfo auditInfo,
-      Column[] columns) {
+      Column[] columns,
+      Distribution distribution,
+      SortOrder[] sortOrders) {
     this.name = name;
     this.namespace = namespace;
     this.comment = comment;
     this.properties = properties;
     this.auditInfo = auditInfo;
     this.columns = columns;
+    this.sortOrders = sortOrders;
+    this.distribution = distribution;
 
     validate();
   }

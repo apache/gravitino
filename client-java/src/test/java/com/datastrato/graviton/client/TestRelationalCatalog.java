@@ -13,10 +13,14 @@ import static org.apache.hc.core5.http.HttpStatus.SC_OK;
 import com.datastrato.graviton.Catalog;
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
+import com.datastrato.graviton.SortOrder;
 import com.datastrato.graviton.dto.AuditDTO;
 import com.datastrato.graviton.dto.CatalogDTO;
 import com.datastrato.graviton.dto.rel.ColumnDTO;
+import com.datastrato.graviton.dto.rel.DistributionDTO;
+import com.datastrato.graviton.dto.rel.ExpressionPartitionDTO.FieldExpression;
 import com.datastrato.graviton.dto.rel.SchemaDTO;
+import com.datastrato.graviton.dto.rel.SortOrderDTO;
 import com.datastrato.graviton.dto.rel.TableDTO;
 import com.datastrato.graviton.dto.requests.CatalogCreateRequest;
 import com.datastrato.graviton.dto.requests.SchemaCreateRequest;
@@ -31,6 +35,7 @@ import com.datastrato.graviton.dto.responses.EntityListResponse;
 import com.datastrato.graviton.dto.responses.ErrorResponse;
 import com.datastrato.graviton.dto.responses.SchemaResponse;
 import com.datastrato.graviton.dto.responses.TableResponse;
+import com.datastrato.graviton.dto.util.DTOConverters;
 import com.datastrato.graviton.exceptions.NoSuchCatalogException;
 import com.datastrato.graviton.exceptions.NoSuchSchemaException;
 import com.datastrato.graviton.exceptions.NoSuchTableException;
@@ -47,6 +52,7 @@ import com.google.common.collect.ImmutableMap;
 import io.substrait.type.Type;
 import io.substrait.type.TypeCreator;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Map;
 import org.apache.hc.core5.http.Method;
@@ -317,15 +323,48 @@ public class TestRelationalCatalog extends TestBase {
           createMockColumn("col1", TypeCreator.NULLABLE.I8, "comment1"),
           createMockColumn("col2", TypeCreator.NULLABLE.STRING, "comment2")
         };
-    TableDTO expectedTable = createMockTable("table1", columns, "comment", Collections.emptyMap());
+    SortOrderDTO[] sortOrderDTOS =
+        new SortOrderDTO[] {
+          new SortOrderDTO.Builder()
+              .withDirection(SortOrderDTO.Direction.DESC)
+              .withNullOrder(SortOrderDTO.NullOrder.FIRST)
+              .withExpression(
+                  new FieldExpression.Builder().withFieldName(new String[] {"col_2"}).build())
+              .build()
+        };
+    DistributionDTO distributionDTO =
+        new DistributionDTO.Builder()
+            .withDistMethod(DistributionDTO.DistributionMethod.HASH)
+            .withDistNum(10)
+            .withExpressions(
+                ImmutableList.of(
+                    new FieldExpression.Builder().withFieldName(new String[] {"col_1"}).build()))
+            .build();
 
+    TableDTO expectedTable =
+        createMockTable(
+            "table1", columns, "comment", Collections.emptyMap(), distributionDTO, sortOrderDTOS);
     TableCreateRequest req =
-        new TableCreateRequest(tableId.name(), "comment", columns, Collections.emptyMap());
+        new TableCreateRequest(
+            tableId.name(),
+            "comment",
+            columns,
+            Collections.emptyMap(),
+            sortOrderDTOS,
+            distributionDTO);
     TableResponse resp = new TableResponse(expectedTable);
     buildMockResource(Method.POST, tablePath, req, resp, SC_OK);
 
     Table table =
-        catalog.asTableCatalog().createTable(tableId, columns, "comment", Collections.emptyMap());
+        catalog
+            .asTableCatalog()
+            .createTable(
+                tableId,
+                columns,
+                "comment",
+                Collections.emptyMap(),
+                DTOConverters.toDTO(distributionDTO),
+                Arrays.stream(sortOrderDTOS).map(DTOConverters::toDTO).toArray(SortOrder[]::new));
     Assertions.assertEquals(expectedTable.name(), table.name());
     Assertions.assertEquals(expectedTable.comment(), table.comment());
     Assertions.assertEquals(expectedTable.properties(), table.properties());
@@ -350,7 +389,15 @@ public class TestRelationalCatalog extends TestBase {
             () ->
                 catalog
                     .asTableCatalog()
-                    .createTable(tableId, columns, "comment", Collections.emptyMap()));
+                    .createTable(
+                        tableId,
+                        columns,
+                        "comment",
+                        Collections.emptyMap(),
+                        DTOConverters.toDTO(distributionDTO),
+                        Arrays.stream(sortOrderDTOS)
+                            .map(DTOConverters::toDTO)
+                            .toArray(SortOrder[]::new)));
     Assertions.assertTrue(ex.getMessage().contains("schema not found"));
 
     // Test throw TableAlreadyExistsException
@@ -365,7 +412,15 @@ public class TestRelationalCatalog extends TestBase {
             () ->
                 catalog
                     .asTableCatalog()
-                    .createTable(tableId, columns, "comment", Collections.emptyMap()));
+                    .createTable(
+                        tableId,
+                        columns,
+                        "comment",
+                        Collections.emptyMap(),
+                        DTOConverters.toDTO(distributionDTO),
+                        Arrays.stream(sortOrderDTOS)
+                            .map(DTOConverters::toDTO)
+                            .toArray(SortOrder[]::new)));
     Assertions.assertTrue(ex1.getMessage().contains("table already exists"));
   }
 
@@ -380,7 +435,29 @@ public class TestRelationalCatalog extends TestBase {
           createMockColumn("col1", TypeCreator.NULLABLE.I8, "comment1"),
           createMockColumn("col2", TypeCreator.NULLABLE.STRING, "comment2")
         };
-    TableDTO expectedTable = createMockTable("table1", columns, "comment", Collections.emptyMap());
+
+    DistributionDTO distributionDTO =
+        new DistributionDTO.Builder()
+            .withDistMethod(DistributionDTO.DistributionMethod.HASH)
+            .withDistNum(10)
+            .withExpressions(
+                ImmutableList.of(
+                    new FieldExpression.Builder().withFieldName(new String[] {"col_1"}).build()))
+            .build();
+
+    SortOrderDTO[] sortOrderDTOS =
+        new SortOrderDTO[] {
+          new SortOrderDTO.Builder()
+              .withDirection(SortOrderDTO.Direction.DESC)
+              .withNullOrder(SortOrderDTO.NullOrder.FIRST)
+              .withExpression(
+                  new FieldExpression.Builder().withFieldName(new String[] {"col_2"}).build())
+              .build()
+        };
+
+    TableDTO expectedTable =
+        createMockTable(
+            "table1", columns, "comment", Collections.emptyMap(), distributionDTO, sortOrderDTOS);
 
     TableResponse resp = new TableResponse(expectedTable);
     buildMockResource(Method.GET, tablePath, null, resp, SC_OK);
@@ -415,7 +492,28 @@ public class TestRelationalCatalog extends TestBase {
     NameIdentifier tableId = NameIdentifier.of(metalakeName, catalogName, "schema1", "table1");
     ColumnDTO[] columns =
         new ColumnDTO[] {createMockColumn("col1", TypeCreator.NULLABLE.I8, "comment1")};
-    TableDTO expectedTable = createMockTable("table2", columns, "comment", Collections.emptyMap());
+    DistributionDTO distributionDTO =
+        new DistributionDTO.Builder()
+            .withDistMethod(DistributionDTO.DistributionMethod.HASH)
+            .withDistNum(10)
+            .withExpressions(
+                ImmutableList.of(
+                    new FieldExpression.Builder().withFieldName(new String[] {"col_1"}).build()))
+            .build();
+
+    SortOrderDTO[] sortOrderDTOS =
+        new SortOrderDTO[] {
+          new SortOrderDTO.Builder()
+              .withDirection(SortOrderDTO.Direction.DESC)
+              .withNullOrder(SortOrderDTO.NullOrder.FIRST)
+              .withExpression(
+                  new FieldExpression.Builder().withFieldName(new String[] {"col_2"}).build())
+              .build()
+        };
+
+    TableDTO expectedTable =
+        createMockTable(
+            "table2", columns, "comment", Collections.emptyMap(), distributionDTO, sortOrderDTOS);
     TableUpdateRequest.RenameTableRequest req =
         new TableUpdateRequest.RenameTableRequest(expectedTable.name());
 
@@ -427,7 +525,27 @@ public class TestRelationalCatalog extends TestBase {
     NameIdentifier tableId = NameIdentifier.of(metalakeName, catalogName, "schema1", "table1");
     ColumnDTO[] columns =
         new ColumnDTO[] {createMockColumn("col1", TypeCreator.NULLABLE.I8, "comment1")};
-    TableDTO expectedTable = createMockTable("table1", columns, "comment2", Collections.emptyMap());
+    DistributionDTO distributionDTO =
+        new DistributionDTO.Builder()
+            .withDistMethod(DistributionDTO.DistributionMethod.HASH)
+            .withDistNum(10)
+            .withExpressions(
+                ImmutableList.of(
+                    new FieldExpression.Builder().withFieldName(new String[] {"col_1"}).build()))
+            .build();
+
+    SortOrderDTO[] sortOrderDTOS =
+        new SortOrderDTO[] {
+          new SortOrderDTO.Builder()
+              .withDirection(SortOrderDTO.Direction.DESC)
+              .withNullOrder(SortOrderDTO.NullOrder.FIRST)
+              .withExpression(
+                  new FieldExpression.Builder().withFieldName(new String[] {"col_2"}).build())
+              .build()
+        };
+    TableDTO expectedTable =
+        createMockTable(
+            "table1", columns, "comment2", Collections.emptyMap(), distributionDTO, sortOrderDTOS);
     TableUpdateRequest.UpdateTableCommentRequest req =
         new TableUpdateRequest.UpdateTableCommentRequest(expectedTable.comment());
 
@@ -440,7 +558,27 @@ public class TestRelationalCatalog extends TestBase {
     ColumnDTO[] columns =
         new ColumnDTO[] {createMockColumn("col1", TypeCreator.NULLABLE.I8, "comment1")};
     Map<String, String> properties = ImmutableMap.of("k1", "v1");
-    TableDTO expectedTable = createMockTable("table1", columns, "comment", properties);
+    DistributionDTO distributionDTO =
+        new DistributionDTO.Builder()
+            .withDistMethod(DistributionDTO.DistributionMethod.HASH)
+            .withDistNum(10)
+            .withExpressions(
+                ImmutableList.of(
+                    new FieldExpression.Builder().withFieldName(new String[] {"col_1"}).build()))
+            .build();
+
+    SortOrderDTO[] sortOrderDTOS =
+        new SortOrderDTO[] {
+          new SortOrderDTO.Builder()
+              .withDirection(SortOrderDTO.Direction.DESC)
+              .withNullOrder(SortOrderDTO.NullOrder.FIRST)
+              .withExpression(
+                  new FieldExpression.Builder().withFieldName(new String[] {"col_2"}).build())
+              .build()
+        };
+
+    TableDTO expectedTable =
+        createMockTable("table1", columns, "comment", properties, distributionDTO, sortOrderDTOS);
     TableUpdateRequest.SetTablePropertyRequest req =
         new TableUpdateRequest.SetTablePropertyRequest("k1", "v1");
 
@@ -452,7 +590,28 @@ public class TestRelationalCatalog extends TestBase {
     NameIdentifier tableId = NameIdentifier.of(metalakeName, catalogName, "schema1", "table1");
     ColumnDTO[] columns =
         new ColumnDTO[] {createMockColumn("col1", TypeCreator.NULLABLE.I8, "comment1")};
-    TableDTO expectedTable = createMockTable("table1", columns, "comment", Collections.emptyMap());
+    DistributionDTO distributionDTO =
+        new DistributionDTO.Builder()
+            .withDistMethod(DistributionDTO.DistributionMethod.HASH)
+            .withDistNum(10)
+            .withExpressions(
+                ImmutableList.of(
+                    new FieldExpression.Builder().withFieldName(new String[] {"col_1"}).build()))
+            .build();
+
+    SortOrderDTO[] sortOrderDTOS =
+        new SortOrderDTO[] {
+          new SortOrderDTO.Builder()
+              .withDirection(SortOrderDTO.Direction.DESC)
+              .withNullOrder(SortOrderDTO.NullOrder.FIRST)
+              .withExpression(
+                  new FieldExpression.Builder().withFieldName(new String[] {"col_2"}).build())
+              .build()
+        };
+
+    TableDTO expectedTable =
+        createMockTable(
+            "table1", columns, "comment", Collections.emptyMap(), distributionDTO, sortOrderDTOS);
     TableUpdateRequest.RemoveTablePropertyRequest req =
         new TableUpdateRequest.RemoveTablePropertyRequest("k1");
 
@@ -467,7 +626,29 @@ public class TestRelationalCatalog extends TestBase {
           createMockColumn("col1", TypeCreator.NULLABLE.I8, "comment1"),
           createMockColumn("col2", TypeCreator.NULLABLE.STRING, "comment2")
         };
-    TableDTO expectedTable = createMockTable("table1", columns, "comment", Collections.emptyMap());
+
+    DistributionDTO distributionDTO =
+        new DistributionDTO.Builder()
+            .withDistMethod(DistributionDTO.DistributionMethod.HASH)
+            .withDistNum(10)
+            .withExpressions(
+                ImmutableList.of(
+                    new FieldExpression.Builder().withFieldName(new String[] {"col_1"}).build()))
+            .build();
+
+    SortOrderDTO[] sortOrderDTOS =
+        new SortOrderDTO[] {
+          new SortOrderDTO.Builder()
+              .withDirection(SortOrderDTO.Direction.DESC)
+              .withNullOrder(SortOrderDTO.NullOrder.FIRST)
+              .withExpression(
+                  new FieldExpression.Builder().withFieldName(new String[] {"col_2"}).build())
+              .build()
+        };
+    TableDTO expectedTable =
+        createMockTable(
+            "table1", columns, "comment", Collections.emptyMap(), distributionDTO, sortOrderDTOS);
+
     TableUpdateRequest.AddTableColumnRequest req =
         new TableUpdateRequest.AddTableColumnRequest(
             new String[] {"col2"},
@@ -486,7 +667,29 @@ public class TestRelationalCatalog extends TestBase {
           createMockColumn("col1", TypeCreator.NULLABLE.I8, "comment1"),
           createMockColumn("col3", TypeCreator.NULLABLE.STRING, "comment2")
         };
-    TableDTO expectedTable = createMockTable("table1", columns, "comment", Collections.emptyMap());
+
+    DistributionDTO distributionDTO =
+        new DistributionDTO.Builder()
+            .withDistMethod(DistributionDTO.DistributionMethod.HASH)
+            .withDistNum(10)
+            .withExpressions(
+                ImmutableList.of(
+                    new FieldExpression.Builder().withFieldName(new String[] {"col_1"}).build()))
+            .build();
+
+    SortOrderDTO[] sortOrderDTOS =
+        new SortOrderDTO[] {
+          new SortOrderDTO.Builder()
+              .withDirection(SortOrderDTO.Direction.DESC)
+              .withNullOrder(SortOrderDTO.NullOrder.FIRST)
+              .withExpression(
+                  new FieldExpression.Builder().withFieldName(new String[] {"col_2"}).build())
+              .build()
+        };
+
+    TableDTO expectedTable =
+        createMockTable(
+            "table1", columns, "comment", Collections.emptyMap(), distributionDTO, sortOrderDTOS);
     TableUpdateRequest.RenameTableColumnRequest req =
         new TableUpdateRequest.RenameTableColumnRequest(new String[] {"col2"}, "col3");
 
@@ -498,7 +701,28 @@ public class TestRelationalCatalog extends TestBase {
     NameIdentifier tableId = NameIdentifier.of(metalakeName, catalogName, "schema1", "table1");
     ColumnDTO[] columns =
         new ColumnDTO[] {createMockColumn("col1", TypeCreator.NULLABLE.I8, "comment2")};
-    TableDTO expectedTable = createMockTable("table1", columns, "comment", Collections.emptyMap());
+    DistributionDTO distributionDTO =
+        new DistributionDTO.Builder()
+            .withDistMethod(DistributionDTO.DistributionMethod.HASH)
+            .withDistNum(10)
+            .withExpressions(
+                ImmutableList.of(
+                    new FieldExpression.Builder().withFieldName(new String[] {"col_1"}).build()))
+            .build();
+
+    SortOrderDTO[] sortOrderDTOS =
+        new SortOrderDTO[] {
+          new SortOrderDTO.Builder()
+              .withDirection(SortOrderDTO.Direction.DESC)
+              .withNullOrder(SortOrderDTO.NullOrder.FIRST)
+              .withExpression(
+                  new FieldExpression.Builder().withFieldName(new String[] {"col_2"}).build())
+              .build()
+        };
+
+    TableDTO expectedTable =
+        createMockTable(
+            "table1", columns, "comment", Collections.emptyMap(), distributionDTO, sortOrderDTOS);
     TableUpdateRequest.UpdateTableColumnCommentRequest req =
         new TableUpdateRequest.UpdateTableColumnCommentRequest(new String[] {"col1"}, "comment2");
 
@@ -510,7 +734,27 @@ public class TestRelationalCatalog extends TestBase {
     NameIdentifier tableId = NameIdentifier.of(metalakeName, catalogName, "schema1", "table1");
     ColumnDTO[] columns =
         new ColumnDTO[] {createMockColumn("col1", TypeCreator.NULLABLE.STRING, "comment1")};
-    TableDTO expectedTable = createMockTable("table1", columns, "comment", Collections.emptyMap());
+    DistributionDTO distributionDTO =
+        new DistributionDTO.Builder()
+            .withDistMethod(DistributionDTO.DistributionMethod.HASH)
+            .withDistNum(10)
+            .withExpressions(
+                ImmutableList.of(
+                    new FieldExpression.Builder().withFieldName(new String[] {"col_1"}).build()))
+            .build();
+
+    SortOrderDTO[] sortOrderDTOS =
+        new SortOrderDTO[] {
+          new SortOrderDTO.Builder()
+              .withDirection(SortOrderDTO.Direction.DESC)
+              .withNullOrder(SortOrderDTO.NullOrder.FIRST)
+              .withExpression(
+                  new FieldExpression.Builder().withFieldName(new String[] {"col_2"}).build())
+              .build()
+        };
+    TableDTO expectedTable =
+        createMockTable(
+            "table1", columns, "comment", Collections.emptyMap(), distributionDTO, sortOrderDTOS);
     TableUpdateRequest.UpdateTableColumnTypeRequest req =
         new TableUpdateRequest.UpdateTableColumnTypeRequest(
             new String[] {"col1"}, TypeCreator.NULLABLE.STRING);
@@ -526,7 +770,28 @@ public class TestRelationalCatalog extends TestBase {
           createMockColumn("col1", TypeCreator.NULLABLE.I8, "comment1"),
           createMockColumn("col2", TypeCreator.NULLABLE.STRING, "comment2")
         };
-    TableDTO expectedTable = createMockTable("table1", columns, "comment", Collections.emptyMap());
+
+    DistributionDTO distributionDTO =
+        new DistributionDTO.Builder()
+            .withDistMethod(DistributionDTO.DistributionMethod.HASH)
+            .withDistNum(10)
+            .withExpressions(
+                ImmutableList.of(
+                    new FieldExpression.Builder().withFieldName(new String[] {"col_1"}).build()))
+            .build();
+
+    SortOrderDTO[] sortOrderDTOS =
+        new SortOrderDTO[] {
+          new SortOrderDTO.Builder()
+              .withDirection(SortOrderDTO.Direction.DESC)
+              .withNullOrder(SortOrderDTO.NullOrder.FIRST)
+              .withExpression(
+                  new FieldExpression.Builder().withFieldName(new String[] {"col_2"}).build())
+              .build()
+        };
+    TableDTO expectedTable =
+        createMockTable(
+            "table1", columns, "comment", Collections.emptyMap(), distributionDTO, sortOrderDTOS);
     TableUpdateRequest.UpdateTableColumnPositionRequest req =
         new TableUpdateRequest.UpdateTableColumnPositionRequest(
             new String[] {"col1"}, TableChange.ColumnPosition.first());
@@ -539,7 +804,28 @@ public class TestRelationalCatalog extends TestBase {
     NameIdentifier tableId = NameIdentifier.of(metalakeName, catalogName, "schema1", "table1");
     ColumnDTO[] columns =
         new ColumnDTO[] {createMockColumn("col2", TypeCreator.NULLABLE.STRING, "comment2")};
-    TableDTO expectedTable = createMockTable("table1", columns, "comment", Collections.emptyMap());
+    DistributionDTO distributionDTO =
+        new DistributionDTO.Builder()
+            .withDistMethod(DistributionDTO.DistributionMethod.HASH)
+            .withDistNum(10)
+            .withExpressions(
+                ImmutableList.of(
+                    new FieldExpression.Builder().withFieldName(new String[] {"col_1"}).build()))
+            .build();
+
+    SortOrderDTO[] sortOrderDTOS =
+        new SortOrderDTO[] {
+          new SortOrderDTO.Builder()
+              .withDirection(SortOrderDTO.Direction.DESC)
+              .withNullOrder(SortOrderDTO.NullOrder.FIRST)
+              .withExpression(
+                  new FieldExpression.Builder().withFieldName(new String[] {"col_2"}).build())
+              .build()
+        };
+
+    TableDTO expectedTable =
+        createMockTable(
+            "table1", columns, "comment", Collections.emptyMap(), distributionDTO, sortOrderDTOS);
     TableUpdateRequest.DeleteTableColumnRequest req =
         new TableUpdateRequest.DeleteTableColumnRequest(new String[] {"col1"}, true);
 
@@ -628,12 +914,19 @@ public class TestRelationalCatalog extends TestBase {
   }
 
   private static TableDTO createMockTable(
-      String name, ColumnDTO[] columns, String comment, Map<String, String> properties) {
+      String name,
+      ColumnDTO[] columns,
+      String comment,
+      Map<String, String> properties,
+      DistributionDTO distributionDTO,
+      SortOrderDTO[] sortOrderDTOS) {
     return new TableDTO.Builder()
         .withName(name)
         .withColumns(columns)
         .withComment(comment)
         .withProperties(properties)
+        .withDistribution(distributionDTO)
+        .withSortOrders(sortOrderDTOS)
         .withAudit(
             new AuditDTO.Builder().withCreator("creator").withCreateTime(Instant.now()).build())
         .build();

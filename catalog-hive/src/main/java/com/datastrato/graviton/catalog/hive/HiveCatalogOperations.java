@@ -9,11 +9,13 @@ import static com.datastrato.graviton.Entity.EntityType.TABLE;
 import static com.datastrato.graviton.catalog.hive.HiveTable.HMS_TABLE_COMMENT;
 import static com.datastrato.graviton.catalog.hive.HiveTable.SUPPORT_TABLE_TYPES;
 
+import com.datastrato.graviton.Distribution;
 import com.datastrato.graviton.EntityAlreadyExistsException;
 import com.datastrato.graviton.EntityStore;
 import com.datastrato.graviton.GravitonEnv;
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
+import com.datastrato.graviton.SortOrder;
 import com.datastrato.graviton.catalog.CatalogOperations;
 import com.datastrato.graviton.catalog.hive.converter.ToHiveType;
 import com.datastrato.graviton.exceptions.NoSuchCatalogException;
@@ -592,7 +594,12 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
    */
   @Override
   public Table createTable(
-      NameIdentifier tableIdent, Column[] columns, String comment, Map<String, String> properties)
+      NameIdentifier tableIdent,
+      Column[] columns,
+      String comment,
+      Map<String, String> properties,
+      Distribution distribution,
+      SortOrder[] sortOrders)
       throws NoSuchSchemaException, TableAlreadyExistsException {
     Preconditions.checkArgument(
         !tableIdent.name().isEmpty(), "Cannot create table with empty name");
@@ -603,6 +610,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
         String.format(
             "Cannot support invalid namespace in Hive Metastore: %s", schemaIdent.namespace()));
 
+    // TODO(yuqi) check Distribution and SortOrder invalidation
     try {
       HiveSchema schema = loadSchema(schemaIdent);
 
@@ -619,6 +627,8 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
                         .withColumns(columns)
                         .withComment(comment)
                         .withProperties(properties)
+                        .withDistribution(distribution)
+                        .withSortOrders(sortOrders)
                         .withAuditInfo(
                             new AuditInfo.Builder()
                                 .withCreator(currentUser())

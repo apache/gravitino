@@ -4,8 +4,10 @@
  */
 package com.datastrato.graviton.catalog;
 
+import com.datastrato.graviton.Distribution;
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
+import com.datastrato.graviton.SortOrder;
 import com.datastrato.graviton.exceptions.IllegalNameIdentifierException;
 import com.datastrato.graviton.exceptions.NoSuchCatalogException;
 import com.datastrato.graviton.exceptions.NoSuchSchemaException;
@@ -187,13 +189,20 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
    */
   @Override
   public Table createTable(
-      NameIdentifier ident, Column[] columns, String comment, Map<String, String> properties)
+      NameIdentifier ident,
+      Column[] columns,
+      String comment,
+      Map<String, String> properties,
+      Distribution distribution,
+      SortOrder[] sortOrders)
       throws NoSuchSchemaException, TableAlreadyExistsException {
     NameIdentifier catalogIdent = NameIdentifier.of(ident.namespace().levels());
 
     return doWithCatalog(
         catalogIdent,
-        c -> c.doWithTableOps(t -> t.createTable(ident, columns, comment, properties)),
+        c ->
+            c.doWithTableOps(
+                t -> t.createTable(ident, columns, comment, properties, distribution, sortOrders)),
         NoSuchSchemaException.class,
         TableAlreadyExistsException.class);
   }

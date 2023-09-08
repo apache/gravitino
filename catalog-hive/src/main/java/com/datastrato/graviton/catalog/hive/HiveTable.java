@@ -7,11 +7,16 @@ package com.datastrato.graviton.catalog.hive;
 import static org.apache.hadoop.hive.metastore.TableType.EXTERNAL_TABLE;
 import static org.apache.hadoop.hive.metastore.TableType.MANAGED_TABLE;
 
+import com.datastrato.graviton.Distribution;
 import com.datastrato.graviton.NameIdentifier;
+import com.datastrato.graviton.SortOrder;
+import com.datastrato.graviton.SortOrder.Direction;
 import com.datastrato.graviton.catalog.hive.converter.FromHiveType;
 import com.datastrato.graviton.catalog.hive.converter.ToHiveType;
 import com.datastrato.graviton.meta.AuditInfo;
 import com.datastrato.graviton.meta.rel.BaseTable;
+import com.datastrato.graviton.rel.transforms.Transform;
+import com.datastrato.graviton.rel.transforms.Transforms.NamedReference;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import java.time.Instant;
@@ -21,7 +26,9 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.Getter;
 import lombok.ToString;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
+import org.apache.hadoop.hive.metastore.api.Order;
 import org.apache.hadoop.hive.metastore.api.SerDeInfo;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.Table;
@@ -40,7 +47,21 @@ public class HiveTable extends BaseTable {
 
   private String location;
 
+  private SortOrder[] sortOrders;
+
+  private Distribution distribution;
+
   private HiveTable() {}
+
+  @Override
+  public SortOrder[] sortOrder() {
+    return sortOrders;
+  }
+
+  @Override
+  public Distribution distribution() {
+    return distribution;
+  }
 
   /**
    * Creates a new HiveTable instance from a Table and a Builder.
@@ -58,6 +79,31 @@ public class HiveTable extends BaseTable {
       auditInfoBuilder.withCreateTime(Instant.ofEpochSecond(table.getCreateTime()));
     }
 
+    Distribution distribution = null;
+    if (CollectionUtils.isNotEmpty(table.getSd().getBucketCols())) {
+      distribution =
+          Distribution.builder()
+              .transforms(
+                  table.getSd().getBucketCols().stream()
+                      .map(f -> new NamedReference(new String[] {f}))
+                      .toArray(Transform[]::new))
+              .distNum(table.getSd().getNumBuckets())
+              .build();
+    }
+
+    SortOrder[] sortOrders = null;
+    if (CollectionUtils.isNotEmpty(table.getSd().getSortCols())) {
+      sortOrders =
+          table.getSd().getSortCols().stream()
+              .map(
+                  f ->
+                      SortOrder.builder()
+                          .transform(new NamedReference(new String[] {f.getCol()}))
+                          .direction(f.getOrder() == 0 ? Direction.ASC : Direction.DESC)
+                          .build())
+              .toArray(SortOrder[]::new);
+    }
+
     return builder
         .withComment(table.getParameters().get(HMS_TABLE_COMMENT))
         .withProperties(table.getParameters())
@@ -72,6 +118,8 @@ public class HiveTable extends BaseTable {
                             .build())
                 .toArray(HiveColumn[]::new))
         .withLocation(table.getSd().getLocation())
+        .withDistribution(distribution)
+        .withSortOrders(sortOrders)
         .withAuditInfo(auditInfoBuilder.build())
         .build();
   }
@@ -117,6 +165,23 @@ public class HiveTable extends BaseTable {
     //  properties
     sd.setInputFormat("org.apache.hadoop.mapred.TextInputFormat");
     sd.setOutputFormat("org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat");
+
+    // Hive only support named sort columns, maybe we should do some check?
+    if (sortOrders != null) {
+      for (SortOrder sortOrder : sortOrders) {
+        String columnName = ((NamedReference) sortOrder.getTransform()).value()[0];
+        sd.addToSortCols(new Order(columnName, sortOrder.getDirection() == Direction.ASC ? 0 : 1));
+      }
+    }
+
+    if (distribution != null) {
+      sd.setBucketCols(
+          Arrays.stream(distribution.transforms())
+              .map(t -> ((NamedReference) t).value()[0])
+              .collect(Collectors.toList()));
+      sd.setNumBuckets(distribution.distNum());
+    }
+
     return sd;
   }
 
@@ -143,8 +208,22 @@ public class HiveTable extends BaseTable {
     // TODO(minghuang): Support user specify`location` property
     private String location;
 
+    private SortOrder[] sortOrders;
+
+    private Distribution distribution;
+
     public Builder withLocation(String location) {
       this.location = location;
+      return this;
+    }
+
+    public Builder withSortOrders(SortOrder[] sortOrders) {
+      this.sortOrders = sortOrders;
+      return this;
+    }
+
+    public Builder withDistribution(Distribution distribution) {
+      this.distribution = distribution;
       return this;
     }
 
@@ -165,6 +244,8 @@ public class HiveTable extends BaseTable {
       hiveTable.auditInfo = auditInfo;
       hiveTable.columns = columns;
       hiveTable.location = location;
+      hiveTable.distribution = distribution;
+      hiveTable.sortOrders = sortOrders;
 
       // HMS put table comment in parameters
       hiveTable.properties.put(HMS_TABLE_COMMENT, comment);

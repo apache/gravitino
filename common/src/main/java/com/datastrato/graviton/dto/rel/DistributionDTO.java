@@ -13,11 +13,13 @@ import com.fasterxml.jackson.annotation.JsonValue;
 import com.google.common.base.Preconditions;
 import java.util.List;
 import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import lombok.NonNull;
 import org.apache.commons.collections4.CollectionUtils;
 
 @EqualsAndHashCode
 @JsonPropertyOrder({"expressions", "distNum", "distMethod"})
+@Getter
 public class DistributionDTO {
 
   public enum DistributionMethod {

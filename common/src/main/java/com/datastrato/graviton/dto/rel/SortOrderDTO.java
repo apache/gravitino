@@ -12,9 +12,11 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.fasterxml.jackson.annotation.JsonValue;
 import com.google.common.base.Preconditions;
 import lombok.EqualsAndHashCode;
+import lombok.Getter;
 
 @EqualsAndHashCode
 @JsonPropertyOrder({"expression", "direction", "nullOrder"})
+@Getter
 public class SortOrderDTO {
   public enum Direction {
     ASC,
