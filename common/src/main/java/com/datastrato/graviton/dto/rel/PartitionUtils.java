@@ -5,12 +5,12 @@
 package com.datastrato.graviton.dto.rel;
 
 import static com.datastrato.graviton.dto.rel.Partition.Strategy.IDENTITY;
-import static com.datastrato.graviton.rel.transforms.Transforms.DAY;
-import static com.datastrato.graviton.rel.transforms.Transforms.HOUR;
-import static com.datastrato.graviton.rel.transforms.Transforms.LIST;
-import static com.datastrato.graviton.rel.transforms.Transforms.MONTH;
-import static com.datastrato.graviton.rel.transforms.Transforms.RANGE;
-import static com.datastrato.graviton.rel.transforms.Transforms.YEAR;
+import static com.datastrato.graviton.rel.transforms.Transforms.NAME_OF_DAY;
+import static com.datastrato.graviton.rel.transforms.Transforms.NAME_OF_HOUR;
+import static com.datastrato.graviton.rel.transforms.Transforms.NAME_OF_LIST;
+import static com.datastrato.graviton.rel.transforms.Transforms.NAME_OF_MONTH;
+import static com.datastrato.graviton.rel.transforms.Transforms.NAME_OF_RANGE;
+import static com.datastrato.graviton.rel.transforms.Transforms.NAME_OF_YEAR;
 import static com.datastrato.graviton.rel.transforms.Transforms.field;
 import static com.datastrato.graviton.rel.transforms.Transforms.function;
 import static com.datastrato.graviton.rel.transforms.Transforms.identity;
@@ -34,9 +34,8 @@ import static java.time.ZoneOffset.UTC;
 
 import com.datastrato.graviton.rel.transforms.Transform;
 import com.datastrato.graviton.rel.transforms.Transforms;
+import io.substrait.expression.AbstractExpressionVisitor;
 import io.substrait.expression.Expression;
-import io.substrait.expression.ExpressionVisitor;
-import io.substrait.expression.FieldReference;
 import io.substrait.function.ParameterizedTypeVisitor;
 import io.substrait.type.Type;
 import io.substrait.util.DecimalUtil;
@@ -193,45 +192,45 @@ public class PartitionUtils {
           .withStrategy(IDENTITY)
           .withFieldName(((Transforms.NamedReference) transform).value())
           .build();
-    } else if (transform instanceof Transforms.FunctionTrans) {
+    }
+
+    if (transform instanceof Transforms.FunctionTrans) {
+      Transform[] arguments = transform.arguments();
       switch (transform.name().toLowerCase()) {
-        case YEAR:
-        case MONTH:
-        case DAY:
-        case HOUR:
-          if (transform.arguments().length == 1
-              && transform.arguments()[0] instanceof Transforms.NamedReference) {
+        case NAME_OF_YEAR:
+        case NAME_OF_MONTH:
+        case NAME_OF_DAY:
+        case NAME_OF_HOUR:
+          if (arguments.length == 1 && arguments[0] instanceof Transforms.NamedReference) {
             return new SimplePartitionDTO.Builder()
                 .withStrategy(Partition.Strategy.valueOf(transform.name().toUpperCase()))
-                .withFieldName(((Transforms.NamedReference) transform.arguments()[0]).value())
+                .withFieldName(((Transforms.NamedReference) arguments[0]).value())
                 .build();
           }
-        case LIST:
-          if (Arrays.stream(transform.arguments())
-              .allMatch(arg -> arg instanceof Transforms.NamedReference)) {
+        case NAME_OF_LIST:
+          if (Arrays.stream(arguments).allMatch(arg -> arg instanceof Transforms.NamedReference)) {
             return new ListPartitionDTO.Builder()
                 .withFieldNames(
-                    Arrays.stream(transform.arguments())
+                    Arrays.stream(arguments)
                         .map(arg -> ((Transforms.NamedReference) arg).value())
                         .toArray(String[][]::new))
                 // TODO(minghuang): add Assignments after Transform support partition value
                 .build();
           }
-        case RANGE:
-          if (transform.arguments().length == 1
-              && transform.arguments()[0] instanceof Transforms.NamedReference) {
+        case NAME_OF_RANGE:
+          if (arguments.length == 1 && arguments[0] instanceof Transforms.NamedReference) {
             return new RangePartitionDTO.Builder()
-                .withFieldName(((Transforms.NamedReference) transform.arguments()[0]).value())
+                .withFieldName(((Transforms.NamedReference) arguments[0]).value())
                 // TODO(minghuang): add Ranges after Transform support partition value
                 .build();
           }
         default:
           return new ExpressionPartitionDTO.Builder(toExpression(transform)).build();
       }
-    } else {
-      throw new IllegalArgumentException(
-          "Unsupported transform type " + transform.getClass().getCanonicalName());
     }
+
+    throw new IllegalArgumentException(
+        "Unsupported transform type " + transform.getClass().getCanonicalName());
   }
 
   private static ExpressionPartitionDTO.Expression toExpression(Transform transform) {
@@ -257,9 +256,14 @@ public class PartitionUtils {
   }
 
   private static class LiteralStringConverter
-      implements ExpressionVisitor<String, UnsupportedOperationException> {
+      extends AbstractExpressionVisitor<String, UnsupportedOperationException> {
 
-    public static LiteralStringConverter INSTANCE = new LiteralStringConverter();
+    public static final LiteralStringConverter INSTANCE = new LiteralStringConverter();
+
+    @Override
+    public String visitFallback(Expression expr) {
+      throw new UnsupportedOperationException("Unsupported literal type: " + expr.getType());
+    }
 
     @Override
     public String visit(Expression.NullLiteral expr) throws UnsupportedOperationException {
@@ -307,11 +311,6 @@ public class PartitionUtils {
     }
 
     @Override
-    public String visit(Expression.BinaryLiteral expr) throws UnsupportedOperationException {
-      throw new UnsupportedOperationException("Unsupported BinaryLiteral type");
-    }
-
-    @Override
     public String visit(Expression.TimeLiteral expr) throws UnsupportedOperationException {
       return LocalTime.ofSecondOfDay(TimeUnit.MICROSECONDS.toSeconds(expr.value()))
           .format(DateTimeFormatter.ISO_LOCAL_TIME);
@@ -335,16 +334,6 @@ public class PartitionUtils {
     }
 
     @Override
-    public String visit(Expression.IntervalYearLiteral expr) throws UnsupportedOperationException {
-      throw new UnsupportedOperationException("Unsupported IntervalYearLiteral type");
-    }
-
-    @Override
-    public String visit(Expression.IntervalDayLiteral expr) throws UnsupportedOperationException {
-      throw new UnsupportedOperationException("Unsupported IntervalDayLiteral type");
-    }
-
-    @Override
     public String visit(Expression.UUIDLiteral expr) throws UnsupportedOperationException {
       return expr.value().toString();
     }
@@ -360,86 +349,10 @@ public class PartitionUtils {
     }
 
     @Override
-    public String visit(Expression.FixedBinaryLiteral expr) throws UnsupportedOperationException {
-      throw new UnsupportedOperationException("Unsupported FixedBinaryLiteral type");
-    }
-
-    @Override
     public String visit(Expression.DecimalLiteral expr) throws UnsupportedOperationException {
       byte[] value = expr.value().toByteArray();
       BigDecimal decimal = DecimalUtil.getBigDecimalFromBytes(value, expr.scale(), 16);
       return decimal.toPlainString();
-    }
-
-    @Override
-    public String visit(Expression.MapLiteral expr) throws UnsupportedOperationException {
-      throw new UnsupportedOperationException("Unsupported MapLiteral type");
-    }
-
-    @Override
-    public String visit(Expression.ListLiteral expr) throws UnsupportedOperationException {
-      throw new UnsupportedOperationException("Unsupported ListLiteral type");
-    }
-
-    @Override
-    public String visit(Expression.StructLiteral expr) throws UnsupportedOperationException {
-      throw new UnsupportedOperationException("Unsupported StructLiteral type");
-    }
-
-    @Override
-    public String visit(Expression.Switch expr) throws UnsupportedOperationException {
-      throw new UnsupportedOperationException("Unsupported Switch type");
-    }
-
-    @Override
-    public String visit(Expression.IfThen expr) throws UnsupportedOperationException {
-      throw new UnsupportedOperationException("Unsupported IfThen type");
-    }
-
-    @Override
-    public String visit(Expression.ScalarFunctionInvocation expr)
-        throws UnsupportedOperationException {
-      throw new UnsupportedOperationException("Unsupported ScalarFunctionInvocation type");
-    }
-
-    @Override
-    public String visit(Expression.Cast expr) throws UnsupportedOperationException {
-      throw new UnsupportedOperationException("Unsupported Cast type");
-    }
-
-    @Override
-    public String visit(Expression.SingleOrList expr) throws UnsupportedOperationException {
-      throw new UnsupportedOperationException("Unsupported SingleOrList type");
-    }
-
-    @Override
-    public String visit(Expression.MultiOrList expr) throws UnsupportedOperationException {
-      throw new UnsupportedOperationException("Unsupported MultiOrList type");
-    }
-
-    @Override
-    public String visit(FieldReference expr) throws UnsupportedOperationException {
-      throw new UnsupportedOperationException("Unsupported FieldReference type");
-    }
-
-    @Override
-    public String visit(Expression.SetPredicate expr) throws UnsupportedOperationException {
-      throw new UnsupportedOperationException("Unsupported SetPredicate type");
-    }
-
-    @Override
-    public String visit(Expression.ScalarSubquery expr) throws UnsupportedOperationException {
-      throw new UnsupportedOperationException("Unsupported ScalarSubquery type");
-    }
-
-    @Override
-    public String visit(Expression.InPredicate expr) throws UnsupportedOperationException {
-      throw new UnsupportedOperationException("Unsupported InPredicate type");
-    }
-
-    @Override
-    public String visit(Expression.Window expr) throws UnsupportedOperationException {
-      throw new UnsupportedOperationException("Unsupported Window type");
     }
   }
 }

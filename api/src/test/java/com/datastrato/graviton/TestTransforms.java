@@ -4,10 +4,10 @@
  */
 package com.datastrato.graviton;
 
-import static com.datastrato.graviton.rel.transforms.Transforms.DAY;
-import static com.datastrato.graviton.rel.transforms.Transforms.HOUR;
-import static com.datastrato.graviton.rel.transforms.Transforms.MONTH;
-import static com.datastrato.graviton.rel.transforms.Transforms.YEAR;
+import static com.datastrato.graviton.rel.transforms.Transforms.NAME_OF_DAY;
+import static com.datastrato.graviton.rel.transforms.Transforms.NAME_OF_HOUR;
+import static com.datastrato.graviton.rel.transforms.Transforms.NAME_OF_MONTH;
+import static com.datastrato.graviton.rel.transforms.Transforms.NAME_OF_YEAR;
 import static com.datastrato.graviton.rel.transforms.Transforms.day;
 import static com.datastrato.graviton.rel.transforms.Transforms.field;
 import static com.datastrato.graviton.rel.transforms.Transforms.function;
@@ -58,19 +58,19 @@ public class TestTransforms {
     Assertions.assertEquals(fieldName, identity.value());
 
     Transform year = year(fieldName);
-    Assertions.assertEquals(YEAR, year.name());
+    Assertions.assertEquals(NAME_OF_YEAR, year.name());
     Assertions.assertEquals(fieldName, ((FieldTransform) year.arguments()[0]).value());
 
     Transform month = month(fieldName);
-    Assertions.assertEquals(MONTH, month.name());
+    Assertions.assertEquals(NAME_OF_MONTH, month.name());
     Assertions.assertEquals(fieldName, ((FieldTransform) month.arguments()[0]).value());
 
     Transform day = day(fieldName);
-    Assertions.assertEquals(DAY, day.name());
+    Assertions.assertEquals(NAME_OF_DAY, day.name());
     Assertions.assertEquals(fieldName, ((FieldTransform) day.arguments()[0]).value());
 
     Transform hour = hour(fieldName);
-    Assertions.assertEquals(HOUR, hour.name());
+    Assertions.assertEquals(NAME_OF_HOUR, hour.name());
     Assertions.assertEquals(fieldName, ((FieldTransform) hour.arguments()[0]).value());
   }
 

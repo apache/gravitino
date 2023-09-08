@@ -13,40 +13,40 @@ import lombok.EqualsAndHashCode;
 /** Helper methods to create logical transforms to pass into Graviton. */
 public class Transforms {
 
-  public static final String YEAR = "year";
-  public static final String MONTH = "month";
-  public static final String DAY = "day";
-  public static final String HOUR = "hour";
-  public static final String LIST = "list";
-  public static final String RANGE = "range";
+  public static final String NAME_OF_YEAR = "year";
+  public static final String NAME_OF_MONTH = "month";
+  public static final String NAME_OF_DAY = "day";
+  public static final String NAME_OF_HOUR = "hour";
+  public static final String NAME_OF_LIST = "list";
+  public static final String NAME_OF_RANGE = "range";
 
   public static FieldTransform identity(String[] fieldName) {
     return field(fieldName);
   }
 
   public static FunctionTransform year(String[] fieldName) {
-    return function(YEAR, new Transform[] {field(fieldName)});
+    return function(NAME_OF_YEAR, new Transform[] {field(fieldName)});
   }
 
   public static FunctionTransform month(String[] fieldName) {
-    return function(MONTH, new Transform[] {field(fieldName)});
+    return function(NAME_OF_MONTH, new Transform[] {field(fieldName)});
   }
 
   public static FunctionTransform day(String[] fieldName) {
-    return function(DAY, new Transform[] {field(fieldName)});
+    return function(NAME_OF_DAY, new Transform[] {field(fieldName)});
   }
 
   public static FunctionTransform hour(String[] fieldName) {
-    return function(HOUR, new Transform[] {field(fieldName)});
+    return function(NAME_OF_HOUR, new Transform[] {field(fieldName)});
   }
 
   public static FunctionTransform list(String[][] fieldNames) {
     Transform[] args = Arrays.stream(fieldNames).map(Transforms::field).toArray(Transform[]::new);
-    return function(LIST, args);
+    return function(NAME_OF_LIST, args);
   }
 
   public static FunctionTransform range(String[] fieldName) {
-    return function(RANGE, new Transform[] {field(fieldName)});
+    return function(NAME_OF_RANGE, new Transform[] {field(fieldName)});
   }
 
   public static LiteralTransform literal(Expression.Literal value) {
