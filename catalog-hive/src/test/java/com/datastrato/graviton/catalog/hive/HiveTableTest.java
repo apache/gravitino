@@ -188,7 +188,7 @@ public class HiveTableTest extends MiniHiveMetastoreService {
       Assertions.assertEquals(
           sortOrders[i].getDirection(), loadedTable.sortOrder()[i].getDirection());
       Assertions.assertEquals(
-          sortOrders[i].getDirection(), loadedTable.sortOrder()[i].getDirection());
+          sortOrders[i].getTransform(), loadedTable.sortOrder()[i].getTransform());
     }
 
     // Test exception

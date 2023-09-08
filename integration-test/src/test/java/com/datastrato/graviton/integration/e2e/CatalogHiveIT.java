@@ -7,7 +7,12 @@ package com.datastrato.graviton.integration.e2e;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.datastrato.graviton.Catalog;
+import com.datastrato.graviton.Distribution;
+import com.datastrato.graviton.Distribution.DistributionMethod;
 import com.datastrato.graviton.NameIdentifier;
+import com.datastrato.graviton.SortOrder;
+import com.datastrato.graviton.SortOrder.Direction;
+import com.datastrato.graviton.SortOrder.NullOrder;
 import com.datastrato.graviton.catalog.hive.HiveClientPool;
 import com.datastrato.graviton.client.GravitonMetaLake;
 import com.datastrato.graviton.dto.rel.ColumnDTO;
@@ -15,10 +20,16 @@ import com.datastrato.graviton.integration.util.AbstractIT;
 import com.datastrato.graviton.integration.util.GravitonITUtils;
 import com.datastrato.graviton.rel.SchemaChange;
 import com.datastrato.graviton.rel.TableChange;
+import com.datastrato.graviton.rel.transforms.Transform;
+import com.datastrato.graviton.rel.transforms.Transforms;
+import com.datastrato.graviton.rel.transforms.Transforms.NamedReference;
 import com.google.common.collect.Maps;
 import io.substrait.type.TypeCreator;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
@@ -126,9 +137,25 @@ public class CatalogHiveIT extends AbstractIT {
     Map<String, String> properties2 = Maps.newHashMap();
     properties1.put("key2-1", "val1");
     properties1.put("key2-2", "val2");
+    Distribution distribution =
+        Distribution.builder()
+            .distNum(10)
+            .transforms(new Transform[] {Transforms.field(new String[] {HIVE_COL_NAME1})})
+            .distMethod(DistributionMethod.EVEN)
+            .build();
+
+    SortOrder[] sortOrders =
+        new SortOrder[] {
+          SortOrder.builder()
+              .nullOrder(NullOrder.FIRST)
+              .direction(Direction.DESC)
+              .transform(Transforms.field(new String[] {HIVE_COL_NAME2}))
+              .build()
+        };
+
     catalog
         .asTableCatalog()
-        .createTable(nameIdentifier, columns, table_comment, properties2, null, null);
+        .createTable(nameIdentifier, columns, table_comment, properties2, distribution, sortOrders);
 
     // Directly get table from hive metastore to check if the table is created successfully.
     org.apache.hadoop.hive.metastore.api.Table hiveTab =
@@ -149,6 +176,22 @@ public class CatalogHiveIT extends AbstractIT {
     Assertions.assertEquals(HIVE_COL_NAME3, hiveTab.getSd().getCols().get(2).getName());
     Assertions.assertEquals("string", hiveTab.getSd().getCols().get(2).getType());
     Assertions.assertEquals("col_3_comment", hiveTab.getSd().getCols().get(2).getComment());
+
+    Assertions.assertEquals(distribution.distNum(), hiveTab.getSd().getNumBuckets());
+    List<String> resultDistributionCols =
+        Arrays.stream(distribution.transforms())
+            .map(t -> ((NamedReference) t).value()[0])
+            .collect(Collectors.toList());
+    Assertions.assertEquals(resultDistributionCols, hiveTab.getSd().getBucketCols());
+
+    for (int i = 0; i < sortOrders.length; i++) {
+      Assertions.assertEquals(
+          sortOrders[i].getDirection() == Direction.ASC ? 0 : 1,
+          hiveTab.getSd().getSortCols().get(i).getOrder());
+      Assertions.assertEquals(
+          ((NamedReference) sortOrders[i].getTransform()).value()[0],
+          hiveTab.getSd().getSortCols().get(i).getCol());
+    }
   }
 
   @Order(1)
