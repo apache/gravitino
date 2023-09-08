@@ -106,7 +106,6 @@ public class HiveTableTest extends MiniHiveMetastoreService {
             .withName(HIVE_CATALOG_NAME)
             .withNamespace(Namespace.of(META_LAKE_NAME))
             .withType(HiveCatalog.Type.RELATIONAL)
-            .withMetalakeId(1L)
             .withAuditInfo(auditInfo)
             .build();
 

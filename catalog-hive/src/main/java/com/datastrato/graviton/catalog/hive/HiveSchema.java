@@ -165,7 +165,6 @@ public class HiveSchema extends BaseSchema {
     protected HiveSchema internalBuild() {
       HiveSchema hiveSchema = new HiveSchema();
       hiveSchema.id = id;
-      hiveSchema.catalogId = catalogId;
       hiveSchema.name = name;
       hiveSchema.namespace = namespace;
       hiveSchema.comment = comment;

@@ -16,7 +16,6 @@ import com.google.common.collect.Maps;
 import java.util.Collections;
 import java.util.Map;
 import javax.annotation.Nullable;
-import lombok.Getter;
 import lombok.ToString;
 
 /** An abstract class representing a base schema in a relational database. */
@@ -24,8 +23,6 @@ import lombok.ToString;
 public class BaseSchema implements Schema, Entity, HasIdentifier {
 
   public static final Field ID = Field.required("id", Long.class, "The schema's unique identifier");
-  public static final Field CATALOG_ID =
-      Field.required("catalog_id", Long.class, "The catalog's unique identifier");
   public static final Field NAME = Field.required("name", String.class, "The schema's name");
   public static final Field COMMENT =
       Field.optional("comment", String.class, "The comment or description for the schema");
@@ -34,15 +31,13 @@ public class BaseSchema implements Schema, Entity, HasIdentifier {
   public static final Field AUDIT_INFO =
       Field.required("audit_info", AuditInfo.class, "The audit details of the schema");
 
-  @Getter protected Long id;
-
-  @Getter protected Long catalogId;
+  protected Long id;
 
   protected String name;
 
-  @Nullable @Getter protected String comment;
+  @Nullable protected String comment;
 
-  @Nullable @Getter protected Map<String, String> properties;
+  @Nullable protected Map<String, String> properties;
 
   protected AuditInfo auditInfo;
 
@@ -57,7 +52,6 @@ public class BaseSchema implements Schema, Entity, HasIdentifier {
   public Map<Field, Object> fields() {
     Map<Field, Object> fields = Maps.newHashMap();
     fields.put(ID, id);
-    fields.put(CATALOG_ID, catalogId);
     fields.put(NAME, name);
     fields.put(COMMENT, comment);
     fields.put(PROPERTIES, properties);
@@ -74,6 +68,16 @@ public class BaseSchema implements Schema, Entity, HasIdentifier {
   @Override
   public String name() {
     return name;
+  }
+
+  /**
+   * Returns the unique id of the schema.
+   *
+   * @return The unique id of the schema.
+   */
+  @Override
+  public Long id() {
+    return id;
   }
 
   /**
@@ -137,7 +141,6 @@ public class BaseSchema implements Schema, Entity, HasIdentifier {
     }
     BaseSchema schema = (BaseSchema) o;
     return Objects.equal(id, schema.id)
-        && Objects.equal(catalogId, schema.catalogId)
         && Objects.equal(name, schema.name)
         && Objects.equal(properties, schema.properties)
         && Objects.equal(auditInfo, schema.auditInfo);
@@ -145,7 +148,7 @@ public class BaseSchema implements Schema, Entity, HasIdentifier {
 
   @Override
   public int hashCode() {
-    return Objects.hashCode(id, catalogId, name, properties, auditInfo);
+    return Objects.hashCode(id, name, properties, auditInfo);
   }
 
   /**
@@ -156,8 +159,6 @@ public class BaseSchema implements Schema, Entity, HasIdentifier {
    */
   interface Builder<SELF extends Builder<SELF, T>, T extends BaseSchema> {
     SELF withId(Long id);
-
-    SELF withCatalogId(Long catalogId);
 
     SELF withName(String name);
 
@@ -182,7 +183,6 @@ public class BaseSchema implements Schema, Entity, HasIdentifier {
           SELF extends Builder<SELF, T>, T extends BaseSchema>
       implements Builder<SELF, T> {
     protected Long id;
-    protected Long catalogId;
     protected String name;
     protected Namespace namespace;
     protected String comment;
@@ -198,18 +198,6 @@ public class BaseSchema implements Schema, Entity, HasIdentifier {
     @Override
     public SELF withId(Long id) {
       this.id = id;
-      return self();
-    }
-
-    /**
-     * Sets the unique identifier of the catalog.
-     *
-     * @param catalogId The unique identifier of the catalog.
-     * @return The builder instance.
-     */
-    @Override
-    public SELF withCatalogId(Long catalogId) {
-      this.catalogId = catalogId;
       return self();
     }
 
@@ -298,7 +286,6 @@ public class BaseSchema implements Schema, Entity, HasIdentifier {
     protected BaseSchema internalBuild() {
       BaseSchema baseSchema = new BaseSchema();
       baseSchema.id = id;
-      baseSchema.catalogId = catalogId;
       baseSchema.name = name;
       baseSchema.comment = comment;
       baseSchema.properties = properties;

@@ -4,69 +4,27 @@
  */
 package com.datastrato.graviton;
 
-import com.datastrato.graviton.rel.Column;
-import io.substrait.type.Type;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
-import javax.annotation.Nullable;
+import com.datastrato.graviton.meta.rel.BaseColumn;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
 
-@EqualsAndHashCode
+@EqualsAndHashCode(callSuper = true)
 @ToString
-public class TestColumn implements Column, Entity, HasIdentifier {
+public class TestColumn extends BaseColumn {
 
-  public static final Field NAME = Field.required("name", String.class, "The name of the column");
-  public static final Field COMMENT =
-      Field.optional("comment", String.class, "The comment of the column");
-  public static final Field TYPE = Field.required("type", Type.class, "The type of the column");
+  private TestColumn() {}
 
-  private String name;
+  public static class Builder extends BaseColumn.BaseColumnBuilder<Builder, TestColumn> {
 
-  private String comment;
+    @Override
+    protected TestColumn internalBuild() {
+      TestColumn column = new TestColumn();
 
-  private Type dataType;
+      column.name = name;
+      column.comment = comment;
+      column.dataType = dataType;
 
-  public TestColumn(String name, String comment, Type dataType) {
-    this.name = name;
-    this.comment = comment;
-    this.dataType = dataType;
-
-    validate();
-  }
-
-  // For Jackson Deserialization only.
-  public TestColumn() {}
-
-  @Override
-  public Map<Field, Object> fields() {
-    Map<Field, Object> fields = new HashMap<>();
-    fields.put(NAME, name);
-    fields.put(COMMENT, comment);
-    fields.put(TYPE, dataType);
-
-    return Collections.unmodifiableMap(fields);
-  }
-
-  @Override
-  public String name() {
-    return name;
-  }
-
-  @Override
-  public Type dataType() {
-    return dataType;
-  }
-
-  @Nullable
-  @Override
-  public String comment() {
-    return comment;
-  }
-
-  @Override
-  public EntityType type() {
-    return EntityType.COLUMN;
+      return column;
+    }
   }
 }

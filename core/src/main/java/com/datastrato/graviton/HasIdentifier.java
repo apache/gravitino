@@ -15,6 +15,13 @@ public interface HasIdentifier {
   String name();
 
   /**
+   * Get the unique id of the entity.
+   *
+   * @return The unique id of the entity.
+   */
+  Long id();
+
+  /**
    * Get the namespace of the entity.
    *
    * @return The namespace of the entity.
@@ -31,11 +38,4 @@ public interface HasIdentifier {
   default NameIdentifier nameIdentifier() {
     return NameIdentifier.of(namespace(), name());
   }
-
-  /**
-   * Returns a binary compact unique identifier of the entity.
-   *
-   * @return The binary compact unique identifier of the entity.
-   */
-  // TODO. Returns a binary compact unique identifier of the entity. @Jerry
 }

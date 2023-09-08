@@ -118,7 +118,6 @@ public class TestEntityProtoSerDe {
     com.datastrato.graviton.meta.CatalogEntity catalogEntity =
         new com.datastrato.graviton.meta.CatalogEntity.Builder()
             .withId(catalogId)
-            .withMetalakeId(metalakeId)
             .withName(catalogName)
             .withComment(comment)
             .withType(com.datastrato.graviton.Catalog.Type.RELATIONAL)

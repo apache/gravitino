@@ -63,7 +63,6 @@ public class TestKvEntityStorage {
       BaseSchema baseSchema = new BaseSchema();
       try {
         setField(baseSchema, "id", id);
-        setField(baseSchema, "catalogId", catalogId);
         setField(baseSchema, "namespace", namespace);
         setField(baseSchema, "name", name);
         setField(baseSchema, "comment", comment);
@@ -90,7 +89,6 @@ public class TestKvEntityStorage {
       BaseTable baseTable = new BaseTable();
       try {
         setField(baseTable, "id", id);
-        setField(baseTable, "schemaId", schemaId);
         setField(baseTable, "namespace", namespace);
         setField(baseTable, "name", name);
         setField(baseTable, "comment", comment);
@@ -126,7 +124,6 @@ public class TestKvEntityStorage {
         .withName(name)
         .withNamespace(namespace)
         .withType(Type.RELATIONAL)
-        .withMetalakeId(1L)
         .withAuditInfo(auditInfo)
         .build();
   }
@@ -135,7 +132,6 @@ public class TestKvEntityStorage {
     return new MockSchemaBuilder()
         .withId(1L)
         .withName(name)
-        .withCatalogId(1L)
         .withNamespace(namespace)
         .withAuditInfo(auditInfo)
         .withComment("a schmea")
@@ -145,7 +141,6 @@ public class TestKvEntityStorage {
   public BaseTable createBaseTable(Namespace namespace, String name, AuditInfo auditInfo) {
     return new MockTableBuilder()
         .withId(1L)
-        .withSchemaId(1L)
         .withName(name)
         .withNameSpace(namespace)
         .withAuditInfo(auditInfo)
