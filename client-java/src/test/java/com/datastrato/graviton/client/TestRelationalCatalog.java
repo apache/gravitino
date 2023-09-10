@@ -4,6 +4,8 @@
  */
 package com.datastrato.graviton.client;
 
+import static com.datastrato.graviton.dto.rel.PartitionUtils.toPartitions;
+import static com.datastrato.graviton.rel.transforms.Transforms.identity;
 import static org.apache.hc.core5.http.HttpStatus.SC_BAD_REQUEST;
 import static org.apache.hc.core5.http.HttpStatus.SC_CONFLICT;
 import static org.apache.hc.core5.http.HttpStatus.SC_INTERNAL_SERVER_ERROR;
@@ -16,6 +18,7 @@ import com.datastrato.graviton.Namespace;
 import com.datastrato.graviton.dto.AuditDTO;
 import com.datastrato.graviton.dto.CatalogDTO;
 import com.datastrato.graviton.dto.rel.ColumnDTO;
+import com.datastrato.graviton.dto.rel.Partition;
 import com.datastrato.graviton.dto.rel.SchemaDTO;
 import com.datastrato.graviton.dto.rel.TableDTO;
 import com.datastrato.graviton.dto.requests.CatalogCreateRequest;
@@ -41,6 +44,7 @@ import com.datastrato.graviton.exceptions.TableAlreadyExistsException;
 import com.datastrato.graviton.rel.Schema;
 import com.datastrato.graviton.rel.Table;
 import com.datastrato.graviton.rel.TableChange;
+import com.datastrato.graviton.rel.transforms.Transform;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -317,15 +321,21 @@ public class TestRelationalCatalog extends TestBase {
           createMockColumn("col1", TypeCreator.NULLABLE.I8, "comment1"),
           createMockColumn("col2", TypeCreator.NULLABLE.STRING, "comment2")
         };
-    TableDTO expectedTable = createMockTable("table1", columns, "comment", Collections.emptyMap());
+    Transform[] transforms = {identity(new String[] {columns[0].name()})};
+    TableDTO expectedTable =
+        createMockTable(
+            "table1", columns, "comment", Collections.emptyMap(), toPartitions(transforms));
 
     TableCreateRequest req =
-        new TableCreateRequest(tableId.name(), "comment", columns, Collections.emptyMap());
+        new TableCreateRequest(
+            tableId.name(), "comment", columns, Collections.emptyMap(), toPartitions(transforms));
     TableResponse resp = new TableResponse(expectedTable);
     buildMockResource(Method.POST, tablePath, req, resp, SC_OK);
 
     Table table =
-        catalog.asTableCatalog().createTable(tableId, columns, "comment", Collections.emptyMap());
+        catalog
+            .asTableCatalog()
+            .createTable(tableId, columns, "comment", Collections.emptyMap(), transforms);
     Assertions.assertEquals(expectedTable.name(), table.name());
     Assertions.assertEquals(expectedTable.comment(), table.comment());
     Assertions.assertEquals(expectedTable.properties(), table.properties());
@@ -339,6 +349,8 @@ public class TestRelationalCatalog extends TestBase {
     Assertions.assertEquals(expectedTable.columns()[1].dataType(), table.columns()[1].dataType());
     Assertions.assertEquals(expectedTable.columns()[1].comment(), table.columns()[1].comment());
 
+    Assertions.assertArrayEquals(expectedTable.partitioning(), table.partitioning());
+
     // Test throw NoSuchSchemaException
     ErrorResponse errorResp =
         ErrorResponse.notFound(NoSuchSchemaException.class.getSimpleName(), "schema not found");
@@ -350,7 +362,7 @@ public class TestRelationalCatalog extends TestBase {
             () ->
                 catalog
                     .asTableCatalog()
-                    .createTable(tableId, columns, "comment", Collections.emptyMap()));
+                    .createTable(tableId, columns, "comment", Collections.emptyMap(), transforms));
     Assertions.assertTrue(ex.getMessage().contains("schema not found"));
 
     // Test throw TableAlreadyExistsException
@@ -365,8 +377,20 @@ public class TestRelationalCatalog extends TestBase {
             () ->
                 catalog
                     .asTableCatalog()
-                    .createTable(tableId, columns, "comment", Collections.emptyMap()));
+                    .createTable(tableId, columns, "comment", Collections.emptyMap(), transforms));
     Assertions.assertTrue(ex1.getMessage().contains("table already exists"));
+
+    // Test partition field not exist in table
+    Transform[] errorTransforms = {identity(new String[] {"not_exist_field"})};
+    Throwable ex2 =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                catalog
+                    .asTableCatalog()
+                    .createTable(
+                        tableId, columns, "comment", Collections.emptyMap(), errorTransforms));
+    Assertions.assertTrue(ex2.getMessage().contains("not found in table"));
   }
 
   @Test
@@ -629,6 +653,15 @@ public class TestRelationalCatalog extends TestBase {
 
   private static TableDTO createMockTable(
       String name, ColumnDTO[] columns, String comment, Map<String, String> properties) {
+    return createMockTable(name, columns, comment, properties, null);
+  }
+
+  private static TableDTO createMockTable(
+      String name,
+      ColumnDTO[] columns,
+      String comment,
+      Map<String, String> properties,
+      Partition[] partitions) {
     return new TableDTO.Builder()
         .withName(name)
         .withColumns(columns)
@@ -636,6 +669,7 @@ public class TestRelationalCatalog extends TestBase {
         .withProperties(properties)
         .withAudit(
             new AuditDTO.Builder().withCreator("creator").withCreateTime(Instant.now()).build())
+        .withPartitions(partitions)
         .build();
   }
 }

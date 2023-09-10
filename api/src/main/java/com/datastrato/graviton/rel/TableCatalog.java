@@ -25,6 +25,7 @@ import com.datastrato.graviton.Namespace;
 import com.datastrato.graviton.exceptions.NoSuchSchemaException;
 import com.datastrato.graviton.exceptions.NoSuchTableException;
 import com.datastrato.graviton.exceptions.TableAlreadyExistsException;
+import com.datastrato.graviton.rel.transforms.Transform;
 import java.util.Map;
 
 /**
@@ -72,12 +73,17 @@ public interface TableCatalog {
    * @param columns The columns of the new table.
    * @param comment The table comment.
    * @param properties The table properties.
+   * @param partitions The table partitioning.
    * @return Fhe created table metadata.
    * @throws NoSuchSchemaException If the schema does not exist.
    * @throws TableAlreadyExistsException If the table already exists.
    */
   Table createTable(
-      NameIdentifier ident, Column[] columns, String comment, Map<String, String> properties)
+      NameIdentifier ident,
+      Column[] columns,
+      String comment,
+      Map<String, String> properties,
+      Transform[] partitions)
       throws NoSuchSchemaException, TableAlreadyExistsException;
 
   /**

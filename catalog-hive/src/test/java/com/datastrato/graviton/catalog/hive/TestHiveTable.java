@@ -141,7 +141,7 @@ public class TestHiveTable extends MiniHiveMetastoreService {
     Table table =
         hiveCatalog
             .asTableCatalog()
-            .createTable(tableIdentifier, columns, HIVE_COMMENT, properties);
+            .createTable(tableIdentifier, columns, HIVE_COMMENT, properties, null);
     Assertions.assertEquals(tableIdentifier.name(), table.name());
     Assertions.assertEquals(HIVE_COMMENT, table.comment());
     testProperties(properties, table.properties());
@@ -163,7 +163,8 @@ public class TestHiveTable extends MiniHiveMetastoreService {
             () ->
                 hiveCatalog
                     .asTableCatalog()
-                    .createTable(hiveSchema.nameIdentifier(), columns, HIVE_COMMENT, properties));
+                    .createTable(
+                        hiveSchema.nameIdentifier(), columns, HIVE_COMMENT, properties, null));
     Assertions.assertTrue(
         exception.getMessage().contains("Cannot support invalid namespace in Hive Metastore"));
 
@@ -173,7 +174,7 @@ public class TestHiveTable extends MiniHiveMetastoreService {
             () ->
                 hiveCatalog
                     .asTableCatalog()
-                    .createTable(tableIdentifier, columns, HIVE_COMMENT, properties));
+                    .createTable(tableIdentifier, columns, HIVE_COMMENT, properties, null));
     Assertions.assertTrue(exception.getMessage().contains("Table already exists"));
   }
 
@@ -199,7 +200,9 @@ public class TestHiveTable extends MiniHiveMetastoreService {
             .build();
     Column[] columns = new Column[] {col1, col2};
 
-    hiveCatalog.asTableCatalog().createTable(tableIdentifier, columns, HIVE_COMMENT, properties);
+    hiveCatalog
+        .asTableCatalog()
+        .createTable(tableIdentifier, columns, HIVE_COMMENT, properties, null);
 
     Assertions.assertTrue(hiveCatalog.asTableCatalog().tableExists(tableIdentifier));
     hiveCatalog.asTableCatalog().dropTable(tableIdentifier);
@@ -251,7 +254,7 @@ public class TestHiveTable extends MiniHiveMetastoreService {
     Table createdTable =
         hiveCatalog
             .asTableCatalog()
-            .createTable(tableIdentifier, columns, HIVE_COMMENT, properties);
+            .createTable(tableIdentifier, columns, HIVE_COMMENT, properties, null);
     Assertions.assertTrue(hiveCatalog.asTableCatalog().tableExists(tableIdentifier));
 
     // test alter

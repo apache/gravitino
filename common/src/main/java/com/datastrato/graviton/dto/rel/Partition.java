@@ -27,6 +27,14 @@ public interface Partition {
   @JsonProperty("strategy")
   Strategy strategy();
 
+  /**
+   * Validate field referenced exists in table columns
+   *
+   * @param columns The columns of the table.
+   * @throws IllegalArgumentException if validation fails.
+   */
+  void validate(ColumnDTO[] columns) throws IllegalArgumentException;
+
   enum Strategy {
     IDENTITY,
     YEAR,

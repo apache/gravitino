@@ -126,7 +126,7 @@ public class CatalogHiveIT extends AbstractIT {
     Map<String, String> properties2 = Maps.newHashMap();
     properties1.put("key2-1", "val1");
     properties1.put("key2-2", "val2");
-    catalog.asTableCatalog().createTable(nameIdentifier, columns, table_comment, properties2);
+    catalog.asTableCatalog().createTable(nameIdentifier, columns, table_comment, properties2, null);
 
     // Directly get table from hive metastore to check if the table is created successfully.
     org.apache.hadoop.hive.metastore.api.Table hiveTab =

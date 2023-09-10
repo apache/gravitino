@@ -50,6 +50,13 @@ public class ListPartitionDTO implements Partition {
     return Strategy.LIST;
   }
 
+  @Override
+  public void validate(ColumnDTO[] columns) throws IllegalArgumentException {
+    for (String[] fieldName : fieldNames) {
+      PartitionUtils.validateFieldExist(columns, fieldName);
+    }
+  }
+
   @EqualsAndHashCode
   public static class Assignment {
 

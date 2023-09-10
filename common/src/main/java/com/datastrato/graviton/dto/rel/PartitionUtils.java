@@ -34,6 +34,7 @@ import static java.time.ZoneOffset.UTC;
 
 import com.datastrato.graviton.rel.transforms.Transform;
 import com.datastrato.graviton.rel.transforms.Transforms;
+import com.google.common.base.Preconditions;
 import io.substrait.expression.AbstractExpressionVisitor;
 import io.substrait.expression.Expression;
 import io.substrait.function.ParameterizedTypeVisitor;
@@ -45,7 +46,9 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 public class PartitionUtils {
   public static Transform[] toTransforms(Partition[] partitions) {
@@ -354,5 +357,20 @@ public class PartitionUtils {
       BigDecimal decimal = DecimalUtil.getBigDecimalFromBytes(value, expr.scale(), 16);
       return decimal.toPlainString();
     }
+  }
+
+  public static void validateFieldExist(ColumnDTO[] columns, String[] fieldName)
+      throws IllegalArgumentException {
+    Preconditions.checkArgument(
+        columns != null && columns.length != 0, "columns cannot be null or empty");
+
+    List<ColumnDTO> partitionColumn =
+        Arrays.stream(columns)
+            .filter(c -> c.name().equals(fieldName[0]))
+            .collect(Collectors.toList());
+    Preconditions.checkArgument(
+        partitionColumn.size() == 1, "partition field %s not found in table", fieldName[0]);
+
+    // TODO: should validate nested fieldName after column type support namedStruct
   }
 }
