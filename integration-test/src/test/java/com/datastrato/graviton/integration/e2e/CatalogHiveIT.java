@@ -85,9 +85,9 @@ public class CatalogHiveIT extends AbstractIT {
     Map<String, String> properties = Maps.newHashMap();
     properties.put("provider", "hive");
     properties.put(HiveConf.ConfVars.METASTOREURIS.varname, HIVE_METASTORE_URIS);
-    properties.put(HiveConf.ConfVars.METASTORETHRIFTCONNECTIONRETRIES.varname, "10");
-    properties.put(HiveConf.ConfVars.METASTORETHRIFTFAILURERETRIES.varname, "10");
-    properties.put(HiveConf.ConfVars.METASTORE_CLIENT_CONNECT_RETRY_DELAY.varname, "3");
+    properties.put(HiveConf.ConfVars.METASTORETHRIFTCONNECTIONRETRIES.varname, "30");
+    properties.put(HiveConf.ConfVars.METASTORETHRIFTFAILURERETRIES.varname, "30");
+    properties.put(HiveConf.ConfVars.METASTORE_CLIENT_CONNECT_RETRY_DELAY.varname, "5");
 
     Catalog catalog =
         metalake.createCatalog(

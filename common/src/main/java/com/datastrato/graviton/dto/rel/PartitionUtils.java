@@ -55,6 +55,13 @@ public class PartitionUtils {
     return Arrays.stream(partitions).map(PartitionUtils::toTransform).toArray(Transform[]::new);
   }
 
+  public static Partition[] toPartitions(Transform[] transforms) {
+    if (transforms == null) {
+      return null;
+    }
+    return Arrays.stream(transforms).map(PartitionUtils::toPartition).toArray(Partition[]::new);
+  }
+
   private static Transform toTransform(Partition partition) {
     switch (partition.strategy()) {
       case IDENTITY:
@@ -177,13 +184,6 @@ public class PartitionUtils {
 
       return decimal(type.nullable(), new BigDecimal(value), type.precision(), type.scale());
     }
-  }
-
-  public static Partition[] toPartitions(Transform[] transforms) {
-    if (transforms == null) {
-      return null;
-    }
-    return Arrays.stream(transforms).map(PartitionUtils::toPartition).toArray(Partition[]::new);
   }
 
   private static Partition toPartition(Transform transform) {

@@ -44,7 +44,7 @@ public class TestGravitonServer {
   }
 
   @Test
-  public void testStopBeforStart() throws Exception {
+  public void testStopBeforeStart() throws Exception {
     gravitonServer.stop();
   }
 
