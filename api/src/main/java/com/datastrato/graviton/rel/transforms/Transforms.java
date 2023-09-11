@@ -40,11 +40,21 @@ public class Transforms {
     return function(NAME_OF_HOUR, new Transform[] {field(fieldName)});
   }
 
+  /**
+   * Creates a list partitioning by the given field names. For dynamically partitioned tables only.
+   * @param fieldNames The field names to partition by.
+   * @return The list partitioning.
+   */
   public static FunctionTransform list(String[][] fieldNames) {
     Transform[] args = Arrays.stream(fieldNames).map(Transforms::field).toArray(Transform[]::new);
     return function(NAME_OF_LIST, args);
   }
 
+  /**
+   * Creates a range partitioning by the given field name. For dynamically partitioned tables only.
+   * @param fieldName The field name to partition by.
+   * @return The range partitioning.
+   */
   public static FunctionTransform range(String[] fieldName) {
     return function(NAME_OF_RANGE, new Transform[] {field(fieldName)});
   }
