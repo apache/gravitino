@@ -2,7 +2,7 @@
  * Copyright 2023 Datastrato.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.graviton.responses;
+package com.datastrato.graviton.dto.responses;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -17,15 +17,6 @@ import com.datastrato.graviton.dto.MetalakeDTO;
 import com.datastrato.graviton.dto.rel.ColumnDTO;
 import com.datastrato.graviton.dto.rel.SchemaDTO;
 import com.datastrato.graviton.dto.rel.TableDTO;
-import com.datastrato.graviton.dto.responses.BaseResponse;
-import com.datastrato.graviton.dto.responses.CatalogResponse;
-import com.datastrato.graviton.dto.responses.DropResponse;
-import com.datastrato.graviton.dto.responses.EntityListResponse;
-import com.datastrato.graviton.dto.responses.ErrorResponse;
-import com.datastrato.graviton.dto.responses.MetalakeListResponse;
-import com.datastrato.graviton.dto.responses.MetalakeResponse;
-import com.datastrato.graviton.dto.responses.SchemaResponse;
-import com.datastrato.graviton.dto.responses.TableResponse;
 import io.substrait.type.TypeCreator;
 import java.time.Instant;
 import org.junit.jupiter.api.Test;

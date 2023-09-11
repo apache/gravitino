@@ -11,10 +11,12 @@ import com.google.common.collect.Lists;
 import java.util.Arrays;
 import java.util.List;
 import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import org.apache.logging.log4j.util.Strings;
 
 @EqualsAndHashCode(callSuper = false)
 public class ListPartitionDTO implements Partition {
+  @Getter
   @JsonProperty("fieldNames")
   private final String[][] fieldNames;
 
