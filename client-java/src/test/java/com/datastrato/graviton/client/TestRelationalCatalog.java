@@ -363,7 +363,9 @@ public class TestRelationalCatalog extends TestBase {
                 "comment",
                 Collections.emptyMap(),
                 com.datastrato.graviton.dto.util.DTOConverters.toDTO(distributionDTO),
-                Arrays.stream(sortOrderDTOS).map(com.datastrato.graviton.dto.util.DTOConverters::toDTO).toArray(SortOrder[]::new));
+                Arrays.stream(sortOrderDTOS)
+                    .map(com.datastrato.graviton.dto.util.DTOConverters::toDTO)
+                    .toArray(SortOrder[]::new));
     Assertions.assertEquals(expectedTable.name(), table.name());
     Assertions.assertEquals(expectedTable.comment(), table.comment());
     Assertions.assertEquals(expectedTable.properties(), table.properties());
