@@ -24,6 +24,9 @@ public class StringIdentifier {
   @VisibleForTesting static final int CURRENT_FORMAT_VERSION = 1;
 
   @VisibleForTesting static final String CURRENT_FORMAT = "graviton.v%d.uid%d";
+
+  private static final String STRING_COMMENT_FORMAT = "%s(From Graviton, DO NOT EDIT: %s)";
+
   private static final Pattern CURRENT_FORMAT_REGEX =
       Pattern.compile("graviton\\.v(\\d+)\\.uid(\\d+)");
 
@@ -113,10 +116,10 @@ public class StringIdentifier {
 
   public static String addToComment(StringIdentifier stringId, String comment) {
     if (StringUtils.isBlank(comment)) {
-      return "(" + stringId.toString() + ")";
+      return String.format(STRING_COMMENT_FORMAT, "", stringId.toString());
     }
 
-    return String.format("%s (%s)", comment, stringId.toString());
+    return String.format(STRING_COMMENT_FORMAT, comment + " ", stringId.toString());
   }
 
   public static StringIdentifier fromComment(String comment) {
@@ -129,7 +132,7 @@ public class StringIdentifier {
       return null;
     }
 
-    String idString = comment.substring(index + 1, comment.length() - 1);
+    String idString = comment.substring(index + 29, comment.length() - 1);
     return fromString(idString);
   }
 }

@@ -121,12 +121,14 @@ public class TestStringIdentifier {
 
     String comment = "This is a comment";
     String commentWithId = StringIdentifier.addToComment(stringId, comment);
-    Assertions.assertTrue(commentWithId.contains("(" + stringId.toString() + ")"));
+    Assertions.assertTrue(
+        commentWithId.contains("(From Graviton, DO NOT EDIT: " + stringId.toString() + ")"));
     Assertions.assertTrue(commentWithId.contains(comment));
 
     // Test if the input comment is null
     String commentWithId1 = StringIdentifier.addToComment(stringId, null);
-    Assertions.assertTrue(commentWithId1.contains("(" + stringId.toString() + ")"));
+    Assertions.assertTrue(
+        commentWithId1.equals("(From Graviton, DO NOT EDIT: " + stringId.toString() + ")"));
   }
 
   @Test

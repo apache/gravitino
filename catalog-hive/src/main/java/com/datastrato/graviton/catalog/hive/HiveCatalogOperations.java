@@ -600,7 +600,10 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
             "Cannot support invalid namespace in Hive Metastore: %s", schemaIdent.namespace()));
 
     try {
-      HiveSchema schema = loadSchema(schemaIdent);
+      if (!schemaExists(schemaIdent)) {
+        LOG.warn("Hive schema (database) does not exist: {}", schemaIdent);
+        throw new NoSuchSchemaException("Hive Schema (database) does not exist " + schemaIdent);
+      }
 
       EntityStore store = GravitonEnv.getInstance().entityStore();
       long uid = GravitonEnv.getInstance().idGenerator().nextId();
