@@ -10,7 +10,7 @@ on:
 
 env:
   HIVE_IMAGE_NAME: datastrato/graviton-ci-hive
-  HIVE_IMAGE_TAG_NAME: 0.1.0
+  HIVE_IMAGE_TAG_NAME: 0.1.1
 
 concurrency:
   group: ${{ github.worklfow }}-${{ github.event.pull_request.number || github.ref }}
@@ -36,10 +36,10 @@ jobs:
           distribution: 'temurin'
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v1
+        uses: docker/setup-qemu-action@v2
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v1
+        uses: docker/setup-buildx-action@v2
 
       - name: Build the hive Docker image for AMD64
         if: ${{ contains(github.event.pull_request.labels.*.name, 'build docker image') }}
@@ -63,16 +63,29 @@ jobs:
           gradle build
           gradle compileDistribution
 
-      - name: Setup Debug Action
-        if: ${{ contains(github.event.pull_request.labels.*.name, 'debug action') }}
-        uses: csexton/debugger-action@master
+      - name: Check docker container status
+        uses: nick-fields/retry@v2
+        with:
+          max_attempts: 3
+          timeout_seconds: 200
+          continue_on_error: false
+          command: |
+            docker exec -i ${DOCKER_RUN_NAME} bash /tmp/check-status.sh
+          on_retry_command: |
+            docker ps -a
+            docker stop ${DOCKER_RUN_NAME}
+            sleep 3
+            docker ps -a
+            docker run --rm --name ${DOCKER_RUN_NAME} --platform ${PLATFORM} -d -p 8088:8088 -p 50070:50070 -p 50075:50075 -p 10000:10000 -p 10002:10002 -p 8888:8888 -p 9083:9083 -p 8022:22 ${HIVE_IMAGE_NAME}:${HIVE_IMAGE_TAG_NAME}
+            sleep 60
 
       - name: Integration Test
+        id: integrationTest
         run: |
           gradle integrationTest
 
       - name: Print logs when Graviton integration tests failure
-        if: ${{ failure() }}
+        if: ${{ failure() && steps.integrationTest.outcome == 'failure' }}
         run: |
           if [ -f "distribution/package/logs/graviton-server.out" ]; then
             cat distribution/package/logs/graviton-server.out
