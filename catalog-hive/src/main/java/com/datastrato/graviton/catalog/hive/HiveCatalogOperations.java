@@ -602,11 +602,14 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
         String.format(
             "Cannot support invalid namespace in Hive Metastore: %s", schemaIdent.namespace()));
 
-    // TODO(yuqi) check Distribution and SortOrder invalidation
     try {
-      HiveSchema schema = loadSchema(schemaIdent);
-
       EntityStore store = GravitonEnv.getInstance().entityStore();
+      if (!store.exists(schemaIdent, SCHEMA)) {
+        throw new NoSuchSchemaException(
+            String.format(
+                "Schema (database) does not exist: %s in Graviton store", schemaIdent.name()));
+      }
+
       HiveTable hiveTable =
           store.executeInTransaction(
               () -> {

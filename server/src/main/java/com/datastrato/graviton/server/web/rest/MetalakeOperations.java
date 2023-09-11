@@ -11,6 +11,7 @@ import com.datastrato.graviton.dto.MetalakeDTO;
 import com.datastrato.graviton.dto.requests.MetalakeCreateRequest;
 import com.datastrato.graviton.dto.requests.MetalakeUpdateRequest;
 import com.datastrato.graviton.dto.requests.MetalakeUpdatesRequest;
+import com.datastrato.graviton.dto.util.DTOConverters;
 import com.datastrato.graviton.dto.responses.DropResponse;
 import com.datastrato.graviton.dto.responses.MetalakeListResponse;
 import com.datastrato.graviton.dto.responses.MetalakeResponse;

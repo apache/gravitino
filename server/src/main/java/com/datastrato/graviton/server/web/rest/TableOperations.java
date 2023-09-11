@@ -12,6 +12,7 @@ import com.datastrato.graviton.catalog.CatalogOperationDispatcher;
 import com.datastrato.graviton.dto.requests.TableCreateRequest;
 import com.datastrato.graviton.dto.requests.TableUpdateRequest;
 import com.datastrato.graviton.dto.requests.TableUpdatesRequest;
+import com.datastrato.graviton.dto.util.DTOConverters;
 import com.datastrato.graviton.dto.responses.DropResponse;
 import com.datastrato.graviton.dto.responses.EntityListResponse;
 import com.datastrato.graviton.dto.responses.TableResponse;

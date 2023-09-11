@@ -14,10 +14,14 @@ import com.datastrato.graviton.Audit;
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.catalog.CatalogOperationDispatcher;
 import com.datastrato.graviton.dto.rel.ColumnDTO;
+import com.datastrato.graviton.dto.rel.DistributionDTO;
+import com.datastrato.graviton.dto.rel.ExpressionPartitionDTO.FieldExpression;
+import com.datastrato.graviton.dto.rel.SortOrderDTO;
 import com.datastrato.graviton.dto.rel.TableDTO;
 import com.datastrato.graviton.dto.requests.TableCreateRequest;
 import com.datastrato.graviton.dto.requests.TableUpdateRequest;
 import com.datastrato.graviton.dto.requests.TableUpdatesRequest;
+import com.datastrato.graviton.dto.util.DTOConverters;
 import com.datastrato.graviton.dto.responses.DropResponse;
 import com.datastrato.graviton.dto.responses.EntityListResponse;
 import com.datastrato.graviton.dto.responses.ErrorConstants;
@@ -148,14 +152,31 @@ public class TestTableOperations extends JerseyTest {
     Table table = mockTable("table1", columns, "mock comment", ImmutableMap.of("k1", "v1"));
     when(dispatcher.createTable(any(), any(), any(), any(), any(), any())).thenReturn(table);
 
+    SortOrderDTO[] sortOrderDTOS =
+        new SortOrderDTO[] {
+          new SortOrderDTO.Builder()
+              .withDirection(SortOrderDTO.Direction.DESC)
+              .withNullOrder(SortOrderDTO.NullOrder.FIRST)
+              .withExpression(
+                  new FieldExpression.Builder().withFieldName(new String[] {"col_2"}).build())
+              .build()
+        };
+    DistributionDTO distributionDTO =
+        new DistributionDTO.Builder()
+            .withDistMethod(DistributionDTO.DistributionMethod.HASH)
+            .withDistNum(10)
+            .withExpressions(
+                ImmutableList.of(
+                    new FieldExpression.Builder().withFieldName(new String[] {"col_1"}).build()))
+            .build();
     TableCreateRequest req =
         new TableCreateRequest(
             "table1",
             "mock comment",
             Arrays.stream(columns).map(DTOConverters::toDTO).toArray(ColumnDTO[]::new),
             ImmutableMap.of("k1", "v1"),
-            null,
-            null);
+            sortOrderDTOS,
+            distributionDTO);
 
     Response resp =
         target(tablePath(metalake, catalog, schema))

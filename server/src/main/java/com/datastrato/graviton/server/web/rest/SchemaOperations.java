@@ -10,6 +10,7 @@ import com.datastrato.graviton.catalog.CatalogOperationDispatcher;
 import com.datastrato.graviton.dto.requests.SchemaCreateRequest;
 import com.datastrato.graviton.dto.requests.SchemaUpdateRequest;
 import com.datastrato.graviton.dto.requests.SchemaUpdatesRequest;
+import com.datastrato.graviton.dto.util.DTOConverters;
 import com.datastrato.graviton.dto.responses.DropResponse;
 import com.datastrato.graviton.dto.responses.EntityListResponse;
 import com.datastrato.graviton.dto.responses.SchemaResponse;

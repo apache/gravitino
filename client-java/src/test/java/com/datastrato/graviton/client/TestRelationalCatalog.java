@@ -35,7 +35,6 @@ import com.datastrato.graviton.dto.responses.EntityListResponse;
 import com.datastrato.graviton.dto.responses.ErrorResponse;
 import com.datastrato.graviton.dto.responses.SchemaResponse;
 import com.datastrato.graviton.dto.responses.TableResponse;
-import com.datastrato.graviton.dto.util.DTOConverters;
 import com.datastrato.graviton.exceptions.NoSuchCatalogException;
 import com.datastrato.graviton.exceptions.NoSuchSchemaException;
 import com.datastrato.graviton.exceptions.NoSuchTableException;
@@ -363,8 +362,8 @@ public class TestRelationalCatalog extends TestBase {
                 columns,
                 "comment",
                 Collections.emptyMap(),
-                DTOConverters.toDTO(distributionDTO),
-                Arrays.stream(sortOrderDTOS).map(DTOConverters::toDTO).toArray(SortOrder[]::new));
+                com.datastrato.graviton.dto.util.DTOConverters.toDTO(distributionDTO),
+                Arrays.stream(sortOrderDTOS).map(com.datastrato.graviton.dto.util.DTOConverters::toDTO).toArray(SortOrder[]::new));
     Assertions.assertEquals(expectedTable.name(), table.name());
     Assertions.assertEquals(expectedTable.comment(), table.comment());
     Assertions.assertEquals(expectedTable.properties(), table.properties());
@@ -394,9 +393,9 @@ public class TestRelationalCatalog extends TestBase {
                         columns,
                         "comment",
                         Collections.emptyMap(),
-                        DTOConverters.toDTO(distributionDTO),
+                        com.datastrato.graviton.dto.util.DTOConverters.toDTO(distributionDTO),
                         Arrays.stream(sortOrderDTOS)
-                            .map(DTOConverters::toDTO)
+                            .map(com.datastrato.graviton.dto.util.DTOConverters::toDTO)
                             .toArray(SortOrder[]::new)));
     Assertions.assertTrue(ex.getMessage().contains("schema not found"));
 
@@ -417,9 +416,9 @@ public class TestRelationalCatalog extends TestBase {
                         columns,
                         "comment",
                         Collections.emptyMap(),
-                        DTOConverters.toDTO(distributionDTO),
+                        com.datastrato.graviton.dto.util.DTOConverters.toDTO(distributionDTO),
                         Arrays.stream(sortOrderDTOS)
-                            .map(DTOConverters::toDTO)
+                            .map(com.datastrato.graviton.dto.util.DTOConverters::toDTO)
                             .toArray(SortOrder[]::new)));
     Assertions.assertTrue(ex1.getMessage().contains("table already exists"));
   }

@@ -4,7 +4,10 @@
  */
 package com.datastrato.graviton;
 
+import com.datastrato.graviton.Distribution.DistributionMethod;
 import com.datastrato.graviton.Entity.EntityType;
+import com.datastrato.graviton.SortOrder.Direction;
+import com.datastrato.graviton.SortOrder.NullOrder;
 import com.datastrato.graviton.exceptions.NoSuchEntityException;
 import com.datastrato.graviton.meta.AuditInfo;
 import com.datastrato.graviton.meta.BaseMetalake;
@@ -12,6 +15,8 @@ import com.datastrato.graviton.meta.CatalogEntity;
 import com.datastrato.graviton.meta.SchemaVersion;
 import com.datastrato.graviton.rel.Column;
 import com.datastrato.graviton.rel.Table;
+import com.datastrato.graviton.rel.transforms.Transform;
+import com.datastrato.graviton.rel.transforms.Transforms;
 import com.datastrato.graviton.utils.Executable;
 import com.google.common.collect.Maps;
 import io.substrait.type.TypeCreator;
@@ -167,6 +172,22 @@ public class TestEntityStore {
             .withType(TypeCreator.NULLABLE.I8)
             .build();
 
+    Distribution distribution =
+        Distribution.builder()
+            .distNum(10)
+            .transforms(new Transform[] {Transforms.field(new String[] {"column"})})
+            .distMethod(DistributionMethod.EVEN)
+            .build();
+
+    SortOrder[] sortOrders =
+        new SortOrder[] {
+          SortOrder.builder()
+              .nullOrder(NullOrder.FIRST)
+              .direction(Direction.DESC)
+              .transform(Transforms.field(new String[] {"column"}))
+              .build()
+        };
+
     TestTable table =
         new TestTable.Builder()
             .withId(1L)
@@ -176,8 +197,8 @@ public class TestEntityStore {
             .withProperties(Maps.newHashMap())
             .withColumns(new Column[] {column})
             .withAuditInfo(auditInfo)
-            .withDistribution(null)
-            .withSortOrders(null)
+            .withDistribution(distribution)
+            .withSortOrders(sortOrders)
             .build();
 
     InMemoryEntityStore store = new InMemoryEntityStore();
