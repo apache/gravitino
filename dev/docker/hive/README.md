@@ -8,7 +8,7 @@ Build docker image that includes Hadoop2, Hive2
 Build Image
 ===========
 ```
-./build-docker.sh
+./build-docker.sh --platform [all|linux/amd64|linux/arm64] --image {image_name} --tag {tag_name}
 ```
 
 Run container

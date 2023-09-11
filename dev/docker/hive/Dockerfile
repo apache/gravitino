@@ -50,7 +50,7 @@ COPY packages /tmp/packages
 ENV JAVA_HOME=/usr/local/jdk
 ENV HIVE_HOME=/usr/local/hive
 ENV HADOOP_HOME=/usr/local/hadoop
-ENV HADOOP_HEAPSIZE=8192
+ENV HADOOP_HEAPSIZE=128
 ENV HADOOP_INSTALL=${HADOOP_HOME}
 ENV HADOOP_MAPRED_HOME=${HADOOP_INSTALL}
 ENV HADOOP_COMMON_HOME=${HADOOP_INSTALL}
@@ -94,15 +94,18 @@ RUN tar -xz -C ${HADOOP_HOME} --strip-components 1 -f /tmp/packages/${HADOOP_PAC
 # replace configuration templates
 RUN rm -f ${HADOOP_CONF_DIR}/core-site.xml
 RUN rm -f ${HADOOP_CONF_DIR}/hadoop-env.sh
+RUN rm -f ${HADOOP_CONF_DIR}/yarn-env.sh
 RUN rm -f ${HADOOP_CONF_DIR}/hdfs-site.xml
 RUN rm -f ${HADOOP_CONF_DIR}/mapred-site.xml
 RUN rm -f ${HADOOP_CONF_DIR}/yarn-site.xml
 
 ADD core-site.xml ${HADOOP_CONF_DIR}/core-site.xml
 ADD hadoop-env.sh ${HADOOP_CONF_DIR}/hadoop-env.sh
+ADD yarn-env.sh ${HADOOP_CONF_DIR}/yarn-env.sh
 ADD hdfs-site.xml ${HADOOP_CONF_DIR}/hdfs-site.xml
 ADD mapred-site.xml ${HADOOP_CONF_DIR}/mapred-site.xml
 ADD yarn-site.xml ${HADOOP_CONF_DIR}/yarn-site.xml
+ADD check-status.sh /tmp/check-status.sh
 
 # format HFS
 RUN ${HADOOP_HOME}/bin/hdfs namenode -format -nonInteractive
