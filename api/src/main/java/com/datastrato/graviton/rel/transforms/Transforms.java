@@ -42,6 +42,7 @@ public class Transforms {
 
   /**
    * Creates a list partitioning by the given field names. For dynamically partitioned tables only.
+   *
    * @param fieldNames The field names to partition by.
    * @return The list partitioning.
    */
@@ -52,6 +53,7 @@ public class Transforms {
 
   /**
    * Creates a range partitioning by the given field name. For dynamically partitioned tables only.
+   *
    * @param fieldName The field name to partition by.
    * @return The range partitioning.
    */
