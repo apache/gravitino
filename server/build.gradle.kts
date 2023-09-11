@@ -48,6 +48,17 @@ dependencies {
   testImplementation(libs.mockito.core)
 }
 
+fun getGitCommitId(): String {
+  val gitFolder = rootDir.path + "/.git/"
+  val head = File(gitFolder + "HEAD").readText().split(":")
+  val isCommit = head.size == 1
+  if (isCommit) {
+    return head[0].trim()
+  }
+  val refHead = File(gitFolder + head[1].trim())
+  return refHead.readText().trim()
+}
+
 tasks.register("writeProjectPropertiesFile") {
   val propertiesFile = file("src/main/resources/project.properties")
   val dateFormat = SimpleDateFormat("dd/MM/yyyy HH:mm:ss")
@@ -55,6 +66,7 @@ tasks.register("writeProjectPropertiesFile") {
   doLast {
     val compileDate = dateFormat.format(Date())
     val projectVersion = project.version.toString()
+    val commitId = getGitCommitId()
 
     propertiesFile.parentFile.mkdirs()
     propertiesFile.createNewFile()
@@ -63,8 +75,9 @@ tasks.register("writeProjectPropertiesFile") {
               "# Copyright 2023 Datastrato.\n" +
               "# This software is licensed under the Apache License version 2.\n" +
               "#\n")
-      writer.write("compileDate=$compileDate\n")
-      writer.write("version=$projectVersion")
+      writer.write("project.version=$projectVersion\n")
+      writer.write("compile.date=$compileDate\n")
+      writer.write("git.commit.id=$commitId\n")
     }
   }
 }
