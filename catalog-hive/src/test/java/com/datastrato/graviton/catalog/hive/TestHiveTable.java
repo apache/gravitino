@@ -16,6 +16,7 @@ import com.datastrato.graviton.EntityStore;
 import com.datastrato.graviton.GravitonEnv;
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
+import com.datastrato.graviton.StringIdentifier;
 import com.datastrato.graviton.catalog.hive.miniHMS.MiniHiveMetastoreService;
 import com.datastrato.graviton.exceptions.TableAlreadyExistsException;
 import com.datastrato.graviton.meta.AuditInfo;
@@ -37,7 +38,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
-public class HiveTableTest extends MiniHiveMetastoreService {
+public class TestHiveTable extends MiniHiveMetastoreService {
 
   private static final String META_LAKE_NAME = "metalake";
 
@@ -143,10 +144,11 @@ public class HiveTableTest extends MiniHiveMetastoreService {
             .createTable(tableIdentifier, columns, HIVE_COMMENT, properties);
     Assertions.assertEquals(tableIdentifier.name(), table.name());
     Assertions.assertEquals(HIVE_COMMENT, table.comment());
-    Assertions.assertArrayEquals(columns, table.columns());
+    testProperties(properties, table.properties());
 
     Table loadedTable = hiveCatalog.asTableCatalog().loadTable(tableIdentifier);
     Assertions.assertEquals(table.auditInfo(), loadedTable.auditInfo());
+    testProperties(properties, loadedTable.properties());
 
     Assertions.assertTrue(hiveCatalog.asTableCatalog().tableExists(tableIdentifier));
     NameIdentifier[] tableIdents =
@@ -334,5 +336,16 @@ public class HiveTableTest extends MiniHiveMetastoreService {
         createdTable.auditInfo().createTime(), alteredTable1.auditInfo().createTime());
     Assertions.assertNotNull(alteredTable1.auditInfo().lastModifier());
     Assertions.assertNotNull(alteredTable1.auditInfo().lastModifiedTime());
+  }
+
+  private void testProperties(Map<String, String> expectedProps, Map<String, String> testProps) {
+    expectedProps.forEach(
+        (k, v) -> {
+          Assertions.assertEquals(v, testProps.get(k));
+        });
+
+    Assertions.assertTrue(testProps.containsKey(StringIdentifier.ID_KEY));
+    StringIdentifier StringId = StringIdentifier.fromString(testProps.get(StringIdentifier.ID_KEY));
+    Assertions.assertEquals(StringId.toString(), testProps.get(StringIdentifier.ID_KEY));
   }
 }

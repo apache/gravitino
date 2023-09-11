@@ -10,6 +10,7 @@ import com.datastrato.graviton.EntityStore;
 import com.datastrato.graviton.MetalakeChange;
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
+import com.datastrato.graviton.StringIdentifier;
 import com.datastrato.graviton.SupportsMetalakes;
 import com.datastrato.graviton.exceptions.MetalakeAlreadyExistsException;
 import com.datastrato.graviton.exceptions.NoSuchEntityException;
@@ -95,12 +96,15 @@ public class MetalakeManager implements SupportsMetalakes {
   public BaseMetalake createMetalake(
       NameIdentifier ident, String comment, Map<String, String> properties)
       throws MetalakeAlreadyExistsException {
+    long uid = idGenerator.nextId();
+    StringIdentifier stringId = StringIdentifier.fromId(uid);
+
     BaseMetalake metalake =
         new BaseMetalake.Builder()
-            .withId(idGenerator.nextId())
+            .withId(uid)
             .withName(ident.name())
             .withComment(comment)
-            .withProperties(properties)
+            .withProperties(StringIdentifier.addToProperties(stringId, properties))
             .withVersion(SchemaVersion.V_0_1)
             .withAuditInfo(
                 new AuditInfo.Builder()

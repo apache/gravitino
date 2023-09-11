@@ -14,7 +14,7 @@ public interface Configs {
   String DEFAULT_ENTITY_KV_STORE = "RocksDBKvBackend";
   String ENTITY_KV_STORE_KEY = "graviton.entity.store.kv";
 
-  String ENTITY_KV_ROCKSDB_BACKEND_PATH_KEY = "graviton.entity.store.kv.rocskdb.path";
+  String ENTITY_KV_ROCKSDB_BACKEND_PATH_KEY = "graviton.entity.store.kv.rocksdbPath";
   String DEFAULT_KV_ROCKSDB_BACKEND_PATH = "/tmp/graviton";
 
   ConfigEntry<String> ENTITY_STORE =
