@@ -240,7 +240,7 @@ public class ErrorHandlers {
     }
   }
 
-  /** Error handler specific to Metalake operations. */
+  /** Error handler specific to Version operations. */
   private static class VersionErrorHandler extends RestErrorHandler {
     private static final ErrorHandler INSTANCE = new VersionErrorHandler();
 
