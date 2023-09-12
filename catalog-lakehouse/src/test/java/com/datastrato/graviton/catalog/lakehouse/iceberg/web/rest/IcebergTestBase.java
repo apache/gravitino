@@ -6,6 +6,7 @@
 package com.datastrato.graviton.catalog.lakehouse.iceberg.web.rest;
 
 import com.datastrato.graviton.catalog.lakehouse.iceberg.web.IcebergObjectMapperProvider;
+import com.datastrato.graviton.rest.RESTUtils;
 import com.google.common.base.Joiner;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -16,6 +17,10 @@ import javax.ws.rs.core.MediaType;
 import org.glassfish.jersey.test.JerseyTest;
 
 public class IcebergTestBase extends JerseyTest {
+  static {
+    System.setProperty(
+        "jersey.config.test.container.port", String.valueOf(RESTUtils.findAvailablePort()));
+  }
 
   public Builder getRenameTableClientBuilder() {
     return getIcebergClientBuilder(IcebergRestTestUtil.RENAME_TABLE_PATH, Optional.empty());

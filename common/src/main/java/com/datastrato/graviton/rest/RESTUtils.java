@@ -8,8 +8,10 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableMap;
+import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.io.UnsupportedEncodingException;
+import java.net.ServerSocket;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -102,6 +104,15 @@ public class RESTUtils {
     } catch (UnsupportedEncodingException e) {
       throw new UncheckedIOException(
           String.format("Failed to URL decode '%s': UTF-8 encoding is not supported", encoded), e);
+    }
+  }
+
+  // find an available port
+  public static int findAvailablePort() {
+    try (ServerSocket socket = new ServerSocket(0)) {
+      return socket.getLocalPort();
+    } catch (IOException e) {
+      return -1;
     }
   }
 }

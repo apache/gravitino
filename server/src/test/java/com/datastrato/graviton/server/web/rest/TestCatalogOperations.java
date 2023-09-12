@@ -27,6 +27,7 @@ import com.datastrato.graviton.exceptions.NoSuchCatalogException;
 import com.datastrato.graviton.exceptions.NoSuchMetalakeException;
 import com.datastrato.graviton.meta.AuditInfo;
 import com.datastrato.graviton.meta.CatalogEntity;
+import com.datastrato.graviton.rest.RESTUtils;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.time.Instant;
@@ -43,6 +44,10 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class TestCatalogOperations extends JerseyTest {
+  static {
+    System.setProperty(
+        "jersey.config.test.container.port", String.valueOf(RESTUtils.findAvailablePort()));
+  }
 
   private static class MockServletRequestFactory extends ServletRequestFactoryBase {
     @Override

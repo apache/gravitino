@@ -14,13 +14,15 @@ import lombok.ToString;
 public class VersionDTO {
 
   @JsonProperty("version")
-  private final String version;
+  private String version;
 
   @JsonProperty("compileDate")
-  private final String compileDate;
+  private String compileDate;
 
   @JsonProperty("gitCommit")
-  private final String gitCommit;
+  private String gitCommit;
+
+  public VersionDTO() {}
 
   public VersionDTO(String version, String compileDate, String gitCommit) {
     this.version = version;
