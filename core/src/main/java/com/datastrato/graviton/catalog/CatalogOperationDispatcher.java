@@ -199,7 +199,15 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
 
     return doWithCatalog(
         catalogIdent,
-        c -> c.doWithTableOps(t -> t.createTable(ident, columns, comment, properties, partitions)),
+        c ->
+            c.doWithTableOps(
+                t ->
+                    t.createTable(
+                        ident,
+                        columns,
+                        comment,
+                        properties,
+                        partitions == null ? new Transform[0] : partitions)),
         NoSuchSchemaException.class,
         TableAlreadyExistsException.class);
   }

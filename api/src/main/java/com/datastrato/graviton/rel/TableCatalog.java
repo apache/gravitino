@@ -80,7 +80,7 @@ public interface TableCatalog {
   default Table createTable(
       NameIdentifier ident, Column[] columns, String comment, Map<String, String> properties)
       throws NoSuchSchemaException, TableAlreadyExistsException {
-    return createTable(ident, columns, comment, properties, null);
+    return createTable(ident, columns, comment, properties, new Transform[0]);
   }
 
   /**

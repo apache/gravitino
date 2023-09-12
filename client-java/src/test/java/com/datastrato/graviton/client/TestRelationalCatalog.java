@@ -728,7 +728,7 @@ public class TestRelationalCatalog extends TestBase {
 
   private static TableDTO createMockTable(
       String name, ColumnDTO[] columns, String comment, Map<String, String> properties) {
-    return createMockTable(name, columns, comment, properties, null);
+    return createMockTable(name, columns, comment, properties, new Partition[0]);
   }
 
   private static TableDTO createMockTable(

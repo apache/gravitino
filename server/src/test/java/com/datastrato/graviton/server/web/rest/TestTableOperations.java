@@ -187,7 +187,8 @@ public class TestTableOperations extends JerseyTest {
     Assertions.assertEquals(columns[1].dataType(), columnDTOs[1].dataType());
     Assertions.assertEquals(columns[1].comment(), columnDTOs[1].comment());
 
-    Assertions.assertNull(tableDTO.partitioning());
+    Assertions.assertNotNull(tableDTO.partitioning());
+    Assertions.assertEquals(0, tableDTO.partitioning().length);
 
     // Test throw NoSuchSchemaException
     doThrow(new NoSuchSchemaException("mock error"))
@@ -662,7 +663,7 @@ public class TestTableOperations extends JerseyTest {
 
   private static Table mockTable(
       String tableName, Column[] columns, String comment, Map<String, String> properties) {
-    return mockTable(tableName, columns, comment, properties, null);
+    return mockTable(tableName, columns, comment, properties, new Transform[0]);
   }
 
   private static Table mockTable(
