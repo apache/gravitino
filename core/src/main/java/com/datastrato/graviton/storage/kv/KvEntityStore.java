@@ -129,12 +129,16 @@ public class KvEntityStore implements EntityStore {
           String.format("Entity %s already exist, please check again", e.nameIdentifier()));
     }
 
-    // Delete possible delete mark
-    byte[] deleteMarkKey = generateDeleteKey(key);
-    backend.delete(deleteMarkKey);
+    backend.executeInTransaction(
+        () -> {
+          // Delete possible delete mark
+          byte[] deleteMarkKey = generateDeleteKey(key);
+          backend.delete(deleteMarkKey);
 
-    byte[] value = serDe.serialize(e);
-    backend.put(key, value, true);
+          byte[] value = serDe.serialize(e);
+          backend.put(key, value, true);
+          return null;
+        });
   }
 
   @Override
