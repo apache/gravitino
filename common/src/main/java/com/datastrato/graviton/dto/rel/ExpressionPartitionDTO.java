@@ -54,8 +54,11 @@ public class ExpressionPartitionDTO implements Partition {
   }
 
   enum ExpressionType {
+    @JsonProperty("field")
     FIELD,
+    @JsonProperty("literal")
     LITERAL,
+    @JsonProperty("function")
     FUNCTION,
   }
 

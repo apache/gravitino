@@ -5,8 +5,9 @@
 
 package com.datastrato.graviton;
 
-import com.datastrato.graviton.SortOrder.Direction;
-import com.datastrato.graviton.SortOrder.NullOrder;
+import com.datastrato.graviton.rel.SortOrder;
+import com.datastrato.graviton.rel.SortOrder.Direction;
+import com.datastrato.graviton.rel.SortOrder.NullOrder;
 import com.datastrato.graviton.rel.transforms.Transform;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;

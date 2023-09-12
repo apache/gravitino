@@ -5,7 +5,8 @@
 
 package com.datastrato.graviton;
 
-import com.datastrato.graviton.Distribution.DistributionMethod;
+import com.datastrato.graviton.rel.Distribution;
+import com.datastrato.graviton.rel.Distribution.DistributionMethod;
 import com.datastrato.graviton.rel.transforms.Transform;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;

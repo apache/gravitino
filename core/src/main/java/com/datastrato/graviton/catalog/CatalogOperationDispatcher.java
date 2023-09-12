@@ -4,10 +4,8 @@
  */
 package com.datastrato.graviton.catalog;
 
-import com.datastrato.graviton.Distribution;
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
-import com.datastrato.graviton.SortOrder;
 import com.datastrato.graviton.exceptions.IllegalNameIdentifierException;
 import com.datastrato.graviton.exceptions.NoSuchCatalogException;
 import com.datastrato.graviton.exceptions.NoSuchSchemaException;
@@ -16,8 +14,10 @@ import com.datastrato.graviton.exceptions.NonEmptySchemaException;
 import com.datastrato.graviton.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.graviton.exceptions.TableAlreadyExistsException;
 import com.datastrato.graviton.rel.Column;
+import com.datastrato.graviton.rel.Distribution;
 import com.datastrato.graviton.rel.Schema;
 import com.datastrato.graviton.rel.SchemaChange;
+import com.datastrato.graviton.rel.SortOrder;
 import com.datastrato.graviton.rel.SupportsSchemas;
 import com.datastrato.graviton.rel.Table;
 import com.datastrato.graviton.rel.TableCatalog;

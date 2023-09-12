@@ -4,10 +4,10 @@
  */
 package com.datastrato.graviton.server.web.rest;
 
-import com.datastrato.graviton.Distribution;
+import com.datastrato.graviton.rel.Distribution;
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
-import com.datastrato.graviton.SortOrder;
+import com.datastrato.graviton.rel.SortOrder;
 import com.datastrato.graviton.catalog.CatalogOperationDispatcher;
 import com.datastrato.graviton.dto.requests.TableCreateRequest;
 import com.datastrato.graviton.dto.requests.TableUpdateRequest;

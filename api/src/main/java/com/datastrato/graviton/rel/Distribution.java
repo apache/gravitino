@@ -3,7 +3,7 @@
  * This software is licensed under the Apache License version 2.
  */
 
-package com.datastrato.graviton;
+package com.datastrato.graviton.rel;
 
 import com.datastrato.graviton.rel.transforms.Transform;
 import lombok.Builder;

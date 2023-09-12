@@ -4,16 +4,18 @@
  */
 package com.datastrato.graviton;
 
-import com.datastrato.graviton.Distribution.DistributionMethod;
 import com.datastrato.graviton.Entity.EntityType;
-import com.datastrato.graviton.SortOrder.Direction;
-import com.datastrato.graviton.SortOrder.NullOrder;
 import com.datastrato.graviton.exceptions.NoSuchEntityException;
 import com.datastrato.graviton.meta.AuditInfo;
 import com.datastrato.graviton.meta.BaseMetalake;
 import com.datastrato.graviton.meta.CatalogEntity;
 import com.datastrato.graviton.meta.SchemaVersion;
 import com.datastrato.graviton.rel.Column;
+import com.datastrato.graviton.rel.Distribution;
+import com.datastrato.graviton.rel.Distribution.DistributionMethod;
+import com.datastrato.graviton.rel.SortOrder;
+import com.datastrato.graviton.rel.SortOrder.Direction;
+import com.datastrato.graviton.rel.SortOrder.NullOrder;
 import com.datastrato.graviton.rel.Table;
 import com.datastrato.graviton.rel.transforms.Transform;
 import com.datastrato.graviton.rel.transforms.Transforms;

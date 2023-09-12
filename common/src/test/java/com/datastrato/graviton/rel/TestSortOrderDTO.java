@@ -34,7 +34,7 @@ public class TestSortOrderDTO {
     String expectedValue =
         "{\n"
             + "  \"expression\": {\n"
-            + "    \"expressionType\": \"FIELD\",\n"
+            + "    \"expressionType\": \"field\",\n"
             + "    \"fieldName\": [\n"
             + "      \"field1\"\n"
             + "    ]\n"

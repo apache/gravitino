@@ -4,10 +4,10 @@
  */
 package com.datastrato.graviton.client;
 
-import com.datastrato.graviton.Distribution;
+import com.datastrato.graviton.rel.Distribution;
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
-import com.datastrato.graviton.SortOrder;
+import com.datastrato.graviton.rel.SortOrder;
 import com.datastrato.graviton.dto.AuditDTO;
 import com.datastrato.graviton.dto.CatalogDTO;
 import com.datastrato.graviton.dto.rel.ColumnDTO;

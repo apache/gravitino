@@ -6,9 +6,9 @@ package com.datastrato.graviton.dto.util;
 
 import com.datastrato.graviton.Audit;
 import com.datastrato.graviton.Catalog;
-import com.datastrato.graviton.Distribution;
+import com.datastrato.graviton.rel.Distribution;
 import com.datastrato.graviton.Metalake;
-import com.datastrato.graviton.SortOrder;
+import com.datastrato.graviton.rel.SortOrder;
 import com.datastrato.graviton.dto.AuditDTO;
 import com.datastrato.graviton.dto.CatalogDTO;
 import com.datastrato.graviton.dto.MetalakeDTO;

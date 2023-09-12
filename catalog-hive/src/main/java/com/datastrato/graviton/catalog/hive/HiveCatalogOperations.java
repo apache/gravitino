@@ -9,13 +9,13 @@ import static com.datastrato.graviton.Entity.EntityType.TABLE;
 import static com.datastrato.graviton.catalog.hive.HiveTable.HMS_TABLE_COMMENT;
 import static com.datastrato.graviton.catalog.hive.HiveTable.SUPPORT_TABLE_TYPES;
 
-import com.datastrato.graviton.Distribution;
+import com.datastrato.graviton.rel.Distribution;
 import com.datastrato.graviton.EntityAlreadyExistsException;
 import com.datastrato.graviton.EntityStore;
 import com.datastrato.graviton.GravitonEnv;
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
-import com.datastrato.graviton.SortOrder;
+import com.datastrato.graviton.rel.SortOrder;
 import com.datastrato.graviton.StringIdentifier;
 import com.datastrato.graviton.catalog.CatalogOperations;
 import com.datastrato.graviton.catalog.hive.converter.ToHiveType;

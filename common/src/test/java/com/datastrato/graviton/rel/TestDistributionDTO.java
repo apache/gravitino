@@ -33,7 +33,7 @@ public class TestDistributionDTO {
         "{\n"
             + "  \"expressions\": [\n"
             + "    {\n"
-            + "      \"expressionType\": \"FIELD\",\n"
+            + "      \"expressionType\": \"field\",\n"
             + "      \"fieldName\": [\n"
             + "        \"a\"\n"
             + "      ]\n"

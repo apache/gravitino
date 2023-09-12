@@ -7,6 +7,8 @@ package com.datastrato.graviton;
 import com.datastrato.graviton.meta.AuditInfo;
 import com.datastrato.graviton.meta.rel.BaseTable;
 import com.datastrato.graviton.rel.Column;
+import com.datastrato.graviton.rel.Distribution;
+import com.datastrato.graviton.rel.SortOrder;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
