@@ -5,6 +5,7 @@
 package com.datastrato.graviton;
 
 import com.datastrato.graviton.exceptions.IllegalNameIdentifierException;
+import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
 import com.google.common.collect.Iterables;
 import java.util.Arrays;
@@ -40,6 +41,11 @@ public class NameIdentifier {
    */
   public static NameIdentifier of(Namespace namespace, String name) {
     return new NameIdentifier(namespace, name);
+  }
+
+  public NameIdentifier parent() {
+    Preconditions.checkArgument(namespace.levels().length > 0, "No parent for root namespace");
+    return NameIdentifier.of(namespace.levels());
   }
 
   /**

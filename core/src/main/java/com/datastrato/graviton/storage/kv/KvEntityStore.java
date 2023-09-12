@@ -6,10 +6,6 @@
 package com.datastrato.graviton.storage.kv;
 
 import static com.datastrato.graviton.Configs.ENTITY_KV_STORE;
-import static com.datastrato.graviton.Entity.EntityType.CATALOG;
-import static com.datastrato.graviton.Entity.EntityType.SCHEMA;
-import static com.datastrato.graviton.Entity.EntityType.TABLE;
-import static com.datastrato.graviton.storage.kv.BinaryEntityKeyEncoder.LOG;
 import static com.datastrato.graviton.storage.kv.BinaryEntityKeyEncoder.NAMESPACE_SEPARATOR;
 
 import com.datastrato.graviton.Config;
@@ -24,10 +20,11 @@ import com.datastrato.graviton.Namespace;
 import com.datastrato.graviton.exceptions.AlreadyExistsException;
 import com.datastrato.graviton.exceptions.NoSuchEntityException;
 import com.datastrato.graviton.exceptions.NonEmptyEntityException;
-import com.datastrato.graviton.storage.EntityKeyEncoder;
 import com.datastrato.graviton.storage.NameMappingService;
 import com.datastrato.graviton.utils.Bytes;
 import com.datastrato.graviton.utils.Executable;
+import com.datastrato.graviton.utils.NonThrowableFunction;
+import com.datastrato.graviton.utils.NonThrowablePredicate;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableMap;
@@ -35,7 +32,6 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
@@ -58,9 +54,11 @@ public class KvEntityStore implements EntityStore {
       ImmutableMap.of("RocksDBKvBackend", RocksDBKvBackend.class.getCanonicalName());
 
   @Getter @VisibleForTesting private KvBackend backend;
-  private EntityKeyEncoder<byte[]> entityKeyEncoder;
+  private KvEntityKeyEncoder entityKeyEncoder;
   private NameMappingService nameMappingService;
   private EntitySerDe serDe;
+
+  private static final byte[] DELETE_PREFIX = "DELETE".getBytes();
 
   @Override
   public void initialize(Config config) throws RuntimeException {
@@ -88,27 +86,33 @@ public class KvEntityStore implements EntityStore {
     }
 
     byte[] endKey = Bytes.increment(Bytes.wrap(startKey)).get();
-    List<Pair<byte[], byte[]>> kvs =
-        backend.scan(
+
+    // TODO (yuqi), if the list is too large, we need to do pagination or streaming
+    return backend
+        .scan(
             new KvRangeScan.KvRangeScanBuilder()
                 .start(startKey)
                 .end(endKey)
                 .startInclusive(true)
                 .endInclusive(false)
+                .predicate(
+                    NonThrowablePredicate.wrap(key -> backend.get(generateDeleteKey(key)) == null))
                 .limit(Integer.MAX_VALUE)
-                .build());
-
-    for (Pair<byte[], byte[]> pairs : kvs) {
-      entities.add(serDe.deserialize(pairs.getRight(), e));
-    }
-    // TODO (yuqi), if the list is too large, we need to do pagination or streaming
-    return entities;
+                .build())
+        .stream()
+        .map(Pair::getRight)
+        .map(NonThrowableFunction.wraper(value -> serDe.deserialize(value, e)))
+        .collect(Collectors.toList());
   }
 
   @Override
   public boolean exists(NameIdentifier ident, EntityType entityType) throws IOException {
     byte[] key = entityKeyEncoder.encode(ident, entityType, true);
     if (key == null) {
+      return false;
+    }
+
+    if (backend.get(generateDeleteKey(key)) != null) {
       return false;
     }
 
@@ -119,8 +123,18 @@ public class KvEntityStore implements EntityStore {
   public <E extends Entity & HasIdentifier> void put(E e, boolean overwritten)
       throws IOException, EntityAlreadyExistsException {
     byte[] key = entityKeyEncoder.encode(e.nameIdentifier(), e.type());
+
+    if (exists(e.nameIdentifier(), e.type()) && !overwritten) {
+      throw new EntityAlreadyExistsException(
+          String.format("Entity %s already exist, please check again", e.nameIdentifier()));
+    }
+
+    // Delete possible delete mark
+    byte[] deleteMarkKey = generateDeleteKey(key);
+    backend.delete(deleteMarkKey);
+
     byte[] value = serDe.serialize(e);
-    backend.put(key, value, overwritten);
+    backend.put(key, value, true);
   }
 
   @Override
@@ -130,6 +144,10 @@ public class KvEntityStore implements EntityStore {
     byte[] key = entityKeyEncoder.encode(ident, entityType);
     return executeInTransaction(
         () -> {
+          if (backend.get(generateDeleteKey(key)) != null) {
+            throw new NoSuchEntityException(ident.toString());
+          }
+
           byte[] value = backend.get(key);
           if (value == null) {
             throw new NoSuchEntityException(ident.toString());
@@ -218,15 +236,34 @@ public class KvEntityStore implements EntityStore {
     return concatIdAndName(ids, name);
   }
 
+  private boolean hasMarkDeleted(NameIdentifier identifier, EntityType entityType)
+      throws IOException {
+    // Check parents entities have been deleted or not
+    List<byte[]> parents = entityKeyEncoder.getParentsPrefix(identifier, entityType);
+    boolean deleted =
+        parents.stream()
+            .map(NonThrowableFunction.wraper(this::generateDeleteKey))
+            .map(NonThrowableFunction.wraper(key -> backend.get(key)))
+            .anyMatch(Objects::nonNull);
+
+    if (deleted) {
+      return true;
+    }
+
+    // Check current entity has been deleted or not
+    byte[] key = entityKeyEncoder.encode(identifier, entityType, true);
+    return key == null || backend.get(generateDeleteKey(key)) != null;
+  }
+
   @Override
   public <E extends Entity & HasIdentifier> E get(
       NameIdentifier ident, EntityType entityType, Class<E> e)
       throws NoSuchEntityException, IOException {
-    byte[] key = entityKeyEncoder.encode(ident, entityType, true);
-    if (key == null) {
+    if (hasMarkDeleted(ident, entityType)) {
       throw new NoSuchEntityException(ident.toString());
     }
 
+    byte[] key = entityKeyEncoder.encode(ident, entityType, true);
     byte[] value = backend.get(key);
     if (value == null) {
       throw new NoSuchEntityException(ident.toString());
@@ -234,72 +271,24 @@ public class KvEntityStore implements EntityStore {
     return serDe.deserialize(value, e);
   }
 
-  /**
-   * Get key prefix of all sub-entities under a specific entities. For example, as a metalake will
-   * start with `ml_{metalake_id}`, sub-entities under this metalake will have the prefix
-   *
-   * <pre>
-   *   catalog: ca_{metalake_id}
-   *   schema:  sc_{metalake_id}
-   *   table:   ta_{metalake_id}
-   * </pre>
-   *
-   * Why the sub-entities under this metalake start with those prefixes, please see {@link
-   * KvEntityStore} java class doc.
-   *
-   * @param ident identifier of an entity
-   * @param type type of entity
-   * @return list of sub-entities prefix
-   * @throws IOException if error occurs
-   */
-  private List<byte[]> getSubEntitiesPrefix(NameIdentifier ident, EntityType type)
-      throws IOException {
-    List<byte[]> prefixs = Lists.newArrayList();
-    byte[] encode = entityKeyEncoder.encode(ident, type, true);
-    switch (type) {
-      case METALAKE:
-        prefixs.add(replacePrefixTypeInfo(encode, CATALOG.getShortName()));
-        prefixs.add(replacePrefixTypeInfo(encode, SCHEMA.getShortName()));
-        prefixs.add(replacePrefixTypeInfo(encode, TABLE.getShortName()));
-        break;
-      case CATALOG:
-        prefixs.add(replacePrefixTypeInfo(encode, SCHEMA.getShortName()));
-        prefixs.add(replacePrefixTypeInfo(encode, TABLE.getShortName()));
-        break;
-      case SCHEMA:
-        prefixs.add(replacePrefixTypeInfo(encode, TABLE.getShortName()));
-        break;
-      case TABLE:
-        break;
-      default:
-        LOG.warn("Currently unknown type: {}, please check it", type);
-    }
-    Collections.reverse(prefixs);
-    return prefixs;
-  }
-
-  private byte[] replacePrefixTypeInfo(byte[] encode, String subTypePrefix) {
-    byte[] result = new byte[encode.length];
-    System.arraycopy(encode, 0, result, 0, encode.length);
-    byte[] bytes = subTypePrefix.getBytes();
-    result[0] = bytes[0];
-    result[1] = bytes[1];
-
-    return result;
+  private byte[] generateDeleteKey(byte[] key) {
+    return Bytes.concat(DELETE_PREFIX, key);
   }
 
   @Override
   public boolean delete(NameIdentifier ident, EntityType entityType, boolean cascade)
       throws IOException {
-    byte[] dataKey = entityKeyEncoder.encode(ident, entityType, true);
-    if (dataKey == null) {
+    // Parent or self has been already mark as deleted
+    if (hasMarkDeleted(ident, entityType)) {
       return true;
     }
 
-    List<byte[]> subEntityPrefix = getSubEntitiesPrefix(ident, entityType);
+    byte[] dataKey = entityKeyEncoder.encode(ident, entityType, true);
+    List<byte[]> subEntityPrefix = entityKeyEncoder.getChildrenPrefix(ident, entityType);
     if (subEntityPrefix.isEmpty()) {
-      // has no sub-entities
-      return backend.delete(dataKey);
+      // has no sub-entities, just mark the entity as deleted
+      backend.put(generateDeleteKey(dataKey), new byte[0], true);
+      return true;
     }
 
     byte[] directChild = Iterables.getLast(subEntityPrefix);
@@ -312,6 +301,8 @@ public class KvEntityStore implements EntityStore {
                 .startInclusive(true)
                 .endInclusive(false)
                 .limit(1)
+                .predicate(
+                    NonThrowablePredicate.wrap(key -> backend.get(generateDeleteKey(key)) == null))
                 .build());
 
     if (!cascade && !kvs.isEmpty()) {
@@ -319,16 +310,9 @@ public class KvEntityStore implements EntityStore {
           String.format("Entity %s has sub-entities, you should remove sub-entities first", ident));
     }
 
-    for (byte[] prefix : subEntityPrefix) {
-      backend.deleteRange(
-          new KvRangeScan.KvRangeScanBuilder()
-              .start(prefix)
-              .startInclusive(true)
-              .end(Bytes.increment(Bytes.wrap(prefix)).get())
-              .build());
-    }
-
-    return backend.delete(dataKey);
+    // Mark the entity as deleted
+    backend.put(generateDeleteKey(dataKey), new byte[0], true);
+    return true;
   }
 
   @Override

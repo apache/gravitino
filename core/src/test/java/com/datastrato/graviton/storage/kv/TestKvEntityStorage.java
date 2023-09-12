@@ -596,7 +596,7 @@ public class TestKvEntityStorage {
 
       Assertions.assertThrowsExactly(
           NoSuchEntityException.class,
-          () -> store.get(schema2.nameIdentifier(), EntityType.SCHEMA, CatalogEntity.class));
+          () -> store.get(schema2.nameIdentifier(), EntityType.SCHEMA, BaseSchema.class));
     }
   }
 

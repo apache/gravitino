@@ -14,6 +14,8 @@ import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import javax.annotation.concurrent.ThreadSafe;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * {@link KvNameMappingService} is an implementation that use {@link KvBackend} to store name to id
@@ -21,6 +23,9 @@ import javax.annotation.concurrent.ThreadSafe;
  */
 @ThreadSafe
 public class KvNameMappingService implements NameMappingService {
+
+
+  public static final Logger LOGGER = LoggerFactory.getLogger(KvNameMappingService.class);
 
   // TODO(yuqi) Make this configurable
   @VisibleForTesting final KvBackend backend;
@@ -60,6 +65,7 @@ public class KvNameMappingService implements NameMappingService {
     try {
       return backend.executeInTransaction(
           () -> {
+            LOGGER.info("Binding name '{}' to id '{}'", name, ByteUtils.formatByteArray(ByteUtils.longToByte(id)));
             backend.put(nameByte, ByteUtils.longToByte(id), false);
             byte[] idByte = Bytes.concat(ID_PREFIX, ByteUtils.longToByte(id));
             backend.put(idByte, name.getBytes(), false);
