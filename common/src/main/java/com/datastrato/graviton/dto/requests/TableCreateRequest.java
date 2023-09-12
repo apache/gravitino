@@ -6,11 +6,17 @@ package com.datastrato.graviton.dto.requests;
 
 import com.datastrato.graviton.dto.rel.ColumnDTO;
 import com.datastrato.graviton.dto.rel.DistributionDTO;
+import com.datastrato.graviton.dto.rel.ExpressionPartitionDTO.Expression;
+import com.datastrato.graviton.dto.rel.ExpressionPartitionDTO.FieldExpression;
+import com.datastrato.graviton.dto.rel.ExpressionPartitionDTO.FunctionExpression;
 import com.datastrato.graviton.dto.rel.SortOrderDTO;
 import com.datastrato.graviton.rest.RESTRequest;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
@@ -66,5 +72,34 @@ public class TableCreateRequest implements RESTRequest {
     Preconditions.checkArgument(
         columns != null && columns.length != 0,
         "\"columns\" field is required and cannot be empty");
+
+    List<String> columnNames =
+        Arrays.stream(columns).map(ColumnDTO::name).collect(Collectors.toList());
+    if (sortOrders != null) {
+      Arrays.stream(sortOrders)
+          .forEach(sortOrder -> validateExpresion(sortOrder.getExpression(), columnNames));
+    }
+
+    if (distribution != null) {
+      distribution
+          .getExpressions()
+          .forEach(expression -> validateExpresion(expression, columnNames));
+    }
+  }
+
+  private void validateExpresion(Expression expression, List<String> columnNames) {
+    if (expression instanceof FieldExpression) {
+      FieldExpression nameRefernce = (FieldExpression) expression;
+      String columnName = nameRefernce.getFieldName()[0];
+      Preconditions.checkArgument(
+          columnNames.contains(columnName),
+          "Column name %s in sort order expression is not found in table columns",
+          columnName);
+    } else if (expression instanceof FunctionExpression) {
+      FunctionExpression function = (FunctionExpression) expression;
+      for (Expression arg : function.getArgs()) {
+        validateExpresion(arg, columnNames);
+      }
+    }
   }
 }

@@ -3,9 +3,8 @@
  * This software is licensed under the Apache License version 2.
  */
 
-package com.datastrato.graviton;
+package com.datastrato.graviton.rel;
 
-import com.datastrato.graviton.rel.SortOrder;
 import com.datastrato.graviton.rel.SortOrder.Direction;
 import com.datastrato.graviton.rel.SortOrder.NullOrder;
 import com.datastrato.graviton.rel.transforms.Transform;

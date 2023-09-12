@@ -3,9 +3,8 @@
  * This software is licensed under the Apache License version 2.
  */
 
-package com.datastrato.graviton;
+package com.datastrato.graviton.rel;
 
-import com.datastrato.graviton.rel.Distribution;
 import com.datastrato.graviton.rel.Distribution.DistributionMethod;
 import com.datastrato.graviton.rel.transforms.Transform;
 import org.junit.jupiter.api.Assertions;

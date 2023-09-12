@@ -72,6 +72,23 @@ public interface TableCatalog {
    * @param columns The columns of the new table.
    * @param comment The table comment.
    * @param properties The table properties.
+   * @return Fhe created table metadata.
+   * @throws NoSuchSchemaException If the schema does not exist.
+   * @throws TableAlreadyExistsException If the table already exists.
+   */
+  default Table createTable(
+      NameIdentifier ident, Column[] columns, String comment, Map<String, String> properties)
+      throws NoSuchSchemaException, TableAlreadyExistsException {
+    return createTable(ident, columns, comment, properties, null, null);
+  }
+
+  /**
+   * Create a table in the catalog.
+   *
+   * @param ident A table identifier.
+   * @param columns The columns of the new table.
+   * @param comment The table comment.
+   * @param properties The table properties.
    * @param distribution The distribution of the table
    * @param sortOrders The sort orders of the table
    * @return Fhe created table metadata.

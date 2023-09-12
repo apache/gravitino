@@ -47,6 +47,7 @@ import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.Application;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import javax.ws.rs.core.Response.Status;
 import org.glassfish.jersey.internal.inject.AbstractBinder;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.glassfish.jersey.test.JerseyTest;
@@ -158,7 +159,7 @@ public class TestTableOperations extends JerseyTest {
               .withDirection(SortOrderDTO.Direction.DESC)
               .withNullOrder(SortOrderDTO.NullOrder.FIRST)
               .withExpression(
-                  new FieldExpression.Builder().withFieldName(new String[] {"col_2"}).build())
+                  new FieldExpression.Builder().withFieldName(new String[] {"col1"}).build())
               .build()
         };
     DistributionDTO distributionDTO =
@@ -167,7 +168,7 @@ public class TestTableOperations extends JerseyTest {
             .withDistNum(10)
             .withExpressions(
                 ImmutableList.of(
-                    new FieldExpression.Builder().withFieldName(new String[] {"col_1"}).build()))
+                    new FieldExpression.Builder().withFieldName(new String[] {"col2"}).build()))
             .build();
     TableCreateRequest req =
         new TableCreateRequest(
@@ -203,6 +204,42 @@ public class TestTableOperations extends JerseyTest {
     Assertions.assertEquals(columns[1].name(), columnDTOs[1].name());
     Assertions.assertEquals(columns[1].dataType(), columnDTOs[1].dataType());
     Assertions.assertEquals(columns[1].comment(), columnDTOs[1].comment());
+
+    sortOrderDTOS =
+        new SortOrderDTO[] {
+          new SortOrderDTO.Builder()
+              .withDirection(SortOrderDTO.Direction.DESC)
+              .withNullOrder(SortOrderDTO.NullOrder.FIRST)
+              .withExpression(
+                  new FieldExpression.Builder().withFieldName(new String[] {"col_1"}).build())
+              .build()
+        };
+    distributionDTO =
+        new DistributionDTO.Builder()
+            .withDistMethod(DistributionDTO.DistributionMethod.HASH)
+            .withDistNum(10)
+            .withExpressions(
+                ImmutableList.of(
+                    new FieldExpression.Builder().withFieldName(new String[] {"col2_2"}).build()))
+            .build();
+
+    TableCreateRequest badReq =
+        new TableCreateRequest(
+            "table1",
+            "mock comment",
+            Arrays.stream(columns).map(DTOConverters::toDTO).toArray(ColumnDTO[]::new),
+            ImmutableMap.of("k1", "v1"),
+            sortOrderDTOS,
+            distributionDTO);
+
+    resp =
+        target(tablePath(metalake, catalog, schema))
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.graviton.v1+json")
+            .post(Entity.entity(badReq, MediaType.APPLICATION_JSON_TYPE));
+
+    // Sort order and distribution columns name are not found in table columns
+    Assertions.assertEquals(Status.BAD_REQUEST.getStatusCode(), resp.getStatus());
 
     // Test throw NoSuchSchemaException
     doThrow(new NoSuchSchemaException("mock error"))

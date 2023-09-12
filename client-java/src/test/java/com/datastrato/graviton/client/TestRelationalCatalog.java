@@ -13,7 +13,6 @@ import static org.apache.hc.core5.http.HttpStatus.SC_OK;
 import com.datastrato.graviton.Catalog;
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
-import com.datastrato.graviton.rel.SortOrder;
 import com.datastrato.graviton.dto.AuditDTO;
 import com.datastrato.graviton.dto.CatalogDTO;
 import com.datastrato.graviton.dto.rel.ColumnDTO;
@@ -43,6 +42,7 @@ import com.datastrato.graviton.exceptions.RESTException;
 import com.datastrato.graviton.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.graviton.exceptions.TableAlreadyExistsException;
 import com.datastrato.graviton.rel.Schema;
+import com.datastrato.graviton.rel.SortOrder;
 import com.datastrato.graviton.rel.Table;
 import com.datastrato.graviton.rel.TableChange;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -328,7 +328,7 @@ public class TestRelationalCatalog extends TestBase {
               .withDirection(SortOrderDTO.Direction.DESC)
               .withNullOrder(SortOrderDTO.NullOrder.FIRST)
               .withExpression(
-                  new FieldExpression.Builder().withFieldName(new String[] {"col_2"}).build())
+                  new FieldExpression.Builder().withFieldName(new String[] {"col1"}).build())
               .build()
         };
     DistributionDTO distributionDTO =
@@ -337,7 +337,7 @@ public class TestRelationalCatalog extends TestBase {
             .withDistNum(10)
             .withExpressions(
                 ImmutableList.of(
-                    new FieldExpression.Builder().withFieldName(new String[] {"col_1"}).build()))
+                    new FieldExpression.Builder().withFieldName(new String[] {"col2"}).build()))
             .build();
 
     TableDTO expectedTable =

@@ -7,14 +7,14 @@ package com.datastrato.graviton.catalog.hive;
 import static org.apache.hadoop.hive.metastore.TableType.EXTERNAL_TABLE;
 import static org.apache.hadoop.hive.metastore.TableType.MANAGED_TABLE;
 
-import com.datastrato.graviton.rel.Distribution;
 import com.datastrato.graviton.NameIdentifier;
-import com.datastrato.graviton.rel.SortOrder;
-import com.datastrato.graviton.rel.SortOrder.Direction;
 import com.datastrato.graviton.catalog.hive.converter.FromHiveType;
 import com.datastrato.graviton.catalog.hive.converter.ToHiveType;
 import com.datastrato.graviton.meta.AuditInfo;
 import com.datastrato.graviton.meta.rel.BaseTable;
+import com.datastrato.graviton.rel.Distribution;
+import com.datastrato.graviton.rel.SortOrder;
+import com.datastrato.graviton.rel.SortOrder.Direction;
 import com.datastrato.graviton.rel.transforms.Transform;
 import com.datastrato.graviton.rel.transforms.Transforms.NamedReference;
 import com.google.common.collect.Lists;
