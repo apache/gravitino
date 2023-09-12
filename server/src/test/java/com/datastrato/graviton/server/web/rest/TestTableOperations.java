@@ -34,12 +34,10 @@ import com.datastrato.graviton.rel.Column;
 import com.datastrato.graviton.rel.Table;
 import com.datastrato.graviton.rel.TableChange;
 import com.datastrato.graviton.rel.transforms.Transform;
-import com.datastrato.graviton.rest.RESTUtils;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.substrait.type.Type;
 import io.substrait.type.TypeCreator;
-import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
@@ -52,20 +50,10 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.glassfish.jersey.internal.inject.AbstractBinder;
 import org.glassfish.jersey.server.ResourceConfig;
-import org.glassfish.jersey.test.JerseyTest;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-public class TestTableOperations extends JerseyTest {
-  static {
-    int port;
-    try {
-      port = RESTUtils.findAvailablePort("2000:3000");
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    }
-    System.setProperty("jersey.config.test.container.port", String.valueOf(port));
-  }
+public class TestTableOperations extends JerseyTestBase {
 
   private static class MockServletRequestFactory extends ServletRequestFactoryBase {
     @Override

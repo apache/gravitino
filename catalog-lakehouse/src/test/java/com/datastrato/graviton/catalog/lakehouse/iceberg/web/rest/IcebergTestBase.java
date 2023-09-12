@@ -19,13 +19,12 @@ import org.glassfish.jersey.test.JerseyTest;
 
 public class IcebergTestBase extends JerseyTest {
   static {
-    int port;
     try {
-      port = RESTUtils.findAvailablePort("2000:3000");
+      int port = RESTUtils.findAvailablePort(2000, 3000);
+      System.setProperty("jersey.config.test.container.port", String.valueOf(port));
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
-    System.setProperty("jersey.config.test.container.port", String.valueOf(port));
   }
 
   public Builder getRenameTableClientBuilder() {

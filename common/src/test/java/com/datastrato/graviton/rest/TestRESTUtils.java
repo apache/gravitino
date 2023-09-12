@@ -68,16 +68,19 @@ class TestRESTUtils {
 
   @Test
   void testFindAvailablePort() throws IOException {
-    assertTrue(RESTUtils.findAvailablePort(":") > 0);
+    assertTrue(RESTUtils.findAvailablePort(0, 0) > 0);
 
-    String portRange = ":20000";
-    assertTrue(RESTUtils.findAvailablePort(portRange) <= 20000);
+    // valid user registered port https://en.wikipedia.org/wiki/Registered_port
+    int port1 = RESTUtils.findAvailablePort(Integer.MIN_VALUE, Integer.MAX_VALUE);
+    assertTrue(port1 >= 1024 && port1 <= 65535);
 
-    portRange = "20000:";
-    assertTrue(RESTUtils.findAvailablePort(portRange) >= 20000);
+    assertTrue(RESTUtils.findAvailablePort(Integer.MIN_VALUE, 20000) <= 20000);
+    assertTrue(RESTUtils.findAvailablePort(20000, Integer.MAX_VALUE) >= 20000);
 
-    portRange = "20000:30000";
-    int port = RESTUtils.findAvailablePort(portRange);
+    int port = RESTUtils.findAvailablePort(20000, 30000);
     assertTrue(port >= 20000 && port <= 30000);
+
+    assertThrows(
+        IOException.class, () -> RESTUtils.findAvailablePort(Integer.MAX_VALUE, Integer.MIN_VALUE));
   }
 }
