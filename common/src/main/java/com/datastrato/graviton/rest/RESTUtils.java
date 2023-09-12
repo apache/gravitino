@@ -116,7 +116,7 @@ public class RESTUtils {
       try (ServerSocket socket = new ServerSocket(0)) {
         return socket.getLocalPort();
       } catch (IOException e) {
-        throw new IOException("Failed to allocate a automatic port", e);
+        throw new IOException("Failed to allocate a random port", e);
       }
     }
 
