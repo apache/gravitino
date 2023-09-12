@@ -24,7 +24,6 @@ import org.slf4j.LoggerFactory;
 @ThreadSafe
 public class KvNameMappingService implements NameMappingService {
 
-
   public static final Logger LOGGER = LoggerFactory.getLogger(KvNameMappingService.class);
 
   // TODO(yuqi) Make this configurable
@@ -65,7 +64,10 @@ public class KvNameMappingService implements NameMappingService {
     try {
       return backend.executeInTransaction(
           () -> {
-            LOGGER.info("Binding name '{}' to id '{}'", name, ByteUtils.formatByteArray(ByteUtils.longToByte(id)));
+            LOGGER.info(
+                "Binding name '{}' to id '{}'",
+                name,
+                ByteUtils.formatByteArray(ByteUtils.longToByte(id)));
             backend.put(nameByte, ByteUtils.longToByte(id), false);
             byte[] idByte = Bytes.concat(ID_PREFIX, ByteUtils.longToByte(id));
             backend.put(idByte, name.getBytes(), false);
