@@ -30,6 +30,7 @@ import com.datastrato.graviton.meta.CatalogEntity;
 import com.datastrato.graviton.rest.RESTUtils;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import java.io.IOException;
 import java.time.Instant;
 import java.util.Collections;
 import javax.servlet.http.HttpServletRequest;
@@ -45,8 +46,13 @@ import org.junit.jupiter.api.Test;
 
 public class TestCatalogOperations extends JerseyTest {
   static {
-    System.setProperty(
-        "jersey.config.test.container.port", String.valueOf(RESTUtils.findAvailablePort()));
+    int port;
+    try {
+      port = RESTUtils.findAvailablePort("2000:3000");
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+    System.setProperty("jersey.config.test.container.port", String.valueOf(port));
   }
 
   private static class MockServletRequestFactory extends ServletRequestFactoryBase {

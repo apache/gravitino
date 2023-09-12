@@ -16,6 +16,8 @@ import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
+import java.util.Random;
+import org.apache.commons.lang3.StringUtils;
 
 /** Utility class for working with REST related operations. */
 public class RESTUtils {
@@ -108,11 +110,35 @@ public class RESTUtils {
   }
 
   // find an available port
-  public static int findAvailablePort() {
-    try (ServerSocket socket = new ServerSocket(0)) {
-      return socket.getLocalPort();
-    } catch (IOException e) {
-      return -1;
+  public static int findAvailablePort(String portRange) throws IOException {
+    // ':' is the default value which means no constraints on the portRange
+    if (StringUtils.isBlank(portRange) || portRange.equals(":")) {
+      try (ServerSocket socket = new ServerSocket(0)) {
+        return socket.getLocalPort();
+      } catch (IOException e) {
+        throw new IOException("Failed to allocate a automatic port", e);
+      }
     }
+
+    // valid user registered port https://en.wikipedia.org/wiki/Registered_port
+    int start = 1024;
+    int end = 65535;
+    String[] ports = portRange.split(":", -1);
+    if (!ports[0].isEmpty()) {
+      start = Integer.parseInt(ports[0]);
+    }
+    if (!ports[1].isEmpty()) {
+      end = Integer.parseInt(ports[1]);
+    }
+    Random random = new Random();
+    for (int i = start; i <= end; ++i) {
+      int randomNumber = random.nextInt(end - start + 1) + start;
+      try (ServerSocket socket = new ServerSocket(randomNumber)) {
+        return socket.getLocalPort();
+      } catch (IOException e) {
+        // ignore this
+      }
+    }
+    throw new IOException("No available port in the portRange: " + portRange);
   }
 }

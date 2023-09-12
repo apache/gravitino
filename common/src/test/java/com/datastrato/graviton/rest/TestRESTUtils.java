@@ -6,8 +6,10 @@ package com.datastrato.graviton.rest;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.common.collect.ImmutableMap;
+import java.io.IOException;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
@@ -62,5 +64,20 @@ class TestRESTUtils {
     assertEquals("", RESTUtils.decodeString(""));
     assertEquals("hello world", RESTUtils.decodeString("hello%20world"));
     assertThrows(IllegalArgumentException.class, () -> RESTUtils.decodeString(null));
+  }
+
+  @Test
+  void testFindAvailablePort() throws IOException {
+    assertTrue(RESTUtils.findAvailablePort(":") > 0);
+
+    String portRange = ":20000";
+    assertTrue(RESTUtils.findAvailablePort(portRange) <= 20000);
+
+    portRange = "20000:";
+    assertTrue(RESTUtils.findAvailablePort(portRange) >= 20000);
+
+    portRange = "20000:30000";
+    int port = RESTUtils.findAvailablePort(portRange);
+    assertTrue(port >= 20000 && port <= 30000);
   }
 }

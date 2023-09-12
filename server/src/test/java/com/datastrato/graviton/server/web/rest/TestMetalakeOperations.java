@@ -24,8 +24,10 @@ import com.datastrato.graviton.meta.AuditInfo;
 import com.datastrato.graviton.meta.BaseMetalake;
 import com.datastrato.graviton.meta.MetalakeManager;
 import com.datastrato.graviton.meta.SchemaVersion;
+import com.datastrato.graviton.rest.RESTUtils;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
+import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
 import javax.servlet.http.HttpServletRequest;
@@ -40,6 +42,15 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class TestMetalakeOperations extends JerseyTest {
+  static {
+    int port;
+    try {
+      port = RESTUtils.findAvailablePort("2000:3000");
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+    System.setProperty("jersey.config.test.container.port", String.valueOf(port));
+  }
 
   private static class MockServletRequestFactory extends ServletRequestFactoryBase {
     @Override
