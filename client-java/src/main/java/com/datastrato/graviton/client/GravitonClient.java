@@ -192,7 +192,7 @@ public class GravitonClient implements SupportsMetalakes, Closeable {
             "api/version",
             VersionResponse.class,
             Collections.emptyMap(),
-            ErrorHandlers.versionErrorHandler());
+            ErrorHandlers.restErrorHandler());
     resp.validate();
 
     return new GravitonVersion(resp.getVersion());

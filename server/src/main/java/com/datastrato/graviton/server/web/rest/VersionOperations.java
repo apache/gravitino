@@ -26,17 +26,13 @@ public class VersionOperations extends HttpServlet {
   public Response getVersion() {
     Properties projectProperties = new Properties();
     try {
-      projectProperties.load(VersionOperations.class.getResourceAsStream("/project.properties"));
+      projectProperties.load(
+          VersionOperations.class.getClassLoader().getResourceAsStream("project.properties"));
       String version = projectProperties.getProperty("project.version");
       String compileDate = projectProperties.getProperty("compile.date");
       String gitCommit = projectProperties.getProperty("git.commit.id");
 
-      VersionDTO versionDTO =
-          new VersionDTO.Builder()
-              .withVersion(version)
-              .withComment(compileDate)
-              .withGitCommit(gitCommit)
-              .build();
+      VersionDTO versionDTO = new VersionDTO(version, compileDate, gitCommit);
 
       return Utils.ok(new VersionResponse(versionDTO));
     } catch (IOException e) {

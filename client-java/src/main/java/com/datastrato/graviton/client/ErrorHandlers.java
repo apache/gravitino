@@ -65,15 +65,6 @@ public class ErrorHandlers {
   }
 
   /**
-   * Creates an error handler specific to Version operations.
-   *
-   * @return A Consumer representing the Version error handler.
-   */
-  public static Consumer<ErrorResponse> versionErrorHandler() {
-    return VersionErrorHandler.INSTANCE;
-  }
-
-  /**
    * Creates a generic error handler for REST requests.
    *
    * @return A Consumer representing the generic REST error handler.
@@ -236,16 +227,6 @@ public class ErrorHandlers {
           throw new RuntimeException(errorMessage);
       }
 
-      super.accept(errorResponse);
-    }
-  }
-
-  /** Error handler specific to Version operations. */
-  private static class VersionErrorHandler extends RestErrorHandler {
-    private static final ErrorHandler INSTANCE = new VersionErrorHandler();
-
-    @Override
-    public void accept(ErrorResponse errorResponse) {
       super.accept(errorResponse);
     }
   }

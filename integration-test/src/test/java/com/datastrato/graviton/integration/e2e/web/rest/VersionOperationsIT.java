@@ -17,10 +17,11 @@ public class VersionOperationsIT extends AbstractIT {
     Object ret =
         CommandExecutor.executeCommandLocalHost(
             "git rev-parse HEAD", false, ProcessData.TypesOfData.OUTPUT);
+    String gitCommitId = ret.toString().replace("\n", "");
 
     VersionDTO versionDTO = client.getVersion();
-    Assertions.assertEquals("0.2.0-SNAPSHOT", versionDTO.version());
+    Assertions.assertEquals(System.getenv("PROJECT_VERSION"), versionDTO.version());
     Assertions.assertFalse(versionDTO.compileDate().isEmpty());
-    Assertions.assertEquals(ret.toString().replace("\n", ""), versionDTO.gitCommit());
+    Assertions.assertEquals(gitCommitId, versionDTO.gitCommit());
   }
 }
