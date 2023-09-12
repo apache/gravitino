@@ -42,17 +42,13 @@ public class CatalogHiveIT extends AbstractIT {
   public static String HIVE_COL_NAME1 = "hive_col_name1";
   public static String HIVE_COL_NAME2 = "hive_col_name2";
   public static String HIVE_COL_NAME3 = "hive_col_name3";
-
   static String HIVE_METASTORE_URIS = "thrift://localhost:9083";
 
   private static HiveClientPool hiveClientPool;
 
   @BeforeAll
   public static void startup() throws Exception {
-    HiveConf hiveConf = new HiveConf();
-    hiveConf.set(HiveConf.ConfVars.METASTOREURIS.varname, HIVE_METASTORE_URIS);
-
-    GravitonMetaLake[] gravitonMetaLakes = client.listMetalakes();
+    HiveConf hiveConf = GravitonITUtils.hiveConfig();
 
     hiveClientPool = new HiveClientPool(1, hiveConf);
     client.createMetalake(NameIdentifier.of(metalakeName), "comment", Collections.emptyMap());
@@ -71,12 +67,7 @@ public class CatalogHiveIT extends AbstractIT {
     GravitonMetaLake metalake = client.loadMetalake(NameIdentifier.of(metalakeName));
 
     // Create catalog from Graviton API
-    Map<String, String> properties = Maps.newHashMap();
-    properties.put("provider", "hive");
-    properties.put(HiveConf.ConfVars.METASTOREURIS.varname, HIVE_METASTORE_URIS);
-    properties.put(HiveConf.ConfVars.METASTORETHRIFTCONNECTIONRETRIES.varname, "30");
-    properties.put(HiveConf.ConfVars.METASTORETHRIFTFAILURERETRIES.varname, "30");
-    properties.put(HiveConf.ConfVars.METASTORE_CLIENT_CONNECT_RETRY_DELAY.varname, "5");
+    Map<String, String> properties = GravitonITUtils.hiveConfigProperties();
 
     Catalog catalog =
         metalake.createCatalog(
