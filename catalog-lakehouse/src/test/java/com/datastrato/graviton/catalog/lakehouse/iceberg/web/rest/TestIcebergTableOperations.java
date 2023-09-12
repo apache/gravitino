@@ -30,7 +30,6 @@ import org.apache.iceberg.types.Types.NestedField;
 import org.apache.iceberg.types.Types.StringType;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 public class TestIcebergTableOperations extends TestIcebergNamespaceOperations {
@@ -87,8 +86,7 @@ public class TestIcebergTableOperations extends TestIcebergNamespaceOperations {
     return getTableClientBuilder(Optional.of(name)).get();
   }
 
-  private Response doUpdateTable(String name) {
-    TableMetadata base = doGetTableMetaData(name);
+  private Response doUpdateTable(String name, TableMetadata base) {
     MetadataUpdate addSchema = new AddSchema(newTableSchema, base.lastColumnId());
     MetadataUpdate setCurrentSchema = new SetCurrentSchema(1);
     UpdateTableRequest updateTableRequest =
@@ -97,8 +95,13 @@ public class TestIcebergTableOperations extends TestIcebergNamespaceOperations {
         .post(Entity.entity(updateTableRequest, MediaType.APPLICATION_JSON_TYPE));
   }
 
-  private void verifyUpdateSucc(String name) {
-    Response response = doUpdateTable(name);
+  private void verifyUpdateTableFail(String name, int status, TableMetadata base) {
+    Response response = doUpdateTable(name, base);
+    Assertions.assertEquals(status, response.getStatus());
+  }
+
+  private void verifyUpdateSucc(String name, TableMetadata base) {
+    Response response = doUpdateTable(name, base);
     Assertions.assertEquals(Status.OK.getStatusCode(), response.getStatus());
     LoadTableResponse loadTableResponse = response.readEntity(LoadTableResponse.class);
     Assertions.assertEquals(
@@ -160,6 +163,11 @@ public class TestIcebergTableOperations extends TestIcebergNamespaceOperations {
     Assertions.assertEquals(status, response.getStatus());
   }
 
+  private void verifyListTableFail(int status) {
+    Response response = doListTable();
+    Assertions.assertEquals(status, response.getStatus());
+  }
+
   private void verifyListTableSucc(Set<String> expectedTableNames) {
     Response response = doListTable();
     Assertions.assertEquals(Status.OK.getStatusCode(), response.getStatus());
@@ -176,13 +184,12 @@ public class TestIcebergTableOperations extends TestIcebergNamespaceOperations {
     Assertions.assertEquals(status, response.getStatus());
   }
 
-  @BeforeEach
-  void beforeTest() {
-    verifyCreateNamespaceSucc(IcebergRestTestUtil.TEST_NAMESPACE_NAME);
-  }
-
   @Test
   void testCreateTable() {
+    verifyCreateTableFail("create_foo1", 404);
+
+    verifyCreateNamespaceSucc(IcebergRestTestUtil.TEST_NAMESPACE_NAME);
+
     verifyCreateTableSucc("create_foo1");
 
     verifyCreateTableFail("create_foo1", 409);
@@ -191,6 +198,9 @@ public class TestIcebergTableOperations extends TestIcebergNamespaceOperations {
 
   @Test
   void testLoadTable() {
+    verifyLoadTableFail("load_foo1", 404);
+
+    verifyCreateNamespaceSucc(IcebergRestTestUtil.TEST_NAMESPACE_NAME);
     verifyCreateTableSucc("load_foo1");
     verifyLoadTableSucc("load_foo1");
 
@@ -199,21 +209,40 @@ public class TestIcebergTableOperations extends TestIcebergNamespaceOperations {
 
   @Test
   void testDropTable() {
+    verifyDropTableFail("drop_foo1", 404);
+    verifyCreateNamespaceSucc(IcebergRestTestUtil.TEST_NAMESPACE_NAME);
+    verifyDropTableFail("drop_foo1", 404);
+
     verifyCreateTableSucc("drop_foo1");
     verifyDropTableSucc("drop_foo1");
+    verifyLoadTableFail("drop_foo1", 404);
+  }
 
-    verifyDropTableFail("drop_foo1", 404);
+  private TableMetadata getTableMeta(String tableName) {
+    Response response = doLoadTable(tableName);
+    LoadTableResponse loadTableResponse = response.readEntity(LoadTableResponse.class);
+    return loadTableResponse.tableMetadata();
   }
 
   @Test
   void testUpdateTable() {
+    verifyCreateNamespaceSucc(IcebergRestTestUtil.TEST_NAMESPACE_NAME);
     verifyCreateTableSucc("update_foo1");
-    verifyUpdateSucc("update_foo1");
+    TableMetadata metadata = getTableMeta("update_foo1");
+    verifyUpdateSucc("update_foo1", metadata);
+
+    verifyDropTableSucc("update_foo1");
+    verifyUpdateTableFail("update_foo1", 404, metadata);
+
+    verifyDropNamespaceSucc(IcebergRestTestUtil.TEST_NAMESPACE_NAME);
+    verifyUpdateTableFail("update_foo1", 404, metadata);
   }
 
   @Test
   void testListTables() {
-    verifyListTableSucc(ImmutableSet.of());
+    verifyListTableFail(404);
+
+    verifyCreateNamespaceSucc(IcebergRestTestUtil.TEST_NAMESPACE_NAME);
     verifyCreateTableSucc("list_foo1");
     verifyCreateTableSucc("list_foo2");
     verifyListTableSucc(ImmutableSet.of("list_foo1", "list_foo2"));
@@ -221,15 +250,21 @@ public class TestIcebergTableOperations extends TestIcebergNamespaceOperations {
 
   @Test
   void testTableExits() {
-    verifyCreateTableSucc("exists_foo1");
-    verifyTableExistsStatusCode("exists_foo1", Status.OK.getStatusCode());
-    verifyLoadTableSucc("exists_foo1");
+    verifyTableExistsStatusCode("exists_foo2", 404);
+    verifyCreateNamespaceSucc(IcebergRestTestUtil.TEST_NAMESPACE_NAME);
+    verifyTableExistsStatusCode("exists_foo2", 404);
 
-    verifyTableExistsStatusCode("exists_foo2", Status.NOT_FOUND.getStatusCode());
+    verifyCreateTableSucc("exists_foo1");
+    verifyTableExistsStatusCode("exists_foo1", 200);
+    verifyLoadTableSucc("exists_foo1");
   }
 
   @Test
   void testRenameTable() {
+    // namespace not exits
+    verifyRenameTableFail("rename_foo1", "rename_foo3", 404);
+
+    verifyCreateNamespaceSucc(IcebergRestTestUtil.TEST_NAMESPACE_NAME);
     verifyCreateTableSucc("rename_foo1");
     // rename
     verifyRenameTableSucc("rename_foo1", "rename_foo2");

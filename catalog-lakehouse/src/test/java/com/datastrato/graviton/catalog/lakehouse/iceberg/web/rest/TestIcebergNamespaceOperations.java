@@ -86,7 +86,7 @@ public class TestIcebergNamespaceOperations extends IcebergTestBase {
     Assertions.assertEquals(properties, r.properties());
   }
 
-  private void verifyDropNamespaceSucc(String name) {
+  protected void verifyDropNamespaceSucc(String name) {
     Response response = doDropNamespace(name);
     Assertions.assertEquals(Status.NO_CONTENT.getStatusCode(), response.getStatus());
   }
