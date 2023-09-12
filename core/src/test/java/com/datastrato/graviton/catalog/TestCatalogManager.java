@@ -10,6 +10,7 @@ import com.datastrato.graviton.Config;
 import com.datastrato.graviton.Configs;
 import com.datastrato.graviton.EntityStore;
 import com.datastrato.graviton.NameIdentifier;
+import com.datastrato.graviton.StringIdentifier;
 import com.datastrato.graviton.TestEntityStore;
 import com.datastrato.graviton.exceptions.CatalogAlreadyExistsException;
 import com.datastrato.graviton.exceptions.NoSuchCatalogException;
@@ -83,7 +84,7 @@ public class TestCatalogManager {
         catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, "comment", props);
     Assertions.assertEquals("test1", testCatalog.name());
     Assertions.assertEquals("comment", testCatalog.comment());
-    Assertions.assertEquals(props, testCatalog.properties());
+    testProperties(props, testCatalog.properties());
     Assertions.assertEquals(Catalog.Type.RELATIONAL, testCatalog.type());
 
     // Test without setting "provider"
@@ -148,7 +149,7 @@ public class TestCatalogManager {
     Catalog catalog = catalogManager.loadCatalog(ident);
     Assertions.assertEquals("test21", catalog.name());
     Assertions.assertEquals("comment", catalog.comment());
-    Assertions.assertEquals(props, catalog.properties());
+    testProperties(props, catalog.properties());
     Assertions.assertEquals(Catalog.Type.RELATIONAL, catalog.type());
 
     // Test load non-existed catalog
@@ -192,7 +193,7 @@ public class TestCatalogManager {
     catalogManager.alterCatalog(ident1, change2, change3, change4);
     Catalog catalog2 = catalogManager.loadCatalog(ident1);
     Map<String, String> expectedProps = ImmutableMap.of("provider", "test", "key1", "value1");
-    Assertions.assertEquals(expectedProps, catalog2.properties());
+    testProperties(expectedProps, catalog2.properties());
 
     // Test Catalog does not exist
     NameIdentifier ident2 = NameIdentifier.of(ident.namespace(), "test33");
@@ -227,5 +228,16 @@ public class TestCatalogManager {
 
     // Drop operation will update the cache
     Assertions.assertNull(catalogManager.catalogCache.getIfPresent(ident));
+  }
+
+  private void testProperties(Map<String, String> expectedProps, Map<String, String> testProps) {
+    expectedProps.forEach(
+        (k, v) -> {
+          Assertions.assertEquals(v, testProps.get(k));
+        });
+
+    Assertions.assertTrue(testProps.containsKey(StringIdentifier.ID_KEY));
+    StringIdentifier StringId = StringIdentifier.fromString(testProps.get(StringIdentifier.ID_KEY));
+    Assertions.assertEquals(StringId.toString(), testProps.get(StringIdentifier.ID_KEY));
   }
 }
