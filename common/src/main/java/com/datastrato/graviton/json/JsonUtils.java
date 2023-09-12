@@ -13,9 +13,11 @@ import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.JsonDeserializer;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.JsonSerializer;
+import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.SerializerProvider;
+import com.fasterxml.jackson.databind.cfg.EnumFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
@@ -116,7 +118,9 @@ public class JsonUtils {
           mapper =
               new ObjectMapper()
                   .registerModule(new JavaTimeModule())
-                  .configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false);
+                  .configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false)
+                  .configure(EnumFeature.WRITE_ENUMS_TO_LOWERCASE, true)
+                  .enable(MapperFeature.ACCEPT_CASE_INSENSITIVE_ENUMS);
         }
       }
     }

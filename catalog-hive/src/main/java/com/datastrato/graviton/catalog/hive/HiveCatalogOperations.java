@@ -34,6 +34,7 @@ import com.datastrato.graviton.rel.SupportsSchemas;
 import com.datastrato.graviton.rel.Table;
 import com.datastrato.graviton.rel.TableCatalog;
 import com.datastrato.graviton.rel.TableChange;
+import com.datastrato.graviton.rel.transforms.Transform;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -582,13 +583,18 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
    * @param columns The array of columns for the new table.
    * @param comment The comment for the new table.
    * @param properties The properties for the new table.
+   * @param partitions The partitioning for the new table.
    * @return The newly created HiveTable instance.
    * @throws NoSuchSchemaException If the schema for the table does not exist.
    * @throws TableAlreadyExistsException If the table with the same name already exists.
    */
   @Override
   public Table createTable(
-      NameIdentifier tableIdent, Column[] columns, String comment, Map<String, String> properties)
+      NameIdentifier tableIdent,
+      Column[] columns,
+      String comment,
+      Map<String, String> properties,
+      Transform[] partitions)
       throws NoSuchSchemaException, TableAlreadyExistsException {
     Preconditions.checkArgument(
         !tableIdent.name().isEmpty(), "Cannot create table with empty name");

@@ -4,9 +4,11 @@
  */
 package com.datastrato.graviton.dto.rel;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import com.fasterxml.jackson.annotation.JsonValue;
 
 @JsonTypeInfo(
     use = JsonTypeInfo.Id.NAME,
@@ -27,6 +29,14 @@ public interface Partition {
   @JsonProperty("strategy")
   Strategy strategy();
 
+  /**
+   * Validate field referenced exists in table columns
+   *
+   * @param columns The columns of the table.
+   * @throws IllegalArgumentException if validation fails.
+   */
+  void validate(ColumnDTO[] columns) throws IllegalArgumentException;
+
   enum Strategy {
     IDENTITY,
     YEAR,
@@ -35,6 +45,17 @@ public interface Partition {
     HOUR,
     LIST,
     RANGE,
-    EXPRESSION,
+    EXPRESSION;
+
+    @JsonCreator
+    private static Strategy fromString(String strategy) {
+      return valueOf(strategy.toUpperCase());
+    }
+
+    @JsonValue
+    @Override
+    public String toString() {
+      return name().toLowerCase();
+    }
   }
 }

@@ -15,6 +15,7 @@ import com.datastrato.graviton.dto.AuditDTO;
 import com.datastrato.graviton.dto.CatalogDTO;
 import com.datastrato.graviton.dto.MetalakeDTO;
 import com.datastrato.graviton.dto.rel.ColumnDTO;
+import com.datastrato.graviton.dto.rel.Partition;
 import com.datastrato.graviton.dto.rel.SchemaDTO;
 import com.datastrato.graviton.dto.rel.TableDTO;
 import io.substrait.type.TypeCreator;
@@ -149,6 +150,7 @@ public class TestResponses {
             .withComment("comment")
             .withColumns(new ColumnDTO[] {column})
             .withAudit(audit)
+            .withPartitions(new Partition[0])
             .build();
     TableResponse tableResponse = new TableResponse(table);
     tableResponse.validate(); // No exception thrown

@@ -4,6 +4,8 @@
  */
 package com.datastrato.graviton.server.web.rest;
 
+import static com.datastrato.graviton.dto.rel.PartitionUtils.toTransforms;
+
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
 import com.datastrato.graviton.catalog.CatalogOperationDispatcher;
@@ -72,7 +74,11 @@ public class TableOperations {
       NameIdentifier ident = NameIdentifier.ofTable(metalake, catalog, schema, request.getName());
       Table table =
           dispatcher.createTable(
-              ident, request.getColumns(), request.getComment(), request.getProperties());
+              ident,
+              request.getColumns(),
+              request.getComment(),
+              request.getProperties(),
+              toTransforms(request.getPartitions()));
       return Utils.ok(new TableResponse(DTOConverters.toDTO(table)));
 
     } catch (Exception e) {
