@@ -45,6 +45,11 @@ public class TableCreateRequest implements RESTRequest {
   }
 
   public TableCreateRequest(
+      String name, String comment, ColumnDTO[] columns, Map<String, String> properties) {
+    this(name, comment, columns, properties, null);
+  }
+
+  public TableCreateRequest(
       String name,
       String comment,
       ColumnDTO[] columns,

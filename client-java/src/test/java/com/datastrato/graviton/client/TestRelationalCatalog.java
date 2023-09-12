@@ -5,6 +5,8 @@
 package com.datastrato.graviton.client;
 
 import static com.datastrato.graviton.dto.rel.PartitionUtils.toPartitions;
+import static com.datastrato.graviton.rel.transforms.Transforms.day;
+import static com.datastrato.graviton.rel.transforms.Transforms.field;
 import static com.datastrato.graviton.rel.transforms.Transforms.identity;
 import static org.apache.hc.core5.http.HttpStatus.SC_BAD_REQUEST;
 import static org.apache.hc.core5.http.HttpStatus.SC_CONFLICT;
@@ -321,35 +323,16 @@ public class TestRelationalCatalog extends TestBase {
           createMockColumn("col1", TypeCreator.NULLABLE.I8, "comment1"),
           createMockColumn("col2", TypeCreator.NULLABLE.STRING, "comment2")
         };
-    Transform[] transforms = {identity(new String[] {columns[0].name()})};
-    TableDTO expectedTable =
-        createMockTable(
-            "table1", columns, "comment", Collections.emptyMap(), toPartitions(transforms));
+    TableDTO expectedTable = createMockTable("table1", columns, "comment", Collections.emptyMap());
 
     TableCreateRequest req =
-        new TableCreateRequest(
-            tableId.name(), "comment", columns, Collections.emptyMap(), toPartitions(transforms));
+        new TableCreateRequest(tableId.name(), "comment", columns, Collections.emptyMap());
     TableResponse resp = new TableResponse(expectedTable);
     buildMockResource(Method.POST, tablePath, req, resp, SC_OK);
 
     Table table =
-        catalog
-            .asTableCatalog()
-            .createTable(tableId, columns, "comment", Collections.emptyMap(), transforms);
-    Assertions.assertEquals(expectedTable.name(), table.name());
-    Assertions.assertEquals(expectedTable.comment(), table.comment());
-    Assertions.assertEquals(expectedTable.properties(), table.properties());
-
-    Assertions.assertEquals(expectedTable.columns().length, table.columns().length);
-    Assertions.assertEquals(expectedTable.columns()[0].name(), table.columns()[0].name());
-    Assertions.assertEquals(expectedTable.columns()[0].dataType(), table.columns()[0].dataType());
-    Assertions.assertEquals(expectedTable.columns()[0].comment(), table.columns()[0].comment());
-
-    Assertions.assertEquals(expectedTable.columns()[1].name(), table.columns()[1].name());
-    Assertions.assertEquals(expectedTable.columns()[1].dataType(), table.columns()[1].dataType());
-    Assertions.assertEquals(expectedTable.columns()[1].comment(), table.columns()[1].comment());
-
-    Assertions.assertArrayEquals(expectedTable.partitioning(), table.partitioning());
+        catalog.asTableCatalog().createTable(tableId, columns, "comment", Collections.emptyMap());
+    assertTableEquals(expectedTable, table);
 
     // Test throw NoSuchSchemaException
     ErrorResponse errorResp =
@@ -362,8 +345,77 @@ public class TestRelationalCatalog extends TestBase {
             () ->
                 catalog
                     .asTableCatalog()
-                    .createTable(tableId, columns, "comment", Collections.emptyMap(), transforms));
+                    .createTable(tableId, columns, "comment", Collections.emptyMap()));
     Assertions.assertTrue(ex.getMessage().contains("schema not found"));
+
+    // Test throw TableAlreadyExistsException
+    ErrorResponse errorResp1 =
+        ErrorResponse.alreadyExists(
+            TableAlreadyExistsException.class.getSimpleName(), "table already exists");
+    buildMockResource(Method.POST, tablePath, req, errorResp1, SC_CONFLICT);
+
+    Throwable ex1 =
+        Assertions.assertThrows(
+            TableAlreadyExistsException.class,
+            () ->
+                catalog
+                    .asTableCatalog()
+                    .createTable(tableId, columns, "comment", Collections.emptyMap()));
+    Assertions.assertTrue(ex1.getMessage().contains("table already exists"));
+  }
+
+  @Test
+  public void testCreatePartitionedTable() throws JsonProcessingException {
+    NameIdentifier tableId = NameIdentifier.of(metalakeName, catalogName, "schema1", "table1");
+    String tablePath = withSlash(RelationalCatalog.formatTableRequestPath(tableId.namespace()));
+
+    ColumnDTO[] columns =
+        new ColumnDTO[] {
+          createMockColumn("city", TypeCreator.NULLABLE.I32, "comment1"),
+          createMockColumn("dt", TypeCreator.NULLABLE.DATE, "comment2")
+        };
+
+    // Test empty partitions
+    Transform[] emptyTransform = new Transform[0];
+    TableDTO expectedTable =
+        createMockTable(
+            "table1", columns, "comment", Collections.emptyMap(), toPartitions(emptyTransform));
+
+    TableCreateRequest req =
+        new TableCreateRequest(
+            tableId.name(),
+            "comment",
+            columns,
+            Collections.emptyMap(),
+            toPartitions(emptyTransform));
+    TableResponse resp = new TableResponse(expectedTable);
+    buildMockResource(Method.POST, tablePath, req, resp, SC_OK);
+
+    Table table =
+        catalog
+            .asTableCatalog()
+            .createTable(tableId, columns, "comment", Collections.emptyMap(), emptyTransform);
+    assertTableEquals(expectedTable, table);
+
+    // Test partitions
+    Transform[] transforms = {
+      identity(new String[] {columns[0].name()}), day(new String[] {columns[1].name()})
+    };
+    expectedTable =
+        createMockTable(
+            "table1", columns, "comment", Collections.emptyMap(), toPartitions(transforms));
+
+    req =
+        new TableCreateRequest(
+            tableId.name(), "comment", columns, Collections.emptyMap(), toPartitions(transforms));
+    resp = new TableResponse(expectedTable);
+    buildMockResource(Method.POST, tablePath, req, resp, SC_OK);
+
+    table =
+        catalog
+            .asTableCatalog()
+            .createTable(tableId, columns, "comment", Collections.emptyMap(), transforms);
+    assertTableEquals(expectedTable, table);
 
     // Test throw TableAlreadyExistsException
     ErrorResponse errorResp1 =
@@ -391,6 +443,32 @@ public class TestRelationalCatalog extends TestBase {
                     .createTable(
                         tableId, columns, "comment", Collections.emptyMap(), errorTransforms));
     Assertions.assertTrue(ex2.getMessage().contains("not found in table"));
+
+    // Test empty columns
+    Throwable ex3 =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                catalog
+                    .asTableCatalog()
+                    .createTable(
+                        tableId,
+                        new ColumnDTO[0],
+                        "comment",
+                        Collections.emptyMap(),
+                        emptyTransform));
+    Assertions.assertTrue(
+        ex3.getMessage().contains("\"columns\" field is required and cannot be empty"));
+  }
+
+  private void assertTableEquals(TableDTO expected, Table actual) {
+    Assertions.assertEquals(expected.name(), actual.name());
+    Assertions.assertEquals(expected.comment(), actual.comment());
+    Assertions.assertEquals(expected.properties(), actual.properties());
+
+    Assertions.assertArrayEquals(expected.columns(), actual.columns());
+
+    Assertions.assertArrayEquals(expected.partitioning(), actual.partitioning());
   }
 
   @Test
@@ -404,24 +482,19 @@ public class TestRelationalCatalog extends TestBase {
           createMockColumn("col1", TypeCreator.NULLABLE.I8, "comment1"),
           createMockColumn("col2", TypeCreator.NULLABLE.STRING, "comment2")
         };
-    TableDTO expectedTable = createMockTable("table1", columns, "comment", Collections.emptyMap());
+    TableDTO expectedTable =
+        createMockTable(
+            "table1",
+            columns,
+            "comment",
+            Collections.emptyMap(),
+            toPartitions(new Transform[] {field(columns[0])}));
 
     TableResponse resp = new TableResponse(expectedTable);
     buildMockResource(Method.GET, tablePath, null, resp, SC_OK);
 
     Table table = catalog.asTableCatalog().loadTable(tableId);
-    Assertions.assertEquals(expectedTable.name(), table.name());
-    Assertions.assertEquals(expectedTable.comment(), table.comment());
-    Assertions.assertEquals(expectedTable.properties(), table.properties());
-
-    Assertions.assertEquals(expectedTable.columns().length, table.columns().length);
-    Assertions.assertEquals(expectedTable.columns()[0].name(), table.columns()[0].name());
-    Assertions.assertEquals(expectedTable.columns()[0].dataType(), table.columns()[0].dataType());
-    Assertions.assertEquals(expectedTable.columns()[0].comment(), table.columns()[0].comment());
-
-    Assertions.assertEquals(expectedTable.columns()[1].name(), table.columns()[1].name());
-    Assertions.assertEquals(expectedTable.columns()[1].dataType(), table.columns()[1].dataType());
-    Assertions.assertEquals(expectedTable.columns()[1].comment(), table.columns()[1].comment());
+    assertTableEquals(expectedTable, table);
 
     // Test throw NoSuchTableException
     ErrorResponse errorResp =
@@ -614,6 +687,8 @@ public class TestRelationalCatalog extends TestBase {
       Assertions.assertEquals(
           updatedTable.columns()[i].comment(), alteredTable.columns()[i].comment());
     }
+
+    Assertions.assertArrayEquals(updatedTable.partitioning(), alteredTable.partitioning());
   }
 
   private void testAlterSchema(
