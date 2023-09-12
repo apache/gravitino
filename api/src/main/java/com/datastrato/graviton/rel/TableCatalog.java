@@ -73,6 +73,23 @@ public interface TableCatalog {
    * @param columns The columns of the new table.
    * @param comment The table comment.
    * @param properties The table properties.
+   * @return Fhe created table metadata.
+   * @throws NoSuchSchemaException If the schema does not exist.
+   * @throws TableAlreadyExistsException If the table already exists.
+   */
+  default Table createTable(
+      NameIdentifier ident, Column[] columns, String comment, Map<String, String> properties)
+      throws NoSuchSchemaException, TableAlreadyExistsException {
+    return createTable(ident, columns, comment, properties, null);
+  }
+
+  /**
+   * Create a partitioned table in the catalog.
+   *
+   * @param ident A table identifier.
+   * @param columns The columns of the new table.
+   * @param comment The table comment.
+   * @param properties The table properties.
    * @param partitions The table partitioning.
    * @return Fhe created table metadata.
    * @throws NoSuchSchemaException If the schema does not exist.
