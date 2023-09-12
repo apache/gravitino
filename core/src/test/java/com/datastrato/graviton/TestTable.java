@@ -25,6 +25,7 @@ public class TestTable extends BaseTable {
       table.properties = properties;
       table.columns = columns;
       table.auditInfo = auditInfo;
+      table.partitions = partitions;
 
       return table;
     }

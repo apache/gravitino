@@ -42,5 +42,7 @@ public class TableResponse extends BaseResponse {
         table.columns() != null && table.columns().length > 0,
         "table 'columns' must not be null and empty");
     Preconditions.checkArgument(table.auditInfo() != null, "table 'audit' must not be null");
+    Preconditions.checkArgument(
+        table.partitioning() != null, "table 'partitions' must not be null");
   }
 }

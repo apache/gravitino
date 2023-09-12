@@ -12,6 +12,7 @@ import com.datastrato.graviton.Namespace;
 import com.datastrato.graviton.meta.AuditInfo;
 import com.datastrato.graviton.rel.Column;
 import com.datastrato.graviton.rel.Table;
+import com.datastrato.graviton.rel.transforms.Transform;
 import com.google.common.base.Objects;
 import com.google.common.collect.Maps;
 import java.util.Map;
@@ -48,6 +49,8 @@ public class BaseTable implements Table, Entity, HasIdentifier {
   protected Column[] columns;
 
   protected Namespace namespace;
+
+  @Nullable protected Transform[] partitions;
 
   /**
    * Returns a map of the fields and their corresponding values for this table.
@@ -138,6 +141,11 @@ public class BaseTable implements Table, Entity, HasIdentifier {
     return namespace;
   }
 
+  @Override
+  public Transform[] partitioning() {
+    return partitions;
+  }
+
   /**
    * Returns the type of the entity, which is {@link EntityType#TABLE}.
    *
@@ -191,6 +199,8 @@ public class BaseTable implements Table, Entity, HasIdentifier {
 
     SELF withAuditInfo(AuditInfo auditInfo);
 
+    SELF withPartitions(Transform[] partitions);
+
     T build();
   }
 
@@ -209,6 +219,7 @@ public class BaseTable implements Table, Entity, HasIdentifier {
     protected Map<String, String> properties;
     protected AuditInfo auditInfo;
     protected Column[] columns;
+    protected Transform[] partitions;
 
     /**
      * Sets the unique identifier of the table.
@@ -291,6 +302,12 @@ public class BaseTable implements Table, Entity, HasIdentifier {
     @Override
     public SELF withAuditInfo(AuditInfo auditInfo) {
       this.auditInfo = auditInfo;
+      return self();
+    }
+
+    @Override
+    public SELF withPartitions(Transform[] partitions) {
+      this.partitions = partitions;
       return self();
     }
 

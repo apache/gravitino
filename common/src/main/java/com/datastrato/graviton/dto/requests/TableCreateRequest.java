@@ -5,9 +5,11 @@
 package com.datastrato.graviton.dto.requests;
 
 import com.datastrato.graviton.dto.rel.ColumnDTO;
+import com.datastrato.graviton.dto.rel.Partition;
 import com.datastrato.graviton.rest.RESTRequest;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
+import java.util.Arrays;
 import java.util.Map;
 import javax.annotation.Nullable;
 import lombok.EqualsAndHashCode;
@@ -34,16 +36,30 @@ public class TableCreateRequest implements RESTRequest {
   @JsonProperty("properties")
   private final Map<String, String> properties;
 
+  @Nullable
+  @JsonProperty("partitions")
+  private final Partition[] partitions;
+
   public TableCreateRequest() {
-    this(null, null, null, null);
+    this(null, null, null, null, null);
   }
 
   public TableCreateRequest(
       String name, String comment, ColumnDTO[] columns, Map<String, String> properties) {
+    this(name, comment, columns, properties, new Partition[0]);
+  }
+
+  public TableCreateRequest(
+      String name,
+      String comment,
+      ColumnDTO[] columns,
+      Map<String, String> properties,
+      @Nullable Partition[] partitions) {
     this.name = name;
     this.columns = columns;
     this.comment = comment;
     this.properties = properties;
+    this.partitions = partitions;
   }
 
   @Override
@@ -53,5 +69,9 @@ public class TableCreateRequest implements RESTRequest {
     Preconditions.checkArgument(
         columns != null && columns.length != 0,
         "\"columns\" field is required and cannot be empty");
+
+    if (partitions != null) {
+      Arrays.stream(partitions).forEach(p -> p.validate(columns));
+    }
   }
 }
