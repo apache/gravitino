@@ -14,6 +14,7 @@ import com.datastrato.graviton.dto.requests.MetalakeUpdatesRequest;
 import com.datastrato.graviton.dto.responses.DropResponse;
 import com.datastrato.graviton.dto.responses.MetalakeListResponse;
 import com.datastrato.graviton.dto.responses.MetalakeResponse;
+import com.datastrato.graviton.dto.responses.VersionResponse;
 import com.datastrato.graviton.exceptions.MetalakeAlreadyExistsException;
 import com.datastrato.graviton.exceptions.NoSuchMetalakeException;
 import com.datastrato.graviton.json.JsonUtils;
@@ -183,6 +184,18 @@ public class GravitonClient implements SupportsMetalakes, Closeable {
       LOG.warn("Failed to drop metadata {}", ident, e);
       return false;
     }
+  }
+
+  public GravitonVersion getVersion() {
+    VersionResponse resp =
+        restClient.get(
+            "api/version",
+            VersionResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.restErrorHandler());
+    resp.validate();
+
+    return new GravitonVersion(resp.getVersion());
   }
 
   /** Closes the GravitonClient and releases any underlying resources. */
