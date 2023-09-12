@@ -4,7 +4,7 @@
  */
 package com.datastrato.graviton.integration.e2e.web.rest;
 
-import com.datastrato.graviton.dto.VersionDTO;
+import com.datastrato.graviton.client.GravitonVersion;
 import com.datastrato.graviton.integration.util.AbstractIT;
 import com.datastrato.graviton.integration.util.CommandExecutor;
 import com.datastrato.graviton.integration.util.ProcessData;
@@ -19,9 +19,9 @@ public class VersionOperationsIT extends AbstractIT {
             "git rev-parse HEAD", false, ProcessData.TypesOfData.OUTPUT);
     String gitCommitId = ret.toString().replace("\n", "");
 
-    VersionDTO versionDTO = client.getVersion();
-    Assertions.assertEquals(System.getenv("PROJECT_VERSION"), versionDTO.version());
-    Assertions.assertFalse(versionDTO.compileDate().isEmpty());
-    Assertions.assertEquals(gitCommitId, versionDTO.gitCommit());
+    GravitonVersion gravitonVersion = client.getVersion();
+    Assertions.assertEquals(System.getenv("PROJECT_VERSION"), gravitonVersion.version());
+    Assertions.assertFalse(gravitonVersion.compileDate().isEmpty());
+    Assertions.assertEquals(gitCommitId, gravitonVersion.gitCommit());
   }
 }
