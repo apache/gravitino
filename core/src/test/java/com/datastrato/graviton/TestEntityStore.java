@@ -12,7 +12,7 @@ import com.datastrato.graviton.meta.CatalogEntity;
 import com.datastrato.graviton.meta.SchemaVersion;
 import com.datastrato.graviton.rel.Column;
 import com.datastrato.graviton.rel.Table;
-import com.datastrato.graviton.util.Executable;
+import com.datastrato.graviton.utils.Executable;
 import com.google.common.collect.Maps;
 import io.substrait.type.TypeCreator;
 import java.io.IOException;
@@ -115,7 +115,8 @@ public class TestEntityStore {
     }
 
     @Override
-    public boolean delete(NameIdentifier ident, EntityType entityType) throws IOException {
+    public boolean delete(NameIdentifier ident, EntityType entityType, boolean cascade)
+        throws IOException {
       Entity prev = entityMap.remove(ident);
       return prev != null;
     }
@@ -156,20 +157,26 @@ public class TestEntityStore {
             .withName("catalog")
             .withNamespace(Namespace.of("metalake"))
             .withType(TestCatalog.Type.RELATIONAL)
-            .withMetalakeId(1L)
             .withAuditInfo(auditInfo)
             .build();
 
-    TestColumn column = new TestColumn("column", "comment", TypeCreator.NULLABLE.I8);
+    TestColumn column =
+        new TestColumn.Builder()
+            .withName("column")
+            .withComment("comment")
+            .withType(TypeCreator.NULLABLE.I8)
+            .build();
 
     TestTable table =
-        new TestTable(
-            "table",
-            Namespace.of("metalake", "catalog", "db"),
-            "comment",
-            Maps.newHashMap(),
-            auditInfo,
-            new Column[] {column});
+        new TestTable.Builder()
+            .withId(1L)
+            .withName("table")
+            .withNameSpace(Namespace.of("metalake", "catalog", "db"))
+            .withComment("comment")
+            .withProperties(Maps.newHashMap())
+            .withColumns(new Column[] {column})
+            .withAuditInfo(auditInfo)
+            .build();
 
     InMemoryEntityStore store = new InMemoryEntityStore();
     store.initialize(Mockito.mock(Config.class));
@@ -196,5 +203,6 @@ public class TestEntityStore {
         () -> store.get(metalake.nameIdentifier(), EntityType.METALAKE, BaseMetalake.class));
 
     Assertions.assertThrows(EntityAlreadyExistsException.class, () -> store.put(catalog, false));
+    store.close();
   }
 }

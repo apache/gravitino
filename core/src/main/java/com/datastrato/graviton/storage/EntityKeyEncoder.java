@@ -9,7 +9,7 @@ import com.datastrato.graviton.Entity.EntityType;
 import com.datastrato.graviton.NameIdentifier;
 import java.io.IOException;
 
-/** Interface for encoding entity to storage it in underlying storage. E.g. RocksDB. */
+/** Interface for encoding entity to storage it in underlying storage. E.g., RocksDB. */
 public interface EntityKeyEncoder<T> {
   /**
    * Construct the key for key-value store from the entity NameIdentifier and EntityType.
@@ -20,6 +20,15 @@ public interface EntityKeyEncoder<T> {
    * @throws IOException, Exception if error occurs
    */
   default T encode(NameIdentifier ident, EntityType type) throws IOException {
-    throw new UnsupportedOperationException("Not implemented yet");
+    return encode(ident, type, false);
   }
+
+  /**
+   * Construct the key for key-value store from the entity NameIdentifier and EntityType.
+   *
+   * @param nullIfMissing return null if the specific entity no found
+   * @return encoded key for key-value stored
+   * @throws IOException, Exception if error occurs
+   */
+  T encode(NameIdentifier ident, EntityType type, boolean nullIfMissing) throws IOException;
 }

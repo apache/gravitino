@@ -56,12 +56,6 @@ public class MetalakeListResponse extends BaseResponse {
                   "metalake 'name' must not be null and empty");
               Preconditions.checkArgument(
                   metalake.auditInfo() != null, "metalake 'audit' must not be null");
-              Preconditions.checkArgument(
-                  StringUtils.isNotBlank(metalake.auditInfo().creator()),
-                  "metalake 'audit.creator' must not be null and empty");
-              Preconditions.checkArgument(
-                  metalake.auditInfo().createTime() != null,
-                  "metalake 'audit.createTime' must not be null");
             });
   }
 }

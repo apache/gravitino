@@ -183,7 +183,7 @@ public class Namespace {
     return DOT.join(levels);
   }
 
-  private static void check(boolean expression, String message, Object... args) {
+  public static void check(boolean expression, String message, Object... args) {
     if (!expression) {
       throw new IllegalNamespaceException(String.format(message, args));
     }

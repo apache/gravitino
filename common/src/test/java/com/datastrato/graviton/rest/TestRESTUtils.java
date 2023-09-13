@@ -42,7 +42,7 @@ class TestRESTUtils {
     assertEquals(expectedFormData, RESTUtils.decodeFormData(formString));
 
     String emptyFormString = "";
-    Map<String, String> emptyFormData = ImmutableMap.of();
+
     /* This may not be behaviour we want? */
     assertThrows(IllegalArgumentException.class, () -> RESTUtils.decodeFormData(emptyFormString));
   }

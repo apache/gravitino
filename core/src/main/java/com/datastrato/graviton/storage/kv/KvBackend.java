@@ -7,7 +7,7 @@ package com.datastrato.graviton.storage.kv;
 
 import com.datastrato.graviton.Config;
 import com.datastrato.graviton.EntityAlreadyExistsException;
-import com.datastrato.graviton.util.Executable;
+import com.datastrato.graviton.utils.Executable;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.List;
@@ -54,6 +54,15 @@ public interface KvBackend extends Closeable {
   default boolean delete(byte[] key) throws IOException {
     return false;
   }
+
+  /**
+   * Delete the key-value pair associated with the given {@link KvRangeScan}
+   *
+   * @param kvRangeScan kv range to to delete
+   * @return True if the key-value pair was successfully deleted.
+   * @throws IOException If an I/O exception occurs during deletion.
+   */
+  boolean deleteRange(KvRangeScan kvRangeScan) throws IOException;
 
   /**
    * Scans the specified range using the provided KvRangeScan and returns a list of key-value pairs.

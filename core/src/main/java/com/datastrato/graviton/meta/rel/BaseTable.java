@@ -12,21 +12,17 @@ import com.datastrato.graviton.Namespace;
 import com.datastrato.graviton.meta.AuditInfo;
 import com.datastrato.graviton.rel.Column;
 import com.datastrato.graviton.rel.Table;
+import com.google.common.base.Objects;
 import com.google.common.collect.Maps;
 import java.util.Map;
 import javax.annotation.Nullable;
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
 import lombok.ToString;
 
 /** An abstract class representing a base table in a relational database. */
-@EqualsAndHashCode
 @ToString
 public class BaseTable implements Table, Entity, HasIdentifier {
 
   public static final Field ID = Field.required("id", Long.class, "The table's unique identifier");
-  public static final Field SCHEMA_ID =
-      Field.required("schema_id", Long.class, "The schema's unique identifier");
   public static final Field NAME = Field.required("name", String.class, "The table's name");
   public static final Field COMMENT =
       Field.optional("comment", String.class, "The comment or description for the table");
@@ -39,9 +35,7 @@ public class BaseTable implements Table, Entity, HasIdentifier {
   public static final Field COLUMNS =
       Field.optional("columns", Column[].class, "The columns that make up the table");
 
-  @Getter protected Long id;
-
-  @Getter protected Long schemaId;
+  protected Long id;
 
   protected String name;
 
@@ -64,7 +58,6 @@ public class BaseTable implements Table, Entity, HasIdentifier {
   public Map<Field, Object> fields() {
     Map<Field, Object> fields = Maps.newHashMap();
     fields.put(ID, id);
-    fields.put(SCHEMA_ID, schemaId);
     fields.put(NAME, name);
     fields.put(COMMENT, comment);
     fields.put(PROPERTIES, properties);
@@ -92,6 +85,16 @@ public class BaseTable implements Table, Entity, HasIdentifier {
   @Override
   public String name() {
     return name;
+  }
+
+  /**
+   * Returns the unique id of the table.
+   *
+   * @return The unique id of the table.
+   */
+  @Override
+  public Long id() {
+    return id;
   }
 
   /**
@@ -145,6 +148,28 @@ public class BaseTable implements Table, Entity, HasIdentifier {
     return EntityType.TABLE;
   }
 
+  // Ignore field namespace, columns and comment
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+
+    BaseTable baseTable = (BaseTable) o;
+    return Objects.equal(id, baseTable.id)
+        && Objects.equal(name, baseTable.name)
+        && Objects.equal(properties, baseTable.properties)
+        && Objects.equal(auditInfo, baseTable.auditInfo);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hashCode(id, name, comment, properties, auditInfo);
+  }
+
   /**
    * Builder interface for creating instances of {@link BaseTable}.
    *
@@ -153,8 +178,6 @@ public class BaseTable implements Table, Entity, HasIdentifier {
    */
   interface Builder<SELF extends Builder<SELF, T>, T extends BaseTable> {
     SELF withId(Long id);
-
-    SELF withSchemaId(Long schemaId);
 
     SELF withNameSpace(Namespace namespace);
 
@@ -180,7 +203,6 @@ public class BaseTable implements Table, Entity, HasIdentifier {
   public abstract static class BaseTableBuilder<SELF extends Builder<SELF, T>, T extends BaseTable>
       implements Builder<SELF, T> {
     protected Long id;
-    protected Long schemaId;
     protected String name;
     protected Namespace namespace;
     protected String comment;
@@ -197,18 +219,6 @@ public class BaseTable implements Table, Entity, HasIdentifier {
     @Override
     public SELF withId(Long id) {
       this.id = id;
-      return self();
-    }
-
-    /**
-     * Sets the unique identifier of the schema.
-     *
-     * @param schemaId The unique identifier of the schema.
-     * @return The builder instance.
-     */
-    @Override
-    public SELF withSchemaId(Long schemaId) {
-      this.schemaId = schemaId;
       return self();
     }
 
@@ -308,7 +318,6 @@ public class BaseTable implements Table, Entity, HasIdentifier {
     protected BaseTable internalBuild() {
       BaseTable table = new BaseTable();
       table.id = id;
-      table.schemaId = schemaId;
       table.name = name;
       table.comment = comment;
       table.properties = properties;

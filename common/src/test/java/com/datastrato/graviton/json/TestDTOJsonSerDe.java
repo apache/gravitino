@@ -9,7 +9,16 @@ import com.datastrato.graviton.dto.AuditDTO;
 import com.datastrato.graviton.dto.CatalogDTO;
 import com.datastrato.graviton.dto.MetalakeDTO;
 import com.datastrato.graviton.dto.rel.ColumnDTO;
+import com.datastrato.graviton.dto.rel.ExpressionPartitionDTO;
+import com.datastrato.graviton.dto.rel.ListPartitionDTO;
+import com.datastrato.graviton.dto.rel.Partition;
+import com.datastrato.graviton.dto.rel.RangePartitionDTO;
+import com.datastrato.graviton.dto.rel.SimplePartitionDTO;
 import com.datastrato.graviton.dto.rel.TableDTO;
+import com.fasterxml.jackson.databind.cfg.EnumFeature;
+import com.fasterxml.jackson.databind.exc.InvalidTypeIdException;
+import com.fasterxml.jackson.databind.exc.ValueInstantiationException;
+import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.google.common.collect.ImmutableMap;
 import io.substrait.type.StringTypeVisitor;
 import io.substrait.type.TypeCreator;
@@ -74,7 +83,6 @@ public class TestDTOJsonSerDe {
 
   @Test
   public void testMetalakeDTOSerDe() throws Exception {
-    Long id = 1L;
     String name = "metalake";
     String comment = "comment";
     Map<String, String> properties = ImmutableMap.of("k1", "v1", "k2", "v2");
@@ -154,7 +162,6 @@ public class TestDTOJsonSerDe {
     String name = "column";
     io.substrait.type.Type type = TypeCreator.NULLABLE.I8;
     String comment = "comment";
-    Instant now = Instant.now();
 
     // Test required fields
     ColumnDTO column =
@@ -209,5 +216,172 @@ public class TestDTOJsonSerDe {
             JsonUtils.objectMapper().writeValueAsString(properties),
             String.format(auditJson, withQuotes(creator), withQuotes(now.toString()), null, null));
     Assertions.assertEquals(expectedJson, serJson);
+  }
+
+  @Test
+  public void testPartitionDTOSerDe() throws Exception {
+
+    String[] field1 = new String[] {"dt"};
+    String[] field2 = new String[] {"city"};
+
+    // construct simple partition
+    Partition identity =
+        new SimplePartitionDTO.Builder()
+            .withStrategy(Partition.Strategy.IDENTITY)
+            .withFieldName(field1)
+            .build();
+    Partition hourPart =
+        new SimplePartitionDTO.Builder()
+            .withStrategy(Partition.Strategy.HOUR)
+            .withFieldName(field1)
+            .build();
+    Partition dayPart =
+        new SimplePartitionDTO.Builder()
+            .withStrategy(Partition.Strategy.DAY)
+            .withFieldName(field1)
+            .build();
+    Partition monthPart =
+        new SimplePartitionDTO.Builder()
+            .withStrategy(Partition.Strategy.MONTH)
+            .withFieldName(field1)
+            .build();
+    Partition yearPart =
+        new SimplePartitionDTO.Builder()
+            .withStrategy(Partition.Strategy.YEAR)
+            .withFieldName(field1)
+            .build();
+
+    // construct list partition
+    String[][] p1Value = {{"2023-04-01", "San Francisco"}, {"2023-04-01", "San Francisco"}};
+    String[][] p2Value = {{"2023-04-01", "Houston"}, {"2023-04-01", "Dallas"}};
+    Partition listPart =
+        new ListPartitionDTO.Builder()
+            .withFieldNames(new String[][] {field1, field2})
+            .withAssignment("p202304_California", p1Value)
+            .withAssignment("p202304_Texas", p2Value)
+            .build();
+
+    // construct range partition
+    Partition rangePart =
+        new RangePartitionDTO.Builder()
+            .withFieldName(field1)
+            .withRange("p20230101", "2023-01-01T00:00:00", "2023-01-02T00:00:00")
+            .withRange("p20230102", "2023-01-01T00:00:00", null)
+            .build();
+
+    // construct expression partition, toYYYYMM(toDate(ts, ‘Asia/Shanghai’))
+    ExpressionPartitionDTO.Expression arg1 =
+        new ExpressionPartitionDTO.FieldExpression.Builder().withFieldName(field1).build();
+    ExpressionPartitionDTO.Expression arg2 =
+        new ExpressionPartitionDTO.LiteralExpression.Builder()
+            .withType(TypeCreator.REQUIRED.STRING)
+            .withValue("Asia/Shanghai")
+            .build();
+    ExpressionPartitionDTO.Expression toDateFunc =
+        new ExpressionPartitionDTO.FunctionExpression.Builder()
+            .withFuncName("toDate")
+            .withArgs(new ExpressionPartitionDTO.Expression[] {arg1, arg2})
+            .build();
+    ExpressionPartitionDTO.Expression monthFunc =
+        new ExpressionPartitionDTO.FunctionExpression.Builder()
+            .withFuncName("toYYYYMM")
+            .withArgs(new ExpressionPartitionDTO.Expression[] {toDateFunc})
+            .build();
+    Partition expressionPart = new ExpressionPartitionDTO.Builder(monthFunc).build();
+
+    Partition[] partitions = {
+      identity, hourPart, dayPart, monthPart, yearPart, listPart, rangePart, expressionPart
+    };
+    String serJson =
+        JsonMapper.builder()
+            .configure(EnumFeature.WRITE_ENUMS_TO_LOWERCASE, true)
+            .build()
+            .writeValueAsString(partitions);
+    Partition[] desPartitions = JsonUtils.objectMapper().readValue(serJson, Partition[].class);
+
+    Assertions.assertArrayEquals(partitions, desPartitions);
+  }
+
+  @Test
+  public void testPartitionDTOSerDeFail() throws Exception {
+    // test `strategy` value null
+    String wrongJson1 = "{\"strategy\": null,\"fieldName\":[\"dt\"]}";
+    InvalidTypeIdException invalidTypeIdException =
+        Assertions.assertThrows(
+            InvalidTypeIdException.class,
+            () -> JsonUtils.objectMapper().readValue(wrongJson1, Partition.class));
+    Assertions.assertTrue(
+        invalidTypeIdException.getMessage().contains("missing type id property 'strategy'"));
+
+    // test `fieldName` value empty
+    String wrongJson2 = "{\"strategy\": \"day\",\"fieldName\":[]}";
+    ValueInstantiationException valueInstantiationException =
+        Assertions.assertThrows(
+            ValueInstantiationException.class,
+            () -> JsonUtils.objectMapper().readValue(wrongJson2, Partition.class));
+    Assertions.assertTrue(
+        valueInstantiationException.getMessage().contains("fieldName cannot be null or empty"));
+
+    // test listPartition assignment values missing
+    String wrongJson3 =
+        "{\"strategy\": \"list\",\"fieldNames\":[[\"dt\"],[\"city\"]],"
+            + "\"assignments\":["
+            + "{\"name\":\"p202304_California\", "
+            + "\"values\":[[\"2023-04-01\",\"San Francisco\"], [\"2023-04-01\"]]}]}";
+    valueInstantiationException =
+        Assertions.assertThrows(
+            ValueInstantiationException.class,
+            () -> JsonUtils.objectMapper().readValue(wrongJson3, Partition.class));
+    Assertions.assertTrue(
+        valueInstantiationException
+            .getMessage()
+            .contains("Assignment values length must be equal to field number"));
+
+    // test rangePartition range name missing
+    String wrongJson4 =
+        "{\"strategy\": \"range\",\"fieldName\":[\"dt\"],"
+            + "\"ranges\":["
+            + "{\"lower\":null, \"upper\":\"2023-01-02T00:00:00\"},"
+            + "{\"lower\":\"2023-01-01T00:00:00\", \"upper\":null}]}";
+    valueInstantiationException =
+        Assertions.assertThrows(
+            ValueInstantiationException.class,
+            () -> JsonUtils.objectMapper().readValue(wrongJson4, Partition.class));
+    Assertions.assertTrue(
+        valueInstantiationException.getMessage().contains("Range name cannot be null or empty"));
+
+    // test rangePartition range bound literal format wrong
+    String wrongJson5 =
+        "{\"strategy\": \"range\",\"fieldName\":[\"dt\"],"
+            + "\"ranges\":["
+            + "{\"name\":\"p20230101\", \"lower\":\"2023-01-01T00:00:00\", \"upper\":\"2023-01-02\"},"
+            + "{\"name\":\"p20230102\", \"lower\":\"2023-01-01T00:00:00\", \"upper\":null}]}";
+    valueInstantiationException =
+        Assertions.assertThrows(
+            ValueInstantiationException.class,
+            () -> JsonUtils.objectMapper().readValue(wrongJson5, Partition.class));
+    Assertions.assertTrue(
+        valueInstantiationException
+            .getMessage()
+            .contains("only supports ISO date-time format literal"));
+
+    // test expressionPartition `expression` value null
+    String wrongJson6 = "{\"strategy\": \"expression\", \"expression\": null}";
+    valueInstantiationException =
+        Assertions.assertThrows(
+            ValueInstantiationException.class,
+            () -> JsonUtils.objectMapper().readValue(wrongJson6, Partition.class));
+    Assertions.assertTrue(
+        valueInstantiationException.getMessage().contains("expression cannot be null"));
+
+    // test expressionPartition with FunctionExpression `funcName` value empty
+    String wrongJson7 =
+        "{\"strategy\": \"expression\", \"expression\": {\"funcName\": \"\", \"args\": []}}";
+    valueInstantiationException =
+        Assertions.assertThrows(
+            ValueInstantiationException.class,
+            () -> JsonUtils.objectMapper().readValue(wrongJson7, Partition.class));
+    Assertions.assertTrue(
+        valueInstantiationException.getMessage().contains("funcName cannot be null or empty"));
   }
 }

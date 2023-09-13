@@ -8,9 +8,9 @@ package com.datastrato.graviton.storage.kv;
 import com.datastrato.graviton.Config;
 import com.datastrato.graviton.Configs;
 import com.datastrato.graviton.EntityAlreadyExistsException;
-import com.datastrato.graviton.util.ByteUtils;
-import com.datastrato.graviton.util.Bytes;
-import com.datastrato.graviton.util.Executable;
+import com.datastrato.graviton.utils.ByteUtils;
+import com.datastrato.graviton.utils.Bytes;
+import com.datastrato.graviton.utils.Executable;
 import com.google.common.base.Throwables;
 import com.google.common.collect.Lists;
 import java.io.File;
@@ -189,12 +189,44 @@ public class RocksDBKvBackend implements KvBackend {
         TX_LOCAL.get().delete(key);
         return true;
       }
-
       db.delete(key);
       return true;
     } catch (RocksDBException e) {
       throw new IOException(e);
     }
+  }
+
+  @Override
+  public boolean deleteRange(KvRangeScan deleteRange) throws IOException {
+    Transaction tx = TX_LOCAL.get();
+    RocksIterator rocksIterator = tx == null ? db.newIterator() : tx.getIterator(new ReadOptions());
+    rocksIterator.seek(deleteRange.getStart());
+
+    while (rocksIterator.isValid()) {
+      byte[] key = rocksIterator.key();
+      // Break if the key is out of the scan range
+      if (Bytes.wrap(key).compareTo(deleteRange.getEnd()) > 0) {
+        break;
+      }
+
+      if (Bytes.wrap(key).compareTo(deleteRange.getStart()) == 0) {
+        if (deleteRange.isStartInclusive()) {
+          delete(key);
+        }
+      } else if (Bytes.wrap(key).compareTo(deleteRange.getEnd()) == 0) {
+        if (deleteRange.isEndInclusive()) {
+          delete(key);
+        }
+        break;
+      } else {
+        delete(key);
+      }
+
+      rocksIterator.next();
+    }
+
+    rocksIterator.close();
+    return true;
   }
 
   @Override
@@ -205,13 +237,15 @@ public class RocksDBKvBackend implements KvBackend {
   @Override
   public <R, E extends Exception> R executeInTransaction(Executable<R, E> executable)
       throws E, IOException {
-    // Already in tx, directly execute it without creating a new tx
-    if (TX_LOCAL.get() != null) {
+    // TODO (yuqi) Name mapping service and storage should use separately backend, or we should
+    //  handle nested transaction
+    Transaction tx = TX_LOCAL.get();
+    if (tx != null) {
       return executable.execute();
     }
 
-    Transaction tx = db.beginTransaction(new WriteOptions());
-    LOGGER.info("Starting transaction: {}", tx);
+    tx = db.beginTransaction(new WriteOptions());
+    LOGGER.info("Starting transaction: id: '{}'", tx.getID());
     TX_LOCAL.set(tx);
     try {
       R r = executable.execute();
@@ -224,15 +258,16 @@ public class RocksDBKvBackend implements KvBackend {
       rollback(tx, e);
       throw e;
     } finally {
+      LOGGER.info("Transaction close, tx id: '{}', tx state: '{}'", tx.getID(), tx.getState());
       tx.close();
-      LOGGER.info("Transaction close: {}", tx);
       TX_LOCAL.remove();
     }
   }
 
   private void rollback(Transaction tx, Exception e) {
     LOGGER.error(
-        "Error executing transaction, exception: {}, message: {}, stackTrace: \n{}",
+        "Error executing transaction, tx id: '{}', exception: {}, message: {}, stackTrace: \n{}",
+        tx.getID(),
         e.getCause(),
         e.getMessage(),
         Throwables.getStackTraceAsString(e));
@@ -241,7 +276,8 @@ public class RocksDBKvBackend implements KvBackend {
       tx.rollback();
     } catch (Exception e1) {
       LOGGER.error(
-          "Error rolling back transaction, exception: {}, message: {}, stackTrace: \n{}",
+          "Error rolling back transaction, tx id: '{}', exception: {}, message: {}, stackTrace: \n{}",
+          tx.getID(),
           e1.getCause(),
           e1.getMessage(),
           Throwables.getStackTraceAsString(e));

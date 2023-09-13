@@ -41,8 +41,11 @@ subprojects {
   }
 
   tasks.configureEach<Test> {
-    useJUnitPlatform()
-    finalizedBy(tasks.getByName("jacocoTestReport"))
+    // Integration test module are tested sepatately
+    if (project.name != "integration-test") {
+      useJUnitPlatform()
+      finalizedBy(tasks.getByName("jacocoTestReport"))
+    }
   }
 
   tasks.withType<JacocoReport> {
@@ -60,8 +63,10 @@ subprojects {
 
   tasks.withType<Jar> {
     archiveFileName.set("${rootProject.name.lowercase(Locale.getDefault())}-${project.name}-$version.jar")
-    exclude("log4j2.properties")
-    exclude("test/**")
+    if (project.name != "integration-test") {
+      exclude("log4j2.properties")
+      exclude("test/**")
+    }
   }
 
   plugins.withType<SpotlessPlugin>().configureEach {
@@ -115,8 +120,9 @@ tasks.rat {
   inputDir.set(project.rootDir)
 
   val exclusions = mutableListOf(
-          // Ignore files we track but do not distribute
-          "**/.github/**/*",
+    // Ignore files we track but do not distribute
+    "**/.github/**/*",
+    "dev/docker/**/*.xml",
   )
 
   // Add .gitignore excludes to the Apache Rat exclusion list.
@@ -150,7 +156,7 @@ tasks {
   }
 
   val compileDistribution by registering {
-    dependsOn("copyRuntimeClass", "copyCatalogRuntimeClass", "copySubmoduleClass")
+    dependsOn("copyRuntimeClass", "copyCatalogRuntimeClass", "copySubmoduleClass", "copyCatalogModuleClass")
 
     group = "graviton distribution"
     outputs.dir(projectDir.dir("distribution/package"))
@@ -173,8 +179,7 @@ tasks {
     group = "graviton distribution"
     finalizedBy("checksumDistribution")
     from(compileDistribution.map { it.outputs.files.single() })
-    archiveBaseName.set("datastrato")
-    archiveAppendix.set(rootProject.name.lowercase())
+    archiveBaseName.set(rootProject.name.lowercase())
     archiveVersion.set("${version}")
     archiveClassifier.set("bin")
     destinationDirectory.set(outputDir)
@@ -205,10 +210,10 @@ tasks {
 
   val copyRuntimeClass by registering(Copy::class) {
     subprojects.forEach() {
-      if (it.name != "catalog-hive" && it.name != "client-java") {
-        // println("copyRuntimeClass: ${it.name}")
+      if (it.name != "catalog-hive" && it.name != "client-java" && it.name != "integration-test") {
+        println("copyRuntimeClass: ${it.name}")
         from(it.configurations.runtimeClasspath)
-        into("distribution/package/lib")
+        into("distribution/package/libs")
       }
     }
   }
@@ -218,7 +223,7 @@ tasks {
       if (it.name == "catalog-hive") {
         // println("copyCatalogRuntimeClass: ${it.name}")
         from(it.configurations.runtimeClasspath)
-        into("distribution/package/catalogs/catalog-hive/lib")
+        into("distribution/package/catalogs/hive/libs")
       }
     }
   }
@@ -226,34 +231,27 @@ tasks {
   val copySubmoduleClass by registering(Copy::class) {
     dependsOn("copyRuntimeClass", "copyCatalogRuntimeClass")
     subprojects.forEach() {
-      // println("copySubmoduleClass: ${it.name}")
-      if (it.name != "client-java") {
+      if (it.name != "client-java" && it.name != "integration-test" && it.name != "catalog-hive") {
         from("${it.name}/build/libs")
-        into("distribution/package/lib")
+        into("distribution/package/libs")
         include("*.jar")
         setDuplicatesStrategy(DuplicatesStrategy.INCLUDE)
       }
     }
   }
 
-  // Print all dependencies of all subprojects, `./gradlew allDeps`
-  task("allDeps") {
-    doLast {
-      subprojects.forEach { project ->
-        println("Dependencies for project: ${project.name}")
-        project.configurations.forEach { configuration ->
-          configuration.allDependencies.forEach { dependency ->
-            println("- ${dependency.group}:${dependency.name}:${dependency.version}")
-          }
-        }
-        println()
+  val copyCatalogModuleClass by registering(Copy::class) {
+    subprojects.forEach() {
+      if (it.name == "catalog-hive") {
+        from("${it.name}/build/libs")
+        into("distribution/package/catalogs/hive/libs")
       }
     }
   }
 
-//  assemble {
-//    finalizedBy(assembleDistribution)
-//  }
+  task("integrationTest") {
+    dependsOn(":integration-test:integrationTest")
+  }
 
   clean {
     dependsOn(cleanDistribution)

@@ -13,13 +13,18 @@ import com.datastrato.graviton.Entity.EntityType;
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.storage.EntityKeyEncoder;
 import com.datastrato.graviton.storage.NameMappingService;
-import com.datastrato.graviton.util.ByteUtils;
-import com.datastrato.graviton.util.Bytes;
+import com.datastrato.graviton.utils.ByteUtils;
+import com.datastrato.graviton.utils.Bytes;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Map;
+import java.util.stream.Collectors;
+import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,22 +52,33 @@ import org.slf4j.LoggerFactory;
 public class BinaryEntityKeyEncoder implements EntityKeyEncoder<byte[]> {
   public static final Logger LOG = LoggerFactory.getLogger(BinaryEntityKeyEncoder.class);
 
-  @VisibleForTesting static final byte[] NAMESPACE_SEPARATOR = "_".getBytes();
+  public static final String NAMESPACE_SEPARATOR = "/";
 
-  @VisibleForTesting static final String WILD_CARD = "*";
+  @VisibleForTesting
+  static final byte[] BYTABLE_NAMESPACE_SEPARATOR = NAMESPACE_SEPARATOR.getBytes();
+
+  static final String WILD_CARD = "*";
 
   // Key format template. Please the comment of the class for more details.
   public static final Map<EntityType, String[]> ENTITY_TYPE_TO_NAME_IDENTIFIER =
       ImmutableMap.of(
-          METALAKE, new String[] {METALAKE.getShortName() + "_"},
-          CATALOG, new String[] {CATALOG.getShortName() + "_", "_"},
-          SCHEMA, new String[] {SCHEMA.getShortName() + "_", "_", "_"},
-          TABLE, new String[] {TABLE.getShortName() + "_", "_", "_", "_"});
+          METALAKE, new String[] {METALAKE.getShortName() + "/"},
+          CATALOG, new String[] {CATALOG.getShortName() + "/", "/"},
+          SCHEMA, new String[] {SCHEMA.getShortName() + "/", "/", "/"},
+          TABLE, new String[] {TABLE.getShortName() + "/", "/", "/", "/"});
 
   @VisibleForTesting final NameMappingService nameMappingService;
 
   public BinaryEntityKeyEncoder(NameMappingService nameMappingService) {
     this.nameMappingService = nameMappingService;
+  }
+
+  private String generateMappingKey(long[] namespaceIds, String name) {
+    String context =
+        Joiner.on(NAMESPACE_SEPARATOR)
+            .join(
+                Arrays.stream(namespaceIds).mapToObj(String::valueOf).collect(Collectors.toList()));
+    return StringUtils.isBlank(context) ? name : context + NAMESPACE_SEPARATOR + name;
   }
 
   /**
@@ -71,13 +87,21 @@ public class BinaryEntityKeyEncoder implements EntityKeyEncoder<byte[]> {
    *
    * @param identifier NameIdentifier of the entity
    * @param entityType the entity identifier to encode
-   * @return the encoded key for key-value storage
+   * @param nullIfMissing return null if name-id mapping does not contain the mapping of identifier
+   * @return the encoded key for key-value storage. null if returnIfEntityNotFound is true and the
+   *     entity the identifier represents does not exist;
    */
-  private byte[] encodeEntity(NameIdentifier identifier, EntityType entityType) throws IOException {
+  private byte[] encodeEntity(
+      NameIdentifier identifier, EntityType entityType, boolean nullIfMissing) throws IOException {
     String[] nameSpace = identifier.namespace().levels();
     long[] namespaceIds = new long[nameSpace.length];
     for (int i = 0; i < nameSpace.length; i++) {
-      namespaceIds[i] = nameMappingService.getOrCreateIdFromName(nameSpace[i]);
+      String nameKey = generateMappingKey(ArrayUtils.subarray(namespaceIds, 0, i), nameSpace[i]);
+      if (nullIfMissing && null == nameMappingService.getIdByName(nameKey)) {
+        return null;
+      }
+
+      namespaceIds[i] = nameMappingService.getOrCreateIdFromName(nameKey);
     }
 
     // If the name is a wildcard, We only need to encode the namespace.
@@ -92,8 +116,12 @@ public class BinaryEntityKeyEncoder implements EntityKeyEncoder<byte[]> {
     // This is for point query and need to use specific name
     long[] namespaceAndNameIds = new long[namespaceIds.length + 1];
     System.arraycopy(namespaceIds, 0, namespaceAndNameIds, 0, namespaceIds.length);
-    namespaceAndNameIds[namespaceIds.length] =
-        nameMappingService.getOrCreateIdFromName(identifier.name());
+    String nameKey = generateMappingKey(namespaceIds, identifier.name());
+    if (nullIfMissing && null == nameMappingService.getIdByName(nameKey)) {
+      return null;
+    }
+
+    namespaceAndNameIds[namespaceIds.length] = nameMappingService.getOrCreateIdFromName(nameKey);
 
     String[] nameIdentifierTemplate = ENTITY_TYPE_TO_NAME_IDENTIFIER.get(entityType);
     if (nameIdentifierTemplate == null) {
@@ -104,7 +132,7 @@ public class BinaryEntityKeyEncoder implements EntityKeyEncoder<byte[]> {
 
   /**
    * Format the name space template to a byte array. For example, if the name space template is
-   * "ca_{}_" and the ids are [1], the result is "ca_1_" which means we want to get all catalogs in
+   * "ca/{}/" and the ids are [1], the result is "ca/1/" which means we want to get all catalogs in
    * metalake '1'
    *
    * @param namespaceTemplate the name space template, please see {@link
@@ -128,7 +156,7 @@ public class BinaryEntityKeyEncoder implements EntityKeyEncoder<byte[]> {
 
   /**
    * Format the name identifier to a byte array. For example, if the name space template is
-   * "ca_{}_{}" and the ids is [1, 2], the result is "ca_1_2" which means we want to get the
+   * "ca/{}/{}" and the ids is [1, 2], the result is "ca/1/2" which means we want to get the
    * specific catalog '2'
    *
    * @param nameIdentifierTemplate the name space template, please see {@link
@@ -151,10 +179,12 @@ public class BinaryEntityKeyEncoder implements EntityKeyEncoder<byte[]> {
    *
    * @param ident NameIdentifier of the entity
    * @param type the entity identifier to encode
+   * @param nullIfMissing return null if the entity with the name 'ident' not found
    * @return The byte array representing the encoded key.
    */
   @Override
-  public byte[] encode(NameIdentifier ident, EntityType type) throws IOException {
-    return encodeEntity(ident, type);
+  public byte[] encode(NameIdentifier ident, EntityType type, boolean nullIfMissing)
+      throws IOException {
+    return encodeEntity(ident, type, nullIfMissing);
   }
 }

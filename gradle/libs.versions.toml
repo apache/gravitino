@@ -25,12 +25,14 @@ commons-io = "2.13.0"
 commons-net = "3.9.0"
 caffeine = "2.9.3"
 rocksdbjni = "7.10.2"
+iceberg = '1.3.1'
 
 protobuf-plugin = "0.9.4"
 spotless-plugin = '6.13.0' # last version for Java 8
 gradle-extensions-plugin = '1.74'
 publish-plugin = '1.1.0'
 rat-plugin = '0.8.0'
+shadow-plugin = "8.1.1"
 
 
 [libraries]
@@ -63,6 +65,7 @@ jersey-test-framework-provider-jetty = { group = "org.glassfish.jersey.test-fram
 mockito-core = { group = "org.mockito", name = "mockito-core", version.ref = "mockito" }
 hive2-metastore = { group = "org.apache.hive", name = "hive-metastore", version.ref = "hive2"}
 hive2-exec = { group = "org.apache.hive", name = "hive-exec", version.ref = "hive2"}
+hive2-common = { group = "org.apache.hive", name = "hive-common", version.ref = "hive2"}
 hadoop2-common = { group = "org.apache.hadoop", name = "hadoop-common", version.ref = "hadoop2"}
 hadoop2-mapreduce-client-core = { group = "org.apache.hadoop", name = "hadoop-mapreduce-client-core", version.ref = "hadoop2"}
 airlift-units = { group = "io.airlift", name = "units", version.ref = "airlift-units"}
@@ -74,11 +77,13 @@ commons-lang3 = { group = "org.apache.commons", name = "commons-lang3", version.
 commons-io = { group = "commons-io", name = "commons-io", version.ref = "commons-io" }
 caffeine = { group = "com.github.ben-manes.caffeine", name = "caffeine", version.ref = "caffeine" }
 rocksdbjni = { group = "org.rocksdb", name = "rocksdbjni", version.ref = "rocksdbjni" }
+iceberg-core = { group = "org.apache.iceberg", name = "iceberg-core", version.ref = "iceberg" }
 
 [bundles]
 log4j = ["slf4j-api", "log4j-slf4j2-impl", "log4j-api", "log4j-core"]
 jetty = ["jetty-server", "jetty-servlet"]
 jersey = ["jersey-server", "jersey-container-servlet-core", "jersey-container-jetty-http", "jersey-media-json-jackson", "jersey-hk2"]
+iceberg = ["iceberg-core"]
 
 [plugins]
 protobuf = { id = "com.google.protobuf", version.ref = "protobuf-plugin" }
@@ -86,3 +91,4 @@ spotless = { id = "com.diffplug.spotless", version.ref = "spotless-plugin" }
 gradle-extensions = { id = "com.github.vlsi.gradle-extensions", version.ref = "gradle-extensions-plugin" }
 publish = { id = "io.github.gradle-nexus.publish-plugin", version.ref = "publish-plugin" }
 rat = { id = "org.nosphere.apache.rat", version.ref = "rat-plugin" }
+shadow = { id = "com.github.johnrengelman.shadow", version.ref = "shadow-plugin" }

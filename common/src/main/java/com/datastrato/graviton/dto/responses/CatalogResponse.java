@@ -51,10 +51,5 @@ public class CatalogResponse extends BaseResponse {
         StringUtils.isNotBlank(catalog.name()), "catalog 'name' must not be null and empty");
     Preconditions.checkArgument(catalog.type() != null, "catalog 'type' must not be null");
     Preconditions.checkArgument(catalog.auditInfo() != null, "catalog 'audit' must not be null");
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(catalog.auditInfo().creator()),
-        "catalog 'audit.creator' must not be null and empty");
-    Preconditions.checkArgument(
-        catalog.auditInfo().createTime() != null, "catalog 'audit.createTime' must not be null");
   }
 }

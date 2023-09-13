@@ -181,8 +181,8 @@ public interface TableUpdateRequest extends RESTRequest {
   class AddTableColumnRequest implements TableUpdateRequest {
 
     @Getter
-    @JsonProperty("name")
-    private final String[] fieldNames;
+    @JsonProperty("fieldName")
+    private final String[] fieldName;
 
     @Getter
     @JsonProperty("type")
@@ -203,8 +203,8 @@ public interface TableUpdateRequest extends RESTRequest {
     private final TableChange.ColumnPosition position;
 
     public AddTableColumnRequest(
-        String[] fieldNames, Type dataType, String comment, TableChange.ColumnPosition position) {
-      this.fieldNames = fieldNames;
+        String[] fieldName, Type dataType, String comment, TableChange.ColumnPosition position) {
+      this.fieldName = fieldName;
       this.dataType = dataType;
       this.comment = comment;
       this.position = position;
@@ -217,17 +217,17 @@ public interface TableUpdateRequest extends RESTRequest {
     @Override
     public void validate() throws IllegalArgumentException {
       Preconditions.checkArgument(
-          fieldNames != null
-              && fieldNames.length > 0
-              && Arrays.stream(fieldNames).allMatch(StringUtils::isNotBlank),
-          "\"name\" field is required and cannot be empty");
+          fieldName != null
+              && fieldName.length > 0
+              && Arrays.stream(fieldName).allMatch(StringUtils::isNotBlank),
+          "\"fieldName\" field is required and cannot be empty");
       Preconditions.checkArgument(
           dataType != null, "\"type\" field is required and cannot be empty");
     }
 
     @Override
     public TableChange tableChange() {
-      return TableChange.addColumn(fieldNames, dataType, comment, position);
+      return TableChange.addColumn(fieldName, dataType, comment, position);
     }
   }
 
@@ -236,16 +236,16 @@ public interface TableUpdateRequest extends RESTRequest {
   class RenameTableColumnRequest implements TableUpdateRequest {
 
     @Getter
-    @JsonProperty("oldName")
-    private final String[] oldName;
+    @JsonProperty("oldFieldName")
+    private final String[] oldFieldName;
 
     @Getter
-    @JsonProperty("newName")
-    private final String newName;
+    @JsonProperty("newFieldName")
+    private final String newFieldName;
 
-    public RenameTableColumnRequest(String[] oldName, String newName) {
-      this.oldName = oldName;
-      this.newName = newName;
+    public RenameTableColumnRequest(String[] oldFieldName, String newFieldName) {
+      this.oldFieldName = oldFieldName;
+      this.newFieldName = newFieldName;
     }
 
     public RenameTableColumnRequest() {
@@ -255,17 +255,18 @@ public interface TableUpdateRequest extends RESTRequest {
     @Override
     public void validate() throws IllegalArgumentException {
       Preconditions.checkArgument(
-          oldName != null
-              && oldName.length > 0
-              && Arrays.stream(oldName).allMatch(StringUtils::isNotBlank),
-          "\"oldName\" field is required and cannot be empty");
+          oldFieldName != null
+              && oldFieldName.length > 0
+              && Arrays.stream(oldFieldName).allMatch(StringUtils::isNotBlank),
+          "\"oldFieldName\" field is required and cannot be empty");
       Preconditions.checkArgument(
-          StringUtils.isNotBlank(newName), "\"newName\" field is required and cannot be empty");
+          StringUtils.isNotBlank(newFieldName),
+          "\"newFieldName\" field is required and cannot be empty");
     }
 
     @Override
     public TableChange tableChange() {
-      return TableChange.renameColumn(oldName, newName);
+      return TableChange.renameColumn(oldFieldName, newFieldName);
     }
   }
 
@@ -274,8 +275,8 @@ public interface TableUpdateRequest extends RESTRequest {
   class UpdateTableColumnTypeRequest implements TableUpdateRequest {
 
     @Getter
-    @JsonProperty("name")
-    private final String[] name;
+    @JsonProperty("fieldName")
+    private final String[] fieldName;
 
     @Getter
     @JsonProperty("newType")
@@ -283,8 +284,8 @@ public interface TableUpdateRequest extends RESTRequest {
     @JsonDeserialize(using = JsonUtils.TypeDeserializer.class)
     private final Type newType;
 
-    public UpdateTableColumnTypeRequest(String[] name, Type newType) {
-      this.name = name;
+    public UpdateTableColumnTypeRequest(String[] fieldName, Type newType) {
+      this.fieldName = fieldName;
       this.newType = newType;
     }
 
@@ -295,15 +296,17 @@ public interface TableUpdateRequest extends RESTRequest {
     @Override
     public void validate() throws IllegalArgumentException {
       Preconditions.checkArgument(
-          name != null && name.length > 0 && Arrays.stream(name).allMatch(StringUtils::isNotBlank),
-          "\"name\" field is required and cannot be empty");
+          fieldName != null
+              && fieldName.length > 0
+              && Arrays.stream(fieldName).allMatch(StringUtils::isNotBlank),
+          "\"fieldName\" field is required and cannot be empty");
       Preconditions.checkArgument(
           newType != null, "\"newType\" field is required and cannot be empty");
     }
 
     @Override
     public TableChange tableChange() {
-      return TableChange.updateColumnType(name, newType);
+      return TableChange.updateColumnType(fieldName, newType);
     }
   }
 
@@ -312,15 +315,15 @@ public interface TableUpdateRequest extends RESTRequest {
   class UpdateTableColumnCommentRequest implements TableUpdateRequest {
 
     @Getter
-    @JsonProperty("name")
-    private final String[] name;
+    @JsonProperty("fieldName")
+    private final String[] fieldName;
 
     @Getter
     @JsonProperty("newComment")
     private final String newComment;
 
-    public UpdateTableColumnCommentRequest(String[] name, String newComment) {
-      this.name = name;
+    public UpdateTableColumnCommentRequest(String[] fieldName, String newComment) {
+      this.fieldName = fieldName;
       this.newComment = newComment;
     }
 
@@ -331,8 +334,10 @@ public interface TableUpdateRequest extends RESTRequest {
     @Override
     public void validate() throws IllegalArgumentException {
       Preconditions.checkArgument(
-          name != null && name.length > 0 && Arrays.stream(name).allMatch(StringUtils::isNotBlank),
-          "\"name\" field is required and cannot be empty");
+          fieldName != null
+              && fieldName.length > 0
+              && Arrays.stream(fieldName).allMatch(StringUtils::isNotBlank),
+          "\"fieldName\" field is required and cannot be empty");
       Preconditions.checkArgument(
           StringUtils.isNotBlank(newComment),
           "\"newComment\" field is required and cannot be empty");
@@ -340,7 +345,7 @@ public interface TableUpdateRequest extends RESTRequest {
 
     @Override
     public TableChange tableChange() {
-      return TableChange.updateColumnComment(name, newComment);
+      return TableChange.updateColumnComment(fieldName, newComment);
     }
   }
 
@@ -349,8 +354,8 @@ public interface TableUpdateRequest extends RESTRequest {
   class UpdateTableColumnPositionRequest implements TableUpdateRequest {
 
     @Getter
-    @JsonProperty("name")
-    private final String[] name;
+    @JsonProperty("fieldName")
+    private final String[] fieldName;
 
     @Getter
     @JsonProperty("newPosition")
@@ -358,8 +363,9 @@ public interface TableUpdateRequest extends RESTRequest {
     @JsonDeserialize(using = JsonUtils.ColumnPositionDeserializer.class)
     private final TableChange.ColumnPosition newPosition;
 
-    public UpdateTableColumnPositionRequest(String[] name, TableChange.ColumnPosition newPosition) {
-      this.name = name;
+    public UpdateTableColumnPositionRequest(
+        String[] fieldName, TableChange.ColumnPosition newPosition) {
+      this.fieldName = fieldName;
       this.newPosition = newPosition;
     }
 
@@ -370,15 +376,17 @@ public interface TableUpdateRequest extends RESTRequest {
     @Override
     public void validate() throws IllegalArgumentException {
       Preconditions.checkArgument(
-          name != null && name.length > 0 && Arrays.stream(name).allMatch(StringUtils::isNotBlank),
-          "\"name\" field is required and cannot be empty");
+          fieldName != null
+              && fieldName.length > 0
+              && Arrays.stream(fieldName).allMatch(StringUtils::isNotBlank),
+          "\"fieldName\" field is required and cannot be empty");
       Preconditions.checkArgument(
           newPosition != null, "\"newPosition\" field is required and cannot be empty");
     }
 
     @Override
     public TableChange tableChange() {
-      return TableChange.updateColumnPosition(name, newPosition);
+      return TableChange.updateColumnPosition(fieldName, newPosition);
     }
   }
 
@@ -387,15 +395,15 @@ public interface TableUpdateRequest extends RESTRequest {
   class DeleteTableColumnRequest implements TableUpdateRequest {
 
     @Getter
-    @JsonProperty("name")
-    private final String[] name;
+    @JsonProperty("fieldName")
+    private final String[] fieldName;
 
     @Getter
     @JsonProperty("ifExists")
     private final boolean ifExists;
 
-    public DeleteTableColumnRequest(String[] name, boolean ifExists) {
-      this.name = name;
+    public DeleteTableColumnRequest(String[] fieldName, boolean ifExists) {
+      this.fieldName = fieldName;
       this.ifExists = ifExists;
     }
 
@@ -406,13 +414,15 @@ public interface TableUpdateRequest extends RESTRequest {
     @Override
     public void validate() throws IllegalArgumentException {
       Preconditions.checkArgument(
-          name != null && name.length > 0 && Arrays.stream(name).allMatch(StringUtils::isNotBlank),
-          "\"name\" field is required and cannot be empty");
+          fieldName != null
+              && fieldName.length > 0
+              && Arrays.stream(fieldName).allMatch(StringUtils::isNotBlank),
+          "\"fieldName\" field is required and cannot be empty");
     }
 
     @Override
     public TableChange tableChange() {
-      return TableChange.deleteColumn(name, ifExists);
+      return TableChange.deleteColumn(fieldName, ifExists);
     }
   }
 }

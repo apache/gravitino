@@ -37,7 +37,7 @@ public class BaseMetalake implements Metalake, Entity, Auditable, HasIdentifier 
   public static final Field SCHEMA_VERSION =
       Field.required("version", SchemaVersion.class, "The version of the schema for the metalake");
 
-  @Getter private Long id;
+  private Long id;
 
   private String name;
 
@@ -87,6 +87,16 @@ public class BaseMetalake implements Metalake, Entity, Auditable, HasIdentifier 
   @Override
   public String name() {
     return name;
+  }
+
+  /**
+   * The unique id of the metalake.
+   *
+   * @return The unique id of the metalake.
+   */
+  @Override
+  public Long id() {
+    return id;
   }
 
   /**

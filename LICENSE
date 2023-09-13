@@ -231,3 +231,6 @@
    Apache Hive
    ./catalog-hive/src/test/resources/hive-schema-3.1.0.derby.sql
 
+   Apache Zeppelin
+   ./integration-test/src/test/java/com/datastrato/graviton/integration/util/CommandExecutor.java
+   ./integration-test/src/test/java/com/datastrato/graviton/integration/util/ProcessData.java

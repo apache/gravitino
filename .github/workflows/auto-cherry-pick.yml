@@ -1,0 +1,28 @@
+name: Automatically cherry-pick merged PR to different branches
+
+on:
+  pull_request_target:
+    branches:
+      - main
+    types: ["closed"]
+
+jobs:
+  cherry_pick_branch_0_1:
+    runs-on: ubuntu-latest
+    name: Cherry pick into branch_0.1
+    if: ${{ contains(github.event.pull_request.labels.*.name, 'branch-0.1') && github.event.pull_request.merged == true }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - name: Cherry pick into branch-0.1
+        uses: carloscastrojumo/github-cherry-pick-action@v1.0.9
+        with:
+          branch: branch-0.1
+          labels: |
+            cherry-pick
+          reviewers: |
+            jerryshao
+env:
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

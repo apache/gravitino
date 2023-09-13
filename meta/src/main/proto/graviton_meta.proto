@@ -22,8 +22,8 @@ message SchemaVersion {
  * The AuditInfo message is used to record the audit information of a resource.
  */
 message AuditInfo {
-  string creator = 1;
-  google.protobuf.Timestamp create_time = 2;
+  optional string creator = 1;
+  optional google.protobuf.Timestamp create_time = 2;
   optional string last_modifier = 3;
   optional google.protobuf.Timestamp last_modified_time = 4;
 }
@@ -49,24 +49,21 @@ message Catalog {
   }
 
   uint64 id = 1;
-  uint64 metalake_id = 2;
-  string name = 3;
-  Type type = 4;
-  optional string comment = 5;
-  map<string, string> properties = 6;
-  AuditInfo audit_info = 7;
+  string name = 2;
+  Type type = 3;
+  optional string comment = 4;
+  map<string, string> properties = 5;
+  AuditInfo audit_info = 6;
 }
 
 message Schema {
   uint64 id = 1;
-  uint64 catalog_id = 2;
-  string name = 3;
-  AuditInfo audit_info = 4;
+  string name = 2;
+  AuditInfo audit_info = 3;
 }
 
 message Table {
   uint64 id = 1;
-  uint64 schema_id = 2;
-  string name = 3;
-  AuditInfo audit_info = 4;
+  string name = 2;
+  AuditInfo audit_info = 3;
 }

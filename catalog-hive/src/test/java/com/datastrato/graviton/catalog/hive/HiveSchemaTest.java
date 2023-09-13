@@ -4,7 +4,7 @@
  */
 package com.datastrato.graviton.catalog.hive;
 
-import static com.datastrato.graviton.Configs.DEFUALT_ENTITY_KV_STORE;
+import static com.datastrato.graviton.Configs.DEFAULT_ENTITY_KV_STORE;
 import static com.datastrato.graviton.Configs.ENTITY_KV_STORE;
 import static com.datastrato.graviton.Configs.ENTITY_STORE;
 import static com.datastrato.graviton.Configs.ENTRY_KV_ROCKSDB_BACKEND_PATH;
@@ -44,7 +44,7 @@ public class HiveSchemaTest extends MiniHiveMetastoreService {
   private static void setup() {
     Config config = Mockito.mock(Config.class);
     Mockito.when(config.get(ENTITY_STORE)).thenReturn("kv");
-    Mockito.when(config.get(ENTITY_KV_STORE)).thenReturn(DEFUALT_ENTITY_KV_STORE);
+    Mockito.when(config.get(ENTITY_KV_STORE)).thenReturn(DEFAULT_ENTITY_KV_STORE);
     Mockito.when(config.get(Configs.ENTITY_SERDE)).thenReturn("proto");
     Mockito.when(config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)).thenReturn(ROCKS_DB_STORE_PATH);
     Mockito.when(config.get(Configs.CATALOG_CACHE_EVICTION_INTERVAL_MS))
@@ -73,7 +73,6 @@ public class HiveSchemaTest extends MiniHiveMetastoreService {
             .withName("catalog")
             .withNamespace(Namespace.of("metalake"))
             .withType(HiveCatalog.Type.RELATIONAL)
-            .withMetalakeId(1L)
             .withAuditInfo(auditInfo)
             .build();
 
@@ -104,6 +103,9 @@ public class HiveSchemaTest extends MiniHiveMetastoreService {
     NameIdentifier[] idents = hiveCatalog.asSchemas().listSchemas(ident.namespace());
     Assertions.assertTrue(Arrays.asList(idents).contains(ident));
     Assertions.assertTrue(store.exists(ident, SCHEMA));
+
+    Schema loadedSchema = hiveCatalog.asSchemas().loadSchema(ident);
+    Assertions.assertEquals(schema.auditInfo(), loadedSchema.auditInfo());
 
     // Test illegal identifier
     NameIdentifier ident1 = NameIdentifier.of("metalake", hiveCatalog.name());
@@ -136,7 +138,7 @@ public class HiveSchemaTest extends MiniHiveMetastoreService {
     properties.put("key2", "val2");
     String comment = "comment";
 
-    hiveCatalog.asSchemas().createSchema(ident, comment, properties);
+    Schema createdSchema = hiveCatalog.asSchemas().createSchema(ident, comment, properties);
     Assertions.assertTrue(hiveCatalog.asSchemas().schemaExists(ident));
 
     Map<String, String> properties1 = hiveCatalog.asSchemas().loadSchema(ident).properties();
@@ -149,9 +151,17 @@ public class HiveSchemaTest extends MiniHiveMetastoreService {
             ident,
             SchemaChange.removeProperty("key1"),
             SchemaChange.setProperty("key2", "val2-alter"));
-    Map<String, String> properties2 = hiveCatalog.asSchemas().loadSchema(ident).properties();
+    Schema alteredSchema = hiveCatalog.asSchemas().loadSchema(ident);
+    Map<String, String> properties2 = alteredSchema.properties();
     Assertions.assertFalse(properties2.containsKey("key1"));
     Assertions.assertEquals("val2-alter", properties2.get("key2"));
+
+    Assertions.assertEquals(
+        createdSchema.auditInfo().creator(), alteredSchema.auditInfo().creator());
+    Assertions.assertEquals(
+        createdSchema.auditInfo().createTime(), alteredSchema.auditInfo().createTime());
+    Assertions.assertNotNull(alteredSchema.auditInfo().lastModifier());
+    Assertions.assertNotNull(alteredSchema.auditInfo().lastModifiedTime());
 
     hiveCatalog
         .asSchemas()
@@ -159,9 +169,17 @@ public class HiveSchemaTest extends MiniHiveMetastoreService {
             ident,
             SchemaChange.setProperty("key3", "val3"),
             SchemaChange.setProperty("key4", "val4"));
-    Map<String, String> properties3 = hiveCatalog.asSchemas().loadSchema(ident).properties();
+    Schema alteredSchema1 = hiveCatalog.asSchemas().loadSchema(ident);
+    Map<String, String> properties3 = alteredSchema1.properties();
     Assertions.assertEquals("val3", properties3.get("key3"));
     Assertions.assertEquals("val4", properties3.get("key4"));
+
+    Assertions.assertEquals(
+        createdSchema.auditInfo().creator(), alteredSchema1.auditInfo().creator());
+    Assertions.assertEquals(
+        createdSchema.auditInfo().createTime(), alteredSchema1.auditInfo().createTime());
+    Assertions.assertNotNull(alteredSchema1.auditInfo().lastModifier());
+    Assertions.assertNotNull(alteredSchema1.auditInfo().lastModifiedTime());
   }
 
   @Test

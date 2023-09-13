@@ -14,6 +14,7 @@ import com.datastrato.graviton.SupportsMetalakes;
 import com.datastrato.graviton.exceptions.MetalakeAlreadyExistsException;
 import com.datastrato.graviton.exceptions.NoSuchEntityException;
 import com.datastrato.graviton.exceptions.NoSuchMetalakeException;
+import com.datastrato.graviton.storage.IdGenerator;
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.time.Instant;
@@ -28,13 +29,17 @@ public class MetalakeManager implements SupportsMetalakes {
 
   private final EntityStore store;
 
+  private final IdGenerator idGenerator;
+
   /**
    * Constructs a MetalakeManager instance.
    *
    * @param store The EntityStore to use for managing Metalakes.
+   * @param idGenerator The IdGenerator to use for generating Metalake identifiers.
    */
-  public MetalakeManager(EntityStore store) {
+  public MetalakeManager(EntityStore store, IdGenerator idGenerator) {
     this.store = store;
+    this.idGenerator = idGenerator;
   }
 
   /**
@@ -92,7 +97,7 @@ public class MetalakeManager implements SupportsMetalakes {
       throws MetalakeAlreadyExistsException {
     BaseMetalake metalake =
         new BaseMetalake.Builder()
-            .withId(1L /* TODO: Use ID generator */)
+            .withId(idGenerator.nextId())
             .withName(ident.name())
             .withComment(comment)
             .withProperties(properties)
@@ -137,7 +142,7 @@ public class MetalakeManager implements SupportsMetalakes {
           metalake -> {
             BaseMetalake.Builder builder =
                 new BaseMetalake.Builder()
-                    .withId(metalake.getId())
+                    .withId(metalake.id())
                     .withName(metalake.name())
                     .withComment(metalake.comment())
                     .withProperties(metalake.properties())
@@ -188,7 +193,7 @@ public class MetalakeManager implements SupportsMetalakes {
     try {
       return store.delete(ident, EntityType.METALAKE);
     } catch (IOException ioe) {
-      LOG.error("Deletinf metalake {} failed due to storage issues", ident, ioe);
+      LOG.error("Deleting metalake {} failed due to storage issues", ident, ioe);
       throw new RuntimeException(ioe);
     }
   }
