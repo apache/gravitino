@@ -106,7 +106,7 @@ public interface SupportsSchemas {
    *
    * @param ident The name identifier of the schema.
    * @param cascade If true, recursively drop all objects within the schema.
-   * @return True if the schema is dropped successfully, false otherwise.
+   * @return True if the schema exists and is dropped successfully, false otherwise.
    * @throws NonEmptySchemaException If the schema is not empty and cascade is false.
    */
   boolean dropSchema(NameIdentifier ident, boolean cascade) throws NonEmptySchemaException;
