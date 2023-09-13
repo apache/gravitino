@@ -12,10 +12,19 @@ import java.util.Map.Entry;
 import java.util.Optional;
 import javax.ws.rs.client.Invocation.Builder;
 import javax.ws.rs.client.WebTarget;
+import javax.ws.rs.core.Application;
 import javax.ws.rs.core.MediaType;
+import org.glassfish.jersey.server.ResourceConfig;
 import org.glassfish.jersey.test.JerseyTest;
+import org.glassfish.jersey.test.TestProperties;
 
 public class IcebergTestBase extends JerseyTest {
+  @Override
+  protected Application configure() {
+    forceSet(TestProperties.CONTAINER_PORT, "0");
+
+    return new ResourceConfig();
+  }
 
   public Builder getRenameTableClientBuilder() {
     return getIcebergClientBuilder(IcebergRestTestUtil.RENAME_TABLE_PATH, Optional.empty());

@@ -22,6 +22,12 @@ public class VersionDTO {
   @JsonProperty("gitCommit")
   private final String gitCommit;
 
+  public VersionDTO() {
+    this.version = "";
+    this.compileDate = "";
+    this.gitCommit = "";
+  }
+
   public VersionDTO(String version, String compileDate, String gitCommit) {
     this.version = version;
     this.compileDate = compileDate;
