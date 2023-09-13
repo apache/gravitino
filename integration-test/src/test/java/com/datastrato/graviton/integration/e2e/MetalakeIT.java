@@ -120,5 +120,8 @@ public class MetalakeIT extends AbstractIT {
     // Reload metatada from backend to check if the drop are applied
     Assertions.assertThrows(
         NoSuchMetalakeException.class, () -> client.loadMetalake(NameIdentifier.of(metalakeName)));
+
+    // Return false if the metalake has been dropped already
+    Assertions.assertFalse(client.dropMetalake(NameIdentifier.of(metalakeName)));
   }
 }
