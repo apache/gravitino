@@ -4,6 +4,8 @@
  */
 package com.datastrato.graviton.client;
 
+import static com.datastrato.graviton.dto.rel.PartitionUtils.toPartitions;
+
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
 import com.datastrato.graviton.dto.AuditDTO;
@@ -35,6 +37,7 @@ import com.datastrato.graviton.rel.SupportsSchemas;
 import com.datastrato.graviton.rel.Table;
 import com.datastrato.graviton.rel.TableCatalog;
 import com.datastrato.graviton.rel.TableChange;
+import com.datastrato.graviton.rel.transforms.Transform;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
@@ -128,6 +131,7 @@ public class RelationalCatalog extends CatalogDTO implements TableCatalog, Suppo
    * @param columns The columns of the table.
    * @param comment The comment of the table.
    * @param properties The properties of the table.
+   * @param partitions The partitioning of the table.
    * @return The created {@link Table}.
    * @throws NoSuchSchemaException if the schema with specified namespace does not exist.
    * @throws TableAlreadyExistsException if the table with specified identifier already exists.
@@ -138,15 +142,18 @@ public class RelationalCatalog extends CatalogDTO implements TableCatalog, Suppo
       Column[] columns,
       String comment,
       Map<String, String> properties,
+      Transform[] partitions,
       Distribution distribution,
       SortOrder[] sortOrders)
       throws NoSuchSchemaException, TableAlreadyExistsException {
     NameIdentifier.checkTable(ident);
 
     SortOrderDTO[] sortOrderDTOS =
-        Arrays.stream(sortOrders)
-            .map(com.datastrato.graviton.dto.util.DTOConverters::fromSortOrder)
-            .toArray(SortOrderDTO[]::new);
+        sortOrders == null
+            ? new SortOrderDTO[0]
+            : Arrays.stream(sortOrders)
+                .map(com.datastrato.graviton.dto.util.DTOConverters::fromSortOrder)
+                .toArray(SortOrderDTO[]::new);
     TableCreateRequest req =
         new TableCreateRequest(
             ident.name(),
@@ -154,7 +161,8 @@ public class RelationalCatalog extends CatalogDTO implements TableCatalog, Suppo
             (ColumnDTO[]) columns,
             properties,
             sortOrderDTOS,
-            com.datastrato.graviton.dto.util.DTOConverters.fromDistrition(distribution));
+            com.datastrato.graviton.dto.util.DTOConverters.fromDistrition(distribution),
+            toPartitions(partitions));
     req.validate();
 
     TableResponse resp =

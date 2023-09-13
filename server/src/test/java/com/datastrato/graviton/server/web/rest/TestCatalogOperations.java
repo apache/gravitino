@@ -39,6 +39,7 @@ import javax.ws.rs.core.Response;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.glassfish.jersey.test.JerseyTest;
+import org.glassfish.jersey.test.TestProperties;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -57,6 +58,8 @@ public class TestCatalogOperations extends JerseyTest {
 
   @Override
   protected Application configure() {
+    forceSet(TestProperties.CONTAINER_PORT, "0");
+
     ResourceConfig resourceConfig = new ResourceConfig();
     resourceConfig.register(CatalogOperations.class);
     resourceConfig.register(

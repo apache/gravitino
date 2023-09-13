@@ -4,9 +4,12 @@
  */
 package com.datastrato.graviton.dto.rel;
 
+import static com.datastrato.graviton.dto.rel.PartitionUtils.toTransforms;
+
 import com.datastrato.graviton.dto.AuditDTO;
 import com.datastrato.graviton.rel.Column;
 import com.datastrato.graviton.rel.Table;
+import com.datastrato.graviton.rel.transforms.Transform;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import java.util.Map;
@@ -35,6 +38,9 @@ public class TableDTO implements Table {
   @JsonProperty("sortOrders")
   private SortOrderDTO[] sortOrders;
 
+  @JsonProperty("partitions")
+  private Partition[] partitions;
+
   private TableDTO() {}
 
   /**
@@ -45,6 +51,7 @@ public class TableDTO implements Table {
    * @param columns The columns of the table.
    * @param properties The properties associated with the table.
    * @param audit The audit information for the table.
+   * @param partitions The partitions of the table.
    */
   private TableDTO(
       String name,
@@ -52,6 +59,7 @@ public class TableDTO implements Table {
       ColumnDTO[] columns,
       Map<String, String> properties,
       AuditDTO audit,
+      Partition[] partitions,
       DistributionDTO distribution,
       SortOrderDTO[] sortOrderDTOS) {
     this.name = name;
@@ -61,6 +69,7 @@ public class TableDTO implements Table {
     this.audit = audit;
     this.distribution = distribution;
     this.sortOrders = sortOrderDTOS;
+    this.partitions = partitions;
   }
 
   @Override
@@ -88,6 +97,11 @@ public class TableDTO implements Table {
     return audit;
   }
 
+  @Override
+  public Transform[] partitioning() {
+    return toTransforms(partitions);
+  }
+
   /**
    * Creates a new Builder to build a Table DTO.
    *
@@ -110,6 +124,7 @@ public class TableDTO implements Table {
     protected AuditDTO audit;
     protected SortOrderDTO[] sortOrderDTOS;
     protected DistributionDTO distributionDTO;
+    protected Partition[] partitions;
 
     public Builder() {}
 
@@ -178,6 +193,11 @@ public class TableDTO implements Table {
       return (S) this;
     }
 
+    public S withPartitions(Partition[] partitions) {
+      this.partitions = partitions;
+      return (S) this;
+    }
+
     /**
      * Builds a Table DTO based on the provided builder parameters.
      *
@@ -191,7 +211,7 @@ public class TableDTO implements Table {
       Preconditions.checkArgument(audit != null, "audit cannot be null");
 
       return new TableDTO(
-          name, comment, columns, properties, audit, distributionDTO, sortOrderDTOS);
+          name, comment, columns, properties, audit, partitions, distributionDTO, sortOrderDTOS);
     }
   }
 }

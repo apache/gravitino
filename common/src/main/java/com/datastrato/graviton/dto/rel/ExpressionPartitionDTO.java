@@ -33,6 +33,27 @@ public class ExpressionPartitionDTO implements Partition {
     return Strategy.EXPRESSION;
   }
 
+  @Override
+  public void validate(ColumnDTO[] columns) throws IllegalArgumentException {
+    validateExpression(columns, expression);
+  }
+
+  private void validateExpression(ColumnDTO[] columns, Expression expression) {
+    if (expression == null) {
+      return;
+    }
+
+    switch (expression.expressionType()) {
+      case FIELD:
+        FieldExpression fieldExpression = (FieldExpression) expression;
+        PartitionUtils.validateFieldExist(columns, fieldExpression.fieldName);
+        break;
+      case FUNCTION:
+        validateExpression(columns, expression);
+        break;
+    }
+  }
+
   @JsonCreator
   private ExpressionPartitionDTO(
       @JsonProperty("strategy") String strategy,

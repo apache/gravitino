@@ -36,11 +36,14 @@ import com.datastrato.graviton.rel.SupportsSchemas;
 import com.datastrato.graviton.rel.Table;
 import com.datastrato.graviton.rel.TableCatalog;
 import com.datastrato.graviton.rel.TableChange;
+import com.datastrato.graviton.rel.transforms.Transform;
+import com.datastrato.graviton.rel.transforms.Transforms;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -577,6 +580,23 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     }
   }
 
+  private void validateDistriutionAndSort(Distribution distribution, SortOrder[] sortOrder) {
+    if (distribution != null) {
+      boolean allNameRefercen =
+          Arrays.stream(distribution.transforms())
+              .allMatch(t -> t instanceof Transforms.NamedReference);
+      Preconditions.checkArgument(
+          allNameRefercen, "Hive distribution only supports name reference");
+    }
+
+    if (sortOrder != null) {
+      boolean allNameRefercen =
+          Arrays.stream(sortOrder)
+              .allMatch(t -> t.getTransform() instanceof Transforms.NamedReference);
+      Preconditions.checkArgument(allNameRefercen, "Hive sort order only supports name reference");
+    }
+  }
+
   /**
    * Creates a new table in the Hive Metastore.
    *
@@ -584,6 +604,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
    * @param columns The array of columns for the new table.
    * @param comment The comment for the new table.
    * @param properties The properties for the new table.
+   * @param partitions The partitioning for the new table.
    * @return The newly created HiveTable instance.
    * @throws NoSuchSchemaException If the schema for the table does not exist.
    * @throws TableAlreadyExistsException If the table with the same name already exists.
@@ -594,6 +615,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       Column[] columns,
       String comment,
       Map<String, String> properties,
+      Transform[] partitions,
       Distribution distribution,
       SortOrder[] sortOrders)
       throws NoSuchSchemaException, TableAlreadyExistsException {
@@ -605,6 +627,11 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
         isValidNamespace(schemaIdent.namespace()),
         String.format(
             "Cannot support invalid namespace in Hive Metastore: %s", schemaIdent.namespace()));
+
+    Preconditions.checkArgument(
+        Arrays.stream(partitions).allMatch(p -> p instanceof Transforms.NamedReference),
+        "Hive partition only supports identity transform");
+    validateDistriutionAndSort(distribution, sortOrders);
 
     try {
       if (!schemaExists(schemaIdent)) {
@@ -635,6 +662,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
                                 .withCreator(currentUser())
                                 .withCreateTime(Instant.now())
                                 .build())
+                        .withPartitions(partitions)
                         .build();
                 store.put(createdTable, false);
                 clientPool.run(

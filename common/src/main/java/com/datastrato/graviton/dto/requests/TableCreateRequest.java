@@ -9,6 +9,7 @@ import com.datastrato.graviton.dto.rel.DistributionDTO;
 import com.datastrato.graviton.dto.rel.ExpressionPartitionDTO.Expression;
 import com.datastrato.graviton.dto.rel.ExpressionPartitionDTO.FieldExpression;
 import com.datastrato.graviton.dto.rel.ExpressionPartitionDTO.FunctionExpression;
+import com.datastrato.graviton.dto.rel.Partition;
 import com.datastrato.graviton.dto.rel.SortOrderDTO;
 import com.datastrato.graviton.rest.RESTRequest;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -46,9 +47,26 @@ public class TableCreateRequest implements RESTRequest {
   @JsonProperty("properties")
   private final Map<String, String> properties;
 
-  @Nullable private final SortOrderDTO[] sortOrders;
+  @JsonProperty("sortOrders")
+  @Nullable
+  private final SortOrderDTO[] sortOrders;
 
-  @Nullable private final DistributionDTO distribution;
+  @JsonProperty("distribution")
+  @Nullable
+  private final DistributionDTO distribution;
+
+  @Nullable
+  @JsonProperty("partitions")
+  private final Partition[] partitions;
+
+  public TableCreateRequest() {
+    this(null, null, null, null, null, null, null);
+  }
+
+  public TableCreateRequest(
+      String name, String comment, ColumnDTO[] columns, Map<String, String> properties) {
+    this(name, comment, columns, properties, null, null, new Partition[0]);
+  }
 
   public TableCreateRequest(
       String name,
@@ -56,13 +74,15 @@ public class TableCreateRequest implements RESTRequest {
       ColumnDTO[] columns,
       Map<String, String> properties,
       SortOrderDTO[] sortOrders,
-      DistributionDTO distribution) {
+      DistributionDTO distribution,
+      @Nullable Partition[] partitions) {
     this.name = name;
     this.columns = columns;
     this.comment = comment;
     this.properties = properties;
     this.sortOrders = sortOrders;
     this.distribution = distribution;
+    this.partitions = partitions;
   }
 
   @Override
@@ -84,6 +104,10 @@ public class TableCreateRequest implements RESTRequest {
       distribution
           .getExpressions()
           .forEach(expression -> validateExpresion(expression, columnNames));
+    }
+
+    if (partitions != null) {
+      Arrays.stream(partitions).forEach(p -> p.validate(columns));
     }
   }
 

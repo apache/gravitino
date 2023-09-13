@@ -92,6 +92,7 @@ tasks {
     environment("GRAVITON_HOME", rootDir.path + "/distribution/package")
     environment("HADOOP_USER_NAME", "hive")
     environment("HADOOP_HOME", "/tmp")
+    environment("PROJECT_VERSION", version)
     useJUnitPlatform()
   }
 }

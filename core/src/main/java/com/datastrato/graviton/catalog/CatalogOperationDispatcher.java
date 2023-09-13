@@ -22,6 +22,7 @@ import com.datastrato.graviton.rel.SupportsSchemas;
 import com.datastrato.graviton.rel.Table;
 import com.datastrato.graviton.rel.TableCatalog;
 import com.datastrato.graviton.rel.TableChange;
+import com.datastrato.graviton.rel.transforms.Transform;
 import com.datastrato.graviton.utils.ThrowableFunction;
 import com.google.common.annotations.VisibleForTesting;
 import java.util.Arrays;
@@ -183,6 +184,7 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
    * @param columns An array of {@link Column} objects representing the columns of the table.
    * @param comment A description or comment associated with the table.
    * @param properties Additional properties to set for the table.
+   * @param partitions An array of {@link Transform} objects representing the partitioning of table
    * @return The newly created {@link Table} object.
    * @throws NoSuchSchemaException If the schema in which to create the table does not exist.
    * @throws TableAlreadyExistsException If a table with the same name already exists in the schema.
@@ -193,6 +195,7 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
       Column[] columns,
       String comment,
       Map<String, String> properties,
+      Transform[] partitions,
       Distribution distribution,
       SortOrder[] sortOrders)
       throws NoSuchSchemaException, TableAlreadyExistsException {
@@ -202,7 +205,15 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
         catalogIdent,
         c ->
             c.doWithTableOps(
-                t -> t.createTable(ident, columns, comment, properties, distribution, sortOrders)),
+                t ->
+                    t.createTable(
+                        ident,
+                        columns,
+                        comment,
+                        properties,
+                        partitions == null ? new Transform[0] : partitions,
+                        distribution,
+                        sortOrders)),
         NoSuchSchemaException.class,
         TableAlreadyExistsException.class);
   }

@@ -4,6 +4,8 @@
  */
 package com.datastrato.graviton.server.web.rest;
 
+import static com.datastrato.graviton.dto.rel.PartitionUtils.toTransforms;
+
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
 import com.datastrato.graviton.catalog.CatalogOperationDispatcher;
@@ -92,9 +94,9 @@ public class TableOperations {
               request.getColumns(),
               request.getComment(),
               request.getProperties(),
+              toTransforms(request.getPartitions()),
               distribution,
               sortOrders);
-
       return Utils.ok(new TableResponse(DTOConverters.toDTO(table)));
 
     } catch (Exception e) {

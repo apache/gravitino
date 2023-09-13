@@ -15,6 +15,7 @@ import com.datastrato.graviton.rel.SortOrder;
 import com.datastrato.graviton.rel.Table;
 import com.datastrato.graviton.rel.TableCatalog;
 import com.datastrato.graviton.rel.TableChange;
+import com.datastrato.graviton.rel.transforms.Transform;
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.time.Instant;
@@ -56,6 +57,7 @@ public class TestCatalogOperations implements CatalogOperations, TableCatalog {
       Column[] columns,
       String comment,
       Map<String, String> properties,
+      Transform[] partitions,
       Distribution distribution,
       SortOrder[] sortOrders)
       throws NoSuchSchemaException, TableAlreadyExistsException {

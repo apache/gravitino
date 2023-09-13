@@ -48,6 +48,7 @@ public class TestTable extends BaseTable {
       table.auditInfo = auditInfo;
       table.distribution = distribution;
       table.sortOrders = sortOrders;
+      table.partitions = partitions;
       return table;
     }
   }

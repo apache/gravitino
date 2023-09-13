@@ -4,6 +4,8 @@
  */
 package com.datastrato.graviton.dto.util;
 
+import static com.datastrato.graviton.dto.rel.PartitionUtils.toPartitions;
+
 import com.datastrato.graviton.Audit;
 import com.datastrato.graviton.Catalog;
 import com.datastrato.graviton.Metalake;
@@ -85,10 +87,15 @@ public class DTOConverters {
             Arrays.stream(table.columns()).map(DTOConverters::toDTO).toArray(ColumnDTO[]::new))
         .withProperties(table.properties())
         .withAudit(toDTO(table.auditInfo()))
+        .withPartitions(toPartitions(table.partitioning()))
         .build();
   }
 
   public static DistributionDTO fromDistrition(Distribution distribution) {
+    if (distribution == null) {
+      return null;
+    }
+
     return new Builder()
         .withDistMethod(DistributionMethod.fromString(distribution.distMethod().name()))
         .withDistNum(distribution.distNum())
@@ -100,6 +107,10 @@ public class DTOConverters {
   }
 
   public static Distribution toDTO(DistributionDTO distributionDTO) {
+    if (distributionDTO == null) {
+      return null;
+    }
+
     return Distribution.builder()
         .distMethod(
             Distribution.DistributionMethod.valueOf(distributionDTO.getDistributionMethod().name()))
