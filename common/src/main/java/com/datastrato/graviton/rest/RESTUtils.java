@@ -8,12 +8,15 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableMap;
+import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.io.UnsupportedEncodingException;
+import java.net.ServerSocket;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
+import java.util.Random;
 
 /** Utility class for working with REST related operations. */
 public class RESTUtils {
@@ -103,5 +106,52 @@ public class RESTUtils {
       throw new UncheckedIOException(
           String.format("Failed to URL decode '%s': UTF-8 encoding is not supported", encoded), e);
     }
+  }
+
+  /**
+   * Find an available port in the port range.
+   *
+   * @param portRangeStart the start of the port range
+   * @param portRangeEnd the end of the port range
+   * @return the available port
+   * @throws IOException if no available port in the port range
+   */
+  public static int findAvailablePort(final int portRangeStart, final int portRangeEnd)
+      throws IOException {
+    int portStart = portRangeStart;
+    int portEnd = portRangeEnd;
+
+    if (portStart > portEnd) {
+      throw new IOException("Invalidate port range: " + portStart + ":" + portEnd);
+    } else if (portStart == 0 && portEnd == 0) {
+      try (ServerSocket socket = new ServerSocket(0)) {
+        return socket.getLocalPort();
+      } catch (IOException e) {
+        throw new IOException("Failed to allocate a random port", e);
+      }
+    } else if (portStart == portEnd) {
+      try (ServerSocket socket = new ServerSocket(portStart)) {
+        return socket.getLocalPort();
+      } catch (IOException e) {
+        throw new IOException("Failed to allocate a random port", e);
+      }
+    }
+
+    // valid user registered port https://en.wikipedia.org/wiki/Registered_port
+    if (portStart < 1024 || portEnd > 65535) {
+      throw new IOException("port number must be 0 or in [1024, 65535]");
+    }
+
+    Random random = new Random();
+    final int MaxTry = 200;
+    for (int i = portStart; i <= portEnd || i < portStart + MaxTry; ++i) {
+      int randomNumber = random.nextInt(portEnd - portStart + 1) + portStart;
+      try (ServerSocket socket = new ServerSocket(randomNumber)) {
+        return socket.getLocalPort();
+      } catch (IOException e) {
+        // ignore this
+      }
+    }
+    throw new IOException("No available port in the range: " + portRangeStart + ":" + portRangeEnd);
   }
 }
