@@ -124,6 +124,24 @@ public class TestHiveTable extends MiniHiveMetastoreService {
     hiveCatalog = new HiveCatalog().withCatalogConf(conf).withCatalogEntity(entity);
   }
 
+  private Distribution createDistribution() {
+    return Distribution.builder()
+        .distNum(10)
+        .transforms(new Transform[] {Transforms.field(new String[] {"col_1"})})
+        .distMethod(DistributionMethod.EVEN)
+        .build();
+  }
+
+  private SortOrder[] createSortOrder() {
+    return new SortOrder[] {
+      SortOrder.builder()
+          .nullOrder(NullOrder.FIRST)
+          .direction(Direction.DESC)
+          .transform(Transforms.field(new String[] {"col_2"}))
+          .build()
+    };
+  }
+
   @Test
   public void testCreateHiveTable() throws IOException {
     String hiveTableName = "test_hive_table";
@@ -147,21 +165,8 @@ public class TestHiveTable extends MiniHiveMetastoreService {
             .build();
     Column[] columns = new Column[] {col1, col2};
 
-    Distribution distribution =
-        Distribution.builder()
-            .distNum(10)
-            .transforms(new Transform[] {Transforms.field(new String[] {"col_1"})})
-            .distMethod(DistributionMethod.EVEN)
-            .build();
-
-    SortOrder[] sortOrders =
-        new SortOrder[] {
-          SortOrder.builder()
-              .nullOrder(NullOrder.FIRST)
-              .direction(Direction.DESC)
-              .transform(Transforms.field(new String[] {"col_2"}))
-              .build()
-        };
+    Distribution distribution = createDistribution();
+    SortOrder[] sortOrders = createSortOrder();
 
     Table table =
         hiveCatalog
@@ -408,21 +413,8 @@ public class TestHiveTable extends MiniHiveMetastoreService {
             .build();
     Column[] columns = new Column[] {col1, col2};
 
-    Distribution distribution =
-        Distribution.builder()
-            .distNum(10)
-            .transforms(new Transform[] {Transforms.field(new String[] {"col_1"})})
-            .distMethod(DistributionMethod.EVEN)
-            .build();
-
-    SortOrder[] sortOrders =
-        new SortOrder[] {
-          SortOrder.builder()
-              .nullOrder(NullOrder.FIRST)
-              .direction(Direction.DESC)
-              .transform(Transforms.field(new String[] {"col_2"}))
-              .build()
-        };
+    Distribution distribution = createDistribution();
+    SortOrder[] sortOrders = createSortOrder();
 
     Table createdTable =
         hiveCatalog

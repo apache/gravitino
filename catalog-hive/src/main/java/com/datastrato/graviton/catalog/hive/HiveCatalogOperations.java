@@ -662,10 +662,6 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
                                 .build())
                         .withPartitions(partitions)
                         .build();
-                LOG.info(
-                    "Created Hive table {} in Graviton store, table = {}",
-                    tableIdent.name(),
-                    createdTable);
                 store.put(createdTable, false);
                 clientPool.run(
                     c -> {

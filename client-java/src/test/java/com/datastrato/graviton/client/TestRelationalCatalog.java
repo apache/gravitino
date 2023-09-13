@@ -343,23 +343,9 @@ public class TestRelationalCatalog extends TestBase {
           createMockColumn("col1", TypeCreator.NULLABLE.I8, "comment1"),
           createMockColumn("col2", TypeCreator.NULLABLE.STRING, "comment2")
         };
-    SortOrderDTO[] sortOrderDTOS =
-        new SortOrderDTO[] {
-          new SortOrderDTO.Builder()
-              .withDirection(SortOrderDTO.Direction.DESC)
-              .withNullOrder(SortOrderDTO.NullOrder.FIRST)
-              .withExpression(
-                  new FieldExpression.Builder().withFieldName(new String[] {"col1"}).build())
-              .build()
-        };
-    DistributionDTO distributionDTO =
-        new DistributionDTO.Builder()
-            .withDistMethod(DistributionDTO.DistributionMethod.HASH)
-            .withDistNum(10)
-            .withExpressions(
-                ImmutableList.of(
-                    new FieldExpression.Builder().withFieldName(new String[] {"col2"}).build()))
-            .build();
+
+    DistributionDTO distributionDTO = createMockDistributionDTO("col1", 10);
+    SortOrderDTO[] sortOrderDTOS = createMockSortOrderDTO("col2", SortOrderDTO.Direction.DESC);
 
     TableDTO expectedTable =
         createMockTable(
@@ -593,24 +579,8 @@ public class TestRelationalCatalog extends TestBase {
           createMockColumn("col2", TypeCreator.NULLABLE.STRING, "comment2")
         };
 
-    DistributionDTO distributionDTO =
-        new DistributionDTO.Builder()
-            .withDistMethod(DistributionDTO.DistributionMethod.HASH)
-            .withDistNum(10)
-            .withExpressions(
-                ImmutableList.of(
-                    new FieldExpression.Builder().withFieldName(new String[] {"col1"}).build()))
-            .build();
-
-    SortOrderDTO[] sortOrderDTOS =
-        new SortOrderDTO[] {
-          new SortOrderDTO.Builder()
-              .withDirection(SortOrderDTO.Direction.DESC)
-              .withNullOrder(SortOrderDTO.NullOrder.FIRST)
-              .withExpression(
-                  new FieldExpression.Builder().withFieldName(new String[] {"col2"}).build())
-              .build()
-        };
+    DistributionDTO distributionDTO = createMockDistributionDTO("col1", 10);
+    SortOrderDTO[] sortOrderDTOS = createMockSortOrderDTO("col2", SortOrderDTO.Direction.DESC);
 
     TableDTO expectedTable =
         createMockTable(
@@ -644,24 +614,9 @@ public class TestRelationalCatalog extends TestBase {
     NameIdentifier tableId = NameIdentifier.of(metalakeName, catalogName, "schema1", "table1");
     ColumnDTO[] columns =
         new ColumnDTO[] {createMockColumn("col1", TypeCreator.NULLABLE.I8, "comment1")};
-    DistributionDTO distributionDTO =
-        new DistributionDTO.Builder()
-            .withDistMethod(DistributionDTO.DistributionMethod.HASH)
-            .withDistNum(10)
-            .withExpressions(
-                ImmutableList.of(
-                    new FieldExpression.Builder().withFieldName(new String[] {"col1"}).build()))
-            .build();
 
-    SortOrderDTO[] sortOrderDTOS =
-        new SortOrderDTO[] {
-          new SortOrderDTO.Builder()
-              .withDirection(SortOrderDTO.Direction.DESC)
-              .withNullOrder(SortOrderDTO.NullOrder.FIRST)
-              .withExpression(
-                  new FieldExpression.Builder().withFieldName(new String[] {"col1"}).build())
-              .build()
-        };
+    DistributionDTO distributionDTO = createMockDistributionDTO("col1", 10);
+    SortOrderDTO[] sortOrderDTOS = createMockSortOrderDTO("col1", SortOrderDTO.Direction.DESC);
 
     TableDTO expectedTable =
         createMockTable(
@@ -683,24 +638,10 @@ public class TestRelationalCatalog extends TestBase {
     NameIdentifier tableId = NameIdentifier.of(metalakeName, catalogName, "schema1", "table1");
     ColumnDTO[] columns =
         new ColumnDTO[] {createMockColumn("col1", TypeCreator.NULLABLE.I8, "comment1")};
-    DistributionDTO distributionDTO =
-        new DistributionDTO.Builder()
-            .withDistMethod(DistributionDTO.DistributionMethod.HASH)
-            .withDistNum(10)
-            .withExpressions(
-                ImmutableList.of(
-                    new FieldExpression.Builder().withFieldName(new String[] {"col_1"}).build()))
-            .build();
 
-    SortOrderDTO[] sortOrderDTOS =
-        new SortOrderDTO[] {
-          new SortOrderDTO.Builder()
-              .withDirection(SortOrderDTO.Direction.DESC)
-              .withNullOrder(SortOrderDTO.NullOrder.FIRST)
-              .withExpression(
-                  new FieldExpression.Builder().withFieldName(new String[] {"col_1"}).build())
-              .build()
-        };
+    DistributionDTO distributionDTO = createMockDistributionDTO("col1", 10);
+    SortOrderDTO[] sortOrderDTOS = createMockSortOrderDTO("col1", SortOrderDTO.Direction.DESC);
+
     TableDTO expectedTable =
         createMockTable(
             "table1",
@@ -722,24 +663,9 @@ public class TestRelationalCatalog extends TestBase {
     ColumnDTO[] columns =
         new ColumnDTO[] {createMockColumn("col1", TypeCreator.NULLABLE.I8, "comment1")};
     Map<String, String> properties = ImmutableMap.of("k1", "v1");
-    DistributionDTO distributionDTO =
-        new DistributionDTO.Builder()
-            .withDistMethod(DistributionDTO.DistributionMethod.HASH)
-            .withDistNum(10)
-            .withExpressions(
-                ImmutableList.of(
-                    new FieldExpression.Builder().withFieldName(new String[] {"col_1"}).build()))
-            .build();
 
-    SortOrderDTO[] sortOrderDTOS =
-        new SortOrderDTO[] {
-          new SortOrderDTO.Builder()
-              .withDirection(SortOrderDTO.Direction.DESC)
-              .withNullOrder(SortOrderDTO.NullOrder.FIRST)
-              .withExpression(
-                  new FieldExpression.Builder().withFieldName(new String[] {"col_1"}).build())
-              .build()
-        };
+    DistributionDTO distributionDTO = createMockDistributionDTO("col1", 10);
+    SortOrderDTO[] sortOrderDTOS = createMockSortOrderDTO("col1", SortOrderDTO.Direction.DESC);
 
     TableDTO expectedTable =
         createMockTable(
@@ -761,25 +687,9 @@ public class TestRelationalCatalog extends TestBase {
     NameIdentifier tableId = NameIdentifier.of(metalakeName, catalogName, "schema1", "table1");
     ColumnDTO[] columns =
         new ColumnDTO[] {createMockColumn("col1", TypeCreator.NULLABLE.I8, "comment1")};
-    DistributionDTO distributionDTO =
-        new DistributionDTO.Builder()
-            .withDistMethod(DistributionDTO.DistributionMethod.HASH)
-            .withDistNum(10)
-            .withExpressions(
-                ImmutableList.of(
-                    new FieldExpression.Builder().withFieldName(new String[] {"col_1"}).build()))
-            .build();
 
-    SortOrderDTO[] sortOrderDTOS =
-        new SortOrderDTO[] {
-          new SortOrderDTO.Builder()
-              .withDirection(SortOrderDTO.Direction.DESC)
-              .withNullOrder(SortOrderDTO.NullOrder.FIRST)
-              .withExpression(
-                  new FieldExpression.Builder().withFieldName(new String[] {"col_2"}).build())
-              .build()
-        };
-
+    DistributionDTO distributionDTO = createMockDistributionDTO("col1", 10);
+    SortOrderDTO[] sortOrderDTOS = createMockSortOrderDTO("col1", SortOrderDTO.Direction.DESC);
     TableDTO expectedTable =
         createMockTable(
             "table1",
@@ -804,24 +714,9 @@ public class TestRelationalCatalog extends TestBase {
           createMockColumn("col2", TypeCreator.NULLABLE.STRING, "comment2")
         };
 
-    DistributionDTO distributionDTO =
-        new DistributionDTO.Builder()
-            .withDistMethod(DistributionDTO.DistributionMethod.HASH)
-            .withDistNum(10)
-            .withExpressions(
-                ImmutableList.of(
-                    new FieldExpression.Builder().withFieldName(new String[] {"col_1"}).build()))
-            .build();
+    DistributionDTO distributionDTO = createMockDistributionDTO("col2", 10);
+    SortOrderDTO[] sortOrderDTOS = createMockSortOrderDTO("col2", SortOrderDTO.Direction.DESC);
 
-    SortOrderDTO[] sortOrderDTOS =
-        new SortOrderDTO[] {
-          new SortOrderDTO.Builder()
-              .withDirection(SortOrderDTO.Direction.DESC)
-              .withNullOrder(SortOrderDTO.NullOrder.FIRST)
-              .withExpression(
-                  new FieldExpression.Builder().withFieldName(new String[] {"col_2"}).build())
-              .build()
-        };
     TableDTO expectedTable =
         createMockTable(
             "table1",
@@ -848,27 +743,12 @@ public class TestRelationalCatalog extends TestBase {
     ColumnDTO[] columns =
         new ColumnDTO[] {
           createMockColumn("col1", TypeCreator.NULLABLE.I8, "comment1"),
-          createMockColumn("col3", TypeCreator.NULLABLE.STRING, "comment2")
+          createMockColumn("col2", TypeCreator.NULLABLE.STRING, "comment2"),
+          createMockColumn("col3", TypeCreator.NULLABLE.STRING, "comment3")
         };
 
-    DistributionDTO distributionDTO =
-        new DistributionDTO.Builder()
-            .withDistMethod(DistributionDTO.DistributionMethod.HASH)
-            .withDistNum(10)
-            .withExpressions(
-                ImmutableList.of(
-                    new FieldExpression.Builder().withFieldName(new String[] {"col_1"}).build()))
-            .build();
-
-    SortOrderDTO[] sortOrderDTOS =
-        new SortOrderDTO[] {
-          new SortOrderDTO.Builder()
-              .withDirection(SortOrderDTO.Direction.DESC)
-              .withNullOrder(SortOrderDTO.NullOrder.FIRST)
-              .withExpression(
-                  new FieldExpression.Builder().withFieldName(new String[] {"col_2"}).build())
-              .build()
-        };
+    DistributionDTO distributionDTO = createMockDistributionDTO("col1", 10);
+    SortOrderDTO[] sortOrderDTOS = createMockSortOrderDTO("col3", SortOrderDTO.Direction.DESC);
 
     TableDTO expectedTable =
         createMockTable(
@@ -890,24 +770,9 @@ public class TestRelationalCatalog extends TestBase {
     NameIdentifier tableId = NameIdentifier.of(metalakeName, catalogName, "schema1", "table1");
     ColumnDTO[] columns =
         new ColumnDTO[] {createMockColumn("col1", TypeCreator.NULLABLE.I8, "comment2")};
-    DistributionDTO distributionDTO =
-        new DistributionDTO.Builder()
-            .withDistMethod(DistributionDTO.DistributionMethod.HASH)
-            .withDistNum(10)
-            .withExpressions(
-                ImmutableList.of(
-                    new FieldExpression.Builder().withFieldName(new String[] {"col_1"}).build()))
-            .build();
 
-    SortOrderDTO[] sortOrderDTOS =
-        new SortOrderDTO[] {
-          new SortOrderDTO.Builder()
-              .withDirection(SortOrderDTO.Direction.DESC)
-              .withNullOrder(SortOrderDTO.NullOrder.FIRST)
-              .withExpression(
-                  new FieldExpression.Builder().withFieldName(new String[] {"col_2"}).build())
-              .build()
-        };
+    DistributionDTO distributionDTO = createMockDistributionDTO("col1", 10);
+    SortOrderDTO[] sortOrderDTOS = createMockSortOrderDTO("col1", SortOrderDTO.Direction.DESC);
 
     TableDTO expectedTable =
         createMockTable(
@@ -929,24 +794,9 @@ public class TestRelationalCatalog extends TestBase {
     NameIdentifier tableId = NameIdentifier.of(metalakeName, catalogName, "schema1", "table1");
     ColumnDTO[] columns =
         new ColumnDTO[] {createMockColumn("col1", TypeCreator.NULLABLE.STRING, "comment1")};
-    DistributionDTO distributionDTO =
-        new DistributionDTO.Builder()
-            .withDistMethod(DistributionDTO.DistributionMethod.HASH)
-            .withDistNum(10)
-            .withExpressions(
-                ImmutableList.of(
-                    new FieldExpression.Builder().withFieldName(new String[] {"col_1"}).build()))
-            .build();
 
-    SortOrderDTO[] sortOrderDTOS =
-        new SortOrderDTO[] {
-          new SortOrderDTO.Builder()
-              .withDirection(SortOrderDTO.Direction.DESC)
-              .withNullOrder(SortOrderDTO.NullOrder.FIRST)
-              .withExpression(
-                  new FieldExpression.Builder().withFieldName(new String[] {"col_2"}).build())
-              .build()
-        };
+    DistributionDTO distributionDTO = createMockDistributionDTO("col1", 10);
+    SortOrderDTO[] sortOrderDTOS = createMockSortOrderDTO("col1", SortOrderDTO.Direction.DESC);
     TableDTO expectedTable =
         createMockTable(
             "table1",
@@ -972,24 +822,8 @@ public class TestRelationalCatalog extends TestBase {
           createMockColumn("col2", TypeCreator.NULLABLE.STRING, "comment2")
         };
 
-    DistributionDTO distributionDTO =
-        new DistributionDTO.Builder()
-            .withDistMethod(DistributionDTO.DistributionMethod.HASH)
-            .withDistNum(10)
-            .withExpressions(
-                ImmutableList.of(
-                    new FieldExpression.Builder().withFieldName(new String[] {"col_1"}).build()))
-            .build();
-
-    SortOrderDTO[] sortOrderDTOS =
-        new SortOrderDTO[] {
-          new SortOrderDTO.Builder()
-              .withDirection(SortOrderDTO.Direction.DESC)
-              .withNullOrder(SortOrderDTO.NullOrder.FIRST)
-              .withExpression(
-                  new FieldExpression.Builder().withFieldName(new String[] {"col_2"}).build())
-              .build()
-        };
+    DistributionDTO distributionDTO = createMockDistributionDTO("col1", 10);
+    SortOrderDTO[] sortOrderDTOS = createMockSortOrderDTO("col2", SortOrderDTO.Direction.DESC);
     TableDTO expectedTable =
         createMockTable(
             "table1",
@@ -1006,30 +840,36 @@ public class TestRelationalCatalog extends TestBase {
     testAlterTable(tableId, req, expectedTable);
   }
 
+  private DistributionDTO createMockDistributionDTO(String columnName, int bucketNum) {
+    return new DistributionDTO.Builder()
+        .withDistMethod(DistributionDTO.DistributionMethod.HASH)
+        .withDistNum(bucketNum)
+        .withExpressions(
+            ImmutableList.of(
+                new FieldExpression.Builder().withFieldName(new String[] {columnName}).build()))
+        .build();
+  }
+
+  private SortOrderDTO[] createMockSortOrderDTO(
+      String columnName, SortOrderDTO.Direction direction) {
+    return new SortOrderDTO[] {
+      new SortOrderDTO.Builder()
+          .withDirection(direction)
+          .withNullOrder(SortOrderDTO.NullOrder.FIRST)
+          .withExpression(
+              new FieldExpression.Builder().withFieldName(new String[] {columnName}).build())
+          .build()
+    };
+  }
+
   @Test
   public void testDeleteTableColumn() throws JsonProcessingException {
     NameIdentifier tableId = NameIdentifier.of(metalakeName, catalogName, "schema1", "table1");
     ColumnDTO[] columns =
         new ColumnDTO[] {createMockColumn("col2", TypeCreator.NULLABLE.STRING, "comment2")};
-    DistributionDTO distributionDTO =
-        new DistributionDTO.Builder()
-            .withDistMethod(DistributionDTO.DistributionMethod.HASH)
-            .withDistNum(10)
-            .withExpressions(
-                ImmutableList.of(
-                    new FieldExpression.Builder().withFieldName(new String[] {"col_1"}).build()))
-            .build();
 
-    SortOrderDTO[] sortOrderDTOS =
-        new SortOrderDTO[] {
-          new SortOrderDTO.Builder()
-              .withDirection(SortOrderDTO.Direction.DESC)
-              .withNullOrder(SortOrderDTO.NullOrder.FIRST)
-              .withExpression(
-                  new FieldExpression.Builder().withFieldName(new String[] {"col_2"}).build())
-              .build()
-        };
-
+    DistributionDTO distributionDTO = createMockDistributionDTO("col2", 10);
+    SortOrderDTO[] sortOrderDTOS = createMockSortOrderDTO("col2", SortOrderDTO.Direction.DESC);
     TableDTO expectedTable =
         createMockTable(
             "table1",
