@@ -116,13 +116,16 @@ public class RESTUtils {
    * @return the available port
    * @throws IOException if no available port in the port range
    */
-  public static int findAvailablePort(int portRangeStart, int portRangeEnd) throws IOException {
+  public static int findAvailablePort(final int portRangeStart, final int portRangeEnd)
+      throws IOException {
     // valid user registered port https://en.wikipedia.org/wiki/Registered_port
     if (portRangeStart > portRangeEnd) {
       throw new IOException("Invalidate port range: " + portRangeStart + ":" + portRangeEnd);
     }
 
-    if (portRangeStart == 0 && portRangeEnd == 0) {
+    int portStart = portRangeStart;
+    int portEnd = portRangeEnd;
+    if (portStart == 0 && portEnd == 0) {
       try (ServerSocket socket = new ServerSocket(0)) {
         return socket.getLocalPort();
       } catch (IOException e) {
@@ -130,21 +133,21 @@ public class RESTUtils {
       }
     }
 
-    if (portRangeStart < 1024) {
-      portRangeStart = 1024;
+    if (portStart < 1024) {
+      portStart = 1024;
     }
-    if (portRangeStart > 65535) {
-      portRangeStart = 65535;
+    if (portStart > 65535) {
+      portStart = 65535;
     }
-    if (portRangeEnd < 1024) {
-      portRangeEnd = 1024;
+    if (portEnd < 1024) {
+      portEnd = 1024;
     }
-    if (portRangeEnd > 65535) {
-      portRangeEnd = 65535;
+    if (portEnd > 65535) {
+      portEnd = 65535;
     }
     Random random = new Random();
-    for (int i = portRangeStart; i <= portRangeEnd; ++i) {
-      int randomNumber = random.nextInt(portRangeEnd - portRangeStart + 1) + portRangeStart;
+    for (int i = portStart; i <= portEnd; ++i) {
+      int randomNumber = random.nextInt(portEnd - portStart + 1) + portStart;
       try (ServerSocket socket = new ServerSocket(randomNumber)) {
         return socket.getLocalPort();
       } catch (IOException e) {
