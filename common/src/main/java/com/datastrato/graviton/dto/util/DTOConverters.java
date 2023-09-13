@@ -35,7 +35,7 @@ public class DTOConverters {
 
   private DTOConverters() {}
 
-  public static AuditDTO fromDTO(Audit audit) {
+  public static AuditDTO toDTO(Audit audit) {
     return AuditDTO.builder()
         .withCreator(audit.creator())
         .withCreateTime(audit.createTime())
@@ -44,35 +44,35 @@ public class DTOConverters {
         .build();
   }
 
-  public static MetalakeDTO fromDTO(Metalake metalake) {
+  public static MetalakeDTO toDTO(Metalake metalake) {
     return new MetalakeDTO.Builder()
         .withName(metalake.name())
         .withComment(metalake.comment())
         .withProperties(metalake.properties())
-        .withAudit(fromDTO(metalake.auditInfo()))
+        .withAudit(toDTO(metalake.auditInfo()))
         .build();
   }
 
-  public static CatalogDTO fromDTO(Catalog catalog) {
+  public static CatalogDTO toDTO(Catalog catalog) {
     return new CatalogDTO.Builder()
         .withName(catalog.name())
         .withType(catalog.type())
         .withComment(catalog.comment())
         .withProperties(catalog.properties())
-        .withAudit(fromDTO(catalog.auditInfo()))
+        .withAudit(toDTO(catalog.auditInfo()))
         .build();
   }
 
-  public static SchemaDTO fromDTO(Schema schema) {
+  public static SchemaDTO toDTO(Schema schema) {
     return new SchemaDTO.Builder()
         .withName(schema.name())
         .withComment(schema.comment())
         .withProperties(schema.properties())
-        .withAudit(fromDTO(schema.auditInfo()))
+        .withAudit(toDTO(schema.auditInfo()))
         .build();
   }
 
-  public static ColumnDTO fromDTO(Column column) {
+  public static ColumnDTO toDTO(Column column) {
     return new ColumnDTO.Builder()
         .withName(column.name())
         .withDataType(column.dataType())
@@ -80,16 +80,16 @@ public class DTOConverters {
         .build();
   }
 
-  public static TableDTO fromDTO(Table table) {
+  public static TableDTO toDTO(Table table) {
     return new TableDTO.Builder()
         .withName(table.name())
         .withComment(table.comment())
         .withColumns(
-            Arrays.stream(table.columns()).map(DTOConverters::fromDTO).toArray(ColumnDTO[]::new))
+            Arrays.stream(table.columns()).map(DTOConverters::toDTO).toArray(ColumnDTO[]::new))
         .withProperties(table.properties())
         .withSortOrders(DTOConverters.toDTOs(table.sortOrder()))
         .withDistribution(DTOConverters.toDTO(table.distribution()))
-        .withAudit(fromDTO(table.auditInfo()))
+        .withAudit(toDTO(table.auditInfo()))
         .withPartitions(toPartitions(table.partitioning()))
         .build();
   }

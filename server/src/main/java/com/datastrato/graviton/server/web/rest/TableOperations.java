@@ -89,7 +89,7 @@ public class TableOperations {
               toTransforms(request.getPartitions()),
               distribution,
               sortOrders);
-      return Utils.ok(new TableResponse(DTOConverters.fromDTO(table)));
+      return Utils.ok(new TableResponse(DTOConverters.toDTO(table)));
 
     } catch (Exception e) {
       return ExceptionHandlers.handleTableException(
@@ -108,7 +108,7 @@ public class TableOperations {
     try {
       NameIdentifier ident = NameIdentifier.ofTable(metalake, catalog, schema, table);
       Table t = dispatcher.loadTable(ident);
-      return Utils.ok(new TableResponse(DTOConverters.fromDTO(t)));
+      return Utils.ok(new TableResponse(DTOConverters.toDTO(t)));
 
     } catch (Exception e) {
       return ExceptionHandlers.handleTableException(OperationType.LOAD, table, schema, e);
@@ -132,7 +132,7 @@ public class TableOperations {
               .map(TableUpdateRequest::tableChange)
               .toArray(TableChange[]::new);
       Table t = dispatcher.alterTable(ident, changes);
-      return Utils.ok(new TableResponse(DTOConverters.fromDTO(t)));
+      return Utils.ok(new TableResponse(DTOConverters.toDTO(t)));
 
     } catch (Exception e) {
       return ExceptionHandlers.handleTableException(OperationType.ALTER, table, schema, e);

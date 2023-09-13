@@ -72,7 +72,7 @@ public class CatalogOperations {
       Catalog catalog =
           manager.createCatalog(
               ident, request.getType(), request.getComment(), request.getProperties());
-      return Utils.ok(new CatalogResponse(DTOConverters.fromDTO(catalog)));
+      return Utils.ok(new CatalogResponse(DTOConverters.toDTO(catalog)));
 
     } catch (Exception e) {
       return ExceptionHandlers.handleCatalogException(
@@ -88,7 +88,7 @@ public class CatalogOperations {
     try {
       NameIdentifier ident = NameIdentifier.ofCatalog(metalakeName, catalogName);
       Catalog catalog = manager.loadCatalog(ident);
-      return Utils.ok(new CatalogResponse(DTOConverters.fromDTO(catalog)));
+      return Utils.ok(new CatalogResponse(DTOConverters.toDTO(catalog)));
 
     } catch (Exception e) {
       return ExceptionHandlers.handleCatalogException(
@@ -112,7 +112,7 @@ public class CatalogOperations {
               .toArray(CatalogChange[]::new);
 
       Catalog catalog = manager.alterCatalog(ident, changes);
-      return Utils.ok(new CatalogResponse(DTOConverters.fromDTO(catalog)));
+      return Utils.ok(new CatalogResponse(DTOConverters.toDTO(catalog)));
 
     } catch (Exception e) {
       return ExceptionHandlers.handleCatalogException(
