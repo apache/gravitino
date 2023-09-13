@@ -433,14 +433,14 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
             for (BaseTable t : tables) {
               store.delete(NameIdentifier.of(schemaNamespace, t.name()), TABLE);
             }
-            boolean r = store.delete(ident, SCHEMA, true);
+            boolean success = store.delete(ident, SCHEMA, true);
             clientPool.run(
                 client -> {
                   client.dropDatabase(ident.name(), false, false, cascade);
                   return null;
                 });
             LOG.info("Dropped Hive schema (database) {}", ident.name());
-            return r;
+            return success;
           });
 
     } catch (InvalidOperationException e) {
@@ -930,14 +930,14 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       EntityStore store = GravitonEnv.getInstance().entityStore();
       return store.executeInTransaction(
           () -> {
-            boolean v = store.delete(tableIdent, TABLE);
+            boolean success = store.delete(tableIdent, TABLE);
             clientPool.run(
                 c -> {
                   c.dropTable(schemaIdent.name(), tableIdent.name(), deleteData, false, ifPurge);
                   return null;
                 });
             LOG.info("Dropped Hive table {}", tableIdent.name());
-            return v;
+            return success;
           });
     } catch (NoSuchObjectException e) {
       LOG.warn("Hive table {} does not exist in Hive Metastore", tableIdent.name());
