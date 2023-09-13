@@ -152,7 +152,7 @@ public class RelationalCatalog extends CatalogDTO implements TableCatalog, Suppo
         sortOrders == null
             ? new SortOrderDTO[0]
             : Arrays.stream(sortOrders)
-                .map(com.datastrato.graviton.dto.util.DTOConverters::fromSortOrder)
+                .map(com.datastrato.graviton.dto.util.DTOConverters::toDTO)
                 .toArray(SortOrderDTO[]::new);
     TableCreateRequest req =
         new TableCreateRequest(
@@ -161,7 +161,7 @@ public class RelationalCatalog extends CatalogDTO implements TableCatalog, Suppo
             (ColumnDTO[]) columns,
             properties,
             sortOrderDTOS,
-            com.datastrato.graviton.dto.util.DTOConverters.fromDistrition(distribution),
+            com.datastrato.graviton.dto.util.DTOConverters.toDTO(distribution),
             toPartitions(partitions));
     req.validate();
 

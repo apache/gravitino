@@ -75,7 +75,7 @@ public class SchemaOperations {
       request.validate();
       NameIdentifier ident = NameIdentifier.ofSchema(metalake, catalog, request.getName());
       Schema schema = dispatcher.createSchema(ident, request.getComment(), request.getProperties());
-      return Utils.ok(new SchemaResponse(DTOConverters.toDTO(schema)));
+      return Utils.ok(new SchemaResponse(DTOConverters.fromDTO(schema)));
 
     } catch (Exception e) {
       return ExceptionHandlers.handleSchemaException(
@@ -93,7 +93,7 @@ public class SchemaOperations {
     try {
       NameIdentifier ident = NameIdentifier.ofSchema(metalake, catalog, schema);
       Schema s = dispatcher.loadSchema(ident);
-      return Utils.ok(new SchemaResponse(DTOConverters.toDTO(s)));
+      return Utils.ok(new SchemaResponse(DTOConverters.fromDTO(s)));
 
     } catch (Exception e) {
       return ExceptionHandlers.handleSchemaException(OperationType.LOAD, schema, catalog, e);
@@ -116,7 +116,7 @@ public class SchemaOperations {
               .map(SchemaUpdateRequest::schemaChange)
               .toArray(SchemaChange[]::new);
       Schema s = dispatcher.alterSchema(ident, changes);
-      return Utils.ok(new SchemaResponse(DTOConverters.toDTO(s)));
+      return Utils.ok(new SchemaResponse(DTOConverters.fromDTO(s)));
 
     } catch (Exception e) {
       return ExceptionHandlers.handleSchemaException(OperationType.ALTER, schema, catalog, e);

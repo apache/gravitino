@@ -57,7 +57,7 @@ public class MetalakeOperations {
     try {
       BaseMetalake[] metalakes = manager.listMetalakes();
       MetalakeDTO[] metalakeDTOS =
-          Arrays.stream(metalakes).map(DTOConverters::toDTO).toArray(MetalakeDTO[]::new);
+          Arrays.stream(metalakes).map(DTOConverters::fromDTO).toArray(MetalakeDTO[]::new);
       return Utils.ok(new MetalakeListResponse(metalakeDTOS));
 
     } catch (Exception e) {
@@ -74,7 +74,7 @@ public class MetalakeOperations {
       NameIdentifier ident = NameIdentifier.ofMetalake(request.getName());
       BaseMetalake metalake =
           manager.createMetalake(ident, request.getComment(), request.getProperties());
-      return Utils.ok(new MetalakeResponse(DTOConverters.toDTO(metalake)));
+      return Utils.ok(new MetalakeResponse(DTOConverters.fromDTO(metalake)));
 
     } catch (Exception e) {
       return ExceptionHandlers.handleMetalakeException(OperationType.CREATE, request.getName(), e);
@@ -88,7 +88,7 @@ public class MetalakeOperations {
     try {
       NameIdentifier identifier = NameIdentifier.ofMetalake(metalakeName);
       BaseMetalake metalake = manager.loadMetalake(identifier);
-      return Utils.ok(new MetalakeResponse(DTOConverters.toDTO(metalake)));
+      return Utils.ok(new MetalakeResponse(DTOConverters.fromDTO(metalake)));
 
     } catch (Exception e) {
       return ExceptionHandlers.handleMetalakeException(OperationType.LOAD, metalakeName, e);
@@ -109,7 +109,7 @@ public class MetalakeOperations {
               .toArray(MetalakeChange[]::new);
 
       BaseMetalake updatedMetalake = manager.alterMetalake(identifier, changes);
-      return Utils.ok(new MetalakeResponse(DTOConverters.toDTO(updatedMetalake)));
+      return Utils.ok(new MetalakeResponse(DTOConverters.fromDTO(updatedMetalake)));
 
     } catch (Exception e) {
       return ExceptionHandlers.handleMetalakeException(OperationType.ALTER, metalakeName, e);

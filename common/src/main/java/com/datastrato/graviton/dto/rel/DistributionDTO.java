@@ -24,7 +24,8 @@ public class DistributionDTO {
 
   public enum DistributionMethod {
     HASH,
-    EVEN;
+    EVEN,
+    RANGE;
 
     @JsonCreator
     public static DistributionMethod fromString(String value) {

@@ -181,7 +181,7 @@ public class TestTableOperations extends JerseyTest {
         new TableCreateRequest(
             "table1",
             "mock comment",
-            Arrays.stream(columns).map(DTOConverters::toDTO).toArray(ColumnDTO[]::new),
+            Arrays.stream(columns).map(DTOConverters::fromDTO).toArray(ColumnDTO[]::new),
             ImmutableMap.of("k1", "v1"),
             sortOrderDTOS,
             distributionDTO,
@@ -235,7 +235,7 @@ public class TestTableOperations extends JerseyTest {
         new TableCreateRequest(
             "table1",
             "mock comment",
-            Arrays.stream(columns).map(DTOConverters::toDTO).toArray(ColumnDTO[]::new),
+            Arrays.stream(columns).map(DTOConverters::fromDTO).toArray(ColumnDTO[]::new),
             ImmutableMap.of("k1", "v1"),
             sortOrderDTOS,
             distributionDTO,
@@ -322,7 +322,7 @@ public class TestTableOperations extends JerseyTest {
         new TableCreateRequest(
             "table1",
             "mock comment",
-            Arrays.stream(columns).map(DTOConverters::toDTO).toArray(ColumnDTO[]::new),
+            Arrays.stream(columns).map(DTOConverters::fromDTO).toArray(ColumnDTO[]::new),
             ImmutableMap.of("k1", "v1"),
             new SortOrderDTO[0],
             null,
@@ -366,7 +366,7 @@ public class TestTableOperations extends JerseyTest {
         new TableCreateRequest(
             "table1",
             "mock comment",
-            Arrays.stream(columns).map(DTOConverters::toDTO).toArray(ColumnDTO[]::new),
+            Arrays.stream(columns).map(DTOConverters::fromDTO).toArray(ColumnDTO[]::new),
             ImmutableMap.of("k1", "v1"),
             new SortOrderDTO[0],
             null,

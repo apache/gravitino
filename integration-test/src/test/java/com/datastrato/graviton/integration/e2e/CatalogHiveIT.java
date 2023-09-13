@@ -286,11 +286,15 @@ public class CatalogHiveIT extends AbstractIT {
     Assertions.assertEquals("string", hiveTab.getSd().getCols().get(2).getType());
     Assertions.assertEquals("col_3_comment", hiveTab.getSd().getCols().get(2).getComment());
 
-    Assertions.assertEquals(distribution.distNum(), hiveTab.getSd().getNumBuckets());
+    Assertions.assertEquals(
+        distribution == null ? 0 : distribution.distNum(), hiveTab.getSd().getNumBuckets());
+
     List<String> resultDistributionCols =
-        Arrays.stream(distribution.transforms())
-            .map(t -> ((NamedReference) t).value()[0])
-            .collect(Collectors.toList());
+        distribution == null
+            ? Collections.emptyList()
+            : Arrays.stream(distribution.transforms())
+                .map(t -> ((NamedReference) t).value()[0])
+                .collect(Collectors.toList());
     Assertions.assertEquals(resultDistributionCols, hiveTab.getSd().getBucketCols());
 
     for (int i = 0; i < sortOrders.length; i++) {

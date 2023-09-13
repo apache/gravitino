@@ -46,6 +46,7 @@ import com.datastrato.graviton.exceptions.NonEmptySchemaException;
 import com.datastrato.graviton.exceptions.RESTException;
 import com.datastrato.graviton.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.graviton.exceptions.TableAlreadyExistsException;
+import com.datastrato.graviton.rel.Distribution;
 import com.datastrato.graviton.rel.Schema;
 import com.datastrato.graviton.rel.SortOrder;
 import com.datastrato.graviton.rel.Table;
@@ -318,6 +319,20 @@ public class TestRelationalCatalog extends TestBase {
     Assertions.assertTrue(ex2.getMessage().contains("unparsed error"));
   }
 
+  private SortOrder createMockSortOrder(
+      String[] fieldNames, SortOrder.Direction direction, SortOrder.NullOrder nullOrder) {
+    return SortOrder.builder()
+        .direction(direction)
+        .nullOrder(nullOrder)
+        .transform(identity(fieldNames))
+        .build();
+  }
+
+  private Distribution createMockDistribution(
+      Distribution.DistributionMethod method, int num, Transform[] transforms) {
+    return Distribution.builder().distMethod(method).distNum(num).transforms(transforms).build();
+  }
+
   @Test
   public void testCreateTable() throws JsonProcessingException {
     NameIdentifier tableId = NameIdentifier.of(metalakeName, catalogName, "schema1", "table1");
@@ -375,9 +390,9 @@ public class TestRelationalCatalog extends TestBase {
                 columns,
                 "comment",
                 Collections.emptyMap(),
-                com.datastrato.graviton.dto.util.DTOConverters.toDTO(distributionDTO),
+                com.datastrato.graviton.dto.util.DTOConverters.fromDTO(distributionDTO),
                 Arrays.stream(sortOrderDTOS)
-                    .map(com.datastrato.graviton.dto.util.DTOConverters::toDTO)
+                    .map(com.datastrato.graviton.dto.util.DTOConverters::fromDTO)
                     .toArray(SortOrder[]::new));
     Assertions.assertEquals(expectedTable.name(), table.name());
     Assertions.assertEquals(expectedTable.comment(), table.comment());
@@ -409,9 +424,9 @@ public class TestRelationalCatalog extends TestBase {
                         columns,
                         "comment",
                         Collections.emptyMap(),
-                        com.datastrato.graviton.dto.util.DTOConverters.toDTO(distributionDTO),
+                        com.datastrato.graviton.dto.util.DTOConverters.fromDTO(distributionDTO),
                         Arrays.stream(sortOrderDTOS)
-                            .map(com.datastrato.graviton.dto.util.DTOConverters::toDTO)
+                            .map(com.datastrato.graviton.dto.util.DTOConverters::fromDTO)
                             .toArray(SortOrder[]::new)));
     Assertions.assertTrue(ex.getMessage().contains("schema not found"));
 
@@ -432,9 +447,9 @@ public class TestRelationalCatalog extends TestBase {
                         columns,
                         "comment",
                         Collections.emptyMap(),
-                        com.datastrato.graviton.dto.util.DTOConverters.toDTO(distributionDTO),
+                        com.datastrato.graviton.dto.util.DTOConverters.fromDTO(distributionDTO),
                         Arrays.stream(sortOrderDTOS)
-                            .map(com.datastrato.graviton.dto.util.DTOConverters::toDTO)
+                            .map(com.datastrato.graviton.dto.util.DTOConverters::fromDTO)
                             .toArray(SortOrder[]::new)));
     Assertions.assertTrue(ex1.getMessage().contains("table already exists"));
   }
@@ -584,7 +599,7 @@ public class TestRelationalCatalog extends TestBase {
             .withDistNum(10)
             .withExpressions(
                 ImmutableList.of(
-                    new FieldExpression.Builder().withFieldName(new String[] {"col_1"}).build()))
+                    new FieldExpression.Builder().withFieldName(new String[] {"col1"}).build()))
             .build();
 
     SortOrderDTO[] sortOrderDTOS =
@@ -593,7 +608,7 @@ public class TestRelationalCatalog extends TestBase {
               .withDirection(SortOrderDTO.Direction.DESC)
               .withNullOrder(SortOrderDTO.NullOrder.FIRST)
               .withExpression(
-                  new FieldExpression.Builder().withFieldName(new String[] {"col_2"}).build())
+                  new FieldExpression.Builder().withFieldName(new String[] {"col2"}).build())
               .build()
         };
 
@@ -635,7 +650,7 @@ public class TestRelationalCatalog extends TestBase {
             .withDistNum(10)
             .withExpressions(
                 ImmutableList.of(
-                    new FieldExpression.Builder().withFieldName(new String[] {"col_1"}).build()))
+                    new FieldExpression.Builder().withFieldName(new String[] {"col1"}).build()))
             .build();
 
     SortOrderDTO[] sortOrderDTOS =
@@ -644,7 +659,7 @@ public class TestRelationalCatalog extends TestBase {
               .withDirection(SortOrderDTO.Direction.DESC)
               .withNullOrder(SortOrderDTO.NullOrder.FIRST)
               .withExpression(
-                  new FieldExpression.Builder().withFieldName(new String[] {"col_2"}).build())
+                  new FieldExpression.Builder().withFieldName(new String[] {"col1"}).build())
               .build()
         };
 
@@ -683,7 +698,7 @@ public class TestRelationalCatalog extends TestBase {
               .withDirection(SortOrderDTO.Direction.DESC)
               .withNullOrder(SortOrderDTO.NullOrder.FIRST)
               .withExpression(
-                  new FieldExpression.Builder().withFieldName(new String[] {"col_2"}).build())
+                  new FieldExpression.Builder().withFieldName(new String[] {"col_1"}).build())
               .build()
         };
     TableDTO expectedTable =
@@ -722,7 +737,7 @@ public class TestRelationalCatalog extends TestBase {
               .withDirection(SortOrderDTO.Direction.DESC)
               .withNullOrder(SortOrderDTO.NullOrder.FIRST)
               .withExpression(
-                  new FieldExpression.Builder().withFieldName(new String[] {"col_2"}).build())
+                  new FieldExpression.Builder().withFieldName(new String[] {"col_1"}).build())
               .build()
         };
 

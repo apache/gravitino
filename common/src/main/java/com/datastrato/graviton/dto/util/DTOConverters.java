@@ -29,12 +29,13 @@ import com.datastrato.graviton.rel.Table;
 import com.datastrato.graviton.rel.transforms.Transform;
 import java.util.Arrays;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.ArrayUtils;
 
 public class DTOConverters {
 
   private DTOConverters() {}
 
-  public static AuditDTO toDTO(Audit audit) {
+  public static AuditDTO fromDTO(Audit audit) {
     return AuditDTO.builder()
         .withCreator(audit.creator())
         .withCreateTime(audit.createTime())
@@ -43,35 +44,35 @@ public class DTOConverters {
         .build();
   }
 
-  public static MetalakeDTO toDTO(Metalake metalake) {
+  public static MetalakeDTO fromDTO(Metalake metalake) {
     return new MetalakeDTO.Builder()
         .withName(metalake.name())
         .withComment(metalake.comment())
         .withProperties(metalake.properties())
-        .withAudit(toDTO(metalake.auditInfo()))
+        .withAudit(fromDTO(metalake.auditInfo()))
         .build();
   }
 
-  public static CatalogDTO toDTO(Catalog catalog) {
+  public static CatalogDTO fromDTO(Catalog catalog) {
     return new CatalogDTO.Builder()
         .withName(catalog.name())
         .withType(catalog.type())
         .withComment(catalog.comment())
         .withProperties(catalog.properties())
-        .withAudit(toDTO(catalog.auditInfo()))
+        .withAudit(fromDTO(catalog.auditInfo()))
         .build();
   }
 
-  public static SchemaDTO toDTO(Schema schema) {
+  public static SchemaDTO fromDTO(Schema schema) {
     return new SchemaDTO.Builder()
         .withName(schema.name())
         .withComment(schema.comment())
         .withProperties(schema.properties())
-        .withAudit(toDTO(schema.auditInfo()))
+        .withAudit(fromDTO(schema.auditInfo()))
         .build();
   }
 
-  public static ColumnDTO toDTO(Column column) {
+  public static ColumnDTO fromDTO(Column column) {
     return new ColumnDTO.Builder()
         .withName(column.name())
         .withDataType(column.dataType())
@@ -79,19 +80,21 @@ public class DTOConverters {
         .build();
   }
 
-  public static TableDTO toDTO(Table table) {
+  public static TableDTO fromDTO(Table table) {
     return new TableDTO.Builder()
         .withName(table.name())
         .withComment(table.comment())
         .withColumns(
-            Arrays.stream(table.columns()).map(DTOConverters::toDTO).toArray(ColumnDTO[]::new))
+            Arrays.stream(table.columns()).map(DTOConverters::fromDTO).toArray(ColumnDTO[]::new))
         .withProperties(table.properties())
-        .withAudit(toDTO(table.auditInfo()))
+        .withSortOrders(DTOConverters.toDTOs(table.sortOrder()))
+        .withDistribution(DTOConverters.toDTO(table.distribution()))
+        .withAudit(fromDTO(table.auditInfo()))
         .withPartitions(toPartitions(table.partitioning()))
         .build();
   }
 
-  public static DistributionDTO fromDistrition(Distribution distribution) {
+  public static DistributionDTO toDTO(Distribution distribution) {
     if (distribution == null) {
       return null;
     }
@@ -106,7 +109,7 @@ public class DTOConverters {
         .build();
   }
 
-  public static Distribution toDTO(DistributionDTO distributionDTO) {
+  public static Distribution fromDTO(DistributionDTO distributionDTO) {
     if (distributionDTO == null) {
       return null;
     }
@@ -122,7 +125,7 @@ public class DTOConverters {
         .build();
   }
 
-  public static SortOrderDTO fromSortOrder(SortOrder sortOrder) {
+  public static SortOrderDTO toDTO(SortOrder sortOrder) {
     return new SortOrderDTO.Builder()
         .withExpression(PartitionUtils.toExpression(sortOrder.getTransform()))
         .withDirection(Direction.fromString(sortOrder.getDirection().name()))
@@ -132,11 +135,26 @@ public class DTOConverters {
         .build();
   }
 
-  public static SortOrder toDTO(SortOrderDTO sortOrderDTO) {
+  public static SortOrder fromDTO(SortOrderDTO sortOrderDTO) {
     return SortOrder.builder()
         .direction(SortOrder.Direction.valueOf(sortOrderDTO.getDirection().name()))
         .nullOrder(SortOrder.NullOrder.valueOf(sortOrderDTO.getNullOrder().name()))
         .transform(PartitionUtils.toTransform(sortOrderDTO.getExpression()))
         .build();
+  }
+
+  public static SortOrder[] fromDTOs(SortOrderDTO[] sortOrderDTO) {
+    if (ArrayUtils.isEmpty(sortOrderDTO)) {
+      return new SortOrder[0];
+    }
+
+    return Arrays.stream(sortOrderDTO).map(DTOConverters::fromDTO).toArray(SortOrder[]::new);
+  }
+
+  public static SortOrderDTO[] toDTOs(SortOrder[] sortOrders) {
+    if (ArrayUtils.isEmpty(sortOrders)) {
+      return new SortOrderDTO[0];
+    }
+    return Arrays.stream(sortOrders).map(DTOConverters::toDTO).toArray(SortOrderDTO[]::new);
   }
 }

@@ -21,7 +21,6 @@ import com.datastrato.graviton.rel.SortOrder;
 import com.datastrato.graviton.rel.Table;
 import com.datastrato.graviton.rel.TableChange;
 import com.datastrato.graviton.server.web.Utils;
-import java.util.Arrays;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.DELETE;
@@ -76,17 +75,10 @@ public class TableOperations {
     try {
       request.validate();
       NameIdentifier ident = NameIdentifier.ofTable(metalake, catalog, schema, request.getName());
-
       SortOrder[] sortOrders =
-          request.getSortOrders() == null
-              ? null
-              : Arrays.stream(request.getSortOrders())
-                  .map(com.datastrato.graviton.dto.util.DTOConverters::toDTO)
-                  .toArray(SortOrder[]::new);
+          com.datastrato.graviton.dto.util.DTOConverters.fromDTOs(request.getSortOrders());
       Distribution distribution =
-          request.getDistribution() == null
-              ? null
-              : com.datastrato.graviton.dto.util.DTOConverters.toDTO(request.getDistribution());
+          com.datastrato.graviton.dto.util.DTOConverters.fromDTO(request.getDistribution());
 
       Table table =
           dispatcher.createTable(
@@ -97,7 +89,7 @@ public class TableOperations {
               toTransforms(request.getPartitions()),
               distribution,
               sortOrders);
-      return Utils.ok(new TableResponse(DTOConverters.toDTO(table)));
+      return Utils.ok(new TableResponse(DTOConverters.fromDTO(table)));
 
     } catch (Exception e) {
       return ExceptionHandlers.handleTableException(
@@ -116,7 +108,7 @@ public class TableOperations {
     try {
       NameIdentifier ident = NameIdentifier.ofTable(metalake, catalog, schema, table);
       Table t = dispatcher.loadTable(ident);
-      return Utils.ok(new TableResponse(DTOConverters.toDTO(t)));
+      return Utils.ok(new TableResponse(DTOConverters.fromDTO(t)));
 
     } catch (Exception e) {
       return ExceptionHandlers.handleTableException(OperationType.LOAD, table, schema, e);
@@ -140,7 +132,7 @@ public class TableOperations {
               .map(TableUpdateRequest::tableChange)
               .toArray(TableChange[]::new);
       Table t = dispatcher.alterTable(ident, changes);
-      return Utils.ok(new TableResponse(DTOConverters.toDTO(t)));
+      return Utils.ok(new TableResponse(DTOConverters.fromDTO(t)));
 
     } catch (Exception e) {
       return ExceptionHandlers.handleTableException(OperationType.ALTER, table, schema, e);

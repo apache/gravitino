@@ -7,7 +7,10 @@ package com.datastrato.graviton.dto.rel;
 import static com.datastrato.graviton.dto.rel.PartitionUtils.toTransforms;
 
 import com.datastrato.graviton.dto.AuditDTO;
+import com.datastrato.graviton.dto.util.DTOConverters;
 import com.datastrato.graviton.rel.Column;
+import com.datastrato.graviton.rel.Distribution;
+import com.datastrato.graviton.rel.SortOrder;
 import com.datastrato.graviton.rel.Table;
 import com.datastrato.graviton.rel.transforms.Transform;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -100,6 +103,16 @@ public class TableDTO implements Table {
   @Override
   public Transform[] partitioning() {
     return toTransforms(partitions);
+  }
+
+  @Override
+  public SortOrder[] sortOrder() {
+    return DTOConverters.fromDTOs(sortOrders);
+  }
+
+  @Override
+  public Distribution distribution() {
+    return DTOConverters.fromDTO(distribution);
   }
 
   /**

@@ -29,12 +29,6 @@ public class Distribution {
   /** Distribution method. */
   private final DistributionMethod distMethod;
 
-  public Distribution(Transform[] transforms, int distNum, DistributionMethod distMethod) {
-    this.transforms = transforms;
-    this.distNum = distNum;
-    this.distMethod = distMethod;
-  }
-
   public Transform[] transforms() {
     return transforms;
   }

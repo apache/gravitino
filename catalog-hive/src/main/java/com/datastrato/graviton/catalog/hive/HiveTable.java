@@ -32,6 +32,7 @@ import java.util.stream.Collectors;
 import lombok.Getter;
 import lombok.ToString;
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.Order;
 import org.apache.hadoop.hive.metastore.api.SerDeInfo;
@@ -96,7 +97,7 @@ public class HiveTable extends BaseTable {
               .build();
     }
 
-    SortOrder[] sortOrders = null;
+    SortOrder[] sortOrders = new SortOrder[0];
     if (CollectionUtils.isNotEmpty(table.getSd().getSortCols())) {
       sortOrders =
           table.getSd().getSortCols().stream()
@@ -196,8 +197,7 @@ public class HiveTable extends BaseTable {
     sd.setInputFormat("org.apache.hadoop.mapred.TextInputFormat");
     sd.setOutputFormat("org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat");
 
-    // Hive only support named sort columns, maybe we should do some check?
-    if (sortOrders != null) {
+    if (ArrayUtils.isNotEmpty(sortOrders)) {
       for (SortOrder sortOrder : sortOrders) {
         String columnName = ((NamedReference) sortOrder.getTransform()).value()[0];
         sd.addToSortCols(new Order(columnName, sortOrder.getDirection() == Direction.ASC ? 0 : 1));
