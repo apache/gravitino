@@ -131,7 +131,7 @@ public interface EntityStore extends Closeable {
    *
    * @param ident the name identifier of the entity
    * @param entityType the type of the entity to be deleted
-   * @return true if the entity does exist and was deleted successfully, false otherwise
+   * @return true if the entity exists and is deleted successfully, false otherwise
    * @throws IOException if the delete operation fails
    */
   default boolean delete(NameIdentifier ident, EntityType entityType) throws IOException {
