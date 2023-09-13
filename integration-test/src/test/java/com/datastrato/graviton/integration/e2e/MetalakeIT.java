@@ -5,7 +5,6 @@
 package com.datastrato.graviton.integration.e2e;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -18,7 +17,6 @@ import com.datastrato.graviton.exceptions.MetalakeAlreadyExistsException;
 import com.datastrato.graviton.exceptions.NoSuchMetalakeException;
 import com.datastrato.graviton.integration.util.AbstractIT;
 import com.datastrato.graviton.integration.util.GravitonITUtils;
-
 import java.util.ArrayList;
 import java.util.Collections;
 import org.junit.jupiter.api.AfterEach;
@@ -167,8 +165,7 @@ public class MetalakeIT extends AbstractIT {
 
     // Bad metalake name
     assertThrows(
-        IllegalNamespaceException.class,
-        () -> client.dropMetalake(NameIdentifier.of("A", "B")));
+        IllegalNamespaceException.class, () -> client.dropMetalake(NameIdentifier.of("A", "B")));
   }
 
   public void dropMetalakes() {
