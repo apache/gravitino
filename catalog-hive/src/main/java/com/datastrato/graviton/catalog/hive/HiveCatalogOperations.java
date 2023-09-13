@@ -35,11 +35,13 @@ import com.datastrato.graviton.rel.Table;
 import com.datastrato.graviton.rel.TableCatalog;
 import com.datastrato.graviton.rel.TableChange;
 import com.datastrato.graviton.rel.transforms.Transform;
+import com.datastrato.graviton.rel.transforms.Transforms;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -605,6 +607,10 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
         String.format(
             "Cannot support invalid namespace in Hive Metastore: %s", schemaIdent.namespace()));
 
+    Preconditions.checkArgument(
+        Arrays.stream(partitions).allMatch(p -> p instanceof Transforms.NamedReference),
+        "Hive partition only supports identity transform");
+
     try {
       if (!schemaExists(schemaIdent)) {
         LOG.warn("Hive schema (database) does not exist: {}", schemaIdent);
@@ -631,6 +637,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
                                 .withCreator(currentUser())
                                 .withCreateTime(Instant.now())
                                 .build())
+                        .withPartitions(partitions)
                         .build();
                 store.put(createdTable, false);
                 clientPool.run(
