@@ -24,6 +24,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
 import lombok.extern.jackson.Jacksonized;
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 
 @Getter
@@ -95,7 +96,7 @@ public class TableCreateRequest implements RESTRequest {
 
     List<String> columnNames =
         Arrays.stream(columns).map(ColumnDTO::name).collect(Collectors.toList());
-    if (sortOrders != null) {
+    if (ArrayUtils.isNotEmpty(sortOrders)) {
       Arrays.stream(sortOrders)
           .forEach(sortOrder -> validateExpresion(sortOrder.getExpression(), columnNames));
     }
@@ -111,6 +112,7 @@ public class TableCreateRequest implements RESTRequest {
     }
   }
 
+  // Check column name in sort order and distribution expressions are in table columns
   private void validateExpresion(Expression expression, List<String> columnNames) {
     if (expression instanceof FieldExpression) {
       FieldExpression nameRefernce = (FieldExpression) expression;

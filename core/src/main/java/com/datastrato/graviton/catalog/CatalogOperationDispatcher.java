@@ -213,7 +213,7 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
                         properties,
                         partitions == null ? new Transform[0] : partitions,
                         distribution,
-                        sortOrders)),
+                        sortOrders == null ? new SortOrder[0] : sortOrders)),
         NoSuchSchemaException.class,
         TableAlreadyExistsException.class);
   }

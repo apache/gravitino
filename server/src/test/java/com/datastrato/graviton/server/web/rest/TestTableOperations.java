@@ -164,12 +164,12 @@ public class TestTableOperations extends JerseyTest {
   private SortOrderDTO[] createMockSortOrderDTO(
       String columnName, SortOrderDTO.Direction direction) {
     return new SortOrderDTO[] {
-        new SortOrderDTO.Builder()
-            .withDirection(direction)
-            .withNullOrder(SortOrderDTO.NullOrder.FIRST)
-            .withExpression(
-                new FieldExpression.Builder().withFieldName(new String[] {columnName}).build())
-            .build()
+      new SortOrderDTO.Builder()
+          .withDirection(direction)
+          .withNullOrder(SortOrderDTO.NullOrder.FIRST)
+          .withExpression(
+              new FieldExpression.Builder().withFieldName(new String[] {columnName}).build())
+          .build()
     };
   }
 
