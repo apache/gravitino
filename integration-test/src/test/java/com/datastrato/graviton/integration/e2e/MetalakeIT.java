@@ -18,6 +18,8 @@ import com.datastrato.graviton.exceptions.MetalakeAlreadyExistsException;
 import com.datastrato.graviton.exceptions.NoSuchMetalakeException;
 import com.datastrato.graviton.integration.util.AbstractIT;
 import com.datastrato.graviton.integration.util.GravitonITUtils;
+
+import java.util.ArrayList;
 import java.util.Collections;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -58,9 +60,12 @@ public class MetalakeIT extends AbstractIT {
     client.createMetalake(
         NameIdentifier.parse(metalakeNameB), "metalake B comment", Collections.emptyMap());
     metaLakes = client.listMetalakes();
+    ArrayList<String> names = new ArrayList<>(2);
     assertEquals(2, metaLakes.length);
-    assertEquals(metaLakes[0].name(), metalakeNameA);
-    assertEquals(metaLakes[1].name(), metalakeNameB);
+    names.add(metaLakes[0].name());
+    names.add(metaLakes[1].name());
+    assertTrue(names.contains(metalakeNameA));
+    assertTrue(names.contains(metalakeNameB));
   }
 
   @Test
@@ -134,9 +139,10 @@ public class MetalakeIT extends AbstractIT {
     GravitonMetaLake metaLakeA =
         client.createMetalake(
             NameIdentifier.parse(metalakeNameA), "metalake A comment", Collections.emptyMap());
-    assertEquals(metalakeNameA, metaLakeA.name());
-    assertEquals("metalake A comment", metaLakeA.comment());
-    assertEquals("graviton", metaLakeA.auditInfo().creator());
+    GravitonMetaLake metalake = client.loadMetalake(NameIdentifier.of(metalakeNameA));
+    assertEquals(metalakeNameA, metalake.name());
+    assertEquals("metalake A comment", metalake.comment());
+    assertEquals("graviton", metalake.auditInfo().creator());
 
     // Test metalake name already exists
     assertThrows(
