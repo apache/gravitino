@@ -504,7 +504,7 @@ public class TestKvEntityStorage {
           store.get(table1InSchema2.nameIdentifier(), EntityType.TABLE, BaseTable.class));
 
       // Delete the table 'metalake.catalog.schema2.table1'
-      store.delete(table1InSchema2.nameIdentifier(), EntityType.TABLE);
+      Assertions.assertTrue(store.delete(table1InSchema2.nameIdentifier(), EntityType.TABLE));
       Assertions.assertFalse(store.exists(table1InSchema2.nameIdentifier(), EntityType.TABLE));
       // Make sure table 'metalake.catalog.schema1.table1' still exist;
       Assertions.assertEquals(
@@ -526,8 +526,8 @@ public class TestKvEntityStorage {
       Assertions.assertTrue(store.exists(table1.nameIdentifier(), EntityType.TABLE));
 
       // Delete table1 and schema1
-      store.delete(table1.nameIdentifier(), EntityType.TABLE);
-      store.delete(schema1.nameIdentifier(), EntityType.SCHEMA);
+      Assertions.assertTrue(store.delete(table1.nameIdentifier(), EntityType.TABLE));
+      Assertions.assertTrue(store.delete(schema1.nameIdentifier(), EntityType.SCHEMA));
       // Make sure table1 in 'metalake.catalog.schema1' can't be access;
       Assertions.assertFalse(store.exists(table1.nameIdentifier(), EntityType.TABLE));
       Assertions.assertFalse(store.exists(schema1.nameIdentifier(), EntityType.SCHEMA));
@@ -597,6 +597,13 @@ public class TestKvEntityStorage {
       Assertions.assertThrowsExactly(
           NoSuchEntityException.class,
           () -> store.get(schema2.nameIdentifier(), EntityType.SCHEMA, CatalogEntity.class));
+
+      Assertions.assertTrue(store.delete(metalake.nameIdentifier(), EntityType.METALAKE, true));
+
+      // catalog has already deleted, so we can't delete it again and should return false
+      Assertions.assertFalse(store.delete(catalog.nameIdentifier(), EntityType.CATALOG));
+      Assertions.assertFalse(store.delete(schema2.nameIdentifier(), EntityType.SCHEMA));
+      Assertions.assertFalse(store.delete(metalake.nameIdentifier(), EntityType.METALAKE));
     }
   }
 
