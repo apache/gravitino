@@ -46,7 +46,6 @@ import com.datastrato.graviton.exceptions.NonEmptySchemaException;
 import com.datastrato.graviton.exceptions.RESTException;
 import com.datastrato.graviton.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.graviton.exceptions.TableAlreadyExistsException;
-import com.datastrato.graviton.rel.Distribution;
 import com.datastrato.graviton.rel.Schema;
 import com.datastrato.graviton.rel.SortOrder;
 import com.datastrato.graviton.rel.Table;
@@ -317,20 +316,6 @@ public class TestRelationalCatalog extends TestBase {
         Assertions.assertThrows(
             RuntimeException.class, () -> catalog.asTableCatalog().listTables(table1.namespace()));
     Assertions.assertTrue(ex2.getMessage().contains("unparsed error"));
-  }
-
-  private SortOrder createMockSortOrder(
-      String[] fieldNames, SortOrder.Direction direction, SortOrder.NullOrder nullOrder) {
-    return SortOrder.builder()
-        .direction(direction)
-        .nullOrder(nullOrder)
-        .transform(identity(fieldNames))
-        .build();
-  }
-
-  private Distribution createMockDistribution(
-      Distribution.DistributionMethod method, int num, Transform[] transforms) {
-    return Distribution.builder().distMethod(method).distNum(num).transforms(transforms).build();
   }
 
   @Test

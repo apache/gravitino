@@ -151,6 +151,28 @@ public class TestTableOperations extends JerseyTest {
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResp2.getType());
   }
 
+  private DistributionDTO createMockDistributionDTO(String columnName, int bucketNum) {
+    return new DistributionDTO.Builder()
+        .withDistMethod(DistributionDTO.DistributionMethod.HASH)
+        .withDistNum(bucketNum)
+        .withExpressions(
+            ImmutableList.of(
+                new FieldExpression.Builder().withFieldName(new String[] {columnName}).build()))
+        .build();
+  }
+
+  private SortOrderDTO[] createMockSortOrderDTO(
+      String columnName, SortOrderDTO.Direction direction) {
+    return new SortOrderDTO[] {
+        new SortOrderDTO.Builder()
+            .withDirection(direction)
+            .withNullOrder(SortOrderDTO.NullOrder.FIRST)
+            .withExpression(
+                new FieldExpression.Builder().withFieldName(new String[] {columnName}).build())
+            .build()
+    };
+  }
+
   @Test
   public void testCreateTable() {
     Column[] columns =
@@ -160,23 +182,8 @@ public class TestTableOperations extends JerseyTest {
         };
     Table table = mockTable("table1", columns, "mock comment", ImmutableMap.of("k1", "v1"));
     when(dispatcher.createTable(any(), any(), any(), any(), any(), any(), any())).thenReturn(table);
-    SortOrderDTO[] sortOrderDTOS =
-        new SortOrderDTO[] {
-          new SortOrderDTO.Builder()
-              .withDirection(SortOrderDTO.Direction.DESC)
-              .withNullOrder(SortOrderDTO.NullOrder.FIRST)
-              .withExpression(
-                  new FieldExpression.Builder().withFieldName(new String[] {"col1"}).build())
-              .build()
-        };
-    DistributionDTO distributionDTO =
-        new DistributionDTO.Builder()
-            .withDistMethod(DistributionDTO.DistributionMethod.HASH)
-            .withDistNum(10)
-            .withExpressions(
-                ImmutableList.of(
-                    new FieldExpression.Builder().withFieldName(new String[] {"col2"}).build()))
-            .build();
+    SortOrderDTO[] sortOrderDTOS = createMockSortOrderDTO("col1", SortOrderDTO.Direction.DESC);
+    DistributionDTO distributionDTO = createMockDistributionDTO("col2", 10);
     TableCreateRequest req =
         new TableCreateRequest(
             "table1",
@@ -213,23 +220,8 @@ public class TestTableOperations extends JerseyTest {
     Assertions.assertEquals(columns[1].dataType(), columnDTOs[1].dataType());
     Assertions.assertEquals(columns[1].comment(), columnDTOs[1].comment());
 
-    sortOrderDTOS =
-        new SortOrderDTO[] {
-          new SortOrderDTO.Builder()
-              .withDirection(SortOrderDTO.Direction.DESC)
-              .withNullOrder(SortOrderDTO.NullOrder.FIRST)
-              .withExpression(
-                  new FieldExpression.Builder().withFieldName(new String[] {"col_1"}).build())
-              .build()
-        };
-    distributionDTO =
-        new DistributionDTO.Builder()
-            .withDistMethod(DistributionDTO.DistributionMethod.HASH)
-            .withDistNum(10)
-            .withExpressions(
-                ImmutableList.of(
-                    new FieldExpression.Builder().withFieldName(new String[] {"col2_2"}).build()))
-            .build();
+    sortOrderDTOS = createMockSortOrderDTO("col_1", SortOrderDTO.Direction.DESC);
+    distributionDTO = createMockDistributionDTO("col2_2", 10);
 
     TableCreateRequest badReq =
         new TableCreateRequest(
