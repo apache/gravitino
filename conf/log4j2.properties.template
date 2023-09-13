@@ -33,5 +33,5 @@ appender.rolling.strategy.delete.ifLastModified.type = IfLastModified
 appender.rolling.strategy.delete.ifLastModified.age = 30d
 
 # Configure root logger
-rootLogger.level = debug
+rootLogger.level = info
 rootLogger.appenderRef.rolling.ref = fileLogger

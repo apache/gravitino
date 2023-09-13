@@ -94,6 +94,10 @@ jobs:
             cat distribution/package/logs/graviton-server.log
           fi
 
+      - name: Setup Debug Action
+        if: ${{ contains(github.event.pull_request.labels.*.name, 'debug action') }}
+        uses: csexton/debugger-action@master
+
       - name: Stop and remove container
         run: |
           docker stop ${DOCKER_RUN_NAME}

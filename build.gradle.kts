@@ -233,7 +233,7 @@ tasks {
 
   task("integrationTest") {
     mustRunAfter(":catalog-hive:copyDepends", ":catalog-lakehouse:copyDepends")
-    dependsOn(":integration-test:integrationTest")
+    finalizedBy(":integration-test:test") // , ":integration-test:test -PtestMode=deploy"
   }
 
   clean {

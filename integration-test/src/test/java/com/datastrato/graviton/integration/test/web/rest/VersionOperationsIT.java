@@ -5,12 +5,14 @@
 package com.datastrato.graviton.integration.e2e.web.rest;
 
 import com.datastrato.graviton.client.GravitonVersion;
-import com.datastrato.graviton.integration.util.AbstractIT;
-import com.datastrato.graviton.integration.util.CommandExecutor;
-import com.datastrato.graviton.integration.util.ProcessData;
+import com.datastrato.graviton.integration.test.util.AbstractIT;
+import com.datastrato.graviton.integration.test.util.CommandExecutor;
+import com.datastrato.graviton.integration.test.util.ProcessData;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
+@Tag("deploy")
 public class VersionOperationsIT extends AbstractIT {
   @Test
   public void testGetVersion() {
