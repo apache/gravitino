@@ -6,10 +6,8 @@ package com.datastrato.graviton.rest;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.common.collect.ImmutableMap;
-import java.io.IOException;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
@@ -64,23 +62,5 @@ class TestRESTUtils {
     assertEquals("", RESTUtils.decodeString(""));
     assertEquals("hello world", RESTUtils.decodeString("hello%20world"));
     assertThrows(IllegalArgumentException.class, () -> RESTUtils.decodeString(null));
-  }
-
-  @Test
-  void testFindAvailablePort() throws IOException {
-    assertTrue(RESTUtils.findAvailablePort(0, 0) > 0);
-
-    // valid user registered port https://en.wikipedia.org/wiki/Registered_port
-    int port1 = RESTUtils.findAvailablePort(Integer.MIN_VALUE, Integer.MAX_VALUE);
-    assertTrue(port1 >= 1024 && port1 <= 65535);
-
-    assertTrue(RESTUtils.findAvailablePort(Integer.MIN_VALUE, 20000) <= 20000);
-    assertTrue(RESTUtils.findAvailablePort(20000, Integer.MAX_VALUE) >= 20000);
-
-    int port = RESTUtils.findAvailablePort(20000, 30000);
-    assertTrue(port >= 20000 && port <= 30000);
-
-    assertThrows(
-        IOException.class, () -> RESTUtils.findAvailablePort(Integer.MAX_VALUE, Integer.MIN_VALUE));
   }
 }

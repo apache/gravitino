@@ -50,10 +50,12 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.glassfish.jersey.internal.inject.AbstractBinder;
 import org.glassfish.jersey.server.ResourceConfig;
+import org.glassfish.jersey.test.JerseyTest;
+import org.glassfish.jersey.test.TestProperties;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-public class TestTableOperations extends JerseyTestBase {
+public class TestTableOperations extends JerseyTest {
 
   private static class MockServletRequestFactory extends ServletRequestFactoryBase {
     @Override
@@ -74,6 +76,8 @@ public class TestTableOperations extends JerseyTestBase {
 
   @Override
   protected Application configure() {
+    forceSet(TestProperties.CONTAINER_PORT, "0");
+
     ResourceConfig resourceConfig = new ResourceConfig();
     resourceConfig.register(TableOperations.class);
     resourceConfig.register(
