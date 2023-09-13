@@ -122,7 +122,7 @@ public class RESTUtils {
     int portEnd = portRangeEnd;
 
     if (portStart > portEnd) {
-      throw new IOException("Invalidate port range: " + portStart + ":" + portEnd);
+      throw new IOException("Invalid port range: : " + portRangeStart + ":" + portRangeEnd);
     } else if (portStart == 0 && portEnd == 0) {
       try (ServerSocket socket = new ServerSocket(0)) {
         return socket.getLocalPort();
@@ -133,7 +133,7 @@ public class RESTUtils {
       try (ServerSocket socket = new ServerSocket(portStart)) {
         return socket.getLocalPort();
       } catch (IOException e) {
-        throw new IOException("Failed to allocate a random port", e);
+        throw new IOException("Failed to allocate the specified port: " + portStart, e);
       }
     }
 
