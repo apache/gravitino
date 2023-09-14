@@ -12,7 +12,7 @@ import com.datastrato.graviton.meta.CatalogEntity;
 import com.datastrato.graviton.meta.SchemaVersion;
 import com.datastrato.graviton.rel.Column;
 import com.datastrato.graviton.rel.Distribution;
-import com.datastrato.graviton.rel.Distribution.DistributionMethod;
+import com.datastrato.graviton.rel.Distribution.Strategy;
 import com.datastrato.graviton.rel.SortOrder;
 import com.datastrato.graviton.rel.SortOrder.Direction;
 import com.datastrato.graviton.rel.SortOrder.NullOrder;
@@ -176,9 +176,9 @@ public class TestEntityStore {
 
     Distribution distribution =
         Distribution.builder()
-            .withDistributionNumber(10)
+            .withNumber(10)
             .withTransforms(new Transform[] {Transforms.field(new String[] {"column"})})
-            .withdistributionMethod(DistributionMethod.EVEN)
+            .withStrategy(Strategy.EVEN)
             .build();
 
     SortOrder[] sortOrders =

@@ -15,7 +15,8 @@ import com.datastrato.graviton.dto.MetalakeDTO;
 import com.datastrato.graviton.dto.rel.ColumnDTO;
 import com.datastrato.graviton.dto.rel.DistributionDTO;
 import com.datastrato.graviton.dto.rel.DistributionDTO.Builder;
-import com.datastrato.graviton.dto.rel.DistributionDTO.DistributionMethod;
+import com.datastrato.graviton.dto.rel.DistributionDTO.Strategy;
+import com.datastrato.graviton.dto.rel.ExpressionPartitionDTO.Expression;
 import com.datastrato.graviton.dto.rel.PartitionUtils;
 import com.datastrato.graviton.dto.rel.SchemaDTO;
 import com.datastrato.graviton.dto.rel.SortOrderDTO;
@@ -29,7 +30,6 @@ import com.datastrato.graviton.rel.SortOrder;
 import com.datastrato.graviton.rel.Table;
 import com.datastrato.graviton.rel.transforms.Transform;
 import java.util.Arrays;
-import java.util.stream.Collectors;
 import org.apache.commons.lang3.ArrayUtils;
 
 public class DTOConverters {
@@ -101,12 +101,12 @@ public class DTOConverters {
     }
 
     return new Builder()
-        .withDistMethod(DistributionMethod.fromString(distribution.distMethod().name()))
-        .withDistNum(distribution.distributionNumber())
+        .withStrategy(Strategy.fromString(distribution.strategy().name()))
+        .withNumber(distribution.number())
         .withExpressions(
             Arrays.stream(distribution.transforms())
                 .map(PartitionUtils::toExpression)
-                .collect(Collectors.toList()))
+                .toArray(Expression[]::new))
         .build();
   }
 
@@ -116,11 +116,10 @@ public class DTOConverters {
     }
 
     return Distribution.builder()
-        .withdistributionMethod(
-            Distribution.DistributionMethod.valueOf(distributionDTO.getDistributionMethod().name()))
-        .withDistributionNumber(distributionDTO.getDistributionNumber())
+        .withStrategy(Distribution.Strategy.valueOf(distributionDTO.getStrategy().name()))
+        .withNumber(distributionDTO.getNumber())
         .withTransforms(
-            distributionDTO.getExpressions().stream()
+            Arrays.stream(distributionDTO.getExpressions())
                 .map(PartitionUtils::toTransform)
                 .toArray(Transform[]::new))
         .build();

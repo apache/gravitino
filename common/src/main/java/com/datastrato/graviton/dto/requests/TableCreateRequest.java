@@ -109,8 +109,7 @@ public class TableCreateRequest implements RESTRequest {
     }
 
     if (distribution != null) {
-      distribution
-          .getExpressions()
+      Arrays.stream(distribution.getExpressions())
           .forEach(expression -> validateExpresion(expression, columnNames));
     }
 

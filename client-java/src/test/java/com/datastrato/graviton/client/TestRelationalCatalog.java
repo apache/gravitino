@@ -21,6 +21,8 @@ import com.datastrato.graviton.dto.AuditDTO;
 import com.datastrato.graviton.dto.CatalogDTO;
 import com.datastrato.graviton.dto.rel.ColumnDTO;
 import com.datastrato.graviton.dto.rel.DistributionDTO;
+import com.datastrato.graviton.dto.rel.DistributionDTO.Strategy;
+import com.datastrato.graviton.dto.rel.ExpressionPartitionDTO.Expression;
 import com.datastrato.graviton.dto.rel.ExpressionPartitionDTO.FieldExpression;
 import com.datastrato.graviton.dto.rel.Partition;
 import com.datastrato.graviton.dto.rel.SchemaDTO;
@@ -828,11 +830,12 @@ public class TestRelationalCatalog extends TestBase {
 
   private DistributionDTO createMockDistributionDTO(String columnName, int bucketNum) {
     return new DistributionDTO.Builder()
-        .withDistMethod(DistributionDTO.DistributionMethod.HASH)
-        .withDistNum(bucketNum)
+        .withStrategy(Strategy.HASH)
+        .withNumber(bucketNum)
         .withExpressions(
-            ImmutableList.of(
-                new FieldExpression.Builder().withFieldName(new String[] {columnName}).build()))
+            new Expression[] {
+              new FieldExpression.Builder().withFieldName(new String[] {columnName}).build()
+            })
         .build();
   }
 

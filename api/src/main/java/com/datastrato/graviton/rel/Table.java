@@ -35,7 +35,9 @@ public interface Table extends Auditable {
     return new SortOrder[0];
   }
 
-  /** Return the bucketing of the table. If no bucketing is specified, null is returned. */
+  /**
+   * Return the bucketing of the table. If no bucketing is specified, Distribution.NONE is returned.
+   */
   default Distribution distribution() {
     return Distribution.NONE;
   }

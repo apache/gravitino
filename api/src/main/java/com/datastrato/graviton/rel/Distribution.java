@@ -11,10 +11,9 @@ import com.google.common.base.Objects;
 public class Distribution {
 
   // NONE is used to indicate that there is no distribution.
-  public static final Distribution NONE =
-      new Distribution(new Transform[0], 0, DistributionMethod.HASH);
+  public static final Distribution NONE = new Distribution(new Transform[0], 0, Strategy.HASH);
 
-  public enum DistributionMethod {
+  public enum Strategy {
     HASH,
     RANGE,
     EVEN
@@ -28,28 +27,27 @@ public class Distribution {
   private final Transform[] transforms;
 
   /** Number of bucket/distribution. */
-  private final int distributionNumber;
+  private final int number;
 
-  /** Distribution method. */
-  private final DistributionMethod distributionMethod;
+  /** Distribution strategy/method. */
+  private final Strategy strategy;
 
   public Transform[] transforms() {
     return transforms;
   }
 
-  public int distributionNumber() {
-    return distributionNumber;
+  public int number() {
+    return number;
   }
 
-  public DistributionMethod distMethod() {
-    return distributionMethod;
+  public Strategy strategy() {
+    return strategy;
   }
 
-  private Distribution(
-      Transform[] transforms, int distributionNumber, DistributionMethod distributionMethod) {
+  private Distribution(Transform[] transforms, int number, Strategy strategy) {
     this.transforms = transforms;
-    this.distributionNumber = distributionNumber;
-    this.distributionMethod = distributionMethod;
+    this.number = number;
+    this.strategy = strategy;
   }
 
   public static DistributionBuilder builder() {
@@ -59,26 +57,26 @@ public class Distribution {
   public static class DistributionBuilder {
 
     private Transform[] transforms;
-    private int distributionNumber;
-    private DistributionMethod distributionMethod;
+    private int number;
+    private Strategy strategy;
 
     public DistributionBuilder withTransforms(Transform[] transforms) {
       this.transforms = transforms;
       return this;
     }
 
-    public DistributionBuilder withDistributionNumber(int distributionNumber) {
-      this.distributionNumber = distributionNumber;
+    public DistributionBuilder withNumber(int number) {
+      this.number = number;
       return this;
     }
 
-    public DistributionBuilder withdistributionMethod(DistributionMethod distributionMethod) {
-      this.distributionMethod = distributionMethod;
+    public DistributionBuilder withStrategy(Strategy strategy) {
+      this.strategy = strategy;
       return this;
     }
 
     public Distribution build() {
-      return new Distribution(transforms, distributionNumber, distributionMethod);
+      return new Distribution(transforms, number, strategy);
     }
   }
 
@@ -91,13 +89,13 @@ public class Distribution {
       return false;
     }
     Distribution that = (Distribution) o;
-    return distributionNumber == that.distributionNumber
+    return number == that.number
         && Objects.equal(transforms, that.transforms)
-        && distributionMethod == that.distributionMethod;
+        && strategy == that.strategy;
   }
 
   @Override
   public int hashCode() {
-    return Objects.hashCode(transforms, distributionNumber, distributionMethod);
+    return Objects.hashCode(transforms, number, strategy);
   }
 }

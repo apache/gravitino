@@ -25,7 +25,7 @@ import com.datastrato.graviton.meta.AuditInfo;
 import com.datastrato.graviton.meta.CatalogEntity;
 import com.datastrato.graviton.rel.Column;
 import com.datastrato.graviton.rel.Distribution;
-import com.datastrato.graviton.rel.Distribution.DistributionMethod;
+import com.datastrato.graviton.rel.Distribution.Strategy;
 import com.datastrato.graviton.rel.SortOrder;
 import com.datastrato.graviton.rel.SortOrder.Direction;
 import com.datastrato.graviton.rel.SortOrder.NullOrder;
@@ -126,9 +126,9 @@ public class TestHiveTable extends MiniHiveMetastoreService {
 
   private Distribution createDistribution() {
     return Distribution.builder()
-        .withDistributionNumber(10)
+        .withNumber(10)
         .withTransforms(new Transform[] {Transforms.field(new String[] {"col_1"})})
-        .withdistributionMethod(DistributionMethod.EVEN)
+        .withStrategy(Strategy.EVEN)
         .build();
   }
 
@@ -194,8 +194,7 @@ public class TestHiveTable extends MiniHiveMetastoreService {
     Assertions.assertTrue(store.exists(tableIdentifier, TABLE));
 
     // Compare sort and order
-    Assertions.assertEquals(
-        distribution.distributionNumber(), loadedTable.distribution().distributionNumber());
+    Assertions.assertEquals(distribution.number(), loadedTable.distribution().number());
     Assertions.assertArrayEquals(
         distribution.transforms(), loadedTable.distribution().transforms());
 

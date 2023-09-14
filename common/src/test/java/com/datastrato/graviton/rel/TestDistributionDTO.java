@@ -6,13 +6,12 @@
 package com.datastrato.graviton.rel;
 
 import com.datastrato.graviton.dto.rel.DistributionDTO;
-import com.datastrato.graviton.dto.rel.DistributionDTO.DistributionMethod;
+import com.datastrato.graviton.dto.rel.DistributionDTO.Strategy;
 import com.datastrato.graviton.dto.rel.ExpressionPartitionDTO.Expression;
 import com.datastrato.graviton.dto.rel.ExpressionPartitionDTO.FieldExpression;
 import com.datastrato.graviton.dto.rel.ExpressionPartitionDTO.FunctionExpression;
 import com.datastrato.graviton.json.JsonUtils;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.google.common.collect.Lists;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -21,11 +20,12 @@ public class TestDistributionDTO {
   void test() throws JsonProcessingException {
     DistributionDTO distributionDTO =
         new DistributionDTO.Builder()
-            .withDistNum(10)
-            .withDistMethod(DistributionMethod.HASH)
+            .withNumber(10)
+            .withStrategy(Strategy.HASH)
             .withExpressions(
-                Lists.newArrayList(
-                    new FieldExpression.Builder().withFieldName(new String[] {"a"}).build()))
+                new Expression[] {
+                  new FieldExpression.Builder().withFieldName(new String[] {"a"}).build()
+                })
             .build();
 
     String stringValue = JsonUtils.objectMapper().writeValueAsString(distributionDTO);
@@ -39,8 +39,8 @@ public class TestDistributionDTO {
             + "      ]\n"
             + "    }\n"
             + "  ],\n"
-            + "  \"distributionNumber\": 10,\n"
-            + "  \"distributionMethod\": \"hash\"\n"
+            + "  \"number\": 10,\n"
+            + "  \"strategy\": \"hash\"\n"
             + "}";
 
     Assertions.assertEquals(
@@ -50,16 +50,15 @@ public class TestDistributionDTO {
     distributionDTO =
         new DistributionDTO.Builder()
             .withExpressions(
-                Lists.newArrayList(
-                    new FunctionExpression.Builder()
-                        .withFuncName("date")
-                        .withArgs(
-                            new Expression[] {
-                              new FieldExpression.Builder()
-                                  .withFieldName(new String[] {"a"})
-                                  .build()
-                            })
-                        .build()))
+                new Expression[] {
+                  new FunctionExpression.Builder()
+                      .withFuncName("date")
+                      .withArgs(
+                          new Expression[] {
+                            new FieldExpression.Builder().withFieldName(new String[] {"a"}).build()
+                          })
+                      .build()
+                })
             .build();
 
     Assertions.assertEquals(

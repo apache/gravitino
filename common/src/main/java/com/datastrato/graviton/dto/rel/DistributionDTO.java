@@ -10,29 +10,27 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.fasterxml.jackson.annotation.JsonValue;
-import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
-import java.util.Collections;
-import java.util.List;
+import java.util.Arrays;
 import lombok.Getter;
-import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.ArrayUtils;
 
-@JsonPropertyOrder({"expressions", "distributionNumber", "distributionMethod"})
+@JsonPropertyOrder({"expressions", "number", "strategy"})
 @Getter
 public class DistributionDTO {
 
   // NONE is used to indicate that there is no distribution.
   public static final DistributionDTO NONE =
-      new DistributionDTO(Collections.EMPTY_LIST, 0, DistributionMethod.HASH);
+      new DistributionDTO(new Expression[0], 0, Strategy.HASH);
 
-  public enum DistributionMethod {
+  public enum Strategy {
     HASH,
     EVEN,
     RANGE;
 
     @JsonCreator
-    public static DistributionMethod fromString(String value) {
-      return DistributionMethod.valueOf(value.toUpperCase());
+    public static Strategy fromString(String value) {
+      return Strategy.valueOf(value.toUpperCase());
     }
 
     @JsonValue
@@ -43,54 +41,54 @@ public class DistributionDTO {
   }
 
   @JsonProperty("expressions")
-  private final List<Expression> expressions;
+  private final Expression[] expressions;
 
-  @JsonProperty("distributionNumber")
-  private final int distributionNumber;
+  // Number of buckets/distribution
+  @JsonProperty("number")
+  private final int number;
 
-  @JsonProperty("distributionMethod")
-  private final DistributionMethod distributionMethod;
+  // Distribution strategy/method
+  @JsonProperty("strategy")
+  private final Strategy strategy;
 
   private DistributionDTO(
-      @JsonProperty("expressions") List<Expression> expressions,
-      @JsonProperty("distNum") int distributionNumber,
-      @JsonProperty("distMethod") DistributionMethod distributionMethod) {
+      @JsonProperty("expressions") Expression[] expressions,
+      @JsonProperty("number") int number,
+      @JsonProperty("strategy") Strategy strategy) {
     this.expressions = expressions;
-    this.distributionNumber = distributionNumber;
-    this.distributionMethod = distributionMethod;
+    this.number = number;
+    this.strategy = strategy;
   }
 
   public static class Builder {
-    private List<Expression> expressions;
-    private int bucketNum;
-    private DistributionMethod distributionMethod;
+    private Expression[] expressions;
+    private int number;
+    private Strategy strategy;
 
     public Builder() {}
 
-    public Builder withExpressions(List<Expression> expressions) {
+    public Builder withExpressions(Expression[] expressions) {
       this.expressions = expressions;
       return this;
     }
 
-    public Builder withDistNum(int bucketNum) {
-      this.bucketNum = bucketNum;
+    public Builder withNumber(int bucketNum) {
+      this.number = bucketNum;
       return this;
     }
 
-    public Builder withDistMethod(DistributionMethod distributionMethod) {
-      this.distributionMethod = distributionMethod;
+    public Builder withStrategy(Strategy strategy) {
+      this.strategy = strategy;
       return this;
     }
 
     public DistributionDTO build() {
-      // Default bucket method is HASH
-      distributionMethod =
-          distributionMethod == null ? DistributionMethod.HASH : distributionMethod;
+      strategy = strategy == null ? Strategy.HASH : strategy;
 
       Preconditions.checkState(
-          CollectionUtils.isNotEmpty(expressions), "expressions cannot be null or empty");
-      Preconditions.checkState(bucketNum >= 0, "bucketNum must be greater than 0");
-      return new DistributionDTO(expressions, bucketNum, distributionMethod);
+          ArrayUtils.isNotEmpty(expressions), "expressions cannot be null or empty");
+      Preconditions.checkState(number >= 0, "bucketNum must be greater than 0");
+      return new DistributionDTO(expressions, number, strategy);
     }
   }
 
@@ -102,14 +100,24 @@ public class DistributionDTO {
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
+
     DistributionDTO that = (DistributionDTO) o;
-    return distributionNumber == that.distributionNumber
-        && Objects.equal(expressions, that.expressions)
-        && distributionMethod == that.distributionMethod;
+
+    if (number != that.number) {
+      return false;
+    }
+    // Probably incorrect - comparing Object[] arrays with Arrays.equals
+    if (!Arrays.equals(expressions, that.expressions)) {
+      return false;
+    }
+    return strategy == that.strategy;
   }
 
   @Override
   public int hashCode() {
-    return Objects.hashCode(expressions, distributionNumber, distributionMethod);
+    int result = Arrays.hashCode(expressions);
+    result = 31 * result + number;
+    result = 31 * result + (strategy != null ? strategy.hashCode() : 0);
+    return result;
   }
 }

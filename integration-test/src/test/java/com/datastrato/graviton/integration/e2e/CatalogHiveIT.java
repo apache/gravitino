@@ -15,7 +15,7 @@ import com.datastrato.graviton.dto.rel.ColumnDTO;
 import com.datastrato.graviton.integration.util.AbstractIT;
 import com.datastrato.graviton.integration.util.GravitonITUtils;
 import com.datastrato.graviton.rel.Distribution;
-import com.datastrato.graviton.rel.Distribution.DistributionMethod;
+import com.datastrato.graviton.rel.Distribution.Strategy;
 import com.datastrato.graviton.rel.Schema;
 import com.datastrato.graviton.rel.SchemaChange;
 import com.datastrato.graviton.rel.SortOrder;
@@ -183,9 +183,9 @@ public class CatalogHiveIT extends AbstractIT {
         NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
     Distribution distribution =
         Distribution.builder()
-            .withDistributionNumber(10)
+            .withNumber(10)
             .withTransforms(new Transform[] {Transforms.field(new String[] {HIVE_COL_NAME1})})
-            .withdistributionMethod(DistributionMethod.EVEN)
+            .withStrategy(Strategy.EVEN)
             .build();
 
     final SortOrder[] sortOrders =
@@ -240,10 +240,10 @@ public class CatalogHiveIT extends AbstractIT {
     // Bad name in distribution
     final Distribution badDistribution =
         Distribution.builder()
-            .withDistributionNumber(10)
+            .withNumber(10)
             .withTransforms(
                 new Transform[] {Transforms.field(new String[] {HIVE_COL_NAME1 + "bad_name"})})
-            .withdistributionMethod(DistributionMethod.EVEN)
+            .withStrategy(Strategy.EVEN)
             .build();
     Assertions.assertThrows(
         Exception.class,
@@ -375,8 +375,7 @@ public class CatalogHiveIT extends AbstractIT {
     Assertions.assertEquals("col_3_comment", hiveTab.getSd().getCols().get(2).getComment());
 
     Assertions.assertEquals(
-        distribution == null ? 0 : distribution.distributionNumber(),
-        hiveTab.getSd().getNumBuckets());
+        distribution == null ? 0 : distribution.number(), hiveTab.getSd().getNumBuckets());
 
     List<String> resultDistributionCols =
         distribution == null
