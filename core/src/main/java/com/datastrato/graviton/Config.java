@@ -157,14 +157,21 @@ public abstract class Config {
    * Loads configurations from a map.
    *
    * @param map The map containing configuration key-value pairs.
+   * @param checkPrefix whether to check if key prefix matches 'CONFIG_PREPEND'
    */
-  private void loadFromMap(Map<String, String> map) {
+  public void loadFromMap(Map<String, String> map, boolean checkPrefix) {
     map.forEach(
         (k, v) -> {
           String trimmedK = k.trim();
           String trimmedV = v.trim();
-          if (!trimmedK.isEmpty() && !trimmedV.isEmpty() && trimmedK.startsWith(CONFIG_PREPEND)) {
-            configMap.put(trimmedK, trimmedV);
+          if (!trimmedK.isEmpty() && !trimmedV.isEmpty()) {
+            if (checkPrefix) {
+              if (trimmedK.startsWith(CONFIG_PREPEND)) {
+                configMap.put(trimmedK, trimmedV);
+              }
+            } else {
+              configMap.put(trimmedK, trimmedV);
+            }
           }
         });
   }
@@ -176,7 +183,7 @@ public abstract class Config {
    */
   @VisibleForTesting
   public void loadFromProperties(Properties properties) {
-    loadFromMap(Maps.fromProperties(properties));
+    loadFromMap(Maps.fromProperties(properties), true);
   }
 
   /**
