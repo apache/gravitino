@@ -148,7 +148,7 @@ public class RelationalCatalog extends CatalogDTO implements TableCatalog, Suppo
       throws NoSuchSchemaException, TableAlreadyExistsException {
     NameIdentifier.checkTable(ident);
 
-    SortOrderDTO[] sortOrderDTOS =
+    SortOrderDTO[] sortOrderDTOs =
         sortOrders == null
             ? new SortOrderDTO[0]
             : Arrays.stream(sortOrders)
@@ -160,7 +160,7 @@ public class RelationalCatalog extends CatalogDTO implements TableCatalog, Suppo
             comment,
             (ColumnDTO[]) columns,
             properties,
-            sortOrderDTOS,
+            sortOrderDTOs,
             com.datastrato.graviton.dto.util.DTOConverters.toDTO(distribution),
             toPartitions(partitions));
     req.validate();

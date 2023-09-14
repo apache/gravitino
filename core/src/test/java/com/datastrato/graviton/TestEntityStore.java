@@ -15,7 +15,7 @@ import com.datastrato.graviton.rel.Distribution;
 import com.datastrato.graviton.rel.Distribution.Strategy;
 import com.datastrato.graviton.rel.SortOrder;
 import com.datastrato.graviton.rel.SortOrder.Direction;
-import com.datastrato.graviton.rel.SortOrder.NullOrder;
+import com.datastrato.graviton.rel.SortOrder.NullOrdering;
 import com.datastrato.graviton.rel.Table;
 import com.datastrato.graviton.rel.transforms.Transform;
 import com.datastrato.graviton.rel.transforms.Transforms;
@@ -184,7 +184,7 @@ public class TestEntityStore {
     SortOrder[] sortOrders =
         new SortOrder[] {
           SortOrder.builder()
-              .withNullOrder(NullOrder.FIRST)
+              .withNullOrder(NullOrdering.FIRST)
               .withDirection(Direction.DESC)
               .withTransform(Transforms.field(new String[] {"column"}))
               .build()

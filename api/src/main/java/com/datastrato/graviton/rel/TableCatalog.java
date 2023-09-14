@@ -133,6 +133,51 @@ public interface TableCatalog {
   }
 
   /**
+   * Create a table in the catalog.
+   *
+   * @param ident A table identifier.
+   * @param columns The columns of the new table.
+   * @param comment The table comment.
+   * @param properties The table properties.
+   * @return The created table metadata.
+   * @throws NoSuchSchemaException If the schema does not exist.
+   * @throws TableAlreadyExistsException If the table already exists.
+   */
+  default Table createTable(
+      NameIdentifier ident,
+      Column[] columns,
+      String comment,
+      Map<String, String> properties,
+      Distribution distribution)
+      throws NoSuchSchemaException, TableAlreadyExistsException {
+    return createTable(
+        ident, columns, comment, properties, new Transform[0], distribution, new SortOrder[0]);
+  }
+
+  /**
+   * Create a table in the catalog.
+   *
+   * @param ident A table identifier.
+   * @param columns The columns of the new table.
+   * @param comment The table comment.
+   * @param properties The table properties.
+   * @param sortOrders The sort orders of the table
+   * @return The created table metadata.
+   * @throws NoSuchSchemaException If the schema does not exist.
+   * @throws TableAlreadyExistsException If the table already exists.
+   */
+  default Table createTable(
+      NameIdentifier ident,
+      Column[] columns,
+      String comment,
+      Map<String, String> properties,
+      SortOrder[] sortOrders)
+      throws NoSuchSchemaException, TableAlreadyExistsException {
+    return createTable(
+        ident, columns, comment, properties, new Transform[0], Distribution.NONE, sortOrders);
+  }
+
+  /**
    * Create a partitioned table in the catalog.
    *
    * @param ident A table identifier.

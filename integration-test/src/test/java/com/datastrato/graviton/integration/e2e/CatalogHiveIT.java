@@ -20,7 +20,7 @@ import com.datastrato.graviton.rel.Schema;
 import com.datastrato.graviton.rel.SchemaChange;
 import com.datastrato.graviton.rel.SortOrder;
 import com.datastrato.graviton.rel.SortOrder.Direction;
-import com.datastrato.graviton.rel.SortOrder.NullOrder;
+import com.datastrato.graviton.rel.SortOrder.NullOrdering;
 import com.datastrato.graviton.rel.Table;
 import com.datastrato.graviton.rel.TableChange;
 import com.datastrato.graviton.rel.transforms.Transform;
@@ -191,7 +191,7 @@ public class CatalogHiveIT extends AbstractIT {
     final SortOrder[] sortOrders =
         new SortOrder[] {
           SortOrder.builder()
-              .withNullOrder(NullOrder.FIRST)
+              .withNullOrder(NullOrdering.FIRST)
               .withDirection(Direction.DESC)
               .withTransform(Transforms.field(new String[] {HIVE_COL_NAME2}))
               .build()
@@ -224,7 +224,7 @@ public class CatalogHiveIT extends AbstractIT {
     Table createdTable1 =
         catalog
             .asTableCatalog()
-            .createTable(nameIdentifier, columns, table_comment, properties, null);
+            .createTable(nameIdentifier, columns, table_comment, properties, (Transform[]) null);
 
     // Directly get table from hive metastore to check if the table is created successfully.
     org.apache.hadoop.hive.metastore.api.Table hiveTable1 =
@@ -263,7 +263,7 @@ public class CatalogHiveIT extends AbstractIT {
     final SortOrder[] badSortOrders =
         new SortOrder[] {
           SortOrder.builder()
-              .withNullOrder(NullOrder.FIRST)
+              .withNullOrder(NullOrdering.FIRST)
               .withDirection(Direction.DESC)
               .withTransform(Transforms.field(new String[] {HIVE_COL_NAME2 + "bad_name"}))
               .build()
@@ -312,7 +312,7 @@ public class CatalogHiveIT extends AbstractIT {
     Table createdTable1 =
         catalog
             .asTableCatalog()
-            .createTable(nameIdentifier, columns, table_comment, properties, null);
+            .createTable(nameIdentifier, columns, table_comment, properties, (Transform[]) null);
 
     // Directly get table from hive metastore to check if the table is created successfully.
     org.apache.hadoop.hive.metastore.api.Table hiveTable1 =

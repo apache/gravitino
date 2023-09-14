@@ -21,12 +21,12 @@ import com.datastrato.graviton.dto.rel.PartitionUtils;
 import com.datastrato.graviton.dto.rel.SchemaDTO;
 import com.datastrato.graviton.dto.rel.SortOrderDTO;
 import com.datastrato.graviton.dto.rel.SortOrderDTO.Direction;
-import com.datastrato.graviton.dto.rel.SortOrderDTO.NullOrdering;
 import com.datastrato.graviton.dto.rel.TableDTO;
 import com.datastrato.graviton.rel.Column;
 import com.datastrato.graviton.rel.Distribution;
 import com.datastrato.graviton.rel.Schema;
 import com.datastrato.graviton.rel.SortOrder;
+import com.datastrato.graviton.rel.SortOrder.NullOrdering;
 import com.datastrato.graviton.rel.Table;
 import com.datastrato.graviton.rel.transforms.Transform;
 import java.util.Arrays;
@@ -129,14 +129,14 @@ public class DTOConverters {
     return new SortOrderDTO.Builder()
         .withExpression(PartitionUtils.toExpression(sortOrder.getTransform()))
         .withDirection(Direction.fromString(sortOrder.getDirection().name()))
-        .withNullOrder(NullOrdering.fromString(sortOrder.getNullOrder().name()))
+        .withNullOrder(SortOrderDTO.NullOrdering.fromString(sortOrder.getNullOrder().name()))
         .build();
   }
 
   public static SortOrder fromDTO(SortOrderDTO sortOrderDTO) {
     return SortOrder.builder()
         .withDirection(SortOrder.Direction.valueOf(sortOrderDTO.getDirection().name()))
-        .withNullOrder(SortOrder.NullOrder.valueOf(sortOrderDTO.getNullOrdering().name()))
+        .withNullOrder(NullOrdering.valueOf(sortOrderDTO.getNullOrdering().name()))
         .withTransform(PartitionUtils.toTransform(sortOrderDTO.getExpression()))
         .build();
   }

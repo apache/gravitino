@@ -53,10 +53,6 @@ public class HiveTable extends BaseTable {
 
   private String location;
 
-  private SortOrder[] sortOrders;
-
-  private Distribution distribution;
-
   private HiveTable() {}
 
   @Override
@@ -238,22 +234,8 @@ public class HiveTable extends BaseTable {
     // TODO(minghuang): Support user specify`location` property
     private String location;
 
-    private SortOrder[] sortOrders;
-
-    private Distribution distribution;
-
     public Builder withLocation(String location) {
       this.location = location;
-      return this;
-    }
-
-    public Builder withSortOrders(SortOrder[] sortOrders) {
-      this.sortOrders = sortOrders;
-      return this;
-    }
-
-    public Builder withDistribution(Distribution distribution) {
-      this.distribution = distribution;
       return this;
     }
 

@@ -342,7 +342,7 @@ public class TestRelationalCatalog extends TestBase {
             "comment",
             Collections.emptyMap(),
             new Partition[0],
-            distributionDTO,
+            DistributionDTO.NONE,
             sortOrderDTOS);
     TableCreateRequest req =
         new TableCreateRequest(
@@ -351,7 +351,7 @@ public class TestRelationalCatalog extends TestBase {
             columns,
             Collections.emptyMap(),
             sortOrderDTOS,
-            distributionDTO,
+            DistributionDTO.NONE,
             new Partition[0]);
     TableResponse resp = new TableResponse(expectedTable);
     buildMockResource(Method.POST, tablePath, req, resp, SC_OK);
@@ -364,7 +364,6 @@ public class TestRelationalCatalog extends TestBase {
                 columns,
                 "comment",
                 Collections.emptyMap(),
-                com.datastrato.graviton.dto.util.DTOConverters.fromDTO(distributionDTO),
                 Arrays.stream(sortOrderDTOS)
                     .map(com.datastrato.graviton.dto.util.DTOConverters::fromDTO)
                     .toArray(SortOrder[]::new));
@@ -398,7 +397,6 @@ public class TestRelationalCatalog extends TestBase {
                         columns,
                         "comment",
                         Collections.emptyMap(),
-                        com.datastrato.graviton.dto.util.DTOConverters.fromDTO(distributionDTO),
                         Arrays.stream(sortOrderDTOS)
                             .map(com.datastrato.graviton.dto.util.DTOConverters::fromDTO)
                             .toArray(SortOrder[]::new)));
@@ -421,7 +419,6 @@ public class TestRelationalCatalog extends TestBase {
                         columns,
                         "comment",
                         Collections.emptyMap(),
-                        com.datastrato.graviton.dto.util.DTOConverters.fromDTO(distributionDTO),
                         Arrays.stream(sortOrderDTOS)
                             .map(com.datastrato.graviton.dto.util.DTOConverters::fromDTO)
                             .toArray(SortOrder[]::new)));

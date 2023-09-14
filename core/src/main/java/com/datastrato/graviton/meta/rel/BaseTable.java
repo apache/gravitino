@@ -11,6 +11,8 @@ import com.datastrato.graviton.HasIdentifier;
 import com.datastrato.graviton.Namespace;
 import com.datastrato.graviton.meta.AuditInfo;
 import com.datastrato.graviton.rel.Column;
+import com.datastrato.graviton.rel.Distribution;
+import com.datastrato.graviton.rel.SortOrder;
 import com.datastrato.graviton.rel.Table;
 import com.datastrato.graviton.rel.transforms.Transform;
 import com.google.common.base.Objects;
@@ -51,6 +53,10 @@ public class BaseTable implements Table, Entity, HasIdentifier {
   protected Namespace namespace;
 
   @Nullable protected Transform[] partitions;
+
+  @Nullable protected SortOrder[] sortOrders;
+
+  @Nullable protected Distribution distribution;
 
   /**
    * Returns a map of the fields and their corresponding values for this table.
@@ -201,6 +207,10 @@ public class BaseTable implements Table, Entity, HasIdentifier {
 
     SELF withPartitions(Transform[] partitions);
 
+    SELF withSortOrders(SortOrder[] sortOrders);
+
+    SELF withDistribution(Distribution distribution);
+
     T build();
   }
 
@@ -220,6 +230,9 @@ public class BaseTable implements Table, Entity, HasIdentifier {
     protected AuditInfo auditInfo;
     protected Column[] columns;
     protected Transform[] partitions;
+    protected SortOrder[] sortOrders;
+
+    protected Distribution distribution;
 
     /**
      * Sets the unique identifier of the table.
@@ -309,6 +322,16 @@ public class BaseTable implements Table, Entity, HasIdentifier {
     public SELF withPartitions(Transform[] partitions) {
       this.partitions = partitions;
       return self();
+    }
+
+    public SELF withSortOrders(SortOrder[] sortOrders) {
+      this.sortOrders = sortOrders;
+      return (SELF) this;
+    }
+
+    public SELF withDistribution(Distribution distribution) {
+      this.distribution = distribution;
+      return (SELF) this;
     }
 
     /**
