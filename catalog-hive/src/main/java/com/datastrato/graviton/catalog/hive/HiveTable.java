@@ -89,11 +89,11 @@ public class HiveTable extends BaseTable {
     if (CollectionUtils.isNotEmpty(table.getSd().getBucketCols())) {
       distribution =
           Distribution.builder()
-              .transforms(
+              .withTransforms(
                   table.getSd().getBucketCols().stream()
                       .map(f -> new NamedReference(new String[] {f}))
                       .toArray(Transform[]::new))
-              .distributionNumber(table.getSd().getNumBuckets())
+              .withDistributionNumber(table.getSd().getNumBuckets())
               .build();
     }
 
@@ -104,8 +104,8 @@ public class HiveTable extends BaseTable {
               .map(
                   f ->
                       SortOrder.builder()
-                          .transform(new NamedReference(new String[] {f.getCol()}))
-                          .direction(f.getOrder() == 0 ? Direction.ASC : Direction.DESC)
+                          .withTransform(new NamedReference(new String[] {f.getCol()}))
+                          .withDirection(f.getOrder() == 0 ? Direction.ASC : Direction.DESC)
                           .build())
               .toArray(SortOrder[]::new);
     }

@@ -15,18 +15,18 @@ class TestDistribution {
   @Test
   void testDistribution() {
     Distribution.DistributionBuilder builder = new Distribution.DistributionBuilder();
-    builder.distMethod(DistributionMethod.HASH);
-    builder.distributionNumber(1);
-    builder.transforms(new Transform[] {});
+    builder.withdistributionMethod(DistributionMethod.HASH);
+    builder.withDistributionNumber(1);
+    builder.withTransforms(new Transform[] {});
     Distribution bucket = builder.build();
 
     Assertions.assertEquals(DistributionMethod.HASH, bucket.distMethod());
     Assertions.assertEquals(1, bucket.distributionNumber());
     Assertions.assertArrayEquals(new Transform[] {}, bucket.transforms());
 
-    builder.distMethod(DistributionMethod.EVEN);
-    builder.distributionNumber(11111);
-    builder.transforms(new Transform[] {});
+    builder.withdistributionMethod(DistributionMethod.EVEN);
+    builder.withDistributionNumber(11111);
+    builder.withTransforms(new Transform[] {});
     bucket = builder.build();
 
     Assertions.assertEquals(DistributionMethod.EVEN, bucket.distMethod());

@@ -126,18 +126,18 @@ public class TestHiveTable extends MiniHiveMetastoreService {
 
   private Distribution createDistribution() {
     return Distribution.builder()
-        .distributionNumber(10)
-        .transforms(new Transform[] {Transforms.field(new String[] {"col_1"})})
-        .distMethod(DistributionMethod.EVEN)
+        .withDistributionNumber(10)
+        .withTransforms(new Transform[] {Transforms.field(new String[] {"col_1"})})
+        .withdistributionMethod(DistributionMethod.EVEN)
         .build();
   }
 
   private SortOrder[] createSortOrder() {
     return new SortOrder[] {
       SortOrder.builder()
-          .nullOrder(NullOrder.FIRST)
-          .direction(Direction.DESC)
-          .transform(Transforms.field(new String[] {"col_2"}))
+          .withNullOrder(NullOrder.FIRST)
+          .withDirection(Direction.DESC)
+          .withTransform(Transforms.field(new String[] {"col_2"}))
           .build()
     };
   }

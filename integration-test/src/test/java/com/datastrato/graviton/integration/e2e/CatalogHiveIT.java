@@ -183,17 +183,17 @@ public class CatalogHiveIT extends AbstractIT {
         NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
     Distribution distribution =
         Distribution.builder()
-            .distributionNumber(10)
-            .transforms(new Transform[] {Transforms.field(new String[] {HIVE_COL_NAME1})})
-            .distMethod(DistributionMethod.EVEN)
+            .withDistributionNumber(10)
+            .withTransforms(new Transform[] {Transforms.field(new String[] {HIVE_COL_NAME1})})
+            .withdistributionMethod(DistributionMethod.EVEN)
             .build();
 
     final SortOrder[] sortOrders =
         new SortOrder[] {
           SortOrder.builder()
-              .nullOrder(NullOrder.FIRST)
-              .direction(Direction.DESC)
-              .transform(Transforms.field(new String[] {HIVE_COL_NAME2}))
+              .withNullOrder(NullOrder.FIRST)
+              .withDirection(Direction.DESC)
+              .withTransform(Transforms.field(new String[] {HIVE_COL_NAME2}))
               .build()
         };
 
@@ -240,10 +240,10 @@ public class CatalogHiveIT extends AbstractIT {
     // Bad name in distribution
     final Distribution badDistribution =
         Distribution.builder()
-            .distributionNumber(10)
-            .transforms(
+            .withDistributionNumber(10)
+            .withTransforms(
                 new Transform[] {Transforms.field(new String[] {HIVE_COL_NAME1 + "bad_name"})})
-            .distMethod(DistributionMethod.EVEN)
+            .withdistributionMethod(DistributionMethod.EVEN)
             .build();
     Assertions.assertThrows(
         Exception.class,
@@ -263,9 +263,9 @@ public class CatalogHiveIT extends AbstractIT {
     final SortOrder[] badSortOrders =
         new SortOrder[] {
           SortOrder.builder()
-              .nullOrder(NullOrder.FIRST)
-              .direction(Direction.DESC)
-              .transform(Transforms.field(new String[] {HIVE_COL_NAME2 + "bad_name"}))
+              .withNullOrder(NullOrder.FIRST)
+              .withDirection(Direction.DESC)
+              .withTransform(Transforms.field(new String[] {HIVE_COL_NAME2 + "bad_name"}))
               .build()
         };
 

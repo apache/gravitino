@@ -176,17 +176,17 @@ public class TestEntityStore {
 
     Distribution distribution =
         Distribution.builder()
-            .distributionNumber(10)
-            .transforms(new Transform[] {Transforms.field(new String[] {"column"})})
-            .distMethod(DistributionMethod.EVEN)
+            .withDistributionNumber(10)
+            .withTransforms(new Transform[] {Transforms.field(new String[] {"column"})})
+            .withdistributionMethod(DistributionMethod.EVEN)
             .build();
 
     SortOrder[] sortOrders =
         new SortOrder[] {
           SortOrder.builder()
-              .nullOrder(NullOrder.FIRST)
-              .direction(Direction.DESC)
-              .transform(Transforms.field(new String[] {"column"}))
+              .withNullOrder(NullOrder.FIRST)
+              .withDirection(Direction.DESC)
+              .withTransform(Transforms.field(new String[] {"column"}))
               .build()
         };
 

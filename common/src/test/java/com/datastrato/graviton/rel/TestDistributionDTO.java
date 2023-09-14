@@ -39,8 +39,8 @@ public class TestDistributionDTO {
             + "      ]\n"
             + "    }\n"
             + "  ],\n"
-            + "  \"distNum\": 10,\n"
-            + "  \"distMethod\": \"hash\"\n"
+            + "  \"distributionNumber\": 10,\n"
+            + "  \"distributionMethod\": \"hash\"\n"
             + "}";
 
     Assertions.assertEquals(

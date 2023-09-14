@@ -18,7 +18,7 @@ import lombok.NonNull;
 import org.apache.commons.collections4.CollectionUtils;
 
 @EqualsAndHashCode
-@JsonPropertyOrder({"expressions", "distNum", "distMethod"})
+@JsonPropertyOrder({"expressions", "distributionNumber", "distributionMethod"})
 @Getter
 public class DistributionDTO {
 
@@ -43,18 +43,18 @@ public class DistributionDTO {
   @NonNull
   private final List<Expression> expressions;
 
-  @JsonProperty("distNum")
-  private final int distNum;
+  @JsonProperty("distributionNumber")
+  private final int distributionNumber;
 
-  @JsonProperty("distMethod")
+  @JsonProperty("distributionMethod")
   private final DistributionMethod distributionMethod;
 
   private DistributionDTO(
       @JsonProperty("expressions") List<Expression> expressions,
-      @JsonProperty("distNum") int distNum,
+      @JsonProperty("distNum") int distributionNumber,
       @JsonProperty("distMethod") DistributionMethod distributionMethod) {
     this.expressions = expressions;
-    this.distNum = distNum;
+    this.distributionNumber = distributionNumber;
     this.distributionMethod = distributionMethod;
   }
 

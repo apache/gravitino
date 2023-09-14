@@ -16,9 +16,9 @@ class TestSortOrder {
   @Test
   void testSortOrder() {
     SortOrder.SortOrderBuilder builder = new SortOrder.SortOrderBuilder();
-    builder.nullOrder(NullOrder.FIRST);
-    builder.direction(Direction.ASC);
-    builder.transform(
+    builder.withNullOrder(NullOrder.FIRST);
+    builder.withDirection(Direction.ASC);
+    builder.withTransform(
         new Transform() {
           @Override
           public String name() {
@@ -37,9 +37,9 @@ class TestSortOrder {
     Assertions.assertEquals(Direction.ASC, sortOrder.getDirection());
     Assertions.assertEquals("a", sortOrder.getTransform().name());
 
-    builder.nullOrder(NullOrder.LAST);
-    builder.direction(Direction.DESC);
-    builder.transform(
+    builder.withNullOrder(NullOrder.LAST);
+    builder.withDirection(Direction.DESC);
+    builder.withTransform(
         new Transform() {
           @Override
           public String name() {

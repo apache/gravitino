@@ -6,9 +6,7 @@
 package com.datastrato.graviton.rel;
 
 import com.datastrato.graviton.rel.transforms.Transform;
-import lombok.Builder;
 
-@Builder
 public class Distribution {
   public enum DistributionMethod {
     HASH,
@@ -27,7 +25,7 @@ public class Distribution {
   private final int distributionNumber;
 
   /** Distribution method. */
-  private final DistributionMethod distMethod;
+  private final DistributionMethod distributionMethod;
 
   public Transform[] transforms() {
     return transforms;
@@ -38,6 +36,43 @@ public class Distribution {
   }
 
   public DistributionMethod distMethod() {
-    return distMethod;
+    return distributionMethod;
+  }
+
+  private Distribution(
+      Transform[] transforms, int distributionNumber, DistributionMethod distributionMethod) {
+    this.transforms = transforms;
+    this.distributionNumber = distributionNumber;
+    this.distributionMethod = distributionMethod;
+  }
+
+  public static DistributionBuilder builder() {
+    return new DistributionBuilder();
+  }
+
+  public static class DistributionBuilder {
+
+    private Transform[] transforms;
+    private int distributionNumber;
+    private DistributionMethod distributionMethod;
+
+    public DistributionBuilder withTransforms(Transform[] transforms) {
+      this.transforms = transforms;
+      return this;
+    }
+
+    public DistributionBuilder withDistributionNumber(int distributionNumber) {
+      this.distributionNumber = distributionNumber;
+      return this;
+    }
+
+    public DistributionBuilder withdistributionMethod(DistributionMethod distributionMethod) {
+      this.distributionMethod = distributionMethod;
+      return this;
+    }
+
+    public Distribution build() {
+      return new Distribution(transforms, distributionNumber, distributionMethod);
+    }
   }
 }

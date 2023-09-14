@@ -116,10 +116,10 @@ public class DTOConverters {
     }
 
     return Distribution.builder()
-        .distMethod(
+        .withdistributionMethod(
             Distribution.DistributionMethod.valueOf(distributionDTO.getDistributionMethod().name()))
-        .distributionNumber(distributionDTO.getDistNum())
-        .transforms(
+        .withDistributionNumber(distributionDTO.getDistributionNumber())
+        .withTransforms(
             distributionDTO.getExpressions().stream()
                 .map(PartitionUtils::toTransform)
                 .toArray(Transform[]::new))
@@ -136,9 +136,9 @@ public class DTOConverters {
 
   public static SortOrder fromDTO(SortOrderDTO sortOrderDTO) {
     return SortOrder.builder()
-        .direction(SortOrder.Direction.valueOf(sortOrderDTO.getDirection().name()))
-        .nullOrder(SortOrder.NullOrder.valueOf(sortOrderDTO.getNullOrdering().name()))
-        .transform(PartitionUtils.toTransform(sortOrderDTO.getExpression()))
+        .withDirection(SortOrder.Direction.valueOf(sortOrderDTO.getDirection().name()))
+        .withNullOrder(SortOrder.NullOrder.valueOf(sortOrderDTO.getNullOrdering().name()))
+        .withTransform(PartitionUtils.toTransform(sortOrderDTO.getExpression()))
         .build();
   }
 
