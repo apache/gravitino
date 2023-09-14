@@ -118,34 +118,31 @@ public class RESTUtils {
    */
   public static int findAvailablePort(final int portRangeStart, final int portRangeEnd)
       throws IOException {
-    int portStart = portRangeStart;
-    int portEnd = portRangeEnd;
-
-    if (portStart > portEnd) {
+    if (portRangeStart > portRangeEnd) {
       throw new IOException("Invalid port range: " + portRangeStart + ":" + portRangeEnd);
-    } else if (portStart == 0 && portEnd == 0) {
+    } else if (portRangeStart == 0 && portRangeEnd == 0) {
       try (ServerSocket socket = new ServerSocket(0)) {
         return socket.getLocalPort();
       } catch (IOException e) {
         throw new IOException("Failed to allocate a random port", e);
       }
-    } else if (portStart == portEnd) {
-      try (ServerSocket socket = new ServerSocket(portStart)) {
+    } else if (portRangeStart == portRangeEnd) {
+      try (ServerSocket socket = new ServerSocket(portRangeStart)) {
         return socket.getLocalPort();
       } catch (IOException e) {
-        throw new IOException("Failed to allocate the specified port: " + portStart, e);
+        throw new IOException("Failed to allocate the specified port: " + portRangeStart, e);
       }
     }
 
     // valid user registered port https://en.wikipedia.org/wiki/Registered_port
-    if (portStart < 1024 || portEnd > 65535) {
+    if (portRangeStart < 1024 || portRangeEnd > 65535) {
       throw new IOException("port number must be 0 or in [1024, 65535]");
     }
 
     Random random = new Random();
     final int maxRetry = 200;
-    for (int i = portStart; i <= portEnd || i < portStart + maxRetry; ++i) {
-      int randomNumber = random.nextInt(portEnd - portStart + 1) + portStart;
+    for (int i = portRangeStart; i <= portRangeEnd || i < portRangeStart + maxRetry; ++i) {
+      int randomNumber = random.nextInt(portRangeEnd - portRangeStart + 1) + portRangeStart;
       try (ServerSocket socket = new ServerSocket(randomNumber)) {
         return socket.getLocalPort();
       } catch (IOException e) {
