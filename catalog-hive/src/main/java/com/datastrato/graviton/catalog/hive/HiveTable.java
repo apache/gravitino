@@ -55,16 +55,6 @@ public class HiveTable extends BaseTable {
 
   private HiveTable() {}
 
-  @Override
-  public SortOrder[] sortOrder() {
-    return sortOrders;
-  }
-
-  @Override
-  public Distribution distribution() {
-    return distribution;
-  }
-
   /**
    * Creates a new HiveTable instance from a Table and a Builder.
    *

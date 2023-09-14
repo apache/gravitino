@@ -152,6 +152,16 @@ public class BaseTable implements Table, Entity, HasIdentifier {
     return partitions;
   }
 
+  @Override
+  public SortOrder[] sortOrder() {
+    return sortOrders;
+  }
+
+  @Override
+  public Distribution distribution() {
+    return distribution;
+  }
+
   /**
    * Returns the type of the entity, which is {@link EntityType#TABLE}.
    *
