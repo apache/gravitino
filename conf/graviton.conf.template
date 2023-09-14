@@ -35,3 +35,7 @@ graviton.entity.store.kv.rocskdb.path = /tmp/graviton
 # THE CONFIGURATION FOR GRAVITON CATALOG
 # The interval in milliseconds to evict the catalog cache
 graviton.catalog.cache.evictionIntervalMs = 3600000
+
+graviton.server.auxService.AuxServiceNames = GravitonIcebergREST
+
+graviton.server.auxService.GravitonIcebergREST.AuxServiceClasspath = catalogs/lakehouse/libs
