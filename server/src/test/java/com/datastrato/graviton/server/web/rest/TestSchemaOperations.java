@@ -27,8 +27,10 @@ import com.datastrato.graviton.exceptions.NoSuchSchemaException;
 import com.datastrato.graviton.exceptions.NonEmptySchemaException;
 import com.datastrato.graviton.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.graviton.rel.Schema;
+import com.datastrato.graviton.rest.RESTUtils;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import java.io.IOException;
 import java.time.Instant;
 import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
@@ -61,7 +63,12 @@ public class TestSchemaOperations extends JerseyTest {
 
   @Override
   protected Application configure() {
-    forceSet(TestProperties.CONTAINER_PORT, "0");
+    try {
+      forceSet(
+          TestProperties.CONTAINER_PORT, String.valueOf(RESTUtils.findAvailablePort(2000, 3000)));
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
 
     ResourceConfig resourceConfig = new ResourceConfig();
     resourceConfig.register(SchemaOperations.class);
