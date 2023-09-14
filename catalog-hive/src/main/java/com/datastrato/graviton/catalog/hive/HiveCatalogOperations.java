@@ -580,11 +580,11 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
   private void validateDistriutionAndSort(Distribution distribution, SortOrder[] sortOrder) {
     if (distribution != null) {
-      boolean allNameRefercen =
+      boolean allNameReference =
           Arrays.stream(distribution.transforms())
               .allMatch(t -> t instanceof Transforms.NamedReference);
       Preconditions.checkArgument(
-          allNameRefercen, "Hive distribution only supports name reference");
+          allNameReference, "Hive distribution only supports name reference");
     }
 
     if (sortOrder != null) {

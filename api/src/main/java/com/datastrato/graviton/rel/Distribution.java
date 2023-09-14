@@ -24,7 +24,7 @@ public class Distribution {
   private final Transform[] transforms;
 
   /** Number of bucket/distribution. */
-  private final int distNum;
+  private final int distributionNumber;
 
   /** Distribution method. */
   private final DistributionMethod distMethod;
@@ -33,8 +33,8 @@ public class Distribution {
     return transforms;
   }
 
-  public int distNum() {
-    return distNum;
+  public int distributionNumber() {
+    return distributionNumber;
   }
 
   public DistributionMethod distMethod() {

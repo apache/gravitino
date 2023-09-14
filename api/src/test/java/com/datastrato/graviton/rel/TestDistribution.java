@@ -16,21 +16,21 @@ class TestDistribution {
   void testDistribution() {
     Distribution.DistributionBuilder builder = new Distribution.DistributionBuilder();
     builder.distMethod(DistributionMethod.HASH);
-    builder.distNum(1);
+    builder.distributionNumber(1);
     builder.transforms(new Transform[] {});
     Distribution bucket = builder.build();
 
     Assertions.assertEquals(DistributionMethod.HASH, bucket.distMethod());
-    Assertions.assertEquals(1, bucket.distNum());
+    Assertions.assertEquals(1, bucket.distributionNumber());
     Assertions.assertArrayEquals(new Transform[] {}, bucket.transforms());
 
     builder.distMethod(DistributionMethod.EVEN);
-    builder.distNum(11111);
+    builder.distributionNumber(11111);
     builder.transforms(new Transform[] {});
     bucket = builder.build();
 
     Assertions.assertEquals(DistributionMethod.EVEN, bucket.distMethod());
-    Assertions.assertEquals(11111, bucket.distNum());
+    Assertions.assertEquals(11111, bucket.distributionNumber());
     Assertions.assertArrayEquals(new Transform[] {}, bucket.transforms());
   }
 }

@@ -15,7 +15,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 
 @EqualsAndHashCode
-@JsonPropertyOrder({"expression", "direction", "nullOrder"})
+@JsonPropertyOrder({"expression", "direction", "nullOrdering"})
 @Getter
 public class SortOrderDTO {
   public enum Direction {
@@ -34,13 +34,13 @@ public class SortOrderDTO {
     }
   }
 
-  public enum NullOrder {
+  public enum NullOrdering {
     FIRST,
     LAST;
 
     @JsonCreator
-    public static NullOrder fromString(String value) {
-      return NullOrder.valueOf(value.toUpperCase());
+    public static NullOrdering fromString(String value) {
+      return NullOrdering.valueOf(value.toUpperCase());
     }
 
     @JsonValue
@@ -56,23 +56,23 @@ public class SortOrderDTO {
   @JsonProperty("direction")
   private final Direction direction;
 
-  @JsonProperty("nullOrder")
-  private final NullOrder nullOrder;
+  @JsonProperty("nullOrdering")
+  private final NullOrdering nullOrdering;
 
   @JsonCreator
   private SortOrderDTO(
       @JsonProperty("expression") Expression expression,
       @JsonProperty("direction") Direction direction,
-      @JsonProperty("nullOrder") NullOrder nullOrder) {
+      @JsonProperty("nullOrder") NullOrdering nullOrdering) {
     this.expression = expression;
     this.direction = direction;
-    this.nullOrder = nullOrder;
+    this.nullOrdering = nullOrdering;
   }
 
   public static class Builder {
     private Expression expression;
     private Direction direction;
-    private NullOrder nullOrder;
+    private NullOrdering nullOrdering;
 
     public Builder() {}
 
@@ -86,8 +86,8 @@ public class SortOrderDTO {
       return this;
     }
 
-    public Builder withNullOrder(NullOrder nullOrder) {
-      this.nullOrder = nullOrder;
+    public Builder withNullOrder(NullOrdering nullOrdering) {
+      this.nullOrdering = nullOrdering;
       return this;
     }
 
@@ -96,10 +96,10 @@ public class SortOrderDTO {
       this.direction = direction == null ? Direction.ASC : direction;
 
       // Default is nulls first
-      this.nullOrder = nullOrder == null ? NullOrder.FIRST : nullOrder;
+      this.nullOrdering = nullOrdering == null ? NullOrdering.FIRST : nullOrdering;
 
       Preconditions.checkNotNull(this.expression, "expression cannot be null");
-      return new SortOrderDTO(expression, direction, nullOrder);
+      return new SortOrderDTO(expression, direction, nullOrdering);
     }
   }
 }

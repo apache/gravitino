@@ -81,7 +81,7 @@ public class DistributionDTO {
     }
 
     public DistributionDTO build() {
-      // Defualt bucket method is HASH
+      // Default bucket method is HASH
       distributionMethod =
           distributionMethod == null ? DistributionMethod.HASH : distributionMethod;
 

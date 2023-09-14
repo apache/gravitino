@@ -126,7 +126,7 @@ public class TestHiveTable extends MiniHiveMetastoreService {
 
   private Distribution createDistribution() {
     return Distribution.builder()
-        .distNum(10)
+        .distributionNumber(10)
         .transforms(new Transform[] {Transforms.field(new String[] {"col_1"})})
         .distMethod(DistributionMethod.EVEN)
         .build();
@@ -194,7 +194,8 @@ public class TestHiveTable extends MiniHiveMetastoreService {
     Assertions.assertTrue(store.exists(tableIdentifier, TABLE));
 
     // Compare sort and order
-    Assertions.assertEquals(distribution.distNum(), loadedTable.distribution().distNum());
+    Assertions.assertEquals(
+        distribution.distributionNumber(), loadedTable.distribution().distributionNumber());
     Assertions.assertArrayEquals(
         distribution.transforms(), loadedTable.distribution().transforms());
 

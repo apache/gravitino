@@ -25,6 +25,7 @@ import com.datastrato.graviton.dto.rel.ExpressionPartitionDTO.FieldExpression;
 import com.datastrato.graviton.dto.rel.Partition;
 import com.datastrato.graviton.dto.rel.SchemaDTO;
 import com.datastrato.graviton.dto.rel.SortOrderDTO;
+import com.datastrato.graviton.dto.rel.SortOrderDTO.NullOrdering;
 import com.datastrato.graviton.dto.rel.TableDTO;
 import com.datastrato.graviton.dto.requests.CatalogCreateRequest;
 import com.datastrato.graviton.dto.requests.SchemaCreateRequest;
@@ -840,7 +841,7 @@ public class TestRelationalCatalog extends TestBase {
     return new SortOrderDTO[] {
       new SortOrderDTO.Builder()
           .withDirection(direction)
-          .withNullOrder(SortOrderDTO.NullOrder.FIRST)
+          .withNullOrder(NullOrdering.FIRST)
           .withExpression(
               new FieldExpression.Builder().withFieldName(new String[] {columnName}).build())
           .build()

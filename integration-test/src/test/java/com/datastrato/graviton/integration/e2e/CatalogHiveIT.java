@@ -183,7 +183,7 @@ public class CatalogHiveIT extends AbstractIT {
         NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
     Distribution distribution =
         Distribution.builder()
-            .distNum(10)
+            .distributionNumber(10)
             .transforms(new Transform[] {Transforms.field(new String[] {HIVE_COL_NAME1})})
             .distMethod(DistributionMethod.EVEN)
             .build();
@@ -240,7 +240,7 @@ public class CatalogHiveIT extends AbstractIT {
     // Bad name in distribution
     final Distribution badDistribution =
         Distribution.builder()
-            .distNum(10)
+            .distributionNumber(10)
             .transforms(
                 new Transform[] {Transforms.field(new String[] {HIVE_COL_NAME1 + "bad_name"})})
             .distMethod(DistributionMethod.EVEN)
@@ -375,7 +375,8 @@ public class CatalogHiveIT extends AbstractIT {
     Assertions.assertEquals("col_3_comment", hiveTab.getSd().getCols().get(2).getComment());
 
     Assertions.assertEquals(
-        distribution == null ? 0 : distribution.distNum(), hiveTab.getSd().getNumBuckets());
+        distribution == null ? 0 : distribution.distributionNumber(),
+        hiveTab.getSd().getNumBuckets());
 
     List<String> resultDistributionCols =
         distribution == null

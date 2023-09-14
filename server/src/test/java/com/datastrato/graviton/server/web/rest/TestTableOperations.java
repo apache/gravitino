@@ -21,6 +21,7 @@ import com.datastrato.graviton.dto.rel.ExpressionPartitionDTO.FieldExpression;
 import com.datastrato.graviton.dto.rel.Partition;
 import com.datastrato.graviton.dto.rel.SimplePartitionDTO;
 import com.datastrato.graviton.dto.rel.SortOrderDTO;
+import com.datastrato.graviton.dto.rel.SortOrderDTO.NullOrdering;
 import com.datastrato.graviton.dto.rel.TableDTO;
 import com.datastrato.graviton.dto.requests.TableCreateRequest;
 import com.datastrato.graviton.dto.requests.TableUpdateRequest;
@@ -168,7 +169,7 @@ public class TestTableOperations extends JerseyTest {
     return new SortOrderDTO[] {
       new SortOrderDTO.Builder()
           .withDirection(direction)
-          .withNullOrder(SortOrderDTO.NullOrder.FIRST)
+          .withNullOrder(NullOrdering.FIRST)
           .withExpression(
               new FieldExpression.Builder().withFieldName(new String[] {columnName}).build())
           .build()

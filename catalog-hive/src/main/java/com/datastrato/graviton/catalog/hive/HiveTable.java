@@ -93,7 +93,7 @@ public class HiveTable extends BaseTable {
                   table.getSd().getBucketCols().stream()
                       .map(f -> new NamedReference(new String[] {f}))
                       .toArray(Transform[]::new))
-              .distNum(table.getSd().getNumBuckets())
+              .distributionNumber(table.getSd().getNumBuckets())
               .build();
     }
 
@@ -209,7 +209,7 @@ public class HiveTable extends BaseTable {
           Arrays.stream(distribution.transforms())
               .map(t -> ((NamedReference) t).value()[0])
               .collect(Collectors.toList()));
-      sd.setNumBuckets(distribution.distNum());
+      sd.setNumBuckets(distribution.distributionNumber());
     }
 
     return sd;

@@ -20,6 +20,7 @@ import com.datastrato.graviton.dto.rel.PartitionUtils;
 import com.datastrato.graviton.dto.rel.SchemaDTO;
 import com.datastrato.graviton.dto.rel.SortOrderDTO;
 import com.datastrato.graviton.dto.rel.SortOrderDTO.Direction;
+import com.datastrato.graviton.dto.rel.SortOrderDTO.NullOrdering;
 import com.datastrato.graviton.dto.rel.TableDTO;
 import com.datastrato.graviton.rel.Column;
 import com.datastrato.graviton.rel.Distribution;
@@ -101,7 +102,7 @@ public class DTOConverters {
 
     return new Builder()
         .withDistMethod(DistributionMethod.fromString(distribution.distMethod().name()))
-        .withDistNum(distribution.distNum())
+        .withDistNum(distribution.distributionNumber())
         .withExpressions(
             Arrays.stream(distribution.transforms())
                 .map(PartitionUtils::toExpression)
@@ -117,7 +118,7 @@ public class DTOConverters {
     return Distribution.builder()
         .distMethod(
             Distribution.DistributionMethod.valueOf(distributionDTO.getDistributionMethod().name()))
-        .distNum(distributionDTO.getDistNum())
+        .distributionNumber(distributionDTO.getDistNum())
         .transforms(
             distributionDTO.getExpressions().stream()
                 .map(PartitionUtils::toTransform)
@@ -129,16 +130,14 @@ public class DTOConverters {
     return new SortOrderDTO.Builder()
         .withExpression(PartitionUtils.toExpression(sortOrder.getTransform()))
         .withDirection(Direction.fromString(sortOrder.getDirection().name()))
-        .withNullOrder(
-            com.datastrato.graviton.dto.rel.SortOrderDTO.NullOrder.fromString(
-                sortOrder.getNullOrder().name()))
+        .withNullOrder(NullOrdering.fromString(sortOrder.getNullOrder().name()))
         .build();
   }
 
   public static SortOrder fromDTO(SortOrderDTO sortOrderDTO) {
     return SortOrder.builder()
         .direction(SortOrder.Direction.valueOf(sortOrderDTO.getDirection().name()))
-        .nullOrder(SortOrder.NullOrder.valueOf(sortOrderDTO.getNullOrder().name()))
+        .nullOrder(SortOrder.NullOrder.valueOf(sortOrderDTO.getNullOrdering().name()))
         .transform(PartitionUtils.toTransform(sortOrderDTO.getExpression()))
         .build();
   }

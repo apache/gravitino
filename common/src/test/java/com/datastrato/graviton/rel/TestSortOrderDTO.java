@@ -10,7 +10,7 @@ import com.datastrato.graviton.dto.rel.ExpressionPartitionDTO.FieldExpression;
 import com.datastrato.graviton.dto.rel.ExpressionPartitionDTO.FunctionExpression;
 import com.datastrato.graviton.dto.rel.SortOrderDTO;
 import com.datastrato.graviton.dto.rel.SortOrderDTO.Direction;
-import com.datastrato.graviton.dto.rel.SortOrderDTO.NullOrder;
+import com.datastrato.graviton.dto.rel.SortOrderDTO.NullOrdering;
 import com.datastrato.graviton.json.JsonUtils;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -25,7 +25,7 @@ public class TestSortOrderDTO {
     SortOrderDTO dto =
         new SortOrderDTO.Builder()
             .withDirection(Direction.ASC)
-            .withNullOrder(NullOrder.FIRST)
+            .withNullOrder(NullOrdering.FIRST)
             .withExpression(
                 new FieldExpression.Builder().withFieldName(new String[] {"field1"}).build())
             .build();
@@ -40,7 +40,7 @@ public class TestSortOrderDTO {
             + "    ]\n"
             + "  },\n"
             + "  \"direction\": \"asc\",\n"
-            + "  \"nullOrder\": \"first\"\n"
+            + "  \"nullOrdering\": \"first\"\n"
             + "}";
 
     JsonNode expected = JsonUtils.objectMapper().readTree(expectedValue);

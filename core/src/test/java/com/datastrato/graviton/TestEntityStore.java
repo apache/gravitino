@@ -176,7 +176,7 @@ public class TestEntityStore {
 
     Distribution distribution =
         Distribution.builder()
-            .distNum(10)
+            .distributionNumber(10)
             .transforms(new Transform[] {Transforms.field(new String[] {"column"})})
             .distMethod(DistributionMethod.EVEN)
             .build();
