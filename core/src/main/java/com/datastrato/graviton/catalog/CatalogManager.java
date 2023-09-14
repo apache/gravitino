@@ -33,17 +33,13 @@ import com.github.benmanes.caffeine.cache.Scheduler;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterables;
-import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Streams;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
-import java.net.MalformedURLException;
-import java.net.URL;
 import java.time.Instant;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -397,7 +393,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
     IsolatedClassLoader classLoader;
     if (config.get(Configs.CATALOG_LOAD_ISOLATED)) {
       String pkgPath = buildPkgPath(mergedConf, provider);
-      classLoader = buildClassLoader(pkgPath);
+      classLoader = IsolatedClassLoader.buildClassLoader(pkgPath);
     } else {
       // This will use the current class loader, it is mainly used for test.
       classLoader =
@@ -479,30 +475,6 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
     }
 
     return pkgPath;
-  }
-
-  private IsolatedClassLoader buildClassLoader(String pkgPath) {
-    // Listing all the jars under the package path and build the isolated class loader.
-    File pkgFolder = new File(pkgPath);
-    if (!pkgFolder.exists()
-        || !pkgFolder.isDirectory()
-        || !pkgFolder.canRead()
-        || !pkgFolder.canExecute()) {
-      throw new IllegalArgumentException("Invalid package path: " + pkgPath);
-    }
-
-    List<URL> jars = Lists.newArrayList();
-    Arrays.stream(pkgFolder.listFiles())
-        .forEach(
-            f -> {
-              try {
-                jars.add(f.toURI().toURL());
-              } catch (MalformedURLException e) {
-                LOG.warn("Failed to read jar file: {}", f.getAbsolutePath(), e);
-              }
-            });
-
-    return new IsolatedClassLoader(jars, Collections.emptyList(), Collections.emptyList());
   }
 
   private Class<? extends CatalogProvider> lookupCatalogProvider(String provider, ClassLoader cl) {

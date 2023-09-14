@@ -5,13 +5,13 @@
 package com.datastrato.graviton;
 
 import com.datastrato.graviton.config.ConfigEntry;
+import com.datastrato.graviton.utils.MapUtils;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Maps;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
-import java.util.Collections;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Optional;
@@ -128,16 +128,7 @@ public abstract class Config {
    * @return An unmodifiable map containing configuration entries with keys matching the prefix.
    */
   public Map<String, String> getConfigsWithPrefix(String prefix) {
-    Map<String, String> configs = Maps.newHashMap();
-    configMap.forEach(
-        (k, v) -> {
-          if (k.startsWith(prefix)) {
-            String newKey = k.substring(prefix.length());
-            configs.put(newKey, v);
-          }
-        });
-
-    return Collections.unmodifiableMap(configs);
+    return MapUtils.getPrefixMap(configMap, prefix);
   }
 
   /**
