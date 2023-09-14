@@ -175,7 +175,7 @@ public class CatalogHiveIT extends AbstractIT {
   }
 
   @Test
-  public void testCreateHiveTable() throws TException, InterruptedException {
+  void testCreateHiveTableWithDistributionAndSortOrder() throws TException, InterruptedException {
     // Create table from Graviton API
     ColumnDTO[] columns = createColumns();
 
@@ -188,7 +188,7 @@ public class CatalogHiveIT extends AbstractIT {
             .distMethod(DistributionMethod.EVEN)
             .build();
 
-    SortOrder[] sortOrders =
+    final SortOrder[] sortOrders =
         new SortOrder[] {
           SortOrder.builder()
               .nullOrder(NullOrder.FIRST)
@@ -209,6 +209,94 @@ public class CatalogHiveIT extends AbstractIT {
                 new Transform[0],
                 distribution,
                 sortOrders);
+
+    // Directly get table from hive metastore to check if the table is created successfully.
+    org.apache.hadoop.hive.metastore.api.Table hiveTab =
+        hiveClientPool.run(client -> client.getTable(schemaName, tableName));
+    properties
+        .keySet()
+        .forEach(
+            key -> Assertions.assertEquals(properties.get(key), hiveTab.getParameters().get(key)));
+    assertTableEquals(createdTable, hiveTab);
+
+    // test null partition
+    resetSchema();
+    Table createdTable1 =
+        catalog
+            .asTableCatalog()
+            .createTable(nameIdentifier, columns, table_comment, properties, null);
+
+    // Directly get table from hive metastore to check if the table is created successfully.
+    org.apache.hadoop.hive.metastore.api.Table hiveTable1 =
+        hiveClientPool.run(client -> client.getTable(schemaName, tableName));
+    properties
+        .keySet()
+        .forEach(
+            key ->
+                Assertions.assertEquals(properties.get(key), hiveTable1.getParameters().get(key)));
+    assertTableEquals(createdTable1, hiveTable1);
+
+    // Test bad request
+    // Bad name in distribution
+    final Distribution badDistribution =
+        Distribution.builder()
+            .distNum(10)
+            .transforms(
+                new Transform[] {Transforms.field(new String[] {HIVE_COL_NAME1 + "bad_name"})})
+            .distMethod(DistributionMethod.EVEN)
+            .build();
+    Assertions.assertThrows(
+        Exception.class,
+        () -> {
+          catalog
+              .asTableCatalog()
+              .createTable(
+                  nameIdentifier,
+                  columns,
+                  table_comment,
+                  properties,
+                  new Transform[0],
+                  badDistribution,
+                  sortOrders);
+        });
+
+    final SortOrder[] badSortOrders =
+        new SortOrder[] {
+          SortOrder.builder()
+              .nullOrder(NullOrder.FIRST)
+              .direction(Direction.DESC)
+              .transform(Transforms.field(new String[] {HIVE_COL_NAME2 + "bad_name"}))
+              .build()
+        };
+
+    Assertions.assertThrows(
+        Exception.class,
+        () -> {
+          catalog
+              .asTableCatalog()
+              .createTable(
+                  nameIdentifier,
+                  columns,
+                  table_comment,
+                  properties,
+                  new Transform[0],
+                  distribution,
+                  badSortOrders);
+        });
+  }
+
+  @Test
+  public void testCreateHiveTable() throws TException, InterruptedException {
+    // Create table from Graviton API
+    ColumnDTO[] columns = createColumns();
+
+    NameIdentifier nameIdentifier =
+        NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
+    Map<String, String> properties = createProperties();
+    Table createdTable =
+        catalog
+            .asTableCatalog()
+            .createTable(nameIdentifier, columns, table_comment, properties, new Transform[0]);
 
     // Directly get table from hive metastore to check if the table is created successfully.
     org.apache.hadoop.hive.metastore.api.Table hiveTab =

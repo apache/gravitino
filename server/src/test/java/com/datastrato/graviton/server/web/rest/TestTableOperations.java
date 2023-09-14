@@ -35,6 +35,8 @@ import com.datastrato.graviton.exceptions.NoSuchSchemaException;
 import com.datastrato.graviton.exceptions.NoSuchTableException;
 import com.datastrato.graviton.exceptions.TableAlreadyExistsException;
 import com.datastrato.graviton.rel.Column;
+import com.datastrato.graviton.rel.Distribution;
+import com.datastrato.graviton.rel.SortOrder;
 import com.datastrato.graviton.rel.Table;
 import com.datastrato.graviton.rel.TableChange;
 import com.datastrato.graviton.rel.transforms.Transform;
@@ -220,8 +222,9 @@ public class TestTableOperations extends JerseyTest {
     Assertions.assertEquals(columns[1].dataType(), columnDTOs[1].dataType());
     Assertions.assertEquals(columns[1].comment(), columnDTOs[1].comment());
 
+    // Test bad column name
     sortOrderDTOS = createMockSortOrderDTO("col_1", SortOrderDTO.Direction.DESC);
-    distributionDTO = createMockDistributionDTO("col2_2", 10);
+    distributionDTO = createMockDistributionDTO("col_2", 10);
 
     TableCreateRequest badReq =
         new TableCreateRequest(
@@ -243,6 +246,8 @@ public class TestTableOperations extends JerseyTest {
     Assertions.assertEquals(Status.BAD_REQUEST.getStatusCode(), resp.getStatus());
     Assertions.assertNotNull(tableDTO.partitioning());
     Assertions.assertEquals(0, tableDTO.partitioning().length);
+    Assertions.assertNull(tableDTO.distribution());
+    Assertions.assertEquals(0, tableDTO.sortOrder().length);
 
     // Test throw NoSuchSchemaException
     doThrow(new NoSuchSchemaException("mock error"))
@@ -693,6 +698,9 @@ public class TestTableOperations extends JerseyTest {
     Assertions.assertEquals(expectedColumnTypes, actualColumnTypes);
 
     Assertions.assertArrayEquals(tableDTO.partitioning(), updatedTable.partitioning());
+
+    Assertions.assertEquals(tableDTO.distribution(), updatedTable.distribution());
+    Assertions.assertArrayEquals(tableDTO.sortOrder(), updatedTable.sortOrder());
   }
 
   private static String tablePath(String metalake, String catalog, String schema) {
@@ -729,6 +737,20 @@ public class TestTableOperations extends JerseyTest {
       Column[] columns,
       String comment,
       Map<String, String> properties,
+      Distribution distribution,
+      SortOrder[] sortOrder) {
+    Table table = mockTable(tableName, columns, comment, properties, new Transform[0]);
+    when(table.distribution()).thenReturn(distribution);
+    when(table.sortOrder()).thenReturn(sortOrder);
+
+    return table;
+  }
+
+  private static Table mockTable(
+      String tableName,
+      Column[] columns,
+      String comment,
+      Map<String, String> properties,
       Transform[] transforms) {
     Table table = mock(Table.class);
     when(table.name()).thenReturn(tableName);
@@ -736,6 +758,8 @@ public class TestTableOperations extends JerseyTest {
     when(table.comment()).thenReturn(comment);
     when(table.properties()).thenReturn(properties);
     when(table.partitioning()).thenReturn(transforms);
+    when(table.sortOrder()).thenReturn(new SortOrder[0]);
+    when(table.distribution()).thenReturn(null);
 
     Audit mockAudit = mock(Audit.class);
     when(mockAudit.creator()).thenReturn("graviton");

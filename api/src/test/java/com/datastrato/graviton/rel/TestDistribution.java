@@ -10,7 +10,7 @@ import com.datastrato.graviton.rel.transforms.Transform;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-class DistributionTest {
+class TestDistribution {
 
   @Test
   void testDistribution() {

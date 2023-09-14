@@ -11,7 +11,7 @@ import com.datastrato.graviton.rel.transforms.Transform;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-class SortOrderTest {
+class TestSortOrder {
 
   @Test
   void testSortOrder() {
