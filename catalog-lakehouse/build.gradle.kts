@@ -39,3 +39,15 @@ dependencies {
       exclude(group = "org.junit.jupiter")
     }
 }
+
+tasks {
+    val copyDepends by registering(Copy::class) {
+        from(configurations.runtimeClasspath)
+        into("build/libs")
+    }
+    val copyCatalogLibs by registering(Copy::class) {
+        dependsOn(copyDepends)
+        from("build/libs")
+        into("${rootDir}/distribution/package/catalogs/lakehouse/libs")
+    }
+}
