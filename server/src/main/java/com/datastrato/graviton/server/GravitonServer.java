@@ -70,6 +70,7 @@ public class GravitonServer extends ResourceConfig {
 
   public void start() throws Exception {
     server.start();
+    gravitonEnv.start();
   }
 
   public void join() {
