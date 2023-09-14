@@ -320,6 +320,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
       // alter the hive database parameters
       Database alteredDatabase = database.deepCopy();
+      alteredDatabase.setName(ident.name());
       alteredDatabase.setParameters(metadata);
 
       // update store transactionally

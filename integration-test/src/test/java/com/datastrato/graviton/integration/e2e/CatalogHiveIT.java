@@ -46,7 +46,7 @@ public class CatalogHiveIT extends AbstractIT {
   public static String catalogName = GravitonITUtils.genRandomName("CatalogHiveIT_catalog");
   public static String schemaName = GravitonITUtils.genRandomName("CatalogHiveIT_schema");
   public static String tableName = GravitonITUtils.genRandomName("CatalogHiveIT_table");
-  public static String alertTableName = "alert_table_name";
+  public static String alterTableName = "alter_table_name";
   public static String table_comment = "table_comment";
   public static String HIVE_COL_NAME1 = "hive_col_name1";
   public static String HIVE_COL_NAME2 = "hive_col_name2";
@@ -281,7 +281,7 @@ public class CatalogHiveIT extends AbstractIT {
         .asTableCatalog()
         .alterTable(
             NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
-            TableChange.rename(alertTableName),
+            TableChange.rename(alterTableName),
             TableChange.updateComment(table_comment + "_new"),
             TableChange.removeProperty("key1"),
             TableChange.setProperty("key2", "val2_new"),
@@ -292,9 +292,10 @@ public class CatalogHiveIT extends AbstractIT {
 
     // Direct get table from hive metastore to check if the table is altered successfully.
     org.apache.hadoop.hive.metastore.api.Table hiveTab =
-        hiveClientPool.run(client -> client.getTable(schemaName, alertTableName));
+        hiveClientPool.run(client -> client.getTable(schemaName, alterTableName));
+    // Hive is case-insensitive, schemaName has upper letters, So we need to cast to a lower case
     Assertions.assertEquals(schemaName.toLowerCase(), hiveTab.getDbName());
-    Assertions.assertEquals(alertTableName, hiveTab.getTableName());
+    Assertions.assertEquals(alterTableName, hiveTab.getTableName());
     Assertions.assertEquals("val2_new", hiveTab.getParameters().get("key2"));
 
     Assertions.assertEquals(HIVE_COL_NAME1, hiveTab.getSd().getCols().get(0).getName());
@@ -329,23 +330,20 @@ public class CatalogHiveIT extends AbstractIT {
             new Transform[0]);
     catalog
         .asTableCatalog()
-        .dropTable(NameIdentifier.of(metalakeName, catalogName, schemaName, alertTableName));
+        .dropTable(NameIdentifier.of(metalakeName, catalogName, schemaName, alterTableName));
 
     // Directly get table from hive metastore to check if the table is dropped successfully.
     assertThrows(
         NoSuchObjectException.class,
-        () -> hiveClientPool.run(client -> client.getTable(schemaName, alertTableName)));
+        () -> hiveClientPool.run(client -> client.getTable(schemaName, alterTableName)));
   }
 
-  // TODO (xun) enable this test waiting for fixed [#316] [Bug report] alterSchema throw
-  // NoSuchSchemaException
-  //  @Test
+  @Test
   public void testAlterSchema() throws TException, InterruptedException {
     NameIdentifier ident = NameIdentifier.of(metalakeName, catalogName, schemaName);
     Map<String, String> properties = Maps.newHashMap();
     properties.put("key1", "val1");
     properties.put("key2", "val2");
-    String comment = "comment";
 
     GravitonMetaLake metalake = client.loadMetalake(NameIdentifier.of(metalakeName));
     Catalog catalog = metalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
@@ -355,8 +353,6 @@ public class CatalogHiveIT extends AbstractIT {
             ident,
             SchemaChange.removeProperty("key1"),
             SchemaChange.setProperty("key2", "val2-alter"));
-
-    NameIdentifier[] nameIdentifiers = catalog.asSchemas().listSchemas(ident.namespace());
 
     Map<String, String> properties2 = catalog.asSchemas().loadSchema(ident).properties();
     Assertions.assertFalse(properties2.containsKey("key1"));
