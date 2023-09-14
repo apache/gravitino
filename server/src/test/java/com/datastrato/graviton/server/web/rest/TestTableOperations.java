@@ -247,7 +247,7 @@ public class TestTableOperations extends JerseyTest {
     Assertions.assertEquals(Status.BAD_REQUEST.getStatusCode(), resp.getStatus());
     Assertions.assertNotNull(tableDTO.partitioning());
     Assertions.assertEquals(0, tableDTO.partitioning().length);
-    Assertions.assertNull(tableDTO.distribution());
+    Assertions.assertEquals(Distribution.NONE, tableDTO.distribution());
     Assertions.assertEquals(0, tableDTO.sortOrder().length);
 
     // Test throw NoSuchSchemaException
@@ -323,7 +323,7 @@ public class TestTableOperations extends JerseyTest {
             Arrays.stream(columns).map(DTOConverters::toDTO).toArray(ColumnDTO[]::new),
             ImmutableMap.of("k1", "v1"),
             new SortOrderDTO[0],
-            null,
+            DistributionDTO.NONE,
             toPartitions(transforms));
 
     Response resp =
@@ -760,7 +760,7 @@ public class TestTableOperations extends JerseyTest {
     when(table.properties()).thenReturn(properties);
     when(table.partitioning()).thenReturn(transforms);
     when(table.sortOrder()).thenReturn(new SortOrder[0]);
-    when(table.distribution()).thenReturn(null);
+    when(table.distribution()).thenReturn(Distribution.NONE);
 
     Audit mockAudit = mock(Audit.class);
     when(mockAudit.creator()).thenReturn("graviton");

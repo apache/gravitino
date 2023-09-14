@@ -579,7 +579,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
   }
 
   private void validateDistriutionAndSort(Distribution distribution, SortOrder[] sortOrder) {
-    if (distribution != null) {
+    if (distribution != Distribution.NONE) {
       boolean allNameReference =
           Arrays.stream(distribution.transforms())
               .allMatch(t -> t instanceof Transforms.NamedReference);
@@ -587,7 +587,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
           allNameReference, "Hive distribution only supports name reference");
     }
 
-    if (sortOrder != null) {
+    if (ArrayUtils.isNotEmpty(sortOrder)) {
       boolean allNameRefercen =
           Arrays.stream(sortOrder)
               .allMatch(t -> t.getTransform() instanceof Transforms.NamedReference);

@@ -37,7 +37,7 @@ public interface Table extends Auditable {
 
   /** Return the bucketing of the table. If no bucketing is specified, null is returned. */
   default Distribution distribution() {
-    return null;
+    return Distribution.NONE;
   }
 
   /** Return the comment of the table. Null is returned if no comment is set. */

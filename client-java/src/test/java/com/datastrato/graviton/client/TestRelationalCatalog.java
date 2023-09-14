@@ -456,7 +456,7 @@ public class TestRelationalCatalog extends TestBase {
             columns,
             Collections.emptyMap(),
             new SortOrderDTO[0],
-            null,
+            DistributionDTO.NONE,
             toPartitions(emptyTransform));
     TableResponse resp = new TableResponse(expectedTable);
     buildMockResource(Method.POST, tablePath, req, resp, SC_OK);
@@ -478,7 +478,7 @@ public class TestRelationalCatalog extends TestBase {
             "comment",
             Collections.emptyMap(),
             toPartitions(transforms),
-            null,
+            DistributionDTO.NONE,
             new SortOrderDTO[0]);
 
     req =
@@ -488,7 +488,7 @@ public class TestRelationalCatalog extends TestBase {
             columns,
             Collections.emptyMap(),
             new SortOrderDTO[0],
-            null,
+            DistributionDTO.NONE,
             toPartitions(transforms));
     resp = new TableResponse(expectedTable);
     buildMockResource(Method.POST, tablePath, req, resp, SC_OK);

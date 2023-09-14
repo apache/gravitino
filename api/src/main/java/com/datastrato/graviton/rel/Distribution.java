@@ -6,8 +6,14 @@
 package com.datastrato.graviton.rel;
 
 import com.datastrato.graviton.rel.transforms.Transform;
+import com.google.common.base.Objects;
 
 public class Distribution {
+
+  // NONE is used to indicate that there is no distribution.
+  public static final Distribution NONE =
+      new Distribution(new Transform[0], 0, DistributionMethod.HASH);
+
   public enum DistributionMethod {
     HASH,
     RANGE,
@@ -74,5 +80,24 @@ public class Distribution {
     public Distribution build() {
       return new Distribution(transforms, distributionNumber, distributionMethod);
     }
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+    Distribution that = (Distribution) o;
+    return distributionNumber == that.distributionNumber
+        && Objects.equal(transforms, that.transforms)
+        && distributionMethod == that.distributionMethod;
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hashCode(transforms, distributionNumber, distributionMethod);
   }
 }

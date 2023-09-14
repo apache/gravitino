@@ -81,7 +81,7 @@ public interface TableCatalog {
       NameIdentifier ident, Column[] columns, String comment, Map<String, String> properties)
       throws NoSuchSchemaException, TableAlreadyExistsException {
     return createTable(
-        ident, columns, comment, properties, new Transform[0], null, new SortOrder[0]);
+        ident, columns, comment, properties, new Transform[0], Distribution.NONE, new SortOrder[0]);
   }
 
   /**
@@ -103,7 +103,8 @@ public interface TableCatalog {
       Map<String, String> properties,
       Transform[] partitions)
       throws NoSuchSchemaException, TableAlreadyExistsException {
-    return createTable(ident, columns, comment, properties, partitions, null, new SortOrder[0]);
+    return createTable(
+        ident, columns, comment, properties, partitions, Distribution.NONE, new SortOrder[0]);
   }
 
   /**

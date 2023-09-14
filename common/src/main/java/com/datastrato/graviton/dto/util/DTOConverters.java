@@ -96,8 +96,8 @@ public class DTOConverters {
   }
 
   public static DistributionDTO toDTO(Distribution distribution) {
-    if (distribution == null) {
-      return null;
+    if (Distribution.NONE.equals(distribution)) {
+      return DistributionDTO.NONE;
     }
 
     return new Builder()
@@ -111,8 +111,8 @@ public class DTOConverters {
   }
 
   public static Distribution fromDTO(DistributionDTO distributionDTO) {
-    if (distributionDTO == null) {
-      return null;
+    if (DistributionDTO.NONE.equals(distributionDTO)) {
+      return Distribution.NONE;
     }
 
     return Distribution.builder()

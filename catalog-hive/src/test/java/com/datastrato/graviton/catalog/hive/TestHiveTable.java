@@ -364,7 +364,7 @@ public class TestHiveTable extends MiniHiveMetastoreService {
             HIVE_COMMENT,
             properties,
             new Transform[0],
-            null,
+            Distribution.NONE,
             new SortOrder[0]);
 
     Assertions.assertTrue(hiveCatalog.asTableCatalog().tableExists(tableIdentifier));

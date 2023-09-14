@@ -212,7 +212,7 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
                         comment,
                         properties,
                         partitions == null ? new Transform[0] : partitions,
-                        distribution,
+                        distribution == null ? Distribution.NONE : distribution,
                         sortOrders == null ? new SortOrder[0] : sortOrders)),
         NoSuchSchemaException.class,
         TableAlreadyExistsException.class);
@@ -232,7 +232,6 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
   public Table alterTable(NameIdentifier ident, TableChange... changes)
       throws NoSuchTableException, IllegalArgumentException {
     NameIdentifier catalogIdent = NameIdentifier.of(ident.namespace().levels());
-
     return doWithCatalog(
         catalogIdent,
         c -> c.doWithTableOps(t -> t.alterTable(ident, changes)),

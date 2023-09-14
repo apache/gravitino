@@ -10,17 +10,20 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.fasterxml.jackson.annotation.JsonValue;
+import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
+import java.util.Collections;
 import java.util.List;
-import lombok.EqualsAndHashCode;
 import lombok.Getter;
-import lombok.NonNull;
 import org.apache.commons.collections4.CollectionUtils;
 
-@EqualsAndHashCode
 @JsonPropertyOrder({"expressions", "distributionNumber", "distributionMethod"})
 @Getter
 public class DistributionDTO {
+
+  // NONE is used to indicate that there is no distribution.
+  public static final DistributionDTO NONE =
+      new DistributionDTO(Collections.EMPTY_LIST, 0, DistributionMethod.HASH);
 
   public enum DistributionMethod {
     HASH,
@@ -40,7 +43,6 @@ public class DistributionDTO {
   }
 
   @JsonProperty("expressions")
-  @NonNull
   private final List<Expression> expressions;
 
   @JsonProperty("distributionNumber")
@@ -90,5 +92,24 @@ public class DistributionDTO {
       Preconditions.checkState(bucketNum >= 0, "bucketNum must be greater than 0");
       return new DistributionDTO(expressions, bucketNum, distributionMethod);
     }
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+    DistributionDTO that = (DistributionDTO) o;
+    return distributionNumber == that.distributionNumber
+        && Objects.equal(expressions, that.expressions)
+        && distributionMethod == that.distributionMethod;
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hashCode(expressions, distributionNumber, distributionMethod);
   }
 }

@@ -85,7 +85,7 @@ public class HiveTable extends BaseTable {
       auditInfoBuilder.withCreateTime(Instant.ofEpochSecond(table.getCreateTime()));
     }
 
-    Distribution distribution = null;
+    Distribution distribution = Distribution.NONE;
     if (CollectionUtils.isNotEmpty(table.getSd().getBucketCols())) {
       distribution =
           Distribution.builder()
