@@ -6,7 +6,9 @@
 package com.datastrato.graviton.catalog.lakehouse.iceberg.web.rest;
 
 import com.datastrato.graviton.catalog.lakehouse.iceberg.web.IcebergObjectMapperProvider;
+import com.datastrato.graviton.rest.RESTUtils;
 import com.google.common.base.Joiner;
+import java.io.IOException;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Optional;
@@ -21,7 +23,12 @@ import org.glassfish.jersey.test.TestProperties;
 public class IcebergTestBase extends JerseyTest {
   @Override
   protected Application configure() {
-    forceSet(TestProperties.CONTAINER_PORT, "0");
+    try {
+      forceSet(
+          TestProperties.CONTAINER_PORT, String.valueOf(RESTUtils.findAvailablePort(2000, 3000)));
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
 
     return new ResourceConfig();
   }
