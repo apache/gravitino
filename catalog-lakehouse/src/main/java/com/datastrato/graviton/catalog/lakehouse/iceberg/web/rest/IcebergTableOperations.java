@@ -28,7 +28,7 @@ import org.apache.iceberg.rest.requests.UpdateTableRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-@Path("/v1/namespaces/{namespace}/tables")
+@Path("/v1/{prefix:([^/]*/)?}namespaces/{namespace}/tables")
 @Consumes(MediaType.APPLICATION_JSON)
 @Produces(MediaType.APPLICATION_JSON)
 public class IcebergTableOperations {

@@ -17,7 +17,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.iceberg.rest.requests.RenameTableRequest;
 
-@Path("/v1/tables/rename")
+@Path("/v1/{prefix:([^/]*/)?}tables/rename")
 @Consumes(MediaType.APPLICATION_JSON)
 @Produces(MediaType.APPLICATION_JSON)
 public class IcebergTableRenameOperations {
