@@ -122,7 +122,7 @@ public class RESTUtils {
     int portEnd = portRangeEnd;
 
     if (portStart > portEnd) {
-      throw new IOException("Invalid port range: : " + portRangeStart + ":" + portRangeEnd);
+      throw new IOException("Invalid port range: " + portRangeStart + ":" + portRangeEnd);
     } else if (portStart == 0 && portEnd == 0) {
       try (ServerSocket socket = new ServerSocket(0)) {
         return socket.getLocalPort();
@@ -143,8 +143,8 @@ public class RESTUtils {
     }
 
     Random random = new Random();
-    final int MaxTry = 200;
-    for (int i = portStart; i <= portEnd || i < portStart + MaxTry; ++i) {
+    final int maxRetry = 200;
+    for (int i = portStart; i <= portEnd || i < portStart + maxRetry; ++i) {
       int randomNumber = random.nextInt(portEnd - portStart + 1) + portStart;
       try (ServerSocket socket = new ServerSocket(randomNumber)) {
         return socket.getLocalPort();
