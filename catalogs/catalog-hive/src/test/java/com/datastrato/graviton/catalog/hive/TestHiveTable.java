@@ -4,22 +4,13 @@
  */
 package com.datastrato.graviton.catalog.hive;
 
-import static com.datastrato.graviton.Configs.DEFAULT_ENTITY_KV_STORE;
-import static com.datastrato.graviton.Configs.ENTITY_KV_STORE;
-import static com.datastrato.graviton.Configs.ENTITY_STORE;
-import static com.datastrato.graviton.Configs.ENTRY_KV_ROCKSDB_BACKEND_PATH;
-import static com.datastrato.graviton.Entity.EntityType.TABLE;
 import static com.datastrato.graviton.rel.transforms.Transforms.day;
 import static com.datastrato.graviton.rel.transforms.Transforms.identity;
 
-import com.datastrato.graviton.Config;
-import com.datastrato.graviton.Configs;
-import com.datastrato.graviton.EntityStore;
-import com.datastrato.graviton.GravitonEnv;
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
-import com.datastrato.graviton.StringIdentifier;
 import com.datastrato.graviton.catalog.hive.miniHMS.MiniHiveMetastoreService;
+import com.datastrato.graviton.exceptions.NoSuchSchemaException;
 import com.datastrato.graviton.exceptions.TableAlreadyExistsException;
 import com.datastrato.graviton.meta.AuditInfo;
 import com.datastrato.graviton.meta.CatalogEntity;
@@ -39,13 +30,10 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Map;
-import org.apache.commons.io.FileUtils;
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 
 public class TestHiveTable extends MiniHiveMetastoreService {
 
@@ -54,50 +42,24 @@ public class TestHiveTable extends MiniHiveMetastoreService {
   private static final String HIVE_CATALOG_NAME = "test_catalog";
   private static final String HIVE_SCHEMA_NAME = "test_schema";
   private static final String HIVE_COMMENT = "test_comment";
-  private static final String ROCKS_DB_STORE_PATH = "/tmp/graviton/test_hive_table";
   private static HiveCatalog hiveCatalog;
   private static HiveSchema hiveSchema;
-
-  private static EntityStore store;
+  private static final NameIdentifier schemaIdent =
+      NameIdentifier.of(META_LAKE_NAME, HIVE_CATALOG_NAME, HIVE_SCHEMA_NAME);
 
   @BeforeAll
   private static void setup() {
-    mockStore();
     initHiveCatalog();
     initHiveSchema();
   }
 
-  @AfterAll
-  private static void tearDown() {
-    try {
-      FileUtils.deleteDirectory(FileUtils.getFile(ROCKS_DB_STORE_PATH));
-    } catch (Exception e) {
-      // Ignore
-    }
-  }
-
   @AfterEach
   private void resetSchema() {
-    hiveCatalog.asSchemas().dropSchema(hiveSchema.nameIdentifier(), true);
+    hiveCatalog.asSchemas().dropSchema(schemaIdent, true);
     initHiveSchema();
   }
 
-  private static void mockStore() {
-    Config config = Mockito.mock(Config.class);
-    Mockito.when(config.get(ENTITY_STORE)).thenReturn("kv");
-    Mockito.when(config.get(ENTITY_KV_STORE)).thenReturn(DEFAULT_ENTITY_KV_STORE);
-    Mockito.when(config.get(Configs.ENTITY_SERDE)).thenReturn("proto");
-    Mockito.when(config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)).thenReturn(ROCKS_DB_STORE_PATH);
-    Mockito.when(config.get(Configs.CATALOG_CACHE_EVICTION_INTERVAL_MS))
-        .thenReturn(Configs.CATALOG_CACHE_EVICTION_INTERVAL_MS.getDefaultValue());
-
-    GravitonEnv.getInstance().initialize(config);
-    store = GravitonEnv.getInstance().entityStore();
-  }
-
   private static void initHiveSchema() {
-    NameIdentifier schemaIdent =
-        NameIdentifier.of(META_LAKE_NAME, hiveCatalog.name(), HIVE_SCHEMA_NAME);
     Map<String, String> properties = Maps.newHashMap();
     properties.put("key1", "val1");
     properties.put("key2", "val2");
@@ -181,17 +143,24 @@ public class TestHiveTable extends MiniHiveMetastoreService {
                 sortOrders);
     Assertions.assertEquals(tableIdentifier.name(), table.name());
     Assertions.assertEquals(HIVE_COMMENT, table.comment());
-    testProperties(properties, table.properties());
+    Assertions.assertEquals("val1", table.properties().get("key1"));
+    Assertions.assertEquals("val2", table.properties().get("key2"));
 
     Table loadedTable = hiveCatalog.asTableCatalog().loadTable(tableIdentifier);
-    Assertions.assertEquals(table.auditInfo(), loadedTable.auditInfo());
-    testProperties(properties, loadedTable.properties());
+    Assertions.assertEquals(table.auditInfo().creator(), loadedTable.auditInfo().creator());
+    Assertions.assertEquals(
+        table.auditInfo().createTime().getEpochSecond(),
+        loadedTable.auditInfo().createTime().getEpochSecond());
+    Assertions.assertNull(loadedTable.auditInfo().lastModifier());
+    Assertions.assertNull(loadedTable.auditInfo().lastModifiedTime());
+
+    Assertions.assertEquals("val1", loadedTable.properties().get("key1"));
+    Assertions.assertEquals("val2", loadedTable.properties().get("key2"));
 
     Assertions.assertTrue(hiveCatalog.asTableCatalog().tableExists(tableIdentifier));
     NameIdentifier[] tableIdents =
         hiveCatalog.asTableCatalog().listTables(tableIdentifier.namespace());
     Assertions.assertTrue(Arrays.asList(tableIdents).contains(tableIdentifier));
-    Assertions.assertTrue(store.exists(tableIdentifier, TABLE));
 
     // Compare sort and order
     Assertions.assertEquals(distribution.number(), loadedTable.distribution().number());
@@ -209,23 +178,6 @@ public class TestHiveTable extends MiniHiveMetastoreService {
     // Test exception
     Throwable exception =
         Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () ->
-                hiveCatalog
-                    .asTableCatalog()
-                    .createTable(
-                        hiveSchema.nameIdentifier(),
-                        columns,
-                        HIVE_COMMENT,
-                        properties,
-                        new Transform[0],
-                        distribution,
-                        sortOrders));
-    Assertions.assertTrue(
-        exception.getMessage().contains("Cannot support invalid namespace in Hive Metastore"));
-
-    exception =
-        Assertions.assertThrows(
             TableAlreadyExistsException.class,
             () ->
                 hiveCatalog
@@ -242,7 +194,7 @@ public class TestHiveTable extends MiniHiveMetastoreService {
   }
 
   @Test
-  public void testCreatePartitionedHiveTable() throws IOException {
+  public void testCreatePartitionedHiveTable() {
     NameIdentifier tableIdentifier =
         NameIdentifier.of(META_LAKE_NAME, hiveCatalog.name(), hiveSchema.name(), genRandomName());
     Map<String, String> properties = Maps.newHashMap();
@@ -271,19 +223,27 @@ public class TestHiveTable extends MiniHiveMetastoreService {
             .createTable(tableIdentifier, columns, HIVE_COMMENT, properties, partitions);
     Assertions.assertEquals(tableIdentifier.name(), table.name());
     Assertions.assertEquals(HIVE_COMMENT, table.comment());
-    testProperties(properties, table.properties());
+    Assertions.assertEquals("val1", table.properties().get("key1"));
+    Assertions.assertEquals("val2", table.properties().get("key2"));
     Assertions.assertArrayEquals(partitions, table.partitioning());
 
     Table loadedTable = hiveCatalog.asTableCatalog().loadTable(tableIdentifier);
-    Assertions.assertEquals(table.auditInfo(), loadedTable.auditInfo());
-    testProperties(properties, loadedTable.properties());
+
+    Assertions.assertEquals(table.auditInfo().creator(), loadedTable.auditInfo().creator());
+    Assertions.assertEquals(
+        table.auditInfo().createTime().getEpochSecond(),
+        loadedTable.auditInfo().createTime().getEpochSecond());
+    Assertions.assertNull(loadedTable.auditInfo().lastModifier());
+    Assertions.assertNull(loadedTable.auditInfo().lastModifiedTime());
+
+    Assertions.assertEquals("val1", loadedTable.properties().get("key1"));
+    Assertions.assertEquals("val2", loadedTable.properties().get("key2"));
     Assertions.assertArrayEquals(partitions, loadedTable.partitioning());
 
     Assertions.assertTrue(hiveCatalog.asTableCatalog().tableExists(tableIdentifier));
     NameIdentifier[] tableIdents =
         hiveCatalog.asTableCatalog().listTables(tableIdentifier.namespace());
     Assertions.assertTrue(Arrays.asList(tableIdents).contains(tableIdentifier));
-    Assertions.assertTrue(store.exists(tableIdentifier, TABLE));
 
     // Test exception
     Throwable exception =
@@ -334,7 +294,7 @@ public class TestHiveTable extends MiniHiveMetastoreService {
   }
 
   @Test
-  public void testDropHiveTable() throws IOException {
+  public void testDropHiveTable() {
     NameIdentifier tableIdentifier =
         NameIdentifier.of(META_LAKE_NAME, hiveCatalog.name(), hiveSchema.name(), genRandomName());
     Map<String, String> properties = Maps.newHashMap();
@@ -369,25 +329,15 @@ public class TestHiveTable extends MiniHiveMetastoreService {
     Assertions.assertTrue(hiveCatalog.asTableCatalog().tableExists(tableIdentifier));
     hiveCatalog.asTableCatalog().dropTable(tableIdentifier);
     Assertions.assertFalse(hiveCatalog.asTableCatalog().tableExists(tableIdentifier));
-    Assertions.assertFalse(store.exists(tableIdentifier, TABLE));
   }
 
   @Test
   public void testListTableException() {
+    Namespace tableNs = Namespace.of("metalake", hiveCatalog.name(), "not_exist_db");
     Throwable exception =
         Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () -> hiveCatalog.asTableCatalog().listTables(hiveSchema.nameIdentifier().namespace()));
-    Assertions.assertTrue(
-        exception.getMessage().contains("Cannot support invalid namespace in Hive Metastore"));
-
-    NameIdentifier ident = NameIdentifier.of("metalake", hiveCatalog.name(), "not_exist_db");
-    exception =
-        Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () -> hiveCatalog.asTableCatalog().listTables(ident.namespace()));
-    Assertions.assertTrue(
-        exception.getMessage().contains("Cannot support invalid namespace in Hive Metastore"));
+            NoSuchSchemaException.class, () -> hiveCatalog.asTableCatalog().listTables(tableNs));
+    Assertions.assertTrue(exception.getMessage().contains("Schema (database) does not exist"));
   }
 
   @Test
@@ -462,14 +412,12 @@ public class TestHiveTable extends MiniHiveMetastoreService {
     Assertions.assertFalse(alteredTable.properties().containsKey("key1"));
     Assertions.assertEquals(alteredTable.properties().get("key2"), "val2_new");
 
-    Assertions.assertFalse(store.exists(tableIdentifier, TABLE));
-    Assertions.assertTrue(store.exists(((HiveTable) alteredTable).nameIdentifier(), TABLE));
-
     Assertions.assertEquals(createdTable.auditInfo().creator(), alteredTable.auditInfo().creator());
     Assertions.assertEquals(
-        createdTable.auditInfo().createTime(), alteredTable.auditInfo().createTime());
-    Assertions.assertNotNull(alteredTable.auditInfo().lastModifier());
-    Assertions.assertNotNull(alteredTable.auditInfo().lastModifiedTime());
+        createdTable.auditInfo().createTime().getEpochSecond(),
+        alteredTable.auditInfo().createTime().getEpochSecond());
+    Assertions.assertNull(alteredTable.auditInfo().lastModifier());
+    Assertions.assertNull(alteredTable.auditInfo().lastModifiedTime());
     Assertions.assertNotNull(alteredTable.partitioning());
     Assertions.assertArrayEquals(createdTable.partitioning(), alteredTable.partitioning());
 
@@ -510,21 +458,11 @@ public class TestHiveTable extends MiniHiveMetastoreService {
     Assertions.assertEquals(
         createdTable.auditInfo().creator(), alteredTable1.auditInfo().creator());
     Assertions.assertEquals(
-        createdTable.auditInfo().createTime(), alteredTable1.auditInfo().createTime());
-    Assertions.assertNotNull(alteredTable1.auditInfo().lastModifier());
-    Assertions.assertNotNull(alteredTable1.auditInfo().lastModifiedTime());
+        createdTable.auditInfo().createTime().getEpochSecond(),
+        alteredTable1.auditInfo().createTime().getEpochSecond());
+    Assertions.assertNull(alteredTable1.auditInfo().lastModifier());
+    Assertions.assertNull(alteredTable1.auditInfo().lastModifiedTime());
     Assertions.assertNotNull(alteredTable.partitioning());
     Assertions.assertArrayEquals(createdTable.partitioning(), alteredTable.partitioning());
-  }
-
-  private void testProperties(Map<String, String> expectedProps, Map<String, String> testProps) {
-    expectedProps.forEach(
-        (k, v) -> {
-          Assertions.assertEquals(v, testProps.get(k));
-        });
-
-    Assertions.assertTrue(testProps.containsKey(StringIdentifier.ID_KEY));
-    StringIdentifier StringId = StringIdentifier.fromString(testProps.get(StringIdentifier.ID_KEY));
-    Assertions.assertEquals(StringId.toString(), testProps.get(StringIdentifier.ID_KEY));
   }
 }

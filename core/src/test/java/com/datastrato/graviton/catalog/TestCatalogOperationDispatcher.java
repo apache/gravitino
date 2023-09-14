@@ -14,7 +14,7 @@ import org.junit.jupiter.api.Test;
 public class TestCatalogOperationDispatcher {
   @Test
   public void testGetCatalogIdentifier() {
-    CatalogOperationDispatcher dispatcher = new CatalogOperationDispatcher(null);
+    CatalogOperationDispatcher dispatcher = new CatalogOperationDispatcher(null, null, null);
 
     NameIdentifier id1 = NameIdentifier.of("a");
     assertThrows(IllegalNamespaceException.class, () -> dispatcher.getCatalogIdentifier(id1));

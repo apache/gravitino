@@ -78,7 +78,8 @@ public class GravitonEnv {
 
     // Create and initialize Catalog related modules
     this.catalogManager = new CatalogManager(config, entityStore, idGenerator);
-    this.catalogOperationDispatcher = new CatalogOperationDispatcher(catalogManager);
+    this.catalogOperationDispatcher =
+        new CatalogOperationDispatcher(catalogManager, entityStore, idGenerator);
 
     this.auxServiceManager = new AuxiliaryServiceManager();
     this.auxServiceManager.serviceInit(

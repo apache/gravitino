@@ -66,9 +66,7 @@ public class TestCatalogOperations implements CatalogOperations, TableCatalog {
 
     TestTable table =
         new TestTable.Builder()
-            .withId(1L)
             .withName(ident.name())
-            .withNameSpace(ident.namespace())
             .withComment(comment)
             .withProperties(properties)
             .withAuditInfo(auditInfo)

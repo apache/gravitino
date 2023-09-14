@@ -4,11 +4,11 @@
  */
 package com.datastrato.graviton.proto;
 
-import com.datastrato.graviton.meta.rel.BaseTable;
+import com.datastrato.graviton.meta.TableEntity;
 
-public class TableEntitySerde implements ProtoSerDe<BaseTable, Table> {
+public class TableEntitySerde implements ProtoSerDe<TableEntity, Table> {
   @Override
-  public Table serialize(BaseTable tableEntity) {
+  public Table serialize(TableEntity tableEntity) {
     return Table.newBuilder()
         .setId(tableEntity.id())
         .setName(tableEntity.name())
@@ -17,8 +17,8 @@ public class TableEntitySerde implements ProtoSerDe<BaseTable, Table> {
   }
 
   @Override
-  public BaseTable deserialize(Table p) {
-    return new BaseTable.TableBuilder()
+  public TableEntity deserialize(Table p) {
+    return new TableEntity.Builder()
         .withId(p.getId())
         .withName(p.getName())
         .withAuditInfo(new AuditInfoSerDe().deserialize(p.getAuditInfo()))

@@ -4,8 +4,8 @@
  */
 package com.datastrato.graviton.catalog.hive;
 
+import com.datastrato.graviton.catalog.rel.BaseSchema;
 import com.datastrato.graviton.meta.AuditInfo;
-import com.datastrato.graviton.meta.rel.BaseSchema;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import java.util.Collections;
@@ -23,8 +23,6 @@ public class HiveSchema extends BaseSchema {
   private static final String HMS_DB_OWNER = "hive.metastore.database.owner";
   private static final String HMS_DB_OWNER_TYPE = "hive.metastore.database.owner-type";
 
-  private Database innerDb;
-
   private Configuration conf;
 
   private HiveSchema() {}
@@ -33,10 +31,10 @@ public class HiveSchema extends BaseSchema {
    * Creates a new HiveSchema instance from a Database and a Builder.
    *
    * @param db The Database representing the HiveSchema.
-   * @param builder The Builder used to construct the HiveSchema.
+   * @param hiveConf The HiveConf used to construct the HiveSchema.
    * @return A new HiveSchema instance.
    */
-  public static HiveSchema fromInnerDB(Database db, Builder builder) {
+  public static HiveSchema fromHiveDB(Database db, Configuration hiveConf) {
     Map<String, String> properties = convertToMetadata(db);
 
     // Get audit info from Hive's Database object. Because Hive's database doesn't store create
@@ -44,11 +42,12 @@ public class HiveSchema extends BaseSchema {
     AuditInfo.Builder auditInfoBuilder = new AuditInfo.Builder();
     Optional.ofNullable(db.getOwnerName()).ifPresent(auditInfoBuilder::withCreator);
 
-    return builder
+    return new HiveSchema.Builder()
         .withName(db.getName())
         .withComment(db.getDescription())
         .withProperties(properties)
         .withAuditInfo(auditInfoBuilder.build())
+        .withConf(hiveConf)
         .build();
   }
 
@@ -81,12 +80,9 @@ public class HiveSchema extends BaseSchema {
    *
    * @return The converted Database object.
    */
-  public Database toInnerDB() {
-    if (innerDb != null) {
-      return innerDb;
-    }
+  public Database toHiveDB() {
+    Database innerDb = new Database();
 
-    innerDb = new Database();
     Map<String, String> parameter = Maps.newHashMap();
     innerDb.setName(name());
     innerDb.setLocationUri(databaseLocation(name()));
@@ -164,9 +160,7 @@ public class HiveSchema extends BaseSchema {
     @Override
     protected HiveSchema internalBuild() {
       HiveSchema hiveSchema = new HiveSchema();
-      hiveSchema.id = id;
       hiveSchema.name = name;
-      hiveSchema.namespace = namespace;
       hiveSchema.comment = comment;
       hiveSchema.properties = properties;
       hiveSchema.auditInfo = auditInfo;

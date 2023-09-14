@@ -129,5 +129,35 @@ public class TestEntityProtoSerDe {
         protoEntitySerDe.deserialize(
             catalogBytes, com.datastrato.graviton.meta.CatalogEntity.class);
     Assertions.assertEquals(catalogEntity, catalogEntityFromBytes);
+
+    // Test SchemaEntity
+    Long schemaId = 1L;
+    String schemaName = "schema";
+    com.datastrato.graviton.meta.SchemaEntity schemaEntity =
+        new com.datastrato.graviton.meta.SchemaEntity.Builder()
+            .withId(schemaId)
+            .withName(schemaName)
+            .withAuditInfo(auditInfo)
+            .build();
+
+    byte[] schemaBytes = protoEntitySerDe.serialize(schemaEntity);
+    com.datastrato.graviton.meta.SchemaEntity schemaEntityFromBytes =
+        protoEntitySerDe.deserialize(schemaBytes, com.datastrato.graviton.meta.SchemaEntity.class);
+    Assertions.assertEquals(schemaEntity, schemaEntityFromBytes);
+
+    // Test TableEntity
+    Long tableId = 1L;
+    String tableName = "table";
+    com.datastrato.graviton.meta.TableEntity tableEntity =
+        new com.datastrato.graviton.meta.TableEntity.Builder()
+            .withId(tableId)
+            .withName(tableName)
+            .withAuditInfo(auditInfo)
+            .build();
+
+    byte[] tableBytes = protoEntitySerDe.serialize(tableEntity);
+    com.datastrato.graviton.meta.TableEntity tableEntityFromBytes =
+        protoEntitySerDe.deserialize(tableBytes, com.datastrato.graviton.meta.TableEntity.class);
+    Assertions.assertEquals(tableEntity, tableEntityFromBytes);
   }
 }

@@ -29,16 +29,10 @@ public class ProtoEntitySerDe implements EntitySerDe {
               "com.datastrato.graviton.meta.CatalogEntity",
               "com.datastrato.graviton.proto.CatalogEntitySerDe")
           .put(
-              "com.datastrato.graviton.meta.rel.BaseSchema",
+              "com.datastrato.graviton.meta.SchemaEntity",
               "com.datastrato.graviton.proto.SchemaEntitySerDe")
           .put(
-              "com.datastrato.graviton.catalog.hive.HiveSchema",
-              "com.datastrato.graviton.proto.SchemaEntitySerDe")
-          .put(
-              "com.datastrato.graviton.meta.rel.BaseTable",
-              "com.datastrato.graviton.proto.TableEntitySerde")
-          .put(
-              "com.datastrato.graviton.catalog.hive.HiveTable",
+              "com.datastrato.graviton.meta.TableEntity",
               "com.datastrato.graviton.proto.TableEntitySerde")
           .build();
 
@@ -50,9 +44,9 @@ public class ProtoEntitySerDe implements EntitySerDe {
           "com.datastrato.graviton.proto.Metalake",
           "com.datastrato.graviton.meta.CatalogEntity",
           "com.datastrato.graviton.proto.Catalog",
-          "com.datastrato.graviton.meta.rel.BaseSchema",
+          "com.datastrato.graviton.meta.SchemaEntity",
           "com.datastrato.graviton.proto.Schema",
-          "com.datastrato.graviton.meta.rel.BaseTable",
+          "com.datastrato.graviton.meta.TableEntity",
           "com.datastrato.graviton.proto.Table");
 
   private final Map<Class<? extends Entity>, ProtoSerDe<? extends Entity, ? extends Message>>

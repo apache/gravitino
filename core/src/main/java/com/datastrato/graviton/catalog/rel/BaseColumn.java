@@ -3,27 +3,18 @@
  * This software is licensed under the Apache License version 2.
  */
 
-package com.datastrato.graviton.meta.rel;
+package com.datastrato.graviton.catalog.rel;
 
-import com.datastrato.graviton.Entity;
-import com.datastrato.graviton.Field;
 import com.datastrato.graviton.rel.Column;
-import com.google.common.collect.Maps;
 import io.substrait.type.Type;
-import java.util.Map;
 import javax.annotation.Nullable;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
 
 /** An abstract class representing a base column in a relational database. */
-@EqualsAndHashCode
 @ToString
-public abstract class BaseColumn implements Column, Entity {
-  public static final Field NAME = Field.required("name", String.class, "The column's name");
-  public static final Field COMMENT =
-      Field.optional("comment", String.class, "The comment or description for the column");
-  public static final Field TYPE =
-      Field.required("dataType", Type.class, "The data type of the column");
+@EqualsAndHashCode
+public abstract class BaseColumn implements Column {
 
   protected String name;
 
@@ -60,31 +51,6 @@ public abstract class BaseColumn implements Column, Entity {
   @Override
   public String comment() {
     return comment;
-  }
-
-  /**
-   * Returns the type of the entity, which is {@link EntityType#COLUMN}.
-   *
-   * @return The type of the entity.
-   */
-  @Override
-  public EntityType type() {
-    return EntityType.COLUMN;
-  }
-
-  /**
-   * Returns a map of the fields and their corresponding values for this column.
-   *
-   * @return A map of the fields and values.
-   */
-  @Override
-  public Map<Field, Object> fields() {
-    Map<Field, Object> fields = Maps.newHashMap();
-    fields.put(NAME, name);
-    fields.put(COMMENT, comment);
-    fields.put(TYPE, dataType);
-
-    return fields;
   }
 
   /**
@@ -160,7 +126,6 @@ public abstract class BaseColumn implements Column, Entity {
     @Override
     public T build() {
       T t = internalBuild();
-      t.validate();
       return t;
     }
 
