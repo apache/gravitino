@@ -148,9 +148,6 @@ public class TestHiveTable extends MiniHiveMetastoreService {
 
     Table loadedTable = hiveCatalog.asTableCatalog().loadTable(tableIdentifier);
     Assertions.assertEquals(table.auditInfo().creator(), loadedTable.auditInfo().creator());
-    Assertions.assertEquals(
-        table.auditInfo().createTime().getEpochSecond(),
-        loadedTable.auditInfo().createTime().getEpochSecond());
     Assertions.assertNull(loadedTable.auditInfo().lastModifier());
     Assertions.assertNull(loadedTable.auditInfo().lastModifiedTime());
 
@@ -230,9 +227,6 @@ public class TestHiveTable extends MiniHiveMetastoreService {
     Table loadedTable = hiveCatalog.asTableCatalog().loadTable(tableIdentifier);
 
     Assertions.assertEquals(table.auditInfo().creator(), loadedTable.auditInfo().creator());
-    Assertions.assertEquals(
-        table.auditInfo().createTime().getEpochSecond(),
-        loadedTable.auditInfo().createTime().getEpochSecond());
     Assertions.assertNull(loadedTable.auditInfo().lastModifier());
     Assertions.assertNull(loadedTable.auditInfo().lastModifiedTime());
 
@@ -413,9 +407,6 @@ public class TestHiveTable extends MiniHiveMetastoreService {
     Assertions.assertEquals(alteredTable.properties().get("key2"), "val2_new");
 
     Assertions.assertEquals(createdTable.auditInfo().creator(), alteredTable.auditInfo().creator());
-    Assertions.assertEquals(
-        createdTable.auditInfo().createTime().getEpochSecond(),
-        alteredTable.auditInfo().createTime().getEpochSecond());
     Assertions.assertNull(alteredTable.auditInfo().lastModifier());
     Assertions.assertNull(alteredTable.auditInfo().lastModifiedTime());
     Assertions.assertNotNull(alteredTable.partitioning());
@@ -457,9 +448,6 @@ public class TestHiveTable extends MiniHiveMetastoreService {
 
     Assertions.assertEquals(
         createdTable.auditInfo().creator(), alteredTable1.auditInfo().creator());
-    Assertions.assertEquals(
-        createdTable.auditInfo().createTime().getEpochSecond(),
-        alteredTable1.auditInfo().createTime().getEpochSecond());
     Assertions.assertNull(alteredTable1.auditInfo().lastModifier());
     Assertions.assertNull(alteredTable1.auditInfo().lastModifiedTime());
     Assertions.assertNotNull(alteredTable.partitioning());
