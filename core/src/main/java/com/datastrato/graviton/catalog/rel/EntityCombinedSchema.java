@@ -49,6 +49,16 @@ public final class EntityCombinedSchema implements Schema {
 
   @Override
   public Audit auditInfo() {
-    return ((AuditInfo) schema.auditInfo()).merge(schemaEntity.auditInfo(), true /* overwrite */);
+    AuditInfo mergedAudit =
+        new AuditInfo.Builder()
+            .withCreator(schema.auditInfo().creator())
+            .withCreateTime(schema.auditInfo().createTime())
+            .withLastModifier(schema.auditInfo().lastModifier())
+            .withLastModifiedTime(schema.auditInfo().lastModifiedTime())
+            .build();
+
+    return schemaEntity == null
+        ? schema.auditInfo()
+        : mergedAudit.merge(schemaEntity.auditInfo(), true /* overwrite */);
   }
 }

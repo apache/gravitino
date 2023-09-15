@@ -62,6 +62,16 @@ public final class EntityCombinedTable implements Table {
 
   @Override
   public Audit auditInfo() {
-    return ((AuditInfo) table.auditInfo()).merge(tableEntity.auditInfo(), true /* overwrite */);
+    AuditInfo mergedAudit =
+        new AuditInfo.Builder()
+            .withCreator(table.auditInfo().creator())
+            .withCreateTime(table.auditInfo().createTime())
+            .withLastModifier(table.auditInfo().lastModifier())
+            .withLastModifiedTime(table.auditInfo().lastModifiedTime())
+            .build();
+
+    return tableEntity == null
+        ? table.auditInfo()
+        : mergedAudit.merge(tableEntity.auditInfo(), true /* overwrite */);
   }
 }

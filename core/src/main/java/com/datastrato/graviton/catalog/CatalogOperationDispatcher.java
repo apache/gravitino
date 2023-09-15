@@ -378,7 +378,7 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
                             ident,
                             columns,
                             comment,
-                            properties,
+                            updatedProperties,
                             partitions == null ? new Transform[0] : partitions,
                             distribution == null ? Distribution.NONE : distribution,
                             sortOrders == null ? new SortOrder[0] : sortOrders)),
