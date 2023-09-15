@@ -2,13 +2,14 @@
  * Copyright 2023 Datastrato.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.graviton.integration.util;
+package com.datastrato.graviton.integration.test.util;
 
+import java.io.File;
 import java.lang.reflect.Field;
 import java.util.Map;
 
-public class EnvironmentVariable {
-  public static void injectEnv(String key, String value) throws Exception {
+public class ITUtils {
+  public static void injectEnvironment(String key, String value) throws Exception {
     Class<?> processEnvironment = Class.forName("java.lang.ProcessEnvironment");
 
     Field unmodifiableMapField =
@@ -35,5 +36,9 @@ public class EnvironmentVariable {
     Object obj = field.get(map);
 
     ((Map<String, String>) obj).put(key, value);
+  }
+
+  public static String joinDirPath(String... dirs) {
+    return String.join(File.separator, dirs);
   }
 }

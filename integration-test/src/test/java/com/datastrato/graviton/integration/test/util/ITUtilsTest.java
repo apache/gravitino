@@ -4,15 +4,14 @@
  */
 package com.datastrato.graviton.integration.test.util;
 
-import com.datastrato.graviton.integration.util.EnvironmentVariable;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-public class EnvironmentVariableTest {
+public class ITUtilsTest {
   @Test
   public void testInjectEnv() throws Exception {
-    String gravitonHome = "/tmp";
-    EnvironmentVariable.injectEnv("GRAVITON_HOME", gravitonHome);
-    Assertions.assertEquals(gravitonHome, System.getenv("GRAVITON_HOME"));
+    String envInjectVar = "tmp";
+    ITUtils.injectEnvironment("ENV_INJECT_NAME", envInjectVar);
+    Assertions.assertEquals(envInjectVar, System.getenv("ENV_INJECT_NAME"));
   }
 }

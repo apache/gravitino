@@ -2,7 +2,7 @@
  * Copyright 2023 Datastrato.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.graviton.integration;
+package com.datastrato.graviton.integration.test;
 
 import static com.datastrato.graviton.Configs.ENTRY_KV_ROCKSDB_BACKEND_PATH;
 
@@ -13,8 +13,8 @@ import com.datastrato.graviton.client.HTTPClient;
 import com.datastrato.graviton.client.RESTClient;
 import com.datastrato.graviton.dto.responses.VersionResponse;
 import com.datastrato.graviton.exceptions.RESTException;
-import com.datastrato.graviton.integration.util.EnvironmentVariable;
-import com.datastrato.graviton.integration.util.ITUtils;
+import com.datastrato.graviton.integration.test.util.ITUtils;
+import com.datastrato.graviton.rest.RESTUtils;
 import com.datastrato.graviton.server.GravitonServer;
 import com.datastrato.graviton.server.ServerConfig;
 import com.google.common.collect.ImmutableMap;
@@ -22,7 +22,6 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.net.ServerSocket;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Collections;
@@ -39,46 +38,32 @@ import org.slf4j.LoggerFactory;
 public class MiniGraviton {
   private static final Logger LOG = LoggerFactory.getLogger(MiniGraviton.class);
   private RESTClient restClient;
-  private final File confDir;
-  private final Config serverConfig = new ServerConfig();
+  private final File mockConfDir;
+  private final MiniGravitonConfig serverConfig = new MiniGravitonConfig();
   private final ExecutorService executor = Executors.newSingleThreadExecutor();
-  private final Runnable SERVER =
-      new Runnable() {
-        @Override
-        public void run() {
-          try {
-            GravitonServer.main(new String[] {""});
-          } catch (Exception e) {
-            LOG.error("Exception in startup MiniGraviton Server ", e);
-            throw new RuntimeException(e);
-          }
-        }
-      };
 
   public MiniGraviton() {
-    this.confDir =
-        new File(ITUtils.joinDirPath(".", "build", UUID.randomUUID().toString(), "conf"));
-    this.confDir.mkdirs();
+    this.mockConfDir =
+        new File(ITUtils.joinDirPath(".", "build", UUID.randomUUID().toString() + "conf"));
+    mockConfDir.mkdirs();
   }
 
   public void start() throws Exception {
     LOG.info("Staring MiniGraviton up...");
 
-    // copy the resources files to a temp folder
-    String confFileName = ITUtils.joinDirPath(confDir.getAbsolutePath(), "graviton.conf");
     String gravitonRootDir = System.getenv("GRAVITON_ROOT_DIR");
+
     // Generate random Graviton Server port and backend storage path, avoiding conflicts
     customizeConfigFile(
-        ITUtils.joinDirPath(gravitonRootDir, "conf", "graviton.conf.template"), confFileName);
+        ITUtils.joinDirPath(gravitonRootDir, "conf", "graviton.conf.template"),
+        ITUtils.joinDirPath(mockConfDir.getAbsolutePath(), GravitonServer.CONF_FILE));
 
     Files.copy(
         Paths.get(ITUtils.joinDirPath(gravitonRootDir, "conf", "graviton-env.sh.template")),
-        Paths.get(ITUtils.joinDirPath(confDir.getAbsolutePath(), "graviton-env.sh")));
+        Paths.get(ITUtils.joinDirPath(mockConfDir.getAbsolutePath(), "graviton-env.sh")));
 
-    EnvironmentVariable.injectEnv("GRAVITON_HOME", System.getenv("GRAVITON_ROOT_DIR"));
-    EnvironmentVariable.injectEnv("GRAVITON_CONF_DIR", confDir.getAbsolutePath());
-    EnvironmentVariable.injectEnv("GRAVITON_TEST", "true");
-    serverConfig.loadFromFile(GravitonServer.CONF_FILE);
+    ITUtils.injectEnvironment("GRAVITON_TEST", "true");
+    serverConfig.loadFromFile(ITUtils.joinDirPath(mockConfDir.getAbsolutePath(), "graviton.conf"));
 
     // Prepare delete the rocksdb backend storage directory
     try {
@@ -87,13 +72,21 @@ public class MiniGraviton {
       // Ignore
     }
 
-    // Prepare the REST client
+    // Initialization the REST client
     String host = serverConfig.get(ServerConfig.WEBSERVER_HOST);
     int port = serverConfig.get(ServerConfig.WEBSERVER_HTTP_PORT);
     String URI = String.format("http://%s:%d", host, port);
     restClient = HTTPClient.builder(ImmutableMap.of()).uri(URI).build();
 
-    executor.submit(SERVER);
+    executor.submit(
+        () -> {
+          try {
+            MiniGravitonServer.main(new String[] {mockConfDir.getAbsolutePath()});
+          } catch (Exception e) {
+            LOG.error("Exception in startup MiniGraviton Server ", e);
+            throw new RuntimeException(e);
+          }
+        });
     long beginTime = System.currentTimeMillis();
     boolean started = false;
     while (System.currentTimeMillis() - beginTime < 1000 * 60 * 3) {
@@ -114,6 +107,7 @@ public class MiniGraviton {
     LOG.debug("MiniGraviton shutDown...");
 
     executor.shutdown();
+    Thread.sleep(500);
     executor.shutdownNow();
 
     long beginTime = System.currentTimeMillis();
@@ -128,7 +122,7 @@ public class MiniGraviton {
 
     restClient.close();
     try {
-      FileUtils.deleteDirectory(confDir);
+      FileUtils.deleteDirectory(mockConfDir);
       FileUtils.deleteDirectory(FileUtils.getFile(serverConfig.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)));
     } catch (Exception e) {
       // Ignore
@@ -149,7 +143,9 @@ public class MiniGraviton {
   private void customizeConfigFile(String configTempFileName, String configFileName)
       throws IOException {
     Map<String, String> configMap = new HashMap<>();
-    configMap.put(ServerConfig.WEBSERVER_HTTP_PORT.getKey(), String.valueOf(findAvailablePort()));
+    configMap.put(
+        ServerConfig.WEBSERVER_HTTP_PORT.getKey(),
+        String.valueOf(RESTUtils.findAvailablePort(2000, 3000)));
     configMap.put(
         Configs.ENTRY_KV_ROCKSDB_BACKEND_PATH.getKey(), "/tmp/graviton-" + UUID.randomUUID());
 
@@ -169,22 +165,12 @@ public class MiniGraviton {
     }
   }
 
-  private int findAvailablePort() throws IOException {
-    try (ServerSocket socket = new ServerSocket(0)) {
-      return socket.getLocalPort();
-    } catch (IOException e) {
-      LOG.error("Exception in findAvailablePort ", e);
-      throw e;
-    }
-  }
-
   private boolean checkIfServerIsRunning() {
     String host = serverConfig.get(ServerConfig.WEBSERVER_HOST);
     int port = serverConfig.get(ServerConfig.WEBSERVER_HTTP_PORT);
     String URI = String.format("http://%s:%d", host, port);
     LOG.info("checkIfServerIsRunning() URI: {}", URI);
 
-    boolean isRunning = false;
     restClient = HTTPClient.builder(ImmutableMap.of()).uri(URI).build();
     VersionResponse response = null;
     try {
@@ -198,10 +184,11 @@ public class MiniGraviton {
       LOG.warn("checkIfServerIsRunning() fails, GravitonServer is not running");
     }
     if (response != null && response.getCode() == 0) {
-      isRunning = true;
+      return true;
     } else {
       LOG.warn("checkIfServerIsRunning() fails, GravitonServer is not running");
     }
-    return isRunning;
+
+    return false;
   }
 }

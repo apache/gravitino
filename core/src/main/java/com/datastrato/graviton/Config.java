@@ -184,7 +184,7 @@ public abstract class Config {
    * @param properties The properties object containing configuration key-value pairs.
    */
   @VisibleForTesting
-  void loadFromProperties(Properties properties) {
+  protected void loadFromProperties(Properties properties) {
     loadFromMap(Maps.fromProperties(properties));
   }
 

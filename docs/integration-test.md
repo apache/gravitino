@@ -5,11 +5,13 @@
 # How to Run Integration Tests
 
 ## Introduction
-The `integration-test` module contains test cases that serve as integration tests to ensure the correctness of the Graviton Server, API, and Client. These tests can be run locally or on GitHub Actions.
+The `integration-test` module contains test cases that serve as integration tests to ensure the correctness of the 
+Graviton Server, API, and Client. These tests can be run locally or on GitHub Actions.
 
 ## Test Modes
 ### Using MiniGraviton Embedded Server
-The MiniGraviton is a lightweight Graviton Server that is embedded in the integration test module. It provides full Graviton Server functionality and supports the following abilities:
+The MiniGraviton is a lightweight Graviton Server that is embedded in the integration test module. It provides full 
+Graviton Server functionality and supports the following abilities:
 
 - Running a Graviton Server in a single thread
 - Starting a Jetty Server to provide the Graviton Server API, using a random port to avoid port conflicts
@@ -28,30 +30,32 @@ Additionally, the Graviton Server and third-party data source Docker runtime env
 - Hive Docker runtime environment: Ports is `22`, `7180`, `8088`, `8888`, `9000`, `9083`, `10000`, `10002`, `50070`, and ` 50075`
 
 #### Debugging Graviton Server and Integration Tests
-By default, the integration tests are run using MiniGraviton. You can use the `./gradlew build` or `./gradlew build -PtestMode=embedded` command to run the integration tests. Debugging with MiniGraviton is simple and easy. You can modify any code in the Graviton project and set breakpoints anywhere.
+By default, the integration tests are run using MiniGraviton. 
+You can use the `./gradlew build` or `./gradlew build -PtestMode=embedded` command to run the integration tests. 
+Debugging with MiniGraviton is simple and easy. You can modify any code in the Graviton project and set breakpoints anywhere.
 
 ### Deploying Graviton Server Locally
 The Graviton Server can be deployed locally to run the integration tests. Follow these steps:
 
 1. Execute the `./gradlew build` command to build the Graviton project.
 2. Use the `./gradlew compileDistribution` command to compile and package the Graviton project in the `distribution` directory.
-3. Use the `./gradlew build -PtestMode=deploy` command to run the integration tests in the `distribution` directory.
+3. Use the `./gradlew test -PtestMode=deploy` command to run the integration tests in the `distribution` directory.
 
 #### How to Debug Graviton Server and Integration Tests
 
-To debug the Graviton Server and integration tests, you have two modes: `MiniGraviton` and `Deploy` mode.
+To debug the Graviton Server and integration tests, you have two modes: `embedded` and `deploy` mode.
 
-1. MiniGraviton Mode:
+1. Embedded Mode:
     - This mode is simpler to debug but not as close to the actual environment.
     - You can modify all of the Graviton's code and set breakpoints anywhere.
-    - To run the integration tests in MiniGraviton mode, use the `./gradlew build` or `./gradlew build -PtestMode=embedded` command.
 
 2. Deploy Mode:
     - This mode is closer to the actual environment but more complex to debug.
     - To debug the Graviton Server code, follow these steps:
         - Execute the `./gradlew build` command to rebuild the Graviton project.
         - Use the `./gradlew compileDistribution` command to republish the packaged project in the `distribution` directory.
-        - If you need debug `Graviton` project
+        - If you need debug integration test codes, You can modify all the Graviton's code and set breakpoints anywhere.
+        - If you need debug Graviton server codes, flow these steps:
             - Enable the `GRAVITON_DEBUG_OPTS` environment variable in the `distribution/package/conf/graviton-env.sh` file to enable remote JVM debugging.
             - Manually start the Graviton Server using the `./distribution/package/bin/graviton-server.sh start` command.
             - Use remote JVM debugging to attach to the Graviton Server process and set breakpoints.
@@ -59,9 +63,13 @@ To debug the Graviton Server and integration tests, you have two modes: `MiniGra
 ## Docker Test Environment:
 Some integration test cases depend on the Graviton CI Docker environment.
 
-If an integration test relies on the specific Graviton CI Docker environment, you need to set the `@tag(DOCKER-NAME)` annotation in the test class. 
-For example, the `integration-test/src/test/.../CatalogHiveIT.java` test needs to connect to the `datastrato/graviton-ci-hive:{version}` container for testing the Hive data source. 
-Therefore, it should have the following `@tag` annotation:`@tag(DOCKER-NAME)`, This annotation helps identify the specific Docker container required for the integration test.
+If an integration test relies on the specific Graviton CI Docker environment, 
+you need to set the `@tag(DOCKER-NAME)` annotation in the test class. 
+For example, the `integration-test/src/test/.../CatalogHiveIT.java` test needs to connect to 
+the `datastrato/graviton-ci-hive` Docker container for testing the Hive data source. 
+Therefore, it should have the following `@tag` annotation:`@tag(DOCKER-NAME)`, This annotation 
+helps identify the specific Docker container required for the integration test.
+For example:
 ```
 @Tag("graviton-ci-hive")
 public class CatalogHiveIT extends AbstractIT {
@@ -69,7 +77,8 @@ public class CatalogHiveIT extends AbstractIT {
 }
 ```
 
-If you have Docker installed and a special CI Docker container running, the `./gradlew build` command will automatically execute all the test cases.
+If you have Docker installed and a special CI Docker container running, the `./gradlew build` command 
+will automatically execute all the test cases.
 ```
 -------------------- Check Docker environment --------------------
 Docker server status ............................................. [Running]
@@ -79,7 +88,8 @@ Use exist Graviton CI Hive container to run all integration test.  [embbeded/dep
 ------------------------------------------------------------------
 ```
 
-If Docker is not installed or the special CI Docker container is not running, the `./gradlew build` command will skip the test cases that depend on the special Docker environment.
+If Docker is not installed or the special CI Docker container is not running, the `./gradlew build` command 
+will skip the test cases that depend on the special Docker environment.
 
 ```
 -------------------- Check Docker environment --------------------
@@ -96,15 +106,18 @@ Run only test cases where tag is not set `DOCKER-NAME`.            [embbeded/dep
 - Test results can be viewed in the `Actions` tab of the pull request page.
 - The integration tests are executed in several steps:
 
-  + If you set the `build docker image` label in the pull request, GitHub Actions will trigger the build of all Docker images under the `./dev/docker/` directory. This step usually takes around 10 minutes. If you have made changes to the Dockerfile, you need to set the `build docker image` label in the pull request.
-  + If you do not set the `build docker image` label in the pull request, GitHub Actions will pull the Docker image `datastrato/graviton-ci-hive` from the Docker Hub repository. This step usually takes around 15 seconds.
+  + If you set the `build docker image` label in the pull request, GitHub Actions will trigger the build of all Docker 
+    images under the `./dev/docker/` directory. This step usually takes around 10 minutes. If you have made changes to the Dockerfile, 
+    you need to set the `build docker image` label in the pull request.
+  + If you do not set the `build docker image` label in the pull request, GitHub Actions will pull the Docker image 
+    `datastrato/graviton-ci-hive` from the Docker Hub repository. This step usually takes around 15 seconds.
   + The Docker image is then run in the GitHub Actions environment.
-  + If you set the `debug action` label in the pull request, GitHub Actions will run an SSH server with `csexton/debugger-action@master`, allowing you to remotely log in to the Actions environment for debugging purposes.
+  + If you set the `debug action` label in the pull request, GitHub Actions will run an SSH server with 
+    `csexton/debugger-action@master`, allowing you to remotely log in to the Actions environment for debugging purposes.
   + The Graviton project is compiled and packaged in the `distribution` directory using the `./gradlew compileDistribution` command.
   + The integration test cases in the `integration-test` module are executed using the `./gradlew integrationTest` command.
   + The Docker image is stopped.
   + The test environment is cleaned up.
-
 
 ## Running Locally:
 - Before running the tests, ensure that Docker is installed.
@@ -117,4 +130,3 @@ Run only test cases where tag is not set `DOCKER-NAME`.            [embbeded/dep
 Note: Make sure that the necessary ports for the Graviton Server and third-party data source Docker runtime environments are not already in use.
 - Graviton Server: Port `8088`
 - Hive Docker runtime environment: Ports `50070`, `50075`, `10002`, `10000`, `8888`, `9083`, `7180`, and `22`
->>>>>>> d5f34b9 ([#222][#370] feat(CI): MiniGraviton integration test framework)

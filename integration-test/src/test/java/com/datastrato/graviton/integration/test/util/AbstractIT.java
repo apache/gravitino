@@ -8,8 +8,7 @@ import static com.datastrato.graviton.Configs.ENTRY_KV_ROCKSDB_BACKEND_PATH;
 
 import com.datastrato.graviton.Config;
 import com.datastrato.graviton.client.GravitonClient;
-import com.datastrato.graviton.integration.MiniGraviton;
-import com.datastrato.graviton.integration.util.EnvironmentVariable;
+import com.datastrato.graviton.integration.test.MiniGraviton;
 import com.datastrato.graviton.server.GravitonServer;
 import com.datastrato.graviton.server.ServerConfig;
 import java.io.File;
@@ -47,7 +46,7 @@ public class AbstractIT {
       String gravitonRootDir = System.getenv("GRAVITON_ROOT_DIR");
       File gravitonHome =
           new File(gravitonRootDir + File.separator + "distribution" + File.separator + "package");
-      EnvironmentVariable.injectEnv("GRAVITON_HOME", gravitonHome.getAbsolutePath());
+      ITUtils.injectEnvironment("GRAVITON_HOME", gravitonHome.getAbsolutePath());
       serverConfig.loadFromFile(GravitonServer.CONF_FILE);
 
       try {

@@ -41,10 +41,8 @@ subprojects {
 
   tasks.configureEach<Test> {
     // Integration test module are tested separately
-    if (project.name != "integration-test") {
-      useJUnitPlatform()
-      finalizedBy(tasks.getByName("jacocoTestReport"))
-    }
+    useJUnitPlatform()
+    finalizedBy(tasks.getByName("jacocoTestReport"))
   }
 
   tasks.withType<JacocoReport> {
@@ -229,11 +227,6 @@ tasks {
 
   val copyCatalogLibs by registering(Copy::class) {
     dependsOn(":catalog-hive:copyCatalogLibs", ":catalog-lakehouse:copyCatalogLibs")
-  }
-
-  task("integrationTest") {
-    mustRunAfter(":catalog-hive:copyDepends", ":catalog-lakehouse:copyDepends")
-    finalizedBy(":integration-test:test") // , ":integration-test:test -PtestMode=deploy"
   }
 
   clean {
