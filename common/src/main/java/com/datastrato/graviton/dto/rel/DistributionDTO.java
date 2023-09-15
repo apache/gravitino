@@ -25,28 +25,13 @@ public class DistributionDTO {
       new DistributionDTO(new Expression[0], 0, Strategy.HASH);
 
   /**
-   * Create a distribution on a single column. like distribute by (a)
+   * Create a distribution on a single column. Like distribute by (a) or (a, b), for complex like
+   * distributing by (func(a), b) or (func(a), func(b)), please use {@link Builder} to create.
    *
    * @param columnName column name
    * @return
    */
-  public static DistributionDTO singleColumnDistribution(
-      Strategy strategy, int number, String columnName) {
-    return new DistributionDTO(
-        new Expression[] {
-          new FieldExpression.Builder().withFieldName(new String[] {columnName}).build()
-        },
-        number,
-        strategy);
-  }
-
-  /**
-   * Create a distribution on a single column. like distribute by (a, b)
-   *
-   * @param columnName column name
-   * @return
-   */
-  public static DistributionDTO singleColumnDistribution(
+  public static DistributionDTO nameReferenceDistribution(
       Strategy strategy, int number, String... columnName) {
     Expression[] expressions =
         Arrays.stream(columnName)
