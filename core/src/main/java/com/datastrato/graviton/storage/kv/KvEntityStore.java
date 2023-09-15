@@ -101,7 +101,6 @@ public class KvEntityStore implements EntityStore {
     for (Pair<byte[], byte[]> pairs : kvs) {
       entities.add(serDe.deserialize(pairs.getRight(), e));
     }
-    // TODO (yuqi), if the list is too large, we need to do pagination or streaming
     return entities;
   }
 
