@@ -19,7 +19,7 @@ public class RandomIdGenerator implements IdGenerator {
 
   @Override
   public long nextId() {
-    // Make sure this is a postive number.
+    // Make sure this is a positive number.
     return UUID.randomUUID().getLeastSignificantBits() & MAX_ID;
   }
 }

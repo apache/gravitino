@@ -8,7 +8,7 @@ package com.datastrato.graviton.utils;
 import java.util.function.Predicate;
 
 /**
- * Wraper for {@link Predicate} that throws exception. To be more specific, it wraps a predicate
+ * Wrapper for {@link Predicate} that throws exception. To be more specific, it wraps a predicate
  * that throws {@link RuntimeException} or it's subclass.
  */
 @FunctionalInterface
