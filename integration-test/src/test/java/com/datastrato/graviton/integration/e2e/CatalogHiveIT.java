@@ -316,6 +316,34 @@ public class CatalogHiveIT extends AbstractIT {
 
     Assertions.assertEquals(1, hiveTab.getPartitionKeys().size());
     Assertions.assertEquals(columns[0].name(), hiveTab.getPartitionKeys().get(0).getName());
+
+    // Add more test to test case-sensitive issue for table, schema, catalog, metalake
+    catalog
+        .asTableCatalog()
+        .loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, alterTableName));
+
+    catalog
+        .asTableCatalog()
+        .alterTable(
+            NameIdentifier.of(metalakeName, catalogName, schemaName, alterTableName),
+            TableChange.rename(alterTableName.toUpperCase()));
+
+    catalog
+        .asTableCatalog()
+        .loadTable(
+            NameIdentifier.of(metalakeName, catalogName, schemaName, alterTableName.toUpperCase()));
+
+    catalog
+        .asTableCatalog()
+        .alterTable(
+            NameIdentifier.of(metalakeName, catalogName, schemaName, alterTableName.toUpperCase()),
+            TableChange.rename(alterTableName.toUpperCase() + "_new"));
+
+    catalog
+        .asTableCatalog()
+        .loadTable(
+            NameIdentifier.of(
+                metalakeName, catalogName, schemaName, alterTableName.toUpperCase() + "_new"));
   }
 
   @Test
@@ -330,12 +358,16 @@ public class CatalogHiveIT extends AbstractIT {
             new Transform[0]);
     catalog
         .asTableCatalog()
-        .dropTable(NameIdentifier.of(metalakeName, catalogName, schemaName, alterTableName));
+        .dropTable(
+            NameIdentifier.of(
+                metalakeName, catalogName, schemaName, alterTableName.toUpperCase() + "_new"));
 
     // Directly get table from hive metastore to check if the table is dropped successfully.
     assertThrows(
         NoSuchObjectException.class,
-        () -> hiveClientPool.run(client -> client.getTable(schemaName, alterTableName)));
+        () ->
+            hiveClientPool.run(
+                client -> client.getTable(schemaName, alterTableName.toUpperCase() + "_new")));
   }
 
   @Test
@@ -362,5 +394,38 @@ public class CatalogHiveIT extends AbstractIT {
     Map<String, String> properties3 = database.getParameters();
     Assertions.assertFalse(properties3.containsKey("key1"));
     Assertions.assertEquals("val2-alter", properties3.get("key2"));
+  }
+
+  @Test
+  void testAlterScheme() throws TException, InterruptedException {
+    String schemaName = GravitonITUtils.genRandomName("CatalogHiveIT_schema");
+    NameIdentifier ident = NameIdentifier.of(metalakeName, catalogName, schemaName);
+    Map<String, String> properties1 = Maps.newHashMap();
+    properties1.put("key1", "val1");
+    properties1.put("key2", "val2");
+    String comment = "comment";
+
+    Schema createdSchema = catalog.asSchemas().createSchema(ident, comment, properties1);
+    Schema loadSchema = catalog.asSchemas().loadSchema(ident);
+    Assertions.assertEquals(createdSchema.name().toLowerCase(), loadSchema.name());
+
+    // Directly get a database from hive metastore to verify the schema creation
+    Database database = hiveClientPool.run(client -> client.getDatabase(schemaName));
+    Assertions.assertEquals(schemaName.toLowerCase(), database.getName());
+    Assertions.assertEquals(comment, database.getDescription());
+    Assertions.assertEquals("val1", database.getParameters().get("key1"));
+    Assertions.assertEquals("val2", database.getParameters().get("key2"));
+
+    // Now try to rename a schema;
+    catalog.asSchemas().alterSchema(ident, SchemaChange.setProperty("key3", "val1-alter"));
+    loadSchema = catalog.asSchemas().loadSchema(ident);
+    database = hiveClientPool.run(client -> client.getDatabase(schemaName));
+
+    // Hive is case-insensitive, the name of table/schema is always in lower case
+    Assertions.assertEquals(schemaName.toLowerCase(), database.getName());
+    Assertions.assertEquals(comment, database.getDescription());
+    Assertions.assertEquals("val1", database.getParameters().get("key1"));
+    Assertions.assertEquals("val2", database.getParameters().get("key2"));
+    Assertions.assertEquals("val1-alter", database.getParameters().get("key3"));
   }
 }

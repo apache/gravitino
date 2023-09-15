@@ -320,10 +320,14 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
       // alter the hive database parameters
       Database alteredDatabase = database.deepCopy();
+      // Note: Hive will ignore case issues, if the name(ident.name()) of the schema is
+      // upper-case, then the name hive schema will be lower-case, Which will cause a problem,
+      // we need to set the name of the hiveSchema to the same as the name of the ident.
+      // Note: always use the name of the ident to update the hive schema name.
       alteredDatabase.setName(ident.name());
       alteredDatabase.setParameters(metadata);
 
-      // update store transactionally
+      // Update store in a transaction
       EntityStore store = GravitonEnv.getInstance().entityStore();
       HiveSchema alteredHiveSchema =
           store.executeInTransaction(
