@@ -20,7 +20,7 @@ public class Distribution {
   }
 
   /**
-   * Distriubtion transform. This is the transform that is used to distribute the data. Say we have
+   * Distribution transform. This is the transform that is used to distribute the data. Say we have
    * a table with 3 columns: a, b, c. We want to distribute on a. Then the distribution transform is
    * a.
    */

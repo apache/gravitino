@@ -92,7 +92,7 @@ public class SortOrderDTO {
     }
 
     public SortOrderDTO build() {
-      // Default direciton is ASC
+      // Default direction is ASC
       this.direction = direction == null ? Direction.ASC : direction;
 
       // Default is nulls first
