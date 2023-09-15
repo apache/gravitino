@@ -31,6 +31,8 @@ import org.apache.iceberg.types.Types.StringType;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 public class TestIcebergTableOperations extends TestIcebergNamespaceOperations {
 
@@ -238,8 +240,10 @@ public class TestIcebergTableOperations extends TestIcebergNamespaceOperations {
     verifyUpdateTableFail("update_foo1", 404, metadata);
   }
 
-  @Test
-  void testListTables() {
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void testListTables(boolean withPrefix) {
+    setUrlPathWithPrefix(withPrefix);
     verifyListTableFail(404);
 
     verifyCreateNamespaceSucc(IcebergRestTestUtil.TEST_NAMESPACE_NAME);
@@ -259,8 +263,10 @@ public class TestIcebergTableOperations extends TestIcebergNamespaceOperations {
     verifyLoadTableSucc("exists_foo1");
   }
 
-  @Test
-  void testRenameTable() {
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void testRenameTable(boolean withPrefix) {
+    setUrlPathWithPrefix(withPrefix);
     // namespace not exits
     verifyRenameTableFail("rename_foo1", "rename_foo3", 404);
 

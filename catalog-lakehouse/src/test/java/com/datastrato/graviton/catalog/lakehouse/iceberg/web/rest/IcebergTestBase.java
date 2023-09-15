@@ -16,9 +16,11 @@ import javax.ws.rs.client.Invocation.Builder;
 import javax.ws.rs.client.WebTarget;
 import javax.ws.rs.core.Application;
 import javax.ws.rs.core.MediaType;
+import org.apache.commons.lang3.ArrayUtils;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.glassfish.jersey.test.JerseyTest;
 import org.glassfish.jersey.test.TestProperties;
+import org.junit.jupiter.api.Assertions;
 
 public class IcebergTestBase extends JerseyTest {
   @Override
@@ -32,6 +34,8 @@ public class IcebergTestBase extends JerseyTest {
 
     return new ResourceConfig();
   }
+
+  private boolean urlPathWithPrefix = false;
 
   public Builder getRenameTableClientBuilder() {
     return getIcebergClientBuilder(IcebergRestTestUtil.RENAME_TABLE_PATH, Optional.empty());
@@ -68,7 +72,18 @@ public class IcebergTestBase extends JerseyTest {
     return getIcebergClientBuilder(IcebergRestTestUtil.CONFIG_PATH, Optional.empty());
   }
 
-  private Builder getIcebergClientBuilder(String path, Optional<Map<String, String>> queryParam) {
+  public String injectPrefixToPath(String path, String prefix) {
+    Joiner joiner = Joiner.on("/");
+    String[] items = path.split("/");
+    Assertions.assertTrue(items.length > 0);
+    String[] newItems = ArrayUtils.insert(1, items, prefix);
+    return joiner.join(newItems);
+  }
+
+  public Builder getIcebergClientBuilder(String path, Optional<Map<String, String>> queryParam) {
+    if (urlPathWithPrefix) {
+      path = injectPrefixToPath(path, IcebergRestTestUtil.PREFIX);
+    }
     WebTarget target = target(path);
     if (queryParam.isPresent()) {
       Map<String, String> m = queryParam.get();
@@ -81,5 +96,9 @@ public class IcebergTestBase extends JerseyTest {
         .register(IcebergObjectMapperProvider.class)
         .request(MediaType.APPLICATION_JSON_TYPE)
         .accept(MediaType.APPLICATION_JSON_TYPE);
+  }
+
+  public void setUrlPathWithPrefix(boolean urlPathWithPrefix) {
+    this.urlPathWithPrefix = urlPathWithPrefix;
   }
 }

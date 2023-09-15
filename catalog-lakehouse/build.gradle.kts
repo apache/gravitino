@@ -19,6 +19,7 @@ dependencies {
     implementation(libs.jackson.datatype.jdk8)
     implementation(libs.jackson.datatype.jsr310)
     implementation(libs.guava)
+    implementation(libs.commons.lang3)
     implementation(libs.bundles.log4j)
     implementation(libs.bundles.jetty)
     implementation(libs.bundles.jersey)
