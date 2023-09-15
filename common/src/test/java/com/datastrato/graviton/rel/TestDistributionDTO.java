@@ -16,6 +16,27 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class TestDistributionDTO {
+
+  @Test
+  void testCreator() {
+    DistributionDTO distributionDTO =
+        DistributionDTO.singleColumnDistribution(Strategy.HASH, 10, "a");
+    Assertions.assertEquals(Strategy.HASH, distributionDTO.getStrategy());
+    Assertions.assertEquals(10, distributionDTO.getNumber());
+    Assertions.assertEquals(1, distributionDTO.getExpressions().length);
+    Assertions.assertEquals(
+        "a", ((FieldExpression) distributionDTO.getExpressions()[0]).getFieldName()[0]);
+
+    distributionDTO = DistributionDTO.singleColumnDistribution(Strategy.HASH, 10, "a", "b");
+    Assertions.assertEquals(Strategy.HASH, distributionDTO.getStrategy());
+    Assertions.assertEquals(10, distributionDTO.getNumber());
+    Assertions.assertEquals(2, distributionDTO.getExpressions().length);
+    Assertions.assertEquals(
+        "a", ((FieldExpression) distributionDTO.getExpressions()[0]).getFieldName()[0]);
+    Assertions.assertEquals(
+        "b", ((FieldExpression) distributionDTO.getExpressions()[1]).getFieldName()[0]);
+  }
+
   @Test
   void test() throws JsonProcessingException {
     DistributionDTO distributionDTO =

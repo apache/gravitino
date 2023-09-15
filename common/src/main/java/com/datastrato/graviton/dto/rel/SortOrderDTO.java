@@ -11,6 +11,9 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.fasterxml.jackson.annotation.JsonValue;
 import com.google.common.base.Preconditions;
+import io.substrait.type.StringTypeVisitor;
+import io.substrait.type.parser.ParseToPojo;
+import io.substrait.type.parser.TypeStringParser;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 
@@ -58,6 +61,63 @@ public class SortOrderDTO {
 
   @JsonProperty("nullOrdering")
   private final NullOrdering nullOrdering;
+
+  /**
+   * Creates a literal SortOrder instance, i.e. if we want to create a sort order on a literal like
+   * sort/order by "'a' desc" where 'a' is the string literal
+   *
+   * <p>Then we can call this method like:
+   *
+   * <pre>
+   * SortOrderDTO.literalSortOrder("a", "string", Direction.DESC, NullOrdering.FIRST)
+   * </pre>
+   *
+   * @param literal value of the literal
+   * @param type type of the literal, for example string, boolean, i32, i64, etc. For more
+   *     information about the type, you can refer to {@link StringTypeVisitor}
+   * @param direction direction of the sort order, i.e. ASC or DESC
+   * @param nullOrdering null ordering of the sort order, i.e. FIRST or LAST
+   * @return
+   */
+  public static SortOrderDTO literalSortOrder(
+      String literal, String type, Direction direction, NullOrdering nullOrdering) {
+    return new SortOrderDTO.Builder()
+        .withDirection(direction)
+        .withNullOrder(nullOrdering)
+        .withExpression(
+            new ExpressionPartitionDTO.LiteralExpression.Builder()
+                .withType(TypeStringParser.parse(type, ParseToPojo::type))
+                .withValue(literal)
+                .build())
+        .build();
+  }
+
+  /**
+   * Creates a name reference sort order instance, i.e. if we want to create a sort order on a
+   * literal like sort/order by "columnName desc" where 'columnName' is the column name
+   *
+   * <p>Then we can call this method like:
+   *
+   * <pre>
+   * nameReferenceSortOrder(Direction.DESC,NullOrdering.FIRST, "columnName")
+   * </pre>
+   *
+   * @param direction direction of the sort order, i.e. ASC or DESC
+   * @param nullOrdering null ordering of the sort order, i.e. FIRST or LAST
+   * @param nameReference name reference of the sort order, i.e. the name of the field
+   * @return
+   */
+  public static SortOrderDTO nameReferenceSortOrder(
+      Direction direction, NullOrdering nullOrdering, String... nameReference) {
+    return new SortOrderDTO.Builder()
+        .withDirection(direction)
+        .withNullOrder(nullOrdering)
+        .withExpression(
+            new ExpressionPartitionDTO.FieldExpression.Builder()
+                .withFieldName(nameReference)
+                .build())
+        .build();
+  }
 
   @JsonCreator
   private SortOrderDTO(

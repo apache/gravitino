@@ -588,10 +588,10 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     }
 
     if (ArrayUtils.isNotEmpty(sortOrder)) {
-      boolean allNameRefercen =
+      boolean allNameReference =
           Arrays.stream(sortOrder)
               .allMatch(t -> t.getTransform() instanceof Transforms.NamedReference);
-      Preconditions.checkArgument(allNameRefercen, "Hive sort order only supports name reference");
+      Preconditions.checkArgument(allNameReference, "Hive sort order only supports name reference");
     }
   }
 

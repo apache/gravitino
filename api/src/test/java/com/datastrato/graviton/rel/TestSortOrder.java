@@ -20,25 +20,25 @@ class TestSortOrder {
   @Test
   void testSortOrder() {
     Builder builder = new Builder();
-    builder.withNullOrder(NullOrdering.FIRST);
+    builder.withNullOrdering(NullOrdering.FIRST);
     builder.withDirection(Direction.ASC);
 
     Transform transform = Transforms.field(new String[] {"field1"});
     builder.withTransform(transform);
     SortOrder sortOrder = builder.build();
 
-    Assertions.assertEquals(NullOrdering.FIRST, sortOrder.getNullOrder());
+    Assertions.assertEquals(NullOrdering.FIRST, sortOrder.getNullOrdering());
     Assertions.assertEquals(Direction.ASC, sortOrder.getDirection());
     Assertions.assertTrue(sortOrder.getTransform() instanceof NamedReference);
     Assertions.assertArrayEquals(
         new String[] {"field1"}, ((NamedReference) sortOrder.getTransform()).value());
 
-    builder.withNullOrder(NullOrdering.LAST);
+    builder.withNullOrdering(NullOrdering.LAST);
     builder.withDirection(Direction.DESC);
     transform = Transforms.function("date", new Transform[] {Transforms.field(new String[] {"b"})});
     builder.withTransform(transform);
     sortOrder = builder.build();
-    Assertions.assertEquals(NullOrdering.LAST, sortOrder.getNullOrder());
+    Assertions.assertEquals(NullOrdering.LAST, sortOrder.getNullOrdering());
     Assertions.assertEquals(Direction.DESC, sortOrder.getDirection());
 
     Assertions.assertTrue(sortOrder.getTransform() instanceof FunctionTrans);

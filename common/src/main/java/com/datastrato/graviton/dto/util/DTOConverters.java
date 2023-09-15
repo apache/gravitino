@@ -129,14 +129,14 @@ public class DTOConverters {
     return new SortOrderDTO.Builder()
         .withExpression(PartitionUtils.toExpression(sortOrder.getTransform()))
         .withDirection(Direction.fromString(sortOrder.getDirection().name()))
-        .withNullOrder(SortOrderDTO.NullOrdering.fromString(sortOrder.getNullOrder().name()))
+        .withNullOrder(SortOrderDTO.NullOrdering.fromString(sortOrder.getNullOrdering().name()))
         .build();
   }
 
   public static SortOrder fromDTO(SortOrderDTO sortOrderDTO) {
     return SortOrder.builder()
         .withDirection(SortOrder.Direction.valueOf(sortOrderDTO.getDirection().name()))
-        .withNullOrder(NullOrdering.valueOf(sortOrderDTO.getNullOrdering().name()))
+        .withNullOrdering(NullOrdering.valueOf(sortOrderDTO.getNullOrdering().name()))
         .withTransform(PartitionUtils.toTransform(sortOrderDTO.getExpression()))
         .build();
   }

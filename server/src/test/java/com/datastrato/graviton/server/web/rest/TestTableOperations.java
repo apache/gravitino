@@ -188,7 +188,7 @@ public class TestTableOperations extends JerseyTest {
         };
     Table table = mockTable("table1", columns, "mock comment", ImmutableMap.of("k1", "v1"));
     when(dispatcher.createTable(any(), any(), any(), any(), any(), any(), any())).thenReturn(table);
-    SortOrderDTO[] sortOrderDTOS = createMockSortOrderDTO("col1", SortOrderDTO.Direction.DESC);
+    SortOrderDTO[] sortOrderDTOs = createMockSortOrderDTO("col1", SortOrderDTO.Direction.DESC);
     DistributionDTO distributionDTO = createMockDistributionDTO("col2", 10);
     TableCreateRequest req =
         new TableCreateRequest(
@@ -196,7 +196,7 @@ public class TestTableOperations extends JerseyTest {
             "mock comment",
             Arrays.stream(columns).map(DTOConverters::toDTO).toArray(ColumnDTO[]::new),
             ImmutableMap.of("k1", "v1"),
-            sortOrderDTOS,
+            sortOrderDTOs,
             distributionDTO,
             new Partition[0]);
 
@@ -227,7 +227,7 @@ public class TestTableOperations extends JerseyTest {
     Assertions.assertEquals(columns[1].comment(), columnDTOs[1].comment());
 
     // Test bad column name
-    sortOrderDTOS = createMockSortOrderDTO("col_1", SortOrderDTO.Direction.DESC);
+    sortOrderDTOs = createMockSortOrderDTO("col_1", SortOrderDTO.Direction.DESC);
     distributionDTO = createMockDistributionDTO("col_2", 10);
 
     TableCreateRequest badReq =
@@ -236,7 +236,7 @@ public class TestTableOperations extends JerseyTest {
             "mock comment",
             Arrays.stream(columns).map(DTOConverters::toDTO).toArray(ColumnDTO[]::new),
             ImmutableMap.of("k1", "v1"),
-            sortOrderDTOS,
+            sortOrderDTOs,
             distributionDTO,
             new Partition[0]);
 

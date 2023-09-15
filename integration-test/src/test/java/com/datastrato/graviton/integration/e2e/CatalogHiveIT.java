@@ -191,7 +191,7 @@ public class CatalogHiveIT extends AbstractIT {
     final SortOrder[] sortOrders =
         new SortOrder[] {
           SortOrder.builder()
-              .withNullOrder(NullOrdering.FIRST)
+              .withNullOrdering(NullOrdering.FIRST)
               .withDirection(Direction.DESC)
               .withTransform(Transforms.field(new String[] {HIVE_COL_NAME2}))
               .build()
@@ -263,7 +263,7 @@ public class CatalogHiveIT extends AbstractIT {
     final SortOrder[] badSortOrders =
         new SortOrder[] {
           SortOrder.builder()
-              .withNullOrder(NullOrdering.FIRST)
+              .withNullOrdering(NullOrdering.FIRST)
               .withDirection(Direction.DESC)
               .withTransform(Transforms.field(new String[] {HIVE_COL_NAME2 + "bad_name"}))
               .build()

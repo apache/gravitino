@@ -6,6 +6,7 @@
 package com.datastrato.graviton.dto.rel;
 
 import com.datastrato.graviton.dto.rel.ExpressionPartitionDTO.Expression;
+import com.datastrato.graviton.dto.rel.ExpressionPartitionDTO.FieldExpression;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
@@ -22,6 +23,38 @@ public class DistributionDTO {
   // NONE is used to indicate that there is no distribution.
   public static final DistributionDTO NONE =
       new DistributionDTO(new Expression[0], 0, Strategy.HASH);
+
+  /**
+   * Create a distribution on a single column. like distribute by (a)
+   *
+   * @param columnName column name
+   * @return
+   */
+  public static DistributionDTO singleColumnDistribution(
+      Strategy strategy, int number, String columnName) {
+    return new DistributionDTO(
+        new Expression[] {
+          new FieldExpression.Builder().withFieldName(new String[] {columnName}).build()
+        },
+        number,
+        strategy);
+  }
+
+  /**
+   * Create a distribution on a single column. like distribute by (a, b)
+   *
+   * @param columnName column name
+   * @return
+   */
+  public static DistributionDTO singleColumnDistribution(
+      Strategy strategy, int number, String... columnName) {
+    Expression[] expressions =
+        Arrays.stream(columnName)
+            .map(name -> new String[] {name})
+            .map(f -> new FieldExpression.Builder().withFieldName(f).build())
+            .toArray(Expression[]::new);
+    return new DistributionDTO(expressions, number, strategy);
+  }
 
   public enum Strategy {
     HASH,

@@ -19,12 +19,12 @@ public class SortOrder {
   private final Direction direction;
 
   /** Sort null order. Default is FIRST. */
-  private final NullOrdering nullOrder;
+  private final NullOrdering nullOrdering;
 
-  private SortOrder(Transform transform, Direction direction, NullOrdering nullOrder) {
+  private SortOrder(Transform transform, Direction direction, NullOrdering nullOrdering) {
     this.transform = transform;
     this.direction = direction;
-    this.nullOrder = nullOrder;
+    this.nullOrdering = nullOrdering;
   }
 
   public Transform getTransform() {
@@ -35,8 +35,8 @@ public class SortOrder {
     return direction;
   }
 
-  public NullOrdering getNullOrder() {
-    return nullOrder;
+  public NullOrdering getNullOrdering() {
+    return nullOrdering;
   }
 
   public enum Direction {
@@ -63,7 +63,7 @@ public class SortOrder {
 
   public static class Builder {
     private Direction direction;
-    private NullOrdering nullOrder;
+    private NullOrdering nullOrdering;
     private Transform transform;
 
     public Builder withDirection(Direction direction) {
@@ -71,8 +71,8 @@ public class SortOrder {
       return this;
     }
 
-    public Builder withNullOrder(NullOrdering nullOrder) {
-      this.nullOrder = nullOrder;
+    public Builder withNullOrdering(NullOrdering nullOrder) {
+      this.nullOrdering = nullOrder;
       return this;
     }
 
@@ -85,10 +85,10 @@ public class SortOrder {
       if (direction == null) {
         direction = Direction.ASC;
       }
-      if (nullOrder == null) {
-        nullOrder = NullOrdering.FIRST;
+      if (nullOrdering == null) {
+        nullOrdering = NullOrdering.FIRST;
       }
-      return new SortOrder(transform, direction, nullOrder);
+      return new SortOrder(transform, direction, nullOrdering);
     }
   }
 }

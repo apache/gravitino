@@ -64,14 +64,14 @@ public class TableDTO implements Table {
       AuditDTO audit,
       Partition[] partitions,
       DistributionDTO distribution,
-      SortOrderDTO[] sortOrderDTOS) {
+      SortOrderDTO[] sortOrderDTOs) {
     this.name = name;
     this.comment = comment;
     this.columns = columns;
     this.properties = properties;
     this.audit = audit;
     this.distribution = distribution;
-    this.sortOrders = sortOrderDTOS;
+    this.sortOrders = sortOrderDTOs;
     this.partitions = partitions;
   }
 
@@ -135,7 +135,7 @@ public class TableDTO implements Table {
     protected ColumnDTO[] columns;
     protected Map<String, String> properties;
     protected AuditDTO audit;
-    protected SortOrderDTO[] sortOrderDTOS;
+    protected SortOrderDTO[] sortOrderDTOs;
     protected DistributionDTO distributionDTO;
     protected Partition[] partitions;
 
@@ -201,8 +201,8 @@ public class TableDTO implements Table {
       return (S) this;
     }
 
-    public S withSortOrders(SortOrderDTO[] sortOrderDTOS) {
-      this.sortOrderDTOS = sortOrderDTOS;
+    public S withSortOrders(SortOrderDTO[] sortOrderDTOs) {
+      this.sortOrderDTOs = sortOrderDTOs;
       return (S) this;
     }
 
@@ -224,7 +224,7 @@ public class TableDTO implements Table {
       Preconditions.checkArgument(audit != null, "audit cannot be null");
 
       return new TableDTO(
-          name, comment, columns, properties, audit, partitions, distributionDTO, sortOrderDTOS);
+          name, comment, columns, properties, audit, partitions, distributionDTO, sortOrderDTOs);
     }
   }
 }
