@@ -51,10 +51,11 @@ public class TestEntityStore {
 
     @Override
     public <E extends Entity & HasIdentifier> List<E> list(
-        Namespace namespace, Class<E> cl, EntityType entityType) throws IOException {
+        Namespace namespace, Class<E> cl, EntityType entityType, int maxToList) throws IOException {
       return entityMap.entrySet().stream()
           .filter(e -> e.getKey().namespace().equals(namespace))
           .map(entry -> (E) entry.getValue())
+          .limit(maxToList)
           .collect(Collectors.toList());
     }
 

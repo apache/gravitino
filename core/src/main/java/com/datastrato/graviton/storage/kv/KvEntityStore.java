@@ -78,7 +78,7 @@ public class KvEntityStore implements EntityStore {
 
   @Override
   public <E extends Entity & HasIdentifier> List<E> list(
-      Namespace namespace, Class<E> e, EntityType type) throws IOException {
+      Namespace namespace, Class<E> e, EntityType type, int maxToList) throws IOException {
     // Star means it's a wildcard
     List<E> entities = Lists.newArrayList();
     NameIdentifier identifier = NameIdentifier.of(namespace, BinaryEntityKeyEncoder.WILD_CARD);
@@ -95,7 +95,7 @@ public class KvEntityStore implements EntityStore {
                 .end(endKey)
                 .startInclusive(true)
                 .endInclusive(false)
-                .limit(Integer.MAX_VALUE)
+                .limit(maxToList)
                 .build());
 
     for (Pair<byte[], byte[]> pairs : kvs) {

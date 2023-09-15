@@ -168,6 +168,65 @@ public class TestKvEntityStorage {
   }
 
   @Test
+  void testList() {
+    Config config = Mockito.mock(Config.class);
+    Mockito.when(config.get(ENTITY_STORE)).thenReturn("kv");
+    Mockito.when(config.get(ENTITY_KV_STORE)).thenReturn(DEFAULT_ENTITY_KV_STORE);
+    Mockito.when(config.get(Configs.ENTITY_SERDE)).thenReturn("proto");
+    Mockito.when(config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)).thenReturn("/tmp/graviton");
+
+    AuditInfo auditInfo =
+        new AuditInfo.Builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+    try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
+      store.initialize(config);
+      Assertions.assertTrue(store instanceof KvEntityStore);
+      store.setSerDe(EntitySerDeFactory.createEntitySerDe(config.get(Configs.ENTITY_SERDE)));
+
+      BaseMetalake metalake = createBaseMakeLake("metalake", auditInfo);
+      CatalogEntity catalog = createCatalog(Namespace.of("metalake"), "catalog", auditInfo);
+      BaseSchema schema1 =
+          createBaseschema(Namespace.of("metalake", "catalog"), "schema1", auditInfo);
+
+      BaseTable table1 =
+          createBaseTable(Namespace.of("metalake", "catalog", "schema1"), "table1", auditInfo);
+      BaseTable table2 =
+          createBaseTable(Namespace.of("metalake", "catalog", "schema1"), "table2", auditInfo);
+      BaseTable table3 =
+          createBaseTable(Namespace.of("metalake", "catalog", "schema1"), "table3", auditInfo);
+      // Store all entities
+      store.put(metalake);
+      store.put(catalog);
+      store.put(schema1);
+      store.put(table1);
+      store.put(table2);
+      store.put(table3);
+
+      List<BaseTable> tables =
+          store.list(
+              Namespace.of("metalake", "catalog", "schema1"), BaseTable.class, EntityType.TABLE);
+      Assertions.assertEquals(3, tables.size());
+
+      tables =
+          store.list(
+              Namespace.of("metalake", "catalog", "schema1"), BaseTable.class, EntityType.TABLE, 2);
+      Assertions.assertEquals(2, tables.size());
+
+      tables =
+          store.list(
+              Namespace.of("metalake", "catalog", "schema1"), BaseTable.class, EntityType.TABLE, 0);
+      Assertions.assertEquals(0, tables.size());
+
+      tables =
+          store.list(
+              Namespace.of("metalake", "catalog", "schema1"), BaseTable.class, EntityType.TABLE, 4);
+      Assertions.assertEquals(3, tables.size());
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  @Test
   void testEntityUpdate() throws Exception {
     Config config = Mockito.mock(Config.class);
     Mockito.when(config.get(ENTITY_STORE)).thenReturn("kv");

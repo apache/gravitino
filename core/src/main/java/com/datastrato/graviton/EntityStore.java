@@ -42,12 +42,25 @@ public interface EntityStore extends Closeable {
    * may not be consistent.
    *
    * @param namespace the namespace of the entities
-   * @return the list of entities
    * @param type the type of the entity
+   * @param <E> the type of the entity
+   * @param entityType the type of the entity to be listed
+   * @param maxToList the max number of entities to list
+   * @return the list of entities
    * @throws IOException if the list operation fails
    */
   <E extends Entity & HasIdentifier> List<E> list(
-      Namespace namespace, Class<E> type, EntityType entityType) throws IOException;
+      Namespace namespace, Class<E> type, EntityType entityType, int maxToList) throws IOException;
+
+  /**
+   * List all the entities with the specified {@link Namespace}, and deserialize them into the
+   * specified {@link Entity} object. for more, please see {@link #list(Namespace, Class,
+   * EntityType, int)}
+   */
+  default <E extends Entity & HasIdentifier> List<E> list(
+      Namespace namespace, Class<E> type, EntityType entityType) throws IOException {
+    return list(namespace, type, entityType, Integer.MAX_VALUE);
+  }
 
   /**
    * Check if the entity with the specified {@link NameIdentifier} exists.
@@ -106,7 +119,7 @@ public interface EntityStore extends Closeable {
    * @return E the updated entity
    * @throws IOException if the store operation fails
    * @throws NoSuchEntityException if the entity does not exist
-   * @throws AlreadyExistsException if the updated entity already exitsed.
+   * @throws AlreadyExistsException if the updated entity already exists.
    */
   <E extends Entity & HasIdentifier> E update(
       NameIdentifier ident, Class<E> type, EntityType entityType, Function<E, E> updater)
@@ -143,7 +156,7 @@ public interface EntityStore extends Closeable {
    *
    * @param ident the name identifier of the entity
    * @param entityType the type of the entity to be deleted
-   * @param cascade support cacade detele or not
+   * @param cascade support cascade delete or not
    * @return true if the entity exists and is deleted successfully, false otherwise
    * @throws IOException if the delete operation fails
    */
