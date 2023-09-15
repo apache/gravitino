@@ -190,7 +190,7 @@ public class HiveTable extends BaseTable {
       }
     }
 
-    if (distribution != null) {
+    if (!Distribution.NONE.equals(distribution)) {
       sd.setBucketCols(
           Arrays.stream(distribution.transforms())
               .map(t -> ((NamedReference) t).value()[0])

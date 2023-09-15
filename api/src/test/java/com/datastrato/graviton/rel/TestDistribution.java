@@ -5,6 +5,7 @@
 
 package com.datastrato.graviton.rel;
 
+import com.datastrato.graviton.rel.Distribution.Builder;
 import com.datastrato.graviton.rel.Distribution.Strategy;
 import com.datastrato.graviton.rel.transforms.Transform;
 import com.datastrato.graviton.rel.transforms.Transforms;
@@ -15,7 +16,7 @@ class TestDistribution {
 
   @Test
   void testDistribution() {
-    Distribution.DistributionBuilder builder = new Distribution.DistributionBuilder();
+    Builder builder = new Builder();
     builder.withStrategy(Strategy.HASH);
     builder.withNumber(1);
     builder.withTransforms(new Transform[] {Transforms.field(new String[] {"field1"})});

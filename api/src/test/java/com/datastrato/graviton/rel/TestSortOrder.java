@@ -5,6 +5,7 @@
 
 package com.datastrato.graviton.rel;
 
+import com.datastrato.graviton.rel.SortOrder.Builder;
 import com.datastrato.graviton.rel.SortOrder.Direction;
 import com.datastrato.graviton.rel.SortOrder.NullOrdering;
 import com.datastrato.graviton.rel.transforms.Transform;
@@ -18,7 +19,7 @@ class TestSortOrder {
 
   @Test
   void testSortOrder() {
-    SortOrder.SortOrderBuilder builder = new SortOrder.SortOrderBuilder();
+    Builder builder = new Builder();
     builder.withNullOrder(NullOrdering.FIRST);
     builder.withDirection(Direction.ASC);
 

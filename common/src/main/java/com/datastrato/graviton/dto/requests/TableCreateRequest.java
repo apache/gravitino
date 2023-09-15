@@ -118,7 +118,7 @@ public class TableCreateRequest implements RESTRequest {
     }
   }
 
-  // Check column name in sort order and distribution expressions are in table columns
+  // Check column name in the expressions of sort order and distribution are in table columns
   private void validateExpresion(Expression expression, List<String> columnNames) {
     if (expression instanceof FieldExpression) {
       FieldExpression nameRefernce = (FieldExpression) expression;

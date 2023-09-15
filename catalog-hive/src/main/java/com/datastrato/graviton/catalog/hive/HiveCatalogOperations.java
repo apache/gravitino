@@ -578,7 +578,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     }
   }
 
-  private void validateDistriutionAndSort(Distribution distribution, SortOrder[] sortOrder) {
+  private void validateDistributionAndSort(Distribution distribution, SortOrder[] sortOrder) {
     if (distribution != Distribution.NONE) {
       boolean allNameReference =
           Arrays.stream(distribution.transforms())
@@ -629,7 +629,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     Preconditions.checkArgument(
         Arrays.stream(partitions).allMatch(p -> p instanceof Transforms.NamedReference),
         "Hive partition only supports identity transform");
-    validateDistriutionAndSort(distribution, sortOrders);
+    validateDistributionAndSort(distribution, sortOrders);
 
     try {
       if (!schemaExists(schemaIdent)) {

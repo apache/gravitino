@@ -50,27 +50,27 @@ public class Distribution {
     this.strategy = strategy;
   }
 
-  public static DistributionBuilder builder() {
-    return new DistributionBuilder();
+  public static Builder builder() {
+    return new Builder();
   }
 
-  public static class DistributionBuilder {
+  public static class Builder {
 
     private Transform[] transforms;
     private int number;
     private Strategy strategy;
 
-    public DistributionBuilder withTransforms(Transform[] transforms) {
+    public Builder withTransforms(Transform[] transforms) {
       this.transforms = transforms;
       return this;
     }
 
-    public DistributionBuilder withNumber(int number) {
+    public Builder withNumber(int number) {
       this.number = number;
       return this;
     }
 
-    public DistributionBuilder withStrategy(Strategy strategy) {
+    public Builder withStrategy(Strategy strategy) {
       this.strategy = strategy;
       return this;
     }

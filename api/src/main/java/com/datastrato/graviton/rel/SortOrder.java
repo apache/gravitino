@@ -57,26 +57,26 @@ public class SortOrder {
     }
   }
 
-  public static SortOrderBuilder builder() {
-    return new SortOrderBuilder();
+  public static Builder builder() {
+    return new Builder();
   }
 
-  public static class SortOrderBuilder {
+  public static class Builder {
     private Direction direction;
     private NullOrdering nullOrder;
     private Transform transform;
 
-    public SortOrderBuilder withDirection(Direction direction) {
+    public Builder withDirection(Direction direction) {
       this.direction = direction;
       return this;
     }
 
-    public SortOrderBuilder withNullOrder(NullOrdering nullOrder) {
+    public Builder withNullOrder(NullOrdering nullOrder) {
       this.nullOrder = nullOrder;
       return this;
     }
 
-    public SortOrderBuilder withTransform(Transform transform) {
+    public Builder withTransform(Transform transform) {
       this.transform = transform;
       return this;
     }
