@@ -47,7 +47,7 @@ jobs:
 
       - name: Run AMD64 container
         run: |
-          docker run --rm --name ${DOCKER_RUN_NAME} --platform ${PLATFORM} -d -p 8022:22 -p 8088:8088 -p 8888:8888 -p 9000:9000 -p 9083:9083 -p 10000:10000 -p 10002:10002 -p 50070:50070 -p 50075:50075 ${HIVE_IMAGE_NAME}:${HIVE_IMAGE_TAG_NAME}
+          docker run --rm --name ${DOCKER_RUN_NAME} --platform ${PLATFORM} -d -p 8022:22 -p 8088:8088 -p 9000:9000 -p 9083:9083 -p 10000:10000 -p 10002:10002 -p 50070:50070 -p 50075:50075 ${HIVE_IMAGE_NAME}:${HIVE_IMAGE_TAG_NAME}
           docker ps -a
 
       - name: Setup Gradle
@@ -76,7 +76,7 @@ jobs:
             docker stop ${DOCKER_RUN_NAME}
             sleep 3
             docker ps -a
-            docker run --rm --name ${DOCKER_RUN_NAME} --platform ${PLATFORM} -d -p 8022:22 -p 8088:8088 -p 8888:8888 -p 9000:9000 -p 9083:9083 -p 10000:10000 -p 10002:10002 -p 50070:50070 -p 50075:50075 ${HIVE_IMAGE_NAME}:${HIVE_IMAGE_TAG_NAME}
+            docker run --rm --name ${DOCKER_RUN_NAME} --platform ${PLATFORM} -d -p 8022:22 -p 8088:8088 -p 9000:9000 -p 9083:9083 -p 10000:10000 -p 10002:10002 -p 50070:50070 -p 50075:50075 ${HIVE_IMAGE_NAME}:${HIVE_IMAGE_TAG_NAME}
             sleep 60
 
       - name: Integration Test
