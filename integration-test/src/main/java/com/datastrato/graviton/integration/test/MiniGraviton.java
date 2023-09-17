@@ -72,7 +72,7 @@ public class MiniGraviton {
       // Ignore
     }
 
-    // Initialization the REST client
+    // Initialize the REST client
     String host = serverConfig.get(ServerConfig.WEBSERVER_HOST);
     int port = serverConfig.get(ServerConfig.WEBSERVER_HTTP_PORT);
     String URI = String.format("http://%s:%d", host, port);

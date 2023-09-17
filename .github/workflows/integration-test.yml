@@ -79,10 +79,15 @@ jobs:
             docker run --rm --name ${DOCKER_RUN_NAME} --platform ${PLATFORM} -d -p 8022:22 -p 8088:8088 -p 9000:9000 -p 9083:9083 -p 10000:10000 -p 10002:10002 -p 50070:50070 -p 50075:50075 ${HIVE_IMAGE_NAME}:${HIVE_IMAGE_TAG_NAME}
             sleep 60
 
+      - name: Setup debug Github Action
+        if: ${{ contains(github.event.pull_request.labels.*.name, 'debug action') }}
+        uses: csexton/debugger-action@master
+
       - name: Integration Test
         id: integrationTest
         run: |
-          gradle test --rerun-tasks -PtestMode=deploy
+          gradle test -PtestMode=embedded
+          gradle test -PtestMode=deploy
 
       - name: Print logs when Graviton integration tests failure
         if: ${{ failure() && steps.integrationTest.outcome == 'failure' }}
@@ -93,10 +98,6 @@ jobs:
           if [ -f "distribution/package/logs/graviton-server.log" ]; then
             cat distribution/package/logs/graviton-server.log
           fi
-
-      - name: Setup Debug Action
-        if: ${{ contains(github.event.pull_request.labels.*.name, 'debug action') }}
-        uses: csexton/debugger-action@master
 
       - name: Stop and remove container
         run: |

@@ -122,7 +122,7 @@ fun printDockerCheckInfo() {
   if (dockerRunning && hiveContainerRunning) {
     println("Use exist Graviton CI Hive container to run all integration test.  [$testMode test]")
   } else {
-    println("Run only test cases where tag is not set special `DOCKER-NAME`.    [$testMode test]")
+    println("Run only test cases where tag is not set special `CI-DOCKER-NAME`. [$testMode test]")
   }
   println("------------------------------------------------------------------")
 }
@@ -173,32 +173,33 @@ tasks {
 }
 
 tasks.test {
-  dependsOn("checkDockerRunning")
+  var testMode = project.properties["testMode"] as? String ?: ""
+  if (testMode == "") {
+    exclude("**/integration/test/**")
+  } else {
+    dependsOn("checkDockerRunning")
 
-  doFirst {
-    // Default use MiniGraviton to run integration tests
-    environment("GRAVITON_ROOT_DIR", rootDir.path)
-    environment("HADOOP_USER_NAME", "hive")
-    environment("HADOOP_HOME", "/tmp")
-    environment("PROJECT_VERSION", version)
+    doFirst {
+      // Default use MiniGraviton to run integration tests
+      environment("GRAVITON_ROOT_DIR", rootDir.path)
+      environment("HADOOP_USER_NAME", "hive")
+      environment("HADOOP_HOME", "/tmp")
+      environment("PROJECT_VERSION", version)
 
-    val testMode = project.properties["testMode"] as? String ?: "embedded"
-    if (testMode == "deploy") {
-      environment("GRAVITON_HOME", rootDir.path + "/distribution/package")
-      systemProperty("TestMode", "deploy")
-    } else {
-      environment("GRAVITON_HOME", rootDir.path)
-      // default use embedded mode
-      systemProperty("TestMode", "embedded")
-    }
-
-    useJUnitPlatform{
-      if (EXCLUDE_DOCKER_TEST) {
-        excludeTags("graviton-ci-hive")
+      if (testMode == "deploy") {
+        environment("GRAVITON_HOME", rootDir.path + "/distribution/package")
+        systemProperty("TestMode", "deploy")
+      } else if (testMode == "embedded") {
+        environment("GRAVITON_HOME", rootDir.path)
+        systemProperty("TestMode", "embedded")
+      } else {
+        throw GradleException("Graviton integration test only support [embedded] or [deploy] mode!")
       }
 
-      if (testMode == "embedded") {
-        excludeTags("deploy") // exclude all test cases with tag `deploy` mode
+      useJUnitPlatform {
+        if (EXCLUDE_DOCKER_TEST) {
+          excludeTags("graviton-ci-hive")
+        }
       }
     }
   }

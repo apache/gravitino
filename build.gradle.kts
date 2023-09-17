@@ -40,7 +40,6 @@ subprojects {
   }
 
   tasks.configureEach<Test> {
-    // Integration test module are tested separately
     useJUnitPlatform()
     finalizedBy(tasks.getByName("jacocoTestReport"))
   }
