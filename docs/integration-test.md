@@ -27,9 +27,9 @@ Before running the tests, make sure Docker is installed.
 Then, execute blow steps: 
 1. Execute the `./gradlew clean build` command to build Graviton project.
 2. The Graviton project is compiled and packaged in the `distribution` directory using the `./gradlew compileDistribution` command.
-3. Run a hive docker test environment container in the local using the `docker run --rm -d -p 8088:8088 -p 50070:50070 -p 50075:50075 -p 10000:10000 -p 10002:10002 -p 8888:8888 -p 9083:9083 -p 8022:22 datastrato/graviton-ci-hive:0.1.0` command.
+3. Run a hive docker test environment container in the local using the `docker run --rm -d -p 8022:22 -p 8088:8088 -p 9000:9000 -p 9083:9083 -p 10000:10000 -p 10002:10002 -p 50070:50070 -p 50075:50075 datastrato/graviton-ci-hive` command.
 4. The integration test cases in the `integration-test` module are executed using the `./gradlew integrationTest` command.
 
 Additionally, the Graviton Server and third-party data source Docker runtime environments will use certain ports. Ensure that these ports are not already in use:
-- Graviton Server: Port `8088`
-- Hive Docker runtime environment: Ports `50070`, `50075`, `10002`, `10000`, `8888`, `9083`, `7180`, and `22`
+- Graviton Server: Port `8090`
+- Hive Docker runtime environment: Ports is `22`, `7180`, `8088`, `8888`, `9000`, `9083`, `10000`, `10002`, `50070`, and ` 50075`
