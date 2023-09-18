@@ -51,7 +51,6 @@ public class CatalogHiveIT extends AbstractIT {
   public static String HIVE_COL_NAME1 = "hive_col_name1";
   public static String HIVE_COL_NAME2 = "hive_col_name2";
   public static String HIVE_COL_NAME3 = "hive_col_name3";
-
   static String HIVE_METASTORE_URIS = "thrift://localhost:9083";
 
   private static HiveClientPool hiveClientPool;
@@ -62,10 +61,8 @@ public class CatalogHiveIT extends AbstractIT {
 
   @BeforeAll
   public static void startup() throws Exception {
-    HiveConf hiveConf = new HiveConf();
-    hiveConf.set(HiveConf.ConfVars.METASTOREURIS.varname, HIVE_METASTORE_URIS);
+    HiveConf hiveConf = GravitonITUtils.hiveConfig();
     hiveClientPool = new HiveClientPool(1, hiveConf);
-
     createMetalake();
     createCatalog();
     createSchema();
