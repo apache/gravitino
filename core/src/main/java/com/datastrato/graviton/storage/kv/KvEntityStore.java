@@ -291,11 +291,11 @@ public class KvEntityStore implements EntityStore {
   @Override
   public boolean delete(NameIdentifier ident, EntityType entityType, boolean cascade)
       throws IOException {
-    byte[] dataKey = entityKeyEncoder.encode(ident, entityType, true);
-    if (dataKey == null) {
-      return true;
+    if (!exists(ident, entityType)) {
+      return false;
     }
 
+    byte[] dataKey = entityKeyEncoder.encode(ident, entityType, true);
     List<byte[]> subEntityPrefix = getSubEntitiesPrefix(ident, entityType);
     if (subEntityPrefix.isEmpty()) {
       // has no sub-entities

@@ -19,6 +19,7 @@ dependencies {
     implementation(libs.jackson.datatype.jdk8)
     implementation(libs.jackson.datatype.jsr310)
     implementation(libs.guava)
+    implementation(libs.commons.lang3)
     implementation(libs.bundles.log4j)
     implementation(libs.bundles.jetty)
     implementation(libs.bundles.jersey)
@@ -37,5 +38,17 @@ dependencies {
     }
     testImplementation(libs.jersey.test.framework.provider.jetty) {
       exclude(group = "org.junit.jupiter")
+    }
+}
+
+tasks {
+    val copyDepends by registering(Copy::class) {
+        from(configurations.runtimeClasspath)
+        into("build/libs")
+    }
+    val copyCatalogLibs by registering(Copy::class) {
+        dependsOn(copyDepends)
+        from("build/libs")
+        into("${rootDir}/distribution/package/catalogs/lakehouse/libs")
     }
 }

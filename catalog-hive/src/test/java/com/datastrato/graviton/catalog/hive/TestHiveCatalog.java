@@ -17,7 +17,7 @@ import org.apache.thrift.TException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-public class HiveCatalogTest extends MiniHiveMetastoreService {
+public class TestHiveCatalog extends MiniHiveMetastoreService {
   @Test
   public void testListDatabases() throws TException, InterruptedException {
     AuditInfo auditInfo =

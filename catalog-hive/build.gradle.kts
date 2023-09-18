@@ -49,11 +49,12 @@ dependencies {
         exclude("com.google.protobuf")
         exclude("org.apache.calcite")
         exclude("org.apache.calcite.avatica")
+        exclude("org.eclipse.jetty.aggregate", "jetty-all")
+        exclude("org.eclipse.jetty.orbit", "javax.servlet")
         exclude("com.google.code.findbugs", "jsr305")
         exclude("org.apache.logging.log4j")
         exclude("org.apache.curator")
         exclude("org.pentaho")
-//        exclude("com.github.joshelser")
         exclude("org.slf4j")
     }
 
@@ -77,4 +78,17 @@ dependencies {
     testImplementation(libs.junit.jupiter.api)
     testRuntimeOnly(libs.junit.jupiter.engine)
     testImplementation(libs.mockito.core)
+}
+
+tasks {
+    val copyDepends by registering(Copy::class) {
+        from(configurations.runtimeClasspath)
+        into("build/libs")
+    }
+
+    val copyCatalogLibs by registering(Copy::class) {
+        dependsOn(copyDepends)
+        from("build/libs")
+        into("${rootDir}/distribution/package/catalogs/hive/libs")
+    }
 }

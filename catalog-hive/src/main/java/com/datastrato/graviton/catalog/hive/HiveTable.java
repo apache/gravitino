@@ -4,6 +4,7 @@
  */
 package com.datastrato.graviton.catalog.hive;
 
+import static com.datastrato.graviton.rel.transforms.Transforms.identity;
 import static org.apache.hadoop.hive.metastore.TableType.EXTERNAL_TABLE;
 import static org.apache.hadoop.hive.metastore.TableType.MANAGED_TABLE;
 
@@ -12,10 +13,14 @@ import com.datastrato.graviton.catalog.hive.converter.FromHiveType;
 import com.datastrato.graviton.catalog.hive.converter.ToHiveType;
 import com.datastrato.graviton.meta.AuditInfo;
 import com.datastrato.graviton.meta.rel.BaseTable;
-import com.google.common.collect.Lists;
+import com.datastrato.graviton.rel.Column;
+import com.datastrato.graviton.rel.transforms.Transforms;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -73,6 +78,10 @@ public class HiveTable extends BaseTable {
                 .toArray(HiveColumn[]::new))
         .withLocation(table.getSd().getLocation())
         .withAuditInfo(auditInfoBuilder.build())
+        .withPartitions(
+            table.getPartitionKeys().stream()
+                .map(p -> identity(new String[] {p.getName()}))
+                .toArray(Transforms.NamedReference[]::new))
         .build();
   }
 
@@ -88,7 +97,7 @@ public class HiveTable extends BaseTable {
     hiveTable.setDbName(schemaIdentifier().name());
     hiveTable.setSd(buildStorageDescriptor());
     hiveTable.setParameters(properties);
-    hiveTable.setPartitionKeys(Lists.newArrayList() /* TODO(Minghuang): Add partition support */);
+    hiveTable.setPartitionKeys(buildPartitionKeys());
 
     // Set AuditInfo to Hive's Table object. Hive's Table doesn't support setting last modifier
     // and last modified time, so we only set creator and create time.
@@ -96,6 +105,27 @@ public class HiveTable extends BaseTable {
     hiveTable.setCreateTime(Math.toIntExact(auditInfo.createTime().getEpochSecond()));
 
     return hiveTable;
+  }
+
+  private List<FieldSchema> buildPartitionKeys() {
+    return Arrays.stream(partitions)
+        .map(p -> getPartitionKey(((Transforms.NamedReference) p).value()))
+        .collect(Collectors.toList());
+  }
+
+  private FieldSchema getPartitionKey(String[] fieldName) {
+    Preconditions.checkArgument(
+        fieldName.length == 1, "Hive partition does not support nested field");
+    List<Column> partitionColumns =
+        Arrays.stream(columns)
+            .filter(c -> c.name().equals(fieldName[0]))
+            .collect(Collectors.toList());
+    Preconditions.checkArgument(
+        partitionColumns.size() == 1, "Hive partition must match one column");
+    return new FieldSchema(
+        partitionColumns.get(0).name(),
+        partitionColumns.get(0).dataType().accept(ToHiveType.INSTANCE).getQualifiedName(),
+        partitionColumns.get(0).comment());
   }
 
   private StorageDescriptor buildStorageDescriptor() {
@@ -160,13 +190,16 @@ public class HiveTable extends BaseTable {
       hiveTable.namespace = namespace;
       hiveTable.name = name;
       hiveTable.comment = comment;
-      hiveTable.properties = properties;
+      hiveTable.properties = properties != null ? Maps.newHashMap(properties) : Maps.newHashMap();
       hiveTable.auditInfo = auditInfo;
       hiveTable.columns = columns;
       hiveTable.location = location;
+      hiveTable.partitions = partitions;
 
       // HMS put table comment in parameters
-      hiveTable.properties.put(HMS_TABLE_COMMENT, comment);
+      if (comment != null) {
+        hiveTable.properties.put(HMS_TABLE_COMMENT, comment);
+      }
 
       return hiveTable;
     }

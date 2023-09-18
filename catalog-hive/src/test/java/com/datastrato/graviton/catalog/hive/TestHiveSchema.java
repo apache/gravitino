@@ -16,6 +16,7 @@ import com.datastrato.graviton.EntityStore;
 import com.datastrato.graviton.GravitonEnv;
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
+import com.datastrato.graviton.StringIdentifier;
 import com.datastrato.graviton.catalog.hive.miniHMS.MiniHiveMetastoreService;
 import com.datastrato.graviton.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.graviton.meta.AuditInfo;
@@ -34,7 +35,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
-public class HiveSchemaTest extends MiniHiveMetastoreService {
+public class TestHiveSchema extends MiniHiveMetastoreService {
 
   private static final String ROCKS_DB_STORE_PATH = "/tmp/graviton/test_hive_schema";
 
@@ -96,7 +97,7 @@ public class HiveSchemaTest extends MiniHiveMetastoreService {
     Schema schema = hiveCatalog.asSchemas().createSchema(ident, comment, properties);
     Assertions.assertEquals(ident.name(), schema.name());
     Assertions.assertEquals(comment, schema.comment());
-    Assertions.assertEquals(properties, schema.properties());
+    testProperties(properties, schema.properties());
 
     Assertions.assertTrue(hiveCatalog.asSchemas().schemaExists(ident));
 
@@ -106,6 +107,7 @@ public class HiveSchemaTest extends MiniHiveMetastoreService {
 
     Schema loadedSchema = hiveCatalog.asSchemas().loadSchema(ident);
     Assertions.assertEquals(schema.auditInfo(), loadedSchema.auditInfo());
+    testProperties(properties, loadedSchema.properties());
 
     // Test illegal identifier
     NameIdentifier ident1 = NameIdentifier.of("metalake", hiveCatalog.name());
@@ -142,8 +144,7 @@ public class HiveSchemaTest extends MiniHiveMetastoreService {
     Assertions.assertTrue(hiveCatalog.asSchemas().schemaExists(ident));
 
     Map<String, String> properties1 = hiveCatalog.asSchemas().loadSchema(ident).properties();
-    Assertions.assertEquals("val1", properties1.get("key1"));
-    Assertions.assertEquals("val2", properties1.get("key2"));
+    testProperties(properties, properties1);
 
     hiveCatalog
         .asSchemas()
@@ -197,5 +198,16 @@ public class HiveSchemaTest extends MiniHiveMetastoreService {
     hiveCatalog.asSchemas().dropSchema(ident, true);
     Assertions.assertFalse(hiveCatalog.asSchemas().schemaExists(ident));
     Assertions.assertFalse(store.exists(ident, SCHEMA));
+  }
+
+  private void testProperties(Map<String, String> expectedProps, Map<String, String> testProps) {
+    expectedProps.forEach(
+        (k, v) -> {
+          Assertions.assertEquals(v, testProps.get(k));
+        });
+
+    Assertions.assertTrue(testProps.containsKey(StringIdentifier.ID_KEY));
+    StringIdentifier StringId = StringIdentifier.fromString(testProps.get(StringIdentifier.ID_KEY));
+    Assertions.assertEquals(StringId.toString(), testProps.get(StringIdentifier.ID_KEY));
   }
 }

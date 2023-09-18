@@ -5,19 +5,13 @@
 
 package com.datastrato.graviton.catalog.lakehouse.iceberg.web.rest;
 
-import com.datastrato.graviton.catalog.lakehouse.iceberg.ops.IcebergTableOps;
-import com.datastrato.graviton.catalog.lakehouse.iceberg.web.IcebergObjectMapperProvider;
-import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableMap;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import javax.ws.rs.client.Entity;
-import javax.ws.rs.client.Invocation.Builder;
-import javax.ws.rs.client.WebTarget;
 import javax.ws.rs.core.Application;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
@@ -29,60 +23,19 @@ import org.apache.iceberg.rest.responses.CreateNamespaceResponse;
 import org.apache.iceberg.rest.responses.GetNamespaceResponse;
 import org.apache.iceberg.rest.responses.ListNamespacesResponse;
 import org.apache.iceberg.rest.responses.UpdateNamespacePropertiesResponse;
-import org.glassfish.hk2.utilities.binding.AbstractBinder;
-import org.glassfish.jersey.server.ResourceConfig;
-import org.glassfish.jersey.test.JerseyTest;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
-public class TestIcebergNamespaceOperations extends JerseyTest {
+public class TestIcebergNamespaceOperations extends IcebergTestBase {
 
   private final Map<String, String> properties = ImmutableMap.of("a", "b");
   private final Map<String, String> updatedProperties = ImmutableMap.of("b", "c");
 
   @Override
   protected Application configure() {
-    ResourceConfig resourceConfig =
-        IcebergRestTestUtil.getIcebergResourceConfig(IcebergNamespaceOperations.class);
-
-    IcebergTableOps icebergTableOps = new IcebergTableOps();
-    resourceConfig.register(
-        new AbstractBinder() {
-          @Override
-          protected void configure() {
-            bind(icebergTableOps).to(IcebergTableOps.class).ranked(2);
-          }
-        });
-
-    return resourceConfig;
-  }
-
-  private Builder getNamespaceClientBuilder() {
-    return getNamespaceClientBuilder(Optional.empty(), Optional.empty());
-  }
-
-  private Builder getNamespaceClientBuilder(Optional<String> namespace) {
-    return getNamespaceClientBuilder(namespace, Optional.empty());
-  }
-
-  private Builder getNamespaceClientBuilder(
-      Optional<String> namespace, Optional<Map<String, String>> queryParam) {
-    String path =
-        Joiner.on("/")
-            .skipNulls()
-            .join(IcebergRestTestUtil.NAMESPACE_PATH, namespace.orElseGet(() -> null));
-    WebTarget target = target(path);
-    if (queryParam.isPresent()) {
-      Map<String, String> m = queryParam.get();
-      for (Entry<String, String> entry : m.entrySet()) {
-        target = target.queryParam(entry.getKey(), entry.getValue());
-      }
-    }
-
-    return target
-        .register(IcebergObjectMapperProvider.class)
-        .request(MediaType.APPLICATION_JSON_TYPE)
-        .accept(MediaType.APPLICATION_JSON_TYPE);
+    return IcebergRestTestUtil.getIcebergResourceConfig(IcebergNamespaceOperations.class);
   }
 
   private Response doCreateNamespace(String... name) {
@@ -135,7 +88,7 @@ public class TestIcebergNamespaceOperations extends JerseyTest {
     Assertions.assertEquals(properties, r.properties());
   }
 
-  private void verifyDropNamespaceSucc(String name) {
+  protected void verifyDropNamespaceSucc(String name) {
     Response response = doDropNamespace(name);
     Assertions.assertEquals(Status.NO_CONTENT.getStatusCode(), response.getStatus());
   }
@@ -145,7 +98,7 @@ public class TestIcebergNamespaceOperations extends JerseyTest {
     Assertions.assertEquals(status, response.getStatus());
   }
 
-  private void verifyCreateNamespaceSucc(String... name) {
+  protected void verifyCreateNamespaceSucc(String... name) {
     Response response = doCreateNamespace(name);
     Assertions.assertEquals(Status.OK.getStatusCode(), response.getStatus());
 
@@ -215,8 +168,10 @@ public class TestIcebergNamespaceOperations extends JerseyTest {
     Assertions.assertEquals(schemas, ns);
   }
 
-  @Test
-  void testListNamespace() {
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void testListNamespace(boolean withPrefix) {
+    setUrlPathWithPrefix(withPrefix);
     dropAllExistingNamespace();
     verifyListNamespaceSucc(Optional.empty(), Arrays.asList());
 

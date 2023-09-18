@@ -4,6 +4,8 @@
  */
 package com.datastrato.graviton.server.web.rest;
 
+import static com.datastrato.graviton.dto.rel.PartitionUtils.toPartitions;
+
 import com.datastrato.graviton.Audit;
 import com.datastrato.graviton.Catalog;
 import com.datastrato.graviton.Metalake;
@@ -75,6 +77,7 @@ public class DTOConverters {
             Arrays.stream(table.columns()).map(DTOConverters::toDTO).toArray(ColumnDTO[]::new))
         .withProperties(table.properties())
         .withAudit(toDTO(table.auditInfo()))
+        .withPartitions(toPartitions(table.partitioning()))
         .build();
   }
 }

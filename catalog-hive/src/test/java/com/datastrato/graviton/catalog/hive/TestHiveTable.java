@@ -9,6 +9,8 @@ import static com.datastrato.graviton.Configs.ENTITY_KV_STORE;
 import static com.datastrato.graviton.Configs.ENTITY_STORE;
 import static com.datastrato.graviton.Configs.ENTRY_KV_ROCKSDB_BACKEND_PATH;
 import static com.datastrato.graviton.Entity.EntityType.TABLE;
+import static com.datastrato.graviton.rel.transforms.Transforms.day;
+import static com.datastrato.graviton.rel.transforms.Transforms.identity;
 
 import com.datastrato.graviton.Config;
 import com.datastrato.graviton.Configs;
@@ -16,6 +18,7 @@ import com.datastrato.graviton.EntityStore;
 import com.datastrato.graviton.GravitonEnv;
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
+import com.datastrato.graviton.StringIdentifier;
 import com.datastrato.graviton.catalog.hive.miniHMS.MiniHiveMetastoreService;
 import com.datastrato.graviton.exceptions.TableAlreadyExistsException;
 import com.datastrato.graviton.meta.AuditInfo;
@@ -23,6 +26,7 @@ import com.datastrato.graviton.meta.CatalogEntity;
 import com.datastrato.graviton.rel.Column;
 import com.datastrato.graviton.rel.Table;
 import com.datastrato.graviton.rel.TableChange;
+import com.datastrato.graviton.rel.transforms.Transform;
 import com.google.common.collect.Maps;
 import io.substrait.type.TypeCreator;
 import java.io.IOException;
@@ -37,7 +41,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
-public class HiveTableTest extends MiniHiveMetastoreService {
+public class TestHiveTable extends MiniHiveMetastoreService {
 
   private static final String META_LAKE_NAME = "metalake";
 
@@ -140,13 +144,14 @@ public class HiveTableTest extends MiniHiveMetastoreService {
     Table table =
         hiveCatalog
             .asTableCatalog()
-            .createTable(tableIdentifier, columns, HIVE_COMMENT, properties);
+            .createTable(tableIdentifier, columns, HIVE_COMMENT, properties, new Transform[0]);
     Assertions.assertEquals(tableIdentifier.name(), table.name());
     Assertions.assertEquals(HIVE_COMMENT, table.comment());
-    Assertions.assertArrayEquals(columns, table.columns());
+    testProperties(properties, table.properties());
 
     Table loadedTable = hiveCatalog.asTableCatalog().loadTable(tableIdentifier);
     Assertions.assertEquals(table.auditInfo(), loadedTable.auditInfo());
+    testProperties(properties, loadedTable.properties());
 
     Assertions.assertTrue(hiveCatalog.asTableCatalog().tableExists(tableIdentifier));
     NameIdentifier[] tableIdents =
@@ -161,7 +166,12 @@ public class HiveTableTest extends MiniHiveMetastoreService {
             () ->
                 hiveCatalog
                     .asTableCatalog()
-                    .createTable(hiveSchema.nameIdentifier(), columns, HIVE_COMMENT, properties));
+                    .createTable(
+                        hiveSchema.nameIdentifier(),
+                        columns,
+                        HIVE_COMMENT,
+                        properties,
+                        new Transform[0]));
     Assertions.assertTrue(
         exception.getMessage().contains("Cannot support invalid namespace in Hive Metastore"));
 
@@ -171,8 +181,101 @@ public class HiveTableTest extends MiniHiveMetastoreService {
             () ->
                 hiveCatalog
                     .asTableCatalog()
-                    .createTable(tableIdentifier, columns, HIVE_COMMENT, properties));
+                    .createTable(
+                        tableIdentifier, columns, HIVE_COMMENT, properties, new Transform[0]));
     Assertions.assertTrue(exception.getMessage().contains("Table already exists"));
+  }
+
+  @Test
+  public void testCreatePartitionedHiveTable() throws IOException {
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(META_LAKE_NAME, hiveCatalog.name(), hiveSchema.name(), genRandomName());
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put("key1", "val1");
+    properties.put("key2", "val2");
+
+    HiveColumn col1 =
+        new HiveColumn.Builder()
+            .withName("city")
+            .withType(TypeCreator.NULLABLE.I8)
+            .withComment(HIVE_COMMENT)
+            .build();
+    HiveColumn col2 =
+        new HiveColumn.Builder()
+            .withName("dt")
+            .withType(TypeCreator.NULLABLE.DATE)
+            .withComment(HIVE_COMMENT)
+            .build();
+    Column[] columns = new Column[] {col1, col2};
+
+    Transform[] partitions = new Transform[] {identity(new String[] {col1.name()})};
+
+    Table table =
+        hiveCatalog
+            .asTableCatalog()
+            .createTable(tableIdentifier, columns, HIVE_COMMENT, properties, partitions);
+    Assertions.assertEquals(tableIdentifier.name(), table.name());
+    Assertions.assertEquals(HIVE_COMMENT, table.comment());
+    testProperties(properties, table.properties());
+    Assertions.assertArrayEquals(partitions, table.partitioning());
+
+    Table loadedTable = hiveCatalog.asTableCatalog().loadTable(tableIdentifier);
+    Assertions.assertEquals(table.auditInfo(), loadedTable.auditInfo());
+    testProperties(properties, loadedTable.properties());
+    Assertions.assertArrayEquals(partitions, loadedTable.partitioning());
+
+    Assertions.assertTrue(hiveCatalog.asTableCatalog().tableExists(tableIdentifier));
+    NameIdentifier[] tableIdents =
+        hiveCatalog.asTableCatalog().listTables(tableIdentifier.namespace());
+    Assertions.assertTrue(Arrays.asList(tableIdents).contains(tableIdentifier));
+    Assertions.assertTrue(store.exists(tableIdentifier, TABLE));
+
+    // Test exception
+    Throwable exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                hiveCatalog
+                    .asTableCatalog()
+                    .createTable(
+                        tableIdentifier,
+                        columns,
+                        HIVE_COMMENT,
+                        properties,
+                        new Transform[] {day(new String[] {col2.name()})}));
+    Assertions.assertTrue(
+        exception.getMessage().contains("Hive partition only supports identity transform"));
+
+    exception =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () ->
+                hiveCatalog
+                    .asTableCatalog()
+                    .createTable(
+                        NameIdentifier.of(
+                            META_LAKE_NAME, hiveCatalog.name(), hiveSchema.name(), genRandomName()),
+                        columns,
+                        HIVE_COMMENT,
+                        properties,
+                        new Transform[] {identity(new String[] {col1.name(), col2.name()})}));
+    Assertions.assertTrue(
+        exception.getMessage().contains("Hive partition does not support nested field"));
+
+    exception =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () ->
+                hiveCatalog
+                    .asTableCatalog()
+                    .createTable(
+                        NameIdentifier.of(
+                            META_LAKE_NAME, hiveCatalog.name(), hiveSchema.name(), genRandomName()),
+                        columns,
+                        HIVE_COMMENT,
+                        properties,
+                        new Transform[] {identity(new String[] {"not_exist_field"})}));
+    Assertions.assertTrue(exception.getMessage().contains("Hive partition must match one column"));
   }
 
   @Test
@@ -197,7 +300,9 @@ public class HiveTableTest extends MiniHiveMetastoreService {
             .build();
     Column[] columns = new Column[] {col1, col2};
 
-    hiveCatalog.asTableCatalog().createTable(tableIdentifier, columns, HIVE_COMMENT, properties);
+    hiveCatalog
+        .asTableCatalog()
+        .createTable(tableIdentifier, columns, HIVE_COMMENT, properties, new Transform[0]);
 
     Assertions.assertTrue(hiveCatalog.asTableCatalog().tableExists(tableIdentifier));
     hiveCatalog.asTableCatalog().dropTable(tableIdentifier);
@@ -249,7 +354,7 @@ public class HiveTableTest extends MiniHiveMetastoreService {
     Table createdTable =
         hiveCatalog
             .asTableCatalog()
-            .createTable(tableIdentifier, columns, HIVE_COMMENT, properties);
+            .createTable(tableIdentifier, columns, HIVE_COMMENT, properties, new Transform[0]);
     Assertions.assertTrue(hiveCatalog.asTableCatalog().tableExists(tableIdentifier));
 
     // test alter
@@ -293,6 +398,8 @@ public class HiveTableTest extends MiniHiveMetastoreService {
         createdTable.auditInfo().createTime(), alteredTable.auditInfo().createTime());
     Assertions.assertNotNull(alteredTable.auditInfo().lastModifier());
     Assertions.assertNotNull(alteredTable.auditInfo().lastModifiedTime());
+    Assertions.assertNotNull(alteredTable.partitioning());
+    Assertions.assertArrayEquals(createdTable.partitioning(), alteredTable.partitioning());
 
     Column[] expected =
         new Column[] {
@@ -334,5 +441,18 @@ public class HiveTableTest extends MiniHiveMetastoreService {
         createdTable.auditInfo().createTime(), alteredTable1.auditInfo().createTime());
     Assertions.assertNotNull(alteredTable1.auditInfo().lastModifier());
     Assertions.assertNotNull(alteredTable1.auditInfo().lastModifiedTime());
+    Assertions.assertNotNull(alteredTable.partitioning());
+    Assertions.assertArrayEquals(createdTable.partitioning(), alteredTable.partitioning());
+  }
+
+  private void testProperties(Map<String, String> expectedProps, Map<String, String> testProps) {
+    expectedProps.forEach(
+        (k, v) -> {
+          Assertions.assertEquals(v, testProps.get(k));
+        });
+
+    Assertions.assertTrue(testProps.containsKey(StringIdentifier.ID_KEY));
+    StringIdentifier StringId = StringIdentifier.fromString(testProps.get(StringIdentifier.ID_KEY));
+    Assertions.assertEquals(StringId.toString(), testProps.get(StringIdentifier.ID_KEY));
   }
 }

@@ -5,6 +5,7 @@
 package com.datastrato.graviton.integration.e2e;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -20,6 +21,7 @@ import com.datastrato.graviton.integration.util.GravitonITUtils;
 import java.util.ArrayList;
 import java.util.Collections;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Test;
@@ -159,9 +161,8 @@ public class MetalakeIT extends AbstractIT {
     assertThrows(
         NoSuchMetalakeException.class, () -> client.loadMetalake(NameIdentifier.of(metalakeNameA)));
 
-    // Metalake does not exist
-    // TODO This should return False not True
-    assertTrue(client.dropMetalake(NameIdentifier.of(metalakeA.name())));
+    // Metalake does not exist, so we return false
+    assertFalse(client.dropMetalake(NameIdentifier.of(metalakeA.name())));
 
     // Bad metalake name
     assertThrows(
@@ -172,6 +173,17 @@ public class MetalakeIT extends AbstractIT {
     GravitonMetaLake[] metaLakes = client.listMetalakes();
     for (GravitonMetaLake metalake : metaLakes) {
       assertTrue(client.dropMetalake(NameIdentifier.of(metalake.name())));
+    }
+
+    // Reload metadata from backend to check if the drop operations are applied
+    for (GravitonMetaLake metalake : metaLakes) {
+      Assertions.assertThrows(
+          NoSuchMetalakeException.class,
+          () -> client.loadMetalake(NameIdentifier.of(metalake.name())));
+    }
+
+    for (GravitonMetaLake metalake : metaLakes) {
+      Assertions.assertFalse(client.dropMetalake(NameIdentifier.of(metalake.name())));
     }
   }
 }

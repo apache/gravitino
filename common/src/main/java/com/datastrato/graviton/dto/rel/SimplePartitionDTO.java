@@ -4,16 +4,20 @@
  */
 package com.datastrato.graviton.dto.rel;
 
+import static com.datastrato.graviton.dto.rel.PartitionUtils.validateFieldExist;
+
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import lombok.EqualsAndHashCode;
+import lombok.Getter;
 
 @EqualsAndHashCode(callSuper = false)
 public class SimplePartitionDTO implements Partition {
 
   private final Strategy strategy;
 
+  @Getter
   @JsonProperty("fieldName")
   private final String[] fieldName;
 
@@ -31,6 +35,11 @@ public class SimplePartitionDTO implements Partition {
   @Override
   public Strategy strategy() {
     return strategy;
+  }
+
+  @Override
+  public void validate(ColumnDTO[] columns) throws IllegalArgumentException {
+    validateFieldExist(columns, fieldName);
   }
 
   public static class Builder {

@@ -14,6 +14,7 @@ import com.datastrato.graviton.EntityAlreadyExistsException;
 import com.datastrato.graviton.EntityStore;
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
+import com.datastrato.graviton.StringIdentifier;
 import com.datastrato.graviton.SupportsCatalogs;
 import com.datastrato.graviton.exceptions.CatalogAlreadyExistsException;
 import com.datastrato.graviton.exceptions.NoSuchCatalogException;
@@ -237,14 +238,17 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
                       "Metalake " + metalakeIdent + " does not exist");
                 }
 
+                long uid = idGenerator.nextId();
+                StringIdentifier stringId = StringIdentifier.fromId(uid);
+
                 CatalogEntity e =
                     new CatalogEntity.Builder()
-                        .withId(idGenerator.nextId())
+                        .withId(uid)
                         .withName(ident.name())
                         .withNamespace(ident.namespace())
                         .withType(type)
                         .withComment(comment)
-                        .withProperties(properties)
+                        .withProperties(StringIdentifier.addToProperties(stringId, properties))
                         .withAuditInfo(
                             new AuditInfo.Builder()
                                 .withCreator("graviton") /* TODO. Should change to real user */

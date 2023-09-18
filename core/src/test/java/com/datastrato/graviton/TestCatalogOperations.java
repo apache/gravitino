@@ -13,6 +13,7 @@ import com.datastrato.graviton.rel.Column;
 import com.datastrato.graviton.rel.Table;
 import com.datastrato.graviton.rel.TableCatalog;
 import com.datastrato.graviton.rel.TableChange;
+import com.datastrato.graviton.rel.transforms.Transform;
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.time.Instant;
@@ -50,7 +51,11 @@ public class TestCatalogOperations implements CatalogOperations, TableCatalog {
 
   @Override
   public Table createTable(
-      NameIdentifier ident, Column[] columns, String comment, Map<String, String> properties)
+      NameIdentifier ident,
+      Column[] columns,
+      String comment,
+      Map<String, String> properties,
+      Transform[] partitions)
       throws NoSuchSchemaException, TableAlreadyExistsException {
     AuditInfo auditInfo =
         new AuditInfo.Builder().withCreator("test").withCreateTime(Instant.now()).build();

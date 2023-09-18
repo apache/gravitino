@@ -4,6 +4,8 @@
  */
 package com.datastrato.graviton.dto.rel;
 
+import static com.datastrato.graviton.dto.rel.PartitionUtils.validateFieldExist;
+
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
@@ -11,11 +13,13 @@ import com.google.common.collect.Lists;
 import java.time.LocalDateTime;
 import java.util.List;
 import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import org.apache.logging.log4j.util.Strings;
 
 @EqualsAndHashCode(callSuper = false)
 public class RangePartitionDTO implements Partition {
 
+  @Getter
   @JsonProperty("fieldName")
   private final String[] fieldName;
 
@@ -37,6 +41,11 @@ public class RangePartitionDTO implements Partition {
   @Override
   public Strategy strategy() {
     return Strategy.RANGE;
+  }
+
+  @Override
+  public void validate(ColumnDTO[] columns) throws IllegalArgumentException {
+    validateFieldExist(columns, fieldName);
   }
 
   @EqualsAndHashCode

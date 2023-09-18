@@ -49,11 +49,18 @@ dependencies {
     exclude("com.google.protobuf")
     exclude("org.apache.calcite")
     exclude("org.apache.calcite.avatica")
+    exclude("org.eclipse.jetty.aggregate", "jetty-all")
+    exclude("org.eclipse.jetty.orbit", "javax.servlet")
     exclude("com.google.code.findbugs", "jsr305")
     exclude("org.apache.logging.log4j")
     exclude("org.apache.curator")
     exclude("org.pentaho")
     exclude("org.slf4j")
+  }
+
+  testImplementation(libs.hive2.common) {
+    exclude("org.eclipse.jetty.aggregate", "jetty-all")
+    exclude("org.eclipse.jetty.orbit", "javax.servlet")
   }
 
   testImplementation(libs.hadoop2.mapreduce.client.core) {
@@ -72,7 +79,6 @@ dependencies {
   testCompileOnly(libs.lombok)
   testAnnotationProcessor(libs.lombok)
   testImplementation(libs.guava)
-  testImplementation(libs.hive2.common)
   testImplementation(libs.commons.lang3)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
@@ -86,6 +92,7 @@ tasks {
     environment("GRAVITON_HOME", rootDir.path + "/distribution/package")
     environment("HADOOP_USER_NAME", "hive")
     environment("HADOOP_HOME", "/tmp")
+    environment("PROJECT_VERSION", version)
     useJUnitPlatform()
   }
 }
