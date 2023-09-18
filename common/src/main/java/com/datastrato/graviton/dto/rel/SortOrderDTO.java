@@ -63,7 +63,7 @@ public class SortOrderDTO {
   private final NullOrdering nullOrdering;
 
   /**
-   * Creates a literal SortOrder instance, i.e. if we want to create a sort order on a literal like
+   * Creates a literal SortOrder instance, i.e., if we want to create a sort order on a literal like
    * sort/order by "'a' desc" where 'a' is the string literal
    *
    * <p>Then we can call this method like:
@@ -75,9 +75,8 @@ public class SortOrderDTO {
    * @param literal value of the literal
    * @param type type of the literal, for example string, boolean, i32, i64, etc. For more
    *     information about the type, you can refer to {@link StringTypeVisitor}
-   * @param direction direction of the sort order, i.e. ASC or DESC
-   * @param nullOrdering null ordering of the sort order, i.e. FIRST or LAST
-   * @return
+   * @param direction direction of the sort order, i.e., ASC or DESC
+   * @param nullOrdering null ordering of the sort order, i.e., FIRST or LAST
    */
   public static SortOrderDTO literalSortOrder(
       String literal, String type, Direction direction, NullOrdering nullOrdering) {
@@ -93,8 +92,8 @@ public class SortOrderDTO {
   }
 
   /**
-   * Creates a name reference sort order instance, i.e. if we want to create a sort order on a
-   * literal like sort/order by "columnName desc" where 'columnName' is the column name
+   * Creates a name reference sort order instance, i.e., if we want to create a sort order on a
+   * column like sort/order by "columnName desc" where 'columnName' is the column name
    *
    * <p>Then we can call this method like:
    *
@@ -102,10 +101,9 @@ public class SortOrderDTO {
    * nameReferenceSortOrder(Direction.DESC,NullOrdering.FIRST, "columnName")
    * </pre>
    *
-   * @param direction direction of the sort order, i.e. ASC or DESC
-   * @param nullOrdering null ordering of the sort order, i.e. FIRST or LAST
-   * @param nameReference name reference of the sort order, i.e. the name of the field
-   * @return
+   * @param direction direction of the sort order, i.e., ASC or DESC
+   * @param nullOrdering null ordering of the sort order, i.e., FIRST or LAST
+   * @param nameReference name reference of the sort order, i.e., the name of the field
    */
   public static SortOrderDTO nameReferenceSortOrder(
       Direction direction, NullOrdering nullOrdering, String... nameReference) {
