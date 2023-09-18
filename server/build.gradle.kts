@@ -92,3 +92,7 @@ tasks.named("build") {
     throw GradleException("$propertiesFile file not generated!")
   }
 }
+
+tasks.test {
+  environment("GRAVITON_ROOT_DIR", rootDir.path)
+}
