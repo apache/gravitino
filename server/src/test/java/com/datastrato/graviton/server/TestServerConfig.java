@@ -33,7 +33,7 @@ public class TestServerConfig {
             + File.separator
             + "conf"
             + File.separator
-            + "/graviton.conf.template";
+            + "graviton.conf.template";
     InputStream in = Files.newInputStream(new File(confFile).toPath());
     properties.load(in);
 
