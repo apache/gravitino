@@ -24,10 +24,10 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - name: Check release token
+      - name: Check publish Docker token
         run: |
           if [[ "${secrets_token}" != "${input_token}" ]]; then
-            echo "The token you entered is incorrect. Please try again."
+            echo "You have entered an incorrect token. Please re-enter it."
             exit 1
           fi
 

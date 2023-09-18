@@ -15,7 +15,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.iceberg.rest.responses.ConfigResponse;
 
-@Path("/v1/config")
+@Path("/v1/{prefix:([^/]*/)?}config")
 @Consumes(MediaType.APPLICATION_JSON)
 @Produces(MediaType.APPLICATION_JSON)
 public class IcebergConfig {

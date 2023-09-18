@@ -31,6 +31,16 @@ public class Transforms {
   }
 
   /**
+   * Creates a partitioning by given column's name.
+   *
+   * @param column The column to partition by.
+   * @return The identity partitioning.
+   */
+  public static NamedReference identity(Column column) {
+    return field(new String[] {column.name()});
+  }
+
+  /**
    * Creates a partitioning by extract a date or timestamp year value.
    *
    * @param fieldName The field name to partition by.

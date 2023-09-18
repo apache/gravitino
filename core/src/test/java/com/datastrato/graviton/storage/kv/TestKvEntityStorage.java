@@ -446,6 +446,105 @@ public class TestKvEntityStorage {
   }
 
   @Test
+  void testDeleteMark() throws IOException {
+    Config config = Mockito.mock(Config.class);
+    Mockito.when(config.get(ENTITY_STORE)).thenReturn("kv");
+    Mockito.when(config.get(ENTITY_KV_STORE)).thenReturn(DEFAULT_ENTITY_KV_STORE);
+    Mockito.when(config.get(Configs.ENTITY_SERDE)).thenReturn("proto");
+    Mockito.when(config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)).thenReturn("/tmp/graviton");
+
+    AuditInfo auditInfo =
+        new AuditInfo.Builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+    try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
+      store.initialize(config);
+      Assertions.assertTrue(store instanceof KvEntityStore);
+      store.setSerDe(EntitySerDeFactory.createEntitySerDe(config.get(Configs.ENTITY_SERDE)));
+
+      BaseMetalake metalake = createBaseMakeLake("metalake", auditInfo);
+      CatalogEntity catalog = createCatalog(Namespace.of("metalake"), "catalog", auditInfo);
+      CatalogEntity catalogCopy = createCatalog(Namespace.of("metalake"), "catalogCopy", auditInfo);
+
+      BaseSchema schema1 =
+          createBaseschema(Namespace.of("metalake", "catalog"), "schema1", auditInfo);
+      BaseTable table1 =
+          createBaseTable(Namespace.of("metalake", "catalog", "schema1"), "table1", auditInfo);
+
+      BaseSchema schema2 =
+          createBaseschema(Namespace.of("metalake", "catalog"), "schema2", auditInfo);
+      BaseTable table1InSchema2 =
+          createBaseTable(Namespace.of("metalake", "catalog", "schema2"), "table1", auditInfo);
+
+      // Store all entities
+      store.put(metalake);
+      store.put(catalog);
+      store.put(catalogCopy);
+      store.put(schema1);
+      store.put(schema2);
+      store.put(table1);
+      store.put(table1InSchema2);
+
+      store.delete(schema1.nameIdentifier(), EntityType.SCHEMA, true);
+      Assertions.assertFalse(store.exists(schema1.nameIdentifier(), EntityType.SCHEMA));
+      Assertions.assertFalse(store.exists(table1.nameIdentifier(), EntityType.TABLE));
+
+      // Try to insert with the same name, should be OK
+      store.put(schema1);
+      store.put(table1);
+      Assertions.assertTrue(store.exists(schema1.nameIdentifier(), EntityType.SCHEMA));
+      Assertions.assertTrue(store.exists(table1.nameIdentifier(), EntityType.TABLE));
+
+      store.delete(catalog.nameIdentifier(), EntityType.CATALOG, true);
+      store.delete(catalogCopy.nameIdentifier(), EntityType.CATALOG, true);
+      Assertions.assertFalse(store.exists(catalog.nameIdentifier(), EntityType.CATALOG));
+      Assertions.assertFalse(store.exists(catalogCopy.nameIdentifier(), EntityType.CATALOG));
+      Assertions.assertFalse(store.exists(schema1.nameIdentifier(), EntityType.SCHEMA));
+      Assertions.assertFalse(store.exists(table1.nameIdentifier(), EntityType.TABLE));
+      Assertions.assertFalse(store.exists(schema2.nameIdentifier(), EntityType.SCHEMA));
+      Assertions.assertFalse(store.exists(table1InSchema2.nameIdentifier(), EntityType.TABLE));
+
+      // Try to insert with the same name, should be OK
+      store.put(catalog);
+      store.put(schema1);
+      store.put(table1);
+      store.put(catalogCopy);
+      store.put(schema2);
+      store.put(table1InSchema2);
+      Assertions.assertTrue(store.exists(catalog.nameIdentifier(), EntityType.CATALOG));
+      Assertions.assertTrue(store.exists(catalogCopy.nameIdentifier(), EntityType.CATALOG));
+      Assertions.assertTrue(store.exists(schema1.nameIdentifier(), EntityType.SCHEMA));
+      Assertions.assertTrue(store.exists(table1.nameIdentifier(), EntityType.TABLE));
+      Assertions.assertTrue(store.exists(schema2.nameIdentifier(), EntityType.SCHEMA));
+      Assertions.assertTrue(store.exists(table1InSchema2.nameIdentifier(), EntityType.TABLE));
+
+      // Delete metalake and everything should be deleted
+      store.delete(metalake.nameIdentifier(), EntityType.METALAKE, true);
+      Assertions.assertFalse(store.exists(metalake.nameIdentifier(), EntityType.METALAKE));
+      Assertions.assertFalse(store.exists(catalog.nameIdentifier(), EntityType.CATALOG));
+      Assertions.assertFalse(store.exists(schema1.nameIdentifier(), EntityType.SCHEMA));
+      Assertions.assertFalse(store.exists(table1.nameIdentifier(), EntityType.TABLE));
+      Assertions.assertFalse(store.exists(schema2.nameIdentifier(), EntityType.SCHEMA));
+      Assertions.assertFalse(store.exists(table1InSchema2.nameIdentifier(), EntityType.TABLE));
+
+      // Try to insert with the same name, should be OK
+      store.put(metalake);
+      store.put(catalog);
+      store.put(catalogCopy);
+      store.put(schema1);
+      store.put(schema2);
+      store.put(table1);
+      store.put(table1InSchema2);
+      Assertions.assertTrue(store.exists(metalake.nameIdentifier(), EntityType.METALAKE));
+      Assertions.assertTrue(store.exists(metalake.nameIdentifier(), EntityType.METALAKE));
+      Assertions.assertTrue(store.exists(catalog.nameIdentifier(), EntityType.CATALOG));
+      Assertions.assertTrue(store.exists(schema1.nameIdentifier(), EntityType.SCHEMA));
+      Assertions.assertTrue(store.exists(table1.nameIdentifier(), EntityType.TABLE));
+      Assertions.assertTrue(store.exists(schema2.nameIdentifier(), EntityType.SCHEMA));
+      Assertions.assertTrue(store.exists(table1InSchema2.nameIdentifier(), EntityType.TABLE));
+    }
+  }
+
+  @Test
   void testEntityDelete() throws IOException {
     // TODO
     Config config = Mockito.mock(Config.class);
@@ -504,7 +603,7 @@ public class TestKvEntityStorage {
           store.get(table1InSchema2.nameIdentifier(), EntityType.TABLE, BaseTable.class));
 
       // Delete the table 'metalake.catalog.schema2.table1'
-      store.delete(table1InSchema2.nameIdentifier(), EntityType.TABLE);
+      Assertions.assertTrue(store.delete(table1InSchema2.nameIdentifier(), EntityType.TABLE));
       Assertions.assertFalse(store.exists(table1InSchema2.nameIdentifier(), EntityType.TABLE));
       // Make sure table 'metalake.catalog.schema1.table1' still exist;
       Assertions.assertEquals(
@@ -526,8 +625,8 @@ public class TestKvEntityStorage {
       Assertions.assertTrue(store.exists(table1.nameIdentifier(), EntityType.TABLE));
 
       // Delete table1 and schema1
-      store.delete(table1.nameIdentifier(), EntityType.TABLE);
-      store.delete(schema1.nameIdentifier(), EntityType.SCHEMA);
+      Assertions.assertTrue(store.delete(table1.nameIdentifier(), EntityType.TABLE));
+      Assertions.assertTrue(store.delete(schema1.nameIdentifier(), EntityType.SCHEMA));
       // Make sure table1 in 'metalake.catalog.schema1' can't be access;
       Assertions.assertFalse(store.exists(table1.nameIdentifier(), EntityType.TABLE));
       Assertions.assertFalse(store.exists(schema1.nameIdentifier(), EntityType.SCHEMA));
@@ -597,6 +696,13 @@ public class TestKvEntityStorage {
       Assertions.assertThrowsExactly(
           NoSuchEntityException.class,
           () -> store.get(schema2.nameIdentifier(), EntityType.SCHEMA, BaseSchema.class));
+
+      Assertions.assertTrue(store.delete(metalake.nameIdentifier(), EntityType.METALAKE, true));
+
+      // catalog has already deleted, so we can't delete it again and should return false
+      Assertions.assertFalse(store.delete(catalog.nameIdentifier(), EntityType.CATALOG));
+      Assertions.assertFalse(store.delete(schema2.nameIdentifier(), EntityType.SCHEMA));
+      Assertions.assertFalse(store.delete(metalake.nameIdentifier(), EntityType.METALAKE));
     }
   }
 
