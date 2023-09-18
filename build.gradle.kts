@@ -40,7 +40,7 @@ subprojects {
   }
 
   tasks.configureEach<Test> {
-    // Integration test module are tested sepatately
+    // Integration test module are tested separately
     if (project.name != "integration-test") {
       useJUnitPlatform()
       finalizedBy(tasks.getByName("jacocoTestReport"))
@@ -62,6 +62,10 @@ subprojects {
 
   tasks.withType<Jar> {
     archiveFileName.set("${rootProject.name.lowercase(Locale.getDefault())}-${project.name}-$version.jar")
+    if (project.name == "server") {
+      from(sourceSets.main.get().resources)
+      setDuplicatesStrategy(DuplicatesStrategy.INCLUDE)
+    }
     if (project.name != "integration-test") {
       exclude("log4j2.properties")
       exclude("test/**")
@@ -75,14 +79,14 @@ subprojects {
         removeUnusedImports()
         trimTrailingWhitespace()
         replaceRegex(
-                "Remove wildcard imports",
-                "import\\s+[^\\*\\s]+\\*;(\\r\\n|\\r|\\n)",
-                "$1"
+          "Remove wildcard imports",
+          "import\\s+[^\\*\\s]+\\*;(\\r\\n|\\r|\\n)",
+          "$1"
         )
         replaceRegex(
-                "Remove static wildcard imports",
-                "import\\s+(?:static\\s+)?[^*\\s]+\\*;(\\r\\n|\\r|\\n)",
-                "$1"
+          "Remove static wildcard imports",
+          "import\\s+(?:static\\s+)?[^*\\s]+\\*;(\\r\\n|\\r|\\n)",
+          "$1"
         )
 
         targetExclude("**/build/**")
@@ -149,7 +153,7 @@ tasks {
   val outputDir = projectDir.dir("distribution")
 
   val compileDistribution by registering {
-    dependsOn("copyRuntimeClass", "copyCatalogRuntimeClass", "copySubmoduleClass", "copyCatalogModuleClass")
+    dependsOn("copySubprojectDepends", "copyCatalogLibs", "copySubprojectLib")
 
     group = "graviton distribution"
     outputs.dir(projectDir.dir("distribution/package"))
@@ -201,30 +205,20 @@ tasks {
     delete("server/src/main/resources/project.properties")
   }
 
-  val copyRuntimeClass by registering(Copy::class) {
+  val copySubprojectDepends by registering(Copy::class) {
+    dependsOn(":catalog-hive:copyDepends", ":catalog-lakehouse:copyDepends")
     subprojects.forEach() {
-      if (it.name != "catalog-hive" && it.name != "client-java" && it.name != "integration-test") {
-        println("copyRuntimeClass: ${it.name}")
+      if (it.name != "catalog-hive" && it.name != "client-java" && it.name != "integration-test" && it.name != "catalog-lakehouse") {
         from(it.configurations.runtimeClasspath)
         into("distribution/package/libs")
       }
     }
   }
 
-  val copyCatalogRuntimeClass by registering(Copy::class) {
+  val copySubprojectLib by registering(Copy::class) {
     subprojects.forEach() {
-      if (it.name == "catalog-hive") {
-        // println("copyCatalogRuntimeClass: ${it.name}")
-        from(it.configurations.runtimeClasspath)
-        into("distribution/package/catalogs/hive/libs")
-      }
-    }
-  }
-
-  val copySubmoduleClass by registering(Copy::class) {
-    dependsOn("copyRuntimeClass", "copyCatalogRuntimeClass")
-    subprojects.forEach() {
-      if (it.name != "client-java" && it.name != "integration-test" && it.name != "catalog-hive") {
+      if (it.name != "client-java" && it.name != "integration-test" && it.name != "catalog-hive" && it.name != "catalog-lakehouse") {
+        dependsOn("${it.name}:build")
         from("${it.name}/build/libs")
         into("distribution/package/libs")
         include("*.jar")
@@ -233,16 +227,12 @@ tasks {
     }
   }
 
-  val copyCatalogModuleClass by registering(Copy::class) {
-    subprojects.forEach() {
-      if (it.name == "catalog-hive") {
-        from("${it.name}/build/libs")
-        into("distribution/package/catalogs/hive/libs")
-      }
-    }
+  val copyCatalogLibs by registering(Copy::class) {
+    dependsOn(":catalog-hive:copyCatalogLibs", ":catalog-lakehouse:copyCatalogLibs")
   }
 
   task("integrationTest") {
+    mustRunAfter(":catalog-hive:copyDepends", ":catalog-lakehouse:copyDepends")
     dependsOn(":integration-test:integrationTest")
   }
 

@@ -27,8 +27,10 @@ import com.datastrato.graviton.exceptions.NoSuchSchemaException;
 import com.datastrato.graviton.exceptions.NonEmptySchemaException;
 import com.datastrato.graviton.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.graviton.rel.Schema;
+import com.datastrato.graviton.rest.RESTUtils;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import java.io.IOException;
 import java.time.Instant;
 import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
@@ -38,6 +40,7 @@ import javax.ws.rs.core.Response;
 import org.glassfish.jersey.internal.inject.AbstractBinder;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.glassfish.jersey.test.JerseyTest;
+import org.glassfish.jersey.test.TestProperties;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -60,6 +63,13 @@ public class TestSchemaOperations extends JerseyTest {
 
   @Override
   protected Application configure() {
+    try {
+      forceSet(
+          TestProperties.CONTAINER_PORT, String.valueOf(RESTUtils.findAvailablePort(2000, 3000)));
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+
     ResourceConfig resourceConfig = new ResourceConfig();
     resourceConfig.register(SchemaOperations.class);
     resourceConfig.register(

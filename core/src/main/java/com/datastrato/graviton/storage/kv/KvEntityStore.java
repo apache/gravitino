@@ -37,6 +37,7 @@ import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.Getter;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -107,15 +108,10 @@ public class KvEntityStore implements EntityStore {
 
   @Override
   public boolean exists(NameIdentifier ident, EntityType entityType) throws IOException {
+    if (hasMarkDeleted(ident, entityType)) {
+      return false;
+    }
     byte[] key = entityKeyEncoder.encode(ident, entityType, true);
-    if (key == null) {
-      return false;
-    }
-
-    if (backend.get(generateDeleteKey(key)) != null) {
-      return false;
-    }
-
     return backend.get(key) != null;
   }
 
@@ -133,7 +129,25 @@ public class KvEntityStore implements EntityStore {
         () -> {
           // Delete possible delete mark
           byte[] deleteMarkKey = generateDeleteKey(key);
-          backend.delete(deleteMarkKey);
+          // If it has deleted mark, we need to delete all sub entities at once
+          if (backend.get(deleteMarkKey) != null) {
+            List<byte[]> subEntityPrefix =
+                entityKeyEncoder.getChildrenPrefix(e.nameIdentifier(), e.type());
+            if (CollectionUtils.isNotEmpty(subEntityPrefix)) {
+              // Physical delete all sub entities
+              // TODO (yuqi) we should do this in a more elegant ways
+              for (byte[] prefix : subEntityPrefix) {
+                backend.deleteRange(
+                    new KvRangeScan.KvRangeScanBuilder()
+                        .start(prefix)
+                        .end(Bytes.increment(Bytes.wrap(prefix)).get())
+                        .startInclusive(true)
+                        .endInclusive(false)
+                        .build());
+              }
+            }
+            backend.delete(deleteMarkKey);
+          }
 
           byte[] value = serDe.serialize(e);
           backend.put(key, value, true);
@@ -284,7 +298,7 @@ public class KvEntityStore implements EntityStore {
       throws IOException {
     // Parent or self has been already mark as deleted
     if (hasMarkDeleted(ident, entityType)) {
-      return true;
+      return false;
     }
 
     byte[] dataKey = entityKeyEncoder.encode(ident, entityType, true);

@@ -27,8 +27,10 @@ import com.datastrato.graviton.exceptions.NoSuchCatalogException;
 import com.datastrato.graviton.exceptions.NoSuchMetalakeException;
 import com.datastrato.graviton.meta.AuditInfo;
 import com.datastrato.graviton.meta.CatalogEntity;
+import com.datastrato.graviton.rest.RESTUtils;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import java.io.IOException;
 import java.time.Instant;
 import java.util.Collections;
 import javax.servlet.http.HttpServletRequest;
@@ -39,6 +41,7 @@ import javax.ws.rs.core.Response;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.glassfish.jersey.test.JerseyTest;
+import org.glassfish.jersey.test.TestProperties;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -57,6 +60,13 @@ public class TestCatalogOperations extends JerseyTest {
 
   @Override
   protected Application configure() {
+    try {
+      forceSet(
+          TestProperties.CONTAINER_PORT, String.valueOf(RESTUtils.findAvailablePort(2000, 3000)));
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+
     ResourceConfig resourceConfig = new ResourceConfig();
     resourceConfig.register(CatalogOperations.class);
     resourceConfig.register(

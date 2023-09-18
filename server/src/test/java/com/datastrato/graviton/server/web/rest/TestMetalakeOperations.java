@@ -24,8 +24,10 @@ import com.datastrato.graviton.meta.AuditInfo;
 import com.datastrato.graviton.meta.BaseMetalake;
 import com.datastrato.graviton.meta.MetalakeManager;
 import com.datastrato.graviton.meta.SchemaVersion;
+import com.datastrato.graviton.rest.RESTUtils;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
+import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
 import javax.servlet.http.HttpServletRequest;
@@ -36,6 +38,7 @@ import javax.ws.rs.core.Response;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.glassfish.jersey.test.JerseyTest;
+import org.glassfish.jersey.test.TestProperties;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -54,6 +57,13 @@ public class TestMetalakeOperations extends JerseyTest {
 
   @Override
   protected Application configure() {
+    try {
+      forceSet(
+          TestProperties.CONTAINER_PORT, String.valueOf(RESTUtils.findAvailablePort(2000, 3000)));
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+
     ResourceConfig resourceConfig = new ResourceConfig();
     resourceConfig.register(MetalakeOperations.class);
     resourceConfig.register(

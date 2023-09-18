@@ -11,12 +11,18 @@ import javax.ws.rs.NotSupportedException;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.SupportsNamespaces;
+import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.CatalogHandlers;
 import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
+import org.apache.iceberg.rest.requests.CreateTableRequest;
+import org.apache.iceberg.rest.requests.RenameTableRequest;
 import org.apache.iceberg.rest.requests.UpdateNamespacePropertiesRequest;
+import org.apache.iceberg.rest.requests.UpdateTableRequest;
 import org.apache.iceberg.rest.responses.CreateNamespaceResponse;
 import org.apache.iceberg.rest.responses.GetNamespaceResponse;
 import org.apache.iceberg.rest.responses.ListNamespacesResponse;
+import org.apache.iceberg.rest.responses.ListTablesResponse;
+import org.apache.iceberg.rest.responses.LoadTableResponse;
 import org.apache.iceberg.rest.responses.UpdateNamespacePropertiesResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -71,5 +77,42 @@ public class IcebergTableOps {
     validateNamespace(Optional.of(namespace));
     return CatalogHandlers.updateNamespaceProperties(
         asNamespaceCatalog, namespace, updateNamespacePropertiesRequest);
+  }
+
+  public LoadTableResponse createTable(Namespace namespace, CreateTableRequest request) {
+    request.validate();
+    if (request.stageCreate()) {
+      return CatalogHandlers.stageTableCreate(catalog, namespace, request);
+    }
+    return CatalogHandlers.createTable(catalog, namespace, request);
+  }
+
+  public void dropTable(TableIdentifier tableIdentifier) {
+    CatalogHandlers.dropTable(catalog, tableIdentifier);
+  }
+
+  public void purgeTable(TableIdentifier tableIdentifier) {
+    CatalogHandlers.purgeTable(catalog, tableIdentifier);
+  }
+
+  public LoadTableResponse loadTable(TableIdentifier tableIdentifier) {
+    return CatalogHandlers.loadTable(catalog, tableIdentifier);
+  }
+
+  public boolean tableExists(TableIdentifier tableIdentifier) {
+    return catalog.tableExists(tableIdentifier);
+  }
+
+  public ListTablesResponse listTable(Namespace namespace) {
+    return CatalogHandlers.listTables(catalog, namespace);
+  }
+
+  public void renameTable(RenameTableRequest renameTableRequest) {
+    CatalogHandlers.renameTable(catalog, renameTableRequest);
+  }
+
+  public LoadTableResponse updateTable(
+      TableIdentifier tableIdentifier, UpdateTableRequest updateTableRequest) {
+    return CatalogHandlers.updateTable(catalog, tableIdentifier, updateTableRequest);
   }
 }

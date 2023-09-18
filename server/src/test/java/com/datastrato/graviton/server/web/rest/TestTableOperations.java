@@ -4,6 +4,8 @@
  */
 package com.datastrato.graviton.server.web.rest;
 
+import static com.datastrato.graviton.dto.rel.PartitionUtils.toPartitions;
+import static com.datastrato.graviton.rel.transforms.Transforms.field;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
@@ -14,6 +16,8 @@ import com.datastrato.graviton.Audit;
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.catalog.CatalogOperationDispatcher;
 import com.datastrato.graviton.dto.rel.ColumnDTO;
+import com.datastrato.graviton.dto.rel.Partition;
+import com.datastrato.graviton.dto.rel.SimplePartitionDTO;
 import com.datastrato.graviton.dto.rel.TableDTO;
 import com.datastrato.graviton.dto.requests.TableCreateRequest;
 import com.datastrato.graviton.dto.requests.TableUpdateRequest;
@@ -29,10 +33,13 @@ import com.datastrato.graviton.exceptions.TableAlreadyExistsException;
 import com.datastrato.graviton.rel.Column;
 import com.datastrato.graviton.rel.Table;
 import com.datastrato.graviton.rel.TableChange;
+import com.datastrato.graviton.rel.transforms.Transform;
+import com.datastrato.graviton.rest.RESTUtils;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.substrait.type.Type;
 import io.substrait.type.TypeCreator;
+import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
@@ -46,6 +53,7 @@ import javax.ws.rs.core.Response;
 import org.glassfish.jersey.internal.inject.AbstractBinder;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.glassfish.jersey.test.JerseyTest;
+import org.glassfish.jersey.test.TestProperties;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -70,6 +78,13 @@ public class TestTableOperations extends JerseyTest {
 
   @Override
   protected Application configure() {
+    try {
+      forceSet(
+          TestProperties.CONTAINER_PORT, String.valueOf(RESTUtils.findAvailablePort(2000, 3000)));
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+
     ResourceConfig resourceConfig = new ResourceConfig();
     resourceConfig.register(TableOperations.class);
     resourceConfig.register(
@@ -146,14 +161,15 @@ public class TestTableOperations extends JerseyTest {
           mockColumn("col2", TypeCreator.NULLABLE.I8)
         };
     Table table = mockTable("table1", columns, "mock comment", ImmutableMap.of("k1", "v1"));
-    when(dispatcher.createTable(any(), any(), any(), any())).thenReturn(table);
+    when(dispatcher.createTable(any(), any(), any(), any(), any())).thenReturn(table);
 
     TableCreateRequest req =
         new TableCreateRequest(
             "table1",
             "mock comment",
             Arrays.stream(columns).map(DTOConverters::toDTO).toArray(ColumnDTO[]::new),
-            ImmutableMap.of("k1", "v1"));
+            ImmutableMap.of("k1", "v1"),
+            null);
 
     Response resp =
         target(tablePath(metalake, catalog, schema))
@@ -181,10 +197,13 @@ public class TestTableOperations extends JerseyTest {
     Assertions.assertEquals(columns[1].dataType(), columnDTOs[1].dataType());
     Assertions.assertEquals(columns[1].comment(), columnDTOs[1].comment());
 
+    Assertions.assertNotNull(tableDTO.partitioning());
+    Assertions.assertEquals(0, tableDTO.partitioning().length);
+
     // Test throw NoSuchSchemaException
     doThrow(new NoSuchSchemaException("mock error"))
         .when(dispatcher)
-        .createTable(any(), any(), any(), any());
+        .createTable(any(), any(), any(), any(), any());
 
     Response resp1 =
         target(tablePath(metalake, catalog, schema))
@@ -201,7 +220,7 @@ public class TestTableOperations extends JerseyTest {
     // Test throw TableAlreadyExistsException
     doThrow(new TableAlreadyExistsException("mock error"))
         .when(dispatcher)
-        .createTable(any(), any(), any(), any());
+        .createTable(any(), any(), any(), any(), any());
 
     Response resp2 =
         target(tablePath(metalake, catalog, schema))
@@ -219,7 +238,7 @@ public class TestTableOperations extends JerseyTest {
     // Test throw RuntimeException
     doThrow(new RuntimeException("mock error"))
         .when(dispatcher)
-        .createTable(any(), any(), any(), any());
+        .createTable(any(), any(), any(), any(), any());
 
     Response resp3 =
         target(tablePath(metalake, catalog, schema))
@@ -236,13 +255,88 @@ public class TestTableOperations extends JerseyTest {
   }
 
   @Test
+  public void testCreatePartitionedTable() {
+    Column[] columns =
+        new Column[] {
+          mockColumn("col1", TypeCreator.NULLABLE.STRING),
+          mockColumn("col2", TypeCreator.NULLABLE.I8)
+        };
+    Transform[] transforms = new Transform[] {field(columns[0])};
+    Table table =
+        mockTable("table1", columns, "mock comment", ImmutableMap.of("k1", "v1"), transforms);
+    when(dispatcher.createTable(any(), any(), any(), any(), any())).thenReturn(table);
+
+    TableCreateRequest req =
+        new TableCreateRequest(
+            "table1",
+            "mock comment",
+            Arrays.stream(columns).map(DTOConverters::toDTO).toArray(ColumnDTO[]::new),
+            ImmutableMap.of("k1", "v1"),
+            toPartitions(transforms));
+
+    Response resp =
+        target(tablePath(metalake, catalog, schema))
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.graviton.v1+json")
+            .post(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+
+    TableResponse tableResp = resp.readEntity(TableResponse.class);
+    Assertions.assertEquals(0, tableResp.getCode());
+
+    TableDTO tableDTO = tableResp.getTable();
+    Assertions.assertEquals("table1", tableDTO.name());
+    Assertions.assertEquals("mock comment", tableDTO.comment());
+    Assertions.assertEquals(ImmutableMap.of("k1", "v1"), tableDTO.properties());
+
+    Column[] columnDTOs = tableDTO.columns();
+    Assertions.assertEquals(2, columnDTOs.length);
+    Assertions.assertEquals(columns[0].name(), columnDTOs[0].name());
+    Assertions.assertEquals(columns[0].dataType(), columnDTOs[0].dataType());
+    Assertions.assertEquals(columns[0].comment(), columnDTOs[0].comment());
+
+    Assertions.assertEquals(columns[1].name(), columnDTOs[1].name());
+    Assertions.assertEquals(columns[1].dataType(), columnDTOs[1].dataType());
+    Assertions.assertEquals(columns[1].comment(), columnDTOs[1].comment());
+
+    Assertions.assertArrayEquals(transforms, tableDTO.partitioning());
+
+    // Test partition field not exist
+    SimplePartitionDTO errorPartition =
+        new SimplePartitionDTO.Builder()
+            .withStrategy(Partition.Strategy.IDENTITY)
+            .withFieldName(new String[] {"not_exist_field"})
+            .build();
+    req =
+        new TableCreateRequest(
+            "table1",
+            "mock comment",
+            Arrays.stream(columns).map(DTOConverters::toDTO).toArray(ColumnDTO[]::new),
+            ImmutableMap.of("k1", "v1"),
+            new Partition[] {errorPartition});
+    resp =
+        target(tablePath(metalake, catalog, schema))
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.graviton.v1+json")
+            .post(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), resp.getStatus());
+
+    ErrorResponse errorResp3 = resp.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, errorResp3.getCode());
+    Assertions.assertEquals(IllegalArgumentException.class.getSimpleName(), errorResp3.getType());
+  }
+
+  @Test
   public void testLoadTable() {
     Column[] columns =
         new Column[] {
           mockColumn("col1", TypeCreator.NULLABLE.STRING),
           mockColumn("col2", TypeCreator.NULLABLE.I8)
         };
-    Table table = mockTable("table1", columns, "mock comment", ImmutableMap.of("k1", "v1"));
+    Table table =
+        mockTable("table1", columns, "mock comment", ImmutableMap.of("k1", "v1"), new Transform[0]);
     when(dispatcher.loadTable(any())).thenReturn(table);
 
     Response resp =
@@ -270,6 +364,8 @@ public class TestTableOperations extends JerseyTest {
     Assertions.assertEquals(columns[1].name(), columnDTOs[1].name());
     Assertions.assertEquals(columns[1].dataType(), columnDTOs[1].dataType());
     Assertions.assertEquals(columns[1].comment(), columnDTOs[1].comment());
+
+    Assertions.assertEquals(0, tableDTO.partitioning().length);
 
     // Test throw NoSuchTableException
     doThrow(new NoSuchTableException("mock error")).when(dispatcher).loadTable(any());
@@ -311,7 +407,8 @@ public class TestTableOperations extends JerseyTest {
           mockColumn("col1", TypeCreator.NULLABLE.STRING),
           mockColumn("col2", TypeCreator.NULLABLE.I8)
         };
-    Table table = mockTable("table2", columns, "mock comment", ImmutableMap.of("k1", "v1"));
+    Table table =
+        mockTable("table2", columns, "mock comment", ImmutableMap.of("k1", "v1"), new Transform[0]);
     testAlterTableRequest(req, table);
   }
 
@@ -324,7 +421,8 @@ public class TestTableOperations extends JerseyTest {
           mockColumn("col1", TypeCreator.NULLABLE.STRING),
           mockColumn("col2", TypeCreator.NULLABLE.I8)
         };
-    Table table = mockTable("table1", columns, "new comment", ImmutableMap.of("k1", "v1"));
+    Table table =
+        mockTable("table1", columns, "new comment", ImmutableMap.of("k1", "v1"), new Transform[0]);
     testAlterTableRequest(req, table);
   }
 
@@ -338,7 +436,12 @@ public class TestTableOperations extends JerseyTest {
           mockColumn("col2", TypeCreator.NULLABLE.I8)
         };
     Table table =
-        mockTable("table1", columns, "mock comment", ImmutableMap.of("k1", "v1", "k2", "v2"));
+        mockTable(
+            "table1",
+            columns,
+            "mock comment",
+            ImmutableMap.of("k1", "v1", "k2", "v2"),
+            new Transform[0]);
     testAlterTableRequest(req, table);
   }
 
@@ -351,7 +454,7 @@ public class TestTableOperations extends JerseyTest {
           mockColumn("col1", TypeCreator.NULLABLE.STRING),
           mockColumn("col2", TypeCreator.NULLABLE.I8)
         };
-    Table table = mockTable("table1", columns, "mock comment", ImmutableMap.of());
+    Table table = mockTable("table1", columns, "mock comment", ImmutableMap.of(), new Transform[0]);
     testAlterTableRequest(req, table);
   }
 
@@ -369,7 +472,8 @@ public class TestTableOperations extends JerseyTest {
           mockColumn("col1", TypeCreator.NULLABLE.STRING),
           mockColumn("col2", TypeCreator.NULLABLE.I8)
         };
-    Table table = mockTable("table1", columns, "mock comment", ImmutableMap.of("k1", "v1"));
+    Table table =
+        mockTable("table1", columns, "mock comment", ImmutableMap.of("k1", "v1"), new Transform[0]);
     testAlterTableRequest(req, table);
   }
 
@@ -387,7 +491,8 @@ public class TestTableOperations extends JerseyTest {
           mockColumn("col2", TypeCreator.NULLABLE.I8),
           mockColumn("col3", TypeCreator.NULLABLE.STRING)
         };
-    Table table = mockTable("table1", columns, "mock comment", ImmutableMap.of("k1", "v1"));
+    Table table =
+        mockTable("table1", columns, "mock comment", ImmutableMap.of("k1", "v1"), new Transform[0]);
     testAlterTableRequest(req, table);
   }
 
@@ -400,7 +505,8 @@ public class TestTableOperations extends JerseyTest {
           mockColumn("col3", TypeCreator.NULLABLE.STRING),
           mockColumn("col2", TypeCreator.NULLABLE.I8)
         };
-    Table table = mockTable("table1", columns, "mock comment", ImmutableMap.of("k1", "v1"));
+    Table table =
+        mockTable("table1", columns, "mock comment", ImmutableMap.of("k1", "v1"), new Transform[0]);
     testAlterTableRequest(req, table);
   }
 
@@ -413,7 +519,8 @@ public class TestTableOperations extends JerseyTest {
         new Column[] {
           mockColumn("col1", TypeCreator.NULLABLE.I8), mockColumn("col2", TypeCreator.NULLABLE.I8)
         };
-    Table table = mockTable("table1", columns, "mock comment", ImmutableMap.of("k1", "v1"));
+    Table table =
+        mockTable("table1", columns, "mock comment", ImmutableMap.of("k1", "v1"), new Transform[0]);
     testAlterTableRequest(req, table);
   }
 
@@ -427,7 +534,8 @@ public class TestTableOperations extends JerseyTest {
           mockColumn("col1", TypeCreator.NULLABLE.STRING, "new comment"),
           mockColumn("col2", TypeCreator.NULLABLE.I8)
         };
-    Table table = mockTable("table1", columns, "mock comment", ImmutableMap.of("k1", "v1"));
+    Table table =
+        mockTable("table1", columns, "mock comment", ImmutableMap.of("k1", "v1"), new Transform[0]);
     testAlterTableRequest(req, table);
   }
 
@@ -441,7 +549,8 @@ public class TestTableOperations extends JerseyTest {
           mockColumn("col2", TypeCreator.NULLABLE.I8),
           mockColumn("col1", TypeCreator.NULLABLE.STRING)
         };
-    Table table = mockTable("table1", columns, "mock comment", ImmutableMap.of("k1", "v1"));
+    Table table =
+        mockTable("table1", columns, "mock comment", ImmutableMap.of("k1", "v1"), new Transform[0]);
     testAlterTableRequest(req, table);
   }
 
@@ -534,6 +643,8 @@ public class TestTableOperations extends JerseyTest {
     List<Type> actualColumnTypes =
         Arrays.stream(columnDTOs).map(Column::dataType).collect(Collectors.toList());
     Assertions.assertEquals(expectedColumnTypes, actualColumnTypes);
+
+    Assertions.assertArrayEquals(tableDTO.partitioning(), updatedTable.partitioning());
   }
 
   private static String tablePath(String metalake, String catalog, String schema) {
@@ -562,11 +673,21 @@ public class TestTableOperations extends JerseyTest {
 
   private static Table mockTable(
       String tableName, Column[] columns, String comment, Map<String, String> properties) {
+    return mockTable(tableName, columns, comment, properties, new Transform[0]);
+  }
+
+  private static Table mockTable(
+      String tableName,
+      Column[] columns,
+      String comment,
+      Map<String, String> properties,
+      Transform[] transforms) {
     Table table = mock(Table.class);
     when(table.name()).thenReturn(tableName);
     when(table.columns()).thenReturn(columns);
     when(table.comment()).thenReturn(comment);
     when(table.properties()).thenReturn(properties);
+    when(table.partitioning()).thenReturn(transforms);
 
     Audit mockAudit = mock(Audit.class);
     when(mockAudit.creator()).thenReturn("graviton");
