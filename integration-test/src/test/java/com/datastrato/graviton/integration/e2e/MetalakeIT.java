@@ -106,7 +106,7 @@ public class MetalakeIT extends AbstractIT {
     assertEquals("new metalake comment", metaLake.comment());
     assertEquals("graviton", metaLake.auditInfo().creator());
 
-    // Reload metatdata via new name to check if the changes are applied
+    // Reload metadata via new name to check if the changes are applied
     GravitonMetaLake newMetalake = client.loadMetalake(NameIdentifier.of(newName));
     assertEquals(newName, newMetalake.name());
     assertEquals("new metalake comment", newMetalake.comment());
