@@ -28,12 +28,12 @@ public class TestGravitonServer {
 
   @Test
   public void testInitialize() {
-    gravitonServer.initialize();
+    gravitonServer.initialize(null);
   }
 
   @Test
   public void testStartAndStop() throws Exception {
-    gravitonServer.initialize();
+    gravitonServer.initialize(null);
     gravitonServer.start();
     gravitonServer.stop();
   }

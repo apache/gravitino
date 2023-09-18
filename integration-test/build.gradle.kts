@@ -173,8 +173,8 @@ tasks {
 }
 
 tasks.test {
-  var testMode = project.properties["testMode"] as? String ?: ""
-  if (testMode == "") {
+  val skipITs = project.hasProperty("skipITs")
+  if (skipITs) {
     exclude("**/integration/test/**")
   } else {
     dependsOn("checkDockerRunning")
@@ -186,14 +186,13 @@ tasks.test {
       environment("HADOOP_HOME", "/tmp")
       environment("PROJECT_VERSION", version)
 
+      val testMode = project.properties["testMode"] as? String ?: ""
       if (testMode == "deploy") {
         environment("GRAVITON_HOME", rootDir.path + "/distribution/package")
         systemProperty("TestMode", "deploy")
-      } else if (testMode == "embedded") {
+      } else {
         environment("GRAVITON_HOME", rootDir.path)
         systemProperty("TestMode", "embedded")
-      } else {
-        throw GradleException("Graviton integration test only support [embedded] or [deploy] mode!")
       }
 
       useJUnitPlatform {

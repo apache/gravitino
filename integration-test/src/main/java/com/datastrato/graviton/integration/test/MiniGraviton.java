@@ -39,12 +39,11 @@ public class MiniGraviton {
   private static final Logger LOG = LoggerFactory.getLogger(MiniGraviton.class);
   private RESTClient restClient;
   private final File mockConfDir;
-  private final MiniGravitonConfig serverConfig = new MiniGravitonConfig();
+  private final ServerConfig serverConfig = new ServerConfig();
   private final ExecutorService executor = Executors.newSingleThreadExecutor();
 
-  public MiniGraviton() {
-    this.mockConfDir =
-        new File(ITUtils.joinDirPath(".", "build", UUID.randomUUID().toString() + "conf"));
+  public MiniGraviton() throws IOException {
+    this.mockConfDir = Files.createTempDirectory("MiniGraviton").toFile();
     mockConfDir.mkdirs();
   }
 
@@ -63,7 +62,10 @@ public class MiniGraviton {
         Paths.get(ITUtils.joinDirPath(mockConfDir.getAbsolutePath(), "graviton-env.sh")));
 
     ITUtils.injectEnvironment("GRAVITON_TEST", "true");
-    serverConfig.loadFromFile(ITUtils.joinDirPath(mockConfDir.getAbsolutePath(), "graviton.conf"));
+    Properties properties =
+        serverConfig.loadPropertiesFromFile(
+            new File(ITUtils.joinDirPath(mockConfDir.getAbsolutePath(), "graviton.conf")));
+    serverConfig.loadFromProperties(properties);
 
     // Prepare delete the rocksdb backend storage directory
     try {
@@ -81,7 +83,8 @@ public class MiniGraviton {
     executor.submit(
         () -> {
           try {
-            MiniGravitonServer.main(new String[] {mockConfDir.getAbsolutePath()});
+            GravitonServer.main(
+                new String[] {ITUtils.joinDirPath(mockConfDir.getAbsolutePath(), "graviton.conf")});
           } catch (Exception e) {
             LOG.error("Exception in startup MiniGraviton Server ", e);
             throw new RuntimeException(e);

@@ -40,8 +40,11 @@ subprojects {
   }
 
   tasks.configureEach<Test> {
-    useJUnitPlatform()
-    finalizedBy(tasks.getByName("jacocoTestReport"))
+    val skipTests = project.hasProperty("skipTests")
+    if (!skipTests) {
+      useJUnitPlatform()
+      finalizedBy(tasks.getByName("jacocoTestReport"))
+    }
   }
 
   tasks.withType<JacocoReport> {

@@ -11,6 +11,8 @@ import com.datastrato.graviton.meta.MetalakeManager;
 import com.datastrato.graviton.server.web.JettyServer;
 import com.datastrato.graviton.server.web.ObjectMapperProvider;
 import com.datastrato.graviton.server.web.VersioningFilter;
+import java.io.File;
+import java.util.Properties;
 import javax.servlet.Servlet;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.jackson.JacksonFeature;
@@ -37,9 +39,14 @@ public class GravitonServer extends ResourceConfig {
     gravitonEnv = GravitonEnv.getInstance();
   }
 
-  public void initialize() {
+  public void initialize(String[] args) {
     try {
-      serverConfig.loadFromFile(CONF_FILE);
+      if (System.getenv("GRAVITON_TEST") != null) {
+        Properties properties = serverConfig.loadPropertiesFromFile(new File(args[0]));
+        serverConfig.loadFromProperties(properties);
+      } else {
+        serverConfig.loadFromFile(CONF_FILE);
+      }
     } catch (Exception exception) {
       LOG.warn(
           "Failed to load conf from file {}, using default conf instead", CONF_FILE, exception);
@@ -89,7 +96,7 @@ public class GravitonServer extends ResourceConfig {
   public static void main(String[] args) {
     LOG.info("Starting Graviton Server");
     GravitonServer server = new GravitonServer();
-    server.initialize();
+    server.initialize(args);
 
     try {
       // Instantiates GravitonServer
