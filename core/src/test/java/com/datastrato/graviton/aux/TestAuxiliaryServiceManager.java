@@ -19,25 +19,24 @@ import java.util.Collections;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-public class TestGravitonAuxiliaryServiceManager {
+public class TestAuxiliaryServiceManager {
 
   @Test
-  public void testGravitonAuxServiceManagerEmptyServiceName() {
-    GravitonAuxiliaryServiceManager auxServiceManager = new GravitonAuxiliaryServiceManager();
-    auxServiceManager.serviceInit(
-        ImmutableMap.of(GravitonAuxiliaryServiceManager.AUX_SERVICE_NAMES, ""));
+  public void testGravitonAuxServiceManagerEmptyServiceName() throws Exception {
+    AuxiliaryServiceManager auxServiceManager = new AuxiliaryServiceManager();
+    auxServiceManager.serviceInit(ImmutableMap.of(AuxiliaryServiceManager.AUX_SERVICE_NAMES, ""));
     auxServiceManager.serviceStart();
     auxServiceManager.serviceStop();
   }
 
   @Test
   public void testGravitonAuxServiceNotSetClassPath() {
-    GravitonAuxiliaryServiceManager auxServiceManager = new GravitonAuxiliaryServiceManager();
+    AuxiliaryServiceManager auxServiceManager = new AuxiliaryServiceManager();
     Assertions.assertThrowsExactly(
         IllegalArgumentException.class,
         () ->
             auxServiceManager.serviceInit(
-                ImmutableMap.of(GravitonAuxiliaryServiceManager.AUX_SERVICE_NAMES, "mock1")));
+                ImmutableMap.of(AuxiliaryServiceManager.AUX_SERVICE_NAMES, "mock1")));
   }
 
   @Test
@@ -49,8 +48,8 @@ public class TestGravitonAuxiliaryServiceManager {
         new IsolatedClassLoader(
             Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
 
-    GravitonAuxiliaryServiceManager auxServiceManager = new GravitonAuxiliaryServiceManager();
-    GravitonAuxiliaryServiceManager spyAuxManager = spy(auxServiceManager);
+    AuxiliaryServiceManager auxServiceManager = new AuxiliaryServiceManager();
+    AuxiliaryServiceManager spyAuxManager = spy(auxServiceManager);
 
     doReturn(isolatedClassLoader).when(spyAuxManager).getIsolatedClassLoader(anyString());
     doReturn(auxService).when(spyAuxManager).loadAuxService("mock1", isolatedClassLoader);
@@ -58,11 +57,11 @@ public class TestGravitonAuxiliaryServiceManager {
 
     spyAuxManager.serviceInit(
         ImmutableMap.of(
-            GravitonAuxiliaryServiceManager.AUX_SERVICE_NAMES,
+            AuxiliaryServiceManager.AUX_SERVICE_NAMES,
             "mock1,mock2",
-            "mock1." + GravitonAuxiliaryServiceManager.AUX_SERVICE_CLASSPATH,
+            "mock1." + AuxiliaryServiceManager.AUX_SERVICE_CLASSPATH,
             "/tmp",
-            "mock2." + GravitonAuxiliaryServiceManager.AUX_SERVICE_CLASSPATH,
+            "mock2." + AuxiliaryServiceManager.AUX_SERVICE_CLASSPATH,
             "/tmp"));
     verify(auxService, times(1)).serviceInit(any());
     verify(auxService2, times(1)).serviceInit(any());

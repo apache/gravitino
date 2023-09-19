@@ -28,5 +28,5 @@ public interface GravitonAuxiliaryService {
 
   void serviceStart();
 
-  void serviceStop();
+  void serviceStop() throws Exception;
 }

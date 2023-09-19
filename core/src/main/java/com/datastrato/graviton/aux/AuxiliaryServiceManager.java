@@ -13,6 +13,9 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Streams;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -24,20 +27,21 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * GravitonAuxiliaryServiceManager manage all GravitonAuxiliaryServices with isolated classloader
- * provided
+ * AuxiliaryServiceManager manage all GravitonAuxiliaryServices with isolated classloader provided
  */
-public class GravitonAuxiliaryServiceManager {
-  private static final Logger LOG = LoggerFactory.getLogger(GravitonAuxiliaryServiceManager.class);
-  public static final String GRAVITON_AUX_SERVICE_PREFIX = "graviton.server.auxService.";
-  public static final String AUX_SERVICE_NAMES = "AuxServiceNames";
-  public static final String AUX_SERVICE_CLASSPATH = "AuxServiceClasspath";
+public class AuxiliaryServiceManager {
+  private static final Logger LOG = LoggerFactory.getLogger(AuxiliaryServiceManager.class);
+  public static final String GRAVITON_AUX_SERVICE_PREFIX = "graviton.auxService.";
+  public static final String AUX_SERVICE_NAMES = "auxServiceNames";
+  public static final String AUX_SERVICE_CLASSPATH = "auxServiceClasspath";
 
   private static final Splitter splitter = Splitter.on(",");
   private static final Joiner DOT = Joiner.on(".");
 
   private Map<String, GravitonAuxiliaryService> auxServices = new HashMap<>();
   private Map<String, IsolatedClassLoader> auxServiceClassLoaders = new HashMap<>();
+
+  private Exception firstException;
 
   private Class<? extends GravitonAuxiliaryService> lookupAuxService(
       String provider, ClassLoader cl) {
@@ -79,14 +83,36 @@ public class GravitonAuxiliaryServiceManager {
     return IsolatedClassLoader.buildClassLoader(classPath);
   }
 
-  private void registerAuxService(String auxServiceName, Map<String, String> config) {
-    String classPath = config.get(AUX_SERVICE_CLASSPATH);
-    LOG.info("AuxService name:{}, config:{}, classpath:{}", auxServiceName, config, classPath);
+  @VisibleForTesting
+  static String getValidPath(String auxServiceName, String pathString) {
     Preconditions.checkArgument(
-        StringUtils.isNoneBlank(classPath),
+        StringUtils.isNoneBlank(pathString),
         String.format(
             "AuxService:%s, %s%s.%s is not set in configuration",
             auxServiceName, GRAVITON_AUX_SERVICE_PREFIX, auxServiceName, AUX_SERVICE_CLASSPATH));
+
+    Path path = Paths.get(pathString);
+    if (Files.exists(path)) {
+      return pathString;
+    }
+
+    String gravitonHome = System.getenv("GRAVITON_HOME");
+    if (!path.isAbsolute() && gravitonHome != null) {
+      Path newPath = Paths.get(gravitonHome, pathString);
+      if (Files.exists(newPath)) {
+        return newPath.toString();
+      }
+    }
+
+    throw new IllegalArgumentException(
+        String.format("AuxService:{}, classpath: {} not exits", auxServiceName, pathString));
+  }
+
+  private void registerAuxService(String auxServiceName, Map<String, String> config) {
+    String classPath = config.get(AUX_SERVICE_CLASSPATH);
+    classPath = getValidPath(auxServiceName, classPath);
+    LOG.info("AuxService name:{}, config:{}, classpath:{}", auxServiceName, config, classPath);
+
     IsolatedClassLoader isolatedClassLoader = getIsolatedClassLoader(classPath);
     try {
       GravitonAuxiliaryService gravitonAuxiliaryService =
@@ -122,7 +148,7 @@ public class GravitonAuxiliaryServiceManager {
             } catch (Exception e) {
               throw new RuntimeException(e);
             }
-            return 0;
+            return null;
           });
     } catch (RuntimeException e) {
       throw e;
@@ -135,7 +161,11 @@ public class GravitonAuxiliaryServiceManager {
     registerAuxServices(config);
     auxServices.forEach(
         (auxServiceName, auxService) -> {
-          doWithClassLoader(auxServiceName, cl -> auxService.serviceInit(config));
+          doWithClassLoader(
+              auxServiceName,
+              cl ->
+                  auxService.serviceInit(
+                      MapUtils.getPrefixMap(config, DOT.join(auxServiceName, ""))));
         });
   }
 
@@ -146,10 +176,24 @@ public class GravitonAuxiliaryServiceManager {
         });
   }
 
-  public void serviceStop() {
+  private void stopQuietly(String auxServiceName, GravitonAuxiliaryService auxiliaryService) {
+    try {
+      auxiliaryService.serviceStop();
+    } catch (Exception e) {
+      LOG.warn("AuxService:{} stop failed", auxServiceName, e);
+      if (firstException == null) {
+        firstException = e;
+      }
+    }
+  }
+
+  public void serviceStop() throws Exception {
     auxServices.forEach(
         (auxServiceName, auxService) -> {
-          doWithClassLoader(auxServiceName, cl -> auxService.serviceStop());
+          doWithClassLoader(auxServiceName, cl -> stopQuietly(auxServiceName, auxService));
         });
+    if (firstException != null) {
+      throw firstException;
+    }
   }
 }

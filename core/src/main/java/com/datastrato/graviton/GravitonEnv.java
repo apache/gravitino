@@ -4,7 +4,7 @@
  */
 package com.datastrato.graviton;
 
-import com.datastrato.graviton.aux.GravitonAuxiliaryServiceManager;
+import com.datastrato.graviton.aux.AuxiliaryServiceManager;
 import com.datastrato.graviton.catalog.CatalogManager;
 import com.datastrato.graviton.catalog.CatalogOperationDispatcher;
 import com.datastrato.graviton.meta.MetalakeManager;
@@ -35,7 +35,7 @@ public class GravitonEnv {
 
   private IdGenerator idGenerator;
 
-  private GravitonAuxiliaryServiceManager auxServiceManager;
+  private AuxiliaryServiceManager auxServiceManager;
 
   private GravitonEnv() {}
 
@@ -80,9 +80,9 @@ public class GravitonEnv {
     this.catalogManager = new CatalogManager(config, entityStore, idGenerator);
     this.catalogOperationDispatcher = new CatalogOperationDispatcher(catalogManager);
 
-    this.auxServiceManager = new GravitonAuxiliaryServiceManager();
+    this.auxServiceManager = new AuxiliaryServiceManager();
     this.auxServiceManager.serviceInit(
-        config.getConfigsWithPrefix(GravitonAuxiliaryServiceManager.GRAVITON_AUX_SERVICE_PREFIX));
+        config.getConfigsWithPrefix(AuxiliaryServiceManager.GRAVITON_AUX_SERVICE_PREFIX));
 
     LOG.info("Graviton Environment is initialized.");
   }
@@ -172,7 +172,11 @@ public class GravitonEnv {
     }
 
     if (auxServiceManager != null) {
-      auxServiceManager.serviceStop();
+      try {
+        auxServiceManager.serviceStop();
+      } catch (Exception e) {
+        LOG.warn("Failed to stop AuxServiceManager", e);
+      }
     }
 
     LOG.info("Graviton Environment is shut down.");
