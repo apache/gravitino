@@ -5,13 +5,11 @@
 package com.datastrato.graviton.catalog.lakehouse.iceberg.ops;
 
 import com.datastrato.graviton.catalog.lakehouse.iceberg.config.IcebergConfig;
-import com.datastrato.graviton.catalog.lakehouse.iceberg.ops.IcebergTableOpsHelper.IcebergTableChange;
 import com.datastrato.graviton.catalog.lakehouse.iceberg.utils.IcebergCatalogUtil;
 import com.google.common.base.Preconditions;
 import java.util.Map;
 import java.util.Optional;
 import javax.ws.rs.NotSupportedException;
-import org.apache.iceberg.Transaction;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.SupportsNamespaces;
@@ -54,10 +52,6 @@ public class IcebergTableOps {
     if (catalog instanceof SupportsNamespaces) {
       asNamespaceCatalog = (SupportsNamespaces) catalog;
     }
-  }
-
-  public IcebergTableOpsHelper createIcebergTableOpsHelper() {
-    return new IcebergTableOpsHelper(catalog);
   }
 
   private void validateNamespace(Optional<Namespace> namespace) {
@@ -132,11 +126,5 @@ public class IcebergTableOps {
   public LoadTableResponse updateTable(
       TableIdentifier tableIdentifier, UpdateTableRequest updateTableRequest) {
     return CatalogHandlers.updateTable(catalog, tableIdentifier, updateTableRequest);
-  }
-
-  public LoadTableResponse updateTable(IcebergTableChange icebergTableChange) {
-    Transaction transaction = icebergTableChange.getTransaction();
-    transaction.commitTransaction();
-    return loadTable(icebergTableChange.getTableIdentifier());
   }
 }
