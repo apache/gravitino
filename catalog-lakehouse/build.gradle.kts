@@ -14,6 +14,7 @@ plugins {
 dependencies {
     implementation(project(":common"))
     implementation(project(":core"))
+    implementation(project(":api"))
     implementation(libs.jackson.databind)
     implementation(libs.jackson.annotations)
     implementation(libs.jackson.datatype.jdk8)
@@ -24,6 +25,14 @@ dependencies {
     implementation(libs.bundles.jetty)
     implementation(libs.bundles.jersey)
     implementation(libs.bundles.iceberg)
+    implementation(libs.substrait.java.core) {
+      exclude("com.fasterxml.jackson.core")
+      exclude("com.fasterxml.jackson.datatype")
+      exclude("com.fasterxml.jackson.dataformat")
+      exclude("com.google.protobuf")
+      exclude("com.google.code.findbugs")
+      exclude("org.slf4j")
+    }
 
     compileOnly(libs.lombok)
     annotationProcessor(libs.lombok)
