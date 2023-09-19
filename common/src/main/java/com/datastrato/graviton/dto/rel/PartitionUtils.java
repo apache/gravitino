@@ -106,7 +106,7 @@ public class PartitionUtils {
         "Unsupported expression type " + expression.getClass().getCanonicalName());
   }
 
-  private static Expression.Literal getLiteral(
+  public static Expression.Literal getLiteral(
       ExpressionPartitionDTO.LiteralExpression literalExpression) {
     LiteralConverter literalConverter = new LiteralConverter(literalExpression.getValue());
     return literalExpression.getType().accept(literalConverter);

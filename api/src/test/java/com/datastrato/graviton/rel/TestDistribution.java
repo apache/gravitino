@@ -42,4 +42,28 @@ class TestDistribution {
     Assertions.assertEquals(11111, bucket.number());
     Assertions.assertArrayEquals(transforms, bucket.transforms());
   }
+
+  @Test
+  void testUtils() {
+    Distribution distribution =
+        Distribution.nameReferenceDistribution(Strategy.HASH, 1, new String[] {"a"});
+    Assertions.assertEquals(Strategy.HASH, distribution.strategy());
+    Assertions.assertEquals(1, distribution.number());
+    Assertions.assertTrue(distribution.transforms()[0] instanceof Transforms.NamedReference);
+    Assertions.assertArrayEquals(
+        new String[] {"a"}, ((Transforms.NamedReference) distribution.transforms()[0]).value());
+
+    distribution =
+        Distribution.nameReferenceDistribution(
+            Strategy.HASH, 2, new String[] {"a"}, new String[] {"b"});
+
+    Assertions.assertEquals(Strategy.HASH, distribution.strategy());
+    Assertions.assertEquals(2, distribution.number());
+    Assertions.assertTrue(distribution.transforms()[0] instanceof Transforms.NamedReference);
+    Assertions.assertArrayEquals(
+        new String[] {"a"}, ((Transforms.NamedReference) distribution.transforms()[0]).value());
+    Assertions.assertTrue(distribution.transforms()[1] instanceof Transforms.NamedReference);
+    Assertions.assertArrayEquals(
+        new String[] {"b"}, ((Transforms.NamedReference) distribution.transforms()[1]).value());
+  }
 }

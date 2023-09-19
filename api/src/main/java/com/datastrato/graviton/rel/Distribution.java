@@ -6,7 +6,9 @@
 package com.datastrato.graviton.rel;
 
 import com.datastrato.graviton.rel.transforms.Transform;
+import com.datastrato.graviton.rel.transforms.Transforms;
 import com.google.common.base.Objects;
+import java.util.Arrays;
 
 public class Distribution {
 
@@ -97,5 +99,29 @@ public class Distribution {
   @Override
   public int hashCode() {
     return Objects.hashCode(transforms, number, strategy);
+  }
+
+  /**
+   * Create a distribution on columns. Like distribute by (a) or (a, b), for complex like
+   * distributing by (func(a), b) or (func(a), func(b)), please use {@link Builder} to create.
+   *
+   * <pre>
+   *   NOTE: a, b, c are column names.
+   *
+   *   SQL syntax: distribute by hash(a, b)
+   *   nameReferenceDistribution(Strategy.HASH, 2, new String[]{"a"}, new String[]{"b"});
+   *
+   *   SQL syntax: distribute by hash(a, b, c)
+   *   nameReferenceDistribution(Strategy.HASH, 3, new String[]{"a"}, new String[]{"b"}, new String[]{"c"});
+   *
+   *   SQL syntax: distribute by EVEN(a)
+   *   nameReferenceDistribution(Strategy.EVEN, 1, new String[]{"a"});
+   * </pre>
+   */
+  public static Distribution nameReferenceDistribution(
+      Strategy strategy, int number, String[]... columnNames) {
+    Transform[] functions =
+        Arrays.stream(columnNames).map(name -> Transforms.field(name)).toArray(Transform[]::new);
+    return new Distribution(functions, number, strategy);
   }
 }
