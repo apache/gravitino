@@ -41,11 +41,11 @@ public class GravitonServer extends ResourceConfig {
 
   public void initialize(String[] args) {
     try {
-      if (System.getenv("GRAVITON_TEST") != null) {
+      if (System.getenv("GRAVITON_TEST") == null) {
+        serverConfig.loadFromFile(CONF_FILE);
+      } else {
         Properties properties = serverConfig.loadPropertiesFromFile(new File(args[0]));
         serverConfig.loadFromProperties(properties);
-      } else {
-        serverConfig.loadFromFile(CONF_FILE);
       }
     } catch (Exception exception) {
       LOG.warn(

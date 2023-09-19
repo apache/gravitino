@@ -8,7 +8,7 @@ graviton.server.shutdown.timeout = 3000
 
 # THE CONFIGURATION FOR GRAVITON WEB SERVER
 # The host name of the built-in web server
-graviton.server.webserver.host = 0.0.0.0
+graviton.server.webserver.host = 127.0.0.1
 # The http port number of the built-in web server
 graviton.server.webserver.httpPort = 8090
 # The core thread size of the built-in web server
