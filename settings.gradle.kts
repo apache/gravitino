@@ -4,4 +4,5 @@
  */
 rootProject.name = "graviton"
 
-include("api", "client-java", "common", "core", "meta", "server", "catalog-hive", "integration-test", "catalog-lakehouse")
+include("api", "client-java", "common", "core", "meta", "server", "catalog-hive", "integration-test", "catalog-lakehouse", "trino-graviton")
+
