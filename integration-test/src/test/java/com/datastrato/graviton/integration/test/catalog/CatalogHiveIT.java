@@ -41,7 +41,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
 
-@Tag("graviton-ci-hive")
+@Tag("graviton-docker-it")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class CatalogHiveIT extends AbstractIT {
   public static String metalakeName = GravitonITUtils.genRandomName("CatalogHiveIT_metalake");

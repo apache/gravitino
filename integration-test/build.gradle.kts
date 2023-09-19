@@ -107,24 +107,26 @@ project.extra["dockerRunning"] = false
 project.extra["hiveContainerRunning"] = false
 
 fun printDockerCheckInfo() {
+  val testMode = project.properties["testMode"] as? String ?: "embedded"
+  if (testMode != "deploy" && testMode != "embedded") {
+    return
+  }
   val dockerRunning = project.extra["dockerRunning"] as? Boolean ?: false
   val hiveContainerRunning = project.extra["hiveContainerRunning"] as? Boolean ?: false
-  val testMode = project.properties["testMode"] as? String ?: "embedded"
-  // println("dockerRunning: $dockerRunning, hiveContainerRunning: $hiveContainerRunning, testMode: $testMode")
   if (dockerRunning && hiveContainerRunning) {
-    EXCLUDE_DOCKER_TEST = false;
+    EXCLUDE_DOCKER_TEST = false
   }
 
-  println("-------------------- Check Docker environment --------------------")
-  println("Docker server status ............................................. [${if (dockerRunning) "running" else "stop"}]")
-  println("Graviton CI Hive container is already running .................... [${if (hiveContainerRunning) "yes" else "no"}]")
+  println("------------------- Check Docker environment ------------------")
+  println("Docker server status .......................................... [${if (dockerRunning) "running" else "stop"}]")
+  println("Graviton IT Docker container is already running ............... [${if (hiveContainerRunning) "yes" else "no"}]")
 
   if (dockerRunning && hiveContainerRunning) {
-    println("Use exist Graviton CI Hive container to run all integration test.  [$testMode test]")
+    println("Use Graviton IT Docker container to run all integration test.   [$testMode test]")
   } else {
-    println("Run only test cases where tag is not set special `CI-DOCKER-NAME`. [$testMode test]")
+    println("Run only test cases where tag is set `graviton-docker-it`.      [$testMode test]")
   }
-  println("------------------------------------------------------------------")
+  println("---------------------------------------------------------------")
 }
 
 tasks {
@@ -186,18 +188,21 @@ tasks.test {
       environment("HADOOP_HOME", "/tmp")
       environment("PROJECT_VERSION", version)
 
-      val testMode = project.properties["testMode"] as? String ?: ""
+      var testMode = project.properties["testMode"] as? String ?: "embedded"
       if (testMode == "deploy") {
         environment("GRAVITON_HOME", rootDir.path + "/distribution/package")
-        systemProperty("TestMode", "deploy")
-      } else {
+        systemProperty("testMode", "deploy")
+      } else if (testMode == "embedded") {
         environment("GRAVITON_HOME", rootDir.path)
-        systemProperty("TestMode", "embedded")
+        environment("GRAVITON_TEST", "true")
+        systemProperty("testMode", "embedded")
+      } else {
+        throw GradleException("Graviton integration test only support [-PtestMode=embedded] or [-PtestMode=deploy] mode!")
       }
 
       useJUnitPlatform {
         if (EXCLUDE_DOCKER_TEST) {
-          excludeTags("graviton-ci-hive")
+          excludeTags("graviton-docker-it")
         }
       }
     }

@@ -86,7 +86,8 @@ jobs:
       - name: Integration Test
         id: integrationTest
         run: |
-          gradle test --rerun-tasks -PtestMode=deploy
+          gradle test --rerun-tasks -PskipTests -PtestMode=embedded
+          gradle test --rerun-tasks -PskipTests -PtestMode=deploy
 
       - name: Print logs when Graviton integration tests failure
         if: ${{ failure() && steps.integrationTest.outcome == 'failure' }}

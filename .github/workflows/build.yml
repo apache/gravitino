@@ -39,7 +39,7 @@ jobs:
         run: gradle --version
 
       - name: Build with Gradle
-        run: gradle build
+        run: gradle build -PskipITs
 
       - name: Jacoco Report to PR
         id: jacoco

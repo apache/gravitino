@@ -11,7 +11,6 @@ import com.datastrato.graviton.client.GravitonClient;
 import com.datastrato.graviton.integration.test.MiniGraviton;
 import com.datastrato.graviton.server.GravitonServer;
 import com.datastrato.graviton.server.ServerConfig;
-import java.io.File;
 import java.io.IOException;
 import org.apache.commons.io.FileUtils;
 import org.junit.jupiter.api.AfterAll;
@@ -27,7 +26,7 @@ public class AbstractIT {
 
   private static MiniGraviton miniGraviton;
 
-  private static final String TEST_MODE = "TestMode";
+  private static final String TEST_MODE = "testMode";
   private static final String EMBEDDED_TEST_MODE = "embedded";
 
   static String testMode =
@@ -43,10 +42,6 @@ public class AbstractIT {
       miniGraviton.start();
       serverConfig = miniGraviton.getServerConfig();
     } else {
-      String gravitonRootDir = System.getenv("GRAVITON_ROOT_DIR");
-      File gravitonHome =
-          new File(gravitonRootDir + File.separator + "distribution" + File.separator + "package");
-      ITUtils.injectEnvironment("GRAVITON_HOME", gravitonHome.getAbsolutePath());
       serverConfig.loadFromFile(GravitonServer.CONF_FILE);
 
       try {

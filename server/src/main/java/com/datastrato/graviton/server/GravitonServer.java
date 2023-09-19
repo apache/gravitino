@@ -39,25 +39,28 @@ public class GravitonServer extends ResourceConfig {
     gravitonEnv = GravitonEnv.getInstance();
   }
 
-  public void initialize(String[] args) {
-    try {
-      if (System.getenv("GRAVITON_TEST") == null) {
-        serverConfig.loadFromFile(CONF_FILE);
-      } else {
-        Properties properties = serverConfig.loadPropertiesFromFile(new File(args[0]));
-        serverConfig.loadFromProperties(properties);
-      }
-    } catch (Exception exception) {
-      LOG.warn(
-          "Failed to load conf from file {}, using default conf instead", CONF_FILE, exception);
-    }
-
+  public void initialize() {
     server.initialize(serverConfig);
 
     gravitonEnv.initialize(serverConfig);
 
     // initialize Jersey REST API resources.
     initializeRestApi();
+  }
+
+  public void loadConfig(String confPath) {
+    try {
+      if (confPath.isEmpty()) {
+        // Load default conf
+        serverConfig.loadFromFile(CONF_FILE);
+      } else {
+        Properties properties = serverConfig.loadPropertiesFromFile(new File(confPath));
+        serverConfig.loadFromProperties(properties);
+      }
+    } catch (Exception exception) {
+      LOG.warn(
+          "Failed to load conf from file {}, using default conf instead", CONF_FILE, exception);
+    }
   }
 
   private void initializeRestApi() {
@@ -96,7 +99,9 @@ public class GravitonServer extends ResourceConfig {
   public static void main(String[] args) {
     LOG.info("Starting Graviton Server");
     GravitonServer server = new GravitonServer();
-    server.initialize(args);
+    String confPath = System.getenv("GRAVITON_TEST") == null ? "" : args[0];
+    server.loadConfig(confPath);
+    server.initialize();
 
     try {
       // Instantiates GravitonServer

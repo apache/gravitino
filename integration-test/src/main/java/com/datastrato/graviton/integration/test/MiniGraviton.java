@@ -61,7 +61,6 @@ public class MiniGraviton {
         Paths.get(ITUtils.joinDirPath(gravitonRootDir, "conf", "graviton-env.sh.template")),
         Paths.get(ITUtils.joinDirPath(mockConfDir.getAbsolutePath(), "graviton-env.sh")));
 
-    ITUtils.injectEnvironment("GRAVITON_TEST", "true");
     Properties properties =
         serverConfig.loadPropertiesFromFile(
             new File(ITUtils.joinDirPath(mockConfDir.getAbsolutePath(), "graviton.conf")));

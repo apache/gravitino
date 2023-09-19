@@ -53,21 +53,21 @@ public class CatalogHiveIT extends AbstractIT {
 If you have Docker installed and a special CI Docker container running, the `./gradlew test -PtestMode=[embedded|deploy]`
 command will automatically execute all the test cases.
 ```
--------------------- Check Docker environment --------------------
-Docker server status ............................................. [running]
-Graviton CI Hive container is already running .................... [yes]
-Use exist Graviton CI Hive container to run all integration test.  [embbeded|deploy test]
-------------------------------------------------------------------
+------------------- Check Docker environment ------------------
+Docker server status .......................................... [running]
+Graviton IT Docker container is already running ............... [yes]
+Use Graviton IT Docker container to run all integration test.   [embbeded|deploy test]
+---------------------------------------------------------------
 ```
 
 If Docker is not installed or the special CI Docker container is not running, the `./gradlew test -PtestMode=[embedded|deploy]`
 command will skip the test cases that depend on the special Docker environment.
 ```
--------------------- Check Docker environment --------------------
-Docker server status ............................................. [stop]
-Graviton CI Hive container is already running .................... [no]
-Run only test cases where tag is not set `CI-DOCKER-NAME`.         [embbeded|deploy test]
-------------------------------------------------------------------
+------------------- Check Docker environment ------------------
+Docker server status .......................................... [running]
+Graviton IT Docker container is already running ............... [no]
+Run only test cases where tag is set `graviton-docker-it`.      [embbeded|deploy test]
+---------------------------------------------------------------
 ```
 > Graviton will run all integration test cases in the GitHub Actions environment.
 
