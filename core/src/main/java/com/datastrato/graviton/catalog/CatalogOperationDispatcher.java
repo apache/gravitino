@@ -523,7 +523,7 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
       ret = fn.apply(ident);
     } catch (NoSuchEntityException e) {
       // Case 2: The table is created by Graviton, but has no corresponding entity in Graviton.
-      LOG.warn(FormattedErrorMessages.ENTITY_NOT_FOUND, ident);
+      LOG.error(FormattedErrorMessages.ENTITY_NOT_FOUND, ident);
       ret = null;
     } catch (Exception e) {
       // Case 3: The table is created by Graviton, but failed to operate the corresponding entity
@@ -539,7 +539,7 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
     // Case 4: The table is created by Graviton, but the uid in the corresponding entity is not
     // matched.
     if (ret != null && ret.id() != id) {
-      LOG.warn(FormattedErrorMessages.ENTITY_UNMATCHED, ident, ret.id(), id);
+      LOG.error(FormattedErrorMessages.ENTITY_UNMATCHED, ident, ret.id(), id);
       ret = null;
     }
 
