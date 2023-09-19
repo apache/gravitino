@@ -2,7 +2,7 @@
  * Copyright 2023 Datastrato.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.graviton.integration.e2e;
+package com.datastrato.graviton.integration.test.catalog;
 
 import static com.datastrato.graviton.rel.transforms.Transforms.identity;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -12,8 +12,8 @@ import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.catalog.hive.HiveClientPool;
 import com.datastrato.graviton.client.GravitonMetaLake;
 import com.datastrato.graviton.dto.rel.ColumnDTO;
-import com.datastrato.graviton.integration.util.AbstractIT;
-import com.datastrato.graviton.integration.util.GravitonITUtils;
+import com.datastrato.graviton.integration.test.util.AbstractIT;
+import com.datastrato.graviton.integration.test.util.GravitonITUtils;
 import com.datastrato.graviton.rel.Schema;
 import com.datastrato.graviton.rel.SchemaChange;
 import com.datastrato.graviton.rel.Table;
@@ -37,9 +37,11 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.MethodOrderer;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
 
+@Tag("graviton-docker-it")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class CatalogHiveIT extends AbstractIT {
   public static String metalakeName = GravitonITUtils.genRandomName("CatalogHiveIT_metalake");

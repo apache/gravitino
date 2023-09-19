@@ -184,7 +184,7 @@ public abstract class Config {
    * @param properties The properties object containing configuration key-value pairs.
    */
   @VisibleForTesting
-  void loadFromProperties(Properties properties) {
+  public void loadFromProperties(Properties properties) {
     loadFromMap(Maps.fromProperties(properties));
   }
 
@@ -196,7 +196,7 @@ public abstract class Config {
    * @throws IOException If there's an issue loading the properties.
    */
   @VisibleForTesting
-  Properties loadPropertiesFromFile(File file) throws IOException {
+  public Properties loadPropertiesFromFile(File file) throws IOException {
     Properties properties = new Properties();
     try (InputStream in = Files.newInputStream(file.toPath())) {
       properties.load(in);

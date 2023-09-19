@@ -2,7 +2,7 @@
  * Copyright 2023 Datastrato.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.graviton.integration.util;
+package com.datastrato.graviton.integration.test.util;
 
 import com.google.common.collect.Maps;
 import java.util.Map;

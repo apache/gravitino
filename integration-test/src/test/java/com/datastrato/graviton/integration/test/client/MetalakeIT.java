@@ -2,7 +2,7 @@
  * Copyright 2023 Datastrato.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.graviton.integration.e2e;
+package com.datastrato.graviton.integration.test.client;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -16,8 +16,8 @@ import com.datastrato.graviton.exceptions.IllegalNameIdentifierException;
 import com.datastrato.graviton.exceptions.IllegalNamespaceException;
 import com.datastrato.graviton.exceptions.MetalakeAlreadyExistsException;
 import com.datastrato.graviton.exceptions.NoSuchMetalakeException;
-import com.datastrato.graviton.integration.util.AbstractIT;
-import com.datastrato.graviton.integration.util.GravitonITUtils;
+import com.datastrato.graviton.integration.test.util.AbstractIT;
+import com.datastrato.graviton.integration.test.util.GravitonITUtils;
 import java.util.ArrayList;
 import java.util.Collections;
 import org.junit.jupiter.api.AfterEach;
