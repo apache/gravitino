@@ -8,6 +8,7 @@ import static com.datastrato.graviton.Entity.EntityType.SCHEMA;
 import static com.datastrato.graviton.Entity.EntityType.TABLE;
 
 import com.datastrato.graviton.EntityStore;
+import com.datastrato.graviton.HasIdentifier;
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
 import com.datastrato.graviton.StringIdentifier;
@@ -163,24 +164,13 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
       return EntityCombinedSchema.of(schema);
     }
 
-    SchemaEntity schemaEntity;
-    try {
-      schemaEntity = store.get(ident, SCHEMA, SchemaEntity.class);
-    } catch (NoSuchEntityException e) {
-      // Case 2: The schema is created by Graviton, but has no corresponding entity in Graviton.
-      LOG.warn(FormattedErrorMessages.ENTITY_NOT_FOUND, ident);
-      return EntityCombinedSchema.of(schema);
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
-
-    // Case 3: The schema is created by Graviton, but the uid in the corresponding entity is not
-    // matched.
-    if (schemaEntity.id() != stringId.id()) {
-      LOG.warn(FormattedErrorMessages.ENTITY_UNMATCHED, ident, schemaEntity.id(), stringId.id());
-      return EntityCombinedSchema.of(schema);
-    }
-
+    SchemaEntity schemaEntity =
+        operateOnEntity(
+            ident,
+            identifier -> store.get(identifier, SCHEMA, SchemaEntity.class),
+            "GET",
+            stringId.id(),
+            true /* throwIfNotFound */);
     return EntityCombinedSchema.of(schema, schemaEntity);
   }
 
@@ -208,47 +198,32 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
       return EntityCombinedSchema.of(alteredSchema);
     }
 
-    SchemaEntity updatedSchemaEntity;
-    try {
-      updatedSchemaEntity =
-          store.update(
-              ident,
-              SchemaEntity.class,
-              SCHEMA,
-              schemaEntity ->
-                  new SchemaEntity.Builder()
-                      .withId(schemaEntity.id())
-                      .withName(schemaEntity.name())
-                      .withNamespace(ident.namespace())
-                      .withAuditInfo(
-                          new AuditInfo.Builder()
-                              .withCreator(schemaEntity.auditInfo().creator())
-                              .withCreateTime(schemaEntity.auditInfo().createTime())
-                              .withLastModifier("graviton") // TODO. hardcoded as user "graviton"
-                              // for now, will change to real user once user system is ready.
-                              .withLastModifiedTime(Instant.now())
-                              .build())
-                      .build());
-    } catch (NoSuchEntityException e) {
-      // Case 2: The schema is created by Graviton, but has no corresponding entity in Graviton.
-      LOG.warn(FormattedErrorMessages.ENTITY_NOT_FOUND, ident);
-      return EntityCombinedSchema.of(alteredSchema);
-
-    } catch (Exception e) {
-      // Case 3: The schema is created by Graviton, but failed to update the corresponding entity in
-      // Graviton.
-      LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "update", ident, e);
-      return EntityCombinedSchema.of(alteredSchema);
-    }
-
-    // Case 4: The schema is created by Graviton, but the uid in the corresponding entity is not
-    // matched.
-    if (updatedSchemaEntity.id() != stringId.id()) {
-      LOG.warn(
-          FormattedErrorMessages.ENTITY_UNMATCHED, ident, updatedSchemaEntity.id(), stringId.id());
-      return EntityCombinedSchema.of(alteredSchema);
-    }
-
+    SchemaEntity updatedSchemaEntity =
+        operateOnEntity(
+            ident,
+            id ->
+                store.update(
+                    id,
+                    SchemaEntity.class,
+                    SCHEMA,
+                    schemaEntity ->
+                        new SchemaEntity.Builder()
+                            .withId(schemaEntity.id())
+                            .withName(schemaEntity.name())
+                            .withNamespace(ident.namespace())
+                            .withAuditInfo(
+                                new AuditInfo.Builder()
+                                    .withCreator(schemaEntity.auditInfo().creator())
+                                    .withCreateTime(schemaEntity.auditInfo().createTime())
+                                    .withLastModifier(
+                                        "graviton") // TODO. hardcoded as user "graviton"
+                                    // for now, will change to real user once user system is ready.
+                                    .withLastModifiedTime(Instant.now())
+                                    .build())
+                            .build()),
+            "UPDATE",
+            stringId.id(),
+            false /* throwIfNotFound */);
     return EntityCombinedSchema.of(alteredSchema, updatedSchemaEntity);
   }
 
@@ -318,24 +293,13 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
       return EntityCombinedTable.of(table);
     }
 
-    TableEntity tableEntity;
-    try {
-      tableEntity = store.get(ident, TABLE, TableEntity.class);
-    } catch (NoSuchEntityException e) {
-      // Case 2: The table is created by Graviton, but has no corresponding entity in Graviton.
-      LOG.warn(FormattedErrorMessages.ENTITY_NOT_FOUND, ident);
-      return EntityCombinedTable.of(table);
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
-
-    // Case 3: The table is created by Graviton, but the uid in the corresponding entity is not
-    // matched.
-    if (tableEntity.id() != stringId.id()) {
-      LOG.warn(FormattedErrorMessages.ENTITY_UNMATCHED, ident, tableEntity.id(), stringId.id());
-      return EntityCombinedTable.of(table);
-    }
-
+    TableEntity tableEntity =
+        operateOnEntity(
+            ident,
+            identifier -> store.get(identifier, TABLE, TableEntity.class),
+            "GET",
+            stringId.id(),
+            true /* throwIfNotFound */);
     return EntityCombinedTable.of(table, tableEntity);
   }
 
@@ -433,54 +397,41 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
       return EntityCombinedTable.of(alteredTable);
     }
 
-    TableEntity updatedTableEntity;
-    try {
-      updatedTableEntity =
-          store.update(
-              ident,
-              TableEntity.class,
-              TABLE,
-              tableEntity -> {
-                String newName =
-                    Arrays.stream(changes)
-                        .filter(c -> c instanceof TableChange.RenameTable)
-                        .map(c -> ((TableChange.RenameTable) c).getNewName())
-                        .reduce((c1, c2) -> c2)
-                        .orElse(tableEntity.name());
+    TableEntity updatedTableEntity =
+        operateOnEntity(
+            ident,
+            id ->
+                store.update(
+                    id,
+                    TableEntity.class,
+                    TABLE,
+                    tableEntity -> {
+                      String newName =
+                          Arrays.stream(changes)
+                              .filter(c -> c instanceof TableChange.RenameTable)
+                              .map(c -> ((TableChange.RenameTable) c).getNewName())
+                              .reduce((c1, c2) -> c2)
+                              .orElse(tableEntity.name());
 
-                return new TableEntity.Builder()
-                    .withId(tableEntity.id())
-                    .withName(newName)
-                    .withNamespace(ident.namespace())
-                    .withAuditInfo(
-                        new AuditInfo.Builder()
-                            .withCreator(tableEntity.auditInfo().creator())
-                            .withCreateTime(tableEntity.auditInfo().createTime())
-                            .withLastModifier(
-                                "graviton") //  hardcoded as user "graviton" for now, will change
-                            // to real user once user system is ready.
-                            .withLastModifiedTime(Instant.now())
-                            .build())
-                    .build();
-              });
-    } catch (NoSuchEntityException e) {
-      // Case 2: The table is created by Graviton, but has no corresponding entity in Graviton.
-      LOG.warn(FormattedErrorMessages.ENTITY_NOT_FOUND, ident);
-      return EntityCombinedTable.of(alteredTable);
-    } catch (Exception e) {
-      // Case 3: The table is created by Graviton, but failed to update the corresponding entity
-      // in Graviton.
-      LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "update", ident, e);
-      return EntityCombinedTable.of(alteredTable);
-    }
-
-    // Case 4: The table is created by Graviton, but the uid in the corresponding entity is not
-    // matched.
-    if (updatedTableEntity.id() != stringId.id()) {
-      LOG.warn(
-          FormattedErrorMessages.ENTITY_UNMATCHED, ident, updatedTableEntity.id(), stringId.id());
-      return EntityCombinedTable.of(alteredTable);
-    }
+                      return new TableEntity.Builder()
+                          .withId(tableEntity.id())
+                          .withName(newName)
+                          .withNamespace(ident.namespace())
+                          .withAuditInfo(
+                              new AuditInfo.Builder()
+                                  .withCreator(tableEntity.auditInfo().creator())
+                                  .withCreateTime(tableEntity.auditInfo().createTime())
+                                  .withLastModifier(
+                                      "graviton") //  hardcoded as user "graviton" for now, will
+                                  // change
+                                  // to real user once user system is ready.
+                                  .withLastModifiedTime(Instant.now())
+                                  .build())
+                          .build();
+                    }),
+            "UPDATE",
+            stringId.id(),
+            false /* throwIfNotFound */);
 
     return EntityCombinedTable.of(alteredTable, updatedTableEntity);
   }
@@ -559,6 +510,40 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
       LOG.warn(FormattedErrorMessages.STRING_ID_PARSE_ERROR, e.getMessage());
       return null;
     }
+  }
+
+  private <R extends HasIdentifier> R operateOnEntity(
+      NameIdentifier ident,
+      ThrowableFunction<NameIdentifier, R> fn,
+      String opName,
+      long id,
+      boolean shouldFail) {
+    R ret;
+    try {
+      ret = fn.apply(ident);
+    } catch (NoSuchEntityException e) {
+      // Case 2: The table is created by Graviton, but has no corresponding entity in Graviton.
+      LOG.warn(FormattedErrorMessages.ENTITY_NOT_FOUND, ident);
+      ret = null;
+    } catch (Exception e) {
+      // Case 3: The table is created by Graviton, but failed to operate the corresponding entity
+      // in Graviton.
+      if (shouldFail) {
+        throw new RuntimeException(e);
+      } else {
+        LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, opName, ident, e);
+        ret = null;
+      }
+    }
+
+    // Case 4: The table is created by Graviton, but the uid in the corresponding entity is not
+    // matched.
+    if (ret != null && ret.id() != id) {
+      LOG.warn(FormattedErrorMessages.ENTITY_UNMATCHED, ident, ret.id(), id);
+      ret = null;
+    }
+
+    return ret;
   }
 
   @VisibleForTesting
