@@ -16,6 +16,7 @@ dependencies {
   testImplementation(project(":common"))
   testImplementation(project(":client-java"))
   testImplementation(project(":catalog-hive"))
+  testImplementation(project(":catalog-lakehouse"))
   testImplementation(project(":server"))
 
   testImplementation(libs.hive2.metastore) {
@@ -83,6 +84,7 @@ dependencies {
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.httpclient5)
+  testImplementation(libs.iceberg.spark.runtime)
   testRuntimeOnly(libs.junit.jupiter.engine)
   testImplementation(libs.mockito.core)
 }

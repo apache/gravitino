@@ -26,17 +26,17 @@ public class GravitonIcebergAuxiliaryService implements GravitonAuxiliaryService
 
   Server server;
 
-  private Server initServer() {
+  private Server initServer(Map<String, String> config) {
     Server server = new Server(9001);
 
-    ResourceConfig config = new ResourceConfig();
-    config.packages("com.datastrato.graviton.catalog.lakehouse.iceberg.web.rest");
+    ResourceConfig resourceConfig = new ResourceConfig();
+    resourceConfig.packages("com.datastrato.graviton.catalog.lakehouse.iceberg.web.rest");
 
-    config.register(IcebergObjectMapperProvider.class).register(JacksonFeature.class);
-    config.register(IcebergExceptionMapper.class);
+    resourceConfig.register(IcebergObjectMapperProvider.class).register(JacksonFeature.class);
+    resourceConfig.register(IcebergExceptionMapper.class);
 
-    IcebergTableOps icebergTableOps = new IcebergTableOps();
-    config.register(
+    IcebergTableOps icebergTableOps = new IcebergTableOps(config);
+    resourceConfig.register(
         new AbstractBinder() {
           @Override
           protected void configure() {
@@ -44,7 +44,7 @@ public class GravitonIcebergAuxiliaryService implements GravitonAuxiliaryService
           }
         });
 
-    ServletHolder servlet = new ServletHolder(new ServletContainer(config));
+    ServletHolder servlet = new ServletHolder(new ServletContainer(resourceConfig));
 
     ServletContextHandler context = new ServletContextHandler(server, "/");
     context.addServlet(servlet, "/iceberg/*");
@@ -58,7 +58,7 @@ public class GravitonIcebergAuxiliaryService implements GravitonAuxiliaryService
 
   @Override
   public void serviceInit(Map<String, String> config) {
-    server = initServer();
+    server = initServer(config);
     LOG.info("Iceberg aux service inited");
   }
 

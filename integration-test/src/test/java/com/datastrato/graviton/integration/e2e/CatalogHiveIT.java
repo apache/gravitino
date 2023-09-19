@@ -51,28 +51,25 @@ public class CatalogHiveIT extends AbstractIT {
   public static String HIVE_COL_NAME1 = "hive_col_name1";
   public static String HIVE_COL_NAME2 = "hive_col_name2";
   public static String HIVE_COL_NAME3 = "hive_col_name3";
-
   static String HIVE_METASTORE_URIS = "thrift://localhost:9083";
 
-  private static HiveClientPool hiveClientPool;
+  private HiveClientPool hiveClientPool;
 
-  private static GravitonMetaLake metalake;
+  private GravitonMetaLake metalake;
 
-  private static Catalog catalog;
+  private Catalog catalog;
 
   @BeforeAll
-  public static void startup() throws Exception {
+  public void startup() throws Exception {
     HiveConf hiveConf = new HiveConf();
     hiveConf.set(HiveConf.ConfVars.METASTOREURIS.varname, HIVE_METASTORE_URIS);
-    hiveClientPool = new HiveClientPool(1, hiveConf);
-
     createMetalake();
     createCatalog();
     createSchema();
   }
 
   @AfterAll
-  public static void stop() {
+  public void stop() {
     client.dropMetalake(NameIdentifier.of(metalakeName));
     if (hiveClientPool != null) {
       hiveClientPool.close();
@@ -88,7 +85,7 @@ public class CatalogHiveIT extends AbstractIT {
     createSchema();
   }
 
-  private static void createMetalake() {
+  private void createMetalake() {
     GravitonMetaLake[] gravitonMetaLakes = client.listMetalakes();
     Assertions.assertEquals(0, gravitonMetaLakes.length);
 
@@ -100,9 +97,9 @@ public class CatalogHiveIT extends AbstractIT {
     metalake = loadMetalake;
   }
 
-  private static void createCatalog() {
+  private void createCatalog() {
     Map<String, String> properties = Maps.newHashMap();
-    properties.put("provider", "hive");
+    properties.put("provider", getProvider());
     properties.put(HiveConf.ConfVars.METASTOREURIS.varname, HIVE_METASTORE_URIS);
     properties.put(HiveConf.ConfVars.METASTORETHRIFTCONNECTIONRETRIES.varname, "30");
     properties.put(HiveConf.ConfVars.METASTORETHRIFTFAILURERETRIES.varname, "30");
@@ -120,7 +117,7 @@ public class CatalogHiveIT extends AbstractIT {
     catalog = loadCatalog;
   }
 
-  private static void createSchema() throws TException, InterruptedException {
+  private void createSchema() throws TException, InterruptedException {
     NameIdentifier ident = NameIdentifier.of(metalakeName, catalogName, schemaName);
     Map<String, String> properties1 = Maps.newHashMap();
     properties1.put("key1", "val1");
@@ -366,5 +363,9 @@ public class CatalogHiveIT extends AbstractIT {
     Map<String, String> properties3 = database.getParameters();
     Assertions.assertFalse(properties3.containsKey("key1"));
     Assertions.assertEquals("val2-alter", properties3.get("key2"));
+  }
+
+  protected String getProvider() {
+    return "hive";
   }
 }

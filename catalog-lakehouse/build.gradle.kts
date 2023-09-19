@@ -14,15 +14,47 @@ plugins {
 dependencies {
     implementation(project(":common"))
     implementation(project(":core"))
+    implementation(project(":api"))
     implementation(libs.jackson.databind)
     implementation(libs.jackson.annotations)
     implementation(libs.jackson.datatype.jdk8)
     implementation(libs.jackson.datatype.jsr310)
     implementation(libs.guava)
+    implementation(libs.commons.lang3)
     implementation(libs.bundles.log4j)
     implementation(libs.bundles.jetty)
     implementation(libs.bundles.jersey)
     implementation(libs.bundles.iceberg)
+    implementation(libs.substrait.java.core) {
+      exclude("com.fasterxml.jackson.core")
+      exclude("com.fasterxml.jackson.datatype")
+      exclude("com.fasterxml.jackson.dataformat")
+      exclude("com.google.protobuf")
+      exclude("com.google.code.findbugs")
+      exclude("org.slf4j")
+    }
+    implementation(libs.iceberg.hive.metastore)
+
+    implementation(libs.hive2.metastore) {
+        exclude("org.apache.avro", "avro")
+        exclude("org.slf4j", "slf4j-log4j12")
+        exclude("org.pentaho") // missing dependency
+        exclude("org.apache.hbase")
+        exclude("org.apache.logging.log4j")
+        exclude("co.cask.tephra")
+        exclude("com.google.code.findbugs", "jsr305")
+        exclude("org.eclipse.jetty.aggregate","jetty-all")
+        exclude("org.eclipse.jetty.orbit","javax.servlet")
+        exclude("org.apache.parquet", "parquet-hadoop-bundle")
+        exclude("com.tdunning", "json")
+        exclude("javax.transaction", "transaction-api")
+        exclude("com.zaxxer","HikariCP")
+    }
+
+    implementation(libs.hadoop2.client) {
+        exclude("org.apache.avro", "avro")
+        exclude("org.slf4j", "slf4j-log4j12")
+    }
 
     compileOnly(libs.lombok)
     annotationProcessor(libs.lombok)
