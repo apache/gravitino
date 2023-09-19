@@ -33,8 +33,8 @@ public class GravitonServer extends ResourceConfig {
 
   private final GravitonEnv gravitonEnv;
 
-  public GravitonServer() {
-    serverConfig = new ServerConfig();
+  public GravitonServer(ServerConfig config) {
+    serverConfig = config;
     server = new JettyServer();
     gravitonEnv = GravitonEnv.getInstance();
   }
@@ -46,21 +46,6 @@ public class GravitonServer extends ResourceConfig {
 
     // initialize Jersey REST API resources.
     initializeRestApi();
-  }
-
-  public void loadConfig(String confPath) {
-    try {
-      if (confPath.isEmpty()) {
-        // Load default conf
-        serverConfig.loadFromFile(CONF_FILE);
-      } else {
-        Properties properties = serverConfig.loadPropertiesFromFile(new File(confPath));
-        serverConfig.loadFromProperties(properties);
-      }
-    } catch (Exception exception) {
-      LOG.warn(
-          "Failed to load conf from file {}, using default conf instead", CONF_FILE, exception);
-    }
   }
 
   private void initializeRestApi() {
@@ -98,9 +83,9 @@ public class GravitonServer extends ResourceConfig {
 
   public static void main(String[] args) {
     LOG.info("Starting Graviton Server");
-    GravitonServer server = new GravitonServer();
     String confPath = System.getenv("GRAVITON_TEST") == null ? "" : args[0];
-    server.loadConfig(confPath);
+    ServerConfig serverConfig = loadConfig(confPath);
+    GravitonServer server = new GravitonServer(serverConfig);
     server.initialize();
 
     try {
@@ -135,5 +120,21 @@ public class GravitonServer extends ResourceConfig {
     } catch (Exception e) {
       LOG.error("Error while stopping Graviton Server", e);
     }
+  }
+
+  static ServerConfig loadConfig(String confPath) {
+    ServerConfig serverConfig = new ServerConfig();
+    try {
+      if (confPath.isEmpty()) {
+        // Load default conf
+        serverConfig.loadFromFile(CONF_FILE);
+      } else {
+        Properties properties = serverConfig.loadPropertiesFromFile(new File(confPath));
+        serverConfig.loadFromProperties(properties);
+      }
+    } catch (Exception exception) {
+      throw new IllegalArgumentException("Failed to load conf from file " + confPath, exception);
+    }
+    return serverConfig;
   }
 }

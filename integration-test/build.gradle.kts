@@ -117,16 +117,16 @@ fun printDockerCheckInfo() {
     EXCLUDE_DOCKER_TEST = false
   }
 
-  println("------------------- Check Docker environment ------------------")
-  println("Docker server status .......................................... [${if (dockerRunning) "running" else "stop"}]")
-  println("Graviton IT Docker container is already running ............... [${if (hiveContainerRunning) "yes" else "no"}]")
+  println("------------------ Check Docker environment -----------------")
+  println("Docker server status ........................................ [${if (dockerRunning) "running" else "stop"}]")
+  println("Graviton IT Docker container is already running ............. [${if (hiveContainerRunning) "yes" else "no"}]")
 
   if (dockerRunning && hiveContainerRunning) {
-    println("Use Graviton IT Docker container to run all integration test.   [$testMode test]")
+    println("Use Graviton IT Docker container to run all integration test. [$testMode test]")
   } else {
-    println("Run only test cases where tag is set `graviton-docker-it`.      [$testMode test]")
+    println("Run only test cases where tag is set `graviton-docker-it`.... [$testMode test]")
   }
-  println("---------------------------------------------------------------")
+  println("-------------------------------------------------------------")
 }
 
 tasks {
