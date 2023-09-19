@@ -65,9 +65,10 @@ public class KvNameMappingService implements NameMappingService {
       return backend.executeInTransaction(
           () -> {
             LOGGER.info(
-                "Binding name '{}' to id '{}'",
+                "Binding name '{}' to id '{}({})'",
                 name,
-                ByteUtils.formatByteArray(ByteUtils.longToByte(id)));
+                ByteUtils.formatByteArray(ByteUtils.longToByte(id)),
+                id);
             backend.put(nameByte, ByteUtils.longToByte(id), false);
             byte[] idByte = Bytes.concat(ID_PREFIX, ByteUtils.longToByte(id));
             backend.put(idByte, name.getBytes(), false);
@@ -132,5 +133,17 @@ public class KvNameMappingService implements NameMappingService {
     }
 
     return id;
+  }
+
+  @Override
+  public String getNameById(long id) throws IOException {
+    lock.readLock().lock();
+    try {
+      byte[] idByte = Bytes.concat(ID_PREFIX, ByteUtils.longToByte(id));
+      byte[] stringByte = backend.get(idByte);
+      return stringByte == null ? null : new String(stringByte);
+    } finally {
+      lock.readLock().unlock();
+    }
   }
 }

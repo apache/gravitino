@@ -65,4 +65,7 @@ public interface NameMappingService extends AutoCloseable {
    * @throws IOException if the underlying storage failed
    */
   boolean unbindNameAndId(String name) throws IOException;
+
+  /** Get name by id in the mapping service. */
+  String getNameById(long id) throws IOException;
 }

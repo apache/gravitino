@@ -22,13 +22,22 @@ public interface Entity extends Serializable {
 
     AUDIT("au", 65534);
 
-    // Short name can be used to identify the entity type in the logs, peristent storage, etc.
+    // Short name can be used to identify the entity type in the logs, persistent storage, etc.
     private final String shortName;
     private final int index;
 
     EntityType(String shortName, int index) {
       this.shortName = shortName;
       this.index = index;
+    }
+
+    public static EntityType fromShortName(String shortName) {
+      for (EntityType type : EntityType.values()) {
+        if (type.getShortName().equals(shortName)) {
+          return type;
+        }
+      }
+      throw new UnsupportedOperationException("Unknown short name: " + shortName);
     }
   }
 
