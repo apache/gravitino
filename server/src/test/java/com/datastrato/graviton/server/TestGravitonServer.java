@@ -6,6 +6,7 @@ package com.datastrato.graviton.server;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import java.io.File;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -16,7 +17,14 @@ public class TestGravitonServer {
 
   @BeforeEach
   public void setUp() {
-    gravitonServer = new GravitonServer();
+    String confPath =
+        System.getenv("GRAVITON_HOME")
+            + File.separator
+            + "conf"
+            + File.separator
+            + "graviton.conf.template";
+    ServerConfig serverConfig = GravitonServer.loadConfig(confPath);
+    gravitonServer = new GravitonServer(serverConfig);
   }
 
   @AfterEach

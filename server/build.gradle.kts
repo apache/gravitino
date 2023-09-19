@@ -85,11 +85,16 @@ fun writeProjectPropertiesFile() {
   }
 }
 
-tasks.named("build") {
-  writeProjectPropertiesFile()
-  val file = file(propertiesFile)
-  if (!file.exists()) {
-    throw GradleException("$propertiesFile file not generated!")
+tasks {
+  build {
+    writeProjectPropertiesFile()
+    val file = file(propertiesFile)
+    if (!file.exists()) {
+      throw GradleException("$propertiesFile file not generated!")
+    }
+  }
+  test {
+    environment("GRAVITON_HOME", rootDir.path)
   }
 }
 

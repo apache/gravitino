@@ -40,8 +40,8 @@ subprojects {
   }
 
   tasks.configureEach<Test> {
-    // Integration test module are tested separately
-    if (project.name != "integration-test") {
+    val skipTests = project.hasProperty("skipTests")
+    if (!skipTests) {
       useJUnitPlatform()
       finalizedBy(tasks.getByName("jacocoTestReport"))
     }
@@ -229,11 +229,6 @@ tasks {
 
   val copyCatalogLibs by registering(Copy::class) {
     dependsOn(":catalog-hive:copyCatalogLibs", ":catalog-lakehouse:copyCatalogLibs")
-  }
-
-  task("integrationTest") {
-    mustRunAfter(":catalog-hive:copyDepends", ":catalog-lakehouse:copyDepends")
-    dependsOn(":integration-test:integrationTest")
   }
 
   clean {

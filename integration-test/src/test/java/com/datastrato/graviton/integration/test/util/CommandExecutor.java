@@ -14,7 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.datastrato.graviton.integration.util;
+package com.datastrato.graviton.integration.test.util;
 
 import java.io.IOException;
 import java.util.ArrayList;
