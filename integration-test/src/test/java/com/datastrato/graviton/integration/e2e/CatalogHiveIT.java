@@ -341,11 +341,12 @@ public class CatalogHiveIT extends AbstractIT {
             NameIdentifier.of(metalakeName, catalogName, schemaName, alterTableName.toUpperCase()),
             TableChange.rename(alterTableName.toUpperCase() + "_new"));
 
-    catalog
-        .asTableCatalog()
-        .loadTable(
-            NameIdentifier.of(
-                metalakeName, catalogName, schemaName, alterTableName.toUpperCase() + "_new"));
+    t =
+        catalog
+            .asTableCatalog()
+            .loadTable(
+                NameIdentifier.of(
+                    metalakeName, catalogName, schemaName, alterTableName.toUpperCase() + "_new"));
     Assertions.assertEquals(alterTableName.toUpperCase() + "_new", t.name());
   }
 
