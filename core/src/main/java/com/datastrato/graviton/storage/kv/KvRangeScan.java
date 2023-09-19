@@ -8,6 +8,7 @@ package com.datastrato.graviton.storage.kv;
 import java.util.function.Predicate;
 import lombok.Builder;
 import lombok.Data;
+import lombok.NonNull;
 
 /** Represents a range scan configuration for the key-value store. */
 @Builder
@@ -19,7 +20,7 @@ public class KvRangeScan {
   private boolean endInclusive;
 
   private int limit;
-  private Predicate<byte[]> predicate;
+  @NonNull private Predicate<byte[]> predicate;
 
   /**
    * Constructs a KvRangeScan instance with the specified parameters.
