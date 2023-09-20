@@ -7,7 +7,6 @@ package com.datastrato.graviton.rel;
 
 import com.datastrato.graviton.rel.transforms.Transform;
 import com.datastrato.graviton.rel.transforms.Transforms;
-import io.substrait.expression.ExpressionCreator;
 
 public class SortOrder {
   /**
@@ -81,22 +80,6 @@ public class SortOrder {
         Transforms.function(name, new Transform[] {Transforms.field(fieldName)}),
         direction,
         nullOrdering);
-  }
-
-  /** Creates an int literal-based sort order instance, i.e., sort/order by 64 desc NULLS FIRST */
-  public static SortOrder intliteralSortOrder(
-      int value, Direction direction, NullOrdering nullOrdering) {
-    return new SortOrder(
-        Transforms.literal(ExpressionCreator.i32(true, value)), direction, nullOrdering);
-  }
-
-  /**
-   * Creates a string literal-based sort order instance, i.e., sort/order by 'name' desc NULLS FIRST
-   */
-  public static SortOrder stringliteralSortOrder(
-      String value, Direction direction, NullOrdering nullOrdering) {
-    return new SortOrder(
-        Transforms.literal(ExpressionCreator.string(true, value)), direction, nullOrdering);
   }
 
   public Transform getTransform() {
