@@ -25,6 +25,8 @@ import org.apache.iceberg.rest.responses.ListNamespacesResponse;
 import org.apache.iceberg.rest.responses.UpdateNamespacePropertiesResponse;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 public class TestIcebergNamespaceOperations extends IcebergTestBase {
 
@@ -166,8 +168,10 @@ public class TestIcebergNamespaceOperations extends IcebergTestBase {
     Assertions.assertEquals(schemas, ns);
   }
 
-  @Test
-  void testListNamespace() {
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void testListNamespace(boolean withPrefix) {
+    setUrlPathWithPrefix(withPrefix);
     dropAllExistingNamespace();
     verifyListNamespaceSucc(Optional.empty(), Arrays.asList());
 

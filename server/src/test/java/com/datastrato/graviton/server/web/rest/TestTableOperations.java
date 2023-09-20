@@ -43,10 +43,12 @@ import com.datastrato.graviton.rel.SortOrder;
 import com.datastrato.graviton.rel.Table;
 import com.datastrato.graviton.rel.TableChange;
 import com.datastrato.graviton.rel.transforms.Transform;
+import com.datastrato.graviton.rest.RESTUtils;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.substrait.type.Type;
 import io.substrait.type.TypeCreator;
+import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
@@ -86,7 +88,12 @@ public class TestTableOperations extends JerseyTest {
 
   @Override
   protected Application configure() {
-    forceSet(TestProperties.CONTAINER_PORT, "0");
+    try {
+      forceSet(
+          TestProperties.CONTAINER_PORT, String.valueOf(RESTUtils.findAvailablePort(2000, 3000)));
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
 
     ResourceConfig resourceConfig = new ResourceConfig();
     resourceConfig.register(TableOperations.class);

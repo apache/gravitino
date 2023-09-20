@@ -2,7 +2,7 @@
  * Copyright 2023 Datastrato.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.graviton.integration.e2e;
+package com.datastrato.graviton.integration.test.catalog;
 
 import static com.datastrato.graviton.rel.transforms.Transforms.identity;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -12,8 +12,8 @@ import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.catalog.hive.HiveClientPool;
 import com.datastrato.graviton.client.GravitonMetaLake;
 import com.datastrato.graviton.dto.rel.ColumnDTO;
-import com.datastrato.graviton.integration.util.AbstractIT;
-import com.datastrato.graviton.integration.util.GravitonITUtils;
+import com.datastrato.graviton.integration.test.util.AbstractIT;
+import com.datastrato.graviton.integration.test.util.GravitonITUtils;
 import com.datastrato.graviton.rel.Distribution;
 import com.datastrato.graviton.rel.Distribution.Strategy;
 import com.datastrato.graviton.rel.Schema;
@@ -43,9 +43,11 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.MethodOrderer;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
 
+@Tag("graviton-docker-it")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class CatalogHiveIT extends AbstractIT {
   public static String metalakeName = GravitonITUtils.genRandomName("CatalogHiveIT_metalake");
@@ -57,7 +59,6 @@ public class CatalogHiveIT extends AbstractIT {
   public static String HIVE_COL_NAME1 = "hive_col_name1";
   public static String HIVE_COL_NAME2 = "hive_col_name2";
   public static String HIVE_COL_NAME3 = "hive_col_name3";
-
   static String HIVE_METASTORE_URIS = "thrift://localhost:9083";
 
   private static HiveClientPool hiveClientPool;
@@ -68,10 +69,8 @@ public class CatalogHiveIT extends AbstractIT {
 
   @BeforeAll
   public static void startup() throws Exception {
-    HiveConf hiveConf = new HiveConf();
-    hiveConf.set(HiveConf.ConfVars.METASTOREURIS.varname, HIVE_METASTORE_URIS);
+    HiveConf hiveConf = GravitonITUtils.hiveConfig();
     hiveClientPool = new HiveClientPool(1, hiveConf);
-
     createMetalake();
     createCatalog();
     createSchema();

@@ -79,3 +79,16 @@ dependencies {
     testRuntimeOnly(libs.junit.jupiter.engine)
     testImplementation(libs.mockito.core)
 }
+
+tasks {
+    val copyDepends by registering(Copy::class) {
+        from(configurations.runtimeClasspath)
+        into("build/libs")
+    }
+
+    val copyCatalogLibs by registering(Copy::class) {
+        dependsOn(copyDepends)
+        from("build/libs")
+        into("${rootDir}/distribution/package/catalogs/hive/libs")
+    }
+}

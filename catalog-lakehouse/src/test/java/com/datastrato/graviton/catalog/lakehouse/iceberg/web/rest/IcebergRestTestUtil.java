@@ -18,12 +18,13 @@ import org.glassfish.jersey.server.ResourceConfig;
 
 public class IcebergRestTestUtil {
 
-  private static final String PREFIX = "v1";
-  public static final String CONFIG_PATH = PREFIX + "/config";
-  public static final String NAMESPACE_PATH = PREFIX + "/namespaces";
+  private static final String V_1 = "v1";
+  public static final String PREFIX = "prefix_graviton";
+  public static final String CONFIG_PATH = V_1 + "/config";
+  public static final String NAMESPACE_PATH = V_1 + "/namespaces";
   public static final String TEST_NAMESPACE_NAME = "graviton-test";
   public static final String TABLE_PATH = NAMESPACE_PATH + "/" + TEST_NAMESPACE_NAME + "/tables";
-  public static final String RENAME_TABLE_PATH = PREFIX + "/tables/rename";
+  public static final String RENAME_TABLE_PATH = V_1 + "/tables/rename";
 
   public static final boolean DEBUG_SERVER_LOG_ENABLED = true;
 

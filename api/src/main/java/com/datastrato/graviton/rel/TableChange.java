@@ -227,7 +227,7 @@ public interface TableChange {
     private final String property;
     private final String value;
 
-    private SetProperty(String property, String value) {
+    public SetProperty(String property, String value) {
       this.property = property;
       this.value = value;
     }

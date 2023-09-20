@@ -17,17 +17,17 @@ env:
 jobs:
   publish-docker-image:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 30
     env:
       input_token: ${{ github.event.inputs.token }}
       secrets_token: ${{ secrets.PUBLISH_DOCKER_TOKEN }}
     steps:
       - uses: actions/checkout@v3
 
-      - name: Check release token
+      - name: Check publish Docker token
         run: |
           if [[ "${secrets_token}" != "${input_token}" ]]; then
-            echo "The token you entered is incorrect. Please try again."
+            echo "You have entered an incorrect token. Please re-enter it."
             exit 1
           fi
 
