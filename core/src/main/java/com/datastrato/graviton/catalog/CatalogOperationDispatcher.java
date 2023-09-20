@@ -14,8 +14,10 @@ import com.datastrato.graviton.exceptions.NonEmptySchemaException;
 import com.datastrato.graviton.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.graviton.exceptions.TableAlreadyExistsException;
 import com.datastrato.graviton.rel.Column;
+import com.datastrato.graviton.rel.Distribution;
 import com.datastrato.graviton.rel.Schema;
 import com.datastrato.graviton.rel.SchemaChange;
+import com.datastrato.graviton.rel.SortOrder;
 import com.datastrato.graviton.rel.SupportsSchemas;
 import com.datastrato.graviton.rel.Table;
 import com.datastrato.graviton.rel.TableCatalog;
@@ -193,7 +195,9 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
       Column[] columns,
       String comment,
       Map<String, String> properties,
-      Transform[] partitions)
+      Transform[] partitions,
+      Distribution distribution,
+      SortOrder[] sortOrders)
       throws NoSuchSchemaException, TableAlreadyExistsException {
     NameIdentifier catalogIdent = NameIdentifier.of(ident.namespace().levels());
 
@@ -207,7 +211,9 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
                         columns,
                         comment,
                         properties,
-                        partitions == null ? new Transform[0] : partitions)),
+                        partitions == null ? new Transform[0] : partitions,
+                        distribution == null ? Distribution.NONE : distribution,
+                        sortOrders == null ? new SortOrder[0] : sortOrders)),
         NoSuchSchemaException.class,
         TableAlreadyExistsException.class);
   }
@@ -226,7 +232,6 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
   public Table alterTable(NameIdentifier ident, TableChange... changes)
       throws NoSuchTableException, IllegalArgumentException {
     NameIdentifier catalogIdent = NameIdentifier.of(ident.namespace().levels());
-
     return doWithCatalog(
         catalogIdent,
         c -> c.doWithTableOps(t -> t.alterTable(ident, changes)),

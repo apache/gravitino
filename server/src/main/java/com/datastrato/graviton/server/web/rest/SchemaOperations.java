@@ -13,6 +13,7 @@ import com.datastrato.graviton.dto.requests.SchemaUpdatesRequest;
 import com.datastrato.graviton.dto.responses.DropResponse;
 import com.datastrato.graviton.dto.responses.EntityListResponse;
 import com.datastrato.graviton.dto.responses.SchemaResponse;
+import com.datastrato.graviton.dto.util.DTOConverters;
 import com.datastrato.graviton.rel.Schema;
 import com.datastrato.graviton.rel.SchemaChange;
 import com.datastrato.graviton.server.web.Utils;

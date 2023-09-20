@@ -24,9 +24,15 @@ import com.datastrato.graviton.exceptions.TableAlreadyExistsException;
 import com.datastrato.graviton.meta.AuditInfo;
 import com.datastrato.graviton.meta.CatalogEntity;
 import com.datastrato.graviton.rel.Column;
+import com.datastrato.graviton.rel.Distribution;
+import com.datastrato.graviton.rel.Distribution.Strategy;
+import com.datastrato.graviton.rel.SortOrder;
+import com.datastrato.graviton.rel.SortOrder.Direction;
+import com.datastrato.graviton.rel.SortOrder.NullOrdering;
 import com.datastrato.graviton.rel.Table;
 import com.datastrato.graviton.rel.TableChange;
 import com.datastrato.graviton.rel.transforms.Transform;
+import com.datastrato.graviton.rel.transforms.Transforms;
 import com.google.common.collect.Maps;
 import io.substrait.type.TypeCreator;
 import java.io.IOException;
@@ -118,6 +124,24 @@ public class TestHiveTable extends MiniHiveMetastoreService {
     hiveCatalog = new HiveCatalog().withCatalogConf(conf).withCatalogEntity(entity);
   }
 
+  private Distribution createDistribution() {
+    return Distribution.builder()
+        .withNumber(10)
+        .withTransforms(new Transform[] {Transforms.field(new String[] {"col_1"})})
+        .withStrategy(Strategy.EVEN)
+        .build();
+  }
+
+  private SortOrder[] createSortOrder() {
+    return new SortOrder[] {
+      SortOrder.builder()
+          .withNullOrdering(NullOrdering.FIRST)
+          .withDirection(Direction.DESC)
+          .withTransform(Transforms.field(new String[] {"col_2"}))
+          .build()
+    };
+  }
+
   @Test
   public void testCreateHiveTable() throws IOException {
     String hiveTableName = "test_hive_table";
@@ -141,10 +165,20 @@ public class TestHiveTable extends MiniHiveMetastoreService {
             .build();
     Column[] columns = new Column[] {col1, col2};
 
+    Distribution distribution = createDistribution();
+    SortOrder[] sortOrders = createSortOrder();
+
     Table table =
         hiveCatalog
             .asTableCatalog()
-            .createTable(tableIdentifier, columns, HIVE_COMMENT, properties, new Transform[0]);
+            .createTable(
+                tableIdentifier,
+                columns,
+                HIVE_COMMENT,
+                properties,
+                new Transform[0],
+                distribution,
+                sortOrders);
     Assertions.assertEquals(tableIdentifier.name(), table.name());
     Assertions.assertEquals(HIVE_COMMENT, table.comment());
     testProperties(properties, table.properties());
@@ -159,6 +193,19 @@ public class TestHiveTable extends MiniHiveMetastoreService {
     Assertions.assertTrue(Arrays.asList(tableIdents).contains(tableIdentifier));
     Assertions.assertTrue(store.exists(tableIdentifier, TABLE));
 
+    // Compare sort and order
+    Assertions.assertEquals(distribution.number(), loadedTable.distribution().number());
+    Assertions.assertArrayEquals(
+        distribution.transforms(), loadedTable.distribution().transforms());
+
+    Assertions.assertEquals(sortOrders.length, loadedTable.sortOrder().length);
+    for (int i = 0; i < loadedTable.sortOrder().length; i++) {
+      Assertions.assertEquals(
+          sortOrders[i].getDirection(), loadedTable.sortOrder()[i].getDirection());
+      Assertions.assertEquals(
+          sortOrders[i].getTransform(), loadedTable.sortOrder()[i].getTransform());
+    }
+
     // Test exception
     Throwable exception =
         Assertions.assertThrows(
@@ -171,7 +218,9 @@ public class TestHiveTable extends MiniHiveMetastoreService {
                         columns,
                         HIVE_COMMENT,
                         properties,
-                        new Transform[0]));
+                        new Transform[0],
+                        distribution,
+                        sortOrders));
     Assertions.assertTrue(
         exception.getMessage().contains("Cannot support invalid namespace in Hive Metastore"));
 
@@ -182,7 +231,13 @@ public class TestHiveTable extends MiniHiveMetastoreService {
                 hiveCatalog
                     .asTableCatalog()
                     .createTable(
-                        tableIdentifier, columns, HIVE_COMMENT, properties, new Transform[0]));
+                        tableIdentifier,
+                        columns,
+                        HIVE_COMMENT,
+                        properties,
+                        new Transform[0],
+                        distribution,
+                        sortOrders));
     Assertions.assertTrue(exception.getMessage().contains("Table already exists"));
   }
 
@@ -302,7 +357,14 @@ public class TestHiveTable extends MiniHiveMetastoreService {
 
     hiveCatalog
         .asTableCatalog()
-        .createTable(tableIdentifier, columns, HIVE_COMMENT, properties, new Transform[0]);
+        .createTable(
+            tableIdentifier,
+            columns,
+            HIVE_COMMENT,
+            properties,
+            new Transform[0],
+            Distribution.NONE,
+            new SortOrder[0]);
 
     Assertions.assertTrue(hiveCatalog.asTableCatalog().tableExists(tableIdentifier));
     hiveCatalog.asTableCatalog().dropTable(tableIdentifier);
@@ -351,10 +413,20 @@ public class TestHiveTable extends MiniHiveMetastoreService {
             .build();
     Column[] columns = new Column[] {col1, col2};
 
+    Distribution distribution = createDistribution();
+    SortOrder[] sortOrders = createSortOrder();
+
     Table createdTable =
         hiveCatalog
             .asTableCatalog()
-            .createTable(tableIdentifier, columns, HIVE_COMMENT, properties, new Transform[0]);
+            .createTable(
+                tableIdentifier,
+                columns,
+                HIVE_COMMENT,
+                properties,
+                new Transform[0],
+                distribution,
+                sortOrders);
     Assertions.assertTrue(hiveCatalog.asTableCatalog().tableExists(tableIdentifier));
 
     // test alter

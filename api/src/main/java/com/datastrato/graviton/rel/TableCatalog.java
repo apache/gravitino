@@ -73,14 +73,108 @@ public interface TableCatalog {
    * @param columns The columns of the new table.
    * @param comment The table comment.
    * @param properties The table properties.
-   * @return Fhe created table metadata.
+   * @return The created table metadata.
    * @throws NoSuchSchemaException If the schema does not exist.
    * @throws TableAlreadyExistsException If the table already exists.
    */
   default Table createTable(
       NameIdentifier ident, Column[] columns, String comment, Map<String, String> properties)
       throws NoSuchSchemaException, TableAlreadyExistsException {
-    return createTable(ident, columns, comment, properties, new Transform[0]);
+    return createTable(
+        ident, columns, comment, properties, new Transform[0], Distribution.NONE, new SortOrder[0]);
+  }
+
+  /**
+   * Create a table in the catalog.
+   *
+   * @param ident A table identifier.
+   * @param columns The columns of the new table.
+   * @param comment The table comment.
+   * @param properties The table properties.
+   * @param partitions The table partitioning.
+   * @return The created table metadata.
+   * @throws NoSuchSchemaException If the schema does not exist.
+   * @throws TableAlreadyExistsException If the table already exists.
+   */
+  default Table createTable(
+      NameIdentifier ident,
+      Column[] columns,
+      String comment,
+      Map<String, String> properties,
+      Transform[] partitions)
+      throws NoSuchSchemaException, TableAlreadyExistsException {
+    return createTable(
+        ident, columns, comment, properties, partitions, Distribution.NONE, new SortOrder[0]);
+  }
+
+  /**
+   * Create a table in the catalog.
+   *
+   * @param ident A table identifier.
+   * @param columns The columns of the new table.
+   * @param comment The table comment.
+   * @param properties The table properties.
+   * @param distribution The distribution of the table
+   * @param sortOrders The sort orders of the table
+   * @return The created table metadata.
+   * @throws NoSuchSchemaException If the schema does not exist.
+   * @throws TableAlreadyExistsException If the table already exists.
+   */
+  default Table createTable(
+      NameIdentifier ident,
+      Column[] columns,
+      String comment,
+      Map<String, String> properties,
+      Distribution distribution,
+      SortOrder[] sortOrders)
+      throws NoSuchSchemaException, TableAlreadyExistsException {
+    return createTable(
+        ident, columns, comment, properties, new Transform[0], distribution, sortOrders);
+  }
+
+  /**
+   * Create a table in the catalog.
+   *
+   * @param ident A table identifier.
+   * @param columns The columns of the new table.
+   * @param comment The table comment.
+   * @param properties The table properties.
+   * @return The created table metadata.
+   * @throws NoSuchSchemaException If the schema does not exist.
+   * @throws TableAlreadyExistsException If the table already exists.
+   */
+  default Table createTable(
+      NameIdentifier ident,
+      Column[] columns,
+      String comment,
+      Map<String, String> properties,
+      Distribution distribution)
+      throws NoSuchSchemaException, TableAlreadyExistsException {
+    return createTable(
+        ident, columns, comment, properties, new Transform[0], distribution, new SortOrder[0]);
+  }
+
+  /**
+   * Create a table in the catalog.
+   *
+   * @param ident A table identifier.
+   * @param columns The columns of the new table.
+   * @param comment The table comment.
+   * @param properties The table properties.
+   * @param sortOrders The sort orders of the table
+   * @return The created table metadata.
+   * @throws NoSuchSchemaException If the schema does not exist.
+   * @throws TableAlreadyExistsException If the table already exists.
+   */
+  default Table createTable(
+      NameIdentifier ident,
+      Column[] columns,
+      String comment,
+      Map<String, String> properties,
+      SortOrder[] sortOrders)
+      throws NoSuchSchemaException, TableAlreadyExistsException {
+    return createTable(
+        ident, columns, comment, properties, new Transform[0], Distribution.NONE, sortOrders);
   }
 
   /**
@@ -90,6 +184,8 @@ public interface TableCatalog {
    * @param columns The columns of the new table.
    * @param comment The table comment.
    * @param properties The table properties.
+   * @param distribution The distribution of the table
+   * @param sortOrders The sort orders of the table
    * @param partitions The table partitioning.
    * @return Fhe created table metadata.
    * @throws NoSuchSchemaException If the schema does not exist.
@@ -100,7 +196,9 @@ public interface TableCatalog {
       Column[] columns,
       String comment,
       Map<String, String> properties,
-      Transform[] partitions)
+      Transform[] partitions,
+      Distribution distribution,
+      SortOrder[] sortOrders)
       throws NoSuchSchemaException, TableAlreadyExistsException;
 
   /**

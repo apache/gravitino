@@ -14,12 +14,18 @@ import com.datastrato.graviton.client.GravitonMetaLake;
 import com.datastrato.graviton.dto.rel.ColumnDTO;
 import com.datastrato.graviton.integration.test.util.AbstractIT;
 import com.datastrato.graviton.integration.test.util.GravitonITUtils;
+import com.datastrato.graviton.rel.Distribution;
+import com.datastrato.graviton.rel.Distribution.Strategy;
 import com.datastrato.graviton.rel.Schema;
 import com.datastrato.graviton.rel.SchemaChange;
+import com.datastrato.graviton.rel.SortOrder;
+import com.datastrato.graviton.rel.SortOrder.Direction;
+import com.datastrato.graviton.rel.SortOrder.NullOrdering;
 import com.datastrato.graviton.rel.Table;
 import com.datastrato.graviton.rel.TableChange;
 import com.datastrato.graviton.rel.transforms.Transform;
 import com.datastrato.graviton.rel.transforms.Transforms;
+import com.datastrato.graviton.rel.transforms.Transforms.NamedReference;
 import com.google.common.collect.Maps;
 import io.substrait.type.TypeCreator;
 import java.util.Arrays;
@@ -168,6 +174,117 @@ public class CatalogHiveIT extends AbstractIT {
   }
 
   @Test
+  void testCreateHiveTableWithDistributionAndSortOrder() throws TException, InterruptedException {
+    // Create table from Graviton API
+    ColumnDTO[] columns = createColumns();
+
+    NameIdentifier nameIdentifier =
+        NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
+    Distribution distribution =
+        Distribution.builder()
+            .withNumber(10)
+            .withTransforms(new Transform[] {Transforms.field(new String[] {HIVE_COL_NAME1})})
+            .withStrategy(Strategy.EVEN)
+            .build();
+
+    final SortOrder[] sortOrders =
+        new SortOrder[] {
+          SortOrder.builder()
+              .withNullOrdering(NullOrdering.FIRST)
+              .withDirection(Direction.DESC)
+              .withTransform(Transforms.field(new String[] {HIVE_COL_NAME2}))
+              .build()
+        };
+
+    Map<String, String> properties = createProperties();
+    Table createdTable =
+        catalog
+            .asTableCatalog()
+            .createTable(
+                nameIdentifier,
+                columns,
+                table_comment,
+                properties,
+                new Transform[0],
+                distribution,
+                sortOrders);
+
+    // Directly get table from hive metastore to check if the table is created successfully.
+    org.apache.hadoop.hive.metastore.api.Table hiveTab =
+        hiveClientPool.run(client -> client.getTable(schemaName, tableName));
+    properties
+        .keySet()
+        .forEach(
+            key -> Assertions.assertEquals(properties.get(key), hiveTab.getParameters().get(key)));
+    assertTableEquals(createdTable, hiveTab);
+
+    // test null partition
+    resetSchema();
+    Table createdTable1 =
+        catalog
+            .asTableCatalog()
+            .createTable(nameIdentifier, columns, table_comment, properties, (Transform[]) null);
+
+    // Directly get table from hive metastore to check if the table is created successfully.
+    org.apache.hadoop.hive.metastore.api.Table hiveTable1 =
+        hiveClientPool.run(client -> client.getTable(schemaName, tableName));
+    properties
+        .keySet()
+        .forEach(
+            key ->
+                Assertions.assertEquals(properties.get(key), hiveTable1.getParameters().get(key)));
+    assertTableEquals(createdTable1, hiveTable1);
+
+    // Test bad request
+    // Bad name in distribution
+    final Distribution badDistribution =
+        Distribution.builder()
+            .withNumber(10)
+            .withTransforms(
+                new Transform[] {Transforms.field(new String[] {HIVE_COL_NAME1 + "bad_name"})})
+            .withStrategy(Strategy.EVEN)
+            .build();
+    Assertions.assertThrows(
+        Exception.class,
+        () -> {
+          catalog
+              .asTableCatalog()
+              .createTable(
+                  nameIdentifier,
+                  columns,
+                  table_comment,
+                  properties,
+                  new Transform[0],
+                  badDistribution,
+                  sortOrders);
+        });
+
+    final SortOrder[] badSortOrders =
+        new SortOrder[] {
+          SortOrder.builder()
+              .withNullOrdering(NullOrdering.FIRST)
+              .withDirection(Direction.DESC)
+              .withTransform(Transforms.field(new String[] {HIVE_COL_NAME2 + "bad_name"}))
+              .build()
+        };
+
+    Assertions.assertThrows(
+        Exception.class,
+        () -> {
+          catalog
+              .asTableCatalog()
+              .createTable(
+                  nameIdentifier,
+                  columns,
+                  table_comment,
+                  properties,
+                  new Transform[0],
+                  distribution,
+                  badSortOrders);
+        });
+  }
+
+  @Test
   public void testCreateHiveTable() throws TException, InterruptedException {
     // Create table from Graviton API
     ColumnDTO[] columns = createColumns();
@@ -194,7 +311,7 @@ public class CatalogHiveIT extends AbstractIT {
     Table createdTable1 =
         catalog
             .asTableCatalog()
-            .createTable(nameIdentifier, columns, table_comment, properties, null);
+            .createTable(nameIdentifier, columns, table_comment, properties, (Transform[]) null);
 
     // Directly get table from hive metastore to check if the table is created successfully.
     org.apache.hadoop.hive.metastore.api.Table hiveTable1 =
@@ -237,6 +354,8 @@ public class CatalogHiveIT extends AbstractIT {
 
   private void assertTableEquals(
       Table createdTable, org.apache.hadoop.hive.metastore.api.Table hiveTab) {
+    Distribution distribution = createdTable.distribution();
+    SortOrder[] sortOrders = createdTable.sortOrder();
     Assertions.assertEquals(schemaName.toLowerCase(), hiveTab.getDbName());
     Assertions.assertEquals(tableName.toLowerCase(), hiveTab.getTableName());
     Assertions.assertEquals("MANAGED_TABLE", hiveTab.getTableType());
@@ -254,6 +373,25 @@ public class CatalogHiveIT extends AbstractIT {
     Assertions.assertEquals("string", hiveTab.getSd().getCols().get(2).getType());
     Assertions.assertEquals("col_3_comment", hiveTab.getSd().getCols().get(2).getComment());
 
+    Assertions.assertEquals(
+        distribution == null ? 0 : distribution.number(), hiveTab.getSd().getNumBuckets());
+
+    List<String> resultDistributionCols =
+        distribution == null
+            ? Collections.emptyList()
+            : Arrays.stream(distribution.transforms())
+                .map(t -> ((NamedReference) t).value()[0])
+                .collect(Collectors.toList());
+    Assertions.assertEquals(resultDistributionCols, hiveTab.getSd().getBucketCols());
+
+    for (int i = 0; i < sortOrders.length; i++) {
+      Assertions.assertEquals(
+          sortOrders[i].getDirection() == Direction.ASC ? 0 : 1,
+          hiveTab.getSd().getSortCols().get(i).getOrder());
+      Assertions.assertEquals(
+          ((NamedReference) sortOrders[i].getTransform()).value()[0],
+          hiveTab.getSd().getSortCols().get(i).getCol());
+    }
     Assertions.assertNotNull(createdTable.partitioning());
     Assertions.assertEquals(createdTable.partitioning().length, hiveTab.getPartitionKeys().size());
     List<String> partitionKeys =

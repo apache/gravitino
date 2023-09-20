@@ -75,8 +75,11 @@ public class ExpressionPartitionDTO implements Partition {
   }
 
   enum ExpressionType {
+    @JsonProperty("field")
     FIELD,
+    @JsonProperty("literal")
     LITERAL,
+    @JsonProperty("function")
     FUNCTION,
   }
 
@@ -92,6 +95,7 @@ public class ExpressionPartitionDTO implements Partition {
   }
 
   @EqualsAndHashCode
+  @Getter
   public static class FieldExpression implements Expression {
 
     @Getter
@@ -127,6 +131,7 @@ public class ExpressionPartitionDTO implements Partition {
   }
 
   @EqualsAndHashCode
+  @Getter
   public static class LiteralExpression implements Expression {
 
     @Getter
@@ -174,6 +179,7 @@ public class ExpressionPartitionDTO implements Partition {
   }
 
   @EqualsAndHashCode
+  @Getter
   public static class FunctionExpression implements Expression {
 
     @Getter
