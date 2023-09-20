@@ -42,6 +42,8 @@ public class MiniGraviton {
   private final ServerConfig serverConfig = new ServerConfig();
   private final ExecutorService executor = Executors.newSingleThreadExecutor();
 
+  private volatile boolean gravitonServerStopped = false;
+
   public MiniGraviton() throws IOException {
     this.mockConfDir = Files.createTempDirectory("MiniGraviton").toFile();
     mockConfDir.mkdirs();
@@ -85,6 +87,7 @@ public class MiniGraviton {
             GravitonServer.main(
                 new String[] {ITUtils.joinDirPath(mockConfDir.getAbsolutePath(), "graviton.conf")});
           } catch (Exception e) {
+            gravitonServerStopped = true;
             LOG.error("Exception in startup MiniGraviton Server ", e);
             throw new RuntimeException(e);
           }
@@ -94,7 +97,7 @@ public class MiniGraviton {
     while (System.currentTimeMillis() - beginTime < 1000 * 60 * 3) {
       Thread.sleep(500);
       started = checkIfServerIsRunning();
-      if (started) {
+      if (started || gravitonServerStopped) {
         break;
       }
     }
