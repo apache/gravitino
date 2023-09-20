@@ -84,7 +84,7 @@ public class IcebergNamespaceOperations {
   }
 
   @POST
-  @Path("{namespace}")
+  @Path("{namespace}/properties")
   @Produces(MediaType.APPLICATION_JSON)
   public Response updateNamespace(
       @PathParam("namespace") String namespace, UpdateNamespacePropertiesRequest request) {

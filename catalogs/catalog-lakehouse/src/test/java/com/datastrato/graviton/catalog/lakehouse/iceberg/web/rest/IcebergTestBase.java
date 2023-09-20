@@ -68,6 +68,17 @@ public class IcebergTestBase extends JerseyTest {
     return getIcebergClientBuilder(path, queryParams);
   }
 
+  public Builder getUpdateNamespaceClientBuilder(String namespace) {
+    String path =
+        Joiner.on("/")
+            .skipNulls()
+            .join(
+                IcebergRestTestUtil.NAMESPACE_PATH,
+                namespace,
+                IcebergRestTestUtil.UPDATE_NAMESPACE_POSTFIX);
+    return getIcebergClientBuilder(path, Optional.empty());
+  }
+
   public Builder getConfigClientBuilder() {
     return getIcebergClientBuilder(IcebergRestTestUtil.CONFIG_PATH, Optional.empty());
   }
