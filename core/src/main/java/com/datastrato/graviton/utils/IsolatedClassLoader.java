@@ -4,10 +4,15 @@
  */
 package com.datastrato.graviton.utils;
 
+import com.google.common.collect.Lists;
 import java.io.Closeable;
+import java.io.File;
 import java.io.InputStream;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.JavaVersion;
@@ -65,6 +70,30 @@ public class IsolatedClassLoader implements Closeable {
     } finally {
       Thread.currentThread().setContextClassLoader(original);
     }
+  }
+
+  public static IsolatedClassLoader buildClassLoader(String pkgPath) {
+    // Listing all the jars under the package path and build the isolated class loader.
+    File pkgFolder = new File(pkgPath);
+    if (!pkgFolder.exists()
+        || !pkgFolder.isDirectory()
+        || !pkgFolder.canRead()
+        || !pkgFolder.canExecute()) {
+      throw new IllegalArgumentException("Invalid package path: " + pkgPath);
+    }
+
+    List<URL> jars = Lists.newArrayList();
+    Arrays.stream(pkgFolder.listFiles())
+        .forEach(
+            f -> {
+              try {
+                jars.add(f.toURI().toURL());
+              } catch (MalformedURLException e) {
+                LOG.warn("Failed to read jar file: {}", f.getAbsolutePath(), e);
+              }
+            });
+
+    return new IsolatedClassLoader(jars, Collections.emptyList(), Collections.emptyList());
   }
 
   /** Closes the class loader. */
