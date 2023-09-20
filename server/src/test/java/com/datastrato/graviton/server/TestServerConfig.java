@@ -29,7 +29,7 @@ public class TestServerConfig {
     // Load all config keys from `graviton.conf.template` into a map
     Properties properties = new Properties();
     String confFile =
-        System.getenv("GRAVITON_ROOT_DIR")
+        System.getenv("GRAVITON_HOME")
             + File.separator
             + "conf"
             + File.separator
