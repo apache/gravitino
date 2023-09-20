@@ -5,6 +5,7 @@
 package com.datastrato.graviton.server;
 
 import com.datastrato.graviton.Configs;
+import com.datastrato.graviton.aux.AuxiliaryServiceManager;
 import com.datastrato.graviton.config.ConfigEntry;
 import java.io.File;
 import java.io.IOException;
@@ -41,6 +42,9 @@ public class TestServerConfig {
     // `Configs`
     for (Map.Entry<Object, Object> entry : properties.entrySet()) {
       String propKey = (String) entry.getKey();
+      if (propKey.startsWith(AuxiliaryServiceManager.GRAVITON_AUX_SERVICE_PREFIX)) {
+        continue;
+      }
       Assertions.assertTrue(
           configKeyMap.containsKey(propKey),
           "Config key " + propKey + " is not defined in ConfigEntry");
