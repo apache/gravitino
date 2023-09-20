@@ -89,7 +89,7 @@ public class PartitionUtils {
         "Unsupported partition type " + partition.getClass().getCanonicalName());
   }
 
-  private static Transform toTransform(ExpressionPartitionDTO.Expression expression) {
+  public static Transform toTransform(ExpressionPartitionDTO.Expression expression) {
     switch (expression.expressionType()) {
       case FIELD:
         return field(((ExpressionPartitionDTO.FieldExpression) expression).getFieldName());
@@ -106,7 +106,7 @@ public class PartitionUtils {
         "Unsupported expression type " + expression.getClass().getCanonicalName());
   }
 
-  private static Expression.Literal getLiteral(
+  public static Expression.Literal getLiteral(
       ExpressionPartitionDTO.LiteralExpression literalExpression) {
     LiteralConverter literalConverter = new LiteralConverter(literalExpression.getValue());
     return literalExpression.getType().accept(literalConverter);
@@ -236,7 +236,7 @@ public class PartitionUtils {
         "Unsupported transform type " + transform.getClass().getCanonicalName());
   }
 
-  private static ExpressionPartitionDTO.Expression toExpression(Transform transform) {
+  public static ExpressionPartitionDTO.Expression toExpression(Transform transform) {
     if (transform instanceof Transforms.NamedReference) {
       return new ExpressionPartitionDTO.FieldExpression.Builder()
           .withFieldName(((Transforms.NamedReference) transform).value())

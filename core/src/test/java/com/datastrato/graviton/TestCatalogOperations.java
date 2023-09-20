@@ -10,6 +10,8 @@ import com.datastrato.graviton.exceptions.NoSuchTableException;
 import com.datastrato.graviton.exceptions.TableAlreadyExistsException;
 import com.datastrato.graviton.meta.AuditInfo;
 import com.datastrato.graviton.rel.Column;
+import com.datastrato.graviton.rel.Distribution;
+import com.datastrato.graviton.rel.SortOrder;
 import com.datastrato.graviton.rel.Table;
 import com.datastrato.graviton.rel.TableCatalog;
 import com.datastrato.graviton.rel.TableChange;
@@ -55,7 +57,9 @@ public class TestCatalogOperations implements CatalogOperations, TableCatalog {
       Column[] columns,
       String comment,
       Map<String, String> properties,
-      Transform[] partitions)
+      Transform[] partitions,
+      Distribution distribution,
+      SortOrder[] sortOrders)
       throws NoSuchSchemaException, TableAlreadyExistsException {
     AuditInfo auditInfo =
         new AuditInfo.Builder().withCreator("test").withCreateTime(Instant.now()).build();
@@ -69,6 +73,8 @@ public class TestCatalogOperations implements CatalogOperations, TableCatalog {
             .withProperties(properties)
             .withAuditInfo(auditInfo)
             .withColumns(columns)
+            .withDistribution(distribution)
+            .withSortOrders(sortOrders)
             .build();
 
     if (tables.containsKey(ident)) {

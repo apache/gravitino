@@ -14,7 +14,12 @@ import com.datastrato.graviton.catalog.hive.converter.ToHiveType;
 import com.datastrato.graviton.meta.AuditInfo;
 import com.datastrato.graviton.meta.rel.BaseTable;
 import com.datastrato.graviton.rel.Column;
+import com.datastrato.graviton.rel.Distribution;
+import com.datastrato.graviton.rel.SortOrder;
+import com.datastrato.graviton.rel.SortOrder.Direction;
+import com.datastrato.graviton.rel.transforms.Transform;
 import com.datastrato.graviton.rel.transforms.Transforms;
+import com.datastrato.graviton.rel.transforms.Transforms.NamedReference;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
@@ -26,7 +31,10 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.Getter;
 import lombok.ToString;
+import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
+import org.apache.hadoop.hive.metastore.api.Order;
 import org.apache.hadoop.hive.metastore.api.SerDeInfo;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.Table;
@@ -63,6 +71,31 @@ public class HiveTable extends BaseTable {
       auditInfoBuilder.withCreateTime(Instant.ofEpochSecond(table.getCreateTime()));
     }
 
+    Distribution distribution = Distribution.NONE;
+    if (CollectionUtils.isNotEmpty(table.getSd().getBucketCols())) {
+      distribution =
+          Distribution.builder()
+              .withTransforms(
+                  table.getSd().getBucketCols().stream()
+                      .map(f -> new NamedReference(new String[] {f}))
+                      .toArray(Transform[]::new))
+              .withNumber(table.getSd().getNumBuckets())
+              .build();
+    }
+
+    SortOrder[] sortOrders = new SortOrder[0];
+    if (CollectionUtils.isNotEmpty(table.getSd().getSortCols())) {
+      sortOrders =
+          table.getSd().getSortCols().stream()
+              .map(
+                  f ->
+                      SortOrder.builder()
+                          .withTransform(new NamedReference(new String[] {f.getCol()}))
+                          .withDirection(f.getOrder() == 0 ? Direction.ASC : Direction.DESC)
+                          .build())
+              .toArray(SortOrder[]::new);
+    }
+
     return builder
         .withComment(table.getParameters().get(HMS_TABLE_COMMENT))
         .withProperties(table.getParameters())
@@ -77,6 +110,8 @@ public class HiveTable extends BaseTable {
                             .build())
                 .toArray(HiveColumn[]::new))
         .withLocation(table.getSd().getLocation())
+        .withDistribution(distribution)
+        .withSortOrders(sortOrders)
         .withAuditInfo(auditInfoBuilder.build())
         .withPartitions(
             table.getPartitionKeys().stream()
@@ -147,6 +182,22 @@ public class HiveTable extends BaseTable {
     //  properties
     sd.setInputFormat("org.apache.hadoop.mapred.TextInputFormat");
     sd.setOutputFormat("org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat");
+
+    if (ArrayUtils.isNotEmpty(sortOrders)) {
+      for (SortOrder sortOrder : sortOrders) {
+        String columnName = ((NamedReference) sortOrder.getTransform()).value()[0];
+        sd.addToSortCols(new Order(columnName, sortOrder.getDirection() == Direction.ASC ? 0 : 1));
+      }
+    }
+
+    if (!Distribution.NONE.equals(distribution)) {
+      sd.setBucketCols(
+          Arrays.stream(distribution.transforms())
+              .map(t -> ((NamedReference) t).value()[0])
+              .collect(Collectors.toList()));
+      sd.setNumBuckets(distribution.number());
+    }
+
     return sd;
   }
 
@@ -194,6 +245,8 @@ public class HiveTable extends BaseTable {
       hiveTable.auditInfo = auditInfo;
       hiveTable.columns = columns;
       hiveTable.location = location;
+      hiveTable.distribution = distribution;
+      hiveTable.sortOrders = sortOrders;
       hiveTable.partitions = partitions;
 
       // HMS put table comment in parameters

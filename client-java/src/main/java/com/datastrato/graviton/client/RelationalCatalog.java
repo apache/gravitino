@@ -11,6 +11,7 @@ import com.datastrato.graviton.Namespace;
 import com.datastrato.graviton.dto.AuditDTO;
 import com.datastrato.graviton.dto.CatalogDTO;
 import com.datastrato.graviton.dto.rel.ColumnDTO;
+import com.datastrato.graviton.dto.rel.SortOrderDTO;
 import com.datastrato.graviton.dto.requests.SchemaCreateRequest;
 import com.datastrato.graviton.dto.requests.SchemaUpdateRequest;
 import com.datastrato.graviton.dto.requests.SchemaUpdatesRequest;
@@ -28,8 +29,10 @@ import com.datastrato.graviton.exceptions.NonEmptySchemaException;
 import com.datastrato.graviton.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.graviton.exceptions.TableAlreadyExistsException;
 import com.datastrato.graviton.rel.Column;
+import com.datastrato.graviton.rel.Distribution;
 import com.datastrato.graviton.rel.Schema;
 import com.datastrato.graviton.rel.SchemaChange;
+import com.datastrato.graviton.rel.SortOrder;
 import com.datastrato.graviton.rel.SupportsSchemas;
 import com.datastrato.graviton.rel.Table;
 import com.datastrato.graviton.rel.TableCatalog;
@@ -139,13 +142,27 @@ public class RelationalCatalog extends CatalogDTO implements TableCatalog, Suppo
       Column[] columns,
       String comment,
       Map<String, String> properties,
-      Transform[] partitions)
+      Transform[] partitions,
+      Distribution distribution,
+      SortOrder[] sortOrders)
       throws NoSuchSchemaException, TableAlreadyExistsException {
     NameIdentifier.checkTable(ident);
 
+    SortOrderDTO[] sortOrderDTOs =
+        sortOrders == null
+            ? new SortOrderDTO[0]
+            : Arrays.stream(sortOrders)
+                .map(com.datastrato.graviton.dto.util.DTOConverters::toDTO)
+                .toArray(SortOrderDTO[]::new);
     TableCreateRequest req =
         new TableCreateRequest(
-            ident.name(), comment, (ColumnDTO[]) columns, properties, toPartitions(partitions));
+            ident.name(),
+            comment,
+            (ColumnDTO[]) columns,
+            properties,
+            sortOrderDTOs,
+            com.datastrato.graviton.dto.util.DTOConverters.toDTO(distribution),
+            toPartitions(partitions));
     req.validate();
 
     TableResponse resp =

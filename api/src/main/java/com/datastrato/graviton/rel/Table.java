@@ -28,6 +28,20 @@ public interface Table extends Auditable {
     return new Transform[0];
   }
 
+  /**
+   * Return the sort order of the table. If no sort order is specified, an empty array is returned.
+   */
+  default SortOrder[] sortOrder() {
+    return new SortOrder[0];
+  }
+
+  /**
+   * Return the bucketing of the table. If no bucketing is specified, Distribution.NONE is returned.
+   */
+  default Distribution distribution() {
+    return Distribution.NONE;
+  }
+
   /** Return the comment of the table. Null is returned if no comment is set. */
   @Nullable
   default String comment() {

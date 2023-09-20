@@ -29,7 +29,9 @@ import com.datastrato.graviton.meta.CatalogEntity;
 import com.datastrato.graviton.meta.rel.BaseSchema;
 import com.datastrato.graviton.meta.rel.BaseTable;
 import com.datastrato.graviton.rel.Column;
+import com.datastrato.graviton.rel.Distribution;
 import com.datastrato.graviton.rel.SchemaChange;
+import com.datastrato.graviton.rel.SortOrder;
 import com.datastrato.graviton.rel.SupportsSchemas;
 import com.datastrato.graviton.rel.Table;
 import com.datastrato.graviton.rel.TableCatalog;
@@ -576,6 +578,23 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     }
   }
 
+  private void validateDistributionAndSort(Distribution distribution, SortOrder[] sortOrder) {
+    if (distribution != Distribution.NONE) {
+      boolean allNameReference =
+          Arrays.stream(distribution.transforms())
+              .allMatch(t -> t instanceof Transforms.NamedReference);
+      Preconditions.checkArgument(
+          allNameReference, "Hive distribution only supports name reference");
+    }
+
+    if (ArrayUtils.isNotEmpty(sortOrder)) {
+      boolean allNameReference =
+          Arrays.stream(sortOrder)
+              .allMatch(t -> t.getTransform() instanceof Transforms.NamedReference);
+      Preconditions.checkArgument(allNameReference, "Hive sort order only supports name reference");
+    }
+  }
+
   /**
    * Creates a new table in the Hive Metastore.
    *
@@ -594,7 +613,9 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       Column[] columns,
       String comment,
       Map<String, String> properties,
-      Transform[] partitions)
+      Transform[] partitions,
+      Distribution distribution,
+      SortOrder[] sortOrders)
       throws NoSuchSchemaException, TableAlreadyExistsException {
     Preconditions.checkArgument(
         !tableIdent.name().isEmpty(), "Cannot create table with empty name");
@@ -608,6 +629,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     Preconditions.checkArgument(
         Arrays.stream(partitions).allMatch(p -> p instanceof Transforms.NamedReference),
         "Hive partition only supports identity transform");
+    validateDistributionAndSort(distribution, sortOrders);
 
     try {
       if (!schemaExists(schemaIdent)) {
@@ -629,6 +651,9 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
                         .withNameSpace(tableIdent.namespace())
                         .withColumns(columns)
                         .withComment(comment)
+                        .withProperties(properties)
+                        .withDistribution(distribution)
+                        .withSortOrders(sortOrders)
                         .withProperties(StringIdentifier.addToProperties(stringId, properties))
                         .withAuditInfo(
                             new AuditInfo.Builder()

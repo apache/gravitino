@@ -16,8 +16,14 @@ import com.datastrato.graviton.Audit;
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.catalog.CatalogOperationDispatcher;
 import com.datastrato.graviton.dto.rel.ColumnDTO;
+import com.datastrato.graviton.dto.rel.DistributionDTO;
+import com.datastrato.graviton.dto.rel.DistributionDTO.Strategy;
+import com.datastrato.graviton.dto.rel.ExpressionPartitionDTO.Expression;
+import com.datastrato.graviton.dto.rel.ExpressionPartitionDTO.FieldExpression;
 import com.datastrato.graviton.dto.rel.Partition;
 import com.datastrato.graviton.dto.rel.SimplePartitionDTO;
+import com.datastrato.graviton.dto.rel.SortOrderDTO;
+import com.datastrato.graviton.dto.rel.SortOrderDTO.NullOrdering;
 import com.datastrato.graviton.dto.rel.TableDTO;
 import com.datastrato.graviton.dto.requests.TableCreateRequest;
 import com.datastrato.graviton.dto.requests.TableUpdateRequest;
@@ -27,10 +33,13 @@ import com.datastrato.graviton.dto.responses.EntityListResponse;
 import com.datastrato.graviton.dto.responses.ErrorConstants;
 import com.datastrato.graviton.dto.responses.ErrorResponse;
 import com.datastrato.graviton.dto.responses.TableResponse;
+import com.datastrato.graviton.dto.util.DTOConverters;
 import com.datastrato.graviton.exceptions.NoSuchSchemaException;
 import com.datastrato.graviton.exceptions.NoSuchTableException;
 import com.datastrato.graviton.exceptions.TableAlreadyExistsException;
 import com.datastrato.graviton.rel.Column;
+import com.datastrato.graviton.rel.Distribution;
+import com.datastrato.graviton.rel.SortOrder;
 import com.datastrato.graviton.rel.Table;
 import com.datastrato.graviton.rel.TableChange;
 import com.datastrato.graviton.rel.transforms.Transform;
@@ -50,6 +59,7 @@ import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.Application;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import javax.ws.rs.core.Response.Status;
 import org.glassfish.jersey.internal.inject.AbstractBinder;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.glassfish.jersey.test.JerseyTest;
@@ -153,6 +163,29 @@ public class TestTableOperations extends JerseyTest {
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResp2.getType());
   }
 
+  private DistributionDTO createMockDistributionDTO(String columnName, int bucketNum) {
+    return new DistributionDTO.Builder()
+        .withStrategy(Strategy.HASH)
+        .withNumber(bucketNum)
+        .withExpressions(
+            new Expression[] {
+              new FieldExpression.Builder().withFieldName(new String[] {columnName}).build()
+            })
+        .build();
+  }
+
+  private SortOrderDTO[] createMockSortOrderDTO(
+      String columnName, SortOrderDTO.Direction direction) {
+    return new SortOrderDTO[] {
+      new SortOrderDTO.Builder()
+          .withDirection(direction)
+          .withNullOrder(NullOrdering.FIRST)
+          .withExpression(
+              new FieldExpression.Builder().withFieldName(new String[] {columnName}).build())
+          .build()
+    };
+  }
+
   @Test
   public void testCreateTable() {
     Column[] columns =
@@ -161,15 +194,18 @@ public class TestTableOperations extends JerseyTest {
           mockColumn("col2", TypeCreator.NULLABLE.I8)
         };
     Table table = mockTable("table1", columns, "mock comment", ImmutableMap.of("k1", "v1"));
-    when(dispatcher.createTable(any(), any(), any(), any(), any())).thenReturn(table);
-
+    when(dispatcher.createTable(any(), any(), any(), any(), any(), any(), any())).thenReturn(table);
+    SortOrderDTO[] sortOrderDTOs = createMockSortOrderDTO("col1", SortOrderDTO.Direction.DESC);
+    DistributionDTO distributionDTO = createMockDistributionDTO("col2", 10);
     TableCreateRequest req =
         new TableCreateRequest(
             "table1",
             "mock comment",
             Arrays.stream(columns).map(DTOConverters::toDTO).toArray(ColumnDTO[]::new),
             ImmutableMap.of("k1", "v1"),
-            null);
+            sortOrderDTOs,
+            distributionDTO,
+            new Partition[0]);
 
     Response resp =
         target(tablePath(metalake, catalog, schema))
@@ -197,13 +233,37 @@ public class TestTableOperations extends JerseyTest {
     Assertions.assertEquals(columns[1].dataType(), columnDTOs[1].dataType());
     Assertions.assertEquals(columns[1].comment(), columnDTOs[1].comment());
 
+    // Test bad column name
+    sortOrderDTOs = createMockSortOrderDTO("col_1", SortOrderDTO.Direction.DESC);
+    distributionDTO = createMockDistributionDTO("col_2", 10);
+
+    TableCreateRequest badReq =
+        new TableCreateRequest(
+            "table1",
+            "mock comment",
+            Arrays.stream(columns).map(DTOConverters::toDTO).toArray(ColumnDTO[]::new),
+            ImmutableMap.of("k1", "v1"),
+            sortOrderDTOs,
+            distributionDTO,
+            new Partition[0]);
+
+    resp =
+        target(tablePath(metalake, catalog, schema))
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.graviton.v1+json")
+            .post(Entity.entity(badReq, MediaType.APPLICATION_JSON_TYPE));
+
+    // Sort order and distribution columns name are not found in table columns
+    Assertions.assertEquals(Status.BAD_REQUEST.getStatusCode(), resp.getStatus());
     Assertions.assertNotNull(tableDTO.partitioning());
     Assertions.assertEquals(0, tableDTO.partitioning().length);
+    Assertions.assertEquals(Distribution.NONE, tableDTO.distribution());
+    Assertions.assertEquals(0, tableDTO.sortOrder().length);
 
     // Test throw NoSuchSchemaException
     doThrow(new NoSuchSchemaException("mock error"))
         .when(dispatcher)
-        .createTable(any(), any(), any(), any(), any());
+        .createTable(any(), any(), any(), any(), any(), any(), any());
 
     Response resp1 =
         target(tablePath(metalake, catalog, schema))
@@ -220,7 +280,7 @@ public class TestTableOperations extends JerseyTest {
     // Test throw TableAlreadyExistsException
     doThrow(new TableAlreadyExistsException("mock error"))
         .when(dispatcher)
-        .createTable(any(), any(), any(), any(), any());
+        .createTable(any(), any(), any(), any(), any(), any(), any());
 
     Response resp2 =
         target(tablePath(metalake, catalog, schema))
@@ -238,7 +298,7 @@ public class TestTableOperations extends JerseyTest {
     // Test throw RuntimeException
     doThrow(new RuntimeException("mock error"))
         .when(dispatcher)
-        .createTable(any(), any(), any(), any(), any());
+        .createTable(any(), any(), any(), any(), any(), any(), any());
 
     Response resp3 =
         target(tablePath(metalake, catalog, schema))
@@ -264,7 +324,7 @@ public class TestTableOperations extends JerseyTest {
     Transform[] transforms = new Transform[] {field(columns[0])};
     Table table =
         mockTable("table1", columns, "mock comment", ImmutableMap.of("k1", "v1"), transforms);
-    when(dispatcher.createTable(any(), any(), any(), any(), any())).thenReturn(table);
+    when(dispatcher.createTable(any(), any(), any(), any(), any(), any(), any())).thenReturn(table);
 
     TableCreateRequest req =
         new TableCreateRequest(
@@ -272,6 +332,8 @@ public class TestTableOperations extends JerseyTest {
             "mock comment",
             Arrays.stream(columns).map(DTOConverters::toDTO).toArray(ColumnDTO[]::new),
             ImmutableMap.of("k1", "v1"),
+            new SortOrderDTO[0],
+            DistributionDTO.NONE,
             toPartitions(transforms));
 
     Response resp =
@@ -314,6 +376,8 @@ public class TestTableOperations extends JerseyTest {
             "mock comment",
             Arrays.stream(columns).map(DTOConverters::toDTO).toArray(ColumnDTO[]::new),
             ImmutableMap.of("k1", "v1"),
+            new SortOrderDTO[0],
+            null,
             new Partition[] {errorPartition});
     resp =
         target(tablePath(metalake, catalog, schema))
@@ -645,6 +709,9 @@ public class TestTableOperations extends JerseyTest {
     Assertions.assertEquals(expectedColumnTypes, actualColumnTypes);
 
     Assertions.assertArrayEquals(tableDTO.partitioning(), updatedTable.partitioning());
+
+    Assertions.assertEquals(tableDTO.distribution(), updatedTable.distribution());
+    Assertions.assertArrayEquals(tableDTO.sortOrder(), updatedTable.sortOrder());
   }
 
   private static String tablePath(String metalake, String catalog, String schema) {
@@ -681,6 +748,20 @@ public class TestTableOperations extends JerseyTest {
       Column[] columns,
       String comment,
       Map<String, String> properties,
+      Distribution distribution,
+      SortOrder[] sortOrder) {
+    Table table = mockTable(tableName, columns, comment, properties, new Transform[0]);
+    when(table.distribution()).thenReturn(distribution);
+    when(table.sortOrder()).thenReturn(sortOrder);
+
+    return table;
+  }
+
+  private static Table mockTable(
+      String tableName,
+      Column[] columns,
+      String comment,
+      Map<String, String> properties,
       Transform[] transforms) {
     Table table = mock(Table.class);
     when(table.name()).thenReturn(tableName);
@@ -688,6 +769,8 @@ public class TestTableOperations extends JerseyTest {
     when(table.comment()).thenReturn(comment);
     when(table.properties()).thenReturn(properties);
     when(table.partitioning()).thenReturn(transforms);
+    when(table.sortOrder()).thenReturn(new SortOrder[0]);
+    when(table.distribution()).thenReturn(Distribution.NONE);
 
     Audit mockAudit = mock(Audit.class);
     when(mockAudit.creator()).thenReturn("graviton");

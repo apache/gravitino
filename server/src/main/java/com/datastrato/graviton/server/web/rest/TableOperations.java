@@ -15,6 +15,9 @@ import com.datastrato.graviton.dto.requests.TableUpdatesRequest;
 import com.datastrato.graviton.dto.responses.DropResponse;
 import com.datastrato.graviton.dto.responses.EntityListResponse;
 import com.datastrato.graviton.dto.responses.TableResponse;
+import com.datastrato.graviton.dto.util.DTOConverters;
+import com.datastrato.graviton.rel.Distribution;
+import com.datastrato.graviton.rel.SortOrder;
 import com.datastrato.graviton.rel.Table;
 import com.datastrato.graviton.rel.TableChange;
 import com.datastrato.graviton.server.web.Utils;
@@ -72,13 +75,20 @@ public class TableOperations {
     try {
       request.validate();
       NameIdentifier ident = NameIdentifier.ofTable(metalake, catalog, schema, request.getName());
+      SortOrder[] sortOrders =
+          com.datastrato.graviton.dto.util.DTOConverters.fromDTOs(request.getSortOrders());
+      Distribution distribution =
+          com.datastrato.graviton.dto.util.DTOConverters.fromDTO(request.getDistribution());
+
       Table table =
           dispatcher.createTable(
               ident,
               request.getColumns(),
               request.getComment(),
               request.getProperties(),
-              toTransforms(request.getPartitions()));
+              toTransforms(request.getPartitions()),
+              distribution,
+              sortOrders);
       return Utils.ok(new TableResponse(DTOConverters.toDTO(table)));
 
     } catch (Exception e) {
