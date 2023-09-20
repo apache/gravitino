@@ -176,10 +176,9 @@ tasks {
     group = "graviton distribution"
     finalizedBy("checksumDistribution")
     from(compileDistribution.map { it.outputs.files.single() })
-    archiveBaseName.set(rootProject.name.lowercase())
-    archiveVersion.set("${version}")
-    archiveClassifier.set("bin")
-    destinationDirectory.set(outputDir)
+    compression = Compression.GZIP
+    archiveFileName.set("${rootProject.name}-${version}.tar.gz")
+    destinationDirectory.set(projectDir.dir("distribution"))
   }
 
   register("checksumDistribution") {
