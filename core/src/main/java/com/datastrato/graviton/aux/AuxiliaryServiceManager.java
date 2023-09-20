@@ -11,7 +11,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Streams;
 import java.nio.file.Files;
@@ -41,12 +40,6 @@ public class AuxiliaryServiceManager {
 
   private Map<String, GravitonAuxiliaryService> auxServices = new HashMap<>();
   private Map<String, IsolatedClassLoader> auxServiceClassLoaders = new HashMap<>();
-
-  // in integration test mode, catalog jars is placed in catalog-xx/build/libs/
-  // in product mode, catalogs jars is placed in catalogs/xx/libs/
-  private static final Map<String, String> auxServiceTestClassPaths =
-      ImmutableMap.of(
-          "GravitonIcebergREST", Paths.get("catalog-lakehouse", "build", "libs").toString());
 
   private Exception firstException;
 
@@ -100,7 +93,7 @@ public class AuxiliaryServiceManager {
 
     Path path = Paths.get(pathString);
     if (Files.exists(path)) {
-      return pathString;
+      return path.toAbsolutePath().toString();
     }
 
     String gravitonHome = System.getenv("GRAVITON_HOME");
@@ -108,14 +101,6 @@ public class AuxiliaryServiceManager {
       Path newPath = Paths.get(gravitonHome, pathString);
       if (Files.exists(newPath)) {
         return newPath.toString();
-      }
-    }
-
-    boolean testEnv = System.getenv("GRAVITON_TEST") != null;
-    if (testEnv) {
-      String testPath = auxServiceTestClassPaths.getOrDefault(auxServiceName, "");
-      if (StringUtils.isNoneBlank(testPath) && Files.exists(Paths.get(gravitonHome, testPath))) {
-        return Paths.get(gravitonHome, testPath).toString();
       }
     }
 
