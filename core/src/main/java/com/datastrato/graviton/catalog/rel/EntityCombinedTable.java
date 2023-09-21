@@ -8,6 +8,8 @@ import com.datastrato.graviton.Audit;
 import com.datastrato.graviton.meta.AuditInfo;
 import com.datastrato.graviton.meta.TableEntity;
 import com.datastrato.graviton.rel.Column;
+import com.datastrato.graviton.rel.Distribution;
+import com.datastrato.graviton.rel.SortOrder;
 import com.datastrato.graviton.rel.Table;
 import com.datastrato.graviton.rel.transforms.Transform;
 import java.util.Map;
@@ -58,6 +60,16 @@ public final class EntityCombinedTable implements Table {
   @Override
   public Transform[] partitioning() {
     return table.partitioning();
+  }
+
+  @Override
+  public SortOrder[] sortOrder() {
+    return table.sortOrder();
+  }
+
+  @Override
+  public Distribution distribution() {
+    return table.distribution();
   }
 
   @Override
