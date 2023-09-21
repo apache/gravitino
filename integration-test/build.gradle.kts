@@ -16,10 +16,10 @@ plugins {
 dependencies {
   implementation(project(":server"))
   implementation(project(":common"))
-  implementation(project(":client-java"))
+  implementation(project(":clients:client-java"))
   implementation(project(":api"))
   implementation(project(":core"))
-  implementation(project(":catalog-hive"))
+  implementation(project(":catalogs:catalog-hive"))
   implementation(libs.guava)
   implementation(libs.bundles.log4j)
   implementation(libs.bundles.jersey)
@@ -124,7 +124,7 @@ fun printDockerCheckInfo() {
   if (dockerRunning && hiveContainerRunning) {
     println("Use Graviton IT Docker container to run all integration test. [$testMode test]")
   } else {
-    println("Run only test cases where tag is set `graviton-docker-it`.... [$testMode test]")
+    println("Run test cases without `graviton-docker-it` tag ............. [$testMode test]")
   }
   println("-------------------------------------------------------------")
 }
