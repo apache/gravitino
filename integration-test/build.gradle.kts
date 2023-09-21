@@ -124,7 +124,7 @@ fun printDockerCheckInfo() {
   if (dockerRunning && hiveContainerRunning) {
     println("Use Graviton IT Docker container to run all integration test. [$testMode test]")
   } else {
-    println("Run test cases with no `graviton-docker-it` tag ............. [$testMode test]")
+    println("Run test cases without `graviton-docker-it` tag ............. [$testMode test]")
   }
   println("-------------------------------------------------------------")
 }
