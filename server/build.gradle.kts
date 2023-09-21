@@ -46,6 +46,7 @@ dependencies {
     exclude(group = "org.junit.jupiter")
   }
   testImplementation(libs.mockito.core)
+  testImplementation(libs.commons.io)
 }
 
 fun getGitCommitId(): String {
