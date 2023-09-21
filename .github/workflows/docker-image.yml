@@ -3,6 +3,14 @@ name: Publish Docker Image
 on:
   workflow_dispatch:
     inputs:
+      choice:
+        type: choice
+        description: 'Choose the image to build'
+        required: true
+        default: 'gravitino-ci-hive'
+        options:
+          - 'gravitino-ci-hive'
+          - 'gravitino-ci-trino'
       tag:
         description: 'Docker tag to apply to this image'
         required: true
@@ -13,15 +21,21 @@ on:
         type: string
 env:
   HIVE_IMAGE_NAME: datastrato/gravitino-ci-hive
+  TRINO_IMAGE_NAME: datastrato/gravitino-ci-trino
 
 jobs:
-  publish-docker-image:
+  publish-gravitino-ci-hive:
     runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.choice == 'gravitino-ci-hive' }}
     timeout-minutes: 120
     env:
       input_token: ${{ github.event.inputs.token }}
       secrets_token: ${{ secrets.PUBLISH_DOCKER_TOKEN }}
     steps:
+      - name: Print choose option
+        run: |
+          echo "Choose the ${{ github.event.inputs.option }} image to build"
+
       - uses: actions/checkout@v3
 
       - name: Check publish Docker token
@@ -50,3 +64,44 @@ jobs:
       - name: Build and Push the other branch Docker image
         if: ${{ github.ref_name != 'main' }}
         run: ./dev/docker/hive/build-docker.sh --platform all --image ${HIVE_IMAGE_NAME} --tag ${{ github.event.inputs.tag }}
+
+  publish-gravitino-ci-trino:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.choice == 'gravitino-ci-trino' }}
+    timeout-minutes: 120
+    env:
+      input_token: ${{ github.event.inputs.token }}
+      secrets_token: ${{ secrets.PUBLISH_DOCKER_TOKEN }}
+    steps:
+      - name: Print choose option
+        run: |
+          echo "Choose the ${{ github.event.inputs.option }} image to build"
+
+      - uses: actions/checkout@v3
+
+      - name: Check publish Docker token
+        run: |
+          if [[ "${secrets_token}" != "${input_token}" ]]; then
+            echo "You have entered an incorrect token. Please re-enter it."
+            exit 1
+          fi
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: datastrato
+          password: ${{ secrets.DOCKER_REPOSITORY_PASSWORD }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Build and Push the main branch Docker image
+        if: ${{ github.ref_name == 'main' }}
+        run: ./dev/docker/trino/build-docker.sh --platform all --image ${TRINO_IMAGE_NAME} --tag ${{ github.event.inputs.tag }} --latest
+
+      - name: Build and Push the other branch Docker image
+        if: ${{ github.ref_name != 'main' }}
+        run: ./dev/docker/trino/build-docker.sh --platform all --image ${TRINO_IMAGE_NAME} --tag ${{ github.event.inputs.tag }}

@@ -8,7 +8,7 @@ gravitino.server.shutdown.timeout = 3000
 
 # THE CONFIGURATION FOR Gravitino WEB SERVER
 # The host name of the built-in web server
-gravitino.server.webserver.host = 127.0.0.1
+gravitino.server.webserver.host = 0.0.0.0
 # The http port number of the built-in web server
 gravitino.server.webserver.httpPort = 8090
 # The min thread size of the built-in web server

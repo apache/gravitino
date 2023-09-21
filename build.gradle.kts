@@ -209,6 +209,7 @@ tasks.rat {
     // Ignore files we track but do not distribute
     "**/.github/**/*",
     "dev/docker/**/*.xml",
+    "dev/docker/**/*.xml",
     "**/*.log",
   )
 

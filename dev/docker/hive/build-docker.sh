@@ -75,7 +75,7 @@ if [ ! -f "${bin}/packages/${HIVE_PACKAGE_NAME}" ]; then
 fi
 
 # Create multi-arch builder
-BUILDER_NAME="hive-builder"
+BUILDER_NAME="gravitino-builder"
 builders=$(docker buildx ls)
 if echo "${builders}" | grep -q "${BUILDER_NAME}"; then
   echo "BuildKit builder '${BUILDER_NAME}' already exists."

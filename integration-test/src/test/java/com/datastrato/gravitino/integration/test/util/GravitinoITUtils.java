@@ -54,7 +54,7 @@ public class GravitinoITUtils {
   }
 
   public static String genRandomName(String prefix) {
-    return prefix + "_" + UUID.randomUUID().toString().replace("-", "");
+    return prefix + "_" + UUID.randomUUID().toString().replace("-", "").substring(0, 6);
   }
 
   public static HiveConf hiveConfig() {
