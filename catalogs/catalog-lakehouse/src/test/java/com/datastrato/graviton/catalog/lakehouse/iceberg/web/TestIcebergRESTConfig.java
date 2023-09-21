@@ -18,13 +18,13 @@ public class TestIcebergRESTConfig {
         ImmutableMap.of(IcebergRESTConfig.ICEBERG_REST_SERVER_HTTP_PORT.getKey(), "1000");
 
     IcebergRESTConfig icebergRESTConfig = new IcebergRESTConfig();
-    icebergRESTConfig.loadFromMap(properties, true);
+    icebergRESTConfig.loadFromMap(properties, k -> k.startsWith("graviton."));
     Assertions.assertEquals(
         IcebergRESTConfig.ICEBERG_REST_SERVER_HTTP_PORT.getDefaultValue(),
         icebergRESTConfig.get(IcebergRESTConfig.ICEBERG_REST_SERVER_HTTP_PORT));
 
     IcebergRESTConfig icebergRESTConfig2 = new IcebergRESTConfig();
-    icebergRESTConfig2.loadFromMap(properties, false);
+    icebergRESTConfig2.loadFromMap(properties, k -> true);
     Assertions.assertEquals(
         1000, icebergRESTConfig2.get(IcebergRESTConfig.ICEBERG_REST_SERVER_HTTP_PORT));
   }
