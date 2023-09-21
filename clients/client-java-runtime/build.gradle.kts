@@ -35,9 +35,7 @@ tasks.withType<ShadowJar>(ShadowJar::class.java) {
   relocate("org.antlr", "com.datastrato.graviton.shaded.org.antlr")
 }
 
-tasks.named("jar") { dependsOn(tasks.named("shadowJar")) }
-
 tasks.jar {
+  dependsOn(tasks.named("shadowJar"))
   archiveClassifier.set("empty")
 }
-
