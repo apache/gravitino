@@ -24,7 +24,7 @@ public class TestGravitonServer {
 
   private GravitonServer gravitonServer;
   private final String ROCKS_DB_STORE_PATH =
-      "/tmp/graviton_test_server" + UUID.randomUUID().toString().replace("-", "");
+      "/tmp/graviton_test_server_" + UUID.randomUUID().toString().replace("-", "");
   private ServerConfig spyServerConfig;
 
   @BeforeAll
