@@ -61,11 +61,12 @@ subprojects {
   version = "${version}"
 
   tasks.withType<Jar> {
-    archiveFileName.set("${rootProject.name.lowercase(Locale.getDefault())}-${project.name}-$version.jar")
+    archiveBaseName.set("${rootProject.name.lowercase(Locale.getDefault())}-${project.name}")
     if (project.name == "server") {
       from(sourceSets.main.get().resources)
       setDuplicatesStrategy(DuplicatesStrategy.INCLUDE)
     }
+
     if (project.name != "integration-test") {
       exclude("log4j2.properties")
       exclude("test/**")
@@ -153,7 +154,7 @@ tasks {
   val outputDir = projectDir.dir("distribution")
 
   val compileDistribution by registering {
-    dependsOn("copySubprojectDepends", "copyCatalogLibs", "copySubprojectLib")
+    dependsOn("copySubprojectDependencies", "copyCatalogLibs", "copySubprojectLib")
 
     group = "graviton distribution"
     outputs.dir(projectDir.dir("distribution/package"))
@@ -204,10 +205,11 @@ tasks {
     delete("server/src/main/resources/project.properties")
   }
 
-  val copySubprojectDepends by registering(Copy::class) {
-    dependsOn(":catalog-hive:copyDepends", ":catalog-lakehouse:copyDepends")
+  val copySubprojectDependencies by registering(Copy::class) {
     subprojects.forEach() {
-      if (it.name != "catalog-hive" && it.name != "client-java" && it.name != "integration-test" && it.name != "catalog-lakehouse") {
+      if (!it.name.startsWith("catalog")
+          && !it.name.startsWith("client")
+          && it.name != "integration-test") {
         from(it.configurations.runtimeClasspath)
         into("distribution/package/libs")
       }
@@ -216,7 +218,9 @@ tasks {
 
   val copySubprojectLib by registering(Copy::class) {
     subprojects.forEach() {
-      if (it.name != "client-java" && it.name != "integration-test" && it.name != "catalog-hive" && it.name != "catalog-lakehouse") {
+      if (!it.name.startsWith("catalog")
+          && !it.name.startsWith("client")
+          && it.name != "integration-test") {
         dependsOn("${it.name}:build")
         from("${it.name}/build/libs")
         into("distribution/package/libs")
@@ -227,7 +231,8 @@ tasks {
   }
 
   val copyCatalogLibs by registering(Copy::class) {
-    dependsOn(":catalog-hive:copyCatalogLibs", ":catalog-lakehouse:copyCatalogLibs")
+    dependsOn(":catalogs:catalog-hive:copyCatalogLibs",
+            ":catalogs:catalog-lakehouse:copyCatalogLibs")
   }
 
   clean {

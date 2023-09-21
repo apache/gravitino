@@ -465,6 +465,8 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
           new StringBuilder()
               .append(gravitonHome)
               .append(File.separator)
+              .append("catalogs")
+              .append(File.separator)
               .append("catalog-")
               .append(provider)
               .append(File.separator)
