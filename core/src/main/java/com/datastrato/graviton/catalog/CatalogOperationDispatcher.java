@@ -518,13 +518,12 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
       String opName,
       long id,
       boolean shouldFail) {
-    R ret;
+    R ret = null;
     try {
       ret = fn.apply(ident);
     } catch (NoSuchEntityException e) {
       // Case 2: The table is created by Graviton, but has no corresponding entity in Graviton.
       LOG.error(FormattedErrorMessages.ENTITY_NOT_FOUND, ident);
-      ret = null;
     } catch (Exception e) {
       // Case 3: The table is created by Graviton, but failed to operate the corresponding entity
       // in Graviton.
@@ -532,7 +531,6 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
         throw new RuntimeException(e);
       } else {
         LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, opName, ident, e);
-        ret = null;
       }
     }
 

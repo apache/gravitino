@@ -97,7 +97,7 @@ public class SchemaEntity implements Entity, Auditable, HasIdentifier {
     return EntityType.SCHEMA;
   }
 
-  // Ignore field namespace and comment
+  // Ignore field namespace
   @Override
   public boolean equals(Object o) {
     if (this == o) {
