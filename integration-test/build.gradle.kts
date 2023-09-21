@@ -188,7 +188,7 @@ tasks.test {
       environment("HADOOP_HOME", "/tmp")
       environment("PROJECT_VERSION", version)
 
-      var testMode = project.properties["testMode"] as? String ?: "embedded"
+      val testMode = project.properties["testMode"] as? String ?: "embedded"
       if (testMode == "deploy") {
         environment("GRAVITON_HOME", rootDir.path + "/distribution/package")
         systemProperty("testMode", "deploy")
@@ -196,6 +196,7 @@ tasks.test {
         environment("GRAVITON_HOME", rootDir.path)
         environment("GRAVITON_TEST", "true")
         systemProperty("testMode", "embedded")
+        systemProperty("graviton.log.path", buildDir.path)
       } else {
         throw GradleException("Graviton integration test only support [-PtestMode=embedded] or [-PtestMode=deploy] mode!")
       }
