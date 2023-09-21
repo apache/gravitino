@@ -9,8 +9,8 @@ on:
     branches: [ "main", "branch-*" ]
 
 env:
-  HIVE_IMAGE_NAME: datastrato/gravitino-ci-hive
-  HIVE_IMAGE_TAG_NAME: 0.1.4
+  HIVE_IMAGE_NAME: datastrato/gravitino-ci-hive:0.1.5
+  TRINO_IMAGE_NAME: datastrato/gravitino-ci-trino:0.1.0
 
 concurrency:
   group: ${{ github.worklfow }}-${{ github.event.pull_request.number || github.ref }}
@@ -41,13 +41,15 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
-      - name: Build the hive Docker image for AMD64
-        if: ${{ contains(github.event.pull_request.labels.*.name, 'build docker image') }}
-        run: ./dev/docker/hive/build-docker.sh --platform ${PLATFORM} --image ${HIVE_IMAGE_NAME}:${HIVE_IMAGE_TAG_NAME}
+      - name: Pulling the Docker image in advance
+        if: ${{ !contains(github.event.pull_request.labels.*.name, 'build docker image') }}
+        run: |
+          docker pull ${HIVE_IMAGE_NAME}
+          docker pull ${TRINO_IMAGE_NAME}
 
       - name: Run AMD64 container
         run: |
-          docker run --rm --name ${DOCKER_RUN_NAME} --platform ${PLATFORM} -d -p 8022:22 -p 8088:8088 -p 9000:9000 -p 9083:9083 -p 10000:10000 -p 10002:10002 -p 50010:50010 -p 50070:50070 -p 50075:50075 ${HIVE_IMAGE_NAME}:${HIVE_IMAGE_TAG_NAME}
+          docker run --rm --name ${DOCKER_RUN_NAME} --platform ${PLATFORM} -d -p 8022:22 -p 8088:8088 -p 9000:9000 -p 9083:9083 -p 10000:10000 -p 10002:10002 -p 50010:50010 -p 50070:50070 -p 50075:50075 ${HIVE_IMAGE_NAME}
           docker ps -a
 
       - name: Setup Gradle
@@ -76,7 +78,7 @@ jobs:
             docker stop ${DOCKER_RUN_NAME}
             sleep 3
             docker ps -a
-            docker run --rm --name ${DOCKER_RUN_NAME} --platform ${PLATFORM} -d -p 8022:22 -p 8088:8088 -p 9000:9000 -p 9083:9083 -p 10000:10000 -p 10002:10002 -p 50010:50010 -p 50070:50070 -p 50075:50075 ${HIVE_IMAGE_NAME}:${HIVE_IMAGE_TAG_NAME}
+            docker run --rm --name ${DOCKER_RUN_NAME} --platform ${PLATFORM} -d -p 8022:22 -p 8088:8088 -p 9000:9000 -p 9083:9083 -p 10000:10000 -p 10002:10002 -p 50010:50010 -p 50070:50070 -p 50075:50075 ${HIVE_IMAGE_NAME}
             sleep 60
 
       - name: Setup debug Github Action
@@ -107,4 +109,5 @@ jobs:
           docker stop ${DOCKER_RUN_NAME}
           sleep 3
           docker ps -a
-          docker rmi ${HIVE_IMAGE_NAME}:${HIVE_IMAGE_TAG_NAME}
+          docker rmi ${HIVE_IMAGE_NAME}
+          docker rmi ${TRINO_IMAGE_NAME}

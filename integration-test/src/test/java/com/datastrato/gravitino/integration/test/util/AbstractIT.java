@@ -40,6 +40,12 @@ public class AbstractIT {
 
   protected static Map<String, String> customConfigs = new HashMap<>();
 
+  public static int getGravitinoServerPort() {
+    JettyServerConfig jettyServerConfig =
+        JettyServerConfig.fromConfig(serverConfig, WEBSERVER_CONF_PREFIX);
+    return jettyServerConfig.getHttpPort();
+  }
+
   public static void registerCustomConfigs(Map<String, String> configs) {
     customConfigs.putAll(configs);
   }

@@ -111,6 +111,9 @@ dependencies {
   testImplementation(libs.scala.collection.compat)
   testImplementation(libs.sqlite.jdbc)
   testImplementation(libs.spark.hive)
+  testImplementation(libs.testcontainers)
+  testImplementation(libs.testcontainers.junit.jupiter)
+  testImplementation(libs.trino.jdbc)
 }
 
 /* Optimizing integration test execution conditions */
@@ -196,17 +199,27 @@ tasks.test {
     exclude("**/integration/test/**")
   } else {
     dependsOn("checkDockerRunning")
-
     doFirst {
+      copy {
+        from("${project.rootDir}/dev/docker/trino/conf")
+        into("build/tirno-conf")
+        rename { fileName ->
+          fileName.replace(".template", "")
+        }
+        fileMode = 0b111101101
+      }
+
       // Default use MiniGravitino to run integration tests
       environment("GRAVITINO_ROOT_DIR", rootDir.path)
       // TODO: use hive user instead after we fix the permission issue #554
       environment("HADOOP_USER_NAME", "root")
       environment("HADOOP_HOME", "/tmp")
       environment("PROJECT_VERSION", version)
+      environment("TRINO_CONF_DIR", buildDir.path + "/tirno-conf")
 
       val testMode = project.properties["testMode"] as? String ?: "embedded"
-      systemProperty("gravitino.log.path", buildDir.path)
+      systemProperty("gravitino.log.path", buildDir.path + "/integration-test.log")
+      delete(buildDir.path + "/integration-test.log")
       if (testMode == "deploy") {
         environment("GRAVITINO_HOME", rootDir.path + "/distribution/package")
         systemProperty("testMode", "deploy")

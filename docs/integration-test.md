@@ -88,6 +88,11 @@ Run only test cases where tag is set `gravitino-docker-it`.      [embbeded|deplo
 
 Before running the tests, make sure Docker is installed.
 
+#### macOS Docker connector
+Because Docker Desktop for Mac does not provide access to container IP from host(macOS). 
+The macos-docker-connector provides the ability for the macOS host to directly access the docker container IP. 
+Before running the integration tests, make sure to execute the `dev/docker/tools/macos-docker-connector.sh` script.
+
 #### Running Gravitino Hive CI Docker Environment
 
 1. Run a hive docker test environment container in the local using the `docker run --rm -d -p 8022:22 -p 8088:8088 -p 9000:9000 -p 9083:9083 -p 10000:10000 -p 10002:10002 -p 50010:50010 -p 50070:50070 -p 50075:50075 datastrato/gravitino-ci-hive` command.
