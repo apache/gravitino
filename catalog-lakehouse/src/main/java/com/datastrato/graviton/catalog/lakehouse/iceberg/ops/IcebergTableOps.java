@@ -4,6 +4,7 @@
  */
 package com.datastrato.graviton.catalog.lakehouse.iceberg.ops;
 
+import com.datastrato.graviton.catalog.lakehouse.iceberg.IcebergRESTConfig;
 import com.datastrato.graviton.catalog.lakehouse.iceberg.ops.IcebergTableOpsHelper.IcebergTableChange;
 import com.datastrato.graviton.catalog.lakehouse.iceberg.utils.IcebergCatalogUtil;
 import com.google.common.base.Preconditions;
@@ -35,10 +36,19 @@ public class IcebergTableOps {
 
   protected Catalog catalog;
   private SupportsNamespaces asNamespaceCatalog;
-  private final String DEFAULT_ICEBERG_CATALOG_TYPE = "memory";
+
+  public IcebergTableOps(IcebergRESTConfig icebergRESTConfig) {
+    catalog =
+        IcebergCatalogUtil.loadIcebergCatalog(
+            icebergRESTConfig.get(IcebergRESTConfig.CATALOG_IMPL));
+    if (catalog instanceof SupportsNamespaces) {
+      asNamespaceCatalog = (SupportsNamespaces) catalog;
+    }
+  }
 
   public IcebergTableOps() {
-    catalog = IcebergCatalogUtil.loadIcebergCatalog(DEFAULT_ICEBERG_CATALOG_TYPE);
+    catalog =
+        IcebergCatalogUtil.loadIcebergCatalog(IcebergRESTConfig.CATALOG_IMPL.getDefaultValue());
     if (catalog instanceof SupportsNamespaces) {
       asNamespaceCatalog = (SupportsNamespaces) catalog;
     }

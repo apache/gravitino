@@ -16,4 +16,11 @@ public class IcebergRESTConfig extends Config {
           .version("0.1.0")
           .intConf()
           .createWithDefault(9001);
+
+  public static final ConfigEntry<String> CATALOG_IMPL =
+      new ConfigBuilder("catalogImpl")
+          .doc("Choose the implementation of the iceberg catalog")
+          .version("0.1.0")
+          .stringConf()
+          .createWithDefault("memory");
 }

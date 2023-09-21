@@ -172,7 +172,12 @@ public class MiniGraviton {
             + "."
             + IcebergRESTConfig.ICEBERG_REST_SERVER_HTTP_PORT.getKey(),
         String.valueOf(RESTUtils.findAvailablePort(3000, 4000)));
-
+    configMap.put(
+        AuxiliaryServiceManager.GRAVITON_AUX_SERVICE_PREFIX
+            + IcebergAuxiliaryService.SERVICE_NAME
+            + "."
+            + IcebergRESTConfig.CATALOG_IMPL.getKey(),
+        "hive");
     Properties props = new Properties();
 
     try (InputStream inputStream = Files.newInputStream(Paths.get(configTempFileName));
