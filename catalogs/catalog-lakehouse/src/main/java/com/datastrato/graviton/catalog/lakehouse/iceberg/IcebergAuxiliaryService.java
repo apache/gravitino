@@ -22,9 +22,9 @@ import org.slf4j.LoggerFactory;
 
 public class IcebergAuxiliaryService implements GravitonAuxiliaryService {
 
-  Logger LOG = LoggerFactory.getLogger(IcebergAuxiliaryService.class);
+  private Logger LOG = LoggerFactory.getLogger(IcebergAuxiliaryService.class);
 
-  Server server;
+  private Server server;
 
   public static final String SERVICE_NAME = "GravitonIcebergREST";
 
@@ -64,7 +64,7 @@ public class IcebergAuxiliaryService implements GravitonAuxiliaryService {
   @Override
   public void serviceInit(Map<String, String> properties) {
     IcebergRESTConfig icebergConfig = new IcebergRESTConfig();
-    icebergConfig.loadFromMap(properties, false);
+    icebergConfig.loadFromMap(properties, k -> true);
     server = initServer(icebergConfig);
     LOG.info("Iceberg REST service inited");
   }
