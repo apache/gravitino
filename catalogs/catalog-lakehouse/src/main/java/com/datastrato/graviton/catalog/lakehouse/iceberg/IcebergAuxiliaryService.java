@@ -9,10 +9,22 @@ import com.datastrato.graviton.aux.GravitonAuxiliaryService;
 import com.datastrato.graviton.catalog.lakehouse.iceberg.ops.IcebergTableOps;
 import com.datastrato.graviton.catalog.lakehouse.iceberg.web.IcebergExceptionMapper;
 import com.datastrato.graviton.catalog.lakehouse.iceberg.web.IcebergObjectMapperProvider;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.util.Map;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import org.eclipse.jetty.server.ConnectionFactory;
+import org.eclipse.jetty.server.HttpConfiguration;
+import org.eclipse.jetty.server.HttpConnectionFactory;
 import org.eclipse.jetty.server.Server;
+import org.eclipse.jetty.server.ServerConnector;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
+import org.eclipse.jetty.util.thread.ExecutorThreadPool;
+import org.eclipse.jetty.util.thread.ScheduledExecutorScheduler;
+import org.eclipse.jetty.util.thread.Scheduler;
+import org.eclipse.jetty.util.thread.ThreadPool;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.jackson.JacksonFeature;
 import org.glassfish.jersey.server.ResourceConfig;
@@ -28,11 +40,62 @@ public class IcebergAuxiliaryService implements GravitonAuxiliaryService {
 
   public static final String SERVICE_NAME = "GravitonIcebergREST";
 
-  private Server initServer(IcebergRESTConfig restConfig) {
-    // todo, use JettyServer when it's moved to graviton common package
+  private ExecutorThreadPool createThreadPool(
+      int coreThreads, int maxThreads, int threadPoolWorkQueueSize) {
+    return new ExecutorThreadPool(
+        new ThreadPoolExecutor(
+            coreThreads,
+            maxThreads,
+            60,
+            TimeUnit.SECONDS,
+            new LinkedBlockingQueue<>(threadPoolWorkQueueSize),
+            new ThreadFactoryBuilder()
+                .setDaemon(true)
+                .setNameFormat("jetty-Iceberg-REST-%d")
+                .build()));
+  }
+
+  private ServerConnector creatorServerConnector(
+      Server server, ConnectionFactory[] connectionFactories) {
+    Scheduler serverExecutor =
+        new ScheduledExecutorScheduler("graviton-Iceberg-REST-JettyScheduler", true);
+
+    return new ServerConnector(server, null, serverExecutor, null, -1, -1, connectionFactories);
+  }
+
+  private ServerConnector createHttpServerConnector(Server server, String host, int port) {
+    HttpConfiguration httpConfig = new HttpConfiguration();
+    httpConfig.setSendServerVersion(true);
+
+    HttpConnectionFactory httpConnectionFactory = new HttpConnectionFactory(httpConfig);
+    ServerConnector connector =
+        creatorServerConnector(server, new ConnectionFactory[] {httpConnectionFactory});
+    connector.setHost(host);
+    connector.setPort(port);
+    connector.setReuseAddress(true);
+
+    return connector;
+  }
+
+  // todo, use JettyServer when it's moved to graviton common package
+  private Server createJettyServer(IcebergRESTConfig restConfig) {
+    String host = restConfig.get(IcebergRESTConfig.ICEBERG_REST_SERVER_HOST);
     int port = restConfig.get(IcebergRESTConfig.ICEBERG_REST_SERVER_HTTP_PORT);
+    int coreThreads = restConfig.get(IcebergRESTConfig.ICEBERG_REST_SERVER_CORE_THREADS);
+    int maxThreads = restConfig.get(IcebergRESTConfig.ICEBERG_REST_SERVER_MAX_THREADS);
+    int queueSize =
+        restConfig.get(IcebergRESTConfig.ICEBERG_REST_SERVER_THREAD_POOL_WORK_QUEUE_SIZE);
     LOG.info("Iceberg REST service http port:{}", port);
-    Server server = new Server(port);
+    ThreadPool threadPool = createThreadPool(coreThreads, maxThreads, queueSize);
+    Server server = new Server(threadPool);
+    ServerConnector connector = createHttpServerConnector(server, host, port);
+    server.addConnector(connector);
+    return server;
+  }
+
+  private Server initServer(IcebergRESTConfig restConfig) {
+
+    Server server = createJettyServer(restConfig);
 
     ResourceConfig config = new ResourceConfig();
     config.packages("com.datastrato.graviton.catalog.lakehouse.iceberg.web.rest");
