@@ -31,6 +31,7 @@ import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -79,22 +80,25 @@ public class MiniGraviton {
     String URI = String.format("http://%s:%d", host, port);
     restClient = HTTPClient.builder(ImmutableMap.of()).uri(URI).build();
 
-    executor.submit(
-        () -> {
-          try {
-            GravitonServer.main(
-                new String[] {ITUtils.joinDirPath(mockConfDir.getAbsolutePath(), "graviton.conf")});
-          } catch (Exception e) {
-            LOG.error("Exception in startup MiniGraviton Server ", e);
-            throw new RuntimeException(e);
-          }
-        });
+    Future<?> future =
+        executor.submit(
+            () -> {
+              try {
+                GravitonServer.main(
+                    new String[] {
+                      ITUtils.joinDirPath(mockConfDir.getAbsolutePath(), "graviton.conf")
+                    });
+              } catch (Exception e) {
+                LOG.error("Exception in startup MiniGraviton Server ", e);
+                throw new RuntimeException(e);
+              }
+            });
     long beginTime = System.currentTimeMillis();
     boolean started = false;
     while (System.currentTimeMillis() - beginTime < 1000 * 60 * 3) {
       Thread.sleep(500);
       started = checkIfServerIsRunning();
-      if (started) {
+      if (started || future.isDone()) {
         break;
       }
     }
