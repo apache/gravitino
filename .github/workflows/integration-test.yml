@@ -92,6 +92,9 @@ jobs:
       - name: Print logs when Graviton integration tests failure
         if: ${{ failure() && steps.integrationTest.outcome == 'failure' }}
         run: |
+          if [ -f "integration-test/build/graviton-server.log" ]; then
+            cat integration-test/build/graviton-server.log
+          fi
           if [ -f "distribution/package/logs/graviton-server.out" ]; then
             cat distribution/package/logs/graviton-server.out
           fi
