@@ -164,8 +164,6 @@ tasks {
         from(projectDir.dir("bin")) { into("package/bin") }
         into(outputDir)
         rename { fileName ->
-          // a simple way is to remove the "-$version" from the jar filename
-          // but you can customize the filename replacement rule as you wish.
           fileName.replace(".template", "")
         }
         fileMode = 0b111101101
@@ -201,8 +199,6 @@ tasks {
   val cleanDistribution by registering(Delete::class) {
     group = "graviton distribution"
     delete(outputDir)
-    delete("/tmp/graviton")
-    delete("server/src/main/resources/project.properties")
   }
 
   val copySubprojectDependencies by registering(Copy::class) {
@@ -237,5 +233,7 @@ tasks {
 
   clean {
     dependsOn(cleanDistribution)
+    delete("/tmp/graviton")
+    delete("server/src/main/resources/project.properties")
   }
 }
