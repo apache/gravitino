@@ -37,25 +37,10 @@ public class IcebergRESTConfig extends Config {
           .version("0.1.0")
           .intConf()
           .createWithDefault(Math.max(Runtime.getRuntime().availableProcessors() * 4, 400));
-
-  public static final ConfigEntry<Long> ICEBERG_REST_SERVER_STOP_IDLE_TIMEOUT =
-      new ConfigBuilder("stopIdleTimeout")
-          .doc("The stop idle timeout of the Iceberg REST server")
-          .version("0.1.0")
-          .longConf()
-          .createWithDefault(30 * 1000L);
-
   public static final ConfigEntry<Integer> ICEBERG_REST_SERVER_THREAD_POOL_WORK_QUEUE_SIZE =
       new ConfigBuilder("threadPoolWorkQueueSize")
           .doc("The executor thread pool work queue size of the Iceberg REST server")
           .version("0.1.0")
           .intConf()
           .createWithDefault(100);
-
-  public static final ConfigEntry<Integer> ICEBERG_REST_SERVER_SHUTDOWN_TIMEOUT =
-      new ConfigBuilder("shutdownTimeout")
-          .doc("The stop idle timeout(millis) of the Iceberg REST Server")
-          .version("0.1.0")
-          .intConf()
-          .createWithDefault(3 * 1000);
 }

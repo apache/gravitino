@@ -158,7 +158,7 @@ public abstract class Config {
    * Loads configurations from a map.
    *
    * @param map The map containing configuration key-value pairs.
-   * @param checkPrefix whether to check if key prefix matches 'CONFIG_PREPEND'
+   * @param predicate The keys only match the predicate will be loaded to configMap
    */
   public void loadFromMap(Map<String, String> map, Predicate<String> predicate) {
     map.forEach(
