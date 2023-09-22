@@ -22,41 +22,25 @@ public abstract class BaseSchema implements Schema {
 
   protected AuditInfo auditInfo;
 
-  /**
-   * Returns the name of the schema.
-   *
-   * @return The name of the schema.
-   */
+  /** Returns the name of the schema. */
   @Override
   public String name() {
     return name;
   }
 
-  /**
-   * Returns the comment or description for the schema.
-   *
-   * @return The comment or description for the schema.
-   */
+  /** Returns the comment or description for the schema. */
   @Override
   public String comment() {
     return comment;
   }
 
-  /**
-   * Returns the associated properties of the schema.
-   *
-   * @return The associated properties of the schema.
-   */
+  /** Returns the associated properties of the schema. */
   @Override
   public Map<String, String> properties() {
     return properties;
   }
 
-  /**
-   * Returns the audit details of the schema.
-   *
-   * @return The audit details of the schema.
-   */
+  /** Returns the audit details of the schema. */
   @Override
   public AuditInfo auditInfo() {
     return auditInfo;

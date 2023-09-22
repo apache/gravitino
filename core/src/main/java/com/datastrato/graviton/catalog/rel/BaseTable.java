@@ -34,72 +34,54 @@ public abstract class BaseTable implements Table {
 
   @Nullable protected Distribution distribution;
 
-  /**
-   * Returns the audit details of the table.
-   *
-   * @return The audit details of the table.
-   */
+  /** Returns the audit details of the table. */
   @Override
   public AuditInfo auditInfo() {
     return auditInfo;
   }
 
-  /**
-   * Returns the name of the table.
-   *
-   * @return The name of the table.
-   */
+  /** Returns the name of the table. */
   @Override
   public String name() {
     return name;
   }
 
-  /**
-   * Returns an array of columns that make up the table.
-   *
-   * @return An array of columns.
-   */
+  /** Returns an array of columns that make up the table. */
   @Override
   public Column[] columns() {
     return columns;
   }
 
-  /**
-   * Returns the comment or description for the table.
-   *
-   * @return The comment or description for the table.
-   */
+  /** Returns the comment or description for the table. */
   @Nullable
   @Override
   public String comment() {
     return comment;
   }
 
-  /**
-   * Returns the associated properties of the table.
-   *
-   * @return The associated properties of the table.
-   */
+  /** Returns the associated properties of the table. */
   @Override
   public Map<String, String> properties() {
     return properties;
   }
 
-  /**
-   * Returns the partitioning strategies of the table.
-   *
-   * @return The partitioning strategies of the table.
-   */
+  /** Returns the partitioning strategies of the table. */
   @Override
   public Transform[] partitioning() {
     return partitions;
   }
 
+  /** Return the array of {@link SortOrder} of the table. */
   @Override
   public SortOrder[] sortOrder() {
     return sortOrders;
   }
 
+  /**
+   * Returns the distribution strategy of the table.
+   *
+   * @return
+   */
   @Override
   public Distribution distribution() {
     return distribution;

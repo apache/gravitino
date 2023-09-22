@@ -182,7 +182,9 @@ public class TestCatalogOperationDispatcher {
     // Case 3: Test if entity store is failed to get the schema entity
     reset(entityStore);
     doThrow(new IOException()).when(entityStore).get(any(), any(), any());
-    Assertions.assertThrows(RuntimeException.class, () -> dispatcher.loadSchema(schemaIdent));
+    Schema loadedSchema2 = dispatcher.loadSchema(schemaIdent);
+    // Audit info is gotten from the catalog, not from the entity store
+    Assertions.assertEquals("test", loadedSchema2.auditInfo().creator());
 
     // Case 4: Test if the fetched schema entity is matched.
     reset(entityStore);
@@ -198,7 +200,7 @@ public class TestCatalogOperationDispatcher {
                     .build())
             .build();
     doReturn(unmatchedEntity).when(entityStore).get(any(), any(), any());
-    Schema loadedSchema2 = dispatcher.loadSchema(schemaIdent);
+    Schema loadedSchema3 = dispatcher.loadSchema(schemaIdent);
     // Audit info is gotten from the catalog, not from the entity store
     Assertions.assertEquals("test", loadedSchema2.auditInfo().creator());
   }
@@ -371,7 +373,9 @@ public class TestCatalogOperationDispatcher {
     // Case 3: Test if the entity store is failed to get the table entity
     reset(entityStore);
     doThrow(new IOException()).when(entityStore).get(any(), any(), any());
-    Assertions.assertThrows(RuntimeException.class, () -> dispatcher.loadTable(tableIdent1));
+    Table loadedTable3 = dispatcher.loadTable(tableIdent1);
+    // Audit info is gotten from the catalog, not from the entity store
+    Assertions.assertEquals("test", loadedTable3.auditInfo().creator());
 
     // Case 4: Test if the table entity is not matched
     reset(entityStore);
@@ -387,9 +391,9 @@ public class TestCatalogOperationDispatcher {
                     .build())
             .build();
     doReturn(tableEntity).when(entityStore).get(any(), any(), any());
-    Table loadedTable3 = dispatcher.loadTable(tableIdent1);
+    Table loadedTable4 = dispatcher.loadTable(tableIdent1);
     // Audit info is gotten from the catalog, not from the entity store
-    Assertions.assertEquals("test", loadedTable3.auditInfo().creator());
+    Assertions.assertEquals("test", loadedTable4.auditInfo().creator());
   }
 
   @Test

@@ -169,8 +169,7 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
             ident,
             identifier -> store.get(identifier, SCHEMA, SchemaEntity.class),
             "GET",
-            stringId.id(),
-            true /* throwIfNotFound */);
+            stringId.id());
     return EntityCombinedSchema.of(schema, schemaEntity);
   }
 
@@ -222,8 +221,7 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
                                     .build())
                             .build()),
             "UPDATE",
-            stringId.id(),
-            false /* throwIfNotFound */);
+            stringId.id());
     return EntityCombinedSchema.of(alteredSchema, updatedSchemaEntity);
   }
 
@@ -298,8 +296,7 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
             ident,
             identifier -> store.get(identifier, TABLE, TableEntity.class),
             "GET",
-            stringId.id(),
-            true /* throwIfNotFound */);
+            stringId.id());
     return EntityCombinedTable.of(table, tableEntity);
   }
 
@@ -430,8 +427,7 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
                           .build();
                     }),
             "UPDATE",
-            stringId.id(),
-            false /* throwIfNotFound */);
+            stringId.id());
 
     return EntityCombinedTable.of(alteredTable, updatedTableEntity);
   }
@@ -513,11 +509,7 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
   }
 
   private <R extends HasIdentifier> R operateOnEntity(
-      NameIdentifier ident,
-      ThrowableFunction<NameIdentifier, R> fn,
-      String opName,
-      long id,
-      boolean shouldFail) {
+      NameIdentifier ident, ThrowableFunction<NameIdentifier, R> fn, String opName, long id) {
     R ret = null;
     try {
       ret = fn.apply(ident);
@@ -526,12 +518,8 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
       LOG.error(FormattedErrorMessages.ENTITY_NOT_FOUND, ident);
     } catch (Exception e) {
       // Case 3: The table is created by Graviton, but failed to operate the corresponding entity
-      // in Graviton.
-      if (shouldFail) {
-        throw new RuntimeException(e);
-      } else {
-        LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, opName, ident, e);
-      }
+      // in Graviton
+      LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, opName, ident, e);
     }
 
     // Case 4: The table is created by Graviton, but the uid in the corresponding entity is not
