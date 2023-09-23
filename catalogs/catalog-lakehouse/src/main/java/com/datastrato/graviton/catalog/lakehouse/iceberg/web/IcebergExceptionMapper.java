@@ -59,6 +59,7 @@ public class IcebergExceptionMapper implements ExceptionMapper<Exception> {
     } else {
       LOG.info(
           "Iceberg REST server error maybe caused by user request, response http status: {}, exception: {}, exception message: {}",
+          status,
           ex.getClass(),
           ex.getMessage());
     }
