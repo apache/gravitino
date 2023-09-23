@@ -37,6 +37,7 @@ public class IcebergRESTConfig extends Config {
           .version("0.1.0")
           .intConf()
           .createWithDefault(Math.max(Runtime.getRuntime().availableProcessors() * 4, 400));
+
   public static final ConfigEntry<Integer> ICEBERG_REST_SERVER_THREAD_POOL_WORK_QUEUE_SIZE =
       new ConfigBuilder("threadPoolWorkQueueSize")
           .doc("The executor thread pool work queue size of the Iceberg REST server")

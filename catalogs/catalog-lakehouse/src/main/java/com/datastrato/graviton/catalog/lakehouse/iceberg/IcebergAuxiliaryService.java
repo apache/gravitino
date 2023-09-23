@@ -52,6 +52,10 @@ public class IcebergAuxiliaryService implements GravitonAuxiliaryService {
             new ThreadFactoryBuilder()
                 .setDaemon(true)
                 .setNameFormat("jetty-Iceberg-REST-%d")
+                .setUncaughtExceptionHandler(
+                    (thread, throwable) -> {
+                      LOG.warn("%s uncaught exception:", thread.getName(), throwable);
+                    })
                 .build()));
   }
 
