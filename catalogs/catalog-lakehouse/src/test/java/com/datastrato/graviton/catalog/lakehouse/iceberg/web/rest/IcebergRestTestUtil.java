@@ -22,6 +22,7 @@ public class IcebergRestTestUtil {
   public static final String PREFIX = "prefix_graviton";
   public static final String CONFIG_PATH = V_1 + "/config";
   public static final String NAMESPACE_PATH = V_1 + "/namespaces";
+  public static final String UPDATE_NAMESPACE_POSTFIX = "properties";
   public static final String TEST_NAMESPACE_NAME = "graviton-test";
   public static final String TABLE_PATH = NAMESPACE_PATH + "/" + TEST_NAMESPACE_NAME + "/tables";
   public static final String RENAME_TABLE_PATH = V_1 + "/tables/rename";

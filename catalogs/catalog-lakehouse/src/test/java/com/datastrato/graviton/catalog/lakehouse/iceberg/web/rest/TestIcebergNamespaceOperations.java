@@ -62,7 +62,7 @@ public class TestIcebergNamespaceOperations extends IcebergTestBase {
             .removeAll(Arrays.asList("a", "a1"))
             .updateAll(updatedProperties)
             .build();
-    return getNamespaceClientBuilder(Optional.of(name))
+    return getUpdateNamespaceClientBuilder(name)
         .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
   }
 
