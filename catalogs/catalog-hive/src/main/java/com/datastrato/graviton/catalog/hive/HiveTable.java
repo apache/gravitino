@@ -8,11 +8,10 @@ import static com.datastrato.graviton.rel.transforms.Transforms.identity;
 import static org.apache.hadoop.hive.metastore.TableType.EXTERNAL_TABLE;
 import static org.apache.hadoop.hive.metastore.TableType.MANAGED_TABLE;
 
-import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.catalog.hive.converter.FromHiveType;
 import com.datastrato.graviton.catalog.hive.converter.ToHiveType;
+import com.datastrato.graviton.catalog.rel.BaseTable;
 import com.datastrato.graviton.meta.AuditInfo;
-import com.datastrato.graviton.meta.rel.BaseTable;
 import com.datastrato.graviton.rel.Column;
 import com.datastrato.graviton.rel.Distribution;
 import com.datastrato.graviton.rel.SortOrder;
@@ -29,7 +28,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
-import lombok.Getter;
 import lombok.ToString;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.ArrayUtils;
@@ -41,7 +39,6 @@ import org.apache.hadoop.hive.metastore.api.Table;
 
 /** Represents a Hive Table entity in the Hive Metastore catalog. */
 @ToString
-@Getter
 public class HiveTable extends BaseTable {
 
   // A set of supported Hive table types.
@@ -53,16 +50,17 @@ public class HiveTable extends BaseTable {
 
   private String location;
 
+  private String schemaName;
+
   private HiveTable() {}
 
   /**
    * Creates a new HiveTable instance from a Table and a Builder.
    *
    * @param table The inner Table representing the HiveTable.
-   * @param builder The Builder used to construct the HiveTable.
    * @return A new HiveTable instance.
    */
-  public static HiveTable fromInnerTable(Table table, Builder builder) {
+  public static HiveTable fromHiveTable(Table table) {
     // Get audit info from Hive's Table object. Because Hive's table doesn't store last modifier
     // and last modified time, we only get creator and create time from Hive's table.
     AuditInfo.Builder auditInfoBuilder = new AuditInfo.Builder();
@@ -96,7 +94,8 @@ public class HiveTable extends BaseTable {
               .toArray(SortOrder[]::new);
     }
 
-    return builder
+    return new HiveTable.Builder()
+        .withName(table.getTableName())
         .withComment(table.getParameters().get(HMS_TABLE_COMMENT))
         .withProperties(table.getParameters())
         .withColumns(
@@ -117,6 +116,7 @@ public class HiveTable extends BaseTable {
             table.getPartitionKeys().stream()
                 .map(p -> identity(new String[] {p.getName()}))
                 .toArray(Transforms.NamedReference[]::new))
+        .withSchemaName(table.getDbName())
         .build();
   }
 
@@ -125,11 +125,11 @@ public class HiveTable extends BaseTable {
    *
    * @return The converted Table.
    */
-  public Table toInnerTable() {
+  public Table toHiveTable() {
     Table hiveTable = new Table();
 
     hiveTable.setTableName(name);
-    hiveTable.setDbName(schemaIdentifier().name());
+    hiveTable.setDbName(schemaName);
     hiveTable.setSd(buildStorageDescriptor());
     hiveTable.setParameters(properties);
     hiveTable.setPartitionKeys(buildPartitionKeys());
@@ -208,15 +208,6 @@ public class HiveTable extends BaseTable {
     return serDeInfo;
   }
 
-  /**
-   * Gets the schema identifier for this HiveTable.
-   *
-   * @return The schema identifier.
-   */
-  public NameIdentifier schemaIdentifier() {
-    return NameIdentifier.of(nameIdentifier().namespace().levels());
-  }
-
   /** A builder class for constructing HiveTable instances. */
   public static class Builder extends BaseTableBuilder<Builder, HiveTable> {
 
@@ -224,8 +215,27 @@ public class HiveTable extends BaseTable {
     // TODO(minghuang): Support user specify`location` property
     private String location;
 
+    private String schemaName;
+
+    /**
+     * Sets the location to be used for building the HiveTable.
+     *
+     * @param location The string location of the HiveTable.
+     * @return This Builder instance.
+     */
     public Builder withLocation(String location) {
       this.location = location;
+      return this;
+    }
+
+    /**
+     * Sets the Hive schema (database) name to be used for building the HiveTable.
+     *
+     * @param schemaName The string schema name of the HiveTable.
+     * @return This Builder instance.
+     */
+    public Builder withSchemaName(String schemaName) {
+      this.schemaName = schemaName;
       return this;
     }
 
@@ -237,8 +247,6 @@ public class HiveTable extends BaseTable {
     @Override
     protected HiveTable internalBuild() {
       HiveTable hiveTable = new HiveTable();
-      hiveTable.id = id;
-      hiveTable.namespace = namespace;
       hiveTable.name = name;
       hiveTable.comment = comment;
       hiveTable.properties = properties != null ? Maps.newHashMap(properties) : Maps.newHashMap();
@@ -248,6 +256,7 @@ public class HiveTable extends BaseTable {
       hiveTable.distribution = distribution;
       hiveTable.sortOrders = sortOrders;
       hiveTable.partitions = partitions;
+      hiveTable.schemaName = schemaName;
 
       // HMS put table comment in parameters
       if (comment != null) {

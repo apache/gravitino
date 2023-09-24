@@ -4,21 +4,14 @@
  */
 package com.datastrato.graviton.catalog.hive;
 
-import static com.datastrato.graviton.Entity.EntityType.SCHEMA;
-import static com.datastrato.graviton.Entity.EntityType.TABLE;
 import static com.datastrato.graviton.catalog.hive.HiveTable.HMS_TABLE_COMMENT;
 import static com.datastrato.graviton.catalog.hive.HiveTable.SUPPORT_TABLE_TYPES;
 
-import com.datastrato.graviton.EntityAlreadyExistsException;
-import com.datastrato.graviton.EntityStore;
-import com.datastrato.graviton.GravitonEnv;
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
-import com.datastrato.graviton.StringIdentifier;
 import com.datastrato.graviton.catalog.CatalogOperations;
 import com.datastrato.graviton.catalog.hive.converter.ToHiveType;
 import com.datastrato.graviton.exceptions.NoSuchCatalogException;
-import com.datastrato.graviton.exceptions.NoSuchEntityException;
 import com.datastrato.graviton.exceptions.NoSuchSchemaException;
 import com.datastrato.graviton.exceptions.NoSuchTableException;
 import com.datastrato.graviton.exceptions.NonEmptySchemaException;
@@ -26,8 +19,6 @@ import com.datastrato.graviton.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.graviton.exceptions.TableAlreadyExistsException;
 import com.datastrato.graviton.meta.AuditInfo;
 import com.datastrato.graviton.meta.CatalogEntity;
-import com.datastrato.graviton.meta.rel.BaseSchema;
-import com.datastrato.graviton.meta.rel.BaseTable;
 import com.datastrato.graviton.rel.Column;
 import com.datastrato.graviton.rel.Distribution;
 import com.datastrato.graviton.rel.SchemaChange;
@@ -40,7 +31,6 @@ import com.datastrato.graviton.rel.transforms.Transform;
 import com.datastrato.graviton.rel.transforms.Transforms;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
@@ -116,10 +106,6 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
    */
   @Override
   public NameIdentifier[] listSchemas(Namespace namespace) throws NoSuchCatalogException {
-    if (!isValidNamespace(namespace)) {
-      throw new NoSuchCatalogException("Namespace is invalid " + namespace);
-    }
-
     try {
       NameIdentifier[] schemas =
           clientPool.run(
@@ -154,46 +140,27 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
   @Override
   public HiveSchema createSchema(NameIdentifier ident, String comment, Map<String, String> metadata)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
-    Preconditions.checkArgument(
-        !ident.name().isEmpty(),
-        String.format("Cannot create schema with invalid name: %s", ident.name()));
-    Preconditions.checkArgument(
-        isValidNamespace(ident.namespace()),
-        String.format("Cannot support invalid namespace in Hive Metastore: %s", ident.namespace()));
-
     try {
-      EntityStore store = GravitonEnv.getInstance().entityStore();
-      long uid = GravitonEnv.getInstance().idGenerator().nextId();
-      StringIdentifier stringId = StringIdentifier.fromId(uid);
-
       HiveSchema hiveSchema =
-          store.executeInTransaction(
-              () -> {
-                HiveSchema createdSchema =
-                    new HiveSchema.Builder()
-                        .withId(uid)
-                        .withName(ident.name())
-                        .withNamespace(ident.namespace())
-                        .withComment(comment)
-                        .withProperties(StringIdentifier.addToProperties(stringId, metadata))
-                        .withAuditInfo(
-                            new AuditInfo.Builder()
-                                .withCreator(currentUser())
-                                .withCreateTime(Instant.now())
-                                .build())
-                        .withConf(hiveConf)
-                        .build();
-                store.put(createdSchema, false);
-                clientPool.run(
-                    client -> {
-                      client.createDatabase(createdSchema.toInnerDB());
-                      return null;
-                    });
-                return createdSchema;
-              });
+          new HiveSchema.Builder()
+              .withName(ident.name())
+              .withComment(comment)
+              .withProperties(metadata)
+              .withConf(hiveConf)
+              .withAuditInfo(
+                  new AuditInfo.Builder()
+                      .withCreator(currentUser())
+                      .withCreateTime(Instant.now())
+                      .build())
+              .build();
+
+      clientPool.run(
+          client -> {
+            client.createDatabase(hiveSchema.toHiveDB());
+            return null;
+          });
 
       LOG.info("Created Hive schema (database) {} in Hive Metastore", ident.name());
-
       return hiveSchema;
 
     } catch (AlreadyExistsException e) {
@@ -202,19 +169,9 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
               "Hive schema (database) '%s' already exists in Hive Metastore", ident.name()),
           e);
 
-    } catch (EntityAlreadyExistsException e) {
-      throw new SchemaAlreadyExistsException(
-          String.format(
-              "Hive schema (database) '%s' already exists in Graviton store", ident.name()),
-          e);
-
     } catch (TException e) {
       throw new RuntimeException(
           "Failed to create Hive schema (database) " + ident.name() + " in Hive Metastore", e);
-
-    } catch (IOException e) {
-      throw new RuntimeException(
-          "Failed to create Hive schema (database) " + ident.name() + " in Graviton store", e);
 
     } catch (Exception e) {
       throw new RuntimeException(e);
@@ -230,41 +187,17 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
    */
   @Override
   public HiveSchema loadSchema(NameIdentifier ident) throws NoSuchSchemaException {
-    Preconditions.checkArgument(
-        !ident.name().isEmpty(),
-        String.format("Cannot load schema with invalid name: %s", ident.name()));
-    Preconditions.checkArgument(
-        isValidNamespace(ident.namespace()),
-        String.format("Cannot support invalid namespace in Hive Metastore: %s", ident.namespace()));
-
     try {
       Database database = clientPool.run(client -> client.getDatabase(ident.name()));
-      HiveSchema.Builder builder = new HiveSchema.Builder();
-
-      EntityStore store = GravitonEnv.getInstance().entityStore();
-      BaseSchema baseSchema = store.get(ident, SCHEMA, BaseSchema.class);
-
-      builder = builder.withId(baseSchema.id()).withNamespace(ident.namespace()).withConf(hiveConf);
-      HiveSchema hiveSchema = HiveSchema.fromInnerDB(database, builder);
-
-      // Merge audit info from Graviton store
-      hiveSchema.auditInfo().merge(baseSchema.auditInfo(), true /*overwrite*/);
+      HiveSchema hiveSchema = HiveSchema.fromHiveDB(database, hiveConf);
 
       LOG.info("Loaded Hive schema (database) {} from Hive Metastore ", ident.name());
-
       return hiveSchema;
 
     } catch (NoSuchObjectException | UnknownDBException e) {
-      deleteSchemaFromStore(ident);
       throw new NoSuchSchemaException(
           String.format(
               "Hive schema (database) does not exist: %s in Hive Metastore", ident.name()),
-          e);
-
-    } catch (NoSuchEntityException e) {
-      throw new NoSuchSchemaException(
-          String.format(
-              "Hive schema (database) does not exist: %s in Graviton store", ident.name()),
           e);
 
     } catch (TException e) {
@@ -273,10 +206,6 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
     } catch (InterruptedException e) {
       throw new RuntimeException(e);
-
-    } catch (IOException ioe) {
-      LOG.error("Failed to load hive schema {}", ident, ioe);
-      throw new RuntimeException(ioe);
     }
   }
 
@@ -291,13 +220,6 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
   @Override
   public HiveSchema alterSchema(NameIdentifier ident, SchemaChange... changes)
       throws NoSuchSchemaException {
-    Preconditions.checkArgument(
-        !ident.name().isEmpty(),
-        String.format("Cannot create schema with invalid name: %s", ident.name()));
-    Preconditions.checkArgument(
-        isValidNamespace(ident.namespace()),
-        String.format("Cannot support invalid namespace in Hive Metastore: %s", ident.namespace()));
-
     try {
       // load the database parameters
       Database database = clientPool.run(client -> client.getDatabase(ident.name()));
@@ -324,63 +246,23 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       Database alteredDatabase = database.deepCopy();
       alteredDatabase.setParameters(metadata);
 
-      // update store transactionally
-      EntityStore store = GravitonEnv.getInstance().entityStore();
-      HiveSchema alteredHiveSchema =
-          store.executeInTransaction(
-              () -> {
-                BaseSchema oldSchema = store.get(ident, SCHEMA, BaseSchema.class);
-                HiveSchema.Builder builder = new HiveSchema.Builder();
-                builder =
-                    builder
-                        .withId(oldSchema.id())
-                        .withNamespace(ident.namespace())
-                        .withConf(hiveConf);
-                HiveSchema hiveSchema = HiveSchema.fromInnerDB(alteredDatabase, builder);
-
-                AuditInfo newAudit =
-                    new AuditInfo.Builder()
-                        .withCreator(oldSchema.auditInfo().creator())
-                        .withCreateTime(oldSchema.auditInfo().createTime())
-                        .withLastModifier(currentUser())
-                        .withLastModifiedTime(Instant.now())
-                        .build();
-                hiveSchema.auditInfo().merge(newAudit, true /*overwrite*/);
-
-                // To be on the safe side, here uses delete before put (although  hive schema does
-                // not support rename yet)
-                store.delete(ident, SCHEMA);
-                store.put(hiveSchema, false);
-                clientPool.run(
-                    client -> {
-                      client.alterDatabase(ident.name(), alteredDatabase);
-                      return null;
-                    });
-                return hiveSchema;
-              });
+      clientPool.run(
+          client -> {
+            client.alterDatabase(ident.name(), alteredDatabase);
+            return null;
+          });
 
       LOG.info("Altered Hive schema (database) {} in Hive Metastore", ident.name());
-      // todo(xun): hive does not support renaming database name directly,
-      //  perhaps we can use namespace to mapping the database names indirectly
-
-      return alteredHiveSchema;
+      return HiveSchema.fromHiveDB(alteredDatabase, hiveConf);
 
     } catch (NoSuchObjectException e) {
       throw new NoSuchSchemaException(
           String.format("Hive schema (database) %s does not exist in Hive Metastore", ident.name()),
           e);
 
-    } catch (EntityAlreadyExistsException e) {
-      throw new NoSuchSchemaException(
-          "The new Hive schema (database) name already exist in Graviton store", e);
-
     } catch (TException | InterruptedException e) {
       throw new RuntimeException(
           "Failed to alter Hive schema (database) " + ident.name() + " in Hive metastore", e);
-
-    } catch (IOException e) {
-      throw new RuntimeException(
-          "Failed to alter Hive schema (database) " + ident.name() + " in Graviton store", e);
 
     } catch (Exception e) {
       throw new RuntimeException(e);
@@ -397,55 +279,14 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
    */
   @Override
   public boolean dropSchema(NameIdentifier ident, boolean cascade) throws NonEmptySchemaException {
-    if (ident.name().isEmpty()) {
-      LOG.error("Cannot drop schema with invalid name: {}", ident.name());
-      return false;
-    }
-    if (!isValidNamespace(ident.namespace())) {
-      LOG.error("Cannot support invalid namespace in Hive Metastore: {}", ident.namespace());
-      return false;
-    }
-
-    EntityStore store = GravitonEnv.getInstance().entityStore();
-    Namespace schemaNamespace =
-        Namespace.of(ArrayUtils.add(ident.namespace().levels(), ident.name()));
-    List<BaseTable> tables = Lists.newArrayList();
-    if (!cascade) {
-      if (listTables(schemaNamespace).length > 0) {
-        throw new NonEmptySchemaException(
-            String.format(
-                "Hive schema (database) %s is not empty. One or more tables exist in Hive metastore.",
-                ident.name()));
-      }
-
-      try {
-        tables.addAll(store.list(schemaNamespace, BaseTable.class, TABLE));
-      } catch (IOException e) {
-        throw new RuntimeException("Failed to list table from Graviton store", e);
-      }
-      if (!tables.isEmpty()) {
-        throw new NonEmptySchemaException(
-            String.format(
-                "Hive schema (database) %s is not empty. One or more tables exist in Graviton store.",
-                ident.name()));
-      }
-    }
-
     try {
-      return store.executeInTransaction(
-          () -> {
-            for (BaseTable t : tables) {
-              store.delete(NameIdentifier.of(schemaNamespace, t.name()), TABLE);
-            }
-            boolean dropped = store.delete(ident, SCHEMA, true);
-            clientPool.run(
-                client -> {
-                  client.dropDatabase(ident.name(), false, false, cascade);
-                  return null;
-                });
-            LOG.info("Dropped Hive schema (database) {}", ident.name());
-            return dropped;
+      clientPool.run(
+          client -> {
+            client.dropDatabase(ident.name(), false, false, cascade);
+            return null;
           });
+      LOG.info("Dropped Hive schema (database) {}", ident.name());
+      return true;
 
     } catch (InvalidOperationException e) {
       throw new NonEmptySchemaException(
@@ -454,7 +295,6 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
           e);
 
     } catch (NoSuchObjectException e) {
-      deleteSchemaFromStore(ident);
       LOG.warn("Hive schema (database) {} does not exist in Hive Metastore", ident.name());
       return false;
 
@@ -462,21 +302,8 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       throw new RuntimeException(
           "Failed to drop Hive schema (database) " + ident.name() + " in Hive Metastore", e);
 
-    } catch (IOException e) {
-      throw new RuntimeException(
-          "Failed to drop Hive schema (database) " + ident.name() + " in Graviton store", e);
-
     } catch (Exception e) {
       throw new RuntimeException(e);
-    }
-  }
-
-  private void deleteSchemaFromStore(NameIdentifier ident) {
-    EntityStore store = GravitonEnv.getInstance().entityStore();
-    try {
-      store.delete(ident, SCHEMA);
-    } catch (IOException ex) {
-      LOG.error("Failed to delete hive schema {} from Graviton store", ident, ex);
     }
   }
 
@@ -535,35 +362,16 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
    */
   @Override
   public Table loadTable(NameIdentifier tableIdent) throws NoSuchTableException {
-    Preconditions.checkArgument(!tableIdent.name().isEmpty(), "Cannot load table with empty name");
-
     NameIdentifier schemaIdent = NameIdentifier.of(tableIdent.namespace().levels());
-    Preconditions.checkArgument(
-        isValidNamespace(schemaIdent.namespace()),
-        String.format(
-            "Cannot support invalid namespace in Hive Metastore: %s", schemaIdent.namespace()));
 
     try {
-      org.apache.hadoop.hive.metastore.api.Table hiveTable =
+      org.apache.hadoop.hive.metastore.api.Table table =
           clientPool.run(c -> c.getTable(schemaIdent.name(), tableIdent.name()));
-      HiveTable.Builder builder = new HiveTable.Builder();
-
-      EntityStore store = GravitonEnv.getInstance().entityStore();
-      BaseTable baseTable = store.get(tableIdent, TABLE, BaseTable.class);
-
-      builder =
-          builder
-              .withId(baseTable.id())
-              .withName(tableIdent.name())
-              .withNameSpace(tableIdent.namespace());
-      HiveTable table = HiveTable.fromInnerTable(hiveTable, builder);
-
-      // Merge the audit info from Graviton store.
-      table.auditInfo().merge(baseTable.auditInfo(), true /* overwrite */);
+      HiveTable hiveTable = HiveTable.fromHiveTable(table);
 
       LOG.info("Loaded Hive table {} from Hive Metastore ", tableIdent.name());
+      return hiveTable;
 
-      return table;
     } catch (NoSuchObjectException e) {
       throw new NoSuchTableException(
           String.format("Hive table does not exist: %s in Hive Metastore", tableIdent.name()), e);
@@ -571,10 +379,6 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     } catch (InterruptedException | TException e) {
       throw new RuntimeException(
           "Failed to load Hive table " + tableIdent.name() + " from Hive metastore", e);
-
-    } catch (IOException e) {
-      throw new RuntimeException(
-          "Failed to load Hive table " + tableIdent.name() + " from Graviton store", e);
     }
   }
 
@@ -617,14 +421,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       Distribution distribution,
       SortOrder[] sortOrders)
       throws NoSuchSchemaException, TableAlreadyExistsException {
-    Preconditions.checkArgument(
-        !tableIdent.name().isEmpty(), "Cannot create table with empty name");
-
     NameIdentifier schemaIdent = NameIdentifier.of(tableIdent.namespace().levels());
-    Preconditions.checkArgument(
-        isValidNamespace(schemaIdent.namespace()),
-        String.format(
-            "Cannot support invalid namespace in Hive Metastore: %s", schemaIdent.namespace()));
 
     Preconditions.checkArgument(
         Arrays.stream(partitions).allMatch(p -> p instanceof Transforms.NamedReference),
@@ -637,52 +434,36 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
         throw new NoSuchSchemaException("Hive Schema (database) does not exist " + schemaIdent);
       }
 
-      EntityStore store = GravitonEnv.getInstance().entityStore();
-      long uid = GravitonEnv.getInstance().idGenerator().nextId();
-      StringIdentifier stringId = StringIdentifier.fromId(uid);
-
       HiveTable hiveTable =
-          store.executeInTransaction(
-              () -> {
-                HiveTable createdTable =
-                    new HiveTable.Builder()
-                        .withId(uid)
-                        .withName(tableIdent.name())
-                        .withNameSpace(tableIdent.namespace())
-                        .withColumns(columns)
-                        .withComment(comment)
-                        .withProperties(properties)
-                        .withDistribution(distribution)
-                        .withSortOrders(sortOrders)
-                        .withProperties(StringIdentifier.addToProperties(stringId, properties))
-                        .withAuditInfo(
-                            new AuditInfo.Builder()
-                                .withCreator(currentUser())
-                                .withCreateTime(Instant.now())
-                                .build())
-                        .withPartitions(partitions)
-                        .build();
-                store.put(createdTable, false);
-                clientPool.run(
-                    c -> {
-                      c.createTable(createdTable.toInnerTable());
-                      return null;
-                    });
-                return createdTable;
-              });
+          new HiveTable.Builder()
+              .withName(tableIdent.name())
+              .withSchemaName(schemaIdent.name())
+              .withComment(comment)
+              .withColumns(columns)
+              .withProperties(properties)
+              .withDistribution(distribution)
+              .withSortOrders(sortOrders)
+              .withAuditInfo(
+                  new AuditInfo.Builder()
+                      .withCreator(currentUser())
+                      .withCreateTime(Instant.now())
+                      .build())
+              .withPartitions(partitions)
+              .build();
+      clientPool.run(
+          c -> {
+            c.createTable(hiveTable.toHiveTable());
+            return null;
+          });
 
       LOG.info("Created Hive table {} in Hive Metastore", tableIdent.name());
-
       return hiveTable;
 
-    } catch (AlreadyExistsException | EntityAlreadyExistsException e) {
+    } catch (AlreadyExistsException e) {
       throw new TableAlreadyExistsException("Table already exists: " + tableIdent.name(), e);
     } catch (TException | InterruptedException e) {
       throw new RuntimeException(
           "Failed to create Hive table " + tableIdent.name() + " in Hive Metastore", e);
-    } catch (IOException e) {
-      throw new RuntimeException(
-          "Failed to create Hive table " + tableIdent.name() + " in Graviton store", e);
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
@@ -700,19 +481,12 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
   @Override
   public Table alterTable(NameIdentifier tableIdent, TableChange... changes)
       throws NoSuchTableException, IllegalArgumentException {
-    Preconditions.checkArgument(
-        !tableIdent.name().isEmpty(), "Cannot create table with empty name");
-
     NameIdentifier schemaIdent = NameIdentifier.of(tableIdent.namespace().levels());
-    Preconditions.checkArgument(
-        isValidNamespace(schemaIdent.namespace()),
-        String.format(
-            "Cannot support invalid namespace in Hive Metastore: %s", schemaIdent.namespace()));
 
     try {
       // TODO(@Minghuang): require a table lock to avoid race condition
       HiveTable table = (HiveTable) loadTable(tableIdent);
-      org.apache.hadoop.hive.metastore.api.Table alteredHiveTable = table.toInnerTable();
+      org.apache.hadoop.hive.metastore.api.Table alteredHiveTable = table.toHiveTable();
 
       for (TableChange change : changes) {
         // Table change
@@ -761,41 +535,14 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
         }
       }
 
-      EntityStore store = GravitonEnv.getInstance().entityStore();
-      HiveTable updatedTable =
-          store.executeInTransaction(
-              () -> {
-                HiveTable.Builder builder = new HiveTable.Builder();
-                builder =
-                    builder
-                        .withId(table.id())
-                        .withName(alteredHiveTable.getTableName())
-                        .withNameSpace(tableIdent.namespace());
-
-                HiveTable alteredTable = HiveTable.fromInnerTable(alteredHiveTable, builder);
-
-                AuditInfo newAudit =
-                    new AuditInfo.Builder()
-                        .withCreator(table.auditInfo().creator())
-                        .withCreateTime(table.auditInfo().createTime())
-                        .withLastModifier(currentUser())
-                        .withLastModifiedTime(Instant.now())
-                        .build();
-                alteredTable.auditInfo().merge(newAudit, true /* overwrite */);
-
-                store.delete(tableIdent, TABLE);
-                store.put(alteredTable, false);
-                clientPool.run(
-                    c -> {
-                      c.alter_table(schemaIdent.name(), tableIdent.name(), alteredHiveTable);
-                      return null;
-                    });
-                return alteredTable;
-              });
+      clientPool.run(
+          c -> {
+            c.alter_table(schemaIdent.name(), tableIdent.name(), alteredHiveTable);
+            return null;
+          });
 
       LOG.info("Altered Hive table {} in Hive Metastore", tableIdent.name());
-
-      return updatedTable;
+      return HiveTable.fromHiveTable(alteredHiveTable);
 
     } catch (NoSuchObjectException e) {
       throw new NoSuchTableException(
@@ -803,9 +550,6 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     } catch (TException | InterruptedException e) {
       throw new RuntimeException(
           "Failed to alter Hive table " + tableIdent.name() + " in Hive metastore", e);
-    } catch (IOException e) {
-      throw new RuntimeException(
-          "Failed to alter Hive table " + tableIdent.name() + " in Graviton store", e);
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
@@ -937,7 +681,6 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
    */
   @Override
   public boolean purgeTable(NameIdentifier tableIdent) throws UnsupportedOperationException {
-    HiveTable table = (HiveTable) loadTable(tableIdent);
     // TODO(minghuang): HiveTable support specify `tableType`, then reject purge Hive table with
     //  `tableType` EXTERNAL_TABLE
     return dropHiveTable(tableIdent, true, true);
@@ -950,49 +693,27 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
    * @return true if the namespace is valid; otherwise, false.
    */
   private boolean dropHiveTable(NameIdentifier tableIdent, boolean deleteData, boolean ifPurge) {
-    Preconditions.checkArgument(!tableIdent.name().isEmpty(), "Cannot drop table with empty name");
-
     NameIdentifier schemaIdent = NameIdentifier.of(tableIdent.namespace().levels());
-    Preconditions.checkArgument(
-        isValidNamespace(schemaIdent.namespace()),
-        String.format(
-            "Cannot support invalid namespace in Hive Metastore: %s", schemaIdent.namespace()));
 
     try {
-      EntityStore store = GravitonEnv.getInstance().entityStore();
-      return store.executeInTransaction(
-          () -> {
-            boolean dropped = store.delete(tableIdent, TABLE);
-            clientPool.run(
-                c -> {
-                  c.dropTable(schemaIdent.name(), tableIdent.name(), deleteData, false, ifPurge);
-                  return null;
-                });
-            LOG.info("Dropped Hive table {}", tableIdent.name());
-            return dropped;
+      clientPool.run(
+          c -> {
+            c.dropTable(schemaIdent.name(), tableIdent.name(), deleteData, false, ifPurge);
+            return null;
           });
+
+      LOG.info("Dropped Hive table {}", tableIdent.name());
+      return true;
+
     } catch (NoSuchObjectException e) {
       LOG.warn("Hive table {} does not exist in Hive Metastore", tableIdent.name());
       return false;
     } catch (TException | InterruptedException e) {
       throw new RuntimeException(
           "Failed to drop Hive table " + tableIdent.name() + " in Hive Metastore", e);
-    } catch (IOException e) {
-      throw new RuntimeException(
-          "Failed to drop Hive table " + tableIdent.name() + " in Graviton store", e);
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
-  }
-
-  /**
-   * Checks if the given namespace is a valid namespace for the Hive schema.
-   *
-   * @param namespace The namespace to validate.
-   * @return true if the namespace is valid; otherwise, false.
-   */
-  public boolean isValidNamespace(Namespace namespace) {
-    return namespace.levels().length == 2 && namespace.level(1).equals(entity.name());
   }
 
   // TODO. We should figure out a better way to get the current user from servlet container.

@@ -4,9 +4,11 @@
  */
 package com.datastrato.graviton.catalog.hive;
 
-import com.datastrato.graviton.meta.rel.BaseColumn;
+import com.datastrato.graviton.catalog.rel.BaseColumn;
+import lombok.EqualsAndHashCode;
 
 /** Represents a column in the Hive Metastore catalog. */
+@EqualsAndHashCode(callSuper = true)
 public class HiveColumn extends BaseColumn {
 
   private HiveColumn() {}

@@ -29,6 +29,14 @@ public class TestEntity {
   private final String catalogName = "testCatalog";
   private final Catalog.Type type = Catalog.Type.RELATIONAL;
 
+  // Schema test data
+  private final Long schemaId = 1L;
+  private final String schemaName = "testSchema";
+
+  // Table test data
+  private final Long tableId = 1L;
+  private final String tableName = "testTable";
+
   @Test
   public void testMetalake() {
     BaseMetalake metalake =
@@ -69,5 +77,35 @@ public class TestEntity {
     Assertions.assertEquals(type, fields.get(CatalogEntity.TYPE));
     Assertions.assertEquals(map, fields.get(CatalogEntity.PROPERTIES));
     Assertions.assertEquals(auditInfo, fields.get(CatalogEntity.AUDIT_INFO));
+  }
+
+  @Test
+  public void testSchema() {
+    SchemaEntity testSchema =
+        new SchemaEntity.Builder()
+            .withId(schemaId)
+            .withName(schemaName)
+            .withAuditInfo(auditInfo)
+            .build();
+
+    Map<Field, Object> fields = testSchema.fields();
+    Assertions.assertEquals(schemaId, fields.get(SchemaEntity.ID));
+    Assertions.assertEquals(schemaName, fields.get(SchemaEntity.NAME));
+    Assertions.assertEquals(auditInfo, fields.get(SchemaEntity.AUDIT_INFO));
+  }
+
+  @Test
+  public void testTable() {
+    TableEntity testTable =
+        new TableEntity.Builder()
+            .withId(tableId)
+            .withName(tableName)
+            .withAuditInfo(auditInfo)
+            .build();
+
+    Map<Field, Object> fields = testTable.fields();
+    Assertions.assertEquals(tableId, fields.get(TableEntity.ID));
+    Assertions.assertEquals(tableName, fields.get(TableEntity.NAME));
+    Assertions.assertEquals(auditInfo, fields.get(TableEntity.AUDIT_INFO));
   }
 }

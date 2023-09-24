@@ -4,15 +4,27 @@
  */
 package com.datastrato.graviton.catalog;
 
+import static com.datastrato.graviton.Entity.EntityType.SCHEMA;
+import static com.datastrato.graviton.Entity.EntityType.TABLE;
+
+import com.datastrato.graviton.EntityStore;
+import com.datastrato.graviton.HasIdentifier;
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
+import com.datastrato.graviton.StringIdentifier;
+import com.datastrato.graviton.catalog.rel.EntityCombinedSchema;
+import com.datastrato.graviton.catalog.rel.EntityCombinedTable;
 import com.datastrato.graviton.exceptions.IllegalNameIdentifierException;
 import com.datastrato.graviton.exceptions.NoSuchCatalogException;
+import com.datastrato.graviton.exceptions.NoSuchEntityException;
 import com.datastrato.graviton.exceptions.NoSuchSchemaException;
 import com.datastrato.graviton.exceptions.NoSuchTableException;
 import com.datastrato.graviton.exceptions.NonEmptySchemaException;
 import com.datastrato.graviton.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.graviton.exceptions.TableAlreadyExistsException;
+import com.datastrato.graviton.meta.AuditInfo;
+import com.datastrato.graviton.meta.SchemaEntity;
+import com.datastrato.graviton.meta.TableEntity;
 import com.datastrato.graviton.rel.Column;
 import com.datastrato.graviton.rel.Distribution;
 import com.datastrato.graviton.rel.Schema;
@@ -23,13 +35,17 @@ import com.datastrato.graviton.rel.Table;
 import com.datastrato.graviton.rel.TableCatalog;
 import com.datastrato.graviton.rel.TableChange;
 import com.datastrato.graviton.rel.transforms.Transform;
+import com.datastrato.graviton.storage.IdGenerator;
 import com.datastrato.graviton.utils.ThrowableFunction;
 import com.google.common.annotations.VisibleForTesting;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * A catalog operation dispatcher that dispatches the catalog operations to the underlying catalog
@@ -37,15 +53,26 @@ import java.util.stream.Stream;
  */
 public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas {
 
+  private static final Logger LOG = LoggerFactory.getLogger(CatalogOperationDispatcher.class);
+
   private final CatalogManager catalogManager;
+
+  private final EntityStore store;
+
+  private final IdGenerator idGenerator;
 
   /**
    * Creates a new CatalogOperationDispatcher instance.
    *
    * @param catalogManager The CatalogManager instance to be used for catalog operations.
+   * @param store The EntityStore instance to be used for catalog operations.
+   * @param idGenerator The IdGenerator instance to be used for catalog operations.
    */
-  public CatalogOperationDispatcher(CatalogManager catalogManager) {
+  public CatalogOperationDispatcher(
+      CatalogManager catalogManager, EntityStore store, IdGenerator idGenerator) {
     this.catalogManager = catalogManager;
+    this.store = store;
+    this.idGenerator = idGenerator;
   }
 
   /**
@@ -58,10 +85,8 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
    */
   @Override
   public NameIdentifier[] listSchemas(Namespace namespace) throws NoSuchCatalogException {
-    NameIdentifier catalogIdent = NameIdentifier.of(namespace.levels());
-
     return doWithCatalog(
-        catalogIdent,
+        getCatalogIdentifier(NameIdentifier.of(namespace.levels())),
         c -> c.doWithSchemaOps(s -> s.listSchemas(namespace)),
         NoSuchCatalogException.class);
   }
@@ -80,13 +105,42 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
   @Override
   public Schema createSchema(NameIdentifier ident, String comment, Map<String, String> metadata)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
-    NameIdentifier catalogIdent = NameIdentifier.of(ident.namespace().levels());
+    long uid = idGenerator.nextId();
+    // Add StringIdentifier to the properties, the specific catalog will handle this
+    // StringIdentifier to make sure only when the operation is successful, the related
+    // SchemaEntity will be visible.
+    StringIdentifier stringId = StringIdentifier.fromId(uid);
+    Map<String, String> updatedProperties = StringIdentifier.addToProperties(stringId, metadata);
 
-    return doWithCatalog(
-        catalogIdent,
-        c -> c.doWithSchemaOps(s -> s.createSchema(ident, comment, metadata)),
-        NoSuchCatalogException.class,
-        SchemaAlreadyExistsException.class);
+    Schema schema =
+        doWithCatalog(
+            getCatalogIdentifier(ident),
+            c -> c.doWithSchemaOps(s -> s.createSchema(ident, comment, updatedProperties)),
+            NoSuchCatalogException.class,
+            SchemaAlreadyExistsException.class);
+
+    SchemaEntity schemaEntity =
+        new SchemaEntity.Builder()
+            .withId(uid)
+            .withName(ident.name())
+            .withNamespace(ident.namespace())
+            .withAuditInfo(
+                new AuditInfo.Builder()
+                    .withCreator("graviton") // TODO. hardcoded as user "graviton" for now, will
+                    // change to real user once user system is ready.
+                    .withCreateTime(Instant.now())
+                    .build())
+            .build();
+
+    try {
+      store.put(schemaEntity, true /* overwrite */);
+    } catch (Exception e) {
+      LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", ident, e);
+      return EntityCombinedSchema.of(schema);
+    }
+
+    // Merge both the metadata from catalog operation and the metadata from entity store.
+    return EntityCombinedSchema.of(schema, schemaEntity);
   }
 
   /**
@@ -98,12 +152,25 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
    */
   @Override
   public Schema loadSchema(NameIdentifier ident) throws NoSuchSchemaException {
-    NameIdentifier catalogIdent = NameIdentifier.of(ident.namespace().levels());
+    Schema schema =
+        doWithCatalog(
+            getCatalogIdentifier(ident),
+            c -> c.doWithSchemaOps(s -> s.loadSchema(ident)),
+            NoSuchSchemaException.class);
 
-    return doWithCatalog(
-        catalogIdent,
-        c -> c.doWithSchemaOps(s -> s.loadSchema(ident)),
-        NoSuchSchemaException.class);
+    StringIdentifier stringId = getStringIdFromProperties(schema.properties());
+    // Case 1: The schema is not created by Graviton.
+    if (stringId == null) {
+      return EntityCombinedSchema.of(schema);
+    }
+
+    SchemaEntity schemaEntity =
+        operateOnEntity(
+            ident,
+            identifier -> store.get(identifier, SCHEMA, SchemaEntity.class),
+            "GET",
+            stringId.id());
+    return EntityCombinedSchema.of(schema, schemaEntity);
   }
 
   /**
@@ -118,12 +185,44 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
   @Override
   public Schema alterSchema(NameIdentifier ident, SchemaChange... changes)
       throws NoSuchSchemaException {
-    NameIdentifier catalogIdent = NameIdentifier.of(ident.namespace().levels());
+    Schema alteredSchema =
+        doWithCatalog(
+            getCatalogIdentifier(ident),
+            c -> c.doWithSchemaOps(s -> s.alterSchema(ident, changes)),
+            NoSuchSchemaException.class);
 
-    return doWithCatalog(
-        catalogIdent,
-        c -> c.doWithSchemaOps(s -> s.alterSchema(ident, changes)),
-        NoSuchSchemaException.class);
+    StringIdentifier stringId = getStringIdFromProperties(alteredSchema.properties());
+    // Case 1: The schema is not created by Graviton.
+    if (stringId == null) {
+      return EntityCombinedSchema.of(alteredSchema);
+    }
+
+    SchemaEntity updatedSchemaEntity =
+        operateOnEntity(
+            ident,
+            id ->
+                store.update(
+                    id,
+                    SchemaEntity.class,
+                    SCHEMA,
+                    schemaEntity ->
+                        new SchemaEntity.Builder()
+                            .withId(schemaEntity.id())
+                            .withName(schemaEntity.name())
+                            .withNamespace(ident.namespace())
+                            .withAuditInfo(
+                                new AuditInfo.Builder()
+                                    .withCreator(schemaEntity.auditInfo().creator())
+                                    .withCreateTime(schemaEntity.auditInfo().createTime())
+                                    .withLastModifier(
+                                        "graviton") // TODO. hardcoded as user "graviton"
+                                    // for now, will change to real user once user system is ready.
+                                    .withLastModifiedTime(Instant.now())
+                                    .build())
+                            .build()),
+            "UPDATE",
+            stringId.id());
+    return EntityCombinedSchema.of(alteredSchema, updatedSchemaEntity);
   }
 
   /**
@@ -136,12 +235,23 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
    */
   @Override
   public boolean dropSchema(NameIdentifier ident, boolean cascade) throws NonEmptySchemaException {
-    NameIdentifier catalogIdent = NameIdentifier.of(ident.namespace().levels());
+    boolean dropped =
+        doWithCatalog(
+            getCatalogIdentifier(ident),
+            c -> c.doWithSchemaOps(s -> s.dropSchema(ident, cascade)),
+            NonEmptySchemaException.class);
 
-    return doWithCatalog(
-        catalogIdent,
-        c -> c.doWithSchemaOps(s -> s.dropSchema(ident, cascade)),
-        NonEmptySchemaException.class);
+    if (!dropped) {
+      return false;
+    }
+
+    try {
+      store.delete(ident, SCHEMA, cascade);
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+
+    return true;
   }
 
   /**
@@ -154,10 +264,8 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
    */
   @Override
   public NameIdentifier[] listTables(Namespace namespace) throws NoSuchSchemaException {
-    NameIdentifier catalogIdent = NameIdentifier.of(namespace.levels());
-
     return doWithCatalog(
-        catalogIdent,
+        getCatalogIdentifier(NameIdentifier.of(namespace.levels())),
         c -> c.doWithTableOps(t -> t.listTables(namespace)),
         NoSuchSchemaException.class);
   }
@@ -171,10 +279,25 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
    */
   @Override
   public Table loadTable(NameIdentifier ident) throws NoSuchTableException {
-    NameIdentifier catalogIdent = NameIdentifier.of(ident.namespace().levels());
+    Table table =
+        doWithCatalog(
+            getCatalogIdentifier(ident),
+            c -> c.doWithTableOps(t -> t.loadTable(ident)),
+            NoSuchTableException.class);
 
-    return doWithCatalog(
-        catalogIdent, c -> c.doWithTableOps(t -> t.loadTable(ident)), NoSuchTableException.class);
+    StringIdentifier stringId = getStringIdFromProperties(table.properties());
+    // Case 1: The table is not created by Graviton.
+    if (stringId == null) {
+      return EntityCombinedTable.of(table);
+    }
+
+    TableEntity tableEntity =
+        operateOnEntity(
+            ident,
+            identifier -> store.get(identifier, TABLE, TableEntity.class),
+            "GET",
+            stringId.id());
+    return EntityCombinedTable.of(table, tableEntity);
   }
 
   /**
@@ -199,23 +322,50 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
       Distribution distribution,
       SortOrder[] sortOrders)
       throws NoSuchSchemaException, TableAlreadyExistsException {
-    NameIdentifier catalogIdent = NameIdentifier.of(ident.namespace().levels());
+    long uid = idGenerator.nextId();
+    // Add StringIdentifier to the properties, the specific catalog will handle this
+    // StringIdentifier to make sure only when the operation is successful, the related
+    // TableEntity will be visible.
+    StringIdentifier stringId = StringIdentifier.fromId(uid);
+    Map<String, String> updatedProperties = StringIdentifier.addToProperties(stringId, properties);
 
-    return doWithCatalog(
-        catalogIdent,
-        c ->
-            c.doWithTableOps(
-                t ->
-                    t.createTable(
-                        ident,
-                        columns,
-                        comment,
-                        properties,
-                        partitions == null ? new Transform[0] : partitions,
-                        distribution == null ? Distribution.NONE : distribution,
-                        sortOrders == null ? new SortOrder[0] : sortOrders)),
-        NoSuchSchemaException.class,
-        TableAlreadyExistsException.class);
+    Table table =
+        doWithCatalog(
+            getCatalogIdentifier(ident),
+            c ->
+                c.doWithTableOps(
+                    t ->
+                        t.createTable(
+                            ident,
+                            columns,
+                            comment,
+                            updatedProperties,
+                            partitions == null ? new Transform[0] : partitions,
+                            distribution == null ? Distribution.NONE : distribution,
+                            sortOrders == null ? new SortOrder[0] : sortOrders)),
+            NoSuchSchemaException.class,
+            TableAlreadyExistsException.class);
+
+    TableEntity tableEntity =
+        new TableEntity.Builder()
+            .withId(uid)
+            .withName(ident.name())
+            .withNamespace(ident.namespace())
+            .withAuditInfo(
+                new AuditInfo.Builder()
+                    .withCreator("graviton")
+                    .withCreateTime(Instant.now())
+                    .build())
+            .build();
+
+    try {
+      store.put(tableEntity, true /* overwrite */);
+    } catch (Exception e) {
+      LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", ident, e);
+      return EntityCombinedTable.of(table);
+    }
+
+    return EntityCombinedTable.of(table, tableEntity);
   }
 
   /**
@@ -231,12 +381,55 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
   @Override
   public Table alterTable(NameIdentifier ident, TableChange... changes)
       throws NoSuchTableException, IllegalArgumentException {
-    NameIdentifier catalogIdent = NameIdentifier.of(ident.namespace().levels());
-    return doWithCatalog(
-        catalogIdent,
-        c -> c.doWithTableOps(t -> t.alterTable(ident, changes)),
-        NoSuchTableException.class,
-        IllegalArgumentException.class);
+    Table alteredTable =
+        doWithCatalog(
+            getCatalogIdentifier(ident),
+            c -> c.doWithTableOps(t -> t.alterTable(ident, changes)),
+            NoSuchTableException.class,
+            IllegalArgumentException.class);
+
+    StringIdentifier stringId = getStringIdFromProperties(alteredTable.properties());
+    // Case 1: The table is not created by Graviton.
+    if (stringId == null) {
+      return EntityCombinedTable.of(alteredTable);
+    }
+
+    TableEntity updatedTableEntity =
+        operateOnEntity(
+            ident,
+            id ->
+                store.update(
+                    id,
+                    TableEntity.class,
+                    TABLE,
+                    tableEntity -> {
+                      String newName =
+                          Arrays.stream(changes)
+                              .filter(c -> c instanceof TableChange.RenameTable)
+                              .map(c -> ((TableChange.RenameTable) c).getNewName())
+                              .reduce((c1, c2) -> c2)
+                              .orElse(tableEntity.name());
+
+                      return new TableEntity.Builder()
+                          .withId(tableEntity.id())
+                          .withName(newName)
+                          .withNamespace(ident.namespace())
+                          .withAuditInfo(
+                              new AuditInfo.Builder()
+                                  .withCreator(tableEntity.auditInfo().creator())
+                                  .withCreateTime(tableEntity.auditInfo().createTime())
+                                  .withLastModifier(
+                                      "graviton") //  hardcoded as user "graviton" for now, will
+                                  // change
+                                  // to real user once user system is ready.
+                                  .withLastModifiedTime(Instant.now())
+                                  .build())
+                          .build();
+                    }),
+            "UPDATE",
+            stringId.id());
+
+    return EntityCombinedTable.of(alteredTable, updatedTableEntity);
   }
 
   /**
@@ -249,18 +442,30 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
    */
   @Override
   public boolean dropTable(NameIdentifier ident) {
-    NameIdentifier catalogIdent = NameIdentifier.of(ident.namespace().levels());
+    boolean dropped =
+        doWithCatalog(
+            getCatalogIdentifier(ident),
+            c -> c.doWithTableOps(t -> t.dropTable(ident)),
+            NoSuchTableException.class);
 
-    return doWithCatalog(
-        catalogIdent, c -> c.doWithTableOps(t -> t.dropTable(ident)), NoSuchTableException.class);
+    if (!dropped) {
+      return false;
+    }
+
+    try {
+      store.delete(ident, TABLE);
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+
+    return true;
   }
 
   private <R, E extends Throwable> R doWithCatalog(
       NameIdentifier ident, ThrowableFunction<CatalogManager.CatalogWrapper, R> fn, Class<E> ex)
       throws E {
     try {
-      NameIdentifier catalogIdent = getCatalogIdentifier(ident);
-      CatalogManager.CatalogWrapper c = catalogManager.loadCatalogAndWrap(catalogIdent);
+      CatalogManager.CatalogWrapper c = catalogManager.loadCatalogAndWrap(ident);
       return fn.apply(c);
     } catch (Throwable throwable) {
       if (ex.isInstance(throwable)) {
@@ -277,9 +482,7 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
       Class<E2> ex2)
       throws E1, E2 {
     try {
-      NameIdentifier catalogIdent = getCatalogIdentifier(ident);
-
-      CatalogManager.CatalogWrapper c = catalogManager.loadCatalogAndWrap(catalogIdent);
+      CatalogManager.CatalogWrapper c = catalogManager.loadCatalogAndWrap(ident);
       return fn.apply(c);
     } catch (Throwable throwable) {
       if (ex1.isInstance(throwable)) {
@@ -290,6 +493,43 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
 
       throw new RuntimeException(throwable);
     }
+  }
+
+  private StringIdentifier getStringIdFromProperties(Map<String, String> properties) {
+    try {
+      StringIdentifier stringId = StringIdentifier.fromProperties(properties);
+      if (stringId == null) {
+        LOG.warn(FormattedErrorMessages.STRING_ID_NOT_FOUND);
+      }
+      return stringId;
+    } catch (IllegalArgumentException e) {
+      LOG.warn(FormattedErrorMessages.STRING_ID_PARSE_ERROR, e.getMessage());
+      return null;
+    }
+  }
+
+  private <R extends HasIdentifier> R operateOnEntity(
+      NameIdentifier ident, ThrowableFunction<NameIdentifier, R> fn, String opName, long id) {
+    R ret = null;
+    try {
+      ret = fn.apply(ident);
+    } catch (NoSuchEntityException e) {
+      // Case 2: The table is created by Graviton, but has no corresponding entity in Graviton.
+      LOG.error(FormattedErrorMessages.ENTITY_NOT_FOUND, ident);
+    } catch (Exception e) {
+      // Case 3: The table is created by Graviton, but failed to operate the corresponding entity
+      // in Graviton
+      LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, opName, ident, e);
+    }
+
+    // Case 4: The table is created by Graviton, but the uid in the corresponding entity is not
+    // matched.
+    if (ret != null && ret.id() != id) {
+      LOG.error(FormattedErrorMessages.ENTITY_UNMATCHED, ident, ret.id(), id);
+      ret = null;
+    }
+
+    return ret;
   }
 
   @VisibleForTesting
@@ -312,5 +552,33 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
           "Cannot create a catalog NameIdentifier less than two elements.");
     }
     return NameIdentifier.of(allElems.get(0), allElems.get(1));
+  }
+
+  private static final class FormattedErrorMessages {
+    static final String STORE_OP_FAILURE =
+        "Failed to {} entity for {} in "
+            + "Graviton, with this situation the returned object will not contain the metadata from "
+            + "Graviton.";
+
+    static final String STRING_ID_NOT_FOUND =
+        "String identifier is not set in schema properties, "
+            + "this is because the schema is not created by Graviton, or the schema is created by "
+            + "Graviton but the string identifier is removed by the user.";
+
+    static final String STRING_ID_PARSE_ERROR =
+        "Failed to get string identifier from schema "
+            + "properties: {}, this maybe caused by the same-name string identifier is set by the user "
+            + "with unsupported format.";
+
+    static final String ENTITY_NOT_FOUND =
+        "Entity for {} doesn't exist in Graviton, "
+            + "this is unexpected if this is created by Graviton. With this situation the "
+            + "returned object will not contain the metadata from Graviton";
+
+    static final String ENTITY_UNMATCHED =
+        "Entity {} with uid {} doesn't match the string "
+            + "identifier in the property {}, this is unexpected if this object is created by "
+            + "Graviton. This might be due to some operations that are not performed through Graviton. "
+            + "With this situation the returned object will not contain the metadata from Graviton";
   }
 }
