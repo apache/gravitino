@@ -163,7 +163,8 @@ public class MiniGraviton {
             + AuxiliaryServiceManager.AUX_SERVICE_NAMES,
         IcebergAuxiliaryService.SERVICE_NAME);
 
-    String icebergClassPath = Paths.get("catalog-lakehouse", "build", "libs").toString();
+    String icebergClassPath =
+        Paths.get("catalogs", "catalog-lakehouse", "build", "libs").toString();
     configMap.put(
         AuxiliaryServiceManager.GRAVITON_AUX_SERVICE_PREFIX
             + IcebergAuxiliaryService.SERVICE_NAME
