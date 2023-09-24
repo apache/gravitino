@@ -4,11 +4,11 @@
  */
 package com.datastrato.graviton.proto;
 
-import com.datastrato.graviton.meta.rel.BaseSchema;
+import com.datastrato.graviton.meta.SchemaEntity;
 
-public class SchemaEntitySerDe implements ProtoSerDe<BaseSchema, Schema> {
+public class SchemaEntitySerDe implements ProtoSerDe<SchemaEntity, Schema> {
   @Override
-  public Schema serialize(BaseSchema schemaEntity) {
+  public Schema serialize(SchemaEntity schemaEntity) {
     return Schema.newBuilder()
         .setId(schemaEntity.id())
         .setName(schemaEntity.name())
@@ -17,8 +17,8 @@ public class SchemaEntitySerDe implements ProtoSerDe<BaseSchema, Schema> {
   }
 
   @Override
-  public BaseSchema deserialize(Schema p) {
-    return new BaseSchema.SchemaBuilder()
+  public SchemaEntity deserialize(Schema p) {
+    return new SchemaEntity.Builder()
         .withId(p.getId())
         .withName(p.getName())
         .withAuditInfo(new AuditInfoSerDe().deserialize(p.getAuditInfo()))
