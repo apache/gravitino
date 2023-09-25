@@ -104,6 +104,12 @@ public abstract class BaseCatalog<T extends BaseCatalog> implements Catalog, Cat
   }
 
   @Override
+  public String provider() {
+    Preconditions.checkArgument(entity != null, "entity is not set");
+    return entity.getProvider();
+  }
+
+  @Override
   public String comment() {
     Preconditions.checkArgument(entity != null, "entity is not set");
     return entity.getComment();

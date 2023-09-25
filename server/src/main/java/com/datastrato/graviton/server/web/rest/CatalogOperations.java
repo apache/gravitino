@@ -15,6 +15,7 @@ import com.datastrato.graviton.dto.requests.CatalogUpdatesRequest;
 import com.datastrato.graviton.dto.responses.CatalogResponse;
 import com.datastrato.graviton.dto.responses.DropResponse;
 import com.datastrato.graviton.dto.responses.EntityListResponse;
+import com.datastrato.graviton.dto.util.DTOConverters;
 import com.datastrato.graviton.server.web.Utils;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
@@ -70,7 +71,11 @@ public class CatalogOperations {
       NameIdentifier ident = NameIdentifier.ofCatalog(metalake, request.getName());
       Catalog catalog =
           manager.createCatalog(
-              ident, request.getType(), request.getComment(), request.getProperties());
+              ident,
+              request.getType(),
+              request.getProvider(),
+              request.getComment(),
+              request.getProperties());
       return Utils.ok(new CatalogResponse(DTOConverters.toDTO(catalog)));
 
     } catch (Exception e) {

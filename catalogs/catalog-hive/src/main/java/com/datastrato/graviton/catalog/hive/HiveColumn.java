@@ -1,0 +1,34 @@
+/*
+ * Copyright 2023 Datastrato.
+ * This software is licensed under the Apache License version 2.
+ */
+package com.datastrato.graviton.catalog.hive;
+
+import com.datastrato.graviton.catalog.rel.BaseColumn;
+import lombok.EqualsAndHashCode;
+
+/** Represents a column in the Hive Metastore catalog. */
+@EqualsAndHashCode(callSuper = true)
+public class HiveColumn extends BaseColumn {
+
+  private HiveColumn() {}
+
+  /** A builder class for constructing HiveColumn instances. */
+  public static class Builder extends BaseColumnBuilder<Builder, HiveColumn> {
+
+    /**
+     * Internal method to build a HiveColumn instance using the provided values.
+     *
+     * @return A new HiveColumn instance with the configured values.
+     */
+    @Override
+    protected HiveColumn internalBuild() {
+      HiveColumn hiveColumn = new HiveColumn();
+
+      hiveColumn.name = name;
+      hiveColumn.comment = comment;
+      hiveColumn.dataType = dataType;
+      return hiveColumn;
+    }
+  }
+}

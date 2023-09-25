@@ -37,7 +37,7 @@ public class TestDTOJsonSerDe {
   private final String columnJson = "{\"name\":%s,\"type\":%s,\"comment\":%s}";
 
   private final String tableJson =
-      "{\"name\":%s,\"comment\":%s,\"columns\":[%s],\"properties\":%s,\"audit\":%s,\"partitions\":%s}";
+      "{\"name\":%s,\"comment\":%s,\"columns\":[%s],\"properties\":%s,\"audit\":%s,\"distribution\":%s,\"sortOrders\":%s,\"partitions\":%s}";
 
   private String withQuotes(String str) {
     return "\"" + str + "\"";
@@ -135,6 +135,7 @@ public class TestDTOJsonSerDe {
         new CatalogDTO.Builder()
             .withName("catalog")
             .withType(Catalog.Type.RELATIONAL)
+            .withProvider("test")
             .withComment("comment")
             .withProperties(ImmutableMap.of("k1", "v1", "k2", "v2"))
             .withAudit(audit)
@@ -149,6 +150,7 @@ public class TestDTOJsonSerDe {
         new CatalogDTO.Builder()
             .withName("catalog")
             .withType(Catalog.Type.RELATIONAL)
+            .withProvider("test")
             .withAudit(audit)
             .build();
 
@@ -215,6 +217,8 @@ public class TestDTOJsonSerDe {
                 withQuotes(comment)),
             JsonUtils.objectMapper().writeValueAsString(properties),
             String.format(auditJson, withQuotes(creator), withQuotes(now.toString()), null, null),
+            null,
+            null,
             null);
     Assertions.assertEquals(expectedJson, serJson);
   }

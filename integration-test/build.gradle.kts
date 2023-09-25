@@ -3,6 +3,9 @@
  * This software is licensed under the Apache License version 2.
  */
 
+import java.io.IOException
+import kotlin.io.*
+
 plugins {
   `maven-publish`
   id("java")
@@ -11,12 +14,19 @@ plugins {
 }
 
 dependencies {
-  testImplementation(project(":api"))
-  testImplementation(project(":core"))
-  testImplementation(project(":common"))
-  testImplementation(project(":client-java"))
-  testImplementation(project(":catalog-hive"))
-  testImplementation(project(":server"))
+  implementation(project(":server"))
+  implementation(project(":common"))
+  implementation(project(":clients:client-java"))
+  implementation(project(":api"))
+  implementation(project(":core"))
+  implementation(project(":catalogs:catalog-hive"))
+  implementation(project(":catalogs:catalog-lakehouse"))
+  implementation(libs.guava)
+  implementation(libs.bundles.log4j)
+  implementation(libs.bundles.jersey)
+  implementation(libs.bundles.jetty)
+  implementation(libs.httpclient5)
+  implementation(libs.commons.io)
 
   testImplementation(libs.hive2.metastore) {
     exclude("org.apache.hbase")
@@ -85,14 +95,118 @@ dependencies {
   testImplementation(libs.httpclient5)
   testRuntimeOnly(libs.junit.jupiter.engine)
   testImplementation(libs.mockito.core)
+  testImplementation(libs.bundles.log4j)
+}
+
+/* Optimizing integration test execution conditions */
+// Use this variable to control if we need to run docker test or not.
+var HIVE_IMAGE_NAME = "datastrato/graviton-ci-hive"
+var HIVE_IMAGE_TAG_NAME = "${HIVE_IMAGE_NAME}:0.1.2"
+var EXCLUDE_DOCKER_TEST = true
+// Use these 3 variables allow for more detailed control in the future.
+project.extra["dockerRunning"] = false
+project.extra["hiveContainerRunning"] = false
+
+fun printDockerCheckInfo() {
+  val testMode = project.properties["testMode"] as? String ?: "embedded"
+  if (testMode != "deploy" && testMode != "embedded") {
+    return
+  }
+  val dockerRunning = project.extra["dockerRunning"] as? Boolean ?: false
+  val hiveContainerRunning = project.extra["hiveContainerRunning"] as? Boolean ?: false
+  if (dockerRunning && hiveContainerRunning) {
+    EXCLUDE_DOCKER_TEST = false
+  }
+
+  println("------------------ Check Docker environment -----------------")
+  println("Docker server status ........................................ [${if (dockerRunning) "running" else "stop"}]")
+  println("Graviton IT Docker container is already running ............. [${if (hiveContainerRunning) "yes" else "no"}]")
+
+  if (dockerRunning && hiveContainerRunning) {
+    println("Use Graviton IT Docker container to run all integration test. [$testMode test]")
+  } else {
+    println("Run test cases without `graviton-docker-it` tag ............. [$testMode test]")
+  }
+  println("-------------------------------------------------------------")
 }
 
 tasks {
-  val integrationTest by creating(Test::class) {
-    environment("GRAVITON_HOME", rootDir.path + "/distribution/package")
-    environment("HADOOP_USER_NAME", "hive")
-    environment("HADOOP_HOME", "/tmp")
-    environment("PROJECT_VERSION", version)
-    useJUnitPlatform()
+  // Use this task to check if docker container is running
+  register("checkContainerRunning") {
+    doLast {
+      try {
+        val process = ProcessBuilder("docker", "ps", "--format='{{.Image}}'").start()
+        val exitCode = process.waitFor()
+
+        if (exitCode == 0) {
+          val output = process.inputStream.bufferedReader().readText()
+          val haveHiveContainer = output.contains("${HIVE_IMAGE_NAME}")
+          if (haveHiveContainer) {
+            project.extra["hiveContainerRunning"] = true
+          }
+        } else {
+          println("checkContainerRunning command execution failed with exit code $exitCode")
+        }
+      } catch (e: IOException) {
+        println("checkContainerRunning command execution failed: ${e.message}")
+      }
+    }
+  }
+
+  // Use this task to check if docker is running
+  register("checkDockerRunning") {
+    dependsOn("checkContainerRunning")
+
+    doLast {
+      try {
+        val process = ProcessBuilder("docker", "info").start()
+        val exitCode = process.waitFor()
+
+        if (exitCode == 0) {
+          project.extra["dockerRunning"] = true
+        } else {
+          println("checkDockerRunning Command execution failed with exit code $exitCode")
+        }
+      } catch (e: IOException) {
+        println("checkDockerRunning command execution failed: ${e.message}")
+      }
+      printDockerCheckInfo()
+    }
+  }
+}
+
+tasks.test {
+  val skipITs = project.hasProperty("skipITs")
+  if (skipITs) {
+    exclude("**/integration/test/**")
+  } else {
+    dependsOn("checkDockerRunning")
+
+    doFirst {
+      // Default use MiniGraviton to run integration tests
+      environment("GRAVITON_ROOT_DIR", rootDir.path)
+      environment("HADOOP_USER_NAME", "hive")
+      environment("HADOOP_HOME", "/tmp")
+      environment("PROJECT_VERSION", version)
+
+      val testMode = project.properties["testMode"] as? String ?: "embedded"
+      if (testMode == "deploy") {
+        environment("GRAVITON_HOME", rootDir.path + "/distribution/package")
+        systemProperty("testMode", "deploy")
+      } else if (testMode == "embedded") {
+        environment("GRAVITON_HOME", rootDir.path)
+        environment("GRAVITON_TEST", "true")
+        systemProperty("testMode", "embedded")
+        systemProperty("graviton.log.path", buildDir.path)
+      } else {
+        throw GradleException("Graviton integration test only support [-PtestMode=embedded] or [-PtestMode=deploy] mode!")
+      }
+
+      useJUnitPlatform {
+        if (EXCLUDE_DOCKER_TEST) {
+          excludeTags("graviton-docker-it")
+        }
+      }
+    }
   }
 }

@@ -33,17 +33,13 @@ import com.github.benmanes.caffeine.cache.Scheduler;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterables;
-import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Streams;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
-import java.net.MalformedURLException;
-import java.net.URL;
 import java.time.Instant;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -217,6 +213,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
    *
    * @param ident The identifier of the new catalog.
    * @param type The type of the new catalog.
+   * @param provider The provider of the new catalog.
    * @param comment The comment for the new catalog.
    * @param properties The properties of the new catalog.
    * @return The created catalog.
@@ -225,7 +222,11 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
    */
   @Override
   public Catalog createCatalog(
-      NameIdentifier ident, Catalog.Type type, String comment, Map<String, String> properties)
+      NameIdentifier ident,
+      Catalog.Type type,
+      String provider,
+      String comment,
+      Map<String, String> properties)
       throws NoSuchMetalakeException, CatalogAlreadyExistsException {
     try {
       CatalogEntity entity =
@@ -247,6 +248,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
                         .withName(ident.name())
                         .withNamespace(ident.namespace())
                         .withType(type)
+                        .withProvider(provider)
                         .withComment(comment)
                         .withProperties(StringIdentifier.addToProperties(stringId, properties))
                         .withAuditInfo(
@@ -300,6 +302,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
                         .withName(catalog.name())
                         .withNamespace(ident.namespace())
                         .withType(catalog.getType())
+                        .withProvider(catalog.getProvider())
                         .withComment(catalog.getComment());
 
                 AuditInfo newInfo =
@@ -387,17 +390,12 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
   private CatalogWrapper createCatalogWrapper(CatalogEntity entity) {
     Map<String, String> mergedConf =
         mergeConf(entity.getProperties(), catalogConf(entity.name(), config));
-
-    String provider = mergedConf.get(Catalog.PROPERTY_PROVIDER);
-    Preconditions.checkArgument(
-        provider != null,
-        "'provider' not set in catalog properties or conf via "
-            + "'graviton.catalog.<name>.provider'");
+    String provider = entity.getProvider();
 
     IsolatedClassLoader classLoader;
     if (config.get(Configs.CATALOG_LOAD_ISOLATED)) {
       String pkgPath = buildPkgPath(mergedConf, provider);
-      classLoader = buildClassLoader(pkgPath);
+      classLoader = IsolatedClassLoader.buildClassLoader(pkgPath);
     } else {
       // This will use the current class loader, it is mainly used for test.
       classLoader =
@@ -469,6 +467,8 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
           new StringBuilder()
               .append(gravitonHome)
               .append(File.separator)
+              .append("catalogs")
+              .append(File.separator)
               .append("catalog-")
               .append(provider)
               .append(File.separator)
@@ -479,30 +479,6 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
     }
 
     return pkgPath;
-  }
-
-  private IsolatedClassLoader buildClassLoader(String pkgPath) {
-    // Listing all the jars under the package path and build the isolated class loader.
-    File pkgFolder = new File(pkgPath);
-    if (!pkgFolder.exists()
-        || !pkgFolder.isDirectory()
-        || !pkgFolder.canRead()
-        || !pkgFolder.canExecute()) {
-      throw new IllegalArgumentException("Invalid package path: " + pkgPath);
-    }
-
-    List<URL> jars = Lists.newArrayList();
-    Arrays.stream(pkgFolder.listFiles())
-        .forEach(
-            f -> {
-              try {
-                jars.add(f.toURI().toURL());
-              } catch (MalformedURLException e) {
-                LOG.warn("Failed to read jar file: {}", f.getAbsolutePath(), e);
-              }
-            });
-
-    return new IsolatedClassLoader(jars, Collections.emptyList(), Collections.emptyList());
   }
 
   private Class<? extends CatalogProvider> lookupCatalogProvider(String provider, ClassLoader cl) {

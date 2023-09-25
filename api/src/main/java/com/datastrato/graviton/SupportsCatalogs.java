@@ -47,16 +47,25 @@ public interface SupportsCatalogs {
   /**
    * Create a catalog with specified identifier.
    *
+   * <p>The parameter "provider" is a short name of the catalog, used to tell Graviton which catalog
+   * should be created. The short name should be the same as the {@link CatalogProvider} interface
+   * provided.
+   *
    * @param ident the identifier of the catalog.
    * @param type the type of the catalog.
    * @param comment the comment of the catalog.
+   * @param provider the provider of the catalog.
    * @param properties the properties of the catalog.
    * @return The created catalog.
    * @throws NoSuchMetalakeException If the metalake does not exist.
    * @throws CatalogAlreadyExistsException If the catalog already exists.
    */
   Catalog createCatalog(
-      NameIdentifier ident, Catalog.Type type, String comment, Map<String, String> properties)
+      NameIdentifier ident,
+      Catalog.Type type,
+      String provider,
+      String comment,
+      Map<String, String> properties)
       throws NoSuchMetalakeException, CatalogAlreadyExistsException;
 
   /**

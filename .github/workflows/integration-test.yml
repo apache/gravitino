@@ -20,7 +20,7 @@ jobs:
   # Integration test for AMD64 architecture
   test-amd64-arch:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 30
     strategy:
       matrix:
         architecture: [linux/amd64]
@@ -53,14 +53,14 @@ jobs:
       - name: Setup Gradle
         uses: gradle/gradle-build-action@v2
         with:
-          gradle-version: '8.1.1'
+          gradle-version: '8.2'
 
       - name: Show gradle version
         run: gradle --version
 
       - name: Package Graviton
         run: |
-          gradle build
+          gradle build -x test
           gradle compileDistribution
 
       - name: Check docker container status
@@ -79,14 +79,22 @@ jobs:
             docker run --rm --name ${DOCKER_RUN_NAME} --platform ${PLATFORM} -d -p 8022:22 -p 8088:8088 -p 9000:9000 -p 9083:9083 -p 10000:10000 -p 10002:10002 -p 50070:50070 -p 50075:50075 ${HIVE_IMAGE_NAME}:${HIVE_IMAGE_TAG_NAME}
             sleep 60
 
+      - name: Setup debug Github Action
+        if: ${{ contains(github.event.pull_request.labels.*.name, 'debug action') }}
+        uses: csexton/debugger-action@master
+
       - name: Integration Test
         id: integrationTest
         run: |
-          gradle integrationTest
+          gradle test --rerun-tasks -PskipTests -PtestMode=embedded
+          gradle test --rerun-tasks -PskipTests -PtestMode=deploy
 
       - name: Print logs when Graviton integration tests failure
         if: ${{ failure() && steps.integrationTest.outcome == 'failure' }}
         run: |
+          if [ -f "integration-test/build/graviton-server.log" ]; then
+            cat integration-test/build/graviton-server.log
+          fi
           if [ -f "distribution/package/logs/graviton-server.out" ]; then
             cat distribution/package/logs/graviton-server.out
           fi

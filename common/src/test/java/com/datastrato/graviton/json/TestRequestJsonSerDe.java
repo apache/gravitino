@@ -87,7 +87,7 @@ public class TestRequestJsonSerDe {
   public void testCatalogCreateRequestSerDe() throws JsonProcessingException {
     CatalogCreateRequest req =
         new CatalogCreateRequest(
-            "catalog", Catalog.Type.RELATIONAL, "comment", ImmutableMap.of("key", "value"));
+            "catalog", Catalog.Type.RELATIONAL, "hive", "comment", ImmutableMap.of("key", "value"));
     String serJson = JsonUtils.objectMapper().writeValueAsString(req);
     CatalogCreateRequest deserReq =
         JsonUtils.objectMapper().readValue(serJson, CatalogCreateRequest.class);
@@ -95,21 +95,21 @@ public class TestRequestJsonSerDe {
 
     // Test with optional fields
     CatalogCreateRequest req1 =
-        new CatalogCreateRequest("catalog", Catalog.Type.RELATIONAL, null, null);
+        new CatalogCreateRequest("catalog", Catalog.Type.RELATIONAL, "hive", null, null);
     String serJson1 = JsonUtils.objectMapper().writeValueAsString(req1);
     CatalogCreateRequest deserReq1 =
         JsonUtils.objectMapper().readValue(serJson1, CatalogCreateRequest.class);
     Assertions.assertEquals(req1, deserReq1);
 
     CatalogCreateRequest req2 =
-        new CatalogCreateRequest("catalog", Catalog.Type.RELATIONAL, "", null);
+        new CatalogCreateRequest("catalog", Catalog.Type.RELATIONAL, "hive", "", null);
     String serJson2 = JsonUtils.objectMapper().writeValueAsString(req2);
     CatalogCreateRequest deserReq2 =
         JsonUtils.objectMapper().readValue(serJson2, CatalogCreateRequest.class);
     Assertions.assertEquals(req2, deserReq2);
 
     CatalogCreateRequest req3 =
-        new CatalogCreateRequest("catalog", Catalog.Type.RELATIONAL, "", ImmutableMap.of());
+        new CatalogCreateRequest("catalog", Catalog.Type.RELATIONAL, "hive", "", ImmutableMap.of());
     String serJson3 = JsonUtils.objectMapper().writeValueAsString(req3);
     CatalogCreateRequest deserReq3 =
         JsonUtils.objectMapper().readValue(serJson3, CatalogCreateRequest.class);

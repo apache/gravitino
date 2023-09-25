@@ -5,19 +5,20 @@
 package com.datastrato.graviton;
 
 import com.datastrato.graviton.config.ConfigEntry;
+import com.datastrato.graviton.utils.MapUtils;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Maps;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
-import java.util.Collections;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.function.Predicate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -128,16 +129,7 @@ public abstract class Config {
    * @return An unmodifiable map containing configuration entries with keys matching the prefix.
    */
   public Map<String, String> getConfigsWithPrefix(String prefix) {
-    Map<String, String> configs = Maps.newHashMap();
-    configMap.forEach(
-        (k, v) -> {
-          if (k.startsWith(prefix)) {
-            String newKey = k.substring(prefix.length());
-            configs.put(newKey, v);
-          }
-        });
-
-    return Collections.unmodifiableMap(configs);
+    return MapUtils.getPrefixMap(configMap, prefix);
   }
 
   /**
@@ -166,14 +158,17 @@ public abstract class Config {
    * Loads configurations from a map.
    *
    * @param map The map containing configuration key-value pairs.
+   * @param predicate The keys only match the predicate will be loaded to configMap
    */
-  private void loadFromMap(Map<String, String> map) {
+  public void loadFromMap(Map<String, String> map, Predicate<String> predicate) {
     map.forEach(
         (k, v) -> {
           String trimmedK = k.trim();
           String trimmedV = v.trim();
-          if (!trimmedK.isEmpty() && !trimmedV.isEmpty() && trimmedK.startsWith(CONFIG_PREPEND)) {
-            configMap.put(trimmedK, trimmedV);
+          if (!trimmedK.isEmpty() && !trimmedV.isEmpty()) {
+            if (predicate.test(trimmedK)) {
+              configMap.put(trimmedK, trimmedV);
+            }
           }
         });
   }
@@ -184,8 +179,8 @@ public abstract class Config {
    * @param properties The properties object containing configuration key-value pairs.
    */
   @VisibleForTesting
-  void loadFromProperties(Properties properties) {
-    loadFromMap(Maps.fromProperties(properties));
+  public void loadFromProperties(Properties properties) {
+    loadFromMap(Maps.fromProperties(properties), k -> k.startsWith(CONFIG_PREPEND));
   }
 
   /**
@@ -196,7 +191,7 @@ public abstract class Config {
    * @throws IOException If there's an issue loading the properties.
    */
   @VisibleForTesting
-  Properties loadPropertiesFromFile(File file) throws IOException {
+  public Properties loadPropertiesFromFile(File file) throws IOException {
     Properties properties = new Properties();
     try (InputStream in = Files.newInputStream(file.toPath())) {
       properties.load(in);

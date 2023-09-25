@@ -40,6 +40,8 @@ public class TestCatalogManager {
 
   private static String metalake = "metalake";
 
+  private static String provider = "test";
+
   @BeforeAll
   public static void setUp() throws IOException {
     config = new Config(false) {};
@@ -78,38 +80,32 @@ public class TestCatalogManager {
   @Test
   public void testCreateCatalog() {
     NameIdentifier ident = NameIdentifier.of("metalake", "test1");
-    Map<String, String> props = ImmutableMap.of("provider", "test");
+    Map<String, String> props = ImmutableMap.of();
 
     Catalog testCatalog =
-        catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, "comment", props);
+        catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, "comment", props);
     Assertions.assertEquals("test1", testCatalog.name());
     Assertions.assertEquals("comment", testCatalog.comment());
     testProperties(props, testCatalog.properties());
     Assertions.assertEquals(Catalog.Type.RELATIONAL, testCatalog.type());
-
-    // Test without setting "provider"
-    Map<String, String> props1 = ImmutableMap.of();
-    NameIdentifier ident1 = NameIdentifier.of("metalake", "test2");
-    Throwable exception =
-        Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () -> catalogManager.createCatalog(ident1, Catalog.Type.RELATIONAL, "comment", props1));
-    Assertions.assertTrue(
-        exception.getMessage().contains("'provider' not set in catalog properties"));
 
     // Test create under non-existed metalake
     NameIdentifier ident2 = NameIdentifier.of("metalake1", "test1");
     Throwable exception1 =
         Assertions.assertThrows(
             NoSuchMetalakeException.class,
-            () -> catalogManager.createCatalog(ident2, Catalog.Type.RELATIONAL, "comment", props));
+            () ->
+                catalogManager.createCatalog(
+                    ident2, Catalog.Type.RELATIONAL, provider, "comment", props));
     Assertions.assertTrue(exception1.getMessage().contains("Metalake metalake1 does not exist"));
 
     // Test create with duplicated name
     Throwable exception2 =
         Assertions.assertThrows(
             CatalogAlreadyExistsException.class,
-            () -> catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, "comment", props));
+            () ->
+                catalogManager.createCatalog(
+                    ident, Catalog.Type.RELATIONAL, provider, "comment", props));
     Assertions.assertTrue(
         exception2.getMessage().contains("Catalog metalake.test1 already exists"));
 
@@ -124,8 +120,8 @@ public class TestCatalogManager {
     NameIdentifier ident1 = NameIdentifier.of("metalake", "test12");
     Map<String, String> props = ImmutableMap.of("provider", "test");
 
-    catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, "comment", props);
-    catalogManager.createCatalog(ident1, Catalog.Type.RELATIONAL, "comment", props);
+    catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, "comment", props);
+    catalogManager.createCatalog(ident1, Catalog.Type.RELATIONAL, provider, "comment", props);
 
     Set<NameIdentifier> idents = Sets.newHashSet(catalogManager.listCatalogs(ident.namespace()));
     Assertions.assertEquals(2, idents.size());
@@ -144,7 +140,7 @@ public class TestCatalogManager {
     NameIdentifier ident = NameIdentifier.of("metalake", "test21");
     Map<String, String> props = ImmutableMap.of("provider", "test");
 
-    catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, "comment", props);
+    catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, "comment", props);
 
     Catalog catalog = catalogManager.loadCatalog(ident);
     Assertions.assertEquals("test21", catalog.name());
@@ -170,7 +166,7 @@ public class TestCatalogManager {
     Map<String, String> props = ImmutableMap.of("provider", "test");
     String comment = "comment";
 
-    catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, comment, props);
+    catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, comment, props);
 
     // Test alter name;
     CatalogChange change = CatalogChange.rename("test32");
@@ -215,7 +211,7 @@ public class TestCatalogManager {
     Map<String, String> props = ImmutableMap.of("provider", "test");
     String comment = "comment";
 
-    catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, comment, props);
+    catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, comment, props);
 
     // Test drop catalog
     boolean dropped = catalogManager.dropCatalog(ident);

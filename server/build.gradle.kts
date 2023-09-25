@@ -46,6 +46,7 @@ dependencies {
     exclude(group = "org.junit.jupiter")
   }
   testImplementation(libs.mockito.core)
+  testImplementation(libs.commons.io)
 }
 
 fun getGitCommitId(): String {
@@ -85,14 +86,17 @@ fun writeProjectPropertiesFile() {
   }
 }
 
-tasks.named("build") {
-  writeProjectPropertiesFile()
-  val file = file(propertiesFile)
-  if (!file.exists()) {
-    throw GradleException("$propertiesFile file not generated!")
+tasks {
+  jar {
+    doFirst() {
+      writeProjectPropertiesFile()
+      val file = file(propertiesFile)
+      if (!file.exists()) {
+        throw GradleException("$propertiesFile file not generated!")
+      }
+    }
   }
-}
-
-tasks.test {
-  environment("GRAVITON_ROOT_DIR", rootDir.path)
+  test {
+    environment("GRAVITON_HOME", rootDir.path)
+  }
 }

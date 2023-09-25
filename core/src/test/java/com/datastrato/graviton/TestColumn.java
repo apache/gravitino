@@ -4,7 +4,7 @@
  */
 package com.datastrato.graviton;
 
-import com.datastrato.graviton.meta.rel.BaseColumn;
+import com.datastrato.graviton.catalog.rel.BaseColumn;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
 

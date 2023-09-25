@@ -23,6 +23,7 @@ public class CatalogEntitySerDe implements ProtoSerDe<CatalogEntity, Catalog> {
         Catalog.newBuilder()
             .setId(catalogEntity.id())
             .setName(catalogEntity.name())
+            .setProvider(catalogEntity.getProvider())
             .setAuditInfo(new AuditInfoSerDe().serialize((AuditInfo) catalogEntity.auditInfo()));
 
     if (catalogEntity.getComment() != null) {
@@ -53,6 +54,7 @@ public class CatalogEntitySerDe implements ProtoSerDe<CatalogEntity, Catalog> {
     builder
         .withId(p.getId())
         .withName(p.getName())
+        .withProvider(p.getProvider())
         .withAuditInfo(new AuditInfoSerDe().deserialize(p.getAuditInfo()));
 
     if (p.hasComment()) {

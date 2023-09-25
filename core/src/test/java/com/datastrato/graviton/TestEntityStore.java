@@ -9,12 +9,11 @@ import com.datastrato.graviton.exceptions.NoSuchEntityException;
 import com.datastrato.graviton.meta.AuditInfo;
 import com.datastrato.graviton.meta.BaseMetalake;
 import com.datastrato.graviton.meta.CatalogEntity;
+import com.datastrato.graviton.meta.SchemaEntity;
 import com.datastrato.graviton.meta.SchemaVersion;
-import com.datastrato.graviton.rel.Column;
-import com.datastrato.graviton.rel.Table;
+import com.datastrato.graviton.meta.TableEntity;
 import com.datastrato.graviton.utils.Executable;
 import com.google.common.collect.Maps;
-import io.substrait.type.TypeCreator;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
@@ -157,24 +156,23 @@ public class TestEntityStore {
             .withName("catalog")
             .withNamespace(Namespace.of("metalake"))
             .withType(TestCatalog.Type.RELATIONAL)
+            .withProvider("test")
             .withAuditInfo(auditInfo)
             .build();
 
-    TestColumn column =
-        new TestColumn.Builder()
-            .withName("column")
-            .withComment("comment")
-            .withType(TypeCreator.NULLABLE.I8)
+    SchemaEntity schemaEntity =
+        new SchemaEntity.Builder()
+            .withId(1L)
+            .withName("schema")
+            .withNamespace(Namespace.of("metalake", "catalog"))
+            .withAuditInfo(auditInfo)
             .build();
 
-    TestTable table =
-        new TestTable.Builder()
+    TableEntity tableEntity =
+        new TableEntity.Builder()
             .withId(1L)
             .withName("table")
-            .withNameSpace(Namespace.of("metalake", "catalog", "db"))
-            .withComment("comment")
-            .withProperties(Maps.newHashMap())
-            .withColumns(new Column[] {column})
+            .withNamespace(Namespace.of("metalake", "catalog", "db"))
             .withAuditInfo(auditInfo)
             .build();
 
@@ -184,7 +182,8 @@ public class TestEntityStore {
 
     store.put(metalake);
     store.put(catalog);
-    store.put(table);
+    store.put(schemaEntity);
+    store.put(tableEntity);
 
     Metalake retrievedMetalake =
         store.get(metalake.nameIdentifier(), EntityType.METALAKE, BaseMetalake.class);
@@ -194,8 +193,13 @@ public class TestEntityStore {
         store.get(catalog.nameIdentifier(), EntityType.CATALOG, CatalogEntity.class);
     Assertions.assertEquals(catalog, retrievedCatalog);
 
-    Table retrievedTable = store.get(table.nameIdentifier(), EntityType.TABLE, TestTable.class);
-    Assertions.assertEquals(table, retrievedTable);
+    SchemaEntity retrievedSchema =
+        store.get(schemaEntity.nameIdentifier(), EntityType.SCHEMA, SchemaEntity.class);
+    Assertions.assertEquals(schemaEntity, retrievedSchema);
+
+    TableEntity retrievedTable =
+        store.get(tableEntity.nameIdentifier(), EntityType.TABLE, TableEntity.class);
+    Assertions.assertEquals(tableEntity, retrievedTable);
 
     store.delete(metalake.nameIdentifier(), EntityType.METALAKE);
     Assertions.assertThrows(

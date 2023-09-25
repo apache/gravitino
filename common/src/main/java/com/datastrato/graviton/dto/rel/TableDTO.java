@@ -7,7 +7,10 @@ package com.datastrato.graviton.dto.rel;
 import static com.datastrato.graviton.dto.rel.PartitionUtils.toTransforms;
 
 import com.datastrato.graviton.dto.AuditDTO;
+import com.datastrato.graviton.dto.util.DTOConverters;
 import com.datastrato.graviton.rel.Column;
+import com.datastrato.graviton.rel.Distribution;
+import com.datastrato.graviton.rel.SortOrder;
 import com.datastrato.graviton.rel.Table;
 import com.datastrato.graviton.rel.transforms.Transform;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -32,6 +35,12 @@ public class TableDTO implements Table {
   @JsonProperty("audit")
   private AuditDTO audit;
 
+  @JsonProperty("distribution")
+  private DistributionDTO distribution;
+
+  @JsonProperty("sortOrders")
+  private SortOrderDTO[] sortOrders;
+
   @JsonProperty("partitions")
   private Partition[] partitions;
 
@@ -53,12 +62,16 @@ public class TableDTO implements Table {
       ColumnDTO[] columns,
       Map<String, String> properties,
       AuditDTO audit,
-      Partition[] partitions) {
+      Partition[] partitions,
+      DistributionDTO distribution,
+      SortOrderDTO[] sortOrderDTOs) {
     this.name = name;
     this.comment = comment;
     this.columns = columns;
     this.properties = properties;
     this.audit = audit;
+    this.distribution = distribution;
+    this.sortOrders = sortOrderDTOs;
     this.partitions = partitions;
   }
 
@@ -92,6 +105,16 @@ public class TableDTO implements Table {
     return toTransforms(partitions);
   }
 
+  @Override
+  public SortOrder[] sortOrder() {
+    return DTOConverters.fromDTOs(sortOrders);
+  }
+
+  @Override
+  public Distribution distribution() {
+    return DTOConverters.fromDTO(distribution);
+  }
+
   /**
    * Creates a new Builder to build a Table DTO.
    *
@@ -112,6 +135,8 @@ public class TableDTO implements Table {
     protected ColumnDTO[] columns;
     protected Map<String, String> properties;
     protected AuditDTO audit;
+    protected SortOrderDTO[] sortOrderDTOs;
+    protected DistributionDTO distributionDTO;
     protected Partition[] partitions;
 
     public Builder() {}
@@ -171,6 +196,16 @@ public class TableDTO implements Table {
       return (S) this;
     }
 
+    public S withDistribution(DistributionDTO distributionDTO) {
+      this.distributionDTO = distributionDTO;
+      return (S) this;
+    }
+
+    public S withSortOrders(SortOrderDTO[] sortOrderDTOs) {
+      this.sortOrderDTOs = sortOrderDTOs;
+      return (S) this;
+    }
+
     public S withPartitions(Partition[] partitions) {
       this.partitions = partitions;
       return (S) this;
@@ -188,7 +223,8 @@ public class TableDTO implements Table {
           columns != null && columns.length > 0, "columns cannot be null or empty");
       Preconditions.checkArgument(audit != null, "audit cannot be null");
 
-      return new TableDTO(name, comment, columns, properties, audit, partitions);
+      return new TableDTO(
+          name, comment, columns, properties, audit, partitions, distributionDTO, sortOrderDTOs);
     }
   }
 }

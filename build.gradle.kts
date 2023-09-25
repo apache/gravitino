@@ -40,8 +40,8 @@ subprojects {
   }
 
   tasks.configureEach<Test> {
-    // Integration test module are tested separately
-    if (project.name != "integration-test") {
+    val skipTests = project.hasProperty("skipTests")
+    if (!skipTests) {
       useJUnitPlatform()
       finalizedBy(tasks.getByName("jacocoTestReport"))
     }
@@ -61,11 +61,12 @@ subprojects {
   version = "${version}"
 
   tasks.withType<Jar> {
-    archiveFileName.set("${rootProject.name.lowercase(Locale.getDefault())}-${project.name}-$version.jar")
+    archiveBaseName.set("${rootProject.name.lowercase(Locale.getDefault())}-${project.name}")
     if (project.name == "server") {
       from(sourceSets.main.get().resources)
       setDuplicatesStrategy(DuplicatesStrategy.INCLUDE)
     }
+
     if (project.name != "integration-test") {
       exclude("log4j2.properties")
       exclude("test/**")
@@ -154,7 +155,7 @@ tasks {
   val outputDir = projectDir.dir("distribution")
 
   val compileDistribution by registering {
-    dependsOn("copySubprojectDepends", "copyCatalogLibs", "copySubprojectLib")
+    dependsOn("copySubprojectDependencies", "copyCatalogLibs", "copySubprojectLib")
 
     group = "graviton distribution"
     outputs.dir(projectDir.dir("distribution/package"))
@@ -164,8 +165,6 @@ tasks {
         from(projectDir.dir("bin")) { into("package/bin") }
         into(outputDir)
         rename { fileName ->
-          // a simple way is to remove the "-$version" from the jar filename
-          // but you can customize the filename replacement rule as you wish.
           fileName.replace(".template", "")
         }
         fileMode = 0b111101101
@@ -177,10 +176,9 @@ tasks {
     group = "graviton distribution"
     finalizedBy("checksumDistribution")
     from(compileDistribution.map { it.outputs.files.single() })
-    archiveBaseName.set(rootProject.name.lowercase())
-    archiveVersion.set("${version}")
-    archiveClassifier.set("bin")
-    destinationDirectory.set(outputDir)
+    compression = Compression.GZIP
+    archiveFileName.set("${rootProject.name}-${version}.tar.gz")
+    destinationDirectory.set(projectDir.dir("distribution"))
   }
 
   register("checksumDistribution") {
@@ -202,19 +200,14 @@ tasks {
   val cleanDistribution by registering(Delete::class) {
     group = "graviton distribution"
     delete(outputDir)
-    delete("/tmp/graviton")
-    delete("server/src/main/resources/project.properties")
   }
 
-  val copySubprojectDepends by registering(Copy::class) {
-    dependsOn(":catalog-hive:copyDepends", ":catalog-lakehouse:copyDepends")
+  val copySubprojectDependencies by registering(Copy::class) {
     subprojects.forEach() {
-      if (it.name != "catalog-hive" &&
-          it.name != "client-java" &&
-          it.name != "integration-test" &&
-          it.name != "catalog-lakehouse" &&
-          it.name != "trino-connector"
-          ) {
+      if (!it.name.startsWith("catalog")
+          && !it.name.startsWith("client") 
+          && it.name != "trino-connector"
+          && it.name != "integration-test") {
         from(it.configurations.runtimeClasspath)
         into("distribution/package/libs")
       }
@@ -223,12 +216,10 @@ tasks {
 
   val copySubprojectLib by registering(Copy::class) {
     subprojects.forEach() {
-      if (it.name != "client-java" &&
-          it.name != "integration-test" &&
-          it.name != "catalog-hive" &&
-          it.name != "catalog-lakehouse" &&
-          it.name != "trino-connector"
-          ) {
+      if (!it.name.startsWith("catalog")
+          && !it.name.startsWith("client")
+          && it.name != "trino-connector"
+          && it.name != "integration-test") {
         dependsOn("${it.name}:build")
         from("${it.name}/build/libs")
         into("distribution/package/libs")
@@ -239,15 +230,13 @@ tasks {
   }
 
   val copyCatalogLibs by registering(Copy::class) {
-    dependsOn(":catalog-hive:copyCatalogLibs", ":catalog-lakehouse:copyCatalogLibs")
-  }
-
-  task("integrationTest") {
-    mustRunAfter(":catalog-hive:copyDepends", ":catalog-lakehouse:copyDepends")
-    dependsOn(":integration-test:integrationTest")
+    dependsOn(":catalogs:catalog-hive:copyCatalogLibs",
+            ":catalogs:catalog-lakehouse:copyCatalogLibs")
   }
 
   clean {
     dependsOn(cleanDistribution)
+    delete("/tmp/graviton")
+    delete("server/src/main/resources/project.properties")
   }
 }

@@ -27,15 +27,13 @@ import com.datastrato.graviton.exceptions.NonEmptyEntityException;
 import com.datastrato.graviton.meta.AuditInfo;
 import com.datastrato.graviton.meta.BaseMetalake;
 import com.datastrato.graviton.meta.CatalogEntity;
+import com.datastrato.graviton.meta.SchemaEntity;
 import com.datastrato.graviton.meta.SchemaVersion;
-import com.datastrato.graviton.meta.rel.BaseSchema;
-import com.datastrato.graviton.meta.rel.BaseTable;
-import com.datastrato.graviton.rel.Column;
-import io.substrait.type.TypeCreator;
+import com.datastrato.graviton.meta.TableEntity;
 import java.io.IOException;
-import java.lang.reflect.Field;
 import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 import org.apache.commons.io.FileUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -44,7 +42,8 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 public class TestKvEntityStorage {
-  public static final String ROCKS_DB_STORE_PATH = "/tmp/graviton";
+  public static final String ROCKS_DB_STORE_PATH =
+      "/tmp/graviton_test_entityStore_" + UUID.randomUUID().toString().replace("-", "");
 
   @BeforeEach
   @AfterEach
@@ -53,59 +52,6 @@ public class TestKvEntityStorage {
       FileUtils.deleteDirectory(FileUtils.getFile(ROCKS_DB_STORE_PATH));
     } catch (Exception e) {
       // Ignore
-    }
-  }
-
-  static class MockSchemaBuilder
-      extends BaseSchema.BaseSchemaBuilder<MockSchemaBuilder, BaseSchema> {
-    @Override
-    protected BaseSchema internalBuild() {
-      BaseSchema baseSchema = new BaseSchema();
-      try {
-        setField(baseSchema, "id", id);
-        setField(baseSchema, "namespace", namespace);
-        setField(baseSchema, "name", name);
-        setField(baseSchema, "comment", comment);
-        setField(baseSchema, "properties", properties);
-        setField(baseSchema, "auditInfo", auditInfo);
-      } catch (Exception e) {
-        throw new RuntimeException(e);
-      }
-      return baseSchema;
-    }
-
-    private void setField(BaseSchema object, String fieldName, Object value)
-        throws NoSuchFieldException, IllegalAccessException {
-      Field field = object.getClass().getDeclaredField(fieldName);
-      field.setAccessible(true);
-      field.set(object, value);
-    }
-  }
-
-  static class MockTableBuilder extends BaseTable.BaseTableBuilder<MockTableBuilder, BaseTable> {
-
-    @Override
-    protected BaseTable internalBuild() {
-      BaseTable baseTable = new BaseTable();
-      try {
-        setField(baseTable, "id", id);
-        setField(baseTable, "namespace", namespace);
-        setField(baseTable, "name", name);
-        setField(baseTable, "comment", comment);
-        setField(baseTable, "properties", properties);
-        setField(baseTable, "auditInfo", auditInfo);
-        setField(baseTable, "columns", columns);
-      } catch (Exception e) {
-        throw new RuntimeException(e);
-      }
-      return baseTable;
-    }
-
-    private void setField(BaseTable object, String fieldName, Object value)
-        throws NoSuchFieldException, IllegalAccessException {
-      Field field = object.getClass().getDeclaredField(fieldName);
-      field.setAccessible(true);
-      field.set(object, value);
     }
   }
 
@@ -124,46 +70,26 @@ public class TestKvEntityStorage {
         .withName(name)
         .withNamespace(namespace)
         .withType(Type.RELATIONAL)
+        .withProvider("test")
         .withAuditInfo(auditInfo)
         .build();
   }
 
-  public BaseSchema createBaseschema(Namespace namespace, String name, AuditInfo auditInfo) {
-    return new MockSchemaBuilder()
+  public SchemaEntity createSchemaEntity(Namespace namespace, String name, AuditInfo auditInfo) {
+    return new SchemaEntity.Builder()
         .withId(1L)
         .withName(name)
         .withNamespace(namespace)
         .withAuditInfo(auditInfo)
-        .withComment("a schmea")
         .build();
   }
 
-  public BaseTable createBaseTable(Namespace namespace, String name, AuditInfo auditInfo) {
-    return new MockTableBuilder()
+  public TableEntity createTableEntity(Namespace namespace, String name, AuditInfo auditInfo) {
+    return new TableEntity.Builder()
         .withId(1L)
         .withName(name)
-        .withNameSpace(namespace)
+        .withNamespace(namespace)
         .withAuditInfo(auditInfo)
-        .withComment("a table")
-        .withColumns(
-            new Column[] {
-              new Column() {
-                @Override
-                public String name() {
-                  return "test";
-                }
-
-                @Override
-                public io.substrait.type.Type dataType() {
-                  return TypeCreator.NULLABLE.I32;
-                }
-
-                @Override
-                public String comment() {
-                  return "test";
-                }
-              }
-            })
         .build();
   }
 
@@ -173,8 +99,9 @@ public class TestKvEntityStorage {
     Mockito.when(config.get(ENTITY_STORE)).thenReturn("kv");
     Mockito.when(config.get(ENTITY_KV_STORE)).thenReturn(DEFAULT_ENTITY_KV_STORE);
     Mockito.when(config.get(Configs.ENTITY_SERDE)).thenReturn("proto");
-    Mockito.when(config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)).thenReturn("/tmp/graviton");
+    Mockito.when(config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)).thenReturn(ROCKS_DB_STORE_PATH);
 
+    Assertions.assertEquals(ROCKS_DB_STORE_PATH, config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH));
     AuditInfo auditInfo =
         new AuditInfo.Builder().withCreator("creator").withCreateTime(Instant.now()).build();
 
@@ -186,15 +113,16 @@ public class TestKvEntityStorage {
       BaseMetalake metalake = createBaseMakeLake("metalake", auditInfo);
       CatalogEntity catalog = createCatalog(Namespace.of("metalake"), "catalog", auditInfo);
       CatalogEntity catalogCopy = createCatalog(Namespace.of("metalake"), "catalogCopy", auditInfo);
-      BaseSchema schema1 =
-          createBaseschema(Namespace.of("metalake", "catalog"), "schema1", auditInfo);
-      BaseTable table1 =
-          createBaseTable(Namespace.of("metalake", "catalog", "schema1"), "table1", auditInfo);
 
-      BaseSchema schema2 =
-          createBaseschema(Namespace.of("metalake", "catalog"), "schema2", auditInfo);
-      BaseTable table1InSchema2 =
-          createBaseTable(Namespace.of("metalake", "catalog", "schema2"), "table1", auditInfo);
+      SchemaEntity schema1 =
+          createSchemaEntity(Namespace.of("metalake", "catalog"), "schema1", auditInfo);
+      TableEntity table1 =
+          createTableEntity(Namespace.of("metalake", "catalog", "schema1"), "table1", auditInfo);
+
+      SchemaEntity schema2 =
+          createSchemaEntity(Namespace.of("metalake", "catalog"), "schema2", auditInfo);
+      TableEntity table1InSchema2 =
+          createTableEntity(Namespace.of("metalake", "catalog", "schema2"), "table1", auditInfo);
 
       // Store all entities
       store.put(metalake);
@@ -205,7 +133,7 @@ public class TestKvEntityStorage {
       store.put(table1);
       store.put(table1InSchema2);
 
-      // Try to check an update option is what exepct
+      // Try to check an update option is what we expected
       store.update(
           metalake.nameIdentifier(),
           BaseMetalake.class,
@@ -219,7 +147,7 @@ public class TestKvEntityStorage {
             return createBaseMakeLake("metalakeChanged", auditInfo1);
           });
 
-      // Check metalake entity and subenties are already changed.
+      // Check metalake entity and sub-entities are already changed.
       BaseMetalake updatedMetalake =
           store.get(NameIdentifier.of("metalakeChanged"), EntityType.METALAKE, BaseMetalake.class);
       Assertions.assertEquals("creator1", updatedMetalake.auditInfo().creator());
@@ -236,24 +164,24 @@ public class TestKvEntityStorage {
           store.get(
               NameIdentifier.of("metalakeChanged", "catalog", "schema1"),
               EntityType.SCHEMA,
-              BaseSchema.class));
+              SchemaEntity.class));
       Assertions.assertNotNull(
           store.get(
               NameIdentifier.of("metalakeChanged", "catalog", "schema1", "table1"),
               EntityType.TABLE,
-              BaseTable.class));
+              TableEntity.class));
       Assertions.assertNotNull(
           store.get(
               NameIdentifier.of("metalakeChanged", "catalog", "schema2"),
               EntityType.SCHEMA,
-              BaseSchema.class));
+              SchemaEntity.class));
       Assertions.assertNotNull(
           store.get(
               NameIdentifier.of("metalakeChanged", "catalog", "schema1", "table1"),
               EntityType.TABLE,
-              BaseTable.class));
+              TableEntity.class));
 
-      // Check catalog entitis and sub-entities are already changed.
+      // Check catalog entities and sub-entities are already changed.
       store.update(
           NameIdentifier.of("metalakeChanged", "catalog"),
           CatalogEntity.class,
@@ -283,27 +211,27 @@ public class TestKvEntityStorage {
           store.get(
               NameIdentifier.of("metalakeChanged", "catalogChanged", "schema1"),
               EntityType.SCHEMA,
-              BaseSchema.class));
+              SchemaEntity.class));
       Assertions.assertNotNull(
           store.get(
               NameIdentifier.of("metalakeChanged", "catalogChanged", "schema1", "table1"),
               EntityType.TABLE,
-              BaseTable.class));
+              TableEntity.class));
       Assertions.assertNotNull(
           store.get(
               NameIdentifier.of("metalakeChanged", "catalogChanged", "schema2"),
               EntityType.SCHEMA,
-              BaseSchema.class));
+              SchemaEntity.class));
       Assertions.assertNotNull(
           store.get(
               NameIdentifier.of("metalakeChanged", "catalogChanged", "schema2", "table1"),
               EntityType.TABLE,
-              BaseTable.class));
+              TableEntity.class));
 
-      // Check schema entitis and sub-entities are already changed.
+      // Check schema entities and sub-entities are already changed.
       store.update(
           NameIdentifier.of("metalakeChanged", "catalogChanged", "schema1"),
-          BaseSchema.class,
+          SchemaEntity.class,
           EntityType.SCHEMA,
           e -> {
             AuditInfo auditInfo1 =
@@ -311,7 +239,7 @@ public class TestKvEntityStorage {
                     .withCreator("creator3")
                     .withCreateTime(Instant.now())
                     .build();
-            return createBaseschema(
+            return createSchemaEntity(
                 Namespace.of("metalakeChanged", "catalogChanged"), "schemaChanged", auditInfo1);
           });
 
@@ -321,39 +249,39 @@ public class TestKvEntityStorage {
               store.get(
                   NameIdentifier.of("metalakeChanged", "catalogChanged", "schema1"),
                   EntityType.SCHEMA,
-                  BaseSchema.class));
-      BaseSchema updatedSchema =
+                  SchemaEntity.class));
+      SchemaEntity updatedSchema =
           store.get(
               NameIdentifier.of("metalakeChanged", "catalogChanged", "schemaChanged"),
               EntityType.SCHEMA,
-              BaseSchema.class);
+              SchemaEntity.class);
       Assertions.assertEquals("creator3", updatedSchema.auditInfo().creator());
 
       Assertions.assertNotNull(
           store.get(
               NameIdentifier.of("metalakeChanged", "catalogChanged", "schemaChanged"),
               EntityType.SCHEMA,
-              BaseSchema.class));
+              SchemaEntity.class));
       Assertions.assertNotNull(
           store.get(
               NameIdentifier.of("metalakeChanged", "catalogChanged", "schemaChanged", "table1"),
               EntityType.TABLE,
-              BaseTable.class));
+              TableEntity.class));
       Assertions.assertNotNull(
           store.get(
               NameIdentifier.of("metalakeChanged", "catalogChanged", "schema2"),
               EntityType.SCHEMA,
-              BaseSchema.class));
+              SchemaEntity.class));
       Assertions.assertNotNull(
           store.get(
               NameIdentifier.of("metalakeChanged", "catalogChanged", "schema2", "table1"),
               EntityType.TABLE,
-              BaseTable.class));
+              TableEntity.class));
 
       // Check table entities
       store.update(
           NameIdentifier.of("metalakeChanged", "catalogChanged", "schemaChanged", "table1"),
-          BaseTable.class,
+          TableEntity.class,
           EntityType.TABLE,
           e -> {
             AuditInfo auditInfo1 =
@@ -361,7 +289,7 @@ public class TestKvEntityStorage {
                     .withCreator("creator4")
                     .withCreateTime(Instant.now())
                     .build();
-            return createBaseTable(
+            return createTableEntity(
                 Namespace.of("metalakeChanged", "catalogChanged", "schemaChanged"),
                 "tableChanged",
                 auditInfo1);
@@ -373,20 +301,20 @@ public class TestKvEntityStorage {
               store.get(
                   NameIdentifier.of("metalakeChanged", "catalogChanged", "schema1", "table1"),
                   EntityType.TABLE,
-                  BaseTable.class));
-      BaseTable updatedTable =
+                  TableEntity.class));
+      TableEntity updatedTable =
           store.get(
               NameIdentifier.of(
                   "metalakeChanged", "catalogChanged", "schemaChanged", "tableChanged"),
               EntityType.TABLE,
-              BaseTable.class);
+              TableEntity.class);
       Assertions.assertEquals("creator4", updatedTable.auditInfo().creator());
 
       Assertions.assertNotNull(
           store.get(
               NameIdentifier.of("metalakeChanged", "catalogChanged", "schema2", "table1"),
               EntityType.TABLE,
-              BaseTable.class));
+              TableEntity.class));
 
       store.delete(
           NameIdentifier.of("metalakeChanged", "catalogChanged", "schema2", "table1"),
@@ -397,7 +325,7 @@ public class TestKvEntityStorage {
           () ->
               store.update(
                   NameIdentifier.of("metalakeChanged", "catalogChanged", "schema2", "table1"),
-                  BaseTable.class,
+                  TableEntity.class,
                   EntityType.TABLE,
                   (e) -> e));
       // The updated entities already existed, should throw exception
@@ -406,7 +334,7 @@ public class TestKvEntityStorage {
           () ->
               store.update(
                   NameIdentifier.of("metalakeChanged", "catalogChanged", "schema2"),
-                  BaseSchema.class,
+                  SchemaEntity.class,
                   EntityType.SCHEMA,
                   e -> {
                     AuditInfo auditInfo1 =
@@ -414,7 +342,7 @@ public class TestKvEntityStorage {
                             .withCreator("creator5")
                             .withCreateTime(Instant.now())
                             .build();
-                    return createBaseschema(
+                    return createSchemaEntity(
                         Namespace.of("metalakeChanged", "catalogChanged"),
                         "schemaChanged",
                         auditInfo1);
@@ -422,7 +350,7 @@ public class TestKvEntityStorage {
       // Update operations do not conatin any changes in name
       store.update(
           NameIdentifier.of("metalakeChanged", "catalogChanged", "schema2"),
-          BaseSchema.class,
+          SchemaEntity.class,
           EntityType.SCHEMA,
           e -> {
             AuditInfo auditInfo1 =
@@ -430,7 +358,7 @@ public class TestKvEntityStorage {
                     .withCreator("creator6")
                     .withCreateTime(Instant.now())
                     .build();
-            return createBaseschema(
+            return createSchemaEntity(
                 Namespace.of("metalakeChanged", "catalogChanged"), "schema2", auditInfo1);
           });
       Assertions.assertEquals(
@@ -439,7 +367,7 @@ public class TestKvEntityStorage {
               .get(
                   NameIdentifier.of("metalakeChanged", "catalogChanged", "schema2"),
                   EntityType.SCHEMA,
-                  BaseSchema.class)
+                  SchemaEntity.class)
               .auditInfo()
               .creator());
     }
@@ -466,15 +394,15 @@ public class TestKvEntityStorage {
       CatalogEntity catalog = createCatalog(Namespace.of("metalake"), "catalog", auditInfo);
       CatalogEntity catalogCopy = createCatalog(Namespace.of("metalake"), "catalogCopy", auditInfo);
 
-      BaseSchema schema1 =
-          createBaseschema(Namespace.of("metalake", "catalog"), "schema1", auditInfo);
-      BaseTable table1 =
-          createBaseTable(Namespace.of("metalake", "catalog", "schema1"), "table1", auditInfo);
+      SchemaEntity schema1 =
+          createSchemaEntity(Namespace.of("metalake", "catalog"), "schema1", auditInfo);
+      TableEntity table1 =
+          createTableEntity(Namespace.of("metalake", "catalog", "schema1"), "table1", auditInfo);
 
-      BaseSchema schema2 =
-          createBaseschema(Namespace.of("metalake", "catalog"), "schema2", auditInfo);
-      BaseTable table1InSchema2 =
-          createBaseTable(Namespace.of("metalake", "catalog", "schema2"), "table1", auditInfo);
+      SchemaEntity schema2 =
+          createSchemaEntity(Namespace.of("metalake", "catalog"), "schema2", auditInfo);
+      TableEntity table1InSchema2 =
+          createTableEntity(Namespace.of("metalake", "catalog", "schema2"), "table1", auditInfo);
 
       // Store all entities
       store.put(metalake);
@@ -494,24 +422,24 @@ public class TestKvEntityStorage {
           catalogCopy,
           store.get(catalogCopy.nameIdentifier(), EntityType.CATALOG, CatalogEntity.class));
       Assertions.assertEquals(
-          schema1, store.get(schema1.nameIdentifier(), EntityType.SCHEMA, BaseSchema.class));
+          schema1, store.get(schema1.nameIdentifier(), EntityType.SCHEMA, SchemaEntity.class));
       Assertions.assertEquals(
-          schema2, store.get(schema2.nameIdentifier(), EntityType.SCHEMA, BaseSchema.class));
+          schema2, store.get(schema2.nameIdentifier(), EntityType.SCHEMA, SchemaEntity.class));
       Assertions.assertEquals(
-          table1, store.get(table1.nameIdentifier(), EntityType.TABLE, BaseTable.class));
+          table1, store.get(table1.nameIdentifier(), EntityType.TABLE, TableEntity.class));
       Assertions.assertEquals(
           table1InSchema2,
-          store.get(table1InSchema2.nameIdentifier(), EntityType.TABLE, BaseTable.class));
+          store.get(table1InSchema2.nameIdentifier(), EntityType.TABLE, TableEntity.class));
 
       // Delete the table 'metalake.catalog.schema2.table1'
       Assertions.assertTrue(store.delete(table1InSchema2.nameIdentifier(), EntityType.TABLE));
       Assertions.assertFalse(store.exists(table1InSchema2.nameIdentifier(), EntityType.TABLE));
       // Make sure table 'metalake.catalog.schema1.table1' still exist;
       Assertions.assertEquals(
-          table1, store.get(table1.nameIdentifier(), EntityType.TABLE, BaseTable.class));
+          table1, store.get(table1.nameIdentifier(), EntityType.TABLE, TableEntity.class));
       // Make sure schema 'metalake.catalog.schema2' still exist;
       Assertions.assertEquals(
-          schema2, store.get(schema2.nameIdentifier(), EntityType.SCHEMA, BaseSchema.class));
+          schema2, store.get(schema2.nameIdentifier(), EntityType.SCHEMA, SchemaEntity.class));
       // Re-insert table1Inschema2 and everything is OK
       store.put(table1InSchema2);
       Assertions.assertTrue(store.exists(table1InSchema2.nameIdentifier(), EntityType.TABLE));
@@ -535,9 +463,9 @@ public class TestKvEntityStorage {
       store.put(schema1);
       store.put(table1);
       Assertions.assertEquals(
-          schema1, store.get(schema1.nameIdentifier(), EntityType.SCHEMA, BaseSchema.class));
+          schema1, store.get(schema1.nameIdentifier(), EntityType.SCHEMA, SchemaEntity.class));
       Assertions.assertEquals(
-          table1, store.get(table1.nameIdentifier(), EntityType.TABLE, BaseTable.class));
+          table1, store.get(table1.nameIdentifier(), EntityType.TABLE, TableEntity.class));
 
       // Now try to delete all schemas under catalog;
       Assertions.assertThrowsExactly(
@@ -575,12 +503,12 @@ public class TestKvEntityStorage {
           () -> store.delete(schema1.nameIdentifier(), EntityType.SCHEMA));
 
       Assertions.assertEquals(
-          schema1, store.get(schema1.nameIdentifier(), EntityType.SCHEMA, BaseSchema.class));
+          schema1, store.get(schema1.nameIdentifier(), EntityType.SCHEMA, SchemaEntity.class));
 
       // Test cascade delete
       store.delete(schema1.nameIdentifier(), EntityType.SCHEMA, true);
       try {
-        store.get(table1.nameIdentifier(), EntityType.TABLE, BaseTable.class);
+        store.get(table1.nameIdentifier(), EntityType.TABLE, TableEntity.class);
       } catch (Exception e) {
         Assertions.assertTrue(e instanceof NoSuchEntityException);
         Assertions.assertTrue(e.getMessage().contains("metalake.catalog.schema1"));
