@@ -110,6 +110,7 @@ public class TestResponses {
             .withName("CatalogA")
             .withComment("comment")
             .withType(Catalog.Type.RELATIONAL)
+            .withProvider("test")
             .withAudit(audit)
             .build();
     CatalogResponse catalogResponse = new CatalogResponse(catalog);

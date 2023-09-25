@@ -100,6 +100,7 @@ public class GravitonMetaLake extends MetalakeDTO implements SupportsCatalogs {
    *
    * @param ident The identifier of the catalog.
    * @param type The type of the catalog.
+   * @param provider The provider of the catalog.
    * @param comment The comment of the catalog.
    * @param properties The properties of the catalog.
    * @return The created {@link Catalog}.
@@ -108,11 +109,16 @@ public class GravitonMetaLake extends MetalakeDTO implements SupportsCatalogs {
    */
   @Override
   public Catalog createCatalog(
-      NameIdentifier ident, Catalog.Type type, String comment, Map<String, String> properties)
+      NameIdentifier ident,
+      Catalog.Type type,
+      String provider,
+      String comment,
+      Map<String, String> properties)
       throws NoSuchMetalakeException, CatalogAlreadyExistsException {
     NameIdentifier.checkCatalog(ident);
 
-    CatalogCreateRequest req = new CatalogCreateRequest(ident.name(), type, comment, properties);
+    CatalogCreateRequest req =
+        new CatalogCreateRequest(ident.name(), type, provider, comment, properties);
     req.validate();
 
     CatalogResponse resp =

@@ -54,6 +54,7 @@ message Catalog {
   optional string comment = 4;
   map<string, string> properties = 5;
   AuditInfo audit_info = 6;
+  string provider = 7;
 }
 
 message Schema {

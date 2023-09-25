@@ -58,6 +58,7 @@ public class DTOConverters {
     return new CatalogDTO.Builder()
         .withName(catalog.name())
         .withType(catalog.type())
+        .withProvider(catalog.provider())
         .withComment(catalog.comment())
         .withProperties(catalog.properties())
         .withAudit(toDTO(catalog.auditInfo()))

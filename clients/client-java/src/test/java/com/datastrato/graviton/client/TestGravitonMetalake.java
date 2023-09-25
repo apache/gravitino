@@ -42,6 +42,8 @@ public class TestGravitonMetalake extends TestBase {
 
   private static final String metalakeName = "test";
 
+  private static final String provider = "test";
+
   @BeforeAll
   public static void setUp() throws Exception {
     TestBase.setUp();
@@ -96,6 +98,7 @@ public class TestGravitonMetalake extends TestBase {
             .withName("mock")
             .withComment("comment")
             .withType(Catalog.Type.RELATIONAL)
+            .withProvider("test")
             .withAudit(
                 new AuditDTO.Builder().withCreator("creator").withCreateTime(Instant.now()).build())
             .build();
@@ -124,6 +127,7 @@ public class TestGravitonMetalake extends TestBase {
             .withName("mock")
             .withComment("comment")
             .withType(Catalog.Type.FILE)
+            .withProvider("test")
             .withAudit(
                 new AuditDTO.Builder().withCreator("creator").withCreateTime(Instant.now()).build())
             .build();
@@ -161,12 +165,13 @@ public class TestGravitonMetalake extends TestBase {
             .withName(catalogName)
             .withComment("comment")
             .withType(Catalog.Type.RELATIONAL)
+            .withProvider("test")
             .withAudit(
                 new AuditDTO.Builder().withCreator("creator").withCreateTime(Instant.now()).build())
             .build();
     CatalogCreateRequest req =
         new CatalogCreateRequest(
-            catalogName, Catalog.Type.RELATIONAL, "comment", Collections.emptyMap());
+            catalogName, Catalog.Type.RELATIONAL, provider, "comment", Collections.emptyMap());
     CatalogResponse resp = new CatalogResponse(mockCatalog);
     buildMockResource(Method.POST, path, req, resp, HttpStatus.SC_OK);
 
@@ -174,6 +179,7 @@ public class TestGravitonMetalake extends TestBase {
         metalake.createCatalog(
             NameIdentifier.of(metalakeName, catalogName),
             Catalog.Type.RELATIONAL,
+            provider,
             "comment",
             Collections.emptyMap());
     Assertions.assertEquals(catalogName, catalog.name());
@@ -186,11 +192,13 @@ public class TestGravitonMetalake extends TestBase {
             .withName("mock")
             .withComment("comment")
             .withType(Catalog.Type.FILE)
+            .withProvider("test")
             .withAudit(
                 new AuditDTO.Builder().withCreator("creator").withCreateTime(Instant.now()).build())
             .build();
     CatalogCreateRequest req1 =
-        new CatalogCreateRequest(catalogName, Catalog.Type.FILE, "comment", Collections.emptyMap());
+        new CatalogCreateRequest(
+            catalogName, Catalog.Type.FILE, provider, "comment", Collections.emptyMap());
     CatalogResponse resp1 = new CatalogResponse(mockCatalog1);
     buildMockResource(Method.POST, path, req1, resp1, HttpStatus.SC_OK);
     Assertions.assertThrows(
@@ -199,6 +207,7 @@ public class TestGravitonMetalake extends TestBase {
             metalake.createCatalog(
                 NameIdentifier.of(metalakeName, catalogName),
                 Catalog.Type.FILE,
+                provider,
                 "comment",
                 Collections.emptyMap()));
 
@@ -213,6 +222,7 @@ public class TestGravitonMetalake extends TestBase {
                 metalake.createCatalog(
                     NameIdentifier.of(metalakeName, catalogName),
                     Catalog.Type.RELATIONAL,
+                    provider,
                     "comment",
                     Collections.emptyMap()));
     Assertions.assertTrue(ex.getMessage().contains("mock error"));
@@ -229,6 +239,7 @@ public class TestGravitonMetalake extends TestBase {
                 metalake.createCatalog(
                     NameIdentifier.of(metalakeName, catalogName),
                     Catalog.Type.RELATIONAL,
+                    provider,
                     "comment",
                     Collections.emptyMap()));
     Assertions.assertTrue(ex1.getMessage().contains("mock error"));
@@ -243,6 +254,7 @@ public class TestGravitonMetalake extends TestBase {
                 metalake.createCatalog(
                     NameIdentifier.of(metalakeName, catalogName),
                     Catalog.Type.RELATIONAL,
+                    provider,
                     "comment",
                     Collections.emptyMap()));
     Assertions.assertTrue(ex2.getMessage().contains("mock error"));
@@ -258,6 +270,7 @@ public class TestGravitonMetalake extends TestBase {
             .withName("mock1")
             .withComment("comment1")
             .withType(Catalog.Type.RELATIONAL)
+            .withProvider("test")
             .withAudit(
                 new AuditDTO.Builder().withCreator("creator").withCreateTime(Instant.now()).build())
             .build();

@@ -28,6 +28,8 @@ public class CatalogEntity implements Entity, Auditable, HasIdentifier {
   public static final Field NAME = Field.required("name", String.class, "The catalog's name");
   public static final Field TYPE =
       Field.required("type", Catalog.Type.class, "The type of the catalog");
+  public static final Field PROVIDER =
+      Field.required("provider", String.class, "The provider of the catalog");
   public static final Field COMMENT =
       Field.optional("comment", String.class, "The comment or description of the catalog");
   public static final Field PROPERTIES =
@@ -40,6 +42,8 @@ public class CatalogEntity implements Entity, Auditable, HasIdentifier {
   private String name;
 
   @Getter private Catalog.Type type;
+
+  @Getter private String provider;
 
   @Nullable @Getter private String comment;
 
@@ -61,6 +65,7 @@ public class CatalogEntity implements Entity, Auditable, HasIdentifier {
     fields.put(NAME, name);
     fields.put(COMMENT, comment);
     fields.put(TYPE, type);
+    fields.put(PROVIDER, provider);
     fields.put(PROPERTIES, properties);
     fields.put(AUDIT_INFO, auditInfo);
 
@@ -167,6 +172,17 @@ public class CatalogEntity implements Entity, Auditable, HasIdentifier {
     }
 
     /**
+     * Sets the provider of the catalog.
+     *
+     * @param provider the provider of the catalog.
+     * @return the builder instance.
+     */
+    public Builder withProvider(String provider) {
+      catalog.provider = provider;
+      return this;
+    }
+
+    /**
      * Sets the comment or description of the catalog.
      *
      * @param comment the comment of the catalog.
@@ -229,6 +245,7 @@ public class CatalogEntity implements Entity, Auditable, HasIdentifier {
     return Objects.equal(id, that.id)
         && Objects.equal(name, that.name)
         && type == that.type
+        && Objects.equal(provider, that.provider)
         && Objects.equal(comment, that.comment)
         && Objects.equal(properties, that.properties)
         && Objects.equal(auditInfo, that.auditInfo);
@@ -241,6 +258,6 @@ public class CatalogEntity implements Entity, Auditable, HasIdentifier {
    */
   @Override
   public int hashCode() {
-    return Objects.hashCode(id, name, type, comment, properties, auditInfo);
+    return Objects.hashCode(id, name, type, provider, comment, properties, auditInfo);
   }
 }
