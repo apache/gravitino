@@ -18,6 +18,7 @@ import java.util.Optional;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.function.Predicate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -157,14 +158,17 @@ public abstract class Config {
    * Loads configurations from a map.
    *
    * @param map The map containing configuration key-value pairs.
+   * @param predicate The keys only match the predicate will be loaded to configMap
    */
-  private void loadFromMap(Map<String, String> map) {
+  public void loadFromMap(Map<String, String> map, Predicate<String> predicate) {
     map.forEach(
         (k, v) -> {
           String trimmedK = k.trim();
           String trimmedV = v.trim();
-          if (!trimmedK.isEmpty() && !trimmedV.isEmpty() && trimmedK.startsWith(CONFIG_PREPEND)) {
-            configMap.put(trimmedK, trimmedV);
+          if (!trimmedK.isEmpty() && !trimmedV.isEmpty()) {
+            if (predicate.test(trimmedK)) {
+              configMap.put(trimmedK, trimmedV);
+            }
           }
         });
   }
@@ -176,7 +180,7 @@ public abstract class Config {
    */
   @VisibleForTesting
   public void loadFromProperties(Properties properties) {
-    loadFromMap(Maps.fromProperties(properties));
+    loadFromMap(Maps.fromProperties(properties), k -> k.startsWith(CONFIG_PREPEND));
   }
 
   /**
