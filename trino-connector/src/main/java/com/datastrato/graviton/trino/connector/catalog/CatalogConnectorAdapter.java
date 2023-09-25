@@ -2,7 +2,7 @@
  * Copyright 2023 Datastrato.
  * This software is licensed under the Apache License version 2.
  */
-package io.trino.plugin.graviton.catalog;
+package com.datastrato.graviton.trino.connector.catalog;
 
 import static java.util.Collections.emptyList;
 
@@ -15,6 +15,11 @@ import java.util.List;
  */
 public interface CatalogConnectorAdapter {
 
+  /**
+   * *
+   *
+   * @return TableProperties list that used to validate table properties.
+   */
   default List<PropertyMetadata<?>> getTableProperties() {
     return emptyList();
   }

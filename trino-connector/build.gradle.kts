@@ -16,23 +16,25 @@ repositories {
 dependencies {
   implementation(project(":api"))
   implementation(project(":common"))
+  {
+    exclude("org.apache.logging.log4j")
+  }
+  implementation(project(":core"))
+  {
+    exclude("org.apache.logging.log4j")
+  }
   implementation(project(":client-java"))
+  {
+    exclude("org.apache.logging.log4j")
+  }
   implementation(libs.jackson.databind)
   implementation(libs.jackson.annotations)
-  implementation(libs.jackson.datatype.jdk8)
-  implementation(libs.jackson.datatype.jsr310)
   implementation(libs.guava)
-  implementation(libs.bundles.log4j)
   implementation(libs.httpclient5)
   implementation(libs.commons.lang3)
-  implementation("io.trino:trino-plugin-toolkit:425")
-  implementation("io.trino:trino-spi:425")
+  implementation(libs.trino.spi)
+  implementation(libs.trino.toolkit)
   implementation(libs.substrait.java.core)
-
-  compileOnly(libs.lombok)
-  annotationProcessor(libs.lombok)
-  testCompileOnly(libs.lombok)
-  testAnnotationProcessor(libs.lombok)
 
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
@@ -46,4 +48,14 @@ java {
   toolchain {
     languageVersion.set(JavaLanguageVersion.of(17))
   }
+}
+
+tasks {
+    val copyDepends by registering(Copy::class) {
+        from(configurations.runtimeClasspath)
+        into("build/libs")
+    }
+    jar {
+     finalizedBy(copyDepends)
+    }
 }

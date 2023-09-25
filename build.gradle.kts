@@ -126,6 +126,7 @@ tasks.rat {
     // Ignore files we track but do not distribute
     "**/.github/**/*",
     "dev/docker/**/*.xml",
+    "trino-connector/src/main/resources/META-INF/services/io.trino.spi.Plugin",
   )
 
   // Add .gitignore excludes to the Apache Rat exclusion list.
@@ -208,7 +209,12 @@ tasks {
   val copySubprojectDepends by registering(Copy::class) {
     dependsOn(":catalog-hive:copyDepends", ":catalog-lakehouse:copyDepends")
     subprojects.forEach() {
-      if (it.name != "catalog-hive" && it.name != "client-java" && it.name != "integration-test" && it.name != "catalog-lakehouse") {
+      if (it.name != "catalog-hive" &&
+          it.name != "client-java" &&
+          it.name != "integration-test" &&
+          it.name != "catalog-lakehouse" &&
+          it.name != "trino-connector"
+          ) {
         from(it.configurations.runtimeClasspath)
         into("distribution/package/libs")
       }
@@ -217,7 +223,12 @@ tasks {
 
   val copySubprojectLib by registering(Copy::class) {
     subprojects.forEach() {
-      if (it.name != "client-java" && it.name != "integration-test" && it.name != "catalog-hive" && it.name != "catalog-lakehouse") {
+      if (it.name != "client-java" &&
+          it.name != "integration-test" &&
+          it.name != "catalog-hive" &&
+          it.name != "catalog-lakehouse" &&
+          it.name != "trino-connector"
+          ) {
         dependsOn("${it.name}:build")
         from("${it.name}/build/libs")
         into("distribution/package/libs")

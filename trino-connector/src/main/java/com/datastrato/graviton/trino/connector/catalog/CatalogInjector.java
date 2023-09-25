@@ -2,10 +2,14 @@
  * Copyright 2023 Datastrato.
  * This software is licensed under the Apache License version 2.
  */
-package io.trino.plugin.graviton.catalog;
+package com.datastrato.graviton.trino.connector.catalog;
 
+import static com.datastrato.graviton.trino.connector.GravitonErrorCode.GRAVITON_UNSUPPORTED_TRIO_VERSION;
+
+import com.datastrato.graviton.trino.connector.GravitonErrorCode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.airlift.log.Logger;
+import io.trino.spi.TrinoException;
 import io.trino.spi.connector.Connector;
 import io.trino.spi.connector.ConnectorContext;
 import io.trino.spi.connector.MetadataProvider;
@@ -25,11 +29,34 @@ public class CatalogInjector {
 
   private static final Logger log = Logger.get(CatalogInjector.class);
 
+  private static final int MIN_TRINO_SPI_VERSION = 360;
+
   private ConcurrentHashMap catalogs;
   private Object catalogFactoryObject;
+  private String trinoVersion = "";
+
+  private void checkTrinoSpiVersion(ConnectorContext context) {
+    this.trinoVersion = context.getSpiVersion();
+
+    int trino_version = Integer.parseInt(context.getSpiVersion());
+    if (trino_version < MIN_TRINO_SPI_VERSION) {
+      String errmsg =
+          String.format(
+              "Unsuported trino-%d version. min support version is trino-%d",
+              trino_version, MIN_TRINO_SPI_VERSION);
+      throw new TrinoException(GravitonErrorCode.GRAVITON_UNSUPPORTED_TRIO_VERSION, errmsg);
+    }
+  }
 
   public void bindCatalogManager(ConnectorContext context) {
+    // injector trino catalog need NodeManger support allCatalogsOnAllNodes;
+    checkTrinoSpiVersion(context);
+
+    // Try to get trino CatalogFactory instance. normally we can get the catalog from
+    // CatalogFactory. then add catalag to it that loaded from gravaiton.
+
     try {
+      // set Nodemanger  allCatalogsOnAllNodes = true;
       Object nodeManager = context.getNodeManager();
       Field field = nodeManager.getClass().getDeclaredField("nodeManager");
       field.setAccessible(true);
@@ -39,6 +66,7 @@ public class CatalogInjector {
       field.setAccessible(true);
       field.setBoolean(nodeManager, true);
 
+      // find Catalogmanager
       field = nodeManager.getClass().getDeclaredField("activeNodesByCatalogHandle");
       field.setAccessible(true);
       field.set(nodeManager, Optional.empty());
@@ -61,10 +89,12 @@ public class CatalogInjector {
       field.setAccessible(true);
       Object catalogManager = field.get(transactionManager);
 
+      // find CatalogManger.catalogs
       field = catalogManager.getClass().getDeclaredField("catalogs");
       field.setAccessible(true);
       catalogs = (ConcurrentHashMap) field.get(catalogManager);
 
+      // find catalog factory
       field = catalogManager.getClass().getDeclaredField("catalogFactory");
       field.setAccessible(true);
       catalogFactoryObject = field.get(catalogManager);
@@ -72,7 +102,9 @@ public class CatalogInjector {
       log.info("Bind Trino catalog manger successfully.");
     } catch (Throwable t) {
       log.error("Bind Trino catalog manger failed", t.getMessage());
-      throw new RuntimeException(t);
+      throw new TrinoException(
+          GRAVITON_UNSUPPORTED_TRIO_VERSION,
+          "Unsupported trino version. bind catalog factory failed");
     }
   }
 
@@ -84,23 +116,34 @@ public class CatalogInjector {
               .getClass()
               .getClassLoader()
               .loadClass("io.trino.connector.CatalogProperties");
-      String catalogPropertiesTemplate =
-          "{\"catalogHandle\": \"%s:normal:default\",\"connectorName\":\"graviton\", \"properties\": {\"graviton.internal\": \"true\"}}";
-      String catalogProperties = String.format(catalogPropertiesTemplate, catalogName);
+
+      String catalogProperties = createCatalogProperties(catalogName);
 
       ObjectMapper objectMapper = new ObjectMapper();
-      Object person = objectMapper.readValue(catalogProperties, catalogConnectorClass);
+      Object catalogPropertiesObject =
+          objectMapper.readValue(catalogProperties, catalogConnectorClass);
 
+      // call CatalogFactory:createCatalog
       Method method =
           catalogFactoryObject.getClass().getDeclaredMethod("createCatalog", catalogConnectorClass);
-      Object catalogConnector = method.invoke(catalogFactoryObject, person);
+      Object catalogConnector = method.invoke(catalogFactoryObject, catalogPropertiesObject);
+
+      // put catalog to CatalogManger.catalogs
       catalogs.put(catalogName, catalogConnector);
 
       log.info("Inject trino catalog {} successfully.", catalogName);
     } catch (Throwable t) {
       log.info("Inject trino catalog {} failed.", catalogName, t.getMessage());
-      throw new RuntimeException(t);
+      throw new TrinoException(
+          GRAVITON_UNSUPPORTED_TRIO_VERSION,
+          "Unsupported trino version. can not inject trino catalog");
     }
+  }
+
+  String createCatalogProperties(String catalogName) {
+    String catalogPropertiesTemplate =
+        "{\"catalogHandle\": \"%s:normal:default\",\"connectorName\":\"graviton\", \"properties\": {\"graviton.internal\": \"true\"}}";
+    return String.format(catalogPropertiesTemplate, catalogName);
   }
 
   Connector createConnector(String connectorName, Map<String, Object> properties) {
@@ -109,6 +152,7 @@ public class CatalogInjector {
       ObjectMapper objectMapper = new ObjectMapper();
       connectorProperties = objectMapper.writeValueAsString(properties);
 
+      // call CatalogFactory:createCatalog
       Class catalogConnectorClass =
           catalogFactoryObject
               .getClass()
@@ -117,9 +161,11 @@ public class CatalogInjector {
       Method method =
           catalogFactoryObject.getClass().getDeclaredMethod("createCatalog", catalogConnectorClass);
 
-      Object person = objectMapper.readValue(connectorProperties, catalogConnectorClass);
-      Object catalogConnector = method.invoke(catalogFactoryObject, person);
+      Object catalogPropertyObject =
+          objectMapper.readValue(connectorProperties, catalogConnectorClass);
+      Object catalogConnector = method.invoke(catalogFactoryObject, catalogPropertyObject);
 
+      // get connector object from trino CatalogConnector.
       Field field = catalogConnector.getClass().getDeclaredField("catalogConnector");
       field.setAccessible(true);
       Object connectorService = field.get(catalogConnector);
@@ -136,7 +182,9 @@ public class CatalogInjector {
           connectorName,
           properties.toString(),
           t.getMessage());
-      throw new RuntimeException(t);
+      throw new TrinoException(
+          GRAVITON_UNSUPPORTED_TRIO_VERSION,
+          "Unsupported trino version. can not create initernal catalog");
     }
   }
 }

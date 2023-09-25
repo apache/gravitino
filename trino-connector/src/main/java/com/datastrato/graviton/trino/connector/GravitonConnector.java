@@ -2,10 +2,11 @@
  * Copyright 2023 Datastrato.
  * This software is licensed under the Apache License version 2.
  */
-package io.trino.plugin.graviton;
+package com.datastrato.graviton.trino.connector;
 
 import com.datastrato.graviton.NameIdentifier;
-import io.trino.plugin.graviton.catalog.CatalogConnector;
+import com.datastrato.graviton.trino.connector.catalog.CatalogConnectorContext;
+import com.google.common.base.Preconditions;
 import io.trino.spi.connector.Connector;
 import io.trino.spi.connector.ConnectorMetadata;
 import io.trino.spi.connector.ConnectorPageSinkProvider;
@@ -18,16 +19,22 @@ import io.trino.spi.transaction.IsolationLevel;
 import java.util.List;
 import org.apache.commons.lang3.NotImplementedException;
 
+/**
+ * * GravitonConnector serves as the entry point for operations on the connector managed by Trino
+ * and Graviton. It provides a standard entry point for Trino connectors and delegates their
+ * operations to internal connectors.
+ */
 public class GravitonConnector implements Connector {
 
   private final NameIdentifier catalogIdentifier;
-  private final CatalogConnector catalogConnector;
-  private final Connector internalConnector;
+  private final CatalogConnectorContext catalogConnectorContext;
 
-  public GravitonConnector(NameIdentifier catalogIdentifier, CatalogConnector catalogConnector) {
-    this.catalogIdentifier = catalogIdentifier;
-    this.catalogConnector = catalogConnector;
-    this.internalConnector = catalogConnector.getInternalConnector();
+  public GravitonConnector(
+      NameIdentifier catalogIdentifier, CatalogConnectorContext catalogConnectorContext) {
+    this.catalogIdentifier =
+        Preconditions.checkNotNull(catalogIdentifier, "catalogIdentifier is not null");
+    this.catalogConnectorContext =
+        Preconditions.checkNotNull(catalogConnectorContext, "catalogIdentifier is not null");
   }
 
   @Override
@@ -44,32 +51,27 @@ public class GravitonConnector implements Connector {
 
   @Override
   public List<PropertyMetadata<?>> getTableProperties() {
-    return catalogConnector.getTableProperties();
+    return catalogConnectorContext.getTableProperties();
   }
 
   @Override
   public List<PropertyMetadata<?>> getSessionProperties() {
-    return internalConnector.getSessionProperties();
+    throw new NotImplementedException();
   }
 
   @Override
   public List<PropertyMetadata<?>> getColumnProperties() {
-    return internalConnector.getColumnProperties();
+    throw new NotImplementedException();
   }
 
   @Override
   public List<PropertyMetadata<?>> getSchemaProperties() {
-    return internalConnector.getSchemaProperties();
+    throw new NotImplementedException();
   }
 
   @Override
   public ConnectorSplitManager getSplitManager() {
     throw new NotImplementedException();
-  }
-
-  @Override
-  public final void shutdown() {
-    internalConnector.shutdown();
   }
 
   @Override
