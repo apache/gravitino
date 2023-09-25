@@ -13,11 +13,7 @@ import java.util.Map;
 /** Implementation of an Iceberg catalog in Graviton. */
 public class IcebergCatalog extends BaseCatalog<IcebergCatalog> {
 
-  /**
-   * Returns the short name of the Iceberg catalog.
-   *
-   * @return The short name of the catalog.
-   */
+  /** @return The short name of the catalog. */
   @Override
   public String shortName() {
     return "iceberg";
@@ -36,21 +32,13 @@ public class IcebergCatalog extends BaseCatalog<IcebergCatalog> {
     return ops;
   }
 
-  /**
-   * Returns the Iceberg catalog operations as a {@link SupportsSchemas}.
-   *
-   * @return The Iceberg catalog operations as {@link IcebergCatalogOperations}.
-   */
+  /** @return The Iceberg catalog operations as {@link IcebergCatalogOperations}. */
   @Override
   public SupportsSchemas asSchemas() {
     return (IcebergCatalogOperations) ops();
   }
 
-  /**
-   * Returns the Iceberg catalog operations as a {@link TableCatalog}.
-   *
-   * @return The Iceberg catalog operations as {@link IcebergCatalogOperations}.
-   */
+  /** @return The Iceberg catalog operations as {@link IcebergCatalogOperations}. */
   @Override
   public TableCatalog asTableCatalog() {
     return (IcebergCatalogOperations) ops();

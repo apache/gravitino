@@ -34,9 +34,6 @@ public class ProtoEntitySerDe implements EntitySerDe {
           .put(
               "com.datastrato.graviton.meta.TableEntity",
               "com.datastrato.graviton.proto.TableEntitySerde")
-          .put(
-              "com.datastrato.graviton.catalog.lakehouse.iceberg.IcebergSchema",
-              "com.datastrato.graviton.proto.SchemaEntitySerDe")
           .build();
 
   private static final Map<String, String> ENTITY_TO_PROTO =

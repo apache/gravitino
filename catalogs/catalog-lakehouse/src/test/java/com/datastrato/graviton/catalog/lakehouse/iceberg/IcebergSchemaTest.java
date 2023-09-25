@@ -106,10 +106,17 @@ public class IcebergSchemaTest {
 
     icebergCatalog.asSchemas().createSchema(ident, COMMENT_VALUE, properties);
     Assertions.assertTrue(icebergCatalog.asSchemas().schemaExists(ident));
-    icebergCatalog.asSchemas().dropSchema(ident, true);
+    icebergCatalog.asSchemas().dropSchema(ident, false);
     Assertions.assertFalse(icebergCatalog.asSchemas().schemaExists(ident));
 
-    Assertions.assertFalse(icebergCatalog.asSchemas().dropSchema(ident, true));
+    Assertions.assertFalse(icebergCatalog.asSchemas().dropSchema(ident, false));
+
+    Throwable exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> icebergCatalog.asSchemas().dropSchema(ident, true));
+    Assertions.assertTrue(
+        exception.getMessage().contains("Iceberg does not support cascading delete operations"));
   }
 
   private IcebergCatalog initIcebergCatalog(String name) {

@@ -4,7 +4,6 @@
  */
 package com.datastrato.graviton.catalog.lakehouse.iceberg;
 
-import com.datastrato.graviton.EntityAlreadyExistsException;
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
 import com.datastrato.graviton.catalog.CatalogOperations;
@@ -35,7 +34,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import org.apache.commons.lang3.ArrayUtils;
 import org.apache.iceberg.exceptions.NamespaceNotEmptyException;
 import org.apache.iceberg.exceptions.NoSuchNamespaceException;
 import org.apache.iceberg.rest.requests.UpdateNamespacePropertiesRequest;
@@ -126,11 +124,9 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
                       .withCreator(currentUser)
                       .withCreateTime(Instant.now())
                       .build())
-              .internalBuild();
+              .build();
       icebergTableOps.createNamespace(
-          createdSchema.toCreateRequest(
-              IcebergTableOpsHelper.getIcebergNamespace(
-                  ArrayUtils.add(ident.namespace().levels(), ident.name()))));
+          createdSchema.toCreateRequest(IcebergTableOpsHelper.getIcebergNamespace(ident)));
       LOG.info(
           "Created Iceberg schema (database) {} in Iceberg\ncurrentUser:{} \ncomment: {} \nmetadata: {}",
           ident.name(),
@@ -148,12 +144,6 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
               "Iceberg schema (database) does not exist: %s in Graviton store, This scenario occurs after the creation is completed and reloaded",
               ident.name()),
           e);
-    } catch (EntityAlreadyExistsException e) {
-      throw new SchemaAlreadyExistsException(
-          String.format(
-              "Iceberg schema (database) '%s' already exists in Graviton store", ident.name()),
-          e);
-
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
@@ -174,9 +164,7 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
 
     try {
       GetNamespaceResponse response =
-          icebergTableOps.loadNamespace(
-              IcebergTableOpsHelper.getIcebergNamespace(
-                  ArrayUtils.add(ident.namespace().levels(), ident.name())));
+          icebergTableOps.loadNamespace(IcebergTableOpsHelper.getIcebergNamespace(ident));
       IcebergSchema icebergSchema =
           new IcebergSchema.Builder()
               .withName(ident.name())
@@ -186,7 +174,7 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
                       .map(map -> map.get(IcebergSchema.ICEBERG_COMMENT_FIELD_NAME))
                       .orElse(""))
               .withProperties(response.properties())
-              .internalBuild();
+              .build();
       LOG.info("Loaded Iceberg schema (database) {} from Iceberg ", ident.name());
       return icebergSchema;
     } catch (NoSuchNamespaceException e) {
@@ -210,9 +198,7 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
       throws NoSuchSchemaException {
     try {
       GetNamespaceResponse response =
-          icebergTableOps.loadNamespace(
-              IcebergTableOpsHelper.getIcebergNamespace(
-                  ArrayUtils.add(ident.namespace().levels(), ident.name())));
+          icebergTableOps.loadNamespace(IcebergTableOpsHelper.getIcebergNamespace(ident));
       Map<String, String> metadata = response.properties();
       List<String> removals = new ArrayList<>();
       Map<String, String> updates = new HashMap<>();
@@ -250,21 +236,16 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
               .withName(ident.name())
               .withComment(comment)
               .withProperties(resultProperties)
-              .internalBuild();
+              .build();
       UpdateNamespacePropertiesRequest updateNamespacePropertiesRequest =
           UpdateNamespacePropertiesRequest.builder().updateAll(updates).removeAll(removals).build();
       icebergTableOps.updateNamespaceProperties(
-          IcebergTableOpsHelper.getIcebergNamespace(
-              ArrayUtils.add(ident.namespace().levels(), ident.name())),
-          updateNamespacePropertiesRequest);
+          IcebergTableOpsHelper.getIcebergNamespace(ident), updateNamespacePropertiesRequest);
       LOG.info("Altered Iceberg schema (database) {} in Iceberg", ident.name());
       return icebergSchema;
     } catch (NoSuchNamespaceException e) {
       throw new NoSuchSchemaException(
           String.format("Iceberg schema (database) %s does not exist in Iceberg", ident.name()), e);
-    } catch (EntityAlreadyExistsException e) {
-      throw new NoSuchSchemaException(
-          "The new Iceberg schema (database) name already exist in Graviton store", e);
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
@@ -280,10 +261,9 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
    */
   @Override
   public boolean dropSchema(NameIdentifier ident, boolean cascade) throws NonEmptySchemaException {
+    Preconditions.checkArgument(!cascade, "Iceberg does not support cascading delete operations.");
     try {
-      icebergTableOps.dropNamespace(
-          IcebergTableOpsHelper.getIcebergNamespace(
-              ArrayUtils.add(ident.namespace().levels(), ident.name())));
+      icebergTableOps.dropNamespace(IcebergTableOpsHelper.getIcebergNamespace(ident));
       LOG.info("Dropped Iceberg schema (database) {}", ident.name());
       return true;
     } catch (NamespaceNotEmptyException e) {
@@ -397,7 +377,7 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
   }
 
   /**
-   * Checks if the given namespace is a valid namespace for the Icebergschema.
+   * Checks if the given namespace is a valid namespace for the Iceberg schema.
    *
    * @param namespace The namespace to validate.
    * @return true if the namespace is valid; otherwise, false.

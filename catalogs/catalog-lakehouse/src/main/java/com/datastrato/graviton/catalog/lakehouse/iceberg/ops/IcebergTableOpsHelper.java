@@ -35,6 +35,7 @@ import java.util.Set;
 import javax.ws.rs.NotSupportedException;
 import lombok.Getter;
 import lombok.Setter;
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.Transaction;
@@ -293,6 +294,10 @@ public class IcebergTableOpsHelper {
     }
 
     return icebergTableChange;
+  }
+
+  public static Namespace getIcebergNamespace(NameIdentifier ident) {
+    return getIcebergNamespace(ArrayUtils.add(ident.namespace().levels(), ident.name()));
   }
 
   public static Namespace getIcebergNamespace(String... level) {
