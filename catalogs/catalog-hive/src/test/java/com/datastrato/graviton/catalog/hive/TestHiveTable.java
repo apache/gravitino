@@ -78,6 +78,7 @@ public class TestHiveTable extends MiniHiveMetastoreService {
             .withName(HIVE_CATALOG_NAME)
             .withNamespace(Namespace.of(META_LAKE_NAME))
             .withType(HiveCatalog.Type.RELATIONAL)
+            .withProvider("hive")
             .withAuditInfo(auditInfo)
             .build();
 

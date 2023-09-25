@@ -156,6 +156,7 @@ public class TestEntityStore {
             .withName("catalog")
             .withNamespace(Namespace.of("metalake"))
             .withType(TestCatalog.Type.RELATIONAL)
+            .withProvider("test")
             .withAuditInfo(auditInfo)
             .build();
 

@@ -78,6 +78,8 @@ public class TestRelationalCatalog extends TestBase {
 
   private static final String catalogName = "testCatalog";
 
+  private static final String provider = "test";
+
   @BeforeAll
   public static void setUp() throws Exception {
     TestBase.setUp();
@@ -88,6 +90,7 @@ public class TestRelationalCatalog extends TestBase {
         new CatalogDTO.Builder()
             .withName(catalogName)
             .withType(CatalogDTO.Type.RELATIONAL)
+            .withProvider(provider)
             .withComment("comment")
             .withProperties(ImmutableMap.of("k1", "k2"))
             .withAudit(
@@ -96,7 +99,11 @@ public class TestRelationalCatalog extends TestBase {
 
     CatalogCreateRequest catalogCreateRequest =
         new CatalogCreateRequest(
-            catalogName, CatalogDTO.Type.RELATIONAL, "comment", ImmutableMap.of("k1", "k2"));
+            catalogName,
+            CatalogDTO.Type.RELATIONAL,
+            provider,
+            "comment",
+            ImmutableMap.of("k1", "k2"));
     CatalogResponse catalogResponse = new CatalogResponse(mockCatalog);
     buildMockResource(
         Method.POST,
@@ -109,6 +116,7 @@ public class TestRelationalCatalog extends TestBase {
         metalake.createCatalog(
             NameIdentifier.of(metalakeName, catalogName),
             CatalogDTO.Type.RELATIONAL,
+            provider,
             "comment",
             ImmutableMap.of("k1", "k2"));
   }

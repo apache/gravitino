@@ -31,6 +31,7 @@ public class TestHiveSchema extends MiniHiveMetastoreService {
             .withName("catalog")
             .withNamespace(Namespace.of("metalake"))
             .withType(HiveCatalog.Type.RELATIONAL)
+            .withProvider("hive")
             .withAuditInfo(auditInfo)
             .build();
 

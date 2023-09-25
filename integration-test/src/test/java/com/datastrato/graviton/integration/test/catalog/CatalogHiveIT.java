@@ -61,6 +61,8 @@ public class CatalogHiveIT extends AbstractIT {
   public static String HIVE_COL_NAME3 = "hive_col_name3";
   static String HIVE_METASTORE_URIS = "thrift://localhost:9083";
 
+  private static final String provider = "hive";
+
   private static HiveClientPool hiveClientPool;
 
   private static GravitonMetaLake metalake;
@@ -107,7 +109,6 @@ public class CatalogHiveIT extends AbstractIT {
 
   private static void createCatalog() {
     Map<String, String> properties = Maps.newHashMap();
-    properties.put("provider", "hive");
     properties.put(HiveConf.ConfVars.METASTOREURIS.varname, HIVE_METASTORE_URIS);
     properties.put(HiveConf.ConfVars.METASTORETHRIFTCONNECTIONRETRIES.varname, "30");
     properties.put(HiveConf.ConfVars.METASTORETHRIFTFAILURERETRIES.varname, "30");
@@ -117,6 +118,7 @@ public class CatalogHiveIT extends AbstractIT {
         metalake.createCatalog(
             NameIdentifier.of(metalakeName, catalogName),
             Catalog.Type.RELATIONAL,
+            provider,
             "comment",
             properties);
     Catalog loadCatalog = metalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));

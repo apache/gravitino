@@ -28,6 +28,7 @@ public class TestEntity {
   private final Long catalogId = 1L;
   private final String catalogName = "testCatalog";
   private final Catalog.Type type = Catalog.Type.RELATIONAL;
+  private final String provider = "test";
 
   // Schema test data
   private final Long schemaId = 1L;
@@ -66,6 +67,7 @@ public class TestEntity {
             .withName(catalogName)
             .withComment(catalogComment)
             .withType(type)
+            .withProvider(provider)
             .withProperties(map)
             .withAuditInfo(auditInfo)
             .build();
