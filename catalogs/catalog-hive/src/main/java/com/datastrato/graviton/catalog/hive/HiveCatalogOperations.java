@@ -9,6 +9,7 @@ import static com.datastrato.graviton.catalog.hive.HiveTable.SUPPORT_TABLE_TYPES
 
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
+import com.datastrato.graviton.PropertyMetadata;
 import com.datastrato.graviton.catalog.CatalogOperations;
 import com.datastrato.graviton.catalog.hive.converter.ToHiveType;
 import com.datastrato.graviton.exceptions.NoSuchCatalogException;
@@ -63,13 +64,16 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
   private final CatalogEntity entity;
 
+  private final PropertyMetadata tableProperty;
+
   /**
    * Constructs a new instance of HiveCatalogOperations.
    *
    * @param entity The catalog entity associated with this operations instance.
    */
-  public HiveCatalogOperations(CatalogEntity entity) {
+  public HiveCatalogOperations(CatalogEntity entity, PropertyMetadata tableProperty) {
     this.entity = entity;
+    this.tableProperty = tableProperty;
   }
 
   /**

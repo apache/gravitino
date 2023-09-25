@@ -6,6 +6,9 @@ package com.datastrato.graviton.catalog;
 
 import static com.datastrato.graviton.Entity.EntityType.SCHEMA;
 import static com.datastrato.graviton.Entity.EntityType.TABLE;
+import static com.datastrato.graviton.StringIdentifier.ID_KEY;
+import static com.datastrato.graviton.TestTableProperty.COMMENT_KEY;
+import static com.datastrato.graviton.TestTableProperty.TEST_IMMUTABLE_KEY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
@@ -44,6 +47,7 @@ import io.substrait.type.TypeCreator;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.AfterAll;
@@ -124,7 +128,7 @@ public class TestCatalogOperationDispatcher {
     // Check if the created Schema's field values are correct
     Assertions.assertEquals("schema1", schema.name());
     Assertions.assertEquals("comment", schema.comment());
-    testProperties(props, schema.properties());
+    testProperties(props, schema.properties(), true);
 
     // Check if the Schema entity is stored in the EntityStore
     SchemaEntity schemaEntity = entityStore.get(schemaIdent, SCHEMA, SchemaEntity.class);
@@ -148,7 +152,7 @@ public class TestCatalogOperationDispatcher {
     // Check if the created Schema's field values are correct
     Assertions.assertEquals("schema2", schema2.name());
     Assertions.assertEquals("comment", schema2.comment());
-    testProperties(props, schema2.properties());
+    testProperties(props, schema2.properties(), true);
 
     // Check if the Schema entity is stored in the EntityStore
     Assertions.assertFalse(entityStore.exists(schemaIdent2, SCHEMA));
@@ -169,7 +173,7 @@ public class TestCatalogOperationDispatcher {
     Schema loadedSchema = dispatcher.loadSchema(schemaIdent);
     Assertions.assertEquals(schema.name(), loadedSchema.name());
     Assertions.assertEquals(schema.comment(), loadedSchema.comment());
-    testProperties(schema.properties(), loadedSchema.properties());
+    testProperties(schema.properties(), loadedSchema.properties(), true);
     // Audit info is gotten from entity store
     Assertions.assertEquals("graviton", loadedSchema.auditInfo().creator());
 
@@ -220,7 +224,7 @@ public class TestCatalogOperationDispatcher {
     Assertions.assertEquals(schema.name(), alteredSchema.name());
     Assertions.assertEquals(schema.comment(), alteredSchema.comment());
     Map<String, String> expectedProps = ImmutableMap.of("k2", "v2", "k3", "v3");
-    testProperties(expectedProps, alteredSchema.properties());
+    testProperties(expectedProps, alteredSchema.properties(), true);
     // Audit info is gotten from graviton entity store.
     Assertions.assertEquals("graviton", alteredSchema.auditInfo().creator());
     Assertions.assertEquals("graviton", alteredSchema.auditInfo().lastModifier());
@@ -232,7 +236,7 @@ public class TestCatalogOperationDispatcher {
     Schema alteredSchema1 = dispatcher.alterSchema(schemaIdent, changes);
     Assertions.assertEquals(schema.name(), alteredSchema1.name());
     Assertions.assertEquals(schema.comment(), alteredSchema1.comment());
-    testProperties(expectedProps, alteredSchema1.properties());
+    testProperties(expectedProps, alteredSchema1.properties(), true);
     // Audit info is gotten from catalog, not from the entity store
     Assertions.assertEquals("test", alteredSchema1.auditInfo().creator());
     Assertions.assertEquals("test", alteredSchema1.auditInfo().lastModifier());
@@ -243,7 +247,7 @@ public class TestCatalogOperationDispatcher {
     Schema alteredSchema2 = dispatcher.alterSchema(schemaIdent, changes);
     Assertions.assertEquals(schema.name(), alteredSchema2.name());
     Assertions.assertEquals(schema.comment(), alteredSchema2.comment());
-    testProperties(expectedProps, alteredSchema2.properties());
+    testProperties(expectedProps, alteredSchema2.properties(), true);
     // Audit info is gotten from catalog, not from the entity store
     Assertions.assertEquals("test", alteredSchema2.auditInfo().creator());
     Assertions.assertEquals("test", alteredSchema1.auditInfo().lastModifier());
@@ -265,7 +269,7 @@ public class TestCatalogOperationDispatcher {
     Schema alteredSchema3 = dispatcher.alterSchema(schemaIdent, changes);
     Assertions.assertEquals(schema.name(), alteredSchema3.name());
     Assertions.assertEquals(schema.comment(), alteredSchema3.comment());
-    testProperties(expectedProps, alteredSchema3.properties());
+    testProperties(expectedProps, alteredSchema3.properties(), true);
     // Audit info is gotten from catalog, not from the entity store
     Assertions.assertEquals("test", alteredSchema3.auditInfo().creator());
     Assertions.assertEquals("test", alteredSchema1.auditInfo().lastModifier());
@@ -303,17 +307,46 @@ public class TestCatalogOperationDispatcher {
     Table table1 = dispatcher.createTable(tableIdent1, columns, "comment", props, new Transform[0]);
     Assertions.assertEquals("table1", table1.name());
     Assertions.assertEquals("comment", table1.comment());
-    testProperties(props, table1.properties());
+    testProperties(props, table1.properties(), false);
     Assertions.assertEquals(0, table1.partitioning().length);
     Assertions.assertArrayEquals(columns, table1.columns());
+
+    // Test required table properties exception
+    Map<String, String> illegalTableProperties =
+        new HashMap<String, String>() {
+          {
+            put("k2", "v2");
+          }
+        };
+
+    IllegalArgumentException exception =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                dispatcher.createTable(
+                    tableIdent1, columns, "comment", illegalTableProperties, new Transform[0]));
+    Assertions.assertTrue(
+        exception.getMessage().contains("Properties are required and must be set"));
+
+    // Test reserved table properties exception
+    illegalTableProperties.put(COMMENT_KEY, "table comment");
+    illegalTableProperties.put(ID_KEY, "graviton.v1.uidfdsafdsa");
+    IllegalArgumentException exception1 =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                dispatcher.createTable(
+                    tableIdent1, columns, "comment", illegalTableProperties, new Transform[0]));
+    Assertions.assertEquals(
+        "Properties are reserved and cannot be set: [comment, graviton.identifier]",
+        exception1.getMessage());
 
     // Check if the Table entity is stored in the EntityStore
     TableEntity tableEntity = entityStore.get(tableIdent1, TABLE, TableEntity.class);
     Assertions.assertNotNull(tableEntity);
     Assertions.assertEquals("table1", tableEntity.name());
 
-    StringIdentifier stringId = StringIdentifier.fromProperties(table1.properties());
-    Assertions.assertEquals(stringId.id(), tableEntity.id());
+    Assertions.assertFalse(table1.properties().containsKey(ID_KEY));
 
     Optional<NameIdentifier> ident1 =
         Arrays.stream(dispatcher.listTables(tableNs))
@@ -329,7 +362,7 @@ public class TestCatalogOperationDispatcher {
     // Check if the created Schema's field values are correct
     Assertions.assertEquals("table2", table2.name());
     Assertions.assertEquals("comment", table2.comment());
-    testProperties(props, table2.properties());
+    testProperties(props, table2.properties(), false);
 
     // Check if the Table entity is stored in the EntityStore
     Assertions.assertFalse(entityStore.exists(tableIdent2, TABLE));
@@ -357,7 +390,7 @@ public class TestCatalogOperationDispatcher {
     Table loadedTable1 = dispatcher.loadTable(tableIdent1);
     Assertions.assertEquals(table1.name(), loadedTable1.name());
     Assertions.assertEquals(table1.comment(), loadedTable1.comment());
-    testProperties(table1.properties(), loadedTable1.properties());
+    testProperties(table1.properties(), loadedTable1.properties(), false);
     Assertions.assertEquals(0, loadedTable1.partitioning().length);
     Assertions.assertArrayEquals(table1.columns(), loadedTable1.columns());
     // Audit info is gotten from the entity store
@@ -411,6 +444,28 @@ public class TestCatalogOperationDispatcher {
 
     Table table = dispatcher.createTable(tableIdent, columns, "comment", props, new Transform[0]);
 
+    // Test immutable table properties
+    TableChange[] illegalChange1 =
+        new TableChange[] {TableChange.setProperty(COMMENT_KEY, "new comment")};
+    IllegalArgumentException exception =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> dispatcher.alterTable(tableIdent, illegalChange1));
+    Assertions.assertEquals(
+        "Property comment is reserved and cannot be set", exception.getMessage());
+
+    // test set immutable property twice
+    TableChange[] change =
+        new TableChange[] {TableChange.setProperty(TEST_IMMUTABLE_KEY, "new value")};
+    // 1. set immutable property once
+    dispatcher.alterTable(tableIdent, change);
+    // 2. set immutable property again
+    IllegalArgumentException exception1 =
+        assertThrows(
+            IllegalArgumentException.class, () -> dispatcher.alterTable(tableIdent, change));
+    Assertions.assertEquals(
+        "Property immutableKey is immutable and cannot be reset", exception1.getMessage());
+
     TableChange[] changes =
         new TableChange[] {TableChange.setProperty("k3", "v3"), TableChange.removeProperty("k1")};
 
@@ -418,7 +473,7 @@ public class TestCatalogOperationDispatcher {
     Assertions.assertEquals(table.name(), alteredTable.name());
     Assertions.assertEquals(table.comment(), alteredTable.comment());
     Map<String, String> expectedProps = ImmutableMap.of("k2", "v2", "k3", "v3");
-    testProperties(expectedProps, alteredTable.properties());
+    testProperties(expectedProps, alteredTable.properties(), false);
     // Audit info is gotten from graviton entity store
     Assertions.assertEquals("graviton", alteredTable.auditInfo().creator());
     Assertions.assertEquals("graviton", alteredTable.auditInfo().lastModifier());
@@ -500,14 +555,20 @@ public class TestCatalogOperationDispatcher {
     assertEquals(dispatcher.getCatalogIdentifier(id5), NameIdentifier.of("a", "b"));
   }
 
-  private void testProperties(Map<String, String> expectedProps, Map<String, String> testProps) {
+  private void testProperties(
+      Map<String, String> expectedProps, Map<String, String> testProps, boolean validateIDKey) {
     expectedProps.forEach(
         (k, v) -> {
           Assertions.assertEquals(v, testProps.get(k));
         });
 
-    Assertions.assertTrue(testProps.containsKey(StringIdentifier.ID_KEY));
-    StringIdentifier StringId = StringIdentifier.fromString(testProps.get(StringIdentifier.ID_KEY));
-    Assertions.assertEquals(StringId.toString(), testProps.get(StringIdentifier.ID_KEY));
+    if (validateIDKey) {
+      Assertions.assertTrue(testProps.containsKey(StringIdentifier.ID_KEY));
+      StringIdentifier StringId =
+          StringIdentifier.fromString(testProps.get(StringIdentifier.ID_KEY));
+      Assertions.assertEquals(StringId.toString(), testProps.get(StringIdentifier.ID_KEY));
+    } else {
+      Assertions.assertFalse(testProps.containsKey(StringIdentifier.ID_KEY));
+    }
   }
 }

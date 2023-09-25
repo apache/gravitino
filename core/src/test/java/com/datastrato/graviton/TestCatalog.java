@@ -27,4 +27,9 @@ public class TestCatalog extends BaseCatalog<TestCatalog> {
   public TableCatalog asTableCatalog() {
     return (TableCatalog) ops();
   }
+
+  @Override
+  public PropertyMetadata tableProperty() throws UnsupportedOperationException {
+    return new TestTableProperty();
+  }
 }

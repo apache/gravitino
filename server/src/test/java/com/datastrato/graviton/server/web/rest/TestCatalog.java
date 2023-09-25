@@ -4,6 +4,7 @@
  */
 package com.datastrato.graviton.server.web.rest;
 
+import com.datastrato.graviton.PropertyMetadata;
 import com.datastrato.graviton.catalog.BaseCatalog;
 import com.datastrato.graviton.catalog.CatalogOperations;
 import java.io.IOException;
@@ -24,5 +25,10 @@ public class TestCatalog extends BaseCatalog<TestCatalog> {
       @Override
       public void close() throws IOException {}
     };
+  }
+
+  @Override
+  public PropertyMetadata tableProperty() throws UnsupportedOperationException {
+    return null;
   }
 }

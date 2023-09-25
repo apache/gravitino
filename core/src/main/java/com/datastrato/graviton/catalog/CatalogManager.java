@@ -14,6 +14,7 @@ import com.datastrato.graviton.EntityAlreadyExistsException;
 import com.datastrato.graviton.EntityStore;
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
+import com.datastrato.graviton.PropertyMetadata;
 import com.datastrato.graviton.StringIdentifier;
 import com.datastrato.graviton.SupportsCatalogs;
 import com.datastrato.graviton.exceptions.CatalogAlreadyExistsException;
@@ -85,6 +86,10 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
             }
             return fn.apply(asTables());
           });
+    }
+
+    public PropertyMetadata tablePropertyMetadata() {
+      return catalog.tableProperty();
     }
 
     public void close() {

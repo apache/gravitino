@@ -6,11 +6,16 @@ package com.datastrato.graviton.catalog;
 
 import static com.datastrato.graviton.Entity.EntityType.SCHEMA;
 import static com.datastrato.graviton.Entity.EntityType.TABLE;
+import static com.datastrato.graviton.PropertyMetadata.isHiddenProperty;
+import static com.datastrato.graviton.PropertyMetadata.isImmutableProperty;
+import static com.datastrato.graviton.PropertyMetadata.isRequiredProperty;
+import static com.datastrato.graviton.PropertyMetadata.isReservedProperty;
 
 import com.datastrato.graviton.EntityStore;
 import com.datastrato.graviton.HasIdentifier;
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
+import com.datastrato.graviton.PropertyEntry;
 import com.datastrato.graviton.StringIdentifier;
 import com.datastrato.graviton.catalog.rel.EntityCombinedSchema;
 import com.datastrato.graviton.catalog.rel.EntityCombinedTable;
@@ -38,10 +43,12 @@ import com.datastrato.graviton.rel.transforms.Transform;
 import com.datastrato.graviton.storage.IdGenerator;
 import com.datastrato.graviton.utils.ThrowableFunction;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.slf4j.Logger;
@@ -279,6 +286,12 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
    */
   @Override
   public Table loadTable(NameIdentifier ident) throws NoSuchTableException {
+    Table table = loadTableWithAllProperties(ident);
+    removeHiddenProperties(table, getCatalogIdentifier(ident));
+    return table;
+  }
+
+  private Table loadTableWithAllProperties(NameIdentifier ident) {
     Table table =
         doWithCatalog(
             getCatalogIdentifier(ident),
@@ -298,6 +311,11 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
             "GET",
             stringId.id());
     return EntityCombinedTable.of(table, tableEntity);
+  }
+
+  private void removeHiddenProperties(Table table, NameIdentifier catalogIdent) {
+    Map<String, PropertyEntry<?>> tablePropertySpecs = getTablePropertyMetadata(catalogIdent);
+    table.properties().entrySet().removeIf(e -> isHiddenProperty(e.getKey(), tablePropertySpecs));
   }
 
   /**
@@ -322,6 +340,7 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
       Distribution distribution,
       SortOrder[] sortOrders)
       throws NoSuchSchemaException, TableAlreadyExistsException {
+    validateTableProperties(getCatalogIdentifier(ident), properties);
     long uid = idGenerator.nextId();
     // Add StringIdentifier to the properties, the specific catalog will handle this
     // StringIdentifier to make sure only when the operation is successful, the related
@@ -345,7 +364,7 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
                             sortOrders == null ? new SortOrder[0] : sortOrders)),
             NoSuchSchemaException.class,
             TableAlreadyExistsException.class);
-
+    removeHiddenProperties(table, getCatalogIdentifier(ident));
     TableEntity tableEntity =
         new TableEntity.Builder()
             .withId(uid)
@@ -368,6 +387,43 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
     return EntityCombinedTable.of(table, tableEntity);
   }
 
+  private void validateTableProperties(
+      NameIdentifier catalogIdent, Map<String, String> properties) {
+    if (properties == null) {
+      return;
+    }
+    Map<String, PropertyEntry<?>> propertyMetadata = getTablePropertyMetadata(catalogIdent);
+
+    List<String> reservedProperties =
+        properties.keySet().stream()
+            .filter(k -> isReservedProperty(k, propertyMetadata))
+            .collect(Collectors.toList());
+    Preconditions.checkArgument(
+        reservedProperties.isEmpty(),
+        "Properties are reserved and cannot be set: %s",
+        reservedProperties);
+
+    List<String> absentProperties =
+        propertyMetadata.keySet().stream()
+            .filter(k -> isRequiredProperty(k, propertyMetadata))
+            .filter(k -> !properties.containsKey(k))
+            .collect(Collectors.toList());
+    Preconditions.checkArgument(
+        absentProperties.isEmpty(),
+        "Properties are required and must be set: %s",
+        absentProperties);
+
+    // use decode function to validate the property values
+    properties.keySet().stream()
+        .filter(propertyMetadata::containsKey)
+        .forEach(k -> propertyMetadata.get(k).decode(properties.get(k)));
+  }
+
+  private Map<String, PropertyEntry<?>> getTablePropertyMetadata(NameIdentifier catalogIdent) {
+    CatalogManager.CatalogWrapper catalog = catalogManager.loadCatalogAndWrap(catalogIdent);
+    return catalog.tablePropertyMetadata().property();
+  }
+
   /**
    * Alters an existing table.
    *
@@ -381,6 +437,7 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
   @Override
   public Table alterTable(NameIdentifier ident, TableChange... changes)
       throws NoSuchTableException, IllegalArgumentException {
+    validateAlterTable(ident, changes);
     Table alteredTable =
         doWithCatalog(
             getCatalogIdentifier(ident),
@@ -429,7 +486,40 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
             "UPDATE",
             stringId.id());
 
-    return EntityCombinedTable.of(alteredTable, updatedTableEntity);
+    EntityCombinedTable table = EntityCombinedTable.of(alteredTable, updatedTableEntity);
+    removeHiddenProperties(table, getCatalogIdentifier(ident));
+    return table;
+  }
+
+  private void validateAlterTable(NameIdentifier ident, TableChange... changes) {
+    NameIdentifier catalogIdent = getCatalogIdentifier(ident);
+    Set<String> existingProperties = loadTableWithAllProperties(ident).properties().keySet();
+    Map<String, PropertyEntry<?>> tablePropertySpecs = getTablePropertyMetadata(catalogIdent);
+
+    for (TableChange change : changes) {
+      if (change instanceof TableChange.SetProperty) {
+        String propertyName = ((TableChange.SetProperty) change).getProperty();
+        if (isReservedProperty(propertyName, tablePropertySpecs)) {
+          throw new IllegalArgumentException(
+              String.format("Property %s is reserved and cannot be set", propertyName));
+        }
+
+        if (existingProperties.contains(propertyName)
+            && isImmutableProperty(propertyName, tablePropertySpecs)) {
+          throw new IllegalArgumentException(
+              String.format("Property %s is immutable and cannot be reset", propertyName));
+        }
+      }
+
+      if (change instanceof TableChange.RemoveProperty) {
+        String propertyName = ((TableChange.RemoveProperty) change).getProperty();
+        if (isReservedProperty(propertyName, tablePropertySpecs)
+            || isImmutableProperty(propertyName, tablePropertySpecs)) {
+          throw new IllegalArgumentException(
+              String.format("Property %s cannot be removed by user", propertyName));
+        }
+      }
+    }
   }
 
   /**

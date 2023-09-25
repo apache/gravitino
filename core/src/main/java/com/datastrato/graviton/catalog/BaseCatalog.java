@@ -7,6 +7,7 @@ package com.datastrato.graviton.catalog;
 import com.datastrato.graviton.Audit;
 import com.datastrato.graviton.Catalog;
 import com.datastrato.graviton.CatalogProvider;
+import com.datastrato.graviton.PropertyMetadata;
 import com.datastrato.graviton.meta.CatalogEntity;
 import com.google.common.base.Preconditions;
 import java.util.Map;
@@ -23,13 +24,16 @@ import java.util.Map;
  *
  * @param <T> The type of the concrete subclass of BaseCatalog.
  */
-public abstract class BaseCatalog<T extends BaseCatalog> implements Catalog, CatalogProvider {
+public abstract class BaseCatalog<T extends BaseCatalog>
+    implements Catalog, CatalogProvider, HasPropertyMetadata {
 
   private CatalogEntity entity;
 
   private Map<String, String> conf;
 
   private volatile CatalogOperations ops;
+
+  private volatile PropertyMetadata propertyMetadata;
 
   /**
    * Creates a new instance of CatalogOperations.
