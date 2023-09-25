@@ -4,8 +4,10 @@
  */
 package com.datastrato.graviton.server.web.rest;
 
+import com.datastrato.graviton.PropertyMeta;
 import com.datastrato.graviton.catalog.BaseCatalog;
 import com.datastrato.graviton.catalog.CatalogOperations;
+import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.util.Map;
 
@@ -24,5 +26,10 @@ public class TestCatalog extends BaseCatalog<TestCatalog> {
       @Override
       public void close() throws IOException {}
     };
+  }
+
+  @Override
+  public Map<String, PropertyMeta<?>> getPropertyMetas() {
+    return Maps.newHashMap();
   }
 }

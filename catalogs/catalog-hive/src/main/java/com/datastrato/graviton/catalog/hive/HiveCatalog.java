@@ -4,10 +4,12 @@
  */
 package com.datastrato.graviton.catalog.hive;
 
+import com.datastrato.graviton.PropertyMeta;
 import com.datastrato.graviton.catalog.BaseCatalog;
 import com.datastrato.graviton.catalog.CatalogOperations;
 import com.datastrato.graviton.rel.SupportsSchemas;
 import com.datastrato.graviton.rel.TableCatalog;
+import com.google.common.collect.Maps;
 import java.util.Map;
 
 /** Implementation of a Hive catalog in Graviton. */
@@ -54,5 +56,11 @@ public class HiveCatalog extends BaseCatalog<HiveCatalog> {
   @Override
   public TableCatalog asTableCatalog() {
     return (HiveCatalogOperations) ops();
+  }
+
+  @Override
+  public Map<String, PropertyMeta<?>> getPropertyMetas() {
+    // TO IMPLEMENT
+    return Maps.newHashMap();
   }
 }

@@ -14,6 +14,7 @@ import com.datastrato.graviton.EntityAlreadyExistsException;
 import com.datastrato.graviton.EntityStore;
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
+import com.datastrato.graviton.PropertyValidator.Operation;
 import com.datastrato.graviton.StringIdentifier;
 import com.datastrato.graviton.SupportsCatalogs;
 import com.datastrato.graviton.exceptions.CatalogAlreadyExistsException;
@@ -312,6 +313,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
                     catalog.getProperties() == null
                         ? new HashMap<>()
                         : new HashMap<>(catalog.getProperties());
+                // TODO, do some check here to make sure the property is valid.
                 newCatalogBuilder = updateEntity(newCatalogBuilder, newProps, changes);
 
                 return newCatalogBuilder.build();
@@ -427,6 +429,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
 
     // Initialize the catalog
     catalog = catalog.withCatalogEntity(entity).withCatalogConf(mergedConf);
+    catalog.validate(mergedConf, Maps.newHashMap(), Operation.CREATE);
     return new CatalogWrapper(catalog, classLoader);
   }
 

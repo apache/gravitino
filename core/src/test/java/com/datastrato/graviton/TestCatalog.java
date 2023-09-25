@@ -7,6 +7,7 @@ package com.datastrato.graviton;
 import com.datastrato.graviton.catalog.BaseCatalog;
 import com.datastrato.graviton.catalog.CatalogOperations;
 import com.datastrato.graviton.rel.TableCatalog;
+import com.google.common.collect.Maps;
 import java.util.Map;
 
 public class TestCatalog extends BaseCatalog<TestCatalog> {
@@ -26,5 +27,10 @@ public class TestCatalog extends BaseCatalog<TestCatalog> {
   @Override
   public TableCatalog asTableCatalog() {
     return (TableCatalog) ops();
+  }
+
+  @Override
+  public Map<String, PropertyMeta<?>> getPropertyMetas() {
+    return Maps.newHashMap();
   }
 }
