@@ -124,10 +124,14 @@ public class TestCatalogOperations extends JerseyTest {
   public void testCreateCatalog() {
     CatalogCreateRequest req =
         new CatalogCreateRequest(
-            "catalog1", Catalog.Type.RELATIONAL, "comment", ImmutableMap.of("key", "value"));
+            "catalog1",
+            Catalog.Type.RELATIONAL,
+            "test",
+            "comment",
+            ImmutableMap.of("key", "value"));
     TestCatalog catalog = buildCatalog("metalake1", "catalog1");
 
-    when(manager.createCatalog(any(), any(), any(), any())).thenReturn(catalog);
+    when(manager.createCatalog(any(), any(), any(), any(), any())).thenReturn(catalog);
 
     Response resp =
         target("/metalakes/metalake1/catalogs")
@@ -150,7 +154,7 @@ public class TestCatalogOperations extends JerseyTest {
     // Test throw NoSuchMetalakeException
     doThrow(new NoSuchMetalakeException("mock error"))
         .when(manager)
-        .createCatalog(any(), any(), any(), any());
+        .createCatalog(any(), any(), any(), any(), any());
     Response resp1 =
         target("/metalakes/metalake1/catalogs")
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -167,7 +171,7 @@ public class TestCatalogOperations extends JerseyTest {
     // Test throw CatalogAlreadyExistsException
     doThrow(new CatalogAlreadyExistsException("mock error"))
         .when(manager)
-        .createCatalog(any(), any(), any(), any());
+        .createCatalog(any(), any(), any(), any(), any());
     Response resp2 =
         target("/metalakes/metalake1/catalogs")
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -184,7 +188,7 @@ public class TestCatalogOperations extends JerseyTest {
     // Test throw internal RuntimeException
     doThrow(new RuntimeException("mock error"))
         .when(manager)
-        .createCatalog(any(), any(), any(), any());
+        .createCatalog(any(), any(), any(), any(), any());
     Response resp3 =
         target("/metalakes/metalake1/catalogs")
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -391,6 +395,7 @@ public class TestCatalogOperations extends JerseyTest {
             .withNamespace(Namespace.of(metalake))
             .withProperties(ImmutableMap.of("key", "value"))
             .withType(Catalog.Type.RELATIONAL)
+            .withProvider("test")
             .withAuditInfo(
                 new AuditInfo.Builder()
                     .withCreator("creator")

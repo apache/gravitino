@@ -135,6 +135,7 @@ public class TestDTOJsonSerDe {
         new CatalogDTO.Builder()
             .withName("catalog")
             .withType(Catalog.Type.RELATIONAL)
+            .withProvider("test")
             .withComment("comment")
             .withProperties(ImmutableMap.of("k1", "v1", "k2", "v2"))
             .withAudit(audit)
@@ -149,6 +150,7 @@ public class TestDTOJsonSerDe {
         new CatalogDTO.Builder()
             .withName("catalog")
             .withType(Catalog.Type.RELATIONAL)
+            .withProvider("test")
             .withAudit(audit)
             .build();
 

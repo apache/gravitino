@@ -114,6 +114,7 @@ public class TestEntityProtoSerDe {
     Long catalogId = 1L;
     String catalogName = "catalog";
     String comment = "comment";
+    String provider = "test";
 
     com.datastrato.graviton.meta.CatalogEntity catalogEntity =
         new com.datastrato.graviton.meta.CatalogEntity.Builder()
@@ -121,6 +122,7 @@ public class TestEntityProtoSerDe {
             .withName(catalogName)
             .withComment(comment)
             .withType(com.datastrato.graviton.Catalog.Type.RELATIONAL)
+            .withProvider(provider)
             .withAuditInfo(auditInfo)
             .build();
 

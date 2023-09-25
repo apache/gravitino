@@ -45,6 +45,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -62,11 +63,12 @@ public class RelationalCatalog extends CatalogDTO implements TableCatalog, Suppo
   RelationalCatalog(
       String name,
       Type type,
+      String provider,
       String comment,
       Map<String, String> properties,
       AuditDTO auditDTO,
       RESTClient restClient) {
-    super(name, type, comment, properties, auditDTO);
+    super(name, type, provider, comment, properties, auditDTO);
     this.restClient = restClient;
   }
 
@@ -406,12 +408,13 @@ public class RelationalCatalog extends CatalogDTO implements TableCatalog, Suppo
     @Override
     public RelationalCatalog build() {
       Preconditions.checkArgument(restClient != null, "restClient must be set");
-      Preconditions.checkArgument(
-          name != null && !name.isEmpty(), "name must not be null or empty");
+      Preconditions.checkArgument(StringUtils.isNotBlank(name), "name must not be null or empty");
       Preconditions.checkArgument(type != null, "type must not be null");
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(provider), "provider must not be null or empty");
       Preconditions.checkArgument(audit != null, "audit must not be null");
 
-      return new RelationalCatalog(name, type, comment, properties, audit, restClient);
+      return new RelationalCatalog(name, type, provider, comment, properties, audit, restClient);
     }
   }
 }
