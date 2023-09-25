@@ -32,13 +32,13 @@ import org.glassfish.jersey.servlet.ServletContainer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class IcebergAuxiliaryService implements GravitonAuxiliaryService {
+public class IcebergRESTService implements GravitonAuxiliaryService {
 
-  private Logger LOG = LoggerFactory.getLogger(IcebergAuxiliaryService.class);
+  private Logger LOG = LoggerFactory.getLogger(IcebergRESTService.class);
 
   private Server server;
 
-  public static final String SERVICE_NAME = "GravitonIcebergREST";
+  public static final String SERVICE_NAME = "iceberg-rest";
 
   private ExecutorThreadPool createThreadPool(
       int coreThreads, int maxThreads, int threadPoolWorkQueueSize) {
@@ -59,7 +59,7 @@ public class IcebergAuxiliaryService implements GravitonAuxiliaryService {
                 .build()));
   }
 
-  private ServerConnector creatorServerConnector(
+  private ServerConnector createServerConnector(
       Server server, ConnectionFactory[] connectionFactories) {
     Scheduler serverExecutor =
         new ScheduledExecutorScheduler("graviton-Iceberg-REST-JettyScheduler", true);
@@ -73,7 +73,7 @@ public class IcebergAuxiliaryService implements GravitonAuxiliaryService {
 
     HttpConnectionFactory httpConnectionFactory = new HttpConnectionFactory(httpConfig);
     ServerConnector connector =
-        creatorServerConnector(server, new ConnectionFactory[] {httpConnectionFactory});
+        createServerConnector(server, new ConnectionFactory[] {httpConnectionFactory});
     connector.setHost(host);
     connector.setPort(port);
     connector.setReuseAddress(true);
@@ -112,7 +112,7 @@ public class IcebergAuxiliaryService implements GravitonAuxiliaryService {
         new AbstractBinder() {
           @Override
           protected void configure() {
-            bind(icebergTableOps).to(IcebergTableOps.class).ranked(2);
+            bind(icebergTableOps).to(IcebergTableOps.class).ranked(1);
           }
         });
 

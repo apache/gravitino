@@ -9,8 +9,8 @@ import static com.datastrato.graviton.Configs.ENTRY_KV_ROCKSDB_BACKEND_PATH;
 import com.datastrato.graviton.Config;
 import com.datastrato.graviton.Configs;
 import com.datastrato.graviton.aux.AuxiliaryServiceManager;
-import com.datastrato.graviton.catalog.lakehouse.iceberg.IcebergAuxiliaryService;
 import com.datastrato.graviton.catalog.lakehouse.iceberg.IcebergRESTConfig;
+import com.datastrato.graviton.catalog.lakehouse.iceberg.IcebergRESTService;
 import com.datastrato.graviton.client.ErrorHandlers;
 import com.datastrato.graviton.client.HTTPClient;
 import com.datastrato.graviton.client.RESTClient;
@@ -161,19 +161,19 @@ public class MiniGraviton {
     configMap.put(
         AuxiliaryServiceManager.GRAVITON_AUX_SERVICE_PREFIX
             + AuxiliaryServiceManager.AUX_SERVICE_NAMES,
-        IcebergAuxiliaryService.SERVICE_NAME);
+        IcebergRESTService.SERVICE_NAME);
 
     String icebergClassPath =
         Paths.get("catalogs", "catalog-lakehouse", "build", "libs").toString();
     configMap.put(
         AuxiliaryServiceManager.GRAVITON_AUX_SERVICE_PREFIX
-            + IcebergAuxiliaryService.SERVICE_NAME
+            + IcebergRESTService.SERVICE_NAME
             + "."
             + AuxiliaryServiceManager.AUX_SERVICE_CLASSPATH,
         icebergClassPath);
     configMap.put(
         AuxiliaryServiceManager.GRAVITON_AUX_SERVICE_PREFIX
-            + IcebergAuxiliaryService.SERVICE_NAME
+            + IcebergRESTService.SERVICE_NAME
             + "."
             + IcebergRESTConfig.ICEBERG_REST_SERVER_HTTP_PORT.getKey(),
         String.valueOf(RESTUtils.findAvailablePort(3000, 4000)));
