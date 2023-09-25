@@ -84,7 +84,6 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
    */
   @Override
   public NameIdentifier[] listSchemas(Namespace namespace) throws NoSuchCatalogException {
-    Preconditions.checkArgument(isValidNamespace(namespace), "Namespace is invalid " + namespace);
     try {
       return icebergTableOps
           .listNamespace(IcebergTableOpsHelper.getIcebergNamespace(namespace.levels())).namespaces()
@@ -158,10 +157,6 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
    */
   @Override
   public IcebergSchema loadSchema(NameIdentifier ident) throws NoSuchSchemaException {
-    Preconditions.checkArgument(
-        isValidNamespace(ident.namespace()),
-        String.format("Cannot support invalid namespace in Iceberg: %s", ident.namespace()));
-
     try {
       GetNamespaceResponse response =
           icebergTableOps.loadNamespace(IcebergTableOpsHelper.getIcebergNamespace(ident));
@@ -374,16 +369,6 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
   public boolean purgeTable(NameIdentifier tableIdent) throws UnsupportedOperationException {
     // TODO supported method.
     throw new UnsupportedOperationException();
-  }
-
-  /**
-   * Checks if the given namespace is a valid namespace for the Iceberg schema.
-   *
-   * @param namespace The namespace to validate.
-   * @return true if the namespace is valid; otherwise, false.
-   */
-  public boolean isValidNamespace(Namespace namespace) {
-    return namespace.levels().length == 2 && namespace.level(1).equals(entity.name());
   }
 
   // TODO. We should figure out a better way to get the current user from servlet container.
