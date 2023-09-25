@@ -126,6 +126,7 @@ public class IcebergSchemaTest {
             .withName(name)
             .withNamespace(Namespace.of(META_LAKE_NAME))
             .withType(IcebergCatalog.Type.RELATIONAL)
+            .withProvider("iceberg")
             .withAuditInfo(AUDIT_INFO)
             .build();
 

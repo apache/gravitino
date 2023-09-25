@@ -28,6 +28,7 @@ public class IcebergCatalogTest {
             .withName("catalog")
             .withNamespace(Namespace.of("metalake"))
             .withType(IcebergCatalog.Type.RELATIONAL)
+            .withProvider("iceberg")
             .withAuditInfo(auditInfo)
             .build();
 
