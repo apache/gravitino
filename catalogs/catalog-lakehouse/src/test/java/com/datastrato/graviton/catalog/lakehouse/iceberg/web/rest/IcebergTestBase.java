@@ -51,6 +51,14 @@ public class IcebergTestBase extends JerseyTest {
     return getIcebergClientBuilder(path, Optional.empty());
   }
 
+  public Builder getReportMetricsClientBuilder(String name) {
+    String path =
+        Joiner.on("/")
+            .skipNulls()
+            .join(IcebergRestTestUtil.TABLE_PATH, name, IcebergRestTestUtil.REPORT_METRICS_POSTFIX);
+    return getIcebergClientBuilder(path, Optional.empty());
+  }
+
   public Builder getNamespaceClientBuilder() {
     return getNamespaceClientBuilder(Optional.empty(), Optional.empty());
   }
