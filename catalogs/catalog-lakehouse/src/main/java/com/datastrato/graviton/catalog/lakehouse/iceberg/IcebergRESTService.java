@@ -34,7 +34,7 @@ import org.slf4j.LoggerFactory;
 
 public class IcebergRESTService implements GravitonAuxiliaryService {
 
-  private Logger LOG = LoggerFactory.getLogger(IcebergRESTService.class);
+  private static Logger LOG = LoggerFactory.getLogger(IcebergRESTService.class);
 
   private Server server;
 
