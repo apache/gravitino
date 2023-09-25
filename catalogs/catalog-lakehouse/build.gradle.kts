@@ -25,6 +25,9 @@ dependencies {
     implementation(libs.bundles.jetty)
     implementation(libs.bundles.jersey)
     implementation(libs.bundles.iceberg)
+    implementation(libs.commons.lang3)
+    implementation(libs.commons.io)
+    implementation(libs.commons.collections4)
     implementation(libs.substrait.java.core) {
       exclude("com.fasterxml.jackson.core")
       exclude("com.fasterxml.jackson.datatype")
