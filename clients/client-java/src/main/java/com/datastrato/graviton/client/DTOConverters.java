@@ -60,6 +60,7 @@ class DTOConverters {
         return new RelationalCatalog.Builder()
             .withName(catalog.name())
             .withType(catalog.type())
+            .withProvider(catalog.provider())
             .withComment(catalog.comment())
             .withProperties(catalog.properties())
             .withAudit((AuditDTO) catalog.auditInfo())

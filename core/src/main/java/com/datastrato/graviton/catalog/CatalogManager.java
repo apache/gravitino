@@ -213,6 +213,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
    *
    * @param ident The identifier of the new catalog.
    * @param type The type of the new catalog.
+   * @param provider The provider of the new catalog.
    * @param comment The comment for the new catalog.
    * @param properties The properties of the new catalog.
    * @return The created catalog.
@@ -221,7 +222,11 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
    */
   @Override
   public Catalog createCatalog(
-      NameIdentifier ident, Catalog.Type type, String comment, Map<String, String> properties)
+      NameIdentifier ident,
+      Catalog.Type type,
+      String provider,
+      String comment,
+      Map<String, String> properties)
       throws NoSuchMetalakeException, CatalogAlreadyExistsException {
     try {
       CatalogEntity entity =
@@ -243,6 +248,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
                         .withName(ident.name())
                         .withNamespace(ident.namespace())
                         .withType(type)
+                        .withProvider(provider)
                         .withComment(comment)
                         .withProperties(StringIdentifier.addToProperties(stringId, properties))
                         .withAuditInfo(
@@ -296,6 +302,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
                         .withName(catalog.name())
                         .withNamespace(ident.namespace())
                         .withType(catalog.getType())
+                        .withProvider(catalog.getProvider())
                         .withComment(catalog.getComment());
 
                 AuditInfo newInfo =
@@ -383,12 +390,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
   private CatalogWrapper createCatalogWrapper(CatalogEntity entity) {
     Map<String, String> mergedConf =
         mergeConf(entity.getProperties(), catalogConf(entity.name(), config));
-
-    String provider = mergedConf.get(Catalog.PROPERTY_PROVIDER);
-    Preconditions.checkArgument(
-        provider != null,
-        "'provider' not set in catalog properties or conf via "
-            + "'graviton.catalog.<name>.provider'");
+    String provider = entity.getProvider();
 
     IsolatedClassLoader classLoader;
     if (config.get(Configs.CATALOG_LOAD_ISOLATED)) {

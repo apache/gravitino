@@ -27,6 +27,9 @@ public class CatalogCreateRequest implements RESTRequest {
   @JsonProperty("type")
   private final Catalog.Type type;
 
+  @JsonProperty("provider")
+  private final String provider;
+
   @Nullable
   @JsonProperty("comment")
   private final String comment;
@@ -37,7 +40,7 @@ public class CatalogCreateRequest implements RESTRequest {
 
   /** Default constructor for CatalogCreateRequest. */
   public CatalogCreateRequest() {
-    this(null, null, null, null);
+    this(null, null, null, null, null);
   }
 
   /**
@@ -45,13 +48,19 @@ public class CatalogCreateRequest implements RESTRequest {
    *
    * @param name The name of the catalog.
    * @param type The type of the catalog.
+   * @param provider The provider of the catalog.
    * @param comment The comment for the catalog.
    * @param properties The properties for the catalog.
    */
   public CatalogCreateRequest(
-      String name, Catalog.Type type, String comment, Map<String, String> properties) {
+      String name,
+      Catalog.Type type,
+      String provider,
+      String comment,
+      Map<String, String> properties) {
     this.name = name;
     this.type = type;
+    this.provider = provider;
     this.comment = comment;
     this.properties = properties;
   }
@@ -66,5 +75,7 @@ public class CatalogCreateRequest implements RESTRequest {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(name), "\"name\" field is required and cannot be empty");
     Preconditions.checkArgument(type != null, "\"type\" field is required and cannot be empty");
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(provider), "\"provider\" field is required and cannot be empty");
   }
 }

@@ -12,6 +12,7 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
+import org.apache.commons.lang3.StringUtils;
 
 /** Data transfer object representing catalog information. */
 @EqualsAndHashCode
@@ -23,6 +24,9 @@ public class CatalogDTO implements Catalog {
 
   @JsonProperty("type")
   private Type type;
+
+  @JsonProperty("provider")
+  private String provider;
 
   @Nullable
   @JsonProperty("comment")
@@ -38,9 +42,15 @@ public class CatalogDTO implements Catalog {
   protected CatalogDTO() {}
 
   protected CatalogDTO(
-      String name, Type type, String comment, Map<String, String> properties, AuditDTO audit) {
+      String name,
+      Type type,
+      String provider,
+      String comment,
+      Map<String, String> properties,
+      AuditDTO audit) {
     this.name = name;
     this.type = type;
+    this.provider = provider;
     this.comment = comment;
     this.properties = properties;
     this.audit = audit;
@@ -54,6 +64,11 @@ public class CatalogDTO implements Catalog {
   @Override
   public Type type() {
     return type;
+  }
+
+  @Override
+  public String provider() {
+    return provider;
   }
 
   @Override
@@ -79,6 +94,7 @@ public class CatalogDTO implements Catalog {
   public static class Builder<S extends Builder> {
     protected String name;
     protected Type type;
+    protected String provider;
     protected String comment;
     protected Map<String, String> properties;
     protected AuditDTO audit;
@@ -104,6 +120,17 @@ public class CatalogDTO implements Catalog {
      */
     public S withType(Type type) {
       this.type = type;
+      return (S) this;
+    }
+
+    /**
+     * Sets the provider of the catalog.
+     *
+     * @param provider The provider of the catalog.
+     * @return The builder instance.
+     */
+    public S withProvider(String provider) {
+      this.provider = provider;
       return (S) this;
     }
 
@@ -147,11 +174,13 @@ public class CatalogDTO implements Catalog {
      * @throws IllegalArgumentException If name, type or audit are not set.
      */
     public CatalogDTO build() {
-      Preconditions.checkArgument(name != null && !name.isEmpty(), "name cannot be null or empty");
+      Preconditions.checkArgument(StringUtils.isNotBlank(name), "name cannot be null or empty");
       Preconditions.checkArgument(type != null, "type cannot be null");
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(provider), "provider cannot be null or empty");
       Preconditions.checkArgument(audit != null, "audit cannot be null");
 
-      return new CatalogDTO(name, type, comment, properties, audit);
+      return new CatalogDTO(name, type, provider, comment, properties, audit);
     }
   }
 }

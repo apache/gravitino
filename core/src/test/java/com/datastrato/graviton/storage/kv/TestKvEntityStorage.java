@@ -70,6 +70,7 @@ public class TestKvEntityStorage {
         .withName(name)
         .withNamespace(namespace)
         .withType(Type.RELATIONAL)
+        .withProvider("test")
         .withAuditInfo(auditInfo)
         .build();
   }

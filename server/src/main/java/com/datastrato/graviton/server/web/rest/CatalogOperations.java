@@ -71,7 +71,11 @@ public class CatalogOperations {
       NameIdentifier ident = NameIdentifier.ofCatalog(metalake, request.getName());
       Catalog catalog =
           manager.createCatalog(
-              ident, request.getType(), request.getComment(), request.getProperties());
+              ident,
+              request.getType(),
+              request.getProvider(),
+              request.getComment(),
+              request.getProperties());
       return Utils.ok(new CatalogResponse(DTOConverters.toDTO(catalog)));
 
     } catch (Exception e) {

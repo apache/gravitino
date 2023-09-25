@@ -39,6 +39,8 @@ public class SchemaHiveIT extends AbstractIT {
   public static String schemaBName = "schemaB";
   public static String schemaBComment = "schema B comment";
 
+  private static final String provider = "hive";
+
   @BeforeAll
   private static void start() {
     GravitonITUtils.hiveConfig();
@@ -217,6 +219,7 @@ public class SchemaHiveIT extends AbstractIT {
         metalake.createCatalog(
             NameIdentifier.of(metalakeName, catalogName),
             Catalog.Type.RELATIONAL,
+            provider,
             "catalog comment",
             catalogProps);
 

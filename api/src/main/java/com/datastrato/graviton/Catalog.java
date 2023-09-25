@@ -17,16 +17,6 @@ public interface Catalog extends Auditable {
   }
 
   /**
-   * A reserved property to specify the provider of the catalog. The provider is a string used to
-   * specify the class to create the catalog. The provider can be a short name if the catalog is a
-   * built-in catalog, or it can be a full qualified class name if the catalog is a custom one.
-   *
-   * <p>For example, the provider of a built-in Hive catalog could be "hive", Graviton will figure
-   * out the related class to create the catalog.
-   */
-  String PROPERTY_PROVIDER = "provider";
-
-  /**
    * A reserved property to specify the package location of the catalog. The "package" is a string
    * of path to the folder where all the catalog related dependencies is located. The dependencies
    * under the "package" will be loaded by Graviton to create the catalog.
@@ -42,6 +32,9 @@ public interface Catalog extends Auditable {
 
   /** The type of the catalog. */
   Type type();
+
+  /** The provider of the catalog. */
+  String provider();
 
   /**
    * The comment of the catalog. Note. this method will return null if the comment is not set for
