@@ -96,6 +96,9 @@ dependencies {
   testRuntimeOnly(libs.junit.jupiter.engine)
   testImplementation(libs.mockito.core)
   testImplementation(libs.bundles.log4j)
+  testImplementation(libs.iceberg.spark.runtime)
+  testImplementation(libs.spark.sql)
+  testImplementation(libs.slf4j.jdk14)
 }
 
 /* Optimizing integration test execution conditions */
