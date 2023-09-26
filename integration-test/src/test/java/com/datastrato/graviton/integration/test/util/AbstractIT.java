@@ -29,6 +29,8 @@ public class AbstractIT {
   private static final String TEST_MODE = "testMode";
   private static final String EMBEDDED_TEST_MODE = "embedded";
 
+  protected static Config serverConfig;
+
   static String testMode =
       System.getProperty(TEST_MODE) == null ? EMBEDDED_TEST_MODE : System.getProperty(TEST_MODE);
 
@@ -36,7 +38,7 @@ public class AbstractIT {
   public static void startIntegrationTest() throws Exception {
     LOG.info("Running Graviton Server in {} mode", testMode);
 
-    Config serverConfig = new ServerConfig();
+    serverConfig = new ServerConfig();
     if (testMode != null && testMode.equals(EMBEDDED_TEST_MODE)) {
       miniGraviton = new MiniGraviton();
       miniGraviton.start();

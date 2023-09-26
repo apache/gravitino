@@ -7,6 +7,7 @@ package com.datastrato.graviton.catalog.lakehouse.iceberg.utils;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
+import org.apache.iceberg.CatalogProperties;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.inmemory.InMemoryCatalog;
 
@@ -15,6 +16,7 @@ public class IcebergCatalogUtil {
   private static InMemoryCatalog loadMemoryCatalog() {
     InMemoryCatalog memoryCatalog = new InMemoryCatalog();
     Map<String, String> properties = new HashMap<>();
+    properties.put(CatalogProperties.WAREHOUSE_LOCATION, "/tmp");
 
     memoryCatalog.initialize("memory", properties);
     return memoryCatalog;
