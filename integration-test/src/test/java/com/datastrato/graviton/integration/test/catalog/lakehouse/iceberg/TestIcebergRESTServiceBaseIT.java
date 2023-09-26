@@ -24,6 +24,9 @@ import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
 import org.junit.jupiter.api.Assertions;
 
+/*
+ * <p>Referred from spark/v3.4/spark/src/test/java/org/apache/iceberg/spark/SparkTestBase.java
+ */
 public class TestIcebergRESTServiceBaseIT extends AbstractIT {
   private SparkSession sparkSession;
 
@@ -61,7 +64,7 @@ public class TestIcebergRESTServiceBaseIT extends AbstractIT {
 
   protected List<Object[]> sql(String query, Object... args) {
     List<Row> rows = sparkSession.sql(String.format(query, args)).collectAsList();
-    if (rows.size() < 1) {
+    if (rows.isEmpty()) {
       return ImmutableList.of();
     }
     return rowsToJava(rows);
@@ -85,14 +88,13 @@ public class TestIcebergRESTServiceBaseIT extends AbstractIT {
                 return row.getList(pos);
               } else if (value instanceof scala.collection.Map) {
                 return row.getJavaMap(pos);
-              } else {
-                return value;
               }
+              return value;
             })
         .toArray(Object[]::new);
   }
 
-  /*check whether all child map content is in parent map */
+  /** check whether all child map content is in parent map */
   protected void checkMapContains(Map<String, String> child, Map<String, String> parent) {
     child.forEach(
         (k, v) -> {
@@ -101,7 +103,7 @@ public class TestIcebergRESTServiceBaseIT extends AbstractIT {
         });
   }
 
-  /* mainly used to debug */
+  /** mainly used to debug */
   protected void printObjects(List<Object[]> objects) {
     objects.stream()
         .forEach(
