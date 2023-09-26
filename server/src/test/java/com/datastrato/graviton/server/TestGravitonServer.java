@@ -7,6 +7,8 @@ package com.datastrato.graviton.server;
 import static com.datastrato.graviton.Configs.ENTRY_KV_ROCKSDB_BACKEND_PATH;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import com.datastrato.graviton.aux.AuxiliaryServiceManager;
+import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.util.UUID;
 import org.apache.commons.io.FileUtils;
@@ -39,6 +41,11 @@ public class TestGravitonServer {
     spyServerConfig = Mockito.spy(serverConfig);
     Mockito.when(spyServerConfig.get(ENTRY_KV_ROCKSDB_BACKEND_PATH))
         .thenReturn(ROCKS_DB_STORE_PATH);
+
+    Mockito.when(
+            spyServerConfig.getConfigsWithPrefix(
+                AuxiliaryServiceManager.GRAVITON_AUX_SERVICE_PREFIX))
+        .thenReturn(ImmutableMap.of(AuxiliaryServiceManager.AUX_SERVICE_NAMES, ""));
   }
 
   @BeforeEach
