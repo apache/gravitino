@@ -32,8 +32,8 @@ import org.slf4j.LoggerFactory;
 public class AuxiliaryServiceManager {
   private static final Logger LOG = LoggerFactory.getLogger(AuxiliaryServiceManager.class);
   public static final String GRAVITON_AUX_SERVICE_PREFIX = "graviton.auxService.";
-  public static final String AUX_SERVICE_NAMES = "auxServiceNames";
-  public static final String AUX_SERVICE_CLASSPATH = "auxServiceClasspath";
+  public static final String AUX_SERVICE_NAMES = "names";
+  public static final String AUX_SERVICE_CLASSPATH = "classpath";
 
   private static final Splitter splitter = Splitter.on(",");
   private static final Joiner DOT = Joiner.on(".");
