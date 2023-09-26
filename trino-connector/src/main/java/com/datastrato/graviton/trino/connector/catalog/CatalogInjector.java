@@ -110,7 +110,6 @@ public class CatalogInjector {
 
   void injectCatalogConnector(String catalogName) {
     try {
-      System.out.println("loading graviton catalogs");
       Class catalogConnectorClass =
           catalogFactoryObject
               .getClass()

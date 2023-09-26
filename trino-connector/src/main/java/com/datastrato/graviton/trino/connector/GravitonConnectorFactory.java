@@ -9,6 +9,7 @@ import com.datastrato.graviton.trino.connector.catalog.CatalogConnectorFactory;
 import com.datastrato.graviton.trino.connector.catalog.CatalogConnectorManager;
 import com.datastrato.graviton.trino.connector.catalog.CatalogInjector;
 import com.google.common.base.Preconditions;
+import io.airlift.log.Logger;
 import io.trino.spi.connector.Connector;
 import io.trino.spi.connector.ConnectorContext;
 import io.trino.spi.connector.ConnectorFactory;
@@ -16,6 +17,7 @@ import java.util.Map;
 
 public class GravitonConnectorFactory implements ConnectorFactory {
 
+  private static final Logger log = Logger.get(CatalogConnectorManager.class);
   private static final String DEFAULT_CONNECTOR_NAME = "graviton";
 
   private CatalogConnectorManager catalogConnectorManager;
@@ -54,7 +56,8 @@ public class GravitonConnectorFactory implements ConnectorFactory {
           catalogConnectorManager.start();
 
         } catch (Exception e) {
-          throw new RuntimeException(e);
+          log.error("Initialization of the GravitonConnector failed.", e);
+          throw e;
         }
 
         // Default GravitonConnector named "graviton" is just using to load CatalogConnectorManager,
