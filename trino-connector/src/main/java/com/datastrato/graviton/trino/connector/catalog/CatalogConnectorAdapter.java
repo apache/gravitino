@@ -10,16 +10,11 @@ import io.trino.spi.session.PropertyMetadata;
 import java.util.List;
 
 /**
- * * This interface is used to handle different parts of connectors from different catalog
- * connectors.
+ * This interface is used to handle different parts of connectors from different catalog connectors.
  */
 public interface CatalogConnectorAdapter {
 
-  /**
-   * *
-   *
-   * @return TableProperties list that used to validate table properties.
-   */
+  /** @return TableProperties list that used to validate table properties. */
   default List<PropertyMetadata<?>> getTableProperties() {
     return emptyList();
   }

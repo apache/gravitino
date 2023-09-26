@@ -19,8 +19,8 @@ import java.util.List;
  */
 public class CatalogConnectorContext {
 
-  protected final NameIdentifier catalogName;
-  protected final GravitonMetaLake metaLake;
+  private final NameIdentifier catalogName;
+  private final GravitonMetaLake metaLake;
 
   // connector communicate with trino
   protected GravitonConnector connector;
