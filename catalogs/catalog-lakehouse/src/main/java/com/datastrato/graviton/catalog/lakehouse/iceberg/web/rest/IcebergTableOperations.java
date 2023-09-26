@@ -24,6 +24,7 @@ import javax.ws.rs.core.Response;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.RESTUtil;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
+import org.apache.iceberg.rest.requests.ReportMetricsRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -126,5 +127,15 @@ public class IcebergTableOperations {
     } else {
       return IcebergRestUtils.notExists();
     }
+  }
+
+  @POST
+  @Path("{table}/metrics")
+  @Produces(MediaType.APPLICATION_JSON)
+  public Response reportTableMetrics(
+      @PathParam("namespace") String namespace,
+      @PathParam("table") String table,
+      ReportMetricsRequest request) {
+    return IcebergRestUtils.noContent();
   }
 }
