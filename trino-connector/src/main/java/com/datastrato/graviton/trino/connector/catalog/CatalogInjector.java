@@ -40,11 +40,11 @@ public class CatalogInjector {
   private void checkTrinoSpiVersion(ConnectorContext context) {
     this.trinoVersion = context.getSpiVersion();
 
-    int trino_version = Integer.parseInt(context.getSpiVersion());
-    if (trino_version < MIN_TRINO_SPI_VERSION) {
+    int version = Integer.parseInt(context.getSpiVersion());
+    if (version < MIN_TRINO_SPI_VERSION) {
       String errmsg =
           String.format(
-              "Unsupported trino-%d version. min support version is trino-%d",
+              "Unsupported trino-%s version. min support version is trino-%d",
               trinoVersion, MIN_TRINO_SPI_VERSION);
       throw new TrinoException(GravitonErrorCode.GRAVITON_UNSUPPORTED_TRIO_VERSION, errmsg);
     }
@@ -67,7 +67,7 @@ public class CatalogInjector {
       field = nodeManager.getClass().getDeclaredField("allCatalogsOnAllNodes");
       field.setAccessible(true);
       field.setBoolean(nodeManager, true);
-      Preconditions.checkState(field.getBoolean(nodeManager), "allCatalogsOnAllNodes shoud true");
+      Preconditions.checkState(field.getBoolean(nodeManager), "allCatalogsOnAllNodes should true");
 
       // find CatalogManager
       field = nodeManager.getClass().getDeclaredField("activeNodesByCatalogHandle");
@@ -106,11 +106,11 @@ public class CatalogInjector {
 
       LOG.info("Bind Trino catalog manger successfully.");
     } catch (Throwable t) {
-      String meesgae =
+      String message =
           String.format(
-              "Bind Trino catalog manger failed, Unsuported trino-%d version", trinoVersion);
-      LOG.error(meesgae, t.getMessage());
-      throw new TrinoException(GRAVITON_UNSUPPORTED_TRIO_VERSION, meesgae);
+              "Bind Trino catalog manger failed, unsupported trino-%d version", trinoVersion);
+      LOG.error(message, t.getMessage());
+      throw new TrinoException(GRAVITON_UNSUPPORTED_TRIO_VERSION, message);
     }
   }
 
