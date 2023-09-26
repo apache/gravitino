@@ -15,7 +15,7 @@ public class GravitonCatalog {
   }
 
   public String getProvider() {
-    return catalog.properties().getOrDefault("provider", "");
+    return catalog.provider();
   }
 
   public String getName() {

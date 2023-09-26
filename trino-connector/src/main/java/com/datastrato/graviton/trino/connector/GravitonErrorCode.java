@@ -12,7 +12,8 @@ import io.trino.spi.ErrorType;
 
 public enum GravitonErrorCode implements ErrorCodeSupplier {
   GRAVITON_UNSUPPORTED_TRIO_VERSION(0, EXTERNAL),
-  GRAVITON_NO_METALAKE_SELECTED(0, EXTERNAL),
+  GRAVITON_NO_METALAKE_SELECTED(1, EXTERNAL),
+  GRAVITON_MISSING_CONFIG(2, EXTERNAL),
   ;
 
   private final ErrorCode errorCode;

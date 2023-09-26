@@ -19,11 +19,7 @@ dependencies {
   {
     exclude("org.apache.logging.log4j")
   }
-  implementation(project(":core"))
-  {
-    exclude("org.apache.logging.log4j")
-  }
-  implementation(project(":client-java"))
+  implementation(project(":clients:client-java"))
   {
     exclude("org.apache.logging.log4j")
   }

@@ -127,7 +127,6 @@ tasks.rat {
     // Ignore files we track but do not distribute
     "**/.github/**/*",
     "dev/docker/**/*.xml",
-    "trino-connector/src/main/resources/META-INF/services/io.trino.spi.Plugin",
   )
 
   // Add .gitignore excludes to the Apache Rat exclusion list.
