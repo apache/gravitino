@@ -20,9 +20,9 @@ import java.util.List;
 import org.apache.commons.lang3.NotImplementedException;
 
 /**
- * * GravitonConnector serves as the entry point for operations on the connector managed by Trino
- * and Graviton. It provides a standard entry point for Trino connectors and delegates their
- * operations to internal connectors.
+ * GravitonConnector serves as the entry point for operations on the connector managed by Trino and
+ * Graviton. It provides a standard entry point for Trino connectors and delegates their operations
+ * to internal connectors.
  */
 public class GravitonConnector implements Connector {
 
@@ -31,10 +31,10 @@ public class GravitonConnector implements Connector {
 
   public GravitonConnector(
       NameIdentifier catalogIdentifier, CatalogConnectorContext catalogConnectorContext) {
-    this.catalogIdentifier =
-        Preconditions.checkNotNull(catalogIdentifier, "catalogIdentifier is not null");
-    this.catalogConnectorContext =
-        Preconditions.checkNotNull(catalogConnectorContext, "catalogIdentifier is not null");
+    Preconditions.checkArgument(catalogIdentifier != null, "catalogIdentifier is not null");
+    Preconditions.checkArgument(catalogConnectorContext != null, "catalogIdentifier is not null");
+    this.catalogIdentifier = catalogIdentifier;
+    this.catalogConnectorContext = catalogConnectorContext;
   }
 
   @Override

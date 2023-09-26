@@ -24,7 +24,7 @@ public class CatalogConnectorContext {
 
   // connector communicate with trino
   protected GravitonConnector connector;
-  // inter connector communicate with data storage
+  // internal connector communicate with data storage
   protected Connector internalConnector;
 
   private CatalogConnectorAdapter adapter;
@@ -34,11 +34,15 @@ public class CatalogConnectorContext {
       GravitonMetaLake metaLake,
       Connector internalConnector,
       CatalogConnectorAdapter adapter) {
-    this.catalogName = Preconditions.checkNotNull(catalogName, "catalogName is not null");
-    this.metaLake = Preconditions.checkNotNull(metaLake, "metaLake is not null");
-    this.internalConnector =
-        Preconditions.checkNotNull(internalConnector, "internalConnector is not null");
-    this.adapter = Preconditions.checkNotNull(adapter, "adapter is not null");
+    Preconditions.checkArgument(catalogName != null, "catalogName is not null");
+    Preconditions.checkArgument(metaLake != null, "metaLake is not null");
+    Preconditions.checkArgument(internalConnector != null, "internalConnector is not null");
+    Preconditions.checkArgument(adapter != null, "adapter is not null");
+
+    this.catalogName = catalogName;
+    this.metaLake = metaLake;
+    this.internalConnector = internalConnector;
+    this.adapter = adapter;
 
     this.connector = new GravitonConnector(catalogName, this);
   }

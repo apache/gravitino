@@ -17,7 +17,7 @@ import java.util.Map;
 
 public class GravitonConnectorFactory implements ConnectorFactory {
 
-  private static final Logger log = Logger.get(CatalogConnectorManager.class);
+  private static final Logger LOG = Logger.get(CatalogConnectorManager.class);
   private static final String DEFAULT_CONNECTOR_NAME = "graviton";
 
   private CatalogConnectorManager catalogConnectorManager;
@@ -28,7 +28,7 @@ public class GravitonConnectorFactory implements ConnectorFactory {
   }
 
   /**
-   * This function call by trino create connector. It'create DummyGravitonConnector at first. other
+   * This function call by trino create connector. It creates DummyGravitonConnector at first. other
    * time's it get GravitonConnector by CatalogManger
    *
    * @param catalogName
@@ -56,7 +56,7 @@ public class GravitonConnectorFactory implements ConnectorFactory {
           catalogConnectorManager.start();
 
         } catch (Exception e) {
-          log.error("Initialization of the GravitonConnector failed.", e);
+          LOG.error("Initialization of the GravitonConnector failed.", e);
           throw e;
         }
 

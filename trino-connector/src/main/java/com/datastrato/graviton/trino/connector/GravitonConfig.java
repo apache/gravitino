@@ -13,28 +13,27 @@ import java.util.Map;
 
 public class GravitonConfig {
 
-  private static final Map<String, ConfigEntry> configDefintions = new HashMap<>();
+  private static final Map<String, ConfigEntry> CONFIG_DEFINITIONS = new HashMap<>();
 
   private final Map<String, String> config;
 
-  public static final ConfigEntry GRAVITON_URI =
+  private static final ConfigEntry GRAVITON_URI =
       new ConfigEntry(
           "graviton.uri", "The uri of the graviton web server", "http://localhost:8090", false);
 
-  public static final ConfigEntry GRAVI_METALAKE =
+  private static final ConfigEntry GRAVITON_METALAKE =
       new ConfigEntry("graviton.metalake", "The metalake name for used", "", true);
 
   public GravitonConfig(Map<String, String> requiredConfig) {
-    config = Preconditions.checkNotNull(requiredConfig, "catalogInjector is not null");
+    Preconditions.checkArgument(requiredConfig != null, "requiredConfig is not null");
+    config = requiredConfig;
 
-    for (Map.Entry<String, ConfigEntry> entry : configDefintions.entrySet()) {
-      ConfigEntry configDefinish = entry.getValue();
-      if (configDefinish.isRequired) {
-        if (!config.containsKey(configDefinish.key)) {
-          String message =
-              String.format("Missing graviton config, %s is required", configDefinish.key);
-          throw new TrinoException(GRAVITON_MISSING_CONFIG, message);
-        }
+    for (Map.Entry<String, ConfigEntry> entry : CONFIG_DEFINITIONS.entrySet()) {
+      ConfigEntry configDefinition = entry.getValue();
+      if (configDefinition.isRequired && !config.containsKey(configDefinition.key)) {
+        String message =
+            String.format("Missing graviton config, %s is required", configDefinition.key);
+        throw new TrinoException(GRAVITON_MISSING_CONFIG, message);
       }
     }
   }
@@ -44,7 +43,7 @@ public class GravitonConfig {
   }
 
   public String getMetalake() {
-    return config.getOrDefault(GRAVI_METALAKE.key, GRAVI_METALAKE.defaultValue);
+    return config.getOrDefault(GRAVITON_METALAKE.key, GRAVITON_METALAKE.defaultValue);
   }
 
   static class ConfigEntry {
@@ -59,7 +58,7 @@ public class GravitonConfig {
       this.defaultValue = defaultValue;
       this.isRequired = isRequired;
 
-      configDefintions.put(key, this);
+      CONFIG_DEFINITIONS.put(key, this);
     }
   }
 }

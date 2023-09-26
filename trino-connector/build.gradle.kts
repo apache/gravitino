@@ -15,12 +15,10 @@ repositories {
 
 dependencies {
   implementation(project(":api"))
-  implementation(project(":common"))
-  {
+  implementation(project(":common")) {
     exclude("org.apache.logging.log4j")
   }
-  implementation(project(":clients:client-java"))
-  {
+  implementation(project(":clients:client-java")) {
     exclude("org.apache.logging.log4j")
   }
   implementation(libs.jackson.databind)

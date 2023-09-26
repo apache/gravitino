@@ -5,16 +5,17 @@
 package com.datastrato.graviton.trino.connector.catalog;
 
 import static com.datastrato.graviton.trino.connector.GravitonErrorCode.GRAVITON_NO_METALAKE_SELECTED;
-import static java.util.Objects.requireNonNull;
 
 import com.datastrato.graviton.Catalog;
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
 import com.datastrato.graviton.client.GravitonClient;
 import com.datastrato.graviton.client.GravitonMetaLake;
+import com.datastrato.graviton.exceptions.NoSuchMetalakeException;
 import com.datastrato.graviton.trino.connector.GravitonConfig;
 import com.datastrato.graviton.trino.connector.metadata.GravitonCatalog;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
 import io.airlift.log.Logger;
 import io.trino.spi.TrinoException;
 import java.util.Arrays;
@@ -25,14 +26,14 @@ import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.NotImplementedException;
 
 /**
- * * This class has the following main functions: 1. Load catalogs from the Graviton server and
- * create catalog contexts. 2. Manage all catalog context instances, which primarily handle
- * communication with Trino through Graviton connectors and inner connectors related to the engine.
+ * This class has the following main functions: 1. Load catalogs from the Graviton server and create
+ * catalog contexts. 2. Manage all catalog context instances, which primarily handle communication
+ * with Trino through Graviton connectors and inner connectors related to the engine.
  */
 public class CatalogConnectorManager {
-  private static final Logger log = Logger.get(CatalogConnectorManager.class);
+  private static final Logger LOG = Logger.get(CatalogConnectorManager.class);
 
-  private static int CatalogLoadFrequnceSecond = 30;
+  private static final int CATALOG_LOAD_FREQUENCY_SECOND = 30;
 
   private final ScheduledExecutorService executorService =
       Executors.newSingleThreadScheduledExecutor();
@@ -44,13 +45,14 @@ public class CatalogConnectorManager {
 
   private GravitonClient gravitonClient;
   private GravitonConfig config;
+  private String usedMetalake;
 
   public CatalogConnectorManager(
       CatalogInjector catalogInjector, CatalogConnectorFactory catalogFactory) {
-    this.catalogInjector =
-        Preconditions.checkNotNull(catalogInjector, "catalogInjector is not null");
-    this.catalogConnectorFactory =
-        Preconditions.checkNotNull(catalogFactory, "catalogFactory is not null");
+    Preconditions.checkArgument(catalogInjector != null, "catalogInjector is not null");
+    Preconditions.checkArgument(catalogFactory != null, "catalogFactory is not null");
+    this.catalogInjector = catalogInjector;
+    this.catalogConnectorFactory = catalogFactory;
   }
 
   public void config(GravitonConfig config) {
@@ -59,32 +61,35 @@ public class CatalogConnectorManager {
 
   public void start() {
     gravitonClient = GravitonClient.builder(config.getURI()).build();
-    Preconditions.checkArgument(gravitonClient != null, "catalogFactory is not null");
+    Preconditions.checkNotNull(gravitonClient, "catalogFactory is not null");
+
+    String metalake = config.getMetalake();
+    if (Strings.isNullOrEmpty(metalake)) {
+      throw new TrinoException(GRAVITON_NO_METALAKE_SELECTED, "No graviton metalake selected");
+    }
+    this.usedMetalake = metalake;
 
     // schedule task to load catalog from graviton server.
-    executorService.execute(this::loadMetalakes);
-    log.info("Graviton CatalogConnectorManager started.");
+    executorService.execute(this::loadMetalake);
+    LOG.info("Graviton CatalogConnectorManager started.");
   }
 
-  void loadMetalakes() {
+  void loadMetalake() {
     try {
-      GravitonMetaLake[] gravitonMetaLakes = gravitonClient.listMetalakes();
 
-      String usedMetalake = config.getMetalake();
-      if ("".equals(usedMetalake)) {
-        throw new TrinoException(GRAVITON_NO_METALAKE_SELECTED, "No graviton metalake selected");
+      GravitonMetaLake metalake = null;
+      try {
+        metalake = gravitonClient.loadMetalake(NameIdentifier.ofMetalake(usedMetalake));
+      } catch (NoSuchMetalakeException noSuchMetalakeException) {
+        LOG.warn("No such Metalake {}", metalake.name());
       }
 
-      for (GravitonMetaLake metaLake : gravitonMetaLakes) {
-        if (metaLake.name().equals(usedMetalake)) {
-          log.debug("Load metalake: " + metaLake.name());
-          loadCatalogs(metaLake);
-          break;
-        }
-      }
+      LOG.debug("Load metalake: " + metalake.name());
+      loadCatalogs(metalake);
       // TODO need to handle metalake dropped.
     } finally {
-      executorService.schedule(this::loadMetalakes, CatalogLoadFrequnceSecond, TimeUnit.SECONDS);
+      // load metalake for handling catalog in the metalake updates.
+      executorService.schedule(this::loadMetalake, CATALOG_LOAD_FREQUENCY_SECOND, TimeUnit.SECONDS);
     }
   }
 
@@ -92,8 +97,8 @@ public class CatalogConnectorManager {
     try {
       NameIdentifier[] catalogNames = metalake.listCatalogs(Namespace.ofCatalog(metalake.name()));
 
-      log.info(
-          "Load {} metalake's catelog. catalogs: {}.",
+      LOG.info(
+          "Load {} metalake's catalogs. catalogs: {}.",
           metalake.name(),
           Arrays.toString(catalogNames));
       Arrays.stream(catalogNames)
@@ -105,7 +110,7 @@ public class CatalogConnectorManager {
                   // TODO need to handle catalog changed.
                   if (!catalogConnectors.containsKey(catalogName)) {
                     Catalog catalog = metalake.loadCatalog(nameIdentifier);
-                    requireNonNull(catalogInjector, "catalogInjector is null");
+                    Preconditions.checkNotNull(catalog, "catalog is not null");
 
                     GravitonCatalog gravitonCatalog = new GravitonCatalog(catalog);
                     CatalogConnectorContext catalogConnectorContext =
@@ -114,18 +119,18 @@ public class CatalogConnectorManager {
 
                     catalogConnectors.put(catalogName, catalogConnectorContext);
                     catalogInjector.injectCatalogConnector(catalogName);
-                    log.info("Load {} metalake's catalog {} successfully.", metalake, catalogName);
+                    LOG.info("Load {} metalake's catalog {} successfully.", metalake, catalogName);
                   }
                 } catch (Exception e) {
-                  log.error(
-                      "Load {} metalake's catelog {} failed.",
+                  LOG.error(
+                      "Load {} metalake's catalogs {} failed.",
                       metalake.name(),
                       catalogNames,
                       e.getMessage());
                 }
               });
     } catch (Throwable t) {
-      log.error("Load {} metalake's catelog failed.", metalake.name(), t.getMessage());
+      LOG.error("Load {} metalake's catalog failed.", metalake.name(), t.getMessage());
     }
   }
 
@@ -133,8 +138,8 @@ public class CatalogConnectorManager {
     return catalogConnectors.get(catalogName);
   }
 
-  public void shutdown(String catalogName) {
-    log.info("Graviton CatalogConnectorManager shutdown.");
+  public void shutdown() {
+    LOG.info("Graviton CatalogConnectorManager shutdown.");
     throw new NotImplementedException();
   }
 }
