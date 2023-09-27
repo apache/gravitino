@@ -117,7 +117,7 @@ public class CatalogConnectorManager {
     try {
       catalogNames = metalake.listCatalogs(Namespace.ofCatalog(metalake.name()));
     } catch (Exception e) {
-      LOG.error("Load metalake {}'s catalog failed.", metalake.name(), e);
+      LOG.error("Failed to list catalogs in metalake {}.", metalake.name(), e);
       return;
     }
 
