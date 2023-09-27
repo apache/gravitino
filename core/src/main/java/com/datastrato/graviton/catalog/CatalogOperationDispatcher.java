@@ -38,10 +38,12 @@ import com.datastrato.graviton.rel.transforms.Transform;
 import com.datastrato.graviton.storage.IdGenerator;
 import com.datastrato.graviton.utils.ThrowableFunction;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.slf4j.Logger;
@@ -279,16 +281,18 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
    */
   @Override
   public Table loadTable(NameIdentifier ident) throws NoSuchTableException {
+    NameIdentifier catalogIdentifier = getCatalogIdentifier(ident);
     Table table =
         doWithCatalog(
-            getCatalogIdentifier(ident),
+            catalogIdentifier,
             c -> c.doWithTableOps(t -> t.loadTable(ident)),
             NoSuchTableException.class);
 
     StringIdentifier stringId = getStringIdFromProperties(table.properties());
     // Case 1: The table is not created by Graviton.
     if (stringId == null) {
-      return EntityCombinedTable.of(table);
+      return EntityCombinedTable.of(table, null)
+          .withHiddenPropertiesSet(getHiddenPropertyNames(catalogIdentifier, table.properties()));
     }
 
     TableEntity tableEntity =
@@ -297,7 +301,24 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
             identifier -> store.get(identifier, TABLE, TableEntity.class),
             "GET",
             stringId.id());
-    return EntityCombinedTable.of(table, tableEntity);
+
+    return EntityCombinedTable.of(table, tableEntity)
+        .withHiddenPropertiesSet(getHiddenPropertyNames(catalogIdentifier, table.properties()));
+  }
+
+  private Set<String> getHiddenPropertyNames(
+      NameIdentifier catalogIdent, Map<String, String> properties) {
+    return doWithCatalog(
+        catalogIdent,
+        c ->
+            c.doWithPropertiesMeta(
+                p -> {
+                  PropertiesMetadata propertiesMetadata = p.tablePropertiesMetadata();
+                  return properties.keySet().stream()
+                      .filter(propertiesMetadata::isHiddenProperty)
+                      .collect(Collectors.toSet());
+                }),
+        IllegalArgumentException.class);
   }
 
   /**
@@ -322,6 +343,15 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
       Distribution distribution,
       SortOrder[] sortOrders)
       throws NoSuchSchemaException, TableAlreadyExistsException {
+    doWithCatalog(
+        getCatalogIdentifier(ident),
+        c ->
+            c.doWithPropertiesMeta(
+                p -> {
+                  validateCreateTableProperties(p.tablePropertiesMetadata(), properties);
+                  return null;
+                }),
+        IllegalArgumentException.class);
     long uid = idGenerator.nextId();
     // Add StringIdentifier to the properties, the specific catalog will handle this
     // StringIdentifier to make sure only when the operation is successful, the related
@@ -362,10 +392,45 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
       store.put(tableEntity, true /* overwrite */);
     } catch (Exception e) {
       LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", ident, e);
-      return EntityCombinedTable.of(table);
+      return EntityCombinedTable.of(table, null)
+          .withHiddenPropertiesSet(
+              getHiddenPropertyNames(getCatalogIdentifier(ident), table.properties()));
     }
 
-    return EntityCombinedTable.of(table, tableEntity);
+    return EntityCombinedTable.of(table, tableEntity)
+        .withHiddenPropertiesSet(
+            getHiddenPropertyNames(getCatalogIdentifier(ident), table.properties()));
+  }
+
+  private void validateCreateTableProperties(
+      PropertiesMetadata tablePropertiesMetadata, Map<String, String> properties) {
+    if (properties == null) {
+      return;
+    }
+
+    List<String> reservedProperties =
+        properties.keySet().stream()
+            .filter(tablePropertiesMetadata::isReservedProperty)
+            .collect(Collectors.toList());
+    Preconditions.checkArgument(
+        reservedProperties.isEmpty(),
+        "Properties are reserved and cannot be set: %s",
+        reservedProperties);
+
+    List<String> absentProperties =
+        tablePropertiesMetadata.propertyEntries().keySet().stream()
+            .filter(tablePropertiesMetadata::isRequiredProperty)
+            .filter(k -> !properties.containsKey(k))
+            .collect(Collectors.toList());
+    Preconditions.checkArgument(
+        absentProperties.isEmpty(),
+        "Properties are required and must be set: %s",
+        absentProperties);
+
+    // use decode function to validate the property values
+    properties.keySet().stream()
+        .filter(tablePropertiesMetadata::containsProperty)
+        .forEach(k -> tablePropertiesMetadata.propertyEntries().get(k).decode(properties.get(k)));
   }
 
   /**
@@ -381,6 +446,7 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
   @Override
   public Table alterTable(NameIdentifier ident, TableChange... changes)
       throws NoSuchTableException, IllegalArgumentException {
+    validateAlterTableProperties(ident, changes);
     Table alteredTable =
         doWithCatalog(
             getCatalogIdentifier(ident),
@@ -391,7 +457,9 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
     StringIdentifier stringId = getStringIdFromProperties(alteredTable.properties());
     // Case 1: The table is not created by Graviton.
     if (stringId == null) {
-      return EntityCombinedTable.of(alteredTable);
+      return EntityCombinedTable.of(alteredTable, null)
+          .withHiddenPropertiesSet(
+              getHiddenPropertyNames(getCatalogIdentifier(ident), alteredTable.properties()));
     }
 
     TableEntity updatedTableEntity =
@@ -429,7 +497,42 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
             "UPDATE",
             stringId.id());
 
-    return EntityCombinedTable.of(alteredTable, updatedTableEntity);
+    return EntityCombinedTable.of(alteredTable, updatedTableEntity)
+        .withHiddenPropertiesSet(
+            getHiddenPropertyNames(getCatalogIdentifier(ident), alteredTable.properties()));
+  }
+
+  private void validateAlterTableProperties(NameIdentifier ident, TableChange... changes) {
+    doWithCatalog(
+        getCatalogIdentifier(ident),
+        c ->
+            c.doWithPropertiesMeta(
+                p -> {
+                  PropertiesMetadata tablePropertiesMetadata = p.tablePropertiesMetadata();
+                  for (TableChange change : changes) {
+                    if (change instanceof TableChange.SetProperty) {
+                      String propertyName = ((TableChange.SetProperty) change).getProperty();
+                      if (tablePropertiesMetadata.isReservedProperty(propertyName)
+                          || tablePropertiesMetadata.isImmutableProperty(propertyName)) {
+                        throw new IllegalArgumentException(
+                            String.format(
+                                "Property %s is reserved or immutable and cannot be set",
+                                propertyName));
+                      }
+                    }
+
+                    if (change instanceof TableChange.RemoveProperty) {
+                      String propertyName = ((TableChange.RemoveProperty) change).getProperty();
+                      if (tablePropertiesMetadata.isReservedProperty(propertyName)
+                          || tablePropertiesMetadata.isImmutableProperty(propertyName)) {
+                        throw new IllegalArgumentException(
+                            String.format("Property %s cannot be removed by user", propertyName));
+                      }
+                    }
+                  }
+                  return null;
+                }),
+        IllegalArgumentException.class);
   }
 
   /**
