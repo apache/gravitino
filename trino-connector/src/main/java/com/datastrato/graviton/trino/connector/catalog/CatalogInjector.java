@@ -5,7 +5,7 @@
 package com.datastrato.graviton.trino.connector.catalog;
 
 import static com.datastrato.graviton.trino.connector.GravitonErrorCode.GRAVITON_CREATE_INNER_CONNECTOR_FAILED;
-import static com.datastrato.graviton.trino.connector.GravitonErrorCode.GRAVITON_UNSUPPORTED_TRIO_VERSION;
+import static com.datastrato.graviton.trino.connector.GravitonErrorCode.GRAVITON_UNSUPPORTED_TRINO_VERSION;
 
 import com.datastrato.graviton.trino.connector.GravitonErrorCode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -35,7 +35,7 @@ public class CatalogInjector {
 
   private ConcurrentHashMap catalogs;
   private Object catalogFactoryObject;
-  private String trinoVersion = "";
+  private String trinoVersion;
 
   private void checkTrinoSpiVersion(ConnectorContext context) {
     this.trinoVersion = context.getSpiVersion();
@@ -46,19 +46,19 @@ public class CatalogInjector {
           String.format(
               "Unsupported trino-%s version. min support version is trino-%d",
               trinoVersion, MIN_TRINO_SPI_VERSION);
-      throw new TrinoException(GravitonErrorCode.GRAVITON_UNSUPPORTED_TRIO_VERSION, errmsg);
+      throw new TrinoException(GravitonErrorCode.GRAVITON_UNSUPPORTED_TRINO_VERSION, errmsg);
     }
   }
 
   public void bindCatalogManager(ConnectorContext context) {
-    // injector trino catalog need NodeManger support allCatalogsOnAllNodes;
+    // injector trino catalog need NodeManager support allCatalogsOnAllNodes;
     checkTrinoSpiVersion(context);
 
-    // Try to get trino CatalogFactory instance. normally we can get the catalog from
-    // CatalogFactory. then add catalog to it that loaded from graviton.
+    // Try to get trino CatalogFactory instance, normally we can get the catalog from
+    // CatalogFactory, then add catalog to it that loaded from graviton.
 
     try {
-      // set NodeManger  allCatalogsOnAllNodes = true;
+      // set NodeManager  allCatalogsOnAllNodes = true;
       Object nodeManager = context.getNodeManager();
       Field field = nodeManager.getClass().getDeclaredField("nodeManager");
       field.setAccessible(true);
@@ -92,7 +92,7 @@ public class CatalogInjector {
       field.setAccessible(true);
       Object catalogManager = field.get(transactionManager);
 
-      // find CatalogManger.catalogs
+      // find CatalogManager.catalogs
       field = catalogManager.getClass().getDeclaredField("catalogs");
       field.setAccessible(true);
       catalogs = (ConcurrentHashMap) field.get(catalogManager);
@@ -104,13 +104,13 @@ public class CatalogInjector {
       catalogFactoryObject = field.get(catalogManager);
       Preconditions.checkNotNull(catalogFactoryObject, "catalogFactoryObject should not be null");
 
-      LOG.info("Bind Trino catalog manger successfully.");
+      LOG.info("Bind Trino catalog manager successfully.");
     } catch (Throwable t) {
       String message =
           String.format(
-              "Bind Trino catalog manger failed, unsupported trino-%d version", trinoVersion);
-      LOG.error(message, t.getMessage());
-      throw new TrinoException(GRAVITON_UNSUPPORTED_TRIO_VERSION, message);
+              "Bind Trino catalog manager failed, unsupported trino-%s version", trinoVersion);
+      LOG.error(message, t);
+      throw new TrinoException(GRAVITON_UNSUPPORTED_TRINO_VERSION, message, t);
     }
   }
 
@@ -133,13 +133,13 @@ public class CatalogInjector {
           catalogFactoryObject.getClass().getDeclaredMethod("createCatalog", catalogConnectorClass);
       Object catalogConnector = method.invoke(catalogFactoryObject, catalogPropertiesObject);
 
-      // put catalog to CatalogManger.catalogs
+      // put catalog to CatalogManager.catalogs
       catalogs.put(catalogName, catalogConnector);
 
       LOG.info("Inject trino catalog {} successfully.", catalogName);
     } catch (Throwable t) {
-      LOG.error("Inject trino catalog {} failed.", catalogName, t.getMessage());
-      throw new TrinoException(GRAVITON_CREATE_INNER_CONNECTOR_FAILED, t.getMessage());
+      LOG.error("Inject trino catalog {} failed.", catalogName, t);
+      throw new TrinoException(GRAVITON_CREATE_INNER_CONNECTOR_FAILED, t);
     }
   }
 
@@ -152,7 +152,7 @@ public class CatalogInjector {
   }
 
   Connector createConnector(String connectorName, Map<String, Object> properties) {
-    String connectorProperties = "";
+    String connectorProperties;
     try {
       ObjectMapper objectMapper = new ObjectMapper();
       connectorProperties = objectMapper.writeValueAsString(properties);
@@ -170,7 +170,7 @@ public class CatalogInjector {
           objectMapper.readValue(connectorProperties, catalogConnectorClass);
       Object catalogConnector = method.invoke(catalogFactoryObject, catalogPropertyObject);
 
-      // get connector object from trino CatalogConnector.
+      // get a connector object from trino CatalogConnector.
       Field field = catalogConnector.getClass().getDeclaredField("catalogConnector");
       field.setAccessible(true);
       Object connectorService = field.get(catalogConnector);
@@ -182,12 +182,12 @@ public class CatalogInjector {
       LOG.info("Create internal catalog connector {} successfully.", connectorName);
       return (Connector) connector;
     } catch (Throwable t) {
-      LOG.info(
+      LOG.error(
           "Create internal catalog connector {} failed. connector properties: {} ",
           connectorName,
           properties.toString(),
-          t.getMessage());
-      throw new TrinoException(GRAVITON_CREATE_INNER_CONNECTOR_FAILED, t.getMessage());
+          t);
+      throw new TrinoException(GRAVITON_CREATE_INNER_CONNECTOR_FAILED, t);
     }
   }
 }

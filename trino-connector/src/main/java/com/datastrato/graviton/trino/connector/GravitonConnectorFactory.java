@@ -28,13 +28,13 @@ public class GravitonConnectorFactory implements ConnectorFactory {
   }
 
   /**
-   * This function call by trino create connector. It creates DummyGravitonConnector at first. other
-   * time's it get GravitonConnector by CatalogManger
+   * This function call by trino creates a connector. It creates DummyGravitonConnector at first.
+   * Another time's it get GravitonConnector by CatalogConnectorManger
    *
-   * @param catalogName
-   * @param requiredConfig
-   * @param context
-   * @return
+   * @param catalogName the connector name of catalog
+   * @param requiredConfig the config of connector
+   * @param context trino connector context
+   * @return trino connector
    */
   @Override
   public Connector create(

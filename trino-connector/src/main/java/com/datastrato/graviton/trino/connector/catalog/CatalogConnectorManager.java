@@ -4,7 +4,7 @@
  */
 package com.datastrato.graviton.trino.connector.catalog;
 
-import static com.datastrato.graviton.trino.connector.GravitonErrorCode.GRAVITON_NO_METALAKE_SELECTED;
+import static com.datastrato.graviton.trino.connector.GravitonErrorCode.GRAVITON_METALAKE_NOT_EXISTS;
 
 import com.datastrato.graviton.Catalog;
 import com.datastrato.graviton.NameIdentifier;
@@ -61,30 +61,34 @@ public class CatalogConnectorManager {
 
   public void start() {
     gravitonClient = GravitonClient.builder(config.getURI()).build();
-    Preconditions.checkNotNull(gravitonClient, "catalogFactory is not null");
+    Preconditions.checkNotNull(gravitonClient, "gravitonClient is not null");
 
     String metalake = config.getMetalake();
     if (Strings.isNullOrEmpty(metalake)) {
-      throw new TrinoException(GRAVITON_NO_METALAKE_SELECTED, "No graviton metalake selected");
+      throw new TrinoException(GRAVITON_METALAKE_NOT_EXISTS, "No graviton metalake selected");
     }
     this.usedMetalake = metalake;
 
-    // schedule task to load catalog from graviton server.
+    // schedule a task to load catalog from graviton server.
     executorService.execute(this::loadMetalake);
     LOG.info("Graviton CatalogConnectorManager started.");
   }
 
   void loadMetalake() {
     try {
-
       GravitonMetaLake metalake = null;
       try {
         metalake = gravitonClient.loadMetalake(NameIdentifier.ofMetalake(usedMetalake));
+        Preconditions.checkNotNull(metalake);
       } catch (NoSuchMetalakeException noSuchMetalakeException) {
-        LOG.warn("No such Metalake {}", metalake.name());
+        LOG.warn("Metalake {} is not exists", usedMetalake);
+        return;
+      } catch (Exception e) {
+        LOG.error("Load Metalake {} failed", e);
+        return;
       }
 
-      LOG.debug("Load metalake: " + metalake.name());
+      LOG.debug("Load metalake: " + usedMetalake);
       loadCatalogs(metalake);
       // TODO need to handle metalake dropped.
     } finally {
@@ -130,7 +134,7 @@ public class CatalogConnectorManager {
                 }
               });
     } catch (Throwable t) {
-      LOG.error("Load {} metalake's catalog failed.", metalake.name(), t.getMessage());
+      LOG.error("Load {} metalake's catalog failed.", metalake.name(), t);
     }
   }
 

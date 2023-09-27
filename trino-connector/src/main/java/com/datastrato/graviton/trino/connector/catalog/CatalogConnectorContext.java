@@ -20,35 +20,35 @@ import java.util.List;
 public class CatalogConnectorContext {
 
   private final NameIdentifier catalogName;
-  private final GravitonMetaLake metaLake;
+  private final GravitonMetaLake metalake;
 
-  // connector communicate with trino
+  // connector communicates with trino
   protected GravitonConnector connector;
-  // internal connector communicate with data storage
+  // internal connector communicates with data storage
   protected Connector internalConnector;
 
   private CatalogConnectorAdapter adapter;
 
   public CatalogConnectorContext(
       NameIdentifier catalogName,
-      GravitonMetaLake metaLake,
+      GravitonMetaLake metalake,
       Connector internalConnector,
       CatalogConnectorAdapter adapter) {
     Preconditions.checkArgument(catalogName != null, "catalogName is not null");
-    Preconditions.checkArgument(metaLake != null, "metaLake is not null");
+    Preconditions.checkArgument(metalake != null, "metalake is not null");
     Preconditions.checkArgument(internalConnector != null, "internalConnector is not null");
     Preconditions.checkArgument(adapter != null, "adapter is not null");
 
     this.catalogName = catalogName;
-    this.metaLake = metaLake;
+    this.metalake = metalake;
     this.internalConnector = internalConnector;
     this.adapter = adapter;
 
     this.connector = new GravitonConnector(catalogName, this);
   }
 
-  public GravitonMetaLake getMetaLake() {
-    return metaLake;
+  public GravitonMetaLake getMetalake() {
+    return metalake;
   }
 
   public GravitonConnector getConnector() {

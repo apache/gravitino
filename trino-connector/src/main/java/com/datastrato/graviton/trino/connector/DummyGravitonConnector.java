@@ -9,7 +9,7 @@ import io.trino.spi.connector.Connector;
 /**
  * DummyGravitonConnector is primarily used to drive the GravitonCatalogManager to load catalog
  * connectors managed in the Graviton server. After users configure the Graviton connector through
- * Trino catalog configuration, a DummyGravitonConnector is initially created. It just a
+ * Trino catalog configuration, a DummyGravitonConnector is initially created. It is just a
  * placeholder.
  */
 public class DummyGravitonConnector implements Connector {
