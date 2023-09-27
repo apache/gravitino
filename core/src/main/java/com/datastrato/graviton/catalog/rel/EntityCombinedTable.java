@@ -13,6 +13,8 @@ import com.datastrato.graviton.rel.SortOrder;
 import com.datastrato.graviton.rel.Table;
 import com.datastrato.graviton.rel.transforms.Transform;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * A Table class to represent a table metadata object that combines the metadata both from {@link
@@ -24,17 +26,27 @@ public final class EntityCombinedTable implements Table {
 
   private final TableEntity tableEntity;
 
-  private EntityCombinedTable(Table table, TableEntity tableEntity) {
+  private final Map<String, String> properties;
+
+  private EntityCombinedTable(
+      Table table, TableEntity tableEntity, Map<String, String> properties) {
     this.table = table;
     this.tableEntity = tableEntity;
+    this.properties = properties;
   }
 
-  public static EntityCombinedTable of(Table table, TableEntity tableEntity) {
-    return new EntityCombinedTable(table, tableEntity);
+  public static EntityCombinedTable withHiddenProperties(
+      Table table, TableEntity tableEntity, Set<String> hiddenProperties) {
+    Map<String, String> resultProperties =
+        table.properties().entrySet().stream()
+            .filter(e -> !hiddenProperties.contains(e.getKey()))
+            .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+    return new EntityCombinedTable(table, tableEntity, resultProperties);
   }
 
-  public static EntityCombinedTable of(Table table) {
-    return of(table, null);
+  public static EntityCombinedTable withHiddenProperties(
+      Table table, Set<String> hiddenProperties) {
+    return withHiddenProperties(table, null, hiddenProperties);
   }
 
   @Override
@@ -54,7 +66,7 @@ public final class EntityCombinedTable implements Table {
 
   @Override
   public Map<String, String> properties() {
-    return table.properties();
+    return properties;
   }
 
   @Override

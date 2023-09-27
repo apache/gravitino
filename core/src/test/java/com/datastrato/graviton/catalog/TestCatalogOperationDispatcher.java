@@ -8,7 +8,6 @@ import static com.datastrato.graviton.Entity.EntityType.SCHEMA;
 import static com.datastrato.graviton.Entity.EntityType.TABLE;
 import static com.datastrato.graviton.StringIdentifier.ID_KEY;
 import static com.datastrato.graviton.TestTablePropertiesMetadata.COMMENT_KEY;
-import static com.datastrato.graviton.TestTablePropertiesMetadata.TEST_IMMUTABLE_KEY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
@@ -453,18 +452,6 @@ public class TestCatalogOperationDispatcher {
             () -> dispatcher.alterTable(tableIdent, illegalChange1));
     Assertions.assertEquals(
         "Property comment is reserved and cannot be set", exception.getMessage());
-
-    // test set immutable property twice
-    TableChange[] change =
-        new TableChange[] {TableChange.setProperty(TEST_IMMUTABLE_KEY, "new value")};
-    // 1. set immutable property once
-    dispatcher.alterTable(tableIdent, change);
-    // 2. set immutable property again
-    IllegalArgumentException exception1 =
-        assertThrows(
-            IllegalArgumentException.class, () -> dispatcher.alterTable(tableIdent, change));
-    Assertions.assertEquals(
-        "Property immutableKey is immutable and cannot be reset", exception1.getMessage());
 
     TableChange[] changes =
         new TableChange[] {TableChange.setProperty("k3", "v3"), TableChange.removeProperty("k1")};
