@@ -83,52 +83,52 @@ public final class PropertyEntry<T> {
     private boolean hidden;
     private boolean reserved;
 
-    public Builder<T> name(String name) {
+    public Builder<T> withName(String name) {
       this.name = name;
       return this;
     }
 
-    public Builder<T> description(String description) {
+    public Builder<T> withDescription(String description) {
       this.description = description;
       return this;
     }
 
-    public Builder<T> required(boolean required) {
+    public Builder<T> withRequired(boolean required) {
       this.required = required;
       return this;
     }
 
-    public Builder<T> immutable(boolean immutable) {
+    public Builder<T> withImmutable(boolean immutable) {
       this.immutable = immutable;
       return this;
     }
 
-    public Builder<T> javaType(Class<T> javaType) {
+    public Builder<T> withJavaType(Class<T> javaType) {
       this.javaType = javaType;
       return this;
     }
 
-    public Builder<T> defaultValue(T defaultValue) {
+    public Builder<T> withDefaultValue(T defaultValue) {
       this.defaultValue = defaultValue;
       return this;
     }
 
-    public Builder<T> decoder(Function<String, T> decoder) {
+    public Builder<T> withDecoder(Function<String, T> decoder) {
       this.decoder = decoder;
       return this;
     }
 
-    public Builder<T> encoder(Function<T, String> encoder) {
+    public Builder<T> withEncoder(Function<T, String> encoder) {
       this.encoder = encoder;
       return this;
     }
 
-    public Builder<T> hidden(boolean hidden) {
+    public Builder<T> withHidden(boolean hidden) {
       this.hidden = hidden;
       return this;
     }
 
-    public Builder<T> reserved(boolean reserved) {
+    public Builder<T> withReserved(boolean reserved) {
       this.reserved = reserved;
       return this;
     }
@@ -161,16 +161,16 @@ public final class PropertyEntry<T> {
       boolean hidden,
       boolean reserved) {
     return new Builder<String>()
-        .name(name)
-        .description(description)
-        .required(required)
-        .immutable(immutable)
-        .javaType(String.class)
-        .defaultValue(defaultValue)
-        .decoder(Function.identity())
-        .encoder(Function.identity())
-        .hidden(hidden)
-        .reserved(reserved)
+        .withName(name)
+        .withDescription(description)
+        .withRequired(required)
+        .withImmutable(immutable)
+        .withJavaType(String.class)
+        .withDefaultValue(defaultValue)
+        .withDecoder(Function.identity())
+        .withEncoder(Function.identity())
+        .withHidden(hidden)
+        .withReserved(reserved)
         .build();
   }
 
