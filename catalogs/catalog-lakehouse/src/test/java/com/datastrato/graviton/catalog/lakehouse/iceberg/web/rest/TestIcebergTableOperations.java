@@ -21,8 +21,12 @@ import org.apache.iceberg.Schema;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.metrics.CommitReport;
+import org.apache.iceberg.metrics.ImmutableCommitMetricsResult;
+import org.apache.iceberg.metrics.ImmutableCommitReport;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.requests.RenameTableRequest;
+import org.apache.iceberg.rest.requests.ReportMetricsRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
 import org.apache.iceberg.rest.responses.ListTablesResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
@@ -283,5 +287,28 @@ public class TestIcebergTableOperations extends TestIcebergNamespaceOperations {
     // dest table exists
     verifyCreateTableSucc("rename_foo3");
     verifyRenameTableFail("rename_foo2", "rename_foo3", 409);
+  }
+
+  @Test
+  void testReportTableMetrics() {
+
+    verifyCreateNamespaceSucc(IcebergRestTestUtil.TEST_NAMESPACE_NAME);
+    verifyCreateTableSucc("metrics_foo1");
+
+    ImmutableCommitMetricsResult commitMetrics = ImmutableCommitMetricsResult.builder().build();
+    CommitReport commitReport =
+        ImmutableCommitReport.builder()
+            .tableName("metrics_foo1")
+            .snapshotId(-1)
+            .sequenceNumber(-1)
+            .operation("append")
+            .commitMetrics(commitMetrics)
+            .build();
+    ReportMetricsRequest request = ReportMetricsRequest.of(commitReport);
+    Response response =
+        getReportMetricsClientBuilder("metrics_foo1")
+            .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Status.NO_CONTENT.getStatusCode(), response.getStatus());
   }
 }
