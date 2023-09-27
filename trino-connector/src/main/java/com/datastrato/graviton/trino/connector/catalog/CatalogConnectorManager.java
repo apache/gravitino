@@ -77,7 +77,6 @@ public class CatalogConnectorManager {
       GravitonMetaLake metalake = null;
       try {
         metalake = gravitonClient.loadMetalake(NameIdentifier.ofMetalake(usedMetalake));
-        Preconditions.checkNotNull(metalake);
       } catch (NoSuchMetalakeException noSuchMetalakeException) {
         LOG.warn("Metalake {} is not exists", usedMetalake);
         return;
