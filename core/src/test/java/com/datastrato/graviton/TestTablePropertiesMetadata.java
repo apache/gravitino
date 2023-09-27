@@ -22,12 +22,11 @@ public class TestTablePropertiesMetadata extends TablePropertiesMetadata {
   static {
     List<PropertyEntry<?>> tablePropertyMetadata =
         ImmutableList.of(
-            PropertyEntry.stringPropertyEntry(
-                TEST_REQUIRED_KEY, "test required k1 property", true, false, null, false, false),
-            PropertyEntry.stringPropertyEntry(
-                COMMENT_KEY, "table comment", false, true, "", true, true),
-            PropertyEntry.stringPropertyEntry(
-                TEST_IMMUTABLE_KEY, "test immutable property", false, true, null, false, false));
+            PropertyEntry.stringRequiredPropertyEntry(
+                TEST_REQUIRED_KEY, "test required k1 property", false, false),
+            PropertyEntry.stringReservedPropertyEntry(COMMENT_KEY, "table comment", true),
+            PropertyEntry.stringImmutablePropertyEntry(
+                TEST_IMMUTABLE_KEY, "test immutable property", false, null, false, false));
 
     TEST_TABLE_PROPERTY = Maps.uniqueIndex(tablePropertyMetadata, PropertyEntry::getName);
   }

@@ -173,4 +173,24 @@ public final class PropertyEntry<T> {
         .reserved(reserved)
         .build();
   }
+
+  public static PropertyEntry<String> stringReservedPropertyEntry(
+      String name, String description, boolean hidden) {
+    return stringPropertyEntry(name, description, false, true, null, hidden, true);
+  }
+
+  public static PropertyEntry<String> stringRequiredPropertyEntry(
+      String name, String description, boolean immutable, boolean hidden) {
+    return stringPropertyEntry(name, description, true, immutable, null, hidden, false);
+  }
+
+  public static PropertyEntry<String> stringImmutablePropertyEntry(
+      String name,
+      String description,
+      boolean required,
+      String defaultValue,
+      boolean hidden,
+      boolean reserved) {
+    return stringPropertyEntry(name, description, required, true, defaultValue, hidden, reserved);
+  }
 }

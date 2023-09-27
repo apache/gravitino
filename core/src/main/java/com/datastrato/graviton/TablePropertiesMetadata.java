@@ -20,13 +20,9 @@ public abstract class TablePropertiesMetadata implements PropertiesMetadata {
   static {
     List<PropertyEntry<?>> basicTablePropertyEntries =
         ImmutableList.of(
-            PropertyEntry.stringPropertyEntry(
+            PropertyEntry.stringReservedPropertyEntry(
                 ID_KEY,
                 "To differentiate the entities created directly by the underlying sources",
-                false,
-                true,
-                "",
-                true,
                 true));
 
     BASIC_TABLE_PROPERTY_ENTRIES =
