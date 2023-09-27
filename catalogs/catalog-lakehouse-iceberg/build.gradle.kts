@@ -2,7 +2,7 @@
  * Copyright 2023 Datastrato.
  * This software is licensed under the Apache License version 2.
  */
-description = "catalog-lakehouse"
+description = "catalog-lakehouse-iceberg"
 
 plugins {
     `maven-publish`
@@ -61,6 +61,6 @@ tasks {
     val copyCatalogLibs by registering(Copy::class) {
         dependsOn(copyDepends)
         from("build/libs")
-        into("${rootDir}/distribution/package/catalogs/lakehouse/libs")
+        into("${rootDir}/distribution/package/catalogs/lakehouse-iceberg/libs")
     }
 }

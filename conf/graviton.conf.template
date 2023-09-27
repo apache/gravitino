@@ -40,4 +40,4 @@ graviton.catalog.cache.evictionIntervalMs = 3600000
 # Auxiliary service names, seperate by ','
 graviton.auxService.names = iceberg-rest
 # Iceberg REST service classpath
-graviton.auxService.iceberg-rest.classpath = catalogs/lakehouse/libs
+graviton.auxService.iceberg-rest.classpath = catalogs/lakehouse-iceberg/libs
