@@ -14,6 +14,7 @@ import com.datastrato.graviton.rel.Table;
 import com.datastrato.graviton.rel.transforms.Transform;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * A Table class to represent a table metadata object that combines the metadata both from {@link
@@ -25,6 +26,9 @@ public final class EntityCombinedTable implements Table {
 
   private final TableEntity tableEntity;
 
+  // Sets of properties that should be hidden from the user.
+  private Set<String> hiddenProperties;
+
   private EntityCombinedTable(Table table, TableEntity tableEntity) {
     this.table = table;
     this.tableEntity = tableEntity;
@@ -35,7 +39,7 @@ public final class EntityCombinedTable implements Table {
   }
 
   public EntityCombinedTable withHiddenPropertiesSet(Set<String> hiddenProperties) {
-    hiddenProperties.forEach(p -> table.properties().remove(p));
+    this.hiddenProperties = hiddenProperties;
     return this;
   }
 
@@ -56,7 +60,9 @@ public final class EntityCombinedTable implements Table {
 
   @Override
   public Map<String, String> properties() {
-    return table.properties();
+    return table.properties().entrySet().stream()
+        .filter(p -> !hiddenProperties.contains(p.getKey()))
+        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
   }
 
   @Override

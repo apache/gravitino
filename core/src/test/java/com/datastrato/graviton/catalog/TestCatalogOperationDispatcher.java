@@ -451,7 +451,7 @@ public class TestCatalogOperationDispatcher {
             IllegalArgumentException.class,
             () -> dispatcher.alterTable(tableIdent, illegalChange1));
     Assertions.assertEquals(
-        "Property comment is reserved and cannot be set", exception.getMessage());
+        "Property comment is reserved or immutable and cannot be set", exception.getMessage());
 
     TableChange[] changes =
         new TableChange[] {TableChange.setProperty("k3", "v3"), TableChange.removeProperty("k1")};

@@ -512,10 +512,12 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
                   for (TableChange change : changes) {
                     if (change instanceof TableChange.SetProperty) {
                       String propertyName = ((TableChange.SetProperty) change).getProperty();
-                      if (tablePropertiesMetadata.isReservedProperty(propertyName)) {
+                      if (tablePropertiesMetadata.isReservedProperty(propertyName)
+                          || tablePropertiesMetadata.isImmutableProperty(propertyName)) {
                         throw new IllegalArgumentException(
                             String.format(
-                                "Property %s is reserved and cannot be set", propertyName));
+                                "Property %s is reserved or immutable and cannot be set",
+                                propertyName));
                       }
                     }
 
