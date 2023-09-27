@@ -7,7 +7,6 @@ package com.datastrato.graviton.catalog;
 import com.datastrato.graviton.Audit;
 import com.datastrato.graviton.Catalog;
 import com.datastrato.graviton.CatalogProvider;
-import com.datastrato.graviton.PropertiesMetadata;
 import com.datastrato.graviton.meta.CatalogEntity;
 import com.google.common.base.Preconditions;
 import java.util.Map;

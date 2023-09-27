@@ -2,7 +2,7 @@
  * Copyright 2023 Datastrato.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.graviton;
+package com.datastrato.graviton.catalog;
 
 import static com.datastrato.graviton.StringIdentifier.ID_KEY;
 

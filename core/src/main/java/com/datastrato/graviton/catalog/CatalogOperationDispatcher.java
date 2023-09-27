@@ -11,7 +11,6 @@ import com.datastrato.graviton.EntityStore;
 import com.datastrato.graviton.HasIdentifier;
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
-import com.datastrato.graviton.PropertiesMetadata;
 import com.datastrato.graviton.StringIdentifier;
 import com.datastrato.graviton.catalog.rel.EntityCombinedSchema;
 import com.datastrato.graviton.catalog.rel.EntityCombinedTable;

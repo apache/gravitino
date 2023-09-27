@@ -6,8 +6,8 @@ package com.datastrato.graviton.catalog.lakehouse.iceberg;
 
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
-import com.datastrato.graviton.PropertiesMetadata;
 import com.datastrato.graviton.catalog.CatalogOperations;
+import com.datastrato.graviton.catalog.PropertiesMetadata;
 import com.datastrato.graviton.catalog.lakehouse.iceberg.ops.IcebergTableOps;
 import com.datastrato.graviton.catalog.lakehouse.iceberg.ops.IcebergTableOpsHelper;
 import com.datastrato.graviton.exceptions.NoSuchCatalogException;

@@ -9,8 +9,8 @@ import static com.datastrato.graviton.catalog.hive.HiveTable.SUPPORT_TABLE_TYPES
 
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
-import com.datastrato.graviton.PropertiesMetadata;
 import com.datastrato.graviton.catalog.CatalogOperations;
+import com.datastrato.graviton.catalog.PropertiesMetadata;
 import com.datastrato.graviton.catalog.hive.converter.ToHiveType;
 import com.datastrato.graviton.exceptions.NoSuchCatalogException;
 import com.datastrato.graviton.exceptions.NoSuchSchemaException;

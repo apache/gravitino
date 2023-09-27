@@ -5,6 +5,8 @@
 package com.datastrato.graviton;
 
 import com.datastrato.graviton.catalog.CatalogOperations;
+import com.datastrato.graviton.catalog.PropertiesMetadata;
+import com.datastrato.graviton.catalog.TablePropertiesMetadata;
 import com.datastrato.graviton.exceptions.NoSuchCatalogException;
 import com.datastrato.graviton.exceptions.NoSuchSchemaException;
 import com.datastrato.graviton.exceptions.NoSuchTableException;

@@ -4,8 +4,8 @@
  */
 package com.datastrato.graviton.catalog.hive;
 
-import com.datastrato.graviton.PropertyEntry;
-import com.datastrato.graviton.TablePropertiesMetadata;
+import com.datastrato.graviton.catalog.PropertyEntry;
+import com.datastrato.graviton.catalog.TablePropertiesMetadata;
 import com.google.common.collect.Maps;
 import java.util.Map;
 

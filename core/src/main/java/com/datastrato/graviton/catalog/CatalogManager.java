@@ -14,7 +14,6 @@ import com.datastrato.graviton.EntityAlreadyExistsException;
 import com.datastrato.graviton.EntityStore;
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
-import com.datastrato.graviton.PropertiesMetadata;
 import com.datastrato.graviton.StringIdentifier;
 import com.datastrato.graviton.SupportsCatalogs;
 import com.datastrato.graviton.exceptions.CatalogAlreadyExistsException;

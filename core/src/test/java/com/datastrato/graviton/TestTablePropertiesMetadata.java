@@ -4,6 +4,8 @@
  */
 package com.datastrato.graviton;
 
+import com.datastrato.graviton.catalog.PropertyEntry;
+import com.datastrato.graviton.catalog.TablePropertiesMetadata;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
 import java.util.List;
