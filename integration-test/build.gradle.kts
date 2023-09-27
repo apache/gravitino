@@ -20,7 +20,7 @@ dependencies {
   implementation(project(":api"))
   implementation(project(":core"))
   implementation(project(":catalogs:catalog-hive"))
-  implementation(project(":catalogs:catalog-lakehouse"))
+  implementation(project(":catalogs:catalog-lakehouse-iceberg"))
   implementation(libs.guava)
   implementation(libs.bundles.log4j)
   implementation(libs.bundles.jersey)
