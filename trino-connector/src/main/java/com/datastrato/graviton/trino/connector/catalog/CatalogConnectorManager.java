@@ -49,8 +49,6 @@ public class CatalogConnectorManager {
 
   public CatalogConnectorManager(
       CatalogInjector catalogInjector, CatalogConnectorFactory catalogFactory) {
-    Preconditions.checkArgument(catalogInjector != null, "catalogInjector is not null");
-    Preconditions.checkArgument(catalogFactory != null, "catalogFactory is not null");
     this.catalogInjector = catalogInjector;
     this.catalogConnectorFactory = catalogFactory;
   }

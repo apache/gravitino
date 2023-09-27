@@ -6,7 +6,6 @@ package com.datastrato.graviton.trino.connector;
 
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.trino.connector.catalog.CatalogConnectorContext;
-import com.google.common.base.Preconditions;
 import io.trino.spi.connector.Connector;
 import io.trino.spi.connector.ConnectorMetadata;
 import io.trino.spi.connector.ConnectorPageSinkProvider;
@@ -31,8 +30,6 @@ public class GravitonConnector implements Connector {
 
   public GravitonConnector(
       NameIdentifier catalogIdentifier, CatalogConnectorContext catalogConnectorContext) {
-    Preconditions.checkArgument(catalogIdentifier != null, "catalogIdentifier is not null");
-    Preconditions.checkArgument(catalogConnectorContext != null, "catalogIdentifier is not null");
     this.catalogIdentifier = catalogIdentifier;
     this.catalogConnectorContext = catalogConnectorContext;
   }

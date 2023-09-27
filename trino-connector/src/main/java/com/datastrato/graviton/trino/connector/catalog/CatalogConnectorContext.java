@@ -7,7 +7,6 @@ package com.datastrato.graviton.trino.connector.catalog;
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.client.GravitonMetaLake;
 import com.datastrato.graviton.trino.connector.GravitonConnector;
-import com.google.common.base.Preconditions;
 import io.trino.spi.connector.Connector;
 import io.trino.spi.session.PropertyMetadata;
 import java.util.List;
@@ -34,11 +33,6 @@ public class CatalogConnectorContext {
       GravitonMetaLake metalake,
       Connector internalConnector,
       CatalogConnectorAdapter adapter) {
-    Preconditions.checkArgument(catalogName != null, "catalogName is not null");
-    Preconditions.checkArgument(metalake != null, "metalake is not null");
-    Preconditions.checkArgument(internalConnector != null, "internalConnector is not null");
-    Preconditions.checkArgument(adapter != null, "adapter is not null");
-
     this.catalogName = catalogName;
     this.metalake = metalake;
     this.internalConnector = internalConnector;

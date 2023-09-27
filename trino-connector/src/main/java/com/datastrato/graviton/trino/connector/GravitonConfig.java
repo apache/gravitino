@@ -6,7 +6,6 @@ package com.datastrato.graviton.trino.connector;
 
 import static com.datastrato.graviton.trino.connector.GravitonErrorCode.GRAVITON_MISSING_CONFIG;
 
-import com.google.common.base.Preconditions;
 import io.trino.spi.TrinoException;
 import java.util.HashMap;
 import java.util.Map;
@@ -25,7 +24,6 @@ public class GravitonConfig {
       new ConfigEntry("graviton.metalake", "The metalake name for used", "", true);
 
   public GravitonConfig(Map<String, String> requiredConfig) {
-    Preconditions.checkArgument(requiredConfig != null, "requiredConfig is not null");
     config = requiredConfig;
 
     for (Map.Entry<String, ConfigEntry> entry : CONFIG_DEFINITIONS.entrySet()) {
