@@ -33,8 +33,6 @@ public abstract class BaseCatalog<T extends BaseCatalog>
 
   private volatile CatalogOperations ops;
 
-  private volatile PropertyMetadata propertyMetadata;
-
   /**
    * Creates a new instance of CatalogOperations.
    *
@@ -42,6 +40,11 @@ public abstract class BaseCatalog<T extends BaseCatalog>
    * @return A new instance of CatalogOperations.
    */
   protected abstract CatalogOperations newOps(Map<String, String> config);
+
+  @Override
+  public PropertyMetadata tableProperty() throws UnsupportedOperationException {
+    return ops().tableProperty();
+  }
 
   /**
    * Retrieves the CatalogOperations instance associated with this catalog. Lazily initializes the

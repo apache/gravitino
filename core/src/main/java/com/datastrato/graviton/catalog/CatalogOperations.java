@@ -14,7 +14,7 @@ import java.util.Map;
  * should be mixed with other Catalog interface like {@link SupportsSchemas} to provide schema
  * operation, {@link TableCatalog} to support table operations, etc.
  */
-public interface CatalogOperations extends Closeable {
+public interface CatalogOperations extends Closeable, HasPropertyMetadata {
 
   /**
    * Initialize the CatalogOperation with specified configuration. This method is called after

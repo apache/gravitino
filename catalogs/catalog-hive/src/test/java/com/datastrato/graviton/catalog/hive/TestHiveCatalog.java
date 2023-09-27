@@ -36,7 +36,7 @@ public class TestHiveCatalog extends MiniHiveMetastoreService {
     Map<String, String> conf = Maps.newHashMap();
     metastore.hiveConf().forEach(e -> conf.put(e.getKey(), e.getValue()));
 
-    try (HiveCatalogOperations ops = new HiveCatalogOperations(entity, new HiveTableProperty())) {
+    try (HiveCatalogOperations ops = new HiveCatalogOperations(entity)) {
       ops.initialize(conf);
       List<String> dbs = ops.clientPool.run(IMetaStoreClient::getAllDatabases);
       Assertions.assertEquals(2, dbs.size());

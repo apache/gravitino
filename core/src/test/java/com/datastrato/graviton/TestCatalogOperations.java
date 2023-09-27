@@ -34,9 +34,12 @@ public class TestCatalogOperations implements CatalogOperations, TableCatalog, S
 
   private final Map<NameIdentifier, TestSchema> schemas;
 
+  private final TableProperty tablePropertyMetadata;
+
   public TestCatalogOperations() {
     tables = Maps.newHashMap();
     schemas = Maps.newHashMap();
+    tablePropertyMetadata = new TestTableProperty();
   }
 
   @Override
@@ -262,5 +265,10 @@ public class TestCatalogOperations implements CatalogOperations, TableCatalog, S
     }
 
     return true;
+  }
+
+  @Override
+  public PropertyMetadata tableProperty() throws UnsupportedOperationException {
+    return tablePropertyMetadata;
   }
 }

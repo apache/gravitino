@@ -4,7 +4,6 @@
  */
 package com.datastrato.graviton.catalog.hive;
 
-import com.datastrato.graviton.PropertyMetadata;
 import com.datastrato.graviton.catalog.BaseCatalog;
 import com.datastrato.graviton.catalog.CatalogOperations;
 import com.datastrato.graviton.rel.SupportsSchemas;
@@ -32,7 +31,7 @@ public class HiveCatalog extends BaseCatalog<HiveCatalog> {
    */
   @Override
   protected CatalogOperations newOps(Map<String, String> config) {
-    HiveCatalogOperations ops = new HiveCatalogOperations(entity(), tableProperty());
+    HiveCatalogOperations ops = new HiveCatalogOperations(entity());
     ops.initialize(config);
     return ops;
   }
@@ -55,10 +54,5 @@ public class HiveCatalog extends BaseCatalog<HiveCatalog> {
   @Override
   public TableCatalog asTableCatalog() {
     return (HiveCatalogOperations) ops();
-  }
-
-  @Override
-  public PropertyMetadata tableProperty() throws UnsupportedOperationException {
-    return new HiveTableProperty();
   }
 }

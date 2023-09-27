@@ -11,6 +11,7 @@ import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
 import com.datastrato.graviton.PropertyMetadata;
 import com.datastrato.graviton.catalog.CatalogOperations;
+import com.datastrato.graviton.catalog.HasPropertyMetadata;
 import com.datastrato.graviton.catalog.hive.converter.ToHiveType;
 import com.datastrato.graviton.exceptions.NoSuchCatalogException;
 import com.datastrato.graviton.exceptions.NoSuchSchemaException;
@@ -54,7 +55,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /** Operations for interacting with the Hive catalog in Graviton. */
-public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas, TableCatalog {
+public class HiveCatalogOperations
+    implements CatalogOperations, SupportsSchemas, TableCatalog, HasPropertyMetadata {
 
   public static final Logger LOG = LoggerFactory.getLogger(HiveCatalogOperations.class);
 
@@ -64,16 +66,15 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
   private final CatalogEntity entity;
 
-  private final PropertyMetadata tableProperty;
+  private HiveTableProperty tableProperty;
 
   /**
    * Constructs a new instance of HiveCatalogOperations.
    *
    * @param entity The catalog entity associated with this operations instance.
    */
-  public HiveCatalogOperations(CatalogEntity entity, PropertyMetadata tableProperty) {
+  public HiveCatalogOperations(CatalogEntity entity) {
     this.entity = entity;
-    this.tableProperty = tableProperty;
   }
 
   /**
@@ -90,6 +91,8 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
     // todo(xun): add hive client pool size in config
     this.clientPool = new HiveClientPool(1, hiveConf);
+
+    this.tableProperty = new HiveTableProperty();
   }
 
   /** Closes the Hive catalog and releases the associated client pool. */
@@ -735,5 +738,10 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       LOG.warn("Hadoop user is null, defaulting to user.name");
       return System.getProperty("user.name");
     }
+  }
+
+  @Override
+  public PropertyMetadata tableProperty() throws UnsupportedOperationException {
+    return tableProperty;
   }
 }

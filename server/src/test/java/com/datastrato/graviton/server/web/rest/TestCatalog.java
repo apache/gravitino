@@ -20,15 +20,15 @@ public class TestCatalog extends BaseCatalog<TestCatalog> {
   protected CatalogOperations newOps(Map config) {
     return new CatalogOperations() {
       @Override
+      public PropertyMetadata tableProperty() throws UnsupportedOperationException {
+        throw new UnsupportedOperationException();
+      }
+
+      @Override
       public void initialize(Map<String, String> config) throws RuntimeException {}
 
       @Override
       public void close() throws IOException {}
     };
-  }
-
-  @Override
-  public PropertyMetadata tableProperty() throws UnsupportedOperationException {
-    return null;
   }
 }

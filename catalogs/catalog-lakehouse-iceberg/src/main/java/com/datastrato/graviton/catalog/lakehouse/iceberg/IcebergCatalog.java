@@ -4,7 +4,6 @@
  */
 package com.datastrato.graviton.catalog.lakehouse.iceberg;
 
-import com.datastrato.graviton.PropertyMetadata;
 import com.datastrato.graviton.catalog.BaseCatalog;
 import com.datastrato.graviton.catalog.CatalogOperations;
 import com.datastrato.graviton.rel.SupportsSchemas;
@@ -43,10 +42,5 @@ public class IcebergCatalog extends BaseCatalog<IcebergCatalog> {
   @Override
   public TableCatalog asTableCatalog() {
     return (IcebergCatalogOperations) ops();
-  }
-
-  @Override
-  public PropertyMetadata tableProperty() throws UnsupportedOperationException {
-    return new IcebergTableProperty();
   }
 }
