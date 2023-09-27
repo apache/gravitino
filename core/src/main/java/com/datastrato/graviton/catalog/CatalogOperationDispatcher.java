@@ -348,7 +348,7 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
         c ->
             c.doWithPropertiesMeta(
                 p -> {
-                  validateTableProperties(p.tablePropertiesMetadata(), properties);
+                  validateCreateTableProperties(p.tablePropertiesMetadata(), properties);
                   return null;
                 }),
         IllegalArgumentException.class);
@@ -398,7 +398,7 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
     return EntityCombinedTable.of(table, tableEntity);
   }
 
-  private void validateTableProperties(
+  private void validateCreateTableProperties(
       PropertiesMetadata tablePropertiesMetadata, Map<String, String> properties) {
     if (properties == null) {
       return;

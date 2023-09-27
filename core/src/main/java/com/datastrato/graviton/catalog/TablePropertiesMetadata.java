@@ -17,6 +17,8 @@ public abstract class TablePropertiesMetadata implements PropertiesMetadata {
 
   private static final Map<String, PropertyEntry<?>> BASIC_TABLE_PROPERTY_ENTRIES;
 
+  private Map<String, PropertyEntry<?>> propertyEntries;
+
   static {
     List<PropertyEntry<?>> basicTablePropertyEntries =
         ImmutableList.of(
@@ -31,18 +33,26 @@ public abstract class TablePropertiesMetadata implements PropertiesMetadata {
 
   @Override
   public Map<String, PropertyEntry<?>> propertyEntries() {
-    ImmutableMap.Builder<String, PropertyEntry<?>> builder = ImmutableMap.builder();
-    Map<String, PropertyEntry<?>> catalogTableProperty = tablePropertyEntries();
-    builder.putAll(catalogTableProperty);
+    if (propertyEntries == null) {
+      synchronized (this) {
+        if (propertyEntries == null) {
+          ImmutableMap.Builder<String, PropertyEntry<?>> builder = ImmutableMap.builder();
+          Map<String, PropertyEntry<?>> catalogTableProperty = tablePropertyEntries();
+          builder.putAll(catalogTableProperty);
 
-    BASIC_TABLE_PROPERTY_ENTRIES.forEach(
-        (name, entry) -> {
-          Preconditions.checkArgument(
-              !catalogTableProperty.containsKey(name), "Property metadata already exists: " + name);
-          builder.put(name, entry);
-        });
+          BASIC_TABLE_PROPERTY_ENTRIES.forEach(
+              (name, entry) -> {
+                Preconditions.checkArgument(
+                    !catalogTableProperty.containsKey(name),
+                    "Property metadata already exists: " + name);
+                builder.put(name, entry);
+              });
 
-    return builder.build();
+          propertyEntries = builder.build();
+        }
+      }
+    }
+    return propertyEntries;
   }
 
   protected abstract Map<String, PropertyEntry<?>> tablePropertyEntries();
