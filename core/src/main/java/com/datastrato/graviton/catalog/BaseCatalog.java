@@ -23,7 +23,8 @@ import java.util.Map;
  *
  * @param <T> The type of the concrete subclass of BaseCatalog.
  */
-public abstract class BaseCatalog<T extends BaseCatalog> implements Catalog, CatalogProvider {
+public abstract class BaseCatalog<T extends BaseCatalog>
+    implements Catalog, CatalogProvider, HasPropertyMetadata {
 
   private CatalogEntity entity;
 
@@ -38,6 +39,11 @@ public abstract class BaseCatalog<T extends BaseCatalog> implements Catalog, Cat
    * @return A new instance of CatalogOperations.
    */
   protected abstract CatalogOperations newOps(Map<String, String> config);
+
+  @Override
+  public PropertiesMetadata tablePropertiesMetadata() throws UnsupportedOperationException {
+    return ops().tablePropertiesMetadata();
+  }
 
   /**
    * Retrieves the CatalogOperations instance associated with this catalog. Lazily initializes the
