@@ -74,7 +74,6 @@ dependencies {
     implementation(libs.slf4j.api)
     implementation(libs.guava)
 
-    testImplementation(libs.slf4j.jdk14)
     testImplementation(libs.junit.jupiter.api)
     testRuntimeOnly(libs.junit.jupiter.engine)
     testImplementation(libs.mockito.core)
