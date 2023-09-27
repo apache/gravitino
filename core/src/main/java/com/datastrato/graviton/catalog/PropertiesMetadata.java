@@ -6,6 +6,7 @@ package com.datastrato.graviton.catalog;
 
 import java.util.Map;
 
+/** The PropertiesMetadata class is responsible for managing property metadata. */
 public interface PropertiesMetadata {
   Map<String, PropertyEntry<?>> propertyEntries();
 
