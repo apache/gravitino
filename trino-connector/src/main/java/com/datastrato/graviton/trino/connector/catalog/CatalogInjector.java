@@ -67,7 +67,8 @@ public class CatalogInjector {
       field = nodeManager.getClass().getDeclaredField("allCatalogsOnAllNodes");
       field.setAccessible(true);
       field.setBoolean(nodeManager, true);
-      Preconditions.checkState(field.getBoolean(nodeManager), "allCatalogsOnAllNodes should true");
+      Preconditions.checkState(
+          field.getBoolean(nodeManager), "allCatalogsOnAllNodes should be true");
 
       // find CatalogManager
       field = nodeManager.getClass().getDeclaredField("activeNodesByCatalogHandle");
@@ -183,7 +184,7 @@ public class CatalogInjector {
       return (Connector) connector;
     } catch (Exception e) {
       LOG.error(
-          "Create internal catalog connector {} failed. connector properties: {} ",
+          "Create internal catalog connector {} failed. Connector properties: {} ",
           connectorName,
           properties.toString(),
           e);
