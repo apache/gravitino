@@ -291,8 +291,8 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
     StringIdentifier stringId = getStringIdFromProperties(table.properties());
     // Case 1: The table is not created by Graviton.
     if (stringId == null) {
-      return EntityCombinedTable.withHiddenProperties(
-          table, getHiddenPropertyNames(catalogIdentifier, table.properties()));
+      return EntityCombinedTable.of(table, null)
+          .withHiddenPropertiesSet(getHiddenPropertyNames(catalogIdentifier, table.properties()));
     }
 
     TableEntity tableEntity =
@@ -301,8 +301,9 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
             identifier -> store.get(identifier, TABLE, TableEntity.class),
             "GET",
             stringId.id());
-    return EntityCombinedTable.withHiddenProperties(
-        table, tableEntity, getHiddenPropertyNames(catalogIdentifier, table.properties()));
+
+    return EntityCombinedTable.of(table, tableEntity)
+        .withHiddenPropertiesSet(getHiddenPropertyNames(catalogIdentifier, table.properties()));
   }
 
   private Set<String> getHiddenPropertyNames(
@@ -391,14 +392,14 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
       store.put(tableEntity, true /* overwrite */);
     } catch (Exception e) {
       LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", ident, e);
-      return EntityCombinedTable.withHiddenProperties(
-          table, getHiddenPropertyNames(getCatalogIdentifier(ident), table.properties()));
+      return EntityCombinedTable.of(table, null)
+          .withHiddenPropertiesSet(
+              getHiddenPropertyNames(getCatalogIdentifier(ident), table.properties()));
     }
 
-    return EntityCombinedTable.withHiddenProperties(
-        table,
-        tableEntity,
-        getHiddenPropertyNames(getCatalogIdentifier(ident), table.properties()));
+    return EntityCombinedTable.of(table, tableEntity)
+        .withHiddenPropertiesSet(
+            getHiddenPropertyNames(getCatalogIdentifier(ident), table.properties()));
   }
 
   private void validateCreateTableProperties(
@@ -445,7 +446,7 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
   @Override
   public Table alterTable(NameIdentifier ident, TableChange... changes)
       throws NoSuchTableException, IllegalArgumentException {
-    validateAlterTable(ident, changes);
+    validateAlterTableProperties(ident, changes);
     Table alteredTable =
         doWithCatalog(
             getCatalogIdentifier(ident),
@@ -456,9 +457,9 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
     StringIdentifier stringId = getStringIdFromProperties(alteredTable.properties());
     // Case 1: The table is not created by Graviton.
     if (stringId == null) {
-      return EntityCombinedTable.withHiddenProperties(
-          alteredTable,
-          getHiddenPropertyNames(getCatalogIdentifier(ident), alteredTable.properties()));
+      return EntityCombinedTable.of(alteredTable, null)
+          .withHiddenPropertiesSet(
+              getHiddenPropertyNames(getCatalogIdentifier(ident), alteredTable.properties()));
     }
 
     TableEntity updatedTableEntity =
@@ -496,13 +497,12 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
             "UPDATE",
             stringId.id());
 
-    return EntityCombinedTable.withHiddenProperties(
-        alteredTable,
-        updatedTableEntity,
-        getHiddenPropertyNames(getCatalogIdentifier(ident), alteredTable.properties()));
+    return EntityCombinedTable.of(alteredTable, updatedTableEntity)
+        .withHiddenPropertiesSet(
+            getHiddenPropertyNames(getCatalogIdentifier(ident), alteredTable.properties()));
   }
 
-  private void validateAlterTable(NameIdentifier ident, TableChange... changes) {
+  private void validateAlterTableProperties(NameIdentifier ident, TableChange... changes) {
     doWithCatalog(
         getCatalogIdentifier(ident),
         c ->
