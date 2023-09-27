@@ -309,8 +309,16 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
   }
 
   private void removeHiddenProperties(Table table, NameIdentifier catalogIdent) {
-    PropertiesMetadata tablePropertiesMetadata = getTablePropertiesMetadata(catalogIdent);
-    table.properties().keySet().removeIf(tablePropertiesMetadata::isHiddenProperty);
+    doWithCatalog(
+        catalogIdent,
+        c ->
+            c.doWithPropertiesMeta(
+                p -> {
+                  PropertiesMetadata propertiesMetadata = p.tablePropertiesMetadata();
+                  table.properties().keySet().removeIf(propertiesMetadata::isHiddenProperty);
+                  return null;
+                }),
+        IllegalArgumentException.class);
   }
 
   /**
@@ -335,7 +343,15 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
       Distribution distribution,
       SortOrder[] sortOrders)
       throws NoSuchSchemaException, TableAlreadyExistsException {
-    validateTableProperties(getCatalogIdentifier(ident), properties);
+    doWithCatalog(
+        getCatalogIdentifier(ident),
+        c ->
+            c.doWithPropertiesMeta(
+                p -> {
+                  validateTableProperties(p.tablePropertiesMetadata(), properties);
+                  return null;
+                }),
+        IllegalArgumentException.class);
     long uid = idGenerator.nextId();
     // Add StringIdentifier to the properties, the specific catalog will handle this
     // StringIdentifier to make sure only when the operation is successful, the related
@@ -383,11 +399,10 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
   }
 
   private void validateTableProperties(
-      NameIdentifier catalogIdent, Map<String, String> properties) {
+      PropertiesMetadata tablePropertiesMetadata, Map<String, String> properties) {
     if (properties == null) {
       return;
     }
-    PropertiesMetadata tablePropertiesMetadata = getTablePropertiesMetadata(catalogIdent);
 
     List<String> reservedProperties =
         properties.keySet().stream()
@@ -412,11 +427,6 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
     properties.keySet().stream()
         .filter(tablePropertiesMetadata::containsProperty)
         .forEach(k -> tablePropertiesMetadata.propertyEntries().get(k).decode(properties.get(k)));
-  }
-
-  private PropertiesMetadata getTablePropertiesMetadata(NameIdentifier catalogIdent) {
-    CatalogManager.CatalogWrapper catalog = catalogManager.loadCatalogAndWrap(catalogIdent);
-    return catalog.tablePropertyMetadata();
   }
 
   /**
@@ -487,34 +497,42 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
   }
 
   private void validateAlterTable(NameIdentifier ident, TableChange... changes) {
-    NameIdentifier catalogIdent = getCatalogIdentifier(ident);
     Set<String> existingProperties = loadTableWithAllProperties(ident).properties().keySet();
-    PropertiesMetadata tablePropertiesMetadata = getTablePropertiesMetadata(catalogIdent);
+    doWithCatalog(
+        getCatalogIdentifier(ident),
+        c ->
+            c.doWithPropertiesMeta(
+                p -> {
+                  PropertiesMetadata tablePropertiesMetadata = p.tablePropertiesMetadata();
+                  for (TableChange change : changes) {
+                    if (change instanceof TableChange.SetProperty) {
+                      String propertyName = ((TableChange.SetProperty) change).getProperty();
+                      if (tablePropertiesMetadata.isReservedProperty(propertyName)) {
+                        throw new IllegalArgumentException(
+                            String.format(
+                                "Property %s is reserved and cannot be set", propertyName));
+                      }
 
-    for (TableChange change : changes) {
-      if (change instanceof TableChange.SetProperty) {
-        String propertyName = ((TableChange.SetProperty) change).getProperty();
-        if (tablePropertiesMetadata.isReservedProperty(propertyName)) {
-          throw new IllegalArgumentException(
-              String.format("Property %s is reserved and cannot be set", propertyName));
-        }
+                      if (existingProperties.contains(propertyName)
+                          && tablePropertiesMetadata.isImmutableProperty(propertyName)) {
+                        throw new IllegalArgumentException(
+                            String.format(
+                                "Property %s is immutable and cannot be reset", propertyName));
+                      }
+                    }
 
-        if (existingProperties.contains(propertyName)
-            && tablePropertiesMetadata.isImmutableProperty(propertyName)) {
-          throw new IllegalArgumentException(
-              String.format("Property %s is immutable and cannot be reset", propertyName));
-        }
-      }
-
-      if (change instanceof TableChange.RemoveProperty) {
-        String propertyName = ((TableChange.RemoveProperty) change).getProperty();
-        if (tablePropertiesMetadata.isReservedProperty(propertyName)
-            || tablePropertiesMetadata.isImmutableProperty(propertyName)) {
-          throw new IllegalArgumentException(
-              String.format("Property %s cannot be removed by user", propertyName));
-        }
-      }
-    }
+                    if (change instanceof TableChange.RemoveProperty) {
+                      String propertyName = ((TableChange.RemoveProperty) change).getProperty();
+                      if (tablePropertiesMetadata.isReservedProperty(propertyName)
+                          || tablePropertiesMetadata.isImmutableProperty(propertyName)) {
+                        throw new IllegalArgumentException(
+                            String.format("Property %s cannot be removed by user", propertyName));
+                      }
+                    }
+                  }
+                  return null;
+                }),
+        IllegalArgumentException.class);
   }
 
   /**
