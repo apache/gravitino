@@ -87,6 +87,11 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
           });
     }
 
+    public <R> R doWithPropertiesMeta(ThrowableFunction<HasPropertyMetadata, R> fn)
+        throws Exception {
+      return classLoader.withClassLoader(cl -> fn.apply(catalog.ops()));
+    }
+
     public void close() {
       try {
         classLoader.withClassLoader(
