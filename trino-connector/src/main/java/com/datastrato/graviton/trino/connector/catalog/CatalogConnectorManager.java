@@ -87,7 +87,7 @@ public class CatalogConnectorManager {
 
       LOG.debug("Load metalake: " + usedMetalake);
       loadCatalogs(metalake);
-      // TODO need to handle metalake dropped.
+      // TODO (yuhui) need to handle metalake dropped.
     } finally {
       // load metalake for handling catalog in the metalake updates.
       executorService.schedule(this::loadMetalake, CATALOG_LOAD_FREQUENCY_SECOND, TimeUnit.SECONDS);
@@ -108,7 +108,7 @@ public class CatalogConnectorManager {
                 try {
                   String catalogName = nameIdentifier.toString();
 
-                  // TODO need to handle catalog changed.
+                  // TODO (yuhui) need to handle catalog changed.
                   if (!catalogConnectors.containsKey(catalogName)) {
                     Catalog catalog = metalake.loadCatalog(nameIdentifier);
                     Preconditions.checkNotNull(catalog, "catalog is not null");
@@ -120,7 +120,7 @@ public class CatalogConnectorManager {
 
                     catalogConnectors.put(catalogName, catalogConnectorContext);
                     catalogInjector.injectCatalogConnector(catalogName);
-                    LOG.info("Load {} metalake's catalog {} successfully.", metalake, catalogName);
+                    LOG.info("Load catalog {} in metalake {} successfully.", catalogName, metalake);
                   }
                 } catch (Exception e) {
                   LOG.error(

@@ -17,7 +17,7 @@ import java.util.Map;
 
 public class GravitonConnectorFactory implements ConnectorFactory {
 
-  private static final Logger LOG = Logger.get(CatalogConnectorManager.class);
+  private static final Logger LOG = Logger.get(GravitonConnectorFactory.class);
   private static final String DEFAULT_CONNECTOR_NAME = "graviton";
 
   private CatalogConnectorManager catalogConnectorManager;
@@ -65,8 +65,6 @@ public class GravitonConnectorFactory implements ConnectorFactory {
         return new DummyGravitonConnector();
       }
     }
-
-    Preconditions.checkNotNull(catalogConnectorManager, "catalogConnectorManager is not null");
 
     CatalogConnectorContext catalogConnectorContext =
         catalogConnectorManager.getCatalogConnector(catalogName);
