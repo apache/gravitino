@@ -105,12 +105,12 @@ public class CatalogInjector {
       Preconditions.checkNotNull(catalogFactoryObject, "catalogFactoryObject should not be null");
 
       LOG.info("Bind Trino catalog manager successfully.");
-    } catch (Throwable t) {
+    } catch (Exception e) {
       String message =
           String.format(
               "Bind Trino catalog manager failed, unsupported trino-%s version", trinoVersion);
-      LOG.error(message, t);
-      throw new TrinoException(GRAVITON_UNSUPPORTED_TRINO_VERSION, message, t);
+      LOG.error(message, e);
+      throw new TrinoException(GRAVITON_UNSUPPORTED_TRINO_VERSION, message, e);
     }
   }
 
@@ -137,9 +137,9 @@ public class CatalogInjector {
       catalogs.put(catalogName, catalogConnector);
 
       LOG.info("Inject trino catalog {} successfully.", catalogName);
-    } catch (Throwable t) {
-      LOG.error("Inject trino catalog {} failed.", catalogName, t);
-      throw new TrinoException(GRAVITON_CREATE_INNER_CONNECTOR_FAILED, t);
+    } catch (Exception e) {
+      LOG.error("Inject trino catalog {} failed.", catalogName, e);
+      throw new TrinoException(GRAVITON_CREATE_INNER_CONNECTOR_FAILED, e);
     }
   }
 
@@ -181,13 +181,13 @@ public class CatalogInjector {
 
       LOG.info("Create internal catalog connector {} successfully.", connectorName);
       return (Connector) connector;
-    } catch (Throwable t) {
+    } catch (Exception e) {
       LOG.error(
           "Create internal catalog connector {} failed. connector properties: {} ",
           connectorName,
           properties.toString(),
-          t);
-      throw new TrinoException(GRAVITON_CREATE_INNER_CONNECTOR_FAILED, t);
+          e);
+      throw new TrinoException(GRAVITON_CREATE_INNER_CONNECTOR_FAILED, e);
     }
   }
 }

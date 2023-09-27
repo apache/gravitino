@@ -78,7 +78,7 @@ public class CatalogConnectorManager {
       try {
         metalake = gravitonClient.loadMetalake(NameIdentifier.ofMetalake(usedMetalake));
       } catch (NoSuchMetalakeException noSuchMetalakeException) {
-        LOG.warn("Metalake {} is not exists", usedMetalake);
+        LOG.warn("Metalake {} does not exists", usedMetalake);
         return;
       } catch (Exception e) {
         LOG.error("Load Metalake {} failed", e);
@@ -124,14 +124,11 @@ public class CatalogConnectorManager {
                   }
                 } catch (Exception e) {
                   LOG.error(
-                      "Load {} metalake's catalogs {} failed.",
-                      metalake.name(),
-                      catalogNames,
-                      e.getMessage());
+                      "Load {} metalake's catalogs {} failed.", metalake.name(), catalogNames, e);
                 }
               });
-    } catch (Throwable t) {
-      LOG.error("Load {} metalake's catalog failed.", metalake.name(), t);
+    } catch (Exception e) {
+      LOG.error("Load {} metalake's catalog failed.", metalake.name(), e);
     }
   }
 
