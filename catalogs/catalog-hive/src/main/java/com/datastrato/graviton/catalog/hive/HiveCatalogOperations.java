@@ -11,7 +11,6 @@ import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
 import com.datastrato.graviton.PropertyMetadata;
 import com.datastrato.graviton.catalog.CatalogOperations;
-import com.datastrato.graviton.catalog.HasPropertyMetadata;
 import com.datastrato.graviton.catalog.hive.converter.ToHiveType;
 import com.datastrato.graviton.exceptions.NoSuchCatalogException;
 import com.datastrato.graviton.exceptions.NoSuchSchemaException;
@@ -55,8 +54,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /** Operations for interacting with the Hive catalog in Graviton. */
-public class HiveCatalogOperations
-    implements CatalogOperations, SupportsSchemas, TableCatalog, HasPropertyMetadata {
+public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas, TableCatalog {
 
   public static final Logger LOG = LoggerFactory.getLogger(HiveCatalogOperations.class);
 
