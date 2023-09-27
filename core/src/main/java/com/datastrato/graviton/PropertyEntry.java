@@ -152,7 +152,7 @@ public final class PropertyEntry<T> {
     return decoder.apply(value);
   }
 
-  public static PropertyEntry<String> stringProperty(
+  public static PropertyEntry<String> stringPropertyEntry(
       String name,
       String description,
       boolean required,

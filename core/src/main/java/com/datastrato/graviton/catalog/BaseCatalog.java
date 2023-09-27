@@ -7,7 +7,7 @@ package com.datastrato.graviton.catalog;
 import com.datastrato.graviton.Audit;
 import com.datastrato.graviton.Catalog;
 import com.datastrato.graviton.CatalogProvider;
-import com.datastrato.graviton.PropertyMetadata;
+import com.datastrato.graviton.PropertiesMetadata;
 import com.datastrato.graviton.meta.CatalogEntity;
 import com.google.common.base.Preconditions;
 import java.util.Map;
@@ -42,8 +42,8 @@ public abstract class BaseCatalog<T extends BaseCatalog>
   protected abstract CatalogOperations newOps(Map<String, String> config);
 
   @Override
-  public PropertyMetadata tableProperty() throws UnsupportedOperationException {
-    return ops().tableProperty();
+  public PropertiesMetadata tablePropertiesMetadata() throws UnsupportedOperationException {
+    return ops().tablePropertiesMetadata();
   }
 
   /**

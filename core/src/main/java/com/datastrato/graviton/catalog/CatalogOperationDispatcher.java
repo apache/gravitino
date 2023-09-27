@@ -6,16 +6,12 @@ package com.datastrato.graviton.catalog;
 
 import static com.datastrato.graviton.Entity.EntityType.SCHEMA;
 import static com.datastrato.graviton.Entity.EntityType.TABLE;
-import static com.datastrato.graviton.PropertyMetadata.isHiddenProperty;
-import static com.datastrato.graviton.PropertyMetadata.isImmutableProperty;
-import static com.datastrato.graviton.PropertyMetadata.isRequiredProperty;
-import static com.datastrato.graviton.PropertyMetadata.isReservedProperty;
 
 import com.datastrato.graviton.EntityStore;
 import com.datastrato.graviton.HasIdentifier;
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
-import com.datastrato.graviton.PropertyEntry;
+import com.datastrato.graviton.PropertiesMetadata;
 import com.datastrato.graviton.StringIdentifier;
 import com.datastrato.graviton.catalog.rel.EntityCombinedSchema;
 import com.datastrato.graviton.catalog.rel.EntityCombinedTable;
@@ -314,8 +310,8 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
   }
 
   private void removeHiddenProperties(Table table, NameIdentifier catalogIdent) {
-    Map<String, PropertyEntry<?>> tablePropertySpecs = getTablePropertyMetadata(catalogIdent);
-    table.properties().entrySet().removeIf(e -> isHiddenProperty(e.getKey(), tablePropertySpecs));
+    PropertiesMetadata tablePropertiesMetadata = getTablePropertiesMetadata(catalogIdent);
+    table.properties().keySet().removeIf(tablePropertiesMetadata::isHiddenProperty);
   }
 
   /**
@@ -392,11 +388,11 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
     if (properties == null) {
       return;
     }
-    Map<String, PropertyEntry<?>> propertyMetadata = getTablePropertyMetadata(catalogIdent);
+    PropertiesMetadata tablePropertiesMetadata = getTablePropertiesMetadata(catalogIdent);
 
     List<String> reservedProperties =
         properties.keySet().stream()
-            .filter(k -> isReservedProperty(k, propertyMetadata))
+            .filter(tablePropertiesMetadata::isReservedProperty)
             .collect(Collectors.toList());
     Preconditions.checkArgument(
         reservedProperties.isEmpty(),
@@ -404,8 +400,8 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
         reservedProperties);
 
     List<String> absentProperties =
-        propertyMetadata.keySet().stream()
-            .filter(k -> isRequiredProperty(k, propertyMetadata))
+        tablePropertiesMetadata.propertyEntries().keySet().stream()
+            .filter(tablePropertiesMetadata::isRequiredProperty)
             .filter(k -> !properties.containsKey(k))
             .collect(Collectors.toList());
     Preconditions.checkArgument(
@@ -415,13 +411,13 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
 
     // use decode function to validate the property values
     properties.keySet().stream()
-        .filter(propertyMetadata::containsKey)
-        .forEach(k -> propertyMetadata.get(k).decode(properties.get(k)));
+        .filter(tablePropertiesMetadata::containsProperty)
+        .forEach(k -> tablePropertiesMetadata.propertyEntries().get(k).decode(properties.get(k)));
   }
 
-  private Map<String, PropertyEntry<?>> getTablePropertyMetadata(NameIdentifier catalogIdent) {
+  private PropertiesMetadata getTablePropertiesMetadata(NameIdentifier catalogIdent) {
     CatalogManager.CatalogWrapper catalog = catalogManager.loadCatalogAndWrap(catalogIdent);
-    return catalog.tablePropertyMetadata().property();
+    return catalog.tablePropertyMetadata();
   }
 
   /**
@@ -494,18 +490,18 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
   private void validateAlterTable(NameIdentifier ident, TableChange... changes) {
     NameIdentifier catalogIdent = getCatalogIdentifier(ident);
     Set<String> existingProperties = loadTableWithAllProperties(ident).properties().keySet();
-    Map<String, PropertyEntry<?>> tablePropertySpecs = getTablePropertyMetadata(catalogIdent);
+    PropertiesMetadata tablePropertiesMetadata = getTablePropertiesMetadata(catalogIdent);
 
     for (TableChange change : changes) {
       if (change instanceof TableChange.SetProperty) {
         String propertyName = ((TableChange.SetProperty) change).getProperty();
-        if (isReservedProperty(propertyName, tablePropertySpecs)) {
+        if (tablePropertiesMetadata.isReservedProperty(propertyName)) {
           throw new IllegalArgumentException(
               String.format("Property %s is reserved and cannot be set", propertyName));
         }
 
         if (existingProperties.contains(propertyName)
-            && isImmutableProperty(propertyName, tablePropertySpecs)) {
+            && tablePropertiesMetadata.isImmutableProperty(propertyName)) {
           throw new IllegalArgumentException(
               String.format("Property %s is immutable and cannot be reset", propertyName));
         }
@@ -513,8 +509,8 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
 
       if (change instanceof TableChange.RemoveProperty) {
         String propertyName = ((TableChange.RemoveProperty) change).getProperty();
-        if (isReservedProperty(propertyName, tablePropertySpecs)
-            || isImmutableProperty(propertyName, tablePropertySpecs)) {
+        if (tablePropertiesMetadata.isReservedProperty(propertyName)
+            || tablePropertiesMetadata.isImmutableProperty(propertyName)) {
           throw new IllegalArgumentException(
               String.format("Property %s cannot be removed by user", propertyName));
         }

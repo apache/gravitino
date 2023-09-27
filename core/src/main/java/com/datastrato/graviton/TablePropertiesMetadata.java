@@ -13,14 +13,14 @@ import com.google.common.collect.Maps;
 import java.util.List;
 import java.util.Map;
 
-public abstract class TableProperty implements PropertyMetadata {
+public abstract class TablePropertiesMetadata implements PropertiesMetadata {
 
-  private static final Map<String, PropertyEntry<?>> BASIC_TABLE_PROPERTY;
+  private static final Map<String, PropertyEntry<?>> BASIC_TABLE_PROPERTY_ENTRIES;
 
   static {
-    List<PropertyEntry<?>> basicTableProperty =
+    List<PropertyEntry<?>> basicTablePropertyEntries =
         ImmutableList.of(
-            PropertyEntry.stringProperty(
+            PropertyEntry.stringPropertyEntry(
                 ID_KEY,
                 "To differentiate the entities created directly by the underlying sources",
                 false,
@@ -29,16 +29,17 @@ public abstract class TableProperty implements PropertyMetadata {
                 true,
                 true));
 
-    BASIC_TABLE_PROPERTY = Maps.uniqueIndex(basicTableProperty, PropertyEntry::getName);
+    BASIC_TABLE_PROPERTY_ENTRIES =
+        Maps.uniqueIndex(basicTablePropertyEntries, PropertyEntry::getName);
   }
 
   @Override
-  public Map<String, PropertyEntry<?>> property() {
+  public Map<String, PropertyEntry<?>> propertyEntries() {
     ImmutableMap.Builder<String, PropertyEntry<?>> builder = ImmutableMap.builder();
-    Map<String, PropertyEntry<?>> catalogTableProperty = tableProperty();
+    Map<String, PropertyEntry<?>> catalogTableProperty = tablePropertyEntries();
     builder.putAll(catalogTableProperty);
 
-    BASIC_TABLE_PROPERTY.forEach(
+    BASIC_TABLE_PROPERTY_ENTRIES.forEach(
         (name, entry) -> {
           Preconditions.checkArgument(
               !catalogTableProperty.containsKey(name), "Property metadata already exists: " + name);
@@ -48,5 +49,5 @@ public abstract class TableProperty implements PropertyMetadata {
     return builder.build();
   }
 
-  protected abstract Map<String, PropertyEntry<?>> tableProperty();
+  protected abstract Map<String, PropertyEntry<?>> tablePropertyEntries();
 }

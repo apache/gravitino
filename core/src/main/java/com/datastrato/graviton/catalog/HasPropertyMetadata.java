@@ -4,8 +4,8 @@
  */
 package com.datastrato.graviton.catalog;
 
-import com.datastrato.graviton.PropertyMetadata;
+import com.datastrato.graviton.PropertiesMetadata;
 
 public interface HasPropertyMetadata {
-  PropertyMetadata tableProperty() throws UnsupportedOperationException;
+  PropertiesMetadata tablePropertiesMetadata() throws UnsupportedOperationException;
 }

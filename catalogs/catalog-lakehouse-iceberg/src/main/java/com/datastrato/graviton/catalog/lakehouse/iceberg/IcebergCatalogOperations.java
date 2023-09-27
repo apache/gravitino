@@ -6,7 +6,7 @@ package com.datastrato.graviton.catalog.lakehouse.iceberg;
 
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
-import com.datastrato.graviton.PropertyMetadata;
+import com.datastrato.graviton.PropertiesMetadata;
 import com.datastrato.graviton.catalog.CatalogOperations;
 import com.datastrato.graviton.catalog.lakehouse.iceberg.ops.IcebergTableOps;
 import com.datastrato.graviton.catalog.lakehouse.iceberg.ops.IcebergTableOpsHelper;
@@ -49,7 +49,7 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
 
   @VisibleForTesting IcebergTableOps icebergTableOps;
 
-  private IcebergTableProperty tablePropertyMetadata;
+  private IcebergTablePropertiesMetadata tablePropertiesMetadata;
 
   private final CatalogEntity entity;
 
@@ -72,7 +72,7 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
   public void initialize(Map<String, String> conf) throws RuntimeException {
     // Todo initialize iceberg ops
     this.icebergTableOps = new IcebergTableOps();
-    this.tablePropertyMetadata = new IcebergTableProperty();
+    this.tablePropertiesMetadata = new IcebergTablePropertiesMetadata();
   }
 
   /** Closes the Iceberg catalog and releases the associated client pool. */
@@ -381,7 +381,7 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
   }
 
   @Override
-  public PropertyMetadata tableProperty() throws UnsupportedOperationException {
-    return tablePropertyMetadata;
+  public PropertiesMetadata tablePropertiesMetadata() throws UnsupportedOperationException {
+    return tablePropertiesMetadata;
   }
 }

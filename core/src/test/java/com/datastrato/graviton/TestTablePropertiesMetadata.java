@@ -9,7 +9,7 @@ import com.google.common.collect.Maps;
 import java.util.List;
 import java.util.Map;
 
-public class TestTableProperty extends TableProperty {
+public class TestTablePropertiesMetadata extends TablePropertiesMetadata {
 
   public static final String COMMENT_KEY = "comment";
 
@@ -22,17 +22,18 @@ public class TestTableProperty extends TableProperty {
   static {
     List<PropertyEntry<?>> tablePropertyMetadata =
         ImmutableList.of(
-            PropertyEntry.stringProperty(
+            PropertyEntry.stringPropertyEntry(
                 TEST_REQUIRED_KEY, "test required k1 property", true, false, null, false, false),
-            PropertyEntry.stringProperty(COMMENT_KEY, "table comment", false, true, "", true, true),
-            PropertyEntry.stringProperty(
+            PropertyEntry.stringPropertyEntry(
+                COMMENT_KEY, "table comment", false, true, "", true, true),
+            PropertyEntry.stringPropertyEntry(
                 TEST_IMMUTABLE_KEY, "test immutable property", false, true, null, false, false));
 
     TEST_TABLE_PROPERTY = Maps.uniqueIndex(tablePropertyMetadata, PropertyEntry::getName);
   }
 
   @Override
-  protected Map<String, PropertyEntry<?>> tableProperty() {
+  protected Map<String, PropertyEntry<?>> tablePropertyEntries() {
     return TEST_TABLE_PROPERTY;
   }
 }

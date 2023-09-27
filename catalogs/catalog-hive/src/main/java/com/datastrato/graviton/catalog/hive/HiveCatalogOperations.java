@@ -9,7 +9,7 @@ import static com.datastrato.graviton.catalog.hive.HiveTable.SUPPORT_TABLE_TYPES
 
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
-import com.datastrato.graviton.PropertyMetadata;
+import com.datastrato.graviton.PropertiesMetadata;
 import com.datastrato.graviton.catalog.CatalogOperations;
 import com.datastrato.graviton.catalog.hive.converter.ToHiveType;
 import com.datastrato.graviton.exceptions.NoSuchCatalogException;
@@ -64,7 +64,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
   private final CatalogEntity entity;
 
-  private HiveTableProperty tableProperty;
+  private HiveTablePropertiesMetadata tablePropertiesMetadata;
 
   /**
    * Constructs a new instance of HiveCatalogOperations.
@@ -90,7 +90,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     // todo(xun): add hive client pool size in config
     this.clientPool = new HiveClientPool(1, hiveConf);
 
-    this.tableProperty = new HiveTableProperty();
+    this.tablePropertiesMetadata = new HiveTablePropertiesMetadata();
   }
 
   /** Closes the Hive catalog and releases the associated client pool. */
@@ -739,7 +739,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
   }
 
   @Override
-  public PropertyMetadata tableProperty() throws UnsupportedOperationException {
-    return tableProperty;
+  public PropertiesMetadata tablePropertiesMetadata() throws UnsupportedOperationException {
+    return tablePropertiesMetadata;
   }
 }
