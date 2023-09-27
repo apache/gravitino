@@ -10,6 +10,7 @@ import static com.datastrato.graviton.catalog.hive.HiveTable.SUPPORT_TABLE_TYPES
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
 import com.datastrato.graviton.catalog.CatalogOperations;
+import com.datastrato.graviton.catalog.PropertiesMetadata;
 import com.datastrato.graviton.catalog.hive.converter.ToHiveType;
 import com.datastrato.graviton.exceptions.NoSuchCatalogException;
 import com.datastrato.graviton.exceptions.NoSuchSchemaException;
@@ -63,6 +64,8 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
   private final CatalogEntity entity;
 
+  private HiveTablePropertiesMetadata tablePropertiesMetadata;
+
   /**
    * Constructs a new instance of HiveCatalogOperations.
    *
@@ -86,6 +89,8 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
     // todo(xun): add hive client pool size in config
     this.clientPool = new HiveClientPool(1, hiveConf);
+
+    this.tablePropertiesMetadata = new HiveTablePropertiesMetadata();
   }
 
   /** Closes the Hive catalog and releases the associated client pool. */
@@ -731,5 +736,10 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       LOG.warn("Hadoop user is null, defaulting to user.name");
       return System.getProperty("user.name");
     }
+  }
+
+  @Override
+  public PropertiesMetadata tablePropertiesMetadata() throws UnsupportedOperationException {
+    return tablePropertiesMetadata;
   }
 }

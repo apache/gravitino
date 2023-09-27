@@ -5,6 +5,8 @@
 package com.datastrato.graviton;
 
 import com.datastrato.graviton.catalog.CatalogOperations;
+import com.datastrato.graviton.catalog.PropertiesMetadata;
+import com.datastrato.graviton.catalog.TablePropertiesMetadata;
 import com.datastrato.graviton.exceptions.NoSuchCatalogException;
 import com.datastrato.graviton.exceptions.NoSuchSchemaException;
 import com.datastrato.graviton.exceptions.NoSuchTableException;
@@ -25,6 +27,7 @@ import com.datastrato.graviton.rel.transforms.Transform;
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.Map;
 
 public class TestCatalogOperations implements CatalogOperations, TableCatalog, SupportsSchemas {
@@ -33,9 +36,12 @@ public class TestCatalogOperations implements CatalogOperations, TableCatalog, S
 
   private final Map<NameIdentifier, TestSchema> schemas;
 
+  private final TablePropertiesMetadata tablePropertiesMetadata;
+
   public TestCatalogOperations() {
     tables = Maps.newHashMap();
     schemas = Maps.newHashMap();
+    tablePropertiesMetadata = new TestTablePropertiesMetadata();
   }
 
   @Override
@@ -77,7 +83,7 @@ public class TestCatalogOperations implements CatalogOperations, TableCatalog, S
         new TestTable.Builder()
             .withName(ident.name())
             .withComment(comment)
-            .withProperties(properties)
+            .withProperties(new HashMap<>(properties))
             .withAuditInfo(auditInfo)
             .withColumns(columns)
             .withDistribution(distribution)
@@ -91,7 +97,16 @@ public class TestCatalogOperations implements CatalogOperations, TableCatalog, S
       tables.put(ident, table);
     }
 
-    return table;
+    return new TestTable.Builder()
+        .withName(ident.name())
+        .withComment(comment)
+        .withProperties(new HashMap<>(properties))
+        .withAuditInfo(auditInfo)
+        .withColumns(columns)
+        .withDistribution(distribution)
+        .withSortOrders(sortOrders)
+        .withPartitions(partitions)
+        .build();
   }
 
   @Override
@@ -129,14 +144,21 @@ public class TestCatalogOperations implements CatalogOperations, TableCatalog, S
         new TestTable.Builder()
             .withName(ident.name())
             .withComment(table.comment())
-            .withProperties(newProps)
+            .withProperties(new HashMap<>(newProps))
             .withAuditInfo(updatedAuditInfo)
             .withColumns(table.columns())
             .withPartitions(table.partitioning())
             .build();
 
     tables.put(ident, updatedTable);
-    return updatedTable;
+    return new TestTable.Builder()
+        .withName(ident.name())
+        .withComment(table.comment())
+        .withProperties(new HashMap<>(newProps))
+        .withAuditInfo(updatedAuditInfo)
+        .withColumns(table.columns())
+        .withPartitions(table.partitioning())
+        .build();
   }
 
   @Override
@@ -245,5 +267,10 @@ public class TestCatalogOperations implements CatalogOperations, TableCatalog, S
     }
 
     return true;
+  }
+
+  @Override
+  public PropertiesMetadata tablePropertiesMetadata() throws UnsupportedOperationException {
+    return tablePropertiesMetadata;
   }
 }
