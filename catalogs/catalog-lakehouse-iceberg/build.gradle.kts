@@ -36,6 +36,27 @@ dependencies {
       exclude("com.google.code.findbugs")
       exclude("org.slf4j")
     }
+    implementation(libs.iceberg.hive.metastore)
+
+    implementation(libs.hive2.metastore) {
+        exclude("org.apache.avro", "avro")
+        exclude("org.slf4j", "slf4j-log4j12")
+        exclude("org.pentaho") // missing dependency
+        exclude("org.apache.hbase")
+        exclude("org.apache.logging.log4j")
+        exclude("co.cask.tephra")
+        exclude("com.google.code.findbugs", "jsr305")
+        exclude("org.eclipse.jetty.aggregate","jetty-all")
+        exclude("org.eclipse.jetty.orbit","javax.servlet")
+        exclude("org.apache.parquet", "parquet-hadoop-bundle")
+        exclude("com.tdunning", "json")
+        exclude("javax.transaction", "transaction-api")
+        exclude("com.zaxxer","HikariCP")
+    }
+
+    implementation(libs.hadoop2.hdfs)
+    implementation(libs.hadoop2.common)
+    implementation(libs.hadoop2.mapreduce.client.core)
 
     compileOnly(libs.lombok)
     annotationProcessor(libs.lombok)
