@@ -107,7 +107,7 @@ public class IcebergRESTService implements GravitonAuxiliaryService {
     config.register(IcebergObjectMapperProvider.class).register(JacksonFeature.class);
     config.register(IcebergExceptionMapper.class);
 
-    IcebergTableOps icebergTableOps = new IcebergTableOps();
+    IcebergTableOps icebergTableOps = new IcebergTableOps(restConfig);
     config.register(
         new AbstractBinder() {
           @Override
