@@ -470,7 +470,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
         (name, entry) -> {
           String value = properties.get(name);
           if (!entry.isRequired()) {
-            // If use has provided a value for optional property, check the value
+            // If users have provided a value for optional property, check the value
             if (Objects.nonNull(value)) {
               checkValueFormat(name, value, entry::decode);
             }
