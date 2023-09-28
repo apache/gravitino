@@ -5,8 +5,14 @@
 
 package com.datastrato.graviton.catalog.lakehouse.iceberg.utils;
 
+import com.datastrato.graviton.catalog.lakehouse.iceberg.IcebergRESTConfig;
+import java.util.HashMap;
+import java.util.Map;
+import org.apache.iceberg.CatalogProperties;
 import org.apache.iceberg.catalog.Catalog;
+import org.apache.iceberg.hive.HiveCatalog;
 import org.apache.iceberg.inmemory.InMemoryCatalog;
+import org.apache.iceberg.jdbc.JdbcCatalog;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -16,16 +22,39 @@ public class TestIcebergCatalogUtil {
   void testLoadCatalog() {
     Catalog catalog;
 
-    catalog = IcebergCatalogUtil.loadIcebergCatalog("memory");
+    catalog =
+        IcebergCatalogUtil.loadCatalogBackend(
+            IcebergRESTConfig.CATALOG_TYPE.getDefaultValue().toLowerCase());
     Assertions.assertTrue(catalog instanceof InMemoryCatalog);
 
-    catalog = IcebergCatalogUtil.loadIcebergCatalog("MEMORY");
+    catalog =
+        IcebergCatalogUtil.loadCatalogBackend(
+            IcebergRESTConfig.CATALOG_TYPE.getDefaultValue().toUpperCase());
     Assertions.assertTrue(catalog instanceof InMemoryCatalog);
+
+    catalog = IcebergCatalogUtil.loadCatalogBackend("hive");
+    Assertions.assertTrue(catalog instanceof HiveCatalog);
+
+    catalog = IcebergCatalogUtil.loadCatalogBackend("HIVE");
+    Assertions.assertTrue(catalog instanceof HiveCatalog);
+
+    Assertions.assertThrowsExactly(
+        NullPointerException.class,
+        () -> {
+          IcebergCatalogUtil.loadCatalogBackend("jdbc");
+        });
+
+    Map<String, String> properties = new HashMap<>();
+    properties.put(CatalogProperties.URI, "jdbc://0.0.0.0:3306");
+    properties.put(CatalogProperties.WAREHOUSE_LOCATION, "test");
+    properties.put(IcebergRESTConfig.INITIALIZE_JDBC_CATALOG_TABLES.getKey(), "false");
+    catalog = IcebergCatalogUtil.loadCatalogBackend("jdbc", properties);
+    Assertions.assertTrue(catalog instanceof JdbcCatalog);
 
     Assertions.assertThrowsExactly(
         RuntimeException.class,
         () -> {
-          IcebergCatalogUtil.loadIcebergCatalog("other");
+          IcebergCatalogUtil.loadCatalogBackend("other");
         });
   }
 }
