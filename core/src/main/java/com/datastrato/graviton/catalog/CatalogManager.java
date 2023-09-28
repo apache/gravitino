@@ -297,7 +297,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
   public Catalog alterCatalog(NameIdentifier ident, CatalogChange... changes)
       throws NoSuchCatalogException, IllegalArgumentException {
 
-    CatalogWrapper catalogWrapper = catalogCache.getIfPresent(ident);
+    CatalogWrapper catalogWrapper = loadCatalogAndWrap(ident);
     if (catalogWrapper == null) {
       throw new NoSuchCatalogException("Catalog " + ident + " does not exist");
     }

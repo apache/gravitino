@@ -4,7 +4,7 @@
  */
 package com.datastrato.graviton;
 
-import com.datastrato.graviton.catalog.AbstractPropertiesMetadata;
+import com.datastrato.graviton.catalog.BasePropertiesMetadata;
 import com.datastrato.graviton.catalog.CatalogOperations;
 import com.datastrato.graviton.catalog.PropertiesMetadata;
 import com.datastrato.graviton.catalog.PropertyEntry;
@@ -38,13 +38,13 @@ public class TestCatalogOperations implements CatalogOperations, TableCatalog, S
 
   private final Map<NameIdentifier, TestSchema> schemas;
 
-  private final AbstractPropertiesMetadata abstractPropertiesMetadata;
+  private final BasePropertiesMetadata basePropertiesMetadata;
   private Map<String, String> config;
 
   public TestCatalogOperations(Map<String, String> config) {
     tables = Maps.newHashMap();
     schemas = Maps.newHashMap();
-    abstractPropertiesMetadata = new TestAbstractPropertiesMetadata();
+    basePropertiesMetadata = new TestBasePropertiesMetadata();
     this.config = config;
   }
 
@@ -275,15 +275,15 @@ public class TestCatalogOperations implements CatalogOperations, TableCatalog, S
 
   @Override
   public PropertiesMetadata tablePropertiesMetadata() throws UnsupportedOperationException {
-    return abstractPropertiesMetadata;
+    return basePropertiesMetadata;
   }
 
   @Override
   public PropertiesMetadata catalogPropertiesMetadata() throws UnsupportedOperationException {
     if (config.containsKey("mock")) {
-      return new AbstractPropertiesMetadata() {
+      return new BasePropertiesMetadata() {
         @Override
-        protected Map<String, PropertyEntry<?>> propertyMetas() {
+        protected Map<String, PropertyEntry<?>> specificPropertyEntries() {
           return ImmutableMap.<String, PropertyEntry<?>>builder()
               .put(
                   "key1",

@@ -4,14 +4,14 @@
  */
 package com.datastrato.graviton.catalog.lakehouse.iceberg;
 
-import com.datastrato.graviton.catalog.AbstractPropertiesMetadata;
+import com.datastrato.graviton.catalog.BasePropertiesMetadata;
 import com.datastrato.graviton.catalog.PropertyEntry;
 import com.google.common.collect.Maps;
 import java.util.Map;
 
-public class IcebergTablePropertiesMetadata extends AbstractPropertiesMetadata {
+public class IcebergTablePropertiesMetadata extends BasePropertiesMetadata {
   @Override
-  protected Map<String, PropertyEntry<?>> propertyMetas() {
+  protected Map<String, PropertyEntry<?>> specificPropertyEntries() {
     // TODO: support Iceberg table property specs
     return Maps.newHashMap();
   }

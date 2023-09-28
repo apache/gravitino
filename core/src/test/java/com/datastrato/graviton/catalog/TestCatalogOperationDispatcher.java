@@ -7,7 +7,7 @@ package com.datastrato.graviton.catalog;
 import static com.datastrato.graviton.Entity.EntityType.SCHEMA;
 import static com.datastrato.graviton.Entity.EntityType.TABLE;
 import static com.datastrato.graviton.StringIdentifier.ID_KEY;
-import static com.datastrato.graviton.TestAbstractPropertiesMetadata.COMMENT_KEY;
+import static com.datastrato.graviton.TestBasePropertiesMetadata.COMMENT_KEY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
