@@ -27,6 +27,8 @@ public abstract class Config {
 
   private static final Logger LOG = LoggerFactory.getLogger(Config.class);
 
+  protected static final String DEFAULT_VERSION = "0.2.0";
+
   private static final String CONFIG_PREPEND = "graviton.";
 
   private final ConcurrentMap<String, String> configMap;

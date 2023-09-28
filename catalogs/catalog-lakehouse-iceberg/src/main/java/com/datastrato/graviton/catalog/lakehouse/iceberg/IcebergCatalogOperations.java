@@ -70,9 +70,9 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
    */
   @Override
   public void initialize(Map<String, String> conf) throws RuntimeException {
-    // Todo initialize iceberg ops
-    this.icebergTableOps = new IcebergTableOps();
-    this.tablePropertiesMetadata = new IcebergTablePropertiesMetadata();
+    IcebergRESTConfig icebergConfig = new IcebergRESTConfig();
+    icebergConfig.loadFromMap(conf, k -> true);
+    this.icebergTableOps = new IcebergTableOps(icebergConfig);
   }
 
   /** Closes the Iceberg catalog and releases the associated client pool. */
