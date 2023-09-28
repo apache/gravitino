@@ -34,7 +34,7 @@ public class TestAbstractPropertiesMetadata extends AbstractPropertiesMetadata {
   }
 
   @Override
-  protected Map<String, PropertyEntry<?>> properties() {
+  protected Map<String, PropertyEntry<?>> propertyMetas() {
     return TEST_TABLE_PROPERTY;
   }
 }

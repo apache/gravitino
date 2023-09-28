@@ -37,7 +37,7 @@ public abstract class AbstractPropertiesMetadata implements PropertiesMetadata {
       synchronized (this) {
         if (propertyEntries == null) {
           ImmutableMap.Builder<String, PropertyEntry<?>> builder = ImmutableMap.builder();
-          Map<String, PropertyEntry<?>> properties = properties();
+          Map<String, PropertyEntry<?>> properties = propertyMetas();
           builder.putAll(properties);
 
           BASIC_TABLE_PROPERTY_ENTRIES.forEach(
@@ -54,5 +54,5 @@ public abstract class AbstractPropertiesMetadata implements PropertiesMetadata {
     return propertyEntries;
   }
 
-  protected abstract Map<String, PropertyEntry<?>> properties();
+  protected abstract Map<String, PropertyEntry<?>> propertyMetas();
 }

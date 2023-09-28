@@ -11,7 +11,7 @@ import java.util.Map;
 
 public class IcebergTablePropertiesMetadata extends AbstractPropertiesMetadata {
   @Override
-  protected Map<String, PropertyEntry<?>> properties() {
+  protected Map<String, PropertyEntry<?>> propertyMetas() {
     // TODO: support Iceberg table property specs
     return Maps.newHashMap();
   }

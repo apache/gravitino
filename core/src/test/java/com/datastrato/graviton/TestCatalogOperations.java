@@ -283,7 +283,7 @@ public class TestCatalogOperations implements CatalogOperations, TableCatalog, S
     if (config.containsKey("mock")) {
       return new AbstractPropertiesMetadata() {
         @Override
-        protected Map<String, PropertyEntry<?>> properties() {
+        protected Map<String, PropertyEntry<?>> propertyMetas() {
           return ImmutableMap.<String, PropertyEntry<?>>builder()
               .put(
                   "key1",

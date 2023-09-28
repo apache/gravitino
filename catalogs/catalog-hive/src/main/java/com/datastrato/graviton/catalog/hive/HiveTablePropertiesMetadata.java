@@ -11,7 +11,7 @@ import java.util.Map;
 
 public class HiveTablePropertiesMetadata extends AbstractPropertiesMetadata {
   @Override
-  protected Map<String, PropertyEntry<?>> properties() {
+  protected Map<String, PropertyEntry<?>> propertyMetas() {
     // TODO(Minghuang): support Hive table property specs
     return Maps.newHashMap();
   }
