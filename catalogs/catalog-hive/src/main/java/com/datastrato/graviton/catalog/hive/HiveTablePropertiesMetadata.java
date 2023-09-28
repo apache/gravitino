@@ -4,14 +4,14 @@
  */
 package com.datastrato.graviton.catalog.hive;
 
+import com.datastrato.graviton.catalog.AbstractPropertiesMetadata;
 import com.datastrato.graviton.catalog.PropertyEntry;
-import com.datastrato.graviton.catalog.TablePropertiesMetadata;
 import com.google.common.collect.Maps;
 import java.util.Map;
 
-public class HiveTablePropertiesMetadata extends TablePropertiesMetadata {
+public class HiveTablePropertiesMetadata extends AbstractPropertiesMetadata {
   @Override
-  protected Map<String, PropertyEntry<?>> tablePropertyEntries() {
+  protected Map<String, PropertyEntry<?>> properties() {
     // TODO(Minghuang): support Hive table property specs
     return Maps.newHashMap();
   }

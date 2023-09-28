@@ -6,7 +6,9 @@ package com.datastrato.graviton.catalog;
 
 import com.google.common.base.Preconditions;
 import java.util.function.Function;
+import javax.annotation.Nullable;
 import lombok.Getter;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.logging.log4j.util.Strings;
 
 @Getter
@@ -192,5 +194,34 @@ public final class PropertyEntry<T> {
       boolean hidden,
       boolean reserved) {
     return stringPropertyEntry(name, description, required, true, defaultValue, hidden, reserved);
+  }
+
+  /**
+   * Checks if the property is valid.
+   *
+   * @param key The property name
+   * @param value The property value, value can be null, null means users do not set the property
+   */
+  public void checkProperty(String key, @Nullable String value) {
+    if (!required) {
+      if (value == null) {
+        return;
+      }
+
+      try {
+        decoder.apply(value);
+      } catch (Exception e) {
+        throw new IllegalArgumentException(
+            "Property " + key + " must be of type " + javaType.getName());
+      }
+    }
+
+    Preconditions.checkArgument(StringUtils.isNoneBlank(value), "Property " + key + " is required");
+    try {
+      decoder.apply(value);
+    } catch (Exception e) {
+      throw new IllegalArgumentException(
+          "Property " + key + " is required and must be of type " + javaType.getName());
+    }
   }
 }

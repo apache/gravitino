@@ -4,14 +4,14 @@
  */
 package com.datastrato.graviton;
 
+import com.datastrato.graviton.catalog.AbstractPropertiesMetadata;
 import com.datastrato.graviton.catalog.PropertyEntry;
-import com.datastrato.graviton.catalog.TablePropertiesMetadata;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
 import java.util.List;
 import java.util.Map;
 
-public class TestTablePropertiesMetadata extends TablePropertiesMetadata {
+public class TestAbstractPropertiesMetadata extends AbstractPropertiesMetadata {
 
   public static final String COMMENT_KEY = "comment";
 
@@ -34,7 +34,7 @@ public class TestTablePropertiesMetadata extends TablePropertiesMetadata {
   }
 
   @Override
-  protected Map<String, PropertyEntry<?>> tablePropertyEntries() {
+  protected Map<String, PropertyEntry<?>> properties() {
     return TEST_TABLE_PROPERTY;
   }
 }

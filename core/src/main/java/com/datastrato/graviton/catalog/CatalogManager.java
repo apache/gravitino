@@ -6,6 +6,8 @@ package com.datastrato.graviton.catalog;
 
 import com.datastrato.graviton.Catalog;
 import com.datastrato.graviton.CatalogChange;
+import com.datastrato.graviton.CatalogChange.RemoveProperty;
+import com.datastrato.graviton.CatalogChange.SetProperty;
 import com.datastrato.graviton.CatalogProvider;
 import com.datastrato.graviton.Config;
 import com.datastrato.graviton.Configs;
@@ -40,15 +42,19 @@ import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.ServiceLoader;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -290,6 +296,14 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
   @Override
   public Catalog alterCatalog(NameIdentifier ident, CatalogChange... changes)
       throws NoSuchCatalogException, IllegalArgumentException {
+
+    CatalogWrapper catalogWrapper = catalogCache.getIfPresent(ident);
+    if (catalogWrapper == null) {
+      throw new NoSuchCatalogException("Catalog " + ident + " does not exist");
+    }
+
+    validateAlterCatalogProperties(
+        catalogWrapper.catalog.catalogPropertiesMetadata().propertyEntries(), changes);
     // There could be a race issue that someone is using the catalog from cache while we are
     // updating it.
     catalogCache.invalidate(ident);
@@ -434,7 +448,74 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
 
     // Initialize the catalog
     catalog = catalog.withCatalogEntity(entity).withCatalogConf(mergedConf);
+
+    validateCreateCatalogProperties(
+        mergedConf, catalog.ops().catalogPropertiesMetadata().propertyEntries());
     return new CatalogWrapper(catalog, classLoader);
+  }
+
+  private <T> void checkValueFormat(String key, String value, Function<String, T> decoder) {
+    try {
+      decoder.apply(value);
+    } catch (Exception e) {
+      throw new IllegalArgumentException(
+          String.format("Invalid value: '%s' for property: '%s'", value, key), e);
+    }
+  }
+
+  @VisibleForTesting
+  void validateCreateCatalogProperties(
+      Map<String, String> properties, Map<String, PropertyEntry<?>> propertyEntries) {
+    propertyEntries.forEach(
+        (name, entry) -> {
+          String value = properties.get(name);
+          if (!entry.isRequired()) {
+            // If use has provided a value for optional property, check the value
+            if (Objects.nonNull(value)) {
+              checkValueFormat(name, value, entry::decode);
+            }
+            return;
+          }
+
+          // Now we know entry is required
+          if (StringUtils.isBlank(value)) {
+            throw new IllegalArgumentException(
+                "Missing required property: " + name + " for catalog " + entry.getName());
+          }
+
+          checkValueFormat(name, value, entry::decode);
+
+          // TODO(yuqi) check reserved property?
+        });
+  }
+
+  void validateAlterCatalogProperties(
+      Map<String, PropertyEntry<?>> propertyEntries, CatalogChange... tableChanges) {
+    // Check set property
+    Arrays.stream(tableChanges)
+        .filter(SetProperty.class::isInstance)
+        .forEach(
+            tableChange -> {
+              SetProperty setProperty = (SetProperty) tableChange;
+              PropertyEntry<?> entry = propertyEntries.get(setProperty.getProperty());
+              if (Objects.nonNull(entry)) {
+                Preconditions.checkArgument(
+                    !entry.isImmutable(), "Property " + entry.getName() + " is immutable");
+                checkValueFormat(setProperty.getProperty(), setProperty.getValue(), entry::decode);
+              }
+            });
+
+    // Check remove property
+    Arrays.stream(tableChanges)
+        .filter(RemoveProperty.class::isInstance)
+        .forEach(
+            tableChange -> {
+              RemoveProperty removeProperty = (RemoveProperty) tableChange;
+              PropertyEntry<?> entry = propertyEntries.get(removeProperty.getProperty());
+              if (Objects.nonNull(entry) && entry.isImmutable()) {
+                throw new IllegalArgumentException("Property " + entry.getName() + " is immutable");
+              }
+            });
   }
 
   static Map<String, String> mergeConf(Map<String, String> properties, Map<String, String> conf) {

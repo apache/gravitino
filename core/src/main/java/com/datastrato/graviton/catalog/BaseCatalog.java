@@ -10,6 +10,7 @@ import com.datastrato.graviton.CatalogProvider;
 import com.datastrato.graviton.meta.CatalogEntity;
 import com.google.common.base.Preconditions;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * The abstract base class for Catalog implementations.
@@ -43,6 +44,11 @@ public abstract class BaseCatalog<T extends BaseCatalog>
   @Override
   public PropertiesMetadata tablePropertiesMetadata() throws UnsupportedOperationException {
     return ops().tablePropertiesMetadata();
+  }
+
+  @Override
+  public PropertiesMetadata catalogPropertiesMetadata() throws UnsupportedOperationException {
+    return ops().catalogPropertiesMetadata();
   }
 
   /**
@@ -124,7 +130,18 @@ public abstract class BaseCatalog<T extends BaseCatalog>
   @Override
   public Map<String, String> properties() {
     Preconditions.checkArgument(entity != null, "entity is not set");
-    return entity.getProperties();
+
+    return entity.getProperties().entrySet().stream()
+        .filter(
+            entry -> {
+              PropertyEntry<?> propertyEntry =
+                  ops().catalogPropertiesMetadata().propertyEntries().get(entry.getKey());
+              if (propertyEntry != null) {
+                return !propertyEntry.isHidden();
+              }
+              return true;
+            })
+        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
   }
 
   @Override

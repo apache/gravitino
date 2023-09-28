@@ -20,7 +20,7 @@ public class TestCatalog extends BaseCatalog<TestCatalog> {
 
   @Override
   protected CatalogOperations newOps(Map<String, String> config) {
-    return new TestCatalogOperations();
+    return new TestCatalogOperations(config);
   }
 
   @Override
