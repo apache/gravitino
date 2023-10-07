@@ -4,6 +4,9 @@
  */
 package com.datastrato.graviton.integration.test.catalog.hive;
 
+import static com.datastrato.graviton.catalog.hive.HiveTablePropertiesMetadata.ORC_INPUT_FORMAT_CLASS;
+import static com.datastrato.graviton.catalog.hive.HiveTablePropertiesMetadata.ORC_OUTPUT_FORMAT_CLASS;
+import static com.datastrato.graviton.catalog.hive.HiveTablePropertiesMetadata.ORC_SERDE_CLASS;
 import static com.datastrato.graviton.rel.transforms.Transforms.identity;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -172,6 +175,7 @@ public class CatalogHiveIT extends AbstractIT {
     Map<String, String> properties = Maps.newHashMap();
     properties.put("key1", "val1");
     properties.put("key2", "val2");
+    properties.put("format", "orc");
     return properties;
   }
 
@@ -403,6 +407,10 @@ public class CatalogHiveIT extends AbstractIT {
     List<String> hivePartitionKeys =
         hiveTab.getPartitionKeys().stream().map(FieldSchema::getName).collect(Collectors.toList());
     Assertions.assertEquals(partitionKeys, hivePartitionKeys);
+
+    Assertions.assertEquals(ORC_SERDE_CLASS, hiveTab.getSd().getSerdeInfo().getSerializationLib());
+    Assertions.assertEquals(ORC_INPUT_FORMAT_CLASS, hiveTab.getSd().getInputFormat());
+    Assertions.assertEquals(ORC_OUTPUT_FORMAT_CLASS, hiveTab.getSd().getOutputFormat());
   }
 
   @Test

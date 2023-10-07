@@ -4,6 +4,15 @@
  */
 package com.datastrato.graviton.catalog.hive;
 
+import static com.datastrato.graviton.catalog.hive.HiveTablePropertiesMetadata.COMMENT;
+import static com.datastrato.graviton.catalog.hive.HiveTablePropertiesMetadata.FORMAT;
+import static com.datastrato.graviton.catalog.hive.HiveTablePropertiesMetadata.INPUT_FORMAT;
+import static com.datastrato.graviton.catalog.hive.HiveTablePropertiesMetadata.LOCATION;
+import static com.datastrato.graviton.catalog.hive.HiveTablePropertiesMetadata.OUTPUT_FORMAT;
+import static com.datastrato.graviton.catalog.hive.HiveTablePropertiesMetadata.SERDE_LIB;
+import static com.datastrato.graviton.catalog.hive.HiveTablePropertiesMetadata.SERDE_NAME;
+import static com.datastrato.graviton.catalog.hive.HiveTablePropertiesMetadata.SERDE_PARAMETER_PREFIX;
+import static com.datastrato.graviton.catalog.hive.HiveTablePropertiesMetadata.TABLE_TYPE;
 import static com.datastrato.graviton.rel.transforms.Transforms.identity;
 import static org.apache.hadoop.hive.metastore.TableType.EXTERNAL_TABLE;
 import static org.apache.hadoop.hive.metastore.TableType.MANAGED_TABLE;
@@ -25,6 +34,7 @@ import com.google.common.collect.Sets;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -44,12 +54,6 @@ public class HiveTable extends BaseTable {
   // A set of supported Hive table types.
   public static final Set<String> SUPPORT_TABLE_TYPES =
       Sets.newHashSet(MANAGED_TABLE.name(), EXTERNAL_TABLE.name());
-
-  // The key to store the Hive table comment in the parameters map.
-  public static final String HMS_TABLE_COMMENT = "comment";
-
-  private String location;
-
   private String schemaName;
 
   private HiveTable() {}
@@ -96,8 +100,8 @@ public class HiveTable extends BaseTable {
 
     return new HiveTable.Builder()
         .withName(table.getTableName())
-        .withComment(table.getParameters().get(HMS_TABLE_COMMENT))
-        .withProperties(table.getParameters())
+        .withComment(table.getParameters().get(COMMENT))
+        .withProperties(buildTableProperties(table))
         .withColumns(
             table.getSd().getCols().stream()
                 .map(
@@ -108,7 +112,6 @@ public class HiveTable extends BaseTable {
                             .withComment(f.getComment())
                             .build())
                 .toArray(HiveColumn[]::new))
-        .withLocation(table.getSd().getLocation())
         .withDistribution(distribution)
         .withSortOrders(sortOrders)
         .withAuditInfo(auditInfoBuilder.build())
@@ -120,18 +123,38 @@ public class HiveTable extends BaseTable {
         .build();
   }
 
+  private static Map<String, String> buildTableProperties(Table table) {
+    Map<String, String> properties = Maps.newHashMap(table.getParameters());
+
+    Optional.ofNullable(table.getTableType()).ifPresent(t -> properties.put(TABLE_TYPE, t));
+
+    StorageDescriptor sd = table.getSd();
+    properties.put(LOCATION, sd.getLocation());
+    properties.put(INPUT_FORMAT, sd.getInputFormat());
+    properties.put(OUTPUT_FORMAT, sd.getOutputFormat());
+
+    SerDeInfo serdeInfo = sd.getSerdeInfo();
+    Optional.ofNullable(serdeInfo.getName()).ifPresent(name -> properties.put(SERDE_NAME, name));
+    Optional.ofNullable(serdeInfo.getSerializationLib())
+        .ifPresent(lib -> properties.put(SERDE_LIB, lib));
+    Optional.ofNullable(serdeInfo.getParameters())
+        .ifPresent(p -> p.forEach((k, v) -> properties.put(SERDE_PARAMETER_PREFIX + k, v)));
+
+    return properties;
+  }
+
   /**
    * Converts this HiveTable to its corresponding Table in the Hive Metastore.
    *
    * @return The converted Table.
    */
-  public Table toHiveTable() {
+  public Table toHiveTable(HiveTablePropertiesMetadata tablePropertiesMetadata) {
     Table hiveTable = new Table();
 
     hiveTable.setTableName(name);
     hiveTable.setDbName(schemaName);
-    hiveTable.setSd(buildStorageDescriptor());
-    hiveTable.setParameters(properties);
+    hiveTable.setSd(buildStorageDescriptor(tablePropertiesMetadata));
+    hiveTable.setParameters(buildTableParameters());
     hiveTable.setPartitionKeys(buildPartitionKeys());
 
     // Set AuditInfo to Hive's Table object. Hive's Table doesn't support setting last modifier
@@ -140,6 +163,20 @@ public class HiveTable extends BaseTable {
     hiveTable.setCreateTime(Math.toIntExact(auditInfo.createTime().getEpochSecond()));
 
     return hiveTable;
+  }
+
+  private Map<String, String> buildTableParameters() {
+    Map<String, String> parameters = Maps.newHashMap(properties());
+    parameters.put(COMMENT, comment);
+
+    parameters.remove(LOCATION);
+    parameters.remove(TABLE_TYPE);
+    parameters.remove(INPUT_FORMAT);
+    parameters.remove(OUTPUT_FORMAT);
+    parameters.remove(SERDE_NAME);
+    parameters.remove(SERDE_LIB);
+    parameters.keySet().removeIf(k -> k.startsWith(SERDE_PARAMETER_PREFIX));
+    return parameters;
   }
 
   private List<FieldSchema> buildPartitionKeys() {
@@ -163,7 +200,8 @@ public class HiveTable extends BaseTable {
         partitionColumns.get(0).comment());
   }
 
-  private StorageDescriptor buildStorageDescriptor() {
+  private StorageDescriptor buildStorageDescriptor(
+      HiveTablePropertiesMetadata tablePropertiesMetadata) {
     StorageDescriptor sd = new StorageDescriptor();
     sd.setCols(
         Arrays.stream(columns)
@@ -174,14 +212,22 @@ public class HiveTable extends BaseTable {
                         c.dataType().accept(ToHiveType.INSTANCE).getQualifiedName(),
                         c.comment()))
             .collect(Collectors.toList()));
-    sd.setSerdeInfo(buildSerDeInfo());
+
     // `location` must not be null, otherwise it will result in an NPE when calling HMS `alterTable`
     // interface
-    sd.setLocation(location);
-    // TODO(minghuang): Remove hard coding below after supporting the specified Hive table
-    //  properties
-    sd.setInputFormat("org.apache.hadoop.mapred.TextInputFormat");
-    sd.setOutputFormat("org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat");
+    Optional.ofNullable(properties().get(LOCATION))
+        .ifPresent(l -> sd.setLocation(properties().get(LOCATION)));
+
+    sd.setSerdeInfo(buildSerDeInfo(tablePropertiesMetadata));
+    HiveTablePropertiesMetadata.StorageFormat storageFormat =
+        (HiveTablePropertiesMetadata.StorageFormat)
+            tablePropertiesMetadata.getOrDefault(properties(), FORMAT);
+    sd.setInputFormat(storageFormat.getInputFormat());
+    sd.setOutputFormat(storageFormat.getOutputFormat());
+    // Individually specified INPUT_FORMAT and OUTPUT_FORMAT can override the inputFormat and
+    // outputFormat of FORMAT
+    Optional.ofNullable(properties().get(INPUT_FORMAT)).ifPresent(sd::setInputFormat);
+    Optional.ofNullable(properties().get(OUTPUT_FORMAT)).ifPresent(sd::setOutputFormat);
 
     if (ArrayUtils.isNotEmpty(sortOrders)) {
       for (SortOrder sortOrder : sortOrders) {
@@ -201,32 +247,30 @@ public class HiveTable extends BaseTable {
     return sd;
   }
 
-  private SerDeInfo buildSerDeInfo() {
-    // TODO(minghuang): Build SerDeInfo object based on user specifications.
+  private SerDeInfo buildSerDeInfo(HiveTablePropertiesMetadata tablePropertiesMetadata) {
     SerDeInfo serDeInfo = new SerDeInfo();
-    serDeInfo.setSerializationLib("org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe");
+    serDeInfo.setName(properties().getOrDefault(SERDE_NAME, name()));
+
+    HiveTablePropertiesMetadata.StorageFormat storageFormat =
+        (HiveTablePropertiesMetadata.StorageFormat)
+            tablePropertiesMetadata.getOrDefault(properties(), FORMAT);
+    serDeInfo.setSerializationLib(storageFormat.getSerde());
+    // Individually specified SERDE_LIB can override the serdeLib of FORMAT
+    Optional.ofNullable(properties().get(SERDE_LIB)).ifPresent(serDeInfo::setSerializationLib);
+
+    properties().entrySet().stream()
+        .filter(e -> e.getKey().startsWith(SERDE_PARAMETER_PREFIX))
+        .forEach(
+            e ->
+                serDeInfo.putToParameters(
+                    e.getKey().substring(SERDE_PARAMETER_PREFIX.length()), e.getValue()));
     return serDeInfo;
   }
 
   /** A builder class for constructing HiveTable instances. */
   public static class Builder extends BaseTableBuilder<Builder, HiveTable> {
 
-    // currently, load from HMS only
-    // TODO(minghuang): Support user specify`location` property
-    private String location;
-
     private String schemaName;
-
-    /**
-     * Sets the location to be used for building the HiveTable.
-     *
-     * @param location The string location of the HiveTable.
-     * @return This Builder instance.
-     */
-    public Builder withLocation(String location) {
-      this.location = location;
-      return this;
-    }
 
     /**
      * Sets the Hive schema (database) name to be used for building the HiveTable.
@@ -252,7 +296,6 @@ public class HiveTable extends BaseTable {
       hiveTable.properties = properties != null ? Maps.newHashMap(properties) : Maps.newHashMap();
       hiveTable.auditInfo = auditInfo;
       hiveTable.columns = columns;
-      hiveTable.location = location;
       hiveTable.distribution = distribution;
       hiveTable.sortOrders = sortOrders;
       hiveTable.partitions = partitions;
@@ -260,7 +303,7 @@ public class HiveTable extends BaseTable {
 
       // HMS put table comment in parameters
       if (comment != null) {
-        hiveTable.properties.put(HMS_TABLE_COMMENT, comment);
+        hiveTable.properties.put(COMMENT, comment);
       }
 
       return hiveTable;

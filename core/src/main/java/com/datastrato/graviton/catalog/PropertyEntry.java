@@ -4,7 +4,11 @@
  */
 package com.datastrato.graviton.catalog;
 
+import static java.lang.String.format;
+import static java.util.stream.Collectors.joining;
+
 import com.google.common.base.Preconditions;
+import java.util.EnumSet;
 import java.util.function.Function;
 import lombok.Getter;
 import org.apache.logging.log4j.util.Strings;
@@ -192,5 +196,53 @@ public final class PropertyEntry<T> {
       boolean hidden,
       boolean reserved) {
     return stringPropertyEntry(name, description, required, true, defaultValue, hidden, reserved);
+  }
+
+  public static <T extends Enum<T>> PropertyEntry<T> enumPropertyEntry(
+      String name,
+      String description,
+      boolean required,
+      boolean immutable,
+      Class<T> javaType,
+      T defaultValue,
+      boolean hidden,
+      boolean reserved) {
+    String allValues =
+        EnumSet.allOf(javaType).stream()
+            .map(Enum::name)
+            .map(String::toLowerCase)
+            .collect(joining(", ", "[", "]"));
+    return new Builder<T>()
+        .withName(name)
+        .withDescription(description)
+        .withRequired(required)
+        .withImmutable(immutable)
+        .withJavaType(javaType)
+        .withDefaultValue(defaultValue)
+        .withDecoder(
+            value -> {
+              try {
+                return Enum.valueOf(javaType, value.toUpperCase());
+              } catch (IllegalArgumentException | NullPointerException e) {
+                throw new IllegalArgumentException(
+                    format("Invalid value [%s]. Valid values: %s", value, allValues), e);
+              }
+            })
+        .withEncoder(e -> e.name().toLowerCase())
+        .withHidden(hidden)
+        .withReserved(reserved)
+        .build();
+  }
+
+  public static <T extends Enum<T>> PropertyEntry<T> enumImmutablePropertyEntry(
+      String name,
+      String description,
+      boolean required,
+      Class<T> javaType,
+      T defaultValue,
+      boolean hidden,
+      boolean reserved) {
+    return enumPropertyEntry(
+        name, description, required, true, javaType, defaultValue, hidden, reserved);
   }
 }

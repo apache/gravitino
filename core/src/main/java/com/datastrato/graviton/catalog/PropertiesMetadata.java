@@ -106,4 +106,22 @@ public interface PropertiesMetadata {
       }
     }
   }
+
+  default Object getOrDefault(Map<String, String> properties, String propertyName) {
+    if (!containsProperty(propertyName)) {
+      throw new IllegalArgumentException("Property metadata is not defined: " + propertyName);
+    }
+
+    if (properties.containsKey(propertyName)) {
+      return decode(propertyName, properties.get(propertyName));
+    }
+    return propertyEntries().get(propertyName).getDefaultValue();
+  }
+
+  default Object decode(String propertyName, String propertyValue) {
+    if (!containsProperty(propertyName)) {
+      throw new IllegalArgumentException("Property %s is not defined: " + propertyName);
+    }
+    return propertyEntries().get(propertyName).decode(propertyValue);
+  }
 }
