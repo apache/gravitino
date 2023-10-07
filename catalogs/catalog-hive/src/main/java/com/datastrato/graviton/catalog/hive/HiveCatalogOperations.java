@@ -9,8 +9,10 @@ import static com.datastrato.graviton.catalog.hive.HiveTable.SUPPORT_TABLE_TYPES
 
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
+import com.datastrato.graviton.catalog.BasePropertiesMetadata;
 import com.datastrato.graviton.catalog.CatalogOperations;
 import com.datastrato.graviton.catalog.PropertiesMetadata;
+import com.datastrato.graviton.catalog.PropertyEntry;
 import com.datastrato.graviton.catalog.hive.converter.ToHiveType;
 import com.datastrato.graviton.exceptions.NoSuchCatalogException;
 import com.datastrato.graviton.exceptions.NoSuchSchemaException;
@@ -32,7 +34,7 @@ import com.datastrato.graviton.rel.transforms.Transform;
 import com.datastrato.graviton.rel.transforms.Transforms;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Maps;
+import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
@@ -746,7 +748,22 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
   @Override
   public PropertiesMetadata catalogPropertiesMetadata() throws UnsupportedOperationException {
-    // TODO(yuqi): We will implement this in next PR
-    return Maps::newHashMap;
+    return new BasePropertiesMetadata() {
+      @Override
+      protected Map<String, PropertyEntry<?>> specificPropertyEntries() {
+        return ImmutableMap.<String, PropertyEntry<?>>builder()
+            .put(
+                HiveConf.ConfVars.METASTOREURIS.varname,
+                PropertyEntry.stringPropertyEntry(
+                    HiveConf.ConfVars.METASTOREURIS.varname,
+                    "The Hive metastore URIs",
+                    true,
+                    true,
+                    null,
+                    false,
+                    false))
+            .build();
+      }
+    };
   }
 }

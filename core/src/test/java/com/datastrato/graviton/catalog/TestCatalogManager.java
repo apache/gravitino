@@ -97,6 +97,44 @@ public class TestCatalogManager {
   }
 
   @Test
+  void testCreateWithHiveProperty() throws IOException {
+    NameIdentifier ident = NameIdentifier.of("metalake", "test445");
+    Map<String, String> props1 = ImmutableMap.<String, String>builder().put("hive", "hive").build();
+    Assertions.assertThrowsExactly(
+        IllegalArgumentException.class,
+        () ->
+            catalogManager.createCatalog(
+                ident, Catalog.Type.RELATIONAL, provider, "comment", props1));
+    // BUG here, In memory store does not support rollback operation, so the catalog is created in
+    // entity store,
+    // we need to remove it manually
+    reset();
+    Map<String, String> props2 =
+        ImmutableMap.<String, String>builder()
+            .put("hive", "hive")
+            .put("hive.metastore.uris", "mock_url")
+            .build();
+    Assertions.assertDoesNotThrow(
+        () ->
+            catalogManager.createCatalog(
+                ident, Catalog.Type.RELATIONAL, provider, "comment", props2));
+    reset();
+
+    Map<String, String> props3 =
+        ImmutableMap.<String, String>builder()
+            .put("hive", "hive")
+            .put("hive.metastore.uris", "") /* Should we allow blank string value? */
+            .put("hive.metastore.sasl.enabled", "true")
+            .put("hive.metastore.kerberos.principal", "mock_principal")
+            .put("hive.metastore.kerberos.keytab.file", "mock_keytab")
+            .build();
+    Assertions.assertDoesNotThrow(
+        () ->
+            catalogManager.createCatalog(
+                ident, Catalog.Type.RELATIONAL, provider, "comment", props3));
+  }
+
+  @Test
   @Order(1)
   void testLoadTable() throws IOException {
     NameIdentifier ident = NameIdentifier.of("metalake", "test444");

@@ -12,6 +12,7 @@ import com.google.common.collect.Maps;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.thrift.TException;
 import org.junit.jupiter.api.Assertions;
@@ -42,6 +43,48 @@ public class TestHiveCatalog extends MiniHiveMetastoreService {
       Assertions.assertEquals(2, dbs.size());
       Assertions.assertTrue(dbs.contains("default"));
       Assertions.assertTrue(dbs.contains(DB_NAME));
+    }
+  }
+
+  @Test
+  void testCatalogProperty() {
+    AuditInfo auditInfo =
+        new AuditInfo.Builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+    CatalogEntity entity =
+        new CatalogEntity.Builder()
+            .withId(1L)
+            .withName("catalog")
+            .withNamespace(Namespace.of("metalake"))
+            .withType(HiveCatalog.Type.RELATIONAL)
+            .withProvider("hive")
+            .withAuditInfo(auditInfo)
+            .build();
+
+    Map<String, String> conf = Maps.newHashMap();
+    metastore.hiveConf().forEach(e -> conf.put(e.getKey(), e.getValue()));
+
+    try (HiveCatalogOperations ops = new HiveCatalogOperations(entity)) {
+      ops.initialize(conf);
+      Assertions.assertDoesNotThrow(
+          () -> {
+            Map<String, String> map = Maps.newHashMap();
+            map.put(HiveConf.ConfVars.METASTOREURIS.varname, "/tmp");
+            ops.catalogPropertiesMetadata().validatePropertyForCreate(map);
+          });
+
+      Throwable throwable =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () -> ops.catalogPropertiesMetadata().validatePropertyForCreate(Maps.newHashMap()));
+
+      Assertions.assertTrue(
+          throwable
+              .getMessage()
+              .contains(
+                  String.format(
+                      "Properties are required and must be set: [%s]",
+                      HiveConf.ConfVars.METASTOREURIS.varname)));
     }
   }
 }
