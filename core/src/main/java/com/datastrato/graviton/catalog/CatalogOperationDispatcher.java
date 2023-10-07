@@ -38,7 +38,6 @@ import com.datastrato.graviton.rel.transforms.Transform;
 import com.datastrato.graviton.storage.IdGenerator;
 import com.datastrato.graviton.utils.ThrowableFunction;
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
@@ -402,37 +401,6 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
             getHiddenPropertyNames(getCatalogIdentifier(ident), table.properties()));
   }
 
-  private void validateCreateTableProperties(
-      PropertiesMetadata tablePropertiesMetadata, Map<String, String> properties) {
-    if (properties == null) {
-      return;
-    }
-
-    List<String> reservedProperties =
-        properties.keySet().stream()
-            .filter(tablePropertiesMetadata::isReservedProperty)
-            .collect(Collectors.toList());
-    Preconditions.checkArgument(
-        reservedProperties.isEmpty(),
-        "Properties are reserved and cannot be set: %s",
-        reservedProperties);
-
-    List<String> absentProperties =
-        tablePropertiesMetadata.propertyEntries().keySet().stream()
-            .filter(tablePropertiesMetadata::isRequiredProperty)
-            .filter(k -> !properties.containsKey(k))
-            .collect(Collectors.toList());
-    Preconditions.checkArgument(
-        absentProperties.isEmpty(),
-        "Properties are required and must be set: %s",
-        absentProperties);
-
-    // use decode function to validate the property values
-    properties.keySet().stream()
-        .filter(tablePropertiesMetadata::containsProperty)
-        .forEach(k -> tablePropertiesMetadata.propertyEntries().get(k).decode(properties.get(k)));
-  }
-
   /**
    * Alters an existing table.
    *
@@ -508,28 +476,7 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
         c ->
             c.doWithPropertiesMeta(
                 p -> {
-                  PropertiesMetadata tablePropertiesMetadata = p.tablePropertiesMetadata();
-                  for (TableChange change : changes) {
-                    if (change instanceof TableChange.SetProperty) {
-                      String propertyName = ((TableChange.SetProperty) change).getProperty();
-                      if (tablePropertiesMetadata.isReservedProperty(propertyName)
-                          || tablePropertiesMetadata.isImmutableProperty(propertyName)) {
-                        throw new IllegalArgumentException(
-                            String.format(
-                                "Property %s is reserved or immutable and cannot be set",
-                                propertyName));
-                      }
-                    }
-
-                    if (change instanceof TableChange.RemoveProperty) {
-                      String propertyName = ((TableChange.RemoveProperty) change).getProperty();
-                      if (tablePropertiesMetadata.isReservedProperty(propertyName)
-                          || tablePropertiesMetadata.isImmutableProperty(propertyName)) {
-                        throw new IllegalArgumentException(
-                            String.format("Property %s cannot be removed by user", propertyName));
-                      }
-                    }
-                  }
+                  p.tablePropertiesMetadata().validateAlter(changes);
                   return null;
                 }),
         IllegalArgumentException.class);

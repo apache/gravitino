@@ -54,7 +54,6 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -321,12 +320,20 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
       throw new NoSuchCatalogException("Catalog " + ident + " does not exist");
     }
 
-    validateAlterCatalogProperties(
-        catalogWrapper.catalog.catalogPropertiesMetadata().propertyEntries(), changes);
-    // There could be a race issue that someone is using the catalog from cache while we are
-    // updating it.
-    catalogCache.invalidate(ident);
+    try {
+      catalogWrapper.doWithPropertiesMeta(
+          f -> {
+            f.catalogPropertiesMetadata().validateAlter(changes);
+            return null;
+          });
+    } catch (IllegalArgumentException e1) {
+      throw e1;
+    } catch (Exception e) {
+      LOG.error("Failed to alter catalog {}", ident, e);
+      throw new RuntimeException(e);
+    }
 
+    catalogCache.invalidate(ident);
     try {
       CatalogEntity updatedCatalog =
           store.update(
@@ -477,32 +484,6 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
       throw new IllegalArgumentException(
           String.format("Invalid value: '%s' for property: '%s'", value, key), e);
     }
-  }
-
-  @VisibleForTesting
-  void validateCreateCatalogProperties(
-      Map<String, String> properties, Map<String, PropertyEntry<?>> propertyEntries) {
-    propertyEntries.forEach(
-        (name, entry) -> {
-          String value = properties.get(name);
-          if (!entry.isRequired()) {
-            // If users have provided a value for optional property, check the value
-            if (Objects.nonNull(value)) {
-              checkValueFormat(name, value, entry::decode);
-            }
-            return;
-          }
-
-          // Now we know entry is required
-          if (StringUtils.isBlank(value)) {
-            throw new IllegalArgumentException(
-                "Missing required property: " + name + " for catalog " + entry.getName());
-          }
-
-          checkValueFormat(name, value, entry::decode);
-
-          // TODO(yuqi) check reserved property?
-        });
   }
 
   void validateAlterCatalogProperties(

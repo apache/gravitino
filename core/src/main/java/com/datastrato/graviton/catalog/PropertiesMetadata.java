@@ -4,9 +4,16 @@
  */
 package com.datastrato.graviton.catalog;
 
+import com.datastrato.graviton.CatalogChange;
+import com.datastrato.graviton.CatalogChange.RemoveProperty;
+import com.datastrato.graviton.CatalogChange.SetProperty;
+import com.datastrato.graviton.rel.TableChange;
 import com.google.common.base.Preconditions;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /** The PropertiesMetadata class is responsible for managing property metadata. */
@@ -35,6 +42,80 @@ public interface PropertiesMetadata {
 
   default boolean containsProperty(String propertyName) {
     return propertyEntries().containsKey(propertyName);
+  }
+
+  default void validateAlter(Object[] changes) {
+    if (changes == null) {
+      return;
+    }
+    // Maybe we should check all elements in changes are of the same type
+    Object o = changes[0];
+    if (o instanceof TableChange) {
+      validateTableChange(
+          Arrays.stream(changes).map(TableChange.class::cast).toArray(TableChange[]::new));
+    } else if (o instanceof CatalogChange) {
+      validateCatalogChange(
+          Arrays.stream(changes).map(CatalogChange.class::cast).toArray(CatalogChange[]::new));
+    }
+    // TODO(yuqi): add more validation for schema and metalake
+  }
+
+  default void validateTableChange(TableChange[] tableChanges) {
+    for (TableChange change : tableChanges) {
+      if (change instanceof TableChange.SetProperty) {
+        String propertyName = ((TableChange.SetProperty) change).getProperty();
+        if (isReservedProperty(propertyName) || isImmutableProperty(propertyName)) {
+          throw new IllegalArgumentException(
+              String.format(
+                  "Property %s is reserved or immutable and cannot be set", propertyName));
+        }
+      }
+
+      if (change instanceof TableChange.RemoveProperty) {
+        String propertyName = ((TableChange.RemoveProperty) change).getProperty();
+        if (isReservedProperty(propertyName) || isImmutableProperty(propertyName)) {
+          throw new IllegalArgumentException(
+              String.format("Property %s cannot be removed by user", propertyName));
+        }
+      }
+    }
+  }
+
+  default void validateCatalogChange(CatalogChange[] catalogChanges) {
+    // Check set property
+    Arrays.stream(catalogChanges)
+        .filter(SetProperty.class::isInstance)
+        .forEach(
+            tableChange -> {
+              SetProperty setProperty = (SetProperty) tableChange;
+              PropertyEntry<?> entry = propertyEntries().get(setProperty.getProperty());
+              if (Objects.nonNull(entry)) {
+                Preconditions.checkArgument(
+                    !entry.isImmutable(), "Property " + entry.getName() + " is immutable");
+                checkValueFormat(setProperty.getProperty(), setProperty.getValue(), entry::decode);
+              }
+            });
+
+    // Check remove property
+    Arrays.stream(catalogChanges)
+        .filter(RemoveProperty.class::isInstance)
+        .forEach(
+            tableChange -> {
+              RemoveProperty removeProperty = (RemoveProperty) tableChange;
+              PropertyEntry<?> entry = propertyEntries().get(removeProperty.getProperty());
+              if (Objects.nonNull(entry) && entry.isImmutable()) {
+                throw new IllegalArgumentException("Property " + entry.getName() + " is immutable");
+              }
+            });
+  }
+
+  static <T> void checkValueFormat(String key, String value, Function<String, T> decoder) {
+    try {
+      decoder.apply(value);
+    } catch (Exception e) {
+      throw new IllegalArgumentException(
+          String.format("Invalid value: '%s' for property: '%s'", value, key), e);
+    }
   }
 
   default void validateCreate(Map<String, String> properties) throws IllegalArgumentException {
