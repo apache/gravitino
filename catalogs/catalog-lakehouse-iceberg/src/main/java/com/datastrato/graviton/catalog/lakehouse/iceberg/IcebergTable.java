@@ -20,7 +20,7 @@ import org.apache.iceberg.Schema;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
 
-/** Represents an Iceberg Table entity in the Iceberg Metastore catalog. */
+/** Represents an Iceberg Table entity in the Iceberg table. */
 @ToString
 @Getter
 public class IcebergTable extends BaseTable {

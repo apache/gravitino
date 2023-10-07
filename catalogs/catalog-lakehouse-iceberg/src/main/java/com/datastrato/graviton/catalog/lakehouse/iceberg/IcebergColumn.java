@@ -6,7 +6,7 @@ package com.datastrato.graviton.catalog.lakehouse.iceberg;
 
 import com.datastrato.graviton.catalog.rel.BaseColumn;
 
-/** Represents a column in the Iceberg Metastore catalog. */
+/** Represents a column in the Iceberg column. */
 public class IcebergColumn extends BaseColumn {
 
   private int id;
