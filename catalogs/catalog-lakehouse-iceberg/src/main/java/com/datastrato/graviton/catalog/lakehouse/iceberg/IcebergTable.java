@@ -5,8 +5,8 @@
 package com.datastrato.graviton.catalog.lakehouse.iceberg;
 
 import com.datastrato.graviton.catalog.lakehouse.iceberg.converter.ConvertUtil;
-import com.datastrato.graviton.catalog.lakehouse.iceberg.converter.FormIcebergPartitionSpec;
-import com.datastrato.graviton.catalog.lakehouse.iceberg.converter.FormIcebergSortOrder;
+import com.datastrato.graviton.catalog.lakehouse.iceberg.converter.FromIcebergPartitionSpec;
+import com.datastrato.graviton.catalog.lakehouse.iceberg.converter.FromIcebergSortOrder;
 import com.datastrato.graviton.catalog.lakehouse.iceberg.converter.ToIcebergPartitionSpec;
 import com.datastrato.graviton.catalog.lakehouse.iceberg.converter.ToIcebergSortOrder;
 import com.datastrato.graviton.catalog.lakehouse.iceberg.ops.IcebergTableOpsHelper;
@@ -70,8 +70,8 @@ public class IcebergTable extends BaseTable {
         .withColumns(icebergColumns)
         .withName(tableName)
         .withAuditInfo(AuditInfo.EMPTY)
-        .withPartitions(FormIcebergPartitionSpec.formPartitionSpec(table.spec(), schema))
-        .withSortOrders(FormIcebergSortOrder.formSortOrder(table.sortOrder()))
+        .withPartitions(FromIcebergPartitionSpec.formPartitionSpec(table.spec(), schema))
+        .withSortOrders(FromIcebergSortOrder.formSortOrder(table.sortOrder()))
         .build();
   }
 

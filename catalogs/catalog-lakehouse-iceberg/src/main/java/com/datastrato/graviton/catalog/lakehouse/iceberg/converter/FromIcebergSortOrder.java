@@ -18,11 +18,11 @@ import org.apache.iceberg.transforms.SortOrderVisitor;
  *
  * <p>Referred from core/src/main/java/org/apache/iceberg/spark/SortOrderToSpark.java
  */
-public class FormIcebergSortOrder implements SortOrderVisitor<SortOrder> {
+public class FromIcebergSortOrder implements SortOrderVisitor<SortOrder> {
 
   private final Map<Integer, String> nameByIds;
 
-  public FormIcebergSortOrder(Schema schema) {
+  public FromIcebergSortOrder(Schema schema) {
     this.nameByIds = schema.idToName();
   }
 
@@ -86,7 +86,7 @@ public class FormIcebergSortOrder implements SortOrderVisitor<SortOrder> {
    */
   @VisibleForTesting
   public static SortOrder[] formSortOrder(org.apache.iceberg.SortOrder sortOrder) {
-    FormIcebergSortOrder visitor = new FormIcebergSortOrder(sortOrder.schema());
+    FromIcebergSortOrder visitor = new FromIcebergSortOrder(sortOrder.schema());
     List<SortOrder> ordering = SortOrderVisitor.visit(sortOrder, visitor);
     return ordering.toArray(new SortOrder[0]);
   }

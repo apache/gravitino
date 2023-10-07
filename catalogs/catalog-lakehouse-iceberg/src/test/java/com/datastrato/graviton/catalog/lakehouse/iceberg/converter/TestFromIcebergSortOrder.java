@@ -18,8 +18,8 @@ import org.apache.iceberg.types.Types;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-/** Test class for {@link FormIcebergSortOrder}. */
-public class TestFormIcebergSortOrder extends TestBaseConvert {
+/** Test class for {@link FromIcebergSortOrder}. */
+public class TestFromIcebergSortOrder extends TestBaseConvert {
 
   @Test
   public void testFormSortOrder() {

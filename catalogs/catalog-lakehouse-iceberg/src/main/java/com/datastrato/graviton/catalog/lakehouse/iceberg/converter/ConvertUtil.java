@@ -17,7 +17,7 @@ public class ConvertUtil {
    * Convert the iceberg Table to the corresponding schema information in the iceberg.
    *
    * @param icebergTable Iceberg table.
-   * @return
+   * @return iceberg schema.
    */
   public static Schema toIcebergSchema(IcebergTable icebergTable) {
     Type converted = ToIcebergTypeVisitor.visit(icebergTable, new ToIcebergType(icebergTable));
@@ -41,7 +41,7 @@ public class ConvertUtil {
    * @return
    */
   public static io.substrait.type.Type formIcebergType(Type type) {
-    return TypeUtil.visit(type, new FormIcebergType());
+    return TypeUtil.visit(type, new FromIcebergType());
   }
 
   /**

@@ -46,13 +46,11 @@ public class ToIcebergTypeVisitor<T> {
    */
   public static <T> T visit(Type type, ToIcebergTypeVisitor<T> visitor) {
     if (type instanceof Type.Map) {
-      return visitor.map(
-          (Type.Map) type,
-          visit(((Type.Map) type).key(), visitor),
-          visit(((Type.Map) type).value(), visitor));
+      Type.Map map = (Type.Map) type;
+      return visitor.map(map, visit(map.key(), visitor), visit(map.value(), visitor));
     } else if (type instanceof Type.ListType) {
-      return visitor.array(
-          (Type.ListType) type, visit(((Type.ListType) type).elementType(), visitor));
+      Type.ListType list = (Type.ListType) type;
+      return visitor.array(list, visit(list.elementType(), visitor));
     } else {
       return visitor.atomic(type);
     }

@@ -21,11 +21,11 @@ import org.apache.iceberg.transforms.PartitionSpecVisitor;
  * <p>Referred from
  * core/src/main/java/org/apache/iceberg/spark/Spark3Util/SpecTransformToSparkTransform.java
  */
-public class FormIcebergPartitionSpec implements PartitionSpecVisitor<Transform> {
+public class FromIcebergPartitionSpec implements PartitionSpecVisitor<Transform> {
 
   private final Map<Integer, String> nameByIds;
 
-  public FormIcebergPartitionSpec(Map<Integer, String> nameByIds) {
+  public FromIcebergPartitionSpec(Map<Integer, String> nameByIds) {
     this.nameByIds = nameByIds;
   }
 
@@ -86,7 +86,7 @@ public class FormIcebergPartitionSpec implements PartitionSpecVisitor<Transform>
    */
   @VisibleForTesting
   public static Transform[] formPartitionSpec(PartitionSpec partitionSpec, Schema schema) {
-    FormIcebergPartitionSpec visitor = new FormIcebergPartitionSpec(schema.idToName());
+    FromIcebergPartitionSpec visitor = new FromIcebergPartitionSpec(schema.idToName());
     List<Transform> transforms = Lists.newArrayList();
     List<PartitionField> fields = partitionSpec.fields();
 

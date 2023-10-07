@@ -13,8 +13,8 @@ import org.apache.iceberg.types.Types;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-/** Test class for {@link FormIcebergPartitionSpec}. */
-public class TestFormIcebergPartitionSpec extends TestBaseConvert {
+/** Test class for {@link FromIcebergPartitionSpec}. */
+public class TestFromIcebergPartitionSpec extends TestBaseConvert {
 
   @Test
   public void testFormTransform() {
@@ -27,7 +27,7 @@ public class TestFormIcebergPartitionSpec extends TestBaseConvert {
     Schema schema = new Schema(nestedFields);
     PartitionSpec.Builder builder = PartitionSpec.builderFor(schema);
     PartitionSpec partitionSpec = builder.day(col4Name).identity("col_1").build();
-    Transform[] transforms = FormIcebergPartitionSpec.formPartitionSpec(partitionSpec, schema);
+    Transform[] transforms = FromIcebergPartitionSpec.formPartitionSpec(partitionSpec, schema);
     Assertions.assertEquals(2, transforms.length);
     Assertions.assertEquals("day", transforms[0].name());
     Assertions.assertTrue(transforms[0] instanceof Transforms.FunctionTrans);

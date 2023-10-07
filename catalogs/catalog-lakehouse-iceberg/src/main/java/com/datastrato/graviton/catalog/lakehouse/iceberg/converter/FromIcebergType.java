@@ -16,9 +16,9 @@ import org.apache.iceberg.types.Types;
  *
  * <p>Referred from core/src/main/java/org/apache/iceberg/spark/TypeToSparkType.java
  */
-public class FormIcebergType extends TypeUtil.SchemaVisitor<Type> {
+public class FromIcebergType extends TypeUtil.SchemaVisitor<Type> {
 
-  public FormIcebergType() {}
+  public FromIcebergType() {}
 
   @Override
   public Type schema(Schema schema, Type structType) {
