@@ -746,6 +746,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
   @Override
   public PropertiesMetadata catalogPropertiesMetadata() throws UnsupportedOperationException {
+    // TODO(yuqi): We will implement this in next PR
     return Maps::newHashMap;
   }
 }
