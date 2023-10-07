@@ -29,8 +29,10 @@ import java.time.Instant;
 import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
@@ -74,7 +76,9 @@ public class TestCatalogManager {
     catalogManager = Mockito.spy(catalogManager);
   }
 
-  private void reset() throws IOException {
+  @BeforeEach
+  @AfterEach
+  void reset() throws IOException {
     ((InMemoryEntityStore) entityStore).clear();
     entityStore.put(metalakeEntity, true);
   }
@@ -193,7 +197,7 @@ public class TestCatalogManager {
     // key4 is optional and mutable and have default value, is not hidden and not reserved
     // reserved_key is optional and immutable and have default value, is not hidden and reserved
     // hidden_key is optional and mutable and have default value, is hidden and not reserved
-    NameIdentifier ident = NameIdentifier.of("metalake", "test11");
+    NameIdentifier ident = NameIdentifier.of("metalake", "test111111");
 
     // key1 is required;
     Map<String, String> props1 =
@@ -204,7 +208,8 @@ public class TestCatalogManager {
             () ->
                 catalogManager.createCatalog(
                     ident, Catalog.Type.RELATIONAL, provider, "comment", props1));
-    Assertions.assertTrue(e1.getMessage().contains("Missing required property: key1 for catalog"));
+    Assertions.assertTrue(
+        e1.getMessage().contains("Properties are required and must be set: [key1]"));
     // BUG here, in memory does not support rollback
     reset();
 
@@ -217,7 +222,8 @@ public class TestCatalogManager {
             () ->
                 catalogManager.createCatalog(
                     ident, Catalog.Type.RELATIONAL, provider, "comment", props2));
-    Assertions.assertTrue(e1.getMessage().contains("Missing required property: key2 for catalog"));
+    Assertions.assertTrue(
+        e1.getMessage().contains("Properties are required and must be set: [key2]"));
     reset();
 
     // key3 is optional, but we assign a wrong value format

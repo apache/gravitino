@@ -216,6 +216,19 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
    */
   @Override
   public Catalog loadCatalog(NameIdentifier ident) throws NoSuchCatalogException {
+    CatalogWrapper wrapper = loadCatalogInternal(ident);
+    try {
+      // Call wrapper.catalog.properties() to make BaseCatalog#properties in IsolatedClassLoader
+      wrapper.doWithPropertiesMeta(
+          f -> {
+            wrapper.catalog.properties();
+            return null;
+          });
+    } catch (Exception e) {
+      LOG.error("Failed to load catalog {}", ident, e);
+      throw new RuntimeException(e);
+    }
+
     return loadCatalogAndWrap(ident).catalog;
   }
 
@@ -272,13 +285,19 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
                 store.put(e, false /* overwrite */);
                 return e;
               });
-      return catalogCache.get(ident, id -> createCatalogWrapper(entity)).catalog;
-
+      CatalogWrapper wrapper = catalogCache.get(ident, id -> createCatalogWrapper(entity));
+      wrapper.doWithPropertiesMeta(
+          f -> {
+            f.catalogPropertiesMetadata().validateCreate(properties);
+            return null;
+          });
+      return wrapper.catalog;
     } catch (EntityAlreadyExistsException ee) {
       LOG.warn("Catalog {} already exists", ident, ee);
       throw new CatalogAlreadyExistsException("Catalog " + ident + " already exists");
-
-    } catch (IOException ioe) {
+    } catch (IllegalArgumentException | NoSuchMetalakeException e) {
+      throw e;
+    } catch (Exception ioe) {
       LOG.error("Failed to create catalog {}", ident, ioe);
       throw new RuntimeException(ioe);
     }
@@ -448,9 +467,6 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
 
     // Initialize the catalog
     catalog = catalog.withCatalogEntity(entity).withCatalogConf(mergedConf);
-
-    validateCreateCatalogProperties(
-        mergedConf, catalog.ops().catalogPropertiesMetadata().propertyEntries());
     return new CatalogWrapper(catalog, classLoader);
   }
 

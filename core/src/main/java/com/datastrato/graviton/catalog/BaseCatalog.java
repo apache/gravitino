@@ -33,7 +33,7 @@ public abstract class BaseCatalog<T extends BaseCatalog>
 
   private volatile CatalogOperations ops;
 
-  private volatile Map<String, String> properties;
+  private volatile Map<String, String> properties = null;
   /**
    * Creates a new instance of CatalogOperations.
    *
@@ -135,7 +135,6 @@ public abstract class BaseCatalog<T extends BaseCatalog>
         if (properties == null) {
           Preconditions.checkArgument(entity != null, "entity is not set");
           properties = Maps.newHashMap(entity.getProperties());
-
           properties
               .entrySet()
               .removeIf(
@@ -147,7 +146,6 @@ public abstract class BaseCatalog<T extends BaseCatalog>
         }
       }
     }
-
     return properties;
   }
 

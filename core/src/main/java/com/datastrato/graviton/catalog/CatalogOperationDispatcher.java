@@ -348,7 +348,7 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
         c ->
             c.doWithPropertiesMeta(
                 p -> {
-                  validateCreateTableProperties(p.tablePropertiesMetadata(), properties);
+                  p.tablePropertiesMetadata().validateCreate(properties);
                   return null;
                 }),
         IllegalArgumentException.class);
