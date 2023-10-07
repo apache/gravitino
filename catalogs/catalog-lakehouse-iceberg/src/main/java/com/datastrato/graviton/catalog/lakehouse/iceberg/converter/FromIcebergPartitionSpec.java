@@ -23,15 +23,15 @@ import org.apache.iceberg.transforms.PartitionSpecVisitor;
  */
 public class FromIcebergPartitionSpec implements PartitionSpecVisitor<Transform> {
 
-  private final Map<Integer, String> nameByIds;
+  private final Map<Integer, String> idToName;
 
-  public FromIcebergPartitionSpec(Map<Integer, String> nameByIds) {
-    this.nameByIds = nameByIds;
+  public FromIcebergPartitionSpec(Map<Integer, String> idToName) {
+    this.idToName = idToName;
   }
 
   @Override
   public Transform identity(String sourceName, int sourceId) {
-    return Transforms.identity(new String[] {nameByIds.get(sourceId)});
+    return Transforms.identity(new String[] {idToName.get(sourceId)});
   }
 
   @Override
@@ -48,22 +48,22 @@ public class FromIcebergPartitionSpec implements PartitionSpecVisitor<Transform>
 
   @Override
   public Transform year(String sourceName, int sourceId) {
-    return Transforms.year(new String[] {nameByIds.get(sourceId)});
+    return Transforms.year(new String[] {idToName.get(sourceId)});
   }
 
   @Override
   public Transform month(String sourceName, int sourceId) {
-    return Transforms.month(new String[] {nameByIds.get(sourceId)});
+    return Transforms.month(new String[] {idToName.get(sourceId)});
   }
 
   @Override
   public Transform day(String sourceName, int sourceId) {
-    return Transforms.day(new String[] {nameByIds.get(sourceId)});
+    return Transforms.day(new String[] {idToName.get(sourceId)});
   }
 
   @Override
   public Transform hour(String sourceName, int sourceId) {
-    return Transforms.hour(new String[] {nameByIds.get(sourceId)});
+    return Transforms.hour(new String[] {idToName.get(sourceId)});
   }
 
   @Override

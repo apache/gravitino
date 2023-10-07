@@ -20,10 +20,10 @@ import org.apache.iceberg.transforms.SortOrderVisitor;
  */
 public class FromIcebergSortOrder implements SortOrderVisitor<SortOrder> {
 
-  private final Map<Integer, String> nameByIds;
+  private final Map<Integer, String> idToName;
 
   public FromIcebergSortOrder(Schema schema) {
-    this.nameByIds = schema.idToName();
+    this.idToName = schema.idToName();
   }
 
   @Override
@@ -55,7 +55,7 @@ public class FromIcebergSortOrder implements SortOrderVisitor<SortOrder> {
 
   private SortOrder getSortOrder(int id, SortDirection direction, NullOrder nullOrder) {
     return SortOrder.fieldSortOrder(
-        new String[] {nameByIds.get(id)}, toGraviton(direction), toGraviton(nullOrder));
+        new String[] {idToName.get(id)}, toGraviton(direction), toGraviton(nullOrder));
   }
 
   @Override

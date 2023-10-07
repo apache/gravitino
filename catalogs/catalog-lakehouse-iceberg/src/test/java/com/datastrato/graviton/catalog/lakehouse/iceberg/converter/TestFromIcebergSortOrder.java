@@ -37,10 +37,10 @@ public class TestFromIcebergSortOrder extends TestBaseConvert {
             .collect(
                 Collectors.toMap(
                     o -> ((Transforms.NamedReference) o.getTransform()).value()[0], v -> v));
-    Map<Integer, String> nameById = schema.idToName();
+    Map<Integer, String> idToName = schema.idToName();
     for (SortField sortField : sortFields) {
-      Assertions.assertTrue(nameById.containsKey(sortField.sourceId()));
-      String sortOrderName = nameById.get(sortField.sourceId());
+      Assertions.assertTrue(idToName.containsKey(sortField.sourceId()));
+      String sortOrderName = idToName.get(sortField.sourceId());
       Assertions.assertTrue(sortOrderByName.containsKey(sortOrderName));
       SortOrder sortOrder = sortOrderByName.get(sortOrderName);
       Assertions.assertEquals(

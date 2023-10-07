@@ -49,13 +49,13 @@ public class TestToIcebergPartitionSpec extends TestBaseConvert {
     List<PartitionField> fields = partitionSpec.fields();
     Assertions.assertEquals(partitioning.length, fields.size());
     Assertions.assertEquals(3, fields.size());
-    Map<Integer, String> nameById = schema.idToName();
+    Map<Integer, String> idToName = schema.idToName();
     Map<String, Types.NestedField> nestedFieldByName =
         Arrays.stream(nestedFields).collect(Collectors.toMap(Types.NestedField::name, v -> v));
     for (int i = 0; i < fields.size(); i++) {
       PartitionField partitionField = fields.get(i);
-      Assertions.assertTrue(nameById.containsKey(partitionField.sourceId()));
-      String colName = nameById.get(partitionField.sourceId());
+      Assertions.assertTrue(idToName.containsKey(partitionField.sourceId()));
+      String colName = idToName.get(partitionField.sourceId());
       Assertions.assertTrue(nestedFieldByName.containsKey(colName));
     }
   }

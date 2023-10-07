@@ -47,7 +47,7 @@ public class TestToIcebergSortOrder extends TestBaseConvert {
     List<SortField> sortFields = icebergSortOrder.fields();
     Assertions.assertEquals(sortOrders.length, sortFields.size());
 
-    Map<Integer, String> nameById = schema.idToName();
+    Map<Integer, String> idToName = schema.idToName();
     Map<String, SortOrder> sortOrderByName =
         Arrays.stream(sortOrders)
             .collect(
@@ -64,8 +64,8 @@ public class TestToIcebergSortOrder extends TestBaseConvert {
                     },
                     v -> v));
     for (SortField sortField : sortFields) {
-      Assertions.assertTrue(nameById.containsKey(sortField.sourceId()));
-      String colName = nameById.get(sortField.sourceId());
+      Assertions.assertTrue(idToName.containsKey(sortField.sourceId()));
+      String colName = idToName.get(sortField.sourceId());
       Assertions.assertTrue(sortOrderByName.containsKey(colName));
       SortOrder sortOrder = sortOrderByName.get(colName);
       Assertions.assertTrue(sortField.transform().isIdentity());

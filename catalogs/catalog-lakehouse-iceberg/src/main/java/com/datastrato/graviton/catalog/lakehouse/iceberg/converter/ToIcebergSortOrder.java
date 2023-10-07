@@ -26,48 +26,48 @@ public class ToIcebergSortOrder {
    * @return
    */
   public static org.apache.iceberg.SortOrder toSortOrder(Schema schema, SortOrder[] sortOrders) {
-    org.apache.iceberg.SortOrder icebergSortOrder = null;
-    if (ArrayUtils.isNotEmpty(sortOrders)) {
-      org.apache.iceberg.SortOrder.Builder sortOrderBuilder =
-          org.apache.iceberg.SortOrder.builderFor(schema);
-      for (SortOrder sortOrder : sortOrders) {
-        Transform transform = sortOrder.getTransform();
-        if (transform instanceof Transforms.NamedReference) {
-          String[] fieldName = ((Transforms.NamedReference) transform).value();
-          for (String name : fieldName) {
-            sortOrderBuilder.sortBy(
-                name,
-                sortOrder.getDirection() == SortOrder.Direction.ASC
-                    ? SortDirection.ASC
-                    : SortDirection.DESC,
-                sortOrder.getNullOrdering() == SortOrder.NullOrdering.FIRST
-                    ? NullOrder.NULLS_FIRST
-                    : NullOrder.NULLS_LAST);
-          }
-        } else if (transform instanceof Transforms.FunctionTrans) {
-          Preconditions.checkArgument(
-              transform.arguments().length == 1,
-              "Iceberg sort order does not support nested field",
-              transform);
-          String colName =
-              Arrays.stream(transform.arguments())
-                  .map(t -> ((Transforms.NamedReference) t).value()[0])
-                  .collect(Collectors.joining());
+    if (ArrayUtils.isEmpty(sortOrders)) {
+      return null;
+    }
+    org.apache.iceberg.SortOrder icebergSortOrder;
+    org.apache.iceberg.SortOrder.Builder sortOrderBuilder =
+        org.apache.iceberg.SortOrder.builderFor(schema);
+    for (SortOrder sortOrder : sortOrders) {
+      Transform transform = sortOrder.getTransform();
+      if (transform instanceof Transforms.NamedReference) {
+        String[] fieldName = ((Transforms.NamedReference) transform).value();
+        for (String name : fieldName) {
           sortOrderBuilder.sortBy(
-              colName,
+              name,
               sortOrder.getDirection() == SortOrder.Direction.ASC
                   ? SortDirection.ASC
                   : SortDirection.DESC,
               sortOrder.getNullOrdering() == SortOrder.NullOrdering.FIRST
                   ? NullOrder.NULLS_FIRST
                   : NullOrder.NULLS_LAST);
-        } else {
-          throw new UnsupportedOperationException(
-              "Transform is not supported: " + transform.name());
         }
+      } else if (transform instanceof Transforms.FunctionTrans) {
+        Preconditions.checkArgument(
+            transform.arguments().length == 1,
+            "Iceberg sort order does not support nested field",
+            transform);
+        String colName =
+            Arrays.stream(transform.arguments())
+                .map(t -> ((Transforms.NamedReference) t).value()[0])
+                .collect(Collectors.joining());
+        sortOrderBuilder.sortBy(
+            colName,
+            sortOrder.getDirection() == SortOrder.Direction.ASC
+                ? SortDirection.ASC
+                : SortDirection.DESC,
+            sortOrder.getNullOrdering() == SortOrder.NullOrdering.FIRST
+                ? NullOrder.NULLS_FIRST
+                : NullOrder.NULLS_LAST);
+      } else {
+        throw new UnsupportedOperationException("Transform is not supported: " + transform.name());
       }
-      icebergSortOrder = sortOrderBuilder.build();
     }
+    icebergSortOrder = sortOrderBuilder.build();
     return icebergSortOrder;
   }
 }
