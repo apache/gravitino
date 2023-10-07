@@ -47,12 +47,10 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.ServiceLoader;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
 import org.slf4j.Logger;
@@ -499,44 +497,6 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
     // Initialize the catalog
     catalog = catalog.withCatalogEntity(entity).withCatalogConf(mergedConf);
     return new CatalogWrapper(catalog, classLoader);
-  }
-
-  private <T> void checkValueFormat(String key, String value, Function<String, T> decoder) {
-    try {
-      decoder.apply(value);
-    } catch (Exception e) {
-      throw new IllegalArgumentException(
-          String.format("Invalid value: '%s' for property: '%s'", value, key), e);
-    }
-  }
-
-  void validateAlterCatalogProperties(
-      Map<String, PropertyEntry<?>> propertyEntries, CatalogChange... tableChanges) {
-    // Check set property
-    Arrays.stream(tableChanges)
-        .filter(SetProperty.class::isInstance)
-        .forEach(
-            tableChange -> {
-              SetProperty setProperty = (SetProperty) tableChange;
-              PropertyEntry<?> entry = propertyEntries.get(setProperty.getProperty());
-              if (Objects.nonNull(entry)) {
-                Preconditions.checkArgument(
-                    !entry.isImmutable(), "Property " + entry.getName() + " is immutable");
-                checkValueFormat(setProperty.getProperty(), setProperty.getValue(), entry::decode);
-              }
-            });
-
-    // Check remove property
-    Arrays.stream(tableChanges)
-        .filter(RemoveProperty.class::isInstance)
-        .forEach(
-            tableChange -> {
-              RemoveProperty removeProperty = (RemoveProperty) tableChange;
-              PropertyEntry<?> entry = propertyEntries.get(removeProperty.getProperty());
-              if (Objects.nonNull(entry) && entry.isImmutable()) {
-                throw new IllegalArgumentException("Property " + entry.getName() + " is immutable");
-              }
-            });
   }
 
   static Map<String, String> mergeConf(Map<String, String> properties, Map<String, String> conf) {
