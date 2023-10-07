@@ -54,6 +54,7 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.tuple.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -287,7 +288,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
       CatalogWrapper wrapper = catalogCache.get(ident, id -> createCatalogWrapper(entity));
       wrapper.doWithPropertiesMeta(
           f -> {
-            f.catalogPropertiesMetadata().validateCreate(properties);
+            f.catalogPropertiesMetadata().validatePropertyForCreate(properties);
             return null;
           });
       return wrapper.catalog;
@@ -300,6 +301,26 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
       LOG.error("Failed to create catalog {}", ident, ioe);
       throw new RuntimeException(ioe);
     }
+  }
+
+  private Pair<Map<String, String>, Map<String, String>> getCatalogAlterProperty(
+      CatalogChange... tableChanges) {
+    Map<String, String> upserts = Maps.newHashMap();
+    Map<String, String> deletes = Maps.newHashMap();
+
+    Arrays.stream(tableChanges)
+        .forEach(
+            tableChange -> {
+              if (tableChange instanceof SetProperty) {
+                SetProperty setProperty = (SetProperty) tableChange;
+                upserts.put(setProperty.getProperty(), setProperty.getValue());
+              } else if (tableChange instanceof RemoveProperty) {
+                RemoveProperty removeProperty = (RemoveProperty) tableChange;
+                deletes.put(removeProperty.getProperty(), removeProperty.getProperty());
+              }
+            });
+
+    return Pair.of(upserts, deletes);
   }
 
   /**
@@ -323,7 +344,10 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
     try {
       catalogWrapper.doWithPropertiesMeta(
           f -> {
-            f.catalogPropertiesMetadata().validateAlter(changes);
+            Pair<Map<String, String>, Map<String, String>> alterProperty =
+                getCatalogAlterProperty(changes);
+            f.catalogPropertiesMetadata()
+                .validatePropertyForAlter(alterProperty.getLeft(), alterProperty.getRight());
             return null;
           });
     } catch (IllegalArgumentException e1) {

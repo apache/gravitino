@@ -34,10 +34,13 @@ import com.datastrato.graviton.rel.SupportsSchemas;
 import com.datastrato.graviton.rel.Table;
 import com.datastrato.graviton.rel.TableCatalog;
 import com.datastrato.graviton.rel.TableChange;
+import com.datastrato.graviton.rel.TableChange.RemoveProperty;
+import com.datastrato.graviton.rel.TableChange.SetProperty;
 import com.datastrato.graviton.rel.transforms.Transform;
 import com.datastrato.graviton.storage.IdGenerator;
 import com.datastrato.graviton.utils.ThrowableFunction;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.Maps;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
@@ -45,6 +48,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import org.apache.commons.lang3.tuple.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -347,7 +351,7 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
         c ->
             c.doWithPropertiesMeta(
                 p -> {
-                  p.tablePropertiesMetadata().validateCreate(properties);
+                  p.tablePropertiesMetadata().validatePropertyForCreate(properties);
                   return null;
                 }),
         IllegalArgumentException.class);
@@ -470,13 +474,36 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
             getHiddenPropertyNames(getCatalogIdentifier(ident), alteredTable.properties()));
   }
 
+  private Pair<Map<String, String>, Map<String, String>> getTableAlterProperty(
+      TableChange... tableChanges) {
+    Map<String, String> upserts = Maps.newHashMap();
+    Map<String, String> deletes = Maps.newHashMap();
+
+    Arrays.stream(tableChanges)
+        .forEach(
+            tableChange -> {
+              if (tableChange instanceof SetProperty) {
+                SetProperty setProperty = (SetProperty) tableChange;
+                upserts.put(setProperty.getProperty(), setProperty.getValue());
+              } else if (tableChange instanceof RemoveProperty) {
+                RemoveProperty removeProperty = (RemoveProperty) tableChange;
+                deletes.put(removeProperty.getProperty(), removeProperty.getProperty());
+              }
+            });
+
+    return Pair.of(upserts, deletes);
+  }
+
   private void validateAlterTableProperties(NameIdentifier ident, TableChange... changes) {
     doWithCatalog(
         getCatalogIdentifier(ident),
         c ->
             c.doWithPropertiesMeta(
                 p -> {
-                  p.tablePropertiesMetadata().validateAlter(changes);
+                  Pair<Map<String, String>, Map<String, String>> alterProperty =
+                      getTableAlterProperty(changes);
+                  p.tablePropertiesMetadata()
+                      .validatePropertyForAlter(alterProperty.getLeft(), alterProperty.getRight());
                   return null;
                 }),
         IllegalArgumentException.class);
