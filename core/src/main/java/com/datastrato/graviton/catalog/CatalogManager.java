@@ -227,7 +227,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
       throw new RuntimeException(e);
     }
 
-    return loadCatalogAndWrap(ident).catalog;
+    return wrapper.catalog;
   }
 
   /**
