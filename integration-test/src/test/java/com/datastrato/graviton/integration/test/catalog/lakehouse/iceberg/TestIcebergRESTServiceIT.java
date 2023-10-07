@@ -16,6 +16,7 @@ import org.apache.iceberg.exceptions.ValidationException;
 import org.apache.spark.sql.AnalysisException;
 import org.apache.spark.sql.catalyst.analysis.NamespaceAlreadyExistsException;
 import org.apache.spark.sql.catalyst.analysis.NoSuchNamespaceException;
+import org.apache.spark.sql.catalyst.analysis.NoSuchTableException;
 import org.apache.spark.sql.catalyst.analysis.TableAlreadyExistsException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -122,7 +123,7 @@ public class TestIcebergRESTServiceIT extends TestIcebergRESTServiceBaseIT {
         AnalysisException.class, () -> sql("DESC TABLE table_test.drop_foo1"));
 
     Assertions.assertThrowsExactly(
-        AnalysisException.class, () -> sql("DROP TABLE table_test.drop_foo1"));
+        NoSuchTableException.class, () -> sql("DROP TABLE table_test.drop_foo1"));
   }
 
   @Test
