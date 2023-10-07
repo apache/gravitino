@@ -21,7 +21,7 @@ import org.slf4j.LoggerFactory;
 
 public class IcebergCatalogUtil {
 
-  private static Logger LOG = LoggerFactory.getLogger(IcebergCatalogUtil.class);
+  private static final Logger LOG = LoggerFactory.getLogger(IcebergCatalogUtil.class);
 
   private static InMemoryCatalog loadMemoryCatalog(Map<String, String> properties) {
     InMemoryCatalog memoryCatalog = new InMemoryCatalog();

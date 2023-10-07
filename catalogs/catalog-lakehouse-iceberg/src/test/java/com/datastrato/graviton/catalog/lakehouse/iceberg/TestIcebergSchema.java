@@ -18,7 +18,7 @@ import java.util.Map;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-public class IcebergSchemaTest {
+public class TestIcebergSchema {
 
   private static final String META_LAKE_NAME = "metalake";
 

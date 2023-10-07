@@ -23,6 +23,7 @@ import com.datastrato.graviton.rel.TableChange.UpdateComment;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import io.substrait.type.Type;
@@ -31,10 +32,12 @@ import io.substrait.type.Type.I32;
 import io.substrait.type.Type.I64;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import javax.ws.rs.NotSupportedException;
 import lombok.Getter;
 import lombok.Setter;
+import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.Table;
@@ -296,12 +299,32 @@ public class IcebergTableOpsHelper {
     return icebergTableChange;
   }
 
+  public static Map<String, String> removeReservedProperties(Map<String, String> createProperties) {
+    ImmutableMap.Builder<String, String> tableProperties = ImmutableMap.builder();
+    if (MapUtils.isNotEmpty(createProperties)) {
+      createProperties.entrySet().stream()
+          .filter(entry -> !IcebergReservedProperties.contains(entry.getKey()))
+          .forEach(tableProperties::put);
+    }
+    return tableProperties.build();
+  }
+
   public static Namespace getIcebergNamespace(NameIdentifier ident) {
     return getIcebergNamespace(ArrayUtils.add(ident.namespace().levels(), ident.name()));
   }
 
   public static Namespace getIcebergNamespace(String... level) {
     return Namespace.of(level);
+  }
+
+  public static TableIdentifier buildIcebergTableIdentifier(
+      com.datastrato.graviton.Namespace namespace, String name) {
+    return TableIdentifier.of(ArrayUtils.add(namespace.levels(), name));
+  }
+
+  public static TableIdentifier buildIcebergTableIdentifier(NameIdentifier nameIdentifier) {
+    return TableIdentifier.of(
+        ArrayUtils.add(nameIdentifier.namespace().levels(), nameIdentifier.name()));
   }
 
   @VisibleForTesting
