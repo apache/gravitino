@@ -294,14 +294,14 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
             return null;
           });
       return wrapper.catalog;
-    } catch (EntityAlreadyExistsException ee) {
-      LOG.warn("Catalog {} already exists", ident, ee);
+    } catch (EntityAlreadyExistsException e1) {
+      LOG.warn("Catalog {} already exists", ident, e1);
       throw new CatalogAlreadyExistsException("Catalog " + ident + " already exists");
-    } catch (IllegalArgumentException | NoSuchMetalakeException e) {
-      throw e;
-    } catch (Exception ioe) {
-      LOG.error("Failed to create catalog {}", ident, ioe);
-      throw new RuntimeException(ioe);
+    } catch (IllegalArgumentException | NoSuchMetalakeException e2) {
+      throw e2;
+    } catch (Exception e3) {
+      LOG.error("Failed to create catalog {}", ident, e3);
+      throw new RuntimeException(e3);
     }
   }
 
@@ -337,6 +337,8 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
   @Override
   public Catalog alterCatalog(NameIdentifier ident, CatalogChange... changes)
       throws NoSuchCatalogException, IllegalArgumentException {
+    // There could be a race issue that someone is using the catalog from cache while we are
+    // updating it.
 
     CatalogWrapper catalogWrapper = loadCatalogAndWrap(ident);
     if (catalogWrapper == null) {
