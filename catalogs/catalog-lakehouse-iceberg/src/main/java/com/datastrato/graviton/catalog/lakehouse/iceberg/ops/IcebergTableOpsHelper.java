@@ -6,6 +6,7 @@
 package com.datastrato.graviton.catalog.lakehouse.iceberg.ops;
 
 import com.datastrato.graviton.NameIdentifier;
+import com.datastrato.graviton.catalog.lakehouse.iceberg.converter.ConvertUtil;
 import com.datastrato.graviton.rel.TableChange;
 import com.datastrato.graviton.rel.TableChange.AddColumn;
 import com.datastrato.graviton.rel.TableChange.After;
@@ -25,10 +26,6 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
-import io.substrait.type.Type;
-import io.substrait.type.Type.Binary;
-import io.substrait.type.Type.I32;
-import io.substrait.type.Type.I64;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -47,10 +44,7 @@ import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.types.Type.PrimitiveType;
-import org.apache.iceberg.types.Types.IntegerType;
-import org.apache.iceberg.types.Types.LongType;
 import org.apache.iceberg.types.Types.NestedField;
-import org.apache.iceberg.types.Types.StringType;
 import org.apache.iceberg.types.Types.StructType;
 
 public class IcebergTableOpsHelper {
@@ -81,18 +75,6 @@ public class IcebergTableOpsHelper {
       this.tableIdentifier = tableIdentifier;
       this.transaction = transaction;
     }
-  }
-
-  // todo, just for pass the updateTable test, @yunqing will provide a new implement
-  private static org.apache.iceberg.types.Type convertType(Type gravitonType) {
-    if (gravitonType instanceof I32) {
-      return IntegerType.get();
-    } else if (gravitonType instanceof I64) {
-      return LongType.get();
-    } else if (gravitonType instanceof Binary) {
-      return StringType.get();
-    }
-    return StringType.get();
   }
 
   private void doDeleteColumn(
@@ -151,7 +133,8 @@ public class IcebergTableOpsHelper {
 
   private void doUpdateColumnType(
       UpdateSchema icebergUpdateSchema, UpdateColumnType updateColumnType) {
-    org.apache.iceberg.types.Type type = convertType(updateColumnType.getNewDataType());
+    org.apache.iceberg.types.Type type =
+        ConvertUtil.toIcebergType(updateColumnType.getNewDataType());
     Preconditions.checkArgument(
         type.isPrimitiveType(),
         "Cannot update %s, not a primitive type: %s",
@@ -198,7 +181,7 @@ public class IcebergTableOpsHelper {
     icebergUpdateSchema.addColumn(
         getParentName(addColumn.fieldNames()),
         getLeafName(addColumn.fieldNames()),
-        convertType(addColumn.getDataType()),
+        ConvertUtil.toIcebergType(addColumn.getDataType()),
         addColumn.getComment());
 
     ColumnPosition position = getAddColumnPosition(parentStruct, addColumn.getPosition());

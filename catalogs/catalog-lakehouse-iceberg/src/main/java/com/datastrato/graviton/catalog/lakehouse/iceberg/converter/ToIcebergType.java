@@ -49,14 +49,8 @@ public class ToIcebergType extends ToIcebergTypeVisitor<Type> {
       IcebergColumn field = fields.get(i);
       Type type = types.get(i);
 
-      int id;
-      if (isRoot) {
-        // for new conversions, use ordinals for ids in the root struct
-        id = i;
-      } else {
-        id = getNextId();
-      }
-
+      // for new conversions, use ordinals for ids in the root struct
+      int id = isRoot ? i : getNextId();
       if (field.isOptional()) {
         newFields.add(Types.NestedField.optional(id, field.name(), type, field.comment()));
       } else {
