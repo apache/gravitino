@@ -9,6 +9,7 @@ import com.datastrato.graviton.Catalog;
 import com.datastrato.graviton.CatalogProvider;
 import com.datastrato.graviton.meta.CatalogEntity;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Maps;
 import java.util.Map;
 
 /**
@@ -32,6 +33,7 @@ public abstract class BaseCatalog<T extends BaseCatalog>
 
   private volatile CatalogOperations ops;
 
+  private volatile Map<String, String> properties;
   /**
    * Creates a new instance of CatalogOperations.
    *
@@ -43,6 +45,11 @@ public abstract class BaseCatalog<T extends BaseCatalog>
   @Override
   public PropertiesMetadata tablePropertiesMetadata() throws UnsupportedOperationException {
     return ops().tablePropertiesMetadata();
+  }
+
+  @Override
+  public PropertiesMetadata catalogPropertiesMetadata() throws UnsupportedOperationException {
+    return ops().catalogPropertiesMetadata();
   }
 
   /**
@@ -123,8 +130,19 @@ public abstract class BaseCatalog<T extends BaseCatalog>
 
   @Override
   public Map<String, String> properties() {
-    Preconditions.checkArgument(entity != null, "entity is not set");
-    return entity.getProperties();
+    if (properties == null) {
+      synchronized (this) {
+        if (properties == null) {
+          Preconditions.checkArgument(entity != null, "entity is not set");
+          properties = Maps.newHashMap(entity.getProperties());
+          properties
+              .entrySet()
+              .removeIf(
+                  entry -> ops().catalogPropertiesMetadata().isHiddenProperty(entry.getKey()));
+        }
+      }
+    }
+    return properties;
   }
 
   @Override

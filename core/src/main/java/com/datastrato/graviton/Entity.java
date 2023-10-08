@@ -22,7 +22,7 @@ public interface Entity extends Serializable {
 
     AUDIT("au", 65534);
 
-    // Short name can be used to identify the entity type in the logs, peristent storage, etc.
+    // Short name can be used to identify the entity type in the logs, persistent storage, etc.
     private final String shortName;
     private final int index;
 

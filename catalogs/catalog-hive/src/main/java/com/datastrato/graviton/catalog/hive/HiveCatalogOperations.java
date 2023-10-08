@@ -32,6 +32,7 @@ import com.datastrato.graviton.rel.transforms.Transform;
 import com.datastrato.graviton.rel.transforms.Transforms;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
@@ -741,5 +742,11 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
   @Override
   public PropertiesMetadata tablePropertiesMetadata() throws UnsupportedOperationException {
     return tablePropertiesMetadata;
+  }
+
+  @Override
+  public PropertiesMetadata catalogPropertiesMetadata() throws UnsupportedOperationException {
+    // TODO(yuqi): We will implement this in next PR
+    return Maps::newHashMap;
   }
 }
