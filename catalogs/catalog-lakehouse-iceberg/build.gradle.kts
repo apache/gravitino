@@ -52,6 +52,12 @@ dependencies {
         exclude("com.tdunning", "json")
         exclude("javax.transaction", "transaction-api")
         exclude("com.zaxxer","HikariCP")
+        exclude("org.apache.zookeeper")
+        exclude("org.apache.hadoop", "hadoop-yarn-server-common")
+        exclude("org.apache.hadoop", "hadoop-yarn-server-applicationhistoryservice")
+        exclude("org.apache.hadoop", "hadoop-yarn-server-web-proxy")
+        exclude("org.apache.hadoop", "hadoop-yarn-api")
+        exclude("org.apache.hadoop", "hadoop-yarn-server-resourcemanager")
     }
 
     implementation(libs.hadoop2.hdfs)
