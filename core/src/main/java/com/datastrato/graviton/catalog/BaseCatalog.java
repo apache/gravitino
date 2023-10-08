@@ -43,12 +43,12 @@ public abstract class BaseCatalog<T extends BaseCatalog>
   protected abstract CatalogOperations newOps(Map<String, String> config);
 
   @Override
-  public PropertiesMetadata tablePropertiesMetadata() {
+  public PropertiesMetadata tablePropertiesMetadata() throws UnsupportedOperationException {
     return ops().tablePropertiesMetadata();
   }
 
   @Override
-  public PropertiesMetadata catalogPropertiesMetadata() {
+  public PropertiesMetadata catalogPropertiesMetadata() throws UnsupportedOperationException {
     return ops().catalogPropertiesMetadata();
   }
 

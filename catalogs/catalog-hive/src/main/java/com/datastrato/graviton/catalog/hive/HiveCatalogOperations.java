@@ -740,12 +740,12 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
   }
 
   @Override
-  public PropertiesMetadata tablePropertiesMetadata() {
+  public PropertiesMetadata tablePropertiesMetadata() throws UnsupportedOperationException {
     return tablePropertiesMetadata;
   }
 
   @Override
-  public PropertiesMetadata catalogPropertiesMetadata() {
+  public PropertiesMetadata catalogPropertiesMetadata() throws UnsupportedOperationException {
     // TODO(yuqi): We will implement this in next PR
     return Maps::newHashMap;
   }

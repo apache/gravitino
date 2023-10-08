@@ -274,12 +274,12 @@ public class TestCatalogOperations implements CatalogOperations, TableCatalog, S
   }
 
   @Override
-  public PropertiesMetadata tablePropertiesMetadata() {
+  public PropertiesMetadata tablePropertiesMetadata() throws UnsupportedOperationException {
     return basePropertiesMetadata;
   }
 
   @Override
-  public PropertiesMetadata catalogPropertiesMetadata() {
+  public PropertiesMetadata catalogPropertiesMetadata() throws UnsupportedOperationException {
     if (config.containsKey("mock")) {
       return new BasePropertiesMetadata() {
         @Override
