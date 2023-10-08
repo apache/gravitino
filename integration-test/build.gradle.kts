@@ -16,6 +16,7 @@ plugins {
 dependencies {
   implementation(project(":server"))
   implementation(project(":common"))
+  implementation(project(":server-common"))
   implementation(project(":clients:client-java"))
   implementation(project(":api"))
   implementation(project(":core"))

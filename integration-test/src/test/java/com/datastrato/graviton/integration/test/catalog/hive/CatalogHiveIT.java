@@ -2,7 +2,7 @@
  * Copyright 2023 Datastrato.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.graviton.integration.test.catalog;
+package com.datastrato.graviton.integration.test.catalog.hive;
 
 import static com.datastrato.graviton.rel.transforms.Transforms.identity;
 import static org.junit.jupiter.api.Assertions.assertThrows;

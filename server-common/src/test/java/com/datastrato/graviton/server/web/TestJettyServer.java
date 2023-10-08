@@ -8,8 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 
-import com.datastrato.graviton.server.GravitonServerException;
-import com.datastrato.graviton.server.ServerConfig;
+import com.datastrato.graviton.Config;
 import javax.servlet.Filter;
 import javax.servlet.Servlet;
 import org.junit.jupiter.api.AfterEach;
@@ -34,28 +33,28 @@ public class TestJettyServer {
 
   @Test
   public void testInitialize() {
-    ServerConfig config = new ServerConfig();
-
-    jettyServer.initialize(config);
+    Config config = new Config(false) {};
+    JettyServerContext serverContext = JettyServerContext.fromConfig(config);
+    jettyServer.initialize(serverContext);
 
     // TODO might be nice to have an isInitalised method or similar?
   }
 
   @Test
-  public void testStartAndStop() throws GravitonServerException {
-    ServerConfig config = new ServerConfig();
-
-    jettyServer.initialize(config);
+  public void testStartAndStop() throws RuntimeException {
+    Config config = new Config(false) {};
+    JettyServerContext serverContext = JettyServerContext.fromConfig(config);
+    jettyServer.initialize(serverContext);
     jettyServer.start();
     // TODO might be nice to have an IsRunning method or similar?
     jettyServer.stop();
   }
 
   @Test
-  public void testAddServletAndFilter() throws GravitonServerException {
-    ServerConfig config = new ServerConfig();
-
-    jettyServer.initialize(config);
+  public void testAddServletAndFilter() throws RuntimeException {
+    Config config = new Config(false) {};
+    JettyServerContext serverContext = JettyServerContext.fromConfig(config);
+    jettyServer.initialize(serverContext);
     jettyServer.start();
 
     Servlet mockServlet = mock(Servlet.class);
@@ -75,6 +74,6 @@ public class TestJettyServer {
 
   @Test
   public void testStartWithoutInitialise() throws InterruptedException {
-    assertThrows(GravitonServerException.class, () -> jettyServer.start());
+    assertThrows(RuntimeException.class, () -> jettyServer.start());
   }
 }

@@ -5,12 +5,14 @@
 package com.datastrato.graviton.integration.test.util;
 
 import static com.datastrato.graviton.Configs.ENTRY_KV_ROCKSDB_BACKEND_PATH;
+import static com.datastrato.graviton.server.GravitonServer.WEBSERVER_CONF_PREFIX;
 
 import com.datastrato.graviton.Config;
 import com.datastrato.graviton.client.GravitonClient;
 import com.datastrato.graviton.integration.test.MiniGraviton;
 import com.datastrato.graviton.server.GravitonServer;
 import com.datastrato.graviton.server.ServerConfig;
+import com.datastrato.graviton.server.web.JettyServerContext;
 import java.io.IOException;
 import org.apache.commons.io.FileUtils;
 import org.junit.jupiter.api.AfterAll;
@@ -56,11 +58,10 @@ public class AbstractIT {
       GravitonITUtils.startGravitonServer();
     }
 
-    String uri =
-        "http://"
-            + serverConfig.get(ServerConfig.WEBSERVER_HOST)
-            + ":"
-            + serverConfig.get(ServerConfig.WEBSERVER_HTTP_PORT);
+    JettyServerContext serverContext =
+        JettyServerContext.fromConfig(serverConfig, WEBSERVER_CONF_PREFIX);
+
+    String uri = "http://" + serverContext.getHost() + ":" + serverContext.getHttpPort();
     client = GravitonClient.builder(uri).build();
   }
 

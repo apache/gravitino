@@ -4,7 +4,7 @@
  */
 package com.datastrato.graviton.catalog.lakehouse.iceberg.utils;
 
-import static com.datastrato.graviton.catalog.lakehouse.iceberg.IcebergRESTConfig.INITIALIZE_JDBC_CATALOG_TABLES;
+import static com.datastrato.graviton.catalog.lakehouse.iceberg.IcebergConfig.INITIALIZE_JDBC_CATALOG_TABLES;
 
 import java.util.Collections;
 import java.util.HashMap;

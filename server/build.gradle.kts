@@ -16,6 +16,7 @@ plugins {
 dependencies {
   implementation(project(":api"))
   implementation(project(":common"))
+  implementation(project(":server-common"))
   implementation(project(":core"))
   implementation(libs.jackson.databind)
   implementation(libs.jackson.annotations)
