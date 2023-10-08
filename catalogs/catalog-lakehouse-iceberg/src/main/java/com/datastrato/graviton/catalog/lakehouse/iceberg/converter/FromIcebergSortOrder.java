@@ -82,10 +82,10 @@ public class FromIcebergSortOrder implements SortOrderVisitor<SortOrder> {
    * Convert iceberg's order to graviton's.
    *
    * @param sortOrder
-   * @return
+   * @return graviton's sort order
    */
   @VisibleForTesting
-  public static SortOrder[] formSortOrder(org.apache.iceberg.SortOrder sortOrder) {
+  public static SortOrder[] fromSortOrder(org.apache.iceberg.SortOrder sortOrder) {
     FromIcebergSortOrder visitor = new FromIcebergSortOrder(sortOrder.schema());
     List<SortOrder> ordering = SortOrderVisitor.visit(sortOrder, visitor);
     return ordering.toArray(new SortOrder[0]);

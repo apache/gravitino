@@ -27,7 +27,7 @@ public class TestFromIcebergPartitionSpec extends TestBaseConvert {
     Schema schema = new Schema(nestedFields);
     PartitionSpec.Builder builder = PartitionSpec.builderFor(schema);
     PartitionSpec partitionSpec = builder.day(col4Name).identity("col_1").build();
-    Transform[] transforms = FromIcebergPartitionSpec.formPartitionSpec(partitionSpec, schema);
+    Transform[] transforms = FromIcebergPartitionSpec.fromPartitionSpec(partitionSpec, schema);
     Assertions.assertEquals(2, transforms.length);
     Assertions.assertEquals("day", transforms[0].name());
     Assertions.assertTrue(transforms[0] instanceof Transforms.FunctionTrans);

@@ -70,8 +70,8 @@ public class IcebergTable extends BaseTable {
         .withColumns(icebergColumns)
         .withName(tableName)
         .withAuditInfo(AuditInfo.EMPTY)
-        .withPartitions(FromIcebergPartitionSpec.formPartitionSpec(table.spec(), schema))
-        .withSortOrders(FromIcebergSortOrder.formSortOrder(table.sortOrder()))
+        .withPartitions(FromIcebergPartitionSpec.fromPartitionSpec(table.spec(), schema))
+        .withSortOrders(FromIcebergSortOrder.fromSortOrder(table.sortOrder()))
         .build();
   }
 

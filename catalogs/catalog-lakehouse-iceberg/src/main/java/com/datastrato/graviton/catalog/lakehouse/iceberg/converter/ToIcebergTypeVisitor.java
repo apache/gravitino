@@ -37,7 +37,7 @@ public class ToIcebergTypeVisitor<T> {
   }
 
   /**
-   * Convert the type mapping of graviton to iceberg.
+   * Convert the type mapping of graviton to Iceberg.
    *
    * @param type TODO Abstract a data type in a graviton.
    * @param visitor

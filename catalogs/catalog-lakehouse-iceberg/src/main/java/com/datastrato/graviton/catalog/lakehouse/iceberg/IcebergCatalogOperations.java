@@ -391,7 +391,7 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
    *
    * @param tableIdent tableIdent of this table.
    * @param renameTable Table Change to modify the table name.
-   * @return Returns the table for iceberg.
+   * @return Returns the table for Iceberg.
    * @throws NoSuchTableException
    * @throws IllegalArgumentException
    */

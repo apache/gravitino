@@ -61,6 +61,7 @@ public class ToIcebergPartitionSpec {
                 .map(t -> ((Transforms.NamedReference) t).value()[0])
                 .collect(Collectors.joining());
         switch (transform.name().toLowerCase(Locale.ROOT)) {
+            // TODO minghuang add support for other transforms.
           case "identity":
             builder.identity(colName);
             break;

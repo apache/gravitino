@@ -89,7 +89,7 @@ public class FromIcebergPartitionSpec implements PartitionSpecVisitor<Transform>
    * @return
    */
   @VisibleForTesting
-  public static Transform[] formPartitionSpec(PartitionSpec partitionSpec, Schema schema) {
+  public static Transform[] fromPartitionSpec(PartitionSpec partitionSpec, Schema schema) {
     FromIcebergPartitionSpec visitor = new FromIcebergPartitionSpec(schema.idToName());
     List<Transform> transforms = Lists.newArrayList();
     List<PartitionField> fields = partitionSpec.fields();

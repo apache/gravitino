@@ -22,7 +22,7 @@ import org.junit.jupiter.api.Test;
 public class TestFromIcebergSortOrder extends TestBaseConvert {
 
   @Test
-  public void testFormSortOrder() {
+  public void testFromSortOrder() {
     SortOrder[] sortOrders = createSortOrder("col_1", "col_2", "col_3");
     Types.NestedField[] nestedFields = createNestedField("col_1", "col_2", "col_3");
     Schema schema = new Schema(nestedFields);
