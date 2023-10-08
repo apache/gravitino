@@ -41,6 +41,7 @@ import java.util.stream.Collectors;
 import lombok.ToString;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.ArrayUtils;
+import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.Order;
 import org.apache.hadoop.hive.metastore.api.SerDeInfo;
@@ -153,6 +154,8 @@ public class HiveTable extends BaseTable {
 
     hiveTable.setTableName(name);
     hiveTable.setDbName(schemaName);
+    hiveTable.setTableType(
+        ((TableType) tablePropertiesMetadata.getOrDefault(properties(), TABLE_TYPE)).name());
     hiveTable.setSd(buildStorageDescriptor(tablePropertiesMetadata));
     hiveTable.setParameters(buildTableParameters());
     hiveTable.setPartitionKeys(buildPartitionKeys());
