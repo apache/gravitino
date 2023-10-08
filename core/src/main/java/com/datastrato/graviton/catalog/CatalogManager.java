@@ -217,6 +217,10 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
     CatalogWrapper wrapper = loadCatalogInternal(ident);
     try {
       // Call wrapper.catalog.properties() to make BaseCatalog#properties in IsolatedClassLoader
+      // not null. Why we do this? Because wrapper.catalog.properties() need to called in the
+      // IsolatedClassLoader, it needs to load the specific catalog class such as HiveCatalog or so.
+      // For simply, We will preload the value of properties and thus AppClassLoader can get the
+      // value of properties.
       wrapper.doWithPropertiesMeta(
           f -> {
             wrapper.catalog.properties();
@@ -302,11 +306,11 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
   }
 
   private Pair<Map<String, String>, Map<String, String>> getCatalogAlterProperty(
-      CatalogChange... tableChanges) {
+      CatalogChange... catalogChanges) {
     Map<String, String> upserts = Maps.newHashMap();
     Map<String, String> deletes = Maps.newHashMap();
 
-    Arrays.stream(tableChanges)
+    Arrays.stream(catalogChanges)
         .forEach(
             tableChange -> {
               if (tableChange instanceof SetProperty) {

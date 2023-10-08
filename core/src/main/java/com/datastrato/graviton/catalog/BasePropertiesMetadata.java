@@ -15,7 +15,7 @@ import java.util.Map;
 
 public abstract class BasePropertiesMetadata implements PropertiesMetadata {
 
-  private static final Map<String, PropertyEntry<?>> BASIC_TABLE_PROPERTY_ENTRIES;
+  private static final Map<String, PropertyEntry<?>> BASIC_PROPERTY_ENTRIES;
 
   private volatile Map<String, PropertyEntry<?>> propertyEntries;
 
@@ -28,7 +28,7 @@ public abstract class BasePropertiesMetadata implements PropertiesMetadata {
                 "To differentiate the entities created directly by the underlying sources",
                 true));
 
-    BASIC_TABLE_PROPERTY_ENTRIES = Maps.uniqueIndex(basicPropertyEntries, PropertyEntry::getName);
+    BASIC_PROPERTY_ENTRIES = Maps.uniqueIndex(basicPropertyEntries, PropertyEntry::getName);
   }
 
   @Override
@@ -40,7 +40,7 @@ public abstract class BasePropertiesMetadata implements PropertiesMetadata {
           Map<String, PropertyEntry<?>> properties = specificPropertyEntries();
           builder.putAll(properties);
 
-          BASIC_TABLE_PROPERTY_ENTRIES.forEach(
+          BASIC_PROPERTY_ENTRIES.forEach(
               (name, entry) -> {
                 Preconditions.checkArgument(
                     !properties.containsKey(name), "Property metadata already exists: " + name);

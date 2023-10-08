@@ -33,7 +33,7 @@ public abstract class BaseCatalog<T extends BaseCatalog>
 
   private volatile CatalogOperations ops;
 
-  private volatile Map<String, String> properties = null;
+  private volatile Map<String, String> properties;
   /**
    * Creates a new instance of CatalogOperations.
    *
@@ -138,11 +138,7 @@ public abstract class BaseCatalog<T extends BaseCatalog>
           properties
               .entrySet()
               .removeIf(
-                  entry -> {
-                    PropertyEntry<?> propertyEntry =
-                        ops().catalogPropertiesMetadata().propertyEntries().get(entry.getKey());
-                    return propertyEntry != null && propertyEntry.isHidden();
-                  });
+                  entry -> ops().catalogPropertiesMetadata().isHiddenProperty(entry.getKey()));
         }
       }
     }
