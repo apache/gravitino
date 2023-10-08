@@ -215,18 +215,6 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
   @Override
   public Catalog loadCatalog(NameIdentifier ident) throws NoSuchCatalogException {
     CatalogWrapper wrapper = loadCatalogInternal(ident);
-    try {
-      // Call wrapper.catalog.properties() to make BaseCatalog#properties in IsolatedClassLoader
-      wrapper.doWithPropertiesMeta(
-          f -> {
-            wrapper.catalog.properties();
-            return null;
-          });
-    } catch (Exception e) {
-      LOG.error("Failed to load catalog {}", ident, e);
-      throw new RuntimeException(e);
-    }
-
     return wrapper.catalog;
   }
 
@@ -290,30 +278,30 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
             return null;
           });
       return wrapper.catalog;
-    } catch (EntityAlreadyExistsException ee) {
-      LOG.warn("Catalog {} already exists", ident, ee);
+    } catch (EntityAlreadyExistsException e1) {
+      LOG.warn("Catalog {} already exists", ident, e1);
       throw new CatalogAlreadyExistsException("Catalog " + ident + " already exists");
-    } catch (IllegalArgumentException | NoSuchMetalakeException e) {
-      throw e;
-    } catch (Exception ioe) {
-      LOG.error("Failed to create catalog {}", ident, ioe);
-      throw new RuntimeException(ioe);
+    } catch (IllegalArgumentException | NoSuchMetalakeException e2) {
+      throw e2;
+    } catch (Exception e3) {
+      LOG.error("Failed to create catalog {}", ident, e3);
+      throw new RuntimeException(e3);
     }
   }
 
   private Pair<Map<String, String>, Map<String, String>> getCatalogAlterProperty(
-      CatalogChange... tableChanges) {
+      CatalogChange... catalogChanges) {
     Map<String, String> upserts = Maps.newHashMap();
     Map<String, String> deletes = Maps.newHashMap();
 
-    Arrays.stream(tableChanges)
+    Arrays.stream(catalogChanges)
         .forEach(
-            tableChange -> {
-              if (tableChange instanceof SetProperty) {
-                SetProperty setProperty = (SetProperty) tableChange;
+            catalogChange -> {
+              if (catalogChange instanceof SetProperty) {
+                SetProperty setProperty = (SetProperty) catalogChange;
                 upserts.put(setProperty.getProperty(), setProperty.getValue());
-              } else if (tableChange instanceof RemoveProperty) {
-                RemoveProperty removeProperty = (RemoveProperty) tableChange;
+              } else if (catalogChange instanceof RemoveProperty) {
+                RemoveProperty removeProperty = (RemoveProperty) catalogChange;
                 deletes.put(removeProperty.getProperty(), removeProperty.getProperty());
               }
             });
@@ -333,6 +321,8 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
   @Override
   public Catalog alterCatalog(NameIdentifier ident, CatalogChange... changes)
       throws NoSuchCatalogException, IllegalArgumentException {
+    // There could be a race issue that someone is using the catalog from cache while we are
+    // updating it.
 
     CatalogWrapper catalogWrapper = loadCatalogAndWrap(ident);
     if (catalogWrapper == null) {
@@ -496,7 +486,24 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
 
     // Initialize the catalog
     catalog = catalog.withCatalogEntity(entity).withCatalogConf(mergedConf);
-    return new CatalogWrapper(catalog, classLoader);
+    CatalogWrapper wrapper = new CatalogWrapper(catalog, classLoader);
+
+    // Call wrapper.catalog.properties() to make BaseCatalog#properties in IsolatedClassLoader
+    // not null. Why we do this? Because wrapper.catalog.properties() need to be called in the
+    // IsolatedClassLoader, it needs to load the specific catalog class such as HiveCatalog or so.
+    // For simply, We will preload the value of properties and thus AppClassLoader can get the
+    // value of properties.
+    try {
+      wrapper.doWithPropertiesMeta(
+          f -> {
+            wrapper.catalog.properties();
+            return null;
+          });
+    } catch (Exception e) {
+      LOG.error("Failed to load catalog '{}' properties", entity.name(), e);
+      throw new RuntimeException(e);
+    }
+    return wrapper;
   }
 
   static Map<String, String> mergeConf(Map<String, String> properties, Map<String, String> conf) {

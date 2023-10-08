@@ -3,9 +3,8 @@
  * This software is licensed under the Apache License version 2.
  */
 
-package com.datastrato.graviton.rel;
+package com.datastrato.graviton.dto.rel;
 
-import com.datastrato.graviton.dto.rel.DistributionDTO;
 import com.datastrato.graviton.dto.rel.DistributionDTO.Strategy;
 import com.datastrato.graviton.dto.rel.ExpressionPartitionDTO.Expression;
 import com.datastrato.graviton.dto.rel.ExpressionPartitionDTO.FieldExpression;

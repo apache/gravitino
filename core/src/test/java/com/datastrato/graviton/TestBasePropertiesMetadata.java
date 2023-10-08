@@ -19,7 +19,7 @@ public class TestBasePropertiesMetadata extends BasePropertiesMetadata {
 
   public static final String TEST_IMMUTABLE_KEY = "immutableKey";
 
-  private static final Map<String, PropertyEntry<?>> TEST_TABLE_PROPERTY;
+  private static final Map<String, PropertyEntry<?>> TEST_BASE_PROPERTY;
 
   static {
     List<PropertyEntry<?>> tablePropertyMetadata =
@@ -30,11 +30,11 @@ public class TestBasePropertiesMetadata extends BasePropertiesMetadata {
             PropertyEntry.stringImmutablePropertyEntry(
                 TEST_IMMUTABLE_KEY, "test immutable property", false, null, false, false));
 
-    TEST_TABLE_PROPERTY = Maps.uniqueIndex(tablePropertyMetadata, PropertyEntry::getName);
+    TEST_BASE_PROPERTY = Maps.uniqueIndex(tablePropertyMetadata, PropertyEntry::getName);
   }
 
   @Override
   protected Map<String, PropertyEntry<?>> specificPropertyEntries() {
-    return TEST_TABLE_PROPERTY;
+    return TEST_BASE_PROPERTY;
   }
 }
