@@ -15,6 +15,8 @@ import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.transforms.PartitionSpecVisitor;
 
+import static io.substrait.expression.ExpressionCreator.i32;
+
 /**
  * Convert IcebergTransform to GravitonTransform.
  *
@@ -36,8 +38,10 @@ public class FromIcebergPartitionSpec implements PartitionSpecVisitor<Transform>
 
   @Override
   public Transform bucket(String sourceName, int sourceId, int numBuckets) {
-    // TODO @minghuang Need to implement bucket type conversion
-    throw new UnsupportedOperationException();
+    Transforms.LiteralReference bucketNum = Transforms.literal(i32(false, numBuckets));
+    Transforms.NamedReference field = Transforms.field(new String[]{idToName.get(sourceId)});
+    // bucket(fieldName, bucketNum)
+    return Transforms.function("bucket", new Transform[]{field, bucketNum});
   }
 
   @Override

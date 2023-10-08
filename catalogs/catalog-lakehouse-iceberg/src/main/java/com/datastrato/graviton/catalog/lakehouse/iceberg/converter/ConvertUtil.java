@@ -14,7 +14,7 @@ import org.apache.iceberg.types.Types;
 public class ConvertUtil {
 
   /**
-   * Convert the iceberg Table to the corresponding schema information in the iceberg.
+   * Convert the Iceberg Table to the corresponding schema information in the Iceberg.
    *
    * @param icebergTable Iceberg table.
    * @return iceberg schema.
@@ -25,7 +25,7 @@ public class ConvertUtil {
   }
 
   /**
-   * Convert the basic iceberg field type.
+   * Convert the basic Iceberg field type.
    *
    * @param primitive
    * @return
@@ -35,9 +35,9 @@ public class ConvertUtil {
   }
 
   /**
-   * Convert the nested type of iceberg to the type of graviton.
+   * Convert the nested type of Iceberg to the type of graviton.
    *
-   * @param type iceberg type of field.
+   * @param type Iceberg type of field.
    * @return
    */
   public static io.substrait.type.Type formIcebergType(Type type) {
@@ -47,7 +47,7 @@ public class ConvertUtil {
   /**
    * Convert the nested field. to the {@link IcebergColumn}.
    *
-   * @param nestedField iceberg nested field.
+   * @param nestedField Iceberg nested field.
    * @return
    */
   public static IcebergColumn fromNestedField(Types.NestedField nestedField) {
