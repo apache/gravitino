@@ -207,7 +207,7 @@ public final class PropertyEntry<T> {
       T defaultValue,
       boolean hidden,
       boolean reserved) {
-    String allValues =
+    String validValues =
         EnumSet.allOf(javaType).stream()
             .map(Enum::name)
             .map(String::toLowerCase)
@@ -225,7 +225,7 @@ public final class PropertyEntry<T> {
                 return Enum.valueOf(javaType, value.toUpperCase());
               } catch (IllegalArgumentException | NullPointerException e) {
                 throw new IllegalArgumentException(
-                    format("Invalid value [%s]. Valid values: %s", value, allValues), e);
+                    format("Invalid value [%s]. Valid values: %s", value, validValues), e);
               }
             })
         .withEncoder(e -> e.name().toLowerCase())
