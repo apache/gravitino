@@ -21,7 +21,7 @@ public class TestCatalog extends BaseCatalog<TestCatalog> {
   protected CatalogOperations newOps(Map config) {
     return new CatalogOperations() {
       @Override
-      public PropertiesMetadata tablePropertiesMetadata() throws UnsupportedOperationException {
+      public PropertiesMetadata tablePropertiesMetadata() {
         throw new UnsupportedOperationException();
       }
 
@@ -31,7 +31,7 @@ public class TestCatalog extends BaseCatalog<TestCatalog> {
       @Override
       public void close() throws IOException {}
 
-      public PropertiesMetadata catalogPropertiesMetadata() throws UnsupportedOperationException {
+      public PropertiesMetadata catalogPropertiesMetadata() {
         return Maps::newHashMap;
       }
     };

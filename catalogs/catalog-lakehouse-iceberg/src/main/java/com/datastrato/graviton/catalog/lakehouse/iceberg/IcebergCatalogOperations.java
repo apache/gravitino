@@ -382,12 +382,12 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
   }
 
   @Override
-  public PropertiesMetadata tablePropertiesMetadata() throws UnsupportedOperationException {
+  public PropertiesMetadata tablePropertiesMetadata() {
     return tablePropertiesMetadata;
   }
 
   @Override
-  public PropertiesMetadata catalogPropertiesMetadata() throws UnsupportedOperationException {
+  public PropertiesMetadata catalogPropertiesMetadata() {
     return Maps::newHashMap;
   }
 }

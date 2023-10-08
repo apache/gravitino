@@ -7,19 +7,9 @@ package com.datastrato.graviton.catalog;
 /** This interface represents entities that have property metadata. */
 public interface HasPropertyMetadata {
 
-  /**
-   * Returns the table property metadata.
-   *
-   * @return The table property metadata.
-   * @throws UnsupportedOperationException if the entity does not support table properties.
-   */
-  PropertiesMetadata tablePropertiesMetadata() throws UnsupportedOperationException;
+  /** Returns the table property metadata. */
+  PropertiesMetadata tablePropertiesMetadata();
 
-  /**
-   * Returns the catalog property metadata.
-   *
-   * @return The catalog property metadata.
-   * @throws UnsupportedOperationException if the entity does not support catalog properties.
-   */
-  PropertiesMetadata catalogPropertiesMetadata() throws UnsupportedOperationException;
+  /** Returns the catalog property metadata. */
+  PropertiesMetadata catalogPropertiesMetadata();
 }
