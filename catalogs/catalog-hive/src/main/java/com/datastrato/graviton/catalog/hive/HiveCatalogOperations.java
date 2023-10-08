@@ -751,6 +751,8 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     return new BasePropertiesMetadata() {
       @Override
       protected Map<String, PropertyEntry<?>> specificPropertyEntries() {
+        // Hive catalog only needs to specify the metastore URIs, maybe we need to add more by
+        // referring to the trino catalog.
         return ImmutableMap.<String, PropertyEntry<?>>builder()
             .put(
                 HiveConf.ConfVars.METASTOREURIS.varname,
