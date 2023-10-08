@@ -78,7 +78,6 @@ public class CatalogConnectorManager {
 
   public void start() {
     gravitonClient = GravitonClient.builder(config.getURI()).build();
-
     String metalake = config.getMetalake();
     if (Strings.isNullOrEmpty(metalake)) {
       throw new TrinoException(GRAVITON_METALAKE_NOT_EXISTS, "No graviton metalake selected");

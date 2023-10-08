@@ -4,8 +4,15 @@
  */
 package com.datastrato.graviton.trino.connector;
 
+import static com.datastrato.graviton.trino.connector.GravitonErrorCode.GRAVITON_CATALOG_NOT_EXISTS;
+
 import com.datastrato.graviton.NameIdentifier;
+import com.datastrato.graviton.client.GravitonMetaLake;
+import com.datastrato.graviton.exceptions.NoSuchCatalogException;
 import com.datastrato.graviton.trino.connector.catalog.CatalogConnectorContext;
+import com.datastrato.graviton.trino.connector.catalog.CatalogConnectorMetadata;
+import com.google.common.base.Preconditions;
+import io.trino.spi.TrinoException;
 import io.trino.spi.connector.Connector;
 import io.trino.spi.connector.ConnectorMetadata;
 import io.trino.spi.connector.ConnectorPageSinkProvider;
@@ -37,13 +44,39 @@ public class GravitonConnector implements Connector {
   @Override
   public ConnectorTransactionHandle beginTransaction(
       IsolationLevel isolationLevel, boolean readOnly, boolean autoCommit) {
-    throw new NotImplementedException();
+    Connector internalConnector = catalogConnectorContext.getInternalConnector();
+
+    ConnectorTransactionHandle internalTransactionHandler =
+        internalConnector.beginTransaction(isolationLevel, readOnly, autoCommit);
+    Preconditions.checkNotNull(internalConnector);
+
+    return new GravitonTransactionHandle(internalTransactionHandler);
   }
 
   @Override
   public ConnectorMetadata getMetadata(
       ConnectorSession session, ConnectorTransactionHandle transactionHandle) {
-    throw new NotImplementedException();
+    GravitonTransactionHandle gravitonTransactionHandle =
+        (GravitonTransactionHandle) transactionHandle;
+
+    try {
+      Connector internalConnector = catalogConnectorContext.getInternalConnector();
+      ConnectorMetadata internalMetadata =
+          internalConnector.getMetadata(
+              session, gravitonTransactionHandle.getInternalTransactionHandle());
+      Preconditions.checkNotNull(internalMetadata);
+
+      GravitonMetaLake metalake = catalogConnectorContext.getMetalake();
+
+      CatalogConnectorMetadata catalogConnectorMetadata =
+          new CatalogConnectorMetadata(metalake, catalogIdentifier);
+
+      return new GravitonMetadata(
+          catalogConnectorMetadata, catalogConnectorContext.getMetaDataAdapter(), internalMetadata);
+
+    } catch (NoSuchCatalogException noSuchCatalogException) {
+      throw new TrinoException(GRAVITON_CATALOG_NOT_EXISTS, noSuchCatalogException);
+    }
   }
 
   @Override

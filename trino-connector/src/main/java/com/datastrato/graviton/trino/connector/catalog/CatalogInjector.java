@@ -33,8 +33,8 @@ public class CatalogInjector {
 
   private static final int MIN_TRINO_SPI_VERSION = 360;
 
-  private ConcurrentHashMap catalogs;
-  private Object catalogFactoryObject;
+  private InjectCatalogHandle injectHandle;
+  private CreateCatalogHandle createHandle;
   private String trinoVersion;
 
   private void checkTrinoSpiVersion(ConnectorContext context) {
@@ -58,32 +58,41 @@ public class CatalogInjector {
     // CatalogFactory, then add catalog to it that loaded from graviton.
 
     try {
-      // set NodeManager  allCatalogsOnAllNodes = true;
+      // set NodeManager  allCatalogsOnAllNodes = true & activeNodesByCatalogHandle = empty
       Object nodeManager = context.getNodeManager();
       Field field = nodeManager.getClass().getDeclaredField("nodeManager");
       field.setAccessible(true);
       nodeManager = field.get(nodeManager);
 
-      field = nodeManager.getClass().getDeclaredField("allCatalogsOnAllNodes");
-      field.setAccessible(true);
-      field.setBoolean(nodeManager, true);
-      Preconditions.checkState(
-          field.getBoolean(nodeManager), "allCatalogsOnAllNodes should be true");
+      // Need to skip this step in the testing environment, that's using InMemoryNodeManager
+      if (nodeManager.getClass().getName().endsWith("DiscoveryNodeManager")) {
+        field = nodeManager.getClass().getDeclaredField("allCatalogsOnAllNodes");
+        field.setAccessible(true);
+        field.setBoolean(nodeManager, true);
+        Preconditions.checkState(
+            field.getBoolean(nodeManager), "allCatalogsOnAllNodes should be true");
+
+        field = nodeManager.getClass().getDeclaredField("activeNodesByCatalogHandle");
+        field.setAccessible(true);
+        field.set(nodeManager, Optional.empty());
+      }
 
       // find CatalogManager
-      field = nodeManager.getClass().getDeclaredField("activeNodesByCatalogHandle");
-      field.setAccessible(true);
-      field.set(nodeManager, Optional.empty());
-
       MetadataProvider metadataProvider = context.getMetadataProvider();
 
       field = metadataProvider.getClass().getDeclaredField("metadata");
       field.setAccessible(true);
       Object metadata = field.get(metadataProvider);
 
-      field = metadata.getClass().getDeclaredField("delegate");
-      field.setAccessible(true);
-      Object metadataManager = field.get(metadata);
+      Object metadataManager;
+      if (metadata.getClass().getName().endsWith("TracingMetadata")) {
+        field = metadata.getClass().getDeclaredField("delegate");
+        field.setAccessible(true);
+        metadataManager = field.get(metadata);
+      } else {
+        metadataManager = metadata;
+      }
+      Preconditions.checkNotNull(metadataManager, "metadataManager should not be null");
 
       field = metadataManager.getClass().getDeclaredField("transactionManager");
       field.setAccessible(true);
@@ -92,18 +101,95 @@ public class CatalogInjector {
       field = transactionManager.getClass().getDeclaredField("catalogManager");
       field.setAccessible(true);
       Object catalogManager = field.get(transactionManager);
+      Preconditions.checkNotNull(catalogManager, "catalogManager should not be null");
 
-      // find CatalogManager.catalogs
-      field = catalogManager.getClass().getDeclaredField("catalogs");
-      field.setAccessible(true);
-      catalogs = (ConcurrentHashMap) field.get(catalogManager);
-      Preconditions.checkNotNull(catalogs, "catalogs should not be null");
-
-      // find catalog factory
+      // find CatalogFactory, createCatalog method, and CatalogProperties.
       field = catalogManager.getClass().getDeclaredField("catalogFactory");
       field.setAccessible(true);
-      catalogFactoryObject = field.get(catalogManager);
-      Preconditions.checkNotNull(catalogFactoryObject, "catalogFactoryObject should not be null");
+      Object catalogFactory = field.get(catalogManager);
+      Preconditions.checkNotNull(catalogFactory, "catalogFactory should not be null");
+
+      Class catalogPropertiesClass =
+          catalogManager
+              .getClass()
+              .getClassLoader()
+              .loadClass("io.trino.connector.CatalogProperties");
+
+      Method createCatalogMethod =
+          catalogFactory.getClass().getDeclaredMethod("createCatalog", catalogPropertiesClass);
+      Preconditions.checkNotNull(createCatalogMethod, "createCatalogMethod should not be null");
+
+      createHandle =
+          (catalogName, catalogProperties) -> {
+            ObjectMapper objectMapper = new ObjectMapper();
+            Object catalogPropertiesObject =
+                objectMapper.readValue(catalogProperties, catalogPropertiesClass);
+
+            Object catalogConnector =
+                createCatalogMethod.invoke(catalogFactory, catalogPropertiesObject);
+
+            // get a connector object from trino CatalogConnector.
+            Field connectorField = catalogConnector.getClass().getDeclaredField("catalogConnector");
+            connectorField.setAccessible(true);
+            Object connectorService = connectorField.get(catalogConnector);
+
+            connectorField = connectorService.getClass().getDeclaredField("connector");
+            connectorField.setAccessible(true);
+            Object connector = connectorField.get(connectorService);
+            return connector;
+          };
+
+      // find CatalogManager.catalogs
+      if (catalogManager.getClass().getName().endsWith("CoordinatorDynamicCatalogManager")) {
+        field = catalogManager.getClass().getDeclaredField("activeCatalogs");
+        field.setAccessible(true);
+        ConcurrentHashMap activeCatalogs = (ConcurrentHashMap) field.get(catalogManager);
+        Preconditions.checkNotNull(activeCatalogs, "activeCatalogs should not be null");
+
+        field = catalogManager.getClass().getDeclaredField("allCatalogs");
+        field.setAccessible(true);
+        ConcurrentHashMap allCatalogs = (ConcurrentHashMap) field.get(catalogManager);
+        Preconditions.checkNotNull(allCatalogs, "allCatalogs should not be null");
+
+        injectHandle =
+            (catalogName, catalogProperties) -> {
+              // call CatalogFactory:createCatalog and add the catalog to
+              // CoordinatorDynamicCatalogManager
+              ObjectMapper objectMapper = new ObjectMapper();
+              Object catalogPropertiesObject =
+                  objectMapper.readValue(catalogProperties, catalogPropertiesClass);
+              Object catalogConnector =
+                  createCatalogMethod.invoke(catalogFactory, catalogPropertiesObject);
+
+              Field catelogField = catalogConnector.getClass().getDeclaredField("catalog");
+              catelogField.setAccessible(true);
+              Object catalog = catelogField.get(catalogConnector);
+              activeCatalogs.put(catalogName, catalog);
+
+              Field catelogHandleField =
+                  catalogConnector.getClass().getDeclaredField("catalogHandle");
+              catelogHandleField.setAccessible(true);
+              Object catalogHandle = catelogHandleField.get(catalogConnector);
+              allCatalogs.put(catalogHandle, catalogConnector);
+            };
+      } else {
+        field = catalogManager.getClass().getDeclaredField("catalogs");
+        field.setAccessible(true);
+        ConcurrentHashMap catalogs = (ConcurrentHashMap) field.get(catalogManager);
+        Preconditions.checkNotNull(catalogs, "catalogs should not be null");
+
+        injectHandle =
+            (catalogName, catalogProperties) -> {
+              // call CatalogFactory:createCatalog and add the catalog to StaticCatalogManager
+              ObjectMapper objectMapper = new ObjectMapper();
+              Object catalogPropertiesObject =
+                  objectMapper.readValue(catalogProperties, catalogPropertiesClass);
+
+              Object catalogConnector =
+                  createCatalogMethod.invoke(catalogFactory, catalogPropertiesObject);
+              catalogs.put(catalogName, catalogConnector);
+            };
+      }
 
       LOG.info("Bind Trino catalog manager successfully.");
     } catch (Exception e) {
@@ -117,25 +203,8 @@ public class CatalogInjector {
 
   void injectCatalogConnector(String catalogName) {
     try {
-      Class catalogConnectorClass =
-          catalogFactoryObject
-              .getClass()
-              .getClassLoader()
-              .loadClass("io.trino.connector.CatalogProperties");
-
       String catalogProperties = createCatalogProperties(catalogName);
-
-      ObjectMapper objectMapper = new ObjectMapper();
-      Object catalogPropertiesObject =
-          objectMapper.readValue(catalogProperties, catalogConnectorClass);
-
-      // call CatalogFactory:createCatalog
-      Method method =
-          catalogFactoryObject.getClass().getDeclaredMethod("createCatalog", catalogConnectorClass);
-      Object catalogConnector = method.invoke(catalogFactoryObject, catalogPropertiesObject);
-
-      // put catalog to CatalogManager.catalogs
-      catalogs.put(catalogName, catalogConnector);
+      injectHandle.invoke(catalogName, catalogProperties);
 
       LOG.info("Inject trino catalog {} successfully.", catalogName);
     } catch (Exception e) {
@@ -157,31 +226,15 @@ public class CatalogInjector {
     try {
       ObjectMapper objectMapper = new ObjectMapper();
       connectorProperties = objectMapper.writeValueAsString(properties);
+      LOG.debug(
+          "Create internal catalog connector {}. The config:{} .",
+          connectorName,
+          connectorProperties);
 
-      // call CatalogFactory:createCatalog
-      Class catalogConnectorClass =
-          catalogFactoryObject
-              .getClass()
-              .getClassLoader()
-              .loadClass("io.trino.connector.CatalogProperties");
-      Method method =
-          catalogFactoryObject.getClass().getDeclaredMethod("createCatalog", catalogConnectorClass);
-
-      Object catalogPropertyObject =
-          objectMapper.readValue(connectorProperties, catalogConnectorClass);
-      Object catalogConnector = method.invoke(catalogFactoryObject, catalogPropertyObject);
-
-      // get a connector object from trino CatalogConnector.
-      Field field = catalogConnector.getClass().getDeclaredField("catalogConnector");
-      field.setAccessible(true);
-      Object connectorService = field.get(catalogConnector);
-
-      field = connectorService.getClass().getDeclaredField("connector");
-      field.setAccessible(true);
-      Object connector = field.get(connectorService);
+      Object catalogConnector = createHandle.invoke(connectorName, connectorProperties);
 
       LOG.info("Create internal catalog connector {} successfully.", connectorName);
-      return (Connector) connector;
+      return (Connector) catalogConnector;
     } catch (Exception e) {
       LOG.error(
           "Create internal catalog connector {} failed. Connector properties: {} ",
@@ -190,5 +243,13 @@ public class CatalogInjector {
           e);
       throw new TrinoException(GRAVITON_CREATE_INNER_CONNECTOR_FAILED, e);
     }
+  }
+
+  interface InjectCatalogHandle {
+    void invoke(String name, String properties) throws Exception;
+  }
+
+  interface CreateCatalogHandle {
+    Object invoke(String name, String properties) throws Exception;
   }
 }
