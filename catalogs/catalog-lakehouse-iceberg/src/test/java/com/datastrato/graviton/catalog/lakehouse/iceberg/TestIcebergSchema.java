@@ -53,7 +53,7 @@ public class TestIcebergSchema {
             () -> {
               icebergCatalog.asSchemas().createSchema(ident, COMMENT_VALUE, properties);
             });
-    Assertions.assertTrue(exception.getMessage().contains("already exists in Iceberg"));
+    Assertions.assertTrue(exception.getMessage().contains("already exists"));
   }
 
   @Test

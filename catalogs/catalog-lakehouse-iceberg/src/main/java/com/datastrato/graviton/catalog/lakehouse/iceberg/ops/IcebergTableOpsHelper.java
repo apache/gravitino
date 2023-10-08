@@ -23,7 +23,6 @@ import com.datastrato.graviton.rel.TableChange.UpdateComment;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import io.substrait.type.Type;
@@ -38,7 +37,6 @@ import java.util.stream.Collectors;
 import javax.ws.rs.NotSupportedException;
 import lombok.Getter;
 import lombok.Setter;
-import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.Table;
@@ -302,8 +300,8 @@ public class IcebergTableOpsHelper {
 
   public static Map<String, String> removeReservedProperties(Map<String, String> createProperties) {
     return createProperties.entrySet().stream()
-            .filter(entry -> !IcebergReservedProperties.contains(entry.getKey()))
-            .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+        .filter(entry -> !IcebergReservedProperties.contains(entry.getKey()))
+        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
   }
 
   public static Namespace getIcebergNamespace(NameIdentifier ident) {

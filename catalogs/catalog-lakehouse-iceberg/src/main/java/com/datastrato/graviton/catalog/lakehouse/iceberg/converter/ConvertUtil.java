@@ -25,13 +25,13 @@ public class ConvertUtil {
   }
 
   /**
-   * Convert the basic Iceberg field type.
+   * Convert the Graviton type to the Iceberg type.
    *
-   * @param primitive
-   * @return
+   * @param gravitonType
+   * @return Iceberg type.
    */
-  public static Type toPrimitiveType(io.substrait.type.Type primitive) {
-    return ToIcebergTypeVisitor.visit(primitive, new ToIcebergType());
+  public static Type toIcebergType(io.substrait.type.Type gravitonType) {
+    return ToIcebergTypeVisitor.visit(gravitonType, new ToIcebergType());
   }
 
   /**
