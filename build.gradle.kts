@@ -174,6 +174,7 @@ tasks {
   val assembleDistribution by registering(Tar::class) {
     group = "graviton distribution"
     finalizedBy("checksumDistribution")
+    into("${rootProject.name}-${version}")
     from(compileDistribution.map { it.outputs.files.single() })
     compression = Compression.GZIP
     archiveFileName.set("${rootProject.name}-${version}.tar.gz")
