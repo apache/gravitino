@@ -217,7 +217,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
     CatalogWrapper wrapper = loadCatalogInternal(ident);
     try {
       // Call wrapper.catalog.properties() to make BaseCatalog#properties in IsolatedClassLoader
-      // not null. Why we do this? Because wrapper.catalog.properties() need to called in the
+      // not null. Why we do this? Because wrapper.catalog.properties() need to be called in the
       // IsolatedClassLoader, it needs to load the specific catalog class such as HiveCatalog or so.
       // For simply, We will preload the value of properties and thus AppClassLoader can get the
       // value of properties.
