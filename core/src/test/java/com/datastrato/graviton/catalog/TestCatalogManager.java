@@ -4,6 +4,8 @@
  */
 package com.datastrato.graviton.catalog;
 
+import static com.datastrato.graviton.StringIdentifier.ID_KEY;
+
 import com.datastrato.graviton.Catalog;
 import com.datastrato.graviton.CatalogChange;
 import com.datastrato.graviton.Config;
@@ -12,6 +14,7 @@ import com.datastrato.graviton.EntityStore;
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.StringIdentifier;
 import com.datastrato.graviton.TestEntityStore;
+import com.datastrato.graviton.TestEntityStore.InMemoryEntityStore;
 import com.datastrato.graviton.exceptions.CatalogAlreadyExistsException;
 import com.datastrato.graviton.exceptions.NoSuchCatalogException;
 import com.datastrato.graviton.exceptions.NoSuchMetalakeException;
@@ -26,10 +29,17 @@ import java.time.Instant;
 import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.MethodOrderer;
+import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestMethodOrder;
+import org.mockito.Mockito;
 
+@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class TestCatalogManager {
 
   private static CatalogManager catalogManager;
@@ -42,6 +52,15 @@ public class TestCatalogManager {
 
   private static String provider = "test";
 
+  private static BaseMetalake metalakeEntity =
+      new BaseMetalake.Builder()
+          .withId(1L)
+          .withName(metalake)
+          .withAuditInfo(
+              new AuditInfo.Builder().withCreator("test").withCreateTime(Instant.now()).build())
+          .withVersion(SchemaVersion.V_0_1)
+          .build();
+
   @BeforeAll
   public static void setUp() throws IOException {
     config = new Config(false) {};
@@ -51,17 +70,17 @@ public class TestCatalogManager {
     entityStore.initialize(config);
     entityStore.setSerDe(null);
 
-    BaseMetalake metalakeEntity =
-        new BaseMetalake.Builder()
-            .withId(1L)
-            .withName(metalake)
-            .withAuditInfo(
-                new AuditInfo.Builder().withCreator("test").withCreateTime(Instant.now()).build())
-            .withVersion(SchemaVersion.V_0_1)
-            .build();
     entityStore.put(metalakeEntity, true);
 
     catalogManager = new CatalogManager(config, entityStore, new RandomIdGenerator());
+    catalogManager = Mockito.spy(catalogManager);
+  }
+
+  @BeforeEach
+  @AfterEach
+  void reset() throws IOException {
+    ((InMemoryEntityStore) entityStore).clear();
+    entityStore.put(metalakeEntity, true);
   }
 
   @AfterAll
@@ -75,6 +94,154 @@ public class TestCatalogManager {
       catalogManager.close();
       catalogManager = null;
     }
+  }
+
+  @Test
+  @Order(1)
+  void testLoadTable() throws IOException {
+    NameIdentifier ident = NameIdentifier.of("metalake", "test444");
+    // key1 is required;
+    Map<String, String> props1 =
+        ImmutableMap.<String, String>builder()
+            .put("key2", "value2")
+            .put("key1", "value1")
+            .put("hidden_key", "hidden_value")
+            .put("mock", "mock")
+            .build();
+    Assertions.assertDoesNotThrow(
+        () ->
+            catalogManager.createCatalog(
+                ident, Catalog.Type.RELATIONAL, provider, "comment", props1));
+
+    Map<String, String> properties = catalogManager.loadCatalog(ident).properties();
+    Assertions.assertTrue(properties.containsKey("key2"));
+    Assertions.assertTrue(properties.containsKey("key1"));
+    Assertions.assertFalse(properties.containsKey("hidden_key"));
+    Assertions.assertFalse(properties.containsKey(ID_KEY));
+    reset();
+  }
+
+  @Test
+  @Order(2)
+  void testPropertyValidationInAlter() throws IOException {
+    // key1 is required and immutable and do not have default value, is not hidden and not reserved
+    // key2 is required and mutable and do not have default value, is not hidden and not reserved
+    // key3 is optional and immutable and have default value, is not hidden and not reserved
+    // key4 is optional and mutable and have default value, is not hidden and not reserved
+    // reserved_key is optional and immutable and have default value, is not hidden and reserved
+    // hidden_key is optional and mutable and have default value, is hidden and not reserved
+
+    NameIdentifier ident = NameIdentifier.of("metalake", "test111");
+    // key1 is required;
+    Map<String, String> props1 =
+        ImmutableMap.<String, String>builder()
+            .put("key2", "value2")
+            .put("key1", "value1")
+            .put("mock", "mock")
+            .build();
+    Assertions.assertDoesNotThrow(
+        () ->
+            catalogManager.createCatalog(
+                ident, Catalog.Type.RELATIONAL, provider, "comment", props1));
+
+    NameIdentifier ident2 = NameIdentifier.of("metalake", "test222");
+    // key1 is required;
+    Map<String, String> props2 =
+        ImmutableMap.<String, String>builder()
+            .put("key2", "value2")
+            .put("key1", "value1")
+            .put("key3", "3")
+            .put("key4", "value4")
+            .put("mock", "mock")
+            .build();
+    Assertions.assertDoesNotThrow(
+        () ->
+            catalogManager.createCatalog(
+                ident2, Catalog.Type.RELATIONAL, provider, "comment", props2));
+
+    Exception e1 =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> catalogManager.alterCatalog(ident, CatalogChange.setProperty("key1", "value1")));
+    Assertions.assertTrue(e1.getMessage().contains("Property key1 is immutable"));
+
+    Exception e2 =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> catalogManager.alterCatalog(ident2, CatalogChange.setProperty("key3", "value2")));
+    Assertions.assertTrue(e2.getMessage().contains("Property key3 is immutable"));
+
+    Assertions.assertDoesNotThrow(
+        () -> catalogManager.alterCatalog(ident2, CatalogChange.setProperty("key4", "value4")));
+    Assertions.assertDoesNotThrow(
+        () -> catalogManager.alterCatalog(ident2, CatalogChange.setProperty("key2", "value2")));
+
+    Exception e3 =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                catalogManager.alterCatalog(
+                    ident2,
+                    CatalogChange.setProperty("key4", "value4"),
+                    CatalogChange.removeProperty("key1")));
+    Assertions.assertTrue(e3.getMessage().contains("Property key1 is immutable"));
+    reset();
+  }
+
+  @Test
+  @Order(3)
+  void testPropertyValidationInCreate() throws IOException {
+    // key1 is required and immutable and do not have default value, is not hidden and not reserved
+    // key2 is required and mutable and do not have default value, is not hidden and not reserved
+    // key3 is optional and immutable and have default value, is not hidden and not reserved
+    // key4 is optional and mutable and have default value, is not hidden and not reserved
+    // reserved_key is optional and immutable and have default value, is not hidden and reserved
+    // hidden_key is optional and mutable and have default value, is hidden and not reserved
+    NameIdentifier ident = NameIdentifier.of("metalake", "test111111");
+
+    // key1 is required;
+    Map<String, String> props1 =
+        ImmutableMap.<String, String>builder().put("key2", "value2").put("mock", "mock").build();
+    IllegalArgumentException e1 =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                catalogManager.createCatalog(
+                    ident, Catalog.Type.RELATIONAL, provider, "comment", props1));
+    Assertions.assertTrue(
+        e1.getMessage().contains("Properties are required and must be set: [key1]"));
+    // BUG here, in memory does not support rollback
+    reset();
+
+    // key2 is required;
+    Map<String, String> props2 =
+        ImmutableMap.<String, String>builder().put("key1", "value1").put("mock", "mock").build();
+    e1 =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                catalogManager.createCatalog(
+                    ident, Catalog.Type.RELATIONAL, provider, "comment", props2));
+    Assertions.assertTrue(
+        e1.getMessage().contains("Properties are required and must be set: [key2]"));
+    reset();
+
+    // key3 is optional, but we assign a wrong value format
+    Map<String, String> props3 =
+        ImmutableMap.<String, String>builder()
+            .put("key1", "value1")
+            .put("key2", "value2")
+            .put("key3", "a12a1a")
+            .put("mock", "mock")
+            .build();
+    e1 =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                catalogManager.createCatalog(
+                    ident, Catalog.Type.RELATIONAL, provider, "comment", props3));
+    Assertions.assertTrue(e1.getMessage().contains("Invalid value: 'a12a1a' for property: 'key3'"));
+    reset();
   }
 
   @Test
@@ -232,8 +399,8 @@ public class TestCatalogManager {
           Assertions.assertEquals(v, testProps.get(k));
         });
 
-    Assertions.assertTrue(testProps.containsKey(StringIdentifier.ID_KEY));
-    StringIdentifier StringId = StringIdentifier.fromString(testProps.get(StringIdentifier.ID_KEY));
-    Assertions.assertEquals(StringId.toString(), testProps.get(StringIdentifier.ID_KEY));
+    Assertions.assertTrue(testProps.containsKey(ID_KEY));
+    StringIdentifier StringId = StringIdentifier.fromString(testProps.get(ID_KEY));
+    Assertions.assertEquals(StringId.toString(), testProps.get(ID_KEY));
   }
 }

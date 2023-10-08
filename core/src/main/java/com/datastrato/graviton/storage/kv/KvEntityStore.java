@@ -254,28 +254,28 @@ public class KvEntityStore implements EntityStore {
    */
   private List<byte[]> getSubEntitiesPrefix(NameIdentifier ident, EntityType type)
       throws IOException {
-    List<byte[]> prefixs = Lists.newArrayList();
+    List<byte[]> prefixes = Lists.newArrayList();
     byte[] encode = entityKeyEncoder.encode(ident, type, true);
     switch (type) {
       case METALAKE:
-        prefixs.add(replacePrefixTypeInfo(encode, CATALOG.getShortName()));
-        prefixs.add(replacePrefixTypeInfo(encode, SCHEMA.getShortName()));
-        prefixs.add(replacePrefixTypeInfo(encode, TABLE.getShortName()));
+        prefixes.add(replacePrefixTypeInfo(encode, CATALOG.getShortName()));
+        prefixes.add(replacePrefixTypeInfo(encode, SCHEMA.getShortName()));
+        prefixes.add(replacePrefixTypeInfo(encode, TABLE.getShortName()));
         break;
       case CATALOG:
-        prefixs.add(replacePrefixTypeInfo(encode, SCHEMA.getShortName()));
-        prefixs.add(replacePrefixTypeInfo(encode, TABLE.getShortName()));
+        prefixes.add(replacePrefixTypeInfo(encode, SCHEMA.getShortName()));
+        prefixes.add(replacePrefixTypeInfo(encode, TABLE.getShortName()));
         break;
       case SCHEMA:
-        prefixs.add(replacePrefixTypeInfo(encode, TABLE.getShortName()));
+        prefixes.add(replacePrefixTypeInfo(encode, TABLE.getShortName()));
         break;
       case TABLE:
         break;
       default:
         LOG.warn("Currently unknown type: {}, please check it", type);
     }
-    Collections.reverse(prefixs);
-    return prefixs;
+    Collections.reverse(prefixes);
+    return prefixes;
   }
 
   private byte[] replacePrefixTypeInfo(byte[] encode, String subTypePrefix) {

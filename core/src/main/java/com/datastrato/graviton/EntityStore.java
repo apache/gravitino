@@ -106,7 +106,7 @@ public interface EntityStore extends Closeable {
    * @return E the updated entity
    * @throws IOException if the store operation fails
    * @throws NoSuchEntityException if the entity does not exist
-   * @throws AlreadyExistsException if the updated entity already exitsed.
+   * @throws AlreadyExistsException if the updated entity already existed.
    */
   <E extends Entity & HasIdentifier> E update(
       NameIdentifier ident, Class<E> type, EntityType entityType, Function<E, E> updater)
@@ -143,7 +143,7 @@ public interface EntityStore extends Closeable {
    *
    * @param ident the name identifier of the entity
    * @param entityType the type of the entity to be deleted
-   * @param cascade support cacade detele or not
+   * @param cascade support cascade delete or not
    * @return true if the entity exists and is deleted successfully, false otherwise
    * @throws IOException if the delete operation fails
    */

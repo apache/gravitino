@@ -13,22 +13,22 @@ import com.google.common.collect.Maps;
 import java.util.List;
 import java.util.Map;
 
-public abstract class TablePropertiesMetadata implements PropertiesMetadata {
+public abstract class BasePropertiesMetadata implements PropertiesMetadata {
 
-  private static final Map<String, PropertyEntry<?>> BASIC_TABLE_PROPERTY_ENTRIES;
+  private static final Map<String, PropertyEntry<?>> BASIC_PROPERTY_ENTRIES;
 
-  private Map<String, PropertyEntry<?>> propertyEntries;
+  private volatile Map<String, PropertyEntry<?>> propertyEntries;
 
   static {
-    List<PropertyEntry<?>> basicTablePropertyEntries =
+    // basicPropertyEntries is shared by all entities
+    List<PropertyEntry<?>> basicPropertyEntries =
         ImmutableList.of(
             PropertyEntry.stringReservedPropertyEntry(
                 ID_KEY,
                 "To differentiate the entities created directly by the underlying sources",
                 true));
 
-    BASIC_TABLE_PROPERTY_ENTRIES =
-        Maps.uniqueIndex(basicTablePropertyEntries, PropertyEntry::getName);
+    BASIC_PROPERTY_ENTRIES = Maps.uniqueIndex(basicPropertyEntries, PropertyEntry::getName);
   }
 
   @Override
@@ -37,14 +37,13 @@ public abstract class TablePropertiesMetadata implements PropertiesMetadata {
       synchronized (this) {
         if (propertyEntries == null) {
           ImmutableMap.Builder<String, PropertyEntry<?>> builder = ImmutableMap.builder();
-          Map<String, PropertyEntry<?>> catalogTableProperty = tablePropertyEntries();
-          builder.putAll(catalogTableProperty);
+          Map<String, PropertyEntry<?>> properties = specificPropertyEntries();
+          builder.putAll(properties);
 
-          BASIC_TABLE_PROPERTY_ENTRIES.forEach(
+          BASIC_PROPERTY_ENTRIES.forEach(
               (name, entry) -> {
                 Preconditions.checkArgument(
-                    !catalogTableProperty.containsKey(name),
-                    "Property metadata already exists: " + name);
+                    !properties.containsKey(name), "Property metadata already exists: " + name);
                 builder.put(name, entry);
               });
 
@@ -55,5 +54,5 @@ public abstract class TablePropertiesMetadata implements PropertiesMetadata {
     return propertyEntries;
   }
 
-  protected abstract Map<String, PropertyEntry<?>> tablePropertyEntries();
+  protected abstract Map<String, PropertyEntry<?>> specificPropertyEntries();
 }

@@ -29,6 +29,7 @@ import com.datastrato.graviton.rel.TableChange;
 import com.datastrato.graviton.rel.transforms.Transform;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Maps;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -383,5 +384,10 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
   @Override
   public PropertiesMetadata tablePropertiesMetadata() throws UnsupportedOperationException {
     return tablePropertiesMetadata;
+  }
+
+  @Override
+  public PropertiesMetadata catalogPropertiesMetadata() throws UnsupportedOperationException {
+    return Maps::newHashMap;
   }
 }

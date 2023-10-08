@@ -4,9 +4,10 @@
  */
 package com.datastrato.graviton;
 
+import com.datastrato.graviton.catalog.BasePropertiesMetadata;
 import com.datastrato.graviton.catalog.CatalogOperations;
 import com.datastrato.graviton.catalog.PropertiesMetadata;
-import com.datastrato.graviton.catalog.TablePropertiesMetadata;
+import com.datastrato.graviton.catalog.PropertyEntry;
 import com.datastrato.graviton.exceptions.NoSuchCatalogException;
 import com.datastrato.graviton.exceptions.NoSuchSchemaException;
 import com.datastrato.graviton.exceptions.NoSuchTableException;
@@ -24,6 +25,7 @@ import com.datastrato.graviton.rel.Table;
 import com.datastrato.graviton.rel.TableCatalog;
 import com.datastrato.graviton.rel.TableChange;
 import com.datastrato.graviton.rel.transforms.Transform;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.time.Instant;
@@ -36,12 +38,14 @@ public class TestCatalogOperations implements CatalogOperations, TableCatalog, S
 
   private final Map<NameIdentifier, TestSchema> schemas;
 
-  private final TablePropertiesMetadata tablePropertiesMetadata;
+  private final BasePropertiesMetadata tablePropertiesMetadata;
+  private Map<String, String> config;
 
-  public TestCatalogOperations() {
+  public TestCatalogOperations(Map<String, String> config) {
     tables = Maps.newHashMap();
     schemas = Maps.newHashMap();
-    tablePropertiesMetadata = new TestTablePropertiesMetadata();
+    tablePropertiesMetadata = new TestBasePropertiesMetadata();
+    this.config = config;
   }
 
   @Override
@@ -263,7 +267,7 @@ public class TestCatalogOperations implements CatalogOperations, TableCatalog, S
     if (cascade) {
       tables.keySet().stream()
           .filter(table -> table.namespace().toString().equals(ident.toString()))
-          .forEach(table -> tables.remove(table));
+          .forEach(tables::remove);
     }
 
     return true;
@@ -272,5 +276,53 @@ public class TestCatalogOperations implements CatalogOperations, TableCatalog, S
   @Override
   public PropertiesMetadata tablePropertiesMetadata() throws UnsupportedOperationException {
     return tablePropertiesMetadata;
+  }
+
+  @Override
+  public PropertiesMetadata catalogPropertiesMetadata() throws UnsupportedOperationException {
+    if (config.containsKey("mock")) {
+      return new BasePropertiesMetadata() {
+        @Override
+        protected Map<String, PropertyEntry<?>> specificPropertyEntries() {
+          return ImmutableMap.<String, PropertyEntry<?>>builder()
+              .put(
+                  "key1",
+                  PropertyEntry.stringPropertyEntry(
+                      "key1", "value1", true, true, null, false, false))
+              .put(
+                  "key2",
+                  PropertyEntry.stringPropertyEntry(
+                      "key2", "value2", true, false, null, false, false))
+              .put(
+                  "key3",
+                  new PropertyEntry.Builder<Integer>()
+                      .withDecoder(Integer::parseInt)
+                      .withEncoder(Object::toString)
+                      .withDefaultValue(1)
+                      .withDescription("key3")
+                      .withHidden(false)
+                      .withReserved(false)
+                      .withImmutable(true)
+                      .withJavaType(Integer.class)
+                      .withRequired(false)
+                      .withName("key3")
+                      .build())
+              .put(
+                  "key4",
+                  PropertyEntry.stringPropertyEntry(
+                      "key4", "value4", false, false, "value4", false, false))
+              .put(
+                  "reserved_key",
+                  PropertyEntry.stringPropertyEntry(
+                      "reserved_key", "reserved_key", false, true, "reserved_value", false, true))
+              .put(
+                  "hidden_key",
+                  PropertyEntry.stringPropertyEntry(
+                      "hidden_key", "hidden_key", false, false, "hidden_value", true, false))
+              .build();
+        }
+      };
+    }
+    return Maps::newHashMap;
   }
 }
