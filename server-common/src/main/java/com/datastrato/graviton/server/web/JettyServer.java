@@ -45,12 +45,12 @@ public final class JettyServer {
 
   private String serverName;
 
-  public JettyServer() {
-    this.serverName = "jetty-webserver";
-  }
+  public JettyServer() {}
 
-  public synchronized void initialize(JettyServerContext serverContext) {
+  public synchronized void initialize(JettyServerContext serverContext, String serverName) {
     this.serverContext = serverContext;
+    this.serverName = serverName;
+
     ExecutorThreadPool threadPool =
         createThreadPool(
             serverContext.getCoreThreads(),
@@ -89,19 +89,21 @@ public final class JettyServer {
       server.start();
     } catch (BindException e) {
       LOG.error(
-          "Failed to start web server on host {} port {}, which is already in use.",
+          "Failed to start {} web server on host {} port {}, which is already in use.",
+          serverName,
           serverContext.getHost(),
           serverContext.getHttpPort(),
           e);
-      throw new RuntimeException("Failed to start Jetty web server.", e);
+      throw new RuntimeException("Failed to start " + serverName + " web server.", e);
 
     } catch (Exception e) {
-      LOG.error("Failed to start Jetty web server.", e);
-      throw new RuntimeException("Failed to start web server.", e);
+      LOG.error("Failed to start {} web server.", serverName, e);
+      throw new RuntimeException("Failed to start " + serverName + " web server.", e);
     }
 
     LOG.info(
-        "Jetty web server started on host {} port {}.",
+        "{} web server started on host {} port {}.",
+        serverName,
         serverContext.getHost(),
         serverContext.getHttpPort());
   }
@@ -110,7 +112,7 @@ public final class JettyServer {
     try {
       server.join();
     } catch (InterruptedException e) {
-      LOG.info("Interrupted while Jetty web server is joining.");
+      LOG.info("Interrupted while {} web server is joining.", serverName);
       Thread.currentThread().interrupt();
     }
   }
@@ -131,12 +133,13 @@ public final class JettyServer {
         }
 
         LOG.info(
-            "Jetty web server stopped on host {} port {}.",
+            "{} web server stopped on host {} port {}.",
+            serverName,
             serverContext.getHost(),
             serverContext.getHttpPort());
       } catch (Exception e) {
         // Swallow the exception.
-        LOG.warn("Failed to stop Jetty web server.", e);
+        LOG.warn("Failed to stop {} web server.", serverName, e);
       }
 
       server = null;
@@ -150,10 +153,6 @@ public final class JettyServer {
   public void addFilter(Filter filter, String pathSpec) {
     servletContextHandler.addFilter(
         new FilterHolder(filter), pathSpec, EnumSet.allOf(DispatcherType.class));
-  }
-
-  public void setServerName(String serverName) {
-    this.serverName = serverName;
   }
 
   private void initializeServletContextHandler(Server server) {
@@ -187,7 +186,7 @@ public final class JettyServer {
   private ServerConnector creatorServerConnector(
       Server server, ConnectionFactory[] connectionFactories) {
     Scheduler serverExecutor =
-        new ScheduledExecutorScheduler("graviton-webserver-JettyScheduler", true);
+        new ScheduledExecutorScheduler(serverName + "-webserver-JettyScheduler", true);
 
     return new ServerConnector(server, null, serverExecutor, null, -1, -1, connectionFactories);
   }

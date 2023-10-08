@@ -35,7 +35,7 @@ public class TestJettyServer {
   public void testInitialize() {
     Config config = new Config(false) {};
     JettyServerContext serverContext = JettyServerContext.fromConfig(config);
-    jettyServer.initialize(serverContext);
+    jettyServer.initialize(serverContext, "test");
 
     // TODO might be nice to have an isInitalised method or similar?
   }
@@ -44,7 +44,7 @@ public class TestJettyServer {
   public void testStartAndStop() throws RuntimeException {
     Config config = new Config(false) {};
     JettyServerContext serverContext = JettyServerContext.fromConfig(config);
-    jettyServer.initialize(serverContext);
+    jettyServer.initialize(serverContext, "test");
     jettyServer.start();
     // TODO might be nice to have an IsRunning method or similar?
     jettyServer.stop();
@@ -54,7 +54,7 @@ public class TestJettyServer {
   public void testAddServletAndFilter() throws RuntimeException {
     Config config = new Config(false) {};
     JettyServerContext serverContext = JettyServerContext.fromConfig(config);
-    jettyServer.initialize(serverContext);
+    jettyServer.initialize(serverContext, "test");
     jettyServer.start();
 
     Servlet mockServlet = mock(Servlet.class);

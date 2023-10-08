@@ -30,6 +30,8 @@ public class GravitonServer extends ResourceConfig {
 
   public static final String WEBSERVER_CONF_PREFIX = "graviton.server.webserver.";
 
+  public static final String SERVER_NAME = "Graviton-webserver";
+
   private final ServerConfig serverConfig;
 
   private final JettyServer server;
@@ -45,7 +47,7 @@ public class GravitonServer extends ResourceConfig {
   public void initialize() {
     JettyServerContext serverContext =
         JettyServerContext.fromConfig(serverConfig, WEBSERVER_CONF_PREFIX);
-    server.initialize(serverContext);
+    server.initialize(serverContext, SERVER_NAME);
 
     gravitonEnv.initialize(serverConfig);
 

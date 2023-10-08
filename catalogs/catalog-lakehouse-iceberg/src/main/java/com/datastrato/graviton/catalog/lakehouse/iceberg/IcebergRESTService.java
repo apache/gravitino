@@ -31,8 +31,7 @@ public class IcebergRESTService implements GravitonAuxiliaryService {
   private void initServer(IcebergConfig icebergConfig) {
     JettyServerContext serverContext = JettyServerContext.fromConfig(icebergConfig);
     server = new JettyServer();
-    server.setServerName(SERVICE_NAME);
-    server.initialize(serverContext);
+    server.initialize(serverContext, SERVICE_NAME);
 
     ResourceConfig config = new ResourceConfig();
     config.packages("com.datastrato.graviton.catalog.lakehouse.iceberg.web.rest");
