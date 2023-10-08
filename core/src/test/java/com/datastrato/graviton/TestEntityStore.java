@@ -40,6 +40,10 @@ public class TestEntityStore {
       this.lock = new ReentrantLock();
     }
 
+    public void clear() {
+      entityMap.clear();
+    }
+
     @Override
     public void initialize(Config config) throws RuntimeException {}
 

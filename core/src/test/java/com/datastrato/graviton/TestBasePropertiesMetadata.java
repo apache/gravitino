@@ -4,14 +4,14 @@
  */
 package com.datastrato.graviton;
 
+import com.datastrato.graviton.catalog.BasePropertiesMetadata;
 import com.datastrato.graviton.catalog.PropertyEntry;
-import com.datastrato.graviton.catalog.TablePropertiesMetadata;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
 import java.util.List;
 import java.util.Map;
 
-public class TestTablePropertiesMetadata extends TablePropertiesMetadata {
+public class TestBasePropertiesMetadata extends BasePropertiesMetadata {
 
   public static final String COMMENT_KEY = "comment";
 
@@ -19,7 +19,7 @@ public class TestTablePropertiesMetadata extends TablePropertiesMetadata {
 
   public static final String TEST_IMMUTABLE_KEY = "immutableKey";
 
-  private static final Map<String, PropertyEntry<?>> TEST_TABLE_PROPERTY;
+  private static final Map<String, PropertyEntry<?>> TEST_BASE_PROPERTY;
 
   static {
     List<PropertyEntry<?>> tablePropertyMetadata =
@@ -30,11 +30,11 @@ public class TestTablePropertiesMetadata extends TablePropertiesMetadata {
             PropertyEntry.stringImmutablePropertyEntry(
                 TEST_IMMUTABLE_KEY, "test immutable property", false, null, false, false));
 
-    TEST_TABLE_PROPERTY = Maps.uniqueIndex(tablePropertyMetadata, PropertyEntry::getName);
+    TEST_BASE_PROPERTY = Maps.uniqueIndex(tablePropertyMetadata, PropertyEntry::getName);
   }
 
   @Override
-  protected Map<String, PropertyEntry<?>> tablePropertyEntries() {
-    return TEST_TABLE_PROPERTY;
+  protected Map<String, PropertyEntry<?>> specificPropertyEntries() {
+    return TEST_BASE_PROPERTY;
   }
 }

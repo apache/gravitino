@@ -6,6 +6,8 @@ package com.datastrato.graviton.catalog;
 
 import com.datastrato.graviton.Catalog;
 import com.datastrato.graviton.CatalogChange;
+import com.datastrato.graviton.CatalogChange.RemoveProperty;
+import com.datastrato.graviton.CatalogChange.SetProperty;
 import com.datastrato.graviton.CatalogProvider;
 import com.datastrato.graviton.Config;
 import com.datastrato.graviton.Configs;
@@ -40,6 +42,7 @@ import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -49,6 +52,7 @@ import java.util.ServiceLoader;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.tuple.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -210,7 +214,8 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
    */
   @Override
   public Catalog loadCatalog(NameIdentifier ident) throws NoSuchCatalogException {
-    return loadCatalogAndWrap(ident).catalog;
+    CatalogWrapper wrapper = loadCatalogInternal(ident);
+    return wrapper.catalog;
   }
 
   /**
@@ -266,16 +271,42 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
                 store.put(e, false /* overwrite */);
                 return e;
               });
-      return catalogCache.get(ident, id -> createCatalogWrapper(entity)).catalog;
-
-    } catch (EntityAlreadyExistsException ee) {
-      LOG.warn("Catalog {} already exists", ident, ee);
+      CatalogWrapper wrapper = catalogCache.get(ident, id -> createCatalogWrapper(entity));
+      wrapper.doWithPropertiesMeta(
+          f -> {
+            f.catalogPropertiesMetadata().validatePropertyForCreate(properties);
+            return null;
+          });
+      return wrapper.catalog;
+    } catch (EntityAlreadyExistsException e1) {
+      LOG.warn("Catalog {} already exists", ident, e1);
       throw new CatalogAlreadyExistsException("Catalog " + ident + " already exists");
-
-    } catch (IOException ioe) {
-      LOG.error("Failed to create catalog {}", ident, ioe);
-      throw new RuntimeException(ioe);
+    } catch (IllegalArgumentException | NoSuchMetalakeException e2) {
+      throw e2;
+    } catch (Exception e3) {
+      LOG.error("Failed to create catalog {}", ident, e3);
+      throw new RuntimeException(e3);
     }
+  }
+
+  private Pair<Map<String, String>, Map<String, String>> getCatalogAlterProperty(
+      CatalogChange... catalogChanges) {
+    Map<String, String> upserts = Maps.newHashMap();
+    Map<String, String> deletes = Maps.newHashMap();
+
+    Arrays.stream(catalogChanges)
+        .forEach(
+            tableChange -> {
+              if (tableChange instanceof SetProperty) {
+                SetProperty setProperty = (SetProperty) tableChange;
+                upserts.put(setProperty.getProperty(), setProperty.getValue());
+              } else if (tableChange instanceof RemoveProperty) {
+                RemoveProperty removeProperty = (RemoveProperty) tableChange;
+                deletes.put(removeProperty.getProperty(), removeProperty.getProperty());
+              }
+            });
+
+    return Pair.of(upserts, deletes);
   }
 
   /**
@@ -292,8 +323,29 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
       throws NoSuchCatalogException, IllegalArgumentException {
     // There could be a race issue that someone is using the catalog from cache while we are
     // updating it.
-    catalogCache.invalidate(ident);
 
+    CatalogWrapper catalogWrapper = loadCatalogAndWrap(ident);
+    if (catalogWrapper == null) {
+      throw new NoSuchCatalogException("Catalog " + ident + " does not exist");
+    }
+
+    try {
+      catalogWrapper.doWithPropertiesMeta(
+          f -> {
+            Pair<Map<String, String>, Map<String, String>> alterProperty =
+                getCatalogAlterProperty(changes);
+            f.catalogPropertiesMetadata()
+                .validatePropertyForAlter(alterProperty.getLeft(), alterProperty.getRight());
+            return null;
+          });
+    } catch (IllegalArgumentException e1) {
+      throw e1;
+    } catch (Exception e) {
+      LOG.error("Failed to alter catalog {}", ident, e);
+      throw new RuntimeException(e);
+    }
+
+    catalogCache.invalidate(ident);
     try {
       CatalogEntity updatedCatalog =
           store.update(
@@ -434,7 +486,24 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
 
     // Initialize the catalog
     catalog = catalog.withCatalogEntity(entity).withCatalogConf(mergedConf);
-    return new CatalogWrapper(catalog, classLoader);
+    CatalogWrapper wrapper = new CatalogWrapper(catalog, classLoader);
+
+    // Call wrapper.catalog.properties() to make BaseCatalog#properties in IsolatedClassLoader
+    // not null. Why we do this? Because wrapper.catalog.properties() need to be called in the
+    // IsolatedClassLoader, it needs to load the specific catalog class such as HiveCatalog or so.
+    // For simply, We will preload the value of properties and thus AppClassLoader can get the
+    // value of properties.
+    try {
+      wrapper.doWithPropertiesMeta(
+          f -> {
+            wrapper.catalog.properties();
+            return null;
+          });
+    } catch (Exception e) {
+      LOG.error("Failed to load catalog '{}' properties", entity.name(), e);
+      throw new RuntimeException(e);
+    }
+    return wrapper;
   }
 
   static Map<String, String> mergeConf(Map<String, String> properties, Map<String, String> conf) {
