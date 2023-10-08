@@ -215,22 +215,6 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
   @Override
   public Catalog loadCatalog(NameIdentifier ident) throws NoSuchCatalogException {
     CatalogWrapper wrapper = loadCatalogInternal(ident);
-    try {
-      // Call wrapper.catalog.properties() to make BaseCatalog#properties in IsolatedClassLoader
-      // not null. Why we do this? Because wrapper.catalog.properties() need to be called in the
-      // IsolatedClassLoader, it needs to load the specific catalog class such as HiveCatalog or so.
-      // For simply, We will preload the value of properties and thus AppClassLoader can get the
-      // value of properties.
-      wrapper.doWithPropertiesMeta(
-          f -> {
-            wrapper.catalog.properties();
-            return null;
-          });
-    } catch (Exception e) {
-      LOG.error("Failed to load catalog {}", ident, e);
-      throw new RuntimeException(e);
-    }
-
     return wrapper.catalog;
   }
 
@@ -502,7 +486,24 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
 
     // Initialize the catalog
     catalog = catalog.withCatalogEntity(entity).withCatalogConf(mergedConf);
-    return new CatalogWrapper(catalog, classLoader);
+    CatalogWrapper wrapper = new CatalogWrapper(catalog, classLoader);
+
+    // Call wrapper.catalog.properties() to make BaseCatalog#properties in IsolatedClassLoader
+    // not null. Why we do this? Because wrapper.catalog.properties() need to be called in the
+    // IsolatedClassLoader, it needs to load the specific catalog class such as HiveCatalog or so.
+    // For simply, We will preload the value of properties and thus AppClassLoader can get the
+    // value of properties.
+    try {
+      wrapper.doWithPropertiesMeta(
+          f -> {
+            wrapper.catalog.properties();
+            return null;
+          });
+    } catch (Exception e) {
+      LOG.error("Failed to load catalog '{}' properties", entity.name(), e);
+      throw new RuntimeException(e);
+    }
+    return wrapper;
   }
 
   static Map<String, String> mergeConf(Map<String, String> properties, Map<String, String> conf) {
