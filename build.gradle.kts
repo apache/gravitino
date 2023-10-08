@@ -127,6 +127,7 @@ tasks.rat {
     // Ignore files we track but do not distribute
     "**/.github/**/*",
     "dev/docker/**/*.xml",
+    "**/*.log",
   )
 
   // Add .gitignore excludes to the Apache Rat exclusion list.
