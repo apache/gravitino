@@ -98,8 +98,11 @@ dependencies {
   testImplementation(libs.bundles.log4j)
   testImplementation(libs.iceberg.spark.runtime)
   testImplementation(libs.spark.sql) {
-    exclude("org.apache.hadoop") 
-    exclude("org.rocksdb") 
+    exclude("org.apache.hadoop")
+    exclude("org.rocksdb")
+    exclude("org.apache.avro")
+    exclude("org.apache.zookeeper")
+    exclude("io.dropwizard.metrics")
   }
   testImplementation(libs.slf4j.jdk14)
 }
