@@ -8,7 +8,7 @@ import com.datastrato.graviton.trino.connector.catalog.CatalogConnectorMetadataA
 import com.datastrato.graviton.trino.connector.metadata.GravitonColumn;
 import com.datastrato.graviton.trino.connector.metadata.GravitonSchema;
 import com.datastrato.graviton.trino.connector.metadata.GravitonTable;
-import com.datastrato.graviton.trino.connector.util.DataTypeTransform;
+import com.datastrato.graviton.trino.connector.util.DataTypeTransformer;
 import io.trino.spi.connector.ColumnMetadata;
 import io.trino.spi.connector.ConnectorTableMetadata;
 import io.trino.spi.connector.ConnectorTableProperties;
@@ -55,7 +55,7 @@ public class HiveMetadataAdapter implements CatalogConnectorMetadataAdapter {
 
   @Override
   public ColumnMetadata getColumnMetadata(GravitonColumn column) {
-    return new ColumnMetadata(column.getName(), DataTypeTransform.getTrinoType(column.getType()));
+    return new ColumnMetadata(column.getName(), DataTypeTransformer.getTrinoType(column.getType()));
   }
 
   @Override

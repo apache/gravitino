@@ -7,16 +7,17 @@ package com.datastrato.graviton.trino.connector;
 import static io.trino.testing.TestingSession.testSessionBuilder;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.airlift.log.Logger;
 import io.trino.Session;
 import io.trino.testing.BaseConnectorTest;
 import io.trino.testing.DistributedQueryRunner;
 import io.trino.testing.QueryRunner;
 import java.util.HashMap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class TestGravitonConnector extends BaseConnectorTest {
 
-  private static final Logger LOG = Logger.get(TestGravitonConnector.class);
+  private static final Logger LOG = LoggerFactory.getLogger(TestGravitonConnector.class);
 
   @Override
   protected QueryRunner createQueryRunner() throws Exception {
@@ -40,6 +41,6 @@ public class TestGravitonConnector extends BaseConnectorTest {
 
   @Override
   public void testCreateSchema() {
-    assertThat(computeActual("SHOW CATALOGS").getOnlyColumnAsSet()).contains("graviton");
+    assertThat(computeActual("SHOW catalogs").getOnlyColumnAsSet()).contains("graviton");
   }
 }

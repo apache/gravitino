@@ -5,6 +5,7 @@
 package com.datastrato.graviton.trino.connector.catalog.hive;
 
 import com.datastrato.graviton.trino.connector.catalog.CatalogConnectorAdapter;
+import com.datastrato.graviton.trino.connector.catalog.CatalogConnectorMetadataAdapter;
 import com.datastrato.graviton.trino.connector.metadata.GravitonCatalog;
 import io.trino.spi.session.PropertyMetadata;
 import java.util.HashMap;
@@ -32,5 +33,10 @@ public class HiveConnectorAdapter implements CatalogConnectorAdapter {
   @Override
   public List<PropertyMetadata<?>> getTableProperties() {
     return tableProperties.getTableProperties();
+  }
+
+  public CatalogConnectorMetadataAdapter getMetaDataAdapter() {
+    // TODO yuhui Need to improve schema table and column properties
+    return new HiveMetadataAdapter(null, getTableProperties(), null);
   }
 }

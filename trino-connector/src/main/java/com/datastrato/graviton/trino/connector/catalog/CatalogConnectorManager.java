@@ -17,7 +17,6 @@ import com.datastrato.graviton.trino.connector.metadata.GravitonCatalog;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import io.airlift.log.Logger;
 import io.trino.spi.TrinoException;
 import java.util.Arrays;
 import java.util.concurrent.ConcurrentHashMap;
@@ -25,6 +24,8 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.NotImplementedException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * This class has the following main functions:
@@ -37,7 +38,7 @@ import org.apache.commons.lang3.NotImplementedException;
  * </pre>
  */
 public class CatalogConnectorManager {
-  private static final Logger LOG = Logger.get(CatalogConnectorManager.class);
+  private static final Logger LOG = LoggerFactory.getLogger(CatalogConnectorManager.class);
 
   private static final int CATALOG_LOAD_FREQUENCY_SECOND = 30;
   private static final int NUMBER_EXECUTOR_THREAD = 1;
@@ -98,7 +99,7 @@ public class CatalogConnectorManager {
         LOG.warn("Metalake {} does not exist.", usedMetalake);
         return;
       } catch (Exception e) {
-        LOG.error("Load Metalake {} failed.", e);
+        LOG.error("Load Metalake {} failed.", usedMetalake, e);
         return;
       }
 

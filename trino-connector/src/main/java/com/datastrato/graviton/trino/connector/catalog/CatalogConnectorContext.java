@@ -7,7 +7,6 @@ package com.datastrato.graviton.trino.connector.catalog;
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.client.GravitonMetaLake;
 import com.datastrato.graviton.trino.connector.GravitonConnector;
-import com.datastrato.graviton.trino.connector.catalog.hive.HiveMetadataAdapter;
 import com.datastrato.graviton.trino.connector.metadata.GravitonCatalog;
 import com.google.common.base.Preconditions;
 import io.trino.spi.connector.Connector;
@@ -67,7 +66,7 @@ public class CatalogConnectorContext {
   }
 
   public CatalogConnectorMetadataAdapter getMetaDataAdapter() {
-    return new HiveMetadataAdapter(getTableProperties(), null, null);
+    return adapter.getMetaDataAdapter();
   }
 
   static class Builder {
@@ -80,11 +79,8 @@ public class CatalogConnectorContext {
       this.connectorAdapter = connectorAdapter;
     }
 
-    public Builder(Builder builder) {
-      this.connectorAdapter = builder.connectorAdapter;
-      this.catalogName = null;
-      this.metalake = null;
-      this.internalConnector = null;
+    public Builder clone() {
+      return new Builder(connectorAdapter);
     }
 
     public Map<String, Object> buildConfig(GravitonCatalog catalog) {

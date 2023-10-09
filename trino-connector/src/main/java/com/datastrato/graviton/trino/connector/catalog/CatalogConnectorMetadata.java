@@ -21,15 +21,16 @@ import com.datastrato.graviton.rel.Table;
 import com.datastrato.graviton.rel.TableCatalog;
 import com.datastrato.graviton.trino.connector.metadata.GravitonSchema;
 import com.datastrato.graviton.trino.connector.metadata.GravitonTable;
-import io.airlift.log.Logger;
 import io.trino.spi.TrinoException;
 import java.util.Arrays;
 import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** This class implements graviton metadata operators. */
 public class CatalogConnectorMetadata {
 
-  private static final Logger LOG = Logger.get(CatalogConnectorMetadata.class);
+  private static final Logger LOG = LoggerFactory.getLogger(CatalogConnectorMetadata.class);
 
   private final GravitonMetaLake metalake;
   private final Catalog catalog;

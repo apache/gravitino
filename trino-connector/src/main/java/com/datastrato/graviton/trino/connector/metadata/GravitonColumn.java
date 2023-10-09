@@ -26,7 +26,7 @@ public final class GravitonColumn {
   }
 
   public Map<String, String> getProperties() {
-    return null;
+    return Map.of();
   }
 
   public String getName() {

@@ -14,6 +14,7 @@ public class HiveTableProperties {
 
   private final List<PropertyMetadata<?>> tableProperties;
 
+  // TODO yuhui Need to add table properties
   HiveTableProperties() {
     tableProperties =
         ImmutableList.of(

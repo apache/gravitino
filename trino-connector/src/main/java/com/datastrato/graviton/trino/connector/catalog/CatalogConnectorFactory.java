@@ -11,14 +11,15 @@ import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.client.GravitonMetaLake;
 import com.datastrato.graviton.trino.connector.catalog.hive.HiveConnectorAdapter;
 import com.datastrato.graviton.trino.connector.metadata.GravitonCatalog;
-import io.airlift.log.Logger;
 import io.trino.spi.TrinoException;
 import io.trino.spi.connector.Connector;
 import java.util.HashMap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** This class use to create CatalogConnectorContext instance by given catalog. */
 public class CatalogConnectorFactory {
-  private static final Logger LOG = Logger.get(CatalogConnectorFactory.class);
+  private static final Logger LOG = LoggerFactory.getLogger(CatalogConnectorFactory.class);
 
   private final CatalogInjector catalogInjector;
   private final HashMap<String, CatalogConnectorContext.Builder> catalogBuilders = new HashMap<>();
@@ -40,7 +41,7 @@ public class CatalogConnectorFactory {
     }
 
     // Need to use a copy of builder to avoid garbage data.
-    builder = new CatalogConnectorContext.Builder(builder);
+    builder = builder.clone();
 
     try {
       Connector internalConnector =

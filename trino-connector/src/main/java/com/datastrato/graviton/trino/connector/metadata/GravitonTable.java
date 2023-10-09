@@ -5,7 +5,6 @@
 package com.datastrato.graviton.trino.connector.metadata;
 
 import com.datastrato.graviton.rel.Table;
-import com.fasterxml.jackson.annotation.JsonCreator;
 import com.google.common.collect.ImmutableList;
 import java.util.List;
 import java.util.Map;
@@ -18,7 +17,6 @@ public class GravitonTable {
   private final ImmutableList<GravitonColumn> columns;
   private final Map<String, String> properties;
 
-  @JsonCreator
   public GravitonTable(String schemaName, Table tableMetadata) {
     this.schemaName = schemaName;
     this.tableMetadata = tableMetadata;

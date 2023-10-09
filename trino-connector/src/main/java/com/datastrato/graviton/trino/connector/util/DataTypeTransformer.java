@@ -16,11 +16,12 @@ import static io.trino.spi.type.VarcharType.createUnboundedVarcharType;
 
 import io.substrait.type.TypeCreator;
 import io.trino.spi.TrinoException;
+import io.trino.spi.type.Type;
 
 /** This class is used to transform datatype between graviton and trino */
-public class DataTypeTransform {
+public class DataTypeTransformer {
 
-  public static io.trino.spi.type.Type getTrinoType(io.substrait.type.Type type) {
+  public static Type getTrinoType(io.substrait.type.Type type) {
     if (type.equals(TypeCreator.REQUIRED.STRING) || type.equals(TypeCreator.NULLABLE.STRING)) {
       return createUnboundedVarcharType();
     } else if (type.equals(TypeCreator.REQUIRED.I32) || type.equals(TypeCreator.NULLABLE.I32)) {
@@ -37,8 +38,7 @@ public class DataTypeTransform {
         GRAVITON_UNSUPPORTED_GRAVITON_DATATYPE, "Unsupported graviton datatype: " + type);
   }
 
-  public static io.substrait.type.Type getGravitonType(
-      io.trino.spi.type.Type type, boolean nullable) {
+  public static io.substrait.type.Type getGravitonType(Type type, boolean nullable) {
     if (type.equals(VARCHAR)) {
       return nullable ? TypeCreator.NULLABLE.STRING : TypeCreator.REQUIRED.STRING;
     } else if (type.equals(INTEGER)) {
