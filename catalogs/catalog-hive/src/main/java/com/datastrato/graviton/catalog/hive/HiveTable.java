@@ -5,6 +5,7 @@
 package com.datastrato.graviton.catalog.hive;
 
 import static com.datastrato.graviton.catalog.hive.HiveTablePropertiesMetadata.COMMENT;
+import static com.datastrato.graviton.catalog.hive.HiveTablePropertiesMetadata.EXTERNAL;
 import static com.datastrato.graviton.catalog.hive.HiveTablePropertiesMetadata.FORMAT;
 import static com.datastrato.graviton.catalog.hive.HiveTablePropertiesMetadata.INPUT_FORMAT;
 import static com.datastrato.graviton.catalog.hive.HiveTablePropertiesMetadata.LOCATION;
@@ -171,6 +172,10 @@ public class HiveTable extends BaseTable {
   private Map<String, String> buildTableParameters() {
     Map<String, String> parameters = Maps.newHashMap(properties());
     parameters.put(COMMENT, comment);
+    String ignore =
+        EXTERNAL_TABLE.name().equalsIgnoreCase(properties().get(TABLE_TYPE))
+            ? parameters.put(EXTERNAL, "true")
+            : parameters.put(EXTERNAL, "false");
 
     parameters.remove(LOCATION);
     parameters.remove(TABLE_TYPE);

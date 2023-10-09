@@ -183,6 +183,33 @@ public final class PropertyEntry<T> {
     return stringPropertyEntry(name, description, false, true, null, hidden, true);
   }
 
+  public static PropertyEntry<Boolean> booleanReservedPropertyEntry(
+      String name, String description, boolean defaultValue, boolean hidden) {
+    return booleanPropertyEntry(name, description, false, true, defaultValue, hidden, true);
+  }
+
+  public static PropertyEntry<Boolean> booleanPropertyEntry(
+      String name,
+      String description,
+      boolean required,
+      boolean immutable,
+      Boolean defaultValue,
+      boolean hidden,
+      boolean reserved) {
+    return new Builder<Boolean>()
+        .withName(name)
+        .withDescription(description)
+        .withRequired(required)
+        .withImmutable(immutable)
+        .withJavaType(Boolean.class)
+        .withDefaultValue(defaultValue)
+        .withDecoder(Boolean::valueOf)
+        .withEncoder(b -> Boolean.toString(b))
+        .withHidden(hidden)
+        .withReserved(reserved)
+        .build();
+  }
+
   public static PropertyEntry<String> stringRequiredPropertyEntry(
       String name, String description, boolean immutable, boolean hidden) {
     return stringPropertyEntry(name, description, true, immutable, null, hidden, false);

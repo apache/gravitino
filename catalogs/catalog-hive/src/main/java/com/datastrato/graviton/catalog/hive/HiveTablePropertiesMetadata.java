@@ -4,6 +4,7 @@
  */
 package com.datastrato.graviton.catalog.hive;
 
+import static com.datastrato.graviton.catalog.PropertyEntry.booleanReservedPropertyEntry;
 import static com.datastrato.graviton.catalog.PropertyEntry.enumImmutablePropertyEntry;
 import static com.datastrato.graviton.catalog.PropertyEntry.stringImmutablePropertyEntry;
 import static com.datastrato.graviton.catalog.PropertyEntry.stringReservedPropertyEntry;
@@ -22,6 +23,7 @@ import org.apache.hadoop.hive.metastore.TableType;
 
 public class HiveTablePropertiesMetadata extends BasePropertiesMetadata {
   public static final String COMMENT = "comment";
+  public static final String EXTERNAL = "EXTERNAL";
   public static final String LOCATION = "location";
   public static final String FORMAT = "format";
   public static final String TABLE_TYPE = "tableType ";
@@ -119,6 +121,8 @@ public class HiveTablePropertiesMetadata extends BasePropertiesMetadata {
     List<PropertyEntry<?>> propertyEntries =
         ImmutableList.of(
             stringReservedPropertyEntry(COMMENT, "table comment", true),
+            booleanReservedPropertyEntry(
+                EXTERNAL, "Indicate whether it is an external table", false, true),
             stringImmutablePropertyEntry(
                 LOCATION, "HDFS location for table storage", false, null, false, false),
             enumImmutablePropertyEntry(

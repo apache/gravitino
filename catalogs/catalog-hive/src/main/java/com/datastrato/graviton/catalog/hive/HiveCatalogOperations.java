@@ -6,7 +6,6 @@ package com.datastrato.graviton.catalog.hive;
 
 import static com.datastrato.graviton.catalog.hive.HiveTable.SUPPORT_TABLE_TYPES;
 import static com.datastrato.graviton.catalog.hive.HiveTablePropertiesMetadata.COMMENT;
-import static com.datastrato.graviton.catalog.hive.HiveTablePropertiesMetadata.LOCATION;
 import static com.datastrato.graviton.catalog.hive.HiveTablePropertiesMetadata.TABLE_TYPE;
 
 import com.datastrato.graviton.NameIdentifier;
@@ -437,7 +436,10 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
         "Hive partition only supports identity transform");
     validateDistributionAndSort(distribution, sortOrders);
 
-    validateCreateTableProperties(properties);
+    TableType tableType = (TableType) tablePropertiesMetadata.getOrDefault(properties, TABLE_TYPE);
+    Preconditions.checkArgument(
+        SUPPORT_TABLE_TYPES.contains(tableType.name()),
+        "Unsupported table type: " + tableType.name());
 
     try {
       if (!schemaExists(schemaIdent)) {
@@ -478,22 +480,6 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
-  }
-
-  private void validateCreateTableProperties(Map<String, String> properties) {
-    TableType tableType = (TableType) tablePropertiesMetadata.getOrDefault(properties, TABLE_TYPE);
-    Preconditions.checkArgument(
-        SUPPORT_TABLE_TYPES.contains(tableType.name()),
-        "Unsupported table type: " + tableType.name());
-
-    boolean isExternalTable = tableType == TableType.EXTERNAL_TABLE;
-    boolean hasLocationProperty = properties.containsKey(LOCATION);
-
-    Preconditions.checkArgument(
-        !isExternalTable || hasLocationProperty, "External table must specify location property");
-    Preconditions.checkArgument(
-        !hasLocationProperty || isExternalTable,
-        "Only external table can specify location property");
   }
 
   /**
