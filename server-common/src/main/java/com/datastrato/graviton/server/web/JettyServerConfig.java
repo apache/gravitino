@@ -9,7 +9,7 @@ import com.datastrato.graviton.config.ConfigBuilder;
 import com.datastrato.graviton.config.ConfigEntry;
 import java.util.Map;
 
-public final class JettyServerContext {
+public final class JettyServerConfig {
 
   public static final ConfigEntry<String> WEBSERVER_HOST =
       new ConfigBuilder("host")
@@ -85,7 +85,7 @@ public final class JettyServerContext {
 
   private final Config internalConfig;
 
-  private JettyServerContext(Map<String, String> configs) {
+  private JettyServerConfig(Map<String, String> configs) {
     this.internalConfig = new Config(false) {};
     internalConfig.loadFromMap(configs, t -> true);
 
@@ -99,12 +99,12 @@ public final class JettyServerContext {
     this.threadPoolWorkQueueSize = internalConfig.get(WEBSERVER_THREAD_POOL_WORK_QUEUE_SIZE);
   }
 
-  public static JettyServerContext fromConfig(Config config, String prefix) {
+  public static JettyServerConfig fromConfig(Config config, String prefix) {
     Map<String, String> configs = config.getConfigsWithPrefix(prefix);
-    return new JettyServerContext(configs);
+    return new JettyServerConfig(configs);
   }
 
-  public static JettyServerContext fromConfig(Config config) {
+  public static JettyServerConfig fromConfig(Config config) {
     return fromConfig(config, "");
   }
 

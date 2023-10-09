@@ -41,26 +41,26 @@ public final class JettyServer {
 
   private ServletContextHandler servletContextHandler;
 
-  private JettyServerContext serverContext;
+  private JettyServerConfig serverConfig;
 
   private String serverName;
 
   public JettyServer() {}
 
-  public synchronized void initialize(JettyServerContext serverContext, String serverName) {
-    this.serverContext = serverContext;
+  public synchronized void initialize(JettyServerConfig serverConfig, String serverName) {
+    this.serverConfig = serverConfig;
     this.serverName = serverName;
 
     ExecutorThreadPool threadPool =
         createThreadPool(
-            serverContext.getCoreThreads(),
-            serverContext.getMaxThreads(),
-            serverContext.getThreadPoolWorkQueueSize());
+            serverConfig.getCoreThreads(),
+            serverConfig.getMaxThreads(),
+            serverConfig.getThreadPoolWorkQueueSize());
 
     // Create and config Jetty Server
     server = new Server(threadPool);
     server.setStopAtShutdown(true);
-    server.setStopTimeout(serverContext.getStopIdleTimeout());
+    server.setStopTimeout(serverConfig.getStopIdleTimeout());
 
     // Set error handler for Jetty Server
     ErrorHandler errorHandler = new ErrorHandler();
@@ -72,10 +72,10 @@ public final class JettyServer {
     ServerConnector httpConnector =
         createHttpServerConnector(
             server,
-            serverContext.getRequestHeaderSize(),
-            serverContext.getResponseHeaderSize(),
-            serverContext.getHost(),
-            serverContext.getHttpPort());
+            serverConfig.getRequestHeaderSize(),
+            serverConfig.getResponseHeaderSize(),
+            serverConfig.getHost(),
+            serverConfig.getHttpPort());
     server.addConnector(httpConnector);
 
     // TODO. Create and set https connector @jerry
@@ -91,8 +91,8 @@ public final class JettyServer {
       LOG.error(
           "Failed to start {} web server on host {} port {}, which is already in use.",
           serverName,
-          serverContext.getHost(),
-          serverContext.getHttpPort(),
+          serverConfig.getHost(),
+          serverConfig.getHttpPort(),
           e);
       throw new RuntimeException("Failed to start " + serverName + " web server.", e);
 
@@ -104,8 +104,8 @@ public final class JettyServer {
     LOG.info(
         "{} web server started on host {} port {}.",
         serverName,
-        serverContext.getHost(),
-        serverContext.getHttpPort());
+        serverConfig.getHost(),
+        serverConfig.getHttpPort());
   }
 
   public synchronized void join() {
@@ -135,8 +135,8 @@ public final class JettyServer {
         LOG.info(
             "{} web server stopped on host {} port {}.",
             serverName,
-            serverContext.getHost(),
-            serverContext.getHttpPort());
+            serverConfig.getHost(),
+            serverConfig.getHttpPort());
       } catch (Exception e) {
         // Swallow the exception.
         LOG.warn("Failed to stop {} web server.", serverName, e);

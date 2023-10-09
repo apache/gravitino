@@ -9,7 +9,7 @@ import com.datastrato.graviton.catalog.CatalogManager;
 import com.datastrato.graviton.catalog.CatalogOperationDispatcher;
 import com.datastrato.graviton.meta.MetalakeManager;
 import com.datastrato.graviton.server.web.JettyServer;
-import com.datastrato.graviton.server.web.JettyServerContext;
+import com.datastrato.graviton.server.web.JettyServerConfig;
 import com.datastrato.graviton.server.web.ObjectMapperProvider;
 import com.datastrato.graviton.server.web.VersioningFilter;
 import java.io.File;
@@ -45,9 +45,9 @@ public class GravitonServer extends ResourceConfig {
   }
 
   public void initialize() {
-    JettyServerContext serverContext =
-        JettyServerContext.fromConfig(serverConfig, WEBSERVER_CONF_PREFIX);
-    server.initialize(serverContext, SERVER_NAME);
+    JettyServerConfig jettyServerConfig =
+        JettyServerConfig.fromConfig(serverConfig, WEBSERVER_CONF_PREFIX);
+    server.initialize(jettyServerConfig, SERVER_NAME);
 
     gravitonEnv.initialize(serverConfig);
 

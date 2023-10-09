@@ -12,7 +12,7 @@ import com.datastrato.graviton.client.GravitonClient;
 import com.datastrato.graviton.integration.test.MiniGraviton;
 import com.datastrato.graviton.server.GravitonServer;
 import com.datastrato.graviton.server.ServerConfig;
-import com.datastrato.graviton.server.web.JettyServerContext;
+import com.datastrato.graviton.server.web.JettyServerConfig;
 import java.io.IOException;
 import org.apache.commons.io.FileUtils;
 import org.junit.jupiter.api.AfterAll;
@@ -58,10 +58,10 @@ public class AbstractIT {
       GravitonITUtils.startGravitonServer();
     }
 
-    JettyServerContext serverContext =
-        JettyServerContext.fromConfig(serverConfig, WEBSERVER_CONF_PREFIX);
+    JettyServerConfig jettyServerConfig =
+        JettyServerConfig.fromConfig(serverConfig, WEBSERVER_CONF_PREFIX);
 
-    String uri = "http://" + serverContext.getHost() + ":" + serverContext.getHttpPort();
+    String uri = "http://" + jettyServerConfig.getHost() + ":" + jettyServerConfig.getHttpPort();
     client = GravitonClient.builder(uri).build();
   }
 

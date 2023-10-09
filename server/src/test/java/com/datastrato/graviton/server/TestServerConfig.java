@@ -7,7 +7,7 @@ package com.datastrato.graviton.server;
 import com.datastrato.graviton.Configs;
 import com.datastrato.graviton.aux.AuxiliaryServiceManager;
 import com.datastrato.graviton.config.ConfigEntry;
-import com.datastrato.graviton.server.web.JettyServerContext;
+import com.datastrato.graviton.server.web.JettyServerConfig;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -29,7 +29,7 @@ public class TestServerConfig {
     configKeyMap.putAll(getConfigEntryFromClass(ServerConfig.class));
     configKeyMap.putAll(getConfigEntryFromClass(Configs.class));
     Map<String, String> jettyConfigMap =
-        getConfigEntryFromClass(JettyServerContext.class).entrySet().stream()
+        getConfigEntryFromClass(JettyServerConfig.class).entrySet().stream()
             .collect(
                 Collectors.toMap(
                     kv -> GravitonServer.WEBSERVER_CONF_PREFIX + kv.getKey(), Map.Entry::getValue));

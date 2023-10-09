@@ -10,7 +10,7 @@ import com.datastrato.graviton.catalog.lakehouse.iceberg.ops.IcebergTableOps;
 import com.datastrato.graviton.catalog.lakehouse.iceberg.web.IcebergExceptionMapper;
 import com.datastrato.graviton.catalog.lakehouse.iceberg.web.IcebergObjectMapperProvider;
 import com.datastrato.graviton.server.web.JettyServer;
-import com.datastrato.graviton.server.web.JettyServerContext;
+import com.datastrato.graviton.server.web.JettyServerConfig;
 import java.util.Map;
 import javax.servlet.Servlet;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
@@ -29,9 +29,9 @@ public class IcebergRESTService implements GravitonAuxiliaryService {
   public static final String SERVICE_NAME = "iceberg-rest";
 
   private void initServer(IcebergConfig icebergConfig) {
-    JettyServerContext serverContext = JettyServerContext.fromConfig(icebergConfig);
+    JettyServerConfig serverConfig = JettyServerConfig.fromConfig(icebergConfig);
     server = new JettyServer();
-    server.initialize(serverContext, SERVICE_NAME);
+    server.initialize(serverConfig, SERVICE_NAME);
 
     ResourceConfig config = new ResourceConfig();
     config.packages("com.datastrato.graviton.catalog.lakehouse.iceberg.web.rest");

@@ -10,7 +10,7 @@ import com.datastrato.graviton.aux.AuxiliaryServiceManager;
 import com.datastrato.graviton.catalog.lakehouse.iceberg.IcebergConfig;
 import com.datastrato.graviton.catalog.lakehouse.iceberg.IcebergRESTService;
 import com.datastrato.graviton.integration.test.util.AbstractIT;
-import com.datastrato.graviton.server.web.JettyServerContext;
+import com.datastrato.graviton.server.web.JettyServerConfig;
 import com.datastrato.graviton.utils.MapUtils;
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
@@ -46,7 +46,7 @@ public class IcebergRESTServiceBaseIT extends AbstractIT {
 
   private void initSparkEnv() {
     IcebergConfig icebergConfig = buildIcebergConfig(serverConfig);
-    int port = icebergConfig.get(JettyServerContext.WEBSERVER_HTTP_PORT);
+    int port = icebergConfig.get(JettyServerConfig.WEBSERVER_HTTP_PORT);
     LOG.info("Iceberg REST server port:{}", port);
     String IcebergRESTUri = String.format("http://127.0.0.1:%d/iceberg/", port);
     sparkSession =

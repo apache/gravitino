@@ -19,7 +19,7 @@ import com.datastrato.graviton.integration.test.util.ITUtils;
 import com.datastrato.graviton.rest.RESTUtils;
 import com.datastrato.graviton.server.GravitonServer;
 import com.datastrato.graviton.server.ServerConfig;
-import com.datastrato.graviton.server.web.JettyServerContext;
+import com.datastrato.graviton.server.web.JettyServerConfig;
 import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.io.IOException;
@@ -82,10 +82,10 @@ public class MiniGraviton {
     }
 
     // Initialize the REST client
-    JettyServerContext serverContext =
-        JettyServerContext.fromConfig(serverConfig, GravitonServer.WEBSERVER_CONF_PREFIX);
-    this.host = serverContext.getHost();
-    this.port = serverContext.getHttpPort();
+    JettyServerConfig jettyServerConfig =
+        JettyServerConfig.fromConfig(serverConfig, GravitonServer.WEBSERVER_CONF_PREFIX);
+    this.host = jettyServerConfig.getHost();
+    this.port = jettyServerConfig.getHttpPort();
     String URI = String.format("http://%s:%d", host, port);
     restClient = HTTPClient.builder(ImmutableMap.of()).uri(URI).build();
 
@@ -159,7 +159,7 @@ public class MiniGraviton {
       throws IOException {
     Map<String, String> configMap = new HashMap<>();
     configMap.put(
-        GravitonServer.WEBSERVER_CONF_PREFIX + JettyServerContext.WEBSERVER_HTTP_PORT.getKey(),
+        GravitonServer.WEBSERVER_CONF_PREFIX + JettyServerConfig.WEBSERVER_HTTP_PORT.getKey(),
         String.valueOf(RESTUtils.findAvailablePort(2000, 3000)));
     configMap.put(
         Configs.ENTRY_KV_ROCKSDB_BACKEND_PATH.getKey(), "/tmp/graviton-" + UUID.randomUUID());
@@ -181,7 +181,7 @@ public class MiniGraviton {
         AuxiliaryServiceManager.GRAVITON_AUX_SERVICE_PREFIX
             + IcebergRESTService.SERVICE_NAME
             + "."
-            + JettyServerContext.WEBSERVER_HTTP_PORT.getKey(),
+            + JettyServerConfig.WEBSERVER_HTTP_PORT.getKey(),
         String.valueOf(RESTUtils.findAvailablePort(3000, 4000)));
 
     Properties props = new Properties();
