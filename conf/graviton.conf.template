@@ -42,6 +42,6 @@ graviton.auxService.names = iceberg-rest
 # Iceberg REST service classpath
 graviton.auxService.iceberg-rest.classpath = catalogs/lakehouse-iceberg/libs
 # Iceberg REST service host
-graviton.auxService.iceberg-test.host = 127.0.0.1
+graviton.auxService.iceberg-rest.host = 127.0.0.1
 # Iceberg REST service http port
 graviton.auxService.iceberg-rest.httpPort = 9001
