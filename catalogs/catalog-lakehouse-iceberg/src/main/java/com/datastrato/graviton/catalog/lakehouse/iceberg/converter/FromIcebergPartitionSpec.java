@@ -46,8 +46,9 @@ public class FromIcebergPartitionSpec implements PartitionSpecVisitor<Transform>
 
   @Override
   public Transform truncate(String sourceName, int sourceId, int width) {
-    // TODO @minghuang Need to implement truncate type conversion
-    throw new UnsupportedOperationException();
+    Transforms.LiteralReference bucketNum = Transforms.literal(i32(false, width));
+    Transforms.NamedReference field = Transforms.field(new String[] {idToName.get(sourceId)});
+    return Transforms.function("truncate", new Transform[] {field, bucketNum});
   }
 
   @Override
