@@ -753,7 +753,8 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       protected Map<String, PropertyEntry<?>> specificPropertyEntries() {
         // Hive catalog only needs to specify the metastore URIs, maybe we need to add more by
         // referring to the trino catalog.
-        // TODO(yuqi), we can add more properties like client pool size when we finish refactor properties
+        // TODO(yuqi), we can add more properties like client pool size when we finish refactor
+        // properties
         //   framework.
         return ImmutableMap.<String, PropertyEntry<?>>builder()
             .put(
