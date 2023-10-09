@@ -19,6 +19,8 @@ import org.apache.iceberg.Schema;
 /** Convert Graviton Transforms to Iceberg PartitionSpec. */
 public class ToIcebergPartitionSpec {
 
+  private static final String DOT = ".";
+
   /**
    * Convert iceberg table to iceberg partition spec through graviton.
    *
@@ -49,7 +51,7 @@ public class ToIcebergPartitionSpec {
         String[] fieldName = ((Transforms.NamedReference) transform).value();
         Preconditions.checkArgument(
             fieldName.length == 1, "Iceberg partition does not support nested field", transform);
-        String colName = Arrays.stream(fieldName).collect(Collectors.joining());
+        String colName = String.join(DOT, fieldName);
         builder.identity(colName);
       } else if (transform instanceof Transforms.FunctionTrans) {
         Preconditions.checkArgument(
@@ -59,7 +61,7 @@ public class ToIcebergPartitionSpec {
         String colName =
             Arrays.stream(transform.arguments())
                 .map(t -> ((Transforms.NamedReference) t).value()[0])
-                .collect(Collectors.joining());
+                .collect(Collectors.joining(DOT));
         switch (transform.name().toLowerCase(Locale.ROOT)) {
             // TODO minghuang add support for other transforms.
           case "identity":
