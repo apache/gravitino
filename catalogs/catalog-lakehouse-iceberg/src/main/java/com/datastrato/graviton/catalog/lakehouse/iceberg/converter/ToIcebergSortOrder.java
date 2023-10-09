@@ -18,34 +18,27 @@ import org.apache.iceberg.SortDirection;
 /** Implement iceberg sort order converter to graviton sort order. */
 public class ToIcebergSortOrder {
 
+  private static final String DOT = ".";
+
   /**
-   * Convert graviton's order to iceberg's.
+   * Convert Graviton order to Iceberg.
    *
-   * @param schema
-   * @param sortOrders
-   * @return
+   * @param schema Iceberg schema.
+   * @param sortOrders Graviton sort order.
+   * @return Iceberg sort order.
    */
   public static org.apache.iceberg.SortOrder toSortOrder(Schema schema, SortOrder[] sortOrders) {
     if (ArrayUtils.isEmpty(sortOrders)) {
       return null;
     }
-    org.apache.iceberg.SortOrder icebergSortOrder;
     org.apache.iceberg.SortOrder.Builder sortOrderBuilder =
         org.apache.iceberg.SortOrder.builderFor(schema);
     for (SortOrder sortOrder : sortOrders) {
       Transform transform = sortOrder.getTransform();
       if (transform instanceof Transforms.NamedReference) {
-        String[] fieldName = ((Transforms.NamedReference) transform).value();
-        for (String name : fieldName) {
-          sortOrderBuilder.sortBy(
-              name,
-              sortOrder.getDirection() == SortOrder.Direction.ASC
-                  ? SortDirection.ASC
-                  : SortDirection.DESC,
-              sortOrder.getNullOrdering() == SortOrder.NullOrdering.FIRST
-                  ? NullOrder.NULLS_FIRST
-                  : NullOrder.NULLS_LAST);
-        }
+        String fieldName = String.join(DOT, ((Transforms.NamedReference) transform).value());
+        sortOrderBuilder.sortBy(
+            fieldName, toIceberg(sortOrder.getDirection()), toIceberg(sortOrder.getNullOrdering()));
       } else if (transform instanceof Transforms.FunctionTrans) {
         Preconditions.checkArgument(
             transform.arguments().length == 1,
@@ -54,20 +47,23 @@ public class ToIcebergSortOrder {
         String colName =
             Arrays.stream(transform.arguments())
                 .map(t -> ((Transforms.NamedReference) t).value()[0])
-                .collect(Collectors.joining());
+                .collect(Collectors.joining(DOT));
         sortOrderBuilder.sortBy(
-            colName,
-            sortOrder.getDirection() == SortOrder.Direction.ASC
-                ? SortDirection.ASC
-                : SortDirection.DESC,
-            sortOrder.getNullOrdering() == SortOrder.NullOrdering.FIRST
-                ? NullOrder.NULLS_FIRST
-                : NullOrder.NULLS_LAST);
+            colName, toIceberg(sortOrder.getDirection()), toIceberg(sortOrder.getNullOrdering()));
       } else {
         throw new UnsupportedOperationException("Transform is not supported: " + transform.name());
       }
     }
-    icebergSortOrder = sortOrderBuilder.build();
-    return icebergSortOrder;
+    return sortOrderBuilder.build();
+  }
+
+  private static NullOrder toIceberg(SortOrder.NullOrdering nullOrdering) {
+    return nullOrdering == SortOrder.NullOrdering.FIRST
+        ? NullOrder.NULLS_FIRST
+        : NullOrder.NULLS_LAST;
+  }
+
+  private static SortDirection toIceberg(SortOrder.Direction direction) {
+    return direction == SortOrder.Direction.ASC ? SortDirection.ASC : SortDirection.DESC;
   }
 }

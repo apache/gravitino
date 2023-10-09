@@ -45,7 +45,7 @@ public class ConvertUtil {
   }
 
   /**
-   * Convert the nested field. to the {@link IcebergColumn}.
+   * Convert the nested field of Iceberg to the Iceberg column.
    *
    * @param nestedField Iceberg nested field.
    * @return
