@@ -4,9 +4,6 @@
  */
 package com.datastrato.graviton.server.web;
 
-import com.datastrato.graviton.Config;
-import com.datastrato.graviton.server.GravitonServerException;
-import com.datastrato.graviton.server.ServerConfig;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.net.BindException;
 import java.util.EnumSet;
@@ -42,26 +39,28 @@ public final class JettyServer {
 
   private Server server;
 
-  private String host;
-
-  private int httpPort;
-
   private ServletContextHandler servletContextHandler;
+
+  private JettyServerConfig serverConfig;
+
+  private String serverName;
 
   public JettyServer() {}
 
-  public synchronized void initialize(Config config) {
-    int coreThreads = config.get(ServerConfig.WEBSERVER_CORE_THREADS);
-    int maxThreads = config.get(ServerConfig.WEBSERVER_MAX_THREADS);
-    long idleTimeout = config.get(ServerConfig.WEBSERVER_STOP_IDLE_TIMEOUT);
-    int threadPoolWorkQueueSize = config.get(ServerConfig.WEBSERVER_THREAD_POOL_WORK_QUEUE_SIZE);
+  public synchronized void initialize(JettyServerConfig serverConfig, String serverName) {
+    this.serverConfig = serverConfig;
+    this.serverName = serverName;
+
     ExecutorThreadPool threadPool =
-        createThreadPool(coreThreads, maxThreads, threadPoolWorkQueueSize);
+        createThreadPool(
+            serverConfig.getCoreThreads(),
+            serverConfig.getMaxThreads(),
+            serverConfig.getThreadPoolWorkQueueSize());
 
     // Create and config Jetty Server
     server = new Server(threadPool);
     server.setStopAtShutdown(true);
-    server.setStopTimeout(idleTimeout);
+    server.setStopTimeout(serverConfig.getStopIdleTimeout());
 
     // Set error handler for Jetty Server
     ErrorHandler errorHandler = new ErrorHandler();
@@ -70,12 +69,13 @@ public final class JettyServer {
     server.addBean(errorHandler);
 
     // Create and set Http ServerConnector
-    int reqHeaderSize = config.get(ServerConfig.WEBSERVER_REQUEST_HEADER_SIZE);
-    int respHeaderSize = config.get(ServerConfig.WEBSERVER_RESPONSE_HEADER_SIZE);
-    host = config.get(ServerConfig.WEBSERVER_HOST);
-    httpPort = config.get(ServerConfig.WEBSERVER_HTTP_PORT);
     ServerConnector httpConnector =
-        createHttpServerConnector(server, reqHeaderSize, respHeaderSize, host, httpPort);
+        createHttpServerConnector(
+            server,
+            serverConfig.getRequestHeaderSize(),
+            serverConfig.getResponseHeaderSize(),
+            serverConfig.getHost(),
+            serverConfig.getHttpPort());
     server.addConnector(httpConnector);
 
     // TODO. Create and set https connector @jerry
@@ -84,30 +84,35 @@ public final class JettyServer {
     initializeServletContextHandler(server);
   }
 
-  public synchronized void start() throws GravitonServerException {
+  public synchronized void start() throws RuntimeException {
     try {
       server.start();
     } catch (BindException e) {
       LOG.error(
-          "Failed to start web server on host {} port {}, which is already in use.",
-          host,
-          httpPort,
+          "Failed to start {} web server on host {} port {}, which is already in use.",
+          serverName,
+          serverConfig.getHost(),
+          serverConfig.getHttpPort(),
           e);
-      throw new GravitonServerException("Failed to start web server.", e);
+      throw new RuntimeException("Failed to start " + serverName + " web server.", e);
 
     } catch (Exception e) {
-      LOG.error("Failed to start web server.", e);
-      throw new GravitonServerException("Failed to start web server.", e);
+      LOG.error("Failed to start {} web server.", serverName, e);
+      throw new RuntimeException("Failed to start " + serverName + " web server.", e);
     }
 
-    LOG.info("Graviton web server started on host {} port {}.", host, httpPort);
+    LOG.info(
+        "{} web server started on host {} port {}.",
+        serverName,
+        serverConfig.getHost(),
+        serverConfig.getHttpPort());
   }
 
   public synchronized void join() {
     try {
       server.join();
     } catch (InterruptedException e) {
-      LOG.info("Interrupted while web server is joining.");
+      LOG.info("Interrupted while {} web server is joining.", serverName);
       Thread.currentThread().interrupt();
     }
   }
@@ -127,10 +132,14 @@ public final class JettyServer {
           ((LifeCycle) threadPool).stop();
         }
 
-        LOG.info("Graviton web server stopped on host {} port {}.", host, httpPort);
+        LOG.info(
+            "{} web server stopped on host {} port {}.",
+            serverName,
+            serverConfig.getHost(),
+            serverConfig.getHttpPort());
       } catch (Exception e) {
         // Swallow the exception.
-        LOG.warn("Failed to stop web server.", e);
+        LOG.warn("Failed to stop {} web server.", serverName, e);
       }
 
       server = null;
@@ -177,7 +186,7 @@ public final class JettyServer {
   private ServerConnector creatorServerConnector(
       Server server, ConnectionFactory[] connectionFactories) {
     Scheduler serverExecutor =
-        new ScheduledExecutorScheduler("graviton-webserver-JettyScheduler", true);
+        new ScheduledExecutorScheduler(serverName + "-webserver-JettyScheduler", true);
 
     return new ServerConnector(server, null, serverExecutor, null, -1, -1, connectionFactories);
   }
@@ -193,7 +202,11 @@ public final class JettyServer {
             new LinkedBlockingQueue<>(threadPoolWorkQueueSize),
             new ThreadFactoryBuilder()
                 .setDaemon(true)
-                .setNameFormat("jetty-webserver-%d")
+                .setNameFormat(serverName + "-%d")
+                .setUncaughtExceptionHandler(
+                    (thread, throwable) -> {
+                      LOG.error("{} uncaught exception:", thread.getName(), throwable);
+                    })
                 .build()));
   }
 }

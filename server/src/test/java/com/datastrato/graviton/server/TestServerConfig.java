@@ -7,6 +7,7 @@ package com.datastrato.graviton.server;
 import com.datastrato.graviton.Configs;
 import com.datastrato.graviton.aux.AuxiliaryServiceManager;
 import com.datastrato.graviton.config.ConfigEntry;
+import com.datastrato.graviton.server.web.JettyServerConfig;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -15,6 +16,7 @@ import java.nio.file.Files;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -26,6 +28,12 @@ public class TestServerConfig {
     Map<String, String> configKeyMap = new HashMap<>();
     configKeyMap.putAll(getConfigEntryFromClass(ServerConfig.class));
     configKeyMap.putAll(getConfigEntryFromClass(Configs.class));
+    Map<String, String> jettyConfigMap =
+        getConfigEntryFromClass(JettyServerConfig.class).entrySet().stream()
+            .collect(
+                Collectors.toMap(
+                    kv -> GravitonServer.WEBSERVER_CONF_PREFIX + kv.getKey(), Map.Entry::getValue));
+    configKeyMap.putAll(jettyConfigMap);
 
     // Load all config keys from `graviton.conf.template` into a map
     Properties properties = new Properties();

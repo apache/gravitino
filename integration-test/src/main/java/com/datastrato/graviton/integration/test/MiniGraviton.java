@@ -9,7 +9,6 @@ import static com.datastrato.graviton.Configs.ENTRY_KV_ROCKSDB_BACKEND_PATH;
 import com.datastrato.graviton.Config;
 import com.datastrato.graviton.Configs;
 import com.datastrato.graviton.aux.AuxiliaryServiceManager;
-import com.datastrato.graviton.catalog.lakehouse.iceberg.IcebergRESTConfig;
 import com.datastrato.graviton.catalog.lakehouse.iceberg.IcebergRESTService;
 import com.datastrato.graviton.client.ErrorHandlers;
 import com.datastrato.graviton.client.HTTPClient;
@@ -20,6 +19,7 @@ import com.datastrato.graviton.integration.test.util.ITUtils;
 import com.datastrato.graviton.rest.RESTUtils;
 import com.datastrato.graviton.server.GravitonServer;
 import com.datastrato.graviton.server.ServerConfig;
+import com.datastrato.graviton.server.web.JettyServerConfig;
 import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.io.IOException;
@@ -45,6 +45,10 @@ public class MiniGraviton {
   private final File mockConfDir;
   private final ServerConfig serverConfig = new ServerConfig();
   private final ExecutorService executor = Executors.newSingleThreadExecutor();
+
+  private String host;
+
+  private int port;
 
   public MiniGraviton() throws IOException {
     this.mockConfDir = Files.createTempDirectory("MiniGraviton").toFile();
@@ -78,8 +82,10 @@ public class MiniGraviton {
     }
 
     // Initialize the REST client
-    String host = serverConfig.get(ServerConfig.WEBSERVER_HOST);
-    int port = serverConfig.get(ServerConfig.WEBSERVER_HTTP_PORT);
+    JettyServerConfig jettyServerConfig =
+        JettyServerConfig.fromConfig(serverConfig, GravitonServer.WEBSERVER_CONF_PREFIX);
+    this.host = jettyServerConfig.getHost();
+    this.port = jettyServerConfig.getHttpPort();
     String URI = String.format("http://%s:%d", host, port);
     restClient = HTTPClient.builder(ImmutableMap.of()).uri(URI).build();
 
@@ -153,7 +159,7 @@ public class MiniGraviton {
       throws IOException {
     Map<String, String> configMap = new HashMap<>();
     configMap.put(
-        ServerConfig.WEBSERVER_HTTP_PORT.getKey(),
+        GravitonServer.WEBSERVER_CONF_PREFIX + JettyServerConfig.WEBSERVER_HTTP_PORT.getKey(),
         String.valueOf(RESTUtils.findAvailablePort(2000, 3000)));
     configMap.put(
         Configs.ENTRY_KV_ROCKSDB_BACKEND_PATH.getKey(), "/tmp/graviton-" + UUID.randomUUID());
@@ -175,7 +181,7 @@ public class MiniGraviton {
         AuxiliaryServiceManager.GRAVITON_AUX_SERVICE_PREFIX
             + IcebergRESTService.SERVICE_NAME
             + "."
-            + IcebergRESTConfig.ICEBERG_REST_SERVER_HTTP_PORT.getKey(),
+            + JettyServerConfig.WEBSERVER_HTTP_PORT.getKey(),
         String.valueOf(RESTUtils.findAvailablePort(3000, 4000)));
 
     Properties props = new Properties();
@@ -195,8 +201,6 @@ public class MiniGraviton {
   }
 
   private boolean checkIfServerIsRunning() {
-    String host = serverConfig.get(ServerConfig.WEBSERVER_HOST);
-    int port = serverConfig.get(ServerConfig.WEBSERVER_HTTP_PORT);
     String URI = String.format("http://%s:%d", host, port);
     LOG.info("checkIfServerIsRunning() URI: {}", URI);
 
