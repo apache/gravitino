@@ -666,6 +666,57 @@ public class TestTableOperations extends JerseyTest {
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResp2.getType());
   }
 
+  @Test
+  public void testPurgeTable() {
+    when(dispatcher.purgeTable(any())).thenReturn(true);
+
+    Response resp =
+        target(tablePath(metalake, catalog, schema) + "table1")
+            .queryParam("purge", true)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.graviton.v1+json")
+            .delete();
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+
+    DropResponse dropResponse = resp.readEntity(DropResponse.class);
+    Assertions.assertEquals(0, dropResponse.getCode());
+    Assertions.assertTrue(dropResponse.dropped());
+
+    // Test when failed to drop table
+    when(dispatcher.purgeTable(any())).thenReturn(false);
+
+    Response resp1 =
+        target(tablePath(metalake, catalog, schema) + "table1")
+            .queryParam("purge", true)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.graviton.v1+json")
+            .delete();
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp1.getStatus());
+
+    DropResponse dropResponse1 = resp1.readEntity(DropResponse.class);
+    Assertions.assertEquals(0, dropResponse1.getCode());
+    Assertions.assertFalse(dropResponse1.dropped());
+
+    // Test throw RuntimeException
+    doThrow(new RuntimeException("mock error")).when(dispatcher).purgeTable(any());
+
+    Response resp2 =
+        target(tablePath(metalake, catalog, schema) + "table1")
+            .queryParam("purge", true)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.graviton.v1+json")
+            .delete();
+
+    Assertions.assertEquals(
+        Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), resp2.getStatus());
+
+    ErrorResponse errorResp2 = resp2.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResp2.getCode());
+    Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResp2.getType());
+  }
+
   private void testAlterTableRequest(TableUpdateRequest req, Table updatedTable) {
     TableUpdatesRequest updatesRequest = new TableUpdatesRequest(ImmutableList.of(req));
 
