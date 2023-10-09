@@ -9,12 +9,15 @@ import com.datastrato.graviton.Config;
 import com.datastrato.graviton.aux.AuxiliaryServiceManager;
 import com.datastrato.graviton.catalog.lakehouse.iceberg.IcebergConfig;
 import com.datastrato.graviton.catalog.lakehouse.iceberg.IcebergRESTService;
+import com.datastrato.graviton.catalog.lakehouse.iceberg.utils.IcebergCatalogUtil;
+import com.datastrato.graviton.catalog.lakehouse.iceberg.utils.IcebergCatalogUtil.CatalogType;
 import com.datastrato.graviton.integration.test.util.AbstractIT;
 import com.datastrato.graviton.server.web.JettyServerConfig;
 import com.datastrato.graviton.utils.MapUtils;
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -23,16 +26,114 @@ import java.util.stream.IntStream;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.api.TestInstance.Lifecycle;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /*
  * <p>Referred from spark/v3.4/spark/src/test/java/org/apache/iceberg/spark/SparkTestBase.java
  */
-public class IcebergRESTServiceBaseIT extends AbstractIT {
-  private SparkSession sparkSession;
 
-  public IcebergRESTServiceBaseIT() {
+@TestInstance(Lifecycle.PER_CLASS)
+public class IcebergRESTServiceBaseIT extends AbstractIT {
+  public static final Logger LOG = LoggerFactory.getLogger(IcebergRESTServiceBaseIT.class);
+  private SparkSession sparkSession;
+  protected CatalogType catalogType = IcebergCatalogUtil.CatalogType.MEMORY;
+
+  @BeforeAll
+  void initIcebergTestEnv() throws Exception {
+    registerIcebergCatalogConfig();
+    AbstractIT.startIntegrationTest();
     initSparkEnv();
+    LOG.info("graviton and spark env started,{}", catalogType);
+  }
+
+  @AfterAll
+  void stopIcebergTestEnv() throws Exception {
+    stopSparkEnv();
+    AbstractIT.stopIntegrationTest();
+    LOG.info("graviton and spark env stopped,{}", catalogType);
+  }
+
+  // the purpose of `startIntegrationTest` and `stopIntegrationTest` is to
+  // stop the corresponding func in AbstractIT auto run by junit
+  @BeforeAll
+  public static void startIntegrationTest() {}
+
+  @AfterAll
+  public static void stopIntegrationTest() {}
+
+  private void registerIcebergCatalogConfig() {
+    Map<String, String> icebergConfigs;
+
+    switch (catalogType) {
+      case HIVE:
+        icebergConfigs = getIcebergHiveCatalogConfigs();
+        break;
+      case JDBC:
+        icebergConfigs = getIcebergJdbcCatalogConfigs();
+        break;
+      case MEMORY:
+        icebergConfigs = getIcebergMemoryCatalogConfigs();
+        break;
+      default:
+        throw new RuntimeException("Not support Iceberg catalog type:" + catalogType);
+    }
+
+    AbstractIT.registerCustomConfigs(icebergConfigs);
+    LOG.info("Iceberg REST service config registered," + StringUtils.join(icebergConfigs));
+  }
+
+  private static Map<String, String> getIcebergMemoryCatalogConfigs() {
+    Map<String, String> configMap = new HashMap<>();
+    configMap.put(
+        AuxiliaryServiceManager.GRAVITON_AUX_SERVICE_PREFIX
+            + IcebergRESTService.SERVICE_NAME
+            + "."
+            + IcebergConfig.CATALOG_TYPE.getKey(),
+        "memory");
+
+    configMap.put(
+        AuxiliaryServiceManager.GRAVITON_AUX_SERVICE_PREFIX
+            + IcebergRESTService.SERVICE_NAME
+            + "."
+            + "warehouse",
+        "/tmp/");
+    return configMap;
+  }
+
+  private static Map<String, String> getIcebergJdbcCatalogConfigs() {
+    Map<String, String> configMap = new HashMap<>();
+    return configMap;
+  }
+
+  private static Map<String, String> getIcebergHiveCatalogConfigs() {
+    Map<String, String> customConfigs = new HashMap<>();
+    customConfigs.put(
+        AuxiliaryServiceManager.GRAVITON_AUX_SERVICE_PREFIX
+            + IcebergRESTService.SERVICE_NAME
+            + "."
+            + IcebergConfig.CATALOG_TYPE.getKey(),
+        "hive");
+
+    customConfigs.put(
+        AuxiliaryServiceManager.GRAVITON_AUX_SERVICE_PREFIX
+            + IcebergRESTService.SERVICE_NAME
+            + "."
+            + "uri",
+        "thrift://127.0.0.1:9083");
+
+    customConfigs.put(
+        AuxiliaryServiceManager.GRAVITON_AUX_SERVICE_PREFIX
+            + IcebergRESTService.SERVICE_NAME
+            + "."
+            + "warehouse",
+        "file:///tmp/user/hive/warehouse-hive/");
+    return customConfigs;
   }
 
   private static IcebergConfig buildIcebergConfig(Config config) {
@@ -45,7 +146,7 @@ public class IcebergRESTServiceBaseIT extends AbstractIT {
   }
 
   private void initSparkEnv() {
-    IcebergConfig icebergConfig = buildIcebergConfig(serverConfig);
+    IcebergConfig icebergConfig = buildIcebergConfig(AbstractIT.getServerConfig());
     int port = icebergConfig.get(JettyServerConfig.WEBSERVER_HTTP_PORT);
     LOG.info("Iceberg REST server port:{}", port);
     String IcebergRESTUri = String.format("http://127.0.0.1:%d/iceberg/", port);
@@ -59,8 +160,13 @@ public class IcebergRESTServiceBaseIT extends AbstractIT {
             .config("spark.sql.catalog.rest.type", "rest")
             .config("spark.sql.catalog.rest.uri", IcebergRESTUri)
             .getOrCreate();
+  }
 
-    sparkSession.sparkContext().setLogLevel("WARN");
+  private void stopSparkEnv() {
+    if (sparkSession != null) {
+      sparkSession.close();
+      sparkSession = null;
+    }
   }
 
   protected List<Object[]> sql(String query, Object... args) {
@@ -137,6 +243,10 @@ public class IcebergRESTServiceBaseIT extends AbstractIT {
 
   protected Set<String> convertToStringSet(List<Object[]> objects, int index) {
     return objects.stream().map(row -> String.valueOf(row[index])).collect(Collectors.toSet());
+  }
+
+  protected List<String> convertToStringList(List<Object[]> objects, int index) {
+    return objects.stream().map(row -> String.valueOf(row[index])).collect(Collectors.toList());
   }
 
   protected Map<String, String> convertToStringMap(List<Object[]> objects) {

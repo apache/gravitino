@@ -10,10 +10,16 @@ import static com.datastrato.graviton.server.GravitonServer.WEBSERVER_CONF_PREFI
 import com.datastrato.graviton.Config;
 import com.datastrato.graviton.client.GravitonClient;
 import com.datastrato.graviton.integration.test.MiniGraviton;
+import com.datastrato.graviton.integration.test.MiniGravitonContext;
 import com.datastrato.graviton.server.GravitonServer;
 import com.datastrato.graviton.server.ServerConfig;
 import com.datastrato.graviton.server.web.JettyServerConfig;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.HashMap;
+import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -27,27 +33,48 @@ public class AbstractIT {
   protected static GravitonClient client;
 
   private static MiniGraviton miniGraviton;
-
-  private static final String TEST_MODE = "testMode";
-  private static final String EMBEDDED_TEST_MODE = "embedded";
-
   protected static Config serverConfig;
 
   static String testMode = "";
 
+  protected static Map<String, String> customConfigs = new HashMap<>();
+
+  public static void registerCustomConfigs(Map<String, String> configs) {
+    customConfigs.putAll(configs);
+  }
+
+  private static void rewriteGravitonServerConfig() throws IOException {
+    if (customConfigs.isEmpty()) return;
+
+    String gravitonHome = System.getenv("GRAVITON_HOME");
+
+    String tmpFileName = GravitonServer.CONF_FILE + ".tmp";
+    Path tmpPath = Paths.get(gravitonHome, "conf", tmpFileName);
+    Files.deleteIfExists(tmpPath);
+
+    Path configPath = Paths.get(gravitonHome, "conf", GravitonServer.CONF_FILE);
+    Files.move(configPath, tmpPath);
+
+    ITUtils.rewriteConfigFile(tmpPath.toString(), configPath.toString(), customConfigs);
+  }
+
   @BeforeAll
   public static void startIntegrationTest() throws Exception {
     testMode =
-        System.getProperty(TEST_MODE) == null ? EMBEDDED_TEST_MODE : System.getProperty(TEST_MODE);
+        System.getProperty(ITUtils.TEST_MODE) == null
+            ? ITUtils.EMBEDDED_TEST_MODE
+            : System.getProperty(ITUtils.TEST_MODE);
 
     LOG.info("Running Graviton Server in {} mode", testMode);
 
     serverConfig = new ServerConfig();
-    if (testMode != null && testMode.equals(EMBEDDED_TEST_MODE)) {
-      miniGraviton = new MiniGraviton();
+    if (testMode != null && testMode.equals(ITUtils.EMBEDDED_TEST_MODE)) {
+      MiniGravitonContext context = new MiniGravitonContext(customConfigs);
+      miniGraviton = new MiniGraviton(context);
       miniGraviton.start();
       serverConfig = miniGraviton.getServerConfig();
     } else {
+      rewriteGravitonServerConfig();
       serverConfig.loadFromFile(GravitonServer.CONF_FILE);
 
       try {
@@ -72,11 +99,15 @@ public class AbstractIT {
     if (client != null) {
       client.close();
     }
-    if (testMode != null && testMode.equals(EMBEDDED_TEST_MODE)) {
+    if (testMode != null && testMode.equals(ITUtils.EMBEDDED_TEST_MODE)) {
       miniGraviton.stop();
     } else {
       GravitonITUtils.stopGravitonServer();
     }
     LOG.info("Tearing down Graviton Server");
+  }
+
+  public static Config getServerConfig() {
+    return serverConfig;
   }
 }
