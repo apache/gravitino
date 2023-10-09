@@ -11,9 +11,13 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.trino.spi.connector.ColumnHandle;
 
+/**
+ * The GravitonColumnHandle is used to transform column information between Trino and Graviton, as
+ * well as to wrap the inner connector column handle for data access.
+ */
 public final class GravitonColumnHandle implements ColumnHandle {
-  private String columnName;
-  private ColumnHandle internalColumnHandler;
+  private final String columnName;
+  private final ColumnHandle internalColumnHandler;
 
   @JsonCreator
   public GravitonColumnHandle(

@@ -10,6 +10,7 @@ import com.datastrato.graviton.rel.Column;
 import io.substrait.type.Type;
 import java.util.Map;
 
+/** Help Graviton connector access ColumnMetadata from graviton client. */
 public final class GravitonColumn {
   private final Column column;
   private final int index;

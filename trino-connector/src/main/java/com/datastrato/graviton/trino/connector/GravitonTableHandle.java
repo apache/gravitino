@@ -11,6 +11,10 @@ import io.trino.spi.connector.ConnectorTableHandle;
 import io.trino.spi.connector.SchemaTableName;
 import java.util.Objects;
 
+/**
+ * The GravitonTableHandle is used to transform table information between Trino and Graviton, as
+ * well as to wrap the inner connector table handle for data access.
+ */
 public final class GravitonTableHandle implements ConnectorTableHandle {
 
   private final String schemaName;
@@ -25,7 +29,7 @@ public final class GravitonTableHandle implements ConnectorTableHandle {
       @JsonProperty("internalTableHandle") ConnectorTableHandle internalTableHandle) {
     Preconditions.checkArgument(schemaName != null, "schemaName is not null");
     Preconditions.checkArgument(tableName != null, "tableName is not null");
-    Preconditions.checkArgument(internalTableHandle != null, "tableName is not null");
+    Preconditions.checkArgument(internalTableHandle != null, "internalTableHandle is not null");
 
     this.schemaName = schemaName;
     this.tableName = tableName;

@@ -7,6 +7,7 @@ package com.datastrato.graviton.trino.connector.metadata;
 import com.datastrato.graviton.rel.Schema;
 import java.util.Map;
 
+/** Help Graviton connector access SchemaMetadata from graviton client. */
 public class GravitonSchema {
 
   private final Schema schema;

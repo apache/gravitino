@@ -51,14 +51,14 @@ public class CatalogInjector {
   }
 
   public void bindCatalogManager(ConnectorContext context) {
-    // injector trino catalog need NodeManager support allCatalogsOnAllNodes;
+    // Injector trino catalog need NodeManager support allCatalogsOnAllNodes;
     checkTrinoSpiVersion(context);
 
     // Try to get trino CatalogFactory instance, normally we can get the catalog from
     // CatalogFactory, then add catalog to it that loaded from graviton.
 
     try {
-      // set NodeManager  allCatalogsOnAllNodes = true & activeNodesByCatalogHandle = empty
+      // Set NodeManager allCatalogsOnAllNodes = true & activeNodesByCatalogHandle = empty
       Object nodeManager = context.getNodeManager();
       Field field = nodeManager.getClass().getDeclaredField("nodeManager");
       field.setAccessible(true);
@@ -77,7 +77,7 @@ public class CatalogInjector {
         field.set(nodeManager, Optional.empty());
       }
 
-      // find CatalogManager
+      // Find CatalogManager
       MetadataProvider metadataProvider = context.getMetadataProvider();
 
       field = metadataProvider.getClass().getDeclaredField("metadata");
@@ -103,7 +103,7 @@ public class CatalogInjector {
       Object catalogManager = field.get(transactionManager);
       Preconditions.checkNotNull(catalogManager, "catalogManager should not be null");
 
-      // find CatalogFactory, createCatalog method, and CatalogProperties.
+      // Find CatalogFactory, createCatalog method, and CatalogProperties.
       field = catalogManager.getClass().getDeclaredField("catalogFactory");
       field.setAccessible(true);
       Object catalogFactory = field.get(catalogManager);
@@ -128,18 +128,17 @@ public class CatalogInjector {
             Object catalogConnector =
                 createCatalogMethod.invoke(catalogFactory, catalogPropertiesObject);
 
-            // get a connector object from trino CatalogConnector.
+            // Get a connector object from trino CatalogConnector.
             Field connectorField = catalogConnector.getClass().getDeclaredField("catalogConnector");
             connectorField.setAccessible(true);
             Object connectorService = connectorField.get(catalogConnector);
 
             connectorField = connectorService.getClass().getDeclaredField("connector");
             connectorField.setAccessible(true);
-            Object connector = connectorField.get(connectorService);
-            return connector;
+            return connectorField.get(connectorService);
           };
 
-      // find CatalogManager.catalogs
+      // Find CatalogManager.catalogs
       if (catalogManager.getClass().getName().endsWith("CoordinatorDynamicCatalogManager")) {
         field = catalogManager.getClass().getDeclaredField("activeCatalogs");
         field.setAccessible(true);
@@ -153,7 +152,7 @@ public class CatalogInjector {
 
         injectHandle =
             (catalogName, catalogProperties) -> {
-              // call CatalogFactory:createCatalog and add the catalog to
+              // Call CatalogFactory:createCatalog and add the catalog to
               // CoordinatorDynamicCatalogManager
               ObjectMapper objectMapper = new ObjectMapper();
               Object catalogPropertiesObject =

@@ -39,7 +39,7 @@ public class CatalogConnectorFactory {
       throw new TrinoException(GRAVITON_UNSUPPORTED_CATALOG_PROVIDER, message);
     }
 
-    // need to use a copy of builder to avoid garbage data.
+    // Need to use a copy of builder to avoid garbage data.
     builder = new CatalogConnectorContext.Builder(builder);
 
     try {

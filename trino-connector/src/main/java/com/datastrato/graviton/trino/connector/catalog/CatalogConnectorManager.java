@@ -84,7 +84,7 @@ public class CatalogConnectorManager {
     }
     this.usedMetalake = metalake;
 
-    // schedule a task to load catalog from graviton server.
+    // Schedule a task to load catalog from graviton server.
     executorService.execute(this::loadMetalake);
     LOG.info("Graviton CatalogConnectorManager started.");
   }
@@ -106,7 +106,7 @@ public class CatalogConnectorManager {
       loadCatalogs(metalake);
       // TODO (yuhui) need to handle metalake dropped.
     } finally {
-      // load metalake for handling catalog in the metalake updates.
+      // Load metalake for handling catalog in the metalake updates.
       executorService.schedule(this::loadMetalake, CATALOG_LOAD_FREQUENCY_SECOND, TimeUnit.SECONDS);
     }
   }

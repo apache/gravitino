@@ -17,7 +17,7 @@ import static io.trino.spi.type.VarcharType.createUnboundedVarcharType;
 import io.substrait.type.TypeCreator;
 import io.trino.spi.TrinoException;
 
-/** This class used to transform datatype between graviton and trino */
+/** This class is used to transform datatype between graviton and trino */
 public class DataTypeTransform {
 
   public static io.trino.spi.type.Type getTrinoType(io.substrait.type.Type type) {
@@ -39,30 +39,16 @@ public class DataTypeTransform {
 
   public static io.substrait.type.Type getGravitonType(
       io.trino.spi.type.Type type, boolean nullable) {
-    if (nullable) {
-      if (type.equals(VARCHAR)) {
-        return TypeCreator.NULLABLE.STRING;
-      } else if (type.equals(INTEGER)) {
-        return TypeCreator.NULLABLE.I32;
-      } else if (type.equals(BIGINT)) {
-        return TypeCreator.NULLABLE.I64;
-      } else if (type.equals(DATE)) {
-        return TypeCreator.NULLABLE.DATE;
-      } else if (type.equals(TIMESTAMP_SECONDS)) {
-        return TypeCreator.NULLABLE.TIMESTAMP;
-      }
-    } else {
-      if (type.equals(VARCHAR)) {
-        return TypeCreator.REQUIRED.STRING;
-      } else if (type.equals(INTEGER)) {
-        return TypeCreator.REQUIRED.I32;
-      } else if (type.equals(BIGINT)) {
-        return TypeCreator.REQUIRED.I64;
-      } else if (type.equals(DATE)) {
-        return TypeCreator.REQUIRED.DATE;
-      } else if (type.equals(TIMESTAMP_SECONDS)) {
-        return TypeCreator.REQUIRED.TIMESTAMP;
-      }
+    if (type.equals(VARCHAR)) {
+      return nullable ? TypeCreator.NULLABLE.STRING : TypeCreator.REQUIRED.STRING;
+    } else if (type.equals(INTEGER)) {
+      return nullable ? TypeCreator.NULLABLE.I32 : TypeCreator.REQUIRED.I32;
+    } else if (type.equals(BIGINT)) {
+      return nullable ? TypeCreator.NULLABLE.I64 : TypeCreator.REQUIRED.I64;
+    } else if (type.equals(DATE)) {
+      return nullable ? TypeCreator.NULLABLE.DATE : TypeCreator.REQUIRED.DATE;
+    } else if (type.equals(TIMESTAMP_SECONDS)) {
+      return nullable ? TypeCreator.NULLABLE.TIMESTAMP : TypeCreator.REQUIRED.TIMESTAMP;
     }
     throw new TrinoException(
         GRAVITON_UNSUPPORTED_TRINO_DATATYPE, "Unsupported trino datatype: " + type);

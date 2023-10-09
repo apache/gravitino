@@ -21,6 +21,6 @@ public interface CatalogConnectorAdapter {
     return emptyList();
   }
 
-  /** @return internal connector config which trino. */
+  /** @return Return internal connector config with trino. */
   Map<String, Object> buildInternalConnectorConfig(GravitonCatalog catalog);
 }

@@ -4,7 +4,6 @@
  */
 package com.datastrato.graviton.trino.connector.metadata;
 
-import com.datastrato.graviton.rel.Column;
 import com.datastrato.graviton.rel.Table;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.google.common.collect.ImmutableList;
@@ -12,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+/** Help Graviton connector access TableMetadata from graviton client. */
 public class GravitonTable {
   private final String schemaName;
   private final Table tableMetadata;
@@ -24,10 +24,8 @@ public class GravitonTable {
     this.tableMetadata = tableMetadata;
 
     ImmutableList.Builder<GravitonColumn> table_columns = ImmutableList.builder();
-    int i = 0;
-    for (Column column : tableMetadata.columns()) {
-      table_columns.add(new GravitonColumn(column, i));
-      i++;
+    for (int i = 0; i < tableMetadata.columns().length; i++) {
+      table_columns.add(new GravitonColumn(tableMetadata.columns()[i], i));
     }
     this.columns = table_columns.build();
 

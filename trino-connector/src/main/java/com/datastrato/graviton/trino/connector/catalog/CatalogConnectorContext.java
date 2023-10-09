@@ -25,10 +25,10 @@ public class CatalogConnectorContext {
   private final NameIdentifier catalogName;
   private final GravitonMetaLake metalake;
 
-  // connector communicates with trino
+  // Connector communicates with trino
   private final GravitonConnector connector;
 
-  // internal connector communicates with data storage
+  // Internal connector communicates with data storage
   private final Connector internalConnector;
 
   private final CatalogConnectorAdapter adapter;
