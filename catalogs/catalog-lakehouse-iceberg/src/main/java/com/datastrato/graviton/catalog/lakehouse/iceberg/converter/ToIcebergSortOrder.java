@@ -8,12 +8,16 @@ import com.datastrato.graviton.rel.SortOrder;
 import com.datastrato.graviton.rel.transforms.Transform;
 import com.datastrato.graviton.rel.transforms.Transforms;
 import com.google.common.base.Preconditions;
+import io.substrait.expression.Expression;
 import java.util.Arrays;
+import java.util.Locale;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.iceberg.NullOrder;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.SortDirection;
+import org.apache.iceberg.expressions.Expressions;
+import org.apache.iceberg.expressions.UnboundTerm;
 
 /** Implement iceberg sort order converter to graviton sort order. */
 public class ToIcebergSortOrder {
@@ -48,8 +52,43 @@ public class ToIcebergSortOrder {
             Arrays.stream(transform.arguments())
                 .map(t -> ((Transforms.NamedReference) t).value()[0])
                 .collect(Collectors.joining(DOT));
+        UnboundTerm<Object> expression;
+        switch (transform.name().toLowerCase(Locale.ROOT)) {
+            // TODO minghuang - add more functions implementation.
+          case "bucket":
+            int numBuckets =
+                ((Expression.I32Literal)
+                        ((Transforms.LiteralReference) transform.arguments()[0]).value())
+                    .value();
+            expression = Expressions.bucket(colName, numBuckets);
+            break;
+          case "truncate":
+            int width =
+                ((Expression.I32Literal)
+                        ((Transforms.LiteralReference) transform.arguments()[0]).value())
+                    .value();
+            expression = Expressions.truncate(colName, width);
+            break;
+          case Transforms.NAME_OF_YEAR:
+            expression = Expressions.year(colName);
+            break;
+          case Transforms.NAME_OF_MONTH:
+            expression = Expressions.month(colName);
+            break;
+          case Transforms.NAME_OF_DAY:
+            expression = Expressions.day(colName);
+            break;
+          case Transforms.NAME_OF_HOUR:
+            expression = Expressions.hour(colName);
+            break;
+          default:
+            throw new UnsupportedOperationException(
+                "Transform is not supported: " + transform.name());
+        }
         sortOrderBuilder.sortBy(
-            colName, toIceberg(sortOrder.getDirection()), toIceberg(sortOrder.getNullOrdering()));
+            expression,
+            toIceberg(sortOrder.getDirection()),
+            toIceberg(sortOrder.getNullOrdering()));
       } else {
         throw new UnsupportedOperationException("Transform is not supported: " + transform.name());
       }

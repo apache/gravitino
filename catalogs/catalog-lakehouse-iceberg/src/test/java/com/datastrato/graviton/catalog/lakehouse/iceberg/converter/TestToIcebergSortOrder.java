@@ -68,7 +68,11 @@ public class TestToIcebergSortOrder extends TestBaseConvert {
       String colName = idToName.get(sortField.sourceId());
       Assertions.assertTrue(sortOrderByName.containsKey(colName));
       SortOrder sortOrder = sortOrderByName.get(colName);
-      Assertions.assertTrue(sortField.transform().isIdentity());
+      if (colName.equals("col_6") || colName.equals("col_7") || colName.equals("col_8")) {
+        Assertions.assertFalse(sortField.transform().isIdentity());
+      } else {
+        Assertions.assertTrue(sortField.transform().isIdentity());
+      }
       Assertions.assertEquals(
           sortOrder.getDirection() == SortOrder.Direction.ASC
               ? SortDirection.ASC
