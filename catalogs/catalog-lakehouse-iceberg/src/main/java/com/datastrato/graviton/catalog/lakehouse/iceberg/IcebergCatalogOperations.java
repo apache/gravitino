@@ -474,7 +474,6 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
               .withPartitions(partitions)
               .withSortOrders(sortOrders)
               .withProperties(properties)
-              .withLocation(properties.get("location"))
               .withAuditInfo(
                   new AuditInfo.Builder()
                       .withCreator(currentUser())

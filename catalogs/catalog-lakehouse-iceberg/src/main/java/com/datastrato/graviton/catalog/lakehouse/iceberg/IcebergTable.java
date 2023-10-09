@@ -25,6 +25,18 @@ import org.apache.iceberg.rest.requests.CreateTableRequest;
 @Getter
 public class IcebergTable extends BaseTable {
 
+  /**
+   * A reserved property to specify the location of the table. The files of the table should be
+   * under this location.
+   */
+  public static final String PROP_LOCATION = "location";
+
+  /** A reserved property to specify the provider of the table. */
+  public static final String PROP_PROVIDER = "provider";
+
+  /** The default provider of the table. */
+  public static final String DEFAULT_ICEBERG_PROVIDER = "iceberg";
+
   public static final String ICEBERG_COMMENT_FIELD_NAME = "comment";
 
   private String location;
@@ -36,9 +48,6 @@ public class IcebergTable extends BaseTable {
 
     Map<String, String> resultProperties =
         Maps.newHashMap(IcebergTableOpsHelper.removeReservedProperties(properties));
-    if (null != comment) {
-      resultProperties.putIfAbsent(ICEBERG_COMMENT_FIELD_NAME, comment);
-    }
     CreateTableRequest.Builder builder =
         CreateTableRequest.builder()
             .withName(name)
@@ -99,10 +108,20 @@ public class IcebergTable extends BaseTable {
           properties != null ? Maps.newHashMap(properties) : Maps.newHashMap();
       icebergTable.auditInfo = auditInfo;
       icebergTable.columns = columns;
-      icebergTable.location = location;
+      if (null != location) {
+        icebergTable.location = location;
+      } else {
+        icebergTable.location = icebergTable.properties.get(PROP_LOCATION);
+      }
       icebergTable.partitions = partitions;
       icebergTable.sortOrders = sortOrders;
-
+      if (null != comment) {
+        icebergTable.properties.putIfAbsent(ICEBERG_COMMENT_FIELD_NAME, comment);
+      }
+      String provider = icebergTable.properties.get(PROP_PROVIDER);
+      if (provider != null && !DEFAULT_ICEBERG_PROVIDER.equalsIgnoreCase(provider)) {
+        throw new IllegalArgumentException("Unsupported format in USING: " + provider);
+      }
       return icebergTable;
     }
   }
