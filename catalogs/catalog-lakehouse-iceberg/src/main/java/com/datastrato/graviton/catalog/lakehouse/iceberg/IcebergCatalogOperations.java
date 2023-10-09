@@ -48,6 +48,7 @@ import org.apache.iceberg.rest.requests.UpdateNamespacePropertiesRequest;
 import org.apache.iceberg.rest.responses.GetNamespaceResponse;
 import org.apache.iceberg.rest.responses.ListTablesResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
+import org.apache.iceberg.rest.responses.UpdateNamespacePropertiesResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -251,9 +252,9 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
               .build();
       UpdateNamespacePropertiesRequest updateNamespacePropertiesRequest =
           UpdateNamespacePropertiesRequest.builder().updateAll(updates).removeAll(removals).build();
-      icebergTableOps.updateNamespaceProperties(
-          IcebergTableOpsHelper.getIcebergNamespace(ident), updateNamespacePropertiesRequest);
-      LOG.info("Altered Iceberg schema (database) {}", ident.name());
+      UpdateNamespacePropertiesResponse updateNamespacePropertiesResponse = icebergTableOps.updateNamespaceProperties(
+              IcebergTableOpsHelper.getIcebergNamespace(ident), updateNamespacePropertiesRequest);
+      LOG.info("Altered Iceberg schema (database) {}. UpdateResponse:\n{}", ident.name(), updateNamespacePropertiesResponse);
       return icebergSchema;
     } catch (NoSuchNamespaceException e) {
       throw new NoSuchSchemaException(
