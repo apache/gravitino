@@ -15,6 +15,7 @@ dependencies {
     implementation(project(":common"))
     implementation(project(":core"))
     implementation(project(":api"))
+    implementation(project(":server-common"))
     implementation(libs.jackson.databind)
     implementation(libs.jackson.annotations)
     implementation(libs.jackson.datatype.jdk8)

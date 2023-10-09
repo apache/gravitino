@@ -7,9 +7,10 @@ package com.datastrato.graviton.integration.test.catalog.lakehouse.iceberg;
 
 import com.datastrato.graviton.Config;
 import com.datastrato.graviton.aux.AuxiliaryServiceManager;
-import com.datastrato.graviton.catalog.lakehouse.iceberg.IcebergRESTConfig;
+import com.datastrato.graviton.catalog.lakehouse.iceberg.IcebergConfig;
 import com.datastrato.graviton.catalog.lakehouse.iceberg.IcebergRESTService;
 import com.datastrato.graviton.integration.test.util.AbstractIT;
+import com.datastrato.graviton.server.web.JettyServerConfig;
 import com.datastrato.graviton.utils.MapUtils;
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
@@ -27,25 +28,25 @@ import org.junit.jupiter.api.Assertions;
 /*
  * <p>Referred from spark/v3.4/spark/src/test/java/org/apache/iceberg/spark/SparkTestBase.java
  */
-public class TestIcebergRESTServiceBaseIT extends AbstractIT {
+public class IcebergRESTServiceBaseIT extends AbstractIT {
   private SparkSession sparkSession;
 
-  public TestIcebergRESTServiceBaseIT() {
+  public IcebergRESTServiceBaseIT() {
     initSparkEnv();
   }
 
-  private static IcebergRESTConfig buildIcebergRESTConfig(Config config) {
+  private static IcebergConfig buildIcebergConfig(Config config) {
     Map<String, String> m =
         config.getConfigsWithPrefix(AuxiliaryServiceManager.GRAVITON_AUX_SERVICE_PREFIX);
     m = MapUtils.getPrefixMap(m, IcebergRESTService.SERVICE_NAME + ".");
-    IcebergRESTConfig icebergRESTConfig = new IcebergRESTConfig();
-    icebergRESTConfig.loadFromMap(m, k -> true);
-    return icebergRESTConfig;
+    IcebergConfig icebergConfig = new IcebergConfig();
+    icebergConfig.loadFromMap(m, k -> true);
+    return icebergConfig;
   }
 
   private void initSparkEnv() {
-    IcebergRESTConfig icebergRESTConfig = buildIcebergRESTConfig(serverConfig);
-    int port = icebergRESTConfig.get(IcebergRESTConfig.ICEBERG_REST_SERVER_HTTP_PORT);
+    IcebergConfig icebergConfig = buildIcebergConfig(serverConfig);
+    int port = icebergConfig.get(JettyServerConfig.WEBSERVER_HTTP_PORT);
     LOG.info("Iceberg REST server port:{}", port);
     String IcebergRESTUri = String.format("http://127.0.0.1:%d/iceberg/", port);
     sparkSession =

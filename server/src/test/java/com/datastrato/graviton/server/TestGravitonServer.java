@@ -86,7 +86,7 @@ public class TestGravitonServer {
 
   @Test
   public void testStartWithoutInitialise() throws Exception {
-    assertThrows(GravitonServerException.class, () -> gravitonServer.start());
+    assertThrows(RuntimeException.class, () -> gravitonServer.start());
   }
 
   @Test

@@ -42,7 +42,7 @@ public class ConfigEntry<T> {
    * Creates a new ConfigEntry instance.
    *
    * @param key The key of the configuration.
-   * @param version The version of the configuration.
+   * @param version The Graviton version that introduces this configuration.
    * @param doc The documentation of the configuration.
    * @param alternatives Alternative keys for the configuration.
    * @param isPublic Whether the configuration is public.
