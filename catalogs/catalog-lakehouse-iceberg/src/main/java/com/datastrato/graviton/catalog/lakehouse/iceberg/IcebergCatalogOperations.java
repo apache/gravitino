@@ -252,9 +252,13 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
               .build();
       UpdateNamespacePropertiesRequest updateNamespacePropertiesRequest =
           UpdateNamespacePropertiesRequest.builder().updateAll(updates).removeAll(removals).build();
-      UpdateNamespacePropertiesResponse updateNamespacePropertiesResponse = icebergTableOps.updateNamespaceProperties(
+      UpdateNamespacePropertiesResponse updateNamespacePropertiesResponse =
+          icebergTableOps.updateNamespaceProperties(
               IcebergTableOpsHelper.getIcebergNamespace(ident), updateNamespacePropertiesRequest);
-      LOG.info("Altered Iceberg schema (database) {}. UpdateResponse:\n{}", ident.name(), updateNamespacePropertiesResponse);
+      LOG.info(
+          "Altered Iceberg schema (database) {}. UpdateResponse:\n{}",
+          ident.name(),
+          updateNamespacePropertiesResponse);
       return icebergSchema;
     } catch (NoSuchNamespaceException e) {
       throw new NoSuchSchemaException(
@@ -470,6 +474,7 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
               .withPartitions(partitions)
               .withSortOrders(sortOrders)
               .withProperties(properties)
+              .withLocation(properties.get("location"))
               .withAuditInfo(
                   new AuditInfo.Builder()
                       .withCreator(currentUser())
