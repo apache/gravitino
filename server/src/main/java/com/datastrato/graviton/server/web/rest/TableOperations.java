@@ -24,12 +24,14 @@ import com.datastrato.graviton.server.web.Utils;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.DELETE;
+import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
 import org.slf4j.Logger;
@@ -146,10 +148,11 @@ public class TableOperations {
       @PathParam("metalake") String metalake,
       @PathParam("catalog") String catalog,
       @PathParam("schema") String schema,
-      @PathParam("table") String table) {
+      @PathParam("table") String table,
+      @QueryParam("purge") @DefaultValue("false") boolean purge) {
     try {
       NameIdentifier ident = NameIdentifier.ofTable(metalake, catalog, schema, table);
-      boolean dropped = dispatcher.dropTable(ident);
+      boolean dropped = purge ? dispatcher.purgeTable(ident) : dispatcher.dropTable(ident);
       if (!dropped) {
         LOG.warn("Failed to drop table {} under schema {}", table, schema);
       }

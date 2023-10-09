@@ -538,6 +538,28 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
     return true;
   }
 
+  @Override
+  public boolean purgeTable(NameIdentifier ident) throws UnsupportedOperationException {
+    boolean purged =
+        doWithCatalog(
+            getCatalogIdentifier(ident),
+            c -> c.doWithTableOps(t -> t.purgeTable(ident)),
+            NoSuchTableException.class,
+            UnsupportedOperationException.class);
+
+    if (!purged) {
+      return false;
+    }
+
+    try {
+      store.delete(ident, TABLE);
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+
+    return true;
+  }
+
   private <R, E extends Throwable> R doWithCatalog(
       NameIdentifier ident, ThrowableFunction<CatalogManager.CatalogWrapper, R> fn, Class<E> ex)
       throws E {
