@@ -31,6 +31,8 @@ public class TestToIcebergSortOrder extends TestBaseConvert {
         ArrayUtils.add(sortOrders, createFunctionSortOrder(Transforms.NAME_OF_HOUR, "col_7"));
     sortOrders =
         ArrayUtils.add(sortOrders, createFunctionSortOrder(Transforms.NAME_OF_MONTH, "col_8"));
+    sortOrders =
+        ArrayUtils.add(sortOrders, createFunctionSortOrder(Transforms.NAME_OF_YEAR, "col_8"));
 
     Types.NestedField[] nestedFields =
         createNestedField("col_1", "col_2", "col_3", "col_4", "col_5");
@@ -40,6 +42,8 @@ public class TestToIcebergSortOrder extends TestBaseConvert {
         ArrayUtils.add(nestedFields, createNestedField(7, "col_7", Types.TimestampType.withZone()));
     nestedFields =
         ArrayUtils.add(nestedFields, createNestedField(8, "col_8", Types.DateType.get()));
+    nestedFields =
+        ArrayUtils.add(nestedFields, createNestedField(9, "col_9", Types.DateType.get()));
     Schema schema = new Schema(nestedFields);
     org.apache.iceberg.SortOrder icebergSortOrder =
         ToIcebergSortOrder.toSortOrder(schema, sortOrders);
@@ -68,7 +72,10 @@ public class TestToIcebergSortOrder extends TestBaseConvert {
       String colName = idToName.get(sortField.sourceId());
       Assertions.assertTrue(sortOrderByName.containsKey(colName));
       SortOrder sortOrder = sortOrderByName.get(colName);
-      if (colName.equals("col_6") || colName.equals("col_7") || colName.equals("col_8")) {
+      if (colName.equals("col_6")
+          || colName.equals("col_7")
+          || colName.equals("col_8")
+          || colName.equals("col_9")) {
         Assertions.assertFalse(sortField.transform().isIdentity());
       } else {
         Assertions.assertTrue(sortField.transform().isIdentity());

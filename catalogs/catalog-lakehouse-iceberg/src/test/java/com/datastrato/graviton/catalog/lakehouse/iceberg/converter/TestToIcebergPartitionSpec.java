@@ -6,6 +6,7 @@ package com.datastrato.graviton.catalog.lakehouse.iceberg.converter;
 
 import static com.datastrato.graviton.rel.transforms.Transforms.day;
 import static com.datastrato.graviton.rel.transforms.Transforms.hour;
+import static com.datastrato.graviton.rel.transforms.Transforms.identity;
 import static com.datastrato.graviton.rel.transforms.Transforms.month;
 
 import com.datastrato.graviton.rel.transforms.Transform;
@@ -37,6 +38,7 @@ public class TestToIcebergPartitionSpec extends TestBaseConvert {
 
     Transform[] partitioning =
         new Transform[] {
+          identity(new String[] {nestedFields[0].name()}),
           day(new String[] {nestedFields[4].name()}),
           hour(new String[] {nestedFields[5].name()}),
           month(new String[] {nestedFields[6].name()})
@@ -48,7 +50,7 @@ public class TestToIcebergPartitionSpec extends TestBaseConvert {
 
     List<PartitionField> fields = partitionSpec.fields();
     Assertions.assertEquals(partitioning.length, fields.size());
-    Assertions.assertEquals(3, fields.size());
+    Assertions.assertEquals(4, fields.size());
     Map<Integer, String> idToName = schema.idToName();
     Map<String, Types.NestedField> nestedFieldByName =
         Arrays.stream(nestedFields).collect(Collectors.toMap(Types.NestedField::name, v -> v));
