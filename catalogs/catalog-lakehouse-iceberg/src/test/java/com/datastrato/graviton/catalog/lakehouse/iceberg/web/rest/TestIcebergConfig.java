@@ -19,7 +19,7 @@ public class TestIcebergConfig extends IcebergTestBase {
 
   @Override
   protected Application configure() {
-    return IcebergRestTestUtil.getIcebergResourceConfig(IcebergConfig.class, false);
+    return IcebergRestTestUtil.getIcebergResourceConfig(IcebergConfigOperations.class, false);
   }
 
   @ParameterizedTest

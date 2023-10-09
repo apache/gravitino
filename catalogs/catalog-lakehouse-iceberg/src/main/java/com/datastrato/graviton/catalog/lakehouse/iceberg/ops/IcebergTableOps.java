@@ -4,7 +4,7 @@
  */
 package com.datastrato.graviton.catalog.lakehouse.iceberg.ops;
 
-import com.datastrato.graviton.catalog.lakehouse.iceberg.IcebergRESTConfig;
+import com.datastrato.graviton.catalog.lakehouse.iceberg.IcebergConfig;
 import com.datastrato.graviton.catalog.lakehouse.iceberg.ops.IcebergTableOpsHelper.IcebergTableChange;
 import com.datastrato.graviton.catalog.lakehouse.iceberg.utils.IcebergCatalogUtil;
 import com.google.common.base.Preconditions;
@@ -37,18 +37,17 @@ public class IcebergTableOps {
   protected Catalog catalog;
   private SupportsNamespaces asNamespaceCatalog;
 
-  public IcebergTableOps(IcebergRESTConfig icebergConfig) {
+  public IcebergTableOps(IcebergConfig icebergConfig) {
     catalog =
         IcebergCatalogUtil.loadCatalogBackend(
-            icebergConfig.get(IcebergRESTConfig.CATALOG_TYPE),
-            icebergConfig.getConfigsWithPrefix(""));
+            icebergConfig.get(IcebergConfig.CATALOG_TYPE), icebergConfig.getConfigsWithPrefix(""));
     if (catalog instanceof SupportsNamespaces) {
       asNamespaceCatalog = (SupportsNamespaces) catalog;
     }
   }
 
   public IcebergTableOps() {
-    this(new IcebergRESTConfig());
+    this(new IcebergConfig());
   }
 
   public IcebergTableOpsHelper createIcebergTableOpsHelper() {
