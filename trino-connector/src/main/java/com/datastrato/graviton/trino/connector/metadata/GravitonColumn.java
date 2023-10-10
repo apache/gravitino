@@ -4,9 +4,8 @@
  */
 package com.datastrato.graviton.trino.connector.metadata;
 
-import static java.util.Objects.requireNonNull;
-
 import com.datastrato.graviton.rel.Column;
+import com.google.common.base.Preconditions;
 import io.substrait.type.Type;
 import java.util.Map;
 
@@ -18,7 +17,7 @@ public final class GravitonColumn {
   public GravitonColumn(Column column, int columnIndex) {
     this.column = column;
     this.index = columnIndex;
-    requireNonNull(column, "column is null or is empty");
+    Preconditions.checkArgument(column != null, "column is not null");
   }
 
   public int getIndex() {

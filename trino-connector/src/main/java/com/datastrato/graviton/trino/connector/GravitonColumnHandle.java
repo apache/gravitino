@@ -5,10 +5,10 @@
 package com.datastrato.graviton.trino.connector;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
-import static java.util.Objects.requireNonNull;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.google.common.base.Preconditions;
 import io.trino.spi.connector.ColumnHandle;
 
 /**
@@ -23,8 +23,10 @@ public final class GravitonColumnHandle implements ColumnHandle {
   public GravitonColumnHandle(
       @JsonProperty("columnName") String columnName,
       @JsonProperty("internalColumnHandler") ColumnHandle columnHandle) {
-    this.columnName = requireNonNull(columnName, "column is null");
-    this.internalColumnHandler = requireNonNull(columnHandle, "column is null");
+    Preconditions.checkArgument(columnName != null, "columnName is not null");
+    Preconditions.checkArgument(columnHandle != null, "columnHandle is not null");
+    this.columnName = columnName;
+    this.internalColumnHandler = columnHandle;
   }
 
   @JsonProperty
