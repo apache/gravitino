@@ -4,15 +4,15 @@
  */
 package com.datastrato.graviton.catalog.hive;
 
+import static com.datastrato.graviton.catalog.hive.HiveCatalogPropertiesMeta.CATALOG_CLIENT_POOL_MAXSIZE;
+import static com.datastrato.graviton.catalog.hive.HiveCatalogPropertiesMeta.DEFAULT_CATALOG_CLIENT_POOL_MAXSIZE;
 import static com.datastrato.graviton.catalog.hive.HiveTable.HMS_TABLE_COMMENT;
 import static com.datastrato.graviton.catalog.hive.HiveTable.SUPPORT_TABLE_TYPES;
 
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
-import com.datastrato.graviton.catalog.BasePropertiesMetadata;
 import com.datastrato.graviton.catalog.CatalogOperations;
 import com.datastrato.graviton.catalog.PropertiesMetadata;
-import com.datastrato.graviton.catalog.PropertyEntry;
 import com.datastrato.graviton.catalog.hive.converter.ToHiveType;
 import com.datastrato.graviton.exceptions.NoSuchCatalogException;
 import com.datastrato.graviton.exceptions.NoSuchSchemaException;
@@ -34,7 +34,6 @@ import com.datastrato.graviton.rel.transforms.Transform;
 import com.datastrato.graviton.rel.transforms.Transforms;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
@@ -69,6 +68,8 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
   private HiveTablePropertiesMetadata tablePropertiesMetadata;
 
+  private HiveCatalogPropertiesMeta catalogPropertiesMetadata;
+
   /**
    * Constructs a new instance of HiveCatalogOperations.
    *
@@ -90,10 +91,17 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     conf.forEach(hadoopConf::set);
     hiveConf = new HiveConf(hadoopConf, HiveCatalogOperations.class);
 
-    // todo(xun): add hive client pool size in config
-    this.clientPool = new HiveClientPool(1, hiveConf);
+    this.clientPool = new HiveClientPool(getCatalogClientPoolMaxsize(conf), hiveConf);
 
     this.tablePropertiesMetadata = new HiveTablePropertiesMetadata();
+    this.catalogPropertiesMetadata = new HiveCatalogPropertiesMeta();
+  }
+
+  @VisibleForTesting
+  int getCatalogClientPoolMaxsize(Map<String, String> conf) {
+    return Integer.parseInt(
+        conf.getOrDefault(
+            CATALOG_CLIENT_POOL_MAXSIZE, String.valueOf(DEFAULT_CATALOG_CLIENT_POOL_MAXSIZE)));
   }
 
   /** Closes the Hive catalog and releases the associated client pool. */
@@ -748,26 +756,6 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
   @Override
   public PropertiesMetadata catalogPropertiesMetadata() throws UnsupportedOperationException {
-    return new BasePropertiesMetadata() {
-      @Override
-      protected Map<String, PropertyEntry<?>> specificPropertyEntries() {
-        // Hive catalog only needs to specify the metastore URIs, maybe we need to add more by
-        // referring to the trino catalog.
-        // TODO(yuqi), we can add more properties like client pool size, username for metastore
-        //  (kerberos authentication) when we finish refactor properties framework.
-        return ImmutableMap.<String, PropertyEntry<?>>builder()
-            .put(
-                HiveConf.ConfVars.METASTOREURIS.varname,
-                PropertyEntry.stringPropertyEntry(
-                    HiveConf.ConfVars.METASTOREURIS.varname,
-                    "The Hive metastore URIs",
-                    true,
-                    true,
-                    null,
-                    false,
-                    false))
-            .build();
-      }
-    };
+    return catalogPropertiesMetadata;
   }
 }

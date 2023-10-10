@@ -174,6 +174,28 @@ public final class PropertyEntry<T> {
         .build();
   }
 
+  public static PropertyEntry<Integer> integerPropertyEntry(
+      String name,
+      String description,
+      boolean required,
+      boolean immutable,
+      Integer defaultValue,
+      boolean hidden,
+      boolean reserved) {
+    return new Builder<Integer>()
+        .withName(name)
+        .withDescription(description)
+        .withRequired(required)
+        .withImmutable(immutable)
+        .withJavaType(Integer.class)
+        .withDefaultValue(defaultValue)
+        .withDecoder(Integer::parseInt)
+        .withEncoder(String::valueOf)
+        .withHidden(hidden)
+        .withReserved(reserved)
+        .build();
+  }
+
   public static PropertyEntry<String> stringReservedPropertyEntry(
       String name, String description, boolean hidden) {
     return stringPropertyEntry(name, description, false, true, null, hidden, true);
@@ -182,6 +204,16 @@ public final class PropertyEntry<T> {
   public static PropertyEntry<String> stringRequiredPropertyEntry(
       String name, String description, boolean immutable, boolean hidden) {
     return stringPropertyEntry(name, description, true, immutable, null, hidden, false);
+  }
+
+  public static PropertyEntry<Integer> integerOptionalPropertyEntry(
+      String name, String description, boolean immutable, int defaultValue, boolean hidden) {
+    return integerPropertyEntry(name, description, false, immutable, defaultValue, hidden, false);
+  }
+
+  public static PropertyEntry<Integer> integerRequiredPropertyEntry(
+      String name, String description, boolean immutable, boolean hidden) {
+    return integerPropertyEntry(name, description, true, immutable, null, hidden, false);
   }
 
   public static PropertyEntry<String> stringImmutablePropertyEntry(
