@@ -32,6 +32,8 @@ public final class AuditInfo implements Audit, Entity {
       Field.optional(
           "last_modified_time", Instant.class, "The time when the entity was last modified");
 
+  public static final AuditInfo EMPTY = new AuditInfo.Builder().build();
+
   @Nullable private String creator;
 
   @Nullable private Instant createTime;

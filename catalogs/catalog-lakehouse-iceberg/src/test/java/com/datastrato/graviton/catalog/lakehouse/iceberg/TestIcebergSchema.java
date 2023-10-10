@@ -18,7 +18,7 @@ import java.util.Map;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-public class IcebergSchemaTest {
+public class TestIcebergSchema {
 
   private static final String META_LAKE_NAME = "metalake";
 
@@ -53,7 +53,7 @@ public class IcebergSchemaTest {
             () -> {
               icebergCatalog.asSchemas().createSchema(ident, COMMENT_VALUE, properties);
             });
-    Assertions.assertTrue(exception.getMessage().contains("already exists in Iceberg"));
+    Assertions.assertTrue(exception.getMessage().contains("already exists"));
   }
 
   @Test

@@ -16,7 +16,7 @@ import org.apache.iceberg.rest.responses.ListNamespacesResponse;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-public class IcebergCatalogTest {
+public class TestIcebergCatalog {
   @Test
   public void testListDatabases() {
     AuditInfo auditInfo =
