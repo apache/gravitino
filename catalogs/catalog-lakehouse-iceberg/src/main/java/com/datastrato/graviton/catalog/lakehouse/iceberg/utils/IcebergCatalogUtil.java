@@ -4,11 +4,11 @@
  */
 package com.datastrato.graviton.catalog.lakehouse.iceberg.utils;
 
-import static com.datastrato.graviton.catalog.lakehouse.iceberg.IcebergConfig.INITIALIZE_JDBC_CATALOG_TABLES;
+import static com.datastrato.graviton.catalog.lakehouse.iceberg.IcebergCatalogPropertiesMetadata.ICEBERG_JDBC_INITIALIZE;
 
+import com.datastrato.graviton.catalog.lakehouse.iceberg.IcebergCatalogBackend;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.Locale;
 import java.util.Map;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.iceberg.CatalogProperties;
@@ -33,7 +33,9 @@ public class IcebergCatalogUtil {
 
   private static HiveCatalog loadHiveCatalog(Map<String, String> properties) {
     HiveCatalog hiveCatalog = new HiveCatalog();
-    hiveCatalog.setConf(new HdfsConfiguration());
+    HdfsConfiguration hdfsConfiguration = new HdfsConfiguration();
+    properties.forEach(hdfsConfiguration::set);
+    hiveCatalog.setConf(hdfsConfiguration);
     hiveCatalog.initialize("hive", properties);
     return hiveCatalog;
   }
@@ -43,11 +45,10 @@ public class IcebergCatalogUtil {
         new JdbcCatalog(
             null,
             null,
-            Boolean.parseBoolean(
-                properties.getOrDefault(
-                    INITIALIZE_JDBC_CATALOG_TABLES.getKey(),
-                    String.valueOf(INITIALIZE_JDBC_CATALOG_TABLES.getDefaultValue()))));
-    jdbcCatalog.setConf(new HdfsConfiguration());
+            Boolean.parseBoolean(properties.getOrDefault(ICEBERG_JDBC_INITIALIZE, "false")));
+    HdfsConfiguration hdfsConfiguration = new HdfsConfiguration();
+    properties.forEach(hdfsConfiguration::set);
+    jdbcCatalog.setConf(hdfsConfiguration);
     jdbcCatalog.initialize("jdbc", properties);
     return jdbcCatalog;
   }
@@ -60,13 +61,12 @@ public class IcebergCatalogUtil {
     // TODO Organize the configuration properties and adapt them to the lower layer, and map some
     // graviton configuration keys.
     LOG.info("Load catalog backend of {}", catalogType);
-
-    switch (catalogType.toLowerCase(Locale.ENGLISH)) {
-      case "memory":
+    switch (IcebergCatalogBackend.valueOf(catalogType.toUpperCase())) {
+      case MEMORY:
         return loadMemoryCatalog(properties);
-      case "hive":
+      case HIVE:
         return loadHiveCatalog(properties);
-      case "jdbc":
+      case JDBC:
         return loadJdbcCatalog(properties);
       default:
         throw new RuntimeException(

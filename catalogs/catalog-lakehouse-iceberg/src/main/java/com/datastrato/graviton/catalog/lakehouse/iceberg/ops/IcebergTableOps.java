@@ -38,9 +38,9 @@ public class IcebergTableOps {
   private SupportsNamespaces asNamespaceCatalog;
 
   public IcebergTableOps(IcebergConfig icebergConfig) {
+    String catalogType = icebergConfig.get(IcebergConfig.CATALOG_BACKEND);
     catalog =
-        IcebergCatalogUtil.loadCatalogBackend(
-            icebergConfig.get(IcebergConfig.CATALOG_TYPE), icebergConfig.getConfigsWithPrefix(""));
+        IcebergCatalogUtil.loadCatalogBackend(catalogType, icebergConfig.getConfigsWithPrefix(""));
     if (catalog instanceof SupportsNamespaces) {
       asNamespaceCatalog = (SupportsNamespaces) catalog;
     }

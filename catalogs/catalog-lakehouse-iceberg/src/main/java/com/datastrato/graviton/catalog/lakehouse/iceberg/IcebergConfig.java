@@ -5,25 +5,36 @@
 
 package com.datastrato.graviton.catalog.lakehouse.iceberg;
 
+import static com.datastrato.graviton.catalog.lakehouse.iceberg.IcebergCatalogPropertiesMetadata.CATALOG_BACKEND_NAME;
+import static com.datastrato.graviton.catalog.lakehouse.iceberg.IcebergCatalogPropertiesMetadata.URI;
+import static com.datastrato.graviton.catalog.lakehouse.iceberg.IcebergCatalogPropertiesMetadata.WAREHOUSE;
+
 import com.datastrato.graviton.Config;
 import com.datastrato.graviton.config.ConfigBuilder;
 import com.datastrato.graviton.config.ConfigEntry;
 
 public class IcebergConfig extends Config {
 
-  public static final ConfigEntry<String> CATALOG_TYPE =
-      new ConfigBuilder("catalogType")
+  public static final ConfigEntry<String> CATALOG_BACKEND =
+      new ConfigBuilder(CATALOG_BACKEND_NAME)
           .doc("Choose the implementation of the Iceberg catalog")
           .version(DEFAULT_VERSION)
           .stringConf()
           .createWithDefault("memory");
 
-  public static final ConfigEntry<Boolean> INITIALIZE_JDBC_CATALOG_TABLES =
-      new ConfigBuilder("initializeJdbcCatalogTables")
-          .doc("Whether to load the configuration of the jdbc catalog table during initialization")
+  public static final ConfigEntry<String> CATALOG_WAREHOUSE =
+      new ConfigBuilder(WAREHOUSE)
+          .doc("The warehouse config of the Iceberg catalog")
           .version(DEFAULT_VERSION)
-          .booleanConf()
-          .createWithDefault(true);
+          .stringConf()
+          .createWithDefault(null);
+
+  public static final ConfigEntry<String> CATALOG_URI =
+      new ConfigBuilder(URI)
+          .doc("The uri config of the Iceberg catalog")
+          .version(DEFAULT_VERSION)
+          .stringConf()
+          .createWithDefault(null);
 
   public IcebergConfig() {
     super(false);

@@ -31,6 +31,7 @@ import io.substrait.type.TypeCreator;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 import org.apache.commons.lang3.ArrayUtils;
@@ -81,6 +82,13 @@ public class TestIcebergTable {
   }
 
   private static void initIcebergCatalog() {
+    CatalogEntity entity = createDefaultCatalogEntity();
+
+    Map<String, String> conf = Maps.newHashMap();
+    icebergCatalog = new IcebergCatalog().withCatalogConf(conf).withCatalogEntity(entity);
+  }
+
+  private static CatalogEntity createDefaultCatalogEntity() {
     AuditInfo auditInfo =
         new AuditInfo.Builder()
             .withCreator("testIcebergUser")
@@ -96,9 +104,7 @@ public class TestIcebergTable {
             .withProvider("iceberg")
             .withAuditInfo(auditInfo)
             .build();
-
-    Map<String, String> conf = Maps.newHashMap();
-    icebergCatalog = new IcebergCatalog().withCatalogConf(conf).withCatalogEntity(entity);
+    return entity;
   }
 
   private Distribution createDistribution() {
@@ -478,6 +484,51 @@ public class TestIcebergTable {
 
     Assertions.assertNotNull(alteredTable.partitioning());
     Assertions.assertArrayEquals(createdTable.partitioning(), alteredTable.partitioning());
+  }
+
+  @Test
+  public void testTableProperty() {
+    CatalogEntity entity = createDefaultCatalogEntity();
+    try (IcebergCatalogOperations ops = new IcebergCatalogOperations(entity)) {
+      ops.initialize(Maps.newHashMap());
+      Map<String, String> map = Maps.newHashMap();
+      map.put(IcebergTablePropertiesMetadata.COMMENT, "test");
+      map.put(IcebergTablePropertiesMetadata.CREATOR, "test");
+      map.put(IcebergTablePropertiesMetadata.LOCATION, "test");
+      map.put(IcebergTablePropertiesMetadata.CURRENT_SNAPSHOT_ID, "test");
+      map.put(IcebergTablePropertiesMetadata.CHERRY_PICK_SNAPSHOT_ID, "test");
+      map.put(IcebergTablePropertiesMetadata.SORT_ORDER, "test");
+      map.put(IcebergTablePropertiesMetadata.IDENTIFIER_FIELDS, "test");
+      for (Map.Entry<String, String> entry : map.entrySet()) {
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> {
+              ops.tablePropertiesMetadata()
+                  .validatePropertyForCreate(
+                      new HashMap<String, String>() {
+                        {
+                          put(entry.getKey(), entry.getValue());
+                        }
+                      });
+            });
+      }
+
+      map = Maps.newHashMap();
+      map.put("key1", "val1");
+      map.put("key2", "val2");
+      for (Map.Entry<String, String> entry : map.entrySet()) {
+        Assertions.assertDoesNotThrow(
+            () -> {
+              ops.tablePropertiesMetadata()
+                  .validatePropertyForCreate(
+                      new HashMap<String, String>() {
+                        {
+                          put(entry.getKey(), entry.getValue());
+                        }
+                      });
+            });
+      }
+    }
   }
 
   protected static String genRandomName() {
