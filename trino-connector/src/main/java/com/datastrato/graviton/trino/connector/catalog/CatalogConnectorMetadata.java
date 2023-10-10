@@ -34,29 +34,31 @@ public class CatalogConnectorMetadata {
   private static final Logger LOG = LoggerFactory.getLogger(CatalogConnectorMetadata.class);
 
   private final GravitonMetaLake metalake;
-  private final Catalog catalog;
   private final String catalogName;
+  private final SupportsSchemas schemaCatalog;
+  private final TableCatalog tableCatalog;
 
   public CatalogConnectorMetadata(GravitonMetaLake metalake, NameIdentifier catalogIdentifier) {
     try {
       this.catalogName = catalogIdentifier.name();
       this.metalake = metalake;
-      catalog = metalake.loadCatalog(catalogIdentifier);
+      Catalog catalog = metalake.loadCatalog(catalogIdentifier);
 
       // Make sure the catalog support schema operations.
-      catalog.asSchemas();
+      this.schemaCatalog = catalog.asSchemas();
+      this.tableCatalog = catalog.asTableCatalog();
     } catch (NoSuchCatalogException e) {
       throw new TrinoException(GRAVITON_CATALOG_NOT_EXISTS, "Catalog does not exist", e);
     } catch (UnsupportedOperationException e) {
       throw new TrinoException(
-          GRAVITON_UNSUPPORTED_OPERATION, "Catalog does not support schema operations", e);
+          GRAVITON_UNSUPPORTED_OPERATION, "Catalog does not support schema or table operations", e);
     }
   }
 
   public List<String> listSchemaNames() {
     try {
-      SupportsSchemas schemas = catalog.asSchemas();
-      return Arrays.stream(schemas.listSchemas(Namespace.ofSchema(metalake.name(), catalogName)))
+      return Arrays.stream(
+              schemaCatalog.listSchemas(Namespace.ofSchema(metalake.name(), catalogName)))
           .map(NameIdentifier::name)
           .toList();
     } catch (NoSuchCatalogException e) {
@@ -66,7 +68,6 @@ public class CatalogConnectorMetadata {
 
   public GravitonSchema getSchema(String schemaName) {
     try {
-      SupportsSchemas schemaCatalog = catalog.asSchemas();
       Schema schema =
           schemaCatalog.loadSchema(
               NameIdentifier.ofSchema(metalake.name(), catalogName, schemaName));
@@ -78,7 +79,6 @@ public class CatalogConnectorMetadata {
 
   public GravitonTable getTable(String schemaName, String tableName) {
     try {
-      TableCatalog tableCatalog = catalog.asTableCatalog();
       Table table =
           tableCatalog.loadTable(
               NameIdentifier.ofTable(metalake.name(), catalogName, schemaName, tableName));
@@ -90,7 +90,6 @@ public class CatalogConnectorMetadata {
 
   public List<String> listTables(String schemaName) {
     try {
-      TableCatalog tableCatalog = catalog.asTableCatalog();
       NameIdentifier[] tables =
           tableCatalog.listTables(Namespace.ofTable(metalake.name(), catalogName, schemaName));
       return Arrays.stream(tables).map(NameIdentifier::name).toList();
@@ -100,8 +99,7 @@ public class CatalogConnectorMetadata {
   }
 
   public boolean tableExists(String schemaName, String tableName) {
-    return catalog
-        .asTableCatalog()
-        .tableExists(NameIdentifier.ofTable(metalake.name(), catalogName, schemaName, tableName));
+    return tableCatalog.tableExists(
+        NameIdentifier.ofTable(metalake.name(), catalogName, schemaName, tableName));
   }
 }
