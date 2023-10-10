@@ -33,11 +33,13 @@ public class AbstractIT {
 
   protected static Config serverConfig;
 
-  static String testMode =
-      System.getProperty(TEST_MODE) == null ? EMBEDDED_TEST_MODE : System.getProperty(TEST_MODE);
+  static String testMode = "";
 
   @BeforeAll
   public static void startIntegrationTest() throws Exception {
+    testMode =
+        System.getProperty(TEST_MODE) == null ? EMBEDDED_TEST_MODE : System.getProperty(TEST_MODE);
+
     LOG.info("Running Graviton Server in {} mode", testMode);
 
     serverConfig = new ServerConfig();
