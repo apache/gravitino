@@ -32,7 +32,7 @@ public class TestToIcebergSortOrder extends TestBaseConvert {
     sortOrders =
         ArrayUtils.add(sortOrders, createFunctionSortOrder(Transforms.NAME_OF_MONTH, "col_8"));
     sortOrders =
-        ArrayUtils.add(sortOrders, createFunctionSortOrder(Transforms.NAME_OF_YEAR, "col_8"));
+        ArrayUtils.add(sortOrders, createFunctionSortOrder(Transforms.NAME_OF_YEAR, "col_9"));
 
     Types.NestedField[] nestedFields =
         createNestedField("col_1", "col_2", "col_3", "col_4", "col_5");
