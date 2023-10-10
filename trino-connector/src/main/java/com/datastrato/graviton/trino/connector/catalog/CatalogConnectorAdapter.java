@@ -24,6 +24,6 @@ public interface CatalogConnectorAdapter {
   /** @return Return internal connector config with trino. */
   Map<String, Object> buildInternalConnectorConfig(GravitonCatalog catalog);
 
-  /** @return Return MetaDataAdapter for special catalog connector. */
-  CatalogConnectorMetadataAdapter getMetaDataAdapter();
+  /** @return Return MetadataAdapter for special catalog connector. */
+  CatalogConnectorMetadataAdapter getMetadataAdapter();
 }

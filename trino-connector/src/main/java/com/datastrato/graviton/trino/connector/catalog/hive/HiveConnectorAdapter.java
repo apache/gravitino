@@ -35,7 +35,7 @@ public class HiveConnectorAdapter implements CatalogConnectorAdapter {
     return tableProperties.getTableProperties();
   }
 
-  public CatalogConnectorMetadataAdapter getMetaDataAdapter() {
+  public CatalogConnectorMetadataAdapter getMetadataAdapter() {
     // TODO yuhui Need to improve schema table and column properties
     return new HiveMetadataAdapter(null, getTableProperties(), null);
   }

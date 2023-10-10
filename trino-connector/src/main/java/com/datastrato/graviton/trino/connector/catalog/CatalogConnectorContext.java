@@ -65,8 +65,8 @@ public class CatalogConnectorContext {
     this.internalConnector.shutdown();
   }
 
-  public CatalogConnectorMetadataAdapter getMetaDataAdapter() {
-    return adapter.getMetaDataAdapter();
+  public CatalogConnectorMetadataAdapter getMetadataAdapter() {
+    return adapter.getMetadataAdapter();
   }
 
   static class Builder {

@@ -40,7 +40,7 @@ public class CatalogConnectorFactory {
       throw new TrinoException(GRAVITON_UNSUPPORTED_CATALOG_PROVIDER, message);
     }
 
-    // Need to use a copy of builder to avoid garbage data.
+    // Avoid using the same builder object to prevent catalog creation errors.
     builder = builder.clone();
 
     try {

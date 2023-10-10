@@ -37,7 +37,7 @@ public class HiveMetadataAdapter implements CatalogConnectorMetadataAdapter {
     this.columnProperties = columnProperties;
   }
 
-  public ConnectorTableMetadata getTableMetaData(GravitonTable gravitonTable) {
+  public ConnectorTableMetadata getTableMetadata(GravitonTable gravitonTable) {
     SchemaTableName schemaTableName =
         new SchemaTableName(gravitonTable.getSchemaName(), gravitonTable.getName());
     ArrayList<ColumnMetadata> columnMetadataList = new ArrayList<>();

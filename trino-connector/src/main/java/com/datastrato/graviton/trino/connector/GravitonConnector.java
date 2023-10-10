@@ -67,7 +67,7 @@ public class GravitonConnector implements Connector {
         new CatalogConnectorMetadata(metalake, catalogIdentifier);
 
     return new GravitonMetadata(
-        catalogConnectorMetadata, catalogConnectorContext.getMetaDataAdapter(), internalMetadata);
+        catalogConnectorMetadata, catalogConnectorContext.getMetadataAdapter(), internalMetadata);
   }
 
   @Override

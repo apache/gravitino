@@ -20,7 +20,7 @@ public interface CatalogConnectorMetadataAdapter {
   Map<String, Object> getSchemaProperties(GravitonSchema schema);
 
   /** Transform graviton table metadata to trino ConnectorTableMetadata */
-  ConnectorTableMetadata getTableMetaData(GravitonTable gravitonTable);
+  ConnectorTableMetadata getTableMetadata(GravitonTable gravitonTable);
 
   /** Transform trino ConnectorTableMetadata to graviton table metadata */
   GravitonTable createTable(ConnectorTableMetadata tableMetadata);

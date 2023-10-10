@@ -42,10 +42,10 @@ public class GravitonMetadata implements ConnectorMetadata {
 
   public GravitonMetadata(
       CatalogConnectorMetadata catalogConnectorMetadata,
-      CatalogConnectorMetadataAdapter metaDataAdapter,
+      CatalogConnectorMetadataAdapter metadataAdapter,
       ConnectorMetadata internalMetadata) {
     this.catalogConnectorMetadata = catalogConnectorMetadata;
-    this.metadataAdapter = metaDataAdapter;
+    this.metadataAdapter = metadataAdapter;
     this.internalMetadata = internalMetadata;
   }
 
@@ -93,7 +93,7 @@ public class GravitonMetadata implements ConnectorMetadata {
     GravitonTable table =
         catalogConnectorMetadata.getTable(
             gravitonTableHandle.getSchemaName(), gravitonTableHandle.getTableName());
-    return metadataAdapter.getTableMetaData(table);
+    return metadataAdapter.getTableMetadata(table);
   }
 
   @Override
