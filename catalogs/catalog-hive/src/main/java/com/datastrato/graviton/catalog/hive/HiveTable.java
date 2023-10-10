@@ -84,8 +84,8 @@ public class HiveTable extends BaseTable {
                       .map(f -> new NamedReference(new String[] {f}))
                       .toArray(Transform[]::new))
               .withNumber(table.getSd().getNumBuckets())
-              // TODO(yuqi): support IDENTITY strategy for Hive catalog
-              .withStrategy(Distribution.Strategy.HASH) // temporary work around
+              // Hive table use hash strategy as bucketing strategy
+              .withStrategy(Distribution.Strategy.HASH)
               .build();
     }
 
