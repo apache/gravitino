@@ -33,6 +33,7 @@ dependencies {
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
   testRuntimeOnly(libs.junit.jupiter.engine)
+  testImplementation(libs.trino.testing)
   testImplementation(libs.mockito.core)
   testImplementation(libs.mockserver.netty)
   testImplementation(libs.mockserver.client.java)
