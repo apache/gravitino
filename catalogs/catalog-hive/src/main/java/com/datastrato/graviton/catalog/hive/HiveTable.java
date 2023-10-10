@@ -84,6 +84,8 @@ public class HiveTable extends BaseTable {
                       .map(f -> new NamedReference(new String[] {f}))
                       .toArray(Transform[]::new))
               .withNumber(table.getSd().getNumBuckets())
+              // TODO(yuqi): support IDENTITY strategy for Hive catalog
+              .withStrategy(Distribution.Strategy.HASH) // temporary work around
               .build();
     }
 
@@ -174,8 +176,8 @@ public class HiveTable extends BaseTable {
     parameters.put(COMMENT, comment);
     String ignore =
         EXTERNAL_TABLE.name().equalsIgnoreCase(properties().get(TABLE_TYPE))
-            ? parameters.put(EXTERNAL, "true")
-            : parameters.put(EXTERNAL, "false");
+            ? parameters.put(EXTERNAL, "TRUE")
+            : parameters.put(EXTERNAL, "FALSE");
 
     parameters.remove(LOCATION);
     parameters.remove(TABLE_TYPE);
@@ -183,6 +185,7 @@ public class HiveTable extends BaseTable {
     parameters.remove(OUTPUT_FORMAT);
     parameters.remove(SERDE_NAME);
     parameters.remove(SERDE_LIB);
+    parameters.remove(FORMAT);
     parameters.keySet().removeIf(k -> k.startsWith(SERDE_PARAMETER_PREFIX));
     return parameters;
   }

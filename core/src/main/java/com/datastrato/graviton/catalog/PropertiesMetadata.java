@@ -117,4 +117,12 @@ public interface PropertiesMetadata {
     }
     return propertyEntries().get(propertyName).getDefaultValue();
   }
+
+  default Object getDefaultValue(String propertyName) {
+    if (!containsProperty(propertyName)) {
+      throw new IllegalArgumentException("Property is not defined: " + propertyName);
+    }
+
+    return propertyEntries().get(propertyName).getDefaultValue();
+  }
 }

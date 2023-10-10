@@ -23,10 +23,12 @@ import org.apache.hadoop.hive.metastore.TableType;
 
 public class HiveTablePropertiesMetadata extends BasePropertiesMetadata {
   public static final String COMMENT = "comment";
+  public static final String NUM_FILES = "numFiles";
+  public static final String TOTAL_SIZE = "totalSize";
   public static final String EXTERNAL = "EXTERNAL";
   public static final String LOCATION = "location";
   public static final String FORMAT = "format";
-  public static final String TABLE_TYPE = "tableType ";
+  public static final String TABLE_TYPE = "tableType";
   public static final String INPUT_FORMAT = "inputFormat";
   public static final String OUTPUT_FORMAT = "outputFormat";
   public static final String SERDE_NAME = "serdeName";
@@ -74,7 +76,10 @@ public class HiveTablePropertiesMetadata extends BasePropertiesMetadata {
       "org.apache.hadoop.hive.ql.io.avro.AvroContainerOutputFormat";
   private static final String AVRO_SERDE_CLASS = "org.apache.hadoop.hive.serde2.avro.AvroSerDe";
   private static final String JSON_SERDE_CLASS = "org.apache.hive.hcatalog.data.JsonSerDe";
-  private static final String OPENCSV_SERDE_CLASS = "org.apache.hadoop.hive.serde2.OpenCSVSerde";
+
+  @VisibleForTesting
+  public static final String OPENCSV_SERDE_CLASS = "org.apache.hadoop.hive.serde2.OpenCSVSerde";
+
   private static final String REGEX_SERDE_CLASS = "org.apache.hadoop.hive.serde2.RegexSerDe";
 
   enum StorageFormat {
@@ -121,6 +126,8 @@ public class HiveTablePropertiesMetadata extends BasePropertiesMetadata {
     List<PropertyEntry<?>> propertyEntries =
         ImmutableList.of(
             stringReservedPropertyEntry(COMMENT, "table comment", true),
+            stringReservedPropertyEntry(NUM_FILES, "number of files", false),
+            stringReservedPropertyEntry(TOTAL_SIZE, "total size of the table", false),
             booleanReservedPropertyEntry(
                 EXTERNAL, "Indicate whether it is an external table", false, true),
             stringImmutablePropertyEntry(

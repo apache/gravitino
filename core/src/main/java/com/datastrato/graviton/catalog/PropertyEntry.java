@@ -204,7 +204,7 @@ public final class PropertyEntry<T> {
         .withJavaType(Boolean.class)
         .withDefaultValue(defaultValue)
         .withDecoder(Boolean::valueOf)
-        .withEncoder(b -> Boolean.toString(b))
+        .withEncoder(b -> Boolean.toString(b).toUpperCase())
         .withHidden(hidden)
         .withReserved(reserved)
         .build();
