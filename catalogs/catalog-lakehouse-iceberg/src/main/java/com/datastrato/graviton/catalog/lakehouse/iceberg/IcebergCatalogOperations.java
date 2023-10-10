@@ -54,6 +54,8 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
 
   private final CatalogEntity entity;
 
+  public static final String ICEBERG_RELATED_CONFIG_PREFIX = "graviton.catalog.iceberg.";
+
   /**
    * Constructs a new instance of IcebergCatalogOperations.
    *
@@ -71,6 +73,18 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
    */
   @Override
   public void initialize(Map<String, String> conf) throws RuntimeException {
+    // Convert Graviton config (May starts with ICEBERG_RELATED_CONFIG_PREFIX) to Iceberg
+    // configuration
+    Map<String, String> trimConfig = Maps.newHashMap();
+    conf.forEach(
+        (k, v) -> {
+          if (k.startsWith(ICEBERG_RELATED_CONFIG_PREFIX)) {
+            trimConfig.put(k.replace(ICEBERG_RELATED_CONFIG_PREFIX, ""), v);
+          } else {
+            trimConfig.put(k, v);
+          }
+        });
+
     IcebergConfig icebergConfig = new IcebergConfig();
     icebergConfig.loadFromMap(conf, k -> true);
     this.icebergTableOps = new IcebergTableOps(icebergConfig);

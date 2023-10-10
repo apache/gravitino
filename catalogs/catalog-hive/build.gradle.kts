@@ -90,4 +90,13 @@ tasks {
         from("build/libs")
         into("${rootDir}/distribution/package/catalogs/hive/libs")
     }
+
+    val copyCatalogConfig by registering(Copy::class) {
+        from("src/main/resources")
+        into("${rootDir}/distribution/package/catalogs/hive/conf")
+    }
+
+    val copyLibAndConfig by registering(Copy::class) {
+        dependsOn(copyCatalogConfig, copyCatalogLibs)
+    }
 }

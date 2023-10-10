@@ -90,4 +90,13 @@ tasks {
         from("build/libs")
         into("${rootDir}/distribution/package/catalogs/lakehouse-iceberg/libs")
     }
+
+    val copyCatalogConfig by registering(Copy::class) {
+        from("src/main/resources")
+        into("${rootDir}/distribution/package/catalogs/lakehouse-iceberg/conf")
+    }
+
+    val copyLibAndConfig by registering(Copy::class) {
+        dependsOn(copyCatalogLibs, copyCatalogConfig)
+    }
 }

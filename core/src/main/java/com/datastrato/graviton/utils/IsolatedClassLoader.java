@@ -72,26 +72,57 @@ public class IsolatedClassLoader implements Closeable {
     }
   }
 
-  public static IsolatedClassLoader buildClassLoader(String pkgPath) {
-    // Listing all the jars under the package path and build the isolated class loader.
-    File pkgFolder = new File(pkgPath);
-    if (!pkgFolder.exists()
-        || !pkgFolder.isDirectory()
-        || !pkgFolder.canRead()
-        || !pkgFolder.canExecute()) {
-      throw new IllegalArgumentException("Invalid package path: " + pkgPath);
+  /**
+   * Executes the provided function within the isolated class loading context and wraps any
+   * exception, for more, please refer to {@link #withClassLoader(ThrowableFunction)}.
+   */
+  public <T, E extends RuntimeException> T withClassLoader(
+      ThrowableFunction<ClassLoader, T> fn, Class<E> exceptionClass) {
+    try {
+      return withClassLoader(fn);
+    } catch (Exception e) {
+      if (exceptionClass.isInstance(e)) {
+        throw (E) e;
+      }
+      throw new RuntimeException(e);
     }
+  }
+
+  public static IsolatedClassLoader buildClassLoader(List<String> pkgPaths) {
+    // Listing all the jars under the package path and build the isolated class loader.
 
     List<URL> jars = Lists.newArrayList();
-    Arrays.stream(pkgFolder.listFiles())
-        .forEach(
-            f -> {
-              try {
-                jars.add(f.toURI().toURL());
-              } catch (MalformedURLException e) {
-                LOG.warn("Failed to read jar file: {}", f.getAbsolutePath(), e);
-              }
-            });
+    for (String path : pkgPaths) {
+      File pkgFolder = new File(path);
+      if (!pkgFolder.exists()
+          || !pkgFolder.isDirectory()
+          || !pkgFolder.canRead()
+          || !pkgFolder.canExecute()) {
+        throw new IllegalArgumentException("Invalid package path: " + pkgPaths);
+      }
+
+      // Add all the jars under the package path.
+      Arrays.stream(pkgFolder.listFiles())
+          .forEach(
+              f -> {
+                try {
+                  jars.add(f.toURI().toURL());
+                } catch (MalformedURLException e) {
+                  LOG.warn("Failed to read jar file: {}", f.getAbsolutePath(), e);
+                }
+              });
+
+      // Add itself to the classpath.
+      Lists.newArrayList(pkgFolder).stream()
+          .forEach(
+              f -> {
+                try {
+                  jars.add(f.toURI().toURL());
+                } catch (MalformedURLException e) {
+                  LOG.warn("Failed to read jar file: {}", f.getAbsolutePath(), e);
+                }
+              });
+    }
 
     return new IsolatedClassLoader(jars, Collections.emptyList(), Collections.emptyList());
   }

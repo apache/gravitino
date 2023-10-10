@@ -67,6 +67,9 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
   private HiveTablePropertiesMetadata tablePropertiesMetadata;
 
+  private static final String HIVE_CONFIG_NAME = "hive.properties";
+
+  public static final String HIVE_RELATED_CONFIG_PREFIX = "graviton.catalog.hive.";
   /**
    * Constructs a new instance of HiveCatalogOperations.
    *
@@ -85,7 +88,15 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
   @Override
   public void initialize(Map<String, String> conf) throws RuntimeException {
     Configuration hadoopConf = new Configuration();
-    conf.forEach(hadoopConf::set);
+    conf.forEach(
+        (k, v) -> {
+          if (k.startsWith(HIVE_RELATED_CONFIG_PREFIX)) {
+            hadoopConf.set(k.replace(HIVE_RELATED_CONFIG_PREFIX, ""), v);
+          } else {
+            hadoopConf.set(k, v);
+          }
+        });
+
     hiveConf = new HiveConf(hadoopConf, HiveCatalogOperations.class);
 
     // todo(xun): add hive client pool size in config

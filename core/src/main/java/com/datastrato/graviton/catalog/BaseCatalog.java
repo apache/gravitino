@@ -10,7 +10,11 @@ import com.datastrato.graviton.CatalogProvider;
 import com.datastrato.graviton.meta.CatalogEntity;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
+import java.io.InputStream;
 import java.util.Map;
+import java.util.Properties;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * The abstract base class for Catalog implementations.
@@ -27,6 +31,8 @@ import java.util.Map;
 public abstract class BaseCatalog<T extends BaseCatalog>
     implements Catalog, CatalogProvider, HasPropertyMetadata {
 
+  private static final Logger LOG = LoggerFactory.getLogger(BaseCatalog.class);
+
   private CatalogEntity entity;
 
   private Map<String, String> conf;
@@ -41,6 +47,21 @@ public abstract class BaseCatalog<T extends BaseCatalog>
    * @return A new instance of CatalogOperations.
    */
   protected abstract CatalogOperations newOps(Map<String, String> config);
+
+  /** Get all configuration properties for the catalog in the classpath. */
+  public Map<String, String> loadCatalogSpecificProperties(String catalogName) {
+    Map<String, String> configMap = Maps.newHashMap();
+    try {
+      InputStream inputStream = this.getClass().getClassLoader().getResourceAsStream(catalogName);
+      Properties properties = new Properties();
+      properties.load(inputStream);
+      properties.forEach((key, value) -> configMap.put(key.toString(), value.toString()));
+    } catch (Exception e) {
+      // If the catalog-specific configuration file is not found, it will not be loaded.
+      LOG.warn("Failed to load catalog specific configurations", e);
+    }
+    return configMap;
+  }
 
   @Override
   public PropertiesMetadata tablePropertiesMetadata() throws UnsupportedOperationException {
