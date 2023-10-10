@@ -37,7 +37,8 @@ public class AbstractIT {
 
   @BeforeAll
   public static void startIntegrationTest() throws Exception {
-    testMode = System.getProperty(TEST_MODE) == null ? EMBEDDED_TEST_MODE : System.getProperty(TEST_MODE);
+    testMode =
+        System.getProperty(TEST_MODE) == null ? EMBEDDED_TEST_MODE : System.getProperty(TEST_MODE);
 
     LOG.info("Running Graviton Server in {} mode", testMode);
 
