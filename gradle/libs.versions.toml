@@ -84,6 +84,7 @@ caffeine = { group = "com.github.ben-manes.caffeine", name = "caffeine", version
 rocksdbjni = { group = "org.rocksdb", name = "rocksdbjni", version.ref = "rocksdbjni" }
 commons-collections4 = { group = "org.apache.commons", name = "commons-collections4", version.ref = "commons-collections4" }
 iceberg-core = { group = "org.apache.iceberg", name = "iceberg-core", version.ref = "iceberg" }
+iceberg-api = { group = "org.apache.iceberg", name = "iceberg-api", version.ref = "iceberg" }
 iceberg-hive-metastore = { group = "org.apache.iceberg", name = "iceberg-hive-metastore", version.ref = "iceberg" }
 trino-spi= { group = "io.trino", name = "trino-spi", version.ref = "trino" }
 trino-toolkit= { group = "io.trino", name = "trino-plugin-toolkit", version.ref = "trino" }
@@ -95,7 +96,7 @@ spark-sql = { group = "org.apache.spark", name = "spark-sql_2.13", version.ref =
 log4j = ["slf4j-api", "log4j-slf4j2-impl", "log4j-api", "log4j-core", "log4j-12-api"]
 jetty = ["jetty-server", "jetty-servlet"]
 jersey = ["jersey-server", "jersey-container-servlet-core", "jersey-container-jetty-http", "jersey-media-json-jackson", "jersey-hk2"]
-iceberg = ["iceberg-core"]
+iceberg = ["iceberg-core", "iceberg-api"]
 
 [plugins]
 protobuf = { id = "com.google.protobuf", version.ref = "protobuf-plugin" }
