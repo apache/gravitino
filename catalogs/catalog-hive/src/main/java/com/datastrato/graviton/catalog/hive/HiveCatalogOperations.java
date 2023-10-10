@@ -556,6 +556,8 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     } catch (TException | InterruptedException e) {
       throw new RuntimeException(
           "Failed to alter Hive table " + tableIdent.name() + " in Hive metastore", e);
+    } catch (IllegalArgumentException e) {
+      throw e;
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
@@ -567,9 +569,12 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       return columns.size();
     } else if (position instanceof TableChange.After) {
       String afterColumn = ((TableChange.After) position).getColumn();
-      return indexOfColumn(columns, afterColumn) + 1;
+      int indexOfColumn = indexOfColumn(columns, afterColumn);
+      Preconditions.checkArgument(indexOfColumn != -1, "Column does not exist: " + afterColumn);
+      return indexOfColumn + 1;
+    } else {
+      return 0;
     }
-    return 0;
   }
 
   /**
