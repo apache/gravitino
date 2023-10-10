@@ -4,12 +4,28 @@
  */
 package com.datastrato.graviton.integration.test.catalog.hive;
 
+import static com.datastrato.graviton.catalog.hive.HiveTablePropertiesMetadata.COMMENT;
+import static com.datastrato.graviton.catalog.hive.HiveTablePropertiesMetadata.EXTERNAL;
+import static com.datastrato.graviton.catalog.hive.HiveTablePropertiesMetadata.FORMAT;
+import static com.datastrato.graviton.catalog.hive.HiveTablePropertiesMetadata.IGNORE_KEY_OUTPUT_FORMAT_CLASS;
+import static com.datastrato.graviton.catalog.hive.HiveTablePropertiesMetadata.INPUT_FORMAT;
+import static com.datastrato.graviton.catalog.hive.HiveTablePropertiesMetadata.LOCATION;
+import static com.datastrato.graviton.catalog.hive.HiveTablePropertiesMetadata.NUM_FILES;
+import static com.datastrato.graviton.catalog.hive.HiveTablePropertiesMetadata.OPENCSV_SERDE_CLASS;
+import static com.datastrato.graviton.catalog.hive.HiveTablePropertiesMetadata.OUTPUT_FORMAT;
+import static com.datastrato.graviton.catalog.hive.HiveTablePropertiesMetadata.SERDE_LIB;
+import static com.datastrato.graviton.catalog.hive.HiveTablePropertiesMetadata.TABLE_TYPE;
+import static com.datastrato.graviton.catalog.hive.HiveTablePropertiesMetadata.TEXT_INPUT_FORMAT_CLASS;
+import static com.datastrato.graviton.catalog.hive.HiveTablePropertiesMetadata.TOTAL_SIZE;
+import static com.datastrato.graviton.catalog.hive.HiveTablePropertiesMetadata.TRANSIENT_LAST_DDL_TIME;
 import static com.datastrato.graviton.rel.transforms.Transforms.identity;
+import static org.apache.hadoop.hive.metastore.TableType.EXTERNAL_TABLE;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.datastrato.graviton.Catalog;
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.catalog.hive.HiveClientPool;
+import com.datastrato.graviton.catalog.hive.HiveTablePropertiesMetadata;
 import com.datastrato.graviton.client.GravitonMetaLake;
 import com.datastrato.graviton.dto.rel.ColumnDTO;
 import com.datastrato.graviton.integration.test.util.AbstractIT;
@@ -26,6 +42,7 @@ import com.datastrato.graviton.rel.TableChange;
 import com.datastrato.graviton.rel.transforms.Transform;
 import com.datastrato.graviton.rel.transforms.Transforms;
 import com.datastrato.graviton.rel.transforms.Transforms.NamedReference;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import io.substrait.type.TypeCreator;
 import java.util.Arrays;
@@ -34,6 +51,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
@@ -327,6 +345,73 @@ public class CatalogHiveIT extends AbstractIT {
   }
 
   @Test
+  public void testHiveTableProperties() throws TException, InterruptedException {
+    ColumnDTO[] columns = createColumns();
+    NameIdentifier nameIdentifier =
+        NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
+    // test default properties
+    Table createdTable =
+        catalog
+            .asTableCatalog()
+            .createTable(
+                nameIdentifier, columns, table_comment, ImmutableMap.of(), new Transform[0]);
+    HiveTablePropertiesMetadata tablePropertiesMetadata = new HiveTablePropertiesMetadata();
+    org.apache.hadoop.hive.metastore.api.Table actualTable =
+        hiveClientPool.run(client -> client.getTable(schemaName, tableName));
+    assertDefaultTableProperties(createdTable, actualTable);
+
+    // test set properties
+    String table2 = GravitonITUtils.genRandomName("CatalogHiveIT_table");
+    Table createdTable2 =
+        catalog
+            .asTableCatalog()
+            .createTable(
+                NameIdentifier.of(metalakeName, catalogName, schemaName, table2),
+                columns,
+                table_comment,
+                ImmutableMap.of(
+                    TABLE_TYPE,
+                    "external_table",
+                    LOCATION,
+                    "/tmp",
+                    FORMAT,
+                    "textfile",
+                    SERDE_LIB,
+                    OPENCSV_SERDE_CLASS),
+                new Transform[0]);
+    org.apache.hadoop.hive.metastore.api.Table actualTable2 =
+        hiveClientPool.run(client -> client.getTable(schemaName, table2));
+
+    Assertions.assertEquals(
+        OPENCSV_SERDE_CLASS, actualTable2.getSd().getSerdeInfo().getSerializationLib());
+    Assertions.assertEquals(TEXT_INPUT_FORMAT_CLASS, actualTable2.getSd().getInputFormat());
+    Assertions.assertEquals(IGNORE_KEY_OUTPUT_FORMAT_CLASS, actualTable2.getSd().getOutputFormat());
+    Assertions.assertEquals(EXTERNAL_TABLE.name(), actualTable2.getTableType());
+    Assertions.assertEquals(table2, actualTable2.getSd().getSerdeInfo().getName());
+    Assertions.assertEquals(table_comment, actualTable2.getParameters().get(COMMENT));
+    Assertions.assertEquals(
+        ((Boolean) tablePropertiesMetadata.getDefaultValue(EXTERNAL)).toString().toUpperCase(),
+        actualTable.getParameters().get(EXTERNAL));
+    Assertions.assertTrue(actualTable2.getSd().getLocation().endsWith("/tmp"));
+    Assertions.assertNotNull(createdTable2.properties().get(TRANSIENT_LAST_DDL_TIME));
+    Assertions.assertNotNull(createdTable2.properties().get(NUM_FILES));
+    Assertions.assertNotNull(createdTable2.properties().get(TOTAL_SIZE));
+
+    // test alter properties exception
+    IllegalArgumentException exception =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> {
+              catalog
+                  .asTableCatalog()
+                  .alterTable(
+                      NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
+                      TableChange.setProperty(TRANSIENT_LAST_DDL_TIME, "1234"));
+            });
+    Assertions.assertTrue(exception.getMessage().contains("cannot be set"));
+  }
+
+  @Test
   public void testCreatePartitionedHiveTable() throws TException, InterruptedException {
     // Create table from Graviton API
     ColumnDTO[] columns = createColumns();
@@ -416,18 +501,20 @@ public class CatalogHiveIT extends AbstractIT {
             table_comment,
             createProperties(),
             new Transform[] {identity(columns[0])});
-    catalog
-        .asTableCatalog()
-        .alterTable(
-            NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
-            TableChange.rename(alertTableName),
-            TableChange.updateComment(table_comment + "_new"),
-            TableChange.removeProperty("key1"),
-            TableChange.setProperty("key2", "val2_new"),
-            TableChange.addColumn(new String[] {"col_4"}, TypeCreator.NULLABLE.STRING),
-            TableChange.renameColumn(new String[] {HIVE_COL_NAME2}, "col_2_new"),
-            TableChange.updateColumnComment(new String[] {HIVE_COL_NAME1}, "comment_new"),
-            TableChange.updateColumnType(new String[] {HIVE_COL_NAME1}, TypeCreator.NULLABLE.I32));
+    Table alteredTable =
+        catalog
+            .asTableCatalog()
+            .alterTable(
+                NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
+                TableChange.rename(alertTableName),
+                TableChange.updateComment(table_comment + "_new"),
+                TableChange.removeProperty("key1"),
+                TableChange.setProperty("key2", "val2_new"),
+                TableChange.addColumn(new String[] {"col_4"}, TypeCreator.NULLABLE.STRING),
+                TableChange.renameColumn(new String[] {HIVE_COL_NAME2}, "col_2_new"),
+                TableChange.updateColumnComment(new String[] {HIVE_COL_NAME1}, "comment_new"),
+                TableChange.updateColumnType(
+                    new String[] {HIVE_COL_NAME1}, TypeCreator.NULLABLE.I32));
 
     // Direct get table from hive metastore to check if the table is altered successfully.
     org.apache.hadoop.hive.metastore.api.Table hiveTab =
@@ -454,6 +541,31 @@ public class CatalogHiveIT extends AbstractIT {
 
     Assertions.assertEquals(1, hiveTab.getPartitionKeys().size());
     Assertions.assertEquals(columns[0].name(), hiveTab.getPartitionKeys().get(0).getName());
+    assertDefaultTableProperties(alteredTable, hiveTab);
+  }
+
+  private void assertDefaultTableProperties(
+      Table gravitonReturnTable, org.apache.hadoop.hive.metastore.api.Table actualTable) {
+    HiveTablePropertiesMetadata tablePropertiesMetadata = new HiveTablePropertiesMetadata();
+    Assertions.assertEquals(
+        tablePropertiesMetadata.getDefaultValue(SERDE_LIB),
+        actualTable.getSd().getSerdeInfo().getSerializationLib());
+    Assertions.assertEquals(
+        tablePropertiesMetadata.getDefaultValue(INPUT_FORMAT),
+        actualTable.getSd().getInputFormat());
+    Assertions.assertEquals(
+        tablePropertiesMetadata.getDefaultValue(OUTPUT_FORMAT),
+        actualTable.getSd().getOutputFormat());
+    Assertions.assertEquals(
+        ((TableType) tablePropertiesMetadata.getDefaultValue(TABLE_TYPE)).name(),
+        actualTable.getTableType());
+    Assertions.assertEquals(tableName, actualTable.getSd().getSerdeInfo().getName());
+    Assertions.assertEquals(
+        ((Boolean) tablePropertiesMetadata.getDefaultValue(EXTERNAL)).toString().toUpperCase(),
+        actualTable.getParameters().get(EXTERNAL));
+    Assertions.assertNotNull(actualTable.getParameters().get(COMMENT));
+    Assertions.assertNotNull(actualTable.getSd().getLocation());
+    Assertions.assertNotNull(gravitonReturnTable.properties().get(TRANSIENT_LAST_DDL_TIME));
   }
 
   @Test
