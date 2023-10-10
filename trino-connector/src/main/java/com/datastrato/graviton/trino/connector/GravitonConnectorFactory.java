@@ -9,15 +9,16 @@ import com.datastrato.graviton.trino.connector.catalog.CatalogConnectorFactory;
 import com.datastrato.graviton.trino.connector.catalog.CatalogConnectorManager;
 import com.datastrato.graviton.trino.connector.catalog.CatalogInjector;
 import com.google.common.base.Preconditions;
-import io.airlift.log.Logger;
 import io.trino.spi.connector.Connector;
 import io.trino.spi.connector.ConnectorContext;
 import io.trino.spi.connector.ConnectorFactory;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class GravitonConnectorFactory implements ConnectorFactory {
 
-  private static final Logger LOG = Logger.get(GravitonConnectorFactory.class);
+  private static final Logger LOG = LoggerFactory.getLogger(GravitonConnectorFactory.class);
   private static final String DEFAULT_CONNECTOR_NAME = "graviton";
 
   private CatalogConnectorManager catalogConnectorManager;
@@ -45,7 +46,7 @@ public class GravitonConnectorFactory implements ConnectorFactory {
       if (catalogConnectorManager == null) {
         try {
           CatalogInjector catalogInjector = new CatalogInjector();
-          catalogInjector.bindCatalogManager(context);
+          catalogInjector.init(context);
           CatalogConnectorFactory catalogConnectorFactory =
               new CatalogConnectorFactory(catalogInjector);
 
