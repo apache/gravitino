@@ -37,7 +37,11 @@ graviton.entity.store.kv.rocksdbPath = /tmp/graviton
 graviton.catalog.cache.evictionIntervalMs = 3600000
 
 # THE CONFIGURATION FOR AUXILIARY SERVICE
-# Auxiliary service names, seperate by ','
+# Auxiliary service names, separate by ','
 graviton.auxService.names = iceberg-rest
 # Iceberg REST service classpath
 graviton.auxService.iceberg-rest.classpath = catalogs/lakehouse-iceberg/libs
+# Iceberg REST service host
+graviton.auxService.iceberg-rest.host = 127.0.0.1
+# Iceberg REST service http port
+graviton.auxService.iceberg-rest.httpPort = 9001

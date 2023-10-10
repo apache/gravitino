@@ -5,7 +5,7 @@
 
 package com.datastrato.graviton.catalog.lakehouse.iceberg.utils;
 
-import com.datastrato.graviton.catalog.lakehouse.iceberg.IcebergRESTConfig;
+import com.datastrato.graviton.catalog.lakehouse.iceberg.IcebergConfig;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.iceberg.CatalogProperties;
@@ -24,12 +24,12 @@ public class TestIcebergCatalogUtil {
 
     catalog =
         IcebergCatalogUtil.loadCatalogBackend(
-            IcebergRESTConfig.CATALOG_TYPE.getDefaultValue().toLowerCase());
+            IcebergConfig.CATALOG_TYPE.getDefaultValue().toLowerCase());
     Assertions.assertTrue(catalog instanceof InMemoryCatalog);
 
     catalog =
         IcebergCatalogUtil.loadCatalogBackend(
-            IcebergRESTConfig.CATALOG_TYPE.getDefaultValue().toUpperCase());
+            IcebergConfig.CATALOG_TYPE.getDefaultValue().toUpperCase());
     Assertions.assertTrue(catalog instanceof InMemoryCatalog);
 
     catalog = IcebergCatalogUtil.loadCatalogBackend("hive");
@@ -47,7 +47,7 @@ public class TestIcebergCatalogUtil {
     Map<String, String> properties = new HashMap<>();
     properties.put(CatalogProperties.URI, "jdbc://0.0.0.0:3306");
     properties.put(CatalogProperties.WAREHOUSE_LOCATION, "test");
-    properties.put(IcebergRESTConfig.INITIALIZE_JDBC_CATALOG_TABLES.getKey(), "false");
+    properties.put(IcebergConfig.INITIALIZE_JDBC_CATALOG_TABLES.getKey(), "false");
     catalog = IcebergCatalogUtil.loadCatalogBackend("jdbc", properties);
     Assertions.assertTrue(catalog instanceof JdbcCatalog);
 

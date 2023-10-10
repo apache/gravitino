@@ -18,7 +18,7 @@ import org.apache.iceberg.rest.responses.ConfigResponse;
 @Path("/v1/{prefix:([^/]*/)?}config")
 @Consumes(MediaType.APPLICATION_JSON)
 @Produces(MediaType.APPLICATION_JSON)
-public class IcebergConfig {
+public class IcebergConfigOperations {
 
   @Context private HttpServletRequest httpRequest;
 
