@@ -181,7 +181,7 @@ public class CatalogInjector {
     }
   }
 
-  void createInjectHandler(
+  private void createInjectHandler(
       Object catalogManager,
       Object catalogFactory,
       Method createCatalogMethod,

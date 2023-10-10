@@ -145,7 +145,6 @@ public class GravitonMetadata implements ConnectorMetadata {
 
     GravitonColumnHandle gravitonColumnHandle = (GravitonColumnHandle) columnHandle;
     String columName = gravitonColumnHandle.getColumnName();
-    table.getColumn(columName);
 
     GravitonColumn column = table.getColumn(columName);
     return metadataAdapter.getColumnMetadata(column);

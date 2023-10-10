@@ -4,8 +4,11 @@
  */
 package com.datastrato.graviton.trino.connector.metadata;
 
+import static com.datastrato.graviton.trino.connector.GravitonErrorCode.GRAVITON_COLUMN_NOT_EXISTS;
+
 import com.datastrato.graviton.rel.Table;
 import com.google.common.collect.ImmutableList;
+import io.trino.spi.TrinoException;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -21,11 +24,11 @@ public class GravitonTable {
     this.schemaName = schemaName;
     this.tableMetadata = tableMetadata;
 
-    ImmutableList.Builder<GravitonColumn> table_columns = ImmutableList.builder();
+    ImmutableList.Builder<GravitonColumn> tableColumns = ImmutableList.builder();
     for (int i = 0; i < tableMetadata.columns().length; i++) {
-      table_columns.add(new GravitonColumn(tableMetadata.columns()[i], i));
+      tableColumns.add(new GravitonColumn(tableMetadata.columns()[i], i));
     }
-    this.columns = table_columns.build();
+    this.columns = tableColumns.build();
 
     properties = tableMetadata.properties();
   }
@@ -45,6 +48,11 @@ public class GravitonTable {
   public GravitonColumn getColumn(String columName) {
     Optional<GravitonColumn> entry =
         columns.stream().filter((column -> column.getName().equals(columName))).findFirst();
+    if (entry.isEmpty()) {
+      throw new TrinoException(
+          GRAVITON_COLUMN_NOT_EXISTS, String.format("Column %s does not exist", columName));
+    }
+
     return entry.get();
   }
 

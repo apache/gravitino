@@ -7,6 +7,7 @@ package com.datastrato.graviton.trino.connector.catalog;
 import static com.datastrato.graviton.trino.connector.GravitonErrorCode.GRAVITON_CATALOG_NOT_EXISTS;
 import static com.datastrato.graviton.trino.connector.GravitonErrorCode.GRAVITON_SCHEMA_NOT_EXISTS;
 import static com.datastrato.graviton.trino.connector.GravitonErrorCode.GRAVITON_TABLE_NOT_EXISTS;
+import static com.datastrato.graviton.trino.connector.GravitonErrorCode.GRAVITON_UNSUPPORTED_OPERATION;
 
 import com.datastrato.graviton.Catalog;
 import com.datastrato.graviton.NameIdentifier;
@@ -41,8 +42,14 @@ public class CatalogConnectorMetadata {
       this.catalogName = catalogIdentifier.name();
       this.metalake = metalake;
       catalog = metalake.loadCatalog(catalogIdentifier);
+
+      // Make sure the catalog support schema operations.
+      catalog.asSchemas();
     } catch (NoSuchCatalogException e) {
       throw new TrinoException(GRAVITON_CATALOG_NOT_EXISTS, "Catalog does not exist", e);
+    } catch (UnsupportedOperationException e) {
+      throw new TrinoException(
+          GRAVITON_UNSUPPORTED_OPERATION, "Catalog does not support schema operations", e);
     }
   }
 

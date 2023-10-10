@@ -69,7 +69,7 @@ public class CatalogConnectorManager {
             .setNameFormat("graviton-connector-schedule-%d")
             .setUncaughtExceptionHandler(
                 (thread, throwable) ->
-                    LOG.warn("%s uncaught exception:", thread.getName(), throwable))
+                    LOG.warn("{} uncaught exception:", thread.getName(), throwable))
             .build());
   }
 
