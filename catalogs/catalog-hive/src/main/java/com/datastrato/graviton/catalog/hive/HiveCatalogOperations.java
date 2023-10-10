@@ -4,8 +4,9 @@
  */
 package com.datastrato.graviton.catalog.hive;
 
-import static com.datastrato.graviton.catalog.hive.HiveTable.HMS_TABLE_COMMENT;
 import static com.datastrato.graviton.catalog.hive.HiveTable.SUPPORT_TABLE_TYPES;
+import static com.datastrato.graviton.catalog.hive.HiveTablePropertiesMetadata.COMMENT;
+import static com.datastrato.graviton.catalog.hive.HiveTablePropertiesMetadata.TABLE_TYPE;
 
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
@@ -42,6 +43,7 @@ import java.util.stream.Collectors;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.AlreadyExistsException;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
@@ -434,6 +436,11 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
         "Hive partition only supports identity transform");
     validateDistributionAndSort(distribution, sortOrders);
 
+    TableType tableType = (TableType) tablePropertiesMetadata.getOrDefault(properties, TABLE_TYPE);
+    Preconditions.checkArgument(
+        SUPPORT_TABLE_TYPES.contains(tableType.name()),
+        "Unsupported table type: " + tableType.name());
+
     try {
       if (!schemaExists(schemaIdent)) {
         LOG.warn("Hive schema (database) does not exist: {}", schemaIdent);
@@ -458,7 +465,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
               .build();
       clientPool.run(
           c -> {
-            c.createTable(hiveTable.toHiveTable());
+            c.createTable(hiveTable.toHiveTable(tablePropertiesMetadata));
             return null;
           });
 
@@ -492,7 +499,8 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     try {
       // TODO(@Minghuang): require a table lock to avoid race condition
       HiveTable table = (HiveTable) loadTable(tableIdent);
-      org.apache.hadoop.hive.metastore.api.Table alteredHiveTable = table.toHiveTable();
+      org.apache.hadoop.hive.metastore.api.Table alteredHiveTable =
+          table.toHiveTable(tablePropertiesMetadata);
 
       for (TableChange change : changes) {
         // Table change
@@ -595,7 +603,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
   private void doUpdateComment(
       org.apache.hadoop.hive.metastore.api.Table hiveTable, TableChange.UpdateComment change) {
     Map<String, String> parameters = hiveTable.getParameters();
-    parameters.put(HMS_TABLE_COMMENT, change.getNewComment());
+    parameters.put(COMMENT, change.getNewComment());
   }
 
   private void doSetProperty(

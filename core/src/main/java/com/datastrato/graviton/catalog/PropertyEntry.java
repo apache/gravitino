@@ -4,7 +4,11 @@
  */
 package com.datastrato.graviton.catalog;
 
+import static java.lang.String.format;
+import static java.util.stream.Collectors.joining;
+
 import com.google.common.base.Preconditions;
+import java.util.EnumSet;
 import java.util.function.Function;
 import lombok.Getter;
 import org.apache.logging.log4j.util.Strings;
@@ -179,6 +183,33 @@ public final class PropertyEntry<T> {
     return stringPropertyEntry(name, description, false, true, null, hidden, true);
   }
 
+  public static PropertyEntry<Boolean> booleanReservedPropertyEntry(
+      String name, String description, boolean defaultValue, boolean hidden) {
+    return booleanPropertyEntry(name, description, false, true, defaultValue, hidden, true);
+  }
+
+  public static PropertyEntry<Boolean> booleanPropertyEntry(
+      String name,
+      String description,
+      boolean required,
+      boolean immutable,
+      Boolean defaultValue,
+      boolean hidden,
+      boolean reserved) {
+    return new Builder<Boolean>()
+        .withName(name)
+        .withDescription(description)
+        .withRequired(required)
+        .withImmutable(immutable)
+        .withJavaType(Boolean.class)
+        .withDefaultValue(defaultValue)
+        .withDecoder(Boolean::valueOf)
+        .withEncoder(b -> Boolean.toString(b).toUpperCase())
+        .withHidden(hidden)
+        .withReserved(reserved)
+        .build();
+  }
+
   public static PropertyEntry<String> stringRequiredPropertyEntry(
       String name, String description, boolean immutable, boolean hidden) {
     return stringPropertyEntry(name, description, true, immutable, null, hidden, false);
@@ -192,5 +223,53 @@ public final class PropertyEntry<T> {
       boolean hidden,
       boolean reserved) {
     return stringPropertyEntry(name, description, required, true, defaultValue, hidden, reserved);
+  }
+
+  public static <T extends Enum<T>> PropertyEntry<T> enumPropertyEntry(
+      String name,
+      String description,
+      boolean required,
+      boolean immutable,
+      Class<T> javaType,
+      T defaultValue,
+      boolean hidden,
+      boolean reserved) {
+    String validValues =
+        EnumSet.allOf(javaType).stream()
+            .map(Enum::name)
+            .map(String::toLowerCase)
+            .collect(joining(", ", "[", "]"));
+    return new Builder<T>()
+        .withName(name)
+        .withDescription(description)
+        .withRequired(required)
+        .withImmutable(immutable)
+        .withJavaType(javaType)
+        .withDefaultValue(defaultValue)
+        .withDecoder(
+            value -> {
+              try {
+                return Enum.valueOf(javaType, value.toUpperCase());
+              } catch (IllegalArgumentException | NullPointerException e) {
+                throw new IllegalArgumentException(
+                    format("Invalid value [%s]. Valid values: %s", value, validValues), e);
+              }
+            })
+        .withEncoder(e -> e.name().toLowerCase())
+        .withHidden(hidden)
+        .withReserved(reserved)
+        .build();
+  }
+
+  public static <T extends Enum<T>> PropertyEntry<T> enumImmutablePropertyEntry(
+      String name,
+      String description,
+      boolean required,
+      Class<T> javaType,
+      T defaultValue,
+      boolean hidden,
+      boolean reserved) {
+    return enumPropertyEntry(
+        name, description, required, true, javaType, defaultValue, hidden, reserved);
   }
 }
