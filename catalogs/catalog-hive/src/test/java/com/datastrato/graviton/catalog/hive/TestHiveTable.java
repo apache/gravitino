@@ -374,6 +374,44 @@ public class TestHiveTable extends MiniHiveMetastoreService {
                 sortOrders);
     Assertions.assertTrue(hiveCatalog.asTableCatalog().tableExists(tableIdentifier));
 
+    // test exception
+    Throwable exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                hiveCatalog
+                    .asTableCatalog()
+                    .alterTable(
+                        tableIdentifier,
+                        TableChange.updateColumnPosition(
+                            new String[] {"not_exist_col"},
+                            TableChange.ColumnPosition.after("col_1"))));
+    Assertions.assertTrue(exception.getMessage().contains("UpdateColumnPosition does not exist"));
+
+    exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                hiveCatalog
+                    .asTableCatalog()
+                    .alterTable(
+                        tableIdentifier,
+                        TableChange.updateColumnPosition(
+                            new String[] {"col_1"},
+                            TableChange.ColumnPosition.after("not_exist_col"))));
+    Assertions.assertTrue(exception.getMessage().contains("Column does not exist"));
+
+    exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                hiveCatalog
+                    .asTableCatalog()
+                    .alterTable(
+                        tableIdentifier,
+                        TableChange.updateColumnPosition(new String[] {"col_1"}, null)));
+    Assertions.assertTrue(exception.getMessage().contains("Column position cannot be null"));
+
     // test alter
     hiveCatalog
         .asTableCatalog()

@@ -6,8 +6,9 @@ package com.datastrato.graviton.catalog.hive;
 
 import static com.datastrato.graviton.catalog.hive.HiveCatalogPropertiesMeta.CATALOG_CLIENT_POOL_MAXSIZE;
 import static com.datastrato.graviton.catalog.hive.HiveCatalogPropertiesMeta.DEFAULT_CATALOG_CLIENT_POOL_MAXSIZE;
-import static com.datastrato.graviton.catalog.hive.HiveTable.HMS_TABLE_COMMENT;
 import static com.datastrato.graviton.catalog.hive.HiveTable.SUPPORT_TABLE_TYPES;
+import static com.datastrato.graviton.catalog.hive.HiveTablePropertiesMetadata.COMMENT;
+import static com.datastrato.graviton.catalog.hive.HiveTablePropertiesMetadata.TABLE_TYPE;
 
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
@@ -43,6 +44,7 @@ import java.util.stream.Collectors;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.AlreadyExistsException;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
@@ -444,6 +446,11 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
         "Hive partition only supports identity transform");
     validateDistributionAndSort(distribution, sortOrders);
 
+    TableType tableType = (TableType) tablePropertiesMetadata.getOrDefault(properties, TABLE_TYPE);
+    Preconditions.checkArgument(
+        SUPPORT_TABLE_TYPES.contains(tableType.name()),
+        "Unsupported table type: " + tableType.name());
+
     try {
       if (!schemaExists(schemaIdent)) {
         LOG.warn("Hive schema (database) does not exist: {}", schemaIdent);
@@ -468,7 +475,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
               .build();
       clientPool.run(
           c -> {
-            c.createTable(hiveTable.toHiveTable());
+            c.createTable(hiveTable.toHiveTable(tablePropertiesMetadata));
             return null;
           });
 
@@ -502,7 +509,8 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     try {
       // TODO(@Minghuang): require a table lock to avoid race condition
       HiveTable table = (HiveTable) loadTable(tableIdent);
-      org.apache.hadoop.hive.metastore.api.Table alteredHiveTable = table.toHiveTable();
+      org.apache.hadoop.hive.metastore.api.Table alteredHiveTable =
+          table.toHiveTable(tablePropertiesMetadata);
 
       for (TableChange change : changes) {
         // Table change
@@ -547,7 +555,8 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
           }
         } else {
           throw new IllegalArgumentException(
-              "Unsupported table change type: " + change.getClass().getSimpleName());
+              "Unsupported table change type: "
+                  + (change == null ? "null" : change.getClass().getSimpleName()));
         }
       }
 
@@ -566,20 +575,26 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     } catch (TException | InterruptedException e) {
       throw new RuntimeException(
           "Failed to alter Hive table " + tableIdent.name() + " in Hive metastore", e);
+    } catch (IllegalArgumentException e) {
+      throw e;
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
   }
 
   private int columnPosition(List<FieldSchema> columns, TableChange.ColumnPosition position) {
-    if (position == null) {
-      // add to the end by default
-      return columns.size();
-    } else if (position instanceof TableChange.After) {
+    Preconditions.checkArgument(position != null, "Column position cannot be null");
+    if (position instanceof TableChange.After) {
       String afterColumn = ((TableChange.After) position).getColumn();
-      return indexOfColumn(columns, afterColumn) + 1;
+      int indexOfColumn = indexOfColumn(columns, afterColumn);
+      Preconditions.checkArgument(indexOfColumn != -1, "Column does not exist: " + afterColumn);
+      return indexOfColumn + 1;
+    } else if (position instanceof TableChange.First) {
+      return 0;
+    } else {
+      throw new UnsupportedOperationException(
+          "Unsupported column position type: " + position.getClass().getSimpleName());
     }
-    return 0;
   }
 
   /**
@@ -605,7 +620,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
   private void doUpdateComment(
       org.apache.hadoop.hive.metastore.api.Table hiveTable, TableChange.UpdateComment change) {
     Map<String, String> parameters = hiveTable.getParameters();
-    parameters.put(HMS_TABLE_COMMENT, change.getNewComment());
+    parameters.put(COMMENT, change.getNewComment());
   }
 
   private void doSetProperty(
@@ -621,8 +636,11 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
   }
 
   void doAddColumn(List<FieldSchema> cols, TableChange.AddColumn change) {
+    // add to the end by default
+    int targetPosition =
+        change.getPosition() == null ? cols.size() : columnPosition(cols, change.getPosition());
     cols.add(
-        columnPosition(cols, change.getPosition()),
+        targetPosition,
         new FieldSchema(
             change.fieldNames()[0],
             change.getDataType().accept(ToHiveType.INSTANCE).getQualifiedName(),
