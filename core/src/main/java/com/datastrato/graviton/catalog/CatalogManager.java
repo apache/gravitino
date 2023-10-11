@@ -65,10 +65,9 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
 
   private static final Logger LOG = LoggerFactory.getLogger(CatalogManager.class);
   // Any graviton configuration that starts with this prefix will be trim and passed to the specific
-  // catalog
-  // implementation. For example, if the configuration is "graviton.bypass.hive.metastore.uris",
-  // then we will
-  // trim the prefix and pass "hive.metastore.uris" to the hive catalog implementation.
+  // catalog implementation. For example, if the configuration is
+  // "graviton.bypass.hive.metastore.uris",
+  // then we will trim the prefix and pass "hive.metastore.uris" to the hive catalog implementation.
   public static final String CATALOG_BYPASS_PREFIX = "graviton.bypass.";
 
   /** Wrapper class for a catalog instance and its class loader. */
@@ -266,6 +265,9 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
             .build();
 
     try {
+      // We need to create the catalog wrapper before we put the entity into the store, because we
+      // need
+      // to load the catalog-specific properties from the catalog-specific config file.
       CatalogWrapper wrapper = catalogCache.get(ident, id -> createCatalogWrapper(e));
       store.executeInTransaction(
           () -> {
