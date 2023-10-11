@@ -4,6 +4,9 @@
  */
 package com.datastrato.graviton.catalog.lakehouse.iceberg.converter;
 
+import static com.datastrato.graviton.rel.transforms.Transforms.NAME_OF_BUCKET;
+import static com.datastrato.graviton.rel.transforms.Transforms.NAME_OF_TRUNCATE;
+
 import com.datastrato.graviton.rel.SortOrder;
 import com.datastrato.graviton.rel.transforms.Transform;
 import com.datastrato.graviton.rel.transforms.Transforms;
@@ -54,15 +57,14 @@ public class ToIcebergSortOrder {
                 .collect(Collectors.joining(DOT));
         UnboundTerm<Object> expression;
         switch (transform.name().toLowerCase(Locale.ROOT)) {
-            // TODO minghuang - add more functions implementation.
-          case "bucket":
+          case NAME_OF_BUCKET:
             int numBuckets =
                 ((Expression.I32Literal)
                         ((Transforms.LiteralReference) transform.arguments()[0]).value())
                     .value();
             expression = Expressions.bucket(colName, numBuckets);
             break;
-          case "truncate":
+          case NAME_OF_TRUNCATE:
             int width =
                 ((Expression.I32Literal)
                         ((Transforms.LiteralReference) transform.arguments()[0]).value())

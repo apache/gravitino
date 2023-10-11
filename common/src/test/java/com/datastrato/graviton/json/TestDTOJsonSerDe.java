@@ -4,6 +4,14 @@
  */
 package com.datastrato.graviton.json;
 
+import static com.datastrato.graviton.dto.rel.ExpressionPartitionDTO.bucket;
+import static com.datastrato.graviton.dto.rel.ExpressionPartitionDTO.truncate;
+import static com.datastrato.graviton.dto.rel.SimplePartitionDTO.day;
+import static com.datastrato.graviton.dto.rel.SimplePartitionDTO.hour;
+import static com.datastrato.graviton.dto.rel.SimplePartitionDTO.identity;
+import static com.datastrato.graviton.dto.rel.SimplePartitionDTO.month;
+import static com.datastrato.graviton.dto.rel.SimplePartitionDTO.year;
+
 import com.datastrato.graviton.Catalog;
 import com.datastrato.graviton.dto.AuditDTO;
 import com.datastrato.graviton.dto.CatalogDTO;
@@ -13,7 +21,6 @@ import com.datastrato.graviton.dto.rel.ExpressionPartitionDTO;
 import com.datastrato.graviton.dto.rel.ListPartitionDTO;
 import com.datastrato.graviton.dto.rel.Partition;
 import com.datastrato.graviton.dto.rel.RangePartitionDTO;
-import com.datastrato.graviton.dto.rel.SimplePartitionDTO;
 import com.datastrato.graviton.dto.rel.TableDTO;
 import com.fasterxml.jackson.databind.cfg.EnumFeature;
 import com.fasterxml.jackson.databind.exc.InvalidTypeIdException;
@@ -230,31 +237,11 @@ public class TestDTOJsonSerDe {
     String[] field2 = new String[] {"city"};
 
     // construct simple partition
-    Partition identity =
-        new SimplePartitionDTO.Builder()
-            .withStrategy(Partition.Strategy.IDENTITY)
-            .withFieldName(field1)
-            .build();
-    Partition hourPart =
-        new SimplePartitionDTO.Builder()
-            .withStrategy(Partition.Strategy.HOUR)
-            .withFieldName(field1)
-            .build();
-    Partition dayPart =
-        new SimplePartitionDTO.Builder()
-            .withStrategy(Partition.Strategy.DAY)
-            .withFieldName(field1)
-            .build();
-    Partition monthPart =
-        new SimplePartitionDTO.Builder()
-            .withStrategy(Partition.Strategy.MONTH)
-            .withFieldName(field1)
-            .build();
-    Partition yearPart =
-        new SimplePartitionDTO.Builder()
-            .withStrategy(Partition.Strategy.YEAR)
-            .withFieldName(field1)
-            .build();
+    Partition identity = identity(field1);
+    Partition hourPart = hour(field1);
+    Partition dayPart = day(field1);
+    Partition monthPart = month(field1);
+    Partition yearPart = year(field1);
 
     // construct list partition
     String[][] p1Value = {{"2023-04-01", "San Francisco"}, {"2023-04-01", "San Francisco"}};
@@ -293,9 +280,20 @@ public class TestDTOJsonSerDe {
             .withArgs(new ExpressionPartitionDTO.Expression[] {toDateFunc})
             .build();
     Partition expressionPart = new ExpressionPartitionDTO.Builder(monthFunc).build();
+    Partition bucketPart = bucket(field1, 10);
+    Partition truncatePart = truncate(field2, 20);
 
     Partition[] partitions = {
-      identity, hourPart, dayPart, monthPart, yearPart, listPart, rangePart, expressionPart
+      identity,
+      hourPart,
+      dayPart,
+      monthPart,
+      yearPart,
+      listPart,
+      rangePart,
+      expressionPart,
+      bucketPart,
+      truncatePart
     };
     String serJson =
         JsonMapper.builder()

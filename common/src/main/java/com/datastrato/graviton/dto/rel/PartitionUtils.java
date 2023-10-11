@@ -65,30 +65,6 @@ public class PartitionUtils {
     return Arrays.stream(transforms).map(PartitionUtils::toPartition).toArray(Partition[]::new);
   }
 
-  private static Transform toTransform(Partition partition) {
-    switch (partition.strategy()) {
-      case IDENTITY:
-        return identity(((SimplePartitionDTO) partition).getFieldName());
-      case YEAR:
-      case MONTH:
-      case DAY:
-      case HOUR:
-        return function(
-            partition.strategy().name().toLowerCase(),
-            new Transform[] {field(((SimplePartitionDTO) partition).getFieldName())});
-      case LIST:
-        // TODO(minghuang): add Assignments after Transform support partition value
-        return list(((ListPartitionDTO) partition).getFieldNames());
-      case RANGE:
-        // TODO(minghuang): add Ranges after Transform support partition value
-        return range(((RangePartitionDTO) partition).getFieldName());
-      case EXPRESSION:
-        return toTransform(((ExpressionPartitionDTO) partition).getExpression());
-    }
-    throw new IllegalArgumentException(
-        "Unsupported partition type " + partition.getClass().getCanonicalName());
-  }
-
   public static Transform toTransform(ExpressionPartitionDTO.Expression expression) {
     switch (expression.expressionType()) {
       case FIELD:
@@ -106,7 +82,44 @@ public class PartitionUtils {
         "Unsupported expression type " + expression.getClass().getCanonicalName());
   }
 
-  public static Expression.Literal getLiteral(
+  public static ExpressionPartitionDTO.Expression toExpression(Transform transform) {
+    if (transform instanceof Transforms.NamedReference) {
+      return new ExpressionPartitionDTO.FieldExpression.Builder()
+          .withFieldName(((Transforms.NamedReference) transform).value())
+          .build();
+    } else if (transform instanceof Transforms.LiteralReference) {
+      Expression.Literal literal = ((Transforms.LiteralReference) transform).value();
+      return new ExpressionPartitionDTO.LiteralExpression.Builder()
+          .withType(literal.getType())
+          .withValue(literal.accept(LiteralStringConverter.INSTANCE))
+          .build();
+    } else {
+      return new ExpressionPartitionDTO.FunctionExpression.Builder()
+          .withFuncName(transform.name())
+          .withArgs(
+              Arrays.stream(transform.arguments())
+                  .map(PartitionUtils::toExpression)
+                  .toArray(ExpressionPartitionDTO.Expression[]::new))
+          .build();
+    }
+  }
+
+  public static void validateFieldExist(ColumnDTO[] columns, String[] fieldName)
+      throws IllegalArgumentException {
+    Preconditions.checkArgument(
+        columns != null && columns.length != 0, "columns cannot be null or empty");
+
+    List<ColumnDTO> partitionColumn =
+        Arrays.stream(columns)
+            .filter(c -> c.name().equals(fieldName[0]))
+            .collect(Collectors.toList());
+    Preconditions.checkArgument(
+        partitionColumn.size() == 1, "partition field %s not found in table", fieldName[0]);
+
+    // TODO: should validate nested fieldName after column type support namedStruct
+  }
+
+  private static Expression.Literal getLiteral(
       ExpressionPartitionDTO.LiteralExpression literalExpression) {
     LiteralConverter literalConverter = new LiteralConverter(literalExpression.getValue());
     return literalExpression.getType().accept(literalConverter);
@@ -189,73 +202,28 @@ public class PartitionUtils {
     }
   }
 
-  private static Partition toPartition(Transform transform) {
-    if (transform instanceof Transforms.NamedReference) {
-      return new SimplePartitionDTO.Builder()
-          .withStrategy(IDENTITY)
-          .withFieldName(((Transforms.NamedReference) transform).value())
-          .build();
+  private static Transform toTransform(Partition partition) {
+    switch (partition.strategy()) {
+      case IDENTITY:
+        return identity(((SimplePartitionDTO) partition).getFieldName());
+      case YEAR:
+      case MONTH:
+      case DAY:
+      case HOUR:
+        return function(
+            partition.strategy().name().toLowerCase(),
+            new Transform[] {field(((SimplePartitionDTO) partition).getFieldName())});
+      case LIST:
+        // TODO(minghuang): add Assignments after Transform support partition value
+        return list(((ListPartitionDTO) partition).getFieldNames());
+      case RANGE:
+        // TODO(minghuang): add Ranges after Transform support partition value
+        return range(((RangePartitionDTO) partition).getFieldName());
+      case EXPRESSION:
+        return toTransform(((ExpressionPartitionDTO) partition).getExpression());
     }
-
-    if (transform instanceof Transforms.FunctionTrans) {
-      Transform[] arguments = transform.arguments();
-      switch (transform.name().toLowerCase()) {
-        case NAME_OF_YEAR:
-        case NAME_OF_MONTH:
-        case NAME_OF_DAY:
-        case NAME_OF_HOUR:
-          if (arguments.length == 1 && arguments[0] instanceof Transforms.NamedReference) {
-            return new SimplePartitionDTO.Builder()
-                .withStrategy(Partition.Strategy.valueOf(transform.name().toUpperCase()))
-                .withFieldName(((Transforms.NamedReference) arguments[0]).value())
-                .build();
-          }
-        case NAME_OF_LIST:
-          if (Arrays.stream(arguments).allMatch(arg -> arg instanceof Transforms.NamedReference)) {
-            return new ListPartitionDTO.Builder()
-                .withFieldNames(
-                    Arrays.stream(arguments)
-                        .map(arg -> ((Transforms.NamedReference) arg).value())
-                        .toArray(String[][]::new))
-                // TODO(minghuang): add Assignments after Transform support partition value
-                .build();
-          }
-        case NAME_OF_RANGE:
-          if (arguments.length == 1 && arguments[0] instanceof Transforms.NamedReference) {
-            return new RangePartitionDTO.Builder()
-                .withFieldName(((Transforms.NamedReference) arguments[0]).value())
-                // TODO(minghuang): add Ranges after Transform support partition value
-                .build();
-          }
-        default:
-          return new ExpressionPartitionDTO.Builder(toExpression(transform)).build();
-      }
-    }
-
     throw new IllegalArgumentException(
-        "Unsupported transform type " + transform.getClass().getCanonicalName());
-  }
-
-  public static ExpressionPartitionDTO.Expression toExpression(Transform transform) {
-    if (transform instanceof Transforms.NamedReference) {
-      return new ExpressionPartitionDTO.FieldExpression.Builder()
-          .withFieldName(((Transforms.NamedReference) transform).value())
-          .build();
-    } else if (transform instanceof Transforms.LiteralReference) {
-      Expression.Literal literal = ((Transforms.LiteralReference) transform).value();
-      return new ExpressionPartitionDTO.LiteralExpression.Builder()
-          .withType(literal.getType())
-          .withValue(literal.accept(LiteralStringConverter.INSTANCE))
-          .build();
-    } else {
-      return new ExpressionPartitionDTO.FunctionExpression.Builder()
-          .withFuncName(transform.name())
-          .withArgs(
-              Arrays.stream(transform.arguments())
-                  .map(PartitionUtils::toExpression)
-                  .toArray(ExpressionPartitionDTO.Expression[]::new))
-          .build();
-    }
+        "Unsupported partition type " + partition.getClass().getCanonicalName());
   }
 
   private static class LiteralStringConverter
@@ -359,18 +327,50 @@ public class PartitionUtils {
     }
   }
 
-  public static void validateFieldExist(ColumnDTO[] columns, String[] fieldName)
-      throws IllegalArgumentException {
-    Preconditions.checkArgument(
-        columns != null && columns.length != 0, "columns cannot be null or empty");
+  private static Partition toPartition(Transform transform) {
+    if (transform instanceof Transforms.NamedReference) {
+      return new SimplePartitionDTO.Builder()
+          .withStrategy(IDENTITY)
+          .withFieldName(((Transforms.NamedReference) transform).value())
+          .build();
+    }
 
-    List<ColumnDTO> partitionColumn =
-        Arrays.stream(columns)
-            .filter(c -> c.name().equals(fieldName[0]))
-            .collect(Collectors.toList());
-    Preconditions.checkArgument(
-        partitionColumn.size() == 1, "partition field %s not found in table", fieldName[0]);
+    if (transform instanceof Transforms.FunctionTrans) {
+      Transform[] arguments = transform.arguments();
+      switch (transform.name().toLowerCase()) {
+        case NAME_OF_YEAR:
+        case NAME_OF_MONTH:
+        case NAME_OF_DAY:
+        case NAME_OF_HOUR:
+          if (arguments.length == 1 && arguments[0] instanceof Transforms.NamedReference) {
+            return new SimplePartitionDTO.Builder()
+                .withStrategy(Partition.Strategy.valueOf(transform.name().toUpperCase()))
+                .withFieldName(((Transforms.NamedReference) arguments[0]).value())
+                .build();
+          }
+        case NAME_OF_LIST:
+          if (Arrays.stream(arguments).allMatch(arg -> arg instanceof Transforms.NamedReference)) {
+            return new ListPartitionDTO.Builder()
+                .withFieldNames(
+                    Arrays.stream(arguments)
+                        .map(arg -> ((Transforms.NamedReference) arg).value())
+                        .toArray(String[][]::new))
+                // TODO(minghuang): add Assignments after Transform support partition value
+                .build();
+          }
+        case NAME_OF_RANGE:
+          if (arguments.length == 1 && arguments[0] instanceof Transforms.NamedReference) {
+            return new RangePartitionDTO.Builder()
+                .withFieldName(((Transforms.NamedReference) arguments[0]).value())
+                // TODO(minghuang): add Ranges after Transform support partition value
+                .build();
+          }
+        default:
+          return new ExpressionPartitionDTO.Builder(toExpression(transform)).build();
+      }
+    }
 
-    // TODO: should validate nested fieldName after column type support namedStruct
+    throw new IllegalArgumentException(
+        "Unsupported transform type " + transform.getClass().getCanonicalName());
   }
 }
