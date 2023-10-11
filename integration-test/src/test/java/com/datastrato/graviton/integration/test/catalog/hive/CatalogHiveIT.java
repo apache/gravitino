@@ -542,6 +542,59 @@ public class CatalogHiveIT extends AbstractIT {
     Assertions.assertEquals(1, hiveTab.getPartitionKeys().size());
     Assertions.assertEquals(columns[0].name(), hiveTab.getPartitionKeys().get(0).getName());
     assertDefaultTableProperties(alteredTable, hiveTab);
+
+    // test updateColumnPosition exception
+    ColumnDTO col1 =
+        new ColumnDTO.Builder()
+            .withName("name")
+            .withDataType(TypeCreator.NULLABLE.STRING)
+            .withComment("comment")
+            .build();
+    ColumnDTO col2 =
+        new ColumnDTO.Builder()
+            .withName("address")
+            .withDataType(TypeCreator.NULLABLE.STRING)
+            .withComment("comment")
+            .build();
+    ColumnDTO col3 =
+        new ColumnDTO.Builder()
+            .withName("date_of_birth")
+            .withDataType(TypeCreator.NULLABLE.DATE)
+            .withComment("comment")
+            .build();
+    ColumnDTO[] newColumns = new ColumnDTO[] {col1, col2, col3};
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(
+            metalakeName,
+            catalogName,
+            schemaName,
+            GravitonITUtils.genRandomName("CatalogHiveIT_table"));
+    catalog
+        .asTableCatalog()
+        .createTable(
+            tableIdentifier,
+            newColumns,
+            table_comment,
+            ImmutableMap.of(),
+            new Transform[0],
+            Distribution.NONE,
+            new SortOrder[0]);
+
+    RuntimeException exception =
+        assertThrows(
+            RuntimeException.class,
+            () ->
+                catalog
+                    .asTableCatalog()
+                    .alterTable(
+                        tableIdentifier,
+                        TableChange.updateColumnPosition(
+                            new String[] {"date_of_birth"}, TableChange.ColumnPosition.first())));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains(
+                "columns have types incompatible with the existing columns in their respective positions"));
   }
 
   private void assertDefaultTableProperties(

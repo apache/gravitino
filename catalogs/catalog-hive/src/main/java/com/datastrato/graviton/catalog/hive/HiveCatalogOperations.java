@@ -483,7 +483,12 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
   }
 
   /**
-   * Not supported in this implementation. Throws UnsupportedOperationException.
+   * Apply the {@link TableChange change} to an existing Hive table.
+   *
+   * <p>Note: When changing column position, since HMS will check the compatibility of column type
+   * between the old column position and the new column position, you need to make sure that the new
+   * column position is compatible with the old column position, otherwise the operation will fail
+   * in HMS.
    *
    * @param tableIdent The identifier of the table to alter.
    * @param changes The changes to apply to the table.
