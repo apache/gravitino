@@ -6,6 +6,7 @@ package com.datastrato.graviton.trino.connector.metadata;
 
 import com.datastrato.graviton.Catalog;
 
+/** Help Graviton connector access CatalogMetadata from graviton client. */
 public class GravitonCatalog {
 
   private final Catalog catalog;
