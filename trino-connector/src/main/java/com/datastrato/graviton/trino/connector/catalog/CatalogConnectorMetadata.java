@@ -13,6 +13,7 @@ import com.datastrato.graviton.Catalog;
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
 import com.datastrato.graviton.client.GravitonMetaLake;
+import com.datastrato.graviton.dto.rel.ColumnDTO;
 import com.datastrato.graviton.exceptions.NoSuchCatalogException;
 import com.datastrato.graviton.exceptions.NoSuchSchemaException;
 import com.datastrato.graviton.exceptions.NoSuchTableException;
@@ -25,6 +26,7 @@ import com.datastrato.graviton.trino.connector.metadata.GravitonTable;
 import io.trino.spi.TrinoException;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -82,7 +84,7 @@ public class CatalogConnectorMetadata {
       Table table =
           tableCatalog.loadTable(
               NameIdentifier.ofTable(metalake.name(), catalogName, schemaName, tableName));
-      return new GravitonTable(schemaName, table);
+      return new GravitonTable(schemaName, tableName, table);
     } catch (NoSuchTableException e) {
       throw new TrinoException(GRAVITON_TABLE_NOT_EXISTS, "Table does not exist", e);
     }
@@ -100,6 +102,33 @@ public class CatalogConnectorMetadata {
 
   public boolean tableExists(String schemaName, String tableName) {
     return tableCatalog.tableExists(
+        NameIdentifier.ofTable(metalake.name(), catalogName, schemaName, tableName));
+  }
+
+  public void createTable(GravitonTable table) {
+    NameIdentifier identifier =
+        NameIdentifier.ofTable(
+            metalake.name(), catalogName, table.getSchemaName(), table.getName());
+    ColumnDTO[] gravitonColumns = table.getColumnDTOs();
+    String comment = table.getComment();
+    Map<String, String> properties = table.getProperties();
+    tableCatalog.createTable(identifier, gravitonColumns, comment, properties);
+  }
+
+  public void createSchema(GravitonSchema schema) {
+    schemaCatalog.createSchema(
+        NameIdentifier.ofSchema(metalake.name(), catalogName, schema.getName()),
+        schema.getComment(),
+        schema.getProperties());
+  }
+
+  public void dropSchema(String schemaName, boolean cascade) {
+    schemaCatalog.dropSchema(
+        NameIdentifier.ofSchema(metalake.name(), catalogName, schemaName), cascade);
+  }
+
+  public void dropTable(String schemaName, String tableName) {
+    tableCatalog.dropTable(
         NameIdentifier.ofTable(metalake.name(), catalogName, schemaName, tableName));
   }
 }

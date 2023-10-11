@@ -24,6 +24,12 @@ public interface CatalogConnectorAdapter {
   /** @return Return internal connector config with trino. */
   Map<String, Object> buildInternalConnectorConfig(GravitonCatalog catalog);
 
+  /** @return SchemaProperties list that used to validate schema properties. */
+  List<PropertyMetadata<?>> getSchemaProperties();
+
   /** @return Return MetadataAdapter for special catalog connector. */
   CatalogConnectorMetadataAdapter getMetadataAdapter();
+
+  /** @return ColumnProperties list that used to validate column properties. */
+  List<PropertyMetadata<?>> getColumnProperties();
 }

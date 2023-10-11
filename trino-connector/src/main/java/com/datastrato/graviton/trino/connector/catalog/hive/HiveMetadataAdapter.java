@@ -46,9 +46,7 @@ public class HiveMetadataAdapter implements CatalogConnectorMetadataAdapter {
     }
 
     Map<String, Object> properties =
-        gravitonTable.getProperties().entrySet().stream()
-            .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-
+        normalizeProperties(gravitonTable.getProperties(), tableProperties);
     return new ConnectorTableMetadata(
         schemaTableName, columnMetadataList, properties, Optional.of(gravitonTable.getComment()));
   }
@@ -65,32 +63,53 @@ public class HiveMetadataAdapter implements CatalogConnectorMetadataAdapter {
 
   @Override
   public Map<String, Object> getSchemaProperties(GravitonSchema schema) {
-    return normalizeProperties(schema.properties(), schemaProperties);
+    return normalizeProperties(schema.getProperties(), schemaProperties);
   }
 
   @Override
   public GravitonTable createTable(ConnectorTableMetadata tableMetadata) {
-    throw new NotImplementedException();
+    String tableName = tableMetadata.getTableSchema().getTable().getTableName();
+    String schemaName = tableMetadata.getTableSchema().getTable().getSchemaName();
+    String comment = tableMetadata.getComment().orElse("");
+    Map<String, String> properties = removeUnsetProperties(tableMetadata.getProperties());
+
+    List<GravitonColumn> columns = new ArrayList<>();
+    int index = 0;
+    for (int i = 0; i < tableMetadata.getColumns().size(); i++) {
+      ColumnMetadata column = tableMetadata.getColumns().get(i);
+      columns.add(
+          new GravitonColumn(
+              column.getName(),
+              DataTypeTransformer.getGravitonType(column.getType(), column.isNullable()),
+              index,
+              column.getComment()));
+      index++;
+    }
+    return new GravitonTable(schemaName, tableName, columns, comment, properties);
   }
 
   @Override
   public GravitonSchema createSchema(String schemaName, Map<String, Object> properties) {
-    throw new NotImplementedException();
+    return new GravitonSchema(schemaName, removeUnsetProperties(properties), "");
   }
 
   private Map<String, Object> normalizeProperties(
       Map<String, String> properties, List<PropertyMetadata<?>> propertyTemplate) {
     // TODO yuhui redo this function on graviton table properties supported.
+    // Trino only supports properties defined in the propertyTemplate.
     Map<String, Object> validProperties = new HashMap<>();
     for (PropertyMetadata<?> propertyMetadata : propertyTemplate) {
       String name = propertyMetadata.getName();
       if (properties.containsKey(name)) {
-        if (propertyMetadata.getJavaType() == String.class)
-          validProperties.put(name, properties.get(name));
-
-        if (name.equals("format")) validProperties.put(name, properties.get(name));
+        validProperties.put(name, properties.get(name));
       }
     }
     return validProperties;
+  }
+
+  private Map<String, String> removeUnsetProperties(Map<String, Object> properties) {
+    return properties.entrySet().stream()
+        .filter(e -> !e.getValue().equals(""))
+        .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().toString()));
   }
 }
