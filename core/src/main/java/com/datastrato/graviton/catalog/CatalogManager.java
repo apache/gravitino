@@ -572,7 +572,8 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
       return Lists.newArrayList(pkg.split(","));
     } else if (testEnv) {
       // In test, the catalog package is under the build directory.
-      pkgPath = String.join(File.separator, gravitonHome, "catalogs", "catalog-" + provider, "build");
+      pkgPath =
+          String.join(File.separator, gravitonHome, "catalogs", "catalog-" + provider, "build");
       // Add the config and lib to the classpath.
       return Lists.newArrayList(
           pkgPath + File.separator + "resources", pkgPath + File.separator + "libs");
@@ -580,9 +581,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
 
     // In real environment, the catalog package is under the catalog directory.
     pkgPath = String.join(File.separator, gravitonHome, "catalogs", provider);
-    return Lists.newArrayList(
-        pkgPath + File.separator + "conf", pkgPath + File.separator + "libs");
-
+    return Lists.newArrayList(pkgPath + File.separator + "conf", pkgPath + File.separator + "libs");
   }
 
   private Class<? extends CatalogProvider> lookupCatalogProvider(String provider, ClassLoader cl) {

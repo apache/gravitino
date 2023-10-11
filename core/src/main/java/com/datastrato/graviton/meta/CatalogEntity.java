@@ -75,8 +75,8 @@ public class CatalogEntity implements Entity, Auditable, HasIdentifier {
   }
 
   /**
-   * Merge the properties of the catalog with the given properties.
-   * Note: Properties in catalog entity has higher priority than the given properties.
+   * Merge the properties of the catalog with the given properties. Note: Properties in catalog
+   * entity has higher priority than the given properties.
    */
   public void mergeProperty(Map<String, String> extraProperty) {
     if (extraProperty == null) {
