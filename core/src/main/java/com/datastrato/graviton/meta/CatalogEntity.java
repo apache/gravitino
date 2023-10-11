@@ -74,7 +74,11 @@ public class CatalogEntity implements Entity, Auditable, HasIdentifier {
     return Collections.unmodifiableMap(fields);
   }
 
-  public void addProperty(Map<String, String> extraProperty) {
+  /**
+   * Merge the properties of the catalog with the given properties.
+   * Note: Properties in catalog entity has higher priority than the given properties.
+   */
+  public void mergeProperty(Map<String, String> extraProperty) {
     if (extraProperty == null) {
       return;
     }

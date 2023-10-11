@@ -9,6 +9,7 @@ import com.datastrato.graviton.Catalog;
 import com.datastrato.graviton.CatalogProvider;
 import com.datastrato.graviton.meta.CatalogEntity;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Throwables;
 import com.google.common.collect.Maps;
 import java.io.InputStream;
 import java.util.Map;
@@ -53,13 +54,16 @@ public abstract class BaseCatalog<T extends BaseCatalog>
     Map<String, String> configMap = Maps.newHashMap();
     try {
       InputStream inputStream = this.getClass().getClassLoader().getResourceAsStream(fileURL);
-      Properties properties = new Properties();
-      properties.load(inputStream);
-      properties.forEach((key, value) -> configMap.put(key.toString(), value.toString()));
+      Properties loadProperties = new Properties();
+      loadProperties.load(inputStream);
+      loadProperties.forEach((key, value) -> configMap.put(key.toString(), value.toString()));
     } catch (Exception e) {
       // If the catalog-specific configuration file is not found, it will not be loaded.
       // Should we throw exception directly?
-      LOG.warn("Failed to load catalog specific configurations", e);
+      LOG.warn(
+          "Failed to load catalog specific configurations, file name: '{}', Exception:\n{}",
+          fileURL,
+          Throwables.getStackTraceAsString(e));
     }
     return configMap;
   }

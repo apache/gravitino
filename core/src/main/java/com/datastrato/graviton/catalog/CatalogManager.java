@@ -266,8 +266,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
 
     try {
       // We need to create the catalog wrapper before we put the entity into the store, because we
-      // need
-      // to load the catalog-specific properties from the catalog-specific config file.
+      // need to load the catalog-specific properties from the catalog-specific config file.
       CatalogWrapper wrapper = catalogCache.get(ident, id -> createCatalogWrapper(e));
       store.executeInTransaction(
           () -> {
@@ -468,28 +467,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
     }
 
     // Load Catalog class instance
-    BaseCatalog catalog;
-    try {
-      catalog =
-          classLoader.withClassLoader(
-              cl -> {
-                try {
-                  Class<? extends CatalogProvider> providerClz =
-                      lookupCatalogProvider(provider, cl);
-                  return (BaseCatalog) providerClz.newInstance();
-                } catch (Exception e) {
-                  LOG.error("Failed to load catalog with provider: {}", provider, e);
-                  throw new RuntimeException(e);
-                }
-              });
-    } catch (Exception e) {
-      LOG.error("Failed to load catalog with class loader", e);
-      throw new RuntimeException(e);
-    }
-
-    if (catalog == null) {
-      throw new RuntimeException("Failed to load catalog with provider: " + provider);
-    }
+    BaseCatalog<?> catalog = createCatalogInstance(classLoader, provider);
 
     // Load catalog specific properties
     CatalogWrapper wrapper = new CatalogWrapper(catalog, classLoader);
@@ -498,7 +476,9 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
             cl -> catalog.loadCatalogSpecificProperties(provider + ".properties"),
             RuntimeException.class);
 
-    entity.addProperty(catalogSpecificConfig);
+    // Merge catalog-specific configurations to the entity properties, as the entity only contains
+    // properties that are set by user currently.
+    entity.mergeProperty(catalogSpecificConfig);
 
     Map<String, String> totalMergedConf =
         mergeConf(Maps.newHashMap(mergedConf), catalogSpecificConfig);
@@ -525,6 +505,32 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
         IllegalArgumentException.class);
 
     return wrapper;
+  }
+
+  private BaseCatalog<?> createCatalogInstance(IsolatedClassLoader classLoader, String provider) {
+    BaseCatalog<?> catalog;
+    try {
+      catalog =
+          classLoader.withClassLoader(
+              cl -> {
+                try {
+                  Class<? extends CatalogProvider> providerClz =
+                      lookupCatalogProvider(provider, cl);
+                  return (BaseCatalog) providerClz.newInstance();
+                } catch (Exception e) {
+                  LOG.error("Failed to load catalog with provider: {}", provider, e);
+                  throw new RuntimeException(e);
+                }
+              });
+    } catch (Exception e) {
+      LOG.error("Failed to load catalog with class loader", e);
+      throw new RuntimeException(e);
+    }
+
+    if (catalog == null) {
+      throw new RuntimeException("Failed to load catalog with provider: " + provider);
+    }
+    return catalog;
   }
 
   private Map<String, String> getBypassConfig(Map<String, String> totalMergedConf) {
@@ -563,18 +569,20 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
 
     String pkgPath;
     if (pkg != null) {
-      pkgPath = pkg;
-      return Lists.newArrayList(pkgPath.split(","));
-    } else if (!testEnv) {
-      pkgPath = String.join(File.separator, gravitonHome, "catalogs", provider);
+      return Lists.newArrayList(pkg.split(","));
+    } else if (testEnv) {
+      // In test, the catalog package is under the build directory.
+      pkgPath = String.join(File.separator, gravitonHome, "catalogs", "catalog-" + provider, "build");
       // Add the config and lib to the classpath.
       return Lists.newArrayList(
-          pkgPath + File.separator + "conf", pkgPath + File.separator + "libs");
+          pkgPath + File.separator + "resources", pkgPath + File.separator + "libs");
     }
-    pkgPath = String.join(File.separator, gravitonHome, "catalogs", "catalog-" + provider, "build");
-    // Add the config and lib to the classpath.
+
+    // In real environment, the catalog package is under the catalog directory.
+    pkgPath = String.join(File.separator, gravitonHome, "catalogs", provider);
     return Lists.newArrayList(
-        pkgPath + File.separator + "resources", pkgPath + File.separator + "libs");
+        pkgPath + File.separator + "conf", pkgPath + File.separator + "libs");
+
   }
 
   private Class<? extends CatalogProvider> lookupCatalogProvider(String provider, ClassLoader cl) {
