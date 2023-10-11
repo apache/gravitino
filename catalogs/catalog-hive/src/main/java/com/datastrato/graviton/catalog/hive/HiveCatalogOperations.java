@@ -69,9 +69,6 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
   private HiveTablePropertiesMetadata tablePropertiesMetadata;
 
-  private static final String HIVE_CONFIG_NAME = "hive.properties";
-
-  public static final String HIVE_RELATED_CONFIG_PREFIX = "graviton.catalog.hive.";
   /**
    * Constructs a new instance of HiveCatalogOperations.
    *

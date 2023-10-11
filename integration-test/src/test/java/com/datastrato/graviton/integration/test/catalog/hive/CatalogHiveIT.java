@@ -146,6 +146,9 @@ public class CatalogHiveIT extends AbstractIT {
             "comment",
             properties);
     Catalog loadCatalog = metalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
+
+    // We have added the bypass property 'graviton.bypass.hive.metastore.client.capability.check'
+    // to the hive.properties, so we need to check if the property has been added successfully.
     Assertions.assertTrue(
         loadCatalog
             .properties()

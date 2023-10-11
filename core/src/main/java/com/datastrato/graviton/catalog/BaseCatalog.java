@@ -48,7 +48,7 @@ public abstract class BaseCatalog<T extends BaseCatalog>
    */
   protected abstract CatalogOperations newOps(Map<String, String> config);
 
-  /** Get all configuration properties for the catalog in the classpath. */
+  /** Load properties for the catalog from file in the classpath. */
   public Map<String, String> loadCatalogSpecificProperties(String fileURL) {
     Map<String, String> configMap = Maps.newHashMap();
     try {
@@ -58,6 +58,7 @@ public abstract class BaseCatalog<T extends BaseCatalog>
       properties.forEach((key, value) -> configMap.put(key.toString(), value.toString()));
     } catch (Exception e) {
       // If the catalog-specific configuration file is not found, it will not be loaded.
+      // Should we throw exception directly?
       LOG.warn("Failed to load catalog specific configurations", e);
     }
     return configMap;

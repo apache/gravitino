@@ -64,7 +64,6 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
 
   private final CatalogEntity entity;
 
-  public static final String ICEBERG_RELATED_CONFIG_PREFIX = "graviton.catalog.iceberg.";
   private IcebergTableOpsHelper icebergTableOpsHelper;
 
   /**
