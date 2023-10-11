@@ -4,7 +4,7 @@
  */
 package com.datastrato.graviton.integration.test.catalog.hive;
 
-import static com.datastrato.graviton.catalog.CatalogManager.CATALOG_BYPASS_PREFIX;
+import static com.datastrato.graviton.catalog.BaseCatalog.CATALOG_BYPASS_PREFIX;
 import static com.datastrato.graviton.catalog.hive.HiveTablePropertiesMetadata.COMMENT;
 import static com.datastrato.graviton.catalog.hive.HiveTablePropertiesMetadata.EXTERNAL;
 import static com.datastrato.graviton.catalog.hive.HiveTablePropertiesMetadata.FORMAT;

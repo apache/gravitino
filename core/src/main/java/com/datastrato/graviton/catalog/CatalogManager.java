@@ -36,7 +36,7 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.Scheduler;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableMap;
+import com.google.common.base.Throwables;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -45,6 +45,7 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
@@ -52,10 +53,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Properties;
 import java.util.ServiceLoader;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -64,11 +67,6 @@ import org.slf4j.LoggerFactory;
 public class CatalogManager implements SupportsCatalogs, Closeable {
 
   private static final Logger LOG = LoggerFactory.getLogger(CatalogManager.class);
-  // Any graviton configuration that starts with this prefix will be trim and passed to the specific
-  // catalog implementation. For example, if the configuration is
-  // "graviton.bypass.hive.metastore.uris",
-  // then we will trim the prefix and pass "hive.metastore.uris" to the hive catalog implementation.
-  public static final String CATALOG_BYPASS_PREFIX = "graviton.bypass.";
 
   /** Wrapper class for a catalog instance and its class loader. */
   public static class CatalogWrapper {
@@ -246,6 +244,11 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
       String comment,
       Map<String, String> properties)
       throws NoSuchMetalakeException, CatalogAlreadyExistsException {
+
+    // load catalog-related configuration from catalog-specific configuration file
+    Map<String, String> catalogSpecificConfig = loadCatalogSpecificConfig(provider);
+    Map<String, String> mergedConfig = mergeConf(properties, catalogSpecificConfig);
+
     long uid = idGenerator.nextId();
     StringIdentifier stringId = StringIdentifier.fromId(uid);
     CatalogEntity e =
@@ -256,7 +259,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
             .withType(type)
             .withProvider(provider)
             .withComment(comment)
-            .withProperties(StringIdentifier.addToProperties(stringId, properties))
+            .withProperties(StringIdentifier.addToProperties(stringId, mergedConfig))
             .withAuditInfo(
                 new AuditInfo.Builder()
                     .withCreator("graviton") /* TODO. Should change to real user */
@@ -265,9 +268,6 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
             .build();
 
     try {
-      // We need to create the catalog wrapper before we put the entity into the store, because we
-      // need to load the catalog-specific properties from the catalog-specific config file.
-      CatalogWrapper wrapper = catalogCache.get(ident, id -> createCatalogWrapper(e));
       store.executeInTransaction(
           () -> {
             NameIdentifier metalakeIdent = NameIdentifier.of(ident.namespace().levels());
@@ -279,16 +279,15 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
             store.put(e, false /* overwrite */);
             return null;
           });
+      CatalogWrapper wrapper = catalogCache.get(ident, id -> createCatalogWrapper(e));
       return wrapper.catalog;
     } catch (EntityAlreadyExistsException e1) {
       LOG.warn("Catalog {} already exists", ident, e1);
       throw new CatalogAlreadyExistsException("Catalog " + ident + " already exists");
     } catch (IllegalArgumentException | NoSuchMetalakeException e2) {
-      catalogCache.invalidate(ident);
       throw e2;
     } catch (Exception e3) {
       LOG.error("Failed to create catalog {}", ident, e3);
-      catalogCache.invalidate(ident);
       throw new RuntimeException(e3);
     }
   }
@@ -449,15 +448,12 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
   }
 
   private CatalogWrapper createCatalogWrapper(CatalogEntity entity) {
-    Map<String, String> mergedConf =
-        entity.getProperties() == null
-            ? ImmutableMap.of()
-            : ImmutableMap.copyOf(entity.getProperties());
+    Map<String, String> conf = entity.getProperties();
     String provider = entity.getProvider();
 
     IsolatedClassLoader classLoader;
     if (config.get(Configs.CATALOG_LOAD_ISOLATED)) {
-      List<String> pkgPaths = buildPkgPaths(mergedConf, provider);
+      List<String> pkgPaths = buildPkgPaths(conf, provider);
       classLoader = IsolatedClassLoader.buildClassLoader(pkgPaths);
     } else {
       // This will use the current class loader, it is mainly used for test.
@@ -471,25 +467,15 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
 
     // Load catalog specific properties
     CatalogWrapper wrapper = new CatalogWrapper(catalog, classLoader);
-    Map<String, String> catalogSpecificConfig =
-        classLoader.withClassLoader(
-            cl -> catalog.loadCatalogSpecificProperties(provider + ".properties"),
-            RuntimeException.class);
 
-    // Merge catalog-specific configurations to the entity properties, as the entity only contains
-    // properties that are set by user currently.
-    entity.mergeProperty(catalogSpecificConfig);
-
-    Map<String, String> totalMergedConf =
-        mergeConf(Maps.newHashMap(mergedConf), catalogSpecificConfig);
-    Map<String, String> bypassConfig = getBypassConfig(totalMergedConf);
+    //    Map<String, String> bypassConfig = getBypassConfig(conf);
     // Initialize the catalog
-    catalog.withCatalogConf(bypassConfig).withCatalogEntity(entity);
+    catalog.withCatalogConf(conf).withCatalogEntity(entity);
 
     // Validate catalog properties and initialize the config
     classLoader.withClassLoader(
         cl -> {
-          Map<String, String> configWithoutId = Maps.newHashMap(totalMergedConf);
+          Map<String, String> configWithoutId = Maps.newHashMap(conf);
           configWithoutId.remove(ID_KEY);
           catalog.ops().catalogPropertiesMetadata().validatePropertyForCreate(configWithoutId);
 
@@ -533,15 +519,57 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
     return catalog;
   }
 
-  private Map<String, String> getBypassConfig(Map<String, String> totalMergedConf) {
-    Map<String, String> bypassConfig = Maps.newHashMap();
-    totalMergedConf.forEach(
-        (key, value) -> {
-          if (key.startsWith(CATALOG_BYPASS_PREFIX)) {
-            bypassConfig.put(key.substring(CATALOG_BYPASS_PREFIX.length()), value);
-          }
-        });
-    return bypassConfig;
+  private Map<String, String> loadCatalogSpecificConfig(String provider) {
+    if ("test".equals(provider)) {
+      return Maps.newHashMap();
+    }
+
+    String catalogSpecificConfigFile = provider + ".properties";
+    Map<String, String> catalogSpecificConfig = Maps.newHashMap();
+
+    String gravitonHome = System.getenv("GRAVITON_HOME");
+    Preconditions.checkArgument(gravitonHome != null, "GRAVITON_HOME not set");
+    boolean testEnv = System.getenv("GRAVITON_TEST") != null;
+
+    String fullPath;
+    if (testEnv) {
+      fullPath =
+          String.join(
+              File.separator,
+              gravitonHome,
+              "catalogs",
+              "catalog-" + provider,
+              "build",
+              "resources",
+              "main",
+              catalogSpecificConfigFile);
+    } else {
+      fullPath =
+          String.join(
+              File.separator,
+              gravitonHome,
+              "catalogs",
+              provider,
+              "conf",
+              catalogSpecificConfigFile);
+    }
+
+    try {
+      InputStream inputStream = FileUtils.openInputStream(new File(fullPath));
+      Properties loadProperties = new Properties();
+      loadProperties.load(inputStream);
+      loadProperties.forEach(
+          (key, value) -> catalogSpecificConfig.put(key.toString(), value.toString()));
+    } catch (Exception e) {
+      // If the catalog-specific configuration file is not found, it will not be loaded.
+      // Should we throw exception directly?
+      LOG.error(
+          "Failed to load catalog specific configurations, file name: '{}', Exception:\n{}",
+          catalogSpecificConfigFile,
+          Throwables.getStackTraceAsString(e));
+      throw new RuntimeException(e);
+    }
+    return catalogSpecificConfig;
   }
 
   static Map<String, String> mergeConf(Map<String, String> properties, Map<String, String> conf) {

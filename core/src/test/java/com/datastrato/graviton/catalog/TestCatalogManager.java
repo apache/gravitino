@@ -106,7 +106,7 @@ public class TestCatalogManager {
             .put("key2", "value2")
             .put("key1", "value1")
             .put("hidden_key", "hidden_value")
-            .put(CatalogManager.CATALOG_BYPASS_PREFIX + "mock", "mock")
+            .put("mock", "mock")
             .build();
     Assertions.assertDoesNotThrow(
         () ->
@@ -137,7 +137,7 @@ public class TestCatalogManager {
         ImmutableMap.<String, String>builder()
             .put("key2", "value2")
             .put("key1", "value1")
-            .put(CatalogManager.CATALOG_BYPASS_PREFIX + "mock", "mock")
+            .put("mock", "mock")
             .build();
     Assertions.assertDoesNotThrow(
         () ->
@@ -152,7 +152,7 @@ public class TestCatalogManager {
             .put("key1", "value1")
             .put("key3", "3")
             .put("key4", "value4")
-            .put(CatalogManager.CATALOG_BYPASS_PREFIX + "mock", "mock")
+            .put("mock", "mock")
             .build();
     Assertions.assertDoesNotThrow(
         () ->
@@ -201,10 +201,7 @@ public class TestCatalogManager {
 
     // key1 is required;
     Map<String, String> props1 =
-        ImmutableMap.<String, String>builder()
-            .put("key2", "value2")
-            .put(CatalogManager.CATALOG_BYPASS_PREFIX + "mock", "mock")
-            .build();
+        ImmutableMap.<String, String>builder().put("key2", "value2").put("mock", "mock").build();
     IllegalArgumentException e1 =
         Assertions.assertThrows(
             IllegalArgumentException.class,
@@ -218,10 +215,7 @@ public class TestCatalogManager {
 
     // key2 is required;
     Map<String, String> props2 =
-        ImmutableMap.<String, String>builder()
-            .put("key1", "value1")
-            .put(CatalogManager.CATALOG_BYPASS_PREFIX + "mock", "mock")
-            .build();
+        ImmutableMap.<String, String>builder().put("key1", "value1").put("mock", "mock").build();
     e1 =
         Assertions.assertThrows(
             IllegalArgumentException.class,
@@ -238,7 +232,7 @@ public class TestCatalogManager {
             .put("key1", "value1")
             .put("key2", "value2")
             .put("key3", "a12a1a")
-            .put(CatalogManager.CATALOG_BYPASS_PREFIX + "mock", "mock")
+            .put("mock", "mock")
             .build();
     e1 =
         Assertions.assertThrows(
