@@ -545,7 +545,8 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
           }
         } else {
           throw new IllegalArgumentException(
-              "Unsupported table change type: " + change.getClass().getSimpleName());
+              "Unsupported table change type: "
+                  + (change == null ? "null" : change.getClass().getSimpleName()));
         }
       }
 
@@ -564,20 +565,26 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     } catch (TException | InterruptedException e) {
       throw new RuntimeException(
           "Failed to alter Hive table " + tableIdent.name() + " in Hive metastore", e);
+    } catch (IllegalArgumentException e) {
+      throw e;
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
   }
 
   private int columnPosition(List<FieldSchema> columns, TableChange.ColumnPosition position) {
-    if (position == null) {
-      // add to the end by default
-      return columns.size();
-    } else if (position instanceof TableChange.After) {
+    Preconditions.checkArgument(position != null, "Column position cannot be null");
+    if (position instanceof TableChange.After) {
       String afterColumn = ((TableChange.After) position).getColumn();
-      return indexOfColumn(columns, afterColumn) + 1;
+      int indexOfColumn = indexOfColumn(columns, afterColumn);
+      Preconditions.checkArgument(indexOfColumn != -1, "Column does not exist: " + afterColumn);
+      return indexOfColumn + 1;
+    } else if (position instanceof TableChange.First) {
+      return 0;
+    } else {
+      throw new UnsupportedOperationException(
+          "Unsupported column position type: " + position.getClass().getSimpleName());
     }
-    return 0;
   }
 
   /**
@@ -619,8 +626,11 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
   }
 
   void doAddColumn(List<FieldSchema> cols, TableChange.AddColumn change) {
+    // add to the end by default
+    int targetPosition =
+        change.getPosition() == null ? cols.size() : columnPosition(cols, change.getPosition());
     cols.add(
-        columnPosition(cols, change.getPosition()),
+        targetPosition,
         new FieldSchema(
             change.fieldNames()[0],
             change.getDataType().accept(ToHiveType.INSTANCE).getQualifiedName(),
