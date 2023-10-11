@@ -109,7 +109,7 @@ public class HiveMetadataAdapter implements CatalogConnectorMetadataAdapter {
 
   private Map<String, String> removeUnsetProperties(Map<String, Object> properties) {
     return properties.entrySet().stream()
-        .filter(e -> !e.getValue().equals(""))
+        .filter(e -> e.getValue() != null)
         .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().toString()));
   }
 }

@@ -18,7 +18,7 @@ public class HiveSchemaProperties {
   HiveSchemaProperties() {
     schemaProperties =
         ImmutableList.of(
-            stringProperty("location", "Hive storage location for the schema", "", false));
+            stringProperty("location", "Hive storage location for the schema", null, false));
   }
 
   public List<PropertyMetadata<?>> getSchemaProperties() {
