@@ -64,6 +64,12 @@ import org.slf4j.LoggerFactory;
 public class CatalogManager implements SupportsCatalogs, Closeable {
 
   private static final Logger LOG = LoggerFactory.getLogger(CatalogManager.class);
+  // Any graviton configuration that starts with this prefix will be trim and passed to the specific
+  // catalog
+  // implementation. For example, if the configuration is "graviton.bypass.hive.metastore.uris",
+  // then we will
+  // trim the prefix and pass "hive.metastore.uris" to the hive catalog implementation.
+  public static final String CATALOG_BYPASS_PREFIX = "graviton.bypass.";
 
   /** Wrapper class for a catalog instance and its class loader. */
   public static class CatalogWrapper {
@@ -241,48 +247,47 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
       String comment,
       Map<String, String> properties)
       throws NoSuchMetalakeException, CatalogAlreadyExistsException {
+    long uid = idGenerator.nextId();
+    StringIdentifier stringId = StringIdentifier.fromId(uid);
+    CatalogEntity e =
+        new CatalogEntity.Builder()
+            .withId(uid)
+            .withName(ident.name())
+            .withNamespace(ident.namespace())
+            .withType(type)
+            .withProvider(provider)
+            .withComment(comment)
+            .withProperties(StringIdentifier.addToProperties(stringId, properties))
+            .withAuditInfo(
+                new AuditInfo.Builder()
+                    .withCreator("graviton") /* TODO. Should change to real user */
+                    .withCreateTime(Instant.now())
+                    .build())
+            .build();
+
     try {
-      CatalogEntity entity =
-          store.executeInTransaction(
-              () -> {
-                NameIdentifier metalakeIdent = NameIdentifier.of(ident.namespace().levels());
-                if (!store.exists(metalakeIdent, EntityType.METALAKE)) {
-                  LOG.warn("Metalake {} does not exist", metalakeIdent);
-                  throw new NoSuchMetalakeException(
-                      "Metalake " + metalakeIdent + " does not exist");
-                }
+      CatalogWrapper wrapper = catalogCache.get(ident, id -> createCatalogWrapper(e));
+      store.executeInTransaction(
+          () -> {
+            NameIdentifier metalakeIdent = NameIdentifier.of(ident.namespace().levels());
+            if (!store.exists(metalakeIdent, EntityType.METALAKE)) {
+              LOG.warn("Metalake {} does not exist", metalakeIdent);
+              throw new NoSuchMetalakeException("Metalake " + metalakeIdent + " does not exist");
+            }
 
-                long uid = idGenerator.nextId();
-                StringIdentifier stringId = StringIdentifier.fromId(uid);
-
-                CatalogEntity e =
-                    new CatalogEntity.Builder()
-                        .withId(uid)
-                        .withName(ident.name())
-                        .withNamespace(ident.namespace())
-                        .withType(type)
-                        .withProvider(provider)
-                        .withComment(comment)
-                        .withProperties(StringIdentifier.addToProperties(stringId, properties))
-                        .withAuditInfo(
-                            new AuditInfo.Builder()
-                                .withCreator("graviton") /* TODO. Should change to real user */
-                                .withCreateTime(Instant.now())
-                                .build())
-                        .build();
-
-                store.put(e, false /* overwrite */);
-                return e;
-              });
-      CatalogWrapper wrapper = catalogCache.get(ident, id -> createCatalogWrapper(entity));
+            store.put(e, false /* overwrite */);
+            return null;
+          });
       return wrapper.catalog;
     } catch (EntityAlreadyExistsException e1) {
       LOG.warn("Catalog {} already exists", ident, e1);
       throw new CatalogAlreadyExistsException("Catalog " + ident + " already exists");
     } catch (IllegalArgumentException | NoSuchMetalakeException e2) {
+      catalogCache.invalidate(ident);
       throw e2;
     } catch (Exception e3) {
       LOG.error("Failed to create catalog {}", ident, e3);
+      catalogCache.invalidate(ident);
       throw new RuntimeException(e3);
     }
   }
@@ -491,10 +496,13 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
             cl -> catalog.loadCatalogSpecificProperties(provider + ".properties"),
             RuntimeException.class);
 
+    entity.addProperty(catalogSpecificConfig);
+
     Map<String, String> totalMergedConf =
         mergeConf(Maps.newHashMap(mergedConf), catalogSpecificConfig);
+    Map<String, String> bypassConfig = getBypassConfig(totalMergedConf);
     // Initialize the catalog
-    catalog.withCatalogConf(totalMergedConf).withCatalogEntity(entity);
+    catalog.withCatalogConf(bypassConfig).withCatalogEntity(entity);
 
     // Validate catalog properties and initialize the config
     classLoader.withClassLoader(
@@ -515,6 +523,17 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
         IllegalArgumentException.class);
 
     return wrapper;
+  }
+
+  private Map<String, String> getBypassConfig(Map<String, String> totalMergedConf) {
+    Map<String, String> bypassConfig = Maps.newHashMap();
+    totalMergedConf.forEach(
+        (key, value) -> {
+          if (key.startsWith(CATALOG_BYPASS_PREFIX)) {
+            bypassConfig.put(key.substring(CATALOG_BYPASS_PREFIX.length()), value);
+          }
+        });
+    return bypassConfig;
   }
 
   static Map<String, String> mergeConf(Map<String, String> properties, Map<String, String> conf) {

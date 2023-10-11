@@ -106,7 +106,7 @@ public class TestCatalogManager {
             .put("key2", "value2")
             .put("key1", "value1")
             .put("hidden_key", "hidden_value")
-            .put("mock", "mock")
+            .put(CatalogManager.CATALOG_BYPASS_PREFIX + "mock", "mock")
             .build();
     Assertions.assertDoesNotThrow(
         () ->
@@ -137,7 +137,7 @@ public class TestCatalogManager {
         ImmutableMap.<String, String>builder()
             .put("key2", "value2")
             .put("key1", "value1")
-            .put("mock", "mock")
+            .put(CatalogManager.CATALOG_BYPASS_PREFIX + "mock", "mock")
             .build();
     Assertions.assertDoesNotThrow(
         () ->
@@ -152,7 +152,7 @@ public class TestCatalogManager {
             .put("key1", "value1")
             .put("key3", "3")
             .put("key4", "value4")
-            .put("mock", "mock")
+            .put(CatalogManager.CATALOG_BYPASS_PREFIX + "mock", "mock")
             .build();
     Assertions.assertDoesNotThrow(
         () ->
@@ -201,7 +201,10 @@ public class TestCatalogManager {
 
     // key1 is required;
     Map<String, String> props1 =
-        ImmutableMap.<String, String>builder().put("key2", "value2").put("mock", "mock").build();
+        ImmutableMap.<String, String>builder()
+            .put("key2", "value2")
+            .put(CatalogManager.CATALOG_BYPASS_PREFIX + "mock", "mock")
+            .build();
     IllegalArgumentException e1 =
         Assertions.assertThrows(
             IllegalArgumentException.class,
@@ -215,7 +218,10 @@ public class TestCatalogManager {
 
     // key2 is required;
     Map<String, String> props2 =
-        ImmutableMap.<String, String>builder().put("key1", "value1").put("mock", "mock").build();
+        ImmutableMap.<String, String>builder()
+            .put("key1", "value1")
+            .put(CatalogManager.CATALOG_BYPASS_PREFIX + "mock", "mock")
+            .build();
     e1 =
         Assertions.assertThrows(
             IllegalArgumentException.class,
@@ -232,7 +238,7 @@ public class TestCatalogManager {
             .put("key1", "value1")
             .put("key2", "value2")
             .put("key3", "a12a1a")
-            .put("mock", "mock")
+            .put(CatalogManager.CATALOG_BYPASS_PREFIX + "mock", "mock")
             .build();
     e1 =
         Assertions.assertThrows(
@@ -256,6 +262,8 @@ public class TestCatalogManager {
     testProperties(props, testCatalog.properties());
     Assertions.assertEquals(Catalog.Type.RELATIONAL, testCatalog.type());
 
+    Assertions.assertNotNull(catalogManager.catalogCache.getIfPresent(ident));
+
     // Test create under non-existed metalake
     NameIdentifier ident2 = NameIdentifier.of("metalake1", "test1");
     Throwable exception1 =
@@ -265,6 +273,7 @@ public class TestCatalogManager {
                 catalogManager.createCatalog(
                     ident2, Catalog.Type.RELATIONAL, provider, "comment", props));
     Assertions.assertTrue(exception1.getMessage().contains("Metalake metalake1 does not exist"));
+    Assertions.assertNull(catalogManager.catalogCache.getIfPresent(ident2));
 
     // Test create with duplicated name
     Throwable exception2 =

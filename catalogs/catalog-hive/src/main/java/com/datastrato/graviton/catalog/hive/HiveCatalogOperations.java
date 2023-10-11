@@ -90,15 +90,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
   @Override
   public void initialize(Map<String, String> conf) throws RuntimeException {
     Configuration hadoopConf = new Configuration();
-    conf.forEach(
-        (k, v) -> {
-          if (k.startsWith(HIVE_RELATED_CONFIG_PREFIX)) {
-            hadoopConf.set(k.replace(HIVE_RELATED_CONFIG_PREFIX, ""), v);
-          } else {
-            hadoopConf.set(k, v);
-          }
-        });
-
+    conf.forEach(hadoopConf::set);
     hiveConf = new HiveConf(hadoopConf, HiveCatalogOperations.class);
 
     // todo(xun): add hive client pool size in config

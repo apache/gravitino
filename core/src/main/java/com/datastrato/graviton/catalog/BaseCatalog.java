@@ -49,10 +49,10 @@ public abstract class BaseCatalog<T extends BaseCatalog>
   protected abstract CatalogOperations newOps(Map<String, String> config);
 
   /** Get all configuration properties for the catalog in the classpath. */
-  public Map<String, String> loadCatalogSpecificProperties(String catalogName) {
+  public Map<String, String> loadCatalogSpecificProperties(String fileURL) {
     Map<String, String> configMap = Maps.newHashMap();
     try {
-      InputStream inputStream = this.getClass().getClassLoader().getResourceAsStream(catalogName);
+      InputStream inputStream = this.getClass().getClassLoader().getResourceAsStream(fileURL);
       Properties properties = new Properties();
       properties.load(inputStream);
       properties.forEach((key, value) -> configMap.put(key.toString(), value.toString()));

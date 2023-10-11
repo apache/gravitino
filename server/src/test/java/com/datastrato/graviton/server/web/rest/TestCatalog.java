@@ -42,7 +42,7 @@ public class TestCatalog extends BaseCatalog<TestCatalog> {
   @Test
   void test() {
     TestCatalog testCatalog = new TestCatalog();
-    // This will load the log4j2.xml file from the classpath
+    // This will load the log4j2.properties file from the classpath
     Map<String, String> configs = testCatalog.loadCatalogSpecificProperties("log4j2.properties");
     Assertions.assertTrue(configs.containsKey("status"));
     Assertions.assertEquals("warn", configs.get("status"));

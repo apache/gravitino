@@ -4,6 +4,7 @@
  */
 package com.datastrato.graviton.integration.test.catalog.hive;
 
+import static com.datastrato.graviton.catalog.CatalogManager.CATALOG_BYPASS_PREFIX;
 import static com.datastrato.graviton.catalog.hive.HiveTablePropertiesMetadata.COMMENT;
 import static com.datastrato.graviton.catalog.hive.HiveTablePropertiesMetadata.EXTERNAL;
 import static com.datastrato.graviton.catalog.hive.HiveTablePropertiesMetadata.FORMAT;
@@ -127,10 +128,15 @@ public class CatalogHiveIT extends AbstractIT {
 
   private static void createCatalog() {
     Map<String, String> properties = Maps.newHashMap();
-    properties.put(HiveConf.ConfVars.METASTOREURIS.varname, HIVE_METASTORE_URIS);
-    properties.put(HiveConf.ConfVars.METASTORETHRIFTCONNECTIONRETRIES.varname, "30");
-    properties.put(HiveConf.ConfVars.METASTORETHRIFTFAILURERETRIES.varname, "30");
-    properties.put(HiveConf.ConfVars.METASTORE_CLIENT_CONNECT_RETRY_DELAY.varname, "5");
+    properties.put(
+        CATALOG_BYPASS_PREFIX + HiveConf.ConfVars.METASTOREURIS.varname, HIVE_METASTORE_URIS);
+    properties.put(
+        CATALOG_BYPASS_PREFIX + HiveConf.ConfVars.METASTORETHRIFTCONNECTIONRETRIES.varname, "30");
+    properties.put(
+        CATALOG_BYPASS_PREFIX + HiveConf.ConfVars.METASTORETHRIFTFAILURERETRIES.varname, "30");
+    properties.put(
+        CATALOG_BYPASS_PREFIX + HiveConf.ConfVars.METASTORE_CLIENT_CONNECT_RETRY_DELAY.varname,
+        "5");
 
     Catalog createdCatalog =
         metalake.createCatalog(
@@ -140,6 +146,13 @@ public class CatalogHiveIT extends AbstractIT {
             "comment",
             properties);
     Catalog loadCatalog = metalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
+    Assertions.assertTrue(
+        loadCatalog
+            .properties()
+            .containsKey("graviton.bypass.hive.metastore.client.capability.check"));
+    Assertions.assertEquals(
+        "false",
+        loadCatalog.properties().get("graviton.bypass.hive.metastore.client.capability.check"));
     Assertions.assertEquals(createdCatalog, loadCatalog);
 
     catalog = loadCatalog;

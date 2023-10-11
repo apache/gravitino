@@ -12,6 +12,8 @@ import com.datastrato.graviton.Field;
 import com.datastrato.graviton.HasIdentifier;
 import com.datastrato.graviton.Namespace;
 import com.google.common.base.Objects;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Maps;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -70,6 +72,19 @@ public class CatalogEntity implements Entity, Auditable, HasIdentifier {
     fields.put(AUDIT_INFO, auditInfo);
 
     return Collections.unmodifiableMap(fields);
+  }
+
+  public void addProperty(Map<String, String> extraProperty) {
+    if (extraProperty == null) {
+      return;
+    }
+
+    if (properties == null) {
+      properties = Maps.newHashMap(extraProperty);
+    } else {
+      extraProperty.putAll(properties);
+      properties = ImmutableMap.copyOf(extraProperty);
+    }
   }
 
   /**
