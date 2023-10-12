@@ -117,7 +117,7 @@ public class IsolatedClassLoader implements Closeable {
                 try {
                   classPathContents.add(f.toURI().toURL());
                 } catch (MalformedURLException e) {
-                  LOG.warn("Failed to read jar file: {}", f.getAbsolutePath(), e);
+                  LOG.warn("Failed to read directory: {}", f.getAbsolutePath(), e);
                 }
               });
     }

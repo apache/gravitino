@@ -96,6 +96,8 @@ tasks {
         into("${rootDir}/distribution/package/catalogs/lakehouse-iceberg/conf")
 
         include("lakehouse-iceberg.conf")
+        include("hive-site.xml.template")
+        include("hdfs-site.xml.template")
 
         rename { original -> if (original.endsWith(".template")) {
             original.replace(".template", "")

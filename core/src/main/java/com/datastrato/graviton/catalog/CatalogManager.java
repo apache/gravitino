@@ -521,33 +521,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
     String catalogSpecificConfigFile = provider + ".conf";
     Map<String, String> catalogSpecificConfig = Maps.newHashMap();
 
-    String gravitonHome = System.getenv("GRAVITON_HOME");
-    Preconditions.checkArgument(gravitonHome != null, "GRAVITON_HOME not set");
-    boolean testEnv = System.getenv("GRAVITON_TEST") != null;
-
-    String fullPath;
-    if (testEnv) {
-      fullPath =
-          String.join(
-              File.separator,
-              gravitonHome,
-              "catalogs",
-              "catalog-" + provider,
-              "build",
-              "resources",
-              "main",
-              catalogSpecificConfigFile);
-    } else {
-      fullPath =
-          String.join(
-              File.separator,
-              gravitonHome,
-              "catalogs",
-              provider,
-              "conf",
-              catalogSpecificConfigFile);
-    }
-
+    String fullPath = buildConfPath(provider) + File.separator + catalogSpecificConfigFile;
     try (InputStream inputStream = FileUtils.openInputStream(new File(fullPath))) {
       Properties loadProperties = new Properties();
       loadProperties.load(inputStream);
