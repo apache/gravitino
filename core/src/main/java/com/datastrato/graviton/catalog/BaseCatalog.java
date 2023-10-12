@@ -42,7 +42,7 @@ public abstract class BaseCatalog<T extends BaseCatalog>
   // Any Graviton configuration that starts with this prefix will be trim and passed to the specific
   // catalog implementation. For example, if the configuration is
   // "graviton.bypass.hive.metastore.uris",
-  // then we will trim the prefix and pass "hive.metastore.uris" to the hive catalog implementation.
+  // then we will trim the prefix and pass "hive.metastore.uris" to the hive client configurations.
   public static final String CATALOG_BYPASS_PREFIX = "graviton.bypass.";
 
   /**

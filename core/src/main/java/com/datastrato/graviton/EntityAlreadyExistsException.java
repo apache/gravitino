@@ -4,11 +4,6 @@
  */
 package com.datastrato.graviton;
 
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
-import java.util.List;
-import java.util.Map;
-
 /**
  * Exception class indicating that an entity already exists. This exception is thrown when an
  * attempt is made to create an entity that already exists within the Graviton framework.

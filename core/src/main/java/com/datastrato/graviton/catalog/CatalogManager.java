@@ -58,7 +58,6 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -454,7 +453,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
     IsolatedClassLoader classLoader;
     if (config.get(Configs.CATALOG_LOAD_ISOLATED)) {
       String pkgPath = buildPkgPath(conf, provider);
-      String confPath = buildConfPath(pkgPath);
+      String confPath = buildConfPath(provider);
       classLoader = IsolatedClassLoader.buildClassLoader(Lists.newArrayList(pkgPath, confPath));
     } else {
       // This will use the current class loader, it is mainly used for test.
@@ -522,33 +521,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
     String catalogSpecificConfigFile = provider + ".conf";
     Map<String, String> catalogSpecificConfig = Maps.newHashMap();
 
-    String gravitonHome = System.getenv("GRAVITON_HOME");
-    Preconditions.checkArgument(gravitonHome != null, "GRAVITON_HOME not set");
-    boolean testEnv = System.getenv("GRAVITON_TEST") != null;
-
-    String fullPath;
-    if (testEnv) {
-      fullPath =
-          String.join(
-              File.separator,
-              gravitonHome,
-              "catalogs",
-              "catalog-" + provider,
-              "build",
-              "resources",
-              "main",
-              catalogSpecificConfigFile);
-    } else {
-      fullPath =
-          String.join(
-              File.separator,
-              gravitonHome,
-              "catalogs",
-              provider,
-              "conf",
-              catalogSpecificConfigFile);
-    }
-
+    String fullPath = buildConfPath(provider) + File.separator + catalogSpecificConfigFile;
     try (InputStream inputStream = FileUtils.openInputStream(new File(fullPath))) {
       Properties loadProperties = new Properties();
       loadProperties.load(inputStream);
@@ -569,26 +542,26 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
     return Collections.unmodifiableMap(mergedConf);
   }
 
-  private String deduceConfPath(String pkgPath) {
-    String[] pkgPathParts = pkgPath.split(File.separator);
-    pkgPathParts[pkgPathParts.length - 1] = "conf";
-    return String.join(File.separator, pkgPathParts);
-  }
-
   /**
-   * Get the config path from the package path. Usually, the configuration file is under the conf
-   * and conf and package are under the same directory.
+   * Build the config path from the specific provider. Usually, the configuration file is under the
+   * conf and conf and package are under the same directory.
    */
-  private String buildConfPath(String pkgPath) {
+  private String buildConfPath(String provider) {
+    String gravitonHome = System.getenv("GRAVITON_HOME");
+    Preconditions.checkArgument(gravitonHome != null, "GRAVITON_HOME not set");
     boolean testEnv = System.getenv("GRAVITON_TEST") != null;
     if (testEnv) {
-      String[] pkgPathParts = pkgPath.split(File.separator);
-      pkgPathParts[pkgPathParts.length - 1] = "resources";
-      ArrayUtils.add(pkgPathParts, "main");
-      return String.join(File.separator, pkgPathParts);
+      return String.join(
+          File.separator,
+          gravitonHome,
+          "catalogs",
+          "catalog-" + provider,
+          "build",
+          "resources",
+          "main");
     }
 
-    return deduceConfPath(pkgPath);
+    return String.join(File.separator, gravitonHome, "catalogs", provider, "conf");
   }
 
   private String buildPkgPath(Map<String, String> conf, String provider) {
