@@ -8,6 +8,8 @@ package com.datastrato.graviton.catalog.hive;
 import static com.datastrato.graviton.catalog.BaseCatalog.CATALOG_BYPASS_PREFIX;
 import static com.datastrato.graviton.catalog.hive.HiveCatalogPropertiesMeta.CATALOG_CLIENT_POOL_MAXSIZE;
 
+import com.datastrato.graviton.Catalog;
+import com.datastrato.graviton.catalog.PropertyEntry;
 import com.google.common.collect.Maps;
 import java.util.Map;
 import org.junit.jupiter.api.Assertions;
@@ -55,5 +57,22 @@ class TestHiveCatalogOperations {
     hiveCatalogOperations.initialize(properties);
     v = hiveCatalogOperations.hiveConf.get("mapreduce.job.reduces");
     Assertions.assertEquals("30", v);
+  }
+
+  @Test
+  void testPropertyMeta() {
+    HiveCatalogOperations hiveCatalogOperations = new HiveCatalogOperations(null);
+    hiveCatalogOperations.initialize(Maps.newHashMap());
+
+    Map<String, PropertyEntry<?>> propertyEntryMap =
+        hiveCatalogOperations.catalogPropertiesMetadata().propertyEntries();
+    Assertions.assertEquals(4, propertyEntryMap.size());
+    Assertions.assertTrue(propertyEntryMap.containsKey("graviton.bypass.hive.metastore.uris"));
+    Assertions.assertTrue(propertyEntryMap.containsKey(Catalog.PROPERTY_PACKAGE));
+    Assertions.assertTrue(propertyEntryMap.containsKey(CATALOG_CLIENT_POOL_MAXSIZE));
+
+    Assertions.assertTrue(propertyEntryMap.get("graviton.bypass.hive.metastore.uris").isRequired());
+    Assertions.assertFalse(propertyEntryMap.get(Catalog.PROPERTY_PACKAGE).isRequired());
+    Assertions.assertFalse(propertyEntryMap.get(CATALOG_CLIENT_POOL_MAXSIZE).isRequired());
   }
 }
