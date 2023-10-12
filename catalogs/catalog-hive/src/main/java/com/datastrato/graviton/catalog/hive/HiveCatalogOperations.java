@@ -573,7 +573,9 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
             "Failed to alter Hive table ["
                 + tableIdent.name()
                 + "] in Hive metastore, "
-                + "please make sure the column type of new column position is compatible with the old",
+                + "since Hive metastore will check the compatibility of column type between the old and new column positions, "
+                + "please ensure that the type of the new column position is compatible with the old one, "
+                + "otherwise the alter operation will fail in Hive metastore.",
             e);
       }
       throw new RuntimeException(
