@@ -580,9 +580,9 @@ public class CatalogHiveIT extends AbstractIT {
             Distribution.NONE,
             new SortOrder[0]);
 
-    RuntimeException exception =
+    IllegalArgumentException exception =
         assertThrows(
-            RuntimeException.class,
+            IllegalArgumentException.class,
             () ->
                 catalog
                     .asTableCatalog()
@@ -593,8 +593,7 @@ public class CatalogHiveIT extends AbstractIT {
     Assertions.assertTrue(
         exception
             .getMessage()
-            .contains(
-                "columns have types incompatible with the existing columns in their respective positions"));
+            .contains("column type of new column position is compatible with the old"));
   }
 
   private void assertDefaultTableProperties(

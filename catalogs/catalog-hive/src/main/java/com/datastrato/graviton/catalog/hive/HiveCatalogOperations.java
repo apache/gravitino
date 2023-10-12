@@ -568,6 +568,14 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       throw new NoSuchTableException(
           String.format("Hive table does not exist: %s in Hive Metastore", tableIdent.name()), e);
     } catch (TException | InterruptedException e) {
+      if (e.getMessage().contains("types incompatible with the existing columns")) {
+        throw new IllegalArgumentException(
+            "Failed to alter Hive table ["
+                + tableIdent.name()
+                + "] in Hive metastore, "
+                + "please make sure the column type of new column position is compatible with the old",
+            e);
+      }
       throw new RuntimeException(
           "Failed to alter Hive table " + tableIdent.name() + " in Hive metastore", e);
     } catch (IllegalArgumentException e) {
