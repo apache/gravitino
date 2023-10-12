@@ -98,7 +98,6 @@ tasks {
         include("hive.conf")
         include("hive-site.xml.template")
 
-        include("**/*.template")
         rename { original -> if (original.endsWith(".template")) {
             original.replace(".template", "")
         } else {
