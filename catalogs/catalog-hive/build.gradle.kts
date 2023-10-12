@@ -90,4 +90,26 @@ tasks {
         from("build/libs")
         into("${rootDir}/distribution/package/catalogs/hive/libs")
     }
+
+    val copyCatalogConfig by registering(Copy::class) {
+        from("src/main/resources")
+        into("${rootDir}/distribution/package/catalogs/hive/conf")
+
+        include("hive.conf")
+        include("hive-site.xml.template")
+
+        rename { original -> if (original.endsWith(".template")) {
+            original.replace(".template", "")
+        } else {
+            original
+        }}
+
+        exclude { details ->
+            details.file.isDirectory()
+        }
+    }
+
+    val copyLibAndConfig by registering(Copy::class) {
+        dependsOn(copyCatalogConfig, copyCatalogLibs)
+    }
 }
