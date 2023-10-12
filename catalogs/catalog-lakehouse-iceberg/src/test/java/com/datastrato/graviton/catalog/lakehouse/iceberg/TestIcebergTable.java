@@ -4,8 +4,10 @@
  */
 package com.datastrato.graviton.catalog.lakehouse.iceberg;
 
+import static com.datastrato.graviton.rel.transforms.Transforms.bucket;
 import static com.datastrato.graviton.rel.transforms.Transforms.day;
 import static com.datastrato.graviton.rel.transforms.Transforms.identity;
+import static com.datastrato.graviton.rel.transforms.Transforms.truncate;
 
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
@@ -218,7 +220,12 @@ public class TestIcebergTable {
             .build();
     Column[] columns = new Column[] {col1, col2};
 
-    Transform[] partitions = new Transform[] {day(new String[] {col2.name()})};
+    Transform[] partitions =
+        new Transform[] {
+          day(new String[] {col2.name()}),
+          bucket(new String[] {col1.name()}, 10),
+          truncate(new String[] {col1.name()}, 2)
+        };
 
     Table table =
         icebergCatalog
