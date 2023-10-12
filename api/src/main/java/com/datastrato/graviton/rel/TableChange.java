@@ -188,7 +188,8 @@ public interface TableChange {
    * unless {@code ifExists} is true.
    *
    * @param fieldNames Field names of the column to delete.
-   * @param ifExists If true, the change will succeed even if the field does not exist.
+   * @param ifExists If true, silence the error if column does not exist during drop. Otherwise, an
+   *     {@link IllegalArgumentException} will be thrown.
    * @return A TableChange for the delete.
    */
   static TableChange deleteColumn(String[] fieldNames, Boolean ifExists) {
