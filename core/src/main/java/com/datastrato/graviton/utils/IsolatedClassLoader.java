@@ -111,15 +111,11 @@ public class IsolatedClassLoader implements Closeable {
               });
 
       // Add itself to the classpath.
-      Lists.newArrayList(folder).stream()
-          .forEach(
-              f -> {
-                try {
-                  classPathContents.add(f.toURI().toURL());
-                } catch (MalformedURLException e) {
-                  LOG.warn("Failed to read directory: {}", f.getAbsolutePath(), e);
-                }
-              });
+      try {
+        classPathContents.add(folder.toURI().toURL());
+      } catch (MalformedURLException e) {
+        LOG.warn("Failed to read directory: {}", folder.getAbsolutePath(), e);
+      }
     }
 
     return new IsolatedClassLoader(
