@@ -88,6 +88,7 @@ public class ToIcebergPartitionSpec {
   }
 
   private static int findWidth(Transform transform) {
+    // transform here format is: truncate(fieldName, width) or bucket(fieldName, numBuckets)
     Transform expr = transform.arguments()[1];
     if (expr instanceof Transforms.LiteralReference) {
       Transforms.LiteralReference literalReference = (Transforms.LiteralReference) expr;
