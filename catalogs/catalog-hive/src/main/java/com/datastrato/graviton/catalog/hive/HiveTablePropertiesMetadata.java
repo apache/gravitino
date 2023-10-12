@@ -28,11 +28,11 @@ public class HiveTablePropertiesMetadata extends BasePropertiesMetadata {
   public static final String EXTERNAL = "EXTERNAL";
   public static final String LOCATION = "location";
   public static final String FORMAT = "format";
-  public static final String TABLE_TYPE = "tableType";
-  public static final String INPUT_FORMAT = "inputFormat";
-  public static final String OUTPUT_FORMAT = "outputFormat";
-  public static final String SERDE_NAME = "serdeName";
-  public static final String SERDE_LIB = "serdeLib";
+  public static final String TABLE_TYPE = "table-type";
+  public static final String INPUT_FORMAT = "input-format";
+  public static final String OUTPUT_FORMAT = "output-format";
+  public static final String SERDE_NAME = "serde-name";
+  public static final String SERDE_LIB = "serde-lib";
   public static final String SERDE_PARAMETER_PREFIX = "serde.parameter.";
   public static final String TRANSIENT_LAST_DDL_TIME = "transient_lastDdlTime";
 
