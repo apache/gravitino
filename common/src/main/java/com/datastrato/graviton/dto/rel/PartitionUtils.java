@@ -49,6 +49,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.ArrayUtils;
 
 public class PartitionUtils {
   public static Transform[] toTransforms(Partition[] partitions) {
@@ -104,10 +105,9 @@ public class PartitionUtils {
     }
   }
 
-  public static void validateFieldExist(ColumnDTO[] columns, String[] fieldName)
+  public static void validateFieldExistence(ColumnDTO[] columns, String[] fieldName)
       throws IllegalArgumentException {
-    Preconditions.checkArgument(
-        columns != null && columns.length != 0, "columns cannot be null or empty");
+    Preconditions.checkArgument(ArrayUtils.isNotEmpty(columns), "columns cannot be null or empty");
 
     List<ColumnDTO> partitionColumn =
         Arrays.stream(columns)

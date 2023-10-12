@@ -49,7 +49,7 @@ public class ExpressionPartitionDTO implements Partition {
     switch (expression.expressionType()) {
       case FIELD:
         FieldExpression fieldExpression = (FieldExpression) expression;
-        PartitionUtils.validateFieldExist(columns, fieldExpression.fieldName);
+        PartitionUtils.validateFieldExistence(columns, fieldExpression.fieldName);
         break;
       case FUNCTION:
         validateExpression(columns, expression);

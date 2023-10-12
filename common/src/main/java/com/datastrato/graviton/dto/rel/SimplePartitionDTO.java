@@ -4,7 +4,7 @@
  */
 package com.datastrato.graviton.dto.rel;
 
-import static com.datastrato.graviton.dto.rel.PartitionUtils.validateFieldExist;
+import static com.datastrato.graviton.dto.rel.PartitionUtils.validateFieldExistence;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -43,7 +43,7 @@ public class SimplePartitionDTO implements Partition {
 
   @Override
   public void validate(ColumnDTO[] columns) throws IllegalArgumentException {
-    validateFieldExist(columns, fieldName);
+    validateFieldExistence(columns, fieldName);
   }
 
   public static class Builder {
