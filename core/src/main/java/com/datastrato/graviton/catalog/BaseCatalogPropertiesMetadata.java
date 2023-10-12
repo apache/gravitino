@@ -7,23 +7,22 @@ package com.datastrato.graviton.catalog;
 
 import static com.datastrato.graviton.Catalog.PROPERTY_PACKAGE;
 
-import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Maps;
 import java.util.Map;
 
-public class BaseCatalogPropertiesMetadata extends BasePropertiesMetadata {
-  @Override
-  protected Map<String, PropertyEntry<?>> specificPropertyEntries() {
-    return ImmutableMap.<String, PropertyEntry<?>>builder()
-        .put(
-            PROPERTY_PACKAGE,
-            PropertyEntry.stringPropertyEntry(
-                PROPERTY_PACKAGE,
-                "The path of the catalog-related classes and resources",
-                false,
-                true,
-                null,
-                false,
-                false))
-        .build();
-  }
+public abstract class BaseCatalogPropertiesMetadata extends BasePropertiesMetadata {
+
+  protected static final Map<String, PropertyEntry<?>> BASIC_CATALOG_PROPERTY_ENTRIES =
+      Maps.uniqueIndex(
+          ImmutableList.of(
+              PropertyEntry.stringPropertyEntry(
+                  PROPERTY_PACKAGE,
+                  "The path of the catalog-related classes and resources",
+                  false,
+                  true,
+                  null,
+                  false,
+                  false)),
+          PropertyEntry::getName);
 }
