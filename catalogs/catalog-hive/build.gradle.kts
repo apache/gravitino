@@ -95,10 +95,9 @@ tasks {
         from("src/main/resources")
         into("${rootDir}/distribution/package/catalogs/hive/conf")
 
-        include("**/*.xml")
-        include("**/*.conf")
+        include("hive.conf")
+        include("hive-site.xml.template")
 
-        include("**/*.template")
         rename { original -> if (original.endsWith(".template")) {
             original.replace(".template", "")
         } else {

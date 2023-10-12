@@ -39,7 +39,7 @@ public abstract class BaseCatalog<T extends BaseCatalog>
 
   private volatile Map<String, String> properties;
 
-  // Any graviton configuration that starts with this prefix will be trim and passed to the specific
+  // Any Graviton configuration that starts with this prefix will be trim and passed to the specific
   // catalog implementation. For example, if the configuration is
   // "graviton.bypass.hive.metastore.uris",
   // then we will trim the prefix and pass "hive.metastore.uris" to the hive catalog implementation.
