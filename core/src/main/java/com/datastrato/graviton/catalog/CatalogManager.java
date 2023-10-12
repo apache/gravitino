@@ -58,6 +58,7 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -452,8 +453,9 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
 
     IsolatedClassLoader classLoader;
     if (config.get(Configs.CATALOG_LOAD_ISOLATED)) {
-      List<String> libAndResourcePaths = buildLibAndResourcePaths(conf, provider);
-      classLoader = IsolatedClassLoader.buildClassLoader(libAndResourcePaths);
+      String pkgPath = buildPkgPath(conf, provider);
+      String confPath = buildConfPath(pkgPath);
+      classLoader = IsolatedClassLoader.buildClassLoader(Lists.newArrayList(pkgPath, confPath));
     } else {
       // This will use the current class loader, it is mainly used for test.
       classLoader =
@@ -553,11 +555,10 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
       loadProperties.forEach(
           (key, value) -> catalogSpecificConfig.put(key.toString(), value.toString()));
     } catch (Exception e) {
-      LOG.error(
+      LOG.warn(
           "Failed to load catalog specific configurations, file name: '{}'",
           catalogSpecificConfigFile,
           e);
-      throw new RuntimeException(e);
     }
     return catalogSpecificConfig;
   }
@@ -568,39 +569,48 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
     return Collections.unmodifiableMap(mergedConf);
   }
 
-  /**
-   * We will not support set catalog properties through graviton server config file, instead, we
-   * will support setting catalog properties through catalog-specific config file.
-   */
-  @Deprecated
-  private Map<String, String> catalogConf(String name, Config config) {
-    String confPrefix = "graviton.catalog." + name + ".";
-    return config.getConfigsWithPrefix(confPrefix);
+  private String deduceConfPath(String pkgPath) {
+    String[] pkgPathParts = pkgPath.split(File.separator);
+    pkgPathParts[pkgPathParts.length - 1] = "conf";
+    return String.join(File.separator, pkgPathParts);
   }
 
-  private List<String> buildLibAndResourcePaths(Map<String, String> conf, String provider) {
+  /**
+   * Get the config path from the package path. Usually, the configuration file is under the conf
+   * and conf and package are under the same directory.
+   */
+  private String buildConfPath(String pkgPath) {
+    boolean testEnv = System.getenv("GRAVITON_TEST") != null;
+    if (testEnv) {
+      String[] pkgPathParts = pkgPath.split(File.separator);
+      pkgPathParts[pkgPathParts.length - 1] = "resources";
+      ArrayUtils.add(pkgPathParts, "main");
+      return String.join(File.separator, pkgPathParts);
+    }
+
+    return deduceConfPath(pkgPath);
+  }
+
+  private String buildPkgPath(Map<String, String> conf, String provider) {
     String gravitonHome = System.getenv("GRAVITON_HOME");
     Preconditions.checkArgument(gravitonHome != null, "GRAVITON_HOME not set");
     boolean testEnv = System.getenv("GRAVITON_TEST") != null;
 
     String pkg = conf.get(Catalog.PROPERTY_PACKAGE);
+    String pkgPath;
     if (pkg != null) {
-      // Only libs will be added to the classpath.
-      return Lists.newArrayList(pkg);
+      pkgPath = pkg;
     } else if (testEnv) {
       // In test, the catalog package is under the build directory.
-      String buildDirForTest =
-          String.join(File.separator, gravitonHome, "catalogs", "catalog-" + provider, "build");
-      // Add the config and lib to the classpath.
-      return Lists.newArrayList(
-          buildDirForTest + File.separator + "resources",
-          buildDirForTest + File.separator + "libs");
+      pkgPath =
+          String.join(
+              File.separator, gravitonHome, "catalogs", "catalog-" + provider, "build", "libs");
+    } else {
+      // In real environment, the catalog package is under the catalog directory.
+      pkgPath = String.join(File.separator, gravitonHome, "catalogs", provider, "libs");
     }
 
-    // In real environment, the catalog package is under the catalog directory.
-    String classPathDir = String.join(File.separator, gravitonHome, "catalogs", provider);
-    return Lists.newArrayList(
-        classPathDir + File.separator + "conf", classPathDir + File.separator + "libs");
+    return pkgPath;
   }
 
   private Class<? extends CatalogProvider> lookupCatalogProvider(String provider, ClassLoader cl) {
