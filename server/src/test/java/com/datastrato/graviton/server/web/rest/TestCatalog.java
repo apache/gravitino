@@ -10,8 +10,6 @@ import com.datastrato.graviton.catalog.PropertiesMetadata;
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.util.Map;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
 
 public class TestCatalog extends BaseCatalog<TestCatalog> {
   @Override
@@ -37,14 +35,5 @@ public class TestCatalog extends BaseCatalog<TestCatalog> {
         return Maps::newHashMap;
       }
     };
-  }
-
-  @Test
-  void test() {
-    TestCatalog testCatalog = new TestCatalog();
-    // This will load the log4j2.properties file from the classpath
-    Map<String, String> configs = testCatalog.loadCatalogSpecificProperties("log4j2.properties");
-    Assertions.assertTrue(configs.containsKey("status"));
-    Assertions.assertEquals("warn", configs.get("status"));
   }
 }

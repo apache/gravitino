@@ -12,9 +12,9 @@ import java.util.Map;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-public class TestHiveCatalogOperations {
+class TestHiveCatalogOperations {
   @Test
-  void testLoadConfig() {
+  void testInitialize() {
     Map<String, String> properties = Maps.newHashMap();
     HiveCatalogOperations hiveCatalogOperations = new HiveCatalogOperations(null);
     hiveCatalogOperations.initialize(properties);
@@ -27,6 +27,7 @@ public class TestHiveCatalogOperations {
     v = hiveCatalogOperations.hiveConf.get("mapreduce.job.reduces");
     Assertions.assertEquals("20", v);
 
+    // Test If user properties can override the value in hive-site.xml
     properties.clear();
     properties.put("mapreduce.job.reduces", "30");
     hiveCatalogOperations.initialize(properties);
