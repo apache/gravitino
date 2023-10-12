@@ -476,6 +476,12 @@ public class TestHiveTable extends MiniHiveMetastoreService {
         .asTableCatalog()
         .alterTable(
             NameIdentifier.of(tableIdentifier.namespace(), "test_hive_table_new"),
+            TableChange.deleteColumn(new String[] {"not_exist_col"}, true));
+
+    hiveCatalog
+        .asTableCatalog()
+        .alterTable(
+            NameIdentifier.of(tableIdentifier.namespace(), "test_hive_table_new"),
             TableChange.deleteColumn(new String[] {"col_1"}, false));
     Table alteredTable1 =
         hiveCatalog
