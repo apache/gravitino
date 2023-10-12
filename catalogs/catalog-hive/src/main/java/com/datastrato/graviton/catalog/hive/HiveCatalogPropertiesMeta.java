@@ -5,6 +5,8 @@
 
 package com.datastrato.graviton.catalog.hive;
 
+import static com.datastrato.graviton.catalog.BaseCatalog.CATALOG_BYPASS_PREFIX;
+
 import com.datastrato.graviton.catalog.BasePropertiesMetadata;
 import com.datastrato.graviton.catalog.PropertyEntry;
 import com.google.common.collect.ImmutableMap;
@@ -13,7 +15,7 @@ import org.apache.hadoop.hive.conf.HiveConf;
 
 public class HiveCatalogPropertiesMeta extends BasePropertiesMetadata {
 
-  public static final String CATALOG_CLIENT_POOL_MAXSIZE = "graviton.hive.client.pool.max-size";
+  public static final String CATALOG_CLIENT_POOL_MAXSIZE = "hive.client.pool.max-size";
   public static final int DEFAULT_CATALOG_CLIENT_POOL_MAXSIZE = 1;
 
   @Override
@@ -24,9 +26,9 @@ public class HiveCatalogPropertiesMeta extends BasePropertiesMetadata {
     //  (kerberos authentication) when we finish refactor properties framework.
     return ImmutableMap.<String, PropertyEntry<?>>builder()
         .put(
-            HiveConf.ConfVars.METASTOREURIS.varname,
+            CATALOG_BYPASS_PREFIX + HiveConf.ConfVars.METASTOREURIS.varname,
             PropertyEntry.stringPropertyEntry(
-                HiveConf.ConfVars.METASTOREURIS.varname,
+                CATALOG_BYPASS_PREFIX + HiveConf.ConfVars.METASTOREURIS.varname,
                 "The Hive metastore URIs",
                 true,
                 true,
@@ -37,7 +39,7 @@ public class HiveCatalogPropertiesMeta extends BasePropertiesMetadata {
             CATALOG_CLIENT_POOL_MAXSIZE,
             PropertyEntry.integerOptionalPropertyEntry(
                 CATALOG_CLIENT_POOL_MAXSIZE,
-                "The maximum number of clients in the pool",
+                "The maximum number of Hive clients in the pool for graviton",
                 true,
                 DEFAULT_CATALOG_CLIENT_POOL_MAXSIZE,
                 false))

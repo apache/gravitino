@@ -4,6 +4,7 @@
  */
 package com.datastrato.graviton.catalog.hive;
 
+import static com.datastrato.graviton.catalog.BaseCatalog.CATALOG_BYPASS_PREFIX;
 import static com.datastrato.graviton.catalog.hive.HiveCatalogPropertiesMeta.CATALOG_CLIENT_POOL_MAXSIZE;
 import static com.datastrato.graviton.catalog.hive.HiveCatalogPropertiesMeta.DEFAULT_CATALOG_CLIENT_POOL_MAXSIZE;
 import static com.datastrato.graviton.catalog.hive.HiveTable.SUPPORT_TABLE_TYPES;
@@ -64,7 +65,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
   @VisibleForTesting HiveClientPool clientPool;
 
-  private HiveConf hiveConf;
+  @VisibleForTesting HiveConf hiveConf;
 
   private final CatalogEntity entity;
 
@@ -92,6 +93,14 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     Configuration hadoopConf = new Configuration();
     conf.forEach(hadoopConf::set);
     hiveConf = new HiveConf(hadoopConf, HiveCatalogOperations.class);
+
+    conf.forEach(
+        (key, value) -> {
+          if (key.startsWith(CATALOG_BYPASS_PREFIX)) {
+            // Trim bypass prefix and pass it to hive conf
+            hiveConf.set(key.substring(CATALOG_BYPASS_PREFIX.length()), value);
+          }
+        });
 
     this.clientPool = new HiveClientPool(getCatalogClientPoolMaxsize(conf), hiveConf);
 

@@ -90,4 +90,27 @@ tasks {
         from("build/libs")
         into("${rootDir}/distribution/package/catalogs/lakehouse-iceberg/libs")
     }
+
+    val copyCatalogConfig by registering(Copy::class) {
+        from("src/main/resources")
+        into("${rootDir}/distribution/package/catalogs/lakehouse-iceberg/conf")
+
+        include("**/*.xml")
+        include("**/*.conf")
+
+        include("**/*.template")
+        rename { original -> if (original.endsWith(".template")) {
+            original.replace(".template", "")
+        } else {
+            original
+        }}
+
+        exclude { details ->
+            details.file.isDirectory()
+        }
+    }
+
+    val copyLibAndConfig by registering(Copy::class) {
+        dependsOn(copyCatalogLibs, copyCatalogConfig)
+    }
 }

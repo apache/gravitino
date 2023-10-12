@@ -155,7 +155,7 @@ tasks {
   val outputDir = projectDir.dir("distribution")
 
   val compileDistribution by registering {
-    dependsOn("copySubprojectDependencies", "copyCatalogLibs", "copySubprojectLib")
+    dependsOn("copySubprojectDependencies", "copyCatalogLibAndConfigs", "copySubprojectLib")
 
     group = "graviton distribution"
     outputs.dir(projectDir.dir("distribution/package"))
@@ -230,9 +230,9 @@ tasks {
     }
   }
 
-  val copyCatalogLibs by registering(Copy::class) {
-    dependsOn(":catalogs:catalog-hive:copyCatalogLibs",
-            ":catalogs:catalog-lakehouse-iceberg:copyCatalogLibs")
+  val copyCatalogLibAndConfigs by registering(Copy::class) {
+    dependsOn(":catalogs:catalog-hive:copyLibAndConfig",
+            ":catalogs:catalog-lakehouse-iceberg:copyLibAndConfig")
   }
 
   clean {

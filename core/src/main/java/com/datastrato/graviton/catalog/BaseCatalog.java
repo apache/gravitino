@@ -11,6 +11,8 @@ import com.datastrato.graviton.meta.CatalogEntity;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * The abstract base class for Catalog implementations.
@@ -27,6 +29,8 @@ import java.util.Map;
 public abstract class BaseCatalog<T extends BaseCatalog>
     implements Catalog, CatalogProvider, HasPropertyMetadata {
 
+  private static final Logger LOG = LoggerFactory.getLogger(BaseCatalog.class);
+
   private CatalogEntity entity;
 
   private Map<String, String> conf;
@@ -34,6 +38,13 @@ public abstract class BaseCatalog<T extends BaseCatalog>
   private volatile CatalogOperations ops;
 
   private volatile Map<String, String> properties;
+
+  // Any graviton configuration that starts with this prefix will be trim and passed to the specific
+  // catalog implementation. For example, if the configuration is
+  // "graviton.bypass.hive.metastore.uris",
+  // then we will trim the prefix and pass "hive.metastore.uris" to the hive catalog implementation.
+  public static final String CATALOG_BYPASS_PREFIX = "graviton.bypass.";
+
   /**
    * Creates a new instance of CatalogOperations.
    *
