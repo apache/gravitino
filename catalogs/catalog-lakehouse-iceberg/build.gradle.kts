@@ -94,6 +94,20 @@ tasks {
     val copyCatalogConfig by registering(Copy::class) {
         from("src/main/resources")
         into("${rootDir}/distribution/package/catalogs/lakehouse-iceberg/conf")
+
+        include("**/*.xml")
+        include("**/*.conf")
+
+        include("**/*_template")
+        rename { original -> if (original.endsWith("_template")) {
+            original.replace("_template", "")
+        } else {
+            original
+        }}
+
+        exclude { details ->
+            details.file.isDirectory()
+        }
     }
 
     val copyLibAndConfig by registering(Copy::class) {

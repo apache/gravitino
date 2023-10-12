@@ -36,7 +36,6 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.Scheduler;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.common.base.Throwables;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -524,7 +523,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
       return Maps.newHashMap();
     }
 
-    String catalogSpecificConfigFile = provider + ".properties";
+    String catalogSpecificConfigFile = provider + ".conf";
     Map<String, String> catalogSpecificConfig = Maps.newHashMap();
 
     String gravitonHome = System.getenv("GRAVITON_HOME");
@@ -564,9 +563,9 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
       // If the catalog-specific configuration file is not found, it will not be loaded.
       // Should we throw exception directly?
       LOG.error(
-          "Failed to load catalog specific configurations, file name: '{}', Exception:\n{}",
+          "Failed to load catalog specific configurations, file name: '{}'",
           catalogSpecificConfigFile,
-          Throwables.getStackTraceAsString(e));
+          e);
       throw new RuntimeException(e);
     }
     return catalogSpecificConfig;
