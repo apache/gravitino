@@ -12,16 +12,23 @@ import com.datastrato.graviton.trino.connector.metadata.GravitonTable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import io.airlift.slice.Slice;
 import io.trino.spi.connector.ColumnHandle;
 import io.trino.spi.connector.ColumnMetadata;
+import io.trino.spi.connector.ConnectorInsertTableHandle;
 import io.trino.spi.connector.ConnectorMetadata;
+import io.trino.spi.connector.ConnectorOutputMetadata;
 import io.trino.spi.connector.ConnectorSession;
 import io.trino.spi.connector.ConnectorTableHandle;
 import io.trino.spi.connector.ConnectorTableMetadata;
 import io.trino.spi.connector.ConnectorTableProperties;
 import io.trino.spi.connector.ConnectorTableVersion;
+import io.trino.spi.connector.RetryMode;
 import io.trino.spi.connector.SchemaTableName;
 import io.trino.spi.security.TrinoPrincipal;
+import io.trino.spi.statistics.ComputedStatistics;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -178,5 +185,50 @@ public class GravitonMetadata implements ConnectorMetadata {
     GravitonTableHandle gravitonTableHandle = (GravitonTableHandle) tableHandle;
     catalogConnectorMetadata.dropTable(
         gravitonTableHandle.getTableName(), gravitonTableHandle.getTableName());
+  }
+
+  @Override
+  public void beginQuery(ConnectorSession session) {
+    internalMetadata.beginQuery(session);
+  }
+
+  @Override
+  public void cleanupQuery(ConnectorSession session) {
+    internalMetadata.cleanupQuery(session);
+  }
+
+  @Override
+  public ConnectorInsertTableHandle beginInsert(
+      ConnectorSession session,
+      ConnectorTableHandle tableHandle,
+      List<ColumnHandle> columns,
+      RetryMode retryMode) {
+    GravitonTableHandle gravitonTableHandle = (GravitonTableHandle) tableHandle;
+    List<ColumnHandle> internalColumnHandles = new ArrayList<>();
+    for (ColumnHandle column : columns) {
+      internalColumnHandles.add(((GravitonColumnHandle) column).getInternalColumnHandler());
+    }
+    ConnectorInsertTableHandle insertTableHandle =
+        internalMetadata.beginInsert(
+            session,
+            gravitonTableHandle.getInternalTableHandle(),
+            internalColumnHandles,
+            retryMode);
+    return new GravitonInsertTableHandle(insertTableHandle);
+  }
+
+  @Override
+  public Optional<ConnectorOutputMetadata> finishInsert(
+      ConnectorSession session,
+      ConnectorInsertTableHandle insertHandle,
+      Collection<Slice> fragments,
+      Collection<ComputedStatistics> computedStatistics) {
+
+    GravitonInsertTableHandle gravitonInsertTableHandle = (GravitonInsertTableHandle) insertHandle;
+    return internalMetadata.finishInsert(
+        session,
+        gravitonInsertTableHandle.getInternalInsertTableHandle(),
+        fragments,
+        computedStatistics);
   }
 }
