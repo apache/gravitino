@@ -98,9 +98,9 @@ tasks {
         include("**/*.xml")
         include("**/*.conf")
 
-        include("**/*_template")
-        rename { original -> if (original.endsWith("_template")) {
-            original.replace("_template", "")
+        include("**/*.template")
+        rename { original -> if (original.endsWith(".template")) {
+            original.replace(".template", "")
         } else {
             original
         }}
