@@ -5,6 +5,7 @@
 
 package com.datastrato.graviton.catalog.hive;
 
+import static com.datastrato.graviton.Catalog.PROPERTY_PACKAGE;
 import static com.datastrato.graviton.catalog.BaseCatalog.CATALOG_BYPASS_PREFIX;
 
 import com.datastrato.graviton.catalog.BasePropertiesMetadata;
@@ -42,6 +43,16 @@ public class HiveCatalogPropertiesMeta extends BasePropertiesMetadata {
                 "The maximum number of Hive clients in the pool for graviton",
                 true,
                 DEFAULT_CATALOG_CLIENT_POOL_MAXSIZE,
+                false))
+        .put(
+            PROPERTY_PACKAGE,
+            PropertyEntry.stringPropertyEntry(
+                PROPERTY_PACKAGE,
+                "The path of the catalog-related classes and resources",
+                false,
+                true,
+                null,
+                false,
                 false))
         .build();
   }
