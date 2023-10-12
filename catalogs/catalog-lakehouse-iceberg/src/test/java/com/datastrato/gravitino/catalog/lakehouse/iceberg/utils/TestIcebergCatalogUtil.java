@@ -5,6 +5,7 @@
 
 package com.datastrato.gravitino.catalog.lakehouse.iceberg.utils;
 
+import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogPropertiesMetadata;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergConfig;
 import java.util.HashMap;
 import java.util.Map;
@@ -47,6 +48,7 @@ public class TestIcebergCatalogUtil {
     Map<String, String> properties = new HashMap<>();
     properties.put(CatalogProperties.URI, "jdbc://0.0.0.0:3306");
     properties.put(CatalogProperties.WAREHOUSE_LOCATION, "test");
+    properties.put(IcebergCatalogPropertiesMetadata.ICEBERG_JDBC_INITIALIZE, "false");
     catalog = IcebergCatalogUtil.loadCatalogBackend("jdbc", properties);
     Assertions.assertTrue(catalog instanceof JdbcCatalog);
 
