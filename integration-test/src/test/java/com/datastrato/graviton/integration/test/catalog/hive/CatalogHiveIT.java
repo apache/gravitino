@@ -593,7 +593,8 @@ public class CatalogHiveIT extends AbstractIT {
     Assertions.assertTrue(
         exception
             .getMessage()
-            .contains("column type of new column position is compatible with the old"));
+            .contains(
+                "please ensure that the type of the new column position is compatible with the old one"));
   }
 
   private void assertDefaultTableProperties(
