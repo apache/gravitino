@@ -579,27 +579,28 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
   }
 
   private List<String> buildLibAndResourcePaths(Map<String, String> conf, String provider) {
-    String pkg = conf.get(Catalog.PROPERTY_PACKAGE);
-
     String gravitonHome = System.getenv("GRAVITON_HOME");
     Preconditions.checkArgument(gravitonHome != null, "GRAVITON_HOME not set");
     boolean testEnv = System.getenv("GRAVITON_TEST") != null;
 
-    String pkgPath;
+    String pkg = conf.get(Catalog.PROPERTY_PACKAGE);
     if (pkg != null) {
+      // Only libs will be added to the classpath.
       return Lists.newArrayList(pkg);
     } else if (testEnv) {
       // In test, the catalog package is under the build directory.
-      pkgPath =
+      String buildDirForTest =
           String.join(File.separator, gravitonHome, "catalogs", "catalog-" + provider, "build");
       // Add the config and lib to the classpath.
       return Lists.newArrayList(
-          pkgPath + File.separator + "resources", pkgPath + File.separator + "libs");
+          buildDirForTest + File.separator + "resources",
+          buildDirForTest + File.separator + "libs");
     }
 
     // In real environment, the catalog package is under the catalog directory.
-    pkgPath = String.join(File.separator, gravitonHome, "catalogs", provider);
-    return Lists.newArrayList(pkgPath + File.separator + "conf", pkgPath + File.separator + "libs");
+    String classPathDir = String.join(File.separator, gravitonHome, "catalogs", provider);
+    return Lists.newArrayList(
+        classPathDir + File.separator + "conf", classPathDir + File.separator + "libs");
   }
 
   private Class<? extends CatalogProvider> lookupCatalogProvider(String provider, ClassLoader cl) {
