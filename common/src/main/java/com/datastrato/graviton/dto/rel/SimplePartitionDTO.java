@@ -4,7 +4,7 @@
  */
 package com.datastrato.graviton.dto.rel;
 
-import static com.datastrato.graviton.dto.rel.PartitionUtils.validateFieldExist;
+import static com.datastrato.graviton.dto.rel.PartitionUtils.validateFieldExistence;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -12,6 +12,10 @@ import com.google.common.base.Preconditions;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 
+/**
+ * Represent some common and simple partitioning which only references single field, such as year,
+ * month, day, hour, etc. Mainly for the convenience of usage.
+ */
 @EqualsAndHashCode(callSuper = false)
 public class SimplePartitionDTO implements Partition {
 
@@ -39,7 +43,7 @@ public class SimplePartitionDTO implements Partition {
 
   @Override
   public void validate(ColumnDTO[] columns) throws IllegalArgumentException {
-    validateFieldExist(columns, fieldName);
+    validateFieldExistence(columns, fieldName);
   }
 
   public static class Builder {
@@ -63,5 +67,40 @@ public class SimplePartitionDTO implements Partition {
       Preconditions.checkArgument(strategy != null, "strategy cannot be null");
       return new SimplePartitionDTO(strategy.name(), fieldName);
     }
+  }
+
+  public static SimplePartitionDTO identity(String[] fieldName) {
+    return new SimplePartitionDTO.Builder()
+        .withStrategy(Partition.Strategy.IDENTITY)
+        .withFieldName(fieldName)
+        .build();
+  }
+
+  public static SimplePartitionDTO year(String[] fieldName) {
+    return new SimplePartitionDTO.Builder()
+        .withStrategy(Partition.Strategy.YEAR)
+        .withFieldName(fieldName)
+        .build();
+  }
+
+  public static SimplePartitionDTO month(String[] fieldName) {
+    return new SimplePartitionDTO.Builder()
+        .withStrategy(Partition.Strategy.MONTH)
+        .withFieldName(fieldName)
+        .build();
+  }
+
+  public static SimplePartitionDTO day(String[] fieldName) {
+    return new SimplePartitionDTO.Builder()
+        .withStrategy(Partition.Strategy.DAY)
+        .withFieldName(fieldName)
+        .build();
+  }
+
+  public static SimplePartitionDTO hour(String[] fieldName) {
+    return new SimplePartitionDTO.Builder()
+        .withStrategy(Partition.Strategy.HOUR)
+        .withFieldName(fieldName)
+        .build();
   }
 }
