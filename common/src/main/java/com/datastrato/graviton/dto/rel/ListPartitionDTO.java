@@ -53,7 +53,7 @@ public class ListPartitionDTO implements Partition {
   @Override
   public void validate(ColumnDTO[] columns) throws IllegalArgumentException {
     for (String[] fieldName : fieldNames) {
-      PartitionUtils.validateFieldExist(columns, fieldName);
+      PartitionUtils.validateFieldExistence(columns, fieldName);
     }
   }
 

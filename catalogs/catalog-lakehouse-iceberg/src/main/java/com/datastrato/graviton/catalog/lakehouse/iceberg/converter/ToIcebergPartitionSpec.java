@@ -4,15 +4,16 @@
  */
 package com.datastrato.graviton.catalog.lakehouse.iceberg.converter;
 
+import static com.datastrato.graviton.rel.transforms.Transforms.NAME_OF_BUCKET;
+import static com.datastrato.graviton.rel.transforms.Transforms.NAME_OF_TRUNCATE;
+
 import com.datastrato.graviton.catalog.lakehouse.iceberg.IcebergTable;
 import com.datastrato.graviton.rel.transforms.Transform;
 import com.datastrato.graviton.rel.transforms.Transforms;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import io.substrait.expression.ImmutableExpression;
-import java.util.Arrays;
 import java.util.Locale;
-import java.util.stream.Collectors;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
 
@@ -54,20 +55,10 @@ public class ToIcebergPartitionSpec {
         String colName = String.join(DOT, fieldName);
         builder.identity(colName);
       } else if (transform instanceof Transforms.FunctionTrans) {
-        Preconditions.checkArgument(
-            transform.arguments().length == 1,
-            "Iceberg partition does not support nested field",
-            transform);
         String colName =
-            Arrays.stream(transform.arguments())
-                .map(t -> ((Transforms.NamedReference) t).value()[0])
-                .collect(Collectors.joining(DOT));
+            String.join(DOT, ((Transforms.NamedReference) transform.arguments()[0]).value());
         switch (transform.name().toLowerCase(Locale.ROOT)) {
-            // TODO minghuang add support for other transforms.
-          case "identity":
-            builder.identity(colName);
-            break;
-          case "bucket":
+          case NAME_OF_BUCKET:
             builder.bucket(colName, findWidth(transform));
             break;
           case Transforms.NAME_OF_YEAR:
@@ -82,7 +73,7 @@ public class ToIcebergPartitionSpec {
           case Transforms.NAME_OF_HOUR:
             builder.hour(colName);
             break;
-          case "truncate":
+          case NAME_OF_TRUNCATE:
             builder.truncate(colName, findWidth(transform));
             break;
           default:
@@ -97,9 +88,8 @@ public class ToIcebergPartitionSpec {
   }
 
   private static int findWidth(Transform transform) {
-    Preconditions.checkArgument(
-        transform.arguments().length == 1, "Transform with multiple arguments is not supported");
-    Transform expr = transform.arguments()[0];
+    // transform here format is: truncate(fieldName, width) or bucket(fieldName, numBuckets)
+    Transform expr = transform.arguments()[1];
     if (expr instanceof Transforms.LiteralReference) {
       Transforms.LiteralReference literalReference = (Transforms.LiteralReference) expr;
       if (literalReference.value() instanceof ImmutableExpression.I8Literal) {
