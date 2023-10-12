@@ -25,12 +25,13 @@ public class ITUtils {
       String configTempFileName, String configFileName, Map<String, String> configMap)
       throws IOException {
     Properties props = new Properties();
-    InputStream inputStream = Files.newInputStream(Paths.get(configTempFileName));
-    OutputStream outputStream = Files.newOutputStream(Paths.get(configFileName));
-    props.load(inputStream);
-    for (Map.Entry<String, String> entry : configMap.entrySet()) {
-      props.setProperty(entry.getKey(), entry.getValue());
+    try (InputStream inputStream = Files.newInputStream(Paths.get(configTempFileName));
+        OutputStream outputStream = Files.newOutputStream(Paths.get(configFileName))) {
+      props.load(inputStream);
+      for (Map.Entry<String, String> entry : configMap.entrySet()) {
+        props.setProperty(entry.getKey(), entry.getValue());
+      }
+      props.store(outputStream, null);
     }
-    props.store(outputStream, null);
   }
 }
