@@ -34,7 +34,6 @@ import java.util.stream.Collectors;
 import javax.ws.rs.NotSupportedException;
 import lombok.Getter;
 import lombok.Setter;
-import org.apache.commons.lang3.ArrayUtils;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.Transaction;
@@ -287,8 +286,8 @@ public class IcebergTableOpsHelper {
         .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
   }
 
-  public static Namespace getIcebergNamespace(NameIdentifier ident) {
-    return getIcebergNamespace(ArrayUtils.add(ident.namespace().levels(), ident.name()));
+  public static Namespace getIcebergNamespace(com.datastrato.graviton.Namespace namespace) {
+    return getIcebergNamespace(namespace.level(namespace.length() - 1));
   }
 
   public static Namespace getIcebergNamespace(String... level) {
@@ -297,12 +296,13 @@ public class IcebergTableOpsHelper {
 
   public static TableIdentifier buildIcebergTableIdentifier(
       com.datastrato.graviton.Namespace namespace, String name) {
-    return TableIdentifier.of(ArrayUtils.add(namespace.levels(), name));
+    String[] levels = namespace.levels();
+    return TableIdentifier.of(levels[levels.length - 1], name);
   }
 
   public static TableIdentifier buildIcebergTableIdentifier(NameIdentifier nameIdentifier) {
-    return TableIdentifier.of(
-        ArrayUtils.add(nameIdentifier.namespace().levels(), nameIdentifier.name()));
+    String[] levels = nameIdentifier.namespace().levels();
+    return TableIdentifier.of(levels[levels.length - 1], nameIdentifier.name());
   }
 
   @VisibleForTesting

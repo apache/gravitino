@@ -12,6 +12,7 @@ import com.datastrato.graviton.catalog.lakehouse.iceberg.converter.ToIcebergSort
 import com.datastrato.graviton.catalog.lakehouse.iceberg.ops.IcebergTableOpsHelper;
 import com.datastrato.graviton.catalog.rel.BaseTable;
 import com.datastrato.graviton.meta.AuditInfo;
+import com.datastrato.graviton.rel.Distribution;
 import com.google.common.collect.Maps;
 import java.util.Map;
 import lombok.Getter;
@@ -48,6 +49,7 @@ public class IcebergTable extends BaseTable {
 
     Map<String, String> resultProperties =
         Maps.newHashMap(IcebergTableOpsHelper.removeReservedProperties(properties));
+    resultProperties.putIfAbsent(ICEBERG_COMMENT_FIELD_NAME, comment);
     CreateTableRequest.Builder builder =
         CreateTableRequest.builder()
             .withName(name)
@@ -77,6 +79,7 @@ public class IcebergTable extends BaseTable {
         .withLocation(table.location())
         .withProperties(properties)
         .withColumns(icebergColumns)
+        .withDistribution(Distribution.NONE)
         .withName(tableName)
         .withAuditInfo(AuditInfo.EMPTY)
         .withPartitions(FromIcebergPartitionSpec.fromPartitionSpec(table.spec(), schema))

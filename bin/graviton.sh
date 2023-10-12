@@ -83,6 +83,7 @@ function wait_for_graviton_server_to_die() {
 
 function start() {
   local pid=$(found_graviton_server_pid)
+  check_jdbc_jar "${GRAVITON_HOME}"
 
   if [[ ! -z "${pid}" ]]; then
     if kill -0 ${pid} >/dev/null 2>&1; then

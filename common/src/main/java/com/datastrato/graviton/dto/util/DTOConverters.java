@@ -97,7 +97,7 @@ public class DTOConverters {
   }
 
   public static DistributionDTO toDTO(Distribution distribution) {
-    if (Distribution.NONE.equals(distribution)) {
+    if (Distribution.NONE.equals(distribution) || null == distribution) {
       return DistributionDTO.NONE;
     }
 

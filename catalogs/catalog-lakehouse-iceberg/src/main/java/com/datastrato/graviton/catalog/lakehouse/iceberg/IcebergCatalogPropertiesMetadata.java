@@ -35,6 +35,8 @@ public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
   // it to `catalogType` automatically and pass it to Iceberg.
   public static final Map<String, String> GRAVITON_CONFIG_TO_ICEBERG =
       ImmutableMap.of(
+          CATALOG_BACKEND_NAME,
+          CATALOG_BACKEND_NAME,
           GRAVITON_JDBC_USER,
           ICEBERG_JDBC_USER,
           GRAVITON_JDBC_PASSWORD,

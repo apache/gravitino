@@ -30,7 +30,6 @@ trino = '426'
 spark = "3.4.1"
 scala-collection-compat = "2.7.0"
 
-
 protobuf-plugin = "0.9.2"
 spotless-plugin = '6.11.0'
 gradle-extensions-plugin = '1.74'
@@ -93,7 +92,6 @@ trino-testing= { group = "io.trino", name = "trino-testing", version.ref = "trin
 iceberg-spark-runtime = { group = "org.apache.iceberg", name = "iceberg-spark-runtime-3.4_2.13", version.ref = "iceberg" }
 spark-sql = { group = "org.apache.spark", name = "spark-sql_2.13", version.ref = "spark" }
 scala-collection-compat =  { group = "org.scala-lang.modules", name = "scala-collection-compat_2.13", version.ref = "scala-collection-compat" }
-
 
 [bundles]
 log4j = ["slf4j-api", "log4j-slf4j2-impl", "log4j-api", "log4j-core", "log4j-12-api"]

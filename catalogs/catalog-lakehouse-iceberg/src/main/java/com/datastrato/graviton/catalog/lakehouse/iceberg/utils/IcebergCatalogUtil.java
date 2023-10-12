@@ -45,7 +45,7 @@ public class IcebergCatalogUtil {
         new JdbcCatalog(
             null,
             null,
-            Boolean.parseBoolean(properties.getOrDefault(ICEBERG_JDBC_INITIALIZE, "false")));
+            Boolean.parseBoolean(properties.getOrDefault(ICEBERG_JDBC_INITIALIZE, "true")));
     HdfsConfiguration hdfsConfiguration = new HdfsConfiguration();
     properties.forEach(hdfsConfiguration::set);
     jdbcCatalog.setConf(hdfsConfiguration);

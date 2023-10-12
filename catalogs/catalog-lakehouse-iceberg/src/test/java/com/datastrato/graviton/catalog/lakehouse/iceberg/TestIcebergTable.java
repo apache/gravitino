@@ -17,7 +17,6 @@ import com.datastrato.graviton.meta.AuditInfo;
 import com.datastrato.graviton.meta.CatalogEntity;
 import com.datastrato.graviton.rel.Column;
 import com.datastrato.graviton.rel.Distribution;
-import com.datastrato.graviton.rel.Distribution.Strategy;
 import com.datastrato.graviton.rel.SortOrder;
 import com.datastrato.graviton.rel.SortOrder.Direction;
 import com.datastrato.graviton.rel.SortOrder.NullOrdering;
@@ -107,14 +106,6 @@ public class TestIcebergTable {
     return entity;
   }
 
-  private Distribution createDistribution() {
-    return Distribution.builder()
-        .withNumber(10)
-        .withTransforms(new Transform[] {Transforms.field(new String[] {"col_1"})})
-        .withStrategy(Strategy.EVEN)
-        .build();
-  }
-
   private SortOrder[] createSortOrder() {
     return new SortOrder[] {
       SortOrder.builder()
@@ -159,7 +150,7 @@ public class TestIcebergTable {
                 ICEBERG_COMMENT,
                 properties,
                 new Transform[0],
-                null,
+                Distribution.NONE,
                 sortOrders);
     Assertions.assertEquals(tableIdentifier.name(), table.name());
     Assertions.assertEquals(ICEBERG_COMMENT, table.comment());
@@ -198,7 +189,7 @@ public class TestIcebergTable {
                         ICEBERG_COMMENT,
                         properties,
                         new Transform[0],
-                        null,
+                        Distribution.NONE,
                         sortOrders));
     Assertions.assertTrue(exception.getMessage().contains("Table already exists"));
   }
@@ -380,7 +371,7 @@ public class TestIcebergTable {
             .build();
     Column[] columns = new Column[] {col1, col2};
 
-    Distribution distribution = createDistribution();
+    Distribution distribution = Distribution.NONE;
     SortOrder[] sortOrders = createSortOrder();
 
     Table createdTable =
