@@ -553,8 +553,6 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
       loadProperties.forEach(
           (key, value) -> catalogSpecificConfig.put(key.toString(), value.toString()));
     } catch (Exception e) {
-      // If the catalog-specific configuration file is not found, it will not be loaded.
-      // Should we throw exception directly?
       LOG.error(
           "Failed to load catalog specific configurations, file name: '{}'",
           catalogSpecificConfigFile,
