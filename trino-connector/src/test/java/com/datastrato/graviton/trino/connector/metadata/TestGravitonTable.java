@@ -43,7 +43,7 @@ public class TestGravitonTable {
                 new AuditDTO.Builder().withCreator("creator").withCreateTime(Instant.now()).build())
             .build();
 
-    GravitonTable table = new GravitonTable("db1", tableDTO);
+    GravitonTable table = new GravitonTable("db1", "table1", tableDTO);
 
     Assertions.assertEquals(table.getName(), tableDTO.name());
     Assertions.assertEquals(table.getSchemaName(), "db1");

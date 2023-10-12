@@ -61,6 +61,14 @@ public class CatalogConnectorContext {
     return adapter.getTableProperties();
   }
 
+  public List<PropertyMetadata<?>> getSchemaProperties() {
+    return adapter.getSchemaProperties();
+  }
+
+  public List<PropertyMetadata<?>> getColumnProperties() {
+    return adapter.getColumnProperties();
+  }
+
   public void close() {
     this.internalConnector.shutdown();
   }

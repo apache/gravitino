@@ -77,17 +77,18 @@ public class GravitonConnector implements Connector {
 
   @Override
   public List<PropertyMetadata<?>> getSessionProperties() {
-    throw new NotImplementedException();
+    Connector internalConnector = catalogConnectorContext.getInternalConnector();
+    return internalConnector.getSessionProperties();
   }
 
   @Override
   public List<PropertyMetadata<?>> getColumnProperties() {
-    throw new NotImplementedException();
+    return catalogConnectorContext.getColumnProperties();
   }
 
   @Override
   public List<PropertyMetadata<?>> getSchemaProperties() {
-    throw new NotImplementedException();
+    return catalogConnectorContext.getSchemaProperties();
   }
 
   @Override
@@ -107,6 +108,9 @@ public class GravitonConnector implements Connector {
 
   @Override
   public void commit(ConnectorTransactionHandle transactionHandle) {
-    throw new NotImplementedException();
+    GravitonTransactionHandle gravitonTransactionHandle =
+        (GravitonTransactionHandle) transactionHandle;
+    Connector internalConnector = catalogConnectorContext.getInternalConnector();
+    internalConnector.commit(gravitonTransactionHandle.getInternalTransactionHandle());
   }
 }

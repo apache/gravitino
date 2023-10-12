@@ -4,20 +4,32 @@
  */
 package com.datastrato.graviton.trino.connector.metadata;
 
+import static java.util.Objects.requireNonNull;
+
 import com.datastrato.graviton.rel.Column;
-import com.google.common.base.Preconditions;
 import io.substrait.type.Type;
 import java.util.Map;
 
 /** Help Graviton connector access ColumnMetadata from graviton client. */
 public final class GravitonColumn {
-  private final Column column;
+  private final String name;
+  private final Type dataType;
   private final int index;
+  private final String comment;
 
   public GravitonColumn(Column column, int columnIndex) {
-    this.column = column;
+    this.name = column.name();
+    this.dataType = column.dataType();
     this.index = columnIndex;
-    Preconditions.checkArgument(column != null, "column is not null");
+    this.comment = column.comment();
+    requireNonNull(column, "column is null or is empty");
+  }
+
+  public GravitonColumn(String name, Type dataType, int index, String comment) {
+    this.name = name;
+    this.dataType = dataType;
+    this.index = index;
+    this.comment = comment;
   }
 
   public int getIndex() {
@@ -25,18 +37,18 @@ public final class GravitonColumn {
   }
 
   public Map<String, String> getProperties() {
-    return Map.of();
+    return null;
   }
 
   public String getName() {
-    return column.name();
+    return name;
   }
 
   public Type getType() {
-    return column.dataType();
+    return dataType;
   }
 
   public String getComment() {
-    return column.comment();
+    return comment;
   }
 }
