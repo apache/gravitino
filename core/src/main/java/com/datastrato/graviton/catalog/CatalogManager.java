@@ -463,13 +463,10 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
 
     // Load Catalog class instance
     BaseCatalog<?> catalog = createCatalogInstance(classLoader, provider);
-
-    // Load catalog specific properties
-    CatalogWrapper wrapper = new CatalogWrapper(catalog, classLoader);
-
-    //    Map<String, String> bypassConfig = getBypassConfig(conf);
-    // Initialize the catalog
     catalog.withCatalogConf(conf).withCatalogEntity(entity);
+
+    CatalogWrapper wrapper = new CatalogWrapper(catalog, classLoader);
+    // Initialize the catalog
 
     // Validate catalog properties and initialize the config
     classLoader.withClassLoader(

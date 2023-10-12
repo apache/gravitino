@@ -95,7 +95,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     conf.forEach(
         (key, value) -> {
           if (key.startsWith(CATALOG_BYPASS_PREFIX)) {
-            // Trim bypass prefix
+            // Trim bypass prefix and pass it to hive conf
             hiveConf.set(key.substring(CATALOG_BYPASS_PREFIX.length()), value);
           }
         });
