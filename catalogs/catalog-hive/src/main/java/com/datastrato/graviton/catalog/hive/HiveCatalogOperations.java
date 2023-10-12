@@ -483,7 +483,12 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
   }
 
   /**
-   * Not supported in this implementation. Throws UnsupportedOperationException.
+   * Apply the {@link TableChange change} to an existing Hive table.
+   *
+   * <p>Note: When changing column position, since HMS will check the compatibility of column type
+   * between the old column position and the new column position, you need to make sure that the new
+   * column position is compatible with the old column position, otherwise the operation will fail
+   * in HMS.
    *
    * @param tableIdent The identifier of the table to alter.
    * @param changes The changes to apply to the table.
@@ -563,6 +568,16 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       throw new NoSuchTableException(
           String.format("Hive table does not exist: %s in Hive Metastore", tableIdent.name()), e);
     } catch (TException | InterruptedException e) {
+      if (e.getMessage().contains("types incompatible with the existing columns")) {
+        throw new IllegalArgumentException(
+            "Failed to alter Hive table ["
+                + tableIdent.name()
+                + "] in Hive metastore, "
+                + "since Hive metastore will check the compatibility of column type between the old and new column positions, "
+                + "please ensure that the type of the new column position is compatible with the old one, "
+                + "otherwise the alter operation will fail in Hive metastore.",
+            e);
+      }
       throw new RuntimeException(
           "Failed to alter Hive table " + tableIdent.name() + " in Hive metastore", e);
     } catch (IllegalArgumentException e) {
