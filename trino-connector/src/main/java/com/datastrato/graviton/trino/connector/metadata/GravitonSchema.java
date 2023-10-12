@@ -10,21 +10,31 @@ import java.util.Map;
 /** Help Graviton connector access SchemaMetadata from graviton client. */
 public class GravitonSchema {
 
-  private final Schema schema;
+  private final String schemaName;
+  private final Map<String, String> properties;
+  private final String comment;
 
   public GravitonSchema(Schema schema) {
-    this.schema = schema;
+    this.schemaName = schema.name();
+    this.properties = schema.properties();
+    this.comment = schema.comment();
   }
 
-  public Map<String, String> properties() {
-    return schema.properties();
+  public GravitonSchema(String schemaName, Map<String, String> properties, String comment) {
+    this.schemaName = schemaName;
+    this.properties = properties;
+    this.comment = comment;
   }
 
-  public String name() {
-    return schema.name();
+  public Map<String, String> getProperties() {
+    return properties;
   }
 
-  public String comment() {
-    return schema.comment();
+  public String getName() {
+    return schemaName;
+  }
+
+  public String getComment() {
+    return comment;
   }
 }
