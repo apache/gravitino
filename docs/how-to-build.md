@@ -1,8 +1,10 @@
-<!--
-  Copyright 2023 Datastrato.
-  This software is licensed under the Apache License version 2.
--->
-# How to Build Gravitino
+---
+title: "How to Build Gravitino"
+date: 2023-10-03T09:03:20-08:00
+license: "Copyright 2023 Datastrato.
+This software is licensed under the Apache License version 2."
+---
+# How to Build Graviton
 
 ## Prerequisites
 + JDK 1.8

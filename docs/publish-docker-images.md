@@ -1,7 +1,9 @@
-<!--
-  Copyright 2023 Datastrato.
-  This software is licensed under the Apache License version 2.
--->
+---
+title: "How to Publish Docker images"
+date: 2023-10-01T09:03:20-08:00
+license: "Copyright 2023 Datastrato.
+This software is licensed under the Apache License version 2."
+---
 # How to Publish Docker images
 
 ## Introduction
@@ -27,7 +29,7 @@ We use Github Actions to publish the docker images to the DockerHub repository.
 5. You must enter the correct `publish docker token` before you can execute run `Publish Docker Image` workflow.
 6. Wait for the workflow to complete. You can see a new docker image shown in the [datastrato](https://hub.docker.com/u/datastrato) DockerHub repository.
 
-[<img src="assets/publish-docker-image.png" width="400"/>](assets/publish-docker-image.png)
+![](assets/publish-docker-image.png)
 
 ## The version of the Data source in the Docker image
 - [gravitino-ci-hive](../dev/docker/hive/README.md)
