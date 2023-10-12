@@ -21,6 +21,7 @@ import io.trino.spi.connector.ConnectorTableMetadata;
 import io.trino.spi.connector.ConnectorTableProperties;
 import io.trino.spi.connector.ConnectorTableVersion;
 import io.trino.spi.connector.SchemaTableName;
+import io.trino.spi.security.TrinoPrincipal;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -148,5 +149,34 @@ public class GravitonMetadata implements ConnectorMetadata {
 
     GravitonColumn column = table.getColumn(columName);
     return metadataAdapter.getColumnMetadata(column);
+  }
+
+  @Override
+  public void createTable(
+      ConnectorSession session, ConnectorTableMetadata tableMetadata, boolean ignoreExisting) {
+    GravitonTable table = metadataAdapter.createTable(tableMetadata);
+    catalogConnectorMetadata.createTable(table);
+  }
+
+  @Override
+  public void createSchema(
+      ConnectorSession session,
+      String schemaName,
+      Map<String, Object> properties,
+      TrinoPrincipal owner) {
+    GravitonSchema schema = metadataAdapter.createSchema(schemaName, properties);
+    catalogConnectorMetadata.createSchema(schema);
+  }
+
+  @Override
+  public void dropSchema(ConnectorSession session, String schemaName, boolean cascade) {
+    catalogConnectorMetadata.dropSchema(schemaName, cascade);
+  }
+
+  @Override
+  public void dropTable(ConnectorSession session, ConnectorTableHandle tableHandle) {
+    GravitonTableHandle gravitonTableHandle = (GravitonTableHandle) tableHandle;
+    catalogConnectorMetadata.dropTable(
+        gravitonTableHandle.getTableName(), gravitonTableHandle.getTableName());
   }
 }
