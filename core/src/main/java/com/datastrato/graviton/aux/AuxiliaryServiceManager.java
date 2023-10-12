@@ -12,6 +12,7 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Lists;
 import com.google.common.collect.Streams;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -79,8 +80,8 @@ public class AuxiliaryServiceManager {
   }
 
   @VisibleForTesting
-  public IsolatedClassLoader getIsolatedClassLoader(String classPath) {
-    return IsolatedClassLoader.buildClassLoader(classPath);
+  public IsolatedClassLoader getIsolatedClassLoader(List<String> classPaths) {
+    return IsolatedClassLoader.buildClassLoader(classPaths);
   }
 
   @VisibleForTesting
@@ -115,7 +116,7 @@ public class AuxiliaryServiceManager {
     classPath = getValidPath(auxServiceName, classPath);
     LOG.info("AuxService name:{}, config:{}, classpath:{}", auxServiceName, config, classPath);
 
-    IsolatedClassLoader isolatedClassLoader = getIsolatedClassLoader(classPath);
+    IsolatedClassLoader isolatedClassLoader = getIsolatedClassLoader(Lists.newArrayList(classPath));
     try {
       GravitonAuxiliaryService gravitonAuxiliaryService =
           loadAuxService(auxServiceName, isolatedClassLoader);
