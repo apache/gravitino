@@ -8,8 +8,10 @@ import static com.datastrato.graviton.Configs.ENTRY_KV_ROCKSDB_BACKEND_PATH;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.datastrato.graviton.aux.AuxiliaryServiceManager;
+import com.datastrato.graviton.rest.RESTUtils;
+import com.datastrato.graviton.server.web.JettyServerConfig;
 import com.google.common.collect.ImmutableMap;
-import java.io.File;
+import java.io.IOException;
 import java.util.UUID;
 import org.apache.commons.io.FileUtils;
 import org.junit.jupiter.api.AfterEach;
@@ -30,17 +32,17 @@ public class TestGravitonServer {
   private ServerConfig spyServerConfig;
 
   @BeforeAll
-  void initConfig() {
-    String confPath =
-        System.getenv("GRAVITON_HOME")
-            + File.separator
-            + "conf"
-            + File.separator
-            + "graviton.conf.template";
-    ServerConfig serverConfig = GravitonServer.loadConfig(confPath);
+  void initConfig() throws IOException {
+    ServerConfig serverConfig = new ServerConfig();
+    serverConfig.loadFromMap(
+        ImmutableMap.of(
+            ENTRY_KV_ROCKSDB_BACKEND_PATH.getKey(),
+            ROCKS_DB_STORE_PATH,
+            GravitonServer.WEBSERVER_CONF_PREFIX + JettyServerConfig.WEBSERVER_HTTP_PORT.getKey(),
+            String.valueOf(RESTUtils.findAvailablePort(5000, 6000))),
+        t -> true);
+
     spyServerConfig = Mockito.spy(serverConfig);
-    Mockito.when(spyServerConfig.get(ENTRY_KV_ROCKSDB_BACKEND_PATH))
-        .thenReturn(ROCKS_DB_STORE_PATH);
 
     Mockito.when(
             spyServerConfig.getConfigsWithPrefix(
