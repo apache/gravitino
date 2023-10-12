@@ -95,10 +95,8 @@ tasks {
         from("src/main/resources")
         into("${rootDir}/distribution/package/catalogs/lakehouse-iceberg/conf")
 
-        include("**/*.xml")
-        include("**/*.conf")
+        include("lakehouse-iceberg.conf")
 
-        include("**/*.template")
         rename { original -> if (original.endsWith(".template")) {
             original.replace(".template", "")
         } else {
