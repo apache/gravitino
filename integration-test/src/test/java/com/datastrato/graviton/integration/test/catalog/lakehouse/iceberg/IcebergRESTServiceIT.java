@@ -159,7 +159,8 @@ public class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
   @Test
   void testCreateTable() {
     sql(
-        "CREATE TABLE iceberg_rest_table_test.create_foo1( id bigint, data string, ts timestamp)"
+        "CREATE TABLE iceberg_rest_table_test.create_foo1"
+            + "( id bigint, data string, ts timestamp)"
             + "USING iceberg PARTITIONED BY (bucket(16, id), days(ts))");
     Map<String, String> tableInfo = getTableInfo("iceberg_rest_table_test.create_foo1");
     Map<String, String> m =
@@ -180,7 +181,8 @@ public class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
   @Test
   void testDropTable() {
     sql(
-        "CREATE TABLE iceberg_rest_table_test.drop_foo1(id bigint COMMENT 'unique id',data string) using iceberg");
+        "CREATE TABLE iceberg_rest_table_test.drop_foo1"
+            + "(id bigint COMMENT 'unique id',data string) using iceberg");
     sql("DROP TABLE iceberg_rest_table_test.drop_foo1");
     Assertions.assertThrowsExactly(
         AnalysisException.class, () -> sql("DESC TABLE iceberg_rest_table_test.drop_foo1"));
@@ -238,15 +240,18 @@ public class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
   @Test
   void testSetTableProperties() {
     sql(
-        "CREATE TABLE iceberg_rest_table_test.set_foo1 (id bigint COMMENT 'unique id',data string) using iceberg");
+        "CREATE TABLE iceberg_rest_table_test.set_foo1"
+            + " (id bigint COMMENT 'unique id',data string) using iceberg");
     sql(
-        "ALTER TABLE iceberg_rest_table_test.set_foo1 SET TBLPROPERTIES ('read.split.target-size'='268435456')");
+        "ALTER TABLE iceberg_rest_table_test.set_foo1 SET TBLPROPERTIES "
+            + "('read.split.target-size'='268435456')");
     Map<String, String> m = getTableInfo("iceberg_rest_table_test.set_foo1");
     Assertions.assertTrue(
         m.getOrDefault("Table Properties", "").contains("read.split.target-size=268435456"));
 
     sql(
-        "ALTER TABLE iceberg_rest_table_test.set_foo1 UNSET TBLPROPERTIES ('read.split.target-size')");
+        "ALTER TABLE iceberg_rest_table_test.set_foo1 "
+            + "UNSET TBLPROPERTIES ('read.split.target-size')");
     m = getTableInfo("iceberg_rest_table_test.set_foo1");
     Assertions.assertFalse(
         m.getOrDefault("Table Properties", "read.split.target-size")
@@ -261,13 +266,15 @@ public class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
   @Test
   void testAddColumns() {
     sql(
-        "CREATE TABLE iceberg_rest_table_test.add_foo1 (id string COMMENT 'unique id',data string) using iceberg");
+        "CREATE TABLE iceberg_rest_table_test.add_foo1"
+            + " (id string COMMENT 'unique id',data string) using iceberg");
 
     Assertions.assertThrowsExactly(
         AnalysisException.class,
         () ->
             sql(
-                "ALTER TABLE iceberg_rest_table_test.add_foo1 ADD COLUMNS foo_after String After not_exits"));
+                "ALTER TABLE iceberg_rest_table_test.add_foo1 "
+                    + "ADD COLUMNS foo_after String After not_exits"));
 
     sql("ALTER TABLE iceberg_rest_table_test.add_foo1 ADD COLUMNS foo_after String After id");
     List<String> columns = getTableColumns("iceberg_rest_table_test.add_foo1");
@@ -286,7 +293,8 @@ public class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
   @Test
   void testRenameColumns() {
     sql(
-        "CREATE TABLE iceberg_rest_table_test.renameC_foo1 (id bigint COMMENT 'unique id',data string) using iceberg");
+        "CREATE TABLE iceberg_rest_table_test.renameC_foo1"
+            + " (id bigint COMMENT 'unique id',data string) using iceberg");
     sql("ALTER TABLE iceberg_rest_table_test.renameC_foo1 RENAME COLUMN data TO data1");
 
     Map<String, String> tableInfo = getTableInfo("iceberg_rest_table_test.renameC_foo1");
@@ -301,7 +309,8 @@ public class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
   @Test
   void testDropColumns() {
     sql(
-        "CREATE TABLE iceberg_rest_table_test.dropC_foo1 (id bigint COMMENT 'unique id',data string) using iceberg");
+        "CREATE TABLE iceberg_rest_table_test.dropC_foo1 "
+            + "(id bigint COMMENT 'unique id',data string) using iceberg");
 
     Assertions.assertThrowsExactly(
         AnalysisException.class,
@@ -317,7 +326,8 @@ public class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
   @Test
   void testUpdateColumnType() {
     sql(
-        "CREATE TABLE iceberg_rest_table_test.updateC_foo1 (id int COMMENT 'unique id',data string) using iceberg");
+        "CREATE TABLE iceberg_rest_table_test.updateC_foo1 "
+            + "(id int COMMENT 'unique id',data string) using iceberg");
     Map<String, String> tableInfo = getTableInfo("iceberg_rest_table_test.updateC_foo1");
     Map<String, String> m = ImmutableMap.of("id", "int");
     checkMapContains(m, tableInfo);
@@ -331,7 +341,8 @@ public class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
   @Test
   void testUpdateColumnPosition() {
     sql(
-        "CREATE TABLE iceberg_rest_table_test.updateP_foo1 (id string COMMENT 'unique id',data string) using iceberg");
+        "CREATE TABLE iceberg_rest_table_test.updateP_foo1 "
+            + "(id string COMMENT 'unique id',data string) using iceberg");
     List<String> columns = getTableColumns("iceberg_rest_table_test.updateP_foo1");
     Assertions.assertEquals(Arrays.asList("id", "data"), columns);
 
@@ -347,7 +358,8 @@ public class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
   @Test
   void testAlterPartitions() {
     sql(
-        "CREATE TABLE iceberg_rest_table_test.part_foo1( id bigint, data string, ts timestamp) USING iceberg");
+        "CREATE TABLE iceberg_rest_table_test.part_foo1"
+            + "( id bigint, data string, ts timestamp) USING iceberg");
     sql("ALTER TABLE iceberg_rest_table_test.part_foo1 ADD PARTITION FIELD bucket(16, id)");
     sql("ALTER TABLE iceberg_rest_table_test.part_foo1 ADD PARTITION FIELD truncate(4, data)");
     sql("ALTER TABLE iceberg_rest_table_test.part_foo1 ADD PARTITION FIELD years(ts)");
@@ -365,7 +377,8 @@ public class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
         IllegalArgumentException.class,
         () ->
             sql(
-                "ALTER TABLE iceberg_rest_table_test.part_foo1 DROP PARTITION FIELD bucket(8, id)"));
+                "ALTER TABLE iceberg_rest_table_test.part_foo1 "
+                    + "DROP PARTITION FIELD bucket(8, id)"));
     sql("ALTER TABLE iceberg_rest_table_test.part_foo1 DROP PARTITION FIELD bucket(16, id)");
     tableInfo = getTableInfo("iceberg_rest_table_test.part_foo1");
     partitions =
@@ -379,9 +392,11 @@ public class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
         IllegalArgumentException.class,
         () ->
             sql(
-                "ALTER TABLE iceberg_rest_table_test.part_foo1 REPLACE PARTITION FIELD months(ts) WITH days(ts)"));
+                "ALTER TABLE iceberg_rest_table_test.part_foo1 "
+                    + "REPLACE PARTITION FIELD months(ts) WITH days(ts)"));
     sql(
-        "ALTER TABLE iceberg_rest_table_test.part_foo1 REPLACE PARTITION FIELD years(ts) WITH days(ts)");
+        "ALTER TABLE iceberg_rest_table_test.part_foo1 "
+            + "REPLACE PARTITION FIELD years(ts) WITH days(ts)");
     tableInfo = getTableInfo("iceberg_rest_table_test.part_foo1");
     partitions =
         ImmutableMap.of(
@@ -394,12 +409,14 @@ public class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
   @Test
   void testAlterSortBy() {
     sql(
-        "CREATE TABLE iceberg_rest_table_test.sort_foo1( id bigint, data string, ts timestamp) USING iceberg");
+        "CREATE TABLE iceberg_rest_table_test.sort_foo1"
+            + "( id bigint, data string, ts timestamp) USING iceberg");
     Assertions.assertThrowsExactly(
         ValidationException.class,
         () -> sql("ALTER TABLE iceberg_rest_table_test.sort_foo1 WRITE ORDERED BY xx, id"));
     sql(
-        "ALTER TABLE iceberg_rest_table_test.sort_foo1 WRITE ORDERED BY data ASC NULLS FIRST, id ASC NULLS FIRST");
+        "ALTER TABLE iceberg_rest_table_test.sort_foo1 "
+            + "WRITE ORDERED BY data ASC NULLS FIRST, id ASC NULLS FIRST");
     Map<String, String> tableInfo = getTableInfo("iceberg_rest_table_test.sort_foo1");
     Assertions.assertTrue(
         tableInfo
@@ -416,7 +433,8 @@ public class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
   @Test
   void testAlterPartitionBy() {
     sql(
-        "CREATE TABLE iceberg_rest_table_test.partby_foo1( id bigint, data string, ts timestamp) USING iceberg");
+        "CREATE TABLE iceberg_rest_table_test.partby_foo1"
+            + "( id bigint, data string, ts timestamp) USING iceberg");
     sql("ALTER TABLE iceberg_rest_table_test.partby_foo1 WRITE DISTRIBUTED BY PARTITION");
     Map<String, String> tableInfo = getTableInfo("iceberg_rest_table_test.partby_foo1");
     Assertions.assertTrue(
@@ -426,7 +444,8 @@ public class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
   @Test
   void testAlterIdentifier() {
     sql(
-        "CREATE TABLE iceberg_rest_table_test.identifier_foo1( id bigint NOT NULL, data string, ts timestamp) USING iceberg");
+        "CREATE TABLE iceberg_rest_table_test.identifier_foo1"
+            + "( id bigint NOT NULL, data string, ts timestamp) USING iceberg");
     sql("ALTER TABLE iceberg_rest_table_test.identifier_foo1 SET IDENTIFIER FIELDS id");
     Map<String, String> tableInfo = getTableInfo("iceberg_rest_table_test.identifier_foo1");
     Assertions.assertTrue(tableInfo.get("Table Properties").contains("identifier-fields=[id]"));
@@ -448,7 +467,8 @@ public class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
   // is merged
   void testSnapshot() {
     sql(
-        "CREATE TABLE iceberg_rest_table_test.snapshot_foo1 (id bigint COMMENT 'unique id',data string) using iceberg");
+        "CREATE TABLE iceberg_rest_table_test.snapshot_foo1 "
+            + "(id bigint COMMENT 'unique id',data string) using iceberg");
     sql(" INSERT INTO iceberg_rest_table_test.snapshot_foo1 VALUES (1, 'a'), (2, 'b');");
     sql(" INSERT INTO iceberg_rest_table_test.snapshot_foo1 VALUES (3, 'c'), (4, 'd');");
     printObjects(sql("desc iceberg_rest_table_test.snapshot_foo1"));
