@@ -4,6 +4,8 @@
  */
 package com.datastrato.graviton.catalog;
 
+import static com.datastrato.graviton.StringIdentifier.ID_KEY;
+
 import com.datastrato.graviton.Catalog;
 import com.datastrato.graviton.CatalogChange;
 import com.datastrato.graviton.CatalogChange.RemoveProperty;
@@ -35,12 +37,14 @@ import com.github.benmanes.caffeine.cache.Scheduler;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Streams;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
@@ -48,10 +52,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Properties;
 import java.util.ServiceLoader;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -214,8 +220,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
    */
   @Override
   public Catalog loadCatalog(NameIdentifier ident) throws NoSuchCatalogException {
-    CatalogWrapper wrapper = loadCatalogInternal(ident);
-    return wrapper.catalog;
+    return loadCatalogAndWrap(ident).catalog;
   }
 
   /**
@@ -238,45 +243,42 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
       String comment,
       Map<String, String> properties)
       throws NoSuchMetalakeException, CatalogAlreadyExistsException {
+
+    // load catalog-related configuration from catalog-specific configuration file
+    Map<String, String> catalogSpecificConfig = loadCatalogSpecificConfig(provider);
+    Map<String, String> mergedConfig = mergeConf(properties, catalogSpecificConfig);
+
+    long uid = idGenerator.nextId();
+    StringIdentifier stringId = StringIdentifier.fromId(uid);
+    CatalogEntity e =
+        new CatalogEntity.Builder()
+            .withId(uid)
+            .withName(ident.name())
+            .withNamespace(ident.namespace())
+            .withType(type)
+            .withProvider(provider)
+            .withComment(comment)
+            .withProperties(StringIdentifier.addToProperties(stringId, mergedConfig))
+            .withAuditInfo(
+                new AuditInfo.Builder()
+                    .withCreator("graviton") /* TODO. Should change to real user */
+                    .withCreateTime(Instant.now())
+                    .build())
+            .build();
+
     try {
-      CatalogEntity entity =
-          store.executeInTransaction(
-              () -> {
-                NameIdentifier metalakeIdent = NameIdentifier.of(ident.namespace().levels());
-                if (!store.exists(metalakeIdent, EntityType.METALAKE)) {
-                  LOG.warn("Metalake {} does not exist", metalakeIdent);
-                  throw new NoSuchMetalakeException(
-                      "Metalake " + metalakeIdent + " does not exist");
-                }
+      store.executeInTransaction(
+          () -> {
+            NameIdentifier metalakeIdent = NameIdentifier.of(ident.namespace().levels());
+            if (!store.exists(metalakeIdent, EntityType.METALAKE)) {
+              LOG.warn("Metalake {} does not exist", metalakeIdent);
+              throw new NoSuchMetalakeException("Metalake " + metalakeIdent + " does not exist");
+            }
 
-                long uid = idGenerator.nextId();
-                StringIdentifier stringId = StringIdentifier.fromId(uid);
-
-                CatalogEntity e =
-                    new CatalogEntity.Builder()
-                        .withId(uid)
-                        .withName(ident.name())
-                        .withNamespace(ident.namespace())
-                        .withType(type)
-                        .withProvider(provider)
-                        .withComment(comment)
-                        .withProperties(StringIdentifier.addToProperties(stringId, properties))
-                        .withAuditInfo(
-                            new AuditInfo.Builder()
-                                .withCreator("graviton") /* TODO. Should change to real user */
-                                .withCreateTime(Instant.now())
-                                .build())
-                        .build();
-
-                store.put(e, false /* overwrite */);
-                return e;
-              });
-      CatalogWrapper wrapper = catalogCache.get(ident, id -> createCatalogWrapper(entity));
-      wrapper.doWithPropertiesMeta(
-          f -> {
-            f.catalogPropertiesMetadata().validatePropertyForCreate(properties);
+            store.put(e, false /* overwrite */);
             return null;
           });
+      CatalogWrapper wrapper = catalogCache.get(ident, id -> createCatalogWrapper(e));
       return wrapper.catalog;
     } catch (EntityAlreadyExistsException e1) {
       LOG.warn("Catalog {} already exists", ident, e1);
@@ -445,14 +447,14 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
   }
 
   private CatalogWrapper createCatalogWrapper(CatalogEntity entity) {
-    Map<String, String> mergedConf =
-        mergeConf(entity.getProperties(), catalogConf(entity.name(), config));
+    Map<String, String> conf = entity.getProperties();
     String provider = entity.getProvider();
 
     IsolatedClassLoader classLoader;
     if (config.get(Configs.CATALOG_LOAD_ISOLATED)) {
-      String pkgPath = buildPkgPath(mergedConf, provider);
-      classLoader = IsolatedClassLoader.buildClassLoader(pkgPath);
+      String pkgPath = buildPkgPath(conf, provider);
+      String confPath = buildConfPath(provider);
+      classLoader = IsolatedClassLoader.buildClassLoader(Lists.newArrayList(pkgPath, confPath));
     } else {
       // This will use the current class loader, it is mainly used for test.
       classLoader =
@@ -461,7 +463,32 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
     }
 
     // Load Catalog class instance
-    BaseCatalog catalog;
+    BaseCatalog<?> catalog = createCatalogInstance(classLoader, provider);
+    catalog.withCatalogConf(conf).withCatalogEntity(entity);
+
+    CatalogWrapper wrapper = new CatalogWrapper(catalog, classLoader);
+    // Validate catalog properties and initialize the config
+    classLoader.withClassLoader(
+        cl -> {
+          Map<String, String> configWithoutId = Maps.newHashMap(conf);
+          configWithoutId.remove(ID_KEY);
+          catalog.ops().catalogPropertiesMetadata().validatePropertyForCreate(configWithoutId);
+
+          // Call wrapper.catalog.properties() to make BaseCatalog#properties in IsolatedClassLoader
+          // not null. Why we do this? Because wrapper.catalog.properties() need to be called in the
+          // IsolatedClassLoader, it needs to load the specific catalog class such as HiveCatalog or
+          // so. For simply, We will preload the value of properties and thus AppClassLoader can get
+          // the value of properties.
+          wrapper.catalog.properties();
+          return null;
+        },
+        IllegalArgumentException.class);
+
+    return wrapper;
+  }
+
+  private BaseCatalog<?> createCatalogInstance(IsolatedClassLoader classLoader, String provider) {
+    BaseCatalog<?> catalog;
     try {
       catalog =
           classLoader.withClassLoader(
@@ -483,27 +510,30 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
     if (catalog == null) {
       throw new RuntimeException("Failed to load catalog with provider: " + provider);
     }
+    return catalog;
+  }
 
-    // Initialize the catalog
-    catalog = catalog.withCatalogEntity(entity).withCatalogConf(mergedConf);
-    CatalogWrapper wrapper = new CatalogWrapper(catalog, classLoader);
-
-    // Call wrapper.catalog.properties() to make BaseCatalog#properties in IsolatedClassLoader
-    // not null. Why we do this? Because wrapper.catalog.properties() need to be called in the
-    // IsolatedClassLoader, it needs to load the specific catalog class such as HiveCatalog or so.
-    // For simply, We will preload the value of properties and thus AppClassLoader can get the
-    // value of properties.
-    try {
-      wrapper.doWithPropertiesMeta(
-          f -> {
-            wrapper.catalog.properties();
-            return null;
-          });
-    } catch (Exception e) {
-      LOG.error("Failed to load catalog '{}' properties", entity.name(), e);
-      throw new RuntimeException(e);
+  private Map<String, String> loadCatalogSpecificConfig(String provider) {
+    if ("test".equals(provider)) {
+      return Maps.newHashMap();
     }
-    return wrapper;
+
+    String catalogSpecificConfigFile = provider + ".conf";
+    Map<String, String> catalogSpecificConfig = Maps.newHashMap();
+
+    String fullPath = buildConfPath(provider) + File.separator + catalogSpecificConfigFile;
+    try (InputStream inputStream = FileUtils.openInputStream(new File(fullPath))) {
+      Properties loadProperties = new Properties();
+      loadProperties.load(inputStream);
+      loadProperties.forEach(
+          (key, value) -> catalogSpecificConfig.put(key.toString(), value.toString()));
+    } catch (Exception e) {
+      LOG.warn(
+          "Failed to load catalog specific configurations, file name: '{}'",
+          catalogSpecificConfigFile,
+          e);
+    }
+    return catalogSpecificConfig;
   }
 
   static Map<String, String> mergeConf(Map<String, String> properties, Map<String, String> conf) {
@@ -512,44 +542,45 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
     return Collections.unmodifiableMap(mergedConf);
   }
 
-  private Map<String, String> catalogConf(String name, Config config) {
-    String confPrefix = "graviton.catalog." + name + ".";
-    return config.getConfigsWithPrefix(confPrefix);
+  /**
+   * Build the config path from the specific provider. Usually, the configuration file is under the
+   * conf and conf and package are under the same directory.
+   */
+  private String buildConfPath(String provider) {
+    String gravitonHome = System.getenv("GRAVITON_HOME");
+    Preconditions.checkArgument(gravitonHome != null, "GRAVITON_HOME not set");
+    boolean testEnv = System.getenv("GRAVITON_TEST") != null;
+    if (testEnv) {
+      return String.join(
+          File.separator,
+          gravitonHome,
+          "catalogs",
+          "catalog-" + provider,
+          "build",
+          "resources",
+          "main");
+    }
+
+    return String.join(File.separator, gravitonHome, "catalogs", provider, "conf");
   }
 
   private String buildPkgPath(Map<String, String> conf, String provider) {
-    String pkg = conf.get(Catalog.PROPERTY_PACKAGE);
-
     String gravitonHome = System.getenv("GRAVITON_HOME");
     Preconditions.checkArgument(gravitonHome != null, "GRAVITON_HOME not set");
     boolean testEnv = System.getenv("GRAVITON_TEST") != null;
 
+    String pkg = conf.get(Catalog.PROPERTY_PACKAGE);
     String pkgPath;
     if (pkg != null) {
       pkgPath = pkg;
-    } else if (!testEnv) {
+    } else if (testEnv) {
+      // In test, the catalog package is under the build directory.
       pkgPath =
-          gravitonHome
-              + File.separator
-              + "catalogs"
-              + File.separator
-              + provider
-              + File.separator
-              + "libs";
+          String.join(
+              File.separator, gravitonHome, "catalogs", "catalog-" + provider, "build", "libs");
     } else {
-      pkgPath =
-          new StringBuilder()
-              .append(gravitonHome)
-              .append(File.separator)
-              .append("catalogs")
-              .append(File.separator)
-              .append("catalog-")
-              .append(provider)
-              .append(File.separator)
-              .append("build")
-              .append(File.separator)
-              .append("libs")
-              .toString();
+      // In real environment, the catalog package is under the catalog directory.
+      pkgPath = String.join(File.separator, gravitonHome, "catalogs", provider, "libs");
     }
 
     return pkgPath;
