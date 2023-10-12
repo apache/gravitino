@@ -6,7 +6,7 @@
 package com.datastrato.graviton.catalog.hive;
 
 import static com.datastrato.graviton.catalog.BaseCatalog.CATALOG_BYPASS_PREFIX;
-import static com.datastrato.graviton.catalog.hive.HiveCatalogPropertiesMeta.CATALOG_CLIENT_POOL_MAXSIZE;
+import static com.datastrato.graviton.catalog.hive.HiveCatalogPropertiesMeta.CLIENT_POOL_SIZE;
 
 import com.datastrato.graviton.Catalog;
 import com.datastrato.graviton.catalog.PropertyEntry;
@@ -20,18 +20,18 @@ class TestHiveCatalogOperations {
   @Test
   void testGetCatalogClientPoolMaxsize() {
     Map<String, String> maps = Maps.newHashMap();
-    maps.put(CATALOG_CLIENT_POOL_MAXSIZE, "10");
+    maps.put(CLIENT_POOL_SIZE, "10");
     HiveCatalogOperations op = new HiveCatalogOperations(null);
     op.initialize(maps);
     Assertions.assertEquals(10, op.getCatalogClientPoolMaxsize(maps));
 
     maps.clear();
-    maps.put(CATALOG_CLIENT_POOL_MAXSIZE + "_wrong_mark", "10");
+    maps.put(CLIENT_POOL_SIZE + "_wrong_mark", "10");
     op = new HiveCatalogOperations(null);
     op.initialize(maps);
     Assertions.assertNotEquals(10, op.getCatalogClientPoolMaxsize(maps));
 
-    maps.put(CATALOG_CLIENT_POOL_MAXSIZE, "1");
+    maps.put(CLIENT_POOL_SIZE, "1");
     op = new HiveCatalogOperations(null);
     op.initialize(maps);
     Assertions.assertEquals(1, op.getCatalogClientPoolMaxsize(maps));
@@ -69,10 +69,10 @@ class TestHiveCatalogOperations {
     Assertions.assertEquals(4, propertyEntryMap.size());
     Assertions.assertTrue(propertyEntryMap.containsKey("graviton.bypass.hive.metastore.uris"));
     Assertions.assertTrue(propertyEntryMap.containsKey(Catalog.PROPERTY_PACKAGE));
-    Assertions.assertTrue(propertyEntryMap.containsKey(CATALOG_CLIENT_POOL_MAXSIZE));
+    Assertions.assertTrue(propertyEntryMap.containsKey(CLIENT_POOL_SIZE));
 
     Assertions.assertTrue(propertyEntryMap.get("graviton.bypass.hive.metastore.uris").isRequired());
     Assertions.assertFalse(propertyEntryMap.get(Catalog.PROPERTY_PACKAGE).isRequired());
-    Assertions.assertFalse(propertyEntryMap.get(CATALOG_CLIENT_POOL_MAXSIZE).isRequired());
+    Assertions.assertFalse(propertyEntryMap.get(CLIENT_POOL_SIZE).isRequired());
   }
 }

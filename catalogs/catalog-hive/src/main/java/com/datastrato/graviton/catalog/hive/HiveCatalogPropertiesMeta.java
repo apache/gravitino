@@ -15,8 +15,8 @@ import org.apache.hadoop.hive.conf.HiveConf;
 
 public class HiveCatalogPropertiesMeta extends BaseCatalogPropertiesMetadata {
 
-  public static final String CATALOG_CLIENT_POOL_MAXSIZE = "hive.client.pool.max-size";
-  public static final int DEFAULT_CATALOG_CLIENT_POOL_MAXSIZE = 1;
+  public static final String CLIENT_POOL_SIZE = "client.pool-size";
+  public static final int DEFAULT_CLIENT_POOL_SIZE = 1;
 
   private static final Map<String, PropertyEntry<?>> HIVE_CATALOG_PROPERTY_ENTRIES =
       ImmutableMap.<String, PropertyEntry<?>>builder()
@@ -31,12 +31,12 @@ public class HiveCatalogPropertiesMeta extends BaseCatalogPropertiesMetadata {
                   false,
                   false))
           .put(
-              CATALOG_CLIENT_POOL_MAXSIZE,
+              CLIENT_POOL_SIZE,
               PropertyEntry.integerOptionalPropertyEntry(
-                  CATALOG_CLIENT_POOL_MAXSIZE,
+                  CLIENT_POOL_SIZE,
                   "The maximum number of Hive clients in the pool for graviton",
                   true,
-                  DEFAULT_CATALOG_CLIENT_POOL_MAXSIZE,
+                  DEFAULT_CLIENT_POOL_SIZE,
                   false))
           .putAll(BASIC_CATALOG_PROPERTY_ENTRIES)
           .build();

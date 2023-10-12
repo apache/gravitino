@@ -5,8 +5,8 @@
 package com.datastrato.graviton.catalog.hive;
 
 import static com.datastrato.graviton.catalog.BaseCatalog.CATALOG_BYPASS_PREFIX;
-import static com.datastrato.graviton.catalog.hive.HiveCatalogPropertiesMeta.CATALOG_CLIENT_POOL_MAXSIZE;
-import static com.datastrato.graviton.catalog.hive.HiveCatalogPropertiesMeta.DEFAULT_CATALOG_CLIENT_POOL_MAXSIZE;
+import static com.datastrato.graviton.catalog.hive.HiveCatalogPropertiesMeta.CLIENT_POOL_SIZE;
+import static com.datastrato.graviton.catalog.hive.HiveCatalogPropertiesMeta.DEFAULT_CLIENT_POOL_SIZE;
 import static com.datastrato.graviton.catalog.hive.HiveTable.SUPPORT_TABLE_TYPES;
 import static com.datastrato.graviton.catalog.hive.HiveTablePropertiesMetadata.COMMENT;
 import static com.datastrato.graviton.catalog.hive.HiveTablePropertiesMetadata.TABLE_TYPE;
@@ -111,8 +111,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
   @VisibleForTesting
   int getCatalogClientPoolMaxsize(Map<String, String> conf) {
     return Integer.parseInt(
-        conf.getOrDefault(
-            CATALOG_CLIENT_POOL_MAXSIZE, String.valueOf(DEFAULT_CATALOG_CLIENT_POOL_MAXSIZE)));
+        conf.getOrDefault(CLIENT_POOL_SIZE, String.valueOf(DEFAULT_CLIENT_POOL_SIZE)));
   }
 
   /** Closes the Hive catalog and releases the associated client pool. */
