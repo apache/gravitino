@@ -6,7 +6,7 @@
 package com.datastrato.graviton.aux;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
@@ -51,7 +51,7 @@ public class TestAuxiliaryServiceManager {
     AuxiliaryServiceManager auxServiceManager = new AuxiliaryServiceManager();
     AuxiliaryServiceManager spyAuxManager = spy(auxServiceManager);
 
-    doReturn(isolatedClassLoader).when(spyAuxManager).getIsolatedClassLoader(anyString());
+    doReturn(isolatedClassLoader).when(spyAuxManager).getIsolatedClassLoader(anyList());
     doReturn(auxService).when(spyAuxManager).loadAuxService("mock1", isolatedClassLoader);
     doReturn(auxService2).when(spyAuxManager).loadAuxService("mock2", isolatedClassLoader);
 

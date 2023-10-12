@@ -256,6 +256,8 @@ public class TestCatalogManager {
     testProperties(props, testCatalog.properties());
     Assertions.assertEquals(Catalog.Type.RELATIONAL, testCatalog.type());
 
+    Assertions.assertNotNull(catalogManager.catalogCache.getIfPresent(ident));
+
     // Test create under non-existed metalake
     NameIdentifier ident2 = NameIdentifier.of("metalake1", "test1");
     Throwable exception1 =
@@ -265,6 +267,7 @@ public class TestCatalogManager {
                 catalogManager.createCatalog(
                     ident2, Catalog.Type.RELATIONAL, provider, "comment", props));
     Assertions.assertTrue(exception1.getMessage().contains("Metalake metalake1 does not exist"));
+    Assertions.assertNull(catalogManager.catalogCache.getIfPresent(ident2));
 
     // Test create with duplicated name
     Throwable exception2 =
