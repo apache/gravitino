@@ -30,8 +30,8 @@ public class TestGravitonSchema {
 
     GravitonSchema schema = new GravitonSchema(schemaDTO);
 
-    Assertions.assertEquals(schema.name(), schemaDTO.name());
-    Assertions.assertEquals(schema.comment(), schemaDTO.comment());
-    Assertions.assertEquals(schema.properties(), schemaDTO.properties());
+    Assertions.assertEquals(schema.getName(), schemaDTO.name());
+    Assertions.assertEquals(schema.getComment(), schemaDTO.comment());
+    Assertions.assertEquals(schema.getProperties(), schemaDTO.properties());
   }
 }
