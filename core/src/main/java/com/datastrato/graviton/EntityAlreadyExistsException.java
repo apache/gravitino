@@ -33,14 +33,4 @@ public class EntityAlreadyExistsException extends RuntimeException {
   public EntityAlreadyExistsException(String message, Throwable cause) {
     super(message, cause);
   }
-
-  public static void main(String[] args) {
-    List<String> list = Lists.newArrayList();
-    list.add("a");
-    System.out.println(list);
-
-    Map<String, String> maps = Maps.newHashMap();
-    maps.put("a", "b");
-    System.out.println(maps);
-  }
 }
