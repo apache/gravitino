@@ -452,8 +452,8 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
 
     IsolatedClassLoader classLoader;
     if (config.get(Configs.CATALOG_LOAD_ISOLATED)) {
-      List<String> pkgPaths = buildPkgPaths(conf, provider);
-      classLoader = IsolatedClassLoader.buildClassLoader(pkgPaths);
+      List<String> libAndResourcePaths = buildLibAndResourcePaths(conf, provider);
+      classLoader = IsolatedClassLoader.buildClassLoader(libAndResourcePaths);
     } else {
       // This will use the current class loader, it is mainly used for test.
       classLoader =
@@ -466,8 +466,6 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
     catalog.withCatalogConf(conf).withCatalogEntity(entity);
 
     CatalogWrapper wrapper = new CatalogWrapper(catalog, classLoader);
-    // Initialize the catalog
-
     // Validate catalog properties and initialize the config
     classLoader.withClassLoader(
         cl -> {
@@ -478,9 +476,8 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
           // Call wrapper.catalog.properties() to make BaseCatalog#properties in IsolatedClassLoader
           // not null. Why we do this? Because wrapper.catalog.properties() need to be called in the
           // IsolatedClassLoader, it needs to load the specific catalog class such as HiveCatalog or
-          // so.
-          // For simply, We will preload the value of properties and thus AppClassLoader can get the
-          // value of properties.
+          // so. For simply, We will preload the value of properties and thus AppClassLoader can get
+          // the value of properties.
           wrapper.catalog.properties();
           return null;
         },
@@ -550,8 +547,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
               catalogSpecificConfigFile);
     }
 
-    try {
-      InputStream inputStream = FileUtils.openInputStream(new File(fullPath));
+    try (InputStream inputStream = FileUtils.openInputStream(new File(fullPath))) {
       Properties loadProperties = new Properties();
       loadProperties.load(inputStream);
       loadProperties.forEach(
@@ -584,7 +580,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
     return config.getConfigsWithPrefix(confPrefix);
   }
 
-  private List<String> buildPkgPaths(Map<String, String> conf, String provider) {
+  private List<String> buildLibAndResourcePaths(Map<String, String> conf, String provider) {
     String pkg = conf.get(Catalog.PROPERTY_PACKAGE);
 
     String gravitonHome = System.getenv("GRAVITON_HOME");
@@ -593,7 +589,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
 
     String pkgPath;
     if (pkg != null) {
-      return Lists.newArrayList(pkg.split(","));
+      return Lists.newArrayList(pkg);
     } else if (testEnv) {
       // In test, the catalog package is under the build directory.
       pkgPath =
