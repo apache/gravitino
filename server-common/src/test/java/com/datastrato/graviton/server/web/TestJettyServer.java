@@ -9,6 +9,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 
 import com.datastrato.graviton.Config;
+import com.datastrato.graviton.rest.RESTUtils;
+import java.io.IOException;
 import javax.servlet.Filter;
 import javax.servlet.Servlet;
 import org.junit.jupiter.api.AfterEach;
@@ -32,8 +34,9 @@ public class TestJettyServer {
   }
 
   @Test
-  public void testInitialize() {
+  public void testInitialize() throws IOException {
     Config config = new Config(false) {};
+    config.set(JettyServerConfig.WEBSERVER_HTTP_PORT, RESTUtils.findAvailablePort(5000, 6000));
     JettyServerConfig serverConfig = JettyServerConfig.fromConfig(config);
     jettyServer.initialize(serverConfig, "test");
 
@@ -41,8 +44,9 @@ public class TestJettyServer {
   }
 
   @Test
-  public void testStartAndStop() throws RuntimeException {
+  public void testStartAndStop() throws RuntimeException, IOException {
     Config config = new Config(false) {};
+    config.set(JettyServerConfig.WEBSERVER_HTTP_PORT, RESTUtils.findAvailablePort(5000, 6000));
     JettyServerConfig serverConfig = JettyServerConfig.fromConfig(config);
     jettyServer.initialize(serverConfig, "test");
     jettyServer.start();
@@ -51,8 +55,9 @@ public class TestJettyServer {
   }
 
   @Test
-  public void testAddServletAndFilter() throws RuntimeException {
+  public void testAddServletAndFilter() throws RuntimeException, IOException {
     Config config = new Config(false) {};
+    config.set(JettyServerConfig.WEBSERVER_HTTP_PORT, RESTUtils.findAvailablePort(5000, 6000));
     JettyServerConfig serverConfig = JettyServerConfig.fromConfig(config);
     jettyServer.initialize(serverConfig, "test");
     jettyServer.start();

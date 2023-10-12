@@ -4,8 +4,6 @@
  */
 package com.datastrato.graviton.catalog.lakehouse.iceberg.converter;
 
-import static io.substrait.expression.ExpressionCreator.i32;
-
 import com.datastrato.graviton.rel.transforms.Transform;
 import com.datastrato.graviton.rel.transforms.Transforms;
 import com.google.common.annotations.VisibleForTesting;
@@ -38,17 +36,12 @@ public class FromIcebergPartitionSpec implements PartitionSpecVisitor<Transform>
 
   @Override
   public Transform bucket(String sourceName, int sourceId, int numBuckets) {
-    Transforms.LiteralReference bucketNum = Transforms.literal(i32(false, numBuckets));
-    Transforms.NamedReference field = Transforms.field(new String[] {idToName.get(sourceId)});
-    // bucket(fieldName, bucketNum)
-    return Transforms.function("bucket", new Transform[] {field, bucketNum});
+    return Transforms.bucket(new String[] {idToName.get(sourceId)}, numBuckets);
   }
 
   @Override
   public Transform truncate(String sourceName, int sourceId, int width) {
-    Transforms.LiteralReference bucketNum = Transforms.literal(i32(false, width));
-    Transforms.NamedReference field = Transforms.field(new String[] {idToName.get(sourceId)});
-    return Transforms.function("truncate", new Transform[] {field, bucketNum});
+    return Transforms.truncate(new String[] {idToName.get(sourceId)}, width);
   }
 
   @Override

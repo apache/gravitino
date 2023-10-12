@@ -7,6 +7,8 @@ package com.datastrato.graviton.dto.rel;
 import static com.datastrato.graviton.dto.rel.ExpressionPartitionDTO.ExpressionType.FIELD;
 import static com.datastrato.graviton.dto.rel.ExpressionPartitionDTO.ExpressionType.FUNCTION;
 import static com.datastrato.graviton.dto.rel.ExpressionPartitionDTO.ExpressionType.LITERAL;
+import static com.datastrato.graviton.rel.transforms.Transforms.NAME_OF_BUCKET;
+import static com.datastrato.graviton.rel.transforms.Transforms.NAME_OF_TRUNCATE;
 
 import com.datastrato.graviton.json.JsonUtils;
 import com.fasterxml.jackson.annotation.JsonCreator;
@@ -17,6 +19,7 @@ import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.google.common.base.Preconditions;
 import io.substrait.type.Type;
+import io.substrait.type.TypeCreator;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import org.apache.logging.log4j.util.Strings;
@@ -46,7 +49,7 @@ public class ExpressionPartitionDTO implements Partition {
     switch (expression.expressionType()) {
       case FIELD:
         FieldExpression fieldExpression = (FieldExpression) expression;
-        PartitionUtils.validateFieldExist(columns, fieldExpression.fieldName);
+        PartitionUtils.validateFieldExistence(columns, fieldExpression.fieldName);
         break;
       case FUNCTION:
         validateExpression(columns, expression);
@@ -72,6 +75,38 @@ public class ExpressionPartitionDTO implements Partition {
     public ExpressionPartitionDTO build() {
       return new ExpressionPartitionDTO(Strategy.EXPRESSION.name(), expression);
     }
+  }
+
+  public static ExpressionPartitionDTO bucket(String[] fieldName, int numBuckets) {
+    return new ExpressionPartitionDTO.Builder(
+            new FunctionExpression.Builder()
+                .withFuncName(NAME_OF_BUCKET)
+                .withArgs(
+                    new Expression[] {
+                      new FieldExpression.Builder().withFieldName(fieldName).build(),
+                      new LiteralExpression.Builder()
+                          .withType(TypeCreator.REQUIRED.I32)
+                          .withValue(String.valueOf(numBuckets))
+                          .build()
+                    })
+                .build())
+        .build();
+  }
+
+  public static ExpressionPartitionDTO truncate(String[] fieldName, int width) {
+    return new ExpressionPartitionDTO.Builder(
+            new FunctionExpression.Builder()
+                .withFuncName(NAME_OF_TRUNCATE)
+                .withArgs(
+                    new Expression[] {
+                      new FieldExpression.Builder().withFieldName(fieldName).build(),
+                      new LiteralExpression.Builder()
+                          .withType(TypeCreator.REQUIRED.I32)
+                          .withValue(String.valueOf(width))
+                          .build()
+                    })
+                .build())
+        .build();
   }
 
   enum ExpressionType {

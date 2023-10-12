@@ -346,7 +346,7 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
   }
 
   /**
-   * Not supported in this implementation. Throws UnsupportedOperationException.
+   * Apply the {@link TableChange change} to an existing Iceberg table.
    *
    * @param tableIdent The identifier of the table to alter.
    * @param changes The changes to apply to the table.

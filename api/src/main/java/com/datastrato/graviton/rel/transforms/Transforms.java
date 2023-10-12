@@ -4,6 +4,8 @@
  */
 package com.datastrato.graviton.rel.transforms;
 
+import static io.substrait.expression.ExpressionCreator.i32;
+
 import com.datastrato.graviton.rel.Column;
 import com.google.common.annotations.VisibleForTesting;
 import io.substrait.expression.Expression;
@@ -17,6 +19,8 @@ public class Transforms {
   public static final String NAME_OF_MONTH = "month";
   public static final String NAME_OF_DAY = "day";
   public static final String NAME_OF_HOUR = "hour";
+  public static final String NAME_OF_TRUNCATE = "truncate";
+  public static final String NAME_OF_BUCKET = "bucket";
   public static final String NAME_OF_LIST = "list";
   public static final String NAME_OF_RANGE = "range";
 
@@ -78,6 +82,32 @@ public class Transforms {
    */
   public static FunctionTransform hour(String[] fieldName) {
     return function(NAME_OF_HOUR, new Transform[] {field(fieldName)});
+  }
+
+  /**
+   * Creates a bucket partitioning by the given field name and number of buckets.
+   *
+   * @param fieldName The field name to partition by.
+   * @param numBuckets The number of buckets.
+   * @return The bucket partitioning.
+   */
+  public static FunctionTransform bucket(String[] fieldName, int numBuckets) {
+    Transforms.LiteralReference bucketNum = Transforms.literal(i32(false, numBuckets));
+    Transforms.NamedReference field = Transforms.field(fieldName);
+    return function(NAME_OF_BUCKET, new Transform[] {field, bucketNum});
+  }
+
+  /**
+   * Creates a truncate partitioning by the given field name and width.
+   *
+   * @param fieldName The field name to partition by.
+   * @param width The width.
+   * @return The truncate partitioning.
+   */
+  public static FunctionTransform truncate(String[] fieldName, int width) {
+    Transforms.LiteralReference bucketNum = Transforms.literal(i32(false, width));
+    Transforms.NamedReference field = Transforms.field(fieldName);
+    return function(NAME_OF_TRUNCATE, new Transform[] {field, bucketNum});
   }
 
   /**
