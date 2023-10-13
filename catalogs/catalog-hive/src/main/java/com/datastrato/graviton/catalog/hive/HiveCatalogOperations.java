@@ -7,7 +7,7 @@ package com.datastrato.graviton.catalog.hive;
 import static com.datastrato.graviton.catalog.BaseCatalog.CATALOG_BYPASS_PREFIX;
 import static com.datastrato.graviton.catalog.hive.HiveCatalogPropertiesMeta.CLIENT_POOL_SIZE;
 import static com.datastrato.graviton.catalog.hive.HiveCatalogPropertiesMeta.DEFAULT_CLIENT_POOL_SIZE;
-import static com.datastrato.graviton.catalog.hive.HiveCatalogPropertiesMeta.METASTORE_URL;
+import static com.datastrato.graviton.catalog.hive.HiveCatalogPropertiesMeta.METASTORE_URLS;
 import static com.datastrato.graviton.catalog.hive.HiveTable.SUPPORT_TABLE_TYPES;
 import static com.datastrato.graviton.catalog.hive.HiveTablePropertiesMetadata.COMMENT;
 import static com.datastrato.graviton.catalog.hive.HiveTablePropertiesMetadata.TABLE_TYPE;
@@ -80,7 +80,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
   // will only need to set the configuration 'METASTORE_URL' in Graviton and Graviton will change
   // it to `METASTOREURIS` automatically and pass it to Hive.
   public static final Map<String, String> GRAVITON_CONFIG_TO_HIVE =
-      ImmutableMap.of(METASTORE_URL, ConfVars.METASTOREURIS.varname);
+      ImmutableMap.of(METASTORE_URLS, ConfVars.METASTOREURIS.varname);
 
   /**
    * Constructs a new instance of HiveCatalogOperations.

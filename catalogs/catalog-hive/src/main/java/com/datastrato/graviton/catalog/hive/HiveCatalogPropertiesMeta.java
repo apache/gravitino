@@ -15,14 +15,14 @@ public class HiveCatalogPropertiesMeta extends BaseCatalogPropertiesMetadata {
   public static final String CLIENT_POOL_SIZE = "client.pool-size";
   public static final int DEFAULT_CLIENT_POOL_SIZE = 1;
 
-  public static final String METASTORE_URL = "metastore.uri";
+  public static final String METASTORE_URLS = "metastore.uris";
 
   private static final Map<String, PropertyEntry<?>> HIVE_CATALOG_PROPERTY_ENTRIES =
       ImmutableMap.<String, PropertyEntry<?>>builder()
           .put(
-              METASTORE_URL,
+              METASTORE_URLS,
               PropertyEntry.stringPropertyEntry(
-                  METASTORE_URL, "The Hive metastore URIs", true, true, null, false, false))
+                  METASTORE_URLS, "The Hive metastore URIs", true, true, null, false, false))
           .put(
               CLIENT_POOL_SIZE,
               PropertyEntry.integerOptionalPropertyEntry(

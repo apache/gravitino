@@ -7,7 +7,7 @@ package com.datastrato.graviton.catalog.hive;
 
 import static com.datastrato.graviton.catalog.BaseCatalog.CATALOG_BYPASS_PREFIX;
 import static com.datastrato.graviton.catalog.hive.HiveCatalogPropertiesMeta.CLIENT_POOL_SIZE;
-import static com.datastrato.graviton.catalog.hive.HiveCatalogPropertiesMeta.METASTORE_URL;
+import static com.datastrato.graviton.catalog.hive.HiveCatalogPropertiesMeta.METASTORE_URLS;
 
 import com.datastrato.graviton.Catalog;
 import com.datastrato.graviton.catalog.PropertyEntry;
@@ -62,7 +62,7 @@ class TestHiveCatalogOperations {
 
     // Test If Graviton properties can overwrite bypass configuration
     properties.clear();
-    properties.put(METASTORE_URL, "hive_url1");
+    properties.put(METASTORE_URLS, "hive_url1");
     hiveCatalogOperations.initialize(properties);
     v = hiveCatalogOperations.hiveConf.get(ConfVars.METASTOREURIS.varname);
     Assertions.assertEquals("hive_url1", v);
@@ -76,11 +76,11 @@ class TestHiveCatalogOperations {
     Map<String, PropertyEntry<?>> propertyEntryMap =
         hiveCatalogOperations.catalogPropertiesMetadata().propertyEntries();
     Assertions.assertEquals(4, propertyEntryMap.size());
-    Assertions.assertTrue(propertyEntryMap.containsKey(METASTORE_URL));
+    Assertions.assertTrue(propertyEntryMap.containsKey(METASTORE_URLS));
     Assertions.assertTrue(propertyEntryMap.containsKey(Catalog.PROPERTY_PACKAGE));
     Assertions.assertTrue(propertyEntryMap.containsKey(CLIENT_POOL_SIZE));
 
-    Assertions.assertTrue(propertyEntryMap.get(METASTORE_URL).isRequired());
+    Assertions.assertTrue(propertyEntryMap.get(METASTORE_URLS).isRequired());
     Assertions.assertFalse(propertyEntryMap.get(Catalog.PROPERTY_PACKAGE).isRequired());
     Assertions.assertFalse(propertyEntryMap.get(CLIENT_POOL_SIZE).isRequired());
   }
