@@ -35,6 +35,8 @@ import com.datastrato.graviton.rel.transforms.Transforms;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
+import io.substrait.function.NullableType;
+import io.substrait.type.Type;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
@@ -446,6 +448,8 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
         "Hive partition only supports identity transform");
     validateDistributionAndSort(distribution, sortOrders);
 
+    Arrays.stream(columns).forEach(c -> validateColumnType(c.dataType()));
+
     TableType tableType = (TableType) tablePropertiesMetadata.getOrDefault(properties, TABLE_TYPE);
     Preconditions.checkArgument(
         SUPPORT_TABLE_TYPES.contains(tableType.name()),
@@ -537,7 +541,9 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
           List<FieldSchema> cols = sd.getCols();
 
           if (change instanceof TableChange.AddColumn) {
-            doAddColumn(cols, (TableChange.AddColumn) change);
+            TableChange.AddColumn addColumn = (TableChange.AddColumn) change;
+            validateColumnType(addColumn.getDataType());
+            doAddColumn(cols, addColumn);
 
           } else if (change instanceof TableChange.DeleteColumn) {
             doDeleteColumn(cols, (TableChange.DeleteColumn) change);
@@ -552,7 +558,9 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
             doUpdateColumnPosition(cols, (TableChange.UpdateColumnPosition) change);
 
           } else if (change instanceof TableChange.UpdateColumnType) {
-            doUpdateColumnType(cols, (TableChange.UpdateColumnType) change);
+            TableChange.UpdateColumnType updateColumnType = (TableChange.UpdateColumnType) change;
+            validateColumnType(updateColumnType.getNewDataType());
+            doUpdateColumnType(cols, updateColumnType);
 
           } else {
             throw new IllegalArgumentException(
@@ -595,6 +603,15 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
+  }
+
+  private void validateColumnType(Type... types) {
+    // The NOT NULL constraint for column is supported since Hive3.0, see
+    // https://issues.apache.org/jira/browse/HIVE-16575
+    Preconditions.checkArgument(
+        Arrays.stream(types).allMatch(NullableType::nullable),
+        "The NOT NULL constraint for column is supported since Hive3.0, "
+            + "but the current catalog only supports Hive2.x");
   }
 
   private int columnPosition(List<FieldSchema> columns, TableChange.ColumnPosition position) {
@@ -650,7 +667,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     parameters.remove(change.getProperty());
   }
 
-  void doAddColumn(List<FieldSchema> cols, TableChange.AddColumn change) {
+  private void doAddColumn(List<FieldSchema> cols, TableChange.AddColumn change) {
     // add to the end by default
     int targetPosition =
         change.getPosition() == null ? cols.size() : columnPosition(cols, change.getPosition());
