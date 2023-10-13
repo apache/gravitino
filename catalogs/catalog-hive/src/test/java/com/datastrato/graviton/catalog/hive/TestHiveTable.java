@@ -215,7 +215,8 @@ public class TestHiveTable extends MiniHiveMetastoreService {
         exception
             .getMessage()
             .contains(
-                "The NOT NULL constraint for column is supported since Hive3.0, but the current catalog only supports Hive2.x"));
+                "The NOT NULL constraint for column is only supported since Hive 3.0, "
+                    + "but the current Graviton Hive catalog only supports Hive 2.x"));
   }
 
   @Test
@@ -448,10 +449,12 @@ public class TestHiveTable extends MiniHiveMetastoreService {
                     .alterTable(
                         tableIdentifier,
                         TableChange.addColumn(new String[] {"col_1"}, TypeCreator.REQUIRED.I8)));
-    Assertions.assertEquals(
-        exception.getMessage(),
-        "The NOT NULL constraint for column is supported since Hive3.0, "
-            + "but the current catalog only supports Hive2.x");
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains(
+                "The NOT NULL constraint for column is only supported since Hive 3.0, "
+                    + "but the current Graviton Hive catalog only supports Hive 2.x"));
 
     exception =
         Assertions.assertThrows(
@@ -463,10 +466,12 @@ public class TestHiveTable extends MiniHiveMetastoreService {
                         tableIdentifier,
                         TableChange.updateColumnType(
                             new String[] {"col_1"}, TypeCreator.REQUIRED.I8)));
-    Assertions.assertEquals(
-        exception.getMessage(),
-        "The NOT NULL constraint for column is supported since Hive3.0, "
-            + "but the current catalog only supports Hive2.x");
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains(
+                "The NOT NULL constraint for column is only supported since Hive 3.0, "
+                    + "but the current Graviton Hive catalog only supports Hive 2.x"));
 
     // test alter
     hiveCatalog
