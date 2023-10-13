@@ -4,7 +4,7 @@
  */
 package com.datastrato.graviton.catalog.hive;
 
-import static com.datastrato.graviton.catalog.BaseCatalog.CATALOG_BYPASS_PREFIX;
+import static com.datastrato.graviton.catalog.hive.HiveCatalogPropertiesMeta.METASTORE_URL;
 
 import com.datastrato.graviton.Namespace;
 import com.datastrato.graviton.catalog.hive.miniHMS.MiniHiveMetastoreService;
@@ -14,7 +14,6 @@ import com.google.common.collect.Maps;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
-import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.thrift.TException;
 import org.junit.jupiter.api.Assertions;
@@ -71,7 +70,7 @@ public class TestHiveCatalog extends MiniHiveMetastoreService {
       Assertions.assertDoesNotThrow(
           () -> {
             Map<String, String> map = Maps.newHashMap();
-            map.put(CATALOG_BYPASS_PREFIX + HiveConf.ConfVars.METASTOREURIS.varname, "/tmp");
+            map.put(METASTORE_URL, "/tmp");
             ops.catalogPropertiesMetadata().validatePropertyForCreate(map);
           });
 
@@ -84,9 +83,7 @@ public class TestHiveCatalog extends MiniHiveMetastoreService {
           throwable
               .getMessage()
               .contains(
-                  String.format(
-                      "Properties are required and must be set: [%s]",
-                      CATALOG_BYPASS_PREFIX + HiveConf.ConfVars.METASTOREURIS.varname)));
+                  String.format("Properties are required and must be set: [%s]", METASTORE_URL)));
     }
   }
 }

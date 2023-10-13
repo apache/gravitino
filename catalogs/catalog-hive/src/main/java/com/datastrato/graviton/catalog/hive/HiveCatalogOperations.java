@@ -7,6 +7,7 @@ package com.datastrato.graviton.catalog.hive;
 import static com.datastrato.graviton.catalog.BaseCatalog.CATALOG_BYPASS_PREFIX;
 import static com.datastrato.graviton.catalog.hive.HiveCatalogPropertiesMeta.CLIENT_POOL_SIZE;
 import static com.datastrato.graviton.catalog.hive.HiveCatalogPropertiesMeta.DEFAULT_CLIENT_POOL_SIZE;
+import static com.datastrato.graviton.catalog.hive.HiveCatalogPropertiesMeta.METASTORE_URL;
 import static com.datastrato.graviton.catalog.hive.HiveTable.SUPPORT_TABLE_TYPES;
 import static com.datastrato.graviton.catalog.hive.HiveTablePropertiesMetadata.COMMENT;
 import static com.datastrato.graviton.catalog.hive.HiveTablePropertiesMetadata.TABLE_TYPE;
@@ -36,6 +37,7 @@ import com.datastrato.graviton.rel.transforms.Transform;
 import com.datastrato.graviton.rel.transforms.Transforms;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
@@ -45,6 +47,7 @@ import java.util.stream.Collectors;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.AlreadyExistsException;
 import org.apache.hadoop.hive.metastore.api.Database;
@@ -73,6 +76,12 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
   private HiveCatalogPropertiesMeta catalogPropertiesMetadata;
 
+  // Map that maintain the mapping of keys in Graviton to that in Hive, for example, users
+  // will only need to set the configuration 'METASTORE_URL' in Graviton and Graviton will change
+  // it to `METASTOREURIS` automatically and pass it to Hive.
+  public static final Map<String, String> GRAVITON_CONFIG_TO_HIVE =
+      ImmutableMap.of(METASTORE_URL, ConfVars.METASTOREURIS.varname);
+
   /**
    * Constructs a new instance of HiveCatalogOperations.
    *
@@ -100,6 +109,10 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
           if (key.startsWith(CATALOG_BYPASS_PREFIX)) {
             // Trim bypass prefix and pass it to hive conf
             hiveConf.set(key.substring(CATALOG_BYPASS_PREFIX.length()), value);
+          } else if (GRAVITON_CONFIG_TO_HIVE.containsKey(key)) {
+            hiveConf.set(GRAVITON_CONFIG_TO_HIVE.get(key), value);
+          } else {
+            hiveConf.set(key, value);
           }
         });
 

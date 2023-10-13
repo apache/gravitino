@@ -12,5 +12,10 @@
     <name>mapreduce.job.reduces</name>
     <value>10</value>
   </property>
+
+  <property>
+    <name>hive.metastore.uris</name>
+    <value>hive_url2</value>
+  </property>
 </configuration>
 

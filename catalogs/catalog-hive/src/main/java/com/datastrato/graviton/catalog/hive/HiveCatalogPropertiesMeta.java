@@ -5,31 +5,24 @@
 
 package com.datastrato.graviton.catalog.hive;
 
-import static com.datastrato.graviton.catalog.BaseCatalog.CATALOG_BYPASS_PREFIX;
-
 import com.datastrato.graviton.catalog.BaseCatalogPropertiesMetadata;
 import com.datastrato.graviton.catalog.PropertyEntry;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
-import org.apache.hadoop.hive.conf.HiveConf;
 
 public class HiveCatalogPropertiesMeta extends BaseCatalogPropertiesMetadata {
 
   public static final String CLIENT_POOL_SIZE = "client.pool-size";
   public static final int DEFAULT_CLIENT_POOL_SIZE = 1;
 
+  public static final String METASTORE_URL = "metastore.uri";
+
   private static final Map<String, PropertyEntry<?>> HIVE_CATALOG_PROPERTY_ENTRIES =
       ImmutableMap.<String, PropertyEntry<?>>builder()
           .put(
-              CATALOG_BYPASS_PREFIX + HiveConf.ConfVars.METASTOREURIS.varname,
+              METASTORE_URL,
               PropertyEntry.stringPropertyEntry(
-                  CATALOG_BYPASS_PREFIX + HiveConf.ConfVars.METASTOREURIS.varname,
-                  "The Hive metastore URIs",
-                  true,
-                  true,
-                  null,
-                  false,
-                  false))
+                  METASTORE_URL, "The Hive metastore URIs", true, true, null, false, false))
           .put(
               CLIENT_POOL_SIZE,
               PropertyEntry.integerOptionalPropertyEntry(

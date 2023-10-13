@@ -7,11 +7,13 @@ package com.datastrato.graviton.catalog.hive;
 
 import static com.datastrato.graviton.catalog.BaseCatalog.CATALOG_BYPASS_PREFIX;
 import static com.datastrato.graviton.catalog.hive.HiveCatalogPropertiesMeta.CLIENT_POOL_SIZE;
+import static com.datastrato.graviton.catalog.hive.HiveCatalogPropertiesMeta.METASTORE_URL;
 
 import com.datastrato.graviton.Catalog;
 import com.datastrato.graviton.catalog.PropertyEntry;
 import com.google.common.collect.Maps;
 import java.util.Map;
+import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -51,12 +53,19 @@ class TestHiveCatalogOperations {
     v = hiveCatalogOperations.hiveConf.get("mapreduce.job.reduces");
     Assertions.assertEquals("20", v);
 
-    // Test If user properties can override the value in hive-site.xml
+    // Test If user properties can overwrite the value in hive-site.xml
     properties.clear();
     properties.put("mapreduce.job.reduces", "30");
     hiveCatalogOperations.initialize(properties);
     v = hiveCatalogOperations.hiveConf.get("mapreduce.job.reduces");
     Assertions.assertEquals("30", v);
+
+    // Test If Graviton properties can overwrite bypass configuration
+    properties.clear();
+    properties.put(METASTORE_URL, "hive_url1");
+    hiveCatalogOperations.initialize(properties);
+    v = hiveCatalogOperations.hiveConf.get(ConfVars.METASTOREURIS.varname);
+    Assertions.assertEquals("hive_url1", v);
   }
 
   @Test
@@ -67,11 +76,11 @@ class TestHiveCatalogOperations {
     Map<String, PropertyEntry<?>> propertyEntryMap =
         hiveCatalogOperations.catalogPropertiesMetadata().propertyEntries();
     Assertions.assertEquals(4, propertyEntryMap.size());
-    Assertions.assertTrue(propertyEntryMap.containsKey("graviton.bypass.hive.metastore.uris"));
+    Assertions.assertTrue(propertyEntryMap.containsKey(METASTORE_URL));
     Assertions.assertTrue(propertyEntryMap.containsKey(Catalog.PROPERTY_PACKAGE));
     Assertions.assertTrue(propertyEntryMap.containsKey(CLIENT_POOL_SIZE));
 
-    Assertions.assertTrue(propertyEntryMap.get("graviton.bypass.hive.metastore.uris").isRequired());
+    Assertions.assertTrue(propertyEntryMap.get(METASTORE_URL).isRequired());
     Assertions.assertFalse(propertyEntryMap.get(Catalog.PROPERTY_PACKAGE).isRequired());
     Assertions.assertFalse(propertyEntryMap.get(CLIENT_POOL_SIZE).isRequired());
   }
