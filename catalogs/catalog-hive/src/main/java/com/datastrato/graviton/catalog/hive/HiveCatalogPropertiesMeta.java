@@ -21,8 +21,8 @@ public class HiveCatalogPropertiesMeta extends BaseCatalogPropertiesMetadata {
       ImmutableMap.<String, PropertyEntry<?>>builder()
           .put(
               METASTORE_URIS,
-              PropertyEntry.stringPropertyEntry(
-                  METASTORE_URIS, "The Hive metastore URIs", true, true, null, false, false))
+              PropertyEntry.stringRequiredPropertyEntry(
+                  METASTORE_URIS, "The Hive metastore URIs", true, false))
           .put(
               CLIENT_POOL_SIZE,
               PropertyEntry.integerOptionalPropertyEntry(
@@ -36,10 +36,9 @@ public class HiveCatalogPropertiesMeta extends BaseCatalogPropertiesMetadata {
 
   @Override
   protected Map<String, PropertyEntry<?>> specificPropertyEntries() {
-    // Hive catalog only needs to specify the metastore URIs, maybe we need to add more by
-    // referring to the trino catalog.
+    // Currently, Hive catalog only needs to specify the metastore URIs.
     // TODO(yuqi), we can add more properties like username for metastore
-    //  (kerberos authentication) when we finish refactor properties framework.
+    //  (kerberos authentication) later.
     return HIVE_CATALOG_PROPERTY_ENTRIES;
   }
 }

@@ -242,11 +242,6 @@ public final class PropertyEntry<T> {
     return integerPropertyEntry(name, description, false, immutable, defaultValue, hidden, false);
   }
 
-  public static PropertyEntry<Integer> integerRequiredPropertyEntry(
-      String name, String description, boolean immutable, boolean hidden) {
-    return integerPropertyEntry(name, description, true, immutable, null, hidden, false);
-  }
-
   public static PropertyEntry<String> stringImmutablePropertyEntry(
       String name,
       String description,
