@@ -13,6 +13,7 @@ import com.datastrato.graviton.Catalog;
 import com.datastrato.graviton.catalog.PropertyEntry;
 import com.google.common.collect.Maps;
 import java.util.Map;
+import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -79,11 +80,14 @@ class TestHiveCatalogOperations {
     maps.put("c.d", "v3");
     maps.put(CATALOG_BYPASS_PREFIX + "c.d", "v3");
     maps.put("e.f", "v5");
+
+    maps.put(METASTORE_URIS, "url1");
+    maps.put(ConfVars.METASTOREURIS.varname, "url2");
+    maps.put(CATALOG_BYPASS_PREFIX + ConfVars.METASTOREURIS.varname, "url3");
     HiveCatalogOperations op = new HiveCatalogOperations(null);
     op.initialize(maps);
 
-    Assertions.assertEquals("v1", op.hiveConf.get("a.b"));
+    Assertions.assertEquals("v2", op.hiveConf.get("a.b"));
     Assertions.assertEquals("v3", op.hiveConf.get("c.d"));
-    Assertions.assertEquals("v5", op.hiveConf.get("e.f"));
   }
 }

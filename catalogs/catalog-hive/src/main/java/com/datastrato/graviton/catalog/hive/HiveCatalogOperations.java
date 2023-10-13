@@ -103,29 +103,38 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     this.tablePropertiesMetadata = new HiveTablePropertiesMetadata();
     this.catalogPropertiesMetadata = new HiveCatalogPropertiesMeta();
 
-    Map<String, String> allConfig = Maps.newHashMap();
+    // Key format like graviton.bypass.a.b
+    Map<String, String> byPassConfig = Maps.newHashMap();
+    // Hold keys that lie in GRAVITON_CONFIG_TO_HIVE
+    Map<String, String> gravitonConfig = Maps.newHashMap();
+    // Random key name as user like.
+    Map<String, String> userConfig = Maps.newHashMap();
 
     // Save bypass configuration first so that user configuration can overwrite it.
     conf.forEach(
         (key, value) -> {
           if (key.startsWith(CATALOG_BYPASS_PREFIX)) {
             // Trim bypass prefix and pass it to hive conf
-            allConfig.put(key.substring(CATALOG_BYPASS_PREFIX.length()), value);
-          }
-        });
-
-    // Save user properties
-    conf.forEach(
-        (key, value) -> {
-          if (GRAVITON_CONFIG_TO_HIVE.containsKey(key)) {
-            allConfig.put(GRAVITON_CONFIG_TO_HIVE.get(key), value);
-          } else if (!key.startsWith(CATALOG_BYPASS_PREFIX)) {
-            allConfig.put(key, value);
+            byPassConfig.put(key.substring(CATALOG_BYPASS_PREFIX.length()), value);
+          } else if (GRAVITON_CONFIG_TO_HIVE.containsKey(key)) {
+            gravitonConfig.put(GRAVITON_CONFIG_TO_HIVE.get(key), value);
+          } else {
+            // Overwrite bypass configs.
+            if (byPassConfig.containsKey(key)) {
+              byPassConfig.put(key, value);
+            } else if (gravitonConfig.containsKey(key)) {
+              // Do nothing, as keys in GRAVITON_CONFIG_TO_HIVE have higher priority
+            } else {
+              userConfig.put(key, value);
+            }
           }
         });
 
     Configuration hadoopConf = new Configuration();
-    allConfig.forEach(hadoopConf::set);
+    // Set byPass first to make graviton config overwrite it, only keys in byPassConfig
+    // and gravitonConfig will be passed to Hive config, and gravitonConfig has higher priority
+    byPassConfig.forEach(hadoopConf::set);
+    gravitonConfig.forEach(hadoopConf::set);
     hiveConf = new HiveConf(hadoopConf, HiveCatalogOperations.class);
 
     this.clientPool = new HiveClientPool(getClientPoolSize(conf), hiveConf);

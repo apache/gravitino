@@ -18,6 +18,8 @@
  */
 package com.datastrato.graviton.catalog.hive.miniHMS;
 
+import static com.datastrato.graviton.catalog.BaseCatalog.CATALOG_BYPASS_PREFIX;
+import static com.datastrato.graviton.catalog.hive.HiveCatalogPropertiesMeta.METASTORE_URIS;
 import static java.nio.file.Files.createTempDirectory;
 import static java.nio.file.attribute.PosixFilePermissions.asFileAttribute;
 import static java.nio.file.attribute.PosixFilePermissions.fromString;
@@ -274,13 +276,20 @@ public class MiniHiveMetastore {
 
   private void initConf(HiveConf conf, int port) {
     conf.set(HiveConf.ConfVars.METASTOREURIS.varname, "thrift://localhost:" + port);
+    conf.set(METASTORE_URIS, "thrift://localhost:" + port);
     conf.set(
-        HiveConf.ConfVars.METASTOREWAREHOUSE.varname, "file:" + HIVE_LOCAL_DIR.getAbsolutePath());
-    conf.set(HiveConf.ConfVars.METASTORE_TRY_DIRECT_SQL.varname, "false");
+        CATALOG_BYPASS_PREFIX + HiveConf.ConfVars.METASTOREWAREHOUSE.varname,
+        "file:" + HIVE_LOCAL_DIR.getAbsolutePath());
+    conf.set(CATALOG_BYPASS_PREFIX + HiveConf.ConfVars.METASTORE_TRY_DIRECT_SQL.varname, "false");
+    conf.set(
+        CATALOG_BYPASS_PREFIX
+            + HiveConf.ConfVars.METASTORE_DISALLOW_INCOMPATIBLE_COL_TYPE_CHANGES.varname,
+        "false");
     conf.set(HiveConf.ConfVars.METASTORE_DISALLOW_INCOMPATIBLE_COL_TYPE_CHANGES.varname, "false");
-    conf.set("iceberg.hive.client-pool-size", "2");
+    conf.set(CATALOG_BYPASS_PREFIX + "iceberg.hive.client-pool-size", "2");
     // Setting this to avoid thrift exception during running Iceberg tests outside Iceberg.
     conf.set(
-        HiveConf.ConfVars.HIVE_IN_TEST.varname, HiveConf.ConfVars.HIVE_IN_TEST.getDefaultValue());
+        CATALOG_BYPASS_PREFIX + HiveConf.ConfVars.HIVE_IN_TEST.varname,
+        HiveConf.ConfVars.HIVE_IN_TEST.getDefaultValue());
   }
 }
