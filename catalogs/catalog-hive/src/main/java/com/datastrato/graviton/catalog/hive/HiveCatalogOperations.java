@@ -76,7 +76,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
   private HiveCatalogPropertiesMeta catalogPropertiesMetadata;
 
-  // Map that maintain the mapping of keys in Graviton to that in Hive, for example, users
+  // Map that maintains the mapping of keys in Graviton to that in Hive, for example, users
   // will only need to set the configuration 'METASTORE_URL' in Graviton and Graviton will change
   // it to `METASTOREURIS` automatically and pass it to Hive.
   public static final Map<String, String> GRAVITON_CONFIG_TO_HIVE =
