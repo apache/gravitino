@@ -123,7 +123,7 @@ public class TestCatalogManager {
     Map<String, String> props3 =
         ImmutableMap.<String, String>builder()
             .put("hive", "hive")
-            .put("hive.metastore.uris", "") /* Should we allow blank string value? */
+            .put("hive.metastore.uris", "")
             .put("hive.metastore.sasl.enabled", "true")
             .put("hive.metastore.kerberos.principal", "mock_principal")
             .put("hive.metastore.kerberos.keytab.file", "mock_keytab")

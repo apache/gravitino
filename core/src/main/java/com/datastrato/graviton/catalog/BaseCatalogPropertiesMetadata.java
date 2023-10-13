@@ -16,11 +16,10 @@ public abstract class BaseCatalogPropertiesMetadata extends BasePropertiesMetada
   protected static final Map<String, PropertyEntry<?>> BASIC_CATALOG_PROPERTY_ENTRIES =
       Maps.uniqueIndex(
           ImmutableList.of(
-              PropertyEntry.stringPropertyEntry(
+              PropertyEntry.stringImmutablePropertyEntry(
                   PROPERTY_PACKAGE,
                   "The path of the catalog-related classes and resources",
                   false,
-                  true,
                   null,
                   false,
                   false)),
