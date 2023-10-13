@@ -40,8 +40,9 @@ graviton.catalog.cache.evictionIntervalMs = 3600000
 # Auxiliary service names, separate by ','
 graviton.auxService.names = iceberg-rest
 # Iceberg REST service classpath
-graviton.auxService.iceberg-rest.classpath = catalogs/lakehouse-iceberg/libs
+graviton.auxService.iceberg-rest.classpath = catalogs/lakehouse-iceberg/libs, catalogs/lakehouse-iceberg/conf
 # Iceberg REST service host
 graviton.auxService.iceberg-rest.host = 127.0.0.1
 # Iceberg REST service http port
 graviton.auxService.iceberg-rest.httpPort = 9001
+
