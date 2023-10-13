@@ -12,7 +12,6 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
 import com.google.common.collect.Iterables;
-import com.google.common.collect.Lists;
 import com.google.common.collect.Streams;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -86,12 +85,6 @@ public class AuxiliaryServiceManager {
 
   @VisibleForTesting
   static String getValidPath(String auxServiceName, String pathString) {
-    Preconditions.checkArgument(
-        StringUtils.isNoneBlank(pathString),
-        String.format(
-            "AuxService:%s, %s%s.%s is not set in configuration",
-            auxServiceName, GRAVITON_AUX_SERVICE_PREFIX, auxServiceName, AUX_SERVICE_CLASSPATH));
-
     Path path = Paths.get(pathString);
     if (Files.exists(path)) {
       return path.toAbsolutePath().toString();
@@ -112,11 +105,24 @@ public class AuxiliaryServiceManager {
   }
 
   private void registerAuxService(String auxServiceName, Map<String, String> config) {
-    String classPath = config.get(AUX_SERVICE_CLASSPATH);
-    classPath = getValidPath(auxServiceName, classPath);
-    LOG.info("AuxService name:{}, config:{}, classpath:{}", auxServiceName, config, classPath);
+    String classpath = config.get(AUX_SERVICE_CLASSPATH);
+    Preconditions.checkArgument(
+        StringUtils.isNoneBlank(classpath),
+        String.format(
+            "AuxService:%s, %s%s.%s is not set in configuration",
+            auxServiceName, GRAVITON_AUX_SERVICE_PREFIX, auxServiceName, AUX_SERVICE_CLASSPATH));
 
-    IsolatedClassLoader isolatedClassLoader = getIsolatedClassLoader(Lists.newArrayList(classPath));
+    List<String> validPaths =
+        splitter
+            .trimResults()
+            .omitEmptyStrings()
+            .splitToStream(classpath)
+            .map(path -> getValidPath(auxServiceName, path))
+            .collect(Collectors.toList());
+    LOG.info(
+        "AuxService name:{}, config:{}, valid classpath:{}", auxServiceName, config, validPaths);
+
+    IsolatedClassLoader isolatedClassLoader = getIsolatedClassLoader(validPaths);
     try {
       GravitonAuxiliaryService gravitonAuxiliaryService =
           loadAuxService(auxServiceName, isolatedClassLoader);

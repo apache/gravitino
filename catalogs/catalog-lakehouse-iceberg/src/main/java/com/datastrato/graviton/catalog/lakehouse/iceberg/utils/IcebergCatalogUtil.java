@@ -33,6 +33,7 @@ public class IcebergCatalogUtil {
 
   private static HiveCatalog loadHiveCatalog(Map<String, String> properties) {
     HiveCatalog hiveCatalog = new HiveCatalog();
+    hiveCatalog.setConf(new HdfsConfiguration());
     hiveCatalog.initialize("hive", properties);
     return hiveCatalog;
   }
@@ -59,6 +60,7 @@ public class IcebergCatalogUtil {
     // TODO Organize the configuration properties and adapt them to the lower layer, and map some
     // graviton configuration keys.
     LOG.info("Load catalog backend of {}", catalogType);
+
     switch (catalogType.toLowerCase(Locale.ENGLISH)) {
       case "memory":
         return loadMemoryCatalog(properties);
