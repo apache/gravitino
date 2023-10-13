@@ -19,7 +19,6 @@ import io.trino.spi.connector.ConnectorTransactionHandle;
 import io.trino.spi.session.PropertyMetadata;
 import io.trino.spi.transaction.IsolationLevel;
 import java.util.List;
-import org.apache.commons.lang3.NotImplementedException;
 
 /**
  * GravitonConnector serves as the entry point for operations on the connector managed by Trino and
@@ -93,17 +92,24 @@ public class GravitonConnector implements Connector {
 
   @Override
   public ConnectorSplitManager getSplitManager() {
-    throw new NotImplementedException();
+    Connector internalConnector = catalogConnectorContext.getInternalConnector();
+    ConnectorSplitManager splitManager = internalConnector.getSplitManager();
+    return new GravitonSplitManager(splitManager);
   }
 
   @Override
   public ConnectorPageSourceProvider getPageSourceProvider() {
-    throw new NotImplementedException();
+    Connector internalConnector = catalogConnectorContext.getInternalConnector();
+    ConnectorPageSourceProvider internalPageSourceProvider =
+        internalConnector.getPageSourceProvider();
+    return new GravitonDataSourceProvider(internalPageSourceProvider);
   }
 
   @Override
   public ConnectorPageSinkProvider getPageSinkProvider() {
-    throw new NotImplementedException();
+    Connector internalConnector = catalogConnectorContext.getInternalConnector();
+    ConnectorPageSinkProvider pageSinkProvider = internalConnector.getPageSinkProvider();
+    return new GravitonPageSinkProvider(pageSinkProvider);
   }
 
   @Override
