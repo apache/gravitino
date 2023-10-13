@@ -110,7 +110,6 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     // Random key name as user like.
     Map<String, String> userConfig = Maps.newHashMap();
 
-    // Save bypass configuration first so that user configuration can overwrite it.
     conf.forEach(
         (key, value) -> {
           if (key.startsWith(CATALOG_BYPASS_PREFIX)) {
@@ -119,22 +118,28 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
           } else if (GRAVITON_CONFIG_TO_HIVE.containsKey(key)) {
             gravitonConfig.put(GRAVITON_CONFIG_TO_HIVE.get(key), value);
           } else {
-            // Overwrite bypass configs.
-            if (byPassConfig.containsKey(key)) {
-              byPassConfig.put(key, value);
-            } else if (gravitonConfig.containsKey(key)) {
-              // Do nothing, as keys in GRAVITON_CONFIG_TO_HIVE have higher priority
-            } else {
-              userConfig.put(key, value);
-            }
+            userConfig.put(key, value);
           }
         });
+
+    Map<String, String> mergeConfig = Maps.newHashMap();
+    byPassConfig.forEach(
+        (k, v) -> {
+          // If the user has set it, use user's value
+          if (userConfig.containsKey(k)) {
+            mergeConfig.put(k, userConfig.get(k));
+          } else {
+            mergeConfig.put(k, v);
+          }
+        });
+
+    // Use graviton config to overwrite all.
+    mergeConfig.putAll(gravitonConfig);
 
     Configuration hadoopConf = new Configuration();
     // Set byPass first to make graviton config overwrite it, only keys in byPassConfig
     // and gravitonConfig will be passed to Hive config, and gravitonConfig has higher priority
-    byPassConfig.forEach(hadoopConf::set);
-    gravitonConfig.forEach(hadoopConf::set);
+    mergeConfig.forEach(hadoopConf::set);
     hiveConf = new HiveConf(hadoopConf, HiveCatalogOperations.class);
 
     this.clientPool = new HiveClientPool(getClientPoolSize(conf), hiveConf);

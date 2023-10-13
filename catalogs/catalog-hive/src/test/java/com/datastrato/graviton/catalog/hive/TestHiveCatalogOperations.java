@@ -87,7 +87,7 @@ class TestHiveCatalogOperations {
     HiveCatalogOperations op = new HiveCatalogOperations(null);
     op.initialize(maps);
 
-    Assertions.assertEquals("v2", op.hiveConf.get("a.b"));
+    Assertions.assertEquals("v1", op.hiveConf.get("a.b"));
     Assertions.assertEquals("v3", op.hiveConf.get("c.d"));
   }
 }

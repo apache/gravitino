@@ -277,9 +277,12 @@ public class MiniHiveMetastore {
   private void initConf(HiveConf conf, int port) {
     conf.set(HiveConf.ConfVars.METASTOREURIS.varname, "thrift://localhost:" + port);
     conf.set(METASTORE_URIS, "thrift://localhost:" + port);
+
     conf.set(
         CATALOG_BYPASS_PREFIX + HiveConf.ConfVars.METASTOREWAREHOUSE.varname,
         "file:" + HIVE_LOCAL_DIR.getAbsolutePath());
+    conf.set(
+        HiveConf.ConfVars.METASTOREWAREHOUSE.varname, "file:" + HIVE_LOCAL_DIR.getAbsolutePath());
     conf.set(CATALOG_BYPASS_PREFIX + HiveConf.ConfVars.METASTORE_TRY_DIRECT_SQL.varname, "false");
     conf.set(
         CATALOG_BYPASS_PREFIX
