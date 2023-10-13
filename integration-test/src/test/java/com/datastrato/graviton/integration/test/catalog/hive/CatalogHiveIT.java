@@ -5,7 +5,7 @@
 package com.datastrato.graviton.integration.test.catalog.hive;
 
 import static com.datastrato.graviton.catalog.BaseCatalog.CATALOG_BYPASS_PREFIX;
-import static com.datastrato.graviton.catalog.hive.HiveCatalogPropertiesMeta.METASTORE_URLS;
+import static com.datastrato.graviton.catalog.hive.HiveCatalogPropertiesMeta.METASTORE_URIS;
 import static com.datastrato.graviton.catalog.hive.HiveTablePropertiesMetadata.COMMENT;
 import static com.datastrato.graviton.catalog.hive.HiveTablePropertiesMetadata.EXTERNAL;
 import static com.datastrato.graviton.catalog.hive.HiveTablePropertiesMetadata.FORMAT;
@@ -129,7 +129,7 @@ public class CatalogHiveIT extends AbstractIT {
 
   private static void createCatalog() {
     Map<String, String> properties = Maps.newHashMap();
-    properties.put(METASTORE_URLS, HIVE_METASTORE_URIS);
+    properties.put(METASTORE_URIS, HIVE_METASTORE_URIS);
     properties.put(
         CATALOG_BYPASS_PREFIX + HiveConf.ConfVars.METASTORETHRIFTCONNECTIONRETRIES.varname, "30");
     properties.put(

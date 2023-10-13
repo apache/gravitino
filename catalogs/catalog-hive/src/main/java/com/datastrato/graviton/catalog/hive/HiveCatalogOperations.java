@@ -7,7 +7,7 @@ package com.datastrato.graviton.catalog.hive;
 import static com.datastrato.graviton.catalog.BaseCatalog.CATALOG_BYPASS_PREFIX;
 import static com.datastrato.graviton.catalog.hive.HiveCatalogPropertiesMeta.CLIENT_POOL_SIZE;
 import static com.datastrato.graviton.catalog.hive.HiveCatalogPropertiesMeta.DEFAULT_CLIENT_POOL_SIZE;
-import static com.datastrato.graviton.catalog.hive.HiveCatalogPropertiesMeta.METASTORE_URLS;
+import static com.datastrato.graviton.catalog.hive.HiveCatalogPropertiesMeta.METASTORE_URIS;
 import static com.datastrato.graviton.catalog.hive.HiveTable.SUPPORT_TABLE_TYPES;
 import static com.datastrato.graviton.catalog.hive.HiveTablePropertiesMetadata.COMMENT;
 import static com.datastrato.graviton.catalog.hive.HiveTablePropertiesMetadata.TABLE_TYPE;
@@ -38,6 +38,7 @@ import com.datastrato.graviton.rel.transforms.Transforms;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
@@ -80,7 +81,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
   // will only need to set the configuration 'METASTORE_URL' in Graviton and Graviton will change
   // it to `METASTOREURIS` automatically and pass it to Hive.
   public static final Map<String, String> GRAVITON_CONFIG_TO_HIVE =
-      ImmutableMap.of(METASTORE_URLS, ConfVars.METASTOREURIS.varname);
+      ImmutableMap.of(METASTORE_URIS, ConfVars.METASTOREURIS.varname);
 
   /**
    * Constructs a new instance of HiveCatalogOperations.
@@ -99,22 +100,22 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
    */
   @Override
   public void initialize(Map<String, String> conf) throws RuntimeException {
-    Configuration hadoopConf = new Configuration();
-    conf.forEach(hadoopConf::set);
-    hiveConf = new HiveConf(hadoopConf, HiveCatalogOperations.class);
-
-    // Overwrite hive conf with graviton conf if exists
+    Map<String, String> byPassConfig = Maps.newHashMap();
     conf.forEach(
         (key, value) -> {
           if (key.startsWith(CATALOG_BYPASS_PREFIX)) {
             // Trim bypass prefix and pass it to hive conf
-            hiveConf.set(key.substring(CATALOG_BYPASS_PREFIX.length()), value);
+            byPassConfig.put(key.substring(CATALOG_BYPASS_PREFIX.length()), value);
           } else if (GRAVITON_CONFIG_TO_HIVE.containsKey(key)) {
-            hiveConf.set(GRAVITON_CONFIG_TO_HIVE.get(key), value);
+            byPassConfig.put(GRAVITON_CONFIG_TO_HIVE.get(key), value);
           } else {
-            hiveConf.set(key, value);
+            byPassConfig.put(key, value);
           }
         });
+
+    Configuration hadoopConf = new Configuration();
+    byPassConfig.forEach(hadoopConf::set);
+    hiveConf = new HiveConf(hadoopConf, HiveCatalogOperations.class);
 
     this.clientPool = new HiveClientPool(getCatalogClientPoolMaxsize(conf), hiveConf);
     this.tablePropertiesMetadata = new HiveTablePropertiesMetadata();

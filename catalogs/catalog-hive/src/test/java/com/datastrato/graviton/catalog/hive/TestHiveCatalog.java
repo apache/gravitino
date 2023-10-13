@@ -4,7 +4,7 @@
  */
 package com.datastrato.graviton.catalog.hive;
 
-import static com.datastrato.graviton.catalog.hive.HiveCatalogPropertiesMeta.METASTORE_URLS;
+import static com.datastrato.graviton.catalog.hive.HiveCatalogPropertiesMeta.METASTORE_URIS;
 
 import com.datastrato.graviton.Namespace;
 import com.datastrato.graviton.catalog.hive.miniHMS.MiniHiveMetastoreService;
@@ -70,7 +70,7 @@ public class TestHiveCatalog extends MiniHiveMetastoreService {
       Assertions.assertDoesNotThrow(
           () -> {
             Map<String, String> map = Maps.newHashMap();
-            map.put(METASTORE_URLS, "/tmp");
+            map.put(METASTORE_URIS, "/tmp");
             ops.catalogPropertiesMetadata().validatePropertyForCreate(map);
           });
 
@@ -83,7 +83,7 @@ public class TestHiveCatalog extends MiniHiveMetastoreService {
           throwable
               .getMessage()
               .contains(
-                  String.format("Properties are required and must be set: [%s]", METASTORE_URLS)));
+                  String.format("Properties are required and must be set: [%s]", METASTORE_URIS)));
     }
   }
 }
