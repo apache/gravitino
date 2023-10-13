@@ -12,5 +12,6 @@
     <name>mapreduce.job.reduces</name>
     <value>10</value>
   </property>
+
 </configuration>
 
