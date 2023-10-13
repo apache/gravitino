@@ -12,7 +12,7 @@ import io.trino.spi.connector.ConnectorPageSinkProvider;
 import io.trino.spi.connector.ConnectorSession;
 import io.trino.spi.connector.ConnectorTransactionHandle;
 
-/** This class provides a ConnectorPageSink for trino write data to internal connector. */
+/** This class provides a ConnectorPageSink for trino to write data to internal connector. */
 public class GravitonPageSinkProvider implements ConnectorPageSinkProvider {
 
   ConnectorPageSinkProvider pageSinkProvider;
