@@ -103,21 +103,29 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     this.tablePropertiesMetadata = new HiveTablePropertiesMetadata();
     this.catalogPropertiesMetadata = new HiveCatalogPropertiesMeta();
 
-    Map<String, String> byPassConfig = Maps.newHashMap();
+    Map<String, String> allConfig = Maps.newHashMap();
+
+    // Save bypass configuration first so that user configuration can overwrite it.
     conf.forEach(
         (key, value) -> {
           if (key.startsWith(CATALOG_BYPASS_PREFIX)) {
             // Trim bypass prefix and pass it to hive conf
-            byPassConfig.put(key.substring(CATALOG_BYPASS_PREFIX.length()), value);
-          } else if (GRAVITON_CONFIG_TO_HIVE.containsKey(key)) {
-            byPassConfig.put(GRAVITON_CONFIG_TO_HIVE.get(key), value);
-          } else {
-            byPassConfig.put(key, value);
+            allConfig.put(key.substring(CATALOG_BYPASS_PREFIX.length()), value);
+          }
+        });
+
+    // Save user properties
+    conf.forEach(
+        (key, value) -> {
+          if (GRAVITON_CONFIG_TO_HIVE.containsKey(key)) {
+            allConfig.put(GRAVITON_CONFIG_TO_HIVE.get(key), value);
+          } else if (!key.startsWith(CATALOG_BYPASS_PREFIX)) {
+            allConfig.put(key, value);
           }
         });
 
     Configuration hadoopConf = new Configuration();
-    byPassConfig.forEach(hadoopConf::set);
+    allConfig.forEach(hadoopConf::set);
     hiveConf = new HiveConf(hadoopConf, HiveCatalogOperations.class);
 
     this.clientPool = new HiveClientPool(getClientPoolSize(conf), hiveConf);
