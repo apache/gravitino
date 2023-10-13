@@ -19,23 +19,23 @@ import org.junit.jupiter.api.Test;
 class TestHiveCatalogOperations {
 
   @Test
-  void testGetCatalogClientPoolMaxsize() {
+  void testGetClientPoolSize() {
     Map<String, String> maps = Maps.newHashMap();
     maps.put(CLIENT_POOL_SIZE, "10");
     HiveCatalogOperations op = new HiveCatalogOperations(null);
     op.initialize(maps);
-    Assertions.assertEquals(10, op.getCatalogClientPoolMaxsize(maps));
+    Assertions.assertEquals(10, op.getClientPoolSize(maps));
 
     maps.clear();
     maps.put(CLIENT_POOL_SIZE + "_wrong_mark", "10");
     op = new HiveCatalogOperations(null);
     op.initialize(maps);
-    Assertions.assertNotEquals(10, op.getCatalogClientPoolMaxsize(maps));
+    Assertions.assertNotEquals(10, op.getClientPoolSize(maps));
 
     maps.put(CLIENT_POOL_SIZE, "1");
     op = new HiveCatalogOperations(null);
     op.initialize(maps);
-    Assertions.assertEquals(1, op.getCatalogClientPoolMaxsize(maps));
+    Assertions.assertEquals(1, op.getClientPoolSize(maps));
   }
 
   @Test

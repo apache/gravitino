@@ -6,7 +6,6 @@ package com.datastrato.graviton.catalog.hive;
 
 import static com.datastrato.graviton.catalog.BaseCatalog.CATALOG_BYPASS_PREFIX;
 import static com.datastrato.graviton.catalog.hive.HiveCatalogPropertiesMeta.CLIENT_POOL_SIZE;
-import static com.datastrato.graviton.catalog.hive.HiveCatalogPropertiesMeta.DEFAULT_CLIENT_POOL_SIZE;
 import static com.datastrato.graviton.catalog.hive.HiveCatalogPropertiesMeta.METASTORE_URIS;
 import static com.datastrato.graviton.catalog.hive.HiveTable.SUPPORT_TABLE_TYPES;
 import static com.datastrato.graviton.catalog.hive.HiveTablePropertiesMetadata.COMMENT;
@@ -100,6 +99,9 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
    */
   @Override
   public void initialize(Map<String, String> conf) throws RuntimeException {
+    this.tablePropertiesMetadata = new HiveTablePropertiesMetadata();
+    this.catalogPropertiesMetadata = new HiveCatalogPropertiesMeta();
+
     Map<String, String> byPassConfig = Maps.newHashMap();
     conf.forEach(
         (key, value) -> {
@@ -117,15 +119,12 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     byPassConfig.forEach(hadoopConf::set);
     hiveConf = new HiveConf(hadoopConf, HiveCatalogOperations.class);
 
-    this.clientPool = new HiveClientPool(getCatalogClientPoolMaxsize(conf), hiveConf);
-    this.tablePropertiesMetadata = new HiveTablePropertiesMetadata();
-    this.catalogPropertiesMetadata = new HiveCatalogPropertiesMeta();
+    this.clientPool = new HiveClientPool(getClientPoolSize(conf), hiveConf);
   }
 
   @VisibleForTesting
-  int getCatalogClientPoolMaxsize(Map<String, String> conf) {
-    return Integer.parseInt(
-        conf.getOrDefault(CLIENT_POOL_SIZE, String.valueOf(DEFAULT_CLIENT_POOL_SIZE)));
+  int getClientPoolSize(Map<String, String> conf) {
+    return (int) catalogPropertiesMetadata.getOrDefault(conf, CLIENT_POOL_SIZE);
   }
 
   /** Closes the Hive catalog and releases the associated client pool. */
