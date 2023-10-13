@@ -106,7 +106,7 @@ public class TestHiveTable extends MiniHiveMetastoreService {
   }
 
   @Test
-  public void testCreateHiveTable() throws IOException {
+  public void testCreateHiveTable() {
     String hiveTableName = "test_hive_table";
     NameIdentifier tableIdentifier =
         NameIdentifier.of(META_LAKE_NAME, hiveCatalog.name(), hiveSchema.name(), hiveTableName);
@@ -189,6 +189,34 @@ public class TestHiveTable extends MiniHiveMetastoreService {
                         distribution,
                         sortOrders));
     Assertions.assertTrue(exception.getMessage().contains("Table already exists"));
+
+    HiveColumn illegalColumn =
+        new HiveColumn.Builder()
+            .withName("col_3")
+            .withType(TypeCreator.REQUIRED.I8)
+            .withComment(HIVE_COMMENT)
+            .build();
+
+    exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                hiveCatalog
+                    .asTableCatalog()
+                    .createTable(
+                        tableIdentifier,
+                        new Column[] {illegalColumn},
+                        HIVE_COMMENT,
+                        properties,
+                        new Transform[0],
+                        distribution,
+                        sortOrders));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains(
+                "The NOT NULL constraint for column is only supported since Hive 3.0, "
+                    + "but the current Graviton Hive catalog only supports Hive 2.x"));
   }
 
   @Test
@@ -411,6 +439,39 @@ public class TestHiveTable extends MiniHiveMetastoreService {
                         tableIdentifier,
                         TableChange.updateColumnPosition(new String[] {"col_1"}, null)));
     Assertions.assertTrue(exception.getMessage().contains("Column position cannot be null"));
+
+    exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                hiveCatalog
+                    .asTableCatalog()
+                    .alterTable(
+                        tableIdentifier,
+                        TableChange.addColumn(new String[] {"col_1"}, TypeCreator.REQUIRED.I8)));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains(
+                "The NOT NULL constraint for column is only supported since Hive 3.0, "
+                    + "but the current Graviton Hive catalog only supports Hive 2.x"));
+
+    exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                hiveCatalog
+                    .asTableCatalog()
+                    .alterTable(
+                        tableIdentifier,
+                        TableChange.updateColumnType(
+                            new String[] {"col_1"}, TypeCreator.REQUIRED.I8)));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains(
+                "The NOT NULL constraint for column is only supported since Hive 3.0, "
+                    + "but the current Graviton Hive catalog only supports Hive 2.x"));
 
     // test alter
     hiveCatalog
