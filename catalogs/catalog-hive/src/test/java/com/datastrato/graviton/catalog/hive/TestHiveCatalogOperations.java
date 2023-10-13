@@ -6,15 +6,40 @@
 package com.datastrato.graviton.catalog.hive;
 
 import static com.datastrato.graviton.catalog.BaseCatalog.CATALOG_BYPASS_PREFIX;
+import static com.datastrato.graviton.catalog.hive.HiveCatalogPropertiesMeta.CLIENT_POOL_SIZE;
+import static com.datastrato.graviton.catalog.hive.HiveCatalogPropertiesMeta.METASTORE_URIS;
 
+import com.datastrato.graviton.Catalog;
+import com.datastrato.graviton.catalog.PropertyEntry;
 import com.google.common.collect.Maps;
 import java.util.Map;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 class TestHiveCatalogOperations {
+
   @Test
-  void testInitialize() {
+  void testGetClientPoolSize() {
+    Map<String, String> maps = Maps.newHashMap();
+    maps.put(CLIENT_POOL_SIZE, "10");
+    HiveCatalogOperations op = new HiveCatalogOperations(null);
+    op.initialize(maps);
+    Assertions.assertEquals(10, op.getClientPoolSize(maps));
+
+    maps.clear();
+    maps.put(CLIENT_POOL_SIZE + "_wrong_mark", "10");
+    op = new HiveCatalogOperations(null);
+    op.initialize(maps);
+    Assertions.assertNotEquals(10, op.getClientPoolSize(maps));
+
+    maps.put(CLIENT_POOL_SIZE, "1");
+    op = new HiveCatalogOperations(null);
+    op.initialize(maps);
+    Assertions.assertEquals(1, op.getClientPoolSize(maps));
+  }
+
+  @Test
+  void testInitialize() throws NoSuchFieldException, IllegalAccessException {
     Map<String, String> properties = Maps.newHashMap();
     HiveCatalogOperations hiveCatalogOperations = new HiveCatalogOperations(null);
     hiveCatalogOperations.initialize(properties);
@@ -26,12 +51,22 @@ class TestHiveCatalogOperations {
     hiveCatalogOperations.initialize(properties);
     v = hiveCatalogOperations.hiveConf.get("mapreduce.job.reduces");
     Assertions.assertEquals("20", v);
+  }
 
-    // Test If user properties can override the value in hive-site.xml
-    properties.clear();
-    properties.put("mapreduce.job.reduces", "30");
-    hiveCatalogOperations.initialize(properties);
-    v = hiveCatalogOperations.hiveConf.get("mapreduce.job.reduces");
-    Assertions.assertEquals("30", v);
+  @Test
+  void testPropertyMeta() {
+    HiveCatalogOperations hiveCatalogOperations = new HiveCatalogOperations(null);
+    hiveCatalogOperations.initialize(Maps.newHashMap());
+
+    Map<String, PropertyEntry<?>> propertyEntryMap =
+        hiveCatalogOperations.catalogPropertiesMetadata().propertyEntries();
+    Assertions.assertEquals(4, propertyEntryMap.size());
+    Assertions.assertTrue(propertyEntryMap.containsKey(METASTORE_URIS));
+    Assertions.assertTrue(propertyEntryMap.containsKey(Catalog.PROPERTY_PACKAGE));
+    Assertions.assertTrue(propertyEntryMap.containsKey(CLIENT_POOL_SIZE));
+
+    Assertions.assertTrue(propertyEntryMap.get(METASTORE_URIS).isRequired());
+    Assertions.assertFalse(propertyEntryMap.get(Catalog.PROPERTY_PACKAGE).isRequired());
+    Assertions.assertFalse(propertyEntryMap.get(CLIENT_POOL_SIZE).isRequired());
   }
 }

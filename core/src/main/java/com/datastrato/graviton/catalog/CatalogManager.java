@@ -298,12 +298,12 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
 
     Arrays.stream(catalogChanges)
         .forEach(
-            tableChange -> {
-              if (tableChange instanceof SetProperty) {
-                SetProperty setProperty = (SetProperty) tableChange;
+            catalogChange -> {
+              if (catalogChange instanceof SetProperty) {
+                SetProperty setProperty = (SetProperty) catalogChange;
                 upserts.put(setProperty.getProperty(), setProperty.getValue());
-              } else if (tableChange instanceof RemoveProperty) {
-                RemoveProperty removeProperty = (RemoveProperty) tableChange;
+              } else if (catalogChange instanceof RemoveProperty) {
+                RemoveProperty removeProperty = (RemoveProperty) catalogChange;
                 deletes.put(removeProperty.getProperty(), removeProperty.getProperty());
               }
             });
