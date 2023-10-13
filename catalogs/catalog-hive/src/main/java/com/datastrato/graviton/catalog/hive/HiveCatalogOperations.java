@@ -5,6 +5,8 @@
 package com.datastrato.graviton.catalog.hive;
 
 import static com.datastrato.graviton.catalog.BaseCatalog.CATALOG_BYPASS_PREFIX;
+import static com.datastrato.graviton.catalog.hive.HiveCatalogPropertiesMeta.CLIENT_POOL_SIZE;
+import static com.datastrato.graviton.catalog.hive.HiveCatalogPropertiesMeta.METASTORE_URIS;
 import static com.datastrato.graviton.catalog.hive.HiveTable.SUPPORT_TABLE_TYPES;
 import static com.datastrato.graviton.catalog.hive.HiveTablePropertiesMetadata.COMMENT;
 import static com.datastrato.graviton.catalog.hive.HiveTablePropertiesMetadata.TABLE_TYPE;
@@ -34,6 +36,7 @@ import com.datastrato.graviton.rel.transforms.Transform;
 import com.datastrato.graviton.rel.transforms.Transforms;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import io.substrait.type.Type;
 import java.io.IOException;
@@ -45,6 +48,7 @@ import java.util.stream.Collectors;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.AlreadyExistsException;
 import org.apache.hadoop.hive.metastore.api.Database;
@@ -71,6 +75,14 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
   private HiveTablePropertiesMetadata tablePropertiesMetadata;
 
+  private HiveCatalogPropertiesMeta catalogPropertiesMetadata;
+
+  // Map that maintains the mapping of keys in Graviton to that in Hive, for example, users
+  // will only need to set the configuration 'METASTORE_URL' in Graviton and Graviton will change
+  // it to `METASTOREURIS` automatically and pass it to Hive.
+  public static final Map<String, String> GRAVITON_CONFIG_TO_HIVE =
+      ImmutableMap.of(METASTORE_URIS, ConfVars.METASTOREURIS.varname);
+
   /**
    * Constructs a new instance of HiveCatalogOperations.
    *
@@ -88,23 +100,32 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
    */
   @Override
   public void initialize(Map<String, String> conf) throws RuntimeException {
-    Configuration hadoopConf = new Configuration();
-    conf.forEach(hadoopConf::set);
-    hiveConf = new HiveConf(hadoopConf, HiveCatalogOperations.class);
+    this.tablePropertiesMetadata = new HiveTablePropertiesMetadata();
+    this.catalogPropertiesMetadata = new HiveCatalogPropertiesMeta();
 
-    // Overwrite hive conf with graviton conf if exists
+    Map<String, String> byPassConfig = Maps.newHashMap();
     conf.forEach(
         (key, value) -> {
           if (key.startsWith(CATALOG_BYPASS_PREFIX)) {
             // Trim bypass prefix and pass it to hive conf
-            hiveConf.set(key.substring(CATALOG_BYPASS_PREFIX.length()), value);
+            byPassConfig.put(key.substring(CATALOG_BYPASS_PREFIX.length()), value);
+          } else if (GRAVITON_CONFIG_TO_HIVE.containsKey(key)) {
+            byPassConfig.put(GRAVITON_CONFIG_TO_HIVE.get(key), value);
+          } else {
+            byPassConfig.put(key, value);
           }
         });
 
-    // todo(xun): add hive client pool size in config
-    this.clientPool = new HiveClientPool(1, hiveConf);
+    Configuration hadoopConf = new Configuration();
+    byPassConfig.forEach(hadoopConf::set);
+    hiveConf = new HiveConf(hadoopConf, HiveCatalogOperations.class);
 
-    this.tablePropertiesMetadata = new HiveTablePropertiesMetadata();
+    this.clientPool = new HiveClientPool(getClientPoolSize(conf), hiveConf);
+  }
+
+  @VisibleForTesting
+  int getClientPoolSize(Map<String, String> conf) {
+    return (int) catalogPropertiesMetadata.getOrDefault(conf, CLIENT_POOL_SIZE);
   }
 
   /** Closes the Hive catalog and releases the associated client pool. */
@@ -808,7 +829,6 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
   @Override
   public PropertiesMetadata catalogPropertiesMetadata() throws UnsupportedOperationException {
-    // TODO(yuqi): We will implement this in next PR
-    return Maps::newHashMap;
+    return catalogPropertiesMetadata;
   }
 }
