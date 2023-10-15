@@ -4,6 +4,11 @@
  */
 package com.datastrato.graviton.integration.test.schema;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import com.datastrato.graviton.Catalog;
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
@@ -18,7 +23,6 @@ import com.datastrato.graviton.rel.SchemaChange.RemoveProperty;
 import com.datastrato.graviton.rel.SchemaChange.SetProperty;
 import com.datastrato.graviton.rel.SupportsSchemas;
 import com.google.common.collect.Maps;
-import static org.junit.jupiter.api.Assertions.*;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Map;
