@@ -494,6 +494,7 @@ public class TableHiveIT extends AbstractIT {
         metalake.createCatalog(
             NameIdentifier.of(metalakeName, catalogName),
             Catalog.Type.RELATIONAL,
+            "test",
             "sales catalog",
             catalogProps);
 
