@@ -290,12 +290,9 @@ public class TableHiveIT extends AbstractIT {
     String[] fields = {nameCol};
     Type newDataType = TypeCreator.REQUIRED.STRING;
     UpdateColumnType rename = (UpdateColumnType) TableChange.updateColumnType(fields, newDataType);
-    tableCatalog.alterTable(tableID, rename);
 
-    Table table = tableCatalog.loadTable(tableID);
-    Column[] columns = table.columns();
-    assertEquals(nameCol, columns[0].name());
-    assertEquals(TypeCreator.REQUIRED.STRING, columns[0].dataType());
+    // NOT NULL is not support in Hive 2
+    assertThrows(IllegalArgumentException.class, () -> tableCatalog.alterTable(tableID, rename));
   }
 
   @Test
@@ -357,13 +354,10 @@ public class TableHiveIT extends AbstractIT {
     ColumnPosition position = ColumnPosition.after(addressCol);
     UpdateColumnPosition changePosition =
         (UpdateColumnPosition) TableChange.updateColumnPosition(fields, position);
-    tableCatalog.alterTable(tableID, changePosition);
 
-    Table table = tableCatalog.loadTable(tableID);
-    Column[] columns = table.columns();
-    assertEquals(dobCol.toLowerCase(), columns[0].name());
-    assertEquals(addressCol.toLowerCase(), columns[1].name());
-    assertEquals(nameCol.toLowerCase(), columns[2].name());
+    // Wrong data types
+    assertThrows(
+        IllegalArgumentException.class, () -> tableCatalog.alterTable(tableID, changePosition));
   }
 
   @Test
@@ -381,13 +375,47 @@ public class TableHiveIT extends AbstractIT {
     ColumnPosition position = ColumnPosition.first();
     UpdateColumnPosition changePosition =
         (UpdateColumnPosition) TableChange.updateColumnPosition(fields, position);
-    tableCatalog.alterTable(tableID, changePosition);
+
+    // Wrong data types
+    assertThrows(
+        IllegalArgumentException.class, () -> tableCatalog.alterTable(tableID, changePosition));
+  }
+
+  @Test
+  public void testTableColumnSwap() {
+    NameIdentifier metalakeID = NameIdentifier.of(metalakeName);
+    NameIdentifier catalogID = NameIdentifier.of(metalakeName, catalogName);
+    NameIdentifier schemaID = NameIdentifier.of(metalakeName, catalogName, schemaName);
+    NameIdentifier tableID = NameIdentifier.of(metalakeName, catalogName, schemaName, "customers");
+    GravitonMetaLake metalake = client.loadMetalake(metalakeID);
+    Catalog catalog = metalake.loadCatalog(catalogID);
+    catalog.asSchemas().loadSchema(schemaID);
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    String surnameCol = "surname";
+
+    String[] fieldsA = {surnameCol};
+    TableChange column = TableChange.addColumn(fieldsA, TypeCreator.NULLABLE.STRING, "Lqst name");
+    tableCatalog.alterTable(tableID, column);
 
     Table table = tableCatalog.loadTable(tableID);
     Column[] columns = table.columns();
-    assertEquals(addressCol.toLowerCase(), columns[0].name());
-    assertEquals(nameCol.toLowerCase(), columns[1].name());
-    assertEquals(dobCol.toLowerCase(), columns[2].name());
+    assertEquals(nameCol.toLowerCase(), columns[0].name());
+    assertEquals(dobCol.toLowerCase(), columns[1].name());
+    assertEquals(addressCol.toLowerCase(), columns[2].name());
+    assertEquals(surnameCol.toLowerCase(), columns[3].name());
+
+    String[] fieldsB = {surnameCol};
+    ColumnPosition position = ColumnPosition.first();
+    UpdateColumnPosition changePosition =
+        (UpdateColumnPosition) TableChange.updateColumnPosition(fieldsB, position);
+    tableCatalog.alterTable(tableID, changePosition);
+
+    table = tableCatalog.loadTable(tableID);
+    columns = table.columns();
+    assertEquals(surnameCol.toLowerCase(), columns[0].name());
+    assertEquals(dobCol.toLowerCase(), columns[1].name());
+    assertEquals(addressCol.toLowerCase(), columns[2].name());
+    assertEquals(nameCol.toLowerCase(), columns[3].name());
   }
 
   @Test
