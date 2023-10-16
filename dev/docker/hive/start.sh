@@ -31,6 +31,8 @@ echo """
   CREATE USER 'hive'@'localhost' IDENTIFIED BY 'hive';
   GRANT ALL PRIVILEGES on *.* to 'hive'@'localhost' WITH GRANT OPTION;
   GRANT ALL on hive.* to 'hive'@'localhost' IDENTIFIED BY 'hive';
+  CREATE USER 'iceberg'@'*' IDENTIFIED BY 'iceberg';
+  GRANT ALL PRIVILEGES on *.* to 'iceberg'@'%' identified by 'iceberg' with grant option;
   FLUSH PRIVILEGES;
   CREATE DATABASE hive;
 """ | mysql --user=root --password=${MYSQL_PWD}
