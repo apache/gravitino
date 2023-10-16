@@ -4,6 +4,8 @@
  */
 package com.datastrato.graviton.catalog.lakehouse.iceberg;
 
+import static com.datastrato.graviton.catalog.BaseCatalog.CATALOG_BYPASS_PREFIX;
+
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
 import com.datastrato.graviton.catalog.CatalogOperations;
@@ -27,6 +29,7 @@ import com.datastrato.graviton.rel.Table;
 import com.datastrato.graviton.rel.TableCatalog;
 import com.datastrato.graviton.rel.TableChange;
 import com.datastrato.graviton.rel.transforms.Transform;
+import com.datastrato.graviton.utils.MapUtils;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
@@ -60,7 +63,9 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
 
   @VisibleForTesting IcebergTableOps icebergTableOps;
 
-  private IcebergTablePropertiesMetadata tablePropertiesMetadata;
+  private IcebergCatalogPropertiesMetadata icebergCatalogPropertiesMetadata;
+
+  private IcebergTablePropertiesMetadata icebergTablePropertiesMetadata;
 
   private final CatalogEntity entity;
 
@@ -83,10 +88,23 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
    */
   @Override
   public void initialize(Map<String, String> conf) throws RuntimeException {
+    // Key format like graviton.bypass.a.b
+    Map<String, String> prefixMap = MapUtils.getPrefixMap(conf, CATALOG_BYPASS_PREFIX);
+
+    this.icebergCatalogPropertiesMetadata = new IcebergCatalogPropertiesMetadata();
+    // Hold keys that lie in GRAVITON_CONFIG_TO_ICEBERG
+    Map<String, String> gravitonConfig =
+        this.icebergCatalogPropertiesMetadata.transformProperties(conf);
+
+    Map<String, String> resultConf = Maps.newHashMap(prefixMap);
+    resultConf.putAll(gravitonConfig);
+
     IcebergConfig icebergConfig = new IcebergConfig();
-    icebergConfig.loadFromMap(conf, k -> true);
+    icebergConfig.loadFromMap(resultConf, k -> true);
+
     this.icebergTableOps = new IcebergTableOps(icebergConfig);
     this.icebergTableOpsHelper = icebergTableOps.createIcebergTableOpsHelper();
+    this.icebergTablePropertiesMetadata = new IcebergTablePropertiesMetadata();
   }
 
   /** Closes the Iceberg catalog and releases the associated client pool. */
@@ -522,11 +540,11 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
 
   @Override
   public PropertiesMetadata tablePropertiesMetadata() throws UnsupportedOperationException {
-    return tablePropertiesMetadata;
+    return icebergTablePropertiesMetadata;
   }
 
   @Override
   public PropertiesMetadata catalogPropertiesMetadata() throws UnsupportedOperationException {
-    return Maps::newHashMap;
+    return icebergCatalogPropertiesMetadata;
   }
 }
