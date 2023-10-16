@@ -24,12 +24,12 @@ public class TestIcebergCatalogUtil {
 
     catalog =
         IcebergCatalogUtil.loadCatalogBackend(
-            IcebergConfig.CATALOG_TYPE.getDefaultValue().toLowerCase());
+            IcebergConfig.CATALOG_BACKEND.getDefaultValue().toLowerCase());
     Assertions.assertTrue(catalog instanceof InMemoryCatalog);
 
     catalog =
         IcebergCatalogUtil.loadCatalogBackend(
-            IcebergConfig.CATALOG_TYPE.getDefaultValue().toUpperCase());
+            IcebergConfig.CATALOG_BACKEND.getDefaultValue().toUpperCase());
     Assertions.assertTrue(catalog instanceof InMemoryCatalog);
 
     catalog = IcebergCatalogUtil.loadCatalogBackend("hive");
@@ -47,12 +47,11 @@ public class TestIcebergCatalogUtil {
     Map<String, String> properties = new HashMap<>();
     properties.put(CatalogProperties.URI, "jdbc://0.0.0.0:3306");
     properties.put(CatalogProperties.WAREHOUSE_LOCATION, "test");
-    properties.put(IcebergConfig.INITIALIZE_JDBC_CATALOG_TABLES.getKey(), "false");
     catalog = IcebergCatalogUtil.loadCatalogBackend("jdbc", properties);
     Assertions.assertTrue(catalog instanceof JdbcCatalog);
 
     Assertions.assertThrowsExactly(
-        RuntimeException.class,
+        IllegalArgumentException.class,
         () -> {
           IcebergCatalogUtil.loadCatalogBackend("other");
         });
