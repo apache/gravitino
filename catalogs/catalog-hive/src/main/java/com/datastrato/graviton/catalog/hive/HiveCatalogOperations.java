@@ -107,8 +107,6 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     Map<String, String> byPassConfig = Maps.newHashMap();
     // Hold keys that lie in GRAVITON_CONFIG_TO_HIVE
     Map<String, String> gravitonConfig = Maps.newHashMap();
-    // Random key name as user like.
-    Map<String, String> userConfig = Maps.newHashMap();
 
     conf.forEach(
         (key, value) -> {
