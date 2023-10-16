@@ -13,6 +13,7 @@ import com.datastrato.graviton.Catalog;
 import com.datastrato.graviton.catalog.PropertyEntry;
 import com.google.common.collect.Maps;
 import java.util.Map;
+import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -68,5 +69,25 @@ class TestHiveCatalogOperations {
     Assertions.assertTrue(propertyEntryMap.get(METASTORE_URIS).isRequired());
     Assertions.assertFalse(propertyEntryMap.get(Catalog.PROPERTY_PACKAGE).isRequired());
     Assertions.assertFalse(propertyEntryMap.get(CLIENT_POOL_SIZE).isRequired());
+  }
+
+  @Test
+  void testPropertyOverwrite() {
+    Map<String, String> maps = Maps.newHashMap();
+    maps.put("a.b", "v1");
+    maps.put(CATALOG_BYPASS_PREFIX + "a.b", "v2");
+
+    maps.put("c.d", "v3");
+    maps.put(CATALOG_BYPASS_PREFIX + "c.d", "v4");
+    maps.put("e.f", "v5");
+
+    maps.put(METASTORE_URIS, "url1");
+    maps.put(ConfVars.METASTOREURIS.varname, "url2");
+    maps.put(CATALOG_BYPASS_PREFIX + ConfVars.METASTOREURIS.varname, "url3");
+    HiveCatalogOperations op = new HiveCatalogOperations(null);
+    op.initialize(maps);
+
+    Assertions.assertEquals("v2", op.hiveConf.get("a.b"));
+    Assertions.assertEquals("v4", op.hiveConf.get("c.d"));
   }
 }
