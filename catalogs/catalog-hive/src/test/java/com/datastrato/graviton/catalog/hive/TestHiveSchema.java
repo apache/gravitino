@@ -4,6 +4,9 @@
  */
 package com.datastrato.graviton.catalog.hive;
 
+import static com.datastrato.graviton.catalog.BaseCatalog.CATALOG_BYPASS_PREFIX;
+import static com.datastrato.graviton.catalog.hive.HiveCatalogPropertiesMeta.METASTORE_URIS;
+
 import com.datastrato.graviton.NameIdentifier;
 import com.datastrato.graviton.Namespace;
 import com.datastrato.graviton.catalog.hive.miniHMS.MiniHiveMetastoreService;
@@ -16,6 +19,7 @@ import com.google.common.collect.Maps;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Map;
+import org.apache.hadoop.hive.conf.HiveConf;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -36,6 +40,18 @@ public class TestHiveSchema extends MiniHiveMetastoreService {
             .build();
 
     Map<String, String> conf = Maps.newHashMap();
+    conf.put(METASTORE_URIS, hiveConf.get(HiveConf.ConfVars.METASTOREURIS.varname));
+    conf.put(
+        CATALOG_BYPASS_PREFIX + HiveConf.ConfVars.METASTOREWAREHOUSE.varname,
+        hiveConf.get(HiveConf.ConfVars.METASTOREWAREHOUSE.varname));
+    conf.put(
+        CATALOG_BYPASS_PREFIX
+            + HiveConf.ConfVars.METASTORE_DISALLOW_INCOMPATIBLE_COL_TYPE_CHANGES.varname,
+        hiveConf.get(HiveConf.ConfVars.METASTORE_DISALLOW_INCOMPATIBLE_COL_TYPE_CHANGES.varname));
+
+    conf.put(
+        CATALOG_BYPASS_PREFIX + HiveConf.ConfVars.HIVE_IN_TEST.varname,
+        hiveConf.get(HiveConf.ConfVars.HIVE_IN_TEST.varname));
     metastore.hiveConf().iterator().forEachRemaining(e -> conf.put(e.getKey(), e.getValue()));
     HiveCatalog hiveCatalog = new HiveCatalog().withCatalogConf(conf).withCatalogEntity(entity);
 

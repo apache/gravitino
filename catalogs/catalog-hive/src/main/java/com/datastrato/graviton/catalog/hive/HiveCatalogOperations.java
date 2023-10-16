@@ -117,23 +117,11 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
             byPassConfig.put(key.substring(CATALOG_BYPASS_PREFIX.length()), value);
           } else if (GRAVITON_CONFIG_TO_HIVE.containsKey(key)) {
             gravitonConfig.put(GRAVITON_CONFIG_TO_HIVE.get(key), value);
-          } else {
-            userConfig.put(key, value);
           }
         });
 
-    Map<String, String> mergeConfig = Maps.newHashMap();
-    byPassConfig.forEach(
-        (k, v) -> {
-          // If the user has set it, use user's value
-          if (userConfig.containsKey(k)) {
-            mergeConfig.put(k, userConfig.get(k));
-          } else {
-            mergeConfig.put(k, v);
-          }
-        });
-
-    // Use graviton config to overwrite all.
+    Map<String, String> mergeConfig = Maps.newHashMap(byPassConfig);
+    // `gravitonConfig` overwrite byPassConfig if possible
     mergeConfig.putAll(gravitonConfig);
 
     Configuration hadoopConf = new Configuration();
