@@ -7,10 +7,9 @@ package com.datastrato.graviton.integration.test.catalog.lakehouse.iceberg;
 
 import com.datastrato.graviton.Config;
 import com.datastrato.graviton.aux.AuxiliaryServiceManager;
+import com.datastrato.graviton.catalog.lakehouse.iceberg.IcebergCatalogBackend;
 import com.datastrato.graviton.catalog.lakehouse.iceberg.IcebergConfig;
 import com.datastrato.graviton.catalog.lakehouse.iceberg.IcebergRESTService;
-import com.datastrato.graviton.catalog.lakehouse.iceberg.utils.IcebergCatalogUtil;
-import com.datastrato.graviton.catalog.lakehouse.iceberg.utils.IcebergCatalogUtil.CatalogType;
 import com.datastrato.graviton.integration.test.util.AbstractIT;
 import com.datastrato.graviton.server.web.JettyServerConfig;
 import com.datastrato.graviton.utils.MapUtils;
@@ -42,7 +41,7 @@ import org.slf4j.LoggerFactory;
 public class IcebergRESTServiceBaseIT extends AbstractIT {
   public static final Logger LOG = LoggerFactory.getLogger(IcebergRESTServiceBaseIT.class);
   private SparkSession sparkSession;
-  protected CatalogType catalogType = IcebergCatalogUtil.CatalogType.MEMORY;
+  protected IcebergCatalogBackend catalogType = IcebergCatalogBackend.MEMORY;
 
   @BeforeAll
   void initIcebergTestEnv() throws Exception {
@@ -69,7 +68,7 @@ public class IcebergRESTServiceBaseIT extends AbstractIT {
   public static void stopIntegrationTest() {}
 
   boolean catalogTypeNotMemory() {
-    return !catalogType.equals(CatalogType.MEMORY);
+    return !catalogType.equals(IcebergCatalogBackend.MEMORY);
   }
 
   private void registerIcebergCatalogConfig() {
@@ -99,14 +98,14 @@ public class IcebergRESTServiceBaseIT extends AbstractIT {
         AuxiliaryServiceManager.GRAVITON_AUX_SERVICE_PREFIX
             + IcebergRESTService.SERVICE_NAME
             + "."
-            + IcebergConfig.CATALOG_TYPE.getKey(),
-        "memory");
+            + IcebergConfig.CATALOG_BACKEND.getKey(),
+        IcebergCatalogBackend.MEMORY.toString().toLowerCase());
 
     configMap.put(
         AuxiliaryServiceManager.GRAVITON_AUX_SERVICE_PREFIX
             + IcebergRESTService.SERVICE_NAME
             + "."
-            + "warehouse",
+            + IcebergConfig.CATALOG_WAREHOUSE.getKey(),
         "/tmp/");
     return configMap;
   }
@@ -122,21 +121,21 @@ public class IcebergRESTServiceBaseIT extends AbstractIT {
         AuxiliaryServiceManager.GRAVITON_AUX_SERVICE_PREFIX
             + IcebergRESTService.SERVICE_NAME
             + "."
-            + IcebergConfig.CATALOG_TYPE.getKey(),
-        "hive");
+            + IcebergConfig.CATALOG_BACKEND.getKey(),
+        IcebergCatalogBackend.HIVE.toString().toLowerCase());
 
     customConfigs.put(
         AuxiliaryServiceManager.GRAVITON_AUX_SERVICE_PREFIX
             + IcebergRESTService.SERVICE_NAME
             + "."
-            + "uri",
+            + IcebergConfig.CATALOG_URI.getKey(),
         "thrift://127.0.0.1:9083");
 
     customConfigs.put(
         AuxiliaryServiceManager.GRAVITON_AUX_SERVICE_PREFIX
             + IcebergRESTService.SERVICE_NAME
             + "."
-            + "warehouse",
+            + IcebergConfig.CATALOG_WAREHOUSE.getKey(),
         "file:///tmp/user/hive/warehouse-hive/");
     return customConfigs;
   }

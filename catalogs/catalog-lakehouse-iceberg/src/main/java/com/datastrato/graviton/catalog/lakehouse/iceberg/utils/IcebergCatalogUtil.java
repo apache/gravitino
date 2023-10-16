@@ -23,12 +23,6 @@ public class IcebergCatalogUtil {
 
   private static final Logger LOG = LoggerFactory.getLogger(IcebergCatalogUtil.class);
 
-  public enum CatalogType {
-    MEMORY,
-    HIVE,
-    JDBC
-  }
-
   private static InMemoryCatalog loadMemoryCatalog(Map<String, String> properties) {
     InMemoryCatalog memoryCatalog = new InMemoryCatalog();
     Map<String, String> resultProperties = new HashMap<>(properties);

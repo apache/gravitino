@@ -5,7 +5,7 @@
 
 package com.datastrato.graviton.integration.test.catalog.lakehouse.iceberg;
 
-import com.datastrato.graviton.catalog.lakehouse.iceberg.utils.IcebergCatalogUtil.CatalogType;
+import com.datastrato.graviton.catalog.lakehouse.iceberg.IcebergCatalogBackend;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.util.Arrays;
@@ -226,7 +226,7 @@ public class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
             + "(id bigint COMMENT 'unique id',data string) using iceberg");
 
     Class exception =
-        catalogType == CatalogType.HIVE
+        catalogType == IcebergCatalogBackend.HIVE
             ? ServiceFailureException.class
             : TableAlreadyExistsException.class;
 

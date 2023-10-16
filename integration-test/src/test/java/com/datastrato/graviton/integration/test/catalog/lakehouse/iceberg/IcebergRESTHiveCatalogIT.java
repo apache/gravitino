@@ -5,7 +5,7 @@
 
 package com.datastrato.graviton.integration.test.catalog.lakehouse.iceberg;
 
-import com.datastrato.graviton.catalog.lakehouse.iceberg.utils.IcebergCatalogUtil;
+import com.datastrato.graviton.catalog.lakehouse.iceberg.IcebergCatalogBackend;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
@@ -16,6 +16,6 @@ import org.junit.jupiter.api.TestInstance.Lifecycle;
 @TestInstance(Lifecycle.PER_CLASS)
 public class IcebergRESTHiveCatalogIT extends IcebergRESTServiceIT {
   public IcebergRESTHiveCatalogIT() {
-    catalogType = IcebergCatalogUtil.CatalogType.HIVE;
+    catalogType = IcebergCatalogBackend.HIVE;
   }
 }
