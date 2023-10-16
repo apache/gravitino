@@ -48,3 +48,8 @@ ssh -p 8022 datastrato@localhost (password: ds123, this is a sudo user)
 - base on `datastrato/graviton-ci-hive:0.1.1` 
 - Modify `fs.defaultFS` from `local` to `0.0.0.0` in the `core-site.xml` file.
 - Expose `9000` port int the `Dockerfile` file.
+
+### 0.1.3
+- change mysql bind-address from `127.0.0.1` to `0.0.0.0` 
+- add `iceberg` to mysql users with password `iceberg`
+- export `3306` port for mysql

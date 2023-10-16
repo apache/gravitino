@@ -125,6 +125,7 @@ RUN apt-get install -y mysql-server
 
 RUN chown -R mysql:mysql /var/lib/mysql
 RUN usermod -d /var/lib/mysql/ mysql
+RUN sed -i "s/.*bind-address.*/bind-address = 0.0.0.0/" /etc/mysql/mysql.conf.d/mysqld.cnf
 
 ################################################################################
 # add mysql jdbc driver
@@ -154,7 +155,7 @@ RUN rm -rf /tmp/packages
 
 ################################################################################
 # expose port
-EXPOSE 22 8088 9000 9083 10000 10002 50070 50075
+EXPOSE 22 3306 8088 9000 9083 10000 10002 50070 50075
 
 ################################################################################
 # create startup script and set ENTRYPOINT
