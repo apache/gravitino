@@ -25,6 +25,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
+import org.junit.jupiter.api.condition.EnabledIf;
 
 @TestInstance(Lifecycle.PER_CLASS)
 public class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
@@ -463,19 +464,29 @@ public class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
   }
 
   @Test
-  // todo: MemoryCatalog doesn't support snapshot operations, will be supported after hive catalog
-  // is merged
+  // MemoryCatalog doesn't support snapshot operations, error is:
+  // org.apache.iceberg.exceptions.NotFoundException: File does not exist:
+  // /tmp/iceberg_rest_table_test/snapshot_foo1/metadata/00002-c7516f8e-ef6b-406a-8d78-9dda825dd762.metadata.json
+  // sql("SELECT * FROM table_test.snapshot_foo1.snapshots");
+  @EnabledIf("catalogTypeNotMemory")
   void testSnapshot() {
     sql(
         "CREATE TABLE iceberg_rest_table_test.snapshot_foo1 "
             + "(id bigint COMMENT 'unique id',data string) using iceberg");
     sql(" INSERT INTO iceberg_rest_table_test.snapshot_foo1 VALUES (1, 'a'), (2, 'b');");
     sql(" INSERT INTO iceberg_rest_table_test.snapshot_foo1 VALUES (3, 'c'), (4, 'd');");
-    printObjects(sql("desc iceberg_rest_table_test.snapshot_foo1"));
-    printObjects(sql("select * from iceberg_rest_table_test.snapshot_foo1"));
+    List<String> snapshots =
+        convertToStringList(
+            sql("SELECT * FROM iceberg_rest_table_test.snapshot_foo1.snapshots"), 1);
 
-    // org.apache.iceberg.exceptions.NotFoundException: File does not exist:
-    // /tmp/iceberg_rest_table_test/snapshot_foo1/metadata/00002-c7516f8e-ef6b-406a-8d78-9dda825dd762.metadata.json
-    // printObjects(sql("SELECT * FROM table_test.snapshot_foo1.snapshots"));
+    Assertions.assertEquals(2, snapshots.size());
+    String oldSnapshotId = snapshots.get(0);
+    sql(
+        String.format(
+            "CALL rest.system.rollback_to_snapshot('iceberg_rest_table_test.snapshot_foo1', %s)",
+            oldSnapshotId));
+    Map<String, String> result =
+        convertToStringMap(sql("select * from iceberg_rest_table_test.snapshot_foo1"));
+    Assertions.assertEquals(ImmutableMap.of("1", "a", "2", "b"), result);
   }
 }

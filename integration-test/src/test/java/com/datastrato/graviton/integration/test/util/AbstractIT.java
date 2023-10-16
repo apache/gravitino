@@ -106,8 +106,4 @@ public class AbstractIT {
     }
     LOG.info("Tearing down Graviton Server");
   }
-
-  public static Config getServerConfig() {
-    return serverConfig;
-  }
 }

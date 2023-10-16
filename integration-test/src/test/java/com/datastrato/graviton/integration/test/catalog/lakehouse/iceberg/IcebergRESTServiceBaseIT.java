@@ -68,6 +68,10 @@ public class IcebergRESTServiceBaseIT extends AbstractIT {
   @AfterAll
   public static void stopIntegrationTest() {}
 
+  boolean catalogTypeNotMemory() {
+    return !catalogType.equals(CatalogType.MEMORY);
+  }
+
   private void registerIcebergCatalogConfig() {
     Map<String, String> icebergConfigs;
 
@@ -147,7 +151,7 @@ public class IcebergRESTServiceBaseIT extends AbstractIT {
   }
 
   private void initSparkEnv() {
-    IcebergConfig icebergConfig = buildIcebergConfig(AbstractIT.getServerConfig());
+    IcebergConfig icebergConfig = buildIcebergConfig(serverConfig);
     int port = icebergConfig.get(JettyServerConfig.WEBSERVER_HTTP_PORT);
     LOG.info("Iceberg REST server port:{}", port);
     String IcebergRESTUri = String.format("http://127.0.0.1:%d/iceberg/", port);
