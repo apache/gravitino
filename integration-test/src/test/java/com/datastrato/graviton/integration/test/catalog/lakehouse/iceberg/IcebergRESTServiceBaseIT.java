@@ -59,8 +59,9 @@ public class IcebergRESTServiceBaseIT extends AbstractIT {
     LOG.info("graviton and spark env stopped,{}", catalogType);
   }
 
-  // the purpose of `startIntegrationTest` and `stopIntegrationTest` is to
-  // stop the corresponding func in AbstractIT auto run by junit
+  // AbstractIT#startIntegrationTest() is static, so we couldn't inject catalog info
+  // if startIntegrationTest() is auto invoked by Junit. so here we override
+  // startIntegrationTest() to disable the auto invoke by junit.
   @BeforeAll
   public static void startIntegrationTest() {}
 
