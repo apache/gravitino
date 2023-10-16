@@ -94,6 +94,90 @@ public class TestKvEntityStorage {
   }
 
   @Test
+  void testRestart() throws IOException {
+    Config config = Mockito.mock(Config.class);
+    Mockito.when(config.get(ENTITY_STORE)).thenReturn("kv");
+    Mockito.when(config.get(ENTITY_KV_STORE)).thenReturn(DEFAULT_ENTITY_KV_STORE);
+    Mockito.when(config.get(Configs.ENTITY_SERDE)).thenReturn("proto");
+    Mockito.when(config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)).thenReturn(ROCKS_DB_STORE_PATH);
+
+    Assertions.assertEquals(ROCKS_DB_STORE_PATH, config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH));
+    AuditInfo auditInfo =
+        new AuditInfo.Builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+    try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
+      store.initialize(config);
+      Assertions.assertTrue(store instanceof KvEntityStore);
+      store.setSerDe(EntitySerDeFactory.createEntitySerDe(config.get(Configs.ENTITY_SERDE)));
+
+      BaseMetalake metalake = createBaseMakeLake("metalake", auditInfo);
+      CatalogEntity catalog = createCatalog(Namespace.of("metalake"), "catalog", auditInfo);
+      CatalogEntity catalogCopy = createCatalog(Namespace.of("metalake"), "catalogCopy", auditInfo);
+
+      SchemaEntity schema1 =
+          createSchemaEntity(Namespace.of("metalake", "catalog"), "schema1", auditInfo);
+      TableEntity table1 =
+          createTableEntity(Namespace.of("metalake", "catalog", "schema1"), "table1", auditInfo);
+
+      // Store all entities
+      store.put(metalake);
+      store.put(catalog);
+      store.put(catalogCopy);
+      store.put(schema1);
+      store.put(table1);
+
+      Assertions.assertDoesNotThrow(
+          () -> store.get(NameIdentifier.of("metalake"), EntityType.METALAKE, BaseMetalake.class));
+      Assertions.assertDoesNotThrow(
+          () ->
+              store.get(
+                  NameIdentifier.of("metalake", "catalog"),
+                  EntityType.CATALOG,
+                  CatalogEntity.class));
+      Assertions.assertDoesNotThrow(
+          () ->
+              store.get(
+                  NameIdentifier.of("metalake", "catalog", "schema1"),
+                  EntityType.SCHEMA,
+                  SchemaEntity.class));
+      Assertions.assertDoesNotThrow(
+          () ->
+              store.get(
+                  NameIdentifier.of("metalake", "catalog", "schema1", "table1"),
+                  EntityType.TABLE,
+                  TableEntity.class));
+    }
+
+    // It will automatically close the store we create before, then we reopen the entity store
+    try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
+      store.initialize(config);
+      Assertions.assertTrue(store instanceof KvEntityStore);
+      store.setSerDe(EntitySerDeFactory.createEntitySerDe(config.get(Configs.ENTITY_SERDE)));
+
+      Assertions.assertDoesNotThrow(
+          () -> store.get(NameIdentifier.of("metalake"), EntityType.METALAKE, BaseMetalake.class));
+      Assertions.assertDoesNotThrow(
+          () ->
+              store.get(
+                  NameIdentifier.of("metalake", "catalog"),
+                  EntityType.CATALOG,
+                  CatalogEntity.class));
+      Assertions.assertDoesNotThrow(
+          () ->
+              store.get(
+                  NameIdentifier.of("metalake", "catalog", "schema1"),
+                  EntityType.SCHEMA,
+                  SchemaEntity.class));
+      Assertions.assertDoesNotThrow(
+          () ->
+              store.get(
+                  NameIdentifier.of("metalake", "catalog", "schema1", "table1"),
+                  EntityType.TABLE,
+                  TableEntity.class));
+    }
+  }
+
+  @Test
   void testEntityUpdate() throws Exception {
     Config config = Mockito.mock(Config.class);
     Mockito.when(config.get(ENTITY_STORE)).thenReturn("kv");
