@@ -27,8 +27,8 @@ public class IcebergTablePropertiesMetadata extends BasePropertiesMetadata {
   static {
     List<PropertyEntry<?>> propertyEntries =
         ImmutableList.of(
-            stringReservedPropertyEntry(COMMENT, "table comment", true),
-            stringReservedPropertyEntry(CREATOR, "table creator info", false),
+            stringReservedPropertyEntry(COMMENT, "Table comment", true),
+            stringReservedPropertyEntry(CREATOR, "Table creator info", false),
             stringReservedPropertyEntry(LOCATION, "Iceberg location for table storage", false),
             stringReservedPropertyEntry(
                 CURRENT_SNAPSHOT_ID,
