@@ -58,8 +58,6 @@ public class IcebergCatalogUtil {
   }
 
   public static Catalog loadCatalogBackend(String catalogType, Map<String, String> properties) {
-    // TODO Organize the configuration properties and adapt them to the lower layer, and map some
-    // graviton configuration keys.
     LOG.info("Load catalog backend of {}", catalogType);
     switch (IcebergCatalogBackend.valueOf(catalogType.toUpperCase())) {
       case MEMORY:
