@@ -100,7 +100,6 @@ public class TestHiveTable extends MiniHiveMetastoreService {
     conf.put(
         CATALOG_BYPASS_PREFIX + HiveConf.ConfVars.HIVE_IN_TEST.varname,
         hiveConf.get(HiveConf.ConfVars.HIVE_IN_TEST.varname));
-    // Setting this to avoid thrift exception during running Iceberg tests outside Iceberg.
 
     hiveCatalog = new HiveCatalog().withCatalogConf(conf).withCatalogEntity(entity);
   }
