@@ -54,6 +54,8 @@ public class TableHiveIT extends AbstractIT {
   private static String addressCol = "address";
   private NameIdentifier of;
 
+  private static final String provider = "hive";
+
   @BeforeAll
   private static void start() {
     GravitonITUtils.hiveConfig();
@@ -494,7 +496,7 @@ public class TableHiveIT extends AbstractIT {
         metalake.createCatalog(
             NameIdentifier.of(metalakeName, catalogName),
             Catalog.Type.RELATIONAL,
-            "test",
+            provider,
             "sales catalog",
             catalogProps);
 
