@@ -46,7 +46,7 @@ function copy_docs() {
 
   # Copy all markdown files to the Hugo website docs directory
   # 1. Copy all root directory markdown files
-  cp ${bin}/*.md ${bin}/build/web/content/docs
+  rsync -av --exclude='README.md' ${bin}/*.md ${bin}/build/web/content/docs
 
   # 2. Copy all subdirectory markdown files
   subDirs=$(find "${bin}" -type d -mindepth 1 -maxdepth 1)
@@ -71,11 +71,11 @@ function launch_website() {
   fi
 
   if [ ! -d "${bin}/build/hugo" ]; then
-    if [ ! -f "${bin}/build/${HUGO_PACKAGE_NAME}" ]; then
-      curl -L -o "${bin}/build" ${HUGO_DOWNLOAD_URL}
+    if [ ! -f "${bin}/build/hugo" ]; then
+      wget -q -P "${bin}/build" ${HUGO_DOWNLOAD_URL}
+      tar -xzf "${bin}/build/${HUGO_PACKAGE_NAME}" -C "${bin}/build"
+      rm -rf "${bin}/build/${HUGO_PACKAGE_NAME}"
     fi
-    tar -xzf "${bin}/build/${HUGO_PACKAGE_NAME}" -C "${bin}/build"
-    rm -rf "${bin}/build/${HUGO_PACKAGE_NAME}"
   fi
 
   # Remove the old Hugo website
