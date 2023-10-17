@@ -112,6 +112,49 @@ public class IcebergRESTServiceBaseIT extends AbstractIT {
 
   private static Map<String, String> getIcebergJdbcCatalogConfigs() {
     Map<String, String> configMap = new HashMap<>();
+
+    configMap.put(
+        AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
+            + IcebergRESTService.SERVICE_NAME
+            + "."
+            + IcebergConfig.CATALOG_BACKEND.getKey(),
+        IcebergCatalogBackend.JDBC.toString().toLowerCase());
+
+    configMap.put(
+        AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
+            + IcebergRESTService.SERVICE_NAME
+            + "."
+            + IcebergConfig.CATALOG_URI.getKey(),
+        "jdbc:sqlite:/tmp/iceberg-rest-sqlite");
+
+    configMap.put(
+        AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
+            + IcebergRESTService.SERVICE_NAME
+            + "."
+            + IcebergConfig.JDBC_USER.getKey(),
+        "iceberg");
+
+    configMap.put(
+        AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
+            + IcebergRESTService.SERVICE_NAME
+            + "."
+            + IcebergConfig.JDBC_PASSWORD.getKey(),
+        "iceberg");
+
+    configMap.put(
+        AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
+            + IcebergRESTService.SERVICE_NAME
+            + "."
+            + IcebergConfig.JDBC_INIT_TABLES.getKey(),
+        "true");
+
+    configMap.put(
+        AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
+            + IcebergRESTService.SERVICE_NAME
+            + "."
+            + IcebergConfig.CATALOG_WAREHOUSE.getKey(),
+        "file:///tmp/user/hive/warehouse-mysql/");
+
     return configMap;
   }
 
