@@ -97,8 +97,8 @@ public class CatalogIcebergIT extends AbstractIT {
 
   @AfterEach
   private void resetSchema() {
-    //    clearTableAndSchema();
-    //    createSchema();
+    clearTableAndSchema();
+    createSchema();
   }
 
   private static void clearTableAndSchema() {
