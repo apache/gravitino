@@ -8,8 +8,8 @@ This software is licensed under the Apache License version 2."
 
 # How to customize Gravitino server configurations
 
-Gravitino server can be customized by editing the configuration file `gravitino.conf` in the `conf` directory, though default values are usually sufficient for most use cases.
-But we strongly recommend that you should read the following sections to understand the configuration file.
+Gravitino server can be customized by editing the configuration file `gravitino.conf` in the `conf` directory, though default values are usually sufficient for most use cases and users need not modify them.
+But we strongly recommend that you should read the following sections to understand the configuration file in case that you may need to change it in the future.
 
 
 ## Configuration file
@@ -52,6 +52,7 @@ The following table lists the configuration items in the `gravitino.conf` file. 
 | Configuration item                           | Description                                                                    | Default value |
 |----------------------------------------------|--------------------------------------------------------------------------------|--------------|
 | `gravitino.catalog.cache.evictionIntervalMs` | The interval in milliseconds to evict the catalog cache, default 3600000ms(1h) | `3600000`      |
+|  `gravitino.catalog.classloader.isolated`    | Whether to use isolated classloader for catalog, default `true`                | `true`        |
 
 ### Other configuration
 Note: If you do not understand the following configuration items, you can ignore them and just use the default value. But if you want to modify them, you should refer to the following table and modify them according to your needs.
