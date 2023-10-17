@@ -45,8 +45,8 @@ jobs:
 
       - name: Build and Push the main branch Docker image
         if: ${{ github.ref_name == 'main' }}
-        run: ./dev/docker/hive/build-docker.sh --platform all --image ${HIVE_IMAGE_NAME}:${{ github.event.inputs.tag }} --tag ${HIVE_IMAGE_NAME}:latest
+        run: ./dev/docker/hive/build-docker.sh --platform all --image ${HIVE_IMAGE_NAME} --tag ${{ github.event.inputs.tag }} --latest
 
       - name: Build and Push the other branch Docker image
         if: ${{ github.ref_name != 'main' }}
-        run: ./dev/docker/hive/build-docker.sh --platform all --image ${HIVE_IMAGE_NAME}:${{ github.event.inputs.tag }}
+        run: ./dev/docker/hive/build-docker.sh --platform all --image ${HIVE_IMAGE_NAME} --tag ${{ github.event.inputs.tag }}
