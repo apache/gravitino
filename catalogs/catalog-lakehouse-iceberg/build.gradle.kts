@@ -38,6 +38,7 @@ dependencies {
       exclude("org.slf4j")
     }
     implementation(libs.iceberg.hive.metastore)
+    implementation(libs.sqlite.jdbc)
 
     implementation(libs.hive2.metastore) {
         exclude("org.apache.avro", "avro")
