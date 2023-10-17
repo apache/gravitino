@@ -3,8 +3,8 @@
   This software is licensed under the Apache License version 2.
 -->
 # Hadoop and Hive Docker image
-This Docker image is used to support Graviton integration testing.
-It includes Hadoop-2.x and Hive-2.x, you can use this Docker image to test the Graviton catalog-hive module.
+This Docker image is used to support Gravitino integration testing.
+It includes Hadoop-2.x and Hive-2.x, you can use this Docker image to test the Gravitino catalog-hive module.
 
 ## Build Docker image
 ```
@@ -13,7 +13,7 @@ It includes Hadoop-2.x and Hive-2.x, you can use this Docker image to test the G
 
 ## Run container
 ```
-docker run --rm -d -p 8022:22 -p 8088:8088 -p 9000:9000 -p 9083:9083 -p 10000:10000 -p 10002:10002 -p 50070:50070 -p 50075:50075 datastrato/graviton-ci-hive
+docker run --rm -d -p 8022:22 -p 8088:8088 -p 9000:9000 -p 9083:9083 -p 10000:10000 -p 10002:10002 -p 50070:50070 -p 50075:50075 datastrato/gravitino-ci-hive
 ```
 
 ## Login Docker container
@@ -22,11 +22,11 @@ ssh -p 8022 datastrato@localhost (password: ds123, this is a sudo user)
 ```
 
 # Docker hub repository
-- [datastrato/graviton-ci-hive](https://hub.docker.com/r/datastrato/graviton-ci-hive)
+- [datastrato/gravitino-ci-hive](https://hub.docker.com/r/datastrato/gravitino-ci-hive)
 
 ## Version change history
 ### 0.1.0
-- Docker image `datastrato/graviton-ci-hive:0.1.0`
+- Docker image `datastrato/gravitino-ci-hive:0.1.0`
 - `hadoop-2.7.3`
 - `hive-2.3.9`
 - Expose ports:
@@ -40,12 +40,12 @@ ssh -p 8022 datastrato@localhost (password: ds123, this is a sudo user)
   - `10002` HiveServer2 HTTP
 
 ### 0.1.1
-- base on `datastrato/graviton-ci-hive:0.1.0`
+- base on `datastrato/gravitino-ci-hive:0.1.0`
 - Modify HDFS/YARN/HIVE `MaxPermSize` from `8GB` to `128MB`
 - Modify `HADOOP_HEAPSIZE` from `8192` to `128
 
 ### 0.1.2
-- base on `datastrato/graviton-ci-hive:0.1.1` 
+- base on `datastrato/gravitino-ci-hive:0.1.1` 
 - Modify `fs.defaultFS` from `local` to `0.0.0.0` in the `core-site.xml` file.
 - Expose `9000` port int the `Dockerfile` file.
 

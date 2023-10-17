@@ -24,10 +24,10 @@ Others like MongoDB, ES
 
 After we refer to snowflake schema and others (Hashdata and so on), KV storage is better than other kinds of storage compared to relational databases.
 
-According to our previous design, Matadata in graviton will be originzed as the following structure
+According to our previous design, Matadata in gravitino will be originzed as the following structure
 ![mc](../rfc-1/schema-overview.png)
 
-According to the picture above, Metadata in graviton can be divided into multiple layers which is a little bit like a file directory structure. To implement this hierarchy, we can choose the following options to encode keys.
+According to the picture above, Metadata in gravitino can be divided into multiple layers which is a little bit like a file directory structure. To implement this hierarchy, we can choose the following options to encode keys.
 
 ## Design
 

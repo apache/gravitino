@@ -57,7 +57,7 @@ subprojects {
 
   val allDeps by tasks.registering(DependencyReportTask::class)
 
-  group = "com.datastrato.graviton"
+  group = "com.datastrato.gravitino"
   version = "${version}"
 
   tasks.withType<Jar> {
@@ -157,7 +157,7 @@ tasks {
   val compileDistribution by registering {
     dependsOn("copySubprojectDependencies", "copyCatalogLibAndConfigs", "copySubprojectLib")
 
-    group = "graviton distribution"
+    group = "gravitino distribution"
     outputs.dir(projectDir.dir("distribution/package"))
     doLast {
       copy {
@@ -173,7 +173,7 @@ tasks {
   }
 
   val assembleDistribution by registering(Tar::class) {
-    group = "graviton distribution"
+    group = "gravitino distribution"
     finalizedBy("checksumDistribution")
     into("${rootProject.name}-${version}")
     from(compileDistribution.map { it.outputs.files.single() })
@@ -183,7 +183,7 @@ tasks {
   }
 
   register("checksumDistribution") {
-    group = "graviton distribution"
+    group = "gravitino distribution"
     dependsOn(assembleDistribution)
     val archiveFile = assembleDistribution.flatMap { it.archiveFile }
     val checksumFile = archiveFile.map { archive ->
@@ -199,7 +199,7 @@ tasks {
   }
 
   val cleanDistribution by registering(Delete::class) {
-    group = "graviton distribution"
+    group = "gravitino distribution"
     delete(outputDir)
   }
 
@@ -237,7 +237,7 @@ tasks {
 
   clean {
     dependsOn(cleanDistribution)
-    delete("/tmp/graviton")
+    delete("/tmp/gravitino")
     delete("server/src/main/resources/project.properties")
   }
 }

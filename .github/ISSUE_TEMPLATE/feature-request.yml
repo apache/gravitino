@@ -1,6 +1,6 @@
 name: Feature Request
 title: "[FEATURE] "
-description: Suggest an idea for Graviton
+description: Suggest an idea for Gravitino
 labels: [ "kind:feature,priority:major" ]
 body:
 
