@@ -41,24 +41,24 @@ public class IcebergConfig extends Config {
 
   public static final ConfigEntry<String> JDBC_USER =
       new ConfigBuilder(ICEBERG_JDBC_USER)
-          .doc("The username of the Jdbc")
+          .doc("The username of the Jdbc connection")
           .version(DEFAULT_VERSION)
           .stringConf()
           .createWithDefault(null);
 
   public static final ConfigEntry<String> JDBC_PASSWORD =
       new ConfigBuilder(ICEBERG_JDBC_PASSWORD)
-          .doc("The password of the Jdbc")
+          .doc("The password of the Jdbc connection")
           .version(DEFAULT_VERSION)
           .stringConf()
           .createWithDefault(null);
 
   public static final ConfigEntry<Boolean> JDBC_INIT_TABLES =
       new ConfigBuilder(ICEBERG_JDBC_INITIALIZE)
-          .doc("whether to initialize meta tables when create Jdbc catalog")
+          .doc("Whether to initialize meta tables when create Jdbc catalog")
           .version(DEFAULT_VERSION)
           .booleanConf()
-          .createWithDefault(Boolean.TRUE);
+          .createWithDefault(true);
 
   public IcebergConfig() {
     super(false);
