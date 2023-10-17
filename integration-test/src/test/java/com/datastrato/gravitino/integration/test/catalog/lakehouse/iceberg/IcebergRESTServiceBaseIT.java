@@ -153,7 +153,7 @@ public class IcebergRESTServiceBaseIT extends AbstractIT {
             + IcebergRESTService.SERVICE_NAME
             + "."
             + IcebergConfig.CATALOG_WAREHOUSE.getKey(),
-        "file:///tmp/user/hive/warehouse-mysql/");
+        "file:///tmp/user/hive/warehouse-jdbc-sqlite/");
 
     return configMap;
   }
