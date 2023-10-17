@@ -91,7 +91,7 @@ function launch_website() {
 
   # Set the Hugo website configuration
   echo "languageCode = 'en-us'
-  title = 'Graviton Docs'
+  title = 'Gravitino Docs'
   theme = 'ananke'" > hugo.toml
 
   copy_docs
