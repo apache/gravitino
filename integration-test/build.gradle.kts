@@ -110,7 +110,7 @@ dependencies {
 
 /* Optimizing integration test execution conditions */
 // Use this variable to control if we need to run docker test or not.
-var HIVE_IMAGE_NAME = "datastrato/graviton-ci-hive"
+var HIVE_IMAGE_NAME = "datastrato/gravitino-ci-hive"
 var HIVE_IMAGE_TAG_NAME = "${HIVE_IMAGE_NAME}:0.1.2"
 var EXCLUDE_DOCKER_TEST = true
 // Use these 3 variables allow for more detailed control in the future.
@@ -130,12 +130,12 @@ fun printDockerCheckInfo() {
 
   println("------------------ Check Docker environment -----------------")
   println("Docker server status ........................................ [${if (dockerRunning) "running" else "stop"}]")
-  println("Graviton IT Docker container is already running ............. [${if (hiveContainerRunning) "yes" else "no"}]")
+  println("Gravitino IT Docker container is already running ............. [${if (hiveContainerRunning) "yes" else "no"}]")
 
   if (dockerRunning && hiveContainerRunning) {
-    println("Use Graviton IT Docker container to run all integration test. [$testMode test]")
+    println("Use Gravitino IT Docker container to run all integration test. [$testMode test]")
   } else {
-    println("Run test cases without `graviton-docker-it` tag ............. [$testMode test]")
+    println("Run test cases without `gravitino-docker-it` tag ............. [$testMode test]")
   }
   println("-------------------------------------------------------------")
 }
@@ -193,28 +193,28 @@ tasks.test {
     dependsOn("checkDockerRunning")
 
     doFirst {
-      // Default use MiniGraviton to run integration tests
-      environment("GRAVITON_ROOT_DIR", rootDir.path)
+      // Default use MiniGravitino to run integration tests
+      environment("GRAVITINO_ROOT_DIR", rootDir.path)
       environment("HADOOP_USER_NAME", "hive")
       environment("HADOOP_HOME", "/tmp")
       environment("PROJECT_VERSION", version)
 
       val testMode = project.properties["testMode"] as? String ?: "embedded"
-      systemProperty("graviton.log.path", buildDir.path)
+      systemProperty("gravitino.log.path", buildDir.path)
       if (testMode == "deploy") {
-        environment("GRAVITON_HOME", rootDir.path + "/distribution/package")
+        environment("GRAVITINO_HOME", rootDir.path + "/distribution/package")
         systemProperty("testMode", "deploy")
       } else if (testMode == "embedded") {
-        environment("GRAVITON_HOME", rootDir.path)
-        environment("GRAVITON_TEST", "true")
+        environment("GRAVITINO_HOME", rootDir.path)
+        environment("GRAVITINO_TEST", "true")
         systemProperty("testMode", "embedded")
       } else {
-        throw GradleException("Graviton integration test only support [-PtestMode=embedded] or [-PtestMode=deploy] mode!")
+        throw GradleException("Gravitino integration test only support [-PtestMode=embedded] or [-PtestMode=deploy] mode!")
       }
 
       useJUnitPlatform {
         if (EXCLUDE_DOCKER_TEST) {
-          excludeTags("graviton-docker-it")
+          excludeTags("gravitino-docker-it")
         }
       }
     }

@@ -10,7 +10,7 @@ bin="$(cd "${bin}">/dev/null; pwd)"
 # Environment variables definition
 HADOOP_VERSION="2.7.3"
 HIVE_VERSION="2.3.9"
-IMAGE_NAME="datastrato/graviton-ci-hive:0.1.1"
+IMAGE_NAME="datastrato/gravitino-ci-hive:0.1.1"
 
 HADOOP_PACKAGE_NAME="hadoop-${HADOOP_VERSION}.tar.gz"
 HADOOP_DOWNLOAD_URL="http://archive.apache.org/dist/hadoop/core/hadoop-${HADOOP_VERSION}/${HADOOP_PACKAGE_NAME}"

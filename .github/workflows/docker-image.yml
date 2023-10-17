@@ -12,7 +12,7 @@ on:
         required: true
         type: string
 env:
-  HIVE_IMAGE_NAME: datastrato/graviton-ci-hive
+  HIVE_IMAGE_NAME: datastrato/gravitino-ci-hive
 
 jobs:
   publish-docker-image:

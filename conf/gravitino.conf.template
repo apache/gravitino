@@ -1,0 +1,48 @@
+#
+# Copyright 2023 Datastrato.
+# This software is licensed under the Apache License version 2.
+#
+
+# THE CONFIGURATION FOR Gravitino SERVER
+gravitino.server.shutdown.timeout = 3000
+
+# THE CONFIGURATION FOR Gravitino WEB SERVER
+# The host name of the built-in web server
+gravitino.server.webserver.host = 127.0.0.1
+# The http port number of the built-in web server
+gravitino.server.webserver.httpPort = 8090
+# The core thread size of the built-in web server
+gravitino.server.webserver.coreThreads = 24
+# The max thread size of the built-in web server
+gravitino.server.webserver.maxThreads = 200
+# The stop idle timeout of the built-in web server
+gravitino.server.webserver.stopIdleTimeout = 30000
+# The executor thread pool work queue size of the built-in web server
+gravitino.server.webserver.threadPoolWorkQueueSize = 100
+# The request header size of the built-in web server
+gravitino.server.webserver.requestHeaderSize = 131072
+# The response header size of the built-in web server
+gravitino.server.webserver.responseHeaderSize = 131072
+
+# THE CONFIGURATION FOR Gravitino ENTITY STORE
+# The entity store to use
+gravitino.entity.store = kv
+# The RocksDB entity store
+gravitino.entity.store.kv = RocksDBKvBackend
+# The RocksDB backend path for entity store
+gravitino.entity.store.kv.rocksdbPath = /tmp/gravitino
+
+# THE CONFIGURATION FOR Gravitino CATALOG
+# The interval in milliseconds to evict the catalog cache
+gravitino.catalog.cache.evictionIntervalMs = 3600000
+
+# THE CONFIGURATION FOR AUXILIARY SERVICE
+# Auxiliary service names, separate by ','
+gravitino.auxService.names = iceberg-rest
+# Iceberg REST service classpath
+gravitino.auxService.iceberg-rest.classpath = catalogs/lakehouse-iceberg/libs, catalogs/lakehouse-iceberg/conf
+# Iceberg REST service host
+gravitino.auxService.iceberg-rest.host = 127.0.0.1
+# Iceberg REST service http port
+gravitino.auxService.iceberg-rest.httpPort = 9001
+

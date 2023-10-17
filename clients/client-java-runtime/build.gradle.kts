@@ -20,7 +20,7 @@ tasks.withType<ShadowJar>(ShadowJar::class.java) {
   archiveClassifier.set("")
 
   // Relocate dependencies to avoid conflicts
-  relocate("io.substrait", "com.datastrato.graviton.shaded.io.substrait") {
+  relocate("io.substrait", "com.datastrato.gravitino.shaded.io.substrait") {
     exclude("org.slf4j")
     exclude("com.fasterxml.jackson.core")
     exclude("com.fasterxml.jackson.datatype")
@@ -28,11 +28,11 @@ tasks.withType<ShadowJar>(ShadowJar::class.java) {
     exclude("com.google.code.findbugs")
     exclude("com.google.protobuf")
   }
-  relocate("com.google", "com.datastrato.graviton.shaded.com.google")
-  relocate("com.fasterxml", "com.datastrato.graviton.shaded.com.fasterxml")
-  relocate("org.apache.httpcomponents", "com.datastrato.graviton.shaded.org.apache.httpcomponents")
-  relocate("org.apache.commons", "com.datastrato.graviton.shaded.org.apache.commons")
-  relocate("org.antlr", "com.datastrato.graviton.shaded.org.antlr")
+  relocate("com.google", "com.datastrato.gravitino.shaded.com.google")
+  relocate("com.fasterxml", "com.datastrato.gravitino.shaded.com.fasterxml")
+  relocate("org.apache.httpcomponents", "com.datastrato.gravitino.shaded.org.apache.httpcomponents")
+  relocate("org.apache.commons", "com.datastrato.gravitino.shaded.org.apache.commons")
+  relocate("org.antlr", "com.datastrato.gravitino.shaded.org.antlr")
 }
 
 tasks.jar {
