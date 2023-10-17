@@ -70,12 +70,10 @@ function launch_website() {
     mkdir -p "${bin}/build"
   fi
 
-  if [ ! -d "${bin}/build/hugo" ]; then
-    if [ ! -f "${bin}/build/hugo" ]; then
-      wget -q -P "${bin}/build" ${HUGO_DOWNLOAD_URL}
-      tar -xzf "${bin}/build/${HUGO_PACKAGE_NAME}" -C "${bin}/build"
-      rm -rf "${bin}/build/${HUGO_PACKAGE_NAME}"
-    fi
+  if [ ! -f "${bin}/build/hugo" ]; then
+    wget -q -P "${bin}/build" ${HUGO_DOWNLOAD_URL}
+    tar -xzf "${bin}/build/${HUGO_PACKAGE_NAME}" -C "${bin}/build"
+    rm -rf "${bin}/build/${HUGO_PACKAGE_NAME}"
   fi
 
   # Remove the old Hugo website
