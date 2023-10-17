@@ -98,6 +98,6 @@ tasks {
     }
   }
   test {
-    environment("GRAVITON_HOME", rootDir.path)
+    environment("GRAVITINO_HOME", rootDir.path)
   }
 }

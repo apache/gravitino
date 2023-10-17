@@ -1,6 +1,6 @@
-# Contributing to Graviton
+# Contributing to Gravitino
 
-Welcome! We appreciate your interest in contributing to Graviton. This file provides guidelines and information on how to contribute effectively to the project. Please take a moment to read through this document before getting started. By contributing to this project, you agree to abide by the guidelines outlined below.
+Welcome! We appreciate your interest in contributing to Gravitino. This file provides guidelines and information on how to contribute effectively to the project. Please take a moment to read through this document before getting started. By contributing to this project, you agree to abide by the guidelines outlined below.
 
 ## Table of Contents
 
@@ -14,7 +14,7 @@ Welcome! We appreciate your interest in contributing to Graviton. This file prov
 
 ## Getting Started
 
-To get started with Graviton, follow these steps:
+To get started with Gravitino, follow these steps:
 
 1. Fork the repository on GitHub.
 2. Clone the forked repository to your local machine.
@@ -70,7 +70,7 @@ We value and appreciate the diverse contributions and ideas from the community. 
 
 ## Large Contributions and ICLA
 
-For significant contributions to Graviton, we require contributors to sign an Individual Contributor License Agreement (ICLA). This ensures that the project and its community can properly manage and maintain intellectual property rights.
+For significant contributions to Gravitino, we require contributors to sign an Individual Contributor License Agreement (ICLA). This ensures that the project and its community can properly manage and maintain intellectual property rights.
 
 If you plan to make a large contribution, please contact us at [justin@datastrato.com](mailto:justin@datastrato.com) to discuss the ICLA process.
 
@@ -80,4 +80,4 @@ If you have any questions or need further assistance, you can reach out to us at
 
 ## License
 
-Graviton is licensed under the Apache License version 2. Please see the [LICENSE](LICENSE) file for more details. By contributing to this project, you agree to license your contributions under the same license.
+Gravitino is licensed under the Apache License version 2. Please see the [LICENSE](LICENSE) file for more details. By contributing to this project, you agree to license your contributions under the same license.

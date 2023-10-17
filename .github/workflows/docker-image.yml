@@ -12,12 +12,12 @@ on:
         required: true
         type: string
 env:
-  HIVE_IMAGE_NAME: datastrato/graviton-ci-hive
+  HIVE_IMAGE_NAME: datastrato/gravitino-ci-hive
 
 jobs:
   publish-docker-image:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 120
     env:
       input_token: ${{ github.event.inputs.token }}
       secrets_token: ${{ secrets.PUBLISH_DOCKER_TOKEN }}
