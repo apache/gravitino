@@ -28,9 +28,7 @@ public class ITUtils {
     try (InputStream inputStream = Files.newInputStream(Paths.get(configTempFileName));
         OutputStream outputStream = Files.newOutputStream(Paths.get(configFileName))) {
       props.load(inputStream);
-      for (Map.Entry<String, String> entry : configMap.entrySet()) {
-        props.setProperty(entry.getKey(), entry.getValue());
-      }
+      props.putAll(configMap);
       props.store(outputStream, null);
     }
   }

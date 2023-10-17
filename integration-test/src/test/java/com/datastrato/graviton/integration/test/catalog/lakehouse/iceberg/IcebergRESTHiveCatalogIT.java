@@ -11,7 +11,8 @@ import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
 
 // Hive&Jdbc catalog must be tested with graviton-docker-it env,
-// so create a separate class not using junit `parameterized test` to auto generate catalog type
+// so we should create a separate class instead using junit `parameterized test`
+// to auto-generate catalog type
 @Tag("graviton-docker-it")
 @TestInstance(Lifecycle.PER_CLASS)
 public class IcebergRESTHiveCatalogIT extends IcebergRESTServiceIT {
