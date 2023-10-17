@@ -23,8 +23,6 @@ import com.datastrato.graviton.server.web.JettyServerConfig;
 import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Collections;
@@ -41,6 +39,7 @@ import org.slf4j.LoggerFactory;
 
 public class MiniGraviton {
   private static final Logger LOG = LoggerFactory.getLogger(MiniGraviton.class);
+  private MiniGravitonContext context;
   private RESTClient restClient;
   private final File mockConfDir;
   private final ServerConfig serverConfig = new ServerConfig();
@@ -50,7 +49,8 @@ public class MiniGraviton {
 
   private int port;
 
-  public MiniGraviton() throws IOException {
+  public MiniGraviton(MiniGravitonContext context) throws IOException {
+    this.context = context;
     this.mockConfDir = Files.createTempDirectory("MiniGraviton").toFile();
     mockConfDir.mkdirs();
   }
@@ -154,6 +154,29 @@ public class MiniGraviton {
     return serverConfig;
   }
 
+  Map<String, String> getIcebergRestServiceConfigs() throws IOException {
+    Map<String, String> customConfigs = new HashMap<>();
+
+    String icebergJarPath =
+        Paths.get("catalogs", "catalog-lakehouse-iceberg", "build", "libs").toString();
+    String icebergConfigPath =
+        Paths.get("catalogs", "catalog-lakehouse-iceberg", "src", "main", "resources").toString();
+    customConfigs.put(
+        AuxiliaryServiceManager.GRAVITON_AUX_SERVICE_PREFIX
+            + IcebergRESTService.SERVICE_NAME
+            + "."
+            + AuxiliaryServiceManager.AUX_SERVICE_CLASSPATH,
+        String.join(",", icebergJarPath, icebergConfigPath));
+
+    customConfigs.put(
+        AuxiliaryServiceManager.GRAVITON_AUX_SERVICE_PREFIX
+            + IcebergRESTService.SERVICE_NAME
+            + "."
+            + JettyServerConfig.WEBSERVER_HTTP_PORT.getKey(),
+        String.valueOf(RESTUtils.findAvailablePort(3000, 4000)));
+    return customConfigs;
+  }
+
   // Customize the config file
   private void customizeConfigFile(String configTempFileName, String configFileName)
       throws IOException {
@@ -164,42 +187,10 @@ public class MiniGraviton {
     configMap.put(
         Configs.ENTRY_KV_ROCKSDB_BACKEND_PATH.getKey(), "/tmp/graviton-" + UUID.randomUUID());
 
-    configMap.put(
-        AuxiliaryServiceManager.GRAVITON_AUX_SERVICE_PREFIX
-            + AuxiliaryServiceManager.AUX_SERVICE_NAMES,
-        IcebergRESTService.SERVICE_NAME);
+    configMap.putAll(getIcebergRestServiceConfigs());
+    configMap.putAll(context.customConfig);
 
-    String icebergJarPath =
-        Paths.get("catalogs", "catalog-lakehouse-iceberg", "build", "libs").toString();
-    String icebergConfigPath =
-        Paths.get("catalogs", "catalog-lakehouse-iceberg", "src", "main", "resources").toString();
-    configMap.put(
-        AuxiliaryServiceManager.GRAVITON_AUX_SERVICE_PREFIX
-            + IcebergRESTService.SERVICE_NAME
-            + "."
-            + AuxiliaryServiceManager.AUX_SERVICE_CLASSPATH,
-        String.join(",", icebergJarPath, icebergConfigPath));
-    configMap.put(
-        AuxiliaryServiceManager.GRAVITON_AUX_SERVICE_PREFIX
-            + IcebergRESTService.SERVICE_NAME
-            + "."
-            + JettyServerConfig.WEBSERVER_HTTP_PORT.getKey(),
-        String.valueOf(RESTUtils.findAvailablePort(3000, 4000)));
-
-    Properties props = new Properties();
-
-    try (InputStream inputStream = Files.newInputStream(Paths.get(configTempFileName));
-        OutputStream outputStream = Files.newOutputStream(Paths.get(configFileName))) {
-      props.load(inputStream);
-
-      for (Map.Entry<String, String> entry : configMap.entrySet()) {
-        props.setProperty(entry.getKey(), entry.getValue());
-      }
-
-      props.store(outputStream, null);
-    } catch (IOException e) {
-      LOG.error("Exception in customizeConfigFile ", e);
-    }
+    ITUtils.rewriteConfigFile(configTempFileName, configFileName, configMap);
   }
 
   private boolean checkIfServerIsRunning() {

@@ -105,6 +105,7 @@ dependencies {
     exclude("org.apache.zookeeper")
     exclude("io.dropwizard.metrics")
   }
+  testImplementation(libs.scala.collection.compat) 
   testImplementation(libs.slf4j.jdk14)
 }
 
