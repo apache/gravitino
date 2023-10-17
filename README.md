@@ -2,13 +2,13 @@
   Copyright 2023 Datastrato.
   This software is licensed under the Apache License version 2.
 -->
-# Graviton
+# Gravitino
 ## Introduction
 
-Graviton is a high-performance, geo-distributed and federated metadata lake.
+Gravitino is a high-performance, geo-distributed and federated metadata lake.
 
 ## Development Guide
 
-1. [How to build Graviton](docs/how-to-build.md)
+1. [How to build Gravitino](docs/how-to-build.md)
 2. [How to Run Integration Test](docs/integration-test.md)
 3. [How to publish Docker images](docs/publish-docker-images.md)

@@ -9,7 +9,7 @@ on:
     branches: [ "main", "branch-*" ]
 
 env:
-  HIVE_IMAGE_NAME: datastrato/graviton-ci-hive
+  HIVE_IMAGE_NAME: datastrato/gravitino-ci-hive
   HIVE_IMAGE_TAG_NAME: 0.1.2
 
 concurrency:
@@ -58,7 +58,7 @@ jobs:
       - name: Show gradle version
         run: gradle --version
 
-      - name: Package Graviton
+      - name: Package Gravitino
         run: |
           gradle build -x test
           gradle compileDistribution
@@ -89,17 +89,17 @@ jobs:
           gradle test --rerun-tasks -PskipTests -PtestMode=embedded
           gradle test --rerun-tasks -PskipTests -PtestMode=deploy
 
-      - name: Print logs when Graviton integration tests failure
+      - name: Print logs when Gravitino integration tests failure
         if: ${{ failure() && steps.integrationTest.outcome == 'failure' }}
         run: |
           if [ -f "integration-test/build/integration-test.log" ]; then
             cat integration-test/build/integration-test.log
           fi
-          if [ -f "distribution/package/logs/graviton-server.out" ]; then
-            cat distribution/package/logs/graviton-server.out
+          if [ -f "distribution/package/logs/gravitino-server.out" ]; then
+            cat distribution/package/logs/gravitino-server.out
           fi
-          if [ -f "distribution/package/logs/graviton-server.log" ]; then
-            cat distribution/package/logs/graviton-server.log
+          if [ -f "distribution/package/logs/gravitino-server.log" ]; then
+            cat distribution/package/logs/gravitino-server.log
           fi
 
       - name: Stop and remove container

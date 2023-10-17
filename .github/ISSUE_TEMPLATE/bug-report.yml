@@ -24,7 +24,7 @@ body:
     attributes:
       label: How to reproduce
       placeholder: >
-        + Which Graviton version to use
+        + Which Gravitino version to use
     validations:
       required: true
 

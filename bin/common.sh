@@ -10,25 +10,25 @@ else
   FWDIR=$(dirname "${BASH_SOURCE-$0}")
 fi
 
-echo ${GRAVITON_HOME}
+echo ${GRAVITINO_HOME}
 
-if [[ -z "${GRAVITON_HOME}" ]]; then
-  export GRAVITON_HOME="$(cd "${FWDIR}/.." || exit; pwd)"
+if [[ -z "${GRAVITINO_HOME}" ]]; then
+  export GRAVITINO_HOME="$(cd "${FWDIR}/.." || exit; pwd)"
 fi
 
-if [[ -z "${GRAVITON_CONF_DIR}" ]]; then
-  export GRAVITON_CONF_DIR="${GRAVITON_HOME}/conf"
+if [[ -z "${GRAVITINO_CONF_DIR}" ]]; then
+  export GRAVITINO_CONF_DIR="${GRAVITINO_HOME}/conf"
 fi
 
-if [[ -z "${GRAVITON_LOG_DIR}" ]]; then
-  export GRAVITON_LOG_DIR="${GRAVITON_HOME}/logs"
+if [[ -z "${GRAVITINO_LOG_DIR}" ]]; then
+  export GRAVITINO_LOG_DIR="${GRAVITINO_HOME}/logs"
 fi
 
-if [[ -f "${GRAVITON_CONF_DIR}/graviton-env.sh" ]]; then
-  . "${GRAVITON_CONF_DIR}/graviton-env.sh"
+if [[ -f "${GRAVITINO_CONF_DIR}/gravitino-env.sh" ]]; then
+  . "${GRAVITINO_CONF_DIR}/gravitino-env.sh"
 fi
 
-GRAVITON_CLASSPATH+=":${GRAVITON_CONF_DIR}"
+GRAVITINO_CLASSPATH+=":${GRAVITINO_CONF_DIR}"
 
 function check_java_version() {
   if [[ -n "${JAVA_HOME+x}" ]]; then
@@ -44,7 +44,7 @@ function check_java_version() {
   # JDK 8u151 version fixed a number of security vulnerabilities and issues to improve system stability and security.
   # https://www.oracle.com/java/technologies/javase/8u151-relnotes.html
   if [ "$JVM_VERSION" -lt 8 ] || { [ "$JVM_VERSION" -eq 8 ] && [ "${jvmver#*_}" -lt 151 ]; } ; then
-    echo "Graviton requires either Java 8 update 151 or newer"
+    echo "Gravitino requires either Java 8 update 151 or newer"
     exit 1;
   fi
 }
@@ -52,7 +52,7 @@ function check_java_version() {
 function addEachJarInDir(){
   if [[ -d "${1}" ]]; then
     for jar in "${1}"/*.jar ; do
-      GRAVITON_CLASSPATH="${jar}:${GRAVITON_CLASSPATH}"
+      GRAVITINO_CLASSPATH="${jar}:${GRAVITINO_CLASSPATH}"
     done
   fi
 }
@@ -60,19 +60,19 @@ function addEachJarInDir(){
 function addEachJarInDirRecursive(){
   if [[ -d "${1}" ]]; then
     for jar in "${1}"/**/*.jar ; do
-      GRAVITON_CLASSPATH="${jar}:${GRAVITON_CLASSPATH}"
+      GRAVITINO_CLASSPATH="${jar}:${GRAVITINO_CLASSPATH}"
     done
   fi
 }
 
 function addJarInDir(){
   if [[ -d "${1}" ]]; then
-    GRAVITON_CLASSPATH="${1}/*:${GRAVITON_CLASSPATH}"
+    GRAVITINO_CLASSPATH="${1}/*:${GRAVITINO_CLASSPATH}"
   fi
 }
 
-if [[ -z "${GRAVITON_MEM}" ]]; then
-  export GRAVITON_MEM="-Xmx1024m"
+if [[ -z "${GRAVITINO_MEM}" ]]; then
+  export GRAVITINO_MEM="-Xmx1024m"
 fi
 
 if [[ -n "${JAVA_HOME}" ]]; then

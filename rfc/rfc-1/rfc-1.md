@@ -52,7 +52,7 @@ Substrait’s type system can be referred here https://substrait.io/types/type_s
 
 ### Schema Entities
 
-The schema system in Graviton is organized like below:
+The schema system in Gravitino is organized like below:
 
 ![Schema System](schema-overview.png)
 
