@@ -7,11 +7,22 @@ set -ex
 bin="$(dirname "${BASH_SOURCE-$0}")"
 bin="$(cd "${bin}">/dev/null; pwd)"
 
+USAGE="Usage: launch-docs-website.sh [update]"
+
 OS=$(uname -s)
-if [ "$OS" != "Darwin" ]; then
-  echo "Currently only support macOS. In the future we can support other OS."
+if [ "$OS" == "Darwin" ]; then
+  HUGO_OS_NAME="darwin-universal"
+elif [[ "$OS" == "Linux" ]]; then
+  HUGO_OS_NAME="linux-amd64"
+else
+  echo "Currently only support macOS or Linux."
   exit 1
 fi
+
+# Download Hugo
+HUGO_VERSION="0.119.0"
+HUGO_PACKAGE_NAME="hugo_${HUGO_VERSION}_${HUGO_OS_NAME}.tar.gz"
+HUGO_DOWNLOAD_URL="https://github.com/gohugoio/hugo/releases/download/v${HUGO_VERSION}/${HUGO_PACKAGE_NAME}"
 
 # Because Markdown embedded images are relative paths,
 # Hugo website images are absolute paths.
@@ -54,22 +65,17 @@ function copy_docs() {
 
 # Launch the Hugo website
 function launch_website() {
-  # Download Hugo
-  HUGO_VERSION="0.119.0"
-  HUGO_PACKAGE_NAME="hugo_${HUGO_VERSION}_darwin-universal.tar.gz"
-  HUGO_DOWNLOAD_URL="https://github.com/gohugoio/hugo/releases/download/v${HUGO_VERSION}/${HUGO_PACKAGE_NAME}"
-
   # Prepare download packages
   if [[ ! -d "${bin}/build" ]]; then
     mkdir -p "${bin}/build"
   fi
 
-  if [ ! -f "${bin}/build/${HUGO_PACKAGE_NAME}" ]; then
-    wget -q -P "${bin}/build" ${HUGO_DOWNLOAD_URL}
-  fi
-
   if [ ! -d "${bin}/build/hugo" ]; then
+    if [ ! -f "${bin}/build/${HUGO_PACKAGE_NAME}" ]; then
+      curl -L -o "${bin}/build" ${HUGO_DOWNLOAD_URL}
+    fi
     tar -xzf "${bin}/build/${HUGO_PACKAGE_NAME}" -C "${bin}/build"
+    rm -rf "${bin}/build/${HUGO_PACKAGE_NAME}"
   fi
 
   # Remove the old Hugo website
@@ -96,6 +102,8 @@ function launch_website() {
 
 if [[ "$1" == "update" ]]; then
   copy_docs
+elif [[ "$1" != "" ]]; then
+  echo ${USAGE}
 else
   launch_website
 fi

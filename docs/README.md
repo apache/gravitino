@@ -8,7 +8,7 @@ This software is licensed under the Apache License version 2."
 
 ## Launch Graviton document website
 
-Execute `./launch-docs-website.sh` scripts, It will create the Graviton document website in locally, It follows these steps:
+Execute `./launch-docs-website.sh` scripts, it will create the Graviton document website locally, it follows these steps:
 
 1. Create a `build` directory within the `docs` directory.
 2. Automatically download the [Hugo](https://github.com/gohugoio/hugo) binary executable file into the `build` directory.
@@ -23,10 +23,10 @@ Execute `./launch-docs-website.sh` scripts, It will create the Graviton document
 
 ## Add or modify a document
 
-To add a new document to the Graviton website, follow these steps:
+To add a new document to the Graviton website, We should follow these steps:
 
-1. Create a new markdown file in the `docs` directory any directory.
-2. In the markdown file, include the following header at the beginning, because `Hugo` use it create website link list.
+1. Create a new markdown file in the `docs` directory.
+2. For the markdown file, we should include the following header at the beginning because `Hugo` use it create website link list.
     ```
     ---
     title: "Article Title"
