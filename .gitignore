@@ -37,3 +37,4 @@ distribution
 server/src/main/resources/project.properties
 
 dev/docker/hive/packages
+docs/build
