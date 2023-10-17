@@ -58,7 +58,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
 
-@Tag("graviton-docker-it")
+@Tag("gravitino-docker-it")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class CatalogIcebergIT extends AbstractIT {
   public static String metalakeName = GravitinoITUtils.genRandomName("iceberg_it_metalake");
