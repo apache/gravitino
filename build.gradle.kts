@@ -8,6 +8,10 @@ import com.github.vlsi.gradle.dsl.configureEach
 import java.util.Locale
 import org.gradle.internal.hash.ChecksumService
 import org.gradle.kotlin.dsl.support.serviceOf
+import com.github.jk1.license.render.ReportRenderer
+import com.github.jk1.license.render.InventoryHtmlReportRenderer
+import com.github.jk1.license.filter.DependencyFilter
+import com.github.jk1.license.filter.LicenseBundleNormalizer
 
 plugins {
   `maven-publish`
@@ -19,8 +23,13 @@ plugins {
   alias(libs.plugins.publish)
   // Apply one top level rat plugin to perform any required license enforcement analysis
   alias(libs.plugins.rat)
+  id("com.github.jk1.dependency-license-report") version "2.5"
 }
 
+licenseReport {
+    renderers = arrayOf<ReportRenderer>(InventoryHtmlReportRenderer("report.html", "Backend"))
+    filters = arrayOf<DependencyFilter>(LicenseBundleNormalizer())
+}
 repositories { mavenCentral() }
 
 java {

@@ -234,3 +234,7 @@
    Apache Zeppelin
    ./integration-test/src/test/java/com/datastrato/graviton/integration/util/CommandExecutor.java
    ./integration-test/src/test/java/com/datastrato/graviton/integration/util/ProcessData.java
+
+   Apache Hadoop
+   ./dev/docker/hive/hadoop-env.sh
+   ./dev/docker/hive/yarn-env.sh
