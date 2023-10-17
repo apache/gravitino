@@ -10,10 +10,16 @@ import static com.datastrato.gravitino.server.GravitinoServer.WEBSERVER_CONF_PRE
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.client.GravitinoClient;
 import com.datastrato.gravitino.integration.test.MiniGravitino;
+import com.datastrato.gravitino.integration.test.MiniGravitinoContext;
 import com.datastrato.gravitino.server.GravitinoServer;
 import com.datastrato.gravitino.server.ServerConfig;
 import com.datastrato.gravitino.server.web.JettyServerConfig;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.HashMap;
+import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -28,28 +34,49 @@ public class AbstractIT {
 
   private static MiniGravitino miniGravitino;
 
-  private static final String TEST_MODE = "testMode";
-  private static final String EMBEDDED_TEST_MODE = "embedded";
-
   protected static Config serverConfig;
 
   static String testMode = "";
 
+  protected static Map<String, String> customConfigs = new HashMap<>();
+
+  public static void registerCustomConfigs(Map<String, String> configs) {
+    customConfigs.putAll(configs);
+  }
+
+  private static void rewriteGravitinoServerConfig() throws IOException {
+    if (customConfigs.isEmpty()) return;
+
+    String gravitinoHome = System.getenv("GRAVITINO_HOME");
+
+    String tmpFileName = GravitinoServer.CONF_FILE + ".tmp";
+    Path tmpPath = Paths.get(gravitinoHome, "conf", tmpFileName);
+    Files.deleteIfExists(tmpPath);
+
+    Path configPath = Paths.get(gravitinoHome, "conf", GravitinoServer.CONF_FILE);
+    Files.move(configPath, tmpPath);
+
+    ITUtils.rewriteConfigFile(tmpPath.toString(), configPath.toString(), customConfigs);
+  }
+
   @BeforeAll
   public static void startIntegrationTest() throws Exception {
     testMode =
-        System.getProperty(TEST_MODE) == null ? EMBEDDED_TEST_MODE : System.getProperty(TEST_MODE);
+        System.getProperty(ITUtils.TEST_MODE) == null
+            ? ITUtils.EMBEDDED_TEST_MODE
+            : System.getProperty(ITUtils.TEST_MODE);
 
     LOG.info("Running Gravitino Server in {} mode", testMode);
 
     serverConfig = new ServerConfig();
-    if (testMode != null && testMode.equals(EMBEDDED_TEST_MODE)) {
-      miniGravitino = new MiniGravitino();
+    if (testMode != null && testMode.equals(ITUtils.EMBEDDED_TEST_MODE)) {
+      MiniGravitinoContext context = new MiniGravitinoContext(customConfigs);
+      miniGravitino = new MiniGravitino(context);
       miniGravitino.start();
       serverConfig = miniGravitino.getServerConfig();
     } else {
+      rewriteGravitinoServerConfig();
       serverConfig.loadFromFile(GravitinoServer.CONF_FILE);
-
       try {
         FileUtils.deleteDirectory(
             FileUtils.getFile(serverConfig.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)));
@@ -72,7 +99,7 @@ public class AbstractIT {
     if (client != null) {
       client.close();
     }
-    if (testMode != null && testMode.equals(EMBEDDED_TEST_MODE)) {
+    if (testMode != null && testMode.equals(ITUtils.EMBEDDED_TEST_MODE)) {
       miniGravitino.stop();
     } else {
       GravitinoITUtils.stopGravitinoServer();
