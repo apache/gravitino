@@ -58,7 +58,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
 
-@Tag("gravitino-docker-it")
+@Tag("graviton-docker-it")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class CatalogIcebergIT extends AbstractIT {
   public static String metalakeName = GravitinoITUtils.genRandomName("iceberg_it_metalake");
@@ -203,9 +203,9 @@ public class CatalogIcebergIT extends AbstractIT {
     Set<String> schemaNames =
         Arrays.stream(nameIdentifiers).map(NameIdentifier::name).collect(Collectors.toSet());
     Assertions.assertTrue(schemaNames.contains(schemaName));
+
     List<org.apache.iceberg.catalog.Namespace> icebergNamespaces =
         hiveCatalog.listNamespaces(IcebergTableOpsHelper.getIcebergNamespace());
-
     schemaNames =
         icebergNamespaces.stream().map(ns -> ns.level(ns.length() - 1)).collect(Collectors.toSet());
     Assertions.assertTrue(schemaNames.contains(schemaName));
@@ -218,6 +218,7 @@ public class CatalogIcebergIT extends AbstractIT {
     Map<String, NameIdentifier> schemaMap =
         Arrays.stream(nameIdentifiers).collect(Collectors.toMap(NameIdentifier::name, v -> v));
     Assertions.assertTrue(schemaMap.containsKey(testSchemaName));
+
     icebergNamespaces = hiveCatalog.listNamespaces(IcebergTableOpsHelper.getIcebergNamespace());
     schemaNames =
         icebergNamespaces.stream().map(ns -> ns.level(ns.length() - 1)).collect(Collectors.toSet());
@@ -245,6 +246,7 @@ public class CatalogIcebergIT extends AbstractIT {
         () ->
             hiveCatalog.loadNamespaceMetadata(
                 IcebergTableOpsHelper.getIcebergNamespace(schemaIdent.name())));
+
     nameIdentifiers = schemas.listSchemas(Namespace.of(metalakeName, catalogName));
     schemaMap =
         Arrays.stream(nameIdentifiers).collect(Collectors.toMap(NameIdentifier::name, v -> v));
@@ -268,9 +270,10 @@ public class CatalogIcebergIT extends AbstractIT {
                 Distribution.NONE,
                 null));
     // drop schema failed check.
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> schemas.dropSchema(schemaIdent, true));
     Assertions.assertFalse(schemas.dropSchema(schemaIdent, false));
-    Assertions.assertDoesNotThrow(() -> tableCatalog.dropTable(table));
-    Assertions.assertDoesNotThrow(() -> schemas.dropSchema(schemaIdent, false));
+    Assertions.assertFalse(tableCatalog.dropTable(table));
     icebergNamespaces = hiveCatalog.listNamespaces(IcebergTableOpsHelper.getIcebergNamespace());
     schemaNames =
         icebergNamespaces.stream().map(ns -> ns.level(ns.length() - 1)).collect(Collectors.toSet());
