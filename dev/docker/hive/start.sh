@@ -9,6 +9,12 @@ service ssh start
 ssh-keyscan localhost > /root/.ssh/known_hosts
 ssh-keyscan 0.0.0.0 >> /root/.ssh/known_hosts
 
+# Map the hostname to 127.0.0.1 for external access datanode
+hostname=$(cat /etc/hostname)
+new_content=$(cat /etc/hosts | sed "/$hostname/s/^/# /")
+new_content="${new_content}\n127.0.0.1 ${hostname}"
+echo -e "$new_content" > /etc/hosts
+
 # start hadoop
 ${HADOOP_HOME}/sbin/start-all.sh
 
