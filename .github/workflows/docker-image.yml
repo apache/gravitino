@@ -17,7 +17,7 @@ env:
 jobs:
   publish-docker-image:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     env:
       input_token: ${{ github.event.inputs.token }}
       secrets_token: ${{ secrets.PUBLISH_DOCKER_TOKEN }}
