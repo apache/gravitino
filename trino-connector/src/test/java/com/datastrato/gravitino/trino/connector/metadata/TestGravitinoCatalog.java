@@ -4,17 +4,18 @@
  */
 package com.datastrato.gravitino.trino.connector.metadata;
 
+import static org.testng.Assert.assertEquals;
+
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.dto.AuditDTO;
 import com.datastrato.gravitino.dto.CatalogDTO;
 import java.time.Instant;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
+import org.testng.annotations.Test;
 
 public class TestGravitinoCatalog {
 
   @Test
-  void testGravitinoCatalog() {
+  public void testGravitinoCatalog() {
     String catalogName = "mock";
     String provider = "hive";
     CatalogDTO mockCatalog =
@@ -27,7 +28,7 @@ public class TestGravitinoCatalog {
                 new AuditDTO.Builder().withCreator("creator").withCreateTime(Instant.now()).build())
             .build();
     GravitinoCatalog catalog = new GravitinoCatalog(mockCatalog);
-    Assertions.assertEquals(catalogName, catalog.getName());
-    Assertions.assertEquals(provider, catalog.getProvider());
+    assertEquals(catalogName, catalog.getName());
+    assertEquals(provider, catalog.getProvider());
   }
 }

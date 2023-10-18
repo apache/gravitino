@@ -40,6 +40,10 @@ java {
   }
 }
 
+dependencies {
+  testImplementation(libs.testng)
+}
+
 subprojects {
   apply(plugin = "jacoco")
 
@@ -51,7 +55,11 @@ subprojects {
   tasks.configureEach<Test> {
     val skipTests = project.hasProperty("skipTests")
     if (!skipTests) {
-      useJUnitPlatform()
+      if (project.name == "trino-connector") {
+        useTestNG()
+      } else {
+        useJUnitPlatform()
+      }
       finalizedBy(tasks.getByName("jacocoTestReport"))
     }
   }

@@ -72,6 +72,9 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
         catalogConnectorManager.getCatalogConnector(catalogName);
     Preconditions.checkNotNull(catalogConnectorContext, "catalogConnector is not null");
 
+    // For testing
+    GravitinoPlugin.internalTestingConnector = catalogConnectorContext.getInternalConnector();
+
     return catalogConnectorContext.getConnector();
   }
 }

@@ -30,6 +30,7 @@ trino = '426'
 spark = "3.4.1"
 scala-collection-compat = "2.7.0"
 sqlite-jdbc = "3.42.0.0"
+testng = "7.4.0"
 
 
 protobuf-plugin = "0.9.2"
@@ -95,6 +96,7 @@ iceberg-spark-runtime = { group = "org.apache.iceberg", name = "iceberg-spark-ru
 spark-sql = { group = "org.apache.spark", name = "spark-sql_2.13", version.ref = "spark" }
 scala-collection-compat =  { group = "org.scala-lang.modules", name = "scala-collection-compat_2.13", version.ref = "scala-collection-compat" }
 sqlite-jdbc = { group = "org.xerial", name = "sqlite-jdbc", version.ref = "sqlite-jdbc" }
+testng = { group = "org.testng", name = "testng", version.ref = "testng" }
 
 
 [bundles]

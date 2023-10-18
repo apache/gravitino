@@ -7,7 +7,7 @@ package com.datastrato.gravitino.trino.connector.metadata;
 import static java.util.Objects.requireNonNull;
 
 import com.datastrato.gravitino.rel.Column;
-import io.substrait.type.Type;
+import com.datastrato.gravitino.shaded.io.substrait.type.Type;
 import java.util.Map;
 
 /** Help Gravitino connector access ColumnMetadata from gravitino client. */
