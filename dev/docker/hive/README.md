@@ -8,7 +8,7 @@ It includes Hadoop-2.x and Hive-2.x, you can use this Docker image to test the G
 
 ## Build Docker image
 ```
-./build-docker.sh --platform [all|linux/amd64|linux/arm64] --image {image_name} --tag {tag_name}
+./build-docker.sh --platform [all|linux/amd64|linux/arm64] --image {image_name} --tag {tag_name} --latest
 ```
 
 ## Run container
