@@ -6,6 +6,7 @@ import com.diffplug.gradle.spotless.SpotlessExtension
 import com.diffplug.gradle.spotless.SpotlessPlugin
 import com.github.vlsi.gradle.dsl.configureEach
 import java.util.Locale
+import java.io.File
 import org.gradle.internal.hash.ChecksumService
 import org.gradle.kotlin.dsl.support.serviceOf
 import com.github.jk1.license.render.ReportRenderer
@@ -178,6 +179,10 @@ tasks {
         }
         fileMode = 0b111101101
       }
+
+      // Create the directory 'data' for storage.
+      val directory = File("distribution/package/data")
+      directory.mkdirs()
     }
   }
 
