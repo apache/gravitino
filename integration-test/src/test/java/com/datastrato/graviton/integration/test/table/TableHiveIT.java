@@ -392,10 +392,15 @@ public class TableHiveIT extends AbstractIT {
     catalog.asSchemas().loadSchema(schemaID);
     TableCatalog tableCatalog = catalog.asTableCatalog();
     String surnameCol = "surname";
+    String firstnameCol = "firstname";
 
     String[] fieldsA = {surnameCol};
-    TableChange column = TableChange.addColumn(fieldsA, TypeCreator.NULLABLE.STRING, "Lqst name");
-    tableCatalog.alterTable(tableID, column);
+    TableChange columnA = TableChange.addColumn(fieldsA, TypeCreator.NULLABLE.STRING, "Last name");
+    tableCatalog.alterTable(tableID, columnA);
+
+    String[] fieldsB = {firstnameCol};
+    TableChange columnB = TableChange.addColumn(fieldsA, TypeCreator.NULLABLE.STRING, "First name");
+    tableCatalog.alterTable(tableID, columnB);
 
     Table table = tableCatalog.loadTable(tableID);
     Column[] columns = table.columns();
@@ -403,19 +408,21 @@ public class TableHiveIT extends AbstractIT {
     assertEquals(dobCol.toLowerCase(), columns[1].name());
     assertEquals(addressCol.toLowerCase(), columns[2].name());
     assertEquals(surnameCol.toLowerCase(), columns[3].name());
+    assertEquals(firstnameCol.toLowerCase(), columns[4].name());
 
-    String[] fieldsB = {surnameCol};
-    ColumnPosition position = ColumnPosition.first();
+    // swap first and last names
+    ColumnPosition position = ColumnPosition.after(addressCol);
     UpdateColumnPosition changePosition =
         (UpdateColumnPosition) TableChange.updateColumnPosition(fieldsB, position);
     tableCatalog.alterTable(tableID, changePosition);
 
     table = tableCatalog.loadTable(tableID);
     columns = table.columns();
-    assertEquals(surnameCol.toLowerCase(), columns[0].name());
+    assertEquals(nameCol.toLowerCase(), columns[0].name());
     assertEquals(dobCol.toLowerCase(), columns[1].name());
     assertEquals(addressCol.toLowerCase(), columns[2].name());
-    assertEquals(nameCol.toLowerCase(), columns[3].name());
+    assertEquals(firstnameCol.toLowerCase(), columns[3].name());
+    assertEquals(surnameCol.toLowerCase(), columns[4].name());
   }
 
   @Test
