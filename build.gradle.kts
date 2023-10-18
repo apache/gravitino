@@ -251,7 +251,6 @@ tasks {
 
   clean {
     dependsOn(cleanDistribution)
-    delete("/tmp/gravitino")
     delete("server/src/main/resources/project.properties")
   }
 }
