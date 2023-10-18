@@ -55,12 +55,6 @@ The following table lists the configuration items in the `gravitino.conf` file. 
 | `gravitino.catalog.classloader.isolated`      | Whether to use isolated classloader for catalog, default `true`                | `true`        | 0.1.0         |
 
 ### Other configuration
+
 Note: If you do not understand the following configuration items, you can ignore them and just use the default value. But if you want to modify them, you should refer to the following table and modify them according to your needs.
-
-
-| Configuration item                                  | Description                                                                        | Default value                                                                                     | Since version |
-|-----------------------------------------------------|------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------|---------------|
-| `gravitino.auxService.names`                        | Gravitino auxiliary service names, separated by ',' like "iceberg-rest, server2"   | NO DEFAULT, this is a example: iceberg-rest                                                       | 0.2.0         |
-| `gravitino.auxService.{auxServiceName}.classpath`   | Class path of service `auxServiceName`, separated by ','                           | NO DEFAULT, This is a example: `catalogs/lakehouse-iceberg/libs, catalogs/lakehouse-iceberg/conf` | 0.2.0         |
-| `gravitino.auxService.{auxServiceName}.host`        | The host of service `auxServiceName`                                               | NO DEFAULT, This is a example: `127.0.0.1`                                                        | 0.2.0         |
-| `gravitino.auxService.{auxServiceName}.httpPort`    | The http port of service `auxServiceName`                                          | NO DEFAULT, This is a example: `9001`                                                             | 0.2.0         |
+TO BE CONTINUED...
