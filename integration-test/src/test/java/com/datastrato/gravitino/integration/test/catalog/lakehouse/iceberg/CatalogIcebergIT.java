@@ -271,8 +271,7 @@ public class CatalogIcebergIT extends AbstractIT {
                 Distribution.NONE,
                 null));
     // drop schema failed check.
-    Assertions.assertThrows(
-        IllegalArgumentException.class, () -> schemas.dropSchema(schemaIdent, true));
+    Assertions.assertFalse(schemas.dropSchema(schemaIdent, true));
     Assertions.assertFalse(schemas.dropSchema(schemaIdent, false));
     Assertions.assertFalse(tableCatalog.dropTable(table));
     icebergNamespaces = hiveCatalog.listNamespaces(IcebergTableOpsHelper.getIcebergNamespace());
