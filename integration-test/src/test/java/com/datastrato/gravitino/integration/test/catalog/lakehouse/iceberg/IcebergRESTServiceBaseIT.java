@@ -153,7 +153,7 @@ public class IcebergRESTServiceBaseIT extends AbstractIT {
             + IcebergRESTService.SERVICE_NAME
             + "."
             + IcebergConfig.CATALOG_WAREHOUSE.getKey(),
-        "file:///tmp/user/hive/warehouse-jdbc-sqlite/");
+        "hdfs://127.0.0.1:9000/user/hive/warehouse-jdbc-sqlite/");
 
     return configMap;
   }
@@ -179,7 +179,7 @@ public class IcebergRESTServiceBaseIT extends AbstractIT {
             + IcebergRESTService.SERVICE_NAME
             + "."
             + IcebergConfig.CATALOG_WAREHOUSE.getKey(),
-        "file:///tmp/user/hive/warehouse-hive/");
+        "/user/hive/warehouse-hive/");
     return customConfigs;
   }
 

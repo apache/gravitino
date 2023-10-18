@@ -5,8 +5,6 @@
 
 package com.datastrato.gravitino.integration.test.catalog.lakehouse.iceberg;
 
-import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend.HIVE;
-
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -22,6 +20,7 @@ import org.apache.spark.sql.catalyst.analysis.NamespaceAlreadyExistsException;
 import org.apache.spark.sql.catalyst.analysis.NoSuchNamespaceException;
 import org.apache.spark.sql.catalyst.analysis.NoSuchTableException;
 import org.apache.spark.sql.catalyst.analysis.TableAlreadyExistsException;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -42,13 +41,18 @@ public class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
     sql("CREATE DATABASE IF NOT EXISTS iceberg_rest_table_test");
   }
 
-  private void purgeTable(String namespace, String table) {
-    sql(String.format("DROP TABLE %s.%s PURGE", namespace, table));
+  @AfterAll
+  void cleanup() {
+    purgeAllIcebergTestNamespaces();
+  }
+
+  private void dropTable(String namespace, String table) {
+    sql(String.format("DROP TABLE %s.%s", namespace, table));
   }
 
   private void purgeNameSpace(String namespace) {
     Set<String> tables = convertToStringSet(sql("SHOW TABLES IN " + namespace), 1);
-    tables.forEach(table -> purgeTable(namespace, table));
+    tables.forEach(table -> dropTable(namespace, table));
     sql("DROP database " + namespace);
   }
 
