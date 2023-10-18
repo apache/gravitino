@@ -286,6 +286,13 @@ public class IcebergTableOpsHelper {
         .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
   }
 
+  /**
+   * Gravitino only supports single-level namespace storage management, which differs from Iceberg.
+   * Therefore, we need to handle this difference here.
+   *
+   * @param namespace GravitinoNamespace
+   * @return
+   */
   public static Namespace getIcebergNamespace(com.datastrato.gravitino.Namespace namespace) {
     return getIcebergNamespace(namespace.level(namespace.length() - 1));
   }
@@ -294,12 +301,27 @@ public class IcebergTableOpsHelper {
     return Namespace.of(level);
   }
 
+  /**
+   * Gravitino only supports tables managed with a single level hierarchy, such as
+   * `{namespace}.{table}`, so we need to perform truncation here.
+   *
+   * @param namespace
+   * @param name
+   * @return
+   */
   public static TableIdentifier buildIcebergTableIdentifier(
       com.datastrato.gravitino.Namespace namespace, String name) {
     String[] levels = namespace.levels();
     return TableIdentifier.of(levels[levels.length - 1], name);
   }
 
+  /**
+   * Gravitino only supports tables managed with a single level hierarchy, such as
+   * `{namespace}.{table}`, so we need to perform truncation here.
+   *
+   * @param nameIdentifier GravitinoNameIdentifier
+   * @return
+   */
   public static TableIdentifier buildIcebergTableIdentifier(NameIdentifier nameIdentifier) {
     String[] levels = nameIdentifier.namespace().levels();
     return TableIdentifier.of(levels[levels.length - 1], nameIdentifier.name());

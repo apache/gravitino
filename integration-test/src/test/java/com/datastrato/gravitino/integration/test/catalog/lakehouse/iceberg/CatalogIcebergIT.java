@@ -227,7 +227,8 @@ public class CatalogIcebergIT extends AbstractIT {
     // alert、load schema check.
     schemas.alterSchema(schemaIdent, SchemaChange.setProperty("t1", "v1"));
     Schema schema = schemas.loadSchema(schemaIdent);
-    Assertions.assertTrue(schema.properties().containsKey("t1"));
+    String val = schema.properties().get("t1");
+    Assertions.assertEquals("v1", val);
 
     Map<String, String> hiveCatalogProps =
         hiveCatalog.loadNamespaceMetadata(

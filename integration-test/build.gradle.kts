@@ -73,7 +73,7 @@ dependencies {
     exclude("org.eclipse.jetty.aggregate", "jetty-all")
     exclude("org.eclipse.jetty.orbit", "javax.servlet")
   }
-  testImplementation(libs.hadoop2.hdfs){
+  testImplementation(libs.hadoop2.hdfs) {
     exclude("*")
   }
   testImplementation(libs.hadoop2.mapreduce.client.core) {
