@@ -10,7 +10,7 @@
 
 ## Introduction
 
-Gravitino is a high-performance, geo-distributed, and federated metadata lake. It manages the metadata directly from different sources, different types, and different regions. Also provides users a unified access to the metadata for both data and AI assets.
+Gravitino is a high-performance, geo-distributed, and federated metadata lake. It manages the metadata directly in different sources, different types, and different regions. Also provides users a unified access to the metadata for both data and AI assets.
 
 ![Gravitino Architecture](docs/assets/gravitino-architecture.png)
 
@@ -33,7 +33,7 @@ Gravitino is built using Gradle. To build Gravitno, please run:
 ./gradlew clean build
 ```
 
-If want to build a distribution package, please run:
+If you want to build a distribution package, please run:
 
 ```shell
 ./gradlew clean build
