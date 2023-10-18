@@ -6,6 +6,9 @@
 package com.datastrato.gravitino.catalog.lakehouse.iceberg;
 
 import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogPropertiesMetadata.CATALOG_BACKEND_NAME;
+import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogPropertiesMetadata.ICEBERG_JDBC_INITIALIZE;
+import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogPropertiesMetadata.ICEBERG_JDBC_PASSWORD;
+import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogPropertiesMetadata.ICEBERG_JDBC_USER;
 import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogPropertiesMetadata.URI;
 import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogPropertiesMetadata.WAREHOUSE;
 
@@ -35,6 +38,27 @@ public class IcebergConfig extends Config {
           .version(DEFAULT_VERSION)
           .stringConf()
           .createWithDefault(null);
+
+  public static final ConfigEntry<String> JDBC_USER =
+      new ConfigBuilder(ICEBERG_JDBC_USER)
+          .doc("The username of the Jdbc connection")
+          .version(DEFAULT_VERSION)
+          .stringConf()
+          .createWithDefault(null);
+
+  public static final ConfigEntry<String> JDBC_PASSWORD =
+      new ConfigBuilder(ICEBERG_JDBC_PASSWORD)
+          .doc("The password of the Jdbc connection")
+          .version(DEFAULT_VERSION)
+          .stringConf()
+          .createWithDefault(null);
+
+  public static final ConfigEntry<Boolean> JDBC_INIT_TABLES =
+      new ConfigBuilder(ICEBERG_JDBC_INITIALIZE)
+          .doc("Whether to initialize meta tables when create Jdbc catalog")
+          .version(DEFAULT_VERSION)
+          .booleanConf()
+          .createWithDefault(true);
 
   public IcebergConfig() {
     super(false);
