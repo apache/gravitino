@@ -87,13 +87,13 @@ fi
 cd ${bin}
 if [[ "${platform_type}" == "all" ]]; then
   if [ ${buildLatest} -eq 1 ]; then
-    docker buildx build --platform=linux/amd64,linux/arm64 --build-arg HADOOP_PACKAGE_NAME=${HADOOP_PACKAGE_NAME} --build-arg HIVE_PACKAGE_NAME=${HIVE_PACKAGE_NAME} --push --tag ${image_name}:latest --progress plain -f Dockerfile -t ${image_name}:${tag_name} .
+    docker buildx build --platform=linux/amd64,linux/arm64 --build-arg HADOOP_PACKAGE_NAME=${HADOOP_PACKAGE_NAME} --build-arg HIVE_PACKAGE_NAME=${HIVE_PACKAGE_NAME} --push --progress plain -f Dockerfile -t ${image_name}:latest -t ${image_name}:${tag_name} .
   else
-    docker buildx build --platform=linux/amd64,linux/arm64 --build-arg HADOOP_PACKAGE_NAME=${HADOOP_PACKAGE_NAME} --build-arg HIVE_PACKAGE_NAME=${HIVE_PACKAGE_NAME} --push --tag ${tag_name} --progress plain -f Dockerfile -t ${image_name} .
+    docker buildx build --platform=linux/amd64,linux/arm64 --build-arg HADOOP_PACKAGE_NAME=${HADOOP_PACKAGE_NAME} --build-arg HIVE_PACKAGE_NAME=${HIVE_PACKAGE_NAME} --push  --progress plain -f Dockerfile -t ${image_name}:${tag_name} .
   fi
 else
   if [ ${buildLatest} -eq 1 ]; then
-    docker buildx build --platform=${platform_type} --build-arg HADOOP_PACKAGE_NAME=${HADOOP_PACKAGE_NAME} --build-arg HIVE_PACKAGE_NAME=${HIVE_PACKAGE_NAME} --output type=docker --tag ${image_name}:latest --progress plain -f Dockerfile -t ${image_name}:${tag_name} .
+    docker buildx build --platform=${platform_type} --build-arg HADOOP_PACKAGE_NAME=${HADOOP_PACKAGE_NAME} --build-arg HIVE_PACKAGE_NAME=${HIVE_PACKAGE_NAME} --output type=docker --progress plain -f Dockerfile -t ${image_name}:latest -t ${image_name}:${tag_name} .
   else
     docker buildx build --platform=${platform_type} --build-arg HADOOP_PACKAGE_NAME=${HADOOP_PACKAGE_NAME} --build-arg HIVE_PACKAGE_NAME=${HIVE_PACKAGE_NAME} --output type=docker --progress plain -f Dockerfile -t ${image_name}:${tag_name} .
   fi
