@@ -10,7 +10,7 @@ on:
 
 env:
   HIVE_IMAGE_NAME: datastrato/gravitino-ci-hive
-  HIVE_IMAGE_TAG_NAME: 0.1.2
+  HIVE_IMAGE_TAG_NAME: 0.1.4
 
 concurrency:
   group: ${{ github.worklfow }}-${{ github.event.pull_request.number || github.ref }}

@@ -34,7 +34,6 @@ import java.util.stream.Collectors;
 import javax.ws.rs.NotSupportedException;
 import lombok.Getter;
 import lombok.Setter;
-import org.apache.commons.lang3.ArrayUtils;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.Transaction;
@@ -287,22 +286,45 @@ public class IcebergTableOpsHelper {
         .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
   }
 
-  public static Namespace getIcebergNamespace(NameIdentifier ident) {
-    return getIcebergNamespace(ArrayUtils.add(ident.namespace().levels(), ident.name()));
+  /**
+   * Gravitino only supports single-level namespace storage management, which differs from Iceberg.
+   * Therefore, we need to handle this difference here.
+   *
+   * @param namespace GravitinoNamespace
+   * @return
+   */
+  public static Namespace getIcebergNamespace(com.datastrato.gravitino.Namespace namespace) {
+    return getIcebergNamespace(namespace.level(namespace.length() - 1));
   }
 
   public static Namespace getIcebergNamespace(String... level) {
     return Namespace.of(level);
   }
 
+  /**
+   * Gravitino only supports tables managed with a single level hierarchy, such as
+   * `{namespace}.{table}`, so we need to perform truncation here.
+   *
+   * @param namespace
+   * @param name
+   * @return
+   */
   public static TableIdentifier buildIcebergTableIdentifier(
       com.datastrato.gravitino.Namespace namespace, String name) {
-    return TableIdentifier.of(ArrayUtils.add(namespace.levels(), name));
+    String[] levels = namespace.levels();
+    return TableIdentifier.of(levels[levels.length - 1], name);
   }
 
+  /**
+   * Gravitino only supports tables managed with a single level hierarchy, such as
+   * `{namespace}.{table}`, so we need to perform truncation here.
+   *
+   * @param nameIdentifier GravitinoNameIdentifier
+   * @return
+   */
   public static TableIdentifier buildIcebergTableIdentifier(NameIdentifier nameIdentifier) {
-    return TableIdentifier.of(
-        ArrayUtils.add(nameIdentifier.namespace().levels(), nameIdentifier.name()));
+    String[] levels = nameIdentifier.namespace().levels();
+    return TableIdentifier.of(levels[levels.length - 1], nameIdentifier.name());
   }
 
   @VisibleForTesting

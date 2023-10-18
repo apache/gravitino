@@ -48,6 +48,7 @@ public class IcebergTable extends BaseTable {
 
     Map<String, String> resultProperties =
         Maps.newHashMap(IcebergTableOpsHelper.removeReservedProperties(properties));
+    resultProperties.putIfAbsent(ICEBERG_COMMENT_FIELD_NAME, comment);
     CreateTableRequest.Builder builder =
         CreateTableRequest.builder()
             .withName(name)

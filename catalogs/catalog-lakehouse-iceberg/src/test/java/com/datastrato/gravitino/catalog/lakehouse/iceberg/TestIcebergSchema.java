@@ -15,6 +15,8 @@ import com.google.common.collect.Maps;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -43,8 +45,11 @@ public class TestIcebergSchema {
 
     Assertions.assertTrue(icebergCatalog.asSchemas().schemaExists(ident));
 
-    NameIdentifier[] idents = icebergCatalog.asSchemas().listSchemas(ident.namespace());
-    Assertions.assertTrue(Arrays.asList(idents).contains(ident));
+    Set<String> names =
+        Arrays.stream(icebergCatalog.asSchemas().listSchemas(ident.namespace()))
+            .map(NameIdentifier::name)
+            .collect(Collectors.toSet());
+    Assertions.assertTrue(names.contains(ident.name()));
 
     // Test schema already exists
     Throwable exception =
