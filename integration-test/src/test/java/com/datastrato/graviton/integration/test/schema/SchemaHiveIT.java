@@ -34,9 +34,9 @@ import org.junit.jupiter.api.Test;
 public class SchemaHiveIT extends AbstractIT {
   public static String metalakeName;
   public static String catalogName;
-  public static String schemaAName;;
+  public static String schemaAName = "SchemaA";
   public static String schemaAComment = "schema A comment";
-  public static String schemaBName;
+  public static String schemaBName = "SchemaB";
   public static String schemaBComment = "schema B comment";
 
   private static final String provider = "hive";
@@ -232,6 +232,101 @@ public class SchemaHiveIT extends AbstractIT {
         .asSchemas()
         .createSchema(
             NameIdentifier.of(metalakeName, catalogName, schemaAName), schemaAComment, schemaProps);
+  }
+
+  public static void createSchemaInDifferntCatalogs() {
+    String metalakeName = "Metalake";
+    String catalogNameA = "CatalogA";
+    String catalogNameB = "CatalogB";
+    String schemaName = "SchemaA";
+    NameIdentifier metalakeID = NameIdentifier.of(metalakeName);
+    GravitonMetaLake metalake =
+        client.createMetalake(metalakeID, "metalake comment", Collections.emptyMap());
+
+    Map<String, String> catalogProps = GravitonITUtils.hiveConfigProperties();
+
+    Catalog catalogA =
+        metalake.createCatalog(
+            NameIdentifier.of(metalakeName, catalogNameA),
+            Catalog.Type.RELATIONAL,
+            provider,
+            "catalog comment",
+            catalogProps);
+
+    Catalog catalogB =
+        metalake.createCatalog(
+            NameIdentifier.of(metalakeName, catalogNameB),
+            Catalog.Type.RELATIONAL,
+            provider,
+            "catalog comment",
+            catalogProps);
+
+    Map<String, String> schemaProps = Maps.newHashMap();
+    schemaProps.put("NameA", "ValueA");
+    schemaProps.put("NameB", "ValueB");
+
+    catalogA
+        .asSchemas()
+        .createSchema(
+            NameIdentifier.of(metalakeName, catalogNameA, schemaName),
+            "schema comment",
+            schemaProps);
+
+    catalogB
+        .asSchemas()
+        .createSchema(
+            NameIdentifier.of(metalakeName, catalogNameB, schemaName),
+            "schema comment",
+            schemaProps);
+  }
+
+  public static void createTwoSchemaInDifferntMetalakes() {
+    String metalakeNameA = "MetalakeA";
+    String metalakeNameB = "MetalakeB";
+    String catalogNameA = "CatalogA";
+    String schemaName = "SchemaA";
+    NameIdentifier metalakeIDA = NameIdentifier.of(metalakeNameA);
+    GravitonMetaLake metalakeA =
+        client.createMetalake(metalakeIDA, "metalake comment", Collections.emptyMap());
+    NameIdentifier metalakeIDB = NameIdentifier.of(metalakeNameB);
+    GravitonMetaLake metalakeB =
+        client.createMetalake(metalakeIDB, "metalake comment", Collections.emptyMap());
+
+    Map<String, String> catalogProps = GravitonITUtils.hiveConfigProperties();
+
+    Catalog catalogA =
+        metalakeA.createCatalog(
+            NameIdentifier.of(metalakeName, catalogNameA),
+            Catalog.Type.RELATIONAL,
+            provider,
+            "catalog comment",
+            catalogProps);
+
+    Catalog catalogB =
+        metalakeB.createCatalog(
+            NameIdentifier.of(metalakeName, catalogNameA),
+            Catalog.Type.RELATIONAL,
+            provider,
+            "catalog comment",
+            catalogProps);
+
+    Map<String, String> schemaProps = Maps.newHashMap();
+    schemaProps.put("NameA", "ValueA");
+    schemaProps.put("NameB", "ValueB");
+
+    catalogA
+        .asSchemas()
+        .createSchema(
+            NameIdentifier.of(metalakeNameA, catalogNameA, schemaName),
+            "schema comment",
+            schemaProps);
+
+    catalogB
+        .asSchemas()
+        .createSchema(
+            NameIdentifier.of(metalakeNameB, catalogNameA, schemaName),
+            "schema comment",
+            schemaProps);
   }
 
   public static void dropSchema() {
