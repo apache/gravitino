@@ -197,24 +197,6 @@ subprojects {
   }
 }
 
-//nexusPublishing {
-//  repositories {
-//    create("sonatype") {
-//      val sonatypeUser =
-//        System.getenv("SONATYPE_USER").takeUnless { it.isNullOrEmpty() }
-//          ?: extra["SONATYPE_USER"].toString()
-//      val sonatypePassword =
-//        System.getenv("SONATYPE_PASSWORD").takeUnless { it.isNullOrEmpty() }
-//          ?: extra["SONATYPE_PASSWORD"].toString()
-//      nexusUrl.set(uri("https://s01.oss.sonatype.org/service/local/"))
-//
-//      snapshotRepositoryUrl.set(uri("https://s01.oss.sonatype.org/content/repositories/snapshots/"))
-//      username.set(sonatypeUser)
-//      password.set(sonatypePassword)
-//    }
-//  }
-//}
-
 tasks.rat {
   substringMatcher("DS", "Datastrato", "Copyright 2023 Datastrato.")
   approvedLicense("Datastrato")
