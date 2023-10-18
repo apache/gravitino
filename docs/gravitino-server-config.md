@@ -39,11 +39,11 @@ The following table lists the configuration items in the `gravitino.conf` file. 
 
 ### Storage configuration
 
-| Configuration item                      | Description                                                                                                                        | Default value               | Since version |
-|-----------------------------------------|------------------------------------------------------------------------------------------------------------------------------------|-----------------------------|---------------|
-| `gravitino.entity.store`                | which storage implementation to use, currently we only support `kv`.                                                               | `kv`                        | 0.1.0         |
-| `gravitino.entity.store.kv`             | Detailed implementation of kv storage, currently we only support `RocksDBKvBackend`.                                               | `RocksDBKvBackend`          | 0.1.0         |
-| `gravitino.entity.store.kv.rocksdbPath` | Directory path of `RocksDBKvBackend`, **we highly recommend you to change this default value** as it's under the deploy directory. | `${GRAVITINO}/data/rocksdb` | 0.1.0         |
+| Configuration item                      | Description                                                                                                                        | Default value                    | Since version |
+|-----------------------------------------|------------------------------------------------------------------------------------------------------------------------------------|----------------------------------|---------------|
+| `gravitino.entity.store`                | which storage implementation to use, currently we only support `kv`.                                                               | `kv`                             | 0.1.0         |
+| `gravitino.entity.store.kv`             | Detailed implementation of kv storage, currently we only support `RocksDBKvBackend`.                                               | `RocksDBKvBackend`               | 0.1.0         |
+| `gravitino.entity.store.kv.rocksdbPath` | Directory path of `RocksDBKvBackend`, **we highly recommend you to change this default value** as it's under the deploy directory. | `${GRAVITINO_HOME}/data/rocksdb` | 0.1.0         |
 
 
 
