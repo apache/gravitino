@@ -28,7 +28,6 @@ import com.datastrato.gravitino.rel.transforms.Transform;
 import com.datastrato.gravitino.rel.transforms.Transforms;
 import com.google.common.collect.Maps;
 import io.substrait.type.TypeCreator;
-import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Map;
@@ -258,7 +257,7 @@ public class TestHiveTable extends MiniHiveMetastoreService {
             .build();
     Column[] columns = new Column[] {col1, col2};
 
-    Transform[] partitions = new Transform[] {identity(new String[] {col1.name()})};
+    Transform[] partitions = new Transform[] {identity(new String[] {col2.name()})};
 
     Table table =
         hiveCatalog
@@ -319,18 +318,19 @@ public class TestHiveTable extends MiniHiveMetastoreService {
 
     exception =
         Assertions.assertThrows(
-            RuntimeException.class,
+            IllegalArgumentException.class,
             () ->
                 hiveCatalog
                     .asTableCatalog()
                     .createTable(
-                        NameIdentifier.of(
-                            META_LAKE_NAME, hiveCatalog.name(), hiveSchema.name(), genRandomName()),
+                        tableIdentifier,
                         columns,
                         HIVE_COMMENT,
                         properties,
-                        new Transform[] {identity(new String[] {"not_exist_field"})}));
-    Assertions.assertTrue(exception.getMessage().contains("Hive partition must match one column"));
+                        new Transform[] {identity(new String[] {col1.name()})}));
+    Assertions.assertEquals(
+        "The partition field must be placed at the end of the columns in order",
+        exception.getMessage());
   }
 
   @Test
@@ -381,7 +381,7 @@ public class TestHiveTable extends MiniHiveMetastoreService {
   }
 
   @Test
-  public void testAlterHiveTable() throws IOException {
+  public void testAlterHiveTable() {
     // create a table with random name
     NameIdentifier tableIdentifier =
         NameIdentifier.of(META_LAKE_NAME, hiveCatalog.name(), hiveSchema.name(), genRandomName());

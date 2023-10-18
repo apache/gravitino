@@ -430,6 +430,29 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     }
   }
 
+  private void validatePartition(Column[] columns, Transform[] partitions) {
+    Preconditions.checkArgument(
+        Arrays.stream(partitions).allMatch(p -> p instanceof Transforms.NamedReference),
+        "Hive partition only supports identity transform");
+
+    Preconditions.checkArgument(
+        Arrays.stream(partitions)
+            .allMatch(p -> ((Transforms.NamedReference) p).value().length == 1),
+        "Hive partition does not support nested field");
+
+    // The partition field must be placed at the end of the columns in order.
+    // For example, if the table has columns [a, b, c, d], then the partition field must be
+    // [b, c, d] or [c, d] or [d].
+    int partitionStartIndex = columns.length - partitions.length;
+    for (int i = 0; i < partitions.length; i++) {
+      Preconditions.checkArgument(
+          columns[partitionStartIndex + i]
+              .name()
+              .equals(((Transforms.NamedReference) partitions[i]).value()[0]),
+          "The partition field must be placed at the end of the columns in order");
+    }
+  }
+
   private void validateDistributionAndSort(Distribution distribution, SortOrder[] sortOrder) {
     if (distribution != Distribution.NONE) {
       boolean allNameReference =
@@ -471,9 +494,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       throws NoSuchSchemaException, TableAlreadyExistsException {
     NameIdentifier schemaIdent = NameIdentifier.of(tableIdent.namespace().levels());
 
-    Preconditions.checkArgument(
-        Arrays.stream(partitions).allMatch(p -> p instanceof Transforms.NamedReference),
-        "Hive partition only supports identity transform");
+    validatePartition(columns, partitions);
     validateDistributionAndSort(distribution, sortOrders);
 
     Arrays.stream(columns).forEach(c -> validateColumnType(c.name(), c.dataType()));
@@ -548,6 +569,20 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       HiveTable table = (HiveTable) loadTable(tableIdent);
       org.apache.hadoop.hive.metastore.api.Table alteredHiveTable =
           table.toHiveTable(tablePropertiesMetadata);
+
+      List<String> partitionFields =
+          alteredHiveTable.getPartitionKeys().stream()
+              .map(FieldSchema::getName)
+              .collect(Collectors.toList());
+      Arrays.stream(changes)
+          .filter(c -> c instanceof TableChange.ColumnChange)
+          .forEach(
+              c -> {
+                String alterColumn = ((TableChange.ColumnChange) c).fieldNames()[0];
+                Preconditions.checkArgument(
+                    !partitionFields.contains(alterColumn),
+                    "Cannot alter partition column: " + alterColumn);
+              });
 
       for (TableChange change : changes) {
         // Table change

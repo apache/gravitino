@@ -110,6 +110,7 @@ dependencies {
   testImplementation(libs.slf4j.jdk14)
   testImplementation(libs.scala.collection.compat)
   testImplementation(libs.sqlite.jdbc)
+  testImplementation(libs.spark.hive)
 }
 
 /* Optimizing integration test execution conditions */
@@ -199,7 +200,7 @@ tasks.test {
     doFirst {
       // Default use MiniGravitino to run integration tests
       environment("GRAVITINO_ROOT_DIR", rootDir.path)
-      environment("HADOOP_USER_NAME", "hive")
+      environment("HADOOP_USER_NAME", "root")
       environment("HADOOP_HOME", "/tmp")
       environment("PROJECT_VERSION", version)
 
