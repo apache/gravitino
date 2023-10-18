@@ -1,0 +1,27 @@
+name: Publish Docker Image
+
+on:
+  # Triggers the workflow on push or pull request events but only for the "main" branch
+  push:
+    branches: [ "*" ]
+
+jobs:
+  publish-gravitino:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      SONATYPE_USER: ${{ secrets.OSSRH_USERNAME }}
+      SONATYPE_PASSWORD: ${{ secrets.OSSRH_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Check publish username and password
+        run: |
+          if [ "${SONATYPE_USER}" = "" ] || [ "${SONATYPE_PASSWORD}" = "" ]; then
+            echo "Username or password is empty. Please re-enter try to set it by OSSRH_USERNAME and OSSRH_PASSWORD. "
+            exit 1
+          fi
+
+      - name: Clean, build and publish the release(branch-xxxx) branch
+        run: |
+            ./gradlew clean build publish

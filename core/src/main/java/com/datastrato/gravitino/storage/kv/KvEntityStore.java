@@ -174,28 +174,28 @@ public class KvEntityStore implements EntityStore {
    *
    * <pre>
    *   Assume we have the following entities:
-   *   metalake: a1        ----> 1
-   *   catalog : a1.b1     ----> 2
-   *   schema  : a1.b1.c   ----> 3
+   *   metalake: a1        ---- 1
+   *   catalog : a1.b1     ---- 2
+   *   schema  : a1.b1.c   ---- 3
    *
-   *   metalake: a2        ----> 4
-   *   catalog : a2.b2     ----> 5
-   *   schema  : a2.b2.c   ----> 6
-   *   schema  : a2.b2.c1  ----> 7
+   *   metalake: a2        ---- 4
+   *   catalog : a2.b2     ---- 5
+   *   schema  : a2.b2.c   ---- 6
+   *   schema  : a2.b2.c1  ---- 7
    *
-   *   metalake: a1        ----> 1 means the name of metalake is a1 and the corresponding id is 1
+   *   metalake: a1        ---- 1 means the name of metalake is a1 and the corresponding id is 1
    * </pre>
    *
    * Then we will store the name to id mapping as follows
    *
    * <pre>
-   *  a1         --> 1
-   * 	1/b1       --> 2
-   * 	1/2/c      --> 3
-   * 	a2         --> 4
-   * 	4/b2       --> 5
-   * 	4/5/c      --> 6
-   * 	4/5/c1     --> 7
+   *  a1         -- 1
+   * 	1/b1       -- 2
+   * 	1/2/c      -- 3
+   * 	a2         -- 4
+   * 	4/b2       -- 5
+   * 	4/5/c      -- 6
+   * 	4/5/c1     -- 7
    * </pre>
    *
    * @param nameIdentifier name of a specific entity

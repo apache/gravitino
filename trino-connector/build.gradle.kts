@@ -45,6 +45,10 @@ java {
   }
 }
 
+tasks.named("generateMetadataFileForMavenJavaPublication") {
+    dependsOn(":trino-connector:copyDepends")
+}
+
 tasks {
     val copyDepends by registering(Copy::class) {
         from(configurations.runtimeClasspath)

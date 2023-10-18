@@ -34,19 +34,19 @@ import org.slf4j.LoggerFactory;
  *
  * <pre>
  *     Key                                Value
- * ml_{ml_id}               ----->    matalake info
- * ml_{ml_id}               ----->    matalake info
- * ca_{ml_id}_{ca_id}       ----->    catalog_info
- * ca_{ml_id}_{ca_id}       ----->    catalog_info
- * sc_{ml_id}_{ca_id}_{sc_id} --->    schema_info
- * sc_{ml_id}_{ca_id}_{sc_id} --->    schema_info
- * br_{ml_id}_{ca_id}_{br_id} --->    broker_info
- * br_{ml_id}_{ca_id}_{br_id} --->    broker_info
+ * ml_{ml_id}               -----    metalake info
+ * ml_{ml_id}               -----    metalake info
+ * ca_{ml_id}_{ca_id}       -----    catalog_info
+ * ca_{ml_id}_{ca_id}       -----    catalog_info
+ * sc_{ml_id}_{ca_id}_{sc_id} ---    schema_info
+ * sc_{ml_id}_{ca_id}_{sc_id} ---    schema_info
+ * br_{ml_id}_{ca_id}_{br_id} ---    broker_info
+ * br_{ml_id}_{ca_id}_{br_id} ---    broker_info
  *
- * ta_{ml_id}_{ca_id}_{sc_id}_{table_id}    ----->    table_info
- * ta_{ml_id}_{ca_id}_{sc_id}_{table_id}    ----->    table_info
- * to_{ml_id}_{ca_id}_{br_id}_{to_id}       ----->    topic_info
- * to_{ml_id}_{ca_id}_{br_id}_{to_id}       ----->    topic_info
+ * ta_{ml_id}_{ca_id}_{sc_id}_{table_id}    -----    table_info
+ * ta_{ml_id}_{ca_id}_{sc_id}_{table_id}    -----    table_info
+ * to_{ml_id}_{ca_id}_{br_id}_{to_id}       -----    topic_info
+ * to_{ml_id}_{ca_id}_{br_id}_{to_id}       -----    topic_info
  * </pre>
  */
 public class BinaryEntityKeyEncoder implements EntityKeyEncoder<byte[]> {
