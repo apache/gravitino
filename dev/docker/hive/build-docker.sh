@@ -10,7 +10,6 @@ bin="$(cd "${bin}">/dev/null; pwd)"
 # Environment variables definition
 HADOOP_VERSION="2.7.3"
 HIVE_VERSION="2.3.9"
-IMAGE_NAME="datastrato/gravitino-ci-hive:0.1.1"
 
 HADOOP_PACKAGE_NAME="hadoop-${HADOOP_VERSION}.tar.gz"
 HADOOP_DOWNLOAD_URL="http://archive.apache.org/dist/hadoop/core/hadoop-${HADOOP_VERSION}/${HADOOP_PACKAGE_NAME}"
@@ -19,7 +18,7 @@ HIVE_PACKAGE_NAME="apache-hive-${HIVE_VERSION}-bin.tar.gz"
 HIVE_DOWNLOAD_URL="https://archive.apache.org/dist/hive/hive-${HIVE_VERSION}/${HIVE_PACKAGE_NAME}"
 
 # Build docker image for multi-arch
-USAGE="-e Usage: ./build-docker.sh --platform [all|linux/amd64|linux/arm64] --image {image_name} --tag {tag_name}"
+USAGE="-e Usage: ./build-docker.sh --platform [all|linux/amd64|linux/arm64] --image {image_name} --tag {tag_name} --latest"
 
 # Get platform type
 if [[ "$1" == "--platform" ]]; then
@@ -55,6 +54,13 @@ if [[ "$1" == "--tag" ]]; then
   shift
 fi
 
+# Get latest flag
+buildLatest=0
+if [[ "$1" == "--latest" ]]; then
+  shift
+  buildLatest=1
+fi
+
 # Prepare download packages
 if [[ ! -d "${bin}/packages" ]]; then
   mkdir -p "${bin}/packages"
@@ -80,14 +86,14 @@ fi
 
 cd ${bin}
 if [[ "${platform_type}" == "all" ]]; then
-  if [[ "${tag_name}" == "" ]]; then
-    docker buildx build --platform=linux/amd64,linux/arm64 --build-arg HADOOP_PACKAGE_NAME=${HADOOP_PACKAGE_NAME} --build-arg HIVE_PACKAGE_NAME=${HIVE_PACKAGE_NAME} --push --progress plain -f Dockerfile -t ${image_name} .
+  if [ ${buildLatest} -eq 1 ]; then
+    docker buildx build --platform=linux/amd64,linux/arm64 --build-arg HADOOP_PACKAGE_NAME=${HADOOP_PACKAGE_NAME} --build-arg HIVE_PACKAGE_NAME=${HIVE_PACKAGE_NAME} --push --progress plain -f Dockerfile -t ${image_name}:latest -t ${image_name}:${tag_name} .
   else
-    docker buildx build --platform=linux/amd64,linux/arm64 --build-arg HADOOP_PACKAGE_NAME=${HADOOP_PACKAGE_NAME} --build-arg HIVE_PACKAGE_NAME=${HIVE_PACKAGE_NAME} --push --progress plain -f Dockerfile -t ${image_name}:${tag_name} .
+    docker buildx build --platform=linux/amd64,linux/arm64 --build-arg HADOOP_PACKAGE_NAME=${HADOOP_PACKAGE_NAME} --build-arg HIVE_PACKAGE_NAME=${HIVE_PACKAGE_NAME} --push  --progress plain -f Dockerfile -t ${image_name}:${tag_name} .
   fi
 else
-  if [[ "${tag_name}" == "" ]]; then
-    docker buildx build --platform=${platform_type} --build-arg HADOOP_PACKAGE_NAME=${HADOOP_PACKAGE_NAME} --build-arg HIVE_PACKAGE_NAME=${HIVE_PACKAGE_NAME} --output type=docker --progress plain -f Dockerfile -t ${image_name} .
+  if [ ${buildLatest} -eq 1 ]; then
+    docker buildx build --platform=${platform_type} --build-arg HADOOP_PACKAGE_NAME=${HADOOP_PACKAGE_NAME} --build-arg HIVE_PACKAGE_NAME=${HIVE_PACKAGE_NAME} --output type=docker --progress plain -f Dockerfile -t ${image_name}:latest -t ${image_name}:${tag_name} .
   else
     docker buildx build --platform=${platform_type} --build-arg HADOOP_PACKAGE_NAME=${HADOOP_PACKAGE_NAME} --build-arg HIVE_PACKAGE_NAME=${HIVE_PACKAGE_NAME} --output type=docker --progress plain -f Dockerfile -t ${image_name}:${tag_name} .
   fi
