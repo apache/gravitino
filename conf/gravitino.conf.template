@@ -30,7 +30,7 @@ gravitino.entity.store = kv
 # The RocksDB entity store
 gravitino.entity.store.kv = RocksDBKvBackend
 # The RocksDB backend path for entity store
-gravitino.entity.store.kv.rocksdbPath = /tmp/gravitino
+# gravitino.entity.store.kv.rocksdbPath = /tmp/gravitino
 
 # THE CONFIGURATION FOR Gravitino CATALOG
 # The interval in milliseconds to evict the catalog cache

@@ -56,6 +56,7 @@ public class RocksDBKvBackend implements KvBackend {
         throw new RocksDBException(
             String.format("Can't create RocksDB path '%s'", dbDir.getAbsolutePath()));
       }
+      LOGGER.info("Rocksdb storage directory:{}", dbDir);
       // TODO (yuqi), make options and transactionDBOptions configurable
       TransactionDBOptions transactionDBOptions = new TransactionDBOptions();
       return TransactionDB.open(options, transactionDBOptions, dbDir.getAbsolutePath());
