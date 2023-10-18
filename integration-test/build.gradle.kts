@@ -109,6 +109,7 @@ dependencies {
   }
   testImplementation(libs.slf4j.jdk14)
   testImplementation(libs.scala.collection.compat)
+  testImplementation(libs.sqlite.jdbc)
 }
 
 /* Optimizing integration test execution conditions */

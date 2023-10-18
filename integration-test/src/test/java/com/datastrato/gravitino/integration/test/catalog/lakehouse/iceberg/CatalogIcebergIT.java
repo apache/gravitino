@@ -397,7 +397,6 @@ public class CatalogIcebergIT extends AbstractIT {
         new Transform[0],
         Distribution.NONE,
         new SortOrder[0]);
-    Namespace schemaNamespace = Namespace.of(metalakeName, catalogName, schemaName);
     NameIdentifier[] nameIdentifiers =
         tableCatalog.listTables(Namespace.of(metalakeName, catalogName, schemaName));
     Assertions.assertEquals(1, nameIdentifiers.length);
@@ -435,7 +434,7 @@ public class CatalogIcebergIT extends AbstractIT {
     Assertions.assertEquals("table_2", nameIdentifiers[0].name());
 
     Assertions.assertDoesNotThrow(() -> tableCatalog.dropTable(table2));
-    schemaNamespace = Namespace.of(metalakeName, catalogName, schemaName);
+    Namespace schemaNamespace = Namespace.of(metalakeName, catalogName, schemaName);
     nameIdentifiers = tableCatalog.listTables(schemaNamespace);
     Assertions.assertEquals(0, nameIdentifiers.length);
 
