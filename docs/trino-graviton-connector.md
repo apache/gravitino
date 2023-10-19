@@ -54,14 +54,14 @@ The `gravitino.uri` defines the connection information about Gravitino server.
 The `gravitino.metalake` defines which metalake are used.
 
 ## Multiple Gravitino metalakes
-If you have multiple Gravitino metalakes, you need to configure one catalog for each metalake. To add another catalog:
+If you have multiple Gravitino metalakes, you need to configure a catalog for each metalake. To add another catalog:
 - Add another properties file to `etc/catalog`
 - Save it with a different name that ends in `.properties`
 
 For example, if you name the property file sales.properties. Trino uses the configured connector to create a catalog named `sales`
 
 # SQL support
-The connector provides read access and write access to data and metadata by the type fo gravitino catalog. 
+The connector provides read access and write access to data and metadata in the Gravitino-managed catalogs and its storage system.
 
 ## Basic usage examples
 First, you need to create a metalake and catalog in Gravitino.
@@ -84,16 +84,19 @@ The results like:
 Query 20231017_082503_00018_6nt3n, FINISHED, 1 node
 ```
 
-The `gravtion` catalog is the config catalog by the give metalake. We generally do not use it.
-The `test.hive_test` catalog is Gravitino managed catalog. It dynamically loaded by the `gravtion` catalog from Gravitino. It is a Hive catalog.
-Other catalogs are user-configured regular Trino catalogs.
+The `gravitino` catalog is a catalog defined Trino catalog configuration.
+We generally do not use it.
+The `test.hive_test` catalog is Gravitino managed catalog.
+It is dynamically loaded by the `gravtion` catalog from Gravitino.
+It is a Hive catalog.
+Other catalogs are regular user-configured Trino catalogs.
 
 Create a new schema named `database_01` in `test.hive_test` catalog.
 ```
 create schema "test.hive_test".database_01;
 ```
 
-Create a new table named `table_01` in `"test.hive_test".database_01` schema. That is stored using the TEXTFILE format.
+Create a new table named `table_01` in schema `"test.hive_test".database_01`. That is stored using the TEXTFILE format.
 ```
 create table  "test.hive_test".database_01.table_01
 (
@@ -110,7 +113,7 @@ Drop a schema:
 drop schema "test.hive_test".database_01;
 ```
 
-Drop a schema:
+Drop a table:
 ```
 drop table "test.hive_test".database_01.table_01;
 ```
