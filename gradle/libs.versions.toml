@@ -30,7 +30,7 @@ trino = '426'
 spark = "3.4.1"
 scala-collection-compat = "2.7.0"
 sqlite-jdbc = "3.42.0.0"
-testng = "7.4.0"
+testng = "7.7.1"
 
 
 protobuf-plugin = "0.9.2"
