@@ -661,9 +661,6 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       LOG.info("Altered Hive table {} in Hive Metastore", tableIdent.name());
       return HiveTable.fromHiveTable(alteredHiveTable);
 
-    } catch (NoSuchObjectException e) {
-      throw new NoSuchTableException(
-          String.format("Hive table does not exist: %s in Hive Metastore", tableIdent.name()), e);
     } catch (TException | InterruptedException e) {
       if (e.getMessage().contains("types incompatible with the existing columns")) {
         throw new IllegalArgumentException(
@@ -677,7 +674,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       }
       throw new RuntimeException(
           "Failed to alter Hive table " + tableIdent.name() + " in Hive metastore", e);
-    } catch (IllegalArgumentException e) {
+    } catch (IllegalArgumentException | NoSuchTableException e) {
       throw e;
     } catch (Exception e) {
       throw new RuntimeException(e);
