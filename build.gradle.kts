@@ -42,9 +42,6 @@ java {
 }
 
 allprojects {
-  group = "com.datastrato.gravitino"
-  version = "0.2.0"
-
   repositories {
     mavenCentral()
     mavenLocal()
@@ -111,7 +108,7 @@ subprojects {
         pom {
           name.set("Gravitino")
           description.set("Gravitino is a high-performance, geo-distributed and federated metadata lake.")
-          url.set("https://www.datastrato.com/gravitino")
+          url.set("https://datastrato.ai")
           licenses {
             license {
               name.set("The Apache Software License, Version 2.0")
@@ -120,9 +117,9 @@ subprojects {
           }
           developers {
             developer {
-              id.set("1")
-              name.set("JerryShao")
-              email.set("jerryshao@datastrato.com")
+              id.set("The maintainers of Gravitino")
+              name.set("support")
+              email.set("support@datastrato.com")
             }
           }
           scm {
