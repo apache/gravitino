@@ -67,16 +67,14 @@ public class CatalogConnectorMetadataAdapter {
     Map<String, String> properties = removeUnsetProperties(tableMetadata.getProperties());
 
     List<GravitinoColumn> columns = new ArrayList<>();
-    int index = 0;
     for (int i = 0; i < tableMetadata.getColumns().size(); i++) {
       ColumnMetadata column = tableMetadata.getColumns().get(i);
       columns.add(
           new GravitinoColumn(
               column.getName(),
               DataTypeTransformer.getGravitinoType(column.getType(), column.isNullable()),
-              index,
+              i,
               column.getComment()));
-      index++;
     }
     return new GravitinoTable(schemaName, tableName, columns, comment, properties);
   }
@@ -99,7 +97,7 @@ public class CatalogConnectorMetadataAdapter {
   /** Normalize gravitino attributes for trino */
   protected Map<String, Object> normalizeProperties(
       Map<String, String> properties, List<PropertyMetadata<?>> propertyTemplate) {
-    // TODO yuhui redo this function once graviton table properties are supported..
+    // TODO yuhui redo this function once gravitino table properties are supported..
     // Trino only supports properties defined in the propertyTemplate.
     Map<String, Object> validProperties = new HashMap<>();
     for (PropertyMetadata<?> propertyMetadata : propertyTemplate) {

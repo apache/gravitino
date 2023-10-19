@@ -92,6 +92,7 @@ iceberg-hive-metastore = { group = "org.apache.iceberg", name = "iceberg-hive-me
 trino-spi= { group = "io.trino", name = "trino-spi", version.ref = "trino" }
 trino-toolkit= { group = "io.trino", name = "trino-plugin-toolkit", version.ref = "trino" }
 trino-testing= { group = "io.trino", name = "trino-testing", version.ref = "trino" }
+trino-memory= { group = "io.trino", name = "trino-memory", version.ref = "trino" }
 iceberg-spark-runtime = { group = "org.apache.iceberg", name = "iceberg-spark-runtime-3.4_2.13", version.ref = "iceberg" }
 spark-sql = { group = "org.apache.spark", name = "spark-sql_2.13", version.ref = "spark" }
 scala-collection-compat =  { group = "org.scala-lang.modules", name = "scala-collection-compat_2.13", version.ref = "scala-collection-compat" }

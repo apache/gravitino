@@ -30,7 +30,7 @@ dependencies {
   testImplementation(libs.trino.testing) {
     exclude("org.apache.logging.log4j")
   }
-  testImplementation("io.trino:trino-memory:426") {
+  testImplementation(libs.trino.memory) {
     exclude("org.antlr")
     exclude("org.apache.logging.log4j")
   }
