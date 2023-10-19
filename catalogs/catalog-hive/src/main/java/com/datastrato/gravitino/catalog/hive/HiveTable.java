@@ -29,7 +29,6 @@ import com.datastrato.gravitino.rel.SortOrder.Direction;
 import com.datastrato.gravitino.rel.transforms.Transform;
 import com.datastrato.gravitino.rel.transforms.Transforms;
 import com.datastrato.gravitino.rel.transforms.Transforms.NamedReference;
-import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import java.time.Instant;
@@ -39,6 +38,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import lombok.ToString;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.ArrayUtils;
@@ -102,20 +102,31 @@ public class HiveTable extends BaseTable {
               .toArray(SortOrder[]::new);
     }
 
+    Column[] columns =
+        Stream.concat(
+                table.getSd().getCols().stream()
+                    .map(
+                        f ->
+                            new HiveColumn.Builder()
+                                .withName(f.getName())
+                                .withType(FromHiveType.convert(f.getType()))
+                                .withComment(f.getComment())
+                                .build()),
+                table.getPartitionKeys().stream()
+                    .map(
+                        p ->
+                            new HiveColumn.Builder()
+                                .withName(p.getName())
+                                .withType(FromHiveType.convert(p.getType()))
+                                .withComment(p.getComment())
+                                .build()))
+            .toArray(Column[]::new);
+
     return new HiveTable.Builder()
         .withName(table.getTableName())
         .withComment(table.getParameters().get(COMMENT))
         .withProperties(buildTableProperties(table))
-        .withColumns(
-            table.getSd().getCols().stream()
-                .map(
-                    f ->
-                        new HiveColumn.Builder()
-                            .withName(f.getName())
-                            .withType(FromHiveType.convert(f.getType()))
-                            .withComment(f.getComment())
-                            .build())
-                .toArray(HiveColumn[]::new))
+        .withColumns(columns)
         .withDistribution(distribution)
         .withSortOrders(sortOrders)
         .withAuditInfo(auditInfoBuilder.build())
@@ -159,9 +170,10 @@ public class HiveTable extends BaseTable {
     hiveTable.setDbName(schemaName);
     hiveTable.setTableType(
         ((TableType) tablePropertiesMetadata.getOrDefault(properties(), TABLE_TYPE)).name());
-    hiveTable.setSd(buildStorageDescriptor(tablePropertiesMetadata));
+    List<FieldSchema> partitionFields = buildPartitionKeys();
+    hiveTable.setSd(buildStorageDescriptor(tablePropertiesMetadata, partitionFields));
     hiveTable.setParameters(buildTableParameters());
-    hiveTable.setPartitionKeys(buildPartitionKeys());
+    hiveTable.setPartitionKeys(partitionFields);
 
     // Set AuditInfo to Hive's Table object. Hive's Table doesn't support setting last modifier
     // and last modified time, so we only set creator and create time.
@@ -197,14 +209,10 @@ public class HiveTable extends BaseTable {
   }
 
   private FieldSchema getPartitionKey(String[] fieldName) {
-    Preconditions.checkArgument(
-        fieldName.length == 1, "Hive partition does not support nested field");
     List<Column> partitionColumns =
         Arrays.stream(columns)
             .filter(c -> c.name().equals(fieldName[0]))
             .collect(Collectors.toList());
-    Preconditions.checkArgument(
-        partitionColumns.size() == 1, "Hive partition must match one column");
     return new FieldSchema(
         partitionColumns.get(0).name(),
         partitionColumns.get(0).dataType().accept(ToHiveType.INSTANCE).getQualifiedName(),
@@ -212,10 +220,13 @@ public class HiveTable extends BaseTable {
   }
 
   private StorageDescriptor buildStorageDescriptor(
-      HiveTablePropertiesMetadata tablePropertiesMetadata) {
+      HiveTablePropertiesMetadata tablePropertiesMetadata, List<FieldSchema> partitionFields) {
     StorageDescriptor sd = new StorageDescriptor();
+    List<String> partitionKeys =
+        partitionFields.stream().map(FieldSchema::getName).collect(Collectors.toList());
     sd.setCols(
         Arrays.stream(columns)
+            .filter(c -> !partitionKeys.contains(c.name()))
             .map(
                 c ->
                     new FieldSchema(

@@ -44,6 +44,7 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.hadoop.conf.Configuration;
@@ -430,6 +431,55 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     }
   }
 
+  private void validatePartitionForCreate(Column[] columns, Transform[] partitions) {
+    int partitionStartIndex = columns.length - partitions.length;
+
+    for (int i = 0; i < partitions.length; i++) {
+      Preconditions.checkArgument(
+          partitions[i] instanceof Transforms.NamedReference,
+          "Hive partition only supports identity transform");
+
+      Transforms.NamedReference namedReference = (Transforms.NamedReference) partitions[i];
+      Preconditions.checkArgument(
+          namedReference.value().length == 1, "Hive partition does not support nested field");
+
+      // The partition field must be placed at the end of the columns in order.
+      // For example, if the table has columns [a, b, c, d], then the partition field must be
+      // [b, c, d] or [c, d] or [d].
+      Preconditions.checkArgument(
+          columns[partitionStartIndex + i].name().equals(namedReference.value()[0]),
+          "The partition field must be placed at the end of the columns in order");
+    }
+  }
+
+  private void validatePartitionForAlter(
+      TableChange[] changes, org.apache.hadoop.hive.metastore.api.Table hiveTable) {
+    Set<String> partitionFields =
+        hiveTable.getPartitionKeys().stream().map(FieldSchema::getName).collect(Collectors.toSet());
+    Arrays.stream(changes)
+        .filter(c -> c instanceof TableChange.ColumnChange)
+        .forEach(
+            c -> {
+              String changeColumn = ((TableChange.ColumnChange) c).fieldNames()[0];
+              Preconditions.checkArgument(
+                  c instanceof TableChange.UpdateColumnComment
+                      || !partitionFields.contains(changeColumn),
+                  "Cannot alter partition column: " + changeColumn);
+
+              if (c instanceof TableChange.UpdateColumnPosition
+                  && ((TableChange.UpdateColumnPosition) c).getPosition()
+                      instanceof TableChange.After) {
+                String afterColumn =
+                    ((TableChange.After) ((TableChange.UpdateColumnPosition) c).getPosition())
+                        .getColumn();
+                if (partitionFields.contains(afterColumn)) {
+                  throw new IllegalArgumentException(
+                      "Cannot alter column position to after partition column: " + afterColumn);
+                }
+              }
+            });
+  }
+
   private void validateDistributionAndSort(Distribution distribution, SortOrder[] sortOrder) {
     if (distribution != Distribution.NONE) {
       boolean allNameReference =
@@ -471,9 +521,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       throws NoSuchSchemaException, TableAlreadyExistsException {
     NameIdentifier schemaIdent = NameIdentifier.of(tableIdent.namespace().levels());
 
-    Preconditions.checkArgument(
-        Arrays.stream(partitions).allMatch(p -> p instanceof Transforms.NamedReference),
-        "Hive partition only supports identity transform");
+    validatePartitionForCreate(columns, partitions);
     validateDistributionAndSort(distribution, sortOrders);
 
     Arrays.stream(columns).forEach(c -> validateColumnType(c.name(), c.dataType()));
@@ -549,6 +597,8 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       org.apache.hadoop.hive.metastore.api.Table alteredHiveTable =
           table.toHiveTable(tablePropertiesMetadata);
 
+      validatePartitionForAlter(changes, alteredHiveTable);
+
       for (TableChange change : changes) {
         // Table change
         if (change instanceof TableChange.RenameTable) {
@@ -611,9 +661,6 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       LOG.info("Altered Hive table {} in Hive Metastore", tableIdent.name());
       return HiveTable.fromHiveTable(alteredHiveTable);
 
-    } catch (NoSuchObjectException e) {
-      throw new NoSuchTableException(
-          String.format("Hive table does not exist: %s in Hive Metastore", tableIdent.name()), e);
     } catch (TException | InterruptedException e) {
       if (e.getMessage().contains("types incompatible with the existing columns")) {
         throw new IllegalArgumentException(
@@ -627,7 +674,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       }
       throw new RuntimeException(
           "Failed to alter Hive table " + tableIdent.name() + " in Hive metastore", e);
-    } catch (IllegalArgumentException e) {
+    } catch (IllegalArgumentException | NoSuchTableException e) {
       throw e;
     } catch (Exception e) {
       throw new RuntimeException(e);

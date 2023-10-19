@@ -22,6 +22,10 @@ import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.
 import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.TRANSIENT_LAST_DDL_TIME;
 import static com.datastrato.gravitino.rel.transforms.Transforms.identity;
 import static org.apache.hadoop.hive.metastore.TableType.EXTERNAL_TABLE;
+import static org.apache.hadoop.hive.serde.serdeConstants.DATE_TYPE_NAME;
+import static org.apache.hadoop.hive.serde.serdeConstants.INT_TYPE_NAME;
+import static org.apache.hadoop.hive.serde.serdeConstants.STRING_TYPE_NAME;
+import static org.apache.hadoop.hive.serde.serdeConstants.TINYINT_TYPE_NAME;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.datastrato.gravitino.Catalog;
@@ -30,6 +34,7 @@ import com.datastrato.gravitino.catalog.hive.HiveClientPool;
 import com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata;
 import com.datastrato.gravitino.client.GravitinoMetaLake;
 import com.datastrato.gravitino.dto.rel.ColumnDTO;
+import com.datastrato.gravitino.exceptions.NoSuchTableException;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
 import com.datastrato.gravitino.rel.Distribution;
@@ -47,6 +52,7 @@ import com.datastrato.gravitino.rel.transforms.Transforms.NamedReference;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import io.substrait.type.TypeCreator;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -57,6 +63,7 @@ import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
+import org.apache.spark.sql.SparkSession;
 import org.apache.thrift.TException;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -79,20 +86,42 @@ public class CatalogHiveIT extends AbstractIT {
   public static String HIVE_COL_NAME1 = "hive_col_name1";
   public static String HIVE_COL_NAME2 = "hive_col_name2";
   public static String HIVE_COL_NAME3 = "hive_col_name3";
-  static String HIVE_METASTORE_URIS = "thrift://localhost:9083";
 
+  private static String HIVE_METASTORE_URIS = "thrift://localhost:9083";
   private static final String provider = "hive";
-
   private static HiveClientPool hiveClientPool;
-
   private static GravitinoMetaLake metalake;
-
   private static Catalog catalog;
+  private static SparkSession sparkSession;
+  private static String SELECT_ALL_TEMPLATE = "SELECT * FROM %s.%s";
+  private static String INSERT_WITHOUT_PARTITION_TEMPLATE = "INSERT INTO %s.%s VALUES (%s)";
+  private static String INSERT_WITH_PARTITION_TEMPLATE =
+      "INSERT INTO %s.%s PARTITION (%s) VALUES (%s)";
+
+  private static Map<String, String> typeConstant =
+      ImmutableMap.of(
+          TINYINT_TYPE_NAME,
+          "1",
+          INT_TYPE_NAME,
+          "2",
+          DATE_TYPE_NAME,
+          "'2023-01-01'",
+          STRING_TYPE_NAME,
+          "'gravitino_it_test'");
 
   @BeforeAll
   public static void startup() throws Exception {
     HiveConf hiveConf = GravitinoITUtils.hiveConfig();
     hiveClientPool = new HiveClientPool(1, hiveConf);
+    sparkSession =
+        SparkSession.builder()
+            .master("local[1]")
+            .appName("Hive Catalog integration test")
+            .config("hive.metastore.uris", HIVE_METASTORE_URIS)
+            .config("spark.sql.storeAssignmentPolicy", "LEGACY")
+            .config("mapreduce.input.fileinputformat.input.dir.recursive", "true")
+            .enableHiveSupport()
+            .getOrCreate();
     createMetalake();
     createCatalog();
     createSchema();
@@ -103,6 +132,10 @@ public class CatalogHiveIT extends AbstractIT {
     client.dropMetalake(NameIdentifier.of(metalakeName));
     if (hiveClientPool != null) {
       hiveClientPool.close();
+    }
+
+    if (sparkSession != null) {
+      sparkSession.close();
     }
   }
 
@@ -138,16 +171,14 @@ public class CatalogHiveIT extends AbstractIT {
         CATALOG_BYPASS_PREFIX + HiveConf.ConfVars.METASTORE_CLIENT_CONNECT_RETRY_DELAY.varname,
         "5");
 
-    Catalog createdCatalog =
-        metalake.createCatalog(
-            NameIdentifier.of(metalakeName, catalogName),
-            Catalog.Type.RELATIONAL,
-            provider,
-            "comment",
-            properties);
-    Catalog loadCatalog = metalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
+    metalake.createCatalog(
+        NameIdentifier.of(metalakeName, catalogName),
+        Catalog.Type.RELATIONAL,
+        provider,
+        "comment",
+        properties);
 
-    catalog = loadCatalog;
+    catalog = metalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
   }
 
   private static void createSchema() throws TException, InterruptedException {
@@ -191,6 +222,30 @@ public class CatalogHiveIT extends AbstractIT {
     return new ColumnDTO[] {col1, col2, col3};
   }
 
+  private void checkTableReadWrite(org.apache.hadoop.hive.metastore.api.Table table) {
+    String dbName = table.getDbName();
+    String tableName = table.getTableName();
+    long count = sparkSession.sql(String.format(SELECT_ALL_TEMPLATE, dbName, tableName)).count();
+    String values =
+        table.getSd().getCols().stream()
+            .map(f -> typeConstant.get(f.getType()))
+            .map(Object::toString)
+            .collect(Collectors.joining(","));
+    if (table.getPartitionKeys().isEmpty()) {
+      sparkSession.sql(String.format(INSERT_WITHOUT_PARTITION_TEMPLATE, dbName, tableName, values));
+    } else {
+      String partitionExpressions =
+          table.getPartitionKeys().stream()
+              .map(f -> f.getName() + "=" + typeConstant.get(f.getType()))
+              .collect(Collectors.joining(","));
+      sparkSession.sql(
+          String.format(
+              INSERT_WITH_PARTITION_TEMPLATE, dbName, tableName, partitionExpressions, values));
+    }
+    Assertions.assertEquals(
+        count + 1, sparkSession.sql(String.format(SELECT_ALL_TEMPLATE, dbName, tableName)).count());
+  }
+
   private Map<String, String> createProperties() {
     Map<String, String> properties = Maps.newHashMap();
     properties.put("key1", "val1");
@@ -199,7 +254,8 @@ public class CatalogHiveIT extends AbstractIT {
   }
 
   @Test
-  void testCreateHiveTableWithDistributionAndSortOrder() throws TException, InterruptedException {
+  public void testCreateHiveTableWithDistributionAndSortOrder()
+      throws TException, InterruptedException {
     // Create table from Gravitino API
     ColumnDTO[] columns = createColumns();
 
@@ -242,6 +298,7 @@ public class CatalogHiveIT extends AbstractIT {
         .forEach(
             key -> Assertions.assertEquals(properties.get(key), hiveTab.getParameters().get(key)));
     assertTableEquals(createdTable, hiveTab);
+    checkTableReadWrite(hiveTab);
 
     // test null partition
     resetSchema();
@@ -259,6 +316,7 @@ public class CatalogHiveIT extends AbstractIT {
             key ->
                 Assertions.assertEquals(properties.get(key), hiveTable1.getParameters().get(key)));
     assertTableEquals(createdTable1, hiveTable1);
+    checkTableReadWrite(hiveTable1);
 
     // Test bad request
     // Bad name in distribution
@@ -330,6 +388,7 @@ public class CatalogHiveIT extends AbstractIT {
         .forEach(
             key -> Assertions.assertEquals(properties.get(key), hiveTab.getParameters().get(key)));
     assertTableEquals(createdTable, hiveTab);
+    checkTableReadWrite(hiveTab);
 
     // test null partition
     resetSchema();
@@ -347,6 +406,7 @@ public class CatalogHiveIT extends AbstractIT {
             key ->
                 Assertions.assertEquals(properties.get(key), hiveTable1.getParameters().get(key)));
     assertTableEquals(createdTable1, hiveTable1);
+    checkTableReadWrite(hiveTable1);
   }
 
   @Test
@@ -364,6 +424,7 @@ public class CatalogHiveIT extends AbstractIT {
     org.apache.hadoop.hive.metastore.api.Table actualTable =
         hiveClientPool.run(client -> client.getTable(schemaName, tableName));
     assertDefaultTableProperties(createdTable, actualTable);
+    checkTableReadWrite(actualTable);
 
     // test set properties
     String table2 = GravitinoITUtils.genRandomName("CatalogHiveIT_table");
@@ -401,6 +462,7 @@ public class CatalogHiveIT extends AbstractIT {
     Assertions.assertNotNull(createdTable2.properties().get(TRANSIENT_LAST_DDL_TIME));
     Assertions.assertNotNull(createdTable2.properties().get(NUM_FILES));
     Assertions.assertNotNull(createdTable2.properties().get(TOTAL_SIZE));
+    checkTableReadWrite(actualTable2);
 
     // test alter properties exception
     IllegalArgumentException exception =
@@ -432,7 +494,7 @@ public class CatalogHiveIT extends AbstractIT {
                 columns,
                 table_comment,
                 properties,
-                new Transform[] {identity(columns[0]), identity(columns[1])});
+                new Transform[] {identity(columns[1]), identity(columns[2])});
 
     // Directly get table from hive metastore to check if the table is created successfully.
     org.apache.hadoop.hive.metastore.api.Table hiveTab =
@@ -442,28 +504,52 @@ public class CatalogHiveIT extends AbstractIT {
         .forEach(
             key -> Assertions.assertEquals(properties.get(key), hiveTab.getParameters().get(key)));
     assertTableEquals(createdTable, hiveTab);
+    checkTableReadWrite(hiveTab);
+
+    // test exception
+    RuntimeException exception =
+        assertThrows(
+            RuntimeException.class,
+            () -> {
+              catalog
+                  .asTableCatalog()
+                  .createTable(
+                      nameIdentifier,
+                      columns,
+                      table_comment,
+                      properties,
+                      new Transform[] {identity(columns[0]), identity(columns[1])});
+            });
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains("The partition field must be placed at the end of the columns in order"));
   }
 
   private void assertTableEquals(
       Table createdTable, org.apache.hadoop.hive.metastore.api.Table hiveTab) {
     Distribution distribution = createdTable.distribution();
     SortOrder[] sortOrders = createdTable.sortOrder();
+
+    List<FieldSchema> actualColumns = new ArrayList<>();
+    actualColumns.addAll(hiveTab.getSd().getCols());
+    actualColumns.addAll(hiveTab.getPartitionKeys());
     Assertions.assertEquals(schemaName.toLowerCase(), hiveTab.getDbName());
     Assertions.assertEquals(tableName.toLowerCase(), hiveTab.getTableName());
     Assertions.assertEquals("MANAGED_TABLE", hiveTab.getTableType());
     Assertions.assertEquals(table_comment, hiveTab.getParameters().get("comment"));
 
-    Assertions.assertEquals(HIVE_COL_NAME1, hiveTab.getSd().getCols().get(0).getName());
-    Assertions.assertEquals("tinyint", hiveTab.getSd().getCols().get(0).getType());
-    Assertions.assertEquals("col_1_comment", hiveTab.getSd().getCols().get(0).getComment());
+    Assertions.assertEquals(HIVE_COL_NAME1, actualColumns.get(0).getName());
+    Assertions.assertEquals("tinyint", actualColumns.get(0).getType());
+    Assertions.assertEquals("col_1_comment", actualColumns.get(0).getComment());
 
-    Assertions.assertEquals(HIVE_COL_NAME2, hiveTab.getSd().getCols().get(1).getName());
-    Assertions.assertEquals("date", hiveTab.getSd().getCols().get(1).getType());
-    Assertions.assertEquals("col_2_comment", hiveTab.getSd().getCols().get(1).getComment());
+    Assertions.assertEquals(HIVE_COL_NAME2, actualColumns.get(1).getName());
+    Assertions.assertEquals("date", actualColumns.get(1).getType());
+    Assertions.assertEquals("col_2_comment", actualColumns.get(1).getComment());
 
-    Assertions.assertEquals(HIVE_COL_NAME3, hiveTab.getSd().getCols().get(2).getName());
-    Assertions.assertEquals("string", hiveTab.getSd().getCols().get(2).getType());
-    Assertions.assertEquals("col_3_comment", hiveTab.getSd().getCols().get(2).getComment());
+    Assertions.assertEquals(HIVE_COL_NAME3, actualColumns.get(2).getName());
+    Assertions.assertEquals("string", actualColumns.get(2).getType());
+    Assertions.assertEquals("col_3_comment", actualColumns.get(2).getComment());
 
     Assertions.assertEquals(
         distribution == null ? 0 : distribution.number(), hiveTab.getSd().getNumBuckets());
@@ -496,6 +582,16 @@ public class CatalogHiveIT extends AbstractIT {
   }
 
   @Test
+  void testAlterUnknownTable() {
+    NameIdentifier identifier = NameIdentifier.of(metalakeName, catalogName, schemaName, "unknown");
+    Assertions.assertThrows(
+        NoSuchTableException.class,
+        () -> {
+          catalog.asTableCatalog().alterTable(identifier, TableChange.updateComment("new_comment"));
+        });
+  }
+
+  @Test
   public void testAlterHiveTable() throws TException, InterruptedException {
     ColumnDTO[] columns = createColumns();
     catalog
@@ -505,7 +601,7 @@ public class CatalogHiveIT extends AbstractIT {
             columns,
             table_comment,
             createProperties(),
-            new Transform[] {identity(columns[0])});
+            new Transform[] {identity(columns[2])});
     Table alteredTable =
         catalog
             .asTableCatalog()
@@ -536,17 +632,28 @@ public class CatalogHiveIT extends AbstractIT {
     Assertions.assertEquals("date", hiveTab.getSd().getCols().get(1).getType());
     Assertions.assertEquals("col_2_comment", hiveTab.getSd().getCols().get(1).getComment());
 
-    Assertions.assertEquals(HIVE_COL_NAME3, hiveTab.getSd().getCols().get(2).getName());
+    Assertions.assertEquals("col_4", hiveTab.getSd().getCols().get(2).getName());
     Assertions.assertEquals("string", hiveTab.getSd().getCols().get(2).getType());
-    Assertions.assertEquals("col_3_comment", hiveTab.getSd().getCols().get(2).getComment());
-
-    Assertions.assertEquals("col_4", hiveTab.getSd().getCols().get(3).getName());
-    Assertions.assertEquals("string", hiveTab.getSd().getCols().get(3).getType());
-    Assertions.assertNull(hiveTab.getSd().getCols().get(3).getComment());
+    Assertions.assertNull(hiveTab.getSd().getCols().get(2).getComment());
 
     Assertions.assertEquals(1, hiveTab.getPartitionKeys().size());
-    Assertions.assertEquals(columns[0].name(), hiveTab.getPartitionKeys().get(0).getName());
+    Assertions.assertEquals(columns[2].name(), hiveTab.getPartitionKeys().get(0).getName());
     assertDefaultTableProperties(alteredTable, hiveTab);
+    checkTableReadWrite(hiveTab);
+
+    // test alter partition column exception
+    RuntimeException exception =
+        assertThrows(
+            RuntimeException.class,
+            () -> {
+              catalog
+                  .asTableCatalog()
+                  .alterTable(
+                      NameIdentifier.of(metalakeName, catalogName, schemaName, alertTableName),
+                      TableChange.updateColumnType(
+                          new String[] {HIVE_COL_NAME3}, TypeCreator.NULLABLE.I32));
+            });
+    Assertions.assertTrue(exception.getMessage().contains("Cannot alter partition column"));
 
     // test updateColumnPosition exception
     ColumnDTO col1 =
@@ -585,7 +692,7 @@ public class CatalogHiveIT extends AbstractIT {
             Distribution.NONE,
             new SortOrder[0]);
 
-    IllegalArgumentException exception =
+    exception =
         assertThrows(
             IllegalArgumentException.class,
             () ->
@@ -646,15 +753,9 @@ public class CatalogHiveIT extends AbstractIT {
         () -> hiveClientPool.run(client -> client.getTable(schemaName, alertTableName)));
   }
 
-  // TODO (xun) enable this test waiting for fixed [#316] [Bug report] alterSchema throw
-  // NoSuchSchemaException
-  //  @Test
+  @Test
   public void testAlterSchema() throws TException, InterruptedException {
     NameIdentifier ident = NameIdentifier.of(metalakeName, catalogName, schemaName);
-    Map<String, String> properties = Maps.newHashMap();
-    properties.put("key1", "val1");
-    properties.put("key2", "val2");
-    String comment = "comment";
 
     GravitinoMetaLake metalake = client.loadMetalake(NameIdentifier.of(metalakeName));
     Catalog catalog = metalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
@@ -664,8 +765,6 @@ public class CatalogHiveIT extends AbstractIT {
             ident,
             SchemaChange.removeProperty("key1"),
             SchemaChange.setProperty("key2", "val2-alter"));
-
-    NameIdentifier[] nameIdentifiers = catalog.asSchemas().listSchemas(ident.namespace());
 
     Map<String, String> properties2 = catalog.asSchemas().loadSchema(ident).properties();
     Assertions.assertFalse(properties2.containsKey("key1"));
