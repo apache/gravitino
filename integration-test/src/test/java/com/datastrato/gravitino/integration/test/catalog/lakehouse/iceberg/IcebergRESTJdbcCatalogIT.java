@@ -18,6 +18,6 @@ public class IcebergRESTJdbcCatalogIT extends IcebergRESTServiceIT {
 
   @Test
   void test() {
-    System.out.println("heeloss");
+    System.out.println("heelosss");
   }
 }
