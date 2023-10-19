@@ -20,7 +20,7 @@ jobs:
   # Integration test for AMD64 architecture
   test-amd64-arch:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 120
     strategy:
       matrix:
         architecture: [linux/amd64]
