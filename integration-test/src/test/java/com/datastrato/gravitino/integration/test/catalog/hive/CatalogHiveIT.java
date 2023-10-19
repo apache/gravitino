@@ -34,6 +34,7 @@ import com.datastrato.gravitino.catalog.hive.HiveClientPool;
 import com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata;
 import com.datastrato.gravitino.client.GravitinoMetaLake;
 import com.datastrato.gravitino.dto.rel.ColumnDTO;
+import com.datastrato.gravitino.exceptions.NoSuchTableException;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
 import com.datastrato.gravitino.rel.Distribution;
@@ -578,6 +579,16 @@ public class CatalogHiveIT extends AbstractIT {
     List<String> hivePartitionKeys =
         hiveTab.getPartitionKeys().stream().map(FieldSchema::getName).collect(Collectors.toList());
     Assertions.assertEquals(partitionKeys, hivePartitionKeys);
+  }
+
+  @Test
+  void testAlterUnknownTable() {
+    NameIdentifier identifier = NameIdentifier.of(metalakeName, catalogName, schemaName, "unknown");
+    Assertions.assertThrows(
+        NoSuchTableException.class,
+        () -> {
+          catalog.asTableCatalog().alterTable(identifier, TableChange.updateComment("new_comment"));
+        });
   }
 
   @Test
