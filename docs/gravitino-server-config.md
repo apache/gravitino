@@ -8,8 +8,8 @@ This software is licensed under the Apache License version 2."
 
 # How to configure Gravitino server configurations
 
-Gravitino server can be customized by editing the configuration file `gravitino.conf` in the `conf` directory, though default values are usually sufficient for most use cases and users need not modify them.
-But we strongly recommend that you should read the following sections to understand the configuration file in case that you may need to change it in the future.
+Gravitino server can be customized by editing the configuration file `gravitino.conf` in the `conf` directory, though default values of some configurations are usually sufficient for most use cases and users need not modify them.
+But we strongly recommend that you should read the following sections to understand the configuration file and change the default values if necessary. 
 
 
 ## Configuration file
@@ -39,22 +39,17 @@ The following table lists the configuration items in the `gravitino.conf` file. 
 
 ### Storage configuration
 
-| Configuration item                      | Description                                                                                                                        | Default value                    | Since version |
-|-----------------------------------------|------------------------------------------------------------------------------------------------------------------------------------|----------------------------------|---------------|
-| `gravitino.entity.store`                | which storage implementation to use, currently we only support `kv`.                                                               | `kv`                             | 0.1.0         |
-| `gravitino.entity.store.kv`             | Detailed implementation of kv storage, currently we only support `RocksDBKvBackend`.                                               | `RocksDBKvBackend`               | 0.1.0         |
-| `gravitino.entity.store.kv.rocksdbPath` | Directory path of `RocksDBKvBackend`, **we highly recommend you to change this default value** as it's under the deploy directory. | `${GRAVITINO_HOME}/data/rocksdb` | 0.1.0         |
+| Configuration item                      | Description                                                                                                                                                                    | Default value                    | Since version |
+|-----------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------|---------------|
+| `gravitino.entity.store`                | which storage implementation to use, currently we only support key-value pair storage, default value is `kv`.                                                                  | `kv`                             | 0.1.0         |
+| `gravitino.entity.store.kv`             | Detailed implementation of kv storage, currently we only support `RocksDB` storage implementation `RocksDBKvBackend`.                                                          | `RocksDBKvBackend`               | 0.1.0         |
+| `gravitino.entity.store.kv.rocksdbPath` | Directory path of `RocksDBKvBackend`, **we highly recommend you to change this default value** as it's under the deploy directory and version update operations may remove it. | `${GRAVITINO_HOME}/data/rocksdb` | 0.1.0         |
 
 
 
 ### Catalog configuration
 
-| Configuration item                            | Description                                                                    | Default value | Since version |
-|-----------------------------------------------|--------------------------------------------------------------------------------|---------------|---------------|
-| `gravitino.catalog.cache.evictionIntervalMs`  | The interval in milliseconds to evict the catalog cache, default 3600000ms(1h) | `3600000`     | 0.1.0         |
-| `gravitino.catalog.classloader.isolated`      | Whether to use isolated classloader for catalog, default `true`                | `true`        | 0.1.0         |
-
-### Other configuration
-
-Note: If you do not understand the following configuration items, you can ignore them and just use the default value. But if you want to modify them, you should refer to the following table and modify them according to your needs.
-TO BE CONTINUED...
+| Configuration item                            | Description                                                                                                                                                                                             | Default value | Since version |
+|-----------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|---------------|
+| `gravitino.catalog.cache.evictionIntervalMs`  | The interval in milliseconds to evict the catalog cache, default 3600000ms(1h)                                                                                                                          | `3600000`     | 0.1.0         |
+| `gravitino.catalog.classloader.isolated`      | Whether to use isolated classloader for catalog, if it's true, all catalog-related libraries and configurations will be loaded by an isolated classloader NOT by AppClassLoader. Default value is`true` | `true`        | 0.1.0         |
