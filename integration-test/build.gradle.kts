@@ -200,6 +200,7 @@ tasks.test {
     doFirst {
       // Default use MiniGravitino to run integration tests
       environment("GRAVITINO_ROOT_DIR", rootDir.path)
+      // TODO: use hive user instead after we fix the permission issue #554
       environment("HADOOP_USER_NAME", "root")
       environment("HADOOP_HOME", "/tmp")
       environment("PROJECT_VERSION", version)
