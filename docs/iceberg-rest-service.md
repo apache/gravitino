@@ -10,8 +10,8 @@ Gravitino Iceberg REST Server follows the [Iceberg REST API specification](https
 
 ### Capabilities:
 * Support Iceberg REST API defined in Iceberg 1.3.1, support all namespace&table interface. `Token`, `ReportMetrics` and `Config` interface are not supported yet.
-* Worked as a catalog proxy, supports HiveCatalog and JdbcCatalog for now
-* Build with Iceberg `1.3.1`,  which means the Iceberg table format version is `1` by default.
+* Worked as a catalog proxy, supports HiveCatalog and JdbcCatalog for now.
+* Build with Iceberg `1.3.1`, which means the Iceberg table format version is `1` by default.
 
 ## How to start the Gravitino Iceberg REST server
 
@@ -28,7 +28,7 @@ All configurations are in `$GRAVITINO_HOME/conf/gravitino.conf`
 | `gravitino.auxService.iceberg-rest.httpPort` | The port Gravitino Iceberg REST server | `9001`|
 
 ### Iceberg catalog configuration
-Gravitino Iceberg REST server uses MemoryCatalog by default, it's not recommended on production, we could specify HiveCatalog or JdbcCatalog
+Gravitino Iceberg REST server uses MemoryCatalog by default, it's not recommended on production, we could specify HiveCatalog or JdbcCatalog.
 
 #### Hive catalog configuration
 
@@ -44,7 +44,7 @@ Gravitino Iceberg REST server uses MemoryCatalog by default, it's not recommende
 |-----------------------------------|-----------------------------------------------------------------------------------------------------------------------------|---------------|
 | `gravitino.auxService.iceberg-rest.catalog-backend` | Catalog backend of Gravitino Iceberg REST server | `jdbc`|
 | `gravitino.auxService.iceberg-rest.uri` | The jdbc connection address | `jdbc:postgresql://127.0.0.1:5432/`|
-| `gravitino.auxService.iceberg-rest.warehouse ` | Warehouse directory of JdbcCatalog | `/user/hive/warehouse-jdbc/`|
+| `gravitino.auxService.iceberg-rest.warehouse ` | Warehouse directory of JdbcCatalog, you should set HDFS prefix explictly if using HDFS | `/user/hive/warehouse-jdbc/`|
 | `gravitino.auxService.iceberg-rest.jdbc.user` | The username of the Jdbc connection| `jdbc username`|
 | `gravitino.auxService.iceberg-rest.jdbc.password` | The password of the Jdbc connection  | `jdbc password`|
 | `gravitino.auxService.iceberg-rest.jdbc-initialize` | Whether to initialize meta tables when create Jdbc catalog | `true`|
@@ -60,8 +60,8 @@ Take `clients` properities for example:
 | `gravitino.auxService.iceberg-rest.clients` | client pool size of catalog | `10`|
 
 
-### Hdfs configuration
-Hdfs config files(`core-site.xml` and `hdfs-site.xml`) could be put to dirs defined in `gravitino.auxService.iceberg-rest.classpath `, such as `catalogs/lakehouse-iceberg/conf`, it will be add to the classpath. 
+### HDFS configuration
+HDFS config files(`core-site.xml` and `hdfs-site.xml`) could be put to dirs defined in `gravitino.auxService.iceberg-rest.classpath `, such as `catalogs/lakehouse-iceberg/conf`, it will be add to the classpath. 
 
 ## Start up Gravitino Iceberg REST server
 Start up Gravitino Iceberg REST server
