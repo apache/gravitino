@@ -73,7 +73,8 @@ public class CatalogIcebergIT extends AbstractIT {
   public static String ICEBERG_COL_NAME2 = "iceberg_col_name2";
   public static String ICEBERG_COL_NAME3 = "iceberg_col_name3";
   private static final String provider = "lakehouse-iceberg";
-  private static final String WAREHOUSE = "/user/hive/warehouse-catalog-iceberg/";
+  private static final String WAREHOUSE =
+      "hdfs://127.0.0.1:9000/user/hive/warehouse-catalog-iceberg/";
   private static final String URI = "thrift://127.0.0.1:9083";
 
   private static GravitinoMetaLake metalake;
