@@ -222,7 +222,7 @@ tasks.test {
         if (EXCLUDE_DOCKER_TEST) {
           val redColor = "\u001B[31m"
           val resetColor = "\u001B[0m"
-          println("${redColor}Gravitino-docker is not running, exclude all integration test cases that tagged 'gravitino-docker-it'.${resetColor}")
+          println("${redColor}Gravitino-docker is not running locally, we would exclude all integration test cases that tagged 'gravitino-docker-it'.${resetColor}")
           excludeTags("gravitino-docker-it")
         }
       }
