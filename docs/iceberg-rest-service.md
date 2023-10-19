@@ -9,32 +9,30 @@ This software is licensed under the Apache License version 2."
 Gravitino Iceberg REST Server follows the [Iceberg REST API specification](https://github.com/apache/iceberg/blob/main/open-api/rest-catalog-open-api.yaml) and could act as an Iceberg REST catalog server. 
 
 ### Capabilities:
-* Support Iceberg REST api defined in Iceberg 1.3.1, support all namespace&table interface.  `Token`, `ReportMetrics` and `Config` interface are not supported yet.
+* Support Iceberg REST API defined in Iceberg 1.3.1, support all namespace&table interface. `Token`, `ReportMetrics` and `Config` interface are not supported yet.
 * Worked as a catalog proxy, supports HiveCatalog and JdbcCatalog for now
-* Integration with Iceberg `1.3.1`,  which means the Iceberg table format version is `1` by default.
+* Build with Iceberg `1.3.1`,  which means the Iceberg table format version is `1` by default.
 
 ## How to start the Gravitino Iceberg REST server
 
-Suppose the gravitino server is deployed on the `GRAVITINO_HOME` directory.
-All configurations are in `conf/gravitino.conf`
+Suppose the Gravitino server is deployed on the `GRAVITINO_HOME` directory.
+All configurations are in `$GRAVITINO_HOME/conf/gravitino.conf`
 
 ### Basic Gravitino Iceberg server configuration
 
-| Configuration item                | Description                                                                                                                 | Default value |
+| Configuration item                | Description                                                                                                                 | Configuration value |
 |-----------------------------------|-----------------------------------------------------------------------------------------------------------------------------|---------------|
 | `gravitino.auxService.names ` | The aux service name of Gravitino Iceberg REST server, the name couldn't be changed | ` iceberg-rest `|
 | `gravitino.auxService.iceberg-rest.classpath ` | The classpath of Gravitino Iceberg REST server, includes dirs with jar and configuration which support both absolute path and relative path | `catalogs/lakehouse-iceberg/libs, catalogs/lakehouse-iceberg/conf`|
 | `gravitino.auxService.iceberg-rest.host` | The host of Gravitino Iceberg REST server | `127.0.0.1`|
 | `gravitino.auxService.iceberg-rest.httpPort` | The port Gravitino Iceberg REST server | `9001`|
-| ` ` | | ` `|
-| ` ` | | ` `|
 
 ### Iceberg catalog configuration
 Gravitino Iceberg REST server uses MemoryCatalog by default, it's not recommended on production, we could specify HiveCatalog or JdbcCatalog
 
 #### Hive catalog configuration
 
-| Configuration item                | Description                                                                                                                 | Default value |
+| Configuration item                | Description                                                                                                                 | Configuration value |
 |-----------------------------------|-----------------------------------------------------------------------------------------------------------------------------|---------------|
 | `gravitino.auxService.iceberg-rest.catalog-backend` | Catalog backend of Gravitino Iceberg REST server | `hive`|
 | `gravitino.auxService.iceberg-rest.uri` | Hive metadata address | `thrift://127.0.0.1:9083`|
@@ -47,21 +45,26 @@ Gravitino Iceberg REST server uses MemoryCatalog by default, it's not recommende
 | `gravitino.auxService.iceberg-rest.catalog-backend` | Catalog backend of Gravitino Iceberg REST server | `jdbc`|
 | `gravitino.auxService.iceberg-rest.uri` | The jdbc connection address | `jdbc:postgresql://127.0.0.1:5432/`|
 | `gravitino.auxService.iceberg-rest.warehouse ` | Warehouse directory of JdbcCatalog | `/user/hive/warehouse-jdbc/`|
+| `gravitino.auxService.iceberg-rest.jdbc.user` | The username of the Jdbc connection| `jdbc username`|
+| `gravitino.auxService.iceberg-rest.jdbc.password` | The password of the Jdbc connection  | `jdbc password`|
+| `gravitino.auxService.iceberg-rest.jdbc-initialize` | Whether to initialize meta tables when create Jdbc catalog | `true`|
 
+If using Jdbc catalog, you must download responding jdbc driver jars to Gravitino Iceberg REST server classpath, such as `catalogs/lakehouse-iceberg/libs`.
 
 ### Other Iceberg catalog properties
-we could add other properties defined in [CatalogProperties of Iceberg](https://github.com/apache/iceberg/blob/main/core/src/main/java/org/apache/iceberg/CatalogProperties.java), please note that `catalog-impl` doesn't take effect. 
+We could add other properties defined in [CatalogProperties of Iceberg](https://github.com/apache/iceberg/blob/main/core/src/main/java/org/apache/iceberg/CatalogProperties.java), please note that `catalog-impl` doesn't take effect. 
 Take `clients` properities for example:
 
-| Configuration item                | Description                                                                                                                 | Default value |
+| Configuration item                | Description                                                                                                                 | Configuration value |
 |-----------------------------------|-----------------------------------------------------------------------------------------------------------------------------|---------------|
-| `gravitino.auxService.iceberg-rest.clients` | client pool size of catalog | `2`|
+| `gravitino.auxService.iceberg-rest.clients` | client pool size of catalog | `10`|
 
 
 ### Hdfs configuration
 Hdfs config files(`core-site.xml` and `hdfs-site.xml`) could be put to dirs defined in `gravitino.auxService.iceberg-rest.classpath `, such as `catalogs/lakehouse-iceberg/conf`, it will be add to the classpath. 
 
 ## Start up Gravitino Iceberg REST server
+Start up Gravitino Iceberg REST server
 ```
 ./bin/gravitino.sh start
 ```
@@ -70,7 +73,7 @@ Check whether Gravitino Iceberg REST server started
 curl  http://127.0.0.1:9001/iceberg/application.wadl
 ```
 
-## Exploring gravitino Iceberg REST service with Spark
+## Exploring Gravitino Iceberg REST server with Spark
 
 ### Deploy Spark with Iceberg support
 
@@ -94,7 +97,7 @@ for example:
 
 ### Explore Iceberg with Spark SQL
 ```sql
-//First change to rest catalog
+//First change to `rest` catalog, `rest` is the catalog name
 USE rest;
 CREATE DATABASE IF NOT EXISTS dml;
 CREATE TABLE dml.test (id bigint COMMENT 'unique id') using iceberg
@@ -103,4 +106,4 @@ INSERT INTO dml.test VALUES (1), (2);
 SELECT * FROM dml.test
 ```
 
-If you have any problem please create a issue to connect us :)
+If you have any problem or requirement, please create a issue :)
