@@ -95,6 +95,7 @@ iceberg-spark-runtime = { group = "org.apache.iceberg", name = "iceberg-spark-ru
 spark-sql = { group = "org.apache.spark", name = "spark-sql_2.13", version.ref = "spark" }
 scala-collection-compat =  { group = "org.scala-lang.modules", name = "scala-collection-compat_2.13", version.ref = "scala-collection-compat" }
 sqlite-jdbc = { group = "org.xerial", name = "sqlite-jdbc", version.ref = "sqlite-jdbc" }
+spark-hive = { group = "org.apache.spark", name = "spark-hive_2.13", version.ref = "spark" }
 
 
 [bundles]
