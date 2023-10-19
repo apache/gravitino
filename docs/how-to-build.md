@@ -37,15 +37,17 @@ This software is licensed under the Apache License version 2."
     ```
     ├── ...
     └── distribution/package
-        ├── bin/gravitino.sh          # Gravitino Server Launching scripts
+        ├── bin/gravitino.sh            # Gravitino Server Launching scripts.
         ├── catalogs
-        │   └── hive/libs/           # Hive catalog dependencies
-        ├── conf/                    # All configuration for Gravitino
-        |   ├── gravitino.conf        # Gravitino Server configuration
-        |   ├── gravitino-env.sh      # Environment variables, etc., JAVA_HOME, GRAVITINO_HOME, and more.
-        |   └── log4j2.properties    # log4j configuration for Gravitino Server.
-        ├── libs/                    # Gravitino Server dependencies lib
-        └── logs/                    # Gravitino Server logs
+        │   └── hive/                   # Hive catalog dependencies and configuratons.
+        │   └── lakehouse-iceberg/      # Iceberg catalog dependencies and configuratons.
+        ├── conf/                       # All configuration for Gravitino.
+        |   ├── gravitino.conf          # Gravitino Server configuration.
+        |   ├── gravitino-env.sh        # Environment variables, etc., JAVA_HOME, GRAVITINO_HOME, and more.
+        |   └── log4j2.properties       # log4j configuration for Gravitino Server.
+        ├── libs/                       # Gravitino Server dependencies libraries.
+        └── logs/                       # Gravitino Server logs.
+        └── data/                       # Default directory for Gravitino Server to store data.
     ```
    > Note: The `./gradlew clean` command will delete the `distribution` directory.
 
