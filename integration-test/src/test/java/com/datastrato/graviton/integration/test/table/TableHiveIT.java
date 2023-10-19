@@ -41,8 +41,10 @@ import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
+@Tag("gravitino-docker-it")
 public class TableHiveIT extends AbstractIT {
   public static String metalakeName;
   public static String catalogName;
@@ -195,6 +197,7 @@ public class TableHiveIT extends AbstractIT {
     assertThrows(RuntimeException.class, () -> tableCatalog.alterTable(tableID, update));
   }
 
+  @Test
   public void testTableSetAndRemoveProperty() {
     NameIdentifier metalakeID = NameIdentifier.of(metalakeName);
     NameIdentifier catalogID = NameIdentifier.of(metalakeName, catalogName);
@@ -399,7 +402,7 @@ public class TableHiveIT extends AbstractIT {
     tableCatalog.alterTable(tableID, columnA);
 
     String[] fieldsB = {firstnameCol};
-    TableChange columnB = TableChange.addColumn(fieldsA, TypeCreator.NULLABLE.STRING, "First name");
+    TableChange columnB = TableChange.addColumn(fieldsB, TypeCreator.NULLABLE.STRING, "First name");
     tableCatalog.alterTable(tableID, columnB);
 
     Table table = tableCatalog.loadTable(tableID);
@@ -423,6 +426,32 @@ public class TableHiveIT extends AbstractIT {
     assertEquals(addressCol.toLowerCase(), columns[2].name());
     assertEquals(firstnameCol.toLowerCase(), columns[3].name());
     assertEquals(surnameCol.toLowerCase(), columns[4].name());
+  }
+
+  @Test
+  public void testAddCololumTwice() {
+    NameIdentifier metalakeID = NameIdentifier.of(metalakeName);
+    NameIdentifier catalogID = NameIdentifier.of(metalakeName, catalogName);
+    NameIdentifier schemaID = NameIdentifier.of(metalakeName, catalogName, schemaName);
+    NameIdentifier tableID = NameIdentifier.of(metalakeName, catalogName, schemaName, "customers");
+    GravitonMetaLake metalake = client.loadMetalake(metalakeID);
+    Catalog catalog = metalake.loadCatalog(catalogID);
+    catalog.asSchemas().loadSchema(schemaID);
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    String surnameCol = "surname";
+
+    String[] fields = {surnameCol};
+    TableChange column = TableChange.addColumn(fields, TypeCreator.NULLABLE.STRING, "Last name");
+    tableCatalog.alterTable(tableID, column);
+
+    assertThrows(RuntimeException.class, () -> tableCatalog.alterTable(tableID, column));
+
+    Table table = tableCatalog.loadTable(tableID);
+    Column[] columns = table.columns();
+    assertEquals(nameCol.toLowerCase(), columns[0].name());
+    assertEquals(dobCol.toLowerCase(), columns[1].name());
+    assertEquals(addressCol.toLowerCase(), columns[2].name());
+    assertEquals(surnameCol.toLowerCase(), columns[3].name());
   }
 
   @Test
