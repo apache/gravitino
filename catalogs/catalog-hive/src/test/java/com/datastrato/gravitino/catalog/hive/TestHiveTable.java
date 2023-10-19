@@ -414,7 +414,7 @@ public class TestHiveTable extends MiniHiveMetastoreService {
                 columns,
                 HIVE_COMMENT,
                 properties,
-                new Transform[0],
+                new Transform[] {identity(col2)},
                 distribution,
                 sortOrders);
     Assertions.assertTrue(hiveCatalog.asTableCatalog().tableExists(tableIdentifier));
@@ -465,7 +465,7 @@ public class TestHiveTable extends MiniHiveMetastoreService {
                     .asTableCatalog()
                     .alterTable(
                         tableIdentifier,
-                        TableChange.addColumn(new String[] {"col_1"}, TypeCreator.REQUIRED.I8)));
+                        TableChange.addColumn(new String[] {"col_3"}, TypeCreator.REQUIRED.I8)));
     Assertions.assertTrue(
         exception
             .getMessage()
@@ -490,6 +490,33 @@ public class TestHiveTable extends MiniHiveMetastoreService {
                 "The NOT NULL constraint for column is only supported since Hive 3.0, "
                     + "but the current Gravitino Hive catalog only supports Hive 2.x"));
 
+    exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                hiveCatalog
+                    .asTableCatalog()
+                    .alterTable(
+                        tableIdentifier,
+                        TableChange.addColumn(new String[] {"col_1"}, TypeCreator.NULLABLE.I8)));
+    Assertions.assertTrue(
+        exception.getMessage().contains("Cannot add column after partition column"));
+
+    exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                hiveCatalog
+                    .asTableCatalog()
+                    .alterTable(
+                        tableIdentifier,
+                        TableChange.addColumn(
+                            new String[] {col1.name()},
+                            TypeCreator.NULLABLE.I8,
+                            "comment",
+                            TableChange.ColumnPosition.after(col1.name()))));
+    Assertions.assertTrue(exception.getMessage().contains("Cannot add column with duplicate name"));
+
     // test alter
     hiveCatalog
         .asTableCatalog()
@@ -500,19 +527,23 @@ public class TestHiveTable extends MiniHiveMetastoreService {
             TableChange.removeProperty("key1"),
             TableChange.setProperty("key2", "val2_new"),
             // columns current format: [col_1:I8:comment, col_2:DATE:comment]
-            TableChange.addColumn(new String[] {"col_3"}, TypeCreator.NULLABLE.STRING),
-            // columns current format: [col_1:I8:comment, col_2:DATE:comment, col_3:STRING:null]
-            TableChange.renameColumn(new String[] {"col_2"}, "col_2_new"),
-            // columns current format: [col_1:I8:comment, col_2_new:DATE:comment, col_3:STRING:null]
+            TableChange.addColumn(
+                new String[] {"col_3"},
+                TypeCreator.NULLABLE.STRING,
+                null,
+                TableChange.ColumnPosition.after(col1.name())),
+            // columns current format: [col_1:I8:comment, col_3:STRING:null, col_2:DATE:comment]
+            TableChange.renameColumn(new String[] {"col_3"}, "col_3_new"),
+            // columns current format: [col_1:I8:comment, col_3_new:STRING:null, col_2:DATE:comment]
             TableChange.updateColumnComment(new String[] {"col_1"}, HIVE_COMMENT + "_new"),
-            // columns current format: [col_1:I8:comment_new, col_2_new:DATE:comment,
-            // col_3:STRING:null]
+            // columns current format: [col_1:I8:comment_new, col_3_new:STRING:null,
+            // col_2:DATE:comment]
             TableChange.updateColumnType(new String[] {"col_1"}, TypeCreator.NULLABLE.I32),
-            // columns current format: [col_1:I32:comment_new, col_2_new:DATE:comment,
-            // col_3:STRING:null]
+            // columns current format: [col_1:I32:comment_new, col_3_new:STRING:null,
+            // col_2:DATE:comment]
             TableChange.updateColumnPosition(
-                new String[] {"col_2_new"}, TableChange.ColumnPosition.first())
-            // columns current: [col_2_new:DATE:comment, col_1:I32:comment_new, col_3:STRING:null]
+                new String[] {"col_3_new"}, TableChange.ColumnPosition.first())
+            // columns current: [col_3_new:STRING:null, col_1:I32:comment_new, col_2:DATE:comment]
             );
     Table alteredTable =
         hiveCatalog
@@ -532,9 +563,9 @@ public class TestHiveTable extends MiniHiveMetastoreService {
     Column[] expected =
         new Column[] {
           new HiveColumn.Builder()
-              .withName("col_2_new")
-              .withType(TypeCreator.NULLABLE.DATE)
-              .withComment(HIVE_COMMENT)
+              .withName("col_3_new")
+              .withType(TypeCreator.NULLABLE.STRING)
+              .withComment(null)
               .build(),
           new HiveColumn.Builder()
               .withName("col_1")
@@ -542,9 +573,9 @@ public class TestHiveTable extends MiniHiveMetastoreService {
               .withComment(HIVE_COMMENT + "_new")
               .build(),
           new HiveColumn.Builder()
-              .withName("col_3")
-              .withType(TypeCreator.NULLABLE.STRING)
-              .withComment(null)
+              .withName("col_2")
+              .withType(TypeCreator.NULLABLE.DATE)
+              .withComment(HIVE_COMMENT)
               .build()
         };
     Assertions.assertArrayEquals(expected, alteredTable.columns());
