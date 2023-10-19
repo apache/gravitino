@@ -282,7 +282,7 @@ public class CatalogIcebergIT extends AbstractIT {
 
   @Test
   void testCreateAndLoadIcebergTable() {
-    // Create table from Graviton API
+    // Create table from Gravitino API
     ColumnDTO[] columns = createColumns();
 
     NameIdentifier tableIdentifier =
