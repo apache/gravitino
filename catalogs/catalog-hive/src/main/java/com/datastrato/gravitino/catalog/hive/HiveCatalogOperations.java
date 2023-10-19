@@ -452,32 +452,63 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     }
   }
 
-  private void validatePartitionForAlter(
+  private void validateColumnChangeForAlter(
       TableChange[] changes, org.apache.hadoop.hive.metastore.api.Table hiveTable) {
     Set<String> partitionFields =
         hiveTable.getPartitionKeys().stream().map(FieldSchema::getName).collect(Collectors.toSet());
+    Set<String> existingFields =
+        hiveTable.getSd().getCols().stream().map(FieldSchema::getName).collect(Collectors.toSet());
+    existingFields.addAll(partitionFields);
+
     Arrays.stream(changes)
         .filter(c -> c instanceof TableChange.ColumnChange)
         .forEach(
             c -> {
-              String changeColumn = ((TableChange.ColumnChange) c).fieldNames()[0];
+              String fieldToAdd = String.join(".", ((TableChange.ColumnChange) c).fieldNames());
               Preconditions.checkArgument(
                   c instanceof TableChange.UpdateColumnComment
-                      || !partitionFields.contains(changeColumn),
-                  "Cannot alter partition column: " + changeColumn);
+                      || !partitionFields.contains(fieldToAdd),
+                  "Cannot alter partition column: " + fieldToAdd);
+
+              if (c instanceof TableChange.UpdateColumnType) {
+                validateColumnType(fieldToAdd, ((TableChange.UpdateColumnType) c).getNewDataType());
+              }
 
               if (c instanceof TableChange.UpdateColumnPosition
-                  && ((TableChange.UpdateColumnPosition) c).getPosition()
-                      instanceof TableChange.After) {
-                String afterColumn =
-                    ((TableChange.After) ((TableChange.UpdateColumnPosition) c).getPosition())
-                        .getColumn();
-                if (partitionFields.contains(afterColumn)) {
+                  && afterPartitionColumn(
+                      partitionFields, ((TableChange.UpdateColumnPosition) c).getPosition())) {
+                throw new IllegalArgumentException(
+                    "Cannot alter column position to after partition column");
+              }
+
+              if (c instanceof TableChange.AddColumn) {
+                TableChange.AddColumn addColumn = (TableChange.AddColumn) c;
+
+                validateColumnType(fieldToAdd, addColumn.getDataType());
+
+                if ((addColumn.getPosition() == null && !partitionFields.isEmpty())
+                    || (afterPartitionColumn(partitionFields, addColumn.getPosition()))) {
+                  throw new IllegalArgumentException("Cannot add column after partition column");
+                }
+
+                if (existingFields.contains(fieldToAdd)) {
                   throw new IllegalArgumentException(
-                      "Cannot alter column position to after partition column: " + afterColumn);
+                      "Cannot add column with duplicate name: " + fieldToAdd);
+                } else {
+                  existingFields.add(fieldToAdd);
                 }
               }
             });
+  }
+
+  private boolean afterPartitionColumn(
+      Set<String> partitionFields, TableChange.ColumnPosition columnPosition) {
+    Preconditions.checkArgument(columnPosition != null, "Column position cannot be null");
+
+    if (columnPosition instanceof TableChange.After) {
+      return partitionFields.contains(((TableChange.After) columnPosition).getColumn());
+    }
+    return false;
   }
 
   private void validateDistributionAndSort(Distribution distribution, SortOrder[] sortOrder) {
@@ -597,7 +628,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       org.apache.hadoop.hive.metastore.api.Table alteredHiveTable =
           table.toHiveTable(tablePropertiesMetadata);
 
-      validatePartitionForAlter(changes, alteredHiveTable);
+      validateColumnChangeForAlter(changes, alteredHiveTable);
 
       for (TableChange change : changes) {
         // Table change
@@ -619,9 +650,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
           List<FieldSchema> cols = sd.getCols();
 
           if (change instanceof TableChange.AddColumn) {
-            TableChange.AddColumn addColumn = (TableChange.AddColumn) change;
-            validateColumnType(String.join(".", addColumn.fieldNames()), addColumn.getDataType());
-            doAddColumn(cols, addColumn);
+            doAddColumn(cols, (TableChange.AddColumn) change);
 
           } else if (change instanceof TableChange.DeleteColumn) {
             doDeleteColumn(cols, (TableChange.DeleteColumn) change);
@@ -636,10 +665,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
             doUpdateColumnPosition(cols, (TableChange.UpdateColumnPosition) change);
 
           } else if (change instanceof TableChange.UpdateColumnType) {
-            TableChange.UpdateColumnType updateColumnType = (TableChange.UpdateColumnType) change;
-            validateColumnType(
-                String.join(".", updateColumnType.fieldNames()), updateColumnType.getNewDataType());
-            doUpdateColumnType(cols, updateColumnType);
+            doUpdateColumnType(cols, (TableChange.UpdateColumnType) change);
 
           } else {
             throw new IllegalArgumentException(
