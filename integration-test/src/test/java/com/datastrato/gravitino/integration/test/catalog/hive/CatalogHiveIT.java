@@ -611,7 +611,11 @@ public class CatalogHiveIT extends AbstractIT {
                 TableChange.updateComment(table_comment + "_new"),
                 TableChange.removeProperty("key1"),
                 TableChange.setProperty("key2", "val2_new"),
-                TableChange.addColumn(new String[] {"col_4"}, TypeCreator.NULLABLE.STRING),
+                TableChange.addColumn(
+                    new String[] {"col_4"},
+                    TypeCreator.NULLABLE.STRING,
+                    null,
+                    TableChange.ColumnPosition.after(columns[1].name())),
                 TableChange.renameColumn(new String[] {HIVE_COL_NAME2}, "col_2_new"),
                 TableChange.updateColumnComment(new String[] {HIVE_COL_NAME1}, "comment_new"),
                 TableChange.updateColumnType(
