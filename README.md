@@ -36,7 +36,6 @@ Gravitino is built using Gradle. To build Gravitino, please run:
 If you want to build a distribution package, please run:
 
 ```shell
-./gradlew clean build
 ./gradlew compileDistribution
 ```
 
@@ -45,7 +44,6 @@ to build a distribution package.
 Or:
 
 ```shell
-./gradlew clean build
 ./gradlew assembleDistribution
 ```
 
@@ -78,7 +76,7 @@ To stop Gravitino server, please run:
 
 ### Using Trino with Gravitino
 
-
+Gravitino provides a Trino connector to access the metadata in Gravitino. To use Trino with Gravitino, please follow the [trino-gravitino-connector doc](docs/trino-gravitino-connector.md).
 
 ## Development Guide
 
