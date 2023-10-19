@@ -17,14 +17,14 @@ import static io.trino.spi.type.VarbinaryType.VARBINARY;
 import static io.trino.spi.type.VarcharType.VARCHAR;
 import static io.trino.spi.type.VarcharType.createUnboundedVarcharType;
 
-import io.substrait.type.TypeCreator;
+import com.datastrato.gravitino.shaded.io.substrait.type.TypeCreator;
 import io.trino.spi.TrinoException;
 import io.trino.spi.type.Type;
 
 /** This class is used to transform datatype between gravitino and trino */
 public class DataTypeTransformer {
 
-  public static Type getTrinoType(io.substrait.type.Type type) {
+  public static Type getTrinoType(com.datastrato.gravitino.shaded.io.substrait.type.Type type) {
     if (type.equals(TypeCreator.REQUIRED.STRING) || type.equals(TypeCreator.NULLABLE.STRING)) {
       return createUnboundedVarcharType();
     } else if (type.equals(TypeCreator.REQUIRED.BOOLEAN)
@@ -49,7 +49,8 @@ public class DataTypeTransformer {
         GRAVITINO_UNSUPPORTED_GRAVITINO_DATATYPE, "Unsupported gravitino datatype: " + type);
   }
 
-  public static io.substrait.type.Type getGravitinoType(Type type, boolean nullable) {
+  public static com.datastrato.gravitino.shaded.io.substrait.type.Type getGravitinoType(
+      Type type, boolean nullable) {
     if (type.equals(VARCHAR)) {
       return nullable ? TypeCreator.NULLABLE.STRING : TypeCreator.REQUIRED.STRING;
     } else if (type.equals(BOOLEAN)) {
