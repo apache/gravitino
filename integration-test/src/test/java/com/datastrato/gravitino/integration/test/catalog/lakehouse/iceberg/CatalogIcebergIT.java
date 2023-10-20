@@ -110,6 +110,7 @@ public class CatalogIcebergIT extends AbstractIT {
             .config("spark.sql.warehouse.dir", WAREHOUSE)
             .config("spark.sql.catalog.iceberg", "org.apache.iceberg.spark.SparkCatalog")
             .config("spark.sql.catalog.iceberg.uri", URI)
+            .config("spark.sql.catalog.rest.type", "hive")
             .config(
                 "spark.sql.extensions",
                 "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions")
