@@ -17,9 +17,9 @@ Gravitino is a high-performance, geo-distributed, and federated metadata lake. I
 Gravitino aims to provide several key features:
 
 * SSOT (Single Source of Truth) for multi-regional data with geo-distributed architecture support.
-* Unified Data + AI assets managements for both users and engines.
-* Security in one place, centralize the security for different sources.
-* Built-in data management + data access management.
+* Unified Data and AI asset management for both users and engines.
+* Security in one place, centralizing the security for different sources.
+* Built-in data management and data access management.
 
 ## Online Documentation
 
@@ -58,17 +58,17 @@ For the details of building and testing Gravitino, please see [How to build Grav
 
 ## Quick Start
 
-### Configure and start Gravitino server
+### Configure and start the Gravitino server
 
-Gravitino server configuration file `gravitino.conf` is located under `conf` follow the typical property file format, you can change the configuration in this file.
+Gravitino server configuration file `gravitino.conf` is located under `conf` and follows the typical property file format, you can change the configuration in this file.
 
-To start Gravitino server, please run:
+To start the Gravitino server, please run:
 
 ```shell
 ./bin/gravitino.sh start
 ```
 
-To stop Gravitino server, please run:
+To stop the Gravitino server, please run:
 
 ```shell
 ./bin/gravitino.sh stop
@@ -85,4 +85,5 @@ Gravitino provides a Trino connector to access the metadata in Gravitino. To use
 3. [How to publish Docker images](docs/publish-docker-images.md)
 
 ## License
+
 Gravitino is under the Apache License Version 2.0, See the [LICENSE](LICENSE) for the details.
