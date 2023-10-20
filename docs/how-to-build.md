@@ -4,13 +4,15 @@ date: 2023-10-03T09:03:20-08:00
 license: "Copyright 2023 Datastrato.
 This software is licensed under the Apache License version 2."
 ---
-# How to Build Gravitino
+## How to Build Gravitino
 
 ## Prerequisites
+
 + JDK 1.8
 + Git
 
 ## Quick Start
+
 1. Clone the Gravitino project.
 
     ```shell
@@ -23,6 +25,7 @@ This software is licensed under the Apache License version 2."
     cd gravitino
     ./gradlew build
     ```
+
    > Note: The first time you build the project, it may take a while to download the dependencies.
 
 3. Deploy the Gravitino project in your local environment.
@@ -34,7 +37,8 @@ This software is licensed under the Apache License version 2."
    The `compileDistribution` command will create a `distribution` directory in the Gravitino root directory.
 
    The directory structure of the `distribution` directory is as follows:
-    ```
+
+    ```text
     ├── ...
     └── distribution/package
         ├── bin/gravitino.sh          # Gravitino Server Launching scripts
@@ -47,6 +51,7 @@ This software is licensed under the Apache License version 2."
         ├── libs/                    # Gravitino Server dependencies lib
         └── logs/                    # Gravitino Server logs
     ```
+
    > Note: The `./gradlew clean` command will delete the `distribution` directory.
 
 4. Run Gravitino Server.
@@ -54,6 +59,7 @@ This software is licensed under the Apache License version 2."
     ```shell
     distribution/package/bin/gravitino.sh start
     ```
+
    > Note: If you need to debug the Gravitino Server, you can enable the `GRAVITINO_DEBUG_OPTS` environment variable in the `conf/gravitino-env.sh` file.
    Then you can create a `Remote JVM Debug` configuration in `IntelliJ IDEA` and debug `gravitino.server.main`.
 
@@ -63,11 +69,12 @@ This software is licensed under the Apache License version 2."
     distribution/package/bin/gravitino.sh stop
     ```
 
-6. Assemble Gravitino distribution package.
+6. Assemble the Gravitino distribution package.
 
     ```shell
    ./gradlew assembleDistribution
    ```
+   
    The `assembleDistribution` command will create `gravitino-{version}-bin.tar.gz` and `gravitino-{version}-bin.tar.gz.sha256` under the `distribution` directory.
    
    You can deploy them to your production environment.
