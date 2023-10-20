@@ -27,7 +27,7 @@ public class HiveCatalogPropertiesMeta extends BaseCatalogPropertiesMetadata {
               CLIENT_POOL_SIZE,
               PropertyEntry.integerOptionalPropertyEntry(
                   CLIENT_POOL_SIZE,
-                  "The maximum number of Hive clients in the pool for gravitino",
+                  "The maximum number of Hive metastore clients in the pool for Gravitino",
                   true,
                   DEFAULT_CLIENT_POOL_SIZE,
                   false))
