@@ -1,5 +1,5 @@
 ---
-title: "Gravitino Quickstart"
+title: "Gravitino Quick Start"
 date: 2023-10-01T09:03:20-08:00
 license: "Copyright 2023 Datastrato.
 This software is licensed under the Apache License version 2."
@@ -11,11 +11,11 @@ Gravitino is a high-performance, geo-distributed, and federated metadata lake. I
 
 ## Where to get Gravitino?
 
-You can build from [Github](https://github.com/datastrato/gravitino), see [How to build](/how-to-build) for instructions, or use our docker images at [datastrato](https://hub.docker.com/u/datastrato) DockerHub repository. You can also stop and start a local Gravitino server via ``bin/gravitino.sh start`` and ``bin/gravitino.sh start`` in a Gravitino distribution, see [How to build](/how-to-build) for more instructions.
+You can build from [Github](https://github.com/datastrato/gravitino), see [how to build](/docs/how-to-build) for instructions, or use our docker images at [datastrato](https://hub.docker.com/u/datastrato) DockerHub repository. You can also stop and start a local Gravitino server via ``bin/gravitino.sh start`` and ``bin/gravitino.sh stop`` in a Gravitino distribution, see [how to build](/docs/how-to-build) for more instructions.
 
 ## Where is the Documentation?
 
-Gravitino has a local documentation website that you can view by following these [instructions](/launch_docs-website).
+Gravitino has a local documentation website that you can view by following teh instructions in ``README.md``.
 
 ## How to contribute to Gravitino?
 
