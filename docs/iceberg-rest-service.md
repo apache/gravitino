@@ -25,7 +25,7 @@ All configurations are in [`$GRAVITINO_HOME/conf/gravitino.conf`](gravitino-serv
 | `gravitino.auxService.names ` | The auxiliary service name of Gravitino Iceberg REST server, we should use **`iceberg-rest`** for Gravitino Iceberg REST server | null | 0.2.0 |
 | `gravitino.auxService.iceberg-rest.classpath ` | The classpath of Gravitino Iceberg REST server, includes dirs with jar and configuration which support both absolute path and relative path, like `catalogs/lakehouse-iceberg/libs, catalogs/lakehouse-iceberg/conf` | null | 0.2.0 |
 | `gravitino.auxService.iceberg-rest.host` | The host of Gravitino Iceberg REST server | `0.0.0.0`| 0.2.0 |
-| `gravitino.auxService.iceberg-rest.httpPort` | The port Gravitino Iceberg REST server, the default port is same with port of Gravitino server, we should set a diffrent port explicitly, like `9001` | `8090` | 0.2.0 |
+| `gravitino.auxService.iceberg-rest.httpPort` | The port Gravitino Iceberg REST server, **the default port is same with port of Gravitino server, we should set a diffrent port explicitly, like `9001`** | `8090` | 0.2.0 |
 | `gravitino.auxService.iceberg-rest.coreThreads` | The number of core thread in thread pool which is used by Gravitino Iceberg REST server. | `Math.min(Runtime.getRuntime().availableProcessors() * 2, 100)` | 0.2.0 |
 | `gravitino.auxService.iceberg-rest.maxThreads` | The number of max thread in thread pool which is used by Gravitino Iceberg REST server. | `Math.max(Runtime.getRuntime().availableProcessors() * 4, 400)` | 0.2.0 |
 | `gravitino.auxService.iceberg-rest.threadPoolWorkQueueSize` | The size of queue in thread pool which is used by Gravitino Iceberg REST server. | `100` | 0.2.0 |
@@ -55,7 +55,7 @@ Gravitino Iceberg REST server uses memory catalog by default, it's not recommend
 | `gravitino.auxService.iceberg-rest.jdbc.password` | The password of the Jdbc connection  | null | 0.2.0 |
 | `gravitino.auxService.iceberg-rest.jdbc-initialize` | Whether to initialize meta tables when create Jdbc catalog | `true` | 0.2.0 |
 
-If using Jdbc catalog, you must download responding Jdbc driver jars to Gravitino Iceberg REST server classpath, such as `catalogs/lakehouse-iceberg/libs`.
+If using Jdbc catalog, you must **download responding Jdbc driver jars to Gravitino Iceberg REST server classpath**, such as `catalogs/lakehouse-iceberg/libs`.
 
 ### Other Iceberg catalog properties
 We could add other properties defined in [CatalogProperties of Iceberg](https://github.com/apache/iceberg/blob/main/core/src/main/java/org/apache/iceberg/CatalogProperties.java), please note that `catalog-impl` doesn't take effect. 
