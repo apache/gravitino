@@ -72,6 +72,7 @@ nexusPublishing {
               System.getenv("SONATYPE_PASSWORD").takeUnless { it.isNullOrEmpty() }
                       ?: extra["SONATYPE_PASSWORD"].toString()
 
+      println("Publishing to Sonatype using user $sonatypeUser, ps: $sonatypePassword")
       username.set(sonatypeUser)
       password.set(sonatypePassword)
     }
