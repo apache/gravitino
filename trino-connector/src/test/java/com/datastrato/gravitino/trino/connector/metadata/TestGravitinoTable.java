@@ -4,20 +4,21 @@
  */
 package com.datastrato.gravitino.trino.connector.metadata;
 
+import static org.testng.Assert.assertEquals;
+
 import com.datastrato.gravitino.dto.AuditDTO;
 import com.datastrato.gravitino.dto.rel.ColumnDTO;
 import com.datastrato.gravitino.dto.rel.TableDTO;
-import io.substrait.type.TypeCreator;
+import com.datastrato.gravitino.shaded.io.substrait.type.TypeCreator;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
+import org.testng.annotations.Test;
 
 public class TestGravitinoTable {
 
   @Test
-  void testGravitinoTable() {
+  public void testGravitinoTable() {
     ColumnDTO[] columns =
         new ColumnDTO[] {
           new ColumnDTO.Builder()
@@ -45,13 +46,13 @@ public class TestGravitinoTable {
 
     GravitinoTable table = new GravitinoTable("db1", "table1", tableDTO);
 
-    Assertions.assertEquals(table.getName(), tableDTO.name());
-    Assertions.assertEquals(table.getSchemaName(), "db1");
-    Assertions.assertEquals(table.getColumns().size(), tableDTO.columns().length);
+    assertEquals(table.getName(), tableDTO.name());
+    assertEquals(table.getSchemaName(), "db1");
+    assertEquals(table.getColumns().size(), tableDTO.columns().length);
     for (int i = 0; i < table.getColumns().size(); i++) {
-      Assertions.assertEquals(table.getColumns().get(i).getName(), tableDTO.columns()[i].name());
+      assertEquals(table.getColumns().get(i).getName(), tableDTO.columns()[i].name());
     }
-    Assertions.assertEquals(table.getComment(), tableDTO.comment());
-    Assertions.assertEquals(table.getProperties(), tableDTO.properties());
+    assertEquals(table.getComment(), tableDTO.comment());
+    assertEquals(table.getProperties(), tableDTO.properties());
   }
 }

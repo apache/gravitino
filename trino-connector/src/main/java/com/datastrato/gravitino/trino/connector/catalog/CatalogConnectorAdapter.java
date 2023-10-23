@@ -25,11 +25,15 @@ public interface CatalogConnectorAdapter {
   Map<String, Object> buildInternalConnectorConfig(GravitinoCatalog catalog);
 
   /** @return SchemaProperties list that used to validate schema properties. */
-  List<PropertyMetadata<?>> getSchemaProperties();
+  default List<PropertyMetadata<?>> getSchemaProperties() {
+    return emptyList();
+  };
 
   /** @return Return MetadataAdapter for special catalog connector. */
   CatalogConnectorMetadataAdapter getMetadataAdapter();
 
   /** @return ColumnProperties list that used to validate column properties. */
-  List<PropertyMetadata<?>> getColumnProperties();
+  default List<PropertyMetadata<?>> getColumnProperties() {
+    return emptyList();
+  }
 }

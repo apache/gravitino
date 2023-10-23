@@ -11,6 +11,7 @@ import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergConfig;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergRESTService;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
+import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
 import com.datastrato.gravitino.server.web.JettyServerConfig;
 import com.datastrato.gravitino.utils.MapUtils;
 import com.google.common.collect.ImmutableList;
@@ -125,7 +126,7 @@ public class IcebergRESTServiceBaseIT extends AbstractIT {
             + IcebergRESTService.SERVICE_NAME
             + "."
             + IcebergConfig.CATALOG_URI.getKey(),
-        "jdbc:sqlite:/tmp/iceberg-rest-sqlite");
+        "jdbc:sqlite::memory:");
 
     configMap.put(
         AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
@@ -153,7 +154,7 @@ public class IcebergRESTServiceBaseIT extends AbstractIT {
             + IcebergRESTService.SERVICE_NAME
             + "."
             + IcebergConfig.CATALOG_WAREHOUSE.getKey(),
-        "file:///tmp/user/hive/warehouse-jdbc-sqlite/");
+        GravitinoITUtils.genRandomName("hdfs://127.0.0.1:9000/user/hive/warehouse-jdbc-sqlite"));
 
     return configMap;
   }
@@ -179,7 +180,7 @@ public class IcebergRESTServiceBaseIT extends AbstractIT {
             + IcebergRESTService.SERVICE_NAME
             + "."
             + IcebergConfig.CATALOG_WAREHOUSE.getKey(),
-        "file:///tmp/user/hive/warehouse-hive/");
+        GravitinoITUtils.genRandomName("hdfs://127.0.0.1:9000/user/hive/warehouse-hive"));
     return customConfigs;
   }
 

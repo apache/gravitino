@@ -5,20 +5,20 @@
 package com.datastrato.gravitino.trino.connector;
 
 import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_MISSING_CONFIG;
+import static org.testng.Assert.assertEquals;
 
 import com.google.common.collect.ImmutableMap;
 import io.trino.spi.TrinoException;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Test;
+import org.testng.annotations.AfterTest;
+import org.testng.annotations.BeforeTest;
+import org.testng.annotations.Test;
 
 public class TestGravitinoConfig {
 
-  @BeforeAll
+  @BeforeTest
   public static void startup() throws Exception {}
 
-  @AfterAll
+  @AfterTest
   public static void shutdown() throws Exception {}
 
   @Test
@@ -30,8 +30,8 @@ public class TestGravitinoConfig {
 
     GravitinoConfig config = new GravitinoConfig(configMap);
 
-    Assertions.assertEquals(gravitinoUrl, config.getURI());
-    Assertions.assertEquals(metalake, config.getMetalake());
+    assertEquals(gravitinoUrl, config.getURI());
+    assertEquals(metalake, config.getMetalake());
   }
 
   @Test
@@ -40,7 +40,7 @@ public class TestGravitinoConfig {
     ImmutableMap<String, String> configMap = ImmutableMap.of("gravitino.uri", gravitinoUrl);
     try {
       GravitinoConfig config = new GravitinoConfig(configMap);
-      Assertions.assertEquals(gravitinoUrl, config.getURI());
+      assertEquals(gravitinoUrl, config.getURI());
     } catch (TrinoException e) {
       if (e.getErrorCode() != GRAVITINO_MISSING_CONFIG.toErrorCode()) {
         throw e;

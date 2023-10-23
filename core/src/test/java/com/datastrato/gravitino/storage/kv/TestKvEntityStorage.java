@@ -431,7 +431,7 @@ public class TestKvEntityStorage {
                         "schemaChanged",
                         auditInfo1);
                   }));
-      // Update operations do not conatin any changes in name
+      // Update operations do not contain any changes in name
       store.update(
           NameIdentifier.of("metalakeChanged", "catalogChanged", "schema2"),
           SchemaEntity.class,
@@ -465,6 +465,7 @@ public class TestKvEntityStorage {
     Mockito.when(config.get(ENTITY_KV_STORE)).thenReturn(DEFAULT_ENTITY_KV_STORE);
     Mockito.when(config.get(Configs.ENTITY_SERDE)).thenReturn("proto");
     Mockito.when(config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)).thenReturn("/tmp/gravitino");
+    FileUtils.deleteDirectory(FileUtils.getFile("/tmp/gravitino"));
 
     AuditInfo auditInfo =
         new AuditInfo.Builder().withCreator("creator").withCreateTime(Instant.now()).build();
@@ -620,12 +621,13 @@ public class TestKvEntityStorage {
   }
 
   @Test
-  void testCreateKvEntityStore() {
+  void testCreateKvEntityStore() throws IOException {
     Config config = Mockito.mock(Config.class);
     Mockito.when(config.get(ENTITY_STORE)).thenReturn("kv");
     Mockito.when(config.get(ENTITY_KV_STORE)).thenReturn(DEFAULT_ENTITY_KV_STORE);
     Mockito.when(config.get(Configs.ENTITY_SERDE)).thenReturn("proto");
     Mockito.when(config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)).thenReturn("/tmp/gravitino");
+    FileUtils.deleteDirectory(FileUtils.getFile("/tmp/gravitino"));
 
     try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
       store.initialize(config);
@@ -732,8 +734,6 @@ public class TestKvEntityStorage {
       // 'updatedMetalake2' is a new name, which will trigger id allocation
       BaseMetalake updatedMetalake2 = createBaseMakeLake("updatedMetalake2", auditInfo);
       store.put(updatedMetalake2);
-    } catch (Exception e) {
-      Assertions.fail(e.getMessage());
     }
   }
 }

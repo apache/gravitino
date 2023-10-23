@@ -4,15 +4,16 @@
  */
 package com.datastrato.gravitino.trino.connector.metadata;
 
+import static org.testng.Assert.assertEquals;
+
 import com.datastrato.gravitino.dto.rel.ColumnDTO;
-import io.substrait.type.TypeCreator;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
+import com.datastrato.gravitino.shaded.io.substrait.type.TypeCreator;
+import org.testng.annotations.Test;
 
 public class TestGravitinoColumn {
 
   @Test
-  void testGravitinoColumn() {
+  public void testGravitinoColumn() {
     ColumnDTO columnDTO =
         new ColumnDTO.Builder()
             .withName("f1")
@@ -22,9 +23,9 @@ public class TestGravitinoColumn {
 
     GravitinoColumn column = new GravitinoColumn(columnDTO, 0);
 
-    Assertions.assertEquals(column.getName(), columnDTO.name());
-    Assertions.assertEquals(column.getIndex(), 0);
-    Assertions.assertEquals(column.getComment(), columnDTO.comment());
-    Assertions.assertEquals(column.getType(), columnDTO.dataType());
+    assertEquals(column.getName(), columnDTO.name());
+    assertEquals(column.getIndex(), 0);
+    assertEquals(column.getComment(), columnDTO.comment());
+    assertEquals(column.getType(), columnDTO.dataType());
   }
 }
