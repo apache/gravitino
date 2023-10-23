@@ -28,4 +28,4 @@ jobs:
           fi
 
       - name: Clean, build and publish the release(branch-*) branch
-        run: ./gradlew clean build publish
+        run: ./gradlew clean build publish --info
