@@ -112,4 +112,4 @@ INSERT INTO dml.test VALUES (1), (2);
 SELECT * FROM dml.test
 ```
 
-If you have any problem or requirement, please create a issue :)
+If you have any problem or requirement, please create an issue :)
