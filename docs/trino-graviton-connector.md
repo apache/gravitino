@@ -1,13 +1,13 @@
 ---
 title: "Gravitino connector"
-date: 2023-10-01T09:03:20-08:00
+date: 2023-10-17T11:05:00-08:00
 license: "Copyright 2023 Datastrato.
 This software is licensed under the Apache License version 2."
 ---
 # Gravitino connector
 
-The Gravitino connector allows query tables manager by gravitino. 
-This can be used to manager catalogs, schemas, and tables and dynamically load them into trino. 
+The Gravitino connector allows query tables managed by gravitino. 
+This can be used to manage catalogs, schemas, and tables and dynamically load them into trino. 
 And query data in the original databases on the server, 
 or combine it with other data from different catalogs accessing any other supported data source.
 
@@ -17,7 +17,7 @@ The Graviton connector supports various Trino connector types, including:
 
 # Requirements
 
-To connect to a Gravitino server, you need:
+To connect to a Gravitino server, you should ensure the following things.
 - Trino server version is higher than Trino-server-360.
 - Network access from the Trino coordinator and workers to the Gravitino server. Port 8090 is the default port.
 - Trino needs to install connectors for all the Gravitino-manged types fo catalogs.
