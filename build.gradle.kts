@@ -102,8 +102,8 @@ subprojects {
     publications {
       create<MavenPublication>("MavenJava") {
         from(components["java"])
-        artifact(sourcesJar)
-        artifact(javadocJar)
+//        artifact(sourcesJar)
+//        artifact(javadocJar)
 
         pom {
           name.set("Gravitino")
