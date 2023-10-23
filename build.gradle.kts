@@ -63,7 +63,7 @@ nexusPublishing {
   repositories {
     sonatype {
       nexusUrl.set(uri("https://s01.oss.sonatype.org/service/local/"))
-//      snapshotRepositoryUrl.set(uri("https://s01.oss.sonatype.org/content/repositories/snapshots/"))
+      snapshotRepositoryUrl.set(uri("https://s01.oss.sonatype.org/content/repositories/snapshots/"))
 
       val sonatypeUser =
               System.getenv("SONATYPE_USER").takeUnless { it.isNullOrEmpty() }
@@ -77,6 +77,7 @@ nexusPublishing {
       password.set(sonatypePassword)
     }
   }
+  packageGroup.set("com.datastrato.gravitino")
 }
 
 dependencies {
