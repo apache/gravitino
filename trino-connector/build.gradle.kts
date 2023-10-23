@@ -14,29 +14,26 @@ repositories {
 }
 
 dependencies {
-  implementation(project(":api"))
-  implementation(project(":common")) {
-    exclude("org.apache.logging.log4j")
-  }
-  implementation(project(":clients:client-java")) {
-    exclude("org.apache.logging.log4j")
-  }
+  implementation(project(":clients:client-java-runtime", configuration="shadow"))
   implementation(libs.jackson.databind)
   implementation(libs.jackson.annotations)
   implementation(libs.guava)
   implementation(libs.httpclient5)
   implementation(libs.commons.lang3)
-  implementation(libs.trino.spi)
-  implementation(libs.trino.toolkit)
-  implementation(libs.substrait.java.core)
+  implementation(libs.trino.spi) {
+    exclude("org.apache.logging.log4j")
+  }
+  implementation(libs.trino.toolkit) {
+    exclude("org.apache.logging.log4j")
+  }
 
-  testImplementation(libs.junit.jupiter.api)
-  testImplementation(libs.junit.jupiter.params)
-  testRuntimeOnly(libs.junit.jupiter.engine)
-  testImplementation(libs.trino.testing)
-  testImplementation(libs.mockito.core)
-  testImplementation(libs.mockserver.netty)
-  testImplementation(libs.mockserver.client.java)
+  testImplementation(libs.trino.testing) {
+    exclude("org.apache.logging.log4j")
+  }
+  testImplementation(libs.trino.memory) {
+    exclude("org.antlr")
+    exclude("org.apache.logging.log4j")
+  }
 }
 
 java {

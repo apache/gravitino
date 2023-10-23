@@ -6,6 +6,7 @@ import com.diffplug.gradle.spotless.SpotlessExtension
 import com.diffplug.gradle.spotless.SpotlessPlugin
 import com.github.vlsi.gradle.dsl.configureEach
 import java.util.Locale
+import java.io.File
 import org.gradle.internal.hash.ChecksumService
 import org.gradle.kotlin.dsl.support.serviceOf
 import com.github.jk1.license.render.ReportRenderer
@@ -75,6 +76,12 @@ nexusPublishing {
       password.set(sonatypePassword)
     }
   }
+
+  packageGroup.set("com.datastrato.gravitino")
+}
+
+dependencies {
+  testImplementation(libs.testng)
 }
 
 subprojects {
@@ -129,18 +136,16 @@ subprojects {
         }
       }
     }
-    // If you want to deploy to a local maven repository, uncomment the following block
-//    repositories {
-//      maven {
-//        url = uri(System.getProperty("user.home") + "/.m2/repository")
-//      }
-//    }
   }
 
   tasks.configureEach<Test> {
     val skipTests = project.hasProperty("skipTests")
     if (!skipTests) {
-      useJUnitPlatform()
+      if (project.name == "trino-connector") {
+        useTestNG()
+      } else {
+        useJUnitPlatform()
+      }
       finalizedBy(tasks.getByName("jacocoTestReport"))
     }
   }
@@ -249,6 +254,10 @@ tasks {
         }
         fileMode = 0b111101101
       }
+
+      // Create the directory 'data' for storage.
+      val directory = File("distribution/package/data")
+      directory.mkdirs()
     }
   }
 
@@ -317,7 +326,6 @@ tasks {
 
   clean {
     dependsOn(cleanDistribution)
-    delete("/tmp/gravitino")
     delete("server/src/main/resources/project.properties")
   }
 }

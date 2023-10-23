@@ -607,6 +607,9 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
       } else if (ex2.isInstance(throwable)) {
         throw ex2.cast(throwable);
       }
+      if (RuntimeException.class.isAssignableFrom(throwable.getClass())) {
+        throw (RuntimeException) throwable;
+      }
 
       throw new RuntimeException(throwable);
     }

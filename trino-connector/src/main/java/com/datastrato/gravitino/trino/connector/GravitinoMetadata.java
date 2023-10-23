@@ -21,7 +21,6 @@ import io.trino.spi.connector.ConnectorOutputMetadata;
 import io.trino.spi.connector.ConnectorSession;
 import io.trino.spi.connector.ConnectorTableHandle;
 import io.trino.spi.connector.ConnectorTableMetadata;
-import io.trino.spi.connector.ConnectorTableProperties;
 import io.trino.spi.connector.ConnectorTableVersion;
 import io.trino.spi.connector.RetryMode;
 import io.trino.spi.connector.SchemaTableName;
@@ -66,16 +65,6 @@ public class GravitinoMetadata implements ConnectorMetadata {
   public Map<String, Object> getSchemaProperties(ConnectorSession session, String schemaName) {
     GravitinoSchema schema = catalogConnectorMetadata.getSchema(schemaName);
     return metadataAdapter.getSchemaProperties(schema);
-  }
-
-  @Override
-  public ConnectorTableProperties getTableProperties(
-      ConnectorSession session, ConnectorTableHandle tableHandle) {
-    GravitinoTableHandle gravitinoTableHandle = (GravitinoTableHandle) tableHandle;
-    GravitinoTable table =
-        catalogConnectorMetadata.getTable(
-            gravitinoTableHandle.getSchemaName(), gravitinoTableHandle.getTableName());
-    return metadataAdapter.getTableProperties(table);
   }
 
   @Override
