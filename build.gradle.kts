@@ -195,6 +195,7 @@ tasks {
   }
 
   val assembleDistribution by registering(Tar::class) {
+    dependsOn("assembleTrinoConnector")
     group = "gravitino distribution"
     finalizedBy("checksumDistribution")
     into("${rootProject.name}-${version}")
@@ -204,9 +205,21 @@ tasks {
     destinationDirectory.set(projectDir.dir("distribution"))
   }
 
+  val assembleTrinoConnector by registering(Tar::class) {
+    dependsOn("trino-connector:copyLibs")
+
+    group = "gravitino trino-connector"
+    finalizedBy("checksumTrinoConnector")
+    into("trino-connector")
+    from("trino-connector/build/libs")
+    compression = Compression.GZIP
+    archiveFileName.set("${rootProject.name}-trino-connector-${version}.tar.gz")
+    destinationDirectory.set(projectDir.dir("gravitino-trino-connector"))
+  }
+
   register("checksumDistribution") {
     group = "gravitino distribution"
-    dependsOn(assembleDistribution)
+    dependsOn(assembleDistribution, "checksumTrinoConnector")
     val archiveFile = assembleDistribution.flatMap { it.archiveFile }
     val checksumFile = archiveFile.map { archive ->
       archive.asFile.let { it.resolveSibling("${it.name}.sha256") }
@@ -220,9 +233,26 @@ tasks {
     }
   }
 
+  register("checksumTrinoConnector") {
+    group = "gravitino gravitino trino-connector"
+    dependsOn(assembleTrinoConnector)
+    val archiveFile = assembleTrinoConnector.flatMap { it.archiveFile }
+    val checksumFile = archiveFile.map { archive ->
+      archive.asFile.let { it.resolveSibling("${it.name}.sha256") }
+    }
+    inputs.file(archiveFile)
+    outputs.file(checksumFile)
+    doLast {
+      checksumFile.get().writeText(
+              serviceOf<ChecksumService>().sha256(archiveFile.get().asFile).toString()
+      )
+    }
+  }
+
   val cleanDistribution by registering(Delete::class) {
     group = "gravitino distribution"
     delete(outputDir)
+    delete(projectDir.dir("gravitino-trino-connector"))
   }
 
   val copySubprojectDependencies by registering(Copy::class) {

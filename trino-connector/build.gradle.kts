@@ -50,4 +50,10 @@ tasks {
     jar {
      finalizedBy(copyDepends)
     }
+
+    val copyLibs by registering(Copy::class) {
+        dependsOn(copyDepends, "build")
+        from("build/libs")
+        into("${rootDir}/gravitino-trino-connector/libs")
+    }
 }
