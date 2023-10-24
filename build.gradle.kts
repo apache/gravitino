@@ -195,18 +195,30 @@ tasks {
   }
 
   val assembleDistribution by registering(Tar::class) {
+    dependsOn("assembleTrinoConnector")
     group = "gravitino distribution"
     finalizedBy("checksumDistribution")
-    into("${rootProject.name}-${version}")
+    into("${rootProject.name}-${version}-bin")
     from(compileDistribution.map { it.outputs.files.single() })
     compression = Compression.GZIP
-    archiveFileName.set("${rootProject.name}-${version}.tar.gz")
+    archiveFileName.set("${rootProject.name}-${version}-bin.tar.gz")
+    destinationDirectory.set(projectDir.dir("distribution"))
+  }
+
+  val assembleTrinoConnector by registering(Tar::class) {
+    dependsOn("trino-connector:copyLibs")
+    group = "gravitino distribution"
+    finalizedBy("checksumTrinoConnector")
+    into("${rootProject.name}-trino-connector-${version}")
+    from("trino-connector/build/libs")
+    compression = Compression.GZIP
+    archiveFileName.set("${rootProject.name}-trino-connector-${version}.tar.gz")
     destinationDirectory.set(projectDir.dir("distribution"))
   }
 
   register("checksumDistribution") {
     group = "gravitino distribution"
-    dependsOn(assembleDistribution)
+    dependsOn(assembleDistribution, "checksumTrinoConnector")
     val archiveFile = assembleDistribution.flatMap { it.archiveFile }
     val checksumFile = archiveFile.map { archive ->
       archive.asFile.let { it.resolveSibling("${it.name}.sha256") }
@@ -216,6 +228,22 @@ tasks {
     doLast {
       checksumFile.get().writeText(
         serviceOf<ChecksumService>().sha256(archiveFile.get().asFile).toString()
+      )
+    }
+  }
+
+  register("checksumTrinoConnector") {
+    group = "gravitino distribution"
+    dependsOn(assembleTrinoConnector)
+    val archiveFile = assembleTrinoConnector.flatMap { it.archiveFile }
+    val checksumFile = archiveFile.map { archive ->
+      archive.asFile.let { it.resolveSibling("${it.name}.sha256") }
+    }
+    inputs.file(archiveFile)
+    outputs.file(checksumFile)
+    doLast {
+      checksumFile.get().writeText(
+              serviceOf<ChecksumService>().sha256(archiveFile.get().asFile).toString()
       )
     }
   }
