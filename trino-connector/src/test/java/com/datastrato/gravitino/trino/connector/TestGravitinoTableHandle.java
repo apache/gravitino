@@ -4,11 +4,13 @@
  */
 package com.datastrato.gravitino.trino.connector;
 
+import static org.testng.Assert.assertTrue;
+
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.airlift.json.JsonCodec;
 import io.trino.spi.connector.ConnectorTableHandle;
-import org.junit.jupiter.api.Test;
+import org.testng.annotations.Test;
 
 public class TestGravitinoTableHandle {
   private final JsonCodec<GravitinoTableHandle> codec =
@@ -19,7 +21,10 @@ public class TestGravitinoTableHandle {
     GravitinoTableHandle expected =
         new GravitinoTableHandle("db1", "t1", new MockConnectorTableHandle("mock"));
 
-    codec.toJson(expected);
+    String jsonStr = codec.toJson(expected);
+    assertTrue(jsonStr.contains("db1"));
+    assertTrue(jsonStr.contains("t1"));
+    assertTrue(jsonStr.contains("mock"));
   }
 
   public static class MockConnectorTableHandle implements ConnectorTableHandle {

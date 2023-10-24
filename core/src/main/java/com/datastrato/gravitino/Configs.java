@@ -6,8 +6,10 @@ package com.datastrato.gravitino;
 
 import com.datastrato.gravitino.config.ConfigBuilder;
 import com.datastrato.gravitino.config.ConfigEntry;
+import java.io.File;
 
 public interface Configs {
+
   String DEFAULT_ENTITY_STORE = "kv";
   String ENTITY_STORE_KEY = "gravitino.entity.store";
 
@@ -15,7 +17,10 @@ public interface Configs {
   String ENTITY_KV_STORE_KEY = "gravitino.entity.store.kv";
 
   String ENTITY_KV_ROCKSDB_BACKEND_PATH_KEY = "gravitino.entity.store.kv.rocksdbPath";
-  String DEFAULT_KV_ROCKSDB_BACKEND_PATH = "/tmp/gravitino";
+
+  // Default path for RocksDB backend is "${GRAVITINO_HOME}/data/rocksdb"
+  String DEFAULT_KV_ROCKSDB_BACKEND_PATH =
+      String.join(File.separator, System.getenv("GRAVITINO_HOME"), "data", "rocksdb");
 
   ConfigEntry<String> ENTITY_STORE =
       new ConfigBuilder(ENTITY_STORE_KEY)

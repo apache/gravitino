@@ -38,6 +38,9 @@ import com.datastrato.gravitino.rel.transforms.Transforms;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import io.substrait.type.TypeCreator;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -45,10 +48,17 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
+import org.apache.iceberg.NullOrder;
+import org.apache.iceberg.PartitionField;
+import org.apache.iceberg.PartitionSpec;
+import org.apache.iceberg.SortDirection;
+import org.apache.iceberg.SortField;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.NoSuchNamespaceException;
 import org.apache.iceberg.hive.HiveCatalog;
-import org.apache.thrift.TException;
+import org.apache.spark.sql.Dataset;
+import org.apache.spark.sql.Row;
+import org.apache.spark.sql.SparkSession;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -73,26 +83,46 @@ public class CatalogIcebergIT extends AbstractIT {
   public static String ICEBERG_COL_NAME2 = "iceberg_col_name2";
   public static String ICEBERG_COL_NAME3 = "iceberg_col_name3";
   private static final String provider = "lakehouse-iceberg";
-  private static final String WAREHOUSE = "file:///tmp/iceberg";
+  private static final String WAREHOUSE =
+      "hdfs://127.0.0.1:9000/user/hive/warehouse-catalog-iceberg/";
   private static final String URI = "thrift://127.0.0.1:9083";
 
+  private static String SELECT_ALL_TEMPLATE = "SELECT * FROM iceberg.%s";
+  private static String INSERT_BATCH_WITHOUT_PARTITION_TEMPLATE =
+      "INSERT INTO iceberg.%s VALUES %s";
   private static GravitinoMetaLake metalake;
 
   private static Catalog catalog;
 
   private static HiveCatalog hiveCatalog;
 
+  private static SparkSession spark;
+
   @BeforeAll
   public static void startup() {
     createMetalake();
     createCatalog();
     createSchema();
+    spark =
+        SparkSession.builder()
+            .master("local[1]")
+            .appName("Iceberg Catalog integration test")
+            .config("spark.sql.warehouse.dir", WAREHOUSE)
+            .config("spark.sql.catalog.iceberg", "org.apache.iceberg.spark.SparkCatalog")
+            .config("spark.sql.catalog.iceberg.uri", URI)
+            .config("spark.sql.catalog.iceberg.type", "hive")
+            .config(
+                "spark.sql.extensions",
+                "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions")
+            .enableHiveSupport()
+            .getOrCreate();
   }
 
   @AfterAll
   public static void stop() {
     clearTableAndSchema();
     client.dropMetalake(NameIdentifier.of(metalakeName));
+    spark.close();
   }
 
   @AfterEach
@@ -443,7 +473,7 @@ public class CatalogIcebergIT extends AbstractIT {
   }
 
   @Test
-  public void testAlterIcebergTable() throws TException, InterruptedException {
+  public void testAlterIcebergTable() {
     ColumnDTO[] columns = createColumns();
     catalog
         .asTableCatalog()
@@ -584,5 +614,130 @@ public class CatalogIcebergIT extends AbstractIT {
     Table delColTable = catalog.asTableCatalog().loadTable(tableIdentifier);
     Assertions.assertEquals(1, delColTable.columns().length);
     Assertions.assertEquals(col1.name(), delColTable.columns()[0].name());
+  }
+
+  @Test
+  void testPartitionAndSortOrderIcebergTable() {
+    ColumnDTO[] columns = createColumns();
+    String testTableName = GravitinoITUtils.genRandomName("test_table");
+    SortOrder[] sortOrders = {
+      SortOrder.fieldSortOrder(new String[] {columns[0].name()}, Direction.ASC, NullOrdering.FIRST),
+      SortOrder.fieldSortOrder(new String[] {columns[2].name()}, Direction.DESC, NullOrdering.LAST)
+    };
+    Transform[] transforms = {
+      day(new String[] {columns[1].name()}), Transforms.identity(columns[2])
+    };
+    catalog
+        .asTableCatalog()
+        .createTable(
+            NameIdentifier.of(metalakeName, catalogName, schemaName, testTableName),
+            columns,
+            table_comment,
+            createProperties(),
+            transforms,
+            Distribution.NONE,
+            sortOrders);
+
+    TableIdentifier tableIdentifier = TableIdentifier.of(schemaName, testTableName);
+    org.apache.iceberg.Table table = hiveCatalog.loadTable(tableIdentifier);
+    PartitionSpec spec = table.spec();
+    Map<Integer, String> idToName = table.schema().idToName();
+    List<PartitionField> fields = spec.fields();
+    Assertions.assertEquals(2, fields.size());
+    Assertions.assertEquals(columns[1].name(), idToName.get(fields.get(0).sourceId()));
+    Assertions.assertEquals(columns[2].name(), idToName.get(fields.get(1).sourceId()));
+    Assertions.assertEquals("day", fields.get(0).transform().toString());
+    Assertions.assertEquals("identity", fields.get(1).transform().toString());
+
+    List<SortField> sortFields = table.sortOrder().fields();
+    Assertions.assertEquals(2, sortFields.size());
+    Assertions.assertEquals(columns[0].name(), idToName.get(sortFields.get(0).sourceId()));
+    Assertions.assertEquals(columns[2].name(), idToName.get(sortFields.get(1).sourceId()));
+    Assertions.assertEquals(SortDirection.ASC, sortFields.get(0).direction());
+    Assertions.assertEquals(NullOrder.NULLS_FIRST, sortFields.get(0).nullOrder());
+    Assertions.assertEquals(SortDirection.DESC, sortFields.get(1).direction());
+    Assertions.assertEquals(NullOrder.NULLS_LAST, sortFields.get(1).nullOrder());
+  }
+
+  @Test
+  void testOperationDataIcebergTable() {
+    ColumnDTO[] columns = createColumns();
+    String testTableName = GravitinoITUtils.genRandomName("test_table");
+    SortOrder[] sortOrders = {
+      SortOrder.fieldSortOrder(new String[] {columns[0].name()}, Direction.ASC, NullOrdering.FIRST),
+      SortOrder.fieldSortOrder(new String[] {columns[2].name()}, Direction.DESC, NullOrdering.LAST)
+    };
+    Transform[] transforms = {
+      day(new String[] {columns[1].name()}), Transforms.identity(columns[2])
+    };
+    catalog
+        .asTableCatalog()
+        .createTable(
+            NameIdentifier.of(metalakeName, catalogName, schemaName, testTableName),
+            columns,
+            table_comment,
+            createProperties(),
+            transforms,
+            Distribution.NONE,
+            sortOrders);
+    TableIdentifier tableIdentifier = TableIdentifier.of(schemaName, testTableName);
+    List<String> values = new ArrayList<>();
+    for (int i = 1; i < 5; i++) {
+      values.add(
+          String.format(
+              "(%s, %s, %s)", i, "date_sub(current_date(), " + i + ")", "'data" + i + "'"));
+    }
+    // insert data
+    String insertSQL =
+        String.format(
+            INSERT_BATCH_WITHOUT_PARTITION_TEMPLATE, tableIdentifier, String.join(",", values));
+    spark.sql(insertSQL);
+
+    // select data
+    Dataset<Row> sql = spark.sql(String.format(SELECT_ALL_TEMPLATE, tableIdentifier));
+    Assertions.assertEquals(4, sql.count());
+    Row[] result = (Row[]) sql.sort(ICEBERG_COL_NAME1).collect();
+    LocalDate currentDate = LocalDate.now();
+    DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+    for (int i = 0; i < result.length; i++) {
+      LocalDate previousDay = currentDate.minusDays(i + 1);
+      Assertions.assertEquals(
+          String.format("[%s,%s,data%s]", i + 1, previousDay.format(formatter), i + 1),
+          result[i].toString());
+    }
+
+    // update data
+    spark.sql(
+        String.format(
+            "UPDATE iceberg.%s SET %s = 100 WHERE %s = 1",
+            tableIdentifier, ICEBERG_COL_NAME1, ICEBERG_COL_NAME1));
+    sql = spark.sql(String.format(SELECT_ALL_TEMPLATE, tableIdentifier));
+    Assertions.assertEquals(4, sql.count());
+    result = (Row[]) sql.sort(ICEBERG_COL_NAME1).collect();
+    for (int i = 0; i < result.length; i++) {
+      if (i == result.length - 1) {
+        LocalDate previousDay = currentDate.minusDays(1);
+        Assertions.assertEquals(
+            String.format("[100,%s,data%s]", previousDay.format(formatter), 1),
+            result[i].toString());
+      } else {
+        LocalDate previousDay = currentDate.minusDays(i + 2);
+        Assertions.assertEquals(
+            String.format("[%s,%s,data%s]", i + 2, previousDay.format(formatter), i + 2),
+            result[i].toString());
+      }
+    }
+    // delete data
+    spark.sql(
+        String.format("DELETE FROM iceberg.%s WHERE %s = 100", tableIdentifier, ICEBERG_COL_NAME1));
+    sql = spark.sql(String.format(SELECT_ALL_TEMPLATE, tableIdentifier));
+    Assertions.assertEquals(3, sql.count());
+    result = (Row[]) sql.sort(ICEBERG_COL_NAME1).collect();
+    for (int i = 0; i < result.length; i++) {
+      LocalDate previousDay = currentDate.minusDays(i + 2);
+      Assertions.assertEquals(
+          String.format("[%s,%s,data%s]", i + 2, previousDay.format(formatter), i + 2),
+          result[i].toString());
+    }
   }
 }

@@ -4,18 +4,19 @@
  */
 package com.datastrato.gravitino.trino.connector.metadata;
 
+import static org.testng.Assert.assertEquals;
+
 import com.datastrato.gravitino.dto.AuditDTO;
 import com.datastrato.gravitino.dto.rel.SchemaDTO;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
+import org.testng.annotations.Test;
 
 public class TestGravitinoSchema {
 
   @Test
-  void testGravitinoSchema() {
+  public void testGravitinoSchema() {
     Map<String, String> properties = new HashMap<>();
     properties.put("prop1", "test prop1");
 
@@ -30,8 +31,8 @@ public class TestGravitinoSchema {
 
     GravitinoSchema schema = new GravitinoSchema(schemaDTO);
 
-    Assertions.assertEquals(schema.getName(), schemaDTO.name());
-    Assertions.assertEquals(schema.getComment(), schemaDTO.comment());
-    Assertions.assertEquals(schema.getProperties(), schemaDTO.properties());
+    assertEquals(schema.getName(), schemaDTO.name());
+    assertEquals(schema.getComment(), schemaDTO.comment());
+    assertEquals(schema.getProperties(), schemaDTO.properties());
   }
 }
