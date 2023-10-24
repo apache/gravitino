@@ -75,15 +75,13 @@ Example JSON:
 
 * `name`: The name of the Hive database to be created.
 * `comment`: Optional, user custom Hive database comment.
-* `properties`: The properties of the Hive database. More properties information see the following schema properties table.
+* `properties`: The properties of the Hive database. More properties information see the following schema properties table. Other properties will be passed down to the underlying Hive database parameters.
 
 ### schema properties
 
 | Property name       | Description                                                                                                                                                     | example value                            | Since version |
 |---------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------|---------------|
 | `location`          | The directory for Hive database storage. Not required, HMS will use the value of `hive.metastore.warehouse.dir` in the Hive conf file hive-site.xml by default. | `/user/hive/warehouse`                   | 0.1.0         |
-| `gravitino.bypass.` | Property name with this prefix will be passed down to the Hive database parameters without the prefix.                                                          | `"gravitino.bypass.my-key" = "my-value"` | 0.2.0         |
-
 
 ## Creating a Hive Table
 
@@ -159,7 +157,7 @@ Example JSON:
 * `partitions`: Optional, the partitions of the Hive table, above example is a partitioned table with `dt` column.
 * `distribution`: Optional, equivalent to the `CLUSTERED BY` clause in Hive DDL, above example table is bucketed(cluster by) `id` column.
 * `sortOrders`: Optional, equivalent to the `SORTED BY` clause in Hive DDL, above example table data is sorted in increasing order of `age` in each bucket.
-* `properties`: The properties of the Hive table. More properties information see the following table properties table, other properties will be passed down to the underlying Hive table parameters.
+* `properties`: The properties of the Hive table. More properties information see the following table properties table. Other properties will be passed down to the underlying Hive table parameters.
 
 ### table properties
 
