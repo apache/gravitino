@@ -13,7 +13,7 @@ or combine it with other data from different catalogs accessing any other suppor
 
 ### Supported catalog types
 The Graviton connector supports various Trino connector types, including:
-- [Hive catalog]()
+- [Hive catalog](gravitino-manage-hive.md)
 
 # Requirements
 
@@ -27,7 +27,8 @@ To connect to a Gravitino server, you should ensure the following things.
 To install the Gravitino connector, you should deploy the Trino environment first.
 Then install the Gravitino connector plugin to Trino.
 Please refer to the [Deploying Trino documentation](https://trino.io/docs/current/installation/deployment.html).
-1. Download Gravitino connector tarball, [gravitino-connector-0.2.tar.gz](), and unpack it. The tarball contains a single 
+1. Download Gravitino connector tarball, [gravitino-connector-0.2.tar.gz](https://github.com/datastrato/gravitino/releases/download/v0.2.0/gravitino-trino-connector-v0.2.0.tar.gz), 
+   and unpack it. The tarball contains a single 
    top-level directory `gravitino-connector`, which we call the connector directory. 
 2. Copy the connector directory to trino plugin's directory.
    Normally, the directory location is `Trino-server-xxx/plugin`, and the directory contains another catalog used by Trino.
@@ -36,7 +37,7 @@ Please refer to the [Deploying Trino documentation](https://trino.io/docs/curren
 Alternatively,
 you can build the Gravitino connector package from sources
 and obtain the `gravitino-connector-0.2.tar.gz` file in the `$PROJECT/distribute/trino-connector` directory.
-Please refer to the [Gravitino Development documentation]()
+Please refer to the [Gravitino Development documentation](how-to-build.md)
 
 # Configuration
 
@@ -65,7 +66,7 @@ The connector provides read access and write access to data and metadata in the 
 
 ## Basic usage examples
 First, you need to create a metalake and catalog in Gravitino.
-For example, create a new metalake named `test` and create a new catalog named `hive_text` using the hive provider. [Gravitino catalog docs]()
+For example, create a new metalake named `test` and create a new catalog named `hive_text` using the hive provider.
 
 Listing all Gravitino manager catalogs
 ```
