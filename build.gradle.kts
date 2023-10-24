@@ -207,7 +207,7 @@ tasks {
 
   val assembleTrinoConnector by registering(Tar::class) {
     dependsOn("trino-connector:copyLibs")
-    group = "gravitino trino-connector"
+    group = "gravitino distribution"
     finalizedBy("checksumTrinoConnector")
     into("${rootProject.name}-trino-connector-${version}")
     from("trino-connector/build/libs")
@@ -233,7 +233,7 @@ tasks {
   }
 
   register("checksumTrinoConnector") {
-    group = "gravitino gravitino trino-connector"
+    group = "gravitino distribution"
     dependsOn(assembleTrinoConnector)
     val archiveFile = assembleTrinoConnector.flatMap { it.archiveFile }
     val checksumFile = archiveFile.map { archive ->
