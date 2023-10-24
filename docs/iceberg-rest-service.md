@@ -26,10 +26,11 @@ All configurations are in [`$GRAVITINO_HOME/conf/gravitino.conf`](gravitino-serv
 | `gravitino.auxService.iceberg-rest.classpath ` | The classpath of Gravitino Iceberg REST server, includes dirs with jar and configuration which support both absolute path and relative path, like `catalogs/lakehouse-iceberg/libs, catalogs/lakehouse-iceberg/conf` | null | 0.2.0 |
 | `gravitino.auxService.iceberg-rest.host` | The host of Gravitino Iceberg REST server | `0.0.0.0`| 0.2.0 |
 | `gravitino.auxService.iceberg-rest.httpPort` | The port Gravitino Iceberg REST server, **the default port is same with port of Gravitino server, we should set a diffrent port explicitly, like `9001`** | `8090` | 0.2.0 |
-| `gravitino.auxService.iceberg-rest.coreThreads` | The number of core thread in thread pool which is used by Gravitino Iceberg REST server. | `Math.min(Runtime.getRuntime().availableProcessors() * 2, 100)` | 0.2.0 |
+| `gravitino.auxService.iceberg-rest.minThread` | The number of min thread in thread pool which is used by Gravitino Iceberg REST server. | `Math.min(Runtime.getRuntime().availableProcessors() * 2, 100)` | 0.2.0 |
 | `gravitino.auxService.iceberg-rest.maxThreads` | The number of max thread in thread pool which is used by Gravitino Iceberg REST server. | `Math.max(Runtime.getRuntime().availableProcessors() * 4, 400)` | 0.2.0 |
 | `gravitino.auxService.iceberg-rest.threadPoolWorkQueueSize` | The size of queue in thread pool which is used by Gravitino Iceberg REST server. | `100` | 0.2.0 |
-| `gravitino.auxService.iceberg-rest.stopIdleTimeout` | Time of graceful stop for Gravitino Iceberg REST server, for more, please see `org.eclipse.jetty.server.Server#setStopTimeout`, unit: ms. | `30000` | 0.2.0 |
+| `gravitino.auxService.iceberg-rest.stopTimeout` | Time of graceful stop for Gravitino Iceberg REST server, for more, please see `org.eclipse.jetty.server.Server#setStopTimeout`, unit: ms. | `30000` | 0.2.0 |
+| `gravitino.auxService.iceberg-rest.idleTimeout` | The timeout of idle connections, unit: ms. | `30000` | 0.2.0 |
 | `gravitino.auxService.iceberg-rest.requestHeaderSize` | Max size of Http request. | `131072` | 0.2.0 |
 | `gravitino.auxService.iceberg-rest.responseHeaderSize` | Max size of Http response. | `131072` | 0.2.0 |
 

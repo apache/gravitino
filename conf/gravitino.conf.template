@@ -12,11 +12,13 @@ gravitino.server.webserver.host = 127.0.0.1
 # The http port number of the built-in web server
 gravitino.server.webserver.httpPort = 8090
 # The core thread size of the built-in web server
-gravitino.server.webserver.coreThreads = 24
+gravitino.server.webserver.minThreads = 24
 # The max thread size of the built-in web server
 gravitino.server.webserver.maxThreads = 200
-# The stop idle timeout of the built-in web server
-gravitino.server.webserver.stopIdleTimeout = 30000
+# The stop timeout of the built-in web server
+gravitino.server.webserver.stopTimeout = 30000
+# The timeout of idle connections
+gravitino.server.webserver.idleTimeout = 30000
 # The executor thread pool work queue size of the built-in web server
 gravitino.server.webserver.threadPoolWorkQueueSize = 100
 # The request header size of the built-in web server
