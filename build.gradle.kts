@@ -198,23 +198,22 @@ tasks {
     dependsOn("assembleTrinoConnector")
     group = "gravitino distribution"
     finalizedBy("checksumDistribution")
-    into("${rootProject.name}-${version}")
+    into("${rootProject.name}-${version}-bin")
     from(compileDistribution.map { it.outputs.files.single() })
     compression = Compression.GZIP
-    archiveFileName.set("${rootProject.name}-${version}.tar.gz")
+    archiveFileName.set("${rootProject.name}-${version}-bin.tar.gz")
     destinationDirectory.set(projectDir.dir("distribution"))
   }
 
   val assembleTrinoConnector by registering(Tar::class) {
     dependsOn("trino-connector:copyLibs")
-
     group = "gravitino trino-connector"
     finalizedBy("checksumTrinoConnector")
-    into("trino-connector")
+    into("${rootProject.name}-trino-connector-${version}")
     from("trino-connector/build/libs")
     compression = Compression.GZIP
     archiveFileName.set("${rootProject.name}-trino-connector-${version}.tar.gz")
-    destinationDirectory.set(projectDir.dir("gravitino-trino-connector"))
+    destinationDirectory.set(projectDir.dir("distribution"))
   }
 
   register("checksumDistribution") {

@@ -54,6 +54,6 @@ tasks {
     val copyLibs by registering(Copy::class) {
         dependsOn(copyDepends, "build")
         from("build/libs")
-        into("${rootDir}/gravitino-trino-connector/libs")
+        into("${rootDir}/distribution/${rootProject.name}-trino-connector")
     }
 }

@@ -68,7 +68,7 @@ This software is licensed under the Apache License version 2."
     ```shell
    ./gradlew assembleDistribution
    ```
-   The `assembleDistribution` command will create `gravitino-{version}.tar.gz` and `gravitino-{version}.tar.sha256` under the `distribution` directory.
+   The `assembleDistribution` command will create `gravitino-{version}.tar.gz` and `gravitino-{version}.tar.gz.sha256` under the `distribution` directory.
    
    You can deploy them to your production environment.
    
@@ -84,4 +84,4 @@ This software is licensed under the Apache License version 2."
     ./gradlew assembleDistribution
     ```
    
-   It will create `gravitino-trino-connector-{version}.tar.gz` and `gravitino-trino-connector-{version}.tar.gz` under the `gravitino-trino-connector` directory.
+   It will create `gravitino-trino-connector-{version}.tar.gz` and `gravitino-trino-connector-{version}.tar.gz.sha256` under the `gravitino-trino-connector` directory.
