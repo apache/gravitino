@@ -68,11 +68,11 @@ This software is licensed under the Apache License version 2."
     ```shell
    ./gradlew assembleDistribution
    ```
-   The `assembleDistribution` command will create `gravitino-{version}.tar.gz` and `gravitino-{version}.tar.gz.sha256` under the `distribution` directory.
+   The `assembleDistribution` command will create `gravitino-{version}-bin.tar.gz` and `gravitino-{version}-bin.tar.gz.sha256` under the `distribution` directory.
    
    You can deploy them to your production environment.
    
-   > Note: The `gravitino-{version}.tar.gz` file is the Gravitino Server distribution package, and the `gravitino-{version}.tar.gz.sha256` file is the sha256 checksum file for the Gravitino Server distribution package.
+   > Note: The `gravitino-{version}-bin.tar.gz` file is the Gravitino Server distribution package, and the `gravitino-{version}-bin.tar.gz.sha256` file is the sha256 checksum file for the Gravitino Server distribution package.
 
 7. Assemble Gravitino trino connector package
     
@@ -84,4 +84,4 @@ This software is licensed under the Apache License version 2."
     ./gradlew assembleDistribution
     ```
    
-   It will create `gravitino-trino-connector-{version}.tar.gz` and `gravitino-trino-connector-{version}.tar.gz.sha256` under the `gravitino-trino-connector` directory.
+   It will create `gravitino-trino-connector-{version}.tar.gz` and `gravitino-trino-connector-{version}.tar.gz.sha256` under the `distribution` directory.
