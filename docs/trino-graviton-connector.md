@@ -6,13 +6,13 @@ This software is licensed under the Apache License version 2."
 ---
 # Gravitino connector
 
-The Gravitino connector allows query tables managed by gravitino. 
+The Gravitino connector allows query tables managed by Gravitino. 
 This can be used to manage catalogs, schemas, and tables and dynamically load them into trino. 
 And query data in the original databases on the server, 
 or combine it with other data from different catalogs accessing any other supported data source.
 
 ### Supported catalog types
-The Graviton connector supports various Trino connector types, including:
+The Gravitino connector supports various Trino connector types, including:
 - [Hive catalog](gravitino-manage-hive.md)
 
 # Requirements
@@ -36,7 +36,7 @@ Please refer to the [Deploying Trino documentation](https://trino.io/docs/curren
 
 Alternatively,
 you can build the Gravitino connector package from sources
-and obtain the `gravitino-connector-0.2.tar.gz` file in the `$PROJECT/distribute/trino-connector` directory.
+and obtain the `gravitino-trino-connector-0.2.0-SNAPSHOT.tar.gz` file in the `$PROJECT/distribution` directory.
 Please refer to the [Gravitino Development documentation](how-to-build.md)
 
 # Configuration
@@ -66,7 +66,7 @@ The connector provides read access and write access to data and metadata in the 
 
 ## Basic usage examples
 First, you need to create a metalake and catalog in Gravitino.
-For example, create a new metalake named `test` and create a new catalog named `hive_text` using the hive provider.
+For example, create a new metalake named `test` and create a new catalog named `hive_test` using the hive provider.
 
 Listing all Gravitino manager catalogs
 ```
@@ -88,7 +88,7 @@ Query 20231017_082503_00018_6nt3n, FINISHED, 1 node
 The `gravitino` catalog is a catalog defined Trino catalog configuration.
 We generally do not use it.
 The `test.hive_test` catalog is Gravitino managed catalog.
-It is dynamically loaded by the `gravtion` catalog from Gravitino.
+It is dynamically loaded by the `gravitino` catalog from Gravitino.
 It is a Hive catalog.
 Other catalogs are regular user-configured Trino catalogs.
 
