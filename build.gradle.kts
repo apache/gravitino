@@ -251,7 +251,6 @@ tasks {
   val cleanDistribution by registering(Delete::class) {
     group = "gravitino distribution"
     delete(outputDir)
-    delete(projectDir.dir("gravitino-trino-connector"))
   }
 
   val copySubprojectDependencies by registering(Copy::class) {
