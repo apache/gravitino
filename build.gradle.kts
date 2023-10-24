@@ -104,7 +104,7 @@ subprojects {
     from(tasks["javadoc"])
   }
 
-
+  apply(plugin = "signing")
   publishing {
     publications {
       create<MavenPublication>("MavenJava") {
@@ -136,6 +136,14 @@ subprojects {
         }
       }
     }
+  }
+
+  configure<SigningExtension> {
+    val gpgId = System.getenv("GPG_ID")
+    val gpgSecretKey = System.getenv("GPG_PRIVATE_KEY")
+    val gpgKeyPassword = System.getenv("GPG_PASSPHRASE")
+    useInMemoryPgpKeys(gpgId, gpgSecretKey, gpgKeyPassword)
+    sign(publishing.publications)
   }
 
   tasks.configureEach<Test> {

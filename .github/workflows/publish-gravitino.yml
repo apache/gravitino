@@ -12,6 +12,9 @@ jobs:
     env:
       SONATYPE_USER: ${{ secrets.OSSRH_USERNAME }}
       SONATYPE_PASSWORD: ${{ secrets.OSSRH_PASSWORD }}
+      GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+      GPG_ID: ${{ secrets.GPG_ID }}
+      GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
     steps:
       - uses: actions/checkout@v3
 
@@ -26,6 +29,11 @@ jobs:
             echo "Username or password is empty. Please try to set github action secret OSSRH_USERNAME and OSSRH_PASSWORD. "
             exit 1
           fi
+          
+          if [ "${GPG_PRIVATE_KEY}" = "" ] || [ "${GPG_ID}" = "" ] || [ "${GPG_PASSPHRASE}" = "" ]; then
+            echo "GPG private key, id or passphrase is empty. Please try to set github action secret GPG_PRIVATE_KEY, GPG_ID and GPG_PASSPHRASE. "
+            exit 1
+          fi 
 
       - name: Clean, build and publish the release(branch-*) branch
         run: ./gradlew clean build publish
