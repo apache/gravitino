@@ -7,9 +7,13 @@ package com.datastrato.gravitino.server.web;
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.config.ConfigBuilder;
 import com.datastrato.gravitino.config.ConfigEntry;
+import com.google.common.base.Preconditions;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public final class JettyServerConfig {
+  private static final Logger LOG = LoggerFactory.getLogger(JettyServerConfig.class);
 
   public static final ConfigEntry<String> WEBSERVER_HOST =
       new ConfigBuilder("host")
@@ -25,12 +29,13 @@ public final class JettyServerConfig {
           .intConf()
           .createWithDefault(8090);
 
-  public static final ConfigEntry<Integer> WEBSERVER_CORE_THREADS =
-      new ConfigBuilder("coreThreads")
-          .doc("The core thread size of the Jetty web server")
-          .version("0.1.0")
+  public static final ConfigEntry<Integer> WEBSERVER_MIN_THREADS =
+      new ConfigBuilder("minThreads")
+          .doc("The min thread size of the Jetty web server")
+          .version("0.2.0")
           .intConf()
-          .createWithDefault(Math.min(Runtime.getRuntime().availableProcessors() * 2, 100));
+          .createWithDefault(
+              Math.max(Math.min(Runtime.getRuntime().availableProcessors() * 2, 100), 4));
 
   public static final ConfigEntry<Integer> WEBSERVER_MAX_THREADS =
       new ConfigBuilder("maxThreads")
@@ -39,12 +44,19 @@ public final class JettyServerConfig {
           .intConf()
           .createWithDefault(Math.max(Runtime.getRuntime().availableProcessors() * 4, 400));
 
-  public static final ConfigEntry<Long> WEBSERVER_STOP_IDLE_TIMEOUT =
-      new ConfigBuilder("stopIdleTimeout")
-          .doc("The stop idle timeout of the Jetty web server")
-          .version("0.1.0")
+  public static final ConfigEntry<Long> WEBSERVER_STOP_TIMEOUT =
+      new ConfigBuilder("stopTimeout")
+          .doc("The stop wait timeout of the Jetty web server")
+          .version("0.2.0")
           .longConf()
           .createWithDefault(30 * 1000L);
+
+  public static final ConfigEntry<Integer> WEBSERVER_IDLE_TIMEOUT =
+      new ConfigBuilder("idleTimeout")
+          .doc("The timeout of idle connections")
+          .version("0.2.0")
+          .intConf()
+          .createWithDefault(30 * 1000);
 
   public static final ConfigEntry<Integer> WEBSERVER_REQUEST_HEADER_SIZE =
       new ConfigBuilder("requestHeaderSize")
@@ -71,11 +83,13 @@ public final class JettyServerConfig {
 
   private final int httpPort;
 
-  private final int coreThreads;
+  private final int minThreads;
 
   private final int maxThreads;
 
-  private final long stopIdleTimeout;
+  private final long stopTimeout;
+
+  private final int idleTimeout;
 
   private final int requestHeaderSize;
 
@@ -91,9 +105,26 @@ public final class JettyServerConfig {
 
     this.host = internalConfig.get(WEBSERVER_HOST);
     this.httpPort = internalConfig.get(WEBSERVER_HTTP_PORT);
-    this.coreThreads = internalConfig.get(WEBSERVER_CORE_THREADS);
-    this.maxThreads = internalConfig.get(WEBSERVER_MAX_THREADS);
-    this.stopIdleTimeout = internalConfig.get(WEBSERVER_STOP_IDLE_TIMEOUT);
+
+    int minThreads = internalConfig.get(WEBSERVER_MIN_THREADS);
+    int maxThreads = internalConfig.get(WEBSERVER_MAX_THREADS);
+    Preconditions.checkArgument(
+        maxThreads >= minThreads,
+        String.format("maxThreads:%d should not less than minThreads:%d", maxThreads, minThreads));
+    // at lease acceptor thread + select thread + 1 (worker thread)
+    if (minThreads < 8) {
+      LOG.info("The configuration of minThread is too small, adjust to 8");
+      minThreads = 8;
+    }
+    if (maxThreads < 8) {
+      LOG.info("The configuration of maxThread is too small, adjust to 8");
+      maxThreads = 8;
+    }
+    this.minThreads = minThreads;
+    this.maxThreads = maxThreads;
+
+    this.stopTimeout = internalConfig.get(WEBSERVER_STOP_TIMEOUT);
+    this.idleTimeout = internalConfig.get(WEBSERVER_IDLE_TIMEOUT);
     this.requestHeaderSize = internalConfig.get(WEBSERVER_REQUEST_HEADER_SIZE);
     this.responseHeaderSize = internalConfig.get(WEBSERVER_RESPONSE_HEADER_SIZE);
     this.threadPoolWorkQueueSize = internalConfig.get(WEBSERVER_THREAD_POOL_WORK_QUEUE_SIZE);
@@ -116,16 +147,16 @@ public final class JettyServerConfig {
     return httpPort;
   }
 
-  public int getCoreThreads() {
-    return coreThreads;
+  public int getMinThreads() {
+    return minThreads;
   }
 
   public int getMaxThreads() {
     return maxThreads;
   }
 
-  public long getStopIdleTimeout() {
-    return stopIdleTimeout;
+  public long getStopTimeout() {
+    return stopTimeout;
   }
 
   public int getRequestHeaderSize() {
@@ -138,5 +169,9 @@ public final class JettyServerConfig {
 
   public int getThreadPoolWorkQueueSize() {
     return threadPoolWorkQueueSize;
+  }
+
+  public int getIdleTimeout() {
+    return idleTimeout;
   }
 }
