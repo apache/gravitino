@@ -4,6 +4,7 @@
  */
 package com.datastrato.gravitino.server.web;
 
+import com.google.common.base.Preconditions;
 import java.net.BindException;
 import java.util.EnumSet;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -195,6 +196,19 @@ public final class JettyServer {
   }
 
   private ThreadPool createThreadPool(int minThreads, int maxThreads, int threadPoolWorkQueueSize) {
+
+    Preconditions.checkArgument(
+        maxThreads >= minThreads,
+        String.format("maxThreads:%d should not less than minThreads:%d", maxThreads, minThreads));
+    // at lease acceptor thread + select thread + 1 (worker thread)
+    if (minThreads < 4) {
+      LOG.info("The configuration of minThread is too small, adjust to 4");
+      minThreads = 4;
+    }
+    if (maxThreads < 4) {
+      LOG.info("The configuration of maxThread is too small, adjust to 4");
+      maxThreads = 4;
+    }
 
     ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
 

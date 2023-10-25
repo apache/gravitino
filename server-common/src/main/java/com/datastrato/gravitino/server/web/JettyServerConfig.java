@@ -30,7 +30,8 @@ public final class JettyServerConfig {
           .doc("The min thread size of the Jetty web server")
           .version("0.2.0")
           .intConf()
-          .createWithDefault(Math.min(Runtime.getRuntime().availableProcessors() * 2, 100));
+          .createWithDefault(
+              Math.max(Math.min(Runtime.getRuntime().availableProcessors() * 2, 100), 4));
 
   public static final ConfigEntry<Integer> WEBSERVER_MAX_THREADS =
       new ConfigBuilder("maxThreads")
