@@ -265,17 +265,17 @@ public class RelationalCatalog extends CatalogDTO implements TableCatalog, Suppo
    *
    * @param ident The name identifier of the schema.
    * @param comment The comment of the schema.
-   * @param metadata The metadata of the schema.
+   * @param properties The properties of the schema.
    * @return The created {@link Schema}.
    * @throws NoSuchCatalogException if the catalog with specified namespace does not exist.
    * @throws SchemaAlreadyExistsException if the schema with specified identifier already exists.
    */
   @Override
-  public Schema createSchema(NameIdentifier ident, String comment, Map<String, String> metadata)
+  public Schema createSchema(NameIdentifier ident, String comment, Map<String, String> properties)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
     NameIdentifier.checkSchema(ident);
 
-    SchemaCreateRequest req = new SchemaCreateRequest(ident.name(), comment, metadata);
+    SchemaCreateRequest req = new SchemaCreateRequest(ident.name(), comment, properties);
     req.validate();
 
     SchemaResponse resp =

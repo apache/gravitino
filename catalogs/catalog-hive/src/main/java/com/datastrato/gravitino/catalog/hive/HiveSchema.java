@@ -4,25 +4,21 @@
  */
 package com.datastrato.gravitino.catalog.hive;
 
+import static com.datastrato.gravitino.catalog.hive.HiveSchemaPropertiesMetadata.LOCATION;
+
 import com.datastrato.gravitino.catalog.rel.BaseSchema;
 import com.datastrato.gravitino.meta.AuditInfo;
-import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
-import java.util.Collections;
 import java.util.Map;
 import java.util.Optional;
 import lombok.ToString;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.PrincipalType;
 
 /** Represents a Hive Schema (Database) entity in the Hive Metastore catalog. */
 @ToString
 public class HiveSchema extends BaseSchema {
-  private static final String HMS_DB_OWNER = "hive.metastore.database.owner";
-  private static final String HMS_DB_OWNER_TYPE = "hive.metastore.database.owner-type";
-
   private Configuration conf;
 
   private HiveSchema() {}
@@ -35,7 +31,7 @@ public class HiveSchema extends BaseSchema {
    * @return A new HiveSchema instance.
    */
   public static HiveSchema fromHiveDB(Database db, Configuration hiveConf) {
-    Map<String, String> properties = convertToMetadata(db);
+    Map<String, String> properties = buildSchemaProperties(db);
 
     // Get audit info from Hive's Database object. Because Hive's database doesn't store create
     // time, last modifier and last modified time, we only get creator from Hive's database.
@@ -52,27 +48,15 @@ public class HiveSchema extends BaseSchema {
   }
 
   /**
-   * Converts a Database to metadata represented as a map of key-value pairs.
+   * Build schema properties from a Hive Database object.
    *
-   * @param database The Database to be converted to metadata.
-   * @return A map containing the metadata key-value pairs.
+   * @param database The Hive Database object.
+   * @return A map of schema properties.
    */
-  public static Map<String, String> convertToMetadata(Database database) {
-    Map<String, String> meta = Maps.newHashMap();
-
-    meta.putAll(database.getParameters());
-    meta.put("location", database.getLocationUri());
-    if (database.getDescription() != null) {
-      meta.put("comment", database.getDescription());
-    }
-    if (database.getOwnerName() != null) {
-      meta.put(HMS_DB_OWNER, database.getOwnerName());
-      if (database.getOwnerType() != null) {
-        meta.put(HMS_DB_OWNER_TYPE, database.getOwnerType().name());
-      }
-    }
-
-    return meta;
+  public static Map<String, String> buildSchemaProperties(Database database) {
+    Map<String, String> properties = Maps.newHashMap(database.getParameters());
+    properties.put(LOCATION, database.getLocationUri());
+    return properties;
   }
 
   /**
@@ -81,59 +65,21 @@ public class HiveSchema extends BaseSchema {
    * @return The converted Database object.
    */
   public Database toHiveDB() {
-    Database innerDb = new Database();
+    Database hiveDb = new Database();
 
-    Map<String, String> parameter = Maps.newHashMap();
-    innerDb.setName(name());
-    innerDb.setLocationUri(databaseLocation(name()));
-    if (comment() != null) {
-      innerDb.setDescription(comment());
-    }
+    hiveDb.setName(name());
+    Optional.ofNullable(properties().get(LOCATION)).ifPresent(hiveDb::setLocationUri);
+    Optional.ofNullable(comment()).ifPresent(hiveDb::setDescription);
 
-    Optional.ofNullable(properties)
-        .orElse(Collections.emptyMap())
-        .forEach(
-            (key, value) -> {
-              if (key.equals("location")) {
-                innerDb.setLocationUri(value);
-              } else if (key.equals(HMS_DB_OWNER)) {
-                innerDb.setOwnerName(value);
-              } else if (key.equals(HMS_DB_OWNER_TYPE) && value != null) {
-                innerDb.setOwnerType(PrincipalType.valueOf(value));
-              } else {
-                if (value != null) {
-                  parameter.put(key, value);
-                }
-              }
-            });
+    // TODO: Add more privilege info to Hive's Database object after Gravitino supports privilege.
+    hiveDb.setOwnerName(auditInfo().creator());
+    hiveDb.setOwnerType(PrincipalType.USER);
 
-    if (innerDb.getOwnerName() == null) {
-      innerDb.setOwnerName(auditInfo().creator());
-      innerDb.setOwnerType(PrincipalType.USER);
-    }
+    Map<String, String> parameters = Maps.newHashMap(properties());
+    parameters.remove(LOCATION);
+    hiveDb.setParameters(parameters);
 
-    innerDb.setParameters(parameter);
-
-    return innerDb;
-  }
-
-  private String databaseLocation(String databaseName) {
-    String warehouseLocation = conf.get(HiveConf.ConfVars.METASTOREWAREHOUSE.varname);
-    Preconditions.checkNotNull(
-        warehouseLocation, "Warehouse location is not set: hive.metastore.warehouse.dir=null");
-    warehouseLocation = stripTrailingSlash(warehouseLocation);
-    return String.format("%s/%s.db", warehouseLocation, databaseName);
-  }
-
-  private static String stripTrailingSlash(String path) {
-    Preconditions.checkArgument(
-        path != null && path.length() > 0, "path must not be null or empty");
-
-    String result = path;
-    while (result.endsWith("/")) {
-      result = result.substring(0, result.length() - 1);
-    }
-    return result;
+    return hiveDb;
   }
 
   /** A builder class for constructing HiveSchema instances. */
