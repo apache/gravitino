@@ -74,7 +74,7 @@ public class IcebergTable extends BaseTable {
     IcebergColumn[] icebergColumns =
         schema.columns().stream().map(ConvertUtil::fromNestedField).toArray(IcebergColumn[]::new);
     return new IcebergTable.Builder()
-        .withComment(table.property(IcebergSchema.ICEBERG_COMMENT_FIELD_NAME, ""))
+        .withComment(table.property(IcebergTablePropertiesMetadata.COMMENT, ""))
         .withLocation(table.location())
         .withProperties(properties)
         .withColumns(icebergColumns)

@@ -204,7 +204,7 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
               .withComment(
                   Optional.of(response)
                       .map(GetNamespaceResponse::properties)
-                      .map(map -> map.get(IcebergSchema.ICEBERG_COMMENT_FIELD_NAME))
+                      .map(map -> map.get(IcebergSchemaPropertiesMetadata.COMMENT))
                       .orElse(""))
               .withProperties(response.properties())
               .withAuditInfo(AuditInfo.EMPTY)
@@ -254,15 +254,15 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
 
       // Determine whether to change comment.
       String comment;
-      if (removals.contains(IcebergSchema.ICEBERG_COMMENT_FIELD_NAME)) {
+      if (removals.contains(IcebergSchemaPropertiesMetadata.COMMENT)) {
         comment = null;
-      } else if (updates.containsKey(IcebergSchema.ICEBERG_COMMENT_FIELD_NAME)) {
-        comment = updates.get(IcebergSchema.ICEBERG_COMMENT_FIELD_NAME);
+      } else if (updates.containsKey(IcebergSchemaPropertiesMetadata.COMMENT)) {
+        comment = updates.get(IcebergSchemaPropertiesMetadata.COMMENT);
       } else {
         // Synchronize changes to underlying iceberg sources
         comment =
             Optional.of(response.properties())
-                .map(map -> map.get(IcebergSchema.ICEBERG_COMMENT_FIELD_NAME))
+                .map(map -> map.get(IcebergSchemaPropertiesMetadata.COMMENT))
                 .orElse(null);
       }
       IcebergSchema icebergSchema =
