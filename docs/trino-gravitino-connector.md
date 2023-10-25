@@ -54,7 +54,7 @@ gravitino.metalake=test
 ```
 The `gravitino.uri` defines the connection information about Gravitino server.  
 The `gravitino.metalake` defines which metalake are used. It should exist in the Gravitino server.
-Please refer to the [Metalake documentation]( https://github.com/datastrato/gravitino/blob/main/docs/overview.md#terminology )
+Please refer to the [Metalake documentation](overview.md#terminology )
 
 ## Multiple Gravitino metalakes
 If you have multiple Gravitino metalakes, you need to configure a catalog for each metalake. To add another catalog:
@@ -130,8 +130,3 @@ Insert data to the table `table_01`:
 ```
 insert into  "test.hive_test".database_01.table_01 (name, salary) values ('ice', 12);
 ```
-
-
-
-
-
