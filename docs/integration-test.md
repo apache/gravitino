@@ -90,7 +90,7 @@ Before running the tests, make sure Docker is installed.
 
 #### Running Gravitino Hive CI Docker Environment
 
-1. Run a hive docker test environment container in the local using the `docker run --rm -d -p 8022:22 -p 8088:8088 -p 9000:9000 -p 9083:9083 -p 10000:10000 -p 10002:10002 -p 50070:50070 -p 50075:50075 datastrato/gravitino-ci-hive` command.
+1. Run a hive docker test environment container in the local using the `docker run --rm -d -p 8022:22 -p 8088:8088 -p 9000:9000 -p 9083:9083 -p 10000:10000 -p 10002:10002 -p 50010:50010 -p 50070:50070 -p 50075:50075 datastrato/gravitino-ci-hive` command.
 
 Additionally, the Gravitino Server and third-party data source Docker runtime environments will use certain ports. Ensure that these ports are not already in use:
 
