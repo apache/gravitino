@@ -9,6 +9,8 @@ import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.rel.Schema;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * A Schema class to represent a schema metadata object that combines the metadata both from {@link
@@ -18,6 +20,9 @@ public final class EntityCombinedSchema implements Schema {
 
   private final Schema schema;
   private final SchemaEntity schemaEntity;
+
+  // Sets of properties that should be hidden from the user.
+  private Set<String> hiddenProperties;
 
   private EntityCombinedSchema(Schema schema, SchemaEntity schemaEntity) {
     this.schema = schema;
@@ -32,6 +37,11 @@ public final class EntityCombinedSchema implements Schema {
     return of(schema, null);
   }
 
+  public EntityCombinedSchema withHiddenPropertiesSet(Set<String> hiddenProperties) {
+    this.hiddenProperties = hiddenProperties;
+    return this;
+  }
+
   @Override
   public String name() {
     return schema.name();
@@ -44,7 +54,9 @@ public final class EntityCombinedSchema implements Schema {
 
   @Override
   public Map<String, String> properties() {
-    return schema.properties();
+    return schema.properties().entrySet().stream()
+        .filter(e -> !hiddenProperties.contains(e.getKey()))
+        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
   }
 
   @Override

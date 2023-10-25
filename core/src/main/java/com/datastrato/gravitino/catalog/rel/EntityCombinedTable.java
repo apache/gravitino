@@ -38,6 +38,10 @@ public final class EntityCombinedTable implements Table {
     return new EntityCombinedTable(table, tableEntity);
   }
 
+  public static EntityCombinedTable of(Table table) {
+    return new EntityCombinedTable(table, null);
+  }
+
   public EntityCombinedTable withHiddenPropertiesSet(Set<String> hiddenProperties) {
     this.hiddenProperties = hiddenProperties;
     return this;

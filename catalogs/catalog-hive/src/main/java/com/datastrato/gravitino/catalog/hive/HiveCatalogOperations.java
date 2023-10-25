@@ -78,6 +78,8 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
   private HiveCatalogPropertiesMeta catalogPropertiesMetadata;
 
+  private HiveSchemaPropertiesMetadata schemaPropertiesMetadata;
+
   // Map that maintains the mapping of keys in Gravitino to that in Hive, for example, users
   // will only need to set the configuration 'METASTORE_URL' in Gravitino and Gravitino will change
   // it to `METASTOREURIS` automatically and pass it to Hive.
@@ -103,6 +105,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
   public void initialize(Map<String, String> conf) throws RuntimeException {
     this.tablePropertiesMetadata = new HiveTablePropertiesMetadata();
     this.catalogPropertiesMetadata = new HiveCatalogPropertiesMeta();
+    this.schemaPropertiesMetadata = new HiveSchemaPropertiesMetadata();
 
     // Key format like gravitino.bypass.a.b
     Map<String, String> byPassConfig = Maps.newHashMap();
@@ -911,5 +914,10 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
   @Override
   public PropertiesMetadata catalogPropertiesMetadata() throws UnsupportedOperationException {
     return catalogPropertiesMetadata;
+  }
+
+  @Override
+  public PropertiesMetadata schemaPropertiesMetadata() throws UnsupportedOperationException {
+    return schemaPropertiesMetadata;
   }
 }
