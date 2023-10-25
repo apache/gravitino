@@ -39,12 +39,15 @@ public class TestCatalogOperations implements CatalogOperations, TableCatalog, S
   private final Map<NameIdentifier, TestSchema> schemas;
 
   private final BasePropertiesMetadata tablePropertiesMetadata;
+
+  private final BasePropertiesMetadata schemaPropertiesMetadata;
   private Map<String, String> config;
 
   public TestCatalogOperations(Map<String, String> config) {
     tables = Maps.newHashMap();
     schemas = Maps.newHashMap();
     tablePropertiesMetadata = new TestBasePropertiesMetadata();
+    schemaPropertiesMetadata = new TestBasePropertiesMetadata();
     this.config = config;
   }
 
@@ -276,6 +279,11 @@ public class TestCatalogOperations implements CatalogOperations, TableCatalog, S
   @Override
   public PropertiesMetadata tablePropertiesMetadata() throws UnsupportedOperationException {
     return tablePropertiesMetadata;
+  }
+
+  @Override
+  public PropertiesMetadata schemaPropertiesMetadata() throws UnsupportedOperationException {
+    return schemaPropertiesMetadata;
   }
 
   @Override

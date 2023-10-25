@@ -67,6 +67,8 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
 
   private IcebergTablePropertiesMetadata icebergTablePropertiesMetadata;
 
+  private IcebergSchemaPropertiesMetadata icebergSchemaPropertiesMetadata;
+
   private final CatalogEntity entity;
 
   private IcebergTableOpsHelper icebergTableOpsHelper;
@@ -105,6 +107,7 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
     this.icebergTableOps = new IcebergTableOps(icebergConfig);
     this.icebergTableOpsHelper = icebergTableOps.createIcebergTableOpsHelper();
     this.icebergTablePropertiesMetadata = new IcebergTablePropertiesMetadata();
+    this.icebergSchemaPropertiesMetadata = new IcebergSchemaPropertiesMetadata();
   }
 
   /** Closes the Iceberg catalog and releases the associated client pool. */
@@ -563,5 +566,10 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
   @Override
   public PropertiesMetadata catalogPropertiesMetadata() throws UnsupportedOperationException {
     return icebergCatalogPropertiesMetadata;
+  }
+
+  @Override
+  public PropertiesMetadata schemaPropertiesMetadata() throws UnsupportedOperationException {
+    return icebergSchemaPropertiesMetadata;
   }
 }
