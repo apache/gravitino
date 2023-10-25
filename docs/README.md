@@ -1,10 +1,10 @@
 ---
-title: "Gravitino Document"
+title: "Gravitino Documentation"
 date: 2023-10-03T09:03:20-08:00
 license: "Copyright 2023 Datastrato.
 This software is licensed under the Apache License version 2."
 ---
-# Gravitino Document
+## Gravitino Documentation
 
 ## Launch Gravitino document website
 
@@ -15,7 +15,7 @@ Execute `./launch-docs-website.sh` scripts, it will create the Gravitino documen
 3. Use the `hugo new site web` command to create the website project within the `build` directory.
 4. Copy all markdown files into `web/content/docs` to generate the HTML for the document website using Hugo.
 5. Copy the entire assets directory into `web/static` to include the images referenced in the document website HTML.
-6. Automatically replace the Markdown embedded image addresses with Hugo website absolute paths. 
+6. Automatically replace the Markdown embedded image addresses with Hugo website absolute paths.
    > This is necessary because Markdown embedded images use relative paths, whereas Hugo website images require absolute paths.
    > Replace `![](assets/` with `![](/assets/` in all markdown files.
 7. Execute `hugo server` to launch the website.
@@ -23,10 +23,10 @@ Execute `./launch-docs-website.sh` scripts, it will create the Gravitino documen
 
 ## Add or modify a document
 
-To add a new document to the Gravitino website, We should follow these steps:
+To add a new document to the Gravitino website, follow these steps:
 
 1. Create a new markdown file in the `docs` directory.
-2. For the markdown file, we should include the following header at the beginning because `Hugo` use it create website link list.
+2. For the markdown file, include the following header at the beginning as `Hugo` will use it to create the website link list.
     ```
     ---
     title: "Article Title"
