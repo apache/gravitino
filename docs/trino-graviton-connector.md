@@ -19,8 +19,8 @@ The Gravitino connector supports various Trino connector types, including:
 
 To connect to a Gravitino server, you should ensure the following things.
 - Trino server version is higher than Trino-server-360.
-- Network access from the Trino coordinator and workers to the Gravitino server. Port 8090 is the default port.
-- Trino needs to install connectors for all the Gravitino-manged types fo catalogs.
+- The trino coordinators and workers can connect/access to the Gravitino server, and the default port of Gravitino server is 8090
+- Trino needs to install connectors for all the types of Gravitino-managed catalogs.
 
 # Installation
 
@@ -28,16 +28,16 @@ To install the Gravitino connector, you should deploy the Trino environment firs
 Then install the Gravitino connector plugin to Trino.
 Please refer to the [Deploying Trino documentation](https://trino.io/docs/current/installation/deployment.html).
 1. Download Gravitino connector tarball and unpack it.
-   The tarball contains a single top-level directory `gravitino-trino-connector-xxxxx`,
+   The tarball contains a single top-level directory `gravitino-trino-connector-xxx`,
    which we call the connector directory.
    [Download the graviton-connector](https://github.com/datastrato/gravitino/releases). 
 2. Copy the connector directory to trino plugin's directory.
-   Normally, the directory location is `Trino-server-xxx/plugin`, and the directory contains another catalog used by Trino.
-3. Add jvm arguments `-Dlog4j.configurationFile=file:///xxx/log4j2.properties` to enable logging of Gravitino connector.
+   Normally, the directory location is `Trino-server-xxx/plugin`, and the directory contains other catalogs used by Trino.
+3. Add trino jvm arguments `-Dlog4j.configurationFile=file:///xxx/log4j2.properties` to enable logging for the Gravitino connector.
 
 Alternatively,
 you can build the Gravitino connector package from sources
-and obtain the `gravitino-trino-connector-0.2.0-SNAPSHOT.tar.gz` file in the `$PROJECT/distribution` directory.
+and obtain the `gravitino-trino-connector-xxx.tar.gz` file in the `$PROJECT/distribution` directory.
 Please refer to the [Gravitino Development documentation](how-to-build.md)
 
 # Configuration
