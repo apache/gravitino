@@ -26,6 +26,11 @@ public class TestCatalog extends BaseCatalog<TestCatalog> {
       }
 
       @Override
+      public PropertiesMetadata schemaPropertiesMetadata() throws UnsupportedOperationException {
+        throw new UnsupportedOperationException();
+      }
+
+      @Override
       public void initialize(Map<String, String> config) throws RuntimeException {}
 
       @Override

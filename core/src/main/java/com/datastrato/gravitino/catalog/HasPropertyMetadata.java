@@ -22,4 +22,12 @@ public interface HasPropertyMetadata {
    * @throws UnsupportedOperationException if the entity does not support catalog properties.
    */
   PropertiesMetadata catalogPropertiesMetadata() throws UnsupportedOperationException;
+
+  /**
+   * Returns the schema property metadata.
+   *
+   * @return The schema property metadata.
+   * @throws UnsupportedOperationException if the entity does not support schema properties.
+   */
+  PropertiesMetadata schemaPropertiesMetadata() throws UnsupportedOperationException;
 }

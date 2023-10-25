@@ -237,6 +237,11 @@ public final class PropertyEntry<T> {
     return stringPropertyEntry(name, description, true, immutable, null, hidden, false);
   }
 
+  public static PropertyEntry<String> stringOptionalPropertyEntry(
+      String name, String description, boolean immutable, String defaultValue, boolean hidden) {
+    return stringPropertyEntry(name, description, false, immutable, null, hidden, false);
+  }
+
   public static PropertyEntry<Integer> integerOptionalPropertyEntry(
       String name, String description, boolean immutable, int defaultValue, boolean hidden) {
     return integerPropertyEntry(name, description, false, immutable, defaultValue, hidden, false);
