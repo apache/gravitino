@@ -8,13 +8,11 @@ import static com.datastrato.gravitino.catalog.hive.HiveSchemaPropertiesMetadata
 
 import com.datastrato.gravitino.catalog.rel.BaseSchema;
 import com.datastrato.gravitino.meta.AuditInfo;
-import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import java.util.Map;
 import java.util.Optional;
 import lombok.ToString;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.PrincipalType;
 
