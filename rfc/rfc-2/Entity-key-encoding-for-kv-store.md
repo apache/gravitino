@@ -3,7 +3,7 @@
   This software is licensed under the Apache License version 2.
 -->
 
-# RFC-1: Enity Key Encoding design for KV store
+# RFC-1: Entity Key Encoding design for KV store
 
 | Revision | Owner |  Date |
 | :------- |-------| ------|
@@ -67,8 +67,8 @@ Then, The whole key of entity can be encoded as the following format
 
 | Key                                            | Value         | Description                     | 
 |:-----------------------------------------------|---------------|---------------------------------|
-| ml/{ml_id}                                     | matalake info | ml is a short name for metalake |
-| ml/{ml_id}                                     | matalake info | ml is a short name for metalake |
+| ml/{ml_id}                                     | metalake info | ml is a short name for metalake |
+| ml/{ml_id}                                     | metalake info | ml is a short name for metalake |
 | ca/{ml_id}/{ca_id}                             | catalog_info  | ca is a short name for catalog  |
 | ca/{ml_id}/{ca_id}                             | catalog_info  | ca is a short name for catalog  |
 | sc/{ml_id}/{ca_id}/{sc_id}                     | schema_info   | sc is a short name for schema   |
