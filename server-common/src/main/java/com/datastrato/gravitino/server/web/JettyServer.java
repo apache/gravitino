@@ -201,13 +201,13 @@ public final class JettyServer {
         maxThreads >= minThreads,
         String.format("maxThreads:%d should not less than minThreads:%d", maxThreads, minThreads));
     // at lease acceptor thread + select thread + 1 (worker thread)
-    if (minThreads < 4) {
-      LOG.info("The configuration of minThread is too small, adjust to 4");
-      minThreads = 4;
+    if (minThreads < 8) {
+      LOG.info("The configuration of minThread is too small, adjust to 8");
+      minThreads = 8;
     }
-    if (maxThreads < 4) {
-      LOG.info("The configuration of maxThread is too small, adjust to 4");
-      maxThreads = 4;
+    if (maxThreads < 8) {
+      LOG.info("The configuration of maxThread is too small, adjust to 8");
+      maxThreads = 8;
     }
 
     ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
