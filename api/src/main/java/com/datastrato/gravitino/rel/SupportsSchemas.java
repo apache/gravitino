@@ -70,12 +70,12 @@ public interface SupportsSchemas {
    *
    * @param ident The name identifier of the schema.
    * @param comment The comment of the schema.
-   * @param metadata The metadata of the schema.
+   * @param properties The properties of the schema.
    * @return The created schema.
    * @throws NoSuchCatalogException If the catalog does not exist.
    * @throws SchemaAlreadyExistsException If the schema already exists.
    */
-  Schema createSchema(NameIdentifier ident, String comment, Map<String, String> metadata)
+  Schema createSchema(NameIdentifier ident, String comment, Map<String, String> properties)
       throws NoSuchCatalogException, SchemaAlreadyExistsException;
 
   /**

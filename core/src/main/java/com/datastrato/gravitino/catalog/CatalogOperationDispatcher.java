@@ -101,14 +101,14 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
    *
    * @param ident The identifier for the schema to be created.
    * @param comment The comment for the new schema.
-   * @param metadata Additional metadata for the new schema.
+   * @param properties Additional properties for the new schema.
    * @return The created Schema object.
    * @throws NoSuchCatalogException If the catalog corresponding to the provided identifier does not
    *     exist.
    * @throws SchemaAlreadyExistsException If a schema with the same identifier already exists.
    */
   @Override
-  public Schema createSchema(NameIdentifier ident, String comment, Map<String, String> metadata)
+  public Schema createSchema(NameIdentifier ident, String comment, Map<String, String> properties)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
     NameIdentifier catalogIdent = getCatalogIdentifier(ident);
     doWithCatalog(
@@ -116,7 +116,7 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
         c ->
             c.doWithPropertiesMeta(
                 p -> {
-                  p.schemaPropertiesMetadata().validatePropertyForCreate(metadata);
+                  p.schemaPropertiesMetadata().validatePropertyForCreate(properties);
                   return null;
                 }),
         IllegalArgumentException.class);
@@ -125,7 +125,7 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
     // StringIdentifier to make sure only when the operation is successful, the related
     // SchemaEntity will be visible.
     StringIdentifier stringId = StringIdentifier.fromId(uid);
-    Map<String, String> updatedProperties = StringIdentifier.addToProperties(stringId, metadata);
+    Map<String, String> updatedProperties = StringIdentifier.addToProperties(stringId, properties);
 
     doWithCatalog(
         catalogIdent,

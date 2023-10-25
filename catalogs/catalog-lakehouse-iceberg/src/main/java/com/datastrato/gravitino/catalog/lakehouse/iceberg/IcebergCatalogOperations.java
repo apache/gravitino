@@ -141,14 +141,14 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
    *
    * @param ident The identifier of the schema to create.
    * @param comment The comment for the schema.
-   * @param metadata The metadata properties for the schema.
+   * @param properties The properties for the schema.
    * @return The created {@link IcebergSchema}.
    * @throws NoSuchCatalogException If the provided namespace is invalid or does not exist.
    * @throws SchemaAlreadyExistsException If a schema with the same name already exists.
    */
   @Override
   public IcebergSchema createSchema(
-      NameIdentifier ident, String comment, Map<String, String> metadata)
+      NameIdentifier ident, String comment, Map<String, String> properties)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
     try {
       String currentUser = currentUser();
@@ -156,7 +156,7 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
           new IcebergSchema.Builder()
               .withName(ident.name())
               .withComment(comment)
-              .withProperties(metadata)
+              .withProperties(properties)
               .withAuditInfo(
                   new AuditInfo.Builder()
                       .withCreator(currentUser)
@@ -170,7 +170,7 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
           ident.name(),
           currentUser,
           comment,
-          metadata);
+          properties);
       return createdSchema;
     } catch (org.apache.iceberg.exceptions.AlreadyExistsException e) {
       throw new SchemaAlreadyExistsException(
