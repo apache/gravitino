@@ -7,9 +7,13 @@ package com.datastrato.gravitino.server.web;
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.config.ConfigBuilder;
 import com.datastrato.gravitino.config.ConfigEntry;
+import com.google.common.base.Preconditions;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public final class JettyServerConfig {
+  private static final Logger LOG = LoggerFactory.getLogger(JettyServerConfig.class);
 
   public static final ConfigEntry<String> WEBSERVER_HOST =
       new ConfigBuilder("host")
@@ -101,8 +105,24 @@ public final class JettyServerConfig {
 
     this.host = internalConfig.get(WEBSERVER_HOST);
     this.httpPort = internalConfig.get(WEBSERVER_HTTP_PORT);
-    this.minThreads = internalConfig.get(WEBSERVER_MIN_THREADS);
-    this.maxThreads = internalConfig.get(WEBSERVER_MAX_THREADS);
+
+    int minThreads = internalConfig.get(WEBSERVER_MIN_THREADS);
+    int maxThreads = internalConfig.get(WEBSERVER_MAX_THREADS);
+    Preconditions.checkArgument(
+        maxThreads >= minThreads,
+        String.format("maxThreads:%d should not less than minThreads:%d", maxThreads, minThreads));
+    // at lease acceptor thread + select thread + 1 (worker thread)
+    if (minThreads < 8) {
+      LOG.info("The configuration of minThread is too small, adjust to 8");
+      minThreads = 8;
+    }
+    if (maxThreads < 8) {
+      LOG.info("The configuration of maxThread is too small, adjust to 8");
+      maxThreads = 8;
+    }
+    this.minThreads = minThreads;
+    this.maxThreads = maxThreads;
+
     this.stopTimeout = internalConfig.get(WEBSERVER_STOP_TIMEOUT);
     this.idleTimeout = internalConfig.get(WEBSERVER_IDLE_TIMEOUT);
     this.requestHeaderSize = internalConfig.get(WEBSERVER_REQUEST_HEADER_SIZE);

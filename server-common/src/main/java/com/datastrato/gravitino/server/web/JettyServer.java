@@ -4,7 +4,6 @@
  */
 package com.datastrato.gravitino.server.web;
 
-import com.google.common.base.Preconditions;
 import java.net.BindException;
 import java.util.EnumSet;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -197,21 +196,7 @@ public final class JettyServer {
 
   private ThreadPool createThreadPool(int minThreads, int maxThreads, int threadPoolWorkQueueSize) {
 
-    Preconditions.checkArgument(
-        maxThreads >= minThreads,
-        String.format("maxThreads:%d should not less than minThreads:%d", maxThreads, minThreads));
-    // at lease acceptor thread + select thread + 1 (worker thread)
-    if (minThreads < 8) {
-      LOG.info("The configuration of minThread is too small, adjust to 8");
-      minThreads = 8;
-    }
-    if (maxThreads < 8) {
-      LOG.info("The configuration of maxThread is too small, adjust to 8");
-      maxThreads = 8;
-    }
-
     ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
-
     // Use QueuedThreadPool not ExecutorThreadPool to work around the accidental test failures.
     // see https://github.com/datastrato/gravitino/issues/546
     QueuedThreadPool threadPool =
