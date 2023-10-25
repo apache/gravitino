@@ -12,7 +12,7 @@
 
 ## Background
 Currently, there will be many data to storage, for example, 
-User information. Such as username, passward, user property, this data is structure data
+User information. Such as username, password, user property, this data is structure data
 Metadata. Metadata is the key point of our product. Metadata is Heterogeneous and data may be very large
 Other information, such as query history, query log and so on
 
@@ -24,7 +24,7 @@ Others like MongoDB, ES
 
 After we refer to snowflake schema and others (Hashdata and so on), KV storage is better than other kinds of storage compared to relational databases.
 
-According to our previous design, Matadata in gravitino will be originzed as the following structure
+According to our previous design, Metadata in gravitino will be organized as the following structure
 ![mc](../rfc-1/schema-overview.png)
 
 According to the picture above, Metadata in gravitino can be divided into multiple layers which is a little bit like a file directory structure. To implement this hierarchy, we can choose the following options to encode keys.
@@ -42,8 +42,8 @@ We should design a key encoding method to encode the key of KV store that should
 
 ### Design 
 
-Firstly, we introduce a global auto-increment ID (or simply a UUID) that reprents the name of namespace. This ID is unique in the whole system. 
-For example, if there exists a catalog named `catalog1` with namepace name `metalake1`, and a schema name `schema3` under `catalog2`, then we will add the following key-value pair to KV store
+Firstly, we introduce a global auto-increment ID (or simply a UUID) that represents the name of namespace. This ID is unique in the whole system. 
+For example, if there exists a catalog named `catalog1` with namespace name `metalake1`, and a schema name `schema3` under `catalog2`, then we will add the following key-value pair to KV store
 
 | Key         | Value       | Description                                  | 
 |:------------|-------------|----------------------------------------------|
