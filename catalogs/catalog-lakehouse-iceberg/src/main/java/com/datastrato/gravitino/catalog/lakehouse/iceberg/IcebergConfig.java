@@ -21,42 +21,42 @@ public class IcebergConfig extends Config {
   public static final ConfigEntry<String> CATALOG_BACKEND =
       new ConfigBuilder(CATALOG_BACKEND_NAME)
           .doc("Choose the implementation of the Iceberg catalog")
-          .version(DEFAULT_VERSION)
+          .version("0.2.0")
           .stringConf()
           .createWithDefault("memory");
 
   public static final ConfigEntry<String> CATALOG_WAREHOUSE =
       new ConfigBuilder(WAREHOUSE)
           .doc("The warehouse config of the Iceberg catalog")
-          .version(DEFAULT_VERSION)
+          .version("0.2.0")
           .stringConf()
           .createWithDefault(null);
 
   public static final ConfigEntry<String> CATALOG_URI =
       new ConfigBuilder(URI)
           .doc("The uri config of the Iceberg catalog")
-          .version(DEFAULT_VERSION)
+          .version("0.2.0")
           .stringConf()
           .createWithDefault(null);
 
   public static final ConfigEntry<String> JDBC_USER =
       new ConfigBuilder(ICEBERG_JDBC_USER)
           .doc("The username of the Jdbc connection")
-          .version(DEFAULT_VERSION)
+          .version("0.2.0")
           .stringConf()
           .createWithDefault(null);
 
   public static final ConfigEntry<String> JDBC_PASSWORD =
       new ConfigBuilder(ICEBERG_JDBC_PASSWORD)
           .doc("The password of the Jdbc connection")
-          .version(DEFAULT_VERSION)
+          .version("0.2.0")
           .stringConf()
           .createWithDefault(null);
 
   public static final ConfigEntry<Boolean> JDBC_INIT_TABLES =
       new ConfigBuilder(ICEBERG_JDBC_INITIALIZE)
           .doc("Whether to initialize meta tables when create Jdbc catalog")
-          .version(DEFAULT_VERSION)
+          .version("0.2.0")
           .booleanConf()
           .createWithDefault(true);
 

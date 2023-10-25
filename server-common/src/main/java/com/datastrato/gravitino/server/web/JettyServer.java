@@ -4,12 +4,9 @@
  */
 package com.datastrato.gravitino.server.web;
 
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.net.BindException;
 import java.util.EnumSet;
 import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
 import javax.servlet.DispatcherType;
 import javax.servlet.Filter;
 import javax.servlet.Servlet;
@@ -25,7 +22,6 @@ import org.eclipse.jetty.servlet.FilterHolder;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
 import org.eclipse.jetty.util.component.LifeCycle;
-import org.eclipse.jetty.util.thread.ExecutorThreadPool;
 import org.eclipse.jetty.util.thread.QueuedThreadPool;
 import org.eclipse.jetty.util.thread.ScheduledExecutorScheduler;
 import org.eclipse.jetty.util.thread.Scheduler;
@@ -51,16 +47,16 @@ public final class JettyServer {
     this.serverConfig = serverConfig;
     this.serverName = serverName;
 
-    ExecutorThreadPool threadPool =
+    ThreadPool threadPool =
         createThreadPool(
-            serverConfig.getCoreThreads(),
+            serverConfig.getMinThreads(),
             serverConfig.getMaxThreads(),
             serverConfig.getThreadPoolWorkQueueSize());
 
     // Create and config Jetty Server
     server = new Server(threadPool);
     server.setStopAtShutdown(true);
-    server.setStopTimeout(serverConfig.getStopIdleTimeout());
+    server.setStopTimeout(serverConfig.getStopTimeout());
 
     // Set error handler for Jetty Server
     ErrorHandler errorHandler = new ErrorHandler();
@@ -75,7 +71,8 @@ public final class JettyServer {
             serverConfig.getRequestHeaderSize(),
             serverConfig.getResponseHeaderSize(),
             serverConfig.getHost(),
-            serverConfig.getHttpPort());
+            serverConfig.getHttpPort(),
+            serverConfig.getIdleTimeout());
     server.addConnector(httpConnector);
 
     // TODO. Create and set https connector @jerry
@@ -167,11 +164,17 @@ public final class JettyServer {
   }
 
   private ServerConnector createHttpServerConnector(
-      Server server, int reqHeaderSize, int respHeaderSize, String host, int port) {
+      Server server,
+      int reqHeaderSize,
+      int respHeaderSize,
+      String host,
+      int port,
+      int idleTimeout) {
     HttpConfiguration httpConfig = new HttpConfiguration();
     httpConfig.setRequestHeaderSize(reqHeaderSize);
     httpConfig.setResponseHeaderSize(respHeaderSize);
     httpConfig.setSendServerVersion(true);
+    httpConfig.setIdleTimeout(idleTimeout);
 
     HttpConnectionFactory httpConnectionFactory = new HttpConnectionFactory(httpConfig);
     ServerConnector connector =
@@ -191,22 +194,37 @@ public final class JettyServer {
     return new ServerConnector(server, null, serverExecutor, null, -1, -1, connectionFactories);
   }
 
-  private ExecutorThreadPool createThreadPool(
-      int coreThreads, int maxThreads, int threadPoolWorkQueueSize) {
-    return new ExecutorThreadPool(
-        new ThreadPoolExecutor(
-            coreThreads,
-            maxThreads,
-            60,
-            TimeUnit.SECONDS,
-            new LinkedBlockingQueue<>(threadPoolWorkQueueSize),
-            new ThreadFactoryBuilder()
-                .setDaemon(true)
-                .setNameFormat(serverName + "-%d")
-                .setUncaughtExceptionHandler(
-                    (thread, throwable) -> {
-                      LOG.error("{} uncaught exception:", thread.getName(), throwable);
-                    })
-                .build()));
+  private ThreadPool createThreadPool(int minThreads, int maxThreads, int threadPoolWorkQueueSize) {
+
+    ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
+    // Use QueuedThreadPool not ExecutorThreadPool to work around the accidental test failures.
+    // see https://github.com/datastrato/gravitino/issues/546
+    QueuedThreadPool threadPool =
+        new QueuedThreadPool(
+            maxThreads, minThreads, 60000, new LinkedBlockingQueue(threadPoolWorkQueueSize)) {
+
+          @Override
+          public Thread newThread(Runnable runnable) {
+            return PrivilegedThreadFactory.newThread(
+                () -> {
+                  Thread thread = new Thread(runnable);
+                  thread.setDaemon(true);
+                  thread.setPriority(getThreadsPriority());
+                  thread.setName(getName() + "-" + thread.getId());
+                  thread.setUncaughtExceptionHandler(
+                      (t, throwable) -> {
+                        LOG.error("{} uncaught exception:", t.getName(), throwable);
+                      });
+                  // JettyServer maybe used by Gravitino server and Iceberg REST server with
+                  // different classloaders, we use the classloader of current thread to
+                  // replace the classloader of QueuedThreadPool.class.
+                  // thread.setContextClassLoader(getClass().getClassLoader()) is removed
+                  thread.setContextClassLoader(classLoader);
+                  return thread;
+                });
+          }
+        };
+    threadPool.setName(serverName);
+    return threadPool;
   }
 }
