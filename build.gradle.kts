@@ -22,7 +22,6 @@ plugins {
   alias(libs.plugins.gradle.extensions)
   alias(libs.plugins.spotless)
   alias(libs.plugins.publish)
-  id("org.jetbrains.dokka") version "1.9.10"
   // Apply one top level rat plugin to perform any required license enforcement analysis
   alias(libs.plugins.rat)
   id("com.github.jk1.dependency-license-report") version "2.5"
@@ -47,17 +46,7 @@ allprojects {
     mavenCentral()
     mavenLocal()
   }
-
-  tasks.withType<org.jetbrains.dokka.gradle.DokkaTask>().configureEach {
-    dokkaSourceSets {
-      configureEach {
-        reportUndocumented.set(false)
-      }
-    }
-  }
 }
-
-apply(plugin = "io.github.gradle-nexus.publish-plugin")
 
 nexusPublishing {
   repositories {
