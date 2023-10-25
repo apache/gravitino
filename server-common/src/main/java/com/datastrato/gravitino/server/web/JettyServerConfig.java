@@ -9,7 +9,7 @@ import com.datastrato.gravitino.config.ConfigBuilder;
 import com.datastrato.gravitino.config.ConfigEntry;
 import java.util.Map;
 
-public final class JettyServerConfig extends Config {
+public final class JettyServerConfig {
 
   public static final ConfigEntry<String> WEBSERVER_HOST =
       new ConfigBuilder("host")
@@ -28,7 +28,7 @@ public final class JettyServerConfig extends Config {
   public static final ConfigEntry<Integer> WEBSERVER_MIN_THREADS =
       new ConfigBuilder("minThreads")
           .doc("The min thread size of the Jetty web server")
-          .version(DEFAULT_VERSION)
+          .version("0.2.0")
           .intConf()
           .createWithDefault(Math.min(Runtime.getRuntime().availableProcessors() * 2, 100));
 
@@ -42,14 +42,14 @@ public final class JettyServerConfig extends Config {
   public static final ConfigEntry<Long> WEBSERVER_STOP_TIMEOUT =
       new ConfigBuilder("stopTimeout")
           .doc("The stop wait timeout of the Jetty web server")
-          .version(DEFAULT_VERSION)
+          .version("0.2.0")
           .longConf()
           .createWithDefault(30 * 1000L);
 
   public static final ConfigEntry<Integer> WEBSERVER_IDLE_TIMEOUT =
       new ConfigBuilder("idleTimeout")
           .doc("The timeout of idle connections")
-          .version(DEFAULT_VERSION)
+          .version("0.2.0")
           .intConf()
           .createWithDefault(30 * 1000);
 
