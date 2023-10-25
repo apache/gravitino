@@ -4,17 +4,30 @@
  */
 package com.datastrato.gravitino.catalog.hive;
 
+import static com.datastrato.gravitino.catalog.PropertyEntry.stringOptionalPropertyEntry;
+
 import com.datastrato.gravitino.catalog.BasePropertiesMetadata;
 import com.datastrato.gravitino.catalog.PropertyEntry;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
+import java.util.List;
 import java.util.Map;
 
 public class HiveSchemaPropertiesMetadata extends BasePropertiesMetadata {
-  private static final Map<String, PropertyEntry<?>> propertiesMetadata = Maps.newHashMap();
+  public static final String LOCATION = "location";
+  private static final Map<String, PropertyEntry<?>> propertiesMetadata;
+
+  static {
+    List<PropertyEntry<?>> propertyEntries =
+        ImmutableList.of(
+            stringOptionalPropertyEntry(
+                LOCATION, "The location for Hive database storage", false, null, false));
+
+    propertiesMetadata = Maps.uniqueIndex(propertyEntries, PropertyEntry::getName);
+  }
 
   @Override
   protected Map<String, PropertyEntry<?>> specificPropertyEntries() {
-    // TODO(minghuang): support Hive schema properties metadata
     return propertiesMetadata;
   }
 }

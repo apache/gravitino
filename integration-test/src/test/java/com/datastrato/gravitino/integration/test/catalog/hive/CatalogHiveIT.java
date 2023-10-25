@@ -31,6 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.catalog.hive.HiveClientPool;
+import com.datastrato.gravitino.catalog.hive.HiveSchemaPropertiesMetadata;
 import com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata;
 import com.datastrato.gravitino.client.GravitinoMetaLake;
 import com.datastrato.gravitino.dto.rel.ColumnDTO;
@@ -79,10 +80,12 @@ import org.junit.jupiter.api.TestMethodOrder;
 public class CatalogHiveIT extends AbstractIT {
   public static String metalakeName = GravitinoITUtils.genRandomName("CatalogHiveIT_metalake");
   public static String catalogName = GravitinoITUtils.genRandomName("CatalogHiveIT_catalog");
-  public static String schemaName = GravitinoITUtils.genRandomName("CatalogHiveIT_schema");
-  public static String tableName = GravitinoITUtils.genRandomName("CatalogHiveIT_table");
-  public static String alertTableName = "alert_table_name";
-  public static String table_comment = "table_comment";
+  public static String SCHEMA_PREFIX = "CatalogHiveIT_schema";
+  public static String schemaName = GravitinoITUtils.genRandomName(SCHEMA_PREFIX);
+  public static String TABLE_PREFIX = "CatalogHiveIT_table";
+  public static String tableName = GravitinoITUtils.genRandomName(TABLE_PREFIX);
+  public static String ALTER_TABLE_NAME = "alert_table_name";
+  public static String TABLE_COMMENT = "table_comment";
   public static String HIVE_COL_NAME1 = "hive_col_name1";
   public static String HIVE_COL_NAME2 = "hive_col_name2";
   public static String HIVE_COL_NAME3 = "hive_col_name3";
@@ -183,14 +186,18 @@ public class CatalogHiveIT extends AbstractIT {
 
   private static void createSchema() throws TException, InterruptedException {
     NameIdentifier ident = NameIdentifier.of(metalakeName, catalogName, schemaName);
-    Map<String, String> properties1 = Maps.newHashMap();
-    properties1.put("key1", "val1");
-    properties1.put("key2", "val2");
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put("key1", "val1");
+    properties.put("key2", "val2");
     String comment = "comment";
 
-    Schema createdSchema = catalog.asSchemas().createSchema(ident, comment, properties1);
+    catalog.asSchemas().createSchema(ident, comment, properties);
     Schema loadSchema = catalog.asSchemas().loadSchema(ident);
-    Assertions.assertEquals(createdSchema.name().toLowerCase(), loadSchema.name());
+    Assertions.assertEquals(schemaName.toLowerCase(), loadSchema.name());
+    Assertions.assertEquals(comment, loadSchema.comment());
+    Assertions.assertEquals("val1", loadSchema.properties().get("key1"));
+    Assertions.assertEquals("val2", loadSchema.properties().get("key2"));
+    Assertions.assertNotNull(loadSchema.properties().get(HiveSchemaPropertiesMetadata.LOCATION));
 
     // Directly get database from hive metastore to verify the schema creation
     Database database = hiveClientPool.run(client -> client.getDatabase(schemaName));
@@ -284,7 +291,7 @@ public class CatalogHiveIT extends AbstractIT {
             .createTable(
                 nameIdentifier,
                 columns,
-                table_comment,
+                TABLE_COMMENT,
                 properties,
                 new Transform[0],
                 distribution,
@@ -305,7 +312,7 @@ public class CatalogHiveIT extends AbstractIT {
     Table createdTable1 =
         catalog
             .asTableCatalog()
-            .createTable(nameIdentifier, columns, table_comment, properties, (Transform[]) null);
+            .createTable(nameIdentifier, columns, TABLE_COMMENT, properties, (Transform[]) null);
 
     // Directly get table from hive metastore to check if the table is created successfully.
     org.apache.hadoop.hive.metastore.api.Table hiveTable1 =
@@ -335,7 +342,7 @@ public class CatalogHiveIT extends AbstractIT {
               .createTable(
                   nameIdentifier,
                   columns,
-                  table_comment,
+                  TABLE_COMMENT,
                   properties,
                   new Transform[0],
                   badDistribution,
@@ -359,7 +366,7 @@ public class CatalogHiveIT extends AbstractIT {
               .createTable(
                   nameIdentifier,
                   columns,
-                  table_comment,
+                  TABLE_COMMENT,
                   properties,
                   new Transform[0],
                   distribution,
@@ -378,7 +385,7 @@ public class CatalogHiveIT extends AbstractIT {
     Table createdTable =
         catalog
             .asTableCatalog()
-            .createTable(nameIdentifier, columns, table_comment, properties, new Transform[0]);
+            .createTable(nameIdentifier, columns, TABLE_COMMENT, properties, new Transform[0]);
 
     // Directly get table from hive metastore to check if the table is created successfully.
     org.apache.hadoop.hive.metastore.api.Table hiveTab =
@@ -395,7 +402,7 @@ public class CatalogHiveIT extends AbstractIT {
     Table createdTable1 =
         catalog
             .asTableCatalog()
-            .createTable(nameIdentifier, columns, table_comment, properties, (Transform[]) null);
+            .createTable(nameIdentifier, columns, TABLE_COMMENT, properties, (Transform[]) null);
 
     // Directly get table from hive metastore to check if the table is created successfully.
     org.apache.hadoop.hive.metastore.api.Table hiveTable1 =
@@ -419,7 +426,7 @@ public class CatalogHiveIT extends AbstractIT {
         catalog
             .asTableCatalog()
             .createTable(
-                nameIdentifier, columns, table_comment, ImmutableMap.of(), new Transform[0]);
+                nameIdentifier, columns, TABLE_COMMENT, ImmutableMap.of(), new Transform[0]);
     HiveTablePropertiesMetadata tablePropertiesMetadata = new HiveTablePropertiesMetadata();
     org.apache.hadoop.hive.metastore.api.Table actualTable =
         hiveClientPool.run(client -> client.getTable(schemaName, tableName));
@@ -427,14 +434,14 @@ public class CatalogHiveIT extends AbstractIT {
     checkTableReadWrite(actualTable);
 
     // test set properties
-    String table2 = GravitinoITUtils.genRandomName("CatalogHiveIT_table");
+    String table2 = GravitinoITUtils.genRandomName(TABLE_PREFIX);
     Table createdTable2 =
         catalog
             .asTableCatalog()
             .createTable(
                 NameIdentifier.of(metalakeName, catalogName, schemaName, table2),
                 columns,
-                table_comment,
+                TABLE_COMMENT,
                 ImmutableMap.of(
                     TABLE_TYPE,
                     "external_table",
@@ -454,7 +461,7 @@ public class CatalogHiveIT extends AbstractIT {
     Assertions.assertEquals(IGNORE_KEY_OUTPUT_FORMAT_CLASS, actualTable2.getSd().getOutputFormat());
     Assertions.assertEquals(EXTERNAL_TABLE.name(), actualTable2.getTableType());
     Assertions.assertEquals(table2, actualTable2.getSd().getSerdeInfo().getName());
-    Assertions.assertEquals(table_comment, actualTable2.getParameters().get(COMMENT));
+    Assertions.assertEquals(TABLE_COMMENT, actualTable2.getParameters().get(COMMENT));
     Assertions.assertEquals(
         ((Boolean) tablePropertiesMetadata.getDefaultValue(EXTERNAL)).toString().toUpperCase(),
         actualTable.getParameters().get(EXTERNAL));
@@ -479,6 +486,39 @@ public class CatalogHiveIT extends AbstractIT {
   }
 
   @Test
+  public void testHiveSchemaProperties() throws TException, InterruptedException {
+    // test LOCATION property
+    NameIdentifier schemaIdent =
+        NameIdentifier.of(metalakeName, catalogName, GravitinoITUtils.genRandomName(SCHEMA_PREFIX));
+    Map<String, String> properties = Maps.newHashMap();
+    String expectedSchemaLocation = "/tmp";
+    properties.put(HiveSchemaPropertiesMetadata.LOCATION, expectedSchemaLocation);
+    catalog.asSchemas().createSchema(schemaIdent, "comment", properties);
+
+    Database actualSchema = hiveClientPool.run(client -> client.getDatabase(schemaIdent.name()));
+    String actualSchemaLocation = actualSchema.getLocationUri();
+    Assertions.assertTrue(actualSchemaLocation.endsWith(expectedSchemaLocation));
+
+    NameIdentifier tableIdent =
+        NameIdentifier.of(
+            metalakeName,
+            catalogName,
+            schemaIdent.name(),
+            GravitinoITUtils.genRandomName(TABLE_PREFIX));
+    catalog
+        .asTableCatalog()
+        .createTable(
+            tableIdent, createColumns(), TABLE_COMMENT, ImmutableMap.of(), new Transform[0]);
+    org.apache.hadoop.hive.metastore.api.Table actualTable =
+        hiveClientPool.run(client -> client.getTable(schemaIdent.name(), tableIdent.name()));
+    String actualTableLocation = actualTable.getSd().getLocation();
+    // use `tableIdent.name().toLowerCase()` because HMS will convert table name to lower
+    String expectedTableLocation = expectedSchemaLocation + "/" + tableIdent.name().toLowerCase();
+    Assertions.assertTrue(actualTableLocation.endsWith(expectedTableLocation));
+    checkTableReadWrite(actualTable);
+  }
+
+  @Test
   public void testCreatePartitionedHiveTable() throws TException, InterruptedException {
     // Create table from Gravitino API
     ColumnDTO[] columns = createColumns();
@@ -492,7 +532,7 @@ public class CatalogHiveIT extends AbstractIT {
             .createTable(
                 nameIdentifier,
                 columns,
-                table_comment,
+                TABLE_COMMENT,
                 properties,
                 new Transform[] {identity(columns[1]), identity(columns[2])});
 
@@ -516,7 +556,7 @@ public class CatalogHiveIT extends AbstractIT {
                   .createTable(
                       nameIdentifier,
                       columns,
-                      table_comment,
+                      TABLE_COMMENT,
                       properties,
                       new Transform[] {identity(columns[0]), identity(columns[1])});
             });
@@ -537,7 +577,7 @@ public class CatalogHiveIT extends AbstractIT {
     Assertions.assertEquals(schemaName.toLowerCase(), hiveTab.getDbName());
     Assertions.assertEquals(tableName.toLowerCase(), hiveTab.getTableName());
     Assertions.assertEquals("MANAGED_TABLE", hiveTab.getTableType());
-    Assertions.assertEquals(table_comment, hiveTab.getParameters().get("comment"));
+    Assertions.assertEquals(TABLE_COMMENT, hiveTab.getParameters().get("comment"));
 
     Assertions.assertEquals(HIVE_COL_NAME1, actualColumns.get(0).getName());
     Assertions.assertEquals("tinyint", actualColumns.get(0).getType());
@@ -599,7 +639,7 @@ public class CatalogHiveIT extends AbstractIT {
         .createTable(
             NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
             columns,
-            table_comment,
+            TABLE_COMMENT,
             createProperties(),
             new Transform[] {identity(columns[2])});
     Table alteredTable =
@@ -607,8 +647,8 @@ public class CatalogHiveIT extends AbstractIT {
             .asTableCatalog()
             .alterTable(
                 NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
-                TableChange.rename(alertTableName),
-                TableChange.updateComment(table_comment + "_new"),
+                TableChange.rename(ALTER_TABLE_NAME),
+                TableChange.updateComment(TABLE_COMMENT + "_new"),
                 TableChange.removeProperty("key1"),
                 TableChange.setProperty("key2", "val2_new"),
                 TableChange.addColumn(
@@ -623,9 +663,9 @@ public class CatalogHiveIT extends AbstractIT {
 
     // Direct get table from hive metastore to check if the table is altered successfully.
     org.apache.hadoop.hive.metastore.api.Table hiveTab =
-        hiveClientPool.run(client -> client.getTable(schemaName, alertTableName));
+        hiveClientPool.run(client -> client.getTable(schemaName, ALTER_TABLE_NAME));
     Assertions.assertEquals(schemaName.toLowerCase(), hiveTab.getDbName());
-    Assertions.assertEquals(alertTableName, hiveTab.getTableName());
+    Assertions.assertEquals(ALTER_TABLE_NAME, hiveTab.getTableName());
     Assertions.assertEquals("val2_new", hiveTab.getParameters().get("key2"));
 
     Assertions.assertEquals(HIVE_COL_NAME1, hiveTab.getSd().getCols().get(0).getName());
@@ -653,7 +693,7 @@ public class CatalogHiveIT extends AbstractIT {
               catalog
                   .asTableCatalog()
                   .alterTable(
-                      NameIdentifier.of(metalakeName, catalogName, schemaName, alertTableName),
+                      NameIdentifier.of(metalakeName, catalogName, schemaName, ALTER_TABLE_NAME),
                       TableChange.updateColumnType(
                           new String[] {HIVE_COL_NAME3}, TypeCreator.NULLABLE.I32));
             });
@@ -690,7 +730,7 @@ public class CatalogHiveIT extends AbstractIT {
         .createTable(
             tableIdentifier,
             newColumns,
-            table_comment,
+            TABLE_COMMENT,
             ImmutableMap.of(),
             new Transform[0],
             Distribution.NONE,
@@ -744,17 +784,17 @@ public class CatalogHiveIT extends AbstractIT {
         .createTable(
             NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
             createColumns(),
-            table_comment,
+            TABLE_COMMENT,
             createProperties(),
             new Transform[0]);
     catalog
         .asTableCatalog()
-        .dropTable(NameIdentifier.of(metalakeName, catalogName, schemaName, alertTableName));
+        .dropTable(NameIdentifier.of(metalakeName, catalogName, schemaName, ALTER_TABLE_NAME));
 
     // Directly get table from hive metastore to check if the table is dropped successfully.
     assertThrows(
         NoSuchObjectException.class,
-        () -> hiveClientPool.run(client -> client.getTable(schemaName, alertTableName)));
+        () -> hiveClientPool.run(client -> client.getTable(schemaName, ALTER_TABLE_NAME)));
   }
 
   @Test

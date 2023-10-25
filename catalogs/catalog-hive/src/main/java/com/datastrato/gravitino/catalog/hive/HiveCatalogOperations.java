@@ -184,20 +184,21 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
    *
    * @param ident The identifier of the schema to create.
    * @param comment The comment for the schema.
-   * @param metadata The metadata properties for the schema.
+   * @param properties The metadata properties for the schema.
    * @return The created {@link HiveSchema}.
    * @throws NoSuchCatalogException If the provided namespace is invalid or does not exist.
    * @throws SchemaAlreadyExistsException If a schema with the same name already exists.
    */
   @Override
-  public HiveSchema createSchema(NameIdentifier ident, String comment, Map<String, String> metadata)
+  public HiveSchema createSchema(
+      NameIdentifier ident, String comment, Map<String, String> properties)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
     try {
       HiveSchema hiveSchema =
           new HiveSchema.Builder()
               .withName(ident.name())
               .withComment(comment)
-              .withProperties(metadata)
+              .withProperties(properties)
               .withConf(hiveConf)
               .withAuditInfo(
                   new AuditInfo.Builder()
@@ -275,19 +276,19 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     try {
       // load the database parameters
       Database database = clientPool.run(client -> client.getDatabase(ident.name()));
-      Map<String, String> metadata = HiveSchema.convertToMetadata(database);
+      Map<String, String> properties = HiveSchema.buildSchemaProperties(database);
       LOG.debug(
-          "Loaded metadata for Hive schema (database) {} found {}",
+          "Loaded properties for Hive schema (database) {} found {}",
           ident.name(),
-          metadata.keySet());
+          properties.keySet());
 
       for (SchemaChange change : changes) {
         if (change instanceof SchemaChange.SetProperty) {
-          metadata.put(
+          properties.put(
               ((SchemaChange.SetProperty) change).getProperty(),
               ((SchemaChange.SetProperty) change).getValue());
         } else if (change instanceof SchemaChange.RemoveProperty) {
-          metadata.remove(((SchemaChange.RemoveProperty) change).getProperty());
+          properties.remove(((SchemaChange.RemoveProperty) change).getProperty());
         } else {
           throw new IllegalArgumentException(
               "Unsupported schema change type: " + change.getClass().getSimpleName());
@@ -296,7 +297,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
       // alter the hive database parameters
       Database alteredDatabase = database.deepCopy();
-      alteredDatabase.setParameters(metadata);
+      alteredDatabase.setParameters(properties);
 
       clientPool.run(
           client -> {

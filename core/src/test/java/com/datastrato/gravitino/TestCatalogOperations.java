@@ -186,7 +186,7 @@ public class TestCatalogOperations implements CatalogOperations, TableCatalog, S
   }
 
   @Override
-  public Schema createSchema(NameIdentifier ident, String comment, Map<String, String> metadata)
+  public Schema createSchema(NameIdentifier ident, String comment, Map<String, String> properties)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
     AuditInfo auditInfo =
         new AuditInfo.Builder().withCreator("test").withCreateTime(Instant.now()).build();
@@ -195,7 +195,7 @@ public class TestCatalogOperations implements CatalogOperations, TableCatalog, S
         new TestSchema.Builder()
             .withName(ident.name())
             .withComment(comment)
-            .withProperties(metadata)
+            .withProperties(properties)
             .withAuditInfo(auditInfo)
             .build();
 
