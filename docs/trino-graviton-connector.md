@@ -27,9 +27,10 @@ To connect to a Gravitino server, you should ensure the following things.
 To install the Gravitino connector, you should deploy the Trino environment first.
 Then install the Gravitino connector plugin to Trino.
 Please refer to the [Deploying Trino documentation](https://trino.io/docs/current/installation/deployment.html).
-1. Download Gravitino connector tarball, [gravitino-connector-0.2.tar.gz](https://github.com/datastrato/gravitino/releases/download/v0.2.0/gravitino-trino-connector-v0.2.0.tar.gz), 
-   and unpack it. The tarball contains a single 
-   top-level directory `gravitino-connector`, which we call the connector directory. 
+1. Download Gravitino connector tarball and unpack it.
+   The tarball contains a single top-level directory `gravitino-trino-connector-xxxxx`,
+   which we call the connector directory.
+   [Download the graviton-connector](https://github.com/datastrato/gravitino/releases). 
 2. Copy the connector directory to trino plugin's directory.
    Normally, the directory location is `Trino-server-xxx/plugin`, and the directory contains another catalog used by Trino.
 3. Add jvm arguments `-Dlog4j.configurationFile=file:///xxx/log4j2.properties` to enable logging of Gravitino connector.
