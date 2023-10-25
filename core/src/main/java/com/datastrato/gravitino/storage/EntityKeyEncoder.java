@@ -17,7 +17,7 @@ public interface EntityKeyEncoder<T> {
    * @param ident entity identifier to encode
    * @param type entity type to encode
    * @return encoded key for key-value stored
-   * @throws IOException, Exception if error occurs
+   * @throws IOException Exception if error occurs
    */
   default T encode(NameIdentifier ident, EntityType type) throws IOException {
     return encode(ident, type, false);
@@ -28,7 +28,7 @@ public interface EntityKeyEncoder<T> {
    *
    * @param nullIfMissing return null if the specific entity no found
    * @return encoded key for key-value stored
-   * @throws IOException, Exception if error occurs
+   * @throws IOException Exception if error occurs
    */
   T encode(NameIdentifier ident, EntityType type, boolean nullIfMissing) throws IOException;
 }

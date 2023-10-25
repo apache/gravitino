@@ -41,16 +41,98 @@ java {
   }
 }
 
+allprojects {
+  repositories {
+    mavenCentral()
+    mavenLocal()
+  }
+}
+
+nexusPublishing {
+  repositories {
+    sonatype {
+      nexusUrl.set(uri("https://s01.oss.sonatype.org/service/local/"))
+      snapshotRepositoryUrl.set(uri("https://s01.oss.sonatype.org/content/repositories/snapshots/"))
+
+      val sonatypeUser =
+              System.getenv("SONATYPE_USER").takeUnless { it.isNullOrEmpty() }
+                      ?: extra["SONATYPE_USER"].toString()
+      val sonatypePassword =
+              System.getenv("SONATYPE_PASSWORD").takeUnless { it.isNullOrEmpty() }
+                      ?: extra["SONATYPE_PASSWORD"].toString()
+
+      username.set(sonatypeUser)
+      password.set(sonatypePassword)
+    }
+  }
+
+  packageGroup.set("com.datastrato.gravitino")
+}
+
 dependencies {
   testImplementation(libs.testng)
 }
 
 subprojects {
   apply(plugin = "jacoco")
+  apply(plugin = "maven-publish")
+  apply(plugin = "java")
 
   repositories {
     mavenCentral()
     mavenLocal()
+  }
+
+  val sourcesJar by tasks.registering(Jar::class) {
+    from(sourceSets.named("main").get().allSource)
+    archiveClassifier.set("sources")
+  }
+
+  val javadocJar by tasks.registering(Jar::class) {
+    archiveClassifier.set("javadoc")
+    from(tasks["javadoc"])
+  }
+
+  apply(plugin = "signing")
+  publishing {
+    publications {
+      create<MavenPublication>("MavenJava") {
+        from(components["java"])
+        artifact(sourcesJar)
+        artifact(javadocJar)
+
+        pom {
+          name.set("Gravitino")
+          description.set("Gravitino is a high-performance, geo-distributed and federated metadata lake.")
+          url.set("https://datastrato.ai")
+          licenses {
+            license {
+              name.set("The Apache Software License, Version 2.0")
+              url.set("http://www.apache.org/licenses/LICENSE-2.0.txt")
+            }
+          }
+          developers {
+            developer {
+              id.set("The maintainers of Gravitino")
+              name.set("support")
+              email.set("support@datastrato.com")
+            }
+          }
+          scm {
+            url.set("https://github.com/datastrato/gravitino")
+            connection.set("scm:git:git://github.com/datastrato/gravitino.git")
+          }
+        }
+      }
+    }
+  }
+
+  configure<SigningExtension> {
+    val gpgId = System.getenv("GPG_ID")
+    val gpgSecretKey = System.getenv("GPG_PRIVATE_KEY")
+    val gpgKeyPassword = System.getenv("GPG_PASSPHRASE")
+    useInMemoryPgpKeys(gpgId, gpgSecretKey, gpgKeyPassword)
+    sign(publishing.publications)
   }
 
   tasks.configureEach<Test> {
@@ -110,24 +192,6 @@ subprojects {
 
         targetExclude("**/build/**")
       }
-    }
-  }
-}
-
-nexusPublishing {
-  repositories {
-    create("sonatype") {
-      val sonatypeUser =
-        System.getenv("SONATYPE_USER").takeUnless { it.isNullOrEmpty() }
-          ?: extra["SONATYPE_USER"].toString()
-      val sonatypePassword =
-        System.getenv("SONATYPE_PASSWORD").takeUnless { it.isNullOrEmpty() }
-          ?: extra["SONATYPE_PASSWORD"].toString()
-      nexusUrl.set(uri("https://s01.oss.sonatype.org/service/local/"))
-
-      snapshotRepositoryUrl.set(uri("https://s01.oss.sonatype.org/content/repositories/snapshots/"))
-      username.set(sonatypeUser)
-      password.set(sonatypePassword)
     }
   }
 }
