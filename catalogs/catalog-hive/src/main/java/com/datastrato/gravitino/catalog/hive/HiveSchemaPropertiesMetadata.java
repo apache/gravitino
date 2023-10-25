@@ -21,7 +21,7 @@ public class HiveSchemaPropertiesMetadata extends BasePropertiesMetadata {
     List<PropertyEntry<?>> propertyEntries =
         ImmutableList.of(
             stringOptionalPropertyEntry(
-                LOCATION, "The directory for Hive database storage", false, null, false));
+                LOCATION, "The location for Hive database storage", false, null, false));
 
     propertiesMetadata = Maps.uniqueIndex(propertyEntries, PropertyEntry::getName);
   }

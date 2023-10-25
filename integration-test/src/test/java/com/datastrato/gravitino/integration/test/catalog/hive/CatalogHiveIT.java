@@ -512,6 +512,7 @@ public class CatalogHiveIT extends AbstractIT {
     org.apache.hadoop.hive.metastore.api.Table actualTable =
         hiveClientPool.run(client -> client.getTable(schemaIdent.name(), tableIdent.name()));
     String actualTableLocation = actualTable.getSd().getLocation();
+    // use `tableIdent.name().toLowerCase()` because HMS will convert table name to lower
     String expectedTableLocation = expectedSchemaLocation + "/" + tableIdent.name().toLowerCase();
     Assertions.assertTrue(actualTableLocation.endsWith(expectedTableLocation));
     checkTableReadWrite(actualTable);

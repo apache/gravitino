@@ -21,9 +21,6 @@ import org.apache.hadoop.hive.metastore.api.PrincipalType;
 /** Represents a Hive Schema (Database) entity in the Hive Metastore catalog. */
 @ToString
 public class HiveSchema extends BaseSchema {
-  private static final String HMS_DB_OWNER = "hive.metastore.database.owner";
-  private static final String HMS_DB_OWNER_TYPE = "hive.metastore.database.owner-type";
-
   private Configuration conf;
 
   private HiveSchema() {}
@@ -85,25 +82,6 @@ public class HiveSchema extends BaseSchema {
     hiveDb.setParameters(parameters);
 
     return hiveDb;
-  }
-
-  private String databaseLocation(String databaseName) {
-    String warehouseLocation = conf.get(HiveConf.ConfVars.METASTOREWAREHOUSE.varname);
-    Preconditions.checkNotNull(
-        warehouseLocation, "Warehouse location is not set: hive.metastore.warehouse.dir=null");
-    warehouseLocation = stripTrailingSlash(warehouseLocation);
-    return String.format("%s/%s.db", warehouseLocation, databaseName);
-  }
-
-  private static String stripTrailingSlash(String path) {
-    Preconditions.checkArgument(
-        path != null && path.length() > 0, "path must not be null or empty");
-
-    String result = path;
-    while (result.endsWith("/")) {
-      result = result.substring(0, result.length() - 1);
-    }
-    return result;
   }
 
   /** A builder class for constructing HiveSchema instances. */
