@@ -34,7 +34,7 @@ import org.slf4j.LoggerFactory;
 import org.testng.annotations.Parameters;
 import org.testng.annotations.Test;
 
-@Parameters({"-Xmx1G"})
+@Parameters({"-Xmx2G"})
 public class TestGravitinoConnector extends AbstractTestQueryFramework {
 
   private static final Logger LOG = LoggerFactory.getLogger(TestGravitinoConnector.class);
@@ -79,6 +79,8 @@ public class TestGravitinoConnector extends AbstractTestQueryFramework {
     // testing the catalogs
     assertThat(computeActual("show catalogs").getOnlyColumnAsSet()).contains("gravitino");
     assertThat(computeActual("show catalogs").getOnlyColumnAsSet()).contains(catalogName);
+
+    assertThat(computeActual("select * from system.jdbc.tables"));
 
     String schemaName = "db_01";
     String fullSchemaName = String.format("\"%s\".%s", catalogName, schemaName);
