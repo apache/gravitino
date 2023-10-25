@@ -42,12 +42,12 @@ public interface NameMappingService extends AutoCloseable {
    *
    * <pre>
    * Before:
-   *   oldname -> 1
-   *   1       -> oldname
+   *   oldName ------ 1
+   *   1       ------ oldName
    *
    * After:
-   *  newname -> 1
-   *  1       -> newname
+   *  newName ---- 1
+   *  1       ---- newName
    * </pre>
    *
    * @param oldName name to be updated
@@ -60,7 +60,7 @@ public interface NameMappingService extends AutoCloseable {
   /**
    * Unbind id-name mapping. Ignore if the name does not exist.
    *
-   * @param name name to be unbined
+   * @param name name to be unbind
    * @return true if the name exists and is deleted successfully, false if the name does not exist
    * @throws IOException if the underlying storage failed
    */

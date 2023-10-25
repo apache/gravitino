@@ -92,7 +92,7 @@ public class CatalogInjector {
    *  ----nodeManager (DiscoveryNodeManager)
    *  ------nodeManager (DiscoveryNodeManager)
    *  ------allCatalogsOnAllNodes (boolean)
-   *  ------activeNodesByCatalogHandle (Optional<SetMultimap>)
+   *  ------activeNodesByCatalogHandle (SetMultimap)
    *  --metadataProvider(InternalMetadataProvider)
    *  ----metadata (TracingMetadata)
    *  ------delegate (MetadataManager)
