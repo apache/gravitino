@@ -51,7 +51,7 @@ http://{GravitinoServerHost}:8090/api/metalakes/{Your_metalake_name}/catalogs
 * If you are using the JDBC catalog implementation, make sure to include "jdbc-user" and "jdbc-password" as required configurations.
 * If you intend to use the JDBC connector, you need to add the corresponding JDBC driver to the `catalogs/lakehouse-iceberg/libs` directory in the classpath.
 
-### configuration
+### catalog configuration
 
 | Configuration item                | Description                                      | value                                                                                                |
 |-----------------------------------|--------------------------------------------------|------------------------------------------------------------------------------------------------------|
@@ -70,5 +70,79 @@ You can manage and operate on tables using the following URL format:
    ```shell
    http://{GravitinoServerHost}:8090/api/metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/tables
    ```
+
+Example JSON:
+
+```json
+{
+    "name": "test_table",
+    "comment": "my test table",
+    "columns": [
+        {
+            "name": "id",
+            "type": "int",
+            "comment": "id column comment"
+        },
+        {
+            "name": "name",
+            "type": "string",
+            "comment": "name column comment"
+        },
+        {
+            "name": "age",
+            "type": "int",
+            "comment": "age column comment"
+        },
+        {
+            "name": "dt",
+            "type": "date",
+            "comment": "dt column comment"
+        }
+    ],
+    "partitions": [
+        {
+            "strategy": "identity",
+            "fieldName": ["dt"]
+        }
+    ],
+    "sortOrders": [
+        {
+            "expression": {
+                "expressionType": "field",
+                "fieldName": ["age"]
+            },
+            "direction": "asc",
+            "nullOrdering": "first"
+        }
+    ],
+    "properties": {
+        "k1" : "v1"
+    }
+}
+```
+
+* `name`: The name of the Iceberg table to be created.
+* `comment`: Optional, user custom Iceberg table comment.
+* `columns`: The columns of the Iceberg table.
+* `partitions`: Optional, the partitions of the Iceberg table, above example is a partitioned table with `dt` column.
+* `sortOrders`: Optional, equivalent to the `SORTED BY` clause in Iceberg DDL, above example table data is sorted in increasing order of `age` in each bucket.
+* `properties`: The properties of the Iceberg table. More properties information see the following table properties table. Other properties will be passed down to the underlying Iceberg table parameters.
+
+Iceberg doesn't support distribution. if you want bucket use partitions instead.
+
+### table properties
+The following fields are reserved by Gravitino and cannot be passed in properties.
+
+| Configuration item                                                            | Description                                                                                                                                                                                |
+|-------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `comment`                                                                     | The table comment.                                                                                                                                                                         |
+| `creator`                                                                     | The table creator.                                                                                                                                                                         |
+| `location`                                                                    | Iceberg location for table storage.                                                                         |
+| `current-snapshot-id`                                                         | The snapshot representing the current state of the table.                    |
+| `cherry-pick-snapshot-id`                                                     | Selecting a specific snapshots in a merge operation. |
+| `sort-order`                                                                  | Selecting a specific snapshots in a merge operation.         |
+| `identifier-fields`                                                                            | The identifier field(s) for defining the table.                                                                                                                                           |
+
+Regarding Iceberg's properties, you can refer to [official documentation](https://iceberg.apache.org/docs/1.3.1/configuration/).
 
 Now you can use Iceberg as a catalog for managing your data in Gravitino. If you encounter any issues or need further assistance, refer to the Gravitino documentation or seek help from the support team.
