@@ -752,12 +752,11 @@ public class CatalogIcebergIT extends AbstractIT {
     IllegalArgumentException illegalArgumentException =
         Assertions.assertThrows(
             IllegalArgumentException.class,
-            () -> {
-              catalog.asSchemas().createSchema(ident, schema_comment, prop);
-            });
+            () -> catalog.asSchemas().createSchema(ident, schema_comment, prop));
     Assertions.assertTrue(
         illegalArgumentException.getMessage().contains(IcebergSchemaPropertiesMetadata.COMMENT));
     prop.remove(IcebergSchemaPropertiesMetadata.COMMENT);
+    catalog.asSchemas().createSchema(ident, schema_comment, prop);
     Schema loadSchema = catalog.asSchemas().loadSchema(ident);
     prop.forEach((key, value) -> Assertions.assertEquals(loadSchema.properties().get(key), value));
     Assertions.assertTrue(catalog.asSchemas().dropSchema(ident, false));
