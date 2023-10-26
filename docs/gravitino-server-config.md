@@ -51,9 +51,10 @@ The following table lists the configuration items in the `gravitino.conf` file. 
 
 Gravitino server also supports setting up runtime environment variables by editing the `gravitino-env.sh` file, which is located in the `conf` directory.
 
-### Hadoop environment variables
+### How to access Hadoop
 
-Currently, Gravitino server use `gravitino` as default Hadoop username, since Gravitino need to access Hadoop(HDFS, YARN etc.) while
-performing certain operations, please make sure that `gravitino` have the necessary permissions for accessing HDFS or
-you can change the value of `HADOOP_USER_NAME` by editing the `gravitino-env.sh` file before starting the Gravitino
-server.
+Gravitino currently does not have an interface to specify the Hadoop username for accessing Hadoop (HDFS, YARN, etc.).
+By default, it uses the `HADOOP_USER_NAME` from the runtime environment as the Hadoop user. If you encounter
+a `permission denied` issue, you can modify the value of the `HADOOP_USER_NAME` variable in `gravitino-env.sh`, which is
+located in the `conf` directory, before starting the Gravitino service.
+
