@@ -47,3 +47,15 @@ The following table lists the configuration items in the `gravitino.conf` file. 
 |-----------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|---------------|
 | `gravitino.catalog.cache.evictionIntervalMs`  | The interval in milliseconds to evict the catalog cache, default 3600000ms(1h)                                                                                                                          | `3600000`     | 0.1.0         |
 | `gravitino.catalog.classloader.isolated`      | Whether to use an isolated classloader for catalog, if it's true, all catalog-related libraries and configurations will be loaded by an isolated classloader NOT by AppClassLoader. Default value is `true` | `true`        | 0.1.0         |
+
+## How to set up runtime environment variables
+
+Gravitino server also supports setting up runtime environment variables by editing the `gravitino-env.sh` file, which is located in the `conf` directory.
+
+### How to access Hadoop
+
+Currently, due to the absence of a comprehensive user permission system, Gravitino can only use a single username for
+Hadoop access. Please ensure that the user starting the Gravitino server has Hadoop (HDFS, YARN, etc.) access
+permissions; otherwise, you may encounter a `Permission denied` error. There are also several ways to resolve this error:
+* Granting the Gravitino startup user permissions in Hadoop
+* Specify the authorized Hadoop username in the environment variables `HADOOP_USER_NAME` before starting the Gravitino server.
