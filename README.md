@@ -87,3 +87,4 @@ Gravitino provides a Trino connector to access the metadata in Gravitino. To use
 ## License
 
 Gravitino is under the Apache License Version 2.0, See the [LICENSE](LICENSE) for the details.
+
