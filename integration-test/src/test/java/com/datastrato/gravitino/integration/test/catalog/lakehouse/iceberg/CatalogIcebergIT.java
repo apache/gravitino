@@ -743,7 +743,7 @@ public class CatalogIcebergIT extends AbstractIT {
   }
 
   @Test
-  public void testOperatorSchema() {
+  public void testOperatorSchemeProperties() {
     NameIdentifier ident = NameIdentifier.of(metalakeName, catalogName, "testCreatSchemaCheck");
     Map<String, String> prop = Maps.newHashMap();
     prop.put(IcebergSchemaPropertiesMetadata.COMMENT, "val1");
