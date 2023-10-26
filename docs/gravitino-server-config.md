@@ -53,8 +53,9 @@ Gravitino server also supports setting up runtime environment variables by editi
 
 ### How to access Hadoop
 
-Gravitino currently does not have an interface to specify the Hadoop username for accessing Hadoop (HDFS, YARN, etc.).
-By default, it uses the `HADOOP_USER_NAME` from the runtime environment as the Hadoop user. If you encounter
-a `permission denied` issue, you can modify the value of the `HADOOP_USER_NAME` variable in `gravitino-env.sh`, which is
-located in the `conf` directory, before starting the Gravitino service.
+Currently, due to the absence of a comprehensive user permission system, Gravitino can only use a single username for
+Hadoop access. Please ensure that the user starting the Gravitino server has Hadoop (HDFS, YARN, etc.) access
+permissions; otherwise, you may encounter a `Permission denied` error. To temporarily solve this error, you can also
+specify the value of the environment variable `HADOOP_USER_NAME` to be a username with access to Hadoop before starting
+the service.
 
