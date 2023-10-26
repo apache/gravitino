@@ -105,16 +105,6 @@ Example JSON:
             "fieldName": ["dt"]
         }
     ],
-    "distribution": {
-        "strategy": "hash",
-        "number": 32,
-        "expressions": [
-            {
-                "expressionType": "field",
-                "fieldName": ["id"]
-            }
-        ]
-    },
     "sortOrders": [
         {
             "expression": {
