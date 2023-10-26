@@ -51,7 +51,7 @@ http://{GravitinoServerHost}:8090/api/metalakes/{Your_metalake_name}/catalogs
 * If you are using the JDBC catalog implementation, make sure to include "jdbc-user" and "jdbc-password" as required configurations.
 * If you intend to use the JDBC connector, you need to add the corresponding JDBC driver to the `catalogs/lakehouse-iceberg/libs` directory in the classpath.
 
-### configuration
+### catalog configuration
 
 | Configuration item                | Description                                      | value                                                                                                |
 |-----------------------------------|--------------------------------------------------|------------------------------------------------------------------------------------------------------|
@@ -70,5 +70,73 @@ You can manage and operate on tables using the following URL format:
    ```shell
    http://{GravitinoServerHost}:8090/api/metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/tables
    ```
+
+Example JSON:
+
+```json
+{
+    "name": "test_table",
+    "comment": "my test table",
+    "columns": [
+        {
+            "name": "id",
+            "type": "int",
+            "comment": "id column comment"
+        },
+        {
+            "name": "name",
+            "type": "string",
+            "comment": "name column comment"
+        },
+        {
+            "name": "age",
+            "type": "int",
+            "comment": "age column comment"
+        },
+        {
+            "name": "dt",
+            "type": "date",
+            "comment": "dt column comment"
+        }
+    ],
+    "partitions": [
+        {
+            "strategy": "identity",
+            "fieldName": ["dt"]
+        }
+    ],
+    "distribution": {
+        "strategy": "hash",
+        "number": 32,
+        "expressions": [
+            {
+                "expressionType": "field",
+                "fieldName": ["id"]
+            }
+        ]
+    },
+    "sortOrders": [
+        {
+            "expression": {
+                "expressionType": "field",
+                "fieldName": ["age"]
+            },
+            "direction": "asc",
+            "nullOrdering": "first"
+        }
+    ],
+    "properties": {
+        "format": "ORC"
+    }
+}
+```
+
+* `name`: The name of the Iceberg table to be created.
+* `comment`: Optional, user custom Iceberg table comment.
+* `columns`: The columns of the Iceberg table.
+* `partitions`: Optional, the partitions of the Iceberg table, above example is a partitioned table with `dt` column.
+* `distribution`: Optional, equivalent to the `CLUSTERED BY` clause in Iceberg DDL, above example table is bucketed(cluster by) `id` column.
+* `sortOrders`: Optional, equivalent to the `SORTED BY` clause in Iceberg DDL, above example table data is sorted in increasing order of `age` in each bucket.
+* `properties`: The properties of the Iceberg table. More properties information see the following table properties table. Other properties will be passed down to the underlying Iceberg table parameters.
 
 Now you can use Iceberg as a catalog for managing your data in Gravitino. If you encounter any issues or need further assistance, refer to the Gravitino documentation or seek help from the support team.
