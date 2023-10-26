@@ -252,19 +252,10 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
         }
       }
 
-      // Determine whether to change comment.
-      String comment;
-      if (removals.contains(IcebergSchemaPropertiesMetadata.COMMENT)) {
-        comment = null;
-      } else if (updates.containsKey(IcebergSchemaPropertiesMetadata.COMMENT)) {
-        comment = updates.get(IcebergSchemaPropertiesMetadata.COMMENT);
-      } else {
-        // Synchronize changes to underlying iceberg sources
-        comment =
-            Optional.of(response.properties())
-                .map(map -> map.get(IcebergSchemaPropertiesMetadata.COMMENT))
-                .orElse(null);
-      }
+      String comment =
+          Optional.of(response.properties())
+              .map(map -> map.get(IcebergSchemaPropertiesMetadata.COMMENT))
+              .orElse(null);
       IcebergSchema icebergSchema =
           new IcebergSchema.Builder()
               .withName(ident.name())

@@ -13,6 +13,7 @@ import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergConfig;
+import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergSchemaPropertiesMetadata;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergTable;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.ops.IcebergTableOpsHelper;
 import com.datastrato.gravitino.client.GravitinoMetaLake;
@@ -739,5 +740,28 @@ public class CatalogIcebergIT extends AbstractIT {
           String.format("[%s,%s,data%s]", i + 2, previousDay.format(formatter), i + 2),
           result[i].toString());
     }
+  }
+
+  @Test
+  public void testOperatorSchema() {
+    NameIdentifier ident = NameIdentifier.of(metalakeName, catalogName, "testCreatSchemaCheck");
+    Map<String, String> prop = Maps.newHashMap();
+    prop.put(IcebergSchemaPropertiesMetadata.COMMENT, "val1");
+    prop.put("key2", "val2");
+
+    IllegalArgumentException illegalArgumentException =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> {
+              catalog.asSchemas().createSchema(ident, schema_comment, prop);
+            });
+    Assertions.assertTrue(
+        illegalArgumentException.getMessage().contains(IcebergSchemaPropertiesMetadata.COMMENT));
+    prop.remove(IcebergSchemaPropertiesMetadata.COMMENT);
+    Schema loadSchema = catalog.asSchemas().loadSchema(ident);
+    prop.forEach((key, value) -> Assertions.assertEquals(loadSchema.properties().get(key), value));
+    Assertions.assertTrue(catalog.asSchemas().dropSchema(ident, false));
+    Assertions.assertThrows(
+        NoSuchSchemaException.class, () -> catalog.asSchemas().loadSchema(ident));
   }
 }
