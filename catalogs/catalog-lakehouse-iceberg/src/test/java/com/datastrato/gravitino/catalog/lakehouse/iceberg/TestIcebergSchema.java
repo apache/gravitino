@@ -124,6 +124,38 @@ public class TestIcebergSchema {
         exception.getMessage().contains("Iceberg does not support cascading delete operations"));
   }
 
+  @Test
+  void testSchemaProperty() {
+    AuditInfo auditInfo =
+        new AuditInfo.Builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+    CatalogEntity entity =
+        new CatalogEntity.Builder()
+            .withId(1L)
+            .withName("catalog")
+            .withNamespace(Namespace.of("metalake"))
+            .withType(IcebergCatalog.Type.RELATIONAL)
+            .withProvider("iceberg")
+            .withAuditInfo(auditInfo)
+            .build();
+
+    Map<String, String> conf = Maps.newHashMap();
+
+    try (IcebergCatalogOperations ops = new IcebergCatalogOperations(entity)) {
+      ops.initialize(conf);
+      IllegalArgumentException illegalArgumentException =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () -> {
+                Map<String, String> map = Maps.newHashMap();
+                map.put(IcebergSchemaPropertiesMetadata.COMMENT, "test");
+                ops.schemaPropertiesMetadata().validatePropertyForCreate(map);
+              });
+      Assertions.assertTrue(
+          illegalArgumentException.getMessage().contains(IcebergSchemaPropertiesMetadata.COMMENT));
+    }
+  }
+
   private IcebergCatalog initIcebergCatalog(String name) {
     CatalogEntity entity =
         new CatalogEntity.Builder()

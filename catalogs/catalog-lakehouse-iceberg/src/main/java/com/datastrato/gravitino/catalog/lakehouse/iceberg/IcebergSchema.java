@@ -16,8 +16,6 @@ import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
 @ToString
 public class IcebergSchema extends BaseSchema {
 
-  public static final String ICEBERG_COMMENT_FIELD_NAME = "comment";
-
   private IcebergSchema() {}
 
   public CreateNamespaceRequest toCreateRequest(Namespace namespace) {
@@ -26,7 +24,7 @@ public class IcebergSchema extends BaseSchema {
       meta.putAll(properties);
     }
     if (null != comment) {
-      meta.put(ICEBERG_COMMENT_FIELD_NAME, comment);
+      meta.put(IcebergSchemaPropertiesMetadata.COMMENT, comment);
     }
     return CreateNamespaceRequest.builder().setProperties(meta).withNamespace(namespace).build();
   }
@@ -40,7 +38,9 @@ public class IcebergSchema extends BaseSchema {
       icebergSchema.name = name;
       icebergSchema.comment =
           null == comment
-              ? (null == properties ? null : properties.get(ICEBERG_COMMENT_FIELD_NAME))
+              ? (null == properties
+                  ? null
+                  : properties.get(IcebergSchemaPropertiesMetadata.COMMENT))
               : comment;
       icebergSchema.properties = properties;
       icebergSchema.auditInfo = auditInfo;
