@@ -744,7 +744,7 @@ public class CatalogIcebergIT extends AbstractIT {
 
   @Test
   public void testOperatorSchemeProperties() {
-    NameIdentifier ident = NameIdentifier.of(metalakeName, catalogName, "testCreatSchemaCheck");
+    NameIdentifier ident = NameIdentifier.of(metalakeName, catalogName, "testCreateSchemaCheck");
     Map<String, String> prop = Maps.newHashMap();
     prop.put(IcebergSchemaPropertiesMetadata.COMMENT, "val1");
     prop.put("key2", "val2");
@@ -763,7 +763,7 @@ public class CatalogIcebergIT extends AbstractIT {
         loadSchema.properties().containsKey(IcebergSchemaPropertiesMetadata.COMMENT));
     prop.forEach((key, value) -> Assertions.assertEquals(loadSchema.properties().get(key), value));
 
-    // alert
+    // alter
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () -> catalog.asSchemas().alterSchema(ident, SchemaChange.setProperty("comment", "v1")));
