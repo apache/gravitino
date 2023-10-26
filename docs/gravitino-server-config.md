@@ -21,6 +21,7 @@ The following table lists the configuration items in the `gravitino.conf` file. 
 ### Server configuration
 
 | Configuration item                                   | Description                                                                                                                                           | Default value | Since version |
+|------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|---------------|
 | `gravitino.server.webserver.host`                    | The host of Gravitino server.                                                                                                                         | `0.0.0.0`   | 0.1.0         |
 | `gravitino.server.webserver.httpPort`                | The port on which the Gravitino server listens for incoming connections.                                                                              | `8090`        | 0.1.0         |
 | `gravitino.server.webserver.minThreads`              | The number of min threads in the thread pool which is used by Jetty webserver. `minThreads` will be adjusted to 8 if the value is less than 8.         | `Math.max(Math.min(Runtime.getRuntime().availableProcessors() * 2, 100), 8)`          | 0.2.0         |
