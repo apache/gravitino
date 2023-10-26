@@ -95,7 +95,7 @@ Before running the tests, make sure Docker is installed.
 Additionally, the Gravitino Server and third-party data source Docker runtime environments will use certain ports. Ensure that these ports are not already in use:
 
 - Gravitino Server: Port `8090`
-- Hive Docker runtime environment: Ports are `22`, `7180`, `8088`, `8888`, `9000`, `9083`, `10000`, `10002`, `50070`, and `50075`
+- Hive Docker runtime environment: Ports are `22`, `7180`, `8088`, `8888`, `9000`, `9083`, `10000`, `10002`, `50010`, `50070`, and `50075`
 
 ## Debugging Gravitino Server and Integration Tests
 
@@ -118,7 +118,7 @@ To debug the Gravitino Server and integration tests, you have two modes: `embedd
         - If you only debug integration test codes, You don't have to do any setup to debug directly
         - If you need to debug Gravitino server codes, follow these steps:
             - Enable the `GRAVITINO_DEBUG_OPTS` environment variable in the `distribution/package/conf/gravitino-env.sh` file to enable remote JVM debugging
-            - Manually start the Gravitino Server using the `./distribution/package/bin/gravitino-server.sh start` command
+            - Manually start the Gravitino Server using the `./distribution/package/bin/gravitino.sh start` command
             - Select `gravitino.server.main` module classpath in the `Remote JVM Debug` to attach the Gravitino Server process and debug it
 
 ## Running on GitHub Actions
