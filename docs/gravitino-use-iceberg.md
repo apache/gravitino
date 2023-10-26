@@ -116,7 +116,7 @@ Example JSON:
         }
     ],
     "properties": {
-        "comment" : "my test table"
+        "k1" : "v1"
     }
 }
 ```
