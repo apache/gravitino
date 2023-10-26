@@ -116,7 +116,7 @@ Example JSON:
         }
     ],
     "properties": {
-        "format": "ORC"
+        "comment" : "my test table"
     }
 }
 ```
@@ -125,8 +125,13 @@ Example JSON:
 * `comment`: Optional, user custom Iceberg table comment.
 * `columns`: The columns of the Iceberg table.
 * `partitions`: Optional, the partitions of the Iceberg table, above example is a partitioned table with `dt` column.
-* `distribution`: Optional, equivalent to the `CLUSTERED BY` clause in Iceberg DDL, above example table is bucketed(cluster by) `id` column.
 * `sortOrders`: Optional, equivalent to the `SORTED BY` clause in Iceberg DDL, above example table data is sorted in increasing order of `age` in each bucket.
 * `properties`: The properties of the Iceberg table. More properties information see the following table properties table. Other properties will be passed down to the underlying Iceberg table parameters.
+
+Iceberg doesn't support distribution. if you want bucket use partitions instead.
+
+### table properties
+
+Regarding Iceberg's properties, you can refer to [official documentation](https://iceberg.apache.org/docs/1.3.1/configuration/).
 
 Now you can use Iceberg as a catalog for managing your data in Gravitino. If you encounter any issues or need further assistance, refer to the Gravitino documentation or seek help from the support team.
