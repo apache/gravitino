@@ -205,7 +205,7 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
                   Optional.of(response)
                       .map(GetNamespaceResponse::properties)
                       .map(map -> map.get(IcebergSchemaPropertiesMetadata.COMMENT))
-                      .orElse(""))
+                      .orElse(null))
               .withProperties(response.properties())
               .withAuditInfo(AuditInfo.EMPTY)
               .build();
