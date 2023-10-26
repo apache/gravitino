@@ -749,6 +749,7 @@ public class CatalogIcebergIT extends AbstractIT {
     prop.put(IcebergSchemaPropertiesMetadata.COMMENT, "val1");
     prop.put("key2", "val2");
 
+    // create
     IllegalArgumentException illegalArgumentException =
         Assertions.assertThrows(
             IllegalArgumentException.class,
@@ -759,6 +760,13 @@ public class CatalogIcebergIT extends AbstractIT {
     catalog.asSchemas().createSchema(ident, schema_comment, prop);
     Schema loadSchema = catalog.asSchemas().loadSchema(ident);
     prop.forEach((key, value) -> Assertions.assertEquals(loadSchema.properties().get(key), value));
+
+    // alert
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> catalog.asSchemas().alterSchema(ident, SchemaChange.setProperty("comment", "v1")));
+
+    // drop
     Assertions.assertTrue(catalog.asSchemas().dropSchema(ident, false));
     Assertions.assertThrows(
         NoSuchSchemaException.class, () -> catalog.asSchemas().loadSchema(ident));
