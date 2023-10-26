@@ -131,6 +131,17 @@ Example JSON:
 Iceberg doesn't support distribution. if you want bucket use partitions instead.
 
 ### table properties
+The following fields are reserved by Gravitino and cannot be passed in properties.
+
+| Configuration item                                                            | Description                                                                                                                                                                                |
+|-------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `comment`                                                                     | The table comment.                                                                                                                                                                         |
+| `creator`                                                                     | The table creator.                                                                                                                                                                         |
+| `location`                                                                    | Iceberg location for table storage.                                                                         |
+| `current-snapshot-id`                                                         | The snapshot representing the current state of the table.                    |
+| `cherry-pick-snapshot-id`                                                     | Selecting a specific snapshots in a merge operation. |
+| `sort-order`                                                                  | Selecting a specific snapshots in a merge operation.         |
+| `identifier-fields`                                                                            | The identifier field(s) for defining the table.                                                                                                                                           |
 
 Regarding Iceberg's properties, you can refer to [official documentation](https://iceberg.apache.org/docs/1.3.1/configuration/).
 
