@@ -40,19 +40,6 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 public class TestKvEntityStorage {
-  //  public static final String ROCKS_DB_STORE_PATH =
-  //      "/tmp/gravitino_test_entityStore_" + UUID.randomUUID().toString().replace("-", "");
-  //
-  //  @BeforeEach
-  //  @AfterEach
-  //  public void cleanEnv() {
-  //    try {
-  //      FileUtils.deleteDirectory(FileUtils.getFile(ROCKS_DB_STORE_PATH));
-  //    } catch (Exception e) {
-  //      // Ignore
-  //    }
-  //  }
-
   public BaseMetalake createBaseMakeLake(String name, AuditInfo auditInfo) {
     return new BaseMetalake.Builder()
         .withId(1L)
