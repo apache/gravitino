@@ -5,6 +5,7 @@
 package com.datastrato.gravitino;
 
 import com.datastrato.gravitino.exceptions.IllegalNameIdentifierException;
+import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
 import com.google.common.collect.Iterables;
 import java.util.Arrays;
@@ -134,6 +135,11 @@ public class NameIdentifier {
   public static void checkTable(NameIdentifier ident) {
     check(ident != null, "Table identifier must not be null");
     Namespace.checkTable(ident.namespace);
+  }
+
+  public NameIdentifier parent() {
+    Preconditions.checkArgument(namespace.levels().length > 0, "No parent for root namespace");
+    return NameIdentifier.of(namespace.levels());
   }
 
   /**

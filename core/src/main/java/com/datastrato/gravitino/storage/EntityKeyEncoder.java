@@ -9,7 +9,7 @@ import com.datastrato.gravitino.Entity.EntityType;
 import com.datastrato.gravitino.NameIdentifier;
 import java.io.IOException;
 
-/** Interface for encoding entity to storage it in underlying storage. E.g., RocksDB. */
+/** Interface for encoding entity to storage it in underlying storage. */
 public interface EntityKeyEncoder<T> {
   /**
    * Construct the key for key-value store from the entity NameIdentifier and EntityType.

@@ -35,25 +35,23 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import org.apache.commons.io.FileUtils;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 public class TestKvEntityStorage {
-  public static final String ROCKS_DB_STORE_PATH =
-      "/tmp/gravitino_test_entityStore_" + UUID.randomUUID().toString().replace("-", "");
-
-  @BeforeEach
-  @AfterEach
-  public void cleanEnv() {
-    try {
-      FileUtils.deleteDirectory(FileUtils.getFile(ROCKS_DB_STORE_PATH));
-    } catch (Exception e) {
-      // Ignore
-    }
-  }
+  //  public static final String ROCKS_DB_STORE_PATH =
+  //      "/tmp/gravitino_test_entityStore_" + UUID.randomUUID().toString().replace("-", "");
+  //
+  //  @BeforeEach
+  //  @AfterEach
+  //  public void cleanEnv() {
+  //    try {
+  //      FileUtils.deleteDirectory(FileUtils.getFile(ROCKS_DB_STORE_PATH));
+  //    } catch (Exception e) {
+  //      // Ignore
+  //    }
+  //  }
 
   public BaseMetalake createBaseMakeLake(String name, AuditInfo auditInfo) {
     return new BaseMetalake.Builder()
@@ -95,13 +93,14 @@ public class TestKvEntityStorage {
 
   @Test
   void testRestart() throws IOException {
+    String tmpDir = "/tmp/" + UUID.randomUUID().toString();
     Config config = Mockito.mock(Config.class);
     Mockito.when(config.get(ENTITY_STORE)).thenReturn("kv");
     Mockito.when(config.get(ENTITY_KV_STORE)).thenReturn(DEFAULT_ENTITY_KV_STORE);
     Mockito.when(config.get(Configs.ENTITY_SERDE)).thenReturn("proto");
-    Mockito.when(config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)).thenReturn(ROCKS_DB_STORE_PATH);
+    Mockito.when(config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)).thenReturn(tmpDir);
 
-    Assertions.assertEquals(ROCKS_DB_STORE_PATH, config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH));
+    Assertions.assertEquals(tmpDir, config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH));
     AuditInfo auditInfo =
         new AuditInfo.Builder().withCreator("creator").withCreateTime(Instant.now()).build();
 
@@ -174,18 +173,22 @@ public class TestKvEntityStorage {
                   NameIdentifier.of("metalake", "catalog", "schema1", "table1"),
                   EntityType.TABLE,
                   TableEntity.class));
+    } finally {
+      FileUtils.deleteDirectory(FileUtils.getFile(tmpDir));
     }
   }
 
   @Test
   void testEntityUpdate() throws Exception {
+    String tmpDir = "/tmp/" + UUID.randomUUID().toString();
+
     Config config = Mockito.mock(Config.class);
     Mockito.when(config.get(ENTITY_STORE)).thenReturn("kv");
     Mockito.when(config.get(ENTITY_KV_STORE)).thenReturn(DEFAULT_ENTITY_KV_STORE);
     Mockito.when(config.get(Configs.ENTITY_SERDE)).thenReturn("proto");
-    Mockito.when(config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)).thenReturn(ROCKS_DB_STORE_PATH);
+    Mockito.when(config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)).thenReturn(tmpDir);
 
-    Assertions.assertEquals(ROCKS_DB_STORE_PATH, config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH));
+    Assertions.assertEquals(tmpDir, config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH));
     AuditInfo auditInfo =
         new AuditInfo.Builder().withCreator("creator").withCreateTime(Instant.now()).build();
 
@@ -454,18 +457,19 @@ public class TestKvEntityStorage {
                   SchemaEntity.class)
               .auditInfo()
               .creator());
+    } finally {
+      FileUtils.deleteDirectory(FileUtils.getFile(tmpDir));
     }
   }
 
   @Test
   void testEntityDelete() throws IOException {
-    // TODO
+    String tmpDir = "/tmp/" + UUID.randomUUID().toString();
     Config config = Mockito.mock(Config.class);
     Mockito.when(config.get(ENTITY_STORE)).thenReturn("kv");
     Mockito.when(config.get(ENTITY_KV_STORE)).thenReturn(DEFAULT_ENTITY_KV_STORE);
     Mockito.when(config.get(Configs.ENTITY_SERDE)).thenReturn("proto");
-    Mockito.when(config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)).thenReturn("/tmp/gravitino");
-    FileUtils.deleteDirectory(FileUtils.getFile("/tmp/gravitino"));
+    Mockito.when(config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)).thenReturn(tmpDir);
 
     AuditInfo auditInfo =
         new AuditInfo.Builder().withCreator("creator").withCreateTime(Instant.now()).build();
@@ -617,17 +621,20 @@ public class TestKvEntityStorage {
       Assertions.assertFalse(store.delete(catalog.nameIdentifier(), EntityType.CATALOG));
       Assertions.assertFalse(store.delete(schema2.nameIdentifier(), EntityType.SCHEMA));
       Assertions.assertFalse(store.delete(metalake.nameIdentifier(), EntityType.METALAKE));
+    } finally {
+      FileUtils.deleteDirectory(FileUtils.getFile(tmpDir));
     }
   }
 
   @Test
   void testCreateKvEntityStore() throws IOException {
+    String tmpDir = "/tmp/" + UUID.randomUUID().toString();
+
     Config config = Mockito.mock(Config.class);
     Mockito.when(config.get(ENTITY_STORE)).thenReturn("kv");
     Mockito.when(config.get(ENTITY_KV_STORE)).thenReturn(DEFAULT_ENTITY_KV_STORE);
     Mockito.when(config.get(Configs.ENTITY_SERDE)).thenReturn("proto");
-    Mockito.when(config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)).thenReturn("/tmp/gravitino");
-    FileUtils.deleteDirectory(FileUtils.getFile("/tmp/gravitino"));
+    Mockito.when(config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)).thenReturn(tmpDir);
 
     try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
       store.initialize(config);
@@ -734,6 +741,110 @@ public class TestKvEntityStorage {
       // 'updatedMetalake2' is a new name, which will trigger id allocation
       BaseMetalake updatedMetalake2 = createBaseMakeLake("updatedMetalake2", auditInfo);
       store.put(updatedMetalake2);
+    } finally {
+      FileUtils.deleteDirectory(FileUtils.getFile(tmpDir));
+    }
+  }
+
+  @Test
+  void testDeleteMark() throws IOException {
+    String tmpDir = "/tmp/" + UUID.randomUUID().toString();
+    Config config = Mockito.mock(Config.class);
+    Mockito.when(config.get(ENTITY_STORE)).thenReturn("kv");
+    Mockito.when(config.get(ENTITY_KV_STORE)).thenReturn(DEFAULT_ENTITY_KV_STORE);
+    Mockito.when(config.get(Configs.ENTITY_SERDE)).thenReturn("proto");
+    Mockito.when(config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)).thenReturn(tmpDir);
+
+    AuditInfo auditInfo =
+        new AuditInfo.Builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+    try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
+      store.initialize(config);
+      Assertions.assertTrue(store instanceof KvEntityStore);
+      store.setSerDe(EntitySerDeFactory.createEntitySerDe(config.get(Configs.ENTITY_SERDE)));
+
+      BaseMetalake metalake = createBaseMakeLake("metalake", auditInfo);
+      CatalogEntity catalog = createCatalog(Namespace.of("metalake"), "catalog", auditInfo);
+      CatalogEntity catalogCopy = createCatalog(Namespace.of("metalake"), "catalogCopy", auditInfo);
+
+      SchemaEntity schema1 =
+          createSchemaEntity(Namespace.of("metalake", "catalog"), "schema1", auditInfo);
+      TableEntity table1 =
+          createTableEntity(Namespace.of("metalake", "catalog", "schema1"), "table1", auditInfo);
+
+      SchemaEntity schema2 =
+          createSchemaEntity(Namespace.of("metalake", "catalog"), "schema2", auditInfo);
+      TableEntity table1InSchema2 =
+          createTableEntity(Namespace.of("metalake", "catalog", "schema2"), "table1", auditInfo);
+
+      // Store all entities
+      store.put(metalake);
+      store.put(catalog);
+      store.put(catalogCopy);
+      store.put(schema1);
+      store.put(schema2);
+      store.put(table1);
+      store.put(table1InSchema2);
+
+      store.delete(schema1.nameIdentifier(), EntityType.SCHEMA, true);
+      Assertions.assertFalse(store.exists(schema1.nameIdentifier(), EntityType.SCHEMA));
+      Assertions.assertFalse(store.exists(table1.nameIdentifier(), EntityType.TABLE));
+
+      // Try to insert with the same name, should be OK
+      store.put(schema1);
+      store.put(table1);
+      Assertions.assertTrue(store.exists(schema1.nameIdentifier(), EntityType.SCHEMA));
+      Assertions.assertTrue(store.exists(table1.nameIdentifier(), EntityType.TABLE));
+
+      store.delete(catalog.nameIdentifier(), EntityType.CATALOG, true);
+      store.delete(catalogCopy.nameIdentifier(), EntityType.CATALOG, true);
+      Assertions.assertFalse(store.exists(catalog.nameIdentifier(), EntityType.CATALOG));
+      Assertions.assertFalse(store.exists(catalogCopy.nameIdentifier(), EntityType.CATALOG));
+      Assertions.assertFalse(store.exists(schema1.nameIdentifier(), EntityType.SCHEMA));
+      Assertions.assertFalse(store.exists(table1.nameIdentifier(), EntityType.TABLE));
+      Assertions.assertFalse(store.exists(schema2.nameIdentifier(), EntityType.SCHEMA));
+      Assertions.assertFalse(store.exists(table1InSchema2.nameIdentifier(), EntityType.TABLE));
+
+      // Try to insert with the same name, should be OK
+      store.put(catalog);
+      store.put(schema1);
+      store.put(table1);
+      store.put(catalogCopy);
+      store.put(schema2);
+      store.put(table1InSchema2);
+      Assertions.assertTrue(store.exists(catalog.nameIdentifier(), EntityType.CATALOG));
+      Assertions.assertTrue(store.exists(catalogCopy.nameIdentifier(), EntityType.CATALOG));
+      Assertions.assertTrue(store.exists(schema1.nameIdentifier(), EntityType.SCHEMA));
+      Assertions.assertTrue(store.exists(table1.nameIdentifier(), EntityType.TABLE));
+      Assertions.assertTrue(store.exists(schema2.nameIdentifier(), EntityType.SCHEMA));
+      Assertions.assertTrue(store.exists(table1InSchema2.nameIdentifier(), EntityType.TABLE));
+
+      // Delete metalake and everything should be deleted
+      store.delete(metalake.nameIdentifier(), EntityType.METALAKE, true);
+      Assertions.assertFalse(store.exists(metalake.nameIdentifier(), EntityType.METALAKE));
+      Assertions.assertFalse(store.exists(catalog.nameIdentifier(), EntityType.CATALOG));
+      Assertions.assertFalse(store.exists(schema1.nameIdentifier(), EntityType.SCHEMA));
+      Assertions.assertFalse(store.exists(table1.nameIdentifier(), EntityType.TABLE));
+      Assertions.assertFalse(store.exists(schema2.nameIdentifier(), EntityType.SCHEMA));
+      Assertions.assertFalse(store.exists(table1InSchema2.nameIdentifier(), EntityType.TABLE));
+
+      // Try to insert with the same name, should be OK
+      store.put(metalake);
+      store.put(catalog);
+      store.put(catalogCopy);
+      store.put(schema1);
+      store.put(schema2);
+      store.put(table1);
+      store.put(table1InSchema2);
+      Assertions.assertTrue(store.exists(metalake.nameIdentifier(), EntityType.METALAKE));
+      Assertions.assertTrue(store.exists(metalake.nameIdentifier(), EntityType.METALAKE));
+      Assertions.assertTrue(store.exists(catalog.nameIdentifier(), EntityType.CATALOG));
+      Assertions.assertTrue(store.exists(schema1.nameIdentifier(), EntityType.SCHEMA));
+      Assertions.assertTrue(store.exists(table1.nameIdentifier(), EntityType.TABLE));
+      Assertions.assertTrue(store.exists(schema2.nameIdentifier(), EntityType.SCHEMA));
+      Assertions.assertTrue(store.exists(table1InSchema2.nameIdentifier(), EntityType.TABLE));
+    } finally {
+      FileUtils.deleteDirectory(FileUtils.getFile(tmpDir));
     }
   }
 }

@@ -20,6 +20,7 @@ dependencies {
   }
   implementation(libs.guava)
   implementation(libs.slf4j.api)
+  implementation(libs.commons.lang3)
 
   compileOnly(libs.lombok)
   annotationProcessor(libs.lombok)

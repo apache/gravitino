@@ -11,7 +11,6 @@ import static com.datastrato.gravitino.Entity.EntityType.TABLE;
 
 import com.datastrato.gravitino.Entity.EntityType;
 import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.storage.EntityKeyEncoder;
 import com.datastrato.gravitino.storage.NameMappingService;
 import com.datastrato.gravitino.utils.ByteUtils;
 import com.datastrato.gravitino.utils.Bytes;
@@ -19,8 +18,11 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.ArrayUtils;
@@ -49,7 +51,7 @@ import org.slf4j.LoggerFactory;
  * to_{ml_id}_{ca_id}_{br_id}_{to_id}       -----    topic_info
  * </pre>
  */
-public class BinaryEntityKeyEncoder implements EntityKeyEncoder<byte[]> {
+public class BinaryEntityKeyEncoder implements KvEntityKeyEncoder {
   public static final Logger LOG = LoggerFactory.getLogger(BinaryEntityKeyEncoder.class);
 
   public static final String NAMESPACE_SEPARATOR = "/";
@@ -114,14 +116,13 @@ public class BinaryEntityKeyEncoder implements EntityKeyEncoder<byte[]> {
     }
 
     // This is for point query and need to use specific name
-    long[] namespaceAndNameIds = new long[namespaceIds.length + 1];
-    System.arraycopy(namespaceIds, 0, namespaceAndNameIds, 0, namespaceIds.length);
     String nameKey = generateMappingKey(namespaceIds, identifier.name());
     if (nullIfMissing && null == nameMappingService.getIdByName(nameKey)) {
       return null;
     }
 
-    namespaceAndNameIds[namespaceIds.length] = nameMappingService.getOrCreateIdFromName(nameKey);
+    long[] namespaceAndNameIds =
+        ArrayUtils.add(namespaceIds, nameMappingService.getOrCreateIdFromName(nameKey));
 
     String[] nameIdentifierTemplate = ENTITY_TYPE_TO_NAME_IDENTIFIER.get(entityType);
     if (nameIdentifierTemplate == null) {
@@ -186,5 +187,85 @@ public class BinaryEntityKeyEncoder implements EntityKeyEncoder<byte[]> {
   public byte[] encode(NameIdentifier ident, EntityType type, boolean nullIfMissing)
       throws IOException {
     return encodeEntity(ident, type, nullIfMissing);
+  }
+
+  @Override
+  public List<byte[]> getParentPrefix(NameIdentifier ident, EntityType entityType)
+      throws IOException {
+    List<byte[]> prefixs = Lists.newArrayList();
+    byte[] encode = encode(ident, entityType, true);
+    if (encode == null) {
+      return prefixs;
+    }
+
+    switch (entityType) {
+      case TABLE:
+        prefixs.add(encode(ident.parent(), SCHEMA));
+        prefixs.add(encode(ident.parent().parent(), CATALOG));
+        prefixs.add(encode(ident.parent().parent().parent(), METALAKE));
+        break;
+      case SCHEMA:
+        prefixs.add(encode(ident.parent(), CATALOG));
+        prefixs.add(encode(ident.parent().parent(), METALAKE));
+        break;
+      case CATALOG:
+        prefixs.add(encode(ident.parent(), METALAKE));
+        break;
+      case METALAKE:
+        break;
+      default:
+        LOG.warn("Currently unknown type: {}, please check it", entityType);
+    }
+
+    return prefixs;
+  }
+
+  /**
+   * Get key prefix of all sub-entities under a specific entities. For example, as a metalake will
+   * start with `ml_{metalake_id}`, sub-entities under this metalake will have the prefix
+   *
+   * <pre>
+   *   catalog: ca_{metalake_id}
+   *   schema:  sc_{metalake_id}
+   *   table:   ta_{metalake_id}
+   * </pre>
+   *
+   * Why the sub-entities under this metalake start with those prefixes, please see {@link
+   * KvEntityStore} java class doc.
+   *
+   * @param ident identifier of an entity
+   * @param entityType type of entity
+   * @return list of sub-entities prefix
+   * @throws IOException if error occurs
+   */
+  @Override
+  public List<byte[]> getChildrenPrefix(NameIdentifier ident, EntityType entityType)
+      throws IOException {
+    List<byte[]> prefixs = Lists.newArrayList();
+    byte[] encode = encode(ident, entityType, false);
+    switch (entityType) {
+      case METALAKE:
+        prefixs.add(replacePrefixTypeInfo(encode, CATALOG.getShortName()));
+      case CATALOG:
+        prefixs.add(replacePrefixTypeInfo(encode, SCHEMA.getShortName()));
+      case SCHEMA:
+        prefixs.add(replacePrefixTypeInfo(encode, TABLE.getShortName()));
+      case TABLE:
+        break;
+      default:
+        LOG.warn("Currently unknown type: {}, please check it", entityType);
+    }
+    Collections.reverse(prefixs);
+    return prefixs;
+  }
+
+  private byte[] replacePrefixTypeInfo(byte[] encode, String subTypePrefix) {
+    byte[] result = new byte[encode.length];
+    System.arraycopy(encode, 0, result, 0, encode.length);
+    byte[] bytes = subTypePrefix.getBytes();
+    result[0] = bytes[0];
+    result[1] = bytes[1];
+
+    return result;
   }
 }

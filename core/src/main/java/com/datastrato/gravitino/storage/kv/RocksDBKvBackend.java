@@ -161,6 +161,11 @@ public class RocksDBKvBackend implements KvBackend {
         break;
       }
 
+      if (!scanRange.getPredicate().test(key)) {
+        rocksIterator.next();
+        continue;
+      }
+
       if (Bytes.wrap(key).compareTo(scanRange.getStart()) == 0) {
         if (scanRange.isStartInclusive()) {
           result.add(Pair.of(key, rocksIterator.value()));
