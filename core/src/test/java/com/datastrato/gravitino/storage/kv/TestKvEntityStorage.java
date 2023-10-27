@@ -82,21 +82,10 @@ public class TestKvEntityStorage {
   @Test
   void testRestart() throws IOException {
     String tmpDir = "/tmp/" + UUID.randomUUID().toString();
-    Config config = Mockito.mock(Config.class);
-    Mockito.when(config.get(ENTITY_STORE)).thenReturn("kv");
-    Mockito.when(config.get(ENTITY_KV_STORE)).thenReturn(DEFAULT_ENTITY_KV_STORE);
-    Mockito.when(config.get(Configs.ENTITY_SERDE)).thenReturn("proto");
-    Mockito.when(config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)).thenReturn(tmpDir);
-
-    Assertions.assertEquals(tmpDir, config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH));
     AuditInfo auditInfo =
         new AuditInfo.Builder().withCreator("creator").withCreateTime(Instant.now()).build();
 
-    try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
-      store.initialize(config);
-      Assertions.assertTrue(store instanceof KvEntityStore);
-      store.setSerDe(EntitySerDeFactory.createEntitySerDe(config.get(Configs.ENTITY_SERDE)));
-
+    try (EntityStore store = getEntityStore(tmpDir)) {
       BaseMetalake metalake = createBaseMakeLake("metalake", auditInfo);
       CatalogEntity catalog = createCatalog(Namespace.of("metalake"), "catalog", auditInfo);
       CatalogEntity catalogCopy = createCatalog(Namespace.of("metalake"), "catalogCopy", auditInfo);
@@ -136,11 +125,7 @@ public class TestKvEntityStorage {
     }
 
     // It will automatically close the store we create before, then we reopen the entity store
-    try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
-      store.initialize(config);
-      Assertions.assertTrue(store instanceof KvEntityStore);
-      store.setSerDe(EntitySerDeFactory.createEntitySerDe(config.get(Configs.ENTITY_SERDE)));
-
+    try (EntityStore store = getEntityStore(tmpDir)) {
       Assertions.assertDoesNotThrow(
           () -> store.get(NameIdentifier.of("metalake"), EntityType.METALAKE, BaseMetalake.class));
       Assertions.assertDoesNotThrow(
@@ -169,22 +154,10 @@ public class TestKvEntityStorage {
   @Test
   void testEntityUpdate() throws Exception {
     String tmpDir = "/tmp/" + UUID.randomUUID().toString();
-
-    Config config = Mockito.mock(Config.class);
-    Mockito.when(config.get(ENTITY_STORE)).thenReturn("kv");
-    Mockito.when(config.get(ENTITY_KV_STORE)).thenReturn(DEFAULT_ENTITY_KV_STORE);
-    Mockito.when(config.get(Configs.ENTITY_SERDE)).thenReturn("proto");
-    Mockito.when(config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)).thenReturn(tmpDir);
-
-    Assertions.assertEquals(tmpDir, config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH));
     AuditInfo auditInfo =
         new AuditInfo.Builder().withCreator("creator").withCreateTime(Instant.now()).build();
 
-    try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
-      store.initialize(config);
-      Assertions.assertTrue(store instanceof KvEntityStore);
-      store.setSerDe(EntitySerDeFactory.createEntitySerDe(config.get(Configs.ENTITY_SERDE)));
-
+    try (EntityStore store = getEntityStore(tmpDir)) {
       BaseMetalake metalake = createBaseMakeLake("metalake", auditInfo);
       CatalogEntity catalog = createCatalog(Namespace.of("metalake"), "catalog", auditInfo);
       CatalogEntity catalogCopy = createCatalog(Namespace.of("metalake"), "catalogCopy", auditInfo);
@@ -453,20 +426,10 @@ public class TestKvEntityStorage {
   @Test
   void testEntityDelete() throws IOException {
     String tmpDir = "/tmp/" + UUID.randomUUID().toString();
-    Config config = Mockito.mock(Config.class);
-    Mockito.when(config.get(ENTITY_STORE)).thenReturn("kv");
-    Mockito.when(config.get(ENTITY_KV_STORE)).thenReturn(DEFAULT_ENTITY_KV_STORE);
-    Mockito.when(config.get(Configs.ENTITY_SERDE)).thenReturn("proto");
-    Mockito.when(config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)).thenReturn(tmpDir);
-
     AuditInfo auditInfo =
         new AuditInfo.Builder().withCreator("creator").withCreateTime(Instant.now()).build();
 
-    try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
-      store.initialize(config);
-      Assertions.assertTrue(store instanceof KvEntityStore);
-      store.setSerDe(EntitySerDeFactory.createEntitySerDe(config.get(Configs.ENTITY_SERDE)));
-
+    try (EntityStore store = getEntityStore(tmpDir)) {
       BaseMetalake metalake = createBaseMakeLake("metalake", auditInfo);
       CatalogEntity catalog = createCatalog(Namespace.of("metalake"), "catalog", auditInfo);
       CatalogEntity catalogCopy = createCatalog(Namespace.of("metalake"), "catalogCopy", auditInfo);
@@ -618,17 +581,7 @@ public class TestKvEntityStorage {
   void testCreateKvEntityStore() throws IOException {
     String tmpDir = "/tmp/" + UUID.randomUUID().toString();
 
-    Config config = Mockito.mock(Config.class);
-    Mockito.when(config.get(ENTITY_STORE)).thenReturn("kv");
-    Mockito.when(config.get(ENTITY_KV_STORE)).thenReturn(DEFAULT_ENTITY_KV_STORE);
-    Mockito.when(config.get(Configs.ENTITY_SERDE)).thenReturn("proto");
-    Mockito.when(config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)).thenReturn(tmpDir);
-
-    try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
-      store.initialize(config);
-      Assertions.assertTrue(store instanceof KvEntityStore);
-      store.setSerDe(EntitySerDeFactory.createEntitySerDe(config.get(Configs.ENTITY_SERDE)));
-
+    try (EntityStore store = getEntityStore(tmpDir)) {
       AuditInfo auditInfo =
           new AuditInfo.Builder().withCreator("creator").withCreateTime(Instant.now()).build();
 
@@ -737,20 +690,11 @@ public class TestKvEntityStorage {
   @Test
   void testDeleteMark() throws IOException {
     String tmpDir = "/tmp/" + UUID.randomUUID().toString();
-    Config config = Mockito.mock(Config.class);
-    Mockito.when(config.get(ENTITY_STORE)).thenReturn("kv");
-    Mockito.when(config.get(ENTITY_KV_STORE)).thenReturn(DEFAULT_ENTITY_KV_STORE);
-    Mockito.when(config.get(Configs.ENTITY_SERDE)).thenReturn("proto");
-    Mockito.when(config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)).thenReturn(tmpDir);
 
     AuditInfo auditInfo =
         new AuditInfo.Builder().withCreator("creator").withCreateTime(Instant.now()).build();
 
-    try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
-      store.initialize(config);
-      Assertions.assertTrue(store instanceof KvEntityStore);
-      store.setSerDe(EntitySerDeFactory.createEntitySerDe(config.get(Configs.ENTITY_SERDE)));
-
+    try (EntityStore store = getEntityStore(tmpDir)) {
       BaseMetalake metalake = createBaseMakeLake("metalake", auditInfo);
       CatalogEntity catalog = createCatalog(Namespace.of("metalake"), "catalog", auditInfo);
       CatalogEntity catalogCopy = createCatalog(Namespace.of("metalake"), "catalogCopy", auditInfo);
