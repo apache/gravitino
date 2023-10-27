@@ -7,6 +7,7 @@ package com.datastrato.gravitino.storage.kv;
 
 import static com.datastrato.gravitino.Configs.DEFAULT_ENTITY_KV_STORE;
 import static com.datastrato.gravitino.Configs.ENTITY_KV_STORE;
+import static com.datastrato.gravitino.Configs.ENTITY_KV_TTL;
 import static com.datastrato.gravitino.Configs.ENTITY_STORE;
 import static com.datastrato.gravitino.Configs.ENTRY_KV_ROCKSDB_BACKEND_PATH;
 
@@ -845,6 +846,231 @@ public class TestKvEntityStorage {
       Assertions.assertTrue(store.exists(table1InSchema2.nameIdentifier(), EntityType.TABLE));
     } finally {
       FileUtils.deleteDirectory(FileUtils.getFile(tmpDir));
+    }
+  }
+
+  private EntityStore getEntityStore(String rocksdbPath) {
+    Config config = Mockito.mock(Config.class);
+    Mockito.when(config.get(ENTITY_STORE)).thenReturn("kv");
+    Mockito.when(config.get(ENTITY_KV_STORE)).thenReturn(DEFAULT_ENTITY_KV_STORE);
+    Mockito.when(config.get(Configs.ENTITY_SERDE)).thenReturn("proto");
+    Mockito.when(config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)).thenReturn(rocksdbPath);
+    Mockito.when(config.get(ENTITY_KV_TTL)).thenReturn(0L);
+    EntityStore store = EntityStoreFactory.createEntityStore(config);
+    store.initialize(config);
+    Assertions.assertTrue(store instanceof KvEntityStore);
+    store.setSerDe(EntitySerDeFactory.createEntitySerDe(config.get(Configs.ENTITY_SERDE)));
+    return store;
+  }
+
+  @Test
+  void testGarbageCollector() throws IOException {
+    String rocksdbPath = "/tmp/" + UUID.randomUUID().toString();
+    AuditInfo auditInfo =
+        new AuditInfo.Builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+    BaseMetalake metalake = createBaseMakeLake("metalake", auditInfo);
+    BaseMetalake metalakeCopy = createBaseMakeLake("metalakeCopy", auditInfo);
+    CatalogEntity catalog = createCatalog(Namespace.of("metalake"), "catalog", auditInfo);
+    CatalogEntity catalogCopy = createCatalog(Namespace.of("metalake"), "catalogCopy", auditInfo);
+    SchemaEntity schema1 =
+        createSchemaEntity(Namespace.of("metalake", "catalog"), "schema1", auditInfo);
+    TableEntity table1 =
+        createTableEntity(Namespace.of("metalake", "catalog", "schema1"), "table1", auditInfo);
+
+    SchemaEntity schema2 =
+        createSchemaEntity(Namespace.of("metalake", "catalog"), "schema2", auditInfo);
+    TableEntity table1InSchema2 =
+        createTableEntity(Namespace.of("metalake", "catalog", "schema2"), "table1", auditInfo);
+
+    try (EntityStore store = getEntityStore(rocksdbPath)) {
+      store.put(metalake);
+      store.put(metalakeCopy);
+      store.put(catalog);
+      store.put(catalogCopy);
+      store.put(schema1);
+      store.put(schema2);
+      store.put(table1);
+      store.put(table1InSchema2);
+
+      store.delete(catalog.nameIdentifier(), EntityType.CATALOG, true);
+
+      Assertions.assertFalse(store.exists(catalog.nameIdentifier(), EntityType.CATALOG));
+      Assertions.assertFalse(store.exists(schema1.nameIdentifier(), EntityType.SCHEMA));
+      Assertions.assertFalse(store.exists(schema2.nameIdentifier(), EntityType.SCHEMA));
+      Assertions.assertFalse(store.exists(table1.nameIdentifier(), EntityType.TABLE));
+      Assertions.assertFalse(store.exists(table1InSchema2.nameIdentifier(), EntityType.TABLE));
+
+      KvEntityStore entityStore = (KvEntityStore) store;
+      // Till now, they have not been physically deleted yet
+      KvBackend kvBackend = entityStore.getBackend();
+      byte[] catalogKey =
+          entityStore.entityKeyEncoder.encode(catalog.nameIdentifier(), EntityType.CATALOG);
+      Assertions.assertNotNull(kvBackend.get(catalogKey));
+      // Only catalog has the deletion mark
+      Assertions.assertNotNull(kvBackend.get(entityStore.generateDeleteKey(catalogKey)));
+
+      byte[] schema1Key =
+          entityStore.entityKeyEncoder.encode(schema1.nameIdentifier(), EntityType.SCHEMA);
+      Assertions.assertNotNull(kvBackend.get(schema1Key));
+      // We do not add marks to sub-entities
+      Assertions.assertNull(kvBackend.get(entityStore.generateDeleteKey(schema1Key)));
+
+      byte[] schema2Key =
+          entityStore.entityKeyEncoder.encode(schema2.nameIdentifier(), EntityType.SCHEMA);
+      Assertions.assertNotNull(kvBackend.get(schema2Key));
+      // We do not add marks to sub-entities
+      Assertions.assertNull(kvBackend.get(entityStore.generateDeleteKey(schema2Key)));
+
+      byte[] table1Key =
+          entityStore.entityKeyEncoder.encode(table1.nameIdentifier(), EntityType.TABLE);
+      Assertions.assertNotNull(kvBackend.get(table1Key));
+      // We do not add marks to sub-entities
+      Assertions.assertNull(kvBackend.get(entityStore.generateDeleteKey(table1Key)));
+
+      byte[] table1InSchema2Key =
+          entityStore.entityKeyEncoder.encode(table1InSchema2.nameIdentifier(), EntityType.TABLE);
+      Assertions.assertNotNull(kvBackend.get(table1InSchema2Key));
+      // We do not add marks to sub-entities
+      Assertions.assertNull(kvBackend.get(entityStore.generateDeleteKey(table1InSchema2Key)));
+
+      entityStore.collectGarbage();
+      // All has been removed from deleted
+      Assertions.assertNull(kvBackend.get(catalogKey));
+      Assertions.assertNull(kvBackend.get(entityStore.generateDeleteKey(catalogKey)));
+      Assertions.assertNull(kvBackend.get(schema1Key));
+      Assertions.assertNull(kvBackend.get(entityStore.generateDeleteKey(schema1Key)));
+      Assertions.assertNull(kvBackend.get(schema2Key));
+      Assertions.assertNull(kvBackend.get(entityStore.generateDeleteKey(schema2Key)));
+      Assertions.assertNull(kvBackend.get(table1Key));
+      Assertions.assertNull(kvBackend.get(entityStore.generateDeleteKey(table1Key)));
+      Assertions.assertNull(kvBackend.get(table1InSchema2Key));
+      Assertions.assertNull(kvBackend.get(entityStore.generateDeleteKey(table1InSchema2Key)));
+    } finally {
+      FileUtils.deleteDirectory(FileUtils.getFile(rocksdbPath));
+    }
+  }
+
+  @Test
+  void testPhysicalDelete() throws IOException {
+    String rocksdbPath = "/tmp/" + UUID.randomUUID().toString();
+    AuditInfo auditInfo =
+        new AuditInfo.Builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+    BaseMetalake metalake = createBaseMakeLake("metalake", auditInfo);
+    BaseMetalake metalakeCopy = createBaseMakeLake("metalakeCopy", auditInfo);
+    CatalogEntity catalog = createCatalog(Namespace.of("metalake"), "catalog", auditInfo);
+    CatalogEntity catalogCopy = createCatalog(Namespace.of("metalake"), "catalogCopy", auditInfo);
+    SchemaEntity schema1 =
+        createSchemaEntity(Namespace.of("metalake", "catalog"), "schema1", auditInfo);
+    TableEntity table1 =
+        createTableEntity(Namespace.of("metalake", "catalog", "schema1"), "table1", auditInfo);
+
+    SchemaEntity schema2 =
+        createSchemaEntity(Namespace.of("metalake", "catalog"), "schema2", auditInfo);
+    TableEntity table1InSchema2 =
+        createTableEntity(Namespace.of("metalake", "catalog", "schema2"), "table1", auditInfo);
+
+    try (EntityStore store = getEntityStore(rocksdbPath)) {
+      store.put(metalake);
+      store.put(metalakeCopy);
+      store.put(catalog);
+      store.put(catalogCopy);
+      store.put(schema1);
+      store.put(schema2);
+      store.put(table1);
+      store.put(table1InSchema2);
+
+      Assertions.assertTrue(store.exists(metalake.nameIdentifier(), EntityType.METALAKE));
+      Assertions.assertTrue(store.exists(metalakeCopy.nameIdentifier(), EntityType.METALAKE));
+      Assertions.assertTrue(store.exists(catalog.nameIdentifier(), EntityType.CATALOG));
+      Assertions.assertTrue(store.exists(catalogCopy.nameIdentifier(), EntityType.CATALOG));
+      Assertions.assertTrue(store.exists(schema1.nameIdentifier(), EntityType.SCHEMA));
+      Assertions.assertTrue(store.exists(schema2.nameIdentifier(), EntityType.SCHEMA));
+      Assertions.assertTrue(store.exists(table1.nameIdentifier(), EntityType.TABLE));
+      Assertions.assertTrue(store.exists(table1InSchema2.nameIdentifier(), EntityType.TABLE));
+
+      store.delete(catalog.nameIdentifier(), EntityType.CATALOG, true);
+
+      Assertions.assertFalse(store.exists(catalog.nameIdentifier(), EntityType.CATALOG));
+      Assertions.assertFalse(store.exists(schema1.nameIdentifier(), EntityType.SCHEMA));
+      Assertions.assertFalse(store.exists(schema2.nameIdentifier(), EntityType.SCHEMA));
+      Assertions.assertFalse(store.exists(table1.nameIdentifier(), EntityType.TABLE));
+      Assertions.assertFalse(store.exists(table1InSchema2.nameIdentifier(), EntityType.TABLE));
+
+      // Till now, they have not been physically deleted yet
+      KvEntityStore entityStore = (KvEntityStore) store;
+      KvBackend kvBackend = entityStore.getBackend();
+      byte[] catalogKey =
+          entityStore.entityKeyEncoder.encode(catalog.nameIdentifier(), EntityType.CATALOG);
+      Assertions.assertNotNull(kvBackend.get(catalogKey));
+      // Only catalog has the deletion mark
+      Assertions.assertNotNull(kvBackend.get(entityStore.generateDeleteKey(catalogKey)));
+
+      byte[] schema1Key =
+          entityStore.entityKeyEncoder.encode(schema1.nameIdentifier(), EntityType.SCHEMA);
+      Assertions.assertNotNull(kvBackend.get(schema1Key));
+      // We do not add marks to sub-entities
+      Assertions.assertNull(kvBackend.get(entityStore.generateDeleteKey(schema1Key)));
+
+      byte[] schema2Key =
+          entityStore.entityKeyEncoder.encode(schema2.nameIdentifier(), EntityType.SCHEMA);
+      Assertions.assertNotNull(kvBackend.get(schema2Key));
+      // We do not add marks to sub-entities
+      Assertions.assertNull(kvBackend.get(entityStore.generateDeleteKey(schema2Key)));
+
+      byte[] table1Key =
+          entityStore.entityKeyEncoder.encode(table1.nameIdentifier(), EntityType.TABLE);
+      Assertions.assertNotNull(kvBackend.get(table1Key));
+      // We do not add marks to sub-entities
+      Assertions.assertNull(kvBackend.get(entityStore.generateDeleteKey(table1Key)));
+
+      byte[] table1InSchema2Key =
+          entityStore.entityKeyEncoder.encode(table1InSchema2.nameIdentifier(), EntityType.TABLE);
+      Assertions.assertNotNull(kvBackend.get(table1InSchema2Key));
+      // We do not add marks to sub-entities
+      Assertions.assertNull(kvBackend.get(entityStore.generateDeleteKey(table1InSchema2Key)));
+
+      entityStore.physicalDelete(catalog.nameIdentifier(), EntityType.CATALOG);
+
+      // All has been removed from deleted
+      Assertions.assertNull(kvBackend.get(catalogKey));
+      Assertions.assertNull(kvBackend.get(entityStore.generateDeleteKey(catalogKey)));
+      Assertions.assertNull(kvBackend.get(schema1Key));
+      Assertions.assertNull(kvBackend.get(entityStore.generateDeleteKey(schema1Key)));
+      Assertions.assertNull(kvBackend.get(schema2Key));
+      Assertions.assertNull(kvBackend.get(entityStore.generateDeleteKey(schema2Key)));
+      Assertions.assertNull(kvBackend.get(table1Key));
+      Assertions.assertNull(kvBackend.get(entityStore.generateDeleteKey(table1Key)));
+      Assertions.assertNull(kvBackend.get(table1InSchema2Key));
+      Assertions.assertNull(kvBackend.get(entityStore.generateDeleteKey(table1InSchema2Key)));
+
+      Assertions.assertTrue(store.exists(metalake.nameIdentifier(), EntityType.METALAKE));
+      Assertions.assertTrue(store.exists(metalakeCopy.nameIdentifier(), EntityType.METALAKE));
+      Assertions.assertTrue(store.exists(catalogCopy.nameIdentifier(), EntityType.CATALOG));
+
+      store.delete(metalake.nameIdentifier(), EntityType.METALAKE, true);
+
+      byte[] metalakeKey =
+          entityStore.entityKeyEncoder.encode(metalake.nameIdentifier(), EntityType.METALAKE);
+      Assertions.assertNotNull(kvBackend.get(metalakeKey));
+      // Only metalake has the deletion mark
+      Assertions.assertNotNull(kvBackend.get(entityStore.generateDeleteKey(metalakeKey)));
+
+      byte[] catalogCopyKey =
+          entityStore.entityKeyEncoder.encode(catalogCopy.nameIdentifier(), EntityType.CATALOG);
+      Assertions.assertNotNull(kvBackend.get(catalogCopyKey));
+      // Catalog does not have the deletion mark
+      Assertions.assertNull(kvBackend.get(entityStore.generateDeleteKey(catalogCopyKey)));
+
+      entityStore.physicalDelete(metalake.nameIdentifier(), EntityType.METALAKE);
+
+      Assertions.assertNull(kvBackend.get(metalakeKey));
+      Assertions.assertNull(kvBackend.get(entityStore.generateDeleteKey(metalakeKey)));
+      Assertions.assertNull(kvBackend.get(catalogCopyKey));
+      Assertions.assertNull(kvBackend.get(entityStore.generateDeleteKey(catalogCopyKey)));
+    } finally {
+      FileUtils.deleteDirectory(FileUtils.getFile(rocksdbPath));
     }
   }
 }

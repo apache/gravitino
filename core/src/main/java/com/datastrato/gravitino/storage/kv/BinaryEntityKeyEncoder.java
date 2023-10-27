@@ -17,7 +17,9 @@ import com.datastrato.gravitino.utils.Bytes;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.util.Arrays;
@@ -27,6 +29,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -57,7 +60,7 @@ public class BinaryEntityKeyEncoder implements KvEntityKeyEncoder {
   public static final String NAMESPACE_SEPARATOR = "/";
 
   @VisibleForTesting
-  static final byte[] BYTABLE_NAMESPACE_SEPARATOR = NAMESPACE_SEPARATOR.getBytes();
+  static final byte[] NAMESPACE_SEPARATOR_BYTE_ARRAY = NAMESPACE_SEPARATOR.getBytes();
 
   static final String WILD_CARD = "*";
 
@@ -267,5 +270,34 @@ public class BinaryEntityKeyEncoder implements KvEntityKeyEncoder {
     result[1] = bytes[1];
 
     return result;
+  }
+
+  @Override
+  public Pair<NameIdentifier, EntityType> decode(byte[] key) throws IOException {
+    // Check the first two bytes to get the entity type
+    byte[] prefix = ArrayUtils.subarray(key, 0, 2);
+    String typeName = new String(prefix);
+    EntityType entityType = EntityType.fromShortName(typeName);
+    // Then get the namespace
+    byte[] namespace = ArrayUtils.subarray(key, 3, key.length);
+    NameIdentifier identifier = decodeIdentifier(namespace);
+    return Pair.of(identifier, entityType);
+  }
+
+  private NameIdentifier decodeIdentifier(byte[] namespaceArray) throws IOException {
+    int start = 0;
+    List<String> namespaces = Lists.newArrayList();
+    while (start < namespaceArray.length) {
+      long id = ByteUtils.byteToLong(ArrayUtils.subarray(namespaceArray, start, start + 8));
+      String nameWithContext = nameMappingService.getNameById(id);
+      if (nameWithContext == null) {
+        throw new IllegalStateException("Cannot find name for id: " + id);
+      }
+
+      namespaces.add(
+          Iterables.getLast(Splitter.on(NAMESPACE_SEPARATOR).splitToList(nameWithContext)));
+      start += 9;
+    }
+    return NameIdentifier.of(namespaces.toArray(new String[0]));
   }
 }

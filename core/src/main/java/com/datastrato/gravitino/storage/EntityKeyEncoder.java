@@ -8,6 +8,7 @@ package com.datastrato.gravitino.storage;
 import com.datastrato.gravitino.Entity.EntityType;
 import com.datastrato.gravitino.NameIdentifier;
 import java.io.IOException;
+import org.apache.commons.lang3.tuple.Pair;
 
 /** Interface for encoding entity to storage it in underlying storage. */
 public interface EntityKeyEncoder<T> {
@@ -31,4 +32,9 @@ public interface EntityKeyEncoder<T> {
    * @throws IOException Exception if error occurs
    */
   T encode(NameIdentifier ident, EntityType type, boolean nullIfMissing) throws IOException;
+
+  /** Decode the key from key-value store to entity NameIdentifier and EntityType. */
+  default Pair<NameIdentifier, EntityType> decode(T key) throws IOException {
+    throw new UnsupportedOperationException("Currently not supported");
+  }
 }

@@ -6,6 +6,7 @@
 package com.datastrato.gravitino.storage.kv;
 
 import static com.datastrato.gravitino.Configs.ENTITY_KV_STORE;
+import static com.datastrato.gravitino.Configs.ENTITY_KV_TTL;
 import static com.datastrato.gravitino.storage.kv.BinaryEntityKeyEncoder.NAMESPACE_SEPARATOR;
 
 import com.datastrato.gravitino.Config;
@@ -21,6 +22,7 @@ import com.datastrato.gravitino.exceptions.AlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.exceptions.NonEmptyEntityException;
 import com.datastrato.gravitino.storage.NameMappingService;
+import com.datastrato.gravitino.utils.ByteUtils;
 import com.datastrato.gravitino.utils.Bytes;
 import com.datastrato.gravitino.utils.Executable;
 import com.datastrato.gravitino.utils.NonThrowableFunction;
@@ -34,6 +36,10 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.Getter;
@@ -53,13 +59,19 @@ public class KvEntityStore implements EntityStore {
   public static final Logger LOGGER = LoggerFactory.getLogger(KvEntityStore.class);
   public static final ImmutableMap<String, String> KV_BACKENDS =
       ImmutableMap.of("RocksDBKvBackend", RocksDBKvBackend.class.getCanonicalName());
-
+  private Config config;
   @Getter @VisibleForTesting private KvBackend backend;
-  private KvEntityKeyEncoder entityKeyEncoder;
+  @VisibleForTesting KvEntityKeyEncoder entityKeyEncoder;
   private NameMappingService nameMappingService;
   private EntitySerDe serDe;
 
-  private static final byte[] DELETE_PREFIX = "DELETE".getBytes();
+  private static final byte[] DELETE_PREFIX = "DELETE/".getBytes();
+
+  public static final ScheduledExecutorService GARBAGE_COLLECT_POOL =
+      new ScheduledThreadPoolExecutor(
+          2,
+          r -> new Thread(r, "KvEntityStore-Garbage-Collector-%d"),
+          new ThreadPoolExecutor.AbortPolicy());
 
   @Override
   public void initialize(Config config) throws RuntimeException {
@@ -68,6 +80,95 @@ public class KvEntityStore implements EntityStore {
     //  instance, We should make it configurable in the future.
     this.nameMappingService = new KvNameMappingService(backend);
     this.entityKeyEncoder = new BinaryEntityKeyEncoder(nameMappingService);
+
+    this.config = config;
+
+    // Start the garbage collector
+    GARBAGE_COLLECT_POOL.scheduleAtFixedRate(this::collectGarbage, 0, 10, TimeUnit.MINUTES);
+  }
+
+  @VisibleForTesting
+  void collectGarbage() {
+    try {
+      LOGGER.info("Start to collect garbage...");
+      long now = System.currentTimeMillis();
+      List<Pair<byte[], byte[]>> kvs =
+          backend.scan(
+              new KvRangeScan.KvRangeScanBuilder()
+                  .start(DELETE_PREFIX)
+                  .end(Bytes.increment(Bytes.wrap(DELETE_PREFIX)).get())
+                  .startInclusive(true)
+                  .endInclusive(false)
+                  .limit(10000) /* Each time we only collect 10000 entities at most*/
+                  .build());
+
+      // Only collect those entities that have been deleted for more than 7(default) days
+      List<byte[]> deleteMarkKeys =
+          kvs.stream()
+              .filter(
+                  NonThrowablePredicate.wrap(
+                      kv ->
+                          now - ByteUtils.byteToLong(kv.getRight())
+                              > TimeUnit.DAYS.toMillis(config.get(ENTITY_KV_TTL))))
+              .map(Pair::getLeft)
+              .collect(Collectors.toList());
+
+      if (CollectionUtils.isEmpty(deleteMarkKeys)) {
+        LOGGER.info("No garbage to collect");
+        return;
+      }
+
+      for (byte[] key : deleteMarkKeys) {
+        byte[] entityKey = getEntityKey(key);
+        Pair<NameIdentifier, EntityType> pair = entityKeyEncoder.decode(entityKey);
+        LOGGER.info("Delete entity {} and its sub-entities", pair.getLeft());
+        physicalDelete(pair.getLeft(), pair.getRight());
+      }
+    } catch (Exception e) {
+      LOGGER.error("Failed to collect garbage", e);
+    }
+  }
+
+  /** Get the entity key from the deleted key */
+  private byte[] getEntityKey(byte[] deleteKey) {
+    return Arrays.copyOfRange(deleteKey, DELETE_PREFIX.length, deleteKey.length);
+  }
+
+  @VisibleForTesting
+  void physicalDelete(NameIdentifier identifier, EntityType entityType) throws IOException {
+    byte[] key = entityKeyEncoder.encode(identifier, entityType, true);
+    if (key == null) {
+      return;
+    }
+
+    backend.executeInTransaction(
+        () -> {
+          List<byte[]> subEntityPrefix = entityKeyEncoder.getChildrenPrefix(identifier, entityType);
+          if (CollectionUtils.isNotEmpty(subEntityPrefix)) {
+            // Physical delete all sub entities
+            for (byte[] prefix : subEntityPrefix) {
+              // First delete real data
+              backend.deleteRange(
+                  new KvRangeScan.KvRangeScanBuilder()
+                      .start(prefix)
+                      .end(Bytes.increment(Bytes.wrap(prefix)).get())
+                      .startInclusive(true)
+                      .endInclusive(false)
+                      .build());
+              // Then delete delete mark
+              backend.deleteRange(
+                  new KvRangeScan.KvRangeScanBuilder()
+                      .start(generateDeleteKey(prefix))
+                      .end(Bytes.increment(Bytes.wrap(generateDeleteKey(prefix))).get())
+                      .startInclusive(true)
+                      .endInclusive(false)
+                      .build());
+            }
+          }
+          backend.delete(generateDeleteKey(key));
+          backend.delete(key);
+          return null;
+        });
   }
 
   @Override
@@ -106,7 +207,8 @@ public class KvEntityStore implements EntityStore {
         .collect(Collectors.toList());
   }
 
-  private byte[] generateDeleteKey(byte[] key) {
+  @VisibleForTesting
+  byte[] generateDeleteKey(byte[] key) {
     return Bytes.concat(DELETE_PREFIX, key);
   }
 
@@ -304,7 +406,8 @@ public class KvEntityStore implements EntityStore {
     List<byte[]> subEntityPrefix = entityKeyEncoder.getChildrenPrefix(ident, entityType);
     if (subEntityPrefix.isEmpty()) {
       // has no sub-entities, just mark the entity as deleted
-      backend.put(generateDeleteKey(dataKey), new byte[0], true);
+      backend.put(
+          generateDeleteKey(dataKey), ByteUtils.longToByte(System.currentTimeMillis()), true);
       return true;
     }
 
@@ -328,7 +431,7 @@ public class KvEntityStore implements EntityStore {
     }
 
     // Mark the entity as deleted
-    backend.put(generateDeleteKey(dataKey), new byte[0], true);
+    backend.put(generateDeleteKey(dataKey), ByteUtils.longToByte(System.currentTimeMillis()), true);
     return true;
   }
 

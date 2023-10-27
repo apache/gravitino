@@ -134,4 +134,16 @@ public class KvNameMappingService implements NameMappingService {
 
     return id;
   }
+
+  @Override
+  public String getNameById(long id) throws IOException {
+    lock.readLock().lock();
+    try {
+      byte[] idByte = Bytes.concat(ID_PREFIX, ByteUtils.longToByte(id));
+      byte[] stringByte = backend.get(idByte);
+      return stringByte == null ? null : new String(stringByte);
+    } finally {
+      lock.readLock().unlock();
+    }
+  }
 }

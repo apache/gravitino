@@ -22,6 +22,9 @@ public interface Configs {
   String DEFAULT_KV_ROCKSDB_BACKEND_PATH =
       String.join(File.separator, System.getenv("GRAVITINO_HOME"), "data", "rocksdb");
 
+  Long DEFAULT_ENTITY_KV_TTL = 7L; // 7 days
+  String ENTITY_KV_TTL_KEY_KEY = "graviton.entity.store.kv.ttl";
+
   ConfigEntry<String> ENTITY_STORE =
       new ConfigBuilder(ENTITY_STORE_KEY)
           .doc("The entity store to use")
@@ -63,4 +66,11 @@ public interface Configs {
           .version("0.1.0")
           .booleanConf()
           .createWithDefault(true);
+
+  ConfigEntry<Long> ENTITY_KV_TTL =
+      new ConfigBuilder(ENTITY_KV_TTL_KEY_KEY)
+          .doc("The ttl(day) of kv entity store")
+          .version("0.1.0")
+          .longConf()
+          .createWithDefault(DEFAULT_ENTITY_KV_TTL);
 }

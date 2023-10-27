@@ -191,6 +191,7 @@ public class RocksDBKvBackend implements KvBackend {
   @Override
   public boolean delete(byte[] key) throws IOException {
     try {
+      LOGGER.info("delete key: '{}'", ByteUtils.formatByteArray(key));
       if (TX_LOCAL.get() != null) {
         TX_LOCAL.get().delete(key);
         return true;
