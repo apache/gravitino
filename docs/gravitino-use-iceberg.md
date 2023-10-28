@@ -13,7 +13,7 @@ Gravitino provides the ability to use Iceberg as a catalog for managing your dat
 
 * Worked as a catalog proxy, supports HiveCatalog and JdbcCatalog for now
 * The integrated Iceberg version used is 1.3.1.
-* Before you create a catalog, make sure you have already created a Metalake. If you haven't done so, please follow the Metalake creation steps.
+* Before creating a catalogue, ensure you have already created a Metalake. If you still need to, please follow the Metalake creation steps.
 
 ## Creating an Iceberg Catalog
 
@@ -45,11 +45,11 @@ http://{GravitinoServerHost}:8090/api/metalakes/{Your_metalake_name}/catalogs
 
 * `provider`: Set this to "lakehouse-iceberg" to use Iceberg as the catalog provider.
 * `catalog-backend`: This configuration represents the catalog mode used by Iceberg. You can choose from "hive" and "jdbc".
-* `uri`: This is a required configuration, and it can be either a Hive URI or a JDBC URI.
-* `warehouse`: This is a required configuration and can point to a file system such as HDFS.
+* `uri`: This configuration is required, and it can be either a Hive URI or a JDBC URI.
+* `warehouse`: This configuration is required, and can point to a file system such as HDFS.
 * Other configuration parameters can be added to the "properties" section and passed down to the underlying system.
-* If you are using the JDBC catalog implementation, make sure to include "jdbc-user" and "jdbc-password" as required configurations.
-* If you intend to use the JDBC connector, you need to add the corresponding JDBC driver to the `catalogs/lakehouse-iceberg/libs` directory in the classpath.
+* If you are using the JDBC catalog implementation, include "jdbc-user" and "jdbc-password" as required configurations.
+* If you intend to use the JDBC connector, add the corresponding JDBC driver to the `catalogs/lakehouse-iceberg/libs` directory in the classpath.
 
 ### catalog configuration
 
@@ -126,12 +126,12 @@ Example JSON:
 * `columns`: The columns of the Iceberg table.
 * `partitions`: Optional, the partitions of the Iceberg table, above example is a partitioned table with `dt` column.
 * `sortOrders`: Optional, equivalent to the `SORTED BY` clause in Iceberg DDL, above example table data is sorted in increasing order of `age` in each bucket.
-* `properties`: The properties of the Iceberg table. More properties information see the following table properties table. Other properties will be passed down to the underlying Iceberg table parameters.
+* `properties`: The properties of the Iceberg table. For more property information see the following properties table. Other properties will be passed down to the underlying Iceberg table parameters.
 
-Iceberg doesn't support distribution. if you want bucket use partitions instead.
+Iceberg lacks distribution support. For buckets, consider using partitions instead.
 
 ### table properties
-The following fields are reserved by Gravitino and cannot be passed in properties.
+Gravitino reserves the following fields and they cannot be passed in properties.
 
 | Configuration item                                                            | Description                                                                                                                                                                                |
 |-------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
@@ -145,4 +145,4 @@ The following fields are reserved by Gravitino and cannot be passed in propertie
 
 Regarding Iceberg's properties, you can refer to [official documentation](https://iceberg.apache.org/docs/1.3.1/configuration/).
 
-Now you can use Iceberg as a catalog for managing your data in Gravitino. If you encounter any issues or need further assistance, refer to the Gravitino documentation or seek help from the support team.
+You can use Iceberg as a catalog for managing your data in Gravitino. If you encounter any issues or need further assistance, refer to the Gravitino documentation or seek help from the support team.
