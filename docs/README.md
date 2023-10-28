@@ -8,7 +8,7 @@ This software is licensed under the Apache License version 2."
 
 ## Launch Gravitino document website
 
-Execute `./launch-docs-website.sh` scripts, it will create the Gravitino document website locally, it follows these steps:
+Execute `./launch-docs-website.sh` scripts. The script will create the Gravitino document website locally following these steps:
 
 1. Create a `build` directory within the `docs` directory.
 2. Automatically download the [Hugo](https://github.com/gohugoio/hugo) binary executable file into the `build` directory.
