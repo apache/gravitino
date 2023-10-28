@@ -9,11 +9,11 @@ This software is licensed under the Apache License version 2."
 Gravitino Iceberg REST Server follows the [Iceberg REST API specification](https://github.com/apache/iceberg/blob/main/open-api/rest-catalog-open-api.yaml) and could act as an Iceberg REST catalog server. 
 
 ### Capabilities:
-* Support Iceberg REST API defined in Iceberg 1.3.1, support all namespace&table interface. `Token`, `ReportMetrics` and `Config` interface are not supported yet.
+* Support Iceberg REST API defined in Iceberg 1.3.1, support all namespace&table interface. `Token`, `ReportMetrics` and `Config` interfaces are not supported yet.
 * Worked as a catalog proxy, supports HiveCatalog and JdbcCatalog for now.
 * Build with Iceberg `1.3.1`, which means the Iceberg table format version is `1` by default.
 * When writing to HDFS, the Gravitino Iceberg REST server can only operate as the specified HDFS user when startup and
-  does not yet support proxying to other HDFS users. see *How to access Hadoop* in document *How to customize Gravitino server configurations* gravitino-server-config for more details.
+  does not yet support proxying to other HDFS users. See *How to access Hadoop* in the *How to customize Gravitino server configurations* document for more details.
 
 ## How to start the Gravitino Iceberg REST server
 
