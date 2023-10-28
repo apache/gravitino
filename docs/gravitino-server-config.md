@@ -7,8 +7,8 @@ This software is licensed under the Apache License version 2."
 
 ## How to configure Gravitino server configurations
 
-Gravitino server can be customized by editing the configuration file `gravitino.conf` in the `conf` directory, though default values of some configurations are usually sufficient for most use cases and users need not modify them.
-But we strongly recommend that you read the following sections to understand the configuration file and change the default values based on your specific situation and usage scenarios.
+Gravitino server can be customized by editing the configuration file `gravitino.conf` in the `conf` directory. The default values are sufficient for most use cases and don't need modification.
+But we strongly recommend reading the following sections to understand the configuration file and change the default values to suit your specific situation and usage scenario.
 
 ## Configuration file
 
