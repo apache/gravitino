@@ -2,7 +2,7 @@
  * Copyright 2023 Datastrato.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.gravitino.integration.test.trino;
+package com.datastrato.gravitino.integration.test.util;
 
 import static com.google.common.base.Throwables.propagateIfPossible;
 import static java.util.Objects.requireNonNull;
@@ -11,13 +11,13 @@ import java.util.ArrayDeque;
 import java.util.Deque;
 
 /** This class is inspired by com.google.common.io.Closer */
-public final class AutoCloseableCloser implements AutoCloseable {
+public final class CloseableGroup implements AutoCloseable {
   private final Deque<AutoCloseable> stack = new ArrayDeque<>(4);
 
-  private AutoCloseableCloser() {}
+  private CloseableGroup() {}
 
-  public static AutoCloseableCloser create() {
-    return new AutoCloseableCloser();
+  public static CloseableGroup create() {
+    return new CloseableGroup();
   }
 
   public <C extends AutoCloseable> C register(C closeable) {

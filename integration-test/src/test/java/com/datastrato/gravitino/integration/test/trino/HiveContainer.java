@@ -17,8 +17,9 @@ import org.testcontainers.containers.Network;
 public class HiveContainer extends BaseContainer {
   public static final Logger LOG = LoggerFactory.getLogger(HiveContainer.class);
 
-  public static final String DEFAULT_IMAGE = "datastrato/gravitino-ci-hive:0.1.5";
+  public static final String DEFAULT_IMAGE = "datastrato/gravitino-ci-hive:latest";
   public static final String HOST_NAME = "gravitino-ci-hive";
+  static final int HIVE_METASTORE_PORT = 9083;
 
   public static Builder builder() {
     return new Builder();

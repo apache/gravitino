@@ -4,13 +4,13 @@
 # This software is licensed under the Apache License version 2.
 #
 #set -ex
-set -ex
+
 bin="$(dirname "${BASH_SOURCE-$0}")"
 bin="$(cd "${bin}">/dev/null; pwd)"
 
 OS=$(uname -s)
 if [ "${OS}" != "Darwin" ]; then
-  echo "Only macOS needs to start macos-docker-connector."
+  echo "Only macOS needs to run mac-docker-connector."
   exit 1
 fi
 
@@ -29,7 +29,7 @@ if [ ! -f "${bin}/docker-connector" ]; then
 fi
 
 # Create a docker-connector.conf file with the routes to the docker networks
-docker network ls --filter driver=bridge --format "{{.ID}}" | xargs docker network inspect --format "route {{range .IPAM.Config}}{{.Subnet}}{{end}}" > ./docker-connector.conf
+docker network ls --filter driver=bridge --format "{{.ID}}" | xargs docker network inspect --format "route {{range .IPAM.Config}}{{.Subnet}}{{end}}" > ${bin}/docker-connector.conf
 
 echo "Start docker-connector requires root privileges, Please enter the root password."
-sudo ${bin}/docker-connector -config ./docker-connector.conf
+sudo ${bin}/docker-connector -config ${bin}/docker-connector.conf

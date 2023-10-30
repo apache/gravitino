@@ -4,4 +4,4 @@
 #
 connector.name = hive
 hive.metastore.uri = thrift://HIVE_HOST_IP:9083
-hive.allow-drop-table=true
+hive.allow-drop-table = true

@@ -17,8 +17,15 @@ import org.testcontainers.containers.Network;
 public class TrinoContainer extends BaseContainer {
   public static final Logger LOG = LoggerFactory.getLogger(TrinoContainer.class);
 
-  public static final String DEFAULT_IMAGE = "datastrato/gravitino-ci-trino:0.1.0";
+  public static final String DEFAULT_IMAGE = "datastrato/gravitino-ci-trino:latest";
   public static final String HOST_NAME = "gravitino-ci-trino";
+  static final int TRINO_PORT = 8080;
+
+  static final String TRINO_CONF_GRAVITINO_URI = "gravitino.uri";
+  static final String TRINO_CONF_GRAVITINO_METALAKE = "gravitino.metalake";
+  static final String TRINO_CONF_HIVE_METASTORE_URI = "hive.metastore.uri";
+  static final String TRINO_CONTAINER_CONF_DIR = "/etc/trino";
+  static final String TRINO_CONTAINER_PLUGIN_GRAVITINO_DIR = "/usr/lib/trino/plugin/gravitino";
 
   public static Builder builder() {
     return new Builder();

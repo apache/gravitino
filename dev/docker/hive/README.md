@@ -59,3 +59,6 @@ ssh -p 8022 datastrato@localhost (password: ds123, this is a sudo user)
 - Config HDFS DataNode data transfer address to `0.0.0.0:50010` explicitly
 - Map container hostname to `127.0.0.1` before starting Hadoop
 - Expose `50010` port for the HDFS DataNode
+
+### 0.1.5
+- Rollback `Map container hostname to `127.0.0.1` before starting Hadoop` of `datastrato/gravitino-ci-hive:0.1.4`

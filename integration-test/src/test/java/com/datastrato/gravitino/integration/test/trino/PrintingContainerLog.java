@@ -12,6 +12,7 @@ import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.output.BaseConsumer;
 import org.testcontainers.containers.output.OutputFrame;
 
+// Printing Container Log
 final class PrintingContainerLog extends BaseConsumer<PrintingContainerLog> {
   public static final Logger LOG = LoggerFactory.getLogger(PrintingContainerLog.class);
   private final String prefix;

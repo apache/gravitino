@@ -4,7 +4,6 @@
  */
 package com.datastrato.gravitino.integration.test.trino;
 
-import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
 import static org.testcontainers.utility.MountableFile.forHostPath;
 
@@ -30,17 +29,28 @@ import org.testcontainers.containers.output.OutputFrame;
 import org.testcontainers.containers.startupcheck.IsRunningStartupCheckStrategy;
 import org.testcontainers.containers.wait.strategy.Wait;
 
+/**
+ * The BaseContainer is the base for all containers. It's contains the common methods and settings
+ * for all containers. You can extend this class to create your own container to integration test.
+ */
 public abstract class BaseContainer implements AutoCloseable {
   public static final Logger LOG = LoggerFactory.getLogger(BaseContainer.class);
+  // Host name of the container
   private final String hostName;
+  // Exposed ports of the container
   private final Set<Integer> ports;
+  // Files to mount in the container
   private final Map<String, String> filesToMount;
+  // environment variables of the container
   private final Map<String, String> envVars;
+  // Additional host and IP address mapping
   private final Map<String, String> extraHosts;
+  // Network of the container
   private final Optional<Network> network;
+  // Retry limit for container startup
   private final int startupRetryLimit;
 
-  private GenericContainer<?> container;
+  private final GenericContainer<?> container;
 
   protected BaseContainer(
       String image,
@@ -51,7 +61,6 @@ public abstract class BaseContainer implements AutoCloseable {
       Map<String, String> envVars,
       Optional<Network> network,
       int startupRetryLimit) {
-    checkArgument(startupRetryLimit > 0, "startupRetryLimit needs to be greater or equal to 0");
     this.container = new GenericContainer<>(requireNonNull(image, "image is null"));
     this.ports = requireNonNull(ports, "ports is null");
     this.hostName = requireNonNull(hostName, "hostName is null");
@@ -64,13 +73,19 @@ public abstract class BaseContainer implements AutoCloseable {
   }
 
   protected void setupContainer() {
+    // Add exposed ports in the container
     for (int port : this.ports) {
       container.addExposedPort(port);
     }
+    // Add files to mount in the container
     filesToMount.forEach(
         (dockerPath, filePath) ->
             container.withCopyFileToContainer(forHostPath(filePath), dockerPath));
+    // Set environment variables
     container.withEnv(envVars);
+    // Set up an additional host and IP address mapping through which the container
+    // can look up the corresponding IP address by host name.
+    // This method fixes an error that occurs when HDFS looks up hostnames from DNS.
     extraHosts.forEach((hostName, ipAddress) -> container.withExtraHost(hostName, ipAddress));
     container
         .withCreateContainerCmdModifier(c -> c.withHostName(hostName))
@@ -80,14 +95,17 @@ public abstract class BaseContainer implements AutoCloseable {
     network.ifPresent(net -> container.withNetwork(net).withNetworkAliases(hostName));
   }
 
+  // This method is used to set the log output of the container.
   protected void withLogConsumer(Consumer<OutputFrame> logConsumer) {
     container.withLogConsumer(logConsumer);
   }
 
+  // This method is used to get the expose port number of the container.
   protected Integer getMappedPort(int exposedPort) {
     return container.getMappedPort(exposedPort);
   }
 
+  // This method is used to get the IP address of the container.
   protected String getContainerIpAddress() {
     DockerClient dockerClient = DockerClientFactory.instance().client();
     InspectContainerResponse containerResponse =
@@ -109,6 +127,7 @@ public abstract class BaseContainer implements AutoCloseable {
     container.start();
   }
 
+  // Execute the command in the container.
   public Container.ExecResult executeInContainer(String... commandAndArgs) {
     try {
       return container.execInContainer(commandAndArgs);
