@@ -100,22 +100,22 @@ Example JSON:
     "columns": [
         {
             "name": "id",
-            "type": "int",
+            "type": "i32?",
             "comment": "id column comment"
         },
         {
             "name": "name",
-            "type": "string",
+            "type": "string?",
             "comment": "name column comment"
         },
         {
             "name": "age",
-            "type": "int",
+            "type": "i32?",
             "comment": "age column comment"
         },
         {
             "name": "dt",
-            "type": "date",
+            "type": "date?",
             "comment": "dt column comment"
         }
     ],
