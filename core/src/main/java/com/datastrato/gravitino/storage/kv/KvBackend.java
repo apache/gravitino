@@ -51,9 +51,7 @@ public interface KvBackend extends Closeable {
    * @return True if the key-value pair was successfully deleted, false if the key was not found.
    * @throws IOException If an I/O exception occurs during deletion.
    */
-  default boolean delete(byte[] key) throws IOException {
-    return false;
-  }
+  boolean delete(byte[] key) throws IOException;
 
   /**
    * Delete the key-value pair associated with the given {@link KvRangeScan}
@@ -76,6 +74,9 @@ public interface KvBackend extends Closeable {
   /**
    * Executes a transactional operation on the KV backend.
    *
+   * <p>NOTE: Some backends may not support transactions, in which case this method should throw an
+   * UnsupportedOperationException.
+   *
    * @param executable The executable operation to perform transactionally.
    * @param <R> The type of the result.
    * @param <E> The type of exception that the executable may throw.
@@ -83,6 +84,8 @@ public interface KvBackend extends Closeable {
    * @throws E If the executable throws an exception.
    * @throws IOException If an I/O exception occurs during the transaction.
    */
-  <R, E extends Exception> R executeInTransaction(Executable<R, E> executable)
-      throws E, IOException;
+  default <R, E extends Exception> R executeInTransaction(Executable<R, E> executable)
+      throws E, IOException {
+    throw new UnsupportedOperationException("Transaction not supported");
+  }
 }
