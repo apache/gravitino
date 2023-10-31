@@ -43,14 +43,14 @@ This software is licensed under the Apache License version 2."
     └── distribution/package
         ├── bin/gravitino.sh            # Gravitino Server Launching scripts.
         ├── catalogs
-        │   └── hive/                   # Hive catalog dependencies and configuratons.
-        │   └── lakehouse-iceberg/      # Iceberg catalog dependencies and configuratons.
+        │   └── hive/                   # Hive catalog dependencies and configurations.
+        │   └── lakehouse-iceberg/      # Iceberg catalog dependencies and configurations.
         ├── conf/                       # All configuration for Gravitino.
         |   ├── gravitino.conf          # Gravitino Server configuration.
         |   ├── gravitino-env.sh        # Environment variables, etc., JAVA_HOME, GRAVITINO_HOME, and more.
         |   └── log4j2.properties       # log4j configuration for Gravitino Server.
         ├── libs/                       # Gravitino Server dependencies libraries.
-        └── logs/                       # Gravitino Server logs.
+        └── logs/                       # Gravitino Server logs. Automatically created after the Gravitino server starts.
         └── data/                       # Default directory for Gravitino Server to store data.
     ```
 
