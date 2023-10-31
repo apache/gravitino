@@ -93,7 +93,7 @@ public class RocksDBKvBackend implements KvBackend {
       handlePutWithTransaction(key, value, overwrite, tx);
     } catch (EntityAlreadyExistsException e) {
       throw e;
-    } catch (Throwable e) {
+    } catch (Exception e) {
       throw new IOException(e);
     }
   }
