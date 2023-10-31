@@ -80,7 +80,7 @@ Example JSON:
     "columns": [
         {
             "name": "id",
-            "type": "int",
+            "type": "i32",
             "comment": "id column comment"
         },
         {
@@ -90,7 +90,7 @@ Example JSON:
         },
         {
             "name": "age",
-            "type": "int",
+            "type": "i32",
             "comment": "age column comment"
         },
         {
