@@ -61,4 +61,4 @@ ssh -p 8022 datastrato@localhost (password: ds123, this is a sudo user)
 - Expose `50010` port for the HDFS DataNode
 
 ### 0.1.5
-- Rollback `Map container hostname to `127.0.0.1` before starting Hadoop` of `datastrato/gravitino-ci-hive:0.1.4`
+- Rollback `Map container hostname to 127.0.0.1 before starting Hadoop` of `datastrato/gravitino-ci-hive:0.1.4`

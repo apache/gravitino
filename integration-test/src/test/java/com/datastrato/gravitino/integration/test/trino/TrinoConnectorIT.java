@@ -395,42 +395,33 @@ public class TrinoConnectorIT extends AbstractIT {
 
   private static boolean testTrinoJdbcConnection(int trinoPort) {
     final String dbUrl = String.format("jdbc:trino://127.0.0.1:%d", trinoPort);
-    Statement stmt = null;
+
     try {
       trinoJdbcConnection = DriverManager.getConnection(dbUrl, "admin", "");
-      closer.register(trinoJdbcConnection);
-      stmt = trinoJdbcConnection.createStatement();
-      ResultSet rs = stmt.executeQuery("select 1");
+    } catch (SQLException e) {
+      Assertions.fail(e.getMessage());
+    }
+    closer.register(trinoJdbcConnection);
+
+    try (Statement stmt = trinoJdbcConnection.createStatement();
+        ResultSet rs = stmt.executeQuery("select 1")) {
       while (rs.next()) {
         int one = rs.getInt(1);
         Assertions.assertEquals(1, one);
       }
-      rs.close();
-      stmt.close();
-    } catch (SQLException se) {
-      LOG.error(se.getMessage(), se);
-      if (se.getMessage().contains("Trino server is still initializing")) {
-        return false;
-      }
-      Assertions.fail(se.getMessage());
-    } catch (Exception e) {
+    } catch (SQLException e) {
       LOG.error(e.getMessage(), e);
       Assertions.fail(e.getMessage());
-    } finally {
-      try {
-        if (stmt != null) stmt.close();
-      } catch (SQLException se) {
-      } // do nothing
-    } // end try
+    }
+
     return true;
   }
 
   private static ArrayList<ArrayList<String>> queryTrino(String sql) {
     LOG.info("queryTrino() SQL: {}", sql);
     ArrayList<ArrayList<String>> queryData = new ArrayList<>();
-    try {
-      Statement stmt = trinoJdbcConnection.createStatement();
-      ResultSet rs = stmt.executeQuery(sql);
+    try (Statement stmt = trinoJdbcConnection.createStatement();
+        ResultSet rs = stmt.executeQuery(sql)) {
       ResultSetMetaData metaData = rs.getMetaData();
       int columnCount = metaData.getColumnCount();
 
@@ -442,8 +433,6 @@ public class TrinoConnectorIT extends AbstractIT {
         }
         queryData.add(record);
       }
-      rs.close();
-      stmt.close();
     } catch (SQLException e) {
       LOG.error(e.getMessage(), e);
       Assertions.fail(e.getMessage());
@@ -453,10 +442,8 @@ public class TrinoConnectorIT extends AbstractIT {
 
   private static void updateTrino(String sql) {
     LOG.info("updateTrino() SQL: {}", sql);
-    try {
-      Statement stmt = trinoJdbcConnection.createStatement();
+    try (Statement stmt = trinoJdbcConnection.createStatement()) {
       stmt.executeUpdate(sql);
-      stmt.close();
     } catch (SQLException e) {
       LOG.error(e.getMessage(), e);
       Assertions.fail(e.getMessage());

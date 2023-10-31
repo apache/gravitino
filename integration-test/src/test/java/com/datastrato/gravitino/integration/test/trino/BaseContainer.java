@@ -47,8 +47,6 @@ public abstract class BaseContainer implements AutoCloseable {
   private final Map<String, String> extraHosts;
   // Network of the container
   private final Optional<Network> network;
-  // Retry limit for container startup
-  private final int startupRetryLimit;
 
   private final GenericContainer<?> container;
 
@@ -59,8 +57,7 @@ public abstract class BaseContainer implements AutoCloseable {
       Map<String, String> extraHosts,
       Map<String, String> filesToMount,
       Map<String, String> envVars,
-      Optional<Network> network,
-      int startupRetryLimit) {
+      Optional<Network> network) {
     this.container = new GenericContainer<>(requireNonNull(image, "image is null"));
     this.ports = requireNonNull(ports, "ports is null");
     this.hostName = requireNonNull(hostName, "hostName is null");
@@ -68,7 +65,7 @@ public abstract class BaseContainer implements AutoCloseable {
     this.filesToMount = requireNonNull(filesToMount, "filesToMount is null");
     this.envVars = requireNonNull(envVars, "envVars is null");
     this.network = requireNonNull(network, "network is null");
-    this.startupRetryLimit = startupRetryLimit;
+
     setupContainer();
   }
 
@@ -116,8 +113,7 @@ public abstract class BaseContainer implements AutoCloseable {
         containerResponse.getNetworkSettings().getNetworks();
     Assertions.assertEquals(1, containerNetworkMap.size());
     for (Map.Entry<String, ContainerNetwork> entry : containerNetworkMap.entrySet()) {
-      ipAddress = entry.getValue().getIpAddress();
-      break;
+      return entry.getValue().getIpAddress();
     }
 
     return ipAddress;
@@ -151,7 +147,6 @@ public abstract class BaseContainer implements AutoCloseable {
     protected Map<String, String> filesToMount = ImmutableMap.of();
     protected Map<String, String> envVars = ImmutableMap.of();
     protected Optional<Network> network = Optional.empty();
-    protected int startupRetryLimit = 5;
 
     protected SELF self;
 
@@ -192,11 +187,6 @@ public abstract class BaseContainer implements AutoCloseable {
 
     public SELF withNetwork(Network network) {
       this.network = Optional.of(network);
-      return self;
-    }
-
-    public SELF withStartupRetryLimit(int startupRetryLimit) {
-      this.startupRetryLimit = startupRetryLimit;
       return self;
     }
 

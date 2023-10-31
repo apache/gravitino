@@ -38,9 +38,8 @@ public class TrinoContainer extends BaseContainer {
       Map<String, String> extraHosts,
       Map<String, String> filesToMount,
       Map<String, String> envVars,
-      Optional<Network> network,
-      int startupRetryLimit) {
-    super(image, hostName, ports, extraHosts, filesToMount, envVars, network, startupRetryLimit);
+      Optional<Network> network) {
+    super(image, hostName, ports, extraHosts, filesToMount, envVars, network);
   }
 
   @Override
@@ -60,14 +59,7 @@ public class TrinoContainer extends BaseContainer {
     @Override
     public TrinoContainer build() {
       return new TrinoContainer(
-          image,
-          hostName,
-          exposePorts,
-          extraHosts,
-          filesToMount,
-          envVars,
-          network,
-          startupRetryLimit);
+          image, hostName, exposePorts, extraHosts, filesToMount, envVars, network);
     }
   }
 }

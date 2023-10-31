@@ -32,9 +32,8 @@ public class HiveContainer extends BaseContainer {
       Map<String, String> extraHosts,
       Map<String, String> filesToMount,
       Map<String, String> envVars,
-      Optional<Network> network,
-      int startupRetryLimit) {
-    super(image, hostName, ports, extraHosts, filesToMount, envVars, network, startupRetryLimit);
+      Optional<Network> network) {
+    super(image, hostName, ports, extraHosts, filesToMount, envVars, network);
   }
 
   @Override
@@ -58,14 +57,7 @@ public class HiveContainer extends BaseContainer {
     @Override
     public HiveContainer build() {
       return new HiveContainer(
-          image,
-          hostName,
-          exposePorts,
-          extraHosts,
-          filesToMount,
-          envVars,
-          network,
-          startupRetryLimit);
+          image, hostName, exposePorts, extraHosts, filesToMount, envVars, network);
     }
   }
 }
