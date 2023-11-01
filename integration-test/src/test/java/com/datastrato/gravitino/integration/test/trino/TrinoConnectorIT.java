@@ -155,7 +155,7 @@ public class TrinoConnectorIT extends AbstractIT {
     trinoContainer.start();
 
     // Test Trino JDBC connection
-    testTrinoJdbcConnection();
+    checkTrinoContainerStatus();
 
     createSchemaInTrino();
   }
@@ -200,18 +200,21 @@ public class TrinoConnectorIT extends AbstractIT {
     Assertions.assertTrue(isHiveContainerReady, "Hive container startup failed!");
   }
 
-  static void testTrinoJdbcConnection() {
+  static void checkTrinoContainerStatus() {
     int nRetry = 0;
     boolean isTrinoJdbcConnectionReady = false;
     int sleepTime = 5000;
     while (nRetry++ < 10 && !isTrinoJdbcConnectionReady) {
-      isTrinoJdbcConnectionReady =
-          testTrinoJdbcConnection(trinoContainer.getMappedPort(TrinoContainer.TRINO_PORT));
-      try {
-        Thread.sleep(sleepTime);
-        LOG.warn("Waiting for trino server to be ready... ({}ms)", nRetry * sleepTime);
-      } catch (InterruptedException e) {
-        // ignore
+      isTrinoJdbcConnectionReady = testTrinoJdbcConnection();
+      if (isTrinoJdbcConnectionReady) {
+        break;
+      } else {
+        try {
+          Thread.sleep(sleepTime);
+          LOG.warn("Waiting for trino server to be ready... ({}ms)", nRetry * sleepTime);
+        } catch (InterruptedException e) {
+          // ignore
+        }
       }
     }
     Assertions.assertTrue(isTrinoJdbcConnectionReady, "Test Trino JDBC connection failed!");
@@ -393,15 +396,17 @@ public class TrinoConnectorIT extends AbstractIT {
     Assertions.assertEquals(joinData, joinQueryData);
   }
 
-  private static boolean testTrinoJdbcConnection(int trinoPort) {
-    final String dbUrl = String.format("jdbc:trino://127.0.0.1:%d", trinoPort);
+  private static boolean testTrinoJdbcConnection() {
+    final String dbUrl =
+        String.format(
+            "jdbc:trino://127.0.0.1:%d", trinoContainer.getMappedPort(TrinoContainer.TRINO_PORT));
 
     try {
       trinoJdbcConnection = DriverManager.getConnection(dbUrl, "admin", "");
+      closer.register(trinoJdbcConnection);
     } catch (SQLException e) {
       Assertions.fail(e.getMessage());
     }
-    closer.register(trinoJdbcConnection);
 
     try (Statement stmt = trinoJdbcConnection.createStatement();
         ResultSet rs = stmt.executeQuery("select 1")) {
@@ -410,8 +415,9 @@ public class TrinoConnectorIT extends AbstractIT {
         Assertions.assertEquals(1, one);
       }
     } catch (SQLException e) {
-      LOG.error(e.getMessage(), e);
-      Assertions.fail(e.getMessage());
+      // Maybe Trino server is still initialing
+      LOG.warn(e.getMessage(), e);
+      return false;
     }
 
     return true;
