@@ -38,6 +38,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.Getter;
@@ -58,6 +59,11 @@ public class KvEntityStore implements EntityStore {
       ImmutableMap.of("RocksDBKvBackend", RocksDBKvBackend.class.getCanonicalName());
 
   @Getter @VisibleForTesting private KvBackend backend;
+
+  // Lock to control the concurrency of the entity store, to be more exact, the concurrency of
+  // accessing
+  // the underlying kv store.
+  private ReentrantReadWriteLock reentrantReadWriteLock;
   private EntityKeyEncoder<byte[]> entityKeyEncoder;
   private NameMappingService nameMappingService;
   private EntitySerDe serDe;
@@ -69,6 +75,7 @@ public class KvEntityStore implements EntityStore {
     //  instance, We should make it configurable in the future.
     this.nameMappingService = new KvNameMappingService(backend);
     this.entityKeyEncoder = new BinaryEntityKeyEncoder(nameMappingService);
+    this.reentrantReadWriteLock = new ReentrantReadWriteLock();
   }
 
   @Override
@@ -89,14 +96,17 @@ public class KvEntityStore implements EntityStore {
 
     byte[] endKey = Bytes.increment(Bytes.wrap(startKey)).get();
     List<Pair<byte[], byte[]>> kvs =
-        backend.scan(
-            new KvRangeScan.KvRangeScanBuilder()
-                .start(startKey)
-                .end(endKey)
-                .startInclusive(true)
-                .endInclusive(false)
-                .limit(Integer.MAX_VALUE)
-                .build());
+        executeInWithLock(
+            () ->
+                backend.scan(
+                    new KvRangeScan.KvRangeScanBuilder()
+                        .start(startKey)
+                        .end(endKey)
+                        .startInclusive(true)
+                        .endInclusive(false)
+                        .limit(Integer.MAX_VALUE)
+                        .build()),
+            true);
 
     for (Pair<byte[], byte[]> pairs : kvs) {
       entities.add(serDe.deserialize(pairs.getRight(), e));
@@ -112,7 +122,30 @@ public class KvEntityStore implements EntityStore {
       return false;
     }
 
-    return backend.get(key) != null;
+    return executeInWithLock(() -> backend.get(key) != null, true);
+  }
+
+  @FunctionalInterface
+  interface IOExecutable<R> {
+    R execute() throws IOException;
+  }
+
+  private <R> R executeInWithLock(IOExecutable<R> executable, boolean readOnly) throws IOException {
+    if (readOnly) {
+      reentrantReadWriteLock.readLock().lock();
+    } else {
+      reentrantReadWriteLock.writeLock().lock();
+    }
+
+    try {
+      return executable.execute();
+    } finally {
+      if (readOnly) {
+        reentrantReadWriteLock.readLock().unlock();
+      } else {
+        reentrantReadWriteLock.writeLock().unlock();
+      }
+    }
   }
 
   @Override
@@ -120,7 +153,13 @@ public class KvEntityStore implements EntityStore {
       throws IOException, EntityAlreadyExistsException {
     byte[] key = entityKeyEncoder.encode(e.nameIdentifier(), e.type());
     byte[] value = serDe.serialize(e);
-    backend.put(key, value, overwritten);
+
+    executeInWithLock(
+        () -> {
+          backend.put(key, value, overwritten);
+          return null;
+        },
+        false);
   }
 
   @Override
@@ -128,37 +167,43 @@ public class KvEntityStore implements EntityStore {
       NameIdentifier ident, Class<E> type, EntityType entityType, Function<E, E> updater)
       throws IOException, NoSuchEntityException, AlreadyExistsException {
     byte[] key = entityKeyEncoder.encode(ident, entityType);
-    return executeInTransaction(
-        () -> {
-          byte[] value = backend.get(key);
-          if (value == null) {
-            throw new NoSuchEntityException(ident.toString());
-          }
 
-          E e = serDe.deserialize(value, type);
-          E updatedE = updater.apply(e);
-          if (updatedE.nameIdentifier().equals(ident)) {
-            backend.put(key, serDe.serialize(updatedE), true);
-            return updatedE;
-          }
+    return executeInWithLock(
+        () ->
+            executeInTransaction(
+                () -> {
+                  byte[] value = backend.get(key);
+                  if (value == null) {
+                    throw new NoSuchEntityException(ident.toString());
+                  }
 
-          // If we have changed the name of the entity, We would do the following steps:
-          // Check whether the new entities already existed
-          boolean newEntityExist = exists(updatedE.nameIdentifier(), entityType);
-          if (newEntityExist) {
-            throw new AlreadyExistsException(
-                String.format(
-                    "Entity %s already exist, please check again", updatedE.nameIdentifier()));
-          }
+                  E e = serDe.deserialize(value, type);
+                  E updatedE = updater.apply(e);
+                  if (updatedE.nameIdentifier().equals(ident)) {
+                    backend.put(key, serDe.serialize(updatedE), true);
+                    return updatedE;
+                  }
 
-          // Update the name mapping
-          nameMappingService.updateName(
-              generateKeyForMapping(ident), generateKeyForMapping(updatedE.nameIdentifier()));
+                  // If we have changed the name of the entity, We would do the following steps:
+                  // Check whether the new entities already existed
+                  boolean newEntityExist = exists(updatedE.nameIdentifier(), entityType);
+                  if (newEntityExist) {
+                    throw new AlreadyExistsException(
+                        String.format(
+                            "Entity %s already exist, please check again",
+                            updatedE.nameIdentifier()));
+                  }
 
-          // Update the entity to store
-          backend.put(key, serDe.serialize(updatedE), true);
-          return updatedE;
-        });
+                  // Update the name mapping
+                  nameMappingService.updateName(
+                      generateKeyForMapping(ident),
+                      generateKeyForMapping(updatedE.nameIdentifier()));
+
+                  // Update the entity to store
+                  backend.put(key, serDe.serialize(updatedE), true);
+                  return updatedE;
+                }),
+        false);
   }
 
   private String concatIdAndName(long[] namespaceIds, String name) {
@@ -227,7 +272,7 @@ public class KvEntityStore implements EntityStore {
       throw new NoSuchEntityException(ident.toString());
     }
 
-    byte[] value = backend.get(key);
+    byte[] value = executeInWithLock(() -> backend.get(key), true);
     if (value == null) {
       throw new NoSuchEntityException(ident.toString());
     }
@@ -291,44 +336,49 @@ public class KvEntityStore implements EntityStore {
   @Override
   public boolean delete(NameIdentifier ident, EntityType entityType, boolean cascade)
       throws IOException {
-    if (!exists(ident, entityType)) {
-      return false;
-    }
+    return executeInWithLock(
+        () -> {
+          if (!exists(ident, entityType)) {
+            return false;
+          }
 
-    byte[] dataKey = entityKeyEncoder.encode(ident, entityType, true);
-    List<byte[]> subEntityPrefix = getSubEntitiesPrefix(ident, entityType);
-    if (subEntityPrefix.isEmpty()) {
-      // has no sub-entities
-      return backend.delete(dataKey);
-    }
+          byte[] dataKey = entityKeyEncoder.encode(ident, entityType, true);
+          List<byte[]> subEntityPrefix = getSubEntitiesPrefix(ident, entityType);
+          if (subEntityPrefix.isEmpty()) {
+            // has no sub-entities
+            return backend.delete(dataKey);
+          }
 
-    byte[] directChild = Iterables.getLast(subEntityPrefix);
-    byte[] endKey = Bytes.increment(Bytes.wrap(directChild)).get();
-    List<Pair<byte[], byte[]>> kvs =
-        backend.scan(
-            new KvRangeScan.KvRangeScanBuilder()
-                .start(directChild)
-                .end(endKey)
-                .startInclusive(true)
-                .endInclusive(false)
-                .limit(1)
-                .build());
+          byte[] directChild = Iterables.getLast(subEntityPrefix);
+          byte[] endKey = Bytes.increment(Bytes.wrap(directChild)).get();
+          List<Pair<byte[], byte[]>> kvs =
+              backend.scan(
+                  new KvRangeScan.KvRangeScanBuilder()
+                      .start(directChild)
+                      .end(endKey)
+                      .startInclusive(true)
+                      .endInclusive(false)
+                      .limit(1)
+                      .build());
 
-    if (!cascade && !kvs.isEmpty()) {
-      throw new NonEmptyEntityException(
-          String.format("Entity %s has sub-entities, you should remove sub-entities first", ident));
-    }
+          if (!cascade && !kvs.isEmpty()) {
+            throw new NonEmptyEntityException(
+                String.format(
+                    "Entity %s has sub-entities, you should remove sub-entities first", ident));
+          }
 
-    for (byte[] prefix : subEntityPrefix) {
-      backend.deleteRange(
-          new KvRangeScan.KvRangeScanBuilder()
-              .start(prefix)
-              .startInclusive(true)
-              .end(Bytes.increment(Bytes.wrap(prefix)).get())
-              .build());
-    }
+          for (byte[] prefix : subEntityPrefix) {
+            backend.deleteRange(
+                new KvRangeScan.KvRangeScanBuilder()
+                    .start(prefix)
+                    .startInclusive(true)
+                    .end(Bytes.increment(Bytes.wrap(prefix)).get())
+                    .build());
+          }
 
-    return backend.delete(dataKey);
+          return backend.delete(dataKey);
+        },
+        false);
   }
 
   @Override
