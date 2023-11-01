@@ -157,12 +157,28 @@ public class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
     sql("CREATE DATABASE IF NOT EXISTS " + namespaceName);
     sql(
         String.format(
-            "CREATE TABLE %s (id bigint COMMENT 'unique id',data string) using iceberg",
+            "CREATE TABLE %s (id bigint COMMENT 'unique id',data string, ts timestamp) USING iceberg "
+                + "PARTITIONED BY (bucket(2, id), days(ts))",
             tableName));
-    sql(String.format(" INSERT INTO %s VALUES (1, 'a'), (2, 'b');", tableName));
-    sql(String.format(" INSERT INTO %s VALUES (3, 'c'), (4, 'd');", tableName));
-    Map<String, String> m = convertToStringMap(sql("SELECT * FROM " + tableName));
-    Assertions.assertEquals(m, ImmutableMap.of("1", "a", "2", "b", "3", "c", "4", "d"));
+    sql(
+        String.format(
+            " INSERT INTO %s VALUES (1, 'a', cast('2023-10-01 01:00:00' as timestamp));",
+            tableName));
+    sql(
+        String.format(
+            " INSERT INTO %s VALUES (2, 'b', cast('2023-10-02 01:00:00' as timestamp));",
+            tableName));
+    sql(
+        String.format(
+            " INSERT INTO %s VALUES (3, 'c', cast('2023-10-03 01:00:00' as timestamp));",
+            tableName));
+    sql(
+        String.format(
+            " INSERT INTO %s VALUES (4, 'd', cast('2023-10-04 01:00:00' as timestamp));",
+            tableName));
+    Map<String, String> m =
+        convertToStringMap(sql("SELECT * FROM " + tableName + " WHERE ts > '2023-10-03 00:00:00'"));
+    Assertions.assertEquals(m, ImmutableMap.of("3", "c", "4", "d"));
   }
 
   @Test
