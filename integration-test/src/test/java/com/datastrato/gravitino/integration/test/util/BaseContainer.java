@@ -2,7 +2,7 @@
  * Copyright 2023 Datastrato.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.gravitino.integration.test.trino;
+package com.datastrato.gravitino.integration.test.util;
 
 import static java.util.Objects.requireNonNull;
 import static org.testcontainers.utility.MountableFile.forHostPath;
@@ -10,6 +10,7 @@ import static org.testcontainers.utility.MountableFile.forHostPath;
 import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.api.command.InspectContainerResponse;
 import com.github.dockerjava.api.model.ContainerNetwork;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.io.IOException;
@@ -18,7 +19,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
-import org.junit.jupiter.api.Assertions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.DockerClientFactory;
@@ -98,12 +98,12 @@ public abstract class BaseContainer implements AutoCloseable {
   }
 
   // This method is used to get the expose port number of the container.
-  protected Integer getMappedPort(int exposedPort) {
+  public Integer getMappedPort(int exposedPort) {
     return container.getMappedPort(exposedPort);
   }
 
   // This method is used to get the IP address of the container.
-  protected String getContainerIpAddress() {
+  public String getContainerIpAddress() {
     DockerClient dockerClient = DockerClientFactory.instance().client();
     InspectContainerResponse containerResponse =
         dockerClient.inspectContainerCmd(container.getContainerId()).exec();
@@ -111,7 +111,9 @@ public abstract class BaseContainer implements AutoCloseable {
     String ipAddress = containerResponse.getNetworkSettings().getIpAddress();
     Map<String, ContainerNetwork> containerNetworkMap =
         containerResponse.getNetworkSettings().getNetworks();
-    Assertions.assertEquals(1, containerNetworkMap.size());
+    Preconditions.checkArgument(
+        (containerNetworkMap.size() == 1),
+        "Container \"NetworkMap\" size is required equals to 1.");
     for (Map.Entry<String, ContainerNetwork> entry : containerNetworkMap.entrySet()) {
       return entry.getValue().getIpAddress();
     }
@@ -122,6 +124,8 @@ public abstract class BaseContainer implements AutoCloseable {
   public void start() {
     container.start();
   }
+
+  protected abstract boolean checkContainerStatus(int retryLimit);
 
   // Execute the command in the container.
   public Container.ExecResult executeInContainer(String... commandAndArgs) {

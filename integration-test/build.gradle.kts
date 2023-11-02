@@ -147,7 +147,7 @@ fun printDockerCheckInfo() {
   println("Docker server status ........................................ [${if (dockerRunning) "running" else "stop"}]")
   println("Gravitino IT Docker container is already running ............. [${if (hiveContainerRunning) "yes" else "no"}]")
   if (OperatingSystem.current().isMacOsX() && !(dockerRunning && macDockerConnector)) {
-    println("Run test cases without `gravitino-tirno-it` tag .............. [$testMode test]")
+    println("Run test cases without `gravitino-trino-it` tag .............. [$testMode test]")
   }
 
   if (dockerRunning && hiveContainerRunning) {
@@ -233,7 +233,7 @@ tasks.test {
     doFirst {
       copy {
         from("${project.rootDir}/dev/docker/trino/conf")
-        into("build/tirno-conf")
+        into("build/trino-conf")
         fileMode = 0b111101101
       }
 
@@ -243,7 +243,7 @@ tasks.test {
       environment("HADOOP_USER_NAME", "root")
       environment("HADOOP_HOME", "/tmp")
       environment("PROJECT_VERSION", version)
-      environment("TRINO_CONF_DIR", buildDir.path + "/tirno-conf")
+      environment("TRINO_CONF_DIR", buildDir.path + "/trino-conf")
 
       val testMode = project.properties["testMode"] as? String ?: "embedded"
       systemProperty("gravitino.log.path", buildDir.path + "/integration-test.log")

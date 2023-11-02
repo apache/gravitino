@@ -2,7 +2,7 @@
  * Copyright 2023 Datastrato.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.gravitino.integration.test.trino;
+package com.datastrato.gravitino.integration.test.util;
 
 import static java.util.Objects.requireNonNull;
 import static org.testcontainers.containers.output.OutputFrame.OutputType.END;

@@ -15,9 +15,14 @@ import com.datastrato.gravitino.server.GravitinoServer;
 import com.datastrato.gravitino.server.ServerConfig;
 import com.datastrato.gravitino.server.web.JettyServerConfig;
 import java.io.IOException;
+import java.net.InetAddress;
+import java.net.NetworkInterface;
+import java.net.SocketException;
+import java.net.UnknownHostException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
@@ -111,5 +116,32 @@ public class AbstractIT {
       GravitinoITUtils.stopGravitinoServer();
     }
     LOG.info("Tearing down Gravitino Server");
+  }
+
+  // Get host IP from primary NIC
+  protected static String getPrimaryNICIp() {
+    String hostIP = "127.0.0.1";
+    try {
+      NetworkInterface networkInterface = NetworkInterface.getByName("en0"); // macOS
+      if (networkInterface == null) {
+        networkInterface = NetworkInterface.getByName("eth0"); // Linux and Windows
+      }
+      if (networkInterface != null) {
+        Enumeration<InetAddress> addresses = networkInterface.getInetAddresses();
+        while (addresses.hasMoreElements()) {
+          InetAddress address = addresses.nextElement();
+          if (!address.isLoopbackAddress() && address.getHostAddress().indexOf(':') == -1) {
+            hostIP = address.getHostAddress().replace("/", ""); // remove the first char '/'
+            break;
+          }
+        }
+      } else {
+        InetAddress ip = InetAddress.getLocalHost();
+        hostIP = ip.getHostAddress();
+      }
+    } catch (SocketException | UnknownHostException e) {
+      LOG.error(e.getMessage(), e);
+    }
+    return hostIP;
   }
 }
