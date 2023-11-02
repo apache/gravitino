@@ -61,8 +61,7 @@ public class KvEntityStore implements EntityStore {
   @Getter @VisibleForTesting private KvBackend backend;
 
   // Lock to control the concurrency of the entity store, to be more exact, the concurrency of
-  // accessing
-  // the underlying kv store.
+  // accessing the underlying kv store.
   private ReentrantReadWriteLock reentrantReadWriteLock;
   private EntityKeyEncoder<byte[]> entityKeyEncoder;
   private NameMappingService nameMappingService;

@@ -797,7 +797,7 @@ public class TestKvEntityStorage {
             () -> {
               store.put(catalog);
               return null;
-            }); /* overwrite is false, then only one put will be success */
+            }); /* overwrite is false, then only one put will success */
       }
 
       int totalFailed = 0;
@@ -841,7 +841,7 @@ public class TestKvEntityStorage {
           // NoSuchEntityException: because old entity has been renamed by the other thread already,
           // we can't get the old one.
           // AlreadyExistsException: because the entity has been renamed by the other thread
-          // already, we can rename it again.
+          // already, we can't rename it again.
           Assertions.assertTrue(
               e.getCause() instanceof AlreadyExistsException
                   || e.getCause() instanceof NoSuchEntityException);
