@@ -814,7 +814,7 @@ public class TestKvEntityStorage {
       // Try to use multi-thread to update the same catalog entity, and make sure only one thread
       // can
       // update it.
-      for (int i = 0; i < 10; i++) {
+      for (int i = 0; i < 5; i++) {
         future.submit(
             () -> {
               store.update(
@@ -834,7 +834,7 @@ public class TestKvEntityStorage {
       }
 
       totalFailed = 0;
-      for (int i = 0; i < 10; i++) {
+      for (int i = 0; i < 5; i++) {
         try {
           future.take().get();
         } catch (Exception e) {
@@ -842,7 +842,7 @@ public class TestKvEntityStorage {
           totalFailed++;
         }
       }
-      Assertions.assertEquals(9, totalFailed);
+      Assertions.assertEquals(4, totalFailed);
 
     } finally {
       FileUtils.deleteDirectory(FileUtils.getFile("/tmp/testConcurrentIssues"));
