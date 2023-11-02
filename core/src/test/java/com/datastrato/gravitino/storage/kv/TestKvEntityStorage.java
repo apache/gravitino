@@ -795,9 +795,9 @@ public class TestKvEntityStorage {
       for (int i = 0; i < 20; i++) {
         future.submit(
             () -> {
-              store.put(catalog);
+              store.put(catalog); /* overwrite is false, then only one will save it successfully */
               return null;
-            }); /* overwrite is false, then only one put will success */
+            });
       }
 
       int totalFailed = 0;
@@ -816,6 +816,8 @@ public class TestKvEntityStorage {
       for (int i = 0; i < 10; i++) {
         future.submit(
             () -> {
+              // Ten threads rename the catalog entity from 'catalog' to 'catalog1' at the same
+              // time.
               store.update(
                   NameIdentifier.of("metalake", "catalog"),
                   CatalogEntity.class,

@@ -95,7 +95,7 @@ public class KvEntityStore implements EntityStore {
 
     byte[] endKey = Bytes.increment(Bytes.wrap(startKey)).get();
     List<Pair<byte[], byte[]>> kvs =
-        executeInWithLock(
+        executeWithReadLock(
             () ->
                 backend.scan(
                     new KvRangeScan.KvRangeScanBuilder()
@@ -104,8 +104,7 @@ public class KvEntityStore implements EntityStore {
                         .startInclusive(true)
                         .endInclusive(false)
                         .limit(Integer.MAX_VALUE)
-                        .build()),
-            true);
+                        .build()));
 
     for (Pair<byte[], byte[]> pairs : kvs) {
       entities.add(serDe.deserialize(pairs.getRight(), e));
@@ -121,30 +120,7 @@ public class KvEntityStore implements EntityStore {
       return false;
     }
 
-    return executeInWithLock(() -> backend.get(key) != null, true);
-  }
-
-  @FunctionalInterface
-  interface IOExecutable<R> {
-    R execute() throws IOException;
-  }
-
-  private <R> R executeInWithLock(IOExecutable<R> executable, boolean readOnly) throws IOException {
-    if (readOnly) {
-      reentrantReadWriteLock.readLock().lock();
-    } else {
-      reentrantReadWriteLock.writeLock().lock();
-    }
-
-    try {
-      return executable.execute();
-    } finally {
-      if (readOnly) {
-        reentrantReadWriteLock.readLock().unlock();
-      } else {
-        reentrantReadWriteLock.writeLock().unlock();
-      }
-    }
+    return executeWithReadLock(() -> backend.get(key) != null);
   }
 
   @Override
@@ -153,12 +129,11 @@ public class KvEntityStore implements EntityStore {
     byte[] key = entityKeyEncoder.encode(e.nameIdentifier(), e.type());
     byte[] value = serDe.serialize(e);
 
-    executeInWithLock(
+    executeWithWriteLock(
         () -> {
           backend.put(key, value, overwritten);
           return null;
-        },
-        false);
+        });
   }
 
   @Override
@@ -167,7 +142,7 @@ public class KvEntityStore implements EntityStore {
       throws IOException, NoSuchEntityException, AlreadyExistsException {
     byte[] key = entityKeyEncoder.encode(ident, entityType);
 
-    return executeInWithLock(
+    return executeWithWriteLock(
         () ->
             executeInTransaction(
                 () -> {
@@ -201,8 +176,7 @@ public class KvEntityStore implements EntityStore {
                   // Update the entity to store
                   backend.put(key, serDe.serialize(updatedE), true);
                   return updatedE;
-                }),
-        false);
+                }));
   }
 
   private String concatIdAndName(long[] namespaceIds, String name) {
@@ -271,7 +245,7 @@ public class KvEntityStore implements EntityStore {
       throw new NoSuchEntityException(ident.toString());
     }
 
-    byte[] value = executeInWithLock(() -> backend.get(key), true);
+    byte[] value = executeWithReadLock(() -> backend.get(key));
     if (value == null) {
       throw new NoSuchEntityException(ident.toString());
     }
@@ -335,7 +309,7 @@ public class KvEntityStore implements EntityStore {
   @Override
   public boolean delete(NameIdentifier ident, EntityType entityType, boolean cascade)
       throws IOException {
-    return executeInWithLock(
+    return executeWithWriteLock(
         () -> {
           if (!exists(ident, entityType)) {
             return false;
@@ -376,8 +350,7 @@ public class KvEntityStore implements EntityStore {
           }
 
           return backend.delete(dataKey);
-        },
-        false);
+        });
   }
 
   @Override
@@ -406,6 +379,29 @@ public class KvEntityStore implements EntityStore {
       LOGGER.error("Failed to create and initialize KvBackend by name '{}'.", backendName, e);
       throw new RuntimeException(
           "Failed to create and initialize KvBackend by name: " + backendName, e);
+    }
+  }
+
+  @FunctionalInterface
+  interface IOExecutable<R> {
+    R execute() throws IOException;
+  }
+
+  private <R> R executeWithReadLock(IOExecutable<R> executable) throws IOException {
+    reentrantReadWriteLock.readLock().lock();
+    try {
+      return executable.execute();
+    } finally {
+      reentrantReadWriteLock.readLock().unlock();
+    }
+  }
+
+  private <R> R executeWithWriteLock(IOExecutable<R> executable) throws IOException {
+    reentrantReadWriteLock.writeLock().lock();
+    try {
+      return executable.execute();
+    } finally {
+      reentrantReadWriteLock.writeLock().unlock();
     }
   }
 }
