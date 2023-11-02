@@ -30,7 +30,9 @@ import com.datastrato.gravitino.meta.CatalogEntity;
 import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.meta.SchemaVersion;
 import com.datastrato.gravitino.meta.TableEntity;
+import com.google.common.io.Files;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import java.io.File;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
@@ -747,10 +749,12 @@ public class TestKvEntityStorage {
   @Test
   void testConcurrentIssues() throws IOException, ExecutionException, InterruptedException {
     Config config = Mockito.mock(Config.class);
+    File file = Files.createTempDir();
+    file.deleteOnExit();
     Mockito.when(config.get(ENTITY_STORE)).thenReturn("kv");
     Mockito.when(config.get(ENTITY_KV_STORE)).thenReturn(DEFAULT_ENTITY_KV_STORE);
     Mockito.when(config.get(Configs.ENTITY_SERDE)).thenReturn("proto");
-    Mockito.when(config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)).thenReturn("/tmp/testConcurrentIssues");
+    Mockito.when(config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)).thenReturn(file.getAbsolutePath());
     ThreadPoolExecutor threadPoolExecutor =
         new ThreadPoolExecutor(
             10,
@@ -851,9 +855,6 @@ public class TestKvEntityStorage {
         }
       }
       Assertions.assertEquals(9, totalFailed);
-
-    } finally {
-      FileUtils.deleteDirectory(FileUtils.getFile("/tmp/testConcurrentIssues"));
     }
   }
 }
