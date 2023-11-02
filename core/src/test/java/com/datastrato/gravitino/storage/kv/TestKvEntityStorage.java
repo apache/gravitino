@@ -812,9 +812,8 @@ public class TestKvEntityStorage {
       Assertions.assertEquals(19, totalFailed);
 
       // Try to use multi-thread to update the same catalog entity, and make sure only one thread
-      // can
-      // update it.
-      for (int i = 0; i < 5; i++) {
+      // can update it.
+      for (int i = 0; i < 10; i++) {
         future.submit(
             () -> {
               store.update(
@@ -834,15 +833,22 @@ public class TestKvEntityStorage {
       }
 
       totalFailed = 0;
-      for (int i = 0; i < 5; i++) {
+      for (int i = 0; i < 10; i++) {
         try {
           future.take().get();
         } catch (Exception e) {
-          Assertions.assertTrue(e.getCause() instanceof AlreadyExistsException);
+          // It may throw NoSuchEntityException or AlreadyExistsException
+          // NoSuchEntityException: because old entity has been renamed by the other thread already,
+          // we can't get the old one.
+          // AlreadyExistsException: because the entity has been renamed by the other thread
+          // already, we can rename it again.
+          Assertions.assertTrue(
+              e.getCause() instanceof AlreadyExistsException
+                  || e.getCause() instanceof NoSuchEntityException);
           totalFailed++;
         }
       }
-      Assertions.assertEquals(4, totalFailed);
+      Assertions.assertEquals(9, totalFailed);
 
     } finally {
       FileUtils.deleteDirectory(FileUtils.getFile("/tmp/testConcurrentIssues"));
