@@ -180,7 +180,7 @@ public class TrinoConnectorIT extends AbstractIT {
 
   @Test
   @Order(1)
-  public void showSchemas() {
+  public void testShowSchemas() {
     String sql =
         String.format(
             "SHOW SCHEMAS FROM \"%s.%s\" LIKE '%s'", metalakeName, catalogName, databaseName);
@@ -190,7 +190,7 @@ public class TrinoConnectorIT extends AbstractIT {
 
   @Test
   @Order(2)
-  public void createTableTest() throws TException, InterruptedException {
+  public void testCreateTable() throws TException, InterruptedException {
     String sql3 =
         String.format(
             "CREATE TABLE \"%s.%s\".%s.%s (\n"
@@ -218,7 +218,7 @@ public class TrinoConnectorIT extends AbstractIT {
 
   @Order(3)
   @Test
-  public void showTableTest() {
+  public void testShowTable() {
     String sql =
         String.format(
             "SHOW TABLES FROM \"%s.%s\".%s LIKE '%s'",
@@ -229,7 +229,7 @@ public class TrinoConnectorIT extends AbstractIT {
 
   @Test
   @Order(4)
-  public void scenarioTestTable1() throws TException, InterruptedException {
+  public void testScenarioTable1() throws TException, InterruptedException {
     String sql3 =
         String.format(
             "CREATE TABLE \"%s.%s\".%s.%s (\n"
@@ -296,7 +296,7 @@ public class TrinoConnectorIT extends AbstractIT {
 
   @Test
   @Order(5)
-  public void scenarioTestTable2() throws TException, InterruptedException {
+  public void testScenarioTable2() throws TException, InterruptedException {
     String sql4 =
         String.format(
             "CREATE TABLE \"%s.%s\".%s.%s (\n"
@@ -360,7 +360,7 @@ public class TrinoConnectorIT extends AbstractIT {
 
   @Test
   @Order(6)
-  public void scenarioTestJoinTwoTable() {
+  public void testScenarioJoinTwoTable() {
     String sql9 =
         String.format(
             "SELECT * FROM (SELECT t1.user_name as user_name, gender, age, phone, consumer, recharge, event_time FROM \"%1$s.%2$s\".%3$s.%4$s AS t1\n"
