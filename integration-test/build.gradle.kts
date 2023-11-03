@@ -5,6 +5,7 @@
 
 import java.io.IOException
 import kotlin.io.*
+import org.gradle.internal.os.OperatingSystem
 
 plugins {
   `maven-publish`
@@ -111,6 +112,9 @@ dependencies {
   testImplementation(libs.scala.collection.compat)
   testImplementation(libs.sqlite.jdbc)
   testImplementation(libs.spark.hive)
+  testImplementation(libs.testcontainers)
+  testImplementation(libs.testcontainers.junit.jupiter)
+  testImplementation(libs.trino.jdbc)
 }
 
 /* Optimizing integration test execution conditions */
@@ -118,9 +122,11 @@ dependencies {
 var HIVE_IMAGE_NAME = "datastrato/gravitino-ci-hive"
 var HIVE_IMAGE_TAG_NAME = "${HIVE_IMAGE_NAME}:0.1.2"
 var EXCLUDE_DOCKER_TEST = true
+var EXCLUDE_TRINO_TEST = true
 // Use these 3 variables allow for more detailed control in the future.
 project.extra["dockerRunning"] = false
 project.extra["hiveContainerRunning"] = false
+project.extra["macDockerConnector"] = false
 
 fun printDockerCheckInfo() {
   val testMode = project.properties["testMode"] as? String ?: "embedded"
@@ -129,13 +135,20 @@ fun printDockerCheckInfo() {
   }
   val dockerRunning = project.extra["dockerRunning"] as? Boolean ?: false
   val hiveContainerRunning = project.extra["hiveContainerRunning"] as? Boolean ?: false
+  val macDockerConnector = project.extra["macDockerConnector"] as? Boolean ?: false
   if (dockerRunning && hiveContainerRunning) {
     EXCLUDE_DOCKER_TEST = false
+  }
+  if (dockerRunning && macDockerConnector) {
+    EXCLUDE_TRINO_TEST = false
   }
 
   println("------------------ Check Docker environment -----------------")
   println("Docker server status ........................................ [${if (dockerRunning) "running" else "stop"}]")
   println("Gravitino IT Docker container is already running ............. [${if (hiveContainerRunning) "yes" else "no"}]")
+  if (OperatingSystem.current().isMacOsX() && !(dockerRunning && macDockerConnector)) {
+    println("Run test cases without `gravitino-trino-it` tag .............. [$testMode test]")
+  }
 
   if (dockerRunning && hiveContainerRunning) {
     println("Use Gravitino IT Docker container to run all integration test. [$testMode test]")
@@ -146,6 +159,26 @@ fun printDockerCheckInfo() {
 }
 
 tasks {
+  register("isMacDockerConnectorRunning") {
+    doLast {
+      val processName = "docker-connector"
+      val command = "pgrep -x ${processName}"
+
+      try {
+        val execResult = project.exec {
+          commandLine("bash", "-c", command)
+        }
+        if (execResult.exitValue == 0) {
+          project.extra["macDockerConnector"] = true
+        } else {
+          project.extra["macDockerConnector"] = false
+        }
+      } catch (e: Exception) {
+        project.extra["macDockerConnector"] = false
+      }
+    }
+  }
+
   // Use this task to check if docker container is running
   register("checkContainerRunning") {
     doLast {
@@ -170,7 +203,7 @@ tasks {
 
   // Use this task to check if docker is running
   register("checkDockerRunning") {
-    dependsOn("checkContainerRunning")
+    dependsOn("checkContainerRunning", "isMacDockerConnectorRunning")
 
     doLast {
       try {
@@ -198,15 +231,23 @@ tasks.test {
     dependsOn("checkDockerRunning")
 
     doFirst {
+      copy {
+        from("${project.rootDir}/dev/docker/trino/conf")
+        into("build/trino-conf")
+        fileMode = 0b111101101
+      }
+
       // Default use MiniGravitino to run integration tests
       environment("GRAVITINO_ROOT_DIR", rootDir.path)
       // TODO: use hive user instead after we fix the permission issue #554
       environment("HADOOP_USER_NAME", "root")
       environment("HADOOP_HOME", "/tmp")
       environment("PROJECT_VERSION", version)
+      environment("TRINO_CONF_DIR", buildDir.path + "/trino-conf")
 
       val testMode = project.properties["testMode"] as? String ?: "embedded"
-      systemProperty("gravitino.log.path", buildDir.path)
+      systemProperty("gravitino.log.path", buildDir.path + "/integration-test.log")
+      delete(buildDir.path + "/integration-test.log")
       if (testMode == "deploy") {
         environment("GRAVITINO_HOME", rootDir.path + "/distribution/package")
         systemProperty("testMode", "deploy")
@@ -224,6 +265,12 @@ tasks.test {
           val resetColor = "\u001B[0m"
           println("${redColor}Gravitino-docker is not running locally, all integration test cases that tagged 'gravitino-docker-it' will be excluded.${resetColor}")
           excludeTags("gravitino-docker-it")
+        }
+        if (EXCLUDE_TRINO_TEST && OperatingSystem.current().isMacOsX()) {
+          val redColor = "\u001B[31m"
+          val resetColor = "\u001B[0m"
+          println("${redColor}mac-docker-connector is not running locally, all integration test cases that tagged 'gravitino-trino-it' will be excluded.${resetColor}")
+          excludeTags("gravitino-trino-it")
         }
       }
     }
