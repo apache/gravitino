@@ -8,7 +8,7 @@ gravitino.server.shutdown.timeout = 3000
 
 # THE CONFIGURATION FOR Gravitino WEB SERVER
 # The host name of the built-in web server
-gravitino.server.webserver.host = 127.0.0.1
+gravitino.server.webserver.host = 0.0.0.0
 # The http port number of the built-in web server
 gravitino.server.webserver.httpPort = 8090
 # The min thread size of the built-in web server
@@ -44,7 +44,7 @@ gravitino.auxService.names = iceberg-rest
 # Iceberg REST service classpath
 gravitino.auxService.iceberg-rest.classpath = catalogs/lakehouse-iceberg/libs, catalogs/lakehouse-iceberg/conf
 # Iceberg REST service host
-gravitino.auxService.iceberg-rest.host = 127.0.0.1
+gravitino.auxService.iceberg-rest.host = 0.0.0.0
 # Iceberg REST service http port
 gravitino.auxService.iceberg-rest.httpPort = 9001
 

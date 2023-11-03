@@ -38,3 +38,6 @@ server/src/main/resources/project.properties
 
 dev/docker/hive/packages
 docs/build
+
+dev/docker/tools/docker-connector
+dev/docker/tools/docker-connector.conf

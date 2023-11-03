@@ -29,7 +29,11 @@ public class ITUtils {
         OutputStream outputStream = Files.newOutputStream(Paths.get(configFileName))) {
       props.load(inputStream);
       props.putAll(configMap);
-      props.store(outputStream, null);
+      for (String key : props.stringPropertyNames()) {
+        String value = props.getProperty(key);
+        // Use customized write functions to avoid escaping `:` into `\:`.
+        outputStream.write((key + " = " + value + "\n").getBytes());
+      }
     }
   }
 }
