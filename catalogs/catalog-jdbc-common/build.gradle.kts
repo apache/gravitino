@@ -23,6 +23,7 @@ dependencies {
     implementation(libs.bundles.log4j)
     implementation(libs.commons.lang3)
     implementation(libs.commons.collections4)
+    implementation(libs.commons.dbcp2)
     implementation(libs.substrait.java.core) {
         exclude("com.fasterxml.jackson.core")
         exclude("com.fasterxml.jackson.datatype")
@@ -32,6 +33,11 @@ dependencies {
         exclude("org.slf4j")
     }
 
+    testImplementation(libs.commons.io)
+    testImplementation(libs.sqlite.jdbc)
+    testImplementation(libs.junit.jupiter.api)
+    testImplementation(libs.junit.jupiter.params)
+    testRuntimeOnly(libs.junit.jupiter.engine)
     compileOnly(libs.lombok)
     annotationProcessor(libs.lombok)
 }
