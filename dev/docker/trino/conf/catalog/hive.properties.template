@@ -1,0 +1,7 @@
+#
+# Copyright 2023 Datastrato.
+# This software is licensed under the Apache License version 2.
+#
+connector.name = hive
+hive.metastore.uri = thrift://HIVE_HOST_IP:9083
+hive.allow-drop-table = true
