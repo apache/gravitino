@@ -30,10 +30,19 @@ import com.datastrato.gravitino.meta.CatalogEntity;
 import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.meta.SchemaVersion;
 import com.datastrato.gravitino.meta.TableEntity;
+import com.google.common.io.Files;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import java.io.File;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CompletionService;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorCompletionService;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -734,6 +743,118 @@ public class TestKvEntityStorage {
       // 'updatedMetalake2' is a new name, which will trigger id allocation
       BaseMetalake updatedMetalake2 = createBaseMakeLake("updatedMetalake2", auditInfo);
       store.put(updatedMetalake2);
+    }
+  }
+
+  @Test
+  void testConcurrentIssues() throws IOException, ExecutionException, InterruptedException {
+    Config config = Mockito.mock(Config.class);
+    File file = Files.createTempDir();
+    file.deleteOnExit();
+    Mockito.when(config.get(ENTITY_STORE)).thenReturn("kv");
+    Mockito.when(config.get(ENTITY_KV_STORE)).thenReturn(DEFAULT_ENTITY_KV_STORE);
+    Mockito.when(config.get(Configs.ENTITY_SERDE)).thenReturn("proto");
+    Mockito.when(config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)).thenReturn(file.getAbsolutePath());
+    ThreadPoolExecutor threadPoolExecutor =
+        new ThreadPoolExecutor(
+            10,
+            20,
+            0L,
+            TimeUnit.MILLISECONDS,
+            new LinkedBlockingQueue<Runnable>(1000),
+            new ThreadFactoryBuilder().setDaemon(true).setNameFormat("gravitino-t-%d").build());
+
+    CompletionService<Boolean> future = new ExecutorCompletionService<>(threadPoolExecutor);
+
+    try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
+      store.initialize(config);
+      Assertions.assertTrue(store instanceof KvEntityStore);
+      store.setSerDe(EntitySerDeFactory.createEntitySerDe(config.get(Configs.ENTITY_SERDE)));
+
+      AuditInfo auditInfo =
+          new AuditInfo.Builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+      BaseMetalake metalake = createBaseMakeLake("metalake", auditInfo);
+      CatalogEntity catalog = createCatalog(Namespace.of("metalake"), "catalog", auditInfo);
+
+      store.put(metalake);
+      store.put(catalog);
+      Assertions.assertNotNull(
+          store.get(catalog.nameIdentifier(), EntityType.CATALOG, CatalogEntity.class));
+
+      // Delete the catalog entity, and we try to use multi-thread to delete it and make sure only
+      // one thread can delete it.
+      for (int i = 0; i < 10; i++) {
+        future.submit(
+            () -> store.delete(NameIdentifier.of("metalake", "catalog"), EntityType.CATALOG));
+      }
+      int totalSuccessNum = 0;
+      for (int i = 0; i < 10; i++) {
+        totalSuccessNum += future.take().get() ? 1 : 0;
+      }
+      Assertions.assertEquals(1, totalSuccessNum);
+
+      // Try to use multi-thread to put the same catalog entity, and make sure only one thread can
+      // put it.
+      for (int i = 0; i < 20; i++) {
+        future.submit(
+            () -> {
+              store.put(catalog); /* overwrite is false, then only one will save it successfully */
+              return null;
+            });
+      }
+
+      int totalFailed = 0;
+      for (int i = 0; i < 20; i++) {
+        try {
+          future.take().get();
+        } catch (Exception e) {
+          Assertions.assertTrue(e.getCause() instanceof EntityAlreadyExistsException);
+          totalFailed++;
+        }
+      }
+      Assertions.assertEquals(19, totalFailed);
+
+      // Try to use multi-thread to update the same catalog entity, and make sure only one thread
+      // can update it.
+      for (int i = 0; i < 10; i++) {
+        future.submit(
+            () -> {
+              // Ten threads rename the catalog entity from 'catalog' to 'catalog1' at the same
+              // time.
+              store.update(
+                  NameIdentifier.of("metalake", "catalog"),
+                  CatalogEntity.class,
+                  EntityType.CATALOG,
+                  e -> {
+                    AuditInfo auditInfo1 =
+                        new AuditInfo.Builder()
+                            .withCreator("creator1")
+                            .withCreateTime(Instant.now())
+                            .build();
+                    return createCatalog(Namespace.of("metalake"), "catalog1", auditInfo1);
+                  });
+              return null;
+            });
+      }
+
+      totalFailed = 0;
+      for (int i = 0; i < 10; i++) {
+        try {
+          future.take().get();
+        } catch (Exception e) {
+          // It may throw NoSuchEntityException or AlreadyExistsException
+          // NoSuchEntityException: because old entity has been renamed by the other thread already,
+          // we can't get the old one.
+          // AlreadyExistsException: because the entity has been renamed by the other thread
+          // already, we can't rename it again.
+          Assertions.assertTrue(
+              e.getCause() instanceof AlreadyExistsException
+                  || e.getCause() instanceof NoSuchEntityException);
+          totalFailed++;
+        }
+      }
+      Assertions.assertEquals(9, totalFailed);
     }
   }
 }
