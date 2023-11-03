@@ -24,10 +24,9 @@ import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.TableCatalog;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.transforms.Transform;
+import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.Map;
 
 /** Operations for interacting with the Jdbc catalog in Gravitino. */
 public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas, TableCatalog {
