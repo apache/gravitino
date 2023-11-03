@@ -24,10 +24,10 @@ import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.TableCatalog;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.transforms.Transform;
-import com.google.common.base.Preconditions;
-import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.Map;
 
 /** Operations for interacting with the Jdbc catalog in Gravitino. */
 public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas, TableCatalog {
@@ -81,7 +81,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
   }
 
   /**
-   * Creates a new schema with the provided identifier, comment, and metadata.
+   * Creates a new schema with the provided identifier, comment and metadata.
    *
    * @param ident The identifier of the schema to create.
    * @param comment The comment for the schema.
@@ -133,7 +133,6 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
    */
   @Override
   public boolean dropSchema(NameIdentifier ident, boolean cascade) throws NonEmptySchemaException {
-    Preconditions.checkArgument(!cascade, "Jdbc does not support cascading delete operations.");
     throw new UnsupportedOperationException();
   }
 

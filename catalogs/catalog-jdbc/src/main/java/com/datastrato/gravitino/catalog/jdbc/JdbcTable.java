@@ -9,7 +9,7 @@ import com.google.common.collect.Maps;
 import lombok.Getter;
 import lombok.ToString;
 
-/** Represents an Jdbc Table entity in the Jdbc table. */
+/** Represents a Jdbc Table entity in the jdbc table. */
 @ToString
 @Getter
 public class JdbcTable extends BaseTable {
@@ -22,7 +22,7 @@ public class JdbcTable extends BaseTable {
   public static class Builder extends BaseTableBuilder<Builder, JdbcTable> {
 
     /**
-     * Internal method to build an JdbcTable instance using the provided values.
+     * Internal method to build a JdbcTable instance using the provided values.
      *
      * @return A new JdbcTable instance with the configured values.
      */
