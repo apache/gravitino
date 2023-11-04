@@ -10,7 +10,7 @@
 
 ## Introduction
 
-Gravitino is a high-performance, geo-distributed, and federated metadata lake. It manages the metadata directly in different sources, types, and regions. It also provides users unified access to the metadata for both data and AI assets.
+Gravitino is a high-performance, geo-distributed, and federated metadata lake. It manages the metadata directly in different sources, types, and regions. It also provides users with unified metadata access for data and AI assets.
 
 ![Gravitino Architecture](docs/assets/gravitino-architecture.png)
 
@@ -52,7 +52,7 @@ to build a compressed distribution package.
 Note:
 
 1. Gravitino is built against JDK8, please make sure JDK8 is installed in your environment.
-2. Gravitino trino-connector is built against JDK17, please also make sure JDK17 is installed in your environment.
+2. Gravitino trino-connector is built against JDK17. Please also make sure JDK17 is installed in your environment.
 
 For the details of building and testing Gravitino, please see [How to build Gravitino](docs/how-to-build.md).
 
@@ -60,7 +60,7 @@ For the details of building and testing Gravitino, please see [How to build Grav
 
 ### Configure and start the Gravitino server
 
-Gravitino server configuration file `gravitino.conf` is located under `conf` and follows the typical property file format, you can change the configuration in this file.
+Gravitino server configuration file `gravitino.conf` is located under `conf` and follows the typical property file format. You can change the configuration in this file.
 
 To start the Gravitino server, please run:
 
