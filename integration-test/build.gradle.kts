@@ -143,19 +143,18 @@ fun printDockerCheckInfo() {
     EXCLUDE_TRINO_TEST = false
   }
 
-  println("------------------ Check Docker environment -----------------")
-  println("Docker server status ........................................ [${if (dockerRunning) "running" else "stop"}]")
-  println("Gravitino IT Docker container is already running ............. [${if (hiveContainerRunning) "yes" else "no"}]")
+  println("------------------ Check Docker environment ---------------------")
+  println("Docker server status ............................................ [${if (dockerRunning) "running" else "stop"}]")
+  println("Gravitino IT Docker container is already running ................ [${if (hiveContainerRunning) "yes" else "no"}]")
   if (OperatingSystem.current().isMacOsX() && !(dockerRunning && macDockerConnector)) {
-    println("Run test cases without `gravitino-trino-it` tag .............. [$testMode test]")
+    println("Run test cases without `gravitino-trino-it` tag ................. [$testMode test]")
   }
-
   if (dockerRunning && hiveContainerRunning) {
-    println("Use Gravitino IT Docker container to run all integration test. [$testMode test]")
+    println("Using Gravitino IT Docker container to run all integration tests. [$testMode test]")
   } else {
-    println("Run test cases without `gravitino-docker-it` tag ............. [$testMode test]")
+    println("Run test cases without `gravitino-docker-it` tag ................ [$testMode test]")
   }
-  println("-------------------------------------------------------------")
+  println("-----------------------------------------------------------------")
 }
 
 tasks {
@@ -256,20 +255,20 @@ tasks.test {
         environment("GRAVITINO_TEST", "true")
         systemProperty("testMode", "embedded")
       } else {
-        throw GradleException("Gravitino integration test only support [-PtestMode=embedded] or [-PtestMode=deploy] mode!")
+        throw GradleException("Gravitino integration tests only support [-PtestMode=embedded] or [-PtestMode=deploy] mode!")
       }
 
       useJUnitPlatform {
         if (EXCLUDE_DOCKER_TEST) {
           val redColor = "\u001B[31m"
           val resetColor = "\u001B[0m"
-          println("${redColor}Gravitino-docker is not running locally, all integration test cases that tagged 'gravitino-docker-it' will be excluded.${resetColor}")
+          println("${redColor}Gravitino-docker is not running locally, all integration test cases tagged with 'gravitino-docker-it' will be excluded.${resetColor}")
           excludeTags("gravitino-docker-it")
         }
         if (EXCLUDE_TRINO_TEST && OperatingSystem.current().isMacOsX()) {
           val redColor = "\u001B[31m"
           val resetColor = "\u001B[0m"
-          println("${redColor}mac-docker-connector is not running locally, all integration test cases that tagged 'gravitino-trino-it' will be excluded.${resetColor}")
+          println("${redColor}mac-docker-connector is not running locally, all integration test cases tagged with 'gravitino-trino-it' will be excluded.${resetColor}")
           excludeTags("gravitino-trino-it")
         }
       }
