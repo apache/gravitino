@@ -12,7 +12,6 @@ import com.datastrato.gravitino.utils.ByteUtils;
 import com.datastrato.gravitino.utils.Bytes;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 import javax.annotation.concurrent.ThreadSafe;
 
 /**
@@ -24,7 +23,6 @@ public class KvNameMappingService implements NameMappingService {
 
   // TODO(yuqi) Make this configurable
   @VisibleForTesting final KvBackend backend;
-  private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
   @VisibleForTesting final IdGenerator idGenerator = new RandomIdGenerator();
 
   // name prefix of name in name to id mapping,
@@ -43,68 +41,47 @@ public class KvNameMappingService implements NameMappingService {
 
   @Override
   public Long getIdByName(String name) throws IOException {
-    lock.readLock().lock();
-    try {
-      byte[] nameByte = Bytes.concat(NAME_PREFIX, name.getBytes());
-      byte[] idByte = backend.get(nameByte);
-      return idByte == null ? null : ByteUtils.byteToLong(idByte);
-    } finally {
-      lock.readLock().unlock();
-    }
+    byte[] nameByte = Bytes.concat(NAME_PREFIX, name.getBytes());
+    byte[] idByte = backend.get(nameByte);
+    return idByte == null ? null : ByteUtils.byteToLong(idByte);
   }
 
   private long bindNameAndId(String name) throws IOException {
     byte[] nameByte = Bytes.concat(NAME_PREFIX, name.getBytes());
     long id = idGenerator.nextId();
-    lock.writeLock().lock();
-    try {
-      return backend.executeInTransaction(
-          () -> {
-            backend.put(nameByte, ByteUtils.longToByte(id), false);
-            byte[] idByte = Bytes.concat(ID_PREFIX, ByteUtils.longToByte(id));
-            backend.put(idByte, name.getBytes(), false);
-            return id;
-          });
-    } finally {
-      lock.writeLock().unlock();
-    }
+    return backend.executeInTransaction(
+        () -> {
+          backend.put(nameByte, ByteUtils.longToByte(id), false);
+          byte[] idByte = Bytes.concat(ID_PREFIX, ByteUtils.longToByte(id));
+          backend.put(idByte, name.getBytes(), false);
+          return id;
+        });
   }
 
   @Override
   public boolean updateName(String oldName, String newName) throws IOException {
-    lock.writeLock().lock();
-    try {
-      return backend.executeInTransaction(
-          () -> {
-            byte[] nameByte = Bytes.concat(NAME_PREFIX, oldName.getBytes());
-            byte[] oldIdValue = backend.get(nameByte);
+    return backend.executeInTransaction(
+        () -> {
+          byte[] nameByte = Bytes.concat(NAME_PREFIX, oldName.getBytes());
+          byte[] oldIdValue = backend.get(nameByte);
 
-            // Old mapping has been deleted, no need to do it;
-            if (oldIdValue == null) {
-              return false;
-            }
-            // Delete old name --> id mapping
-            backend.delete(nameByte);
+          // Old mapping has been deleted, no need to do it;
+          if (oldIdValue == null) {
+            return false;
+          }
+          // Delete old name --> id mapping
+          backend.delete(nameByte);
 
-            backend.put(Bytes.concat(NAME_PREFIX, newName.getBytes()), oldIdValue, false);
-            backend.put(Bytes.concat(ID_PREFIX, oldIdValue), newName.getBytes(), true);
-            return true;
-          });
-    } finally {
-      lock.writeLock().unlock();
-    }
+          backend.put(Bytes.concat(NAME_PREFIX, newName.getBytes()), oldIdValue, false);
+          backend.put(Bytes.concat(ID_PREFIX, oldIdValue), newName.getBytes(), true);
+          return true;
+        });
   }
 
   @Override
   public boolean unbindNameAndId(String name) throws IOException {
     byte[] nameByte = Bytes.concat(NAME_PREFIX, name.getBytes());
-
-    lock.writeLock().lock();
-    try {
-      return backend.delete(nameByte);
-    } finally {
-      lock.writeLock().unlock();
-    }
+    return backend.delete(nameByte);
   }
 
   @Override

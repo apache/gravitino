@@ -88,23 +88,24 @@ public class KvEntityStore implements EntityStore {
     // Star means it's a wildcard
     List<E> entities = Lists.newArrayList();
     NameIdentifier identifier = NameIdentifier.of(namespace, BinaryEntityKeyEncoder.WILD_CARD);
-    byte[] startKey = entityKeyEncoder.encode(identifier, type, true);
-    if (startKey == null) {
-      return entities;
-    }
-
-    byte[] endKey = Bytes.increment(Bytes.wrap(startKey)).get();
     List<Pair<byte[], byte[]>> kvs =
         executeWithReadLock(
-            () ->
-                backend.scan(
-                    new KvRangeScan.KvRangeScanBuilder()
-                        .start(startKey)
-                        .end(endKey)
-                        .startInclusive(true)
-                        .endInclusive(false)
-                        .limit(Integer.MAX_VALUE)
-                        .build()));
+            () -> {
+              byte[] startKey = entityKeyEncoder.encode(identifier, type, true);
+              if (startKey == null) {
+                return Collections.emptyList();
+              }
+
+              byte[] endKey = Bytes.increment(Bytes.wrap(startKey)).get();
+              return backend.scan(
+                  new KvRangeScan.KvRangeScanBuilder()
+                      .start(startKey)
+                      .end(endKey)
+                      .startInclusive(true)
+                      .endInclusive(false)
+                      .limit(Integer.MAX_VALUE)
+                      .build());
+            });
 
     for (Pair<byte[], byte[]> pairs : kvs) {
       entities.add(serDe.deserialize(pairs.getRight(), e));
@@ -115,22 +116,24 @@ public class KvEntityStore implements EntityStore {
 
   @Override
   public boolean exists(NameIdentifier ident, EntityType entityType) throws IOException {
-    byte[] key = entityKeyEncoder.encode(ident, entityType, true);
-    if (key == null) {
-      return false;
-    }
+    return executeWithReadLock(
+        () -> {
+          byte[] key = entityKeyEncoder.encode(ident, entityType, true);
+          if (key == null) {
+            return false;
+          }
 
-    return executeWithReadLock(() -> backend.get(key) != null);
+          return backend.get(key) != null;
+        });
   }
 
   @Override
   public <E extends Entity & HasIdentifier> void put(E e, boolean overwritten)
       throws IOException, EntityAlreadyExistsException {
-    byte[] key = entityKeyEncoder.encode(e.nameIdentifier(), e.type());
-    byte[] value = serDe.serialize(e);
-
     executeWithWriteLock(
         () -> {
+          byte[] key = entityKeyEncoder.encode(e.nameIdentifier(), e.type());
+          byte[] value = serDe.serialize(e);
           backend.put(key, value, overwritten);
           return null;
         });
@@ -140,43 +143,42 @@ public class KvEntityStore implements EntityStore {
   public <E extends Entity & HasIdentifier> E update(
       NameIdentifier ident, Class<E> type, EntityType entityType, Function<E, E> updater)
       throws IOException, NoSuchEntityException, AlreadyExistsException {
-    byte[] key = entityKeyEncoder.encode(ident, entityType);
-
     return executeWithWriteLock(
-        () ->
-            executeInTransaction(
-                () -> {
-                  byte[] value = backend.get(key);
-                  if (value == null) {
-                    throw new NoSuchEntityException(ident.toString());
-                  }
+        () -> {
+          byte[] key = entityKeyEncoder.encode(ident, entityType);
+          return executeInTransaction(
+              () -> {
+                byte[] value = backend.get(key);
+                if (value == null) {
+                  throw new NoSuchEntityException(ident.toString());
+                }
 
-                  E e = serDe.deserialize(value, type);
-                  E updatedE = updater.apply(e);
-                  if (updatedE.nameIdentifier().equals(ident)) {
-                    backend.put(key, serDe.serialize(updatedE), true);
-                    return updatedE;
-                  }
-
-                  // If we have changed the name of the entity, We would do the following steps:
-                  // Check whether the new entities already existed
-                  boolean newEntityExist = exists(updatedE.nameIdentifier(), entityType);
-                  if (newEntityExist) {
-                    throw new AlreadyExistsException(
-                        String.format(
-                            "Entity %s already exist, please check again",
-                            updatedE.nameIdentifier()));
-                  }
-
-                  // Update the name mapping
-                  nameMappingService.updateName(
-                      generateKeyForMapping(ident),
-                      generateKeyForMapping(updatedE.nameIdentifier()));
-
-                  // Update the entity to store
+                E e = serDe.deserialize(value, type);
+                E updatedE = updater.apply(e);
+                if (updatedE.nameIdentifier().equals(ident)) {
                   backend.put(key, serDe.serialize(updatedE), true);
                   return updatedE;
-                }));
+                }
+
+                // If we have changed the name of the entity, We would do the following steps:
+                // Check whether the new entities already existed
+                boolean newEntityExist = exists(updatedE.nameIdentifier(), entityType);
+                if (newEntityExist) {
+                  throw new AlreadyExistsException(
+                      String.format(
+                          "Entity %s already exist, please check again",
+                          updatedE.nameIdentifier()));
+                }
+
+                // Update the name mapping
+                nameMappingService.updateName(
+                    generateKeyForMapping(ident), generateKeyForMapping(updatedE.nameIdentifier()));
+
+                // Update the entity to store
+                backend.put(key, serDe.serialize(updatedE), true);
+                return updatedE;
+              });
+        });
   }
 
   private String concatIdAndName(long[] namespaceIds, String name) {
@@ -240,12 +242,17 @@ public class KvEntityStore implements EntityStore {
   public <E extends Entity & HasIdentifier> E get(
       NameIdentifier ident, EntityType entityType, Class<E> e)
       throws NoSuchEntityException, IOException {
-    byte[] key = entityKeyEncoder.encode(ident, entityType, true);
-    if (key == null) {
-      throw new NoSuchEntityException(ident.toString());
-    }
+    byte[] value =
+        executeWithReadLock(
+            () -> {
+              byte[] key = entityKeyEncoder.encode(ident, entityType, true);
+              if (key == null) {
+                throw new NoSuchEntityException(ident.toString());
+              }
 
-    byte[] value = executeWithReadLock(() -> backend.get(key));
+              return backend.get(key);
+            });
+
     if (value == null) {
       throw new NoSuchEntityException(ident.toString());
     }

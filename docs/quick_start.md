@@ -15,7 +15,7 @@ You can build from [Github](https://github.com/datastrato/gravitino), see [how t
 
 ## Where is the Documentation?
 
-Gravitino has a local documentation website that you can view by following teh instructions in ``README.md``.
+Gravitino has a local documentation website that you can view by following the instructions in ``README.md``.
 
 ## How to contribute to Gravitino?
 
