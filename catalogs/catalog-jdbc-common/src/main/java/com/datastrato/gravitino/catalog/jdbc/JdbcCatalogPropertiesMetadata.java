@@ -6,13 +6,14 @@ package com.datastrato.gravitino.catalog.jdbc;
 
 import com.datastrato.gravitino.catalog.BaseCatalogPropertiesMetadata;
 import com.datastrato.gravitino.catalog.PropertyEntry;
-import java.util.HashMap;
+
+import java.util.Collections;
 import java.util.Map;
 
 public class JdbcCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata {
 
   @Override
   protected Map<String, PropertyEntry<?>> specificPropertyEntries() {
-    return new HashMap<>();
+    return Collections.emptyMap();
   }
 }
