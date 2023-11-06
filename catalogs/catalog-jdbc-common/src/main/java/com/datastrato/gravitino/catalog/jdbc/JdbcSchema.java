@@ -19,10 +19,7 @@ public class JdbcSchema extends BaseSchema {
     protected JdbcSchema internalBuild() {
       JdbcSchema jdbcSchema = new JdbcSchema();
       jdbcSchema.name = name;
-      jdbcSchema.comment =
-          null == comment
-              ? (null == properties ? null : properties.get(JdbcSchemaPropertiesMetadata.COMMENT))
-              : comment;
+      jdbcSchema.comment = comment;
       jdbcSchema.properties = properties;
       jdbcSchema.auditInfo = auditInfo;
       return jdbcSchema;

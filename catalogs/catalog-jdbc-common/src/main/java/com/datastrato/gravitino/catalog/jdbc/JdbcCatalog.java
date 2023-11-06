@@ -11,13 +11,7 @@ import com.datastrato.gravitino.rel.TableCatalog;
 import java.util.Map;
 
 /** Implementation of an Jdbc catalog in Gravitino. */
-public class JdbcCatalog extends BaseCatalog<JdbcCatalog> {
-
-  /** @return The short name of the catalog. */
-  @Override
-  public String shortName() {
-    return "jdbc";
-  }
+public abstract class JdbcCatalog extends BaseCatalog<JdbcCatalog> {
 
   /**
    * Creates a new instance of {@link JdbcCatalogOperations} with the provided configuration.

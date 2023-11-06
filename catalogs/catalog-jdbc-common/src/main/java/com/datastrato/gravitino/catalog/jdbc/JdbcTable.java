@@ -36,9 +36,6 @@ public class JdbcTable extends BaseTable {
       jdbcTable.columns = columns;
       jdbcTable.partitions = partitions;
       jdbcTable.sortOrders = sortOrders;
-      if (null != comment) {
-        jdbcTable.properties.putIfAbsent(JDBC_COMMENT_FIELD_NAME, comment);
-      }
       return jdbcTable;
     }
   }

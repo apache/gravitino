@@ -10,6 +10,7 @@ import com.datastrato.gravitino.catalog.BasePropertiesMetadata;
 import com.datastrato.gravitino.catalog.PropertyEntry;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -26,6 +27,6 @@ public class JdbcSchemaPropertiesMetadata extends BasePropertiesMetadata {
 
   @Override
   protected Map<String, PropertyEntry<?>> specificPropertyEntries() {
-    return PROPERTIES_METADATA;
+    return Collections.unmodifiableMap(PROPERTIES_METADATA);
   }
 }

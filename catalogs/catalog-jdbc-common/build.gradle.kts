@@ -2,7 +2,7 @@
  * Copyright 2023 Datastrato.
  * This software is licensed under the Apache License version 2.
  */
-description = "catalog-jdbc"
+description = "catalog-jdbc-common"
 
 plugins {
     `maven-publish`
@@ -15,7 +15,6 @@ dependencies {
     implementation(project(":common"))
     implementation(project(":core"))
     implementation(project(":api"))
-    implementation(project(":server-common"))
     implementation(libs.jackson.databind)
     implementation(libs.jackson.annotations)
     implementation(libs.jackson.datatype.jdk8)
@@ -35,21 +34,9 @@ dependencies {
         exclude("com.google.code.findbugs")
         exclude("org.slf4j")
     }
-    implementation(libs.sqlite.jdbc)
 
     compileOnly(libs.lombok)
     annotationProcessor(libs.lombok)
-
-    testImplementation(libs.junit.jupiter.api)
-    testImplementation(libs.junit.jupiter.params)
-    testRuntimeOnly(libs.junit.jupiter.engine)
-    testImplementation(libs.mockito.core)
-    testImplementation(libs.jersey.test.framework.core) {
-        exclude(group = "org.junit.jupiter")
-    }
-    testImplementation(libs.jersey.test.framework.provider.jetty) {
-        exclude(group = "org.junit.jupiter")
-    }
 }
 
 tasks {
@@ -60,12 +47,12 @@ tasks {
     val copyCatalogLibs by registering(Copy::class) {
         dependsOn(copyDepends, "build")
         from("build/libs")
-        into("${rootDir}/distribution/package/catalogs/jdbc/libs")
+        into("${rootDir}/distribution/package/catalogs/jdbc-common/libs")
     }
 
     val copyCatalogConfig by registering(Copy::class) {
         from("src/main/resources")
-        into("${rootDir}/distribution/package/catalogs/jdbc/conf")
+        into("${rootDir}/distribution/package/catalogs/jdbc-common/conf")
 
         include("jdbc.properties")
         rename { original -> if (original.endsWith(".template")) {
