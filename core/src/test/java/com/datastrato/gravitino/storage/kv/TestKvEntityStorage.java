@@ -9,6 +9,7 @@ import static com.datastrato.gravitino.Configs.DEFAULT_ENTITY_KV_STORE;
 import static com.datastrato.gravitino.Configs.ENTITY_KV_STORE;
 import static com.datastrato.gravitino.Configs.ENTITY_STORE;
 import static com.datastrato.gravitino.Configs.ENTRY_KV_ROCKSDB_BACKEND_PATH;
+import static com.datastrato.gravitino.storage.kv.KvEntityStore.CURRENT_LAYOUT_VERSION;
 
 import com.datastrato.gravitino.Catalog.Type;
 import com.datastrato.gravitino.Config;
@@ -855,6 +856,35 @@ public class TestKvEntityStorage {
         }
       }
       Assertions.assertEquals(9, totalFailed);
+    }
+  }
+
+  @Test
+  void testStorageLayoutVersion() throws IOException {
+    Config config = Mockito.mock(Config.class);
+    File file = Files.createTempDir();
+    file.deleteOnExit();
+    Mockito.when(config.get(ENTITY_STORE)).thenReturn("kv");
+    Mockito.when(config.get(ENTITY_KV_STORE)).thenReturn(DEFAULT_ENTITY_KV_STORE);
+    Mockito.when(config.get(Configs.ENTITY_SERDE)).thenReturn("proto");
+    Mockito.when(config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)).thenReturn(file.getAbsolutePath());
+
+    // First time create entity store, the storage layout version should be CURRENT_LAYOUT_VERSION
+    try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
+      store.initialize(config);
+      Assertions.assertTrue(store instanceof KvEntityStore);
+      store.setSerDe(EntitySerDeFactory.createEntitySerDe(config.get(Configs.ENTITY_SERDE)));
+      KvEntityStore entityStore = (KvEntityStore) store;
+      Assertions.assertEquals(CURRENT_LAYOUT_VERSION, entityStore.storageLayoutVersion);
+    }
+
+    // Second time create entity store, we would directly load version for storage
+    try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
+      store.initialize(config);
+      Assertions.assertTrue(store instanceof KvEntityStore);
+      store.setSerDe(EntitySerDeFactory.createEntitySerDe(config.get(Configs.ENTITY_SERDE)));
+      KvEntityStore entityStore = (KvEntityStore) store;
+
     }
   }
 }

@@ -57,6 +57,8 @@ public class KvEntityStore implements EntityStore {
   public static final Logger LOGGER = LoggerFactory.getLogger(KvEntityStore.class);
   public static final ImmutableMap<String, String> KV_BACKENDS =
       ImmutableMap.of("RocksDBKvBackend", RocksDBKvBackend.class.getCanonicalName());
+  public static final String LAYOUT_VERSION = "layout_version";
+  public static final String CURRENT_LAYOUT_VERSION = "0.2.0";
 
   @Getter @VisibleForTesting private KvBackend backend;
 
@@ -66,6 +68,11 @@ public class KvEntityStore implements EntityStore {
   private EntityKeyEncoder<byte[]> entityKeyEncoder;
   private NameMappingService nameMappingService;
   private EntitySerDe serDe;
+  // We will use storageLayoutVersion to check whether the layout of the storage is compatible with
+  // the current version of the code.
+  // Note: If we change the layout of the storage in the future, please update the value of
+  // storageLayoutVersion and store it in the kv store.
+  @VisibleForTesting String storageLayoutVersion;
 
   @Override
   public void initialize(Config config) throws RuntimeException {
@@ -75,6 +82,7 @@ public class KvEntityStore implements EntityStore {
     this.nameMappingService = new KvNameMappingService(backend);
     this.entityKeyEncoder = new BinaryEntityKeyEncoder(nameMappingService);
     this.reentrantReadWriteLock = new ReentrantReadWriteLock();
+    this.storageLayoutVersion = initStorageVersionInfo();
   }
 
   @Override
@@ -379,6 +387,21 @@ public class KvEntityStore implements EntityStore {
       LOGGER.error("Failed to create and initialize KvBackend by name '{}'.", backendName, e);
       throw new RuntimeException(
           "Failed to create and initialize KvBackend by name: " + backendName, e);
+    }
+  }
+
+  private synchronized String initStorageVersionInfo() {
+    byte[] bytes;
+    try {
+      bytes = backend.get(LAYOUT_VERSION.getBytes());
+      if (bytes == null) {
+        // If the layout version is not set, we will set it to the current version.
+        backend.put(LAYOUT_VERSION.getBytes(), CURRENT_LAYOUT_VERSION.getBytes(), true);
+        return CURRENT_LAYOUT_VERSION;
+      }
+      return String.valueOf(bytes);
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to get/put layout version information", e);
     }
   }
 
