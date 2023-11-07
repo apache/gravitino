@@ -399,7 +399,15 @@ public class KvEntityStore implements EntityStore {
         backend.put(LAYOUT_VERSION.getBytes(), CURRENT_LAYOUT_VERSION.getBytes(), true);
         return CURRENT_LAYOUT_VERSION;
       }
-      return String.valueOf(bytes);
+
+      String oldVersion = String.valueOf(bytes);
+      if (!CURRENT_LAYOUT_VERSION.equals(oldVersion)) {
+        // Layout version has changed, we use the new version to overwrite the old version.
+        backend.put(LAYOUT_VERSION.getBytes(), CURRENT_LAYOUT_VERSION.getBytes(), true);
+        return CURRENT_LAYOUT_VERSION;
+      }
+
+      return oldVersion;
     } catch (IOException e) {
       throw new RuntimeException("Failed to get/put layout version information", e);
     }

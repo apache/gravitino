@@ -878,13 +878,12 @@ public class TestKvEntityStorage {
       Assertions.assertEquals(CURRENT_LAYOUT_VERSION, entityStore.storageLayoutVersion);
     }
 
-    // Second time create entity store, we would directly load version for storage
     try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
       store.initialize(config);
       Assertions.assertTrue(store instanceof KvEntityStore);
       store.setSerDe(EntitySerDeFactory.createEntitySerDe(config.get(Configs.ENTITY_SERDE)));
       KvEntityStore entityStore = (KvEntityStore) store;
-
+      Assertions.assertEquals(CURRENT_LAYOUT_VERSION, entityStore.storageLayoutVersion);
     }
   }
 }
