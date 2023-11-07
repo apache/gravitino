@@ -26,6 +26,7 @@ import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.exceptions.NonEmptyEntityException;
 import com.datastrato.gravitino.storage.EntityKeyEncoder;
 import com.datastrato.gravitino.storage.NameMappingService;
+import com.datastrato.gravitino.storage.StorageVersion;
 import com.datastrato.gravitino.utils.Bytes;
 import com.datastrato.gravitino.utils.Executable;
 import com.google.common.annotations.VisibleForTesting;
@@ -58,7 +59,7 @@ public class KvEntityStore implements EntityStore {
   public static final ImmutableMap<String, String> KV_BACKENDS =
       ImmutableMap.of("RocksDBKvBackend", RocksDBKvBackend.class.getCanonicalName());
   public static final String LAYOUT_VERSION = "layout_version";
-  public static final String CURRENT_LAYOUT_VERSION = "v2";
+  public static final StorageVersion DEFAULT_LAYOUT_VERSION = StorageVersion.V1_1;
 
   @Getter @VisibleForTesting private KvBackend backend;
 
@@ -72,7 +73,7 @@ public class KvEntityStore implements EntityStore {
   // the current version of the code.
   // Note: If we change the layout of the storage in the future, please update the value of
   // storageLayoutVersion and store it in the kv store.
-  @VisibleForTesting String storageLayoutVersion;
+  @VisibleForTesting StorageVersion storageLayoutVersion;
 
   @Override
   public void initialize(Config config) throws RuntimeException {
@@ -390,27 +391,40 @@ public class KvEntityStore implements EntityStore {
     }
   }
 
-  private synchronized String initStorageVersionInfo() {
+  private synchronized StorageVersion initStorageVersionInfo() {
     byte[] bytes;
     try {
       bytes = backend.get(LAYOUT_VERSION.getBytes());
       if (bytes == null) {
-        // If the layout version is not set, we will set it to the current version.
-        backend.put(LAYOUT_VERSION.getBytes(), CURRENT_LAYOUT_VERSION.getBytes(), true);
-        return CURRENT_LAYOUT_VERSION;
+        // If the layout version is not set, we will set it to the default version.
+        backend.put(
+            LAYOUT_VERSION.getBytes(), DEFAULT_LAYOUT_VERSION.getVersion().getBytes(), true);
+        return DEFAULT_LAYOUT_VERSION;
       }
 
-      String oldVersion = String.valueOf(bytes);
-      if (!CURRENT_LAYOUT_VERSION.equals(oldVersion)) {
+      StorageVersion oldVersion = StorageVersion.fromString(new String(bytes));
+      if (!DEFAULT_LAYOUT_VERSION.equals(oldVersion)) {
         // Layout version has changed, we use the new version to overwrite the old version.
-        backend.put(LAYOUT_VERSION.getBytes(), CURRENT_LAYOUT_VERSION.getBytes(), true);
-        return CURRENT_LAYOUT_VERSION;
+        updateLayoutVersion(oldVersion, DEFAULT_LAYOUT_VERSION);
+        return DEFAULT_LAYOUT_VERSION;
       }
 
       return oldVersion;
     } catch (IOException e) {
       throw new RuntimeException("Failed to get/put layout version information", e);
     }
+  }
+
+  private void updateLayoutVersion(StorageVersion oldVersion, StorageVersion newVersion)
+      throws IOException {
+    // If this is the minor update, such as from 1.1 -> 1.2, we will just update the version, but
+    // if this is the major update, such as from 1.1 -> 2.0, we will update all the data and then
+    // update the version
+    if (!newVersion.compatibleWith(oldVersion)) {
+      // TODO (yuqi) load all data and convert them to the new format
+    }
+
+    backend.put(LAYOUT_VERSION.getBytes(), DEFAULT_LAYOUT_VERSION.getVersion().getBytes(), true);
   }
 
   @FunctionalInterface
