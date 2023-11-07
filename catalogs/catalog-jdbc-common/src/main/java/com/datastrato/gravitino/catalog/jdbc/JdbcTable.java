@@ -14,8 +14,6 @@ import lombok.ToString;
 @Getter
 public class JdbcTable extends BaseTable {
 
-  public static final String JDBC_COMMENT_FIELD_NAME = "comment";
-
   private JdbcTable() {}
 
   /** A builder class for constructing JdbcTable instances. */

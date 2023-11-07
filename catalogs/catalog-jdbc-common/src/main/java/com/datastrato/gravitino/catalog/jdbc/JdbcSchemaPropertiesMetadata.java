@@ -4,29 +4,15 @@
  */
 package com.datastrato.gravitino.catalog.jdbc;
 
-import static com.datastrato.gravitino.catalog.PropertyEntry.stringReservedPropertyEntry;
-
 import com.datastrato.gravitino.catalog.BasePropertiesMetadata;
 import com.datastrato.gravitino.catalog.PropertyEntry;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Maps;
 import java.util.Collections;
-import java.util.List;
 import java.util.Map;
 
 public class JdbcSchemaPropertiesMetadata extends BasePropertiesMetadata {
 
-  public static final String COMMENT = "comment";
-  private static final Map<String, PropertyEntry<?>> PROPERTIES_METADATA;
-
-  static {
-    List<PropertyEntry<?>> propertyEntries =
-        ImmutableList.of(stringReservedPropertyEntry(COMMENT, "Schema comment", true));
-    PROPERTIES_METADATA = Maps.uniqueIndex(propertyEntries, PropertyEntry::getName);
-  }
-
   @Override
   protected Map<String, PropertyEntry<?>> specificPropertyEntries() {
-    return Collections.unmodifiableMap(PROPERTIES_METADATA);
+    return Collections.emptyMap();
   }
 }

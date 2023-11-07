@@ -21,10 +21,7 @@ dependencies {
     implementation(libs.jackson.datatype.jsr310)
     implementation(libs.guava)
     implementation(libs.bundles.log4j)
-    implementation(libs.bundles.jetty)
-    implementation(libs.bundles.jersey)
     implementation(libs.commons.lang3)
-    implementation(libs.commons.io)
     implementation(libs.commons.collections4)
     implementation(libs.substrait.java.core) {
         exclude("com.fasterxml.jackson.core")
