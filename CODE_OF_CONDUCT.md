@@ -1,3 +1,8 @@
+<!--
+  Copyright 2023 Datastrato.
+  This software is licensed under the Apache License version 2.
+-->
+
 # Contributor Code of Conduct
 
 This is a copy of the [Contributor Covenant v2.1](https://www.contributor-covenant.org/version/2/1/code_of_conduct.html). No changes have been made.
