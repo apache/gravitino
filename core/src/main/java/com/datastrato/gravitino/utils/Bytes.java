@@ -23,7 +23,7 @@ import java.io.Serializable;
 import java.util.Arrays;
 import java.util.Comparator;
 
-// /core/src/main/java/com/datastrato/gravitino/utils/Bytes.java
+// /org/apache/kafka/common/utils/Bytes.java
 public class Bytes implements Comparable<byte[]> {
 
   public static final byte[] EMPTY = new byte[0];
