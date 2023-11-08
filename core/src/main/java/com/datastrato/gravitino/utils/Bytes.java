@@ -23,7 +23,8 @@ import java.io.Serializable;
 import java.util.Arrays;
 import java.util.Comparator;
 
-// /org/apache/kafka/common/utils/Bytes.java
+// Referred from Apache Kafka's Bytes implementation
+// org/apache/kafka/common/utils/Bytes.java
 public class Bytes implements Comparable<byte[]> {
 
   public static final byte[] EMPTY = new byte[0];
