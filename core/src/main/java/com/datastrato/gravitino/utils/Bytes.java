@@ -24,7 +24,7 @@ import java.util.Arrays;
 import java.util.Comparator;
 
 // Referred from Apache Kafka's Bytes implementation
-// org/apache/kafka/common/utils/Bytes.java
+// clients/src/main/java/org/apache/kafka/common/utils/Bytes.java
 public class Bytes implements Comparable<byte[]> {
 
   public static final byte[] EMPTY = new byte[0];
