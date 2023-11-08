@@ -64,9 +64,11 @@ docker run --rm -d -p 8022:22 -p 8088:8088 -p 9000:9000 -p 9083:9083 -p 10000:10
 
 ### Container startup commands
 ```
-docker run --rm -it -p 9080:9080 datastrato/gravitino-ci-trino
+docker run --rm -it -p 8080:8080 datastrato/gravitino-ci-trino
 ```
 
 ### 0.1.0
 - Docker image `datastrato/gravitino-ci-trino:0.1.0`
 - Base on `trinodb/trino:426` and removed some unused plugins from it.
+- Expose ports:
+  - `8080` Trino JDBC port
