@@ -65,6 +65,7 @@ dependencies {
     implementation(libs.hadoop2.hdfs)
     implementation(libs.hadoop2.common)
     implementation(libs.hadoop2.mapreduce.client.core)
+    implementation(libs.metrics.jersey2)
 
     compileOnly(libs.lombok)
     annotationProcessor(libs.lombok)

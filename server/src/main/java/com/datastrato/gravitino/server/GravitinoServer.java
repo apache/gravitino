@@ -8,8 +8,11 @@ import com.datastrato.gravitino.GravitinoEnv;
 import com.datastrato.gravitino.catalog.CatalogManager;
 import com.datastrato.gravitino.catalog.CatalogOperationDispatcher;
 import com.datastrato.gravitino.meta.MetalakeManager;
+import com.datastrato.gravitino.metrics.MetricsSystem;
+import com.datastrato.gravitino.metrics.source.MetricsSource;
 import com.datastrato.gravitino.server.auth.AuthenticationFilter;
 import com.datastrato.gravitino.server.auth.ServerAuthenticator;
+import com.datastrato.gravitino.server.web.HttpServerMetricsSource;
 import com.datastrato.gravitino.server.web.JettyServer;
 import com.datastrato.gravitino.server.web.JettyServerConfig;
 import com.datastrato.gravitino.server.web.ObjectMapperProvider;
@@ -47,13 +50,14 @@ public class GravitinoServer extends ResourceConfig {
   }
 
   public void initialize() {
+    gravitinoEnv.initialize(serverConfig);
+    MetricsSystem metricsSystem = gravitinoEnv.getMetricsSystem();
+
     JettyServerConfig jettyServerConfig =
         JettyServerConfig.fromConfig(serverConfig, WEBSERVER_CONF_PREFIX);
-    server.initialize(jettyServerConfig, SERVER_NAME, true /* shouldEnableUI */);
+    server.initialize(jettyServerConfig, SERVER_NAME, true, metricsSystem);
 
     ServerAuthenticator.getInstance().initialize(serverConfig);
-
-    gravitinoEnv.initialize(serverConfig);
 
     // initialize Jersey REST API resources.
     initializeRestApi();
@@ -74,6 +78,11 @@ public class GravitinoServer extends ResourceConfig {
         });
     register(ObjectMapperProvider.class).register(JacksonFeature.class);
 
+    HttpServerMetricsSource httpServerMetricsSource =
+        new HttpServerMetricsSource(MetricsSource.GRAVITINO_SERVER_METRIC_NAME, this, server);
+    MetricsSystem metricsSystem = GravitinoEnv.getInstance().getMetricsSystem();
+    metricsSystem.register(httpServerMetricsSource);
+
     Servlet servlet = new ServletContainer(this);
     server.addServlet(servlet, "/api/*");
     server.addFilter(new VersioningFilter(), "/api/*");
@@ -81,8 +90,8 @@ public class GravitinoServer extends ResourceConfig {
   }
 
   public void start() throws Exception {
-    server.start();
     gravitinoEnv.start();
+    server.start();
   }
 
   public void join() {

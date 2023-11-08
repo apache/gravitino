@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 
 import com.datastrato.gravitino.Config;
+import com.datastrato.gravitino.metrics.MetricsSystem;
 import com.datastrato.gravitino.rest.RESTUtils;
 import java.io.IOException;
 import javax.servlet.Filter;
@@ -38,7 +39,7 @@ public class TestJettyServer {
     Config config = new Config(false) {};
     config.set(JettyServerConfig.WEBSERVER_HTTP_PORT, RESTUtils.findAvailablePort(5000, 6000));
     JettyServerConfig serverConfig = JettyServerConfig.fromConfig(config);
-    jettyServer.initialize(serverConfig, "test", false);
+    jettyServer.initialize(serverConfig, "test", false, new MetricsSystem());
 
     // TODO might be nice to have an isInitalised method or similar?
   }
@@ -48,7 +49,7 @@ public class TestJettyServer {
     Config config = new Config(false) {};
     config.set(JettyServerConfig.WEBSERVER_HTTP_PORT, RESTUtils.findAvailablePort(5000, 6000));
     JettyServerConfig serverConfig = JettyServerConfig.fromConfig(config);
-    jettyServer.initialize(serverConfig, "test", false);
+    jettyServer.initialize(serverConfig, "test", false, new MetricsSystem());
     jettyServer.start();
     // TODO might be nice to have an IsRunning method or similar?
     jettyServer.stop();
@@ -59,7 +60,7 @@ public class TestJettyServer {
     Config config = new Config(false) {};
     config.set(JettyServerConfig.WEBSERVER_HTTP_PORT, RESTUtils.findAvailablePort(5000, 6000));
     JettyServerConfig serverConfig = JettyServerConfig.fromConfig(config);
-    jettyServer.initialize(serverConfig, "test", false);
+    jettyServer.initialize(serverConfig, "test", false, new MetricsSystem());
     jettyServer.start();
 
     Servlet mockServlet = mock(Servlet.class);

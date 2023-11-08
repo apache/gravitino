@@ -31,6 +31,7 @@ dependencies {
     exclude("com.fasterxml.jackson.core")
     exclude("com.fasterxml.jackson.datatype")
   }
+  implementation(libs.metrics.jersey2)
 
   compileOnly(libs.lombok)
   annotationProcessor(libs.lombok)
