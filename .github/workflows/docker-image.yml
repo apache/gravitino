@@ -3,6 +3,14 @@ name: Publish Docker Image
 on:
   workflow_dispatch:
     inputs:
+      image:
+        type: choice
+        description: 'Choose the image to build'
+        required: true
+        default: 'gravitino-ci-hive'
+        options:
+          - 'gravitino-ci-hive'
+          - 'gravitino-ci-trino'
       tag:
         description: 'Docker tag to apply to this image'
         required: true
@@ -11,8 +19,6 @@ on:
         description: 'Publish Docker token'
         required: true
         type: string
-env:
-  HIVE_IMAGE_NAME: datastrato/gravitino-ci-hive
 
 jobs:
   publish-docker-image:
@@ -22,6 +28,16 @@ jobs:
       input_token: ${{ github.event.inputs.token }}
       secrets_token: ${{ secrets.PUBLISH_DOCKER_TOKEN }}
     steps:
+      - name: Set environment variables
+        run: |
+          if [ "${{ github.event.inputs.image }}" == "gravitino-ci-hive" ]; then
+            echo "image_type=hive" >> $GITHUB_ENV
+            echo "image_name=datastrato/gravitino-ci-hive" >> $GITHUB_ENV
+          elif [ "${{ github.event.inputs.image }}" == "gravitino-ci-trino" ]; then
+            echo "image_type=trino" >> $GITHUB_ENV
+            echo "image_name=datastrato/gravitino-ci-trino" >> $GITHUB_ENV
+          fi
+
       - uses: actions/checkout@v3
 
       - name: Check publish Docker token
@@ -45,8 +61,7 @@ jobs:
 
       - name: Build and Push the main branch Docker image
         if: ${{ github.ref_name == 'main' }}
-        run: ./dev/docker/hive/build-docker.sh --platform all --image ${HIVE_IMAGE_NAME} --tag ${{ github.event.inputs.tag }} --latest
-
+        run: ./dev/docker/build-docker.sh --platform all --type ${image_type} --image ${image_name} --tag ${{ github.event.inputs.tag }} --latest
       - name: Build and Push the other branch Docker image
         if: ${{ github.ref_name != 'main' }}
-        run: ./dev/docker/hive/build-docker.sh --platform all --image ${HIVE_IMAGE_NAME} --tag ${{ github.event.inputs.tag }}
+        run: ./dev/docker/build-docker.sh --platform all --type ${image_type} --image ${image_name} --tag ${{ github.event.inputs.tag }}
