@@ -35,35 +35,3 @@ dependencies {
     compileOnly(libs.lombok)
     annotationProcessor(libs.lombok)
 }
-
-tasks {
-    val copyDepends by registering(Copy::class) {
-        from(configurations.runtimeClasspath)
-        into("build/libs")
-    }
-    val copyCatalogLibs by registering(Copy::class) {
-        dependsOn(copyDepends, "build")
-        from("build/libs")
-        into("${rootDir}/distribution/package/catalogs/jdbc-common/libs")
-    }
-
-    val copyCatalogConfig by registering(Copy::class) {
-        from("src/main/resources")
-        into("${rootDir}/distribution/package/catalogs/jdbc-common/conf")
-
-        include("jdbc.properties")
-        rename { original -> if (original.endsWith(".template")) {
-            original.replace(".template", "")
-        } else {
-            original
-        }}
-
-        exclude { details ->
-            details.file.isDirectory()
-        }
-    }
-
-    val copyLibAndConfig by registering(Copy::class) {
-        dependsOn(copyCatalogLibs, copyCatalogConfig)
-    }
-}
