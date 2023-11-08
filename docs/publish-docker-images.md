@@ -19,7 +19,7 @@ We use Github Actions to publish the docker images to the DockerHub repository.
 1. Open the <https://github.com/datastrato/gravitino/actions/workflows/docker-image.yml>
 2. Click the `Run workflow` button.
 3. Select the branch you want to build
-   + If you select `main` branch, the docker image will be published the specified tag and the `latest` tag.
+   + If you select `main` branch, the docker image will be published with the specified tag and the `latest` tag.
    + If you select another branch, the docker image will only publish the specified tag.
 4. Choose the image you want to build
    + `datastrato/gravitino-ci-hive`.

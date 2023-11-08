@@ -3,7 +3,7 @@
   This software is licensed under the Apache License version 2.
 -->
 # Gravitino Docker images
-This Docker image is designed to facilitate Gravitino integration testing. 
+This Docker image is designed to facilitate Gravitino integration testing.
 It can be utilized to test all catalog and connector modules within Gravitino.
 
 # Datastrato Docker hub repository
