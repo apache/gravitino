@@ -25,6 +25,7 @@ plugins {
   // Apply one top level rat plugin to perform any required license enforcement analysis
   alias(libs.plugins.rat)
   id("com.github.jk1.dependency-license-report") version "2.5"
+  id("org.cyclonedx.bom") version "1.5.0" // Newer version fail due to our setup
 }
 
 licenseReport {

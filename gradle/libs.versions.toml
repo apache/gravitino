@@ -30,7 +30,7 @@ trino = '426'
 spark = "3.4.1"
 scala-collection-compat = "2.7.0"
 sqlite-jdbc = "3.42.0.0"
-testng = "7.7.1"
+testng = "7.5.1"
 testcontainers = "1.19.0"
 trino-jdbc = "426"
 
