@@ -417,13 +417,13 @@ public class KvEntityStore implements EntityStore {
 
   private void updateLayoutVersion(StorageVersion oldVersion, StorageVersion newVersion)
       throws IOException {
-    // If this is the minor update, such as from 1.1 -> 1.2, we will just update the version, but
-    // if this is the major update, such as from 1.1 -> 2.0, we will update all the data and then
+    // If this is the major update, such as from v1 -> v2, we will update all the data and then
     // update the version
     if (!newVersion.compatibleWith(oldVersion)) {
       // TODO (yuqi) load all data and convert them to the new format
     }
 
+    // Update the version number as well. (shall we need to do so?)
     backend.put(LAYOUT_VERSION.getBytes(), DEFAULT_LAYOUT_VERSION.getVersion().getBytes(), true);
   }
 

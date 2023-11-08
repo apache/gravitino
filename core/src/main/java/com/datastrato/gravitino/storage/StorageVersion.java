@@ -22,8 +22,8 @@ public enum StorageVersion {
     return version;
   }
 
-  // Returns true if the storage version is compatible with the other storage version.
-  // For example, v1.1 is not compatible with v1.2, but v1.1 is compatible with v2.1.
+  // Return true if the storage version is compatible with the other storage version.
+  // For example, v1 is not compatible with v2. v1.1 is compatible with v1.2.
   public boolean compatibleWith(StorageVersion other) {
     String thatVersion = other.version;
     return this.version.split("\\.")[0].equals(thatVersion.split("\\.")[0]);
