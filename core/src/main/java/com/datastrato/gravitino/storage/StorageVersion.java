@@ -7,11 +7,10 @@ package com.datastrato.gravitino.storage;
 
 /** The storage layer version of the entity store. */
 public enum StorageVersion {
-  V1_0("v1.0"),
-  V1_1("v1.1"),
+  V1("v1"),
 
-  // V2_0 has not been released yet, it's just for testing.
-  V2_0("v2.0");
+  // V2 has not been released yet, it's just for testing.
+  V2("v2");
 
   private final String version;
 

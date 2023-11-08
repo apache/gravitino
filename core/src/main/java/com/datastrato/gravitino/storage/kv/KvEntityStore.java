@@ -59,7 +59,7 @@ public class KvEntityStore implements EntityStore {
   public static final ImmutableMap<String, String> KV_BACKENDS =
       ImmutableMap.of("RocksDBKvBackend", RocksDBKvBackend.class.getCanonicalName());
   public static final String LAYOUT_VERSION = "layout_version";
-  public static final StorageVersion DEFAULT_LAYOUT_VERSION = StorageVersion.V1_1;
+  public static final StorageVersion DEFAULT_LAYOUT_VERSION = StorageVersion.V1;
 
   @Getter @VisibleForTesting private KvBackend backend;
 

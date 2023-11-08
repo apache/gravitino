@@ -12,11 +12,11 @@ class TestStorageVersion {
 
   @Test
   void testFromString() {
-    StorageVersion version = StorageVersion.fromString("v1.1");
-    Assertions.assertEquals(StorageVersion.V1_1, version);
+    StorageVersion version = StorageVersion.fromString("v1");
+    Assertions.assertEquals(StorageVersion.V1, version);
 
-    version = StorageVersion.fromString("v2.0");
-    Assertions.assertEquals(StorageVersion.V2_0, version);
+    version = StorageVersion.fromString("v2");
+    Assertions.assertEquals(StorageVersion.V2, version);
 
     Assertions.assertThrowsExactly(
         IllegalArgumentException.class,
@@ -27,7 +27,7 @@ class TestStorageVersion {
 
   @Test
   void testCompatibleWith() {
-    Assertions.assertTrue(StorageVersion.V1_1.compatibleWith(StorageVersion.V1_0));
-    Assertions.assertFalse(StorageVersion.V1_1.compatibleWith(StorageVersion.V2_0));
+    Assertions.assertTrue(StorageVersion.V1.compatibleWith(StorageVersion.V1));
+    Assertions.assertFalse(StorageVersion.V2.compatibleWith(StorageVersion.V1));
   }
 }
