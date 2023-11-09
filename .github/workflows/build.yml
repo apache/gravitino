@@ -30,16 +30,8 @@ jobs:
           java-version: '8'
           distribution: 'temurin'
 
-      - name: Setup Gradle
-        uses: gradle/gradle-build-action@v2
-        with:
-          gradle-version: '8.2'
-
-      - name: Show gradle version
-        run: gradle --version
-
       - name: Build with Gradle
-        run: gradle build -PskipITs
+        run: ./gradlew build -PskipITs
 
       - name: Upload unit tests report
         uses: actions/upload-artifact@v3
