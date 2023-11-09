@@ -96,15 +96,17 @@ public class KvEntityStore implements EntityStore {
     byte[] endKey = Bytes.increment(Bytes.wrap(startKey)).get();
     List<Pair<byte[], byte[]>> kvs =
         executeWithReadLock(
-            () ->
-                backend.scan(
-                    new KvRangeScan.KvRangeScanBuilder()
-                        .start(startKey)
-                        .end(endKey)
-                        .startInclusive(true)
-                        .endInclusive(false)
-                        .limit(Integer.MAX_VALUE)
-                        .build()));
+            () -> {
+              KvTransactionManagerImpl kvTransactionManager = new KvTransactionManagerImpl(backend);
+              return kvTransactionManager.scan(
+                  new KvRangeScan.KvRangeScanBuilder()
+                      .start(startKey)
+                      .end(endKey)
+                      .startInclusive(true)
+                      .endInclusive(false)
+                      .limit(Integer.MAX_VALUE)
+                      .build());
+            });
 
     for (Pair<byte[], byte[]> pairs : kvs) {
       entities.add(serDe.deserialize(pairs.getRight(), e));
@@ -120,7 +122,11 @@ public class KvEntityStore implements EntityStore {
       return false;
     }
 
-    return executeWithReadLock(() -> backend.get(key) != null);
+    return executeWithReadLock(
+        () -> {
+          KvTransactionManagerImpl kvTransactionManager = new KvTransactionManagerImpl(backend);
+          return kvTransactionManager.get(key) != null;
+        });
   }
 
   @Override
@@ -131,7 +137,9 @@ public class KvEntityStore implements EntityStore {
 
     executeWithWriteLock(
         () -> {
-          backend.put(key, value, overwritten);
+          KvTransactionManagerImpl kvTransactionManager = new KvTransactionManagerImpl(backend);
+          kvTransactionManager.put(key, value, overwritten);
+          kvTransactionManager.commit();
           return null;
         });
   }
@@ -143,40 +151,39 @@ public class KvEntityStore implements EntityStore {
     byte[] key = entityKeyEncoder.encode(ident, entityType);
 
     return executeWithWriteLock(
-        () ->
-            executeInTransaction(
-                () -> {
-                  byte[] value = backend.get(key);
-                  if (value == null) {
-                    throw new NoSuchEntityException(ident.toString());
-                  }
+        () -> {
+          KvTransactionManager transactionManager = new KvTransactionManagerImpl(backend);
+          byte[] value = transactionManager.get(key);
+          if (value == null) {
+            throw new NoSuchEntityException(ident.toString());
+          }
 
-                  E e = serDe.deserialize(value, type);
-                  E updatedE = updater.apply(e);
-                  if (updatedE.nameIdentifier().equals(ident)) {
-                    backend.put(key, serDe.serialize(updatedE), true);
-                    return updatedE;
-                  }
+          E e = serDe.deserialize(value, type);
+          E updatedE = updater.apply(e);
+          if (updatedE.nameIdentifier().equals(ident)) {
+            transactionManager.put(key, serDe.serialize(updatedE), true);
+            transactionManager.commit();
+            return updatedE;
+          }
 
-                  // If we have changed the name of the entity, We would do the following steps:
-                  // Check whether the new entities already existed
-                  boolean newEntityExist = exists(updatedE.nameIdentifier(), entityType);
-                  if (newEntityExist) {
-                    throw new AlreadyExistsException(
-                        String.format(
-                            "Entity %s already exist, please check again",
-                            updatedE.nameIdentifier()));
-                  }
+          // If we have changed the name of the entity, We would do the following steps:
+          // Check whether the new entities already existed
+          boolean newEntityExist = exists(updatedE.nameIdentifier(), entityType);
+          if (newEntityExist) {
+            throw new AlreadyExistsException(
+                String.format(
+                    "Entity %s already exist, please check again", updatedE.nameIdentifier()));
+          }
 
-                  // Update the name mapping
-                  nameMappingService.updateName(
-                      generateKeyForMapping(ident),
-                      generateKeyForMapping(updatedE.nameIdentifier()));
+          // Update the name mapping
+          nameMappingService.updateName(
+              generateKeyForMapping(ident), generateKeyForMapping(updatedE.nameIdentifier()));
 
-                  // Update the entity to store
-                  backend.put(key, serDe.serialize(updatedE), true);
-                  return updatedE;
-                }));
+          // Update the entity to store
+          transactionManager.put(key, serDe.serialize(updatedE), true);
+          transactionManager.commit();
+          return updatedE;
+        });
   }
 
   private String concatIdAndName(long[] namespaceIds, String name) {
@@ -245,7 +252,12 @@ public class KvEntityStore implements EntityStore {
       throw new NoSuchEntityException(ident.toString());
     }
 
-    byte[] value = executeWithReadLock(() -> backend.get(key));
+    byte[] value =
+        executeWithReadLock(
+            () -> {
+              KvTransactionManager kvTransactionManager = new KvTransactionManagerImpl(backend);
+              return kvTransactionManager.get(key);
+            });
     if (value == null) {
       throw new NoSuchEntityException(ident.toString());
     }
@@ -311,6 +323,7 @@ public class KvEntityStore implements EntityStore {
       throws IOException {
     return executeWithWriteLock(
         () -> {
+          KvTransactionManager kvTransactionManager = new KvTransactionManagerImpl(backend);
           if (!exists(ident, entityType)) {
             return false;
           }
@@ -319,13 +332,15 @@ public class KvEntityStore implements EntityStore {
           List<byte[]> subEntityPrefix = getSubEntitiesPrefix(ident, entityType);
           if (subEntityPrefix.isEmpty()) {
             // has no sub-entities
-            return backend.delete(dataKey);
+            boolean r = kvTransactionManager.delete(dataKey);
+            kvTransactionManager.commit();
+            return r;
           }
 
           byte[] directChild = Iterables.getLast(subEntityPrefix);
           byte[] endKey = Bytes.increment(Bytes.wrap(directChild)).get();
           List<Pair<byte[], byte[]>> kvs =
-              backend.scan(
+              kvTransactionManager.scan(
                   new KvRangeScan.KvRangeScanBuilder()
                       .start(directChild)
                       .end(endKey)
@@ -341,7 +356,7 @@ public class KvEntityStore implements EntityStore {
           }
 
           for (byte[] prefix : subEntityPrefix) {
-            backend.deleteRange(
+            kvTransactionManager.deleteRange(
                 new KvRangeScan.KvRangeScanBuilder()
                     .start(prefix)
                     .startInclusive(true)
@@ -349,7 +364,9 @@ public class KvEntityStore implements EntityStore {
                     .build());
           }
 
-          return backend.delete(dataKey);
+          boolean r = kvTransactionManager.delete(dataKey);
+          kvTransactionManager.commit();
+          return r;
         });
   }
 

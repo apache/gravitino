@@ -37,6 +37,13 @@ public class ByteUtils {
     return buffer.array();
   }
 
+  public static byte[] longToByteInSmallEndian(long v) {
+    ByteBuffer buffer = ByteBuffer.allocate(Long.BYTES);
+    buffer.order(ByteOrder.LITTLE_ENDIAN);
+    buffer.putLong(v);
+    return buffer.array();
+  }
+
   /**
    * Converts a byte array to an integer value.
    *
@@ -79,4 +86,18 @@ public class ByteUtils {
     }
     return sb.toString();
   }
+
+  //  public static byte[] copyOf(byte[] original, int from, int length) {
+  //    byte[] copy = new byte[length];
+  //    if (from >= original.length) {
+  //      return new byte[0];
+  //    }
+  //
+  //    System.arraycopy(original, from, copy, 0, Math.min(original.length - from, length));
+  //    return copy;
+  //  }
+  //
+  //  public static byte[] copyOf(byte[] original, int from) {
+  //    return copyOf(original, from, original.length - from);
+  //  }
 }

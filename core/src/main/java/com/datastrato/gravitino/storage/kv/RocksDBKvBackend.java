@@ -10,22 +10,17 @@ import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.EntityAlreadyExistsException;
 import com.datastrato.gravitino.utils.ByteUtils;
 import com.datastrato.gravitino.utils.Bytes;
-import com.datastrato.gravitino.utils.Executable;
-import com.google.common.base.Throwables;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
 import org.apache.commons.lang3.tuple.Pair;
 import org.rocksdb.Options;
-import org.rocksdb.ReadOptions;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 import org.rocksdb.RocksIterator;
-import org.rocksdb.Transaction;
 import org.rocksdb.TransactionDB;
 import org.rocksdb.TransactionDBOptions;
-import org.rocksdb.WriteOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -37,8 +32,6 @@ import org.slf4j.LoggerFactory;
 public class RocksDBKvBackend implements KvBackend {
   public static final Logger LOGGER = LoggerFactory.getLogger(RocksDBKvBackend.class);
   private TransactionDB db;
-
-  public static final ThreadLocal<Transaction> TX_LOCAL = new ThreadLocal<>();
 
   /**
    * Initialize the RocksDB backend instance. We have used the {@link TransactionDB} to support
@@ -81,38 +74,13 @@ public class RocksDBKvBackend implements KvBackend {
 
   @Override
   public void put(byte[] key, byte[] value, boolean overwrite) throws IOException {
-    Transaction tx = TX_LOCAL.get();
     try {
-      // Do without transaction if not in transaction
-      if (tx == null) {
-        handlePutWithoutTransaction(key, value, overwrite);
-        return;
-      }
-
-      // Now try with transaction
-      handlePutWithTransaction(key, value, overwrite, tx);
+      handlePutWithoutTransaction(key, value, overwrite);
     } catch (EntityAlreadyExistsException e) {
       throw e;
     } catch (Exception e) {
       throw new IOException(e);
     }
-  }
-
-  private void handlePutWithTransaction(byte[] key, byte[] value, boolean overwrite, Transaction tx)
-      throws RocksDBException {
-    if (overwrite) {
-      tx.put(key, value);
-      return;
-    }
-
-    byte[] existKey = tx.get(new ReadOptions(), key);
-    if (existKey != null) {
-      throw new EntityAlreadyExistsException(
-          String.format(
-              "Key %s already exists in the database, please use overwrite option to overwrite it",
-              ByteUtils.formatByteArray(key)));
-    }
-    tx.put(key, value);
   }
 
   private void handlePutWithoutTransaction(byte[] key, byte[] value, boolean overwrite)
@@ -134,10 +102,6 @@ public class RocksDBKvBackend implements KvBackend {
   @Override
   public byte[] get(byte[] key) throws IOException {
     try {
-      if (TX_LOCAL.get() != null) {
-        return TX_LOCAL.get().get(new ReadOptions(), key);
-      }
-
       return db.get(key);
     } catch (RocksDBException e) {
       throw new IOException(e);
@@ -146,9 +110,7 @@ public class RocksDBKvBackend implements KvBackend {
 
   @Override
   public List<Pair<byte[], byte[]>> scan(KvRangeScan scanRange) throws IOException {
-    Transaction tx = TX_LOCAL.get();
-    RocksIterator rocksIterator =
-        TX_LOCAL.get() == null ? db.newIterator() : tx.getIterator(new ReadOptions());
+    RocksIterator rocksIterator = db.newIterator();
     rocksIterator.seek(scanRange.getStart());
 
     List<Pair<byte[], byte[]>> result = Lists.newArrayList();
@@ -159,6 +121,11 @@ public class RocksDBKvBackend implements KvBackend {
       // Break if the key is out of the scan range
       if (Bytes.wrap(key).compareTo(scanRange.getEnd()) > 0) {
         break;
+      }
+
+      if (!scanRange.getPredicate().test(key, rocksIterator.value())) {
+        rocksIterator.next();
+        continue;
       }
 
       if (Bytes.wrap(key).compareTo(scanRange.getStart()) == 0) {
@@ -186,10 +153,6 @@ public class RocksDBKvBackend implements KvBackend {
   @Override
   public boolean delete(byte[] key) throws IOException {
     try {
-      if (TX_LOCAL.get() != null) {
-        TX_LOCAL.get().delete(key);
-        return true;
-      }
       db.delete(key);
       return true;
     } catch (RocksDBException e) {
@@ -199,8 +162,7 @@ public class RocksDBKvBackend implements KvBackend {
 
   @Override
   public boolean deleteRange(KvRangeScan deleteRange) throws IOException {
-    Transaction tx = TX_LOCAL.get();
-    RocksIterator rocksIterator = tx == null ? db.newIterator() : tx.getIterator(new ReadOptions());
+    RocksIterator rocksIterator = db.newIterator();
     rocksIterator.seek(deleteRange.getStart());
 
     while (rocksIterator.isValid()) {
@@ -233,55 +195,5 @@ public class RocksDBKvBackend implements KvBackend {
   @Override
   public void close() throws IOException {
     db.close();
-  }
-
-  @Override
-  public <R, E extends Exception> R executeInTransaction(Executable<R, E> executable)
-      throws E, IOException {
-    // TODO (yuqi) Name mapping service and storage should use separately backend, or we should
-    //  handle nested transaction
-    Transaction tx = TX_LOCAL.get();
-    if (tx != null) {
-      return executable.execute();
-    }
-
-    tx = db.beginTransaction(new WriteOptions());
-    LOGGER.info("Starting transaction: id: '{}'", tx.getID());
-    TX_LOCAL.set(tx);
-    try {
-      R r = executable.execute();
-      tx.commit();
-      return r;
-    } catch (RocksDBException e) {
-      rollback(tx, e);
-      throw new IOException(e);
-    } catch (Exception e) {
-      rollback(tx, e);
-      throw e;
-    } finally {
-      LOGGER.info("Transaction close, tx id: '{}', tx state: '{}'", tx.getID(), tx.getState());
-      tx.close();
-      TX_LOCAL.remove();
-    }
-  }
-
-  private void rollback(Transaction tx, Exception e) {
-    LOGGER.error(
-        "Error executing transaction, tx id: '{}', exception: {}, message: {}, stackTrace: \n{}",
-        tx.getID(),
-        e.getCause(),
-        e.getMessage(),
-        Throwables.getStackTraceAsString(e));
-
-    try {
-      tx.rollback();
-    } catch (Exception e1) {
-      LOGGER.error(
-          "Error rolling back transaction, tx id: '{}', exception: {}, message: {}, stackTrace: \n{}",
-          tx.getID(),
-          e1.getCause(),
-          e1.getMessage(),
-          Throwables.getStackTraceAsString(e));
-    }
   }
 }

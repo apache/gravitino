@@ -53,7 +53,7 @@ public class TestKvNameMappingService {
     return new KvNameMappingService(backend);
   }
 
-  private IdGenerator getIdGeneratorByRefection(NameMappingService nameMappingService)
+  private IdGenerator getIdGeneratorByReflection(NameMappingService nameMappingService)
       throws Exception {
     Field field = nameMappingService.getClass().getDeclaredField("idGenerator");
     field.setAccessible(true);
@@ -70,7 +70,7 @@ public class TestKvNameMappingService {
         createNameMappingService(ROCKS_DB_STORE_PATH + "/1")) {
       Assertions.assertNull(nameMappingService.getIdByName("name1"));
 
-      IdGenerator spyIdGenerator = getIdGeneratorByRefection(nameMappingService);
+      IdGenerator spyIdGenerator = getIdGeneratorByReflection(nameMappingService);
       Mockito.doReturn(1L).when(spyIdGenerator).nextId();
 
       long name1Id = nameMappingService.getOrCreateIdFromName("name1");
@@ -90,7 +90,7 @@ public class TestKvNameMappingService {
   public void testUpdateName() throws Exception {
     try (NameMappingService nameMappingService =
         createNameMappingService(ROCKS_DB_STORE_PATH + "/2")) {
-      IdGenerator idGenerator = getIdGeneratorByRefection(nameMappingService);
+      IdGenerator idGenerator = getIdGeneratorByReflection(nameMappingService);
       Mockito.doReturn(1L).when(idGenerator).nextId();
       long name1IdRead = nameMappingService.getOrCreateIdFromName("name1");
       Assertions.assertNotNull(nameMappingService.getIdByName("name1"));
@@ -116,7 +116,7 @@ public class TestKvNameMappingService {
   public void testBindAndUnBind() throws Exception {
     idGenerator.nextId();
     NameMappingService nameMappingService = createNameMappingService(ROCKS_DB_STORE_PATH + "/3");
-    IdGenerator idGenerator = getIdGeneratorByRefection(nameMappingService);
+    IdGenerator idGenerator = getIdGeneratorByReflection(nameMappingService);
 
     Mockito.doReturn(1L).when(idGenerator).nextId();
     nameMappingService.getOrCreateIdFromName("name1");
@@ -130,7 +130,10 @@ public class TestKvNameMappingService {
     nameMappingService.getOrCreateIdFromName("name2");
 
     KvBackend spyKvBackend = Mockito.spy(((KvNameMappingService) nameMappingService).backend);
-    Mockito.doThrow(new ArithmeticException()).when(spyKvBackend).delete(Mockito.any());
+    // All deletes && puts will be converted to put operations.
+    Mockito.doThrow(new ArithmeticException())
+        .when(spyKvBackend)
+        .put(Mockito.any(), Mockito.any(), Mockito.anyBoolean());
     final NameMappingService mock = new KvNameMappingService(spyKvBackend);
 
     // Now we try to use update. It should fail.

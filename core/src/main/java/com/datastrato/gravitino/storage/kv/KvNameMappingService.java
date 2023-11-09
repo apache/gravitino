@@ -44,9 +44,9 @@ public class KvNameMappingService implements NameMappingService {
   @Override
   public Long getIdByName(String name) throws IOException {
     lock.readLock().lock();
-    try {
+    try (KvTransactionManager kvTransactionManager = new KvTransactionManagerImpl(backend)) {
       byte[] nameByte = Bytes.concat(NAME_PREFIX, name.getBytes());
-      byte[] idByte = backend.get(nameByte);
+      byte[] idByte = kvTransactionManager.get(nameByte);
       return idByte == null ? null : ByteUtils.byteToLong(idByte);
     } finally {
       lock.readLock().unlock();
@@ -57,14 +57,12 @@ public class KvNameMappingService implements NameMappingService {
     byte[] nameByte = Bytes.concat(NAME_PREFIX, name.getBytes());
     long id = idGenerator.nextId();
     lock.writeLock().lock();
-    try {
-      return backend.executeInTransaction(
-          () -> {
-            backend.put(nameByte, ByteUtils.longToByte(id), false);
-            byte[] idByte = Bytes.concat(ID_PREFIX, ByteUtils.longToByte(id));
-            backend.put(idByte, name.getBytes(), false);
-            return id;
-          });
+    try (KvTransactionManagerImpl kvTransactionManager = new KvTransactionManagerImpl(backend)) {
+      kvTransactionManager.put(nameByte, ByteUtils.longToByte(id), false);
+      byte[] idByte = Bytes.concat(ID_PREFIX, ByteUtils.longToByte(id));
+      kvTransactionManager.put(idByte, name.getBytes(), false);
+      kvTransactionManager.commit();
+      return id;
     } finally {
       lock.writeLock().unlock();
     }
@@ -73,23 +71,21 @@ public class KvNameMappingService implements NameMappingService {
   @Override
   public boolean updateName(String oldName, String newName) throws IOException {
     lock.writeLock().lock();
-    try {
-      return backend.executeInTransaction(
-          () -> {
-            byte[] nameByte = Bytes.concat(NAME_PREFIX, oldName.getBytes());
-            byte[] oldIdValue = backend.get(nameByte);
+    try (KvTransactionManagerImpl kvTransactionManager = new KvTransactionManagerImpl(backend)) {
+      byte[] nameByte = Bytes.concat(NAME_PREFIX, oldName.getBytes());
+      byte[] oldIdValue = kvTransactionManager.get(nameByte);
 
-            // Old mapping has been deleted, no need to do it;
-            if (oldIdValue == null) {
-              return false;
-            }
-            // Delete old name --> id mapping
-            backend.delete(nameByte);
+      // Old mapping has been deleted, no need to do it;
+      if (oldIdValue == null) {
+        return false;
+      }
+      // Delete old name --> id mapping
+      kvTransactionManager.delete(nameByte);
 
-            backend.put(Bytes.concat(NAME_PREFIX, newName.getBytes()), oldIdValue, false);
-            backend.put(Bytes.concat(ID_PREFIX, oldIdValue), newName.getBytes(), true);
-            return true;
-          });
+      kvTransactionManager.put(Bytes.concat(NAME_PREFIX, newName.getBytes()), oldIdValue, false);
+      kvTransactionManager.put(Bytes.concat(ID_PREFIX, oldIdValue), newName.getBytes(), true);
+      kvTransactionManager.commit();
+      return true;
     } finally {
       lock.writeLock().unlock();
     }
@@ -100,8 +96,10 @@ public class KvNameMappingService implements NameMappingService {
     byte[] nameByte = Bytes.concat(NAME_PREFIX, name.getBytes());
 
     lock.writeLock().lock();
-    try {
-      return backend.delete(nameByte);
+    try (KvTransactionManagerImpl kvTransactionManager = new KvTransactionManagerImpl(backend)) {
+      boolean r = kvTransactionManager.delete(nameByte);
+      kvTransactionManager.commit();
+      return r;
     } finally {
       lock.writeLock().unlock();
     }

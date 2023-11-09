@@ -618,7 +618,7 @@ public class TestKvEntityStorage {
 
       Assertions.assertThrowsExactly(
           NoSuchEntityException.class,
-          () -> store.get(schema2.nameIdentifier(), EntityType.SCHEMA, CatalogEntity.class));
+          () -> store.get(schema2.nameIdentifier(), EntityType.SCHEMA, SchemaEntity.class));
 
       Assertions.assertTrue(store.delete(metalake.nameIdentifier(), EntityType.METALAKE, true));
 
@@ -657,32 +657,12 @@ public class TestKvEntityStorage {
       Assertions.assertThrows(
           NoSuchEntityException.class,
           () -> store.get(metalake.nameIdentifier(), EntityType.METALAKE, BaseMetalake.class));
-      try {
-        store.executeInTransaction(
-            () -> {
-              store.put(metalake);
-              // Try to mock an exception
-              double a = 1 / 0;
-              store.put(catalog);
-              return null;
-            });
-      } catch (Exception e) {
-        Assertions.assertTrue(e instanceof ArithmeticException);
-      }
 
-      Assertions.assertThrows(
-          NoSuchEntityException.class,
-          () -> store.get(metalake.nameIdentifier(), EntityType.METALAKE, BaseMetalake.class));
-
-      store.executeInTransaction(
-          () -> {
-            store.put(metalake);
-            store.put(catalog);
-            store.put(metalakeCopy);
-            store.put(catalogCopy);
-            store.put(catalogCopyAgain);
-            return null;
-          });
+      store.put(metalake);
+      store.put(catalog);
+      store.put(metalakeCopy);
+      store.put(catalogCopy);
+      store.put(catalogCopyAgain);
 
       Metalake retrievedMetalake =
           store.get(metalake.nameIdentifier(), EntityType.METALAKE, BaseMetalake.class);
