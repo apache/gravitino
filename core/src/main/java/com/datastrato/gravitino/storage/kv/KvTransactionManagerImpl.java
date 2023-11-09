@@ -36,8 +36,8 @@ import org.apache.commons.lang3.tuple.Pair;
  * can be one of the following values:
  *
  * <pre>
- *   0x00000000(Metrication: 0) -- NORMAL
- *   0x00000001(Metrication: 1) -- DELETED
+ *   0x00000000(Metrication: 0) -- NORMAL, the value is visible
+ *   0x00000001(Metrication: 1) -- DELETED, the value is deleted and not visible
  * </pre>
  */
 public class KvTransactionManagerImpl implements KvTransactionManager {
