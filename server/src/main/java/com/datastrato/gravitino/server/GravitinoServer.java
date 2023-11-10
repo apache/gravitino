@@ -5,6 +5,7 @@
 package com.datastrato.gravitino.server;
 
 import com.datastrato.gravitino.GravitinoEnv;
+import com.datastrato.gravitino.auth.Authenticator;
 import com.datastrato.gravitino.catalog.CatalogManager;
 import com.datastrato.gravitino.catalog.CatalogOperationDispatcher;
 import com.datastrato.gravitino.meta.MetalakeManager;
@@ -66,6 +67,7 @@ public class GravitinoServer extends ResourceConfig {
             bind(gravitinoEnv.catalogOperationDispatcher())
                 .to(CatalogOperationDispatcher.class)
                 .ranked(1);
+            bind(gravitinoEnv.authenticator()).to(Authenticator.class).ranked(1);
           }
         });
     register(ObjectMapperProvider.class).register(JacksonFeature.class);

@@ -94,4 +94,15 @@ public class Utils {
         .type(MediaType.APPLICATION_JSON)
         .build();
   }
+
+  public static Response unauthorized(String message, Throwable throwable) {
+    return unauthorized(throwable.getClass().getSimpleName(), message, throwable);
+  }
+
+  public static Response unauthorized(String type, String message, Throwable throwable) {
+    return Response.status(Response.Status.UNAUTHORIZED)
+        .entity(ErrorResponse.unauthorized(type, message, throwable))
+        .type(MediaType.APPLICATION_JSON)
+        .build();
+  }
 }

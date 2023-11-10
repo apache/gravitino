@@ -8,6 +8,7 @@ import static com.datastrato.gravitino.dto.rel.PartitionUtils.toTransforms;
 
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
+import com.datastrato.gravitino.auth.Authenticator;
 import com.datastrato.gravitino.catalog.CatalogOperationDispatcher;
 import com.datastrato.gravitino.dto.requests.TableCreateRequest;
 import com.datastrato.gravitino.dto.requests.TableUpdateRequest;
@@ -21,11 +22,13 @@ import com.datastrato.gravitino.rel.SortOrder;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.server.web.Utils;
+import com.datastrato.gravitino.utils.Constants;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
+import javax.ws.rs.HeaderParam;
 import javax.ws.rs.POST;
 import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
@@ -43,21 +46,27 @@ public class TableOperations {
   private static final Logger LOG = LoggerFactory.getLogger(TableOperations.class);
 
   private final CatalogOperationDispatcher dispatcher;
+  private final Authenticator authenticator;
 
   @Context private HttpServletRequest httpRequest;
 
   @Inject
-  public TableOperations(CatalogOperationDispatcher dispatcher) {
+  public TableOperations(CatalogOperationDispatcher dispatcher, Authenticator authenticator) {
     this.dispatcher = dispatcher;
+    this.authenticator = authenticator;
   }
 
   @GET
   @Produces("application/vnd.gravitino.v1+json")
   public Response listTables(
+      @HeaderParam(Constants.HTTP_HEADER_NAME) String authData,
       @PathParam("metalake") String metalake,
       @PathParam("catalog") String catalog,
       @PathParam("schema") String schema) {
     try {
+      if (authenticator.isDataFromHTTP()) {
+        authenticator.authenticateHTTPHeader(authData);
+      }
       Namespace tableNS = Namespace.ofTable(metalake, catalog, schema);
       NameIdentifier[] idents = dispatcher.listTables(tableNS);
       return Utils.ok(new EntityListResponse(idents));
@@ -70,11 +79,15 @@ public class TableOperations {
   @POST
   @Produces("application/vnd.gravitino.v1+json")
   public Response createTable(
+      @HeaderParam(Constants.HTTP_HEADER_NAME) String authData,
       @PathParam("metalake") String metalake,
       @PathParam("catalog") String catalog,
       @PathParam("schema") String schema,
       TableCreateRequest request) {
     try {
+      if (authenticator.isDataFromHTTP()) {
+        authenticator.authenticateHTTPHeader(authData);
+      }
       request.validate();
       NameIdentifier ident = NameIdentifier.ofTable(metalake, catalog, schema, request.getName());
       SortOrder[] sortOrders =
@@ -103,11 +116,15 @@ public class TableOperations {
   @Path("{table}")
   @Produces("application/vnd.gravitino.v1+json")
   public Response loadTable(
+      @HeaderParam(Constants.HTTP_HEADER_NAME) String authData,
       @PathParam("metalake") String metalake,
       @PathParam("catalog") String catalog,
       @PathParam("schema") String schema,
       @PathParam("table") String table) {
     try {
+      if (authenticator.isDataFromHTTP()) {
+        authenticator.authenticateHTTPHeader(authData);
+      }
       NameIdentifier ident = NameIdentifier.ofTable(metalake, catalog, schema, table);
       Table t = dispatcher.loadTable(ident);
       return Utils.ok(new TableResponse(DTOConverters.toDTO(t)));
@@ -121,12 +138,16 @@ public class TableOperations {
   @Path("{table}")
   @Produces("application/vnd.gravitino.v1+json")
   public Response alterTable(
+      @HeaderParam(Constants.HTTP_HEADER_NAME) String authData,
       @PathParam("metalake") String metalake,
       @PathParam("catalog") String catalog,
       @PathParam("schema") String schema,
       @PathParam("table") String table,
       TableUpdatesRequest request) {
     try {
+      if (authenticator.isDataFromHTTP()) {
+        authenticator.authenticateHTTPHeader(authData);
+      }
       request.validate();
       NameIdentifier ident = NameIdentifier.ofTable(metalake, catalog, schema, table);
       TableChange[] changes =
@@ -145,12 +166,16 @@ public class TableOperations {
   @Path("{table}")
   @Produces("application/vnd.gravitino.v1+json")
   public Response dropTable(
+      @HeaderParam(Constants.HTTP_HEADER_NAME) String authData,
       @PathParam("metalake") String metalake,
       @PathParam("catalog") String catalog,
       @PathParam("schema") String schema,
       @PathParam("table") String table,
       @QueryParam("purge") @DefaultValue("false") boolean purge) {
     try {
+      if (authenticator.isDataFromHTTP()) {
+        authenticator.authenticateHTTPHeader(authData);
+      }
       NameIdentifier ident = NameIdentifier.ofTable(metalake, catalog, schema, table);
       boolean dropped = purge ? dispatcher.purgeTable(ident) : dispatcher.dropTable(ident);
       if (!dropped) {

@@ -4,6 +4,8 @@
  */
 package com.datastrato.gravitino;
 
+import com.datastrato.gravitino.auth.Authenticator;
+import com.datastrato.gravitino.auth.AuthenticatorFactory;
 import com.datastrato.gravitino.aux.AuxiliaryServiceManager;
 import com.datastrato.gravitino.catalog.CatalogManager;
 import com.datastrato.gravitino.catalog.CatalogOperationDispatcher;
@@ -36,6 +38,7 @@ public class GravitinoEnv {
   private IdGenerator idGenerator;
 
   private AuxiliaryServiceManager auxServiceManager;
+  private Authenticator authenticator;
 
   private GravitinoEnv() {}
 
@@ -84,6 +87,9 @@ public class GravitinoEnv {
     this.auxServiceManager = new AuxiliaryServiceManager();
     this.auxServiceManager.serviceInit(
         config.getConfigsWithPrefix(AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX));
+
+    this.authenticator = AuthenticatorFactory.createAuthenticator(config);
+    this.authenticator.initialize(config);
 
     LOG.info("Gravitino Environment is initialized.");
   }
@@ -150,6 +156,10 @@ public class GravitinoEnv {
    */
   public IdGenerator idGenerator() {
     return idGenerator;
+  }
+
+  public Authenticator authenticator() {
+    return authenticator;
   }
 
   public void start() {

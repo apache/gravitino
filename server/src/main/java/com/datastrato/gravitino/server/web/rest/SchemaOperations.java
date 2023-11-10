@@ -6,6 +6,7 @@ package com.datastrato.gravitino.server.web.rest;
 
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
+import com.datastrato.gravitino.auth.Authenticator;
 import com.datastrato.gravitino.catalog.CatalogOperationDispatcher;
 import com.datastrato.gravitino.dto.requests.SchemaCreateRequest;
 import com.datastrato.gravitino.dto.requests.SchemaUpdateRequest;
@@ -17,12 +18,14 @@ import com.datastrato.gravitino.dto.util.DTOConverters;
 import com.datastrato.gravitino.rel.Schema;
 import com.datastrato.gravitino.rel.SchemaChange;
 import com.datastrato.gravitino.server.web.Utils;
+import com.datastrato.gravitino.utils.Constants;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
+import javax.ws.rs.HeaderParam;
 import javax.ws.rs.POST;
 import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
@@ -43,19 +46,26 @@ public class SchemaOperations {
   private static final Logger LOG = LoggerFactory.getLogger(SchemaOperations.class);
 
   private final CatalogOperationDispatcher dispatcher;
+  private final Authenticator authenticator;
 
   @Context private HttpServletRequest httpRequest;
 
   @Inject
-  public SchemaOperations(CatalogOperationDispatcher dispatcher) {
+  public SchemaOperations(CatalogOperationDispatcher dispatcher, Authenticator authenticator) {
     this.dispatcher = dispatcher;
+    this.authenticator = authenticator;
   }
 
   @GET
   @Produces("application/vnd.gravitino.v1+json")
   public Response listSchemas(
-      @PathParam("metalake") String metalake, @PathParam("catalog") String catalog) {
+      @HeaderParam(Constants.HTTP_HEADER_NAME) String authData,
+      @PathParam("metalake") String metalake,
+      @PathParam("catalog") String catalog) {
     try {
+      if (authenticator.isDataFromHTTP()) {
+        authenticator.authenticateHTTPHeader(authData);
+      }
       Namespace schemaNS = Namespace.ofSchema(metalake, catalog);
       NameIdentifier[] idents = dispatcher.listSchemas(schemaNS);
       return Utils.ok(new EntityListResponse(idents));
@@ -68,10 +78,14 @@ public class SchemaOperations {
   @POST
   @Produces("application/vnd.gravitino.v1+json")
   public Response createSchema(
+      @HeaderParam(Constants.HTTP_HEADER_NAME) String authData,
       @PathParam("metalake") String metalake,
       @PathParam("catalog") String catalog,
       SchemaCreateRequest request) {
     try {
+      if (authenticator.isDataFromHTTP()) {
+        authenticator.authenticateHTTPHeader(authData);
+      }
       request.validate();
       NameIdentifier ident = NameIdentifier.ofSchema(metalake, catalog, request.getName());
       Schema schema = dispatcher.createSchema(ident, request.getComment(), request.getProperties());
@@ -87,10 +101,14 @@ public class SchemaOperations {
   @Path("/{schema}")
   @Produces("application/vnd.gravitino.v1+json")
   public Response loadSchema(
+      @HeaderParam(Constants.HTTP_HEADER_NAME) String authData,
       @PathParam("metalake") String metalake,
       @PathParam("catalog") String catalog,
       @PathParam("schema") String schema) {
     try {
+      if (authenticator.isDataFromHTTP()) {
+        authenticator.authenticateHTTPHeader(authData);
+      }
       NameIdentifier ident = NameIdentifier.ofSchema(metalake, catalog, schema);
       Schema s = dispatcher.loadSchema(ident);
       return Utils.ok(new SchemaResponse(DTOConverters.toDTO(s)));
@@ -104,11 +122,15 @@ public class SchemaOperations {
   @Path("/{schema}")
   @Produces("application/vnd.gravitino.v1+json")
   public Response alterSchema(
+      @HeaderParam(Constants.HTTP_HEADER_NAME) String authData,
       @PathParam("metalake") String metalake,
       @PathParam("catalog") String catalog,
       @PathParam("schema") String schema,
       SchemaUpdatesRequest request) {
     try {
+      if (authenticator.isDataFromHTTP()) {
+        authenticator.authenticateHTTPHeader(authData);
+      }
       request.validate();
       NameIdentifier ident = NameIdentifier.ofSchema(metalake, catalog, schema);
       SchemaChange[] changes =
@@ -127,11 +149,15 @@ public class SchemaOperations {
   @Path("/{schema}")
   @Produces("application/vnd.gravitino.v1+json")
   public Response dropSchema(
+      @HeaderParam(Constants.HTTP_HEADER_NAME) String authData,
       @PathParam("metalake") String metalake,
       @PathParam("catalog") String catalog,
       @PathParam("schema") String schema,
       @DefaultValue("false") @QueryParam("cascade") boolean cascade) {
     try {
+      if (authenticator.isDataFromHTTP()) {
+        authenticator.authenticateHTTPHeader(authData);
+      }
       NameIdentifier ident = NameIdentifier.ofSchema(metalake, catalog, schema);
       boolean dropped = dispatcher.dropSchema(ident, cascade);
       if (!dropped) {

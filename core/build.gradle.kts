@@ -28,6 +28,9 @@ dependencies {
   implementation(libs.commons.io)
   implementation(libs.caffeine)
   implementation(libs.rocksdbjni)
+  implementation(libs.jwt.api)
+  implementation(libs.jwt.impl)
+  implementation(libs.jwt.gson)
 
   compileOnly(libs.lombok)
   annotationProcessor(libs.lombok)

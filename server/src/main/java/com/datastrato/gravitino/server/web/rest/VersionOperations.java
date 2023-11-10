@@ -4,14 +4,19 @@
  */
 package com.datastrato.gravitino.server.web.rest;
 
+import com.datastrato.gravitino.auth.Authenticator;
 import com.datastrato.gravitino.dto.VersionDTO;
 import com.datastrato.gravitino.dto.responses.VersionResponse;
+import com.datastrato.gravitino.exceptions.UnauthorizedException;
 import com.datastrato.gravitino.server.web.Utils;
+import com.datastrato.gravitino.utils.Constants;
 import java.io.IOException;
 import java.util.Properties;
+import javax.inject.Inject;
 import javax.servlet.http.HttpServlet;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.GET;
+import javax.ws.rs.HeaderParam;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
@@ -21,11 +26,22 @@ import javax.ws.rs.core.Response;
 @Consumes(MediaType.APPLICATION_JSON)
 @Produces(MediaType.APPLICATION_JSON)
 public class VersionOperations extends HttpServlet {
+
+  private final Authenticator authenticator;
+
+  @Inject
+  public VersionOperations(Authenticator authenticator) {
+    this.authenticator = authenticator;
+  }
+
   @GET
   @Produces("application/vnd.gravitino.v1+json")
-  public Response getVersion() {
+  public Response getVersion(@HeaderParam(Constants.HTTP_HEADER_NAME) String authData) {
     Properties projectProperties = new Properties();
     try {
+      if (authenticator.isDataFromHTTP()) {
+        authenticator.authenticateHTTPHeader(authData);
+      }
       projectProperties.load(
           VersionOperations.class.getClassLoader().getResourceAsStream("project.properties"));
       String version = projectProperties.getProperty("project.version");
@@ -35,6 +51,8 @@ public class VersionOperations extends HttpServlet {
       VersionDTO versionDTO = new VersionDTO(version, compileDate, gitCommit);
 
       return Utils.ok(new VersionResponse(versionDTO));
+    } catch (UnauthorizedException ue) {
+      return Utils.unauthorized("Failed to authenticate the user", ue);
     } catch (IOException e) {
       return Utils.internalError("Failed to get Gravitino version", e);
     }

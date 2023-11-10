@@ -60,6 +60,9 @@ public class ExceptionHandlers {
       if (e instanceof IllegalArgumentException) {
         return Utils.illegalArguments(errorMsg, e);
 
+      } else if (e instanceof UnsupportedOperationException) {
+        return Utils.unauthorized(errorMsg, e);
+
       } else if (e instanceof NotFoundException) {
         return Utils.notFound(errorMsg, e);
 
@@ -89,6 +92,9 @@ public class ExceptionHandlers {
 
       if (e instanceof IllegalArgumentException) {
         return Utils.illegalArguments(errorMsg, e);
+
+      } else if (e instanceof UnsupportedOperationException) {
+        return Utils.unauthorized(errorMsg, e);
 
       } else if (e instanceof NotFoundException) {
         return Utils.notFound(errorMsg, e);
@@ -123,6 +129,9 @@ public class ExceptionHandlers {
       if (e instanceof IllegalArgumentException) {
         return Utils.illegalArguments(errorMsg, e);
 
+      } else if (e instanceof UnsupportedOperationException) {
+        return Utils.unauthorized(errorMsg, e);
+
       } else if (e instanceof NotFoundException) {
         return Utils.notFound(errorMsg, e);
 
@@ -151,6 +160,9 @@ public class ExceptionHandlers {
 
       if (e instanceof IllegalArgumentException) {
         return Utils.illegalArguments(errorMsg, e);
+
+      } else if (e instanceof UnsupportedOperationException) {
+        return Utils.unauthorized(errorMsg, e);
 
       } else if (e instanceof MetalakeAlreadyExistsException) {
         return Utils.alreadyExists(errorMsg, e);

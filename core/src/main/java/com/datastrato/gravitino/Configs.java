@@ -6,6 +6,7 @@ package com.datastrato.gravitino;
 
 import com.datastrato.gravitino.config.ConfigBuilder;
 import com.datastrato.gravitino.config.ConfigEntry;
+import io.jsonwebtoken.SignatureAlgorithm;
 import java.io.File;
 
 public interface Configs {
@@ -63,4 +64,39 @@ public interface Configs {
           .version("0.1.0")
           .booleanConf()
           .createWithDefault(true);
+
+  ConfigEntry<String> AUTHENTICATOR =
+      new ConfigBuilder("gravitino.authenticator")
+          .doc("The authenticator which Gravitino uses")
+          .version("0.3.0")
+          .stringConf()
+          .createWithDefault("simple");
+
+  ConfigEntry<String> SERVICE_AUDIENCE =
+      new ConfigBuilder("gravitino.authenicator.oauth.service.audience")
+          .doc("The audience name when Gravitino uses oauth as the authenticator")
+          .version("0.3.0")
+          .stringConf()
+          .createWithDefault("");
+
+  ConfigEntry<Long> ALLOW_SKEW_SECONDS =
+      new ConfigBuilder("gravitino.authenticator.oauth.allow.skew.seconds")
+          .doc("The jwt allows skew seconds when Gravitino uses oauth as the authenticator")
+          .version("0.3.0")
+          .longConf()
+          .createWithDefault(0L);
+
+  ConfigEntry<String> DEFAULT_SIGN_KEY =
+      new ConfigBuilder("gravitino.authenticator.oauth.default.sign.key")
+          .doc("The sign key of jwt when Gravitino uses oauth as the authenticator")
+          .version("0.3.0")
+          .stringConf()
+          .createWithDefault(null);
+
+  ConfigEntry<String> ALG_TYPE =
+      new ConfigBuilder("gravitino.authenticator.oauth.algorithm.type")
+          .doc("The encryption algorithm when Gravitino uses oauth as the authenticator")
+          .version("0.3.0")
+          .stringConf()
+          .createWithDefault(SignatureAlgorithm.RS256.name());
 }
