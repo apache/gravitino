@@ -4,14 +4,14 @@
  */
 package com.datastrato.gravitino.client;
 
-import static com.datastrato.gravitino.dto.rel.PartitionUtils.toPartitions;
+import static com.datastrato.gravitino.dto.util.DTOConverters.toDTO;
+import static com.datastrato.gravitino.dto.util.DTOConverters.toDTOs;
 
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.dto.AuditDTO;
 import com.datastrato.gravitino.dto.CatalogDTO;
 import com.datastrato.gravitino.dto.rel.ColumnDTO;
-import com.datastrato.gravitino.dto.rel.SortOrderDTO;
 import com.datastrato.gravitino.dto.requests.SchemaCreateRequest;
 import com.datastrato.gravitino.dto.requests.SchemaUpdateRequest;
 import com.datastrato.gravitino.dto.requests.SchemaUpdatesRequest;
@@ -29,15 +29,15 @@ import com.datastrato.gravitino.exceptions.NonEmptySchemaException;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.TableAlreadyExistsException;
 import com.datastrato.gravitino.rel.Column;
-import com.datastrato.gravitino.rel.Distribution;
 import com.datastrato.gravitino.rel.Schema;
 import com.datastrato.gravitino.rel.SchemaChange;
-import com.datastrato.gravitino.rel.SortOrder;
 import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.TableCatalog;
 import com.datastrato.gravitino.rel.TableChange;
-import com.datastrato.gravitino.rel.transforms.Transform;
+import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
+import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
+import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
@@ -133,7 +133,7 @@ public class RelationalCatalog extends CatalogDTO implements TableCatalog, Suppo
    * @param columns The columns of the table.
    * @param comment The comment of the table.
    * @param properties The properties of the table.
-   * @param partitions The partitioning of the table.
+   * @param partitioning The partitioning of the table.
    * @return The created {@link Table}.
    * @throws NoSuchSchemaException if the schema with specified namespace does not exist.
    * @throws TableAlreadyExistsException if the table with specified identifier already exists.
@@ -144,27 +144,21 @@ public class RelationalCatalog extends CatalogDTO implements TableCatalog, Suppo
       Column[] columns,
       String comment,
       Map<String, String> properties,
-      Transform[] partitions,
+      Transform[] partitioning,
       Distribution distribution,
       SortOrder[] sortOrders)
       throws NoSuchSchemaException, TableAlreadyExistsException {
     NameIdentifier.checkTable(ident);
 
-    SortOrderDTO[] sortOrderDTOs =
-        sortOrders == null
-            ? new SortOrderDTO[0]
-            : Arrays.stream(sortOrders)
-                .map(com.datastrato.gravitino.dto.util.DTOConverters::toDTO)
-                .toArray(SortOrderDTO[]::new);
     TableCreateRequest req =
         new TableCreateRequest(
             ident.name(),
             comment,
             (ColumnDTO[]) columns,
             properties,
-            sortOrderDTOs,
-            com.datastrato.gravitino.dto.util.DTOConverters.toDTO(distribution),
-            toPartitions(partitions));
+            toDTOs(sortOrders),
+            toDTO(distribution),
+            toDTOs(partitioning));
     req.validate();
 
     TableResponse resp =

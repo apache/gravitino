@@ -5,13 +5,15 @@
 
 package com.datastrato.gravitino.rel;
 
-import com.datastrato.gravitino.rel.SortOrder.Builder;
-import com.datastrato.gravitino.rel.SortOrder.Direction;
-import com.datastrato.gravitino.rel.SortOrder.NullOrdering;
-import com.datastrato.gravitino.rel.transforms.Transform;
-import com.datastrato.gravitino.rel.transforms.Transforms;
-import com.datastrato.gravitino.rel.transforms.Transforms.FunctionTrans;
-import com.datastrato.gravitino.rel.transforms.Transforms.NamedReference;
+import static com.datastrato.gravitino.rel.expressions.NamedReference.field;
+
+import com.datastrato.gravitino.rel.expressions.Expression;
+import com.datastrato.gravitino.rel.expressions.FunctionExpression;
+import com.datastrato.gravitino.rel.expressions.NamedReference;
+import com.datastrato.gravitino.rel.expressions.sorts.NullOrdering;
+import com.datastrato.gravitino.rel.expressions.sorts.SortDirection;
+import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
+import com.datastrato.gravitino.rel.expressions.sorts.SortOrders;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -19,51 +21,25 @@ class TestSortOrder {
 
   @Test
   void testSortOrder() {
-    Builder builder = new Builder();
-    builder.withNullOrdering(NullOrdering.FIRST);
-    builder.withDirection(Direction.ASC);
-
-    Transform transform = Transforms.field(new String[] {"field1"});
-    builder.withTransform(transform);
-    SortOrder sortOrder = builder.build();
-
-    Assertions.assertEquals(NullOrdering.FIRST, sortOrder.getNullOrdering());
-    Assertions.assertEquals(Direction.ASC, sortOrder.getDirection());
-    Assertions.assertTrue(sortOrder.getTransform() instanceof NamedReference);
-    Assertions.assertArrayEquals(
-        new String[] {"field1"}, ((NamedReference) sortOrder.getTransform()).value());
-
-    builder.withNullOrdering(NullOrdering.LAST);
-    builder.withDirection(Direction.DESC);
-    transform = Transforms.function("date", new Transform[] {Transforms.field(new String[] {"b"})});
-    builder.withTransform(transform);
-    sortOrder = builder.build();
-    Assertions.assertEquals(NullOrdering.LAST, sortOrder.getNullOrdering());
-    Assertions.assertEquals(Direction.DESC, sortOrder.getDirection());
-
-    Assertions.assertTrue(sortOrder.getTransform() instanceof FunctionTrans);
-    Assertions.assertEquals("date", ((FunctionTrans) sortOrder.getTransform()).name());
-    Assertions.assertArrayEquals(
-        new String[] {"b"}, ((NamedReference) sortOrder.getTransform().arguments()[0]).value());
-  }
-
-  @Test
-  void testUtils() throws Exception {
+    NamedReference.FieldReference fieldReference = field("field1");
     SortOrder sortOrder =
-        SortOrder.fieldSortOrder(new String[] {"a"}, Direction.ASC, NullOrdering.FIRST);
-    Assertions.assertEquals(NullOrdering.FIRST, sortOrder.getNullOrdering());
-    Assertions.assertEquals(Direction.ASC, sortOrder.getDirection());
-    Assertions.assertTrue(sortOrder.getTransform() instanceof NamedReference);
-    Assertions.assertArrayEquals(
-        new String[] {"a"}, ((NamedReference) sortOrder.getTransform()).value());
+        SortOrders.of(fieldReference, SortDirection.ASCENDING, NullOrdering.NULLS_FIRST);
 
-    sortOrder =
-        SortOrder.functionSortOrder("date", new String[] {"b"}, Direction.DESC, NullOrdering.LAST);
-    Assertions.assertEquals(NullOrdering.LAST, sortOrder.getNullOrdering());
-    Assertions.assertEquals(Direction.DESC, sortOrder.getDirection());
-    Assertions.assertTrue(sortOrder.getTransform() instanceof FunctionTrans);
-    Assertions.assertEquals("date", ((FunctionTrans) sortOrder.getTransform()).name());
+    Assertions.assertEquals(NullOrdering.NULLS_FIRST, sortOrder.nullOrdering());
+    Assertions.assertEquals(SortDirection.ASCENDING, sortOrder.direction());
+    Assertions.assertTrue(sortOrder.expression() instanceof NamedReference);
     Assertions.assertArrayEquals(
-        new String[] {"b"}, ((NamedReference) sortOrder.getTransform().arguments()[0]).value());
+        new String[] {"field1"}, ((NamedReference) sortOrder.expression()).fieldName());
+
+    Expression date = FunctionExpression.of("date", new Expression[] {field("b")});
+    sortOrder = SortOrders.of(date, SortDirection.DESCENDING, NullOrdering.NULLS_LAST);
+    Assertions.assertEquals(NullOrdering.NULLS_LAST, sortOrder.nullOrdering());
+    Assertions.assertEquals(SortDirection.DESCENDING, sortOrder.direction());
+
+    Assertions.assertTrue(sortOrder.expression() instanceof FunctionExpression);
+    Assertions.assertEquals("date", ((FunctionExpression) sortOrder.expression()).functionName());
+    Assertions.assertArrayEquals(
+        new String[] {"b"},
+        ((FunctionExpression) sortOrder.expression()).arguments()[0].references()[0].fieldName());
   }
 }

@@ -6,7 +6,10 @@ package com.datastrato.gravitino.rel;
 
 import com.datastrato.gravitino.Auditable;
 import com.datastrato.gravitino.Namespace;
-import com.datastrato.gravitino.rel.transforms.Transform;
+import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
+import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
+import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
+import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import java.util.Collections;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -39,7 +42,7 @@ public interface Table extends Auditable {
    * Return the bucketing of the table. If no bucketing is specified, Distribution.NONE is returned.
    */
   default Distribution distribution() {
-    return Distribution.NONE;
+    return Distributions.NONE;
   }
 
   /** Return the comment of the table. Null is returned if no comment is set. */

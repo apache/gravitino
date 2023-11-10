@@ -4,25 +4,21 @@
  */
 package com.datastrato.gravitino.catalog.lakehouse.iceberg.converter;
 
-import static com.datastrato.gravitino.rel.transforms.Transforms.NAME_OF_BUCKET;
-import static com.datastrato.gravitino.rel.transforms.Transforms.NAME_OF_TRUNCATE;
-
-import com.datastrato.gravitino.rel.SortOrder;
-import com.datastrato.gravitino.rel.transforms.Transform;
-import com.datastrato.gravitino.rel.transforms.Transforms;
-import com.google.common.base.Preconditions;
-import io.substrait.expression.Expression;
-import java.util.Arrays;
+import com.datastrato.gravitino.rel.expressions.Expression;
+import com.datastrato.gravitino.rel.expressions.FunctionExpression;
+import com.datastrato.gravitino.rel.expressions.Literal;
+import com.datastrato.gravitino.rel.expressions.NamedReference;
+import com.datastrato.gravitino.rel.expressions.sorts.NullOrdering;
+import com.datastrato.gravitino.rel.expressions.sorts.SortDirection;
+import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import java.util.Locale;
-import java.util.stream.Collectors;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.iceberg.NullOrder;
 import org.apache.iceberg.Schema;
-import org.apache.iceberg.SortDirection;
 import org.apache.iceberg.expressions.Expressions;
 import org.apache.iceberg.expressions.UnboundTerm;
 
-/** Implement iceberg sort order converter to gravitino sort order. */
+/** Implement gravitino sort order converter to iceberg sort order. */
 public class ToIcebergSortOrder {
 
   private static final String DOT = ".";
@@ -41,70 +37,72 @@ public class ToIcebergSortOrder {
     org.apache.iceberg.SortOrder.Builder sortOrderBuilder =
         org.apache.iceberg.SortOrder.builderFor(schema);
     for (SortOrder sortOrder : sortOrders) {
-      Transform transform = sortOrder.getTransform();
-      if (transform instanceof Transforms.NamedReference) {
-        String fieldName = String.join(DOT, ((Transforms.NamedReference) transform).value());
+      Expression expression = sortOrder.expression();
+      if (expression instanceof NamedReference.FieldReference) {
+        String fieldName =
+            String.join(DOT, ((NamedReference.FieldReference) expression).fieldName());
         sortOrderBuilder.sortBy(
-            fieldName, toIceberg(sortOrder.getDirection()), toIceberg(sortOrder.getNullOrdering()));
-      } else if (transform instanceof Transforms.FunctionTrans) {
-        Preconditions.checkArgument(
-            transform.arguments().length == 1,
-            "Iceberg sort order does not support nested field",
-            transform);
-        String colName =
-            Arrays.stream(transform.arguments())
-                .map(t -> ((Transforms.NamedReference) t).value()[0])
-                .collect(Collectors.joining(DOT));
-        UnboundTerm<Object> expression;
-        switch (transform.name().toLowerCase(Locale.ROOT)) {
-          case NAME_OF_BUCKET:
-            int numBuckets =
-                ((Expression.I32Literal)
-                        ((Transforms.LiteralReference) transform.arguments()[0]).value())
-                    .value();
-            expression = Expressions.bucket(colName, numBuckets);
+            fieldName, toIceberg(sortOrder.direction()), toIceberg(sortOrder.nullOrdering()));
+      } else if (expression instanceof FunctionExpression) {
+        FunctionExpression gravitinoExpr = (FunctionExpression) expression;
+        String colName;
+        if (gravitinoExpr.arguments().length == 1) {
+          colName =
+              String.join(
+                  DOT, ((NamedReference.FieldReference) gravitinoExpr.arguments()[0]).fieldName());
+        } else if (gravitinoExpr.arguments().length == 2) {
+          colName =
+              String.join(
+                  DOT, ((NamedReference.FieldReference) gravitinoExpr.arguments()[1]).fieldName());
+        } else {
+          throw new UnsupportedOperationException(
+              "Sort function is not supported: " + gravitinoExpr.functionName());
+        }
+
+        UnboundTerm<Object> icebergExpression;
+        switch (gravitinoExpr.functionName().toLowerCase(Locale.ROOT)) {
+          case "bucket":
+            int numBuckets = ((Literal<Integer>) gravitinoExpr.arguments()[0]).value();
+            icebergExpression = Expressions.bucket(colName, numBuckets);
             break;
-          case NAME_OF_TRUNCATE:
-            int width =
-                ((Expression.I32Literal)
-                        ((Transforms.LiteralReference) transform.arguments()[0]).value())
-                    .value();
-            expression = Expressions.truncate(colName, width);
+          case "truncate":
+            int width = ((Literal<Integer>) gravitinoExpr.arguments()[0]).value();
+            icebergExpression = Expressions.truncate(colName, width);
             break;
-          case Transforms.NAME_OF_YEAR:
-            expression = Expressions.year(colName);
+          case "year":
+            icebergExpression = Expressions.year(colName);
             break;
-          case Transforms.NAME_OF_MONTH:
-            expression = Expressions.month(colName);
+          case "month":
+            icebergExpression = Expressions.month(colName);
             break;
-          case Transforms.NAME_OF_DAY:
-            expression = Expressions.day(colName);
+          case "day":
+            icebergExpression = Expressions.day(colName);
             break;
-          case Transforms.NAME_OF_HOUR:
-            expression = Expressions.hour(colName);
+          case "hour":
+            icebergExpression = Expressions.hour(colName);
             break;
           default:
             throw new UnsupportedOperationException(
-                "Transform is not supported: " + transform.name());
+                "Sort function is not supported: " + gravitinoExpr.functionName());
         }
         sortOrderBuilder.sortBy(
-            expression,
-            toIceberg(sortOrder.getDirection()),
-            toIceberg(sortOrder.getNullOrdering()));
+            icebergExpression,
+            toIceberg(sortOrder.direction()),
+            toIceberg(sortOrder.nullOrdering()));
       } else {
-        throw new UnsupportedOperationException("Transform is not supported: " + transform.name());
+        throw new UnsupportedOperationException("Sort expression is not supported: " + expression);
       }
     }
     return sortOrderBuilder.build();
   }
 
-  private static NullOrder toIceberg(SortOrder.NullOrdering nullOrdering) {
-    return nullOrdering == SortOrder.NullOrdering.FIRST
-        ? NullOrder.NULLS_FIRST
-        : NullOrder.NULLS_LAST;
+  private static NullOrder toIceberg(NullOrdering nullOrdering) {
+    return nullOrdering == NullOrdering.NULLS_FIRST ? NullOrder.NULLS_FIRST : NullOrder.NULLS_LAST;
   }
 
-  private static SortDirection toIceberg(SortOrder.Direction direction) {
-    return direction == SortOrder.Direction.ASC ? SortDirection.ASC : SortDirection.DESC;
+  private static org.apache.iceberg.SortDirection toIceberg(SortDirection direction) {
+    return direction == SortDirection.ASCENDING
+        ? org.apache.iceberg.SortDirection.ASC
+        : org.apache.iceberg.SortDirection.DESC;
   }
 }

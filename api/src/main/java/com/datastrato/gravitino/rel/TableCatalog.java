@@ -25,7 +25,10 @@ import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NoSuchTableException;
 import com.datastrato.gravitino.exceptions.TableAlreadyExistsException;
-import com.datastrato.gravitino.rel.transforms.Transform;
+import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
+import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
+import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
+import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import java.util.Map;
 
 /**
@@ -81,7 +84,13 @@ public interface TableCatalog {
       NameIdentifier ident, Column[] columns, String comment, Map<String, String> properties)
       throws NoSuchSchemaException, TableAlreadyExistsException {
     return createTable(
-        ident, columns, comment, properties, new Transform[0], Distribution.NONE, new SortOrder[0]);
+        ident,
+        columns,
+        comment,
+        properties,
+        new Transform[0],
+        Distributions.NONE,
+        new SortOrder[0]);
   }
 
   /**
@@ -104,7 +113,7 @@ public interface TableCatalog {
       Transform[] partitions)
       throws NoSuchSchemaException, TableAlreadyExistsException {
     return createTable(
-        ident, columns, comment, properties, partitions, Distribution.NONE, new SortOrder[0]);
+        ident, columns, comment, properties, partitions, Distributions.NONE, new SortOrder[0]);
   }
 
   /**
@@ -174,7 +183,7 @@ public interface TableCatalog {
       SortOrder[] sortOrders)
       throws NoSuchSchemaException, TableAlreadyExistsException {
     return createTable(
-        ident, columns, comment, properties, new Transform[0], Distribution.NONE, sortOrders);
+        ident, columns, comment, properties, new Transform[0], Distributions.NONE, sortOrders);
   }
 
   /**

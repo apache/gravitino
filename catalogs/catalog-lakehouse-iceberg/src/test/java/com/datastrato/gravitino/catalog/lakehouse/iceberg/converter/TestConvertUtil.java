@@ -8,7 +8,7 @@ import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergColumn;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergTable;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.rel.Column;
-import com.datastrato.gravitino.rel.SortOrder;
+import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.google.common.collect.Maps;
 import io.substrait.type.TypeCreator;
 import java.time.Instant;

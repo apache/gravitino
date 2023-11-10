@@ -4,9 +4,15 @@
  */
 package com.datastrato.gravitino.catalog.lakehouse.iceberg.converter;
 
+import static com.datastrato.gravitino.rel.expressions.NamedReference.field;
+
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergColumn;
 import com.datastrato.gravitino.rel.Column;
-import com.datastrato.gravitino.rel.SortOrder;
+import com.datastrato.gravitino.rel.expressions.FunctionExpression;
+import com.datastrato.gravitino.rel.expressions.sorts.NullOrdering;
+import com.datastrato.gravitino.rel.expressions.sorts.SortDirection;
+import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
+import com.datastrato.gravitino.rel.expressions.sorts.SortOrders;
 import com.google.common.collect.Lists;
 import io.substrait.type.Type;
 import io.substrait.type.TypeCreator;
@@ -81,22 +87,19 @@ public class TestBaseConvert {
     ArrayList<SortOrder> results = Lists.newArrayList();
     for (String colName : colNames) {
       results.add(
-          SortOrder.fieldSortOrder(
-              new String[] {colName},
-              RandomUtils.nextBoolean() ? SortOrder.Direction.DESC : SortOrder.Direction.ASC,
-              RandomUtils.nextBoolean()
-                  ? SortOrder.NullOrdering.FIRST
-                  : SortOrder.NullOrdering.LAST));
+          SortOrders.of(
+              field(colName),
+              RandomUtils.nextBoolean() ? SortDirection.DESCENDING : SortDirection.ASCENDING,
+              RandomUtils.nextBoolean() ? NullOrdering.NULLS_FIRST : NullOrdering.NULLS_LAST));
     }
     return results.toArray(new SortOrder[0]);
   }
 
   protected static SortOrder createFunctionSortOrder(String name, String colName) {
-    return SortOrder.functionSortOrder(
-        name,
-        new String[] {colName},
-        RandomUtils.nextBoolean() ? SortOrder.Direction.DESC : SortOrder.Direction.ASC,
-        RandomUtils.nextBoolean() ? SortOrder.NullOrdering.FIRST : SortOrder.NullOrdering.LAST);
+    return SortOrders.of(
+        FunctionExpression.of(name, field(colName)),
+        RandomUtils.nextBoolean() ? SortDirection.DESCENDING : SortDirection.ASCENDING,
+        RandomUtils.nextBoolean() ? NullOrdering.NULLS_FIRST : NullOrdering.NULLS_LAST);
   }
 
   protected static Types.NestedField createNestedField(

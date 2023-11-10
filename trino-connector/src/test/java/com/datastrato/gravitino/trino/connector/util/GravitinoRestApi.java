@@ -10,7 +10,6 @@ import com.datastrato.gravitino.dto.AuditDTO;
 import com.datastrato.gravitino.dto.CatalogDTO;
 import com.datastrato.gravitino.dto.MetalakeDTO;
 import com.datastrato.gravitino.dto.rel.ColumnDTO;
-import com.datastrato.gravitino.dto.rel.PartitionUtils;
 import com.datastrato.gravitino.dto.rel.SchemaDTO;
 import com.datastrato.gravitino.dto.rel.TableDTO;
 import com.datastrato.gravitino.dto.responses.CatalogResponse;
@@ -228,7 +227,7 @@ public class GravitinoRestApi {
             .withComment(originTable.comment())
             .withColumns((ColumnDTO[]) originTable.columns())
             .withProperties(originTable.properties())
-            .withPartitions(PartitionUtils.toPartitions(originTable.partitioning()))
+            .withPartitioning(DTOConverters.toDTOs(originTable.partitioning()))
             .withDistribution(DTOConverters.toDTO(originTable.distribution()))
             .withSortOrders(DTOConverters.toDTOs(originTable.sortOrder()))
             .withAudit(new AuditDTO.Builder().build())
