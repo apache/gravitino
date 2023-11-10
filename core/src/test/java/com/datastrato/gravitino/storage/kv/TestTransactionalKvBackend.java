@@ -24,7 +24,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
-public class TestTransactionalKvBackend {
+class TestTransactionalKvBackend {
 
   private KvBackend getKvBackEnd() throws IOException {
     Config config = Mockito.mock(Config.class);
@@ -267,6 +267,8 @@ public class TestTransactionalKvBackend {
             Pair.of(
                 kvTransactionManager.constructKey("key8".getBytes()),
                 kvTransactionManager.constructValue("value9".getBytes(), ValueStatusEnum.NORMAL)),
+
+            // Will throw NPE to roll back the transaction.
             Pair.of(kvTransactionManager.constructKey("key9".getBytes()), null));
 
     Pair<byte[], byte[]>[] arrayPair = pairs.toArray(new Pair[0]);
@@ -277,8 +279,6 @@ public class TestTransactionalKvBackend {
 
       Assertions.assertThrows(Exception.class, kvTransactionManager::commit);
 
-      // 2 milliseconds is enough for the data to be visible to other threads
-      Thread.currentThread().sleep(2);
       kvTransactionManager =
           new TransactionalKvBackendImpl(kvBackend, new TransactionIdGeneratorImpl(kvBackend));
       kvTransactionManager.begin();

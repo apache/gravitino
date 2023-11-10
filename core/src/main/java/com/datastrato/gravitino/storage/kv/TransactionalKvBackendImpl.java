@@ -155,7 +155,7 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
       }
 
       if (!scanRange.isEndInclusive() && Bytes.wrap(realKey).compareTo(scanRange.getEnd()) == 0) {
-        // Skip all version of the same key.
+        // Skip all versions of the same key.
         while (j < rawPairs.size() && minNextKey.compareTo(rawPairs.get(j).getKey()) >= 0) {
           j++;
         }
@@ -169,7 +169,7 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
       }
 
       j++;
-      // Skip all version of the same key.
+      // Skip all versions of the same key.
       while (j < rawPairs.size() && minNextKey.compareTo(rawPairs.get(j).getKey()) >= 0) {
         j++;
       }
@@ -201,15 +201,15 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
   @Override
   public void close() throws IOException {}
 
-  private byte[] getValue(byte[] value) {
-    byte[] firstFourType = ArrayUtils.subarray(value, 0, 4);
+  private byte[] getValue(byte[] rawValue) {
+    byte[] firstFourType = ArrayUtils.subarray(rawValue, 0, 4);
     int statusCode = ByteUtils.byteToInt(firstFourType);
     ValueStatusEnum statusEnum = ValueStatusEnum.fromCode(statusCode);
     if (statusEnum == ValueStatusEnum.DELETED) {
       // A deleted value is represented by a 4-byte integer with value 1
       return null;
     }
-    return ArrayUtils.subarray(value, VALUE_PREFIX_LENGTH, value.length);
+    return ArrayUtils.subarray(rawValue, VALUE_PREFIX_LENGTH, rawValue.length);
   }
 
   @VisibleForTesting
@@ -225,9 +225,11 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
     return Bytes.concat(key, SEPARATOR, revert(ByteUtils.longToByte(txId)));
   }
 
-  /** Get latest readable value of the key as we support multi-version concurrency control. */
+  /**
+   * Get the latest readable value of the key as we support multi-version concurrency control
+   * mechanism to keep multiple version data.
+   */
   private byte[] getNextReadableValue(byte[] key) throws IOException {
-    // Scan from key_txId to kez
     List<Pair<byte[], byte[]>> pairs =
         kvBackend.scan(
             new KvRangeScan.KvRangeScanBuilder()
@@ -261,8 +263,10 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
 
   /**
    * Revert the bytes, Why we need to revert the bytes? Because we use the transaction id to
-   * construct row key and need to place the latest version of the same key first. That is to say,
-   * the latest version of the same key is the smallest one.
+   * construct a row key and need to place the latest version of the same key first. That is to say,
+   * the latest version of a key is the smallest one in alphabetical order, in this case, we would
+   * quickly locate the latest version of a key as key-value pair databases will sort keys in
+   * ascending order.
    *
    * <p>Let's say we have a key "key1" and the transaction id is 1, 2, 3, 4, 5, 6, 7, 8, 9, 10. The
    * key-value pairs are:
