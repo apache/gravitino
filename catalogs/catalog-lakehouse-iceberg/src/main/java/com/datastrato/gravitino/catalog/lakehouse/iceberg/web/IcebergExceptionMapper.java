@@ -41,7 +41,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 // Referred from Apache Iceberg's EXCEPTION_ERROR_CODES implementation
-// core/src/test/java/org/apache/iceberg/rest/RESTCatalogAdapter
+// core/src/test/java/org/apache/iceberg/rest/RESTCatalogAdapter.java
 @Provider
 public class IcebergExceptionMapper implements ExceptionMapper<Exception> {
 

@@ -215,22 +215,26 @@
    ./api/src/main/java/com/datastrato/gravitino/rel/TableChange.java
 
    Apache Iceberg
-   ./catalog-hive/src/main/java/com/datastrato/gravitino/catalog/hive/HiveClientPool.java
-   ./catalog-hive/src/main/java/com/datastrato/gravitino/catalog/hive/dyn/DynConstructors.java
-   ./catalog-hive/src/main/java/com/datastrato/gravitino/catalog/hive/dyn/DynFields.java
-   ./catalog-hive/src/main/java/com/datastrato/gravitino/catalog/hive/dyn/DynMethods.java
-   ./catalog-hive/src/test/java/com/datastrato/gravitino/catalog/hive/miniHMS/MiniHiveMetastore.java
-   ./catalog-hive/src/test/java/com/datastrato/gravitino/catalog/hive/miniHMS/MiniHiveMetastoreService.java
-   ./catalog-hive/src/test/java/com/datastrato/gravitino/catalog/hive/miniHMS/ScriptRunner.java
+   ./api/src/main/java/com/datastrato/gravitino/exceptions/RESTException.java
+   ./catalogs/catalog-hive/src/main/java/com/datastrato/gravitino/catalog/hive/HiveClientPool.java
+   ./catalogs/catalog-hive/src/main/java/com/datastrato/gravitino/catalog/hive/dyn/DynConstructors.java
+   ./catalogs/catalog-hive/src/main/java/com/datastrato/gravitino/catalog/hive/dyn/DynFields.java
+   ./catalogs/catalog-hive/src/main/java/com/datastrato/gravitino/catalog/hive/dyn/DynMethods.java
+   ./catalogs/catalog-hive/src/test/java/com/datastrato/gravitino/catalog/hive/miniHMS/MiniHiveMetastore.java
+   ./catalogs/catalog-hive/src/test/java/com/datastrato/gravitino/catalog/hive/miniHMS/MiniHiveMetastoreService.java
+   ./catalogs/catalog-hive/src/test/java/com/datastrato/gravitino/catalog/hive/miniHMS/ScriptRunner.java
+   ./catalogs/catalog-lakehouse-iceberg/src/main/java/com/datastrato/gravitino/catalog/lakehouse/iceberg/web/IcebergExceptionMapper.java
    ./client-java/src/main/java/com/datastrato/gravitino/client/HTTPClient.java
    ./client-java/src/main/java/com/datastrato/gravitino/client/RESTClient.java
    ./client-java/src/test/java/com/datastrato/gravitino/client/TestHTTPClient.java
+   ./common/src/main/java/com/datastrato/gravitino/rest/RESTUtils.java
+   ./common/src/main/java/com/datastrato/gravitino/rest/RESTMessage.java
    ./core/src/main/java/com/datastrato/gravitino/util/ClientPool.java
    ./core/src/main/java/com/datastrato/gravitino/util/ClientPoolImpl.java
-   ./core/src/test/java/org/apache/iceberg/rest/RESTCatalogAdapter.java
+
 
    Apache Hive
-   ./catalog-hive/src/test/resources/hive-schema-3.1.0.derby.sql
+   ./catalogs/catalog-hive/src/test/resources/hive-schema-3.1.0.derby.sql
 
    Apache Zeppelin
    ./integration-test/src/test/java/com/datastrato/gravitino/integration/util/CommandExecutor.java
