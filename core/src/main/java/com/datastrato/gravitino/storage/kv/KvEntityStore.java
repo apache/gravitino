@@ -26,6 +26,7 @@ import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.exceptions.NonEmptyEntityException;
 import com.datastrato.gravitino.storage.EntityKeyEncoder;
 import com.datastrato.gravitino.storage.NameMappingService;
+import com.datastrato.gravitino.storage.TransactionIdGenerator;
 import com.datastrato.gravitino.utils.Bytes;
 import com.datastrato.gravitino.utils.Executable;
 import com.google.common.annotations.VisibleForTesting;
@@ -67,12 +68,15 @@ public class KvEntityStore implements EntityStore {
   private NameMappingService nameMappingService;
   private EntitySerDe serDe;
 
+  private TransactionIdGenerator txIdGenerator;
+
   @Override
   public void initialize(Config config) throws RuntimeException {
     this.backend = createKvEntityBackend(config);
     // TODO(yuqi) Currently, KvNameMappingService and KvEntityStore shares the same backend
     //  instance, We should make it configurable in the future.
-    this.nameMappingService = new KvNameMappingService(backend);
+    this.txIdGenerator = new TransactionIdGeneratorImpl(backend);
+    this.nameMappingService = new KvNameMappingService(backend, txIdGenerator);
     this.entityKeyEncoder = new BinaryEntityKeyEncoder(nameMappingService);
     this.reentrantReadWriteLock = new ReentrantReadWriteLock();
   }
@@ -97,7 +101,9 @@ public class KvEntityStore implements EntityStore {
     List<Pair<byte[], byte[]>> kvs =
         executeWithReadLock(
             () -> {
-              KvTransactionManagerImpl kvTransactionManager = new KvTransactionManagerImpl(backend);
+              TransactionalKvBackend kvTransactionManager =
+                  new TransactionalKvBackendImpl(backend, txIdGenerator);
+              kvTransactionManager.begin();
               return kvTransactionManager.scan(
                   new KvRangeScan.KvRangeScanBuilder()
                       .start(startKey)
@@ -124,7 +130,9 @@ public class KvEntityStore implements EntityStore {
 
     return executeWithReadLock(
         () -> {
-          KvTransactionManagerImpl kvTransactionManager = new KvTransactionManagerImpl(backend);
+          TransactionalKvBackendImpl kvTransactionManager =
+              new TransactionalKvBackendImpl(backend, txIdGenerator);
+          kvTransactionManager.begin();
           return kvTransactionManager.get(key) != null;
         });
   }
@@ -137,7 +145,9 @@ public class KvEntityStore implements EntityStore {
 
     executeWithWriteLock(
         () -> {
-          KvTransactionManagerImpl kvTransactionManager = new KvTransactionManagerImpl(backend);
+          TransactionalKvBackendImpl kvTransactionManager =
+              new TransactionalKvBackendImpl(backend, txIdGenerator);
+          kvTransactionManager.begin();
           kvTransactionManager.put(key, value, overwritten);
           kvTransactionManager.commit();
           return null;
@@ -152,7 +162,9 @@ public class KvEntityStore implements EntityStore {
 
     return executeWithWriteLock(
         () -> {
-          KvTransactionManager transactionManager = new KvTransactionManagerImpl(backend);
+          TransactionalKvBackend transactionManager =
+              new TransactionalKvBackendImpl(backend, txIdGenerator);
+          transactionManager.begin();
           byte[] value = transactionManager.get(key);
           if (value == null) {
             throw new NoSuchEntityException(ident.toString());
@@ -255,8 +267,10 @@ public class KvEntityStore implements EntityStore {
     byte[] value =
         executeWithReadLock(
             () -> {
-              KvTransactionManager kvTransactionManager = new KvTransactionManagerImpl(backend);
-              return kvTransactionManager.get(key);
+              TransactionalKvBackend transactionalKvBackend =
+                  new TransactionalKvBackendImpl(backend, txIdGenerator);
+              transactionalKvBackend.begin();
+              return transactionalKvBackend.get(key);
             });
     if (value == null) {
       throw new NoSuchEntityException(ident.toString());
@@ -323,7 +337,9 @@ public class KvEntityStore implements EntityStore {
       throws IOException {
     return executeWithWriteLock(
         () -> {
-          KvTransactionManager kvTransactionManager = new KvTransactionManagerImpl(backend);
+          TransactionalKvBackend transactionalKvBackend =
+              new TransactionalKvBackendImpl(backend, txIdGenerator);
+          transactionalKvBackend.begin();
           if (!exists(ident, entityType)) {
             return false;
           }
@@ -332,15 +348,15 @@ public class KvEntityStore implements EntityStore {
           List<byte[]> subEntityPrefix = getSubEntitiesPrefix(ident, entityType);
           if (subEntityPrefix.isEmpty()) {
             // has no sub-entities
-            boolean r = kvTransactionManager.delete(dataKey);
-            kvTransactionManager.commit();
+            boolean r = transactionalKvBackend.delete(dataKey);
+            transactionalKvBackend.commit();
             return r;
           }
 
           byte[] directChild = Iterables.getLast(subEntityPrefix);
           byte[] endKey = Bytes.increment(Bytes.wrap(directChild)).get();
           List<Pair<byte[], byte[]>> kvs =
-              kvTransactionManager.scan(
+              transactionalKvBackend.scan(
                   new KvRangeScan.KvRangeScanBuilder()
                       .start(directChild)
                       .end(endKey)
@@ -356,7 +372,7 @@ public class KvEntityStore implements EntityStore {
           }
 
           for (byte[] prefix : subEntityPrefix) {
-            kvTransactionManager.deleteRange(
+            transactionalKvBackend.deleteRange(
                 new KvRangeScan.KvRangeScanBuilder()
                     .start(prefix)
                     .startInclusive(true)
@@ -364,8 +380,8 @@ public class KvEntityStore implements EntityStore {
                     .build());
           }
 
-          boolean r = kvTransactionManager.delete(dataKey);
-          kvTransactionManager.commit();
+          boolean r = transactionalKvBackend.delete(dataKey);
+          transactionalKvBackend.commit();
           return r;
         });
   }

@@ -50,7 +50,7 @@ public class TestKvNameMappingService {
 
     KvBackend backend = new RocksDBKvBackend();
     backend.initialize(config);
-    return new KvNameMappingService(backend);
+    return new KvNameMappingService(backend, new TransactionIdGeneratorImpl(backend));
   }
 
   private IdGenerator getIdGeneratorByReflection(NameMappingService nameMappingService)
@@ -134,11 +134,15 @@ public class TestKvNameMappingService {
     Mockito.doThrow(new ArithmeticException())
         .when(spyKvBackend)
         .put(Mockito.any(), Mockito.any(), Mockito.anyBoolean());
-    final NameMappingService mock = new KvNameMappingService(spyKvBackend);
+    final NameMappingService mock =
+        new KvNameMappingService(spyKvBackend, new TransactionIdGeneratorImpl(spyKvBackend));
 
     // Now we try to use update. It should fail.
     Assertions.assertThrowsExactly(
         ArithmeticException.class, () -> mock.updateName("name2", "name3"));
+    Mockito.doCallRealMethod()
+        .when(spyKvBackend)
+        .put(Mockito.any(), Mockito.any(), Mockito.anyBoolean());
     Assertions.assertNull(mock.getIdByName("name3"));
     Assertions.assertNotNull(mock.getIdByName("name2"));
   }

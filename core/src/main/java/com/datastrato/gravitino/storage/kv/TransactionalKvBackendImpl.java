@@ -7,6 +7,7 @@ package com.datastrato.gravitino.storage.kv;
 
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.EntityAlreadyExistsException;
+import com.datastrato.gravitino.storage.TransactionIdGenerator;
 import com.datastrato.gravitino.utils.ByteUtils;
 import com.datastrato.gravitino.utils.Bytes;
 import com.google.common.annotations.VisibleForTesting;
@@ -17,7 +18,7 @@ import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.tuple.Pair;
 
 /**
- * KvTransactionManagerImpl is an implementation of {@link KvTransactionManager} that uses 2PC
+ * KvTransactionManagerImpl is an implementation of {@link TransactionalKvBackend} that uses 2PC
  * (Two-Phase Commit) to support transaction.
  *
  * <p>Assuming we have a key-value pair (k1, v1) and a transaction id 1, the key-value pair will be
@@ -29,8 +30,8 @@ import org.apache.commons.lang3.tuple.Pair;
  * </pre>
  *
  * tx + empty space + 1 is a flag to indicate that the transaction 1 has been successfully committed
- * and key1 is visible, if the transaction 1 fails and there is no tx + empty space + 1, the key1 is
- * not visible.
+ * and key1 is visible, if transaction 1 fails and there is no tx + empty space + 1, the key1 is not
+ * visible.
  *
  * <p>The status_code is a 4-byte integer that indicates the status of the value. The status code
  * can be one of the following values:
@@ -40,10 +41,11 @@ import org.apache.commons.lang3.tuple.Pair;
  *   0x00000001(Metrication: 1) -- DELETED, the value is deleted and not visible
  * </pre>
  */
-public class KvTransactionManagerImpl implements KvTransactionManager {
-  private KvBackend kvBackend;
+public class TransactionalKvBackendImpl implements TransactionalKvBackend {
+  private final KvBackend kvBackend;
+  private final TransactionIdGenerator transactionIdGenerator;
 
-  @VisibleForTesting List<Pair<byte[], byte[]>> putPairs = Lists.newArrayList();
+  @VisibleForTesting final List<Pair<byte[], byte[]>> putPairs = Lists.newArrayList();
 
   private long txId;
 
@@ -53,12 +55,15 @@ public class KvTransactionManagerImpl implements KvTransactionManager {
 
   private static final byte[] SEPARATOR = " ".getBytes();
 
-  public KvTransactionManagerImpl(KvBackend kvBackend) {
+  public TransactionalKvBackendImpl(
+      KvBackend kvBackend, TransactionIdGenerator transactionIdGenerator) {
     this.kvBackend = kvBackend;
-    txId = System.currentTimeMillis();
+    this.transactionIdGenerator = transactionIdGenerator;
   }
 
-  public void begin() {}
+  public synchronized void begin() {
+    txId = transactionIdGenerator.nextId();
+  }
 
   @Override
   public void initialize(Config config) throws IOException {}
@@ -269,7 +274,7 @@ public class KvTransactionManagerImpl implements KvTransactionManager {
    *   ...
    * </pre>
    *
-   * Assuming we have two long value, a and b, a >= b, then we always have:
+   * Assuming we have two long values, a and b, a >= b, then we always have:
    * revert(ByteUtils.longToByte(a)) <= revert(ByteUtils.longToByte(b))
    *
    * <p>When we try to get the value of key1, we will first the value of key1 10 and can skip old

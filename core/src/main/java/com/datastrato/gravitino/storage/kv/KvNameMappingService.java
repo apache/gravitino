@@ -8,6 +8,7 @@ package com.datastrato.gravitino.storage.kv;
 import com.datastrato.gravitino.storage.IdGenerator;
 import com.datastrato.gravitino.storage.NameMappingService;
 import com.datastrato.gravitino.storage.RandomIdGenerator;
+import com.datastrato.gravitino.storage.TransactionIdGenerator;
 import com.datastrato.gravitino.utils.ByteUtils;
 import com.datastrato.gravitino.utils.Bytes;
 import com.google.common.annotations.VisibleForTesting;
@@ -26,6 +27,7 @@ public class KvNameMappingService implements NameMappingService {
   @VisibleForTesting final KvBackend backend;
   private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
   @VisibleForTesting final IdGenerator idGenerator = new RandomIdGenerator();
+  private final TransactionIdGenerator txIdGenerator;
 
   // name prefix of name in name to id mapping,
   // e.g., name_metalake1 -> 1
@@ -37,16 +39,19 @@ public class KvNameMappingService implements NameMappingService {
   //       id_2 -> metalake2
   private static final byte[] ID_PREFIX = "id_".getBytes();
 
-  public KvNameMappingService(KvBackend backend) {
+  public KvNameMappingService(KvBackend backend, TransactionIdGenerator txIdGenerator) {
     this.backend = backend;
+    this.txIdGenerator = txIdGenerator;
   }
 
   @Override
   public Long getIdByName(String name) throws IOException {
     lock.readLock().lock();
-    try (KvTransactionManager kvTransactionManager = new KvTransactionManagerImpl(backend)) {
+    try (TransactionalKvBackend transactionalKvBackend =
+        new TransactionalKvBackendImpl(backend, txIdGenerator)) {
+      transactionalKvBackend.begin();
       byte[] nameByte = Bytes.concat(NAME_PREFIX, name.getBytes());
-      byte[] idByte = kvTransactionManager.get(nameByte);
+      byte[] idByte = transactionalKvBackend.get(nameByte);
       return idByte == null ? null : ByteUtils.byteToLong(idByte);
     } finally {
       lock.readLock().unlock();
@@ -57,7 +62,9 @@ public class KvNameMappingService implements NameMappingService {
     byte[] nameByte = Bytes.concat(NAME_PREFIX, name.getBytes());
     long id = idGenerator.nextId();
     lock.writeLock().lock();
-    try (KvTransactionManagerImpl kvTransactionManager = new KvTransactionManagerImpl(backend)) {
+    try (TransactionalKvBackendImpl kvTransactionManager =
+        new TransactionalKvBackendImpl(backend, txIdGenerator)) {
+      kvTransactionManager.begin();
       kvTransactionManager.put(nameByte, ByteUtils.longToByte(id), false);
       byte[] idByte = Bytes.concat(ID_PREFIX, ByteUtils.longToByte(id));
       kvTransactionManager.put(idByte, name.getBytes(), false);
@@ -71,7 +78,9 @@ public class KvNameMappingService implements NameMappingService {
   @Override
   public boolean updateName(String oldName, String newName) throws IOException {
     lock.writeLock().lock();
-    try (KvTransactionManagerImpl kvTransactionManager = new KvTransactionManagerImpl(backend)) {
+    try (TransactionalKvBackendImpl kvTransactionManager =
+        new TransactionalKvBackendImpl(backend, txIdGenerator)) {
+      kvTransactionManager.begin();
       byte[] nameByte = Bytes.concat(NAME_PREFIX, oldName.getBytes());
       byte[] oldIdValue = kvTransactionManager.get(nameByte);
 
@@ -96,7 +105,9 @@ public class KvNameMappingService implements NameMappingService {
     byte[] nameByte = Bytes.concat(NAME_PREFIX, name.getBytes());
 
     lock.writeLock().lock();
-    try (KvTransactionManagerImpl kvTransactionManager = new KvTransactionManagerImpl(backend)) {
+    try (TransactionalKvBackendImpl kvTransactionManager =
+        new TransactionalKvBackendImpl(backend, txIdGenerator)) {
+      kvTransactionManager.begin();
       boolean r = kvTransactionManager.delete(nameByte);
       kvTransactionManager.commit();
       return r;

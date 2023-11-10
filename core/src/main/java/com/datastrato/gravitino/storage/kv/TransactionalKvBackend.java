@@ -7,7 +7,7 @@ package com.datastrato.gravitino.storage.kv;
 
 import java.io.IOException;
 
-public interface KvTransactionManager extends KvBackend {
+public interface TransactionalKvBackend extends KvBackend {
 
   /** Begin the transaction. */
   void begin();

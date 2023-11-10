@@ -22,6 +22,7 @@ import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.storage.IdGenerator;
 import com.datastrato.gravitino.storage.NameMappingService;
+import com.datastrato.gravitino.storage.TransactionIdGenerator;
 import com.datastrato.gravitino.utils.ByteUtils;
 import com.datastrato.gravitino.utils.Bytes;
 import java.io.IOException;
@@ -55,8 +56,11 @@ public class TestEntityKeyEncoding {
     ENTITY_STORE_INSTANCE.initialize(config);
     ENTITY_STORE_INSTANCE.setSerDe(
         EntitySerDeFactory.createEntitySerDe(config.get(Configs.ENTITY_SERDE)));
+    TransactionIdGenerator txIdGenerator =
+        new TransactionIdGeneratorImpl(((KvEntityStore) ENTITY_STORE_INSTANCE).getBackend());
     NameMappingService nameMappingService =
-        new KvNameMappingService(((KvEntityStore) ENTITY_STORE_INSTANCE).getBackend());
+        new KvNameMappingService(
+            ((KvEntityStore) ENTITY_STORE_INSTANCE).getBackend(), txIdGenerator);
     ENCODER = new BinaryEntityKeyEncoder(nameMappingService);
   }
 
