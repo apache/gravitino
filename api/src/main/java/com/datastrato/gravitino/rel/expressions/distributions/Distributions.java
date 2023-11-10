@@ -8,6 +8,7 @@ import com.datastrato.gravitino.rel.expressions.Expression;
 import com.datastrato.gravitino.rel.expressions.NamedReference;
 import java.util.Arrays;
 
+/** Helper methods to create distributions to pass into Gravitino. */
 public class Distributions {
 
   // NONE is used to indicate that there is no distribution.

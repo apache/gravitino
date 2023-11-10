@@ -6,6 +6,7 @@ package com.datastrato.gravitino.rel.expressions.sorts;
 
 import com.datastrato.gravitino.rel.expressions.Expression;
 
+/** Helper methods to create SortOrders to pass into Gravitino. */
 public class SortOrders {
   public static SortValue of(Expression expression, SortDirection direction) {
     return of(expression, direction, direction.defaultNullOrdering());

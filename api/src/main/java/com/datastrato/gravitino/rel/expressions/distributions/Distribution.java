@@ -6,6 +6,7 @@ package com.datastrato.gravitino.rel.expressions.distributions;
 
 import com.datastrato.gravitino.rel.expressions.Expression;
 
+/** An interface that defines how data is distributed across partitions. */
 public interface Distribution extends Expression {
   /** Returns the distribution strategy name. */
   Strategy strategy();

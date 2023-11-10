@@ -23,6 +23,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 
+/** Base class of the public logical expression API. */
 public interface Expression {
   Expression[] EMPTY_EXPRESSION = new Expression[0];
 
