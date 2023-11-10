@@ -26,7 +26,7 @@ import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.exceptions.NonEmptyEntityException;
 import com.datastrato.gravitino.storage.EntityKeyEncoder;
 import com.datastrato.gravitino.storage.NameMappingService;
-import com.datastrato.gravitino.storage.StorageVersion;
+import com.datastrato.gravitino.storage.StorageLayoutVersion;
 import com.datastrato.gravitino.utils.Bytes;
 import com.datastrato.gravitino.utils.Executable;
 import com.google.common.annotations.VisibleForTesting;
@@ -59,7 +59,7 @@ public class KvEntityStore implements EntityStore {
   public static final ImmutableMap<String, String> KV_BACKENDS =
       ImmutableMap.of("RocksDBKvBackend", RocksDBKvBackend.class.getCanonicalName());
   public static final String LAYOUT_VERSION = "layout_version";
-  public static final StorageVersion DEFAULT_LAYOUT_VERSION = StorageVersion.V1;
+  public static final StorageLayoutVersion DEFAULT_LAYOUT_VERSION = StorageLayoutVersion.V1;
 
   @Getter @VisibleForTesting private KvBackend backend;
 
@@ -73,7 +73,7 @@ public class KvEntityStore implements EntityStore {
   // the current version of the code.
   // Note: If we change the layout of the storage in the future, please update the value of
   // storageLayoutVersion and store it in the kv store.
-  @VisibleForTesting StorageVersion storageLayoutVersion;
+  @VisibleForTesting StorageLayoutVersion storageLayoutVersion;
 
   @Override
   public void initialize(Config config) throws RuntimeException {
@@ -391,7 +391,7 @@ public class KvEntityStore implements EntityStore {
     }
   }
 
-  private synchronized StorageVersion initStorageVersionInfo() {
+  private synchronized StorageLayoutVersion initStorageVersionInfo() {
     byte[] bytes;
     try {
       bytes = backend.get(LAYOUT_VERSION.getBytes());
@@ -402,7 +402,7 @@ public class KvEntityStore implements EntityStore {
         return DEFAULT_LAYOUT_VERSION;
       }
 
-      StorageVersion oldVersion = StorageVersion.fromString(new String(bytes));
+      StorageLayoutVersion oldVersion = StorageLayoutVersion.fromString(new String(bytes));
       if (!DEFAULT_LAYOUT_VERSION.equals(oldVersion)) {
         // Layout version has changed, we use the new version to overwrite the old version.
         updateLayoutVersion(oldVersion, DEFAULT_LAYOUT_VERSION);
@@ -415,7 +415,7 @@ public class KvEntityStore implements EntityStore {
     }
   }
 
-  private void updateLayoutVersion(StorageVersion oldVersion, StorageVersion newVersion)
+  private void updateLayoutVersion(StorageLayoutVersion oldVersion, StorageLayoutVersion newVersion)
       throws IOException {
     // If this is the major update, such as from v1 -> v2, we will update all the data and then
     // update the version

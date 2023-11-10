@@ -12,22 +12,15 @@ class TestStorageVersion {
 
   @Test
   void testFromString() {
-    StorageVersion version = StorageVersion.fromString("v1");
-    Assertions.assertEquals(StorageVersion.V1, version);
-
-    version = StorageVersion.fromString("v2");
-    Assertions.assertEquals(StorageVersion.V2, version);
+    StorageLayoutVersion version = StorageLayoutVersion.fromString("v1");
+    Assertions.assertEquals(StorageLayoutVersion.V1, version);
 
     Assertions.assertThrowsExactly(
-        IllegalArgumentException.class,
-        () -> {
-          StorageVersion.fromString("v3.0");
-        });
+        IllegalArgumentException.class, () -> StorageLayoutVersion.fromString("v3.0"));
   }
 
   @Test
   void testCompatibleWith() {
-    Assertions.assertTrue(StorageVersion.V1.compatibleWith(StorageVersion.V1));
-    Assertions.assertFalse(StorageVersion.V2.compatibleWith(StorageVersion.V1));
+    Assertions.assertTrue(StorageLayoutVersion.V1.compatibleWith(StorageLayoutVersion.V1));
   }
 }

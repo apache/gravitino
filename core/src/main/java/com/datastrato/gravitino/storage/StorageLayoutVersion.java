@@ -6,15 +6,12 @@
 package com.datastrato.gravitino.storage;
 
 /** The storage layer version of the entity store. */
-public enum StorageVersion {
-  V1("v1"),
-
-  // V2 has not been released yet, it's just for testing.
-  V2("v2");
+public enum StorageLayoutVersion {
+  V1("v1");
 
   private final String version;
 
-  StorageVersion(String version) {
+  StorageLayoutVersion(String version) {
     this.version = version;
   }
 
@@ -24,13 +21,13 @@ public enum StorageVersion {
 
   // Return true if the storage version is compatible with the other storage version.
   // For example, v1 is not compatible with v2. v1.1 is compatible with v1.2.
-  public boolean compatibleWith(StorageVersion other) {
+  public boolean compatibleWith(StorageLayoutVersion other) {
     String thatVersion = other.version;
     return this.version.split("\\.")[0].equals(thatVersion.split("\\.")[0]);
   }
 
-  public static StorageVersion fromString(String version) {
-    for (StorageVersion v : StorageVersion.values()) {
+  public static StorageLayoutVersion fromString(String version) {
+    for (StorageLayoutVersion v : StorageLayoutVersion.values()) {
       if (v.version.equals(version)) {
         return v;
       }
