@@ -227,6 +227,7 @@
    ./client-java/src/test/java/com/datastrato/gravitino/client/TestHTTPClient.java
    ./core/src/main/java/com/datastrato/gravitino/util/ClientPool.java
    ./core/src/main/java/com/datastrato/gravitino/util/ClientPoolImpl.java
+   ./core/src/test/java/org/apache/iceberg/rest/RESTCatalogAdapter.java
 
    Apache Hive
    ./catalog-hive/src/test/resources/hive-schema-3.1.0.derby.sql
