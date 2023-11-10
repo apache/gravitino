@@ -18,7 +18,6 @@
  */
 package com.datastrato.gravitino.rest;
 
-
 // Referred from Apache Iceberg's RESTMessage implementation
 // core/src/main/java/org/apache/iceberg/rest/RESTMessage.java
 public interface RESTMessage {
