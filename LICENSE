@@ -238,3 +238,6 @@
    Apache Hadoop
    ./dev/docker/hive/hadoop-env.sh
    ./dev/docker/hive/yarn-env.sh
+
+   Apache Kafka
+   ./core/src/main/java/com/datastrato/gravitino/utils/Bytes.java

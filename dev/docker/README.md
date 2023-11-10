@@ -2,29 +2,26 @@
   Copyright 2023 Datastrato.
   This software is licensed under the Apache License version 2.
 -->
-# Hadoop and Hive Docker image
-This Docker image is used to support Gravitino integration testing.
-It includes Hadoop-2.x and Hive-2.x, you can use this Docker image to test the Gravitino catalog-hive module.
+# Gravitino Docker images
+This Docker image is designed to facilitate Gravitino integration testing.
+It can be utilized to test all catalog and connector modules within Gravitino.
 
-## Build Docker image
+# Datastrato Docker hub repository
+- [Datastrato Docker hub repository address](https://hub.docker.com/r/datastrato)
+
+## How to build Docker image
 ```
-./build-docker.sh --platform [all|linux/amd64|linux/arm64] --image {image_name} --tag {tag_name} --latest
+./build-docker.sh --platform [all|linux/amd64|linux/arm64] --type [hive|trino] --image {image_name} --tag {tag_name} --latest
 ```
 
-## Run container
+# Version change history
+## Gravitino CI Hive
+
+### Container startup commands
 ```
 docker run --rm -d -p 8022:22 -p 8088:8088 -p 9000:9000 -p 9083:9083 -p 10000:10000 -p 10002:10002 -p 50070:50070 -p 50075:50075 -p 50010:50010 datastrato/gravitino-ci-hive
 ```
 
-## Login Docker container
-```
-ssh -p 8022 datastrato@localhost (password: ds123, this is a sudo user)
-```
-
-# Docker hub repository
-- [datastrato/gravitino-ci-hive](https://hub.docker.com/r/datastrato/gravitino-ci-hive)
-
-## Version change history
 ### 0.1.0
 - Docker image `datastrato/gravitino-ci-hive:0.1.0`
 - `hadoop-2.7.3`
@@ -62,3 +59,16 @@ ssh -p 8022 datastrato@localhost (password: ds123, this is a sudo user)
 
 ### 0.1.5
 - Rollback `Map container hostname to 127.0.0.1 before starting Hadoop` of `datastrato/gravitino-ci-hive:0.1.4`
+
+## Gravitino CI Trino
+
+### Container startup commands
+```
+docker run --rm -it -p 8080:8080 datastrato/gravitino-ci-trino
+```
+
+### 0.1.0
+- Docker image `datastrato/gravitino-ci-trino:0.1.0`
+- Base on `trinodb/trino:426` and removed some unused plugins from it.
+- Expose ports:
+  - `8080` Trino JDBC port
