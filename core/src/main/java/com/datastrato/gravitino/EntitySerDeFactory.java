@@ -17,7 +17,7 @@ import org.slf4j.LoggerFactory;
  */
 public class EntitySerDeFactory {
 
-  private static final Logger LOG = LoggerFactory.getLogger(EntitySerDe.class);
+  private static final Logger LOG = LoggerFactory.getLogger(EntitySerDeFactory.class);
 
   // Register EntitySerDe's short name to its full qualified class name in the map. So that user
   // don't need to specify the full qualified class name when creating an EntitySerDe.
