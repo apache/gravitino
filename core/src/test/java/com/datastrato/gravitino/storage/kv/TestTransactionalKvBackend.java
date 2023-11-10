@@ -9,19 +9,26 @@ import static com.datastrato.gravitino.Configs.ENTRY_KV_ROCKSDB_BACKEND_PATH;
 
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Configs;
+import com.datastrato.gravitino.storage.TransactionIdGenerator;
 import com.google.common.collect.Lists;
 import com.google.common.io.Files;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mockito;
 
 class TestTransactionalKvBackend {
@@ -292,5 +299,38 @@ class TestTransactionalKvBackend {
       Assertions.assertNull(kvTransactionManager.get("key8".getBytes()));
       Assertions.assertNull(kvTransactionManager.get("key9".getBytes()));
     }
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {16})
+  void testTransactionIdGeneratorQPS(int threadNum) throws IOException, InterruptedException {
+    KvBackend kvBackend = getKvBackEnd();
+    TransactionIdGenerator transactionIdGenerator = new TransactionIdGeneratorImpl(kvBackend);
+    ThreadPoolExecutor threadPoolExecutor =
+        new ThreadPoolExecutor(
+            threadNum,
+            threadNum,
+            1,
+            TimeUnit.MINUTES,
+            new LinkedBlockingQueue<>(1000),
+            new ThreadFactoryBuilder()
+                .setDaemon(true)
+                .setNameFormat("testTransactionIdGenerator-%d")
+                .build());
+
+    for (int i = 0; i < threadNum; i++) {
+      threadPoolExecutor.execute(
+          () -> {
+            long current = System.currentTimeMillis();
+            while (System.currentTimeMillis() - current <= 3000) {
+              transactionIdGenerator.nextId();
+            }
+          });
+    }
+
+    Thread.currentThread().sleep(4000);
+
+    System.out.println(
+        String.format("%d thread qps is: %d/s", threadNum, transactionIdGenerator.nextId() / 3));
   }
 }
