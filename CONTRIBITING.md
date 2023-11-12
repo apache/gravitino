@@ -3,9 +3,9 @@
   This software is licensed under the Apache License version 2.
 -->
 
-# Contributing to Gravintino
+# Contributing to Gravitino
 
-Thank you for your interest in contributing to Gravintino! We welcome all forms of contribution from the community, and we appreciate your help in making this project better. Code contributions are welcome, but we also accept documentation, tests, best practices, graphic design, or anything else that can help the project.
+Thank you for your interest in contributing to gravitino! We welcome all forms of contribution from the community, and we appreciate your help in making this project better. Code contributions are welcome, but we also accept documentation, tests, best practices, graphic design, or anything else that can help the project.
 
 Before you get started, please read and follow these guidelines to ensure a smooth and productive collaboration.
 
@@ -32,8 +32,8 @@ Before you get started, please read and follow these guidelines to ensure a smoo
 Either click the "Fork" button at the top right of the repository's page on GitHub OR create a fork on your local machine using `git clone`.
 
 ```bash
-git clone https://github.com/datastarto/gravintino.git
-cd gravintino
+git clone https://github.com/datastarto/gravitino.git
+cd gravitino
 ```
 
 Now you are ready to start making contributions!
@@ -66,13 +66,17 @@ git checkout -b your-branch-name
 
 Make your changes and commit them. Be sure to write clear and concise commit messages.
 
+```bash
+git commit -m "Your commit message"
+```
+
 Push your changes to your fork on GitHub:
 
 ```bash
-git push origin branch
+git push your-branch-name
 ```
 
-Create a pull request (PR) on our repository. Be sure to provide a detailed description of your changes, reference any related issues and please follow the template provided.
+After you have pushed your changes, create a pull request (PR) on our repository. Be sure to provide a detailed description of your changes, reference any related issues and please follow the template provided.
 
 ## Development Setup
 
@@ -108,4 +112,4 @@ Join our [community chat](https://datastrato-community.slack.com) to discuss ide
 
 By contributing to this project, you agree that your contributions will be licensed under the Apache License version 2. Please ensure that you have permission to do this if required by your employer.
 
-Thank you for your contributions to Gravintino! We appreciate your help in making this project a success.
+Thank you for your contributions to gravitino! We appreciate your help in making this project a success.
