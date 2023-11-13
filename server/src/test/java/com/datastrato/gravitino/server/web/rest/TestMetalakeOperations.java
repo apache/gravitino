@@ -10,6 +10,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.datastrato.gravitino.MetalakeChange;
+import com.datastrato.gravitino.auth.Authenticator;
 import com.datastrato.gravitino.dto.MetalakeDTO;
 import com.datastrato.gravitino.dto.requests.MetalakeCreateRequest;
 import com.datastrato.gravitino.dto.requests.MetalakeUpdateRequest;
@@ -54,6 +55,7 @@ public class TestMetalakeOperations extends JerseyTest {
   }
 
   private MetalakeManager metalakeManager = mock(MetalakeManager.class);
+  private Authenticator authenticator = mock(Authenticator.class);
 
   @Override
   protected Application configure() {
@@ -71,6 +73,7 @@ public class TestMetalakeOperations extends JerseyTest {
           @Override
           protected void configure() {
             bind(metalakeManager).to(MetalakeManager.class).ranked(2);
+            bind(authenticator).to(Authenticator.class).ranked(2);
             bindFactory(MockServletRequestFactory.class).to(HttpServletRequest.class);
           }
         });
@@ -93,6 +96,7 @@ public class TestMetalakeOperations extends JerseyTest {
             .build();
 
     when(metalakeManager.listMetalakes()).thenReturn(new BaseMetalake[] {metalake, metalake});
+    when(authenticator.isDataFromHTTP()).thenReturn(false);
 
     Response resp =
         target("/metalakes")
@@ -130,6 +134,7 @@ public class TestMetalakeOperations extends JerseyTest {
             .build();
 
     when(metalakeManager.createMetalake(any(), any(), any())).thenReturn(mockMetalake);
+    when(authenticator.isDataFromHTTP()).thenReturn(false);
 
     Response resp =
         target("/metalakes")
@@ -177,6 +182,7 @@ public class TestMetalakeOperations extends JerseyTest {
             .build();
 
     when(metalakeManager.loadMetalake(any())).thenReturn(metalake);
+    when(authenticator.isDataFromHTTP()).thenReturn(false);
 
     Response resp =
         target("/metalakes/" + metalakeName)
@@ -261,6 +267,7 @@ public class TestMetalakeOperations extends JerseyTest {
             .toArray(MetalakeChange[]::new);
 
     when(metalakeManager.alterMetalake(any(), any(), any())).thenReturn(metalake);
+    when(authenticator.isDataFromHTTP()).thenReturn(false);
 
     MetalakeUpdatesRequest req = new MetalakeUpdatesRequest(updateRequests);
 
@@ -317,6 +324,7 @@ public class TestMetalakeOperations extends JerseyTest {
   @Test
   public void testDropMetalake() {
     when(metalakeManager.dropMetalake(any())).thenReturn(true);
+    when(authenticator.isDataFromHTTP()).thenReturn(false);
     Response resp =
         target("/metalakes/test")
             .request(MediaType.APPLICATION_JSON_TYPE)

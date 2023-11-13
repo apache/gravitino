@@ -14,6 +14,7 @@ import static org.mockito.Mockito.when;
 
 import com.datastrato.gravitino.Audit;
 import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.auth.Authenticator;
 import com.datastrato.gravitino.catalog.CatalogOperationDispatcher;
 import com.datastrato.gravitino.dto.rel.ColumnDTO;
 import com.datastrato.gravitino.dto.rel.DistributionDTO;
@@ -79,6 +80,7 @@ public class TestTableOperations extends JerseyTest {
   }
 
   private CatalogOperationDispatcher dispatcher = mock(CatalogOperationDispatcher.class);
+  private Authenticator authenticator = mock(Authenticator.class);
 
   private final String metalake = "metalake1";
 
@@ -102,6 +104,7 @@ public class TestTableOperations extends JerseyTest {
           @Override
           protected void configure() {
             bind(dispatcher).to(CatalogOperationDispatcher.class).ranked(2);
+            bind(authenticator).to(Authenticator.class).ranked(2);
             bindFactory(MockServletRequestFactory.class).to(HttpServletRequest.class);
           }
         });
@@ -115,6 +118,7 @@ public class TestTableOperations extends JerseyTest {
     NameIdentifier table2 = NameIdentifier.of(metalake, catalog, schema, "table2");
 
     when(dispatcher.listTables(any())).thenReturn(new NameIdentifier[] {table1, table2});
+    when(authenticator.isDataFromHTTP()).thenReturn(false);
 
     Response resp =
         target(tablePath(metalake, catalog, schema))
@@ -195,6 +199,7 @@ public class TestTableOperations extends JerseyTest {
         };
     Table table = mockTable("table1", columns, "mock comment", ImmutableMap.of("k1", "v1"));
     when(dispatcher.createTable(any(), any(), any(), any(), any(), any(), any())).thenReturn(table);
+    when(authenticator.isDataFromHTTP()).thenReturn(false);
     SortOrderDTO[] sortOrderDTOs = createMockSortOrderDTO("col1", SortOrderDTO.Direction.DESC);
     DistributionDTO distributionDTO = createMockDistributionDTO("col2", 10);
     TableCreateRequest req =
@@ -325,6 +330,7 @@ public class TestTableOperations extends JerseyTest {
     Table table =
         mockTable("table1", columns, "mock comment", ImmutableMap.of("k1", "v1"), transforms);
     when(dispatcher.createTable(any(), any(), any(), any(), any(), any(), any())).thenReturn(table);
+    when(authenticator.isDataFromHTTP()).thenReturn(false);
 
     TableCreateRequest req =
         new TableCreateRequest(
@@ -402,6 +408,7 @@ public class TestTableOperations extends JerseyTest {
     Table table =
         mockTable("table1", columns, "mock comment", ImmutableMap.of("k1", "v1"), new Transform[0]);
     when(dispatcher.loadTable(any())).thenReturn(table);
+    when(authenticator.isDataFromHTTP()).thenReturn(false);
 
     Response resp =
         target(tablePath(metalake, catalog, schema) + "table1")
@@ -621,6 +628,7 @@ public class TestTableOperations extends JerseyTest {
   @Test
   public void testDropTable() {
     when(dispatcher.dropTable(any())).thenReturn(true);
+    when(authenticator.isDataFromHTTP()).thenReturn(false);
 
     Response resp =
         target(tablePath(metalake, catalog, schema) + "table1")
@@ -669,6 +677,7 @@ public class TestTableOperations extends JerseyTest {
   @Test
   public void testPurgeTable() {
     when(dispatcher.purgeTable(any())).thenReturn(true);
+    when(authenticator.isDataFromHTTP()).thenReturn(false);
 
     Response resp =
         target(tablePath(metalake, catalog, schema) + "table1")
@@ -721,6 +730,7 @@ public class TestTableOperations extends JerseyTest {
     TableUpdatesRequest updatesRequest = new TableUpdatesRequest(ImmutableList.of(req));
 
     when(dispatcher.alterTable(any(), eq(req.tableChange()))).thenReturn(updatedTable);
+    when(authenticator.isDataFromHTTP()).thenReturn(false);
 
     Response resp =
         target(tablePath(metalake, catalog, schema) + "table1")

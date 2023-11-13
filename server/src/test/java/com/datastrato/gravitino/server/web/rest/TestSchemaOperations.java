@@ -12,6 +12,7 @@ import static org.mockito.Mockito.when;
 
 import com.datastrato.gravitino.Audit;
 import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.auth.Authenticator;
 import com.datastrato.gravitino.catalog.CatalogOperationDispatcher;
 import com.datastrato.gravitino.dto.rel.SchemaDTO;
 import com.datastrato.gravitino.dto.requests.SchemaCreateRequest;
@@ -56,6 +57,7 @@ public class TestSchemaOperations extends JerseyTest {
   }
 
   private CatalogOperationDispatcher dispatcher = mock(CatalogOperationDispatcher.class);
+  private Authenticator authenticator = mock(Authenticator.class);
 
   private final String metalake = "metalake1";
 
@@ -77,6 +79,7 @@ public class TestSchemaOperations extends JerseyTest {
           @Override
           protected void configure() {
             bind(dispatcher).to(CatalogOperationDispatcher.class).ranked(2);
+            bind(authenticator).to(Authenticator.class).ranked(2);
             bindFactory(MockServletRequestFactory.class).to(HttpServletRequest.class);
           }
         });
@@ -90,6 +93,7 @@ public class TestSchemaOperations extends JerseyTest {
     NameIdentifier ident2 = NameIdentifier.of(metalake, catalog, "schema2");
 
     when(dispatcher.listSchemas(any())).thenReturn(new NameIdentifier[] {ident1, ident2});
+    when(authenticator.isDataFromHTTP()).thenReturn(false);
 
     Response resp =
         target("/metalakes/" + metalake + "/catalogs/" + catalog + "/schemas")
@@ -147,6 +151,7 @@ public class TestSchemaOperations extends JerseyTest {
     Schema mockSchema = mockSchema("schema1", "comment", ImmutableMap.of("key", "value"));
 
     when(dispatcher.createSchema(any(), any(), any())).thenReturn(mockSchema);
+    when(authenticator.isDataFromHTTP()).thenReturn(false);
 
     Response resp =
         target("/metalakes/" + metalake + "/catalogs/" + catalog + "/schemas")
@@ -223,6 +228,7 @@ public class TestSchemaOperations extends JerseyTest {
   public void testLoadSchema() {
     Schema mockSchema = mockSchema("schema1", "comment", ImmutableMap.of("key", "value"));
     when(dispatcher.loadSchema(any())).thenReturn(mockSchema);
+    when(authenticator.isDataFromHTTP()).thenReturn(false);
 
     Response resp =
         target("/metalakes/" + metalake + "/catalogs/" + catalog + "/schemas/schema1")
@@ -284,6 +290,7 @@ public class TestSchemaOperations extends JerseyTest {
 
     // Test set property
     when(dispatcher.alterSchema(any(), eq(setReq.schemaChange()))).thenReturn(updatedSchema);
+    when(authenticator.isDataFromHTTP()).thenReturn(false);
     SchemaUpdatesRequest req = new SchemaUpdatesRequest(ImmutableList.of(setReq));
     Response resp =
         target("/metalakes/" + metalake + "/catalogs/" + catalog + "/schemas/schema1")
@@ -358,6 +365,7 @@ public class TestSchemaOperations extends JerseyTest {
   @Test
   public void testDropSchema() {
     when(dispatcher.dropSchema(any(), eq(false))).thenReturn(true);
+    when(authenticator.isDataFromHTTP()).thenReturn(false);
 
     Response resp =
         target("/metalakes/" + metalake + "/catalogs/" + catalog + "/schemas/schema1")
