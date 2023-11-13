@@ -11,6 +11,10 @@ This software is licensed under the Apache License version 2."
 + GPG/GnuPG
 + Release artifacts
 
+## Platform Support
+
+Instructions assume the commands are run on OSX, they may need modification to run on other platforms.
+
 ## Signing a release
 
 1. If GPG or GnuPG is not installed, install it. This only needs to be done once.
