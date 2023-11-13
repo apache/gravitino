@@ -13,6 +13,7 @@ import com.datastrato.gravitino.utils.Bytes;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Lists;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -53,7 +54,7 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
 
   private static final int VALUE_PREFIX_LENGTH = 20;
 
-  private static final byte[] SEPARATOR = " ".getBytes();
+  private static final byte[] SEPARATOR = " ".getBytes(StandardCharsets.UTF_8);
 
   public TransactionalKvBackendImpl(
       KvBackend kvBackend, TransactionIdGenerator transactionIdGenerator) {
@@ -131,7 +132,9 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
             .predicate(
                 (k, v) -> {
                   byte[] transactionId = ArrayUtils.subarray(k, k.length - 8, k.length);
-                  return kvBackend.get(Bytes.concat(TRANSACTION_PREFIX.getBytes(), transactionId))
+                  return kvBackend.get(
+                          Bytes.concat(
+                              TRANSACTION_PREFIX.getBytes(StandardCharsets.UTF_8), transactionId))
                       != null;
                 })
             .limit(Integer.MAX_VALUE)
@@ -186,7 +189,9 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
 
     // Commit
     kvBackend.put(
-        Bytes.concat(TRANSACTION_PREFIX.getBytes(), revert(ByteUtils.longToByte(txId))),
+        Bytes.concat(
+            TRANSACTION_PREFIX.getBytes(StandardCharsets.UTF_8),
+            revert(ByteUtils.longToByte(txId))),
         new byte[0],
         true);
   }
@@ -241,7 +246,9 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
                     (k, v) -> {
                       byte[] transactionId = ArrayUtils.subarray(k, k.length - 8, k.length);
                       return kvBackend.get(
-                              Bytes.concat(TRANSACTION_PREFIX.getBytes(), transactionId))
+                              Bytes.concat(
+                                  TRANSACTION_PREFIX.getBytes(StandardCharsets.UTF_8),
+                                  transactionId))
                           != null;
                     })
                 .limit(1)
@@ -253,7 +260,8 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
 
     byte[] realKey = pairs.get(0).getKey();
     byte[] transactionId = ArrayUtils.subarray(realKey, realKey.length - 8, realKey.length);
-    byte[] transactionFlag = Bytes.concat(TRANSACTION_PREFIX.getBytes(), transactionId);
+    byte[] transactionFlag =
+        Bytes.concat(TRANSACTION_PREFIX.getBytes(StandardCharsets.UTF_8), transactionId);
     if (kvBackend.get(transactionFlag) != null) {
       // Commit flag exists, the value is readable
       return pairs.get(0).getValue();
