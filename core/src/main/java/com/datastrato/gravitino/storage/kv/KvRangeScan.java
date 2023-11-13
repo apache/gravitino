@@ -31,6 +31,7 @@ public class KvRangeScan {
    * @param startInclusive True if the start key is inclusive, false otherwise.
    * @param endInclusive True if the end key is inclusive, false otherwise.
    * @param limit The maximum number of results to retrieve.
+   * @param predicate The predicate to use to filter key-value pairs.
    */
   public KvRangeScan(
       byte[] start,

@@ -26,6 +26,7 @@ import org.apache.commons.lang3.tuple.Pair;
  * store as
  *
  * <pre>
+ *       KEY                         VALUE
  *   key1 + empty space + 1 --> status_code  + v1
  *   tx + empty space + 1 --> empty
  * </pre>
