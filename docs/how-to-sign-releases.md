@@ -8,7 +8,7 @@ This software is licensed under the Apache License version 2."
 
 ## Prerequisites
 
-+ PGP
++ GPG/GnuPG
 + Release artifacts
 
 ## Signing a release
