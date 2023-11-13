@@ -402,29 +402,10 @@ public class KvEntityStore implements EntityStore {
         return DEFAULT_LAYOUT_VERSION;
       }
 
-      StorageLayoutVersion oldVersion = StorageLayoutVersion.fromString(new String(bytes));
-      if (!DEFAULT_LAYOUT_VERSION.equals(oldVersion)) {
-        // Layout version has changed, we use the new version to overwrite the old version.
-        updateLayoutVersion(oldVersion, DEFAULT_LAYOUT_VERSION);
-        return DEFAULT_LAYOUT_VERSION;
-      }
-
-      return oldVersion;
+      return StorageLayoutVersion.fromString(new String(bytes));
     } catch (IOException e) {
       throw new RuntimeException("Failed to get/put layout version information", e);
     }
-  }
-
-  private void updateLayoutVersion(StorageLayoutVersion oldVersion, StorageLayoutVersion newVersion)
-      throws IOException {
-    // If this is the major update, such as from v1 -> v2, we will update all the data and then
-    // update the version
-    if (!newVersion.compatibleWith(oldVersion)) {
-      // TODO (yuqi) load all data and convert them to the new format
-    }
-
-    // Update the version number as well. (shall we need to do so?)
-    backend.put(LAYOUT_VERSION.getBytes(), DEFAULT_LAYOUT_VERSION.getVersion().getBytes(), true);
   }
 
   @FunctionalInterface
