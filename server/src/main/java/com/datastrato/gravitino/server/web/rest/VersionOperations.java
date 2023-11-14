@@ -4,19 +4,14 @@
  */
 package com.datastrato.gravitino.server.web.rest;
 
-import com.datastrato.gravitino.auth.Authenticator;
 import com.datastrato.gravitino.dto.VersionDTO;
 import com.datastrato.gravitino.dto.responses.VersionResponse;
-import com.datastrato.gravitino.exceptions.UnauthorizedException;
 import com.datastrato.gravitino.server.web.Utils;
-import com.datastrato.gravitino.utils.Constants;
 import java.io.IOException;
 import java.util.Properties;
-import javax.inject.Inject;
 import javax.servlet.http.HttpServlet;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.GET;
-import javax.ws.rs.HeaderParam;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;

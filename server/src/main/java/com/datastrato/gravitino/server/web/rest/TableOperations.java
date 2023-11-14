@@ -8,7 +8,6 @@ import static com.datastrato.gravitino.dto.rel.PartitionUtils.toTransforms;
 
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
-import com.datastrato.gravitino.auth.Authenticator;
 import com.datastrato.gravitino.catalog.CatalogOperationDispatcher;
 import com.datastrato.gravitino.dto.requests.TableCreateRequest;
 import com.datastrato.gravitino.dto.requests.TableUpdateRequest;

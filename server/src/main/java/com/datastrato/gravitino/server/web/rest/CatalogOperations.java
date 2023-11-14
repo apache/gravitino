@@ -8,7 +8,6 @@ import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.CatalogChange;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
-import com.datastrato.gravitino.auth.Authenticator;
 import com.datastrato.gravitino.catalog.CatalogManager;
 import com.datastrato.gravitino.dto.requests.CatalogCreateRequest;
 import com.datastrato.gravitino.dto.requests.CatalogUpdateRequest;
@@ -18,13 +17,11 @@ import com.datastrato.gravitino.dto.responses.DropResponse;
 import com.datastrato.gravitino.dto.responses.EntityListResponse;
 import com.datastrato.gravitino.dto.util.DTOConverters;
 import com.datastrato.gravitino.server.web.Utils;
-import com.datastrato.gravitino.utils.Constants;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
-import javax.ws.rs.HeaderParam;
 import javax.ws.rs.POST;
 import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
@@ -68,8 +65,7 @@ public class CatalogOperations {
   @POST
   @Produces("application/vnd.gravitino.v1+json")
   public Response createCatalog(
-      @PathParam("metalake") String metalake,
-      CatalogCreateRequest request) {
+      @PathParam("metalake") String metalake, CatalogCreateRequest request) {
     try {
       request.validate();
       NameIdentifier ident = NameIdentifier.ofCatalog(metalake, request.getName());
@@ -92,8 +88,7 @@ public class CatalogOperations {
   @Path("{catalog}")
   @Produces("application/vnd.gravitino.v1+json")
   public Response loadCatalog(
-      @PathParam("metalake") String metalakeName,
-      @PathParam("catalog") String catalogName) {
+      @PathParam("metalake") String metalakeName, @PathParam("catalog") String catalogName) {
     try {
       NameIdentifier ident = NameIdentifier.ofCatalog(metalakeName, catalogName);
       Catalog catalog = manager.loadCatalog(ident);
@@ -133,8 +128,7 @@ public class CatalogOperations {
   @Path("{catalog}")
   @Produces("application/vnd.gravitino.v1+json")
   public Response dropCatalog(
-      @PathParam("metalake") String metalakeName,
-      @PathParam("catalog") String catalogName) {
+      @PathParam("metalake") String metalakeName, @PathParam("catalog") String catalogName) {
     try {
       NameIdentifier ident = NameIdentifier.ofCatalog(metalakeName, catalogName);
       boolean dropped = manager.dropCatalog(ident);

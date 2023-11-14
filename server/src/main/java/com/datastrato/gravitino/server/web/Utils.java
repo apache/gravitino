@@ -94,5 +94,4 @@ public class Utils {
         .type(MediaType.APPLICATION_JSON)
         .build();
   }
-
 }

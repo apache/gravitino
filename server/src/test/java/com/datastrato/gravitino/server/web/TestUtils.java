@@ -119,5 +119,4 @@ public class TestUtils {
     assertEquals("RuntimeException", errorResponse.getType());
     assertEquals("New message", errorResponse.getMessage());
   }
-
 }

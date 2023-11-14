@@ -6,7 +6,6 @@ package com.datastrato.gravitino.server.web.rest;
 
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
-import com.datastrato.gravitino.auth.Authenticator;
 import com.datastrato.gravitino.catalog.CatalogOperationDispatcher;
 import com.datastrato.gravitino.dto.requests.SchemaCreateRequest;
 import com.datastrato.gravitino.dto.requests.SchemaUpdateRequest;
@@ -57,8 +56,7 @@ public class SchemaOperations {
   @GET
   @Produces("application/vnd.gravitino.v1+json")
   public Response listSchemas(
-      @PathParam("metalake") String metalake,
-      @PathParam("catalog") String catalog) {
+      @PathParam("metalake") String metalake, @PathParam("catalog") String catalog) {
     try {
       Namespace schemaNS = Namespace.ofSchema(metalake, catalog);
       NameIdentifier[] idents = dispatcher.listSchemas(schemaNS);

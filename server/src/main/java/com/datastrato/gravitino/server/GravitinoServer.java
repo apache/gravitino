@@ -8,16 +8,14 @@ import com.datastrato.gravitino.GravitinoEnv;
 import com.datastrato.gravitino.catalog.CatalogManager;
 import com.datastrato.gravitino.catalog.CatalogOperationDispatcher;
 import com.datastrato.gravitino.meta.MetalakeManager;
-
-import java.io.File;
-import java.util.Properties;
-import javax.servlet.Servlet;
-
 import com.datastrato.gravitino.server.web.AuthenticationFilter;
 import com.datastrato.gravitino.server.web.JettyServer;
 import com.datastrato.gravitino.server.web.JettyServerConfig;
 import com.datastrato.gravitino.server.web.ObjectMapperProvider;
 import com.datastrato.gravitino.server.web.VersioningFilter;
+import java.io.File;
+import java.util.Properties;
+import javax.servlet.Servlet;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.jackson.JacksonFeature;
 import org.glassfish.jersey.server.ResourceConfig;

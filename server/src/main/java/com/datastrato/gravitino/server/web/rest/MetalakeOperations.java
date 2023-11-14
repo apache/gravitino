@@ -7,7 +7,6 @@ package com.datastrato.gravitino.server.web.rest;
 import com.datastrato.gravitino.MetalakeChange;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
-import com.datastrato.gravitino.auth.Authenticator;
 import com.datastrato.gravitino.dto.MetalakeDTO;
 import com.datastrato.gravitino.dto.requests.MetalakeCreateRequest;
 import com.datastrato.gravitino.dto.requests.MetalakeUpdateRequest;
@@ -103,8 +102,7 @@ public class MetalakeOperations {
   @Path("{name}")
   @Produces("application/vnd.gravitino.v1+json")
   public Response alterMetalake(
-      @PathParam("name") String metalakeName,
-      MetalakeUpdatesRequest updatesRequest) {
+      @PathParam("name") String metalakeName, MetalakeUpdatesRequest updatesRequest) {
     try {
       updatesRequest.validate();
       NameIdentifier identifier = NameIdentifier.ofMetalake(metalakeName);

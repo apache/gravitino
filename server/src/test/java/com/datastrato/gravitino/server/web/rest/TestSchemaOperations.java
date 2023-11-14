@@ -12,7 +12,6 @@ import static org.mockito.Mockito.when;
 
 import com.datastrato.gravitino.Audit;
 import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.auth.Authenticator;
 import com.datastrato.gravitino.catalog.CatalogOperationDispatcher;
 import com.datastrato.gravitino.dto.rel.SchemaDTO;
 import com.datastrato.gravitino.dto.requests.SchemaCreateRequest;
