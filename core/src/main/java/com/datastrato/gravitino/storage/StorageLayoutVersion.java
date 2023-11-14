@@ -5,7 +5,10 @@
 
 package com.datastrato.gravitino.storage;
 
+import lombok.Getter;
+
 /** The storage layer version of the entity store. */
+@Getter
 public enum StorageLayoutVersion {
   V1("v1");
 
@@ -15,12 +18,8 @@ public enum StorageLayoutVersion {
     this.version = version;
   }
 
-  public String getVersion() {
-    return version;
-  }
-
   // Return true if the storage version is compatible with the other storage version.
-  // For example, v1 is not compatible with v2. v1.1 is compatible with v1.2.
+  // For example, v1 is not compatible with v2.
   public boolean compatibleWith(StorageLayoutVersion other) {
     String thatVersion = other.version;
     return this.version.split("\\.")[0].equals(thatVersion.split("\\.")[0]);
