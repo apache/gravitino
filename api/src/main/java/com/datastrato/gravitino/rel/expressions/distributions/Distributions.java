@@ -13,18 +13,18 @@ public class Distributions {
 
   // NONE is used to indicate that there is no distribution.
   public static final Distribution NONE =
-      new DistributionValue(Strategy.HASH, 0, Expression.EMPTY_EXPRESSION);
+      new DistributionImpl(Strategy.HASH, 0, Expression.EMPTY_EXPRESSION);
 
   public static Distribution ofEVEN(int number, Expression... expressions) {
-    return new DistributionValue(Strategy.EVEN, number, expressions);
+    return new DistributionImpl(Strategy.EVEN, number, expressions);
   }
 
   public static Distribution ofHash(int number, Expression... expressions) {
-    return new DistributionValue(Strategy.HASH, number, expressions);
+    return new DistributionImpl(Strategy.HASH, number, expressions);
   }
 
   public static Distribution of(Strategy strategy, int number, Expression... expressions) {
-    return new DistributionValue(strategy, number, expressions);
+    return new DistributionImpl(strategy, number, expressions);
   }
 
   /**
@@ -50,12 +50,12 @@ public class Distributions {
     return of(strategy, number, expressions);
   }
 
-  public static final class DistributionValue implements Distribution {
+  public static final class DistributionImpl implements Distribution {
     private final Strategy strategy;
     private final int number;
     private final Expression[] expressions;
 
-    private DistributionValue(Strategy strategy, int number, Expression[] expressions) {
+    private DistributionImpl(Strategy strategy, int number, Expression[] expressions) {
       this.strategy = strategy;
       this.number = number;
       this.expressions = expressions;
@@ -97,7 +97,7 @@ public class Distributions {
       }
 
       public Distribution build() {
-        return new DistributionValue(strategy, number, expressions);
+        return new DistributionImpl(strategy, number, expressions);
       }
     }
   }

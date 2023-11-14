@@ -32,13 +32,12 @@ public interface Expression {
    * the result array to avoid repeatedly allocating an empty array.
    */
   NamedReference[] EMPTY_NAMED_REFERENCE = new NamedReference[0];
+
   /** Returns an array of the children of this node. Children should not change. */
   Expression[] children();
 
   /** List of fields or columns that are referenced by this expression. */
   default NamedReference[] references() {
-    // SPARK-40398: Replace `Arrays.stream()...distinct()`
-    // to this for perf gain, the result order is not important.
     Set<NamedReference> set = new HashSet<>();
     for (Expression e : children()) {
       Collections.addAll(set, e.references());

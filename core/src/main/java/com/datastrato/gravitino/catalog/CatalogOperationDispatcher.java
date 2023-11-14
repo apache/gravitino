@@ -6,6 +6,7 @@ package com.datastrato.gravitino.catalog;
 
 import static com.datastrato.gravitino.Entity.EntityType.SCHEMA;
 import static com.datastrato.gravitino.Entity.EntityType.TABLE;
+import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.EMPTY_TRANSFORM;
 
 import com.datastrato.gravitino.EntityStore;
 import com.datastrato.gravitino.HasIdentifier;
@@ -432,7 +433,7 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
                         columns,
                         comment,
                         updatedProperties,
-                        partitions == null ? new Transform[0] : partitions,
+                        partitions == null ? EMPTY_TRANSFORM : partitions,
                         distribution == null ? Distributions.NONE : distribution,
                         sortOrders == null ? new SortOrder[0] : sortOrders)),
         NoSuchSchemaException.class,

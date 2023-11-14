@@ -90,7 +90,7 @@ public class TestTransforms {
         };
     // partition by foo(col_1, 'bar')
     NamedReference.FieldReference arg1 = field(new String[] {column.name()});
-    Literal.LiteralValue<String> arg2 = Literal.of("bar", TypeCreator.REQUIRED.STRING);
+    Literal.LiteralImpl<String> arg2 = Literal.of("bar", TypeCreator.REQUIRED.STRING);
     Transform applyTransform = apply("foo", new Expression[] {arg1, arg2});
     Assertions.assertEquals("foo", applyTransform.name());
     Assertions.assertEquals(2, applyTransform.arguments().length);

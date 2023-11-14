@@ -109,7 +109,7 @@ public class TestHiveTable extends MiniHiveMetastoreService {
   }
 
   private SortOrder[] createSortOrder() {
-    return new SortOrders.SortValue[] {
+    return new SortOrders.SortImpl[] {
       SortOrders.of(
           NamedReference.field("col_2"), SortDirection.DESCENDING, NullOrdering.NULLS_FIRST)
     };

@@ -22,7 +22,7 @@ package com.datastrato.gravitino.rel.expressions.transforms;
 
 import com.datastrato.gravitino.rel.expressions.Expression;
 import com.datastrato.gravitino.rel.expressions.NamedReference;
-import lombok.EqualsAndHashCode;
+import java.util.Objects;
 
 /**
  * Represents a transform function in the public logical expression API.
@@ -50,7 +50,6 @@ public interface Transform extends Expression {
     return arguments();
   }
 
-  @EqualsAndHashCode
   abstract class SingleFieldTransform implements Transform {
     NamedReference ref;
 
@@ -66,6 +65,23 @@ public interface Transform extends Expression {
     @Override
     public Expression[] arguments() {
       return new Expression[] {ref};
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (o == null || getClass() != o.getClass()) {
+        return false;
+      }
+      SingleFieldTransform that = (SingleFieldTransform) o;
+      return Objects.equals(ref, that.ref);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(ref);
     }
   }
 }

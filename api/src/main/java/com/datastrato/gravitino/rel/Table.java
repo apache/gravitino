@@ -4,6 +4,8 @@
  */
 package com.datastrato.gravitino.rel;
 
+import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.EMPTY_TRANSFORM;
+
 import com.datastrato.gravitino.Auditable;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
@@ -28,7 +30,7 @@ public interface Table extends Auditable {
 
   /** Returns the physical partitioning of the table. */
   default Transform[] partitioning() {
-    return new Transform[0];
+    return EMPTY_TRANSFORM;
   }
 
   /**

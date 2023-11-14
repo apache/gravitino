@@ -6,8 +6,8 @@ package com.datastrato.gravitino.rel.expressions;
 
 public interface FunctionExpression extends Expression {
 
-  static FuncExpressionValue of(String functionName, Expression... arguments) {
-    return new FuncExpressionValue(functionName, arguments);
+  static FuncExpressionImpl of(String functionName, Expression... arguments) {
+    return new FuncExpressionImpl(functionName, arguments);
   }
 
   /** Returns the transform function name. */
@@ -21,11 +21,11 @@ public interface FunctionExpression extends Expression {
     return arguments();
   }
 
-  final class FuncExpressionValue implements FunctionExpression {
+  final class FuncExpressionImpl implements FunctionExpression {
     private final String functionName;
     private final Expression[] arguments;
 
-    private FuncExpressionValue(String functionName, Expression[] arguments) {
+    private FuncExpressionImpl(String functionName, Expression[] arguments) {
       this.functionName = functionName;
       this.arguments = arguments;
     }

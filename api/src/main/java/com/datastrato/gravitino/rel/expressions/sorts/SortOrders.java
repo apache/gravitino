@@ -8,21 +8,21 @@ import com.datastrato.gravitino.rel.expressions.Expression;
 
 /** Helper methods to create SortOrders to pass into Gravitino. */
 public class SortOrders {
-  public static SortValue of(Expression expression, SortDirection direction) {
+  public static SortImpl of(Expression expression, SortDirection direction) {
     return of(expression, direction, direction.defaultNullOrdering());
   }
 
-  public static SortValue of(
+  public static SortImpl of(
       Expression expression, SortDirection direction, NullOrdering nullOrdering) {
-    return new SortValue(expression, direction, nullOrdering);
+    return new SortImpl(expression, direction, nullOrdering);
   }
 
-  public static final class SortValue implements SortOrder {
+  public static final class SortImpl implements SortOrder {
     private final Expression expression;
     private final SortDirection direction;
     private final NullOrdering nullOrdering;
 
-    private SortValue(Expression expression, SortDirection direction, NullOrdering nullOrdering) {
+    private SortImpl(Expression expression, SortDirection direction, NullOrdering nullOrdering) {
       this.expression = expression;
       this.direction = direction;
       this.nullOrdering = nullOrdering;

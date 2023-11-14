@@ -10,7 +10,7 @@ import com.datastrato.gravitino.rel.expressions.NamedReference;
 import com.google.common.collect.ObjectArrays;
 import io.substrait.type.TypeCreator;
 import java.util.Arrays;
-import lombok.EqualsAndHashCode;
+import java.util.Objects;
 
 /** Helper methods to create logical transforms to pass into Gravitino. */
 public class Transforms {
@@ -89,7 +89,6 @@ public class Transforms {
     return new ApplyTransform(name, arguments);
   }
 
-  @EqualsAndHashCode(callSuper = true)
   public static final class IdentityTransform extends Transform.SingleFieldTransform {
     private IdentityTransform(NamedReference ref) {
       this.ref = ref;
@@ -99,9 +98,18 @@ public class Transforms {
     public String name() {
       return NAME_OF_IDENTITY;
     }
+
+    @Override
+    public boolean equals(Object o) {
+      return super.equals(o);
+    }
+
+    @Override
+    public int hashCode() {
+      return super.hashCode();
+    }
   }
 
-  @EqualsAndHashCode(callSuper = true)
   public static final class YearTransform extends Transform.SingleFieldTransform {
     private YearTransform(NamedReference ref) {
       this.ref = ref;
@@ -111,9 +119,18 @@ public class Transforms {
     public String name() {
       return NAME_OF_YEAR;
     }
+
+    @Override
+    public boolean equals(Object o) {
+      return super.equals(o);
+    }
+
+    @Override
+    public int hashCode() {
+      return super.hashCode();
+    }
   }
 
-  @EqualsAndHashCode(callSuper = true)
   public static final class MonthTransform extends Transform.SingleFieldTransform {
     private MonthTransform(NamedReference ref) {
       this.ref = ref;
@@ -123,9 +140,18 @@ public class Transforms {
     public String name() {
       return NAME_OF_MONTH;
     }
+
+    @Override
+    public boolean equals(Object o) {
+      return super.equals(o);
+    }
+
+    @Override
+    public int hashCode() {
+      return super.hashCode();
+    }
   }
 
-  @EqualsAndHashCode(callSuper = true)
   public static final class DayTransform extends Transform.SingleFieldTransform {
     private DayTransform(NamedReference ref) {
       this.ref = ref;
@@ -135,9 +161,18 @@ public class Transforms {
     public String name() {
       return NAME_OF_DAY;
     }
+
+    @Override
+    public boolean equals(Object o) {
+      return super.equals(o);
+    }
+
+    @Override
+    public int hashCode() {
+      return super.hashCode();
+    }
   }
 
-  @EqualsAndHashCode(callSuper = true)
   public static final class HourTransform extends Transform.SingleFieldTransform {
     private HourTransform(NamedReference ref) {
       this.ref = ref;
@@ -147,9 +182,18 @@ public class Transforms {
     public String name() {
       return NAME_OF_HOUR;
     }
+
+    @Override
+    public boolean equals(Object o) {
+      return super.equals(o);
+    }
+
+    @Override
+    public int hashCode() {
+      return super.hashCode();
+    }
   }
 
-  @EqualsAndHashCode
   public static final class BucketTransform implements Transform {
 
     private final Literal<Integer> numBuckets;
@@ -177,9 +221,27 @@ public class Transforms {
     public Expression[] arguments() {
       return ObjectArrays.concat(numBuckets, fields);
     }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (o == null || getClass() != o.getClass()) {
+        return false;
+      }
+      BucketTransform that = (BucketTransform) o;
+      return Objects.equals(numBuckets, that.numBuckets) && Arrays.equals(fields, that.fields);
+    }
+
+    @Override
+    public int hashCode() {
+      int result = Objects.hash(numBuckets);
+      result = 31 * result + Arrays.hashCode(fields);
+      return result;
+    }
   }
 
-  @EqualsAndHashCode
   public static final class TruncateTransform implements Transform {
 
     private final Literal<Integer> width;
@@ -207,9 +269,25 @@ public class Transforms {
     public Expression[] arguments() {
       return new Expression[] {width, field};
     }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (o == null || getClass() != o.getClass()) {
+        return false;
+      }
+      TruncateTransform that = (TruncateTransform) o;
+      return Objects.equals(width, that.width) && Objects.equals(field, that.field);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(width, field);
+    }
   }
 
-  @EqualsAndHashCode
   public static final class ListTransform implements Transform {
 
     private final NamedReference[] fields;
@@ -237,9 +315,25 @@ public class Transforms {
       // todo: resolve this
       return Transform.super.assignments();
     }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (o == null || getClass() != o.getClass()) {
+        return false;
+      }
+      ListTransform that = (ListTransform) o;
+      return Arrays.equals(fields, that.fields);
+    }
+
+    @Override
+    public int hashCode() {
+      return Arrays.hashCode(fields);
+    }
   }
 
-  @EqualsAndHashCode
   public static final class RangeTransform implements Transform {
 
     private final NamedReference field;
@@ -267,9 +361,21 @@ public class Transforms {
       // todo: resolve this
       return Transform.super.assignments();
     }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) return true;
+      if (o == null || getClass() != o.getClass()) return false;
+      RangeTransform that = (RangeTransform) o;
+      return Objects.equals(field, that.field);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(field);
+    }
   }
 
-  @EqualsAndHashCode
   public static final class ApplyTransform implements Transform {
 
     private final String name;
@@ -288,6 +394,25 @@ public class Transforms {
     @Override
     public Expression[] arguments() {
       return arguments;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (o == null || getClass() != o.getClass()) {
+        return false;
+      }
+      ApplyTransform that = (ApplyTransform) o;
+      return Objects.equals(name, that.name) && Arrays.equals(arguments, that.arguments);
+    }
+
+    @Override
+    public int hashCode() {
+      int result = Objects.hash(name);
+      result = 31 * result + Arrays.hashCode(arguments);
+      return result;
     }
   }
 }

@@ -20,11 +20,20 @@
 
 package com.datastrato.gravitino.rel.expressions;
 
-import lombok.EqualsAndHashCode;
+import java.util.Arrays;
 
 /** Represents a field or column reference in the public logical expression API. */
 public interface NamedReference extends Expression {
 
+  /**
+   * Returns a {@link FieldReference} for the given field name(s). The array of field name(s) is
+   * used to reference nested fields. For example, if we have a struct column named "student" with a
+   * data type of StructType{"name": StringType, "age": IntegerType}, we can reference the field
+   * "name" by calling {@code field("student", "name")}.
+   *
+   * @param fieldName the field name(s)
+   * @return a {@link FieldReference} for the given field name(s)
+   */
   static FieldReference field(String... fieldName) {
     return new FieldReference(fieldName);
   }
@@ -46,7 +55,6 @@ public interface NamedReference extends Expression {
     return new NamedReference[] {this};
   }
 
-  @EqualsAndHashCode
   final class FieldReference implements NamedReference {
     private final String[] fieldName;
 
@@ -57,6 +65,23 @@ public interface NamedReference extends Expression {
     @Override
     public String[] fieldName() {
       return fieldName;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (o == null || getClass() != o.getClass()) {
+        return false;
+      }
+      FieldReference that = (FieldReference) o;
+      return Arrays.equals(fieldName, that.fieldName);
+    }
+
+    @Override
+    public int hashCode() {
+      return Arrays.hashCode(fieldName);
     }
   }
 }

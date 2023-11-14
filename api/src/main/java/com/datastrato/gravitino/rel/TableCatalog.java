@@ -20,6 +20,8 @@
 
 package com.datastrato.gravitino.rel;
 
+import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.EMPTY_TRANSFORM;
+
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
@@ -84,13 +86,7 @@ public interface TableCatalog {
       NameIdentifier ident, Column[] columns, String comment, Map<String, String> properties)
       throws NoSuchSchemaException, TableAlreadyExistsException {
     return createTable(
-        ident,
-        columns,
-        comment,
-        properties,
-        new Transform[0],
-        Distributions.NONE,
-        new SortOrder[0]);
+        ident, columns, comment, properties, EMPTY_TRANSFORM, Distributions.NONE, new SortOrder[0]);
   }
 
   /**

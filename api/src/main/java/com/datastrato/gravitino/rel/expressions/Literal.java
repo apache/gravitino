@@ -21,7 +21,7 @@
 package com.datastrato.gravitino.rel.expressions;
 
 import io.substrait.type.Type;
-import lombok.EqualsAndHashCode;
+import java.util.Objects;
 
 /**
  * Represents a constant literal value in the public expression API.
@@ -40,16 +40,15 @@ public interface Literal<T> extends Expression {
     return EMPTY_EXPRESSION;
   }
 
-  static <T> LiteralValue<T> of(T value, Type dataType) {
-    return new LiteralValue<>(value, dataType);
+  static <T> LiteralImpl<T> of(T value, Type dataType) {
+    return new LiteralImpl<>(value, dataType);
   }
 
-  @EqualsAndHashCode
-  final class LiteralValue<T> implements Literal<T> {
+  final class LiteralImpl<T> implements Literal<T> {
     private final T value;
     private final Type dataType;
 
-    private LiteralValue(T value, Type dataType) {
+    private LiteralImpl(T value, Type dataType) {
       this.value = value;
       this.dataType = dataType;
     }
@@ -62,6 +61,23 @@ public interface Literal<T> extends Expression {
     @Override
     public Type dataType() {
       return dataType;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (o == null || getClass() != o.getClass()) {
+        return false;
+      }
+      LiteralImpl<?> literal = (LiteralImpl<?>) o;
+      return Objects.equals(value, literal.value) && Objects.equals(dataType, literal.dataType);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(value, dataType);
     }
   }
 }
