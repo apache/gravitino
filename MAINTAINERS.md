@@ -9,5 +9,5 @@ This document lists the maintainers of the Project. Maintainers may be added onc
 
 | **NAME** | **GitHub Username** | **Organization** |
 | --- | --- | --- |
-| Maintainer 1 | | |
-| Maintainer 2 | | |
+| Justin Mclean | justinmclean | Datastrato |
+| | | |
