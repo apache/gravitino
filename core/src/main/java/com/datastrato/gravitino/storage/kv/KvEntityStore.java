@@ -34,6 +34,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -299,7 +300,7 @@ public class KvEntityStore implements EntityStore {
   private byte[] replacePrefixTypeInfo(byte[] encode, String subTypePrefix) {
     byte[] result = new byte[encode.length];
     System.arraycopy(encode, 0, result, 0, encode.length);
-    byte[] bytes = subTypePrefix.getBytes();
+    byte[] bytes = subTypePrefix.getBytes(StandardCharsets.UTF_8);
     result[0] = bytes[0];
     result[1] = bytes[1];
 
