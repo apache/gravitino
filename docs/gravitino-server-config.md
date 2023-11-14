@@ -50,13 +50,13 @@ The following table lists the configuration items in the `gravitino.conf` file. 
 
 ## Authentication
 
-| Configuration item                                 | Description                                                      | Default value     | Since version |
-|----------------------------------------------------|------------------------------------------------------------------|-------------------|---------------|
-| `gravitino.authenticator`                          | The authenticator which Gravitino uses                           | `simple`          | 0.3.0         |
-| `gravitino.authenicator.oauth.service.audience`    | The audience name when Gravitino uses oauth as the authenticator | `GravitinoServer` | 0.3.0         |
+| Configuration item                                 | Description                                                                | Default value     | Since version |
+|----------------------------------------------------|----------------------------------------------------------------------------|-------------------|---------------|
+| `gravitino.authenticator`                          | The authenticator which Gravitino uses, setting as `simple` or `oauth`     | `simple`          | 0.3.0         |
+| `gravitino.authenicator.oauth.service.audience`    | The audience name when Gravitino uses oauth as the authenticator           | `GravitinoServer` | 0.3.0         |
 | `gravitino.authenticator.oauth.allow.skew.seconds` | The jwt allows skew seconds when Gravitino uses oauth as the authenticator | `0`               | 0.3.0         |
-| `gravitino.authenticator.oauth.default.sign.key`   | The sign key of jwt when Gravitino uses oauth as the authenticator | `null`            | 0.3.0         |
-| `gravitino.authenticator.oauth.algorithm.type`     | The encryption algorithm when Gravitino uses oauth as the authenticator | `RS256`           | 0.3.0         |
+| `gravitino.authenticator.oauth.default.sign.key`   | The sign key of jwt when Gravitino uses oauth as the authenticator         | `null`            | 0.3.0         |
+| `gravitino.authenticator.oauth.algorithm.type`     | The encryption algorithm when Gravitino uses oauth as the authenticator    | `RS256`           | 0.3.0         |
 ## How to set up runtime environment variables
 
 Gravitino server also supports setting up runtime environment variables by editing the `gravitino-env.sh` file, which is located in the `conf` directory.
