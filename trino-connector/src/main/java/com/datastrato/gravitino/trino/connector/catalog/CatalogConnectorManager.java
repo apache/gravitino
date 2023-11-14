@@ -19,6 +19,7 @@ import com.google.common.base.Strings;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.trino.spi.TrinoException;
 import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
@@ -77,8 +78,13 @@ public class CatalogConnectorManager {
     this.config = Preconditions.checkNotNull(config, "config is not null");
   }
 
+  // For testing.
+  public void setGravitinoClient(GravitinoClient gravitinoClient) {
+    this.gravitinoClient = gravitinoClient;
+  }
+
   public void start() {
-    gravitinoClient = GravitinoClient.builder(config.getURI()).build();
+    if (gravitinoClient == null) gravitinoClient = GravitinoClient.builder(config.getURI()).build();
     String metalake = config.getMetalake();
     if (Strings.isNullOrEmpty(metalake)) {
       throw new TrinoException(GRAVITINO_METALAKE_NOT_EXISTS, "No gravitino metalake selected");
@@ -155,6 +161,10 @@ public class CatalogConnectorManager {
 
   public CatalogConnectorContext getCatalogConnector(String catalogName) {
     return catalogConnectors.get(catalogName);
+  }
+
+  public List<String> getCatalogs() {
+    return Arrays.asList(catalogConnectors.keySet().toArray(new String[catalogConnectors.size()]));
   }
 
   public void shutdown() {

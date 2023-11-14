@@ -4,7 +4,9 @@
  */
 package com.datastrato.gravitino.trino.connector.metadata;
 
+import com.datastrato.gravitino.dto.AuditDTO;
 import com.datastrato.gravitino.dto.rel.ColumnDTO;
+import com.datastrato.gravitino.dto.rel.TableDTO;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.Table;
 import com.fasterxml.jackson.annotation.JsonCreator;
@@ -29,10 +31,8 @@ public class GravitinoTable {
     this.tableName = tableName;
 
     ImmutableList.Builder<GravitinoColumn> table_columns = ImmutableList.builder();
-    int i = 0;
-    for (Column column : tableMetadata.columns()) {
-      table_columns.add(new GravitinoColumn(column, i));
-      i++;
+    for (int i = 0; i < tableMetadata.columns().length; i++) {
+      table_columns.add(new GravitinoColumn(tableMetadata.columns()[i], i));
     }
     this.columns = table_columns.build();
     this.comment = tableMetadata.comment();
@@ -48,6 +48,23 @@ public class GravitinoTable {
     this.schemaName = schemaName;
     this.tableName = tableName;
     this.columns = columns;
+    this.comment = comment;
+    this.properties = properties;
+  }
+
+  public GravitinoTable(
+      String schemaName,
+      String tableName,
+      Column[] columns,
+      String comment,
+      Map<String, String> properties) {
+    this.schemaName = schemaName;
+    this.tableName = tableName;
+    ImmutableList.Builder<GravitinoColumn> table_columns = ImmutableList.builder();
+    for (int i = 0; i < columns.length; i++) {
+      table_columns.add(new GravitinoColumn(columns[i], i));
+    }
+    this.columns = table_columns.build();
     this.comment = comment;
     this.properties = properties;
   }
@@ -89,5 +106,15 @@ public class GravitinoTable {
 
   public String getComment() {
     return comment;
+  }
+
+  public TableDTO getTableDTO() {
+    return TableDTO.builder()
+        .withName(tableName)
+        .withComment(comment)
+        .withColumns(getColumnDTOs())
+        .withProperties(properties)
+        .withAudit(new AuditDTO.Builder().build())
+        .build();
   }
 }
