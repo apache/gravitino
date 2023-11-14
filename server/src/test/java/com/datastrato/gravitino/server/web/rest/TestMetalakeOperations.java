@@ -96,7 +96,8 @@ public class TestMetalakeOperations extends JerseyTest {
             .build();
 
     when(metalakeManager.listMetalakes()).thenReturn(new BaseMetalake[] {metalake, metalake});
-    when(authenticator.isDataFromHTTP()).thenReturn(false);
+    when(authenticator.isDataFromHTTP()).thenReturn(true);
+    when(authenticator.authenticateHTTPHeader(any())).thenReturn("user");
 
     Response resp =
         target("/metalakes")
@@ -134,7 +135,8 @@ public class TestMetalakeOperations extends JerseyTest {
             .build();
 
     when(metalakeManager.createMetalake(any(), any(), any())).thenReturn(mockMetalake);
-    when(authenticator.isDataFromHTTP()).thenReturn(false);
+    when(authenticator.isDataFromHTTP()).thenReturn(true);
+    when(authenticator.authenticateHTTPHeader(any())).thenReturn("user");
 
     Response resp =
         target("/metalakes")
@@ -182,7 +184,8 @@ public class TestMetalakeOperations extends JerseyTest {
             .build();
 
     when(metalakeManager.loadMetalake(any())).thenReturn(metalake);
-    when(authenticator.isDataFromHTTP()).thenReturn(false);
+    when(authenticator.isDataFromHTTP()).thenReturn(true);
+    when(authenticator.authenticateHTTPHeader(any())).thenReturn("user");
 
     Response resp =
         target("/metalakes/" + metalakeName)
@@ -267,7 +270,8 @@ public class TestMetalakeOperations extends JerseyTest {
             .toArray(MetalakeChange[]::new);
 
     when(metalakeManager.alterMetalake(any(), any(), any())).thenReturn(metalake);
-    when(authenticator.isDataFromHTTP()).thenReturn(false);
+    when(authenticator.isDataFromHTTP()).thenReturn(true);
+    when(authenticator.authenticateHTTPHeader(any())).thenReturn("user");
 
     MetalakeUpdatesRequest req = new MetalakeUpdatesRequest(updateRequests);
 
@@ -324,7 +328,8 @@ public class TestMetalakeOperations extends JerseyTest {
   @Test
   public void testDropMetalake() {
     when(metalakeManager.dropMetalake(any())).thenReturn(true);
-    when(authenticator.isDataFromHTTP()).thenReturn(false);
+    when(authenticator.isDataFromHTTP()).thenReturn(true);
+    when(authenticator.authenticateHTTPHeader(any())).thenReturn("user");
     Response resp =
         target("/metalakes/test")
             .request(MediaType.APPLICATION_JSON_TYPE)

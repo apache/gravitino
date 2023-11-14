@@ -93,7 +93,8 @@ public class TestSchemaOperations extends JerseyTest {
     NameIdentifier ident2 = NameIdentifier.of(metalake, catalog, "schema2");
 
     when(dispatcher.listSchemas(any())).thenReturn(new NameIdentifier[] {ident1, ident2});
-    when(authenticator.isDataFromHTTP()).thenReturn(false);
+    when(authenticator.isDataFromHTTP()).thenReturn(true);
+    when(authenticator.authenticateHTTPHeader(any())).thenReturn("user");
 
     Response resp =
         target("/metalakes/" + metalake + "/catalogs/" + catalog + "/schemas")
@@ -151,7 +152,8 @@ public class TestSchemaOperations extends JerseyTest {
     Schema mockSchema = mockSchema("schema1", "comment", ImmutableMap.of("key", "value"));
 
     when(dispatcher.createSchema(any(), any(), any())).thenReturn(mockSchema);
-    when(authenticator.isDataFromHTTP()).thenReturn(false);
+    when(authenticator.isDataFromHTTP()).thenReturn(true);
+    when(authenticator.authenticateHTTPHeader(any())).thenReturn("user");
 
     Response resp =
         target("/metalakes/" + metalake + "/catalogs/" + catalog + "/schemas")
@@ -228,7 +230,8 @@ public class TestSchemaOperations extends JerseyTest {
   public void testLoadSchema() {
     Schema mockSchema = mockSchema("schema1", "comment", ImmutableMap.of("key", "value"));
     when(dispatcher.loadSchema(any())).thenReturn(mockSchema);
-    when(authenticator.isDataFromHTTP()).thenReturn(false);
+    when(authenticator.isDataFromHTTP()).thenReturn(true);
+    when(authenticator.authenticateHTTPHeader(any())).thenReturn("user");
 
     Response resp =
         target("/metalakes/" + metalake + "/catalogs/" + catalog + "/schemas/schema1")
@@ -290,7 +293,8 @@ public class TestSchemaOperations extends JerseyTest {
 
     // Test set property
     when(dispatcher.alterSchema(any(), eq(setReq.schemaChange()))).thenReturn(updatedSchema);
-    when(authenticator.isDataFromHTTP()).thenReturn(false);
+    when(authenticator.isDataFromHTTP()).thenReturn(true);
+    when(authenticator.authenticateHTTPHeader(any())).thenReturn("user");
     SchemaUpdatesRequest req = new SchemaUpdatesRequest(ImmutableList.of(setReq));
     Response resp =
         target("/metalakes/" + metalake + "/catalogs/" + catalog + "/schemas/schema1")
@@ -365,7 +369,8 @@ public class TestSchemaOperations extends JerseyTest {
   @Test
   public void testDropSchema() {
     when(dispatcher.dropSchema(any(), eq(false))).thenReturn(true);
-    when(authenticator.isDataFromHTTP()).thenReturn(false);
+    when(authenticator.isDataFromHTTP()).thenReturn(true);
+    when(authenticator.authenticateHTTPHeader(any())).thenReturn("user");
 
     Response resp =
         target("/metalakes/" + metalake + "/catalogs/" + catalog + "/schemas/schema1")
