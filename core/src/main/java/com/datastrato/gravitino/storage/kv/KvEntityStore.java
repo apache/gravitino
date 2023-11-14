@@ -35,6 +35,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -394,11 +395,13 @@ public class KvEntityStore implements EntityStore {
   private synchronized StorageLayoutVersion initStorageVersionInfo() {
     byte[] bytes;
     try {
-      bytes = backend.get(LAYOUT_VERSION.getBytes());
+      bytes = backend.get(LAYOUT_VERSION.getBytes(StandardCharsets.UTF_8));
       if (bytes == null) {
         // If the layout version is not set, we will set it to the default version.
         backend.put(
-            LAYOUT_VERSION.getBytes(), DEFAULT_LAYOUT_VERSION.getVersion().getBytes(), true);
+            LAYOUT_VERSION.getBytes(),
+            DEFAULT_LAYOUT_VERSION.getVersion().getBytes(StandardCharsets.UTF_8),
+            true);
         return DEFAULT_LAYOUT_VERSION;
       }
 

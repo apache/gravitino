@@ -5,6 +5,7 @@
 
 package com.datastrato.gravitino.storage;
 
+import com.datastrato.gravitino.exceptions.StorageLayoutException;
 import lombok.Getter;
 
 /** The storage layer version of the entity store. */
@@ -24,6 +25,8 @@ public enum StorageLayoutVersion {
         return v;
       }
     }
-    throw new IllegalArgumentException("Unknown storage version: " + version);
+    throw new StorageLayoutException(
+        "Unknown storage version, maybe the data is broken, please contact the support team and"
+            + "check the storage directory.");
   }
 }
