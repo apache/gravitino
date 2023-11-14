@@ -58,7 +58,6 @@ public class TestCatalogOperations extends JerseyTest {
   }
 
   private CatalogManager manager = mock(CatalogManager.class);
-  private Authenticator authenticator = mock(Authenticator.class);
 
   @Override
   protected Application configure() {
@@ -76,7 +75,6 @@ public class TestCatalogOperations extends JerseyTest {
           @Override
           protected void configure() {
             bind(manager).to(CatalogManager.class).ranked(2);
-            bind(authenticator).to(Authenticator.class).ranked(2);
             bindFactory(MockServletRequestFactory.class).to(HttpServletRequest.class);
           }
         });
@@ -90,8 +88,6 @@ public class TestCatalogOperations extends JerseyTest {
     NameIdentifier ident2 = NameIdentifier.of("metalake1", "catalog2");
 
     when(manager.listCatalogs(any())).thenReturn(new NameIdentifier[] {ident1, ident2});
-    when(authenticator.isDataFromHTTP()).thenReturn(true);
-    when(authenticator.authenticateHTTPHeader(any())).thenReturn("user");
 
     Response resp =
         target("/metalakes/metalake1/catalogs")
@@ -137,8 +133,6 @@ public class TestCatalogOperations extends JerseyTest {
     TestCatalog catalog = buildCatalog("metalake1", "catalog1");
 
     when(manager.createCatalog(any(), any(), any(), any(), any())).thenReturn(catalog);
-    when(authenticator.isDataFromHTTP()).thenReturn(true);
-    when(authenticator.authenticateHTTPHeader(any())).thenReturn("user");
 
     Response resp =
         target("/metalakes/metalake1/catalogs")
@@ -215,8 +209,6 @@ public class TestCatalogOperations extends JerseyTest {
     TestCatalog catalog = buildCatalog("metalake1", "catalog1");
 
     when(manager.loadCatalog(any())).thenReturn(catalog);
-    when(authenticator.isDataFromHTTP()).thenReturn(true);
-    when(authenticator.authenticateHTTPHeader(any())).thenReturn("user");
 
     Response resp =
         target("/metalakes/metalake1/catalogs/catalog1")
@@ -284,8 +276,6 @@ public class TestCatalogOperations extends JerseyTest {
     TestCatalog catalog = buildCatalog("metalake1", "catalog2");
 
     when(manager.alterCatalog(any(), any())).thenReturn(catalog);
-    when(authenticator.isDataFromHTTP()).thenReturn(true);
-    when(authenticator.authenticateHTTPHeader(any())).thenReturn("user");
 
     CatalogUpdateRequest updateRequest = new CatalogUpdateRequest.RenameCatalogRequest("catalog2");
     CatalogUpdatesRequest req = new CatalogUpdatesRequest(ImmutableList.of(updateRequest));
@@ -355,8 +345,6 @@ public class TestCatalogOperations extends JerseyTest {
   @Test
   public void testDropCatalog() {
     when(manager.dropCatalog(any())).thenReturn(true);
-    when(authenticator.isDataFromHTTP()).thenReturn(true);
-    when(authenticator.authenticateHTTPHeader(any())).thenReturn("user");
 
     Response resp =
         target("/metalakes/metalake1/catalogs/catalog1")
