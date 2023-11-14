@@ -18,9 +18,4 @@ class TestStorageVersion {
     Assertions.assertThrowsExactly(
         IllegalArgumentException.class, () -> StorageLayoutVersion.fromString("v3.0"));
   }
-
-  @Test
-  void testCompatibleWith() {
-    Assertions.assertTrue(StorageLayoutVersion.V1.compatibleWith(StorageLayoutVersion.V1));
-  }
 }

@@ -18,13 +18,6 @@ public enum StorageLayoutVersion {
     this.version = version;
   }
 
-  // Return true if the storage version is compatible with the other storage version.
-  // For example, v1 is not compatible with v2.
-  public boolean compatibleWith(StorageLayoutVersion other) {
-    String thatVersion = other.version;
-    return this.version.split("\\.")[0].equals(thatVersion.split("\\.")[0]);
-  }
-
   public static StorageLayoutVersion fromString(String version) {
     for (StorageLayoutVersion v : StorageLayoutVersion.values()) {
       if (v.version.equals(version)) {
