@@ -7,6 +7,7 @@ package com.datastrato.gravitino.auth;
 
 import com.datastrato.gravitino.Config;
 
+/** The interface provides authentication mechanism. */
 public interface Authenticator {
 
   /**
@@ -26,7 +27,7 @@ public interface Authenticator {
    */
   default String authenticateHTTPHeader(String authData) {
     throw new UnsupportedOperationException(
-        "Don't support to authenticate the data from the HTTP header");
+        "Authenticator doesn't support to authenticate the data from the HTTP header");
   }
 
   /**

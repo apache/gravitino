@@ -26,6 +26,10 @@ import java.util.Base64;
 import java.util.List;
 import org.apache.commons.lang3.StringUtils;
 
+/**
+ * OAuth2TokenAuthenticator provides the OAuth 2.0 authentication mechanism.
+ * OAuth2TokenAuthenticator only supports to validate the format of JWT's Bearer Token.
+ */
 class OAuth2TokenAuthenticator implements Authenticator {
 
   private long allowSkewSeconds;
@@ -93,18 +97,21 @@ class OAuth2TokenAuthenticator implements Authenticator {
     this.allowSkewSeconds = config.get(Configs.ALLOW_SKEW_SECONDS);
     String configuredSignKey = config.get(Configs.DEFAULT_SIGN_KEY);
     Preconditions.checkNotNull(configuredSignKey, "Default signing key can't be null");
-    String algType = config.get(Configs.ALG_TYPE);
+    String algType = config.get(Configs.SIGNATURE_ALGORITHM_TYPE);
     this.defaultSigningKey = decodeSignKey(Base64.getDecoder().decode(configuredSignKey), algType);
   }
 
   private static Key decodeSignKey(byte[] key, String algType) {
     try {
-      String algFamilyName = SignatureAlgorithm.valueOf(algType).getFamilyName();
-      if ("HMAC".equals(algFamilyName)) {
+      SignatureAlgorithmFamilyType algFamilyType =
+          SignatureAlgorithmFamilyType.valueOf(SignatureAlgorithm.valueOf(algType).getFamilyName());
+
+      if (SignatureAlgorithmFamilyType.HMAC.equals(algFamilyType)) {
         return Keys.hmacShaKeyFor(key);
-      } else if ("RSA".equals(algFamilyName) || "ECDSA".equals(algFamilyName)) {
+      } else if (SignatureAlgorithmFamilyType.RSA.equals(algFamilyType)
+          || SignatureAlgorithmFamilyType.ECDSA.equals(algFamilyType)) {
         X509EncodedKeySpec spec = new X509EncodedKeySpec(key);
-        KeyFactory kf = KeyFactory.getInstance(algFamilyName);
+        KeyFactory kf = KeyFactory.getInstance(algFamilyType);
         return kf.generatePublic(spec);
       } else {
         throw new IllegalArgumentException("Wrong encryption algorithm type: " + algType);

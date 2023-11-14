@@ -10,6 +10,10 @@ import com.datastrato.gravitino.utils.Constants;
 import java.util.Base64;
 import org.apache.commons.lang3.StringUtils;
 
+/**
+ * SimpleAuthenticator will provide a basic authentication mechanism. SimpleAuthenticator will use
+ * the identifier provided by the user without any validation.
+ */
 class SimpleAuthenticator implements Authenticator {
 
   @Override

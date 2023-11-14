@@ -73,7 +73,7 @@ public interface Configs {
           .createWithDefault("simple");
 
   ConfigEntry<String> SERVICE_AUDIENCE =
-      new ConfigBuilder("gravitino.authenicator.oauth.service.audience")
+      new ConfigBuilder("gravitino.authenticator.oauth.service.audience")
           .doc("The audience name when Gravitino uses oauth as the authenticator")
           .version("0.3.0")
           .stringConf()
@@ -93,9 +93,9 @@ public interface Configs {
           .stringConf()
           .createWithDefault(null);
 
-  ConfigEntry<String> ALG_TYPE =
-      new ConfigBuilder("gravitino.authenticator.oauth.algorithm.type")
-          .doc("The encryption algorithm when Gravitino uses oauth as the authenticator")
+  ConfigEntry<String> SIGNATURE_ALGORITHM_TYPE =
+      new ConfigBuilder("gravitino.authenticator.oauth.sign.algorithm.type")
+          .doc("The signature algorithm when Gravitino uses oauth as the authenticator")
           .version("0.3.0")
           .stringConf()
           .createWithDefault(SignatureAlgorithm.RS256.name());

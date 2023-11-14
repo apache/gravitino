@@ -18,9 +18,9 @@ public class AuthenticatorFactory {
 
   public static final ImmutableMap<String, String> AUTHENTICATORS =
       ImmutableMap.of(
-          "simple",
+          AuthenticatorType.SIMPLE.name().toLowerCase(),
           SimpleAuthenticator.class.getCanonicalName(),
-          "oauth",
+          AuthenticatorType.OAUTH.name().toLowerCase(),
           OAuth2TokenAuthenticator.class.getCanonicalName());
 
   private AuthenticatorFactory() {}
