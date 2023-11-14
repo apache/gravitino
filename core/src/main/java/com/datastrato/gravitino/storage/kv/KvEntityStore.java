@@ -399,7 +399,7 @@ public class KvEntityStore implements EntityStore {
       if (bytes == null) {
         // If the layout version is not set, we will set it to the default version.
         backend.put(
-            LAYOUT_VERSION.getBytes(),
+            LAYOUT_VERSION.getBytes(StandardCharsets.UTF_8),
             DEFAULT_LAYOUT_VERSION.getVersion().getBytes(StandardCharsets.UTF_8),
             true);
         return DEFAULT_LAYOUT_VERSION;
