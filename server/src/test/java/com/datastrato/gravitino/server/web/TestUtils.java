@@ -120,26 +120,4 @@ public class TestUtils {
     assertEquals("New message", errorResponse.getMessage());
   }
 
-  @Test
-  public void testUnauthorizedWithType() {
-    Response response = Utils.unauthorized("Resource", "Unauthorized");
-    assertNotNull(response);
-    assertEquals(Response.Status.UNAUTHORIZED.getStatusCode(), response.getStatus());
-    assertEquals(MediaType.APPLICATION_JSON, response.getMediaType().toString());
-    ErrorResponse errorResponse = (ErrorResponse) response.getEntity();
-    assertEquals("Resource", errorResponse.getType());
-    assertEquals("Unauthorized", errorResponse.getMessage());
-  }
-
-  @Test
-  public void testUnauthorizedWithThrowable() {
-    Throwable throwable = new RuntimeException("Unauthorized");
-    Response response = Utils.unauthorized("New message", throwable);
-    assertNotNull(response);
-    assertEquals(Response.Status.UNAUTHORIZED.getStatusCode(), response.getStatus());
-    assertEquals(MediaType.APPLICATION_JSON, response.getMediaType().toString());
-    ErrorResponse errorResponse = (ErrorResponse) response.getEntity();
-    assertEquals("RuntimeException", errorResponse.getType());
-    assertEquals("New message", errorResponse.getMessage());
-  }
 }

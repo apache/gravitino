@@ -60,10 +60,7 @@ public class ExceptionHandlers {
       if (e instanceof IllegalArgumentException) {
         return Utils.illegalArguments(errorMsg, e);
 
-      } else if (e instanceof UnsupportedOperationException) {
-        return Utils.unauthorized(errorMsg, e);
-
-      } else if (e instanceof NotFoundException) {
+      }  else if (e instanceof NotFoundException) {
         return Utils.notFound(errorMsg, e);
 
       } else if (e instanceof TableAlreadyExistsException) {
@@ -92,9 +89,6 @@ public class ExceptionHandlers {
 
       if (e instanceof IllegalArgumentException) {
         return Utils.illegalArguments(errorMsg, e);
-
-      } else if (e instanceof UnsupportedOperationException) {
-        return Utils.unauthorized(errorMsg, e);
 
       } else if (e instanceof NotFoundException) {
         return Utils.notFound(errorMsg, e);
@@ -129,10 +123,7 @@ public class ExceptionHandlers {
       if (e instanceof IllegalArgumentException) {
         return Utils.illegalArguments(errorMsg, e);
 
-      } else if (e instanceof UnsupportedOperationException) {
-        return Utils.unauthorized(errorMsg, e);
-
-      } else if (e instanceof NotFoundException) {
+      }  else if (e instanceof NotFoundException) {
         return Utils.notFound(errorMsg, e);
 
       } else if (e instanceof CatalogAlreadyExistsException) {
@@ -160,9 +151,6 @@ public class ExceptionHandlers {
 
       if (e instanceof IllegalArgumentException) {
         return Utils.illegalArguments(errorMsg, e);
-
-      } else if (e instanceof UnsupportedOperationException) {
-        return Utils.unauthorized(errorMsg, e);
 
       } else if (e instanceof MetalakeAlreadyExistsException) {
         return Utils.alreadyExists(errorMsg, e);

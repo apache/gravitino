@@ -44,25 +44,18 @@ public class CatalogOperations {
   private static final Logger LOG = LoggerFactory.getLogger(CatalogOperations.class);
 
   private final CatalogManager manager;
-  private final Authenticator authenticator;
 
   @Context private HttpServletRequest httpRequest;
 
   @Inject
-  public CatalogOperations(CatalogManager manager, Authenticator authenticator) {
+  public CatalogOperations(CatalogManager manager) {
     this.manager = manager;
-    this.authenticator = authenticator;
   }
 
   @GET
   @Produces("application/vnd.gravitino.v1+json")
-  public Response listCatalogs(
-      @HeaderParam(Constants.HTTP_HEADER_NAME) String authData,
-      @PathParam("metalake") String metalake) {
+  public Response listCatalogs(@PathParam("metalake") String metalake) {
     try {
-      if (authenticator.isDataFromHTTP()) {
-        authenticator.authenticateHTTPHeader(authData);
-      }
       Namespace catalogNS = Namespace.ofCatalog(metalake);
       NameIdentifier[] idents = manager.listCatalogs(catalogNS);
       return Utils.ok(new EntityListResponse(idents));
@@ -75,13 +68,9 @@ public class CatalogOperations {
   @POST
   @Produces("application/vnd.gravitino.v1+json")
   public Response createCatalog(
-      @HeaderParam(Constants.HTTP_HEADER_NAME) String authData,
       @PathParam("metalake") String metalake,
       CatalogCreateRequest request) {
     try {
-      if (authenticator.isDataFromHTTP()) {
-        authenticator.authenticateHTTPHeader(authData);
-      }
       request.validate();
       NameIdentifier ident = NameIdentifier.ofCatalog(metalake, request.getName());
       Catalog catalog =
@@ -103,13 +92,9 @@ public class CatalogOperations {
   @Path("{catalog}")
   @Produces("application/vnd.gravitino.v1+json")
   public Response loadCatalog(
-      @HeaderParam(Constants.HTTP_HEADER_NAME) String authData,
       @PathParam("metalake") String metalakeName,
       @PathParam("catalog") String catalogName) {
     try {
-      if (authenticator.isDataFromHTTP()) {
-        authenticator.authenticateHTTPHeader(authData);
-      }
       NameIdentifier ident = NameIdentifier.ofCatalog(metalakeName, catalogName);
       Catalog catalog = manager.loadCatalog(ident);
       return Utils.ok(new CatalogResponse(DTOConverters.toDTO(catalog)));
@@ -124,14 +109,10 @@ public class CatalogOperations {
   @Path("{catalog}")
   @Produces("application/vnd.gravitino.v1+json")
   public Response alterCatalog(
-      @HeaderParam(Constants.HTTP_HEADER_NAME) String authData,
       @PathParam("metalake") String metalakeName,
       @PathParam("catalog") String catalogName,
       CatalogUpdatesRequest request) {
     try {
-      if (authenticator.isDataFromHTTP()) {
-        authenticator.authenticateHTTPHeader(authData);
-      }
       request.validate();
       NameIdentifier ident = NameIdentifier.ofCatalog(metalakeName, catalogName);
       CatalogChange[] changes =
@@ -152,13 +133,9 @@ public class CatalogOperations {
   @Path("{catalog}")
   @Produces("application/vnd.gravitino.v1+json")
   public Response dropCatalog(
-      @HeaderParam(Constants.HTTP_HEADER_NAME) String authData,
       @PathParam("metalake") String metalakeName,
       @PathParam("catalog") String catalogName) {
     try {
-      if (authenticator.isDataFromHTTP()) {
-        authenticator.authenticateHTTPHeader(authData);
-      }
       NameIdentifier ident = NameIdentifier.ofCatalog(metalakeName, catalogName);
       boolean dropped = manager.dropCatalog(ident);
       if (!dropped) {

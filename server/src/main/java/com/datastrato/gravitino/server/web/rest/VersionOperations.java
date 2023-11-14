@@ -27,21 +27,11 @@ import javax.ws.rs.core.Response;
 @Produces(MediaType.APPLICATION_JSON)
 public class VersionOperations extends HttpServlet {
 
-  private final Authenticator authenticator;
-
-  @Inject
-  public VersionOperations(Authenticator authenticator) {
-    this.authenticator = authenticator;
-  }
-
   @GET
   @Produces("application/vnd.gravitino.v1+json")
-  public Response getVersion(@HeaderParam(Constants.HTTP_HEADER_NAME) String authData) {
+  public Response getVersion() {
     Properties projectProperties = new Properties();
     try {
-      if (authenticator.isDataFromHTTP()) {
-        authenticator.authenticateHTTPHeader(authData);
-      }
       projectProperties.load(
           VersionOperations.class.getClassLoader().getResourceAsStream("project.properties"));
       String version = projectProperties.getProperty("project.version");
@@ -51,8 +41,6 @@ public class VersionOperations extends HttpServlet {
       VersionDTO versionDTO = new VersionDTO(version, compileDate, gitCommit);
 
       return Utils.ok(new VersionResponse(versionDTO));
-    } catch (UnauthorizedException ue) {
-      return Utils.unauthorized("Failed to authenticate the user", ue);
     } catch (IOException e) {
       return Utils.internalError("Failed to get Gravitino version", e);
     }
