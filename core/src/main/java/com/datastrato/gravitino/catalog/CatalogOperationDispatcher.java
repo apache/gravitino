@@ -763,25 +763,21 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
   private NameIdentifier identifierWithCaseSensitivity(
       NameIdentifier ident, boolean schemaNameCaseSensitive, boolean tableNameCaseSensitive) {
     // The name of metalake/catalog are always case-sensitive, so we only need to handle schema and
-    // table
-    // identifiers.
+    // table identifiers.
     String[] levels = ident.namespace().levels();
     if (levels.length <= 1) {
       return ident;
     }
 
-    if (levels.length == 2 && !schemaNameCaseSensitive) {
-      return NameIdentifier.of(levels[0], levels[1], ident.name().toLowerCase(Locale.US));
+    if (levels.length == 2) {
+      String schemaName =
+          schemaNameCaseSensitive ? ident.name() : ident.name().toLowerCase(Locale.US);
+      return NameIdentifier.of(levels[0], levels[1], schemaName);
     }
 
-    if (levels.length == 3) {
-      String schemaName = schemaNameCaseSensitive ? levels[2] : levels[2].toLowerCase(Locale.US);
-      String tableName =
-          tableNameCaseSensitive ? ident.name() : ident.name().toLowerCase(Locale.US);
-      return NameIdentifier.of(levels[0], levels[1], schemaName, tableName);
-    }
-
-    return ident;
+    String schemaName = schemaNameCaseSensitive ? levels[2] : levels[2].toLowerCase(Locale.US);
+    String tableName = tableNameCaseSensitive ? ident.name() : ident.name().toLowerCase(Locale.US);
+    return NameIdentifier.of(levels[0], levels[1], schemaName, tableName);
   }
 
   private NameIdentifier getUniformNameIdentifier(NameIdentifier ident) {

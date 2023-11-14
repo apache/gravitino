@@ -12,6 +12,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.datastrato.gravitino.exceptions.IllegalNameIdentifierException;
 import com.datastrato.gravitino.exceptions.IllegalNamespaceException;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class TestNameIdentifier {
@@ -125,5 +126,20 @@ public class TestNameIdentifier {
             IllegalNamespaceException.class,
             () -> NameIdentifier.checkTable(NameIdentifier.of("a", "b", "c")));
     assertTrue(excep3.getMessage().contains("Table namespace must be non-null and have 3 levels"));
+  }
+
+  @Test
+  void testParent() {
+    NameIdentifier identifier = NameIdentifier.of("a", "b", "c");
+    assertEquals(NameIdentifier.of("a", "b"), identifier.parent());
+
+    NameIdentifier identifier1 = NameIdentifier.of("a", "b");
+    assertEquals(NameIdentifier.of("a"), identifier1.parent());
+
+    NameIdentifier identifier2 = NameIdentifier.of("a");
+    Assertions.assertThrows(UnsupportedOperationException.class, identifier2::parent);
+
+    NameIdentifier identifier3 = NameIdentifier.of("a", "b", "c", "d");
+    assertEquals(NameIdentifier.of("a", "b", "c"), identifier3.parent());
   }
 }
