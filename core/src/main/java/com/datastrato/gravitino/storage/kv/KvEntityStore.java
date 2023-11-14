@@ -309,7 +309,7 @@ public class KvEntityStore implements EntityStore {
   private byte[] replacePrefixTypeInfo(byte[] encode, String subTypePrefix) {
     byte[] result = new byte[encode.length];
     System.arraycopy(encode, 0, result, 0, encode.length);
-    byte[] bytes = subTypePrefix.getBytes();
+    byte[] bytes = subTypePrefix.getBytes(StandardCharsets.UTF_8);
     result[0] = bytes[0];
     result[1] = bytes[1];
 
