@@ -47,8 +47,8 @@ public class MetalakeOperations {
   @Context private HttpServletRequest httpRequest;
 
   @Inject
-  public MetalakeOperations(MetalakeManager metaManager) {
-    this.manager = metaManager;
+  public MetalakeOperations(MetalakeManager manager) {
+    this.manager = manager;
   }
 
   @GET
@@ -70,7 +70,6 @@ public class MetalakeOperations {
   @Produces("application/vnd.gravitino.v1+json")
   public Response createMetalake(MetalakeCreateRequest request) {
     try {
-
       request.validate();
       NameIdentifier ident = NameIdentifier.ofMetalake(request.getName());
       BaseMetalake metalake =
