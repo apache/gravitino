@@ -77,7 +77,7 @@ public interface Configs {
           .doc("The audience name when Gravitino uses oauth as the authenticator")
           .version("0.3.0")
           .stringConf()
-          .createWithDefault("");
+          .createWithDefault("GravitinoServer");
 
   ConfigEntry<Long> ALLOW_SKEW_SECONDS =
       new ConfigBuilder("gravitino.authenticator.oauth.allow.skew.seconds")
