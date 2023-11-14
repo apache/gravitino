@@ -18,14 +18,12 @@ import com.datastrato.gravitino.dto.util.DTOConverters;
 import com.datastrato.gravitino.meta.BaseMetalake;
 import com.datastrato.gravitino.meta.MetalakeManager;
 import com.datastrato.gravitino.server.web.Utils;
-import com.datastrato.gravitino.utils.Constants;
 import java.util.Arrays;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
-import javax.ws.rs.HeaderParam;
 import javax.ws.rs.POST;
 import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
@@ -44,20 +42,20 @@ public class MetalakeOperations {
 
   private static final Logger LOG = LoggerFactory.getLogger(MetalakeOperations.class);
 
-  private final MetalakeManager metalakeManager;
+  private final MetalakeManager manager;
 
   @Context private HttpServletRequest httpRequest;
 
   @Inject
   public MetalakeOperations(MetalakeManager metaManager) {
-    this.metalakeManager = metaManager;
+    this.manager = metaManager;
   }
 
   @GET
   @Produces("application/vnd.gravitino.v1+json")
   public Response listMetalakes() {
     try {
-      BaseMetalake[] metalakes = metalakeManager.listMetalakes();
+      BaseMetalake[] metalakes = manager.listMetalakes();
       MetalakeDTO[] metalakeDTOS =
           Arrays.stream(metalakes).map(DTOConverters::toDTO).toArray(MetalakeDTO[]::new);
       return Utils.ok(new MetalakeListResponse(metalakeDTOS));
@@ -76,7 +74,7 @@ public class MetalakeOperations {
       request.validate();
       NameIdentifier ident = NameIdentifier.ofMetalake(request.getName());
       BaseMetalake metalake =
-          metalakeManager.createMetalake(ident, request.getComment(), request.getProperties());
+          manager.createMetalake(ident, request.getComment(), request.getProperties());
       return Utils.ok(new MetalakeResponse(DTOConverters.toDTO(metalake)));
 
     } catch (Exception e) {
@@ -90,7 +88,7 @@ public class MetalakeOperations {
   public Response loadMetalake(@PathParam("name") String metalakeName) {
     try {
       NameIdentifier identifier = NameIdentifier.ofMetalake(metalakeName);
-      BaseMetalake metalake = metalakeManager.loadMetalake(identifier);
+      BaseMetalake metalake = manager.loadMetalake(identifier);
       return Utils.ok(new MetalakeResponse(DTOConverters.toDTO(metalake)));
 
     } catch (Exception e) {
@@ -111,7 +109,7 @@ public class MetalakeOperations {
               .map(MetalakeUpdateRequest::metalakeChange)
               .toArray(MetalakeChange[]::new);
 
-      BaseMetalake updatedMetalake = metalakeManager.alterMetalake(identifier, changes);
+      BaseMetalake updatedMetalake = manager.alterMetalake(identifier, changes);
       return Utils.ok(new MetalakeResponse(DTOConverters.toDTO(updatedMetalake)));
 
     } catch (Exception e) {
@@ -122,12 +120,10 @@ public class MetalakeOperations {
   @DELETE
   @Path("{name}")
   @Produces("application/vnd.gravitino.v1+json")
-  public Response dropMetalake(
-      @HeaderParam(Constants.HTTP_HEADER_NAME) String authData,
-      @PathParam("name") String metalakeName) {
+  public Response dropMetalake(@PathParam("name") String metalakeName) {
     try {
       NameIdentifier identifier = NameIdentifier.ofMetalake(metalakeName);
-      boolean dropped = metalakeManager.dropMetalake(identifier);
+      boolean dropped = manager.dropMetalake(identifier);
       if (!dropped) {
         LOG.warn("Failed to drop metalake by name {}", metalakeName);
       }

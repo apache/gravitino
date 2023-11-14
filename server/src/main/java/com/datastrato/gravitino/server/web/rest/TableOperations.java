@@ -21,13 +21,11 @@ import com.datastrato.gravitino.rel.SortOrder;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.server.web.Utils;
-import com.datastrato.gravitino.utils.Constants;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
-import javax.ws.rs.HeaderParam;
 import javax.ws.rs.POST;
 import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
@@ -123,7 +121,6 @@ public class TableOperations {
   @Path("{table}")
   @Produces("application/vnd.gravitino.v1+json")
   public Response alterTable(
-      @HeaderParam(Constants.HTTP_HEADER_NAME) String authData,
       @PathParam("metalake") String metalake,
       @PathParam("catalog") String catalog,
       @PathParam("schema") String schema,

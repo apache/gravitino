@@ -21,7 +21,6 @@ import javax.ws.rs.core.Response;
 @Consumes(MediaType.APPLICATION_JSON)
 @Produces(MediaType.APPLICATION_JSON)
 public class VersionOperations extends HttpServlet {
-
   @GET
   @Produces("application/vnd.gravitino.v1+json")
   public Response getVersion() {
