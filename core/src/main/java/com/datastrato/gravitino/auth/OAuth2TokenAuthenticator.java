@@ -111,7 +111,7 @@ class OAuth2TokenAuthenticator implements Authenticator {
       } else if (SignatureAlgorithmFamilyType.RSA.equals(algFamilyType)
           || SignatureAlgorithmFamilyType.ECDSA.equals(algFamilyType)) {
         X509EncodedKeySpec spec = new X509EncodedKeySpec(key);
-        KeyFactory kf = KeyFactory.getInstance(algFamilyType);
+        KeyFactory kf = KeyFactory.getInstance(algFamilyType.name());
         return kf.generatePublic(spec);
       } else {
         throw new IllegalArgumentException("Wrong encryption algorithm type: " + algType);
