@@ -6,7 +6,7 @@
 package com.datastrato.gravitino.auth;
 
 import com.datastrato.gravitino.Config;
-import com.datastrato.gravitino.utils.Constants;
+
 import java.util.Base64;
 import org.apache.commons.lang3.StringUtils;
 
@@ -26,10 +26,10 @@ class SimpleAuthenticator implements Authenticator {
     if (StringUtils.isBlank(authData)) {
       return Constants.UNKNOWN_USER_NAME;
     }
-    if (!authData.startsWith(Constants.HTTP_HEADER_VALUE_BASIC_PREFIX)) {
+    if (!authData.startsWith(Constants.HTTP_HEADER_AUTHORIZATION_BASIC)) {
       return Constants.UNKNOWN_USER_NAME;
     }
-    String credential = authData.substring(Constants.HTTP_HEADER_VALUE_BASIC_PREFIX.length());
+    String credential = authData.substring(Constants.HTTP_HEADER_AUTHORIZATION_BASIC.length());
     if (StringUtils.isBlank(credential)) {
       return Constants.UNKNOWN_USER_NAME;
     }

@@ -7,7 +7,6 @@ package com.datastrato.gravitino.auth;
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.exceptions.UnauthorizedException;
-import com.datastrato.gravitino.utils.Constants;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import io.jsonwebtoken.Claims;
@@ -45,7 +44,7 @@ public class TestOAuth2TokenAuthenticator {
             UnauthorizedException.class,
             () ->
                 auth2TokenAuthenticator.authenticateHTTPHeader(
-                    Constants.HTTP_HEADER_VALUE_BEARER_PREFIX));
+                    Constants.HTTP_HEADER_AUTHORIZATION_BEARER));
     Assertions.assertEquals("Blank token found", e.getMessage());
     String token1 =
         Jwts.builder()
@@ -58,7 +57,7 @@ public class TestOAuth2TokenAuthenticator {
             UnauthorizedException.class,
             () ->
                 auth2TokenAuthenticator.authenticateHTTPHeader(
-                    Constants.HTTP_HEADER_VALUE_BEARER_PREFIX + token1));
+                    Constants.HTTP_HEADER_AUTHORIZATION_BEARER + token1));
     Assertions.assertEquals("Found null Audience in token", e.getMessage());
 
     String token2 =
@@ -73,7 +72,7 @@ public class TestOAuth2TokenAuthenticator {
             UnauthorizedException.class,
             () ->
                 auth2TokenAuthenticator.authenticateHTTPHeader(
-                    Constants.HTTP_HEADER_VALUE_BEARER_PREFIX + token2));
+                    Constants.HTTP_HEADER_AUTHORIZATION_BEARER + token2));
     Assertions.assertEquals(
         "Audience in the token [xxxx] doesn't contain service1", e.getMessage());
 
@@ -91,7 +90,7 @@ public class TestOAuth2TokenAuthenticator {
             UnauthorizedException.class,
             () ->
                 auth2TokenAuthenticator.authenticateHTTPHeader(
-                    Constants.HTTP_HEADER_VALUE_BEARER_PREFIX + token3));
+                    Constants.HTTP_HEADER_AUTHORIZATION_BEARER + token3));
     Assertions.assertEquals(
         "Audiences in the token [x1, x2, x3] don't contain service1", e.getMessage());
 
@@ -112,7 +111,7 @@ public class TestOAuth2TokenAuthenticator {
             UnauthorizedException.class,
             () ->
                 auth2TokenAuthenticator.authenticateHTTPHeader(
-                    Constants.HTTP_HEADER_VALUE_BEARER_PREFIX + token4));
+                    Constants.HTTP_HEADER_AUTHORIZATION_BEARER + token4));
     Assertions.assertEquals(
         "Audiences in token is not in expected format: {k1=v1, k2=v2}", e.getMessage());
 
@@ -126,6 +125,6 @@ public class TestOAuth2TokenAuthenticator {
     Assertions.assertEquals(
         "gravitino",
         auth2TokenAuthenticator.authenticateHTTPHeader(
-            Constants.HTTP_HEADER_VALUE_BEARER_PREFIX + token5));
+            Constants.HTTP_HEADER_AUTHORIZATION_BEARER + token5));
   }
 }

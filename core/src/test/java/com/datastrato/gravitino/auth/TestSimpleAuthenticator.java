@@ -5,7 +5,7 @@
 package com.datastrato.gravitino.auth;
 
 import com.datastrato.gravitino.Config;
-import com.datastrato.gravitino.utils.Constants;
+
 import java.util.Base64;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -24,15 +24,15 @@ public class TestSimpleAuthenticator {
         Constants.UNKNOWN_USER_NAME, simpleAuthenticator.authenticateHTTPHeader("abc"));
     Assertions.assertEquals(
         Constants.UNKNOWN_USER_NAME,
-        simpleAuthenticator.authenticateHTTPHeader(Constants.HTTP_HEADER_VALUE_BASIC_PREFIX));
+        simpleAuthenticator.authenticateHTTPHeader(Constants.HTTP_HEADER_AUTHORIZATION_BASIC));
     Assertions.assertEquals(
         Constants.UNKNOWN_USER_NAME,
         simpleAuthenticator.authenticateHTTPHeader(
-            Constants.HTTP_HEADER_VALUE_BASIC_PREFIX + "xx"));
+            Constants.HTTP_HEADER_AUTHORIZATION_BASIC + "xx"));
     Assertions.assertEquals(
         "gravitino",
         simpleAuthenticator.authenticateHTTPHeader(
-            Constants.HTTP_HEADER_VALUE_BASIC_PREFIX
+            Constants.HTTP_HEADER_AUTHORIZATION_BASIC
                 + new String(Base64.getEncoder().encode("gravitino:gravitino".getBytes()))));
   }
 }

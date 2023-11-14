@@ -15,7 +15,7 @@ import static org.mockito.Mockito.when;
 
 import com.datastrato.gravitino.auth.Authenticator;
 import com.datastrato.gravitino.exceptions.UnauthorizedException;
-import com.datastrato.gravitino.utils.Constants;
+import com.datastrato.gravitino.auth.Constants;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.Vector;
@@ -34,7 +34,7 @@ public class TestAuthenticationFilter {
     FilterChain mockChain = mock(FilterChain.class);
     HttpServletRequest mockRequest = mock(HttpServletRequest.class);
     HttpServletResponse mockResponse = mock(HttpServletResponse.class);
-    when(mockRequest.getHeaders(Constants.HTTP_HEADER_NAME))
+    when(mockRequest.getHeaders(Constants.HTTP_HEADER_AUTHORIZATION))
         .thenReturn(new Vector<>(Collections.singletonList("user")).elements());
     when(authenticator.isDataFromHTTP()).thenReturn(true);
     when(authenticator.authenticateHTTPHeader(any())).thenReturn("user");
@@ -49,7 +49,7 @@ public class TestAuthenticationFilter {
     FilterChain mockChain = mock(FilterChain.class);
     HttpServletRequest mockRequest = mock(HttpServletRequest.class);
     HttpServletResponse mockResponse = mock(HttpServletResponse.class);
-    when(mockRequest.getHeaders(Constants.HTTP_HEADER_NAME))
+    when(mockRequest.getHeaders(Constants.HTTP_HEADER_AUTHORIZATION))
         .thenReturn(new Vector<>(Collections.singletonList("user")).elements());
     when(authenticator.isDataFromHTTP()).thenReturn(true);
     when(authenticator.authenticateHTTPHeader(any()))

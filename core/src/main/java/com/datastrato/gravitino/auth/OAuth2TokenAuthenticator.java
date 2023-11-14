@@ -7,7 +7,6 @@ package com.datastrato.gravitino.auth;
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.exceptions.UnauthorizedException;
-import com.datastrato.gravitino.utils.Constants;
 import com.google.common.base.Preconditions;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
@@ -44,10 +43,10 @@ class OAuth2TokenAuthenticator implements Authenticator {
   @Override
   public String authenticateHTTPHeader(String authData) {
     if (StringUtils.isBlank(authData)
-        || !authData.startsWith(Constants.HTTP_HEADER_VALUE_BEARER_PREFIX)) {
+        || !authData.startsWith(Constants.HTTP_HEADER_AUTHORIZATION_BEARER)) {
       throw new UnauthorizedException("Invalid HTTP Authorization header");
     }
-    String token = authData.substring(Constants.HTTP_HEADER_VALUE_BEARER_PREFIX.length());
+    String token = authData.substring(Constants.HTTP_HEADER_AUTHORIZATION_BEARER.length());
     if (StringUtils.isBlank(token)) {
       throw new UnauthorizedException("Blank token found");
     }

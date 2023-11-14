@@ -6,7 +6,7 @@ package com.datastrato.gravitino.server.web;
 
 import com.datastrato.gravitino.auth.Authenticator;
 import com.datastrato.gravitino.exceptions.UnauthorizedException;
-import com.datastrato.gravitino.utils.Constants;
+import com.datastrato.gravitino.auth.Constants;
 import java.io.IOException;
 import java.util.Enumeration;
 import javax.servlet.Filter;
@@ -34,7 +34,7 @@ public class AuthenticationFilter implements Filter {
       throws IOException, ServletException {
     try {
       HttpServletRequest req = (HttpServletRequest) request;
-      Enumeration<String> headerData = req.getHeaders(Constants.HTTP_HEADER_NAME);
+      Enumeration<String> headerData = req.getHeaders(Constants.HTTP_HEADER_AUTHORIZATION);
       String authData = null;
       if (headerData.hasMoreElements()) {
         authData = headerData.nextElement();
