@@ -5,8 +5,8 @@
 package com.datastrato.gravitino.server.web;
 
 import com.datastrato.gravitino.auth.Authenticator;
-import com.datastrato.gravitino.exceptions.UnauthorizedException;
 import com.datastrato.gravitino.auth.Constants;
+import com.datastrato.gravitino.exceptions.UnauthorizedException;
 import java.io.IOException;
 import java.util.Enumeration;
 import javax.servlet.Filter;

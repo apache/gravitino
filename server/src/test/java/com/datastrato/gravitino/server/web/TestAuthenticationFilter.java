@@ -14,8 +14,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.datastrato.gravitino.auth.Authenticator;
-import com.datastrato.gravitino.exceptions.UnauthorizedException;
 import com.datastrato.gravitino.auth.Constants;
+import com.datastrato.gravitino.exceptions.UnauthorizedException;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.Vector;

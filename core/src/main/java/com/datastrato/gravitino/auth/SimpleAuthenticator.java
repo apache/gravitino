@@ -6,7 +6,6 @@
 package com.datastrato.gravitino.auth;
 
 import com.datastrato.gravitino.Config;
-
 import java.util.Base64;
 import org.apache.commons.lang3.StringUtils;
 
