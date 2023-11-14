@@ -207,10 +207,11 @@ tasks.rat {
   inputDir.set(project.rootDir)
 
   val exclusions = mutableListOf(
-    // Ignore files we track but do not distribute
+    // Ignore files we track but do not need headers
     "**/.github/**/*",
     "dev/docker/**/*.xml",
     "**/*.log",
+    "licenses/*txt"
   )
 
   // Add .gitignore excludes to the Apache Rat exclusion list.
