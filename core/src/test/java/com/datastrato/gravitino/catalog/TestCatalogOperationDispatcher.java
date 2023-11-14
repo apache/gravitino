@@ -118,6 +118,56 @@ public class TestCatalogOperationDispatcher {
   }
 
   @Test
+  void testCaseSensitive() throws IOException {
+    Namespace ns = Namespace.of(metalake, catalog);
+    // A upper-case schema name
+    NameIdentifier schemaIdent = NameIdentifier.of(ns, "Schema1");
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    dispatcher.dropSchema(schemaIdent, true);
+    dispatcher.createSchema(schemaIdent, "comment", props);
+
+    // Schema: the name store in the underlying storage system is 'schema1'
+    Schema schema = dispatcher.loadSchema(schemaIdent);
+    Assertions.assertEquals("schema1", schema.name());
+    NameIdentifier lowerCaseSchemaIdentifier = NameIdentifier.of(ns, "schema1");
+    schema = dispatcher.loadSchema(lowerCaseSchemaIdentifier);
+    Assertions.assertEquals("schema1", schema.name());
+
+    // Schema: the name store in entityStore is 'schema1'
+    SchemaEntity schemaEntity =
+        entityStore.get(lowerCaseSchemaIdentifier, SCHEMA, SchemaEntity.class);
+    Assertions.assertEquals("schema1", schemaEntity.name());
+    NameIdentifier upperCaseSchemaIdentifier = NameIdentifier.of(ns, "Schema1");
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () -> entityStore.get(upperCaseSchemaIdentifier, SCHEMA, SchemaEntity.class));
+
+    Namespace tableNamespace = Namespace.of(metalake, catalog, "schema1");
+    NameIdentifier tableIdentifier = NameIdentifier.of(tableNamespace, "Table1");
+    Column[] columns =
+        new Column[] {
+          new TestColumn.Builder().withName("col1").withType(TypeCreator.NULLABLE.STRING).build(),
+          new TestColumn.Builder().withName("col2").withType(TypeCreator.NULLABLE.STRING).build()
+        };
+    dispatcher.createTable(tableIdentifier, columns, "comment", props, new Transform[0]);
+
+    // Table: the name store in the underlying storage system is 'table1'
+    Table table = dispatcher.loadTable(tableIdentifier);
+    Assertions.assertEquals("table1", table.name());
+    NameIdentifier lowerCaseTableIdentifier = NameIdentifier.of(tableNamespace, "table1");
+    table = dispatcher.loadTable(lowerCaseTableIdentifier);
+    Assertions.assertEquals("table1", table.name());
+
+    // Table: the name store in entityStore is 'table1'
+    TableEntity tableEntity = entityStore.get(lowerCaseTableIdentifier, TABLE, TableEntity.class);
+    Assertions.assertEquals("table1", tableEntity.name());
+    NameIdentifier upperCaseTableIdentifier = NameIdentifier.of(tableNamespace, "Table1");
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () -> entityStore.get(upperCaseTableIdentifier, SCHEMA, SchemaEntity.class));
+  }
+
+  @Test
   public void testCreateAndListSchemas() throws IOException {
     Namespace ns = Namespace.of(metalake, catalog);
 

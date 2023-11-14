@@ -102,6 +102,11 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
       return classLoader.withClassLoader(cl -> fn.apply(catalog.ops()));
     }
 
+    public <R> R doWithDefaultConfig(ThrowableFunction<HasCatalogDefaultConfig, R> fn)
+        throws Exception {
+      return classLoader.withClassLoader(cl -> fn.apply(catalog.ops()));
+    }
+
     public void close() {
       try {
         classLoader.withClassLoader(

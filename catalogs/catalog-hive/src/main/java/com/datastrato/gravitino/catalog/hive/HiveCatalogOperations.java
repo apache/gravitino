@@ -921,4 +921,20 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
   public PropertiesMetadata schemaPropertiesMetadata() throws UnsupportedOperationException {
     return schemaPropertiesMetadata;
   }
+
+  @Override
+  public boolean schemaNameCaseSensitivity() {
+    // If we want this to be more exact, we can create a database with a name to test this.
+    return false;
+  }
+
+  @Override
+  public boolean tableNameCaseSensitivity() {
+    return false;
+  }
+
+  @Override
+  public boolean columnNameCaseSensitivity() {
+    return false;
+  }
 }

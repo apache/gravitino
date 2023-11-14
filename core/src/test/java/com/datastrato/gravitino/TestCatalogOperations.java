@@ -351,4 +351,19 @@ public class TestCatalogOperations implements CatalogOperations, TableCatalog, S
     }
     return Maps::newHashMap;
   }
+
+  @Override
+  public boolean schemaNameCaseSensitivity() {
+    return false;
+  }
+
+  @Override
+  public boolean tableNameCaseSensitivity() {
+    return false;
+  }
+
+  @Override
+  public boolean columnNameCaseSensitivity() {
+    return false;
+  }
 }

@@ -202,4 +202,12 @@ public class NameIdentifier {
       throw new IllegalNameIdentifierException(String.format(message, args));
     }
   }
+
+  public NameIdentifier parent() {
+    if (hasNamespace()) {
+      return NameIdentifier.of(namespace.levels());
+    }
+
+    throw new UnsupportedOperationException("Cannot get the parent of a metalake identifier");
+  }
 }
