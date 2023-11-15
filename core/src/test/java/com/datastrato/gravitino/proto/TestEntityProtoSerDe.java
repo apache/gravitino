@@ -6,6 +6,7 @@ package com.datastrato.gravitino.proto;
 
 import com.datastrato.gravitino.EntitySerDe;
 import com.datastrato.gravitino.EntitySerDeFactory;
+import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.meta.SchemaVersion;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
@@ -113,6 +114,7 @@ public class TestEntityProtoSerDe {
     // Test CatalogEntity
     Long catalogId = 1L;
     String catalogName = "catalog";
+    String namespace = "ns";
     String comment = "comment";
     String provider = "test";
 
@@ -120,6 +122,7 @@ public class TestEntityProtoSerDe {
         new com.datastrato.gravitino.meta.CatalogEntity.Builder()
             .withId(catalogId)
             .withName(catalogName)
+            .withNamespace(Namespace.of(namespace))
             .withComment(comment)
             .withType(com.datastrato.gravitino.Catalog.Type.RELATIONAL)
             .withProvider(provider)

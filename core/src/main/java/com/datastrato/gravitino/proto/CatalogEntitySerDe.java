@@ -5,6 +5,7 @@
 
 package com.datastrato.gravitino.proto;
 
+import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.CatalogEntity;
 
@@ -23,6 +24,8 @@ public class CatalogEntitySerDe implements ProtoSerDe<CatalogEntity, Catalog> {
         Catalog.newBuilder()
             .setId(catalogEntity.id())
             .setName(catalogEntity.name())
+            // catalog entity support one level namespace
+            .setNamespace(catalogEntity.namespace().level(0))
             .setProvider(catalogEntity.getProvider())
             .setAuditInfo(new AuditInfoSerDe().serialize((AuditInfo) catalogEntity.auditInfo()));
 
@@ -54,6 +57,7 @@ public class CatalogEntitySerDe implements ProtoSerDe<CatalogEntity, Catalog> {
     builder
         .withId(p.getId())
         .withName(p.getName())
+        .withNamespace(Namespace.of(p.getNamespace()))
         .withProvider(p.getProvider())
         .withAuditInfo(new AuditInfoSerDe().deserialize(p.getAuditInfo()));
 
