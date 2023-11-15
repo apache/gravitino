@@ -113,7 +113,7 @@ class OAuth2TokenAuthenticator implements Authenticator {
         KeyFactory kf = KeyFactory.getInstance(algFamilyType.name());
         return kf.generatePublic(spec);
       } else {
-        throw new IllegalArgumentException("Wrong encryption algorithm type: " + algType);
+        throw new IllegalArgumentException("Wrong signature algorithm type: " + algType);
       }
     } catch (Exception e) {
       throw new IllegalArgumentException("Failed to decode key", e);
