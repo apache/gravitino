@@ -27,9 +27,7 @@ class TestDistribution {
     Assertions.assertArrayEquals(distributionArg1, bucket.expressions());
 
     Expression[] distributionArg2 =
-        new Expression[] {
-          field("field1"), FunctionExpression.of("now", Expression.EMPTY_EXPRESSION)
-        };
+        new Expression[] {field("field1"), FunctionExpression.of("now")};
     bucket = Distributions.ofEVEN(11111, distributionArg2);
 
     Assertions.assertEquals(Strategy.EVEN, bucket.strategy());

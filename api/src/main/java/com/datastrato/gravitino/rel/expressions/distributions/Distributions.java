@@ -29,7 +29,8 @@ public class Distributions {
 
   /**
    * Create a distribution on columns. Like distribute by (a) or (a, b), for complex like
-   * distributing by (func(a), b) or (func(a), func(b)), please use {@link Builder} to create.
+   * distributing by (func(a), b) or (func(a), func(b)), please use {@link DistributionImpl.Builder}
+   * to create.
    *
    * <pre>
    *   NOTE: a, b, c are column names.

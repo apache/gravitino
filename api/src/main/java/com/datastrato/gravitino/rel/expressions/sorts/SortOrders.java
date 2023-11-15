@@ -8,6 +8,11 @@ import com.datastrato.gravitino.rel.expressions.Expression;
 
 /** Helper methods to create SortOrders to pass into Gravitino. */
 public class SortOrders {
+
+  public static SortImpl of(Expression expression) {
+    return of(expression, SortDirection.ASCENDING);
+  }
+
   public static SortImpl of(Expression expression, SortDirection direction) {
     return of(expression, direction, direction.defaultNullOrdering());
   }

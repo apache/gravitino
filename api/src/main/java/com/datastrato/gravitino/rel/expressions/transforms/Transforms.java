@@ -8,7 +8,6 @@ import com.datastrato.gravitino.rel.expressions.Expression;
 import com.datastrato.gravitino.rel.expressions.Literal;
 import com.datastrato.gravitino.rel.expressions.NamedReference;
 import com.google.common.collect.ObjectArrays;
-import io.substrait.type.TypeCreator;
 import java.util.Arrays;
 import java.util.Objects;
 
@@ -67,7 +66,7 @@ public class Transforms {
 
   public static BucketTransform bucket(int numBuckets, String[]... fieldNames) {
     return new BucketTransform(
-        Literal.of(numBuckets, TypeCreator.REQUIRED.I32),
+        Literal.ofInteger(numBuckets),
         Arrays.stream(fieldNames).map(NamedReference::field).toArray(NamedReference[]::new));
   }
 
@@ -81,8 +80,7 @@ public class Transforms {
   }
 
   public static TruncateTransform truncate(int width, String... fieldName) {
-    return new TruncateTransform(
-        Literal.of(width, TypeCreator.REQUIRED.I32), NamedReference.field(fieldName));
+    return new TruncateTransform(Literal.ofInteger(width), NamedReference.field(fieldName));
   }
 
   public static ApplyTransform apply(String name, Expression[] arguments) {

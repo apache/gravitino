@@ -21,6 +21,7 @@
 package com.datastrato.gravitino.rel.expressions;
 
 import io.substrait.type.Type;
+import io.substrait.type.TypeCreator;
 import java.util.Objects;
 
 /**
@@ -42,6 +43,14 @@ public interface Literal<T> extends Expression {
 
   static <T> LiteralImpl<T> of(T value, Type dataType) {
     return new LiteralImpl<>(value, dataType);
+  }
+
+  static LiteralImpl<Integer> ofInteger(Integer value) {
+    return of(value, TypeCreator.REQUIRED.I32);
+  }
+
+  static LiteralImpl<String> ofString(String value) {
+    return of(value, TypeCreator.REQUIRED.STRING);
   }
 
   final class LiteralImpl<T> implements Literal<T> {

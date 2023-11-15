@@ -10,6 +10,10 @@ public interface FunctionExpression extends Expression {
     return new FuncExpressionImpl(functionName, arguments);
   }
 
+  static FuncExpressionImpl of(String functionName) {
+    return of(functionName, Expression.EMPTY_EXPRESSION);
+  }
+
   /** Returns the transform function name. */
   String functionName();
 
