@@ -5,6 +5,8 @@
 package com.datastrato.gravitino.auth;
 
 import com.datastrato.gravitino.Config;
+
+import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -32,6 +34,6 @@ public class TestSimpleAuthenticator {
         "gravitino",
         simpleAuthenticator.authenticateHTTPHeader(
             Constants.HTTP_HEADER_AUTHORIZATION_BASIC
-                + new String(Base64.getEncoder().encode("gravitino:gravitino".getBytes()))));
+                + new String(Base64.getEncoder().encode("gravitino:gravitino".getBytes(StandardCharsets.UTF_8)))));
   }
 }
