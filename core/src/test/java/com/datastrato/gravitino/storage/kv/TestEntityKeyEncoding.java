@@ -27,6 +27,7 @@ import com.datastrato.gravitino.utils.ByteUtils;
 import com.datastrato.gravitino.utils.Bytes;
 import java.io.IOException;
 import java.lang.reflect.Field;
+import java.nio.charset.StandardCharsets;
 import org.apache.commons.io.FileUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -114,7 +115,7 @@ public class TestEntityKeyEncoding {
     byte[] realKey = ENCODER.encode(mateLakeIdentifier1, EntityType.METALAKE);
     byte[] expectKey =
         Bytes.concat(
-            EntityType.METALAKE.getShortName().getBytes(),
+            EntityType.METALAKE.getShortName().getBytes(StandardCharsets.UTF_8),
             BYTABLE_NAMESPACE_SEPARATOR,
             ByteUtils.longToByte(0L));
     Assertions.assertArrayEquals(expectKey, realKey);
@@ -136,7 +137,7 @@ public class TestEntityKeyEncoding {
       realKey = ENCODER.encode(identifier, EntityType.CATALOG);
       expectKey =
           Bytes.concat(
-              EntityType.CATALOG.getShortName().getBytes(),
+              EntityType.CATALOG.getShortName().getBytes(StandardCharsets.UTF_8),
               BYTABLE_NAMESPACE_SEPARATOR,
               ByteUtils.longToByte(0L),
               BYTABLE_NAMESPACE_SEPARATOR,
@@ -161,7 +162,7 @@ public class TestEntityKeyEncoding {
       realKey = ENCODER.encode(identifier, EntityType.SCHEMA);
       expectKey =
           Bytes.concat(
-              EntityType.SCHEMA.getShortName().getBytes(),
+              EntityType.SCHEMA.getShortName().getBytes(StandardCharsets.UTF_8),
               BYTABLE_NAMESPACE_SEPARATOR,
               ByteUtils.longToByte(0L),
               BYTABLE_NAMESPACE_SEPARATOR,
@@ -188,7 +189,7 @@ public class TestEntityKeyEncoding {
       realKey = ENCODER.encode(identifier, EntityType.TABLE);
       expectKey =
           Bytes.concat(
-              EntityType.TABLE.getShortName().getBytes(),
+              EntityType.TABLE.getShortName().getBytes(StandardCharsets.UTF_8),
               BYTABLE_NAMESPACE_SEPARATOR,
               ByteUtils.longToByte(0L),
               BYTABLE_NAMESPACE_SEPARATOR,
@@ -223,7 +224,9 @@ public class TestEntityKeyEncoding {
     NameIdentifier metalakeIdentifier = NameIdentifier.of(namespace, WILD_CARD);
     byte[] realKey = ENCODER.encode(metalakeIdentifier, EntityType.METALAKE);
     byte[] expectKey =
-        Bytes.concat(EntityType.METALAKE.getShortName().getBytes(), BYTABLE_NAMESPACE_SEPARATOR);
+        Bytes.concat(
+            EntityType.METALAKE.getShortName().getBytes(StandardCharsets.UTF_8),
+            BYTABLE_NAMESPACE_SEPARATOR);
     Assertions.assertArrayEquals(expectKey, realKey);
 
     // Scan all catalog in metalake1
@@ -234,7 +237,7 @@ public class TestEntityKeyEncoding {
     realKey = ENCODER.encode(catalogIdentifier, EntityType.CATALOG);
     expectKey =
         Bytes.concat(
-            EntityType.CATALOG.getShortName().getBytes(),
+            EntityType.CATALOG.getShortName().getBytes(StandardCharsets.UTF_8),
             BYTABLE_NAMESPACE_SEPARATOR,
             ByteUtils.longToByte(0L),
             BYTABLE_NAMESPACE_SEPARATOR);
@@ -248,7 +251,7 @@ public class TestEntityKeyEncoding {
     realKey = ENCODER.encode(schemaIdentifier, EntityType.SCHEMA);
     expectKey =
         Bytes.concat(
-            EntityType.SCHEMA.getShortName().getBytes(),
+            EntityType.SCHEMA.getShortName().getBytes(StandardCharsets.UTF_8),
             BYTABLE_NAMESPACE_SEPARATOR,
             ByteUtils.longToByte(0L),
             BYTABLE_NAMESPACE_SEPARATOR,
@@ -264,7 +267,7 @@ public class TestEntityKeyEncoding {
     realKey = ENCODER.encode(tableIdentifier, EntityType.TABLE);
     expectKey =
         Bytes.concat(
-            EntityType.TABLE.getShortName().getBytes(),
+            EntityType.TABLE.getShortName().getBytes(StandardCharsets.UTF_8),
             BYTABLE_NAMESPACE_SEPARATOR,
             ByteUtils.longToByte(0L),
             BYTABLE_NAMESPACE_SEPARATOR,
