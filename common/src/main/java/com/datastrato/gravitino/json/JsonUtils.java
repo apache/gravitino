@@ -4,8 +4,6 @@
  */
 package com.datastrato.gravitino.json;
 
-import static com.datastrato.gravitino.dto.rel.expressions.FunctionArg.ArgType.FUNCTION;
-
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.dto.rel.DistributionDTO;
@@ -485,7 +483,7 @@ public class JsonUtils {
       Preconditions.checkArgument(
           node.has(STRATEGY), "Cannot parse partitioning from missing strategy: %s", node);
       String strategy = getString(STRATEGY, node);
-      switch (Partitioning.Strategy.fromString(strategy)) {
+      switch (Partitioning.Strategy.getByName(strategy)) {
         case IDENTITY:
           return IdentityPartitioningDTO.of(getStringList(FIELD_NAME, node).toArray(new String[0]));
         case YEAR:
@@ -590,7 +588,7 @@ public class JsonUtils {
       DistributionDTO.Builder builder = new DistributionDTO.Builder();
       if (node.has(STRATEGY)) {
         String strategy = getString(STRATEGY, node);
-        builder.withStrategy(Strategy.fromString(strategy));
+        builder.withStrategy(Strategy.getByName(strategy));
       }
       builder.withNumber(getInt(NUMBER, node));
       List<FunctionArg> args = Lists.newArrayList();

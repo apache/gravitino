@@ -11,15 +11,16 @@ public enum Strategy {
   RANGE,
   EVEN;
 
-  public static Strategy fromString(String strategy) {
-    try {
-      return valueOf(strategy.toUpperCase());
-    } catch (IllegalArgumentException e) {
-      throw new IllegalArgumentException(
-          "Invalid distribution strategy: "
-              + strategy
-              + ". Valid values are: "
-              + Arrays.toString(Strategy.values()));
+  public static Strategy getByName(String name) {
+    for (Strategy strategy : Strategy.values()) {
+      if (strategy.name().equalsIgnoreCase(name)) {
+        return strategy;
+      }
     }
+    throw new IllegalArgumentException(
+        "Invalid distribution strategy: "
+            + name
+            + ". Valid values are: "
+            + Arrays.toString(Strategy.values()));
   }
 }

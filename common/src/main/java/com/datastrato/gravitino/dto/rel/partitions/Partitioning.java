@@ -23,6 +23,7 @@ public interface Partitioning extends Transform {
   Partitioning[] EMPTY_PARTITIONING = new Partitioning[0];
 
   Strategy strategy();
+
   // columns of table
   void validate(ColumnDTO[] columns) throws IllegalArgumentException;
 
@@ -38,16 +39,17 @@ public interface Partitioning extends Transform {
     RANGE,
     FUNCTION;
 
-    public static Strategy fromString(String strategy) {
-      try {
-        return Strategy.valueOf(strategy.toUpperCase());
-      } catch (IllegalArgumentException e) {
-        throw new IllegalArgumentException(
-            "Invalid partitioning strategy: "
-                + strategy
-                + ". Valid values are: "
-                + Arrays.toString(Strategy.values()));
+    public static Strategy getByName(String name) {
+      for (Strategy strategy : Strategy.values()) {
+        if (strategy.name().equalsIgnoreCase(name)) {
+          return strategy;
+        }
       }
+      throw new IllegalArgumentException(
+          "Invalid partitioning strategy: "
+              + name
+              + ". Valid values are: "
+              + Arrays.toString(Strategy.values()));
     }
   }
 
