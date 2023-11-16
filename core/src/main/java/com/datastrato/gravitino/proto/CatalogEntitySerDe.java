@@ -24,7 +24,7 @@ public class CatalogEntitySerDe implements ProtoSerDe<CatalogEntity, Catalog> {
         Catalog.newBuilder()
             .setId(catalogEntity.id())
             .setName(catalogEntity.name())
-            // catalog entity support one level namespace
+            // The catalog entity supports one level namespace
             .setNamespace(catalogEntity.namespace().level(0))
             .setProvider(catalogEntity.getProvider())
             .setAuditInfo(new AuditInfoSerDe().serialize((AuditInfo) catalogEntity.auditInfo()));
