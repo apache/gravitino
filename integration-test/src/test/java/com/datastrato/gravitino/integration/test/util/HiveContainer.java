@@ -19,7 +19,7 @@ import org.testcontainers.containers.Network;
 public class HiveContainer extends BaseContainer {
   public static final Logger LOG = LoggerFactory.getLogger(HiveContainer.class);
 
-  public static final String DEFAULT_IMAGE = "datastrato/gravitino-ci-hive:latest";
+  public static final String DEFAULT_IMAGE = "datastrato/gravitino-ci-hive:0.1.5";
   public static final String HOST_NAME = "gravitino-ci-hive";
   private static final int MYSQL_PORT = 3306;
   private static final int YARN_SERVICE_PORT = 8088;
