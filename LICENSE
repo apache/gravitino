@@ -246,3 +246,6 @@
 
    Apache Kafka
    ./core/src/main/java/com/datastrato/gravitino/utils/Bytes.java
+
+   Apache Submarine
+   ./bin/common.sh
