@@ -6,10 +6,23 @@ package com.datastrato.gravitino.rel.expressions;
 
 public interface FunctionExpression extends Expression {
 
+  /**
+   * Creates a new {@link FunctionExpression} with the given function name and arguments.
+   *
+   * @param functionName The name of the function
+   * @param arguments The arguments to the function
+   * @return The created {@link FunctionExpression}
+   */
   static FuncExpressionImpl of(String functionName, Expression... arguments) {
     return new FuncExpressionImpl(functionName, arguments);
   }
 
+  /**
+   * Creates a new {@link FunctionExpression} with the given function name and no arguments.
+   *
+   * @param functionName The name of the function
+   * @return The created {@link FunctionExpression}
+   */
   static FuncExpressionImpl of(String functionName) {
     return of(functionName, Expression.EMPTY_EXPRESSION);
   }

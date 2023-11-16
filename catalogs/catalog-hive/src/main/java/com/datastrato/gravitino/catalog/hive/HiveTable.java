@@ -83,7 +83,7 @@ public class HiveTable extends BaseTable {
     if (CollectionUtils.isNotEmpty(sd.getBucketCols())) {
       // Hive table use hash strategy as bucketing strategy
       distribution =
-          Distributions.ofHash(
+          Distributions.hash(
               sd.getNumBuckets(),
               sd.getBucketCols().stream().map(NamedReference::field).toArray(Expression[]::new));
     }

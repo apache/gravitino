@@ -41,15 +41,35 @@ public interface Literal<T> extends Expression {
     return EMPTY_EXPRESSION;
   }
 
+  /**
+   * Creates a literal with the given value and data type.
+   *
+   * @param value the literal value
+   * @param dataType the data type of the literal
+   * @return a new {@link Literal} instance
+   * @param <T> the JVM type of value held by the literal
+   */
   static <T> LiteralImpl<T> of(T value, Type dataType) {
     return new LiteralImpl<>(value, dataType);
   }
 
-  static LiteralImpl<Integer> ofInteger(Integer value) {
+  /**
+   * Creates an integer literal with the given value.
+   *
+   * @param value the integer literal value
+   * @return a new {@link Literal} instance
+   */
+  static LiteralImpl<Integer> integer(Integer value) {
     return of(value, TypeCreator.REQUIRED.I32);
   }
 
-  static LiteralImpl<String> ofString(String value) {
+  /**
+   * Creates a string literal with the given value.
+   *
+   * @param value the string literal value
+   * @return a new {@link Literal} instance
+   */
+  static LiteralImpl<String> string(String value) {
     return of(value, TypeCreator.REQUIRED.STRING);
   }
 

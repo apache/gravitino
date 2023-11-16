@@ -15,14 +15,36 @@ public class Distributions {
   public static final Distribution NONE =
       new DistributionImpl(Strategy.HASH, 0, Expression.EMPTY_EXPRESSION);
 
-  public static Distribution ofEVEN(int number, Expression... expressions) {
+  /**
+   * Create a distribution by evenly distributing the data across the number of buckets.
+   *
+   * @param number The number of buckets
+   * @param expressions The expressions to distribute by
+   * @return The created even distribution
+   */
+  public static Distribution even(int number, Expression... expressions) {
     return new DistributionImpl(Strategy.EVEN, number, expressions);
   }
 
-  public static Distribution ofHash(int number, Expression... expressions) {
+  /**
+   * Create a distribution by hashing the data across the number of buckets.
+   *
+   * @param number The number of buckets
+   * @param expressions The expressions to distribute by
+   * @return The created hash distribution
+   */
+  public static Distribution hash(int number, Expression... expressions) {
     return new DistributionImpl(Strategy.HASH, number, expressions);
   }
 
+  /**
+   * Create a distribution by the given strategy.
+   *
+   * @param strategy The strategy to use
+   * @param number The number of buckets
+   * @param expressions The expressions to distribute by
+   * @return The created distribution
+   */
   public static Distribution of(Strategy strategy, int number, Expression... expressions) {
     return new DistributionImpl(strategy, number, expressions);
   }
@@ -35,17 +57,17 @@ public class Distributions {
    * <pre>
    *   NOTE: a, b, c are column names.
    *
-   *   SQL syntax: distribute by hash(a, b) buckets 2
-   *   nameReferenceDistribution(Strategy.HASH, 2, new String[]{"a"}, new String[]{"b"});
+   *   SQL syntax: distribute by hash(a, b) buckets 5
+   *   fields(Strategy.HASH, 5, new String[]{"a"}, new String[]{"b"});
    *
-   *   SQL syntax: distribute by hash(a, b, c) buckets 3
-   *   nameReferenceDistribution(Strategy.HASH, 3, new String[]{"a"}, new String[]{"b"}, new String[]{"c"});
+   *   SQL syntax: distribute by hash(a, b, c) buckets 10
+   *   fields(Strategy.HASH, 10, new String[]{"a"}, new String[]{"b"}, new String[]{"c"});
    *
-   *   SQL syntax: distribute by EVEN(a) buckets 1
-   *   nameReferenceDistribution(Strategy.EVEN, 1, new String[]{"a"});
+   *   SQL syntax: distribute by EVEN(a) buckets 128
+   *   fields(Strategy.EVEN, 128, new String[]{"a"});
    * </pre>
    */
-  public static Distribution ofFields(Strategy strategy, int number, String[] fieldNames) {
+  public static Distribution fields(Strategy strategy, int number, String[]... fieldNames) {
     Expression[] expressions =
         Arrays.stream(fieldNames).map(NamedReference::field).toArray(Expression[]::new);
     return of(strategy, number, expressions);

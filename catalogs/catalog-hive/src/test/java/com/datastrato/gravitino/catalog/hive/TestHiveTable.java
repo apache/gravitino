@@ -105,7 +105,7 @@ public class TestHiveTable extends MiniHiveMetastoreService {
   }
 
   private Distribution createDistribution() {
-    return Distributions.ofHash(10, NamedReference.field("col_1"));
+    return Distributions.hash(10, NamedReference.field("col_1"));
   }
 
   private SortOrder[] createSortOrder() {
@@ -304,7 +304,7 @@ public class TestHiveTable extends MiniHiveMetastoreService {
                         columns,
                         HIVE_COMMENT,
                         properties,
-                        new Transform[] {identity(col1.name(), col2.name())}));
+                        new Transform[] {identity(new String[] {col1.name(), col2.name()})}));
     Assertions.assertTrue(
         exception.getMessage().contains("Hive partition does not support nested field"));
 

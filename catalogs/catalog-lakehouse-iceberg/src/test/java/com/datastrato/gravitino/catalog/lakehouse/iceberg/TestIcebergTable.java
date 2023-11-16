@@ -271,7 +271,7 @@ public class TestIcebergTable {
                         columns,
                         ICEBERG_COMMENT,
                         properties,
-                        new Transform[] {identity(col1.name(), col2.name())}));
+                        new Transform[] {identity(new String[] {col1.name(), col2.name()})}));
     Assertions.assertTrue(exception.getMessage().contains("Cannot find source column"));
 
     exception =

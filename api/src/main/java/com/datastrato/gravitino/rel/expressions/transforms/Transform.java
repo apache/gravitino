@@ -50,9 +50,11 @@ public interface Transform extends Expression {
     return arguments();
   }
 
+  /** Base class for simple transforms of a single field. */
   abstract class SingleFieldTransform implements Transform {
     NamedReference ref;
 
+    /** @return the referenced field name as an array of String parts. */
     public String[] fieldName() {
       return ref.fieldName();
     }

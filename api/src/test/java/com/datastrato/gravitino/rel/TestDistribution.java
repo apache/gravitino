@@ -20,7 +20,7 @@ class TestDistribution {
   @Test
   void testDistribution() {
     Expression[] distributionArg1 = new Expression[] {field("field1")};
-    Distribution bucket = Distributions.ofHash(1, distributionArg1);
+    Distribution bucket = Distributions.hash(1, distributionArg1);
 
     Assertions.assertEquals(Strategy.HASH, bucket.strategy());
     Assertions.assertEquals(1, bucket.number());
@@ -28,7 +28,7 @@ class TestDistribution {
 
     Expression[] distributionArg2 =
         new Expression[] {field("field1"), FunctionExpression.of("now")};
-    bucket = Distributions.ofEVEN(11111, distributionArg2);
+    bucket = Distributions.even(11111, distributionArg2);
 
     Assertions.assertEquals(Strategy.EVEN, bucket.strategy());
     Assertions.assertEquals(11111, bucket.number());

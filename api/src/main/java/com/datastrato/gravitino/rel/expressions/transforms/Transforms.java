@@ -24,67 +24,191 @@ public class Transforms {
   public static final String NAME_OF_LIST = "list";
   public static final String NAME_OF_RANGE = "range";
 
-  public static IdentityTransform identity(String... fieldName) {
+  /**
+   * Create a transform that returns the input value.
+   *
+   * @param fieldName The field name to transform
+   * @return The created transform
+   */
+  public static IdentityTransform identity(String[] fieldName) {
     return identity(NamedReference.field(fieldName));
+  }
+
+  /**
+   * Create a transform that returns the input value.
+   *
+   * @param columnName The column name to transform
+   * @return The created transform
+   */
+  public static IdentityTransform identity(String columnName) {
+    return identity(new String[] {columnName});
+  }
+
+  /**
+   * Create a transform that returns the year of the input value.
+   *
+   * @param fieldName The field name to transform
+   * @return The created transform
+   */
+  public static YearTransform year(String[] fieldName) {
+    return year(NamedReference.field(fieldName));
+  }
+
+  /**
+   * Create a transform that returns the year of the input value.
+   *
+   * @param columnName The column name to transform
+   * @return The created transform
+   */
+  public static YearTransform year(String columnName) {
+    return year(new String[] {columnName});
+  }
+
+  /**
+   * Create a transform that returns the month of the input value.
+   *
+   * @param fieldName The field name to transform
+   * @return The created transform
+   */
+  public static MonthTransform month(String[] fieldName) {
+    return month(NamedReference.field(fieldName));
+  }
+
+  /**
+   * Create a transform that returns the month of the input value.
+   *
+   * @param columnName The column name to transform
+   * @return The created transform
+   */
+  public static MonthTransform month(String columnName) {
+    return month(new String[] {columnName});
+  }
+
+  /**
+   * Create a transform that returns the day of the input value.
+   *
+   * @param fieldName The field name to transform
+   * @return The created transform
+   */
+  public static DayTransform day(String[] fieldName) {
+    return day(NamedReference.field(fieldName));
+  }
+
+  /**
+   * Create a transform that returns the day of the input value.
+   *
+   * @param columnName The column name to transform
+   * @return The created transform
+   */
+  public static DayTransform day(String columnName) {
+    return day(new String[] {columnName});
+  }
+
+  /**
+   * Create a transform that returns the hour of the input value.
+   *
+   * @param fieldName The field name to transform
+   * @return The created transform
+   */
+  public static HourTransform hour(String[] fieldName) {
+    return hour(NamedReference.field(fieldName));
+  }
+
+  /**
+   * Create a transform that returns the hour of the input value.
+   *
+   * @param columnName The column name to transform
+   * @return The created transform
+   */
+  public static HourTransform hour(String columnName) {
+    return hour(new String[] {columnName});
+  }
+
+  /**
+   * Create a transform that returns the bucket of the input value.
+   *
+   * @param numBuckets The number of buckets to use
+   * @param fieldNames The field names to transform
+   * @return The created transform
+   */
+  public static BucketTransform bucket(int numBuckets, String[]... fieldNames) {
+    return new BucketTransform(
+        Literal.integer(numBuckets),
+        Arrays.stream(fieldNames).map(NamedReference::field).toArray(NamedReference[]::new));
+  }
+
+  /**
+   * Create a transform that includes multiple fields in a list.
+   *
+   * @param fieldNames The field names to include in the list
+   * @return The created transform
+   */
+  public static ListTransform list(String[]... fieldNames) {
+    return new ListTransform(
+        Arrays.stream(fieldNames).map(NamedReference::field).toArray(NamedReference[]::new));
+  }
+
+  /**
+   * Create a transform that returns the range of the input value.
+   *
+   * @param fieldName The field name to transform
+   * @return The created transform
+   */
+  public static RangeTransform range(String[] fieldName) {
+    return new RangeTransform(NamedReference.field(fieldName));
+  }
+
+  /**
+   * Create a transform that returns the truncated value of the input value with the given width.
+   *
+   * @param width The width to truncate to
+   * @param fieldName The field name to transform
+   * @return The created transform
+   */
+  public static TruncateTransform truncate(int width, String[] fieldName) {
+    return new TruncateTransform(Literal.integer(width), NamedReference.field(fieldName));
+  }
+
+  /**
+   * Create a transform that returns the truncated value of the input value with the given width.
+   *
+   * @param width The width to truncate to
+   * @param columnName The column name to transform
+   * @return The created transform
+   */
+  public static TruncateTransform truncate(int width, String columnName) {
+    return truncate(width, new String[] {columnName});
+  }
+
+  /**
+   * Create a transform that applies a function to the input value.
+   *
+   * @param name The name of the function to apply
+   * @param arguments The arguments to the function
+   * @return The created transform
+   */
+  public static ApplyTransform apply(String name, Expression[] arguments) {
+    return new ApplyTransform(name, arguments);
   }
 
   private static IdentityTransform identity(NamedReference ref) {
     return new IdentityTransform(ref);
   }
 
-  public static YearTransform year(String... fieldName) {
-    return year(NamedReference.field(fieldName));
-  }
-
   private static YearTransform year(NamedReference ref) {
     return new YearTransform(ref);
-  }
-
-  public static MonthTransform month(String... fieldName) {
-    return month(NamedReference.field(fieldName));
   }
 
   private static MonthTransform month(NamedReference ref) {
     return new MonthTransform(ref);
   }
 
-  public static DayTransform day(String... fieldName) {
-    return day(NamedReference.field(fieldName));
-  }
-
   private static DayTransform day(NamedReference ref) {
     return new DayTransform(ref);
   }
 
-  public static HourTransform hour(String... fieldName) {
-    return hour(NamedReference.field(fieldName));
-  }
-
   private static HourTransform hour(NamedReference ref) {
     return new HourTransform(ref);
-  }
-
-  public static BucketTransform bucket(int numBuckets, String[]... fieldNames) {
-    return new BucketTransform(
-        Literal.ofInteger(numBuckets),
-        Arrays.stream(fieldNames).map(NamedReference::field).toArray(NamedReference[]::new));
-  }
-
-  public static ListTransform list(String[][] fieldNames) {
-    return new ListTransform(
-        Arrays.stream(fieldNames).map(NamedReference::field).toArray(NamedReference[]::new));
-  }
-
-  public static RangeTransform range(String[] fieldName) {
-    return new RangeTransform(NamedReference.field(fieldName));
-  }
-
-  public static TruncateTransform truncate(int width, String... fieldName) {
-    return new TruncateTransform(Literal.ofInteger(width), NamedReference.field(fieldName));
-  }
-
-  public static ApplyTransform apply(String name, Expression[] arguments) {
-    return new ApplyTransform(name, arguments);
   }
 
   public static final class IdentityTransform extends Transform.SingleFieldTransform {

@@ -34,8 +34,18 @@ public interface NamedReference extends Expression {
    * @param fieldName the field name(s)
    * @return a {@link FieldReference} for the given field name(s)
    */
-  static FieldReference field(String... fieldName) {
+  static FieldReference field(String[] fieldName) {
     return new FieldReference(fieldName);
+  }
+
+  /**
+   * Returns a {@link FieldReference} for the given column name.
+   *
+   * @param columnName the column name
+   * @return a {@link FieldReference} for the given column name.
+   */
+  static FieldReference field(String columnName) {
+    return field(new String[] {columnName});
   }
 
   /**
