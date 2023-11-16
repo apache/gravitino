@@ -65,6 +65,7 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
 
   public synchronized void begin() {
     txId = transactionIdGenerator.nextId();
+    System.out.println(txId);
   }
 
   @Override
