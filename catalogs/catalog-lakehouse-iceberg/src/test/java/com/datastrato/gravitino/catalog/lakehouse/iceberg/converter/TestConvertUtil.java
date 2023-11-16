@@ -84,56 +84,57 @@ public class TestConvertUtil extends TestBaseConvert {
   @Test
   public void testToPrimitiveType() {
     Assertions.assertTrue(
-        ConvertUtil.toIcebergType(TypeCreator.NULLABLE.BOOLEAN) instanceof Types.BooleanType);
+        ConvertUtil.toIcebergType(true, TypeCreator.NULLABLE.BOOLEAN) instanceof Types.BooleanType);
     Assertions.assertTrue(
-        ConvertUtil.toIcebergType(TypeCreator.NULLABLE.STRING) instanceof Types.StringType);
+        ConvertUtil.toIcebergType(true, TypeCreator.NULLABLE.STRING) instanceof Types.StringType);
     Assertions.assertTrue(
-        ConvertUtil.toIcebergType(TypeCreator.NULLABLE.I8) instanceof Types.IntegerType);
+        ConvertUtil.toIcebergType(true, TypeCreator.NULLABLE.I8) instanceof Types.IntegerType);
     Assertions.assertTrue(
-        ConvertUtil.toIcebergType(TypeCreator.NULLABLE.I16) instanceof Types.IntegerType);
+        ConvertUtil.toIcebergType(true, TypeCreator.NULLABLE.I16) instanceof Types.IntegerType);
     Assertions.assertTrue(
-        ConvertUtil.toIcebergType(TypeCreator.NULLABLE.I32) instanceof Types.IntegerType);
+        ConvertUtil.toIcebergType(true, TypeCreator.NULLABLE.I32) instanceof Types.IntegerType);
     Assertions.assertTrue(
-        ConvertUtil.toIcebergType(TypeCreator.NULLABLE.I64) instanceof Types.LongType);
+        ConvertUtil.toIcebergType(true, TypeCreator.NULLABLE.I64) instanceof Types.LongType);
     Assertions.assertTrue(
-        ConvertUtil.toIcebergType(TypeCreator.NULLABLE.FP32) instanceof Types.FloatType);
+        ConvertUtil.toIcebergType(true, TypeCreator.NULLABLE.FP32) instanceof Types.FloatType);
     Assertions.assertTrue(
-        ConvertUtil.toIcebergType(TypeCreator.NULLABLE.FP64) instanceof Types.DoubleType);
+        ConvertUtil.toIcebergType(true, TypeCreator.NULLABLE.FP64) instanceof Types.DoubleType);
     Assertions.assertTrue(
-        ConvertUtil.toIcebergType(TypeCreator.NULLABLE.DATE) instanceof Types.DateType);
+        ConvertUtil.toIcebergType(true, TypeCreator.NULLABLE.DATE) instanceof Types.DateType);
     Assertions.assertTrue(
-        ConvertUtil.toIcebergType(TypeCreator.NULLABLE.TIME) instanceof Types.TimeType);
+        ConvertUtil.toIcebergType(true, TypeCreator.NULLABLE.TIME) instanceof Types.TimeType);
     Assertions.assertTrue(
-        ConvertUtil.toIcebergType(TypeCreator.NULLABLE.BINARY) instanceof Types.BinaryType);
+        ConvertUtil.toIcebergType(true, TypeCreator.NULLABLE.BINARY) instanceof Types.BinaryType);
     Assertions.assertTrue(
-        ConvertUtil.toIcebergType(TypeCreator.NULLABLE.UUID) instanceof Types.UUIDType);
+        ConvertUtil.toIcebergType(true, TypeCreator.NULLABLE.UUID) instanceof Types.UUIDType);
 
-    Type timestampTZ = ConvertUtil.toIcebergType(TypeCreator.NULLABLE.TIMESTAMP_TZ);
+    Type timestampTZ = ConvertUtil.toIcebergType(true, TypeCreator.NULLABLE.TIMESTAMP_TZ);
     Assertions.assertTrue(timestampTZ instanceof Types.TimestampType);
     Assertions.assertTrue(((Types.TimestampType) timestampTZ).shouldAdjustToUTC());
 
-    Type timestamp = ConvertUtil.toIcebergType(TypeCreator.NULLABLE.TIMESTAMP);
+    Type timestamp = ConvertUtil.toIcebergType(true, TypeCreator.NULLABLE.TIMESTAMP);
     Assertions.assertTrue(timestamp instanceof Types.TimestampType);
     Assertions.assertFalse(((Types.TimestampType) timestamp).shouldAdjustToUTC());
 
-    Type decimalType = ConvertUtil.toIcebergType(TypeCreator.NULLABLE.decimal(9, 2));
+    Type decimalType = ConvertUtil.toIcebergType(true, TypeCreator.NULLABLE.decimal(9, 2));
     Assertions.assertTrue(decimalType instanceof Types.DecimalType);
     Assertions.assertEquals(((Types.DecimalType) decimalType).precision(), 9);
     Assertions.assertEquals(((Types.DecimalType) decimalType).scale(), 2);
 
-    Type fixedCharType = ConvertUtil.toIcebergType(TypeCreator.NULLABLE.fixedChar(9));
+    Type fixedCharType = ConvertUtil.toIcebergType(true, TypeCreator.NULLABLE.fixedChar(9));
     Assertions.assertTrue(fixedCharType instanceof Types.FixedType);
     Assertions.assertEquals(((Types.FixedType) fixedCharType).length(), 9);
 
     io.substrait.type.Type mapType =
         TypeCreator.NULLABLE.map(TypeCreator.NULLABLE.STRING, TypeCreator.NULLABLE.I8);
-    Type convertedMapType = ConvertUtil.toIcebergType(mapType);
+    Type convertedMapType = ConvertUtil.toIcebergType(true, mapType);
     Assertions.assertTrue(convertedMapType instanceof Types.MapType);
     Assertions.assertTrue(((Types.MapType) convertedMapType).keyType() instanceof Types.StringType);
     Assertions.assertTrue(
         ((Types.MapType) convertedMapType).valueType() instanceof Types.IntegerType);
 
-    Type listType = ConvertUtil.toIcebergType(TypeCreator.NULLABLE.list(TypeCreator.NULLABLE.FP64));
+    Type listType =
+        ConvertUtil.toIcebergType(true, TypeCreator.NULLABLE.list(TypeCreator.NULLABLE.FP64));
     Assertions.assertTrue(listType instanceof Types.ListType);
     Assertions.assertTrue(listType.asListType().elementType() instanceof Types.DoubleType);
   }
@@ -202,7 +203,7 @@ public class TestConvertUtil extends TestBaseConvert {
         Types.NestedField.optional(1, colName, Types.IntegerType.get(), doc);
     IcebergColumn icebergColumn = ConvertUtil.fromNestedField(colField);
     Assertions.assertEquals(icebergColumn.name(), colName);
-    Assertions.assertTrue(icebergColumn.isOptional());
+    Assertions.assertTrue(icebergColumn.nullable());
     Assertions.assertEquals(icebergColumn.comment(), doc);
     Assertions.assertTrue(icebergColumn.dataType() instanceof io.substrait.type.Type.I32);
 
@@ -211,7 +212,7 @@ public class TestConvertUtil extends TestBaseConvert {
     colField = Types.NestedField.required(1, colName, Types.StringType.get(), doc);
     icebergColumn = ConvertUtil.fromNestedField(colField);
     Assertions.assertEquals(icebergColumn.name(), colName);
-    Assertions.assertFalse(icebergColumn.isOptional());
+    Assertions.assertFalse(icebergColumn.nullable());
     Assertions.assertEquals(icebergColumn.comment(), doc);
     Assertions.assertTrue(icebergColumn.dataType() instanceof io.substrait.type.Type.Str);
 
@@ -220,7 +221,7 @@ public class TestConvertUtil extends TestBaseConvert {
     colField = Types.NestedField.required(1, colName, Types.DateType.get(), doc);
     icebergColumn = ConvertUtil.fromNestedField(colField);
     Assertions.assertEquals(icebergColumn.name(), colName);
-    Assertions.assertFalse(icebergColumn.isOptional());
+    Assertions.assertFalse(icebergColumn.nullable());
     Assertions.assertEquals(icebergColumn.comment(), doc);
     Assertions.assertTrue(icebergColumn.dataType() instanceof io.substrait.type.Type.Date);
 
@@ -238,7 +239,7 @@ public class TestConvertUtil extends TestBaseConvert {
             doc);
     icebergColumn = ConvertUtil.fromNestedField(colField);
     Assertions.assertEquals(icebergColumn.name(), colName);
-    Assertions.assertFalse(icebergColumn.isOptional());
+    Assertions.assertFalse(icebergColumn.nullable());
     Assertions.assertEquals(icebergColumn.comment(), doc);
     Assertions.assertTrue(icebergColumn.dataType() instanceof io.substrait.type.Type.Map);
   }
