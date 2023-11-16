@@ -42,6 +42,7 @@ gradle-extensions-plugin = '1.74'
 publish-plugin = '1.2.0'
 rat-plugin = '0.8.0'
 shadow-plugin = "8.1.1"
+metrics = "4.2.19"
 
 
 [libraries]
@@ -109,6 +110,8 @@ trino-jdbc = { group = "io.trino", name = "trino-jdbc", version.ref = "trino-jdb
 jwt-api = { group = "io.jsonwebtoken", name = "jjwt-api", version.ref = "jwt"}
 jwt-impl = { group = "io.jsonwebtoken", name = "jjwt-impl", version.ref = "jwt"}
 jwt-gson = { group = "io.jsonwebtoken", name = "jjwt-gson", version.ref = "jwt"}
+metrics-core = { group = "io.dropwizard.metrics", name = "metrics-core", version.ref = "metrics" }
+metrics-jmx = { group = "io.dropwizard.metrics", name = "metrics-jmx", version.ref = "metrics" }
 
 [bundles]
 log4j = ["slf4j-api", "log4j-slf4j2-impl", "log4j-api", "log4j-core", "log4j-12-api"]
@@ -116,6 +119,7 @@ jetty = ["jetty-server", "jetty-servlet"]
 jersey = ["jersey-server", "jersey-container-servlet-core", "jersey-container-jetty-http", "jersey-media-json-jackson", "jersey-hk2"]
 iceberg = ["iceberg-core", "iceberg-api"]
 jwt = ["jwt-api", "jwt-impl", "jwt-gson"]
+metrics = ["metrics-core", "metrics-jmx"]
 
 [plugins]
 protobuf = { id = "com.google.protobuf", version.ref = "protobuf-plugin" }
