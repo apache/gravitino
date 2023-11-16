@@ -73,7 +73,7 @@ public class KvEntityStore implements EntityStore {
   // We will use storageLayoutVersion to check whether the layout of the storage is compatible with
   // the current version of the code.
   // Note: If we change the layout of the storage in the future, please update the value of
-  // storageLayoutVersion and store it in the kv store.
+  // storageLayoutVersion.
   @VisibleForTesting StorageLayoutVersion storageLayoutVersion;
 
   @Override
@@ -392,7 +392,7 @@ public class KvEntityStore implements EntityStore {
     }
   }
 
-  private synchronized StorageLayoutVersion initStorageVersionInfo() {
+  private StorageLayoutVersion initStorageVersionInfo() {
     byte[] bytes;
     try {
       bytes = backend.get(LAYOUT_VERSION.getBytes(StandardCharsets.UTF_8));
@@ -407,7 +407,7 @@ public class KvEntityStore implements EntityStore {
 
       return StorageLayoutVersion.fromString(new String(bytes));
     } catch (IOException e) {
-      throw new RuntimeException("Failed to get/put layout version information", e);
+      throw new IllegalStateException("Failed to get/put layout version information", e);
     }
   }
 

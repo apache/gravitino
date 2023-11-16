@@ -3,7 +3,9 @@
  * This software is licensed under the Apache License version 2.
  */
 
-package com.datastrato.gravitino.exceptions;
+package com.datastrato.gravitino.storage;
+
+import com.datastrato.gravitino.exceptions.GravitinoRuntimeException;
 
 public class StorageLayoutException extends GravitinoRuntimeException {
 

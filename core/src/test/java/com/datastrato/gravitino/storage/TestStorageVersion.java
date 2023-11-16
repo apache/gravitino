@@ -5,7 +5,6 @@
 
 package com.datastrato.gravitino.storage;
 
-import com.datastrato.gravitino.exceptions.StorageLayoutException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -17,6 +16,6 @@ class TestStorageVersion {
     Assertions.assertEquals(StorageLayoutVersion.V1, version);
 
     Assertions.assertThrowsExactly(
-        StorageLayoutException.class, () -> StorageLayoutVersion.fromString("v3.0"));
+        StorageLayoutException.class, () -> StorageLayoutVersion.fromString("v200000.0"));
   }
 }
