@@ -84,12 +84,12 @@ public class GravitinoEnv {
     this.catalogOperationDispatcher =
         new CatalogOperationDispatcher(catalogManager, entityStore, idGenerator);
 
+    this.authenticator = AuthenticatorFactory.createAuthenticator(config);
+    this.authenticator.initialize(config);
+
     this.auxServiceManager = new AuxiliaryServiceManager();
     this.auxServiceManager.serviceInit(
         config.getConfigsWithPrefix(AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX));
-
-    this.authenticator = AuthenticatorFactory.createAuthenticator(config);
-    this.authenticator.initialize(config);
 
     LOG.info("Gravitino Environment is initialized.");
   }
