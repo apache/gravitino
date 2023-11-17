@@ -14,6 +14,7 @@ import com.datastrato.gravitino.client.GravitinoMetaLake;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
 import com.datastrato.gravitino.trino.connector.GravitinoConfig;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoCatalog;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -78,13 +79,15 @@ public class CatalogConnectorManager {
     this.config = Preconditions.checkNotNull(config, "config is not null");
   }
 
-  // For testing.
+  @VisibleForTesting
   public void setGravitinoClient(GravitinoClient gravitinoClient) {
     this.gravitinoClient = gravitinoClient;
   }
 
   public void start() {
-    if (gravitinoClient == null) gravitinoClient = GravitinoClient.builder(config.getURI()).build();
+    if (gravitinoClient == null) {
+      gravitinoClient = GravitinoClient.builder(config.getURI()).build();
+    }
     String metalake = config.getMetalake();
     if (Strings.isNullOrEmpty(metalake)) {
       throw new TrinoException(GRAVITINO_METALAKE_NOT_EXISTS, "No gravitino metalake selected");

@@ -4,6 +4,8 @@
  */
 package com.datastrato.gravitino.trino.connector.metadata;
 
+import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_COLUMN_NOT_EXISTS;
+
 import com.datastrato.gravitino.dto.AuditDTO;
 import com.datastrato.gravitino.dto.rel.ColumnDTO;
 import com.datastrato.gravitino.dto.rel.TableDTO;
@@ -11,6 +13,7 @@ import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.Table;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.google.common.collect.ImmutableList;
+import io.trino.spi.TrinoException;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -97,7 +100,11 @@ public class GravitinoTable {
   public GravitinoColumn getColumn(String columName) {
     Optional<GravitinoColumn> entry =
         columns.stream().filter((column -> column.getName().equals(columName))).findFirst();
-    return entry.get();
+    if (entry.isEmpty()) {
+      throw new TrinoException(
+          GRAVITINO_COLUMN_NOT_EXISTS, String.format("Column `%s` does not exist", columName));
+    }
+    return entry.orElse(null);
   }
 
   public String getSchemaName() {

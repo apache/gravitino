@@ -33,6 +33,7 @@ import com.datastrato.gravitino.trino.connector.metadata.GravitinoColumn;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoSchema;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoTable;
 import com.datastrato.gravitino.trino.connector.util.DataTypeTransformer;
+import com.google.common.base.Strings;
 import io.trino.spi.TrinoException;
 import io.trino.spi.connector.SchemaTableName;
 import io.trino.spi.type.Type;
@@ -179,7 +180,12 @@ public class CatalogConnectorMetadata {
     } catch (NoSuchTableException e) {
       throw new TrinoException(GRAVITINO_TABLE_NOT_EXISTS, "Table does not exist");
     } catch (IllegalArgumentException e) {
-      throw new TrinoException(GRAVITINO_ILLEGAL_ARGUMENT, e.getMessage(), e);
+      // TODO yuhui need improve get the error message. From IllegalArgumentException.
+      // At present, the IllegalArgumentException cannot  get the error information clearly from the
+      // Graviton server.
+      String message =
+          e.getMessage().lines().toList().get(0) + e.getMessage().lines().toList().get(1);
+      throw new TrinoException(GRAVITINO_ILLEGAL_ARGUMENT, message, e);
     } catch (TrinoException e) {
       throw new TrinoException(
           GRAVITINO_INNER_CONNECTOR_EXCEPTION,
@@ -215,10 +221,13 @@ public class CatalogConnectorMetadata {
 
   public void addColumn(SchemaTableName schemaTableName, GravitinoColumn column) {
     String[] columnNames = {column.getName()};
-    applyAlter(schemaTableName, TableChange.addColumn(columnNames, column.getType()));
-    if (!column.getComment().isEmpty())
+    if (Strings.isNullOrEmpty(column.getComment()))
+      applyAlter(schemaTableName, TableChange.addColumn(columnNames, column.getType()));
+    else {
       applyAlter(
-          schemaTableName, TableChange.updateColumnComment(columnNames, column.getComment()));
+          schemaTableName,
+          TableChange.addColumn(columnNames, column.getType(), column.getComment()));
+    }
   }
 
   public void dropColumn(SchemaTableName schemaTableName, String columnName) {
