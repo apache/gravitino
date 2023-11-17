@@ -10,4 +10,4 @@ This document lists the maintainers of the Project. Maintainers may be added onc
 | **NAME** | **GitHub Username** | **Organization** |
 | --- | --- | --- |
 | Justin Mclean | justinmclean | Datastrato |
-| Heng Qin      | qqqttt123 | Datastrato |
+| Heng Qin | qqqttt123 | Datastrato |
