@@ -74,7 +74,7 @@ public class GravitinoServer extends ResourceConfig {
     Servlet servlet = new ServletContainer(this);
     server.addServlet(servlet, "/api/*");
     server.addFilter(new VersioningFilter(), "/api/*");
-    server.addFilter(new AuthenticationFilter(gravitinoEnv.authenticator()), "/api/*");
+    server.addFilter(new AuthenticationFilter(), "/api/*");
   }
 
   public void start() throws Exception {

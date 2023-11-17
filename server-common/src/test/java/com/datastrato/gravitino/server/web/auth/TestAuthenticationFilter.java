@@ -29,6 +29,7 @@ public class TestAuthenticationFilter {
 
   @Test
   public void testDoFilterNormal() throws ServletException, IOException {
+
     Authenticator authenticator = mock(Authenticator.class);
     AuthenticationFilter filter = new AuthenticationFilter(authenticator);
     FilterChain mockChain = mock(FilterChain.class);

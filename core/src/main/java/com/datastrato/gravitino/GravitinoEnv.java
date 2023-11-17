@@ -84,9 +84,7 @@ public class GravitinoEnv {
     this.catalogOperationDispatcher =
         new CatalogOperationDispatcher(catalogManager, entityStore, idGenerator);
 
-    // Create and initialize Authenticator related modules, the authenticator related modules
-    // must be initialized before auxServiceManager's initialization, otherwise the auxService will
-    // throw an exception
+    // Create and initialize Authenticator related modules
     this.authenticator = AuthenticatorFactory.createAuthenticator(config);
     this.authenticator.initialize(config);
 

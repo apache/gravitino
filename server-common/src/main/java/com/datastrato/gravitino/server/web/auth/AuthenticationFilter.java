@@ -4,9 +4,11 @@
  */
 package com.datastrato.gravitino.server.web.auth;
 
+import com.datastrato.gravitino.GravitinoEnv;
 import com.datastrato.gravitino.auth.AuthConstants;
 import com.datastrato.gravitino.auth.Authenticator;
 import com.datastrato.gravitino.exceptions.UnauthorizedException;
+import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Enumeration;
@@ -21,10 +23,15 @@ import javax.servlet.http.HttpServletResponse;
 
 public class AuthenticationFilter implements Filter {
 
-  private final Authenticator authenticator;
+  private final Authenticator filterAuthenticator;
 
-  public AuthenticationFilter(Authenticator authenticator) {
-    this.authenticator = authenticator;
+  public AuthenticationFilter() {
+    filterAuthenticator = null;
+  }
+
+  @VisibleForTesting
+  AuthenticationFilter(Authenticator authenticator) {
+    this.filterAuthenticator = authenticator;
   }
 
   @Override
@@ -34,6 +41,12 @@ public class AuthenticationFilter implements Filter {
   public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
       throws IOException, ServletException {
     try {
+      Authenticator authenticator;
+      if (filterAuthenticator == null) {
+        authenticator = GravitinoEnv.getInstance().authenticator();
+      } else {
+        authenticator = filterAuthenticator;
+      }
       HttpServletRequest req = (HttpServletRequest) request;
       Enumeration<String> headerData = req.getHeaders(AuthConstants.HTTP_HEADER_AUTHORIZATION);
       byte[] authData = null;
