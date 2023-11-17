@@ -37,13 +37,12 @@ public class TestOAuth2TokenAuthenticator {
     Assertions.assertTrue(auth2TokenAuthenticator.isDataFromToken());
     Exception e =
         Assertions.assertThrows(
-            UnauthorizedException.class,
-            () -> auth2TokenAuthenticator.authenticateToken(null));
+            UnauthorizedException.class, () -> auth2TokenAuthenticator.authenticateToken(null));
     Assertions.assertEquals("Empty HTTP Authorization header", e.getMessage());
     e =
-            Assertions.assertThrows(
-                    UnauthorizedException.class,
-                    () -> auth2TokenAuthenticator.authenticateToken("Xx".getBytes(StandardCharsets.UTF_8)));
+        Assertions.assertThrows(
+            UnauthorizedException.class,
+            () -> auth2TokenAuthenticator.authenticateToken("Xx".getBytes(StandardCharsets.UTF_8)));
     Assertions.assertEquals("Invalid HTTP Authorization header", e.getMessage());
     e =
         Assertions.assertThrows(
