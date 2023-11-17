@@ -23,27 +23,27 @@ class SimpleAuthenticator implements Authenticator {
   @Override
   public String authenticateToken(byte[] tokenData) {
     if (tokenData == null) {
-      return Constants.UNKNOWN_USER_NAME;
+      return AuthConstants.UNKNOWN_USER_NAME;
     }
     String authData = new String(tokenData);
     if (StringUtils.isBlank(authData)) {
-      return Constants.UNKNOWN_USER_NAME;
+      return AuthConstants.UNKNOWN_USER_NAME;
     }
-    if (!authData.startsWith(Constants.HTTP_HEADER_AUTHORIZATION_BASIC)) {
-      return Constants.UNKNOWN_USER_NAME;
+    if (!authData.startsWith(AuthConstants.HTTP_HEADER_AUTHORIZATION_BASIC)) {
+      return AuthConstants.UNKNOWN_USER_NAME;
     }
-    String credential = authData.substring(Constants.HTTP_HEADER_AUTHORIZATION_BASIC.length());
+    String credential = authData.substring(AuthConstants.HTTP_HEADER_AUTHORIZATION_BASIC.length());
     if (StringUtils.isBlank(credential)) {
-      return Constants.UNKNOWN_USER_NAME;
+      return AuthConstants.UNKNOWN_USER_NAME;
     }
     try {
       String[] userInformation = new String(Base64.getDecoder().decode(credential)).split(":");
       if (userInformation.length != 2) {
-        return Constants.UNKNOWN_USER_NAME;
+        return AuthConstants.UNKNOWN_USER_NAME;
       }
       return userInformation[0];
     } catch (IllegalArgumentException ie) {
-      return Constants.UNKNOWN_USER_NAME;
+      return AuthConstants.UNKNOWN_USER_NAME;
     }
   }
 

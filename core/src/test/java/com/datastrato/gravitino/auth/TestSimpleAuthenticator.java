@@ -19,25 +19,26 @@ public class TestSimpleAuthenticator {
     simpleAuthenticator.initialize(config);
     Assertions.assertTrue(simpleAuthenticator.isDataFromToken());
     Assertions.assertEquals(
-        Constants.UNKNOWN_USER_NAME, simpleAuthenticator.authenticateToken(null));
+        AuthConstants.UNKNOWN_USER_NAME, simpleAuthenticator.authenticateToken(null));
     Assertions.assertEquals(
-        Constants.UNKNOWN_USER_NAME,
+        AuthConstants.UNKNOWN_USER_NAME,
         simpleAuthenticator.authenticateToken("".getBytes(StandardCharsets.UTF_8)));
     Assertions.assertEquals(
-        Constants.UNKNOWN_USER_NAME,
+        AuthConstants.UNKNOWN_USER_NAME,
         simpleAuthenticator.authenticateToken("abc".getBytes(StandardCharsets.UTF_8)));
     Assertions.assertEquals(
-        Constants.UNKNOWN_USER_NAME,
+        AuthConstants.UNKNOWN_USER_NAME,
         simpleAuthenticator.authenticateToken(
-            Constants.HTTP_HEADER_AUTHORIZATION_BASIC.getBytes(StandardCharsets.UTF_8)));
+            AuthConstants.HTTP_HEADER_AUTHORIZATION_BASIC.getBytes(StandardCharsets.UTF_8)));
     Assertions.assertEquals(
-        Constants.UNKNOWN_USER_NAME,
+        AuthConstants.UNKNOWN_USER_NAME,
         simpleAuthenticator.authenticateToken(
-            (Constants.HTTP_HEADER_AUTHORIZATION_BASIC + "xx").getBytes(StandardCharsets.UTF_8)));
+            (AuthConstants.HTTP_HEADER_AUTHORIZATION_BASIC + "xx")
+                .getBytes(StandardCharsets.UTF_8)));
     Assertions.assertEquals(
         "gravitino",
         simpleAuthenticator.authenticateToken(
-            (Constants.HTTP_HEADER_AUTHORIZATION_BASIC
+            (AuthConstants.HTTP_HEADER_AUTHORIZATION_BASIC
                     + new String(
                         Base64.getEncoder()
                             .encode("gravitino:gravitino".getBytes(StandardCharsets.UTF_8))))

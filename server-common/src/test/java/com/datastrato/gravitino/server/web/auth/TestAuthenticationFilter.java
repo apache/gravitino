@@ -3,7 +3,7 @@
  * This software is licensed under the Apache License version 2.
  */
 
-package com.datastrato.gravitino.server.web;
+package com.datastrato.gravitino.server.web.auth;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -13,8 +13,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.datastrato.gravitino.auth.AuthConstants;
 import com.datastrato.gravitino.auth.Authenticator;
-import com.datastrato.gravitino.auth.Constants;
 import com.datastrato.gravitino.exceptions.UnauthorizedException;
 import java.io.IOException;
 import java.util.Collections;
@@ -34,7 +34,7 @@ public class TestAuthenticationFilter {
     FilterChain mockChain = mock(FilterChain.class);
     HttpServletRequest mockRequest = mock(HttpServletRequest.class);
     HttpServletResponse mockResponse = mock(HttpServletResponse.class);
-    when(mockRequest.getHeaders(Constants.HTTP_HEADER_AUTHORIZATION))
+    when(mockRequest.getHeaders(AuthConstants.HTTP_HEADER_AUTHORIZATION))
         .thenReturn(new Vector<>(Collections.singletonList("user")).elements());
     when(authenticator.isDataFromToken()).thenReturn(true);
     when(authenticator.authenticateToken(any())).thenReturn("user");
@@ -49,7 +49,7 @@ public class TestAuthenticationFilter {
     FilterChain mockChain = mock(FilterChain.class);
     HttpServletRequest mockRequest = mock(HttpServletRequest.class);
     HttpServletResponse mockResponse = mock(HttpServletResponse.class);
-    when(mockRequest.getHeaders(Constants.HTTP_HEADER_AUTHORIZATION))
+    when(mockRequest.getHeaders(AuthConstants.HTTP_HEADER_AUTHORIZATION))
         .thenReturn(new Vector<>(Collections.singletonList("user")).elements());
     when(authenticator.isDataFromToken()).thenReturn(true);
     when(authenticator.authenticateToken(any()))

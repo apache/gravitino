@@ -5,7 +5,6 @@
 package com.datastrato.gravitino.auth;
 
 import com.datastrato.gravitino.Config;
-import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.exceptions.UnauthorizedException;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -30,9 +29,9 @@ public class TestOAuth2TokenAuthenticator {
     KeyPair keyPair = Keys.keyPairFor(SignatureAlgorithm.RS256);
     String publicKey = new String(Base64.getEncoder().encode(keyPair.getPublic().getEncoded()));
     Config config = new Config(false) {};
-    config.set(Configs.SERVICE_AUDIENCE, "service1");
-    config.set(Configs.DEFAULT_SIGN_KEY, publicKey);
-    config.set(Configs.ALLOW_SKEW_SECONDS, 6L);
+    config.set(OAuthConfig.SERVICE_AUDIENCE, "service1");
+    config.set(OAuthConfig.DEFAULT_SIGN_KEY, publicKey);
+    config.set(OAuthConfig.ALLOW_SKEW_SECONDS, 6L);
     auth2TokenAuthenticator.initialize(config);
     Assertions.assertTrue(auth2TokenAuthenticator.isDataFromToken());
     Exception e =
@@ -49,7 +48,8 @@ public class TestOAuth2TokenAuthenticator {
             UnauthorizedException.class,
             () ->
                 auth2TokenAuthenticator.authenticateToken(
-                    Constants.HTTP_HEADER_AUTHORIZATION_BEARER.getBytes(StandardCharsets.UTF_8)));
+                    AuthConstants.HTTP_HEADER_AUTHORIZATION_BEARER.getBytes(
+                        StandardCharsets.UTF_8)));
     Assertions.assertEquals("Blank token found", e.getMessage());
     String token1 =
         Jwts.builder()
@@ -62,7 +62,7 @@ public class TestOAuth2TokenAuthenticator {
             UnauthorizedException.class,
             () ->
                 auth2TokenAuthenticator.authenticateToken(
-                    (Constants.HTTP_HEADER_AUTHORIZATION_BEARER + token1)
+                    (AuthConstants.HTTP_HEADER_AUTHORIZATION_BEARER + token1)
                         .getBytes(StandardCharsets.UTF_8)));
     Assertions.assertEquals("Found null Audience in token", e.getMessage());
 
@@ -78,7 +78,7 @@ public class TestOAuth2TokenAuthenticator {
             UnauthorizedException.class,
             () ->
                 auth2TokenAuthenticator.authenticateToken(
-                    (Constants.HTTP_HEADER_AUTHORIZATION_BEARER + token2)
+                    (AuthConstants.HTTP_HEADER_AUTHORIZATION_BEARER + token2)
                         .getBytes(StandardCharsets.UTF_8)));
     Assertions.assertEquals(
         "Audience in the token [xxxx] doesn't contain service1", e.getMessage());
@@ -97,7 +97,7 @@ public class TestOAuth2TokenAuthenticator {
             UnauthorizedException.class,
             () ->
                 auth2TokenAuthenticator.authenticateToken(
-                    (Constants.HTTP_HEADER_AUTHORIZATION_BEARER + token3)
+                    (AuthConstants.HTTP_HEADER_AUTHORIZATION_BEARER + token3)
                         .getBytes(StandardCharsets.UTF_8)));
     Assertions.assertEquals(
         "Audiences in the token [x1, x2, x3] don't contain service1", e.getMessage());
@@ -119,7 +119,7 @@ public class TestOAuth2TokenAuthenticator {
             UnauthorizedException.class,
             () ->
                 auth2TokenAuthenticator.authenticateToken(
-                    (Constants.HTTP_HEADER_AUTHORIZATION_BEARER + token4)
+                    (AuthConstants.HTTP_HEADER_AUTHORIZATION_BEARER + token4)
                         .getBytes(StandardCharsets.UTF_8)));
     Assertions.assertEquals(
         "Audiences in token is not in expected format: {k1=v1, k2=v2}", e.getMessage());
@@ -134,7 +134,7 @@ public class TestOAuth2TokenAuthenticator {
     Assertions.assertEquals(
         "gravitino",
         auth2TokenAuthenticator.authenticateToken(
-            (Constants.HTTP_HEADER_AUTHORIZATION_BEARER + token5)
+            (AuthConstants.HTTP_HEADER_AUTHORIZATION_BEARER + token5)
                 .getBytes(StandardCharsets.UTF_8)));
   }
 }

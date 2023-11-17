@@ -2,10 +2,10 @@
  * Copyright 2023 Datastrato.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.gravitino.server.web;
+package com.datastrato.gravitino.server.web.auth;
 
+import com.datastrato.gravitino.auth.AuthConstants;
 import com.datastrato.gravitino.auth.Authenticator;
-import com.datastrato.gravitino.auth.Constants;
 import com.datastrato.gravitino.exceptions.UnauthorizedException;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -35,7 +35,7 @@ public class AuthenticationFilter implements Filter {
       throws IOException, ServletException {
     try {
       HttpServletRequest req = (HttpServletRequest) request;
-      Enumeration<String> headerData = req.getHeaders(Constants.HTTP_HEADER_AUTHORIZATION);
+      Enumeration<String> headerData = req.getHeaders(AuthConstants.HTTP_HEADER_AUTHORIZATION);
       byte[] authData = null;
       if (headerData.hasMoreElements()) {
         authData = headerData.nextElement().getBytes(StandardCharsets.UTF_8);

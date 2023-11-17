@@ -5,7 +5,6 @@
 package com.datastrato.gravitino.auth;
 
 import com.datastrato.gravitino.Config;
-import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.exceptions.UnauthorizedException;
 import com.google.common.base.Preconditions;
 import io.jsonwebtoken.Claims;
@@ -47,10 +46,10 @@ class OAuth2TokenAuthenticator implements Authenticator {
     }
     String authData = new String(tokenData);
     if (StringUtils.isBlank(authData)
-        || !authData.startsWith(Constants.HTTP_HEADER_AUTHORIZATION_BEARER)) {
+        || !authData.startsWith(AuthConstants.HTTP_HEADER_AUTHORIZATION_BEARER)) {
       throw new UnauthorizedException("Invalid HTTP Authorization header");
     }
-    String token = authData.substring(Constants.HTTP_HEADER_AUTHORIZATION_BEARER.length());
+    String token = authData.substring(AuthConstants.HTTP_HEADER_AUTHORIZATION_BEARER.length());
     if (StringUtils.isBlank(token)) {
       throw new UnauthorizedException("Blank token found");
     }
@@ -96,11 +95,11 @@ class OAuth2TokenAuthenticator implements Authenticator {
 
   @Override
   public void initialize(Config config) throws RuntimeException {
-    this.serviceAudience = config.get(Configs.SERVICE_AUDIENCE);
-    this.allowSkewSeconds = config.get(Configs.ALLOW_SKEW_SECONDS);
-    String configuredSignKey = config.get(Configs.DEFAULT_SIGN_KEY);
+    this.serviceAudience = config.get(OAuthConfig.SERVICE_AUDIENCE);
+    this.allowSkewSeconds = config.get(OAuthConfig.ALLOW_SKEW_SECONDS);
+    String configuredSignKey = config.get(OAuthConfig.DEFAULT_SIGN_KEY);
     Preconditions.checkNotNull(configuredSignKey, "Default signing key can't be null");
-    String algType = config.get(Configs.SIGNATURE_ALGORITHM_TYPE);
+    String algType = config.get(OAuthConfig.SIGNATURE_ALGORITHM_TYPE);
     this.defaultSigningKey = decodeSignKey(Base64.getDecoder().decode(configuredSignKey), algType);
   }
 

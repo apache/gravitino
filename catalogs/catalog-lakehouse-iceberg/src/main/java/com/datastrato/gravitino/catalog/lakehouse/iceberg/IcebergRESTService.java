@@ -5,12 +5,14 @@
 
 package com.datastrato.gravitino.catalog.lakehouse.iceberg;
 
+import com.datastrato.gravitino.GravitinoEnv;
 import com.datastrato.gravitino.aux.GravitinoAuxiliaryService;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.ops.IcebergTableOps;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.web.IcebergExceptionMapper;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.web.IcebergObjectMapperProvider;
 import com.datastrato.gravitino.server.web.JettyServer;
 import com.datastrato.gravitino.server.web.JettyServerConfig;
+import com.datastrato.gravitino.server.web.auth.AuthenticationFilter;
 import java.util.Map;
 import javax.servlet.Servlet;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
@@ -50,6 +52,8 @@ public class IcebergRESTService implements GravitinoAuxiliaryService {
 
     Servlet servlet = new ServletContainer(config);
     server.addServlet(servlet, "/iceberg/*");
+    server.addFilter(
+        new AuthenticationFilter(GravitinoEnv.getInstance().authenticator()), "/iceberg/*");
   }
 
   @Override

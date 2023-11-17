@@ -5,7 +5,7 @@
 
 package com.datastrato.gravitino.auth;
 
-public interface Constants {
+public interface AuthConstants {
   String HTTP_HEADER_AUTHORIZATION = "Authorization";
 
   String HTTP_HEADER_AUTHORIZATION_BEARER = "Bearer ";

@@ -113,6 +113,7 @@ log4j = ["slf4j-api", "log4j-slf4j2-impl", "log4j-api", "log4j-core", "log4j-12-
 jetty = ["jetty-server", "jetty-servlet"]
 jersey = ["jersey-server", "jersey-container-servlet-core", "jersey-container-jetty-http", "jersey-media-json-jackson", "jersey-hk2"]
 iceberg = ["iceberg-core", "iceberg-api"]
+jwt = ["jwt-api", "jwt-impl", "jwt-gson"]
 
 [plugins]
 protobuf = { id = "com.google.protobuf", version.ref = "protobuf-plugin" }
