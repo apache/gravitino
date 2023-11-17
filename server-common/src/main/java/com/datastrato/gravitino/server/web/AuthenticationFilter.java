@@ -8,6 +8,7 @@ import com.datastrato.gravitino.auth.Authenticator;
 import com.datastrato.gravitino.auth.Constants;
 import com.datastrato.gravitino.exceptions.UnauthorizedException;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.Enumeration;
 import javax.servlet.Filter;
 import javax.servlet.FilterChain;
@@ -35,12 +36,12 @@ public class AuthenticationFilter implements Filter {
     try {
       HttpServletRequest req = (HttpServletRequest) request;
       Enumeration<String> headerData = req.getHeaders(Constants.HTTP_HEADER_AUTHORIZATION);
-      String authData = null;
+      byte[] authData = null;
       if (headerData.hasMoreElements()) {
-        authData = headerData.nextElement();
+        authData = headerData.nextElement().getBytes(StandardCharsets.UTF_8);
       }
-      if (authenticator.isDataFromHTTP()) {
-        authenticator.authenticateHTTPHeader(authData);
+      if (authenticator.isDataFromToken()) {
+        authenticator.authenticateToken(authData);
       }
       chain.doFilter(request, response);
     } catch (UnauthorizedException ue) {

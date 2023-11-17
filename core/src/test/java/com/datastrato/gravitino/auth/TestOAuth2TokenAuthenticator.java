@@ -14,6 +14,7 @@ import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.impl.DefaultClaims;
 import io.jsonwebtoken.security.Keys;
+import java.nio.charset.StandardCharsets;
 import java.security.KeyPair;
 import java.util.Base64;
 import java.util.Date;
@@ -33,18 +34,18 @@ public class TestOAuth2TokenAuthenticator {
     config.set(Configs.DEFAULT_SIGN_KEY, publicKey);
     config.set(Configs.ALLOW_SKEW_SECONDS, 6L);
     auth2TokenAuthenticator.initialize(config);
-    Assertions.assertTrue(auth2TokenAuthenticator.isDataFromHTTP());
+    Assertions.assertTrue(auth2TokenAuthenticator.isDataFromToken());
     Exception e =
         Assertions.assertThrows(
             UnauthorizedException.class,
-            () -> auth2TokenAuthenticator.authenticateHTTPHeader("Xx"));
+            () -> auth2TokenAuthenticator.authenticateToken("Xx".getBytes(StandardCharsets.UTF_8)));
     Assertions.assertEquals("Invalid HTTP Authorization header", e.getMessage());
     e =
         Assertions.assertThrows(
             UnauthorizedException.class,
             () ->
-                auth2TokenAuthenticator.authenticateHTTPHeader(
-                    Constants.HTTP_HEADER_AUTHORIZATION_BEARER));
+                auth2TokenAuthenticator.authenticateToken(
+                    Constants.HTTP_HEADER_AUTHORIZATION_BEARER.getBytes(StandardCharsets.UTF_8)));
     Assertions.assertEquals("Blank token found", e.getMessage());
     String token1 =
         Jwts.builder()
@@ -56,8 +57,9 @@ public class TestOAuth2TokenAuthenticator {
         Assertions.assertThrows(
             UnauthorizedException.class,
             () ->
-                auth2TokenAuthenticator.authenticateHTTPHeader(
-                    Constants.HTTP_HEADER_AUTHORIZATION_BEARER + token1));
+                auth2TokenAuthenticator.authenticateToken(
+                    (Constants.HTTP_HEADER_AUTHORIZATION_BEARER + token1)
+                        .getBytes(StandardCharsets.UTF_8)));
     Assertions.assertEquals("Found null Audience in token", e.getMessage());
 
     String token2 =
@@ -71,8 +73,9 @@ public class TestOAuth2TokenAuthenticator {
         Assertions.assertThrows(
             UnauthorizedException.class,
             () ->
-                auth2TokenAuthenticator.authenticateHTTPHeader(
-                    Constants.HTTP_HEADER_AUTHORIZATION_BEARER + token2));
+                auth2TokenAuthenticator.authenticateToken(
+                    (Constants.HTTP_HEADER_AUTHORIZATION_BEARER + token2)
+                        .getBytes(StandardCharsets.UTF_8)));
     Assertions.assertEquals(
         "Audience in the token [xxxx] doesn't contain service1", e.getMessage());
 
@@ -89,8 +92,9 @@ public class TestOAuth2TokenAuthenticator {
         Assertions.assertThrows(
             UnauthorizedException.class,
             () ->
-                auth2TokenAuthenticator.authenticateHTTPHeader(
-                    Constants.HTTP_HEADER_AUTHORIZATION_BEARER + token3));
+                auth2TokenAuthenticator.authenticateToken(
+                    (Constants.HTTP_HEADER_AUTHORIZATION_BEARER + token3)
+                        .getBytes(StandardCharsets.UTF_8)));
     Assertions.assertEquals(
         "Audiences in the token [x1, x2, x3] don't contain service1", e.getMessage());
 
@@ -110,8 +114,9 @@ public class TestOAuth2TokenAuthenticator {
         Assertions.assertThrows(
             UnauthorizedException.class,
             () ->
-                auth2TokenAuthenticator.authenticateHTTPHeader(
-                    Constants.HTTP_HEADER_AUTHORIZATION_BEARER + token4));
+                auth2TokenAuthenticator.authenticateToken(
+                    (Constants.HTTP_HEADER_AUTHORIZATION_BEARER + token4)
+                        .getBytes(StandardCharsets.UTF_8)));
     Assertions.assertEquals(
         "Audiences in token is not in expected format: {k1=v1, k2=v2}", e.getMessage());
 
@@ -124,7 +129,8 @@ public class TestOAuth2TokenAuthenticator {
             .compact();
     Assertions.assertEquals(
         "gravitino",
-        auth2TokenAuthenticator.authenticateHTTPHeader(
-            Constants.HTTP_HEADER_AUTHORIZATION_BEARER + token5));
+        auth2TokenAuthenticator.authenticateToken(
+            (Constants.HTTP_HEADER_AUTHORIZATION_BEARER + token5)
+                .getBytes(StandardCharsets.UTF_8)));
   }
 }

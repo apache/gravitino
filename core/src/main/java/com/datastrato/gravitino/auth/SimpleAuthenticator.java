@@ -16,12 +16,13 @@ import org.apache.commons.lang3.StringUtils;
 class SimpleAuthenticator implements Authenticator {
 
   @Override
-  public boolean isDataFromHTTP() {
+  public boolean isDataFromToken() {
     return true;
   }
 
   @Override
-  public String authenticateHTTPHeader(String authData) {
+  public String authenticateToken(byte[] tokenData) {
+    String authData = new String(tokenData);
     if (StringUtils.isBlank(authData)) {
       return Constants.UNKNOWN_USER_NAME;
     }

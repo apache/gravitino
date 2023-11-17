@@ -15,19 +15,19 @@ public interface Authenticator {
    *
    * @return true, if the data used to authenticate is from the HTTP header, Otherwise, it's false.
    */
-  default boolean isDataFromHTTP() {
+  default boolean isDataFromToken() {
     return false;
   }
 
   /**
    * Use the HTTP header data to authenticate.
    *
-   * @param authData The data is used for authentication
+   * @param tokenData The data is used for authentication
    * @return The identifier of user
    */
-  default String authenticateHTTPHeader(String authData) {
+  default String authenticateToken(byte[] tokenData) {
     throw new UnsupportedOperationException(
-        "Authenticator doesn't support to authenticate the data from the HTTP header");
+        "Authenticator doesn't support to authenticate the data from the token");
   }
 
   /**

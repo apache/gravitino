@@ -36,12 +36,13 @@ class OAuth2TokenAuthenticator implements Authenticator {
   private String serviceAudience;
 
   @Override
-  public boolean isDataFromHTTP() {
+  public boolean isDataFromToken() {
     return true;
   }
 
   @Override
-  public String authenticateHTTPHeader(String authData) {
+  public String authenticateToken(byte[] tokenData) {
+    String authData = new String(tokenData);
     if (StringUtils.isBlank(authData)
         || !authData.startsWith(Constants.HTTP_HEADER_AUTHORIZATION_BEARER)) {
       throw new UnauthorizedException("Invalid HTTP Authorization header");

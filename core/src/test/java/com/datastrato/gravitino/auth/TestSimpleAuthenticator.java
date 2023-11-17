@@ -17,24 +17,28 @@ public class TestSimpleAuthenticator {
     SimpleAuthenticator simpleAuthenticator = new SimpleAuthenticator();
     Config config = new Config(false) {};
     simpleAuthenticator.initialize(config);
-    Assertions.assertTrue(simpleAuthenticator.isDataFromHTTP());
-    Assertions.assertEquals(
-        Constants.UNKNOWN_USER_NAME, simpleAuthenticator.authenticateHTTPHeader(""));
-    Assertions.assertEquals(
-        Constants.UNKNOWN_USER_NAME, simpleAuthenticator.authenticateHTTPHeader("abc"));
+    Assertions.assertTrue(simpleAuthenticator.isDataFromToken());
     Assertions.assertEquals(
         Constants.UNKNOWN_USER_NAME,
-        simpleAuthenticator.authenticateHTTPHeader(Constants.HTTP_HEADER_AUTHORIZATION_BASIC));
+        simpleAuthenticator.authenticateToken("".getBytes(StandardCharsets.UTF_8)));
     Assertions.assertEquals(
         Constants.UNKNOWN_USER_NAME,
-        simpleAuthenticator.authenticateHTTPHeader(
-            Constants.HTTP_HEADER_AUTHORIZATION_BASIC + "xx"));
+        simpleAuthenticator.authenticateToken("abc".getBytes(StandardCharsets.UTF_8)));
+    Assertions.assertEquals(
+        Constants.UNKNOWN_USER_NAME,
+        simpleAuthenticator.authenticateToken(
+            Constants.HTTP_HEADER_AUTHORIZATION_BASIC.getBytes(StandardCharsets.UTF_8)));
+    Assertions.assertEquals(
+        Constants.UNKNOWN_USER_NAME,
+        simpleAuthenticator.authenticateToken(
+            (Constants.HTTP_HEADER_AUTHORIZATION_BASIC + "xx").getBytes(StandardCharsets.UTF_8)));
     Assertions.assertEquals(
         "gravitino",
-        simpleAuthenticator.authenticateHTTPHeader(
-            Constants.HTTP_HEADER_AUTHORIZATION_BASIC
-                + new String(
-                    Base64.getEncoder()
-                        .encode("gravitino:gravitino".getBytes(StandardCharsets.UTF_8)))));
+        simpleAuthenticator.authenticateToken(
+            (Constants.HTTP_HEADER_AUTHORIZATION_BASIC
+                    + new String(
+                        Base64.getEncoder()
+                            .encode("gravitino:gravitino".getBytes(StandardCharsets.UTF_8))))
+                .getBytes(StandardCharsets.UTF_8)));
   }
 }
