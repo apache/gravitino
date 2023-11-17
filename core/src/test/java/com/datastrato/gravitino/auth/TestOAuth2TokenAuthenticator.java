@@ -48,8 +48,7 @@ public class TestOAuth2TokenAuthenticator {
             UnauthorizedException.class,
             () ->
                 auth2TokenAuthenticator.authenticateToken(
-                    AuthConstants.AUTHORIZATION_BEARER_HEADER.getBytes(
-                        StandardCharsets.UTF_8)));
+                    AuthConstants.AUTHORIZATION_BEARER_HEADER.getBytes(StandardCharsets.UTF_8)));
     Assertions.assertEquals("Blank token found", e.getMessage());
     String token1 =
         Jwts.builder()
@@ -134,7 +133,6 @@ public class TestOAuth2TokenAuthenticator {
     Assertions.assertEquals(
         "gravitino",
         auth2TokenAuthenticator.authenticateToken(
-            (AuthConstants.AUTHORIZATION_BEARER_HEADER + token5)
-                .getBytes(StandardCharsets.UTF_8)));
+            (AuthConstants.AUTHORIZATION_BEARER_HEADER + token5).getBytes(StandardCharsets.UTF_8)));
   }
 }

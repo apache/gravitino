@@ -33,8 +33,7 @@ public class TestSimpleAuthenticator {
     Assertions.assertEquals(
         AuthConstants.UNKNOWN_USER_NAME,
         simpleAuthenticator.authenticateToken(
-            (AuthConstants.AUTHORIZATION_BASIC_HEADER + "xx")
-                .getBytes(StandardCharsets.UTF_8)));
+            (AuthConstants.AUTHORIZATION_BASIC_HEADER + "xx").getBytes(StandardCharsets.UTF_8)));
     Assertions.assertEquals(
         "gravitino",
         simpleAuthenticator.authenticateToken(
