@@ -19,6 +19,9 @@ public class TestSimpleAuthenticator {
     simpleAuthenticator.initialize(config);
     Assertions.assertTrue(simpleAuthenticator.isDataFromToken());
     Assertions.assertEquals(
+            Constants.UNKNOWN_USER_NAME,
+            simpleAuthenticator.authenticateToken(null));
+    Assertions.assertEquals(
         Constants.UNKNOWN_USER_NAME,
         simpleAuthenticator.authenticateToken("".getBytes(StandardCharsets.UTF_8)));
     Assertions.assertEquals(

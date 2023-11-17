@@ -42,6 +42,9 @@ class OAuth2TokenAuthenticator implements Authenticator {
 
   @Override
   public String authenticateToken(byte[] tokenData) {
+    if (tokenData == null) {
+      throw new UnauthorizedException("Empty HTTP Authorization header");
+    }
     String authData = new String(tokenData);
     if (StringUtils.isBlank(authData)
         || !authData.startsWith(Constants.HTTP_HEADER_AUTHORIZATION_BEARER)) {
