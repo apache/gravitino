@@ -37,6 +37,7 @@ import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
+import org.rnorth.ducttape.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.Network;
@@ -48,9 +49,9 @@ public class TrinoConnectorIT extends AbstractIT {
   private static final CloseableGroup closer = CloseableGroup.create();
 
   // The subnet must match the configuration in `dev/docker/tools/mac-docker-connector.conf`
-  private static String CONTAINER_NETWORK_SUBNET = "192.168.0.0/24";
-  private static String CONTAINER_NETWORK_GATEWAY = "192.168.0.1";
-  private static String CONTAINER_NETWORK_IPRANGE = "192.168.0.100/28";
+  private static final String CONTAINER_NETWORK_SUBNET = "10.0.0.0/22";
+  private static final String CONTAINER_NETWORK_GATEWAY = "10.0.0.1";
+  private static final String CONTAINER_NETWORK_IPRANGE = "10.0.0.100/22";
 
   public static TrinoContainer trinoContainer;
 
@@ -145,7 +146,10 @@ public class TrinoConnectorIT extends AbstractIT {
 
     trinoContainer = closer.register(trinoBuilder.build());
     trinoContainer.start();
-    trinoContainer.checkSyncCatalogFromGravitino(5, metalakeName, catalogName);
+
+    Preconditions.check(
+        "Check sync Catalog from Gravitino failed!",
+        trinoContainer.checkSyncCatalogFromGravitino(5, metalakeName, catalogName));
 
     createSchema();
   }
