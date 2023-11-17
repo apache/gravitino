@@ -11,6 +11,7 @@ import com.datastrato.gravitino.rel.expressions.NamedReference;
 import com.datastrato.gravitino.rel.expressions.sorts.NullOrdering;
 import com.datastrato.gravitino.rel.expressions.sorts.SortDirection;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
+import com.google.common.base.Preconditions;
 import java.util.Locale;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.iceberg.NullOrder;
@@ -37,63 +38,99 @@ public class ToIcebergSortOrder {
     org.apache.iceberg.SortOrder.Builder sortOrderBuilder =
         org.apache.iceberg.SortOrder.builderFor(schema);
     for (SortOrder sortOrder : sortOrders) {
-      Expression expression = sortOrder.expression();
-      if (expression instanceof NamedReference.FieldReference) {
+      if (sortOrder.expression() instanceof NamedReference.FieldReference) {
         String fieldName =
-            String.join(DOT, ((NamedReference.FieldReference) expression).fieldName());
+            String.join(DOT, ((NamedReference.FieldReference) sortOrder.expression()).fieldName());
         sortOrderBuilder.sortBy(
             fieldName, toIceberg(sortOrder.direction()), toIceberg(sortOrder.nullOrdering()));
-      } else if (expression instanceof FunctionExpression) {
-        FunctionExpression gravitinoExpr = (FunctionExpression) expression;
-        String colName;
-        if (gravitinoExpr.arguments().length == 1) {
-          colName =
-              String.join(
-                  DOT, ((NamedReference.FieldReference) gravitinoExpr.arguments()[0]).fieldName());
-        } else if (gravitinoExpr.arguments().length == 2) {
-          colName =
-              String.join(
-                  DOT, ((NamedReference.FieldReference) gravitinoExpr.arguments()[1]).fieldName());
-        } else {
-          throw new UnsupportedOperationException(
-              "Sort function is not supported: " + gravitinoExpr.functionName());
-        }
+        continue;
+      }
 
+      if (sortOrder.expression() instanceof FunctionExpression) {
+        FunctionExpression sortFunc = (FunctionExpression) sortOrder.expression();
         UnboundTerm<Object> icebergExpression;
-        switch (gravitinoExpr.functionName().toLowerCase(Locale.ROOT)) {
+        switch (sortFunc.functionName().toLowerCase(Locale.ROOT)) {
           case "bucket":
-            int numBuckets = ((Literal<Integer>) gravitinoExpr.arguments()[0]).value();
-            icebergExpression = Expressions.bucket(colName, numBuckets);
+            Preconditions.checkArgument(
+                sortFunc.arguments().length == 2, "Bucket sort should have 2 arguments");
+
+            Expression firstArg = sortFunc.arguments()[0];
+            Preconditions.checkArgument(
+                firstArg instanceof Literal && ((Literal<?>) firstArg).value() instanceof Integer,
+                "Bucket sort's first argument must be a integer literal");
+            int numBuckets = (Integer) ((Literal<?>) firstArg).value();
+
+            Expression secondArg = sortFunc.arguments()[1];
+            Preconditions.checkArgument(
+                secondArg instanceof NamedReference.FieldReference,
+                "Bucket sort's second argument must be a field reference");
+            String fieldName =
+                String.join(DOT, ((NamedReference.FieldReference) secondArg).fieldName());
+
+            icebergExpression = Expressions.bucket(fieldName, numBuckets);
             break;
           case "truncate":
-            int width = ((Literal<Integer>) gravitinoExpr.arguments()[0]).value();
-            icebergExpression = Expressions.truncate(colName, width);
+            Preconditions.checkArgument(
+                sortFunc.arguments().length == 2, "Truncate sort should have 2 arguments");
+
+            firstArg = sortFunc.arguments()[0];
+            Preconditions.checkArgument(
+                firstArg instanceof Literal && ((Literal<?>) firstArg).value() instanceof Integer,
+                "Truncate sort's first argument must be a integer literal");
+            int width = (Integer) ((Literal<?>) firstArg).value();
+
+            secondArg = sortFunc.arguments()[1];
+            Preconditions.checkArgument(
+                secondArg instanceof NamedReference.FieldReference,
+                "Truncate sort's second argument must be a field reference");
+            fieldName = String.join(DOT, ((NamedReference.FieldReference) secondArg).fieldName());
+
+            icebergExpression = Expressions.truncate(fieldName, width);
             break;
           case "year":
-            icebergExpression = Expressions.year(colName);
+            icebergExpression = Expressions.year(getValidSingleField("year", sortFunc.arguments()));
             break;
           case "month":
-            icebergExpression = Expressions.month(colName);
+            icebergExpression =
+                Expressions.month(getValidSingleField("month", sortFunc.arguments()));
             break;
           case "day":
-            icebergExpression = Expressions.day(colName);
+            icebergExpression = Expressions.day(getValidSingleField("day", sortFunc.arguments()));
             break;
           case "hour":
-            icebergExpression = Expressions.hour(colName);
+            icebergExpression = Expressions.hour(getValidSingleField("hour", sortFunc.arguments()));
             break;
           default:
             throw new UnsupportedOperationException(
-                "Sort function is not supported: " + gravitinoExpr.functionName());
+                "Sort function is not supported: " + sortFunc.functionName());
         }
         sortOrderBuilder.sortBy(
             icebergExpression,
             toIceberg(sortOrder.direction()),
             toIceberg(sortOrder.nullOrdering()));
-      } else {
-        throw new UnsupportedOperationException("Sort expression is not supported: " + expression);
+        continue;
       }
+
+      throw new UnsupportedOperationException(
+          "Sort expression is not supported: " + sortOrder.expression());
     }
     return sortOrderBuilder.build();
+  }
+
+  private static String getValidSingleField(String functionName, Expression[] arguments) {
+    Preconditions.checkArgument(
+        arguments.length == 1,
+        "Sort function %s should have 1 argument, but got %s",
+        functionName,
+        arguments.length);
+    Expression argument = arguments[0];
+    Preconditions.checkArgument(
+        argument instanceof NamedReference.FieldReference,
+        "Sort function %s's argument should be a field reference, but got %s",
+        functionName,
+        argument);
+    NamedReference.FieldReference fieldReference = (NamedReference.FieldReference) argument;
+    return String.join(DOT, fieldReference.fieldName());
   }
 
   private static NullOrder toIceberg(NullOrdering nullOrdering) {
