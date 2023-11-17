@@ -53,10 +53,9 @@ class OAuth2TokenAuthenticator implements Authenticator {
     if (StringUtils.isBlank(token)) {
       throw new UnauthorizedException("Blank token found");
     }
-    // TODO: If we support multiple OAuth 2.0 server, we should use multiple
+    // TODO: If we support multiple OAuth 2.0 servers, we should use multiple
     // signing keys.
     try {
-
       JwtParser parser =
           Jwts.parserBuilder()
               .setAllowedClockSkewSeconds(allowSkewSeconds)
