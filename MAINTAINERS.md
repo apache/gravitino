@@ -12,3 +12,4 @@ This document lists the maintainers of the Project. Maintainers may be added onc
 | Justin Mclean | justinmclean        | Datastrato       |
 | Heng Qin      | qqqttt123           | Datastrato       |
 | McHades       | mchades             | Datastrato       |
+| Xun Liu       | xunliu              | Datastrato       |
