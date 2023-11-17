@@ -29,10 +29,10 @@ class SimpleAuthenticator implements Authenticator {
     if (StringUtils.isBlank(authData)) {
       return AuthConstants.UNKNOWN_USER_NAME;
     }
-    if (!authData.startsWith(AuthConstants.HTTP_HEADER_AUTHORIZATION_BASIC)) {
+    if (!authData.startsWith(AuthConstants.AUTHORIZATION_BASIC_HEADER)) {
       return AuthConstants.UNKNOWN_USER_NAME;
     }
-    String credential = authData.substring(AuthConstants.HTTP_HEADER_AUTHORIZATION_BASIC.length());
+    String credential = authData.substring(AuthConstants.AUTHORIZATION_BASIC_HEADER.length());
     if (StringUtils.isBlank(credential)) {
       return AuthConstants.UNKNOWN_USER_NAME;
     }

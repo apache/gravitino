@@ -11,16 +11,16 @@ import com.datastrato.gravitino.Config;
 public interface Authenticator {
 
   /**
-   * Judge whether the data used to authenticate is from the HTTP header.
+   * Judge whether the data used to authenticate is from the token.
    *
-   * @return true, if the data used to authenticate is from the HTTP header, Otherwise, it's false.
+   * @return true, if the data used to authenticate is from the token, Otherwise, it's false.
    */
   default boolean isDataFromToken() {
     return false;
   }
 
   /**
-   * Use the HTTP header data to authenticate.
+   * Use the token data to authenticate.
    *
    * @param tokenData The data is used for authentication
    * @return The identifier of user

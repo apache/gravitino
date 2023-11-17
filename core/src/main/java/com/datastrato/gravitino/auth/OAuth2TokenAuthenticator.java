@@ -42,14 +42,14 @@ class OAuth2TokenAuthenticator implements Authenticator {
   @Override
   public String authenticateToken(byte[] tokenData) {
     if (tokenData == null) {
-      throw new UnauthorizedException("Empty HTTP Authorization header");
+      throw new UnauthorizedException("Empty token authorization header");
     }
     String authData = new String(tokenData);
     if (StringUtils.isBlank(authData)
-        || !authData.startsWith(AuthConstants.HTTP_HEADER_AUTHORIZATION_BEARER)) {
-      throw new UnauthorizedException("Invalid HTTP Authorization header");
+        || !authData.startsWith(AuthConstants.AUTHORIZATION_BEARER_HEADER)) {
+      throw new UnauthorizedException("Invalid token authorization header");
     }
-    String token = authData.substring(AuthConstants.HTTP_HEADER_AUTHORIZATION_BEARER.length());
+    String token = authData.substring(AuthConstants.AUTHORIZATION_BEARER_HEADER.length());
     if (StringUtils.isBlank(token)) {
       throw new UnauthorizedException("Blank token found");
     }

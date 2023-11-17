@@ -48,7 +48,7 @@ public class TestOAuth2TokenAuthenticator {
             UnauthorizedException.class,
             () ->
                 auth2TokenAuthenticator.authenticateToken(
-                    AuthConstants.HTTP_HEADER_AUTHORIZATION_BEARER.getBytes(
+                    AuthConstants.AUTHORIZATION_BEARER_HEADER.getBytes(
                         StandardCharsets.UTF_8)));
     Assertions.assertEquals("Blank token found", e.getMessage());
     String token1 =
@@ -62,7 +62,7 @@ public class TestOAuth2TokenAuthenticator {
             UnauthorizedException.class,
             () ->
                 auth2TokenAuthenticator.authenticateToken(
-                    (AuthConstants.HTTP_HEADER_AUTHORIZATION_BEARER + token1)
+                    (AuthConstants.AUTHORIZATION_BEARER_HEADER + token1)
                         .getBytes(StandardCharsets.UTF_8)));
     Assertions.assertEquals("Found null Audience in token", e.getMessage());
 
@@ -78,7 +78,7 @@ public class TestOAuth2TokenAuthenticator {
             UnauthorizedException.class,
             () ->
                 auth2TokenAuthenticator.authenticateToken(
-                    (AuthConstants.HTTP_HEADER_AUTHORIZATION_BEARER + token2)
+                    (AuthConstants.AUTHORIZATION_BEARER_HEADER + token2)
                         .getBytes(StandardCharsets.UTF_8)));
     Assertions.assertEquals(
         "Audience in the token [xxxx] doesn't contain service1", e.getMessage());
@@ -97,7 +97,7 @@ public class TestOAuth2TokenAuthenticator {
             UnauthorizedException.class,
             () ->
                 auth2TokenAuthenticator.authenticateToken(
-                    (AuthConstants.HTTP_HEADER_AUTHORIZATION_BEARER + token3)
+                    (AuthConstants.AUTHORIZATION_BEARER_HEADER + token3)
                         .getBytes(StandardCharsets.UTF_8)));
     Assertions.assertEquals(
         "Audiences in the token [x1, x2, x3] don't contain service1", e.getMessage());
@@ -119,7 +119,7 @@ public class TestOAuth2TokenAuthenticator {
             UnauthorizedException.class,
             () ->
                 auth2TokenAuthenticator.authenticateToken(
-                    (AuthConstants.HTTP_HEADER_AUTHORIZATION_BEARER + token4)
+                    (AuthConstants.AUTHORIZATION_BEARER_HEADER + token4)
                         .getBytes(StandardCharsets.UTF_8)));
     Assertions.assertEquals(
         "Audiences in token is not in expected format: {k1=v1, k2=v2}", e.getMessage());
@@ -134,7 +134,7 @@ public class TestOAuth2TokenAuthenticator {
     Assertions.assertEquals(
         "gravitino",
         auth2TokenAuthenticator.authenticateToken(
-            (AuthConstants.HTTP_HEADER_AUTHORIZATION_BEARER + token5)
+            (AuthConstants.AUTHORIZATION_BEARER_HEADER + token5)
                 .getBytes(StandardCharsets.UTF_8)));
   }
 }

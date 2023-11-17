@@ -8,9 +8,9 @@ package com.datastrato.gravitino.auth;
 public interface AuthConstants {
   String HTTP_HEADER_AUTHORIZATION = "Authorization";
 
-  String HTTP_HEADER_AUTHORIZATION_BEARER = "Bearer ";
+  String AUTHORIZATION_BEARER_HEADER = "Bearer ";
 
-  String HTTP_HEADER_AUTHORIZATION_BASIC = "Basic ";
+  String AUTHORIZATION_BASIC_HEADER = "Basic ";
 
   String UNKNOWN_USER_NAME = "unknown";
 }
