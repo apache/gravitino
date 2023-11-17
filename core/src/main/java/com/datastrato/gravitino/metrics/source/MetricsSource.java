@@ -11,9 +11,14 @@ import com.codahale.metrics.Histogram;
 import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.Timer;
 
+/**
+ * MetricsSource provides utilities to collect specify kind metrics, all metrics must create with
+ * metricRegistry. The real metric name registered to MetricSystem will be
+ * "{metricsSourceName}.{name}".
+ */
 public abstract class MetricsSource {
-  protected MetricRegistry metricRegistry;
-  protected String metricsSourceName;
+  protected final MetricRegistry metricRegistry;
+  private String metricsSourceName;
 
   MetricsSource(String name) {
     this.metricsSourceName = name;

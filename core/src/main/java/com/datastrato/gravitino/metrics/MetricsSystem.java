@@ -18,6 +18,10 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * MetricsSystem manages the lifecycle of MetricsSources and MetricsReporters. MetricsReporter will
+ * report metrics from MetricsSources registered to MetricsSystem.
+ */
 public class MetricsSystem implements Closeable {
   private static final Logger LOG = LoggerFactory.getLogger(MetricsSystem.class);
   private String name;
