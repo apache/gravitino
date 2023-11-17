@@ -9,7 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.rel.Column;
-import com.datastrato.gravitino.rel.transforms.Transform;
+import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
@@ -29,7 +29,7 @@ final class BaseTableExtension extends BaseTable {
       table.properties = properties;
       table.auditInfo = auditInfo;
       table.columns = columns;
-      table.partitions = partitions;
+      table.partitioning = partitioning;
       return table;
     }
   }
@@ -51,7 +51,7 @@ public class TestBaseTable {
             .withComment("testTableComment")
             .withColumns(new Column[0])
             .withProperties(properties)
-            .withPartitions(new Transform[0])
+            .withPartitioning(new Transform[0])
             .withAuditInfo(auditInfo)
             .build();
 
@@ -60,6 +60,6 @@ public class TestBaseTable {
     assertEquals(table.properties, table.properties());
     assertEquals(table.auditInfo, table.auditInfo());
     assertArrayEquals(new Column[0], table.columns);
-    assertArrayEquals(new Transform[0], table.partitions);
+    assertArrayEquals(new Transform[0], table.partitioning);
   }
 }

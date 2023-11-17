@@ -15,9 +15,9 @@ import com.datastrato.gravitino.dto.AuditDTO;
 import com.datastrato.gravitino.dto.CatalogDTO;
 import com.datastrato.gravitino.dto.MetalakeDTO;
 import com.datastrato.gravitino.dto.rel.ColumnDTO;
-import com.datastrato.gravitino.dto.rel.Partition;
 import com.datastrato.gravitino.dto.rel.SchemaDTO;
 import com.datastrato.gravitino.dto.rel.TableDTO;
+import com.datastrato.gravitino.dto.rel.partitions.Partitioning;
 import io.substrait.type.TypeCreator;
 import java.time.Instant;
 import org.junit.jupiter.api.Test;
@@ -151,7 +151,7 @@ public class TestResponses {
             .withComment("comment")
             .withColumns(new ColumnDTO[] {column})
             .withAudit(audit)
-            .withPartitions(new Partition[0])
+            .withPartitioning(Partitioning.EMPTY_PARTITIONING)
             .build();
     TableResponse tableResponse = new TableResponse(table);
     tableResponse.validate(); // No exception thrown

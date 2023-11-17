@@ -4,14 +4,14 @@
  */
 package com.datastrato.gravitino.catalog.lakehouse.iceberg.converter;
 
-import static com.datastrato.gravitino.rel.transforms.Transforms.bucket;
-import static com.datastrato.gravitino.rel.transforms.Transforms.day;
-import static com.datastrato.gravitino.rel.transforms.Transforms.hour;
-import static com.datastrato.gravitino.rel.transforms.Transforms.identity;
-import static com.datastrato.gravitino.rel.transforms.Transforms.month;
-import static com.datastrato.gravitino.rel.transforms.Transforms.truncate;
+import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.bucket;
+import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.day;
+import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.hour;
+import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.identity;
+import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.month;
+import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.truncate;
 
-import com.datastrato.gravitino.rel.transforms.Transform;
+import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -44,12 +44,12 @@ public class TestToIcebergPartitionSpec extends TestBaseConvert {
 
     Transform[] partitioning =
         new Transform[] {
-          identity(new String[] {nestedFields[0].name()}),
-          day(new String[] {nestedFields[4].name()}),
-          hour(new String[] {nestedFields[5].name()}),
-          month(new String[] {nestedFields[6].name()}),
-          bucket(new String[] {nestedFields[4].name()}, 10),
-          truncate(new String[] {nestedFields[7].name()}, 20),
+          identity(nestedFields[0].name()),
+          day(nestedFields[4].name()),
+          hour(nestedFields[5].name()),
+          month(nestedFields[6].name()),
+          bucket(10, new String[] {nestedFields[4].name()}),
+          truncate(20, nestedFields[7].name()),
         };
 
     Schema schema = new Schema(nestedFields);

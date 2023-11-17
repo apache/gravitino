@@ -32,7 +32,7 @@ public class JdbcTable extends BaseTable {
       jdbcTable.properties = properties != null ? Maps.newHashMap(properties) : Maps.newHashMap();
       jdbcTable.auditInfo = auditInfo;
       jdbcTable.columns = columns;
-      jdbcTable.partitions = partitions;
+      jdbcTable.partitioning = partitioning;
       jdbcTable.sortOrders = sortOrders;
       return jdbcTable;
     }

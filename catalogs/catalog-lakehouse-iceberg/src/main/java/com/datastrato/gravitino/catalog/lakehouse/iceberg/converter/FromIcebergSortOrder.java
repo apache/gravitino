@@ -4,8 +4,12 @@
  */
 package com.datastrato.gravitino.catalog.lakehouse.iceberg.converter;
 
-import com.datastrato.gravitino.rel.SortOrder;
-import com.datastrato.gravitino.rel.transforms.Transforms;
+import com.datastrato.gravitino.rel.expressions.FunctionExpression;
+import com.datastrato.gravitino.rel.expressions.NamedReference;
+import com.datastrato.gravitino.rel.expressions.sorts.NullOrdering;
+import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
+import com.datastrato.gravitino.rel.expressions.sorts.SortOrders;
+import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
 import com.google.common.annotations.VisibleForTesting;
 import java.util.List;
 import java.util.Map;
@@ -65,24 +69,27 @@ public class FromIcebergSortOrder implements SortOrderVisitor<SortOrder> {
   }
 
   private SortOrder fieldSortOrder(int id, SortDirection direction, NullOrder nullOrder) {
-    return SortOrder.fieldSortOrder(
-        new String[] {idToName.get(id)}, toGravitino(direction), toGravitino(nullOrder));
+    return SortOrders.of(
+        NamedReference.field(idToName.get(id)), toGravitino(direction), toGravitino(nullOrder));
   }
 
   private SortOrder functionSortOrder(
       String name, int id, SortDirection direction, NullOrder nullOrder) {
-    return SortOrder.functionSortOrder(
-        name, new String[] {idToName.get(id)}, toGravitino(direction), toGravitino(nullOrder));
+    return SortOrders.of(
+        FunctionExpression.of(name, NamedReference.field(idToName.get(id))),
+        toGravitino(direction),
+        toGravitino(nullOrder));
   }
 
-  private SortOrder.Direction toGravitino(SortDirection direction) {
-    return direction == SortDirection.ASC ? SortOrder.Direction.ASC : SortOrder.Direction.DESC;
+  private com.datastrato.gravitino.rel.expressions.sorts.SortDirection toGravitino(
+      SortDirection direction) {
+    return direction == SortDirection.ASC
+        ? com.datastrato.gravitino.rel.expressions.sorts.SortDirection.ASCENDING
+        : com.datastrato.gravitino.rel.expressions.sorts.SortDirection.DESCENDING;
   }
 
-  private SortOrder.NullOrdering toGravitino(NullOrder nullOrder) {
-    return nullOrder == NullOrder.NULLS_FIRST
-        ? SortOrder.NullOrdering.FIRST
-        : SortOrder.NullOrdering.LAST;
+  private NullOrdering toGravitino(NullOrder nullOrder) {
+    return nullOrder == NullOrder.NULLS_FIRST ? NullOrdering.NULLS_FIRST : NullOrdering.NULLS_LAST;
   }
 
   /**
