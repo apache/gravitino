@@ -4,8 +4,9 @@
  */
 package com.datastrato.gravitino.catalog.lakehouse.iceberg.converter;
 
-import com.datastrato.gravitino.rel.SortOrder;
-import com.datastrato.gravitino.rel.transforms.Transforms;
+import com.datastrato.gravitino.rel.expressions.sorts.NullOrdering;
+import com.datastrato.gravitino.rel.expressions.sorts.SortDirection;
+import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -13,7 +14,6 @@ import java.util.stream.Collectors;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.iceberg.NullOrder;
 import org.apache.iceberg.Schema;
-import org.apache.iceberg.SortDirection;
 import org.apache.iceberg.SortField;
 import org.apache.iceberg.types.Types;
 import org.junit.jupiter.api.Assertions;
@@ -25,14 +25,10 @@ public class TestToIcebergSortOrder extends TestBaseConvert {
   @Test
   public void testToSortOrder() {
     SortOrder[] sortOrders = createSortOrder("col_1", "col_2", "col_3", "col_4", "col_5");
-    sortOrders =
-        ArrayUtils.add(sortOrders, createFunctionSortOrder(Transforms.NAME_OF_DAY, "col_6"));
-    sortOrders =
-        ArrayUtils.add(sortOrders, createFunctionSortOrder(Transforms.NAME_OF_HOUR, "col_7"));
-    sortOrders =
-        ArrayUtils.add(sortOrders, createFunctionSortOrder(Transforms.NAME_OF_MONTH, "col_8"));
-    sortOrders =
-        ArrayUtils.add(sortOrders, createFunctionSortOrder(Transforms.NAME_OF_YEAR, "col_9"));
+    sortOrders = ArrayUtils.add(sortOrders, createFunctionSortOrder("day", "col_6"));
+    sortOrders = ArrayUtils.add(sortOrders, createFunctionSortOrder("hour", "col_7"));
+    sortOrders = ArrayUtils.add(sortOrders, createFunctionSortOrder("month", "col_8"));
+    sortOrders = ArrayUtils.add(sortOrders, createFunctionSortOrder("year", "col_9"));
 
     Types.NestedField[] nestedFields =
         createNestedField("col_1", "col_2", "col_3", "col_4", "col_5");
@@ -56,17 +52,7 @@ public class TestToIcebergSortOrder extends TestBaseConvert {
         Arrays.stream(sortOrders)
             .collect(
                 Collectors.toMap(
-                    sortOrder -> {
-                      if (sortOrder.getTransform() instanceof Transforms.NamedReference) {
-                        return ((Transforms.NamedReference) sortOrder.getTransform()).value()[0];
-                      } else if (sortOrder.getTransform() instanceof Transforms.FunctionTrans) {
-                        return ((Transforms.NamedReference) sortOrder.getTransform().arguments()[0])
-                            .value()[0];
-                      } else {
-                        throw new UnsupportedOperationException("Unsupported sort type.");
-                      }
-                    },
-                    v -> v));
+                    sortOrder -> sortOrder.expression().references()[0].fieldName()[0], v -> v));
     for (SortField sortField : sortFields) {
       Assertions.assertTrue(idToName.containsKey(sortField.sourceId()));
       String colName = idToName.get(sortField.sourceId());
@@ -81,12 +67,12 @@ public class TestToIcebergSortOrder extends TestBaseConvert {
         Assertions.assertTrue(sortField.transform().isIdentity());
       }
       Assertions.assertEquals(
-          sortOrder.getDirection() == SortOrder.Direction.ASC
-              ? SortDirection.ASC
-              : SortDirection.DESC,
+          sortOrder.direction() == SortDirection.ASCENDING
+              ? org.apache.iceberg.SortDirection.ASC
+              : org.apache.iceberg.SortDirection.DESC,
           sortField.direction());
       Assertions.assertEquals(
-          sortOrder.getNullOrdering() == SortOrder.NullOrdering.FIRST
+          sortOrder.nullOrdering() == NullOrdering.NULLS_FIRST
               ? NullOrder.NULLS_FIRST
               : NullOrder.NULLS_LAST,
           sortField.nullOrder());

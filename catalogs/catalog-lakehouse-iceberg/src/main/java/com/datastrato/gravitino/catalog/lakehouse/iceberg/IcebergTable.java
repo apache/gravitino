@@ -55,7 +55,7 @@ public class IcebergTable extends BaseTable {
             .withLocation(location)
             .withSchema(schema)
             .setProperties(resultProperties)
-            .withPartitionSpec(ToIcebergPartitionSpec.toPartitionSpec(schema, partitions))
+            .withPartitionSpec(ToIcebergPartitionSpec.toPartitionSpec(schema, partitioning))
             .withWriteOrder(ToIcebergSortOrder.toSortOrder(schema, sortOrders));
     return builder.build();
   }
@@ -80,7 +80,7 @@ public class IcebergTable extends BaseTable {
         .withColumns(icebergColumns)
         .withName(tableName)
         .withAuditInfo(AuditInfo.EMPTY)
-        .withPartitions(FromIcebergPartitionSpec.fromPartitionSpec(table.spec(), schema))
+        .withPartitioning(FromIcebergPartitionSpec.fromPartitionSpec(table.spec(), schema))
         .withSortOrders(FromIcebergSortOrder.fromSortOrder(table.sortOrder()))
         .build();
   }
@@ -114,7 +114,7 @@ public class IcebergTable extends BaseTable {
       } else {
         icebergTable.location = icebergTable.properties.get(PROP_LOCATION);
       }
-      icebergTable.partitions = partitions;
+      icebergTable.partitioning = partitioning;
       icebergTable.sortOrders = sortOrders;
       if (null != comment) {
         icebergTable.properties.putIfAbsent(ICEBERG_COMMENT_FIELD_NAME, comment);

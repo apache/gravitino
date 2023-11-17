@@ -4,7 +4,8 @@
  */
 package com.datastrato.gravitino.server.web.rest;
 
-import static com.datastrato.gravitino.dto.rel.PartitionUtils.toTransforms;
+import static com.datastrato.gravitino.dto.util.DTOConverters.fromDTO;
+import static com.datastrato.gravitino.dto.util.DTOConverters.fromDTOs;
 
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
@@ -16,8 +17,6 @@ import com.datastrato.gravitino.dto.responses.DropResponse;
 import com.datastrato.gravitino.dto.responses.EntityListResponse;
 import com.datastrato.gravitino.dto.responses.TableResponse;
 import com.datastrato.gravitino.dto.util.DTOConverters;
-import com.datastrato.gravitino.rel.Distribution;
-import com.datastrato.gravitino.rel.SortOrder;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.server.web.Utils;
@@ -77,10 +76,6 @@ public class TableOperations {
     try {
       request.validate();
       NameIdentifier ident = NameIdentifier.ofTable(metalake, catalog, schema, request.getName());
-      SortOrder[] sortOrders =
-          com.datastrato.gravitino.dto.util.DTOConverters.fromDTOs(request.getSortOrders());
-      Distribution distribution =
-          com.datastrato.gravitino.dto.util.DTOConverters.fromDTO(request.getDistribution());
 
       Table table =
           dispatcher.createTable(
@@ -88,9 +83,9 @@ public class TableOperations {
               request.getColumns(),
               request.getComment(),
               request.getProperties(),
-              toTransforms(request.getPartitions()),
-              distribution,
-              sortOrders);
+              fromDTOs(request.getPartitioning()),
+              fromDTO(request.getDistribution()),
+              fromDTOs(request.getSortOrders()));
       return Utils.ok(new TableResponse(DTOConverters.toDTO(table)));
 
     } catch (Exception e) {
