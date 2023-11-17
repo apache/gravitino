@@ -12,6 +12,7 @@ import com.datastrato.gravitino.utils.ByteUtils;
 import com.datastrato.gravitino.utils.Bytes;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import javax.annotation.concurrent.ThreadSafe;
 
@@ -30,12 +31,12 @@ public class KvNameMappingService implements NameMappingService {
   // name prefix of name in name to id mapping,
   // e.g., name_metalake1 -> 1
   //       name_metalake2 -> 2
-  private static final byte[] NAME_PREFIX = "name_".getBytes();
+  private static final byte[] NAME_PREFIX = "name_".getBytes(StandardCharsets.UTF_8);
 
   // id prefix of id in name to id mapping,
   // e.g., id_1 -> metalake1
   //       id_2 -> metalake2
-  private static final byte[] ID_PREFIX = "id_".getBytes();
+  private static final byte[] ID_PREFIX = "id_".getBytes(StandardCharsets.UTF_8);
 
   public KvNameMappingService(KvBackend backend) {
     this.backend = backend;
@@ -45,7 +46,7 @@ public class KvNameMappingService implements NameMappingService {
   public Long getIdByName(String name) throws IOException {
     lock.readLock().lock();
     try {
-      byte[] nameByte = Bytes.concat(NAME_PREFIX, name.getBytes());
+      byte[] nameByte = Bytes.concat(NAME_PREFIX, name.getBytes(StandardCharsets.UTF_8));
       byte[] idByte = backend.get(nameByte);
       return idByte == null ? null : ByteUtils.byteToLong(idByte);
     } finally {
@@ -54,7 +55,7 @@ public class KvNameMappingService implements NameMappingService {
   }
 
   private long bindNameAndId(String name) throws IOException {
-    byte[] nameByte = Bytes.concat(NAME_PREFIX, name.getBytes());
+    byte[] nameByte = Bytes.concat(NAME_PREFIX, name.getBytes(StandardCharsets.UTF_8));
     long id = idGenerator.nextId();
     lock.writeLock().lock();
     try {
@@ -62,7 +63,7 @@ public class KvNameMappingService implements NameMappingService {
           () -> {
             backend.put(nameByte, ByteUtils.longToByte(id), false);
             byte[] idByte = Bytes.concat(ID_PREFIX, ByteUtils.longToByte(id));
-            backend.put(idByte, name.getBytes(), false);
+            backend.put(idByte, name.getBytes(StandardCharsets.UTF_8), false);
             return id;
           });
     } finally {
@@ -76,7 +77,7 @@ public class KvNameMappingService implements NameMappingService {
     try {
       return backend.executeInTransaction(
           () -> {
-            byte[] nameByte = Bytes.concat(NAME_PREFIX, oldName.getBytes());
+            byte[] nameByte = Bytes.concat(NAME_PREFIX, oldName.getBytes(StandardCharsets.UTF_8));
             byte[] oldIdValue = backend.get(nameByte);
 
             // Old mapping has been deleted, no need to do it;
@@ -86,8 +87,14 @@ public class KvNameMappingService implements NameMappingService {
             // Delete old name --> id mapping
             backend.delete(nameByte);
 
-            backend.put(Bytes.concat(NAME_PREFIX, newName.getBytes()), oldIdValue, false);
-            backend.put(Bytes.concat(ID_PREFIX, oldIdValue), newName.getBytes(), true);
+            backend.put(
+                Bytes.concat(NAME_PREFIX, newName.getBytes(StandardCharsets.UTF_8)),
+                oldIdValue,
+                false);
+            backend.put(
+                Bytes.concat(ID_PREFIX, oldIdValue),
+                newName.getBytes(StandardCharsets.UTF_8),
+                true);
             return true;
           });
     } finally {
@@ -97,7 +104,7 @@ public class KvNameMappingService implements NameMappingService {
 
   @Override
   public boolean unbindNameAndId(String name) throws IOException {
-    byte[] nameByte = Bytes.concat(NAME_PREFIX, name.getBytes());
+    byte[] nameByte = Bytes.concat(NAME_PREFIX, name.getBytes(StandardCharsets.UTF_8));
 
     lock.writeLock().lock();
     try {

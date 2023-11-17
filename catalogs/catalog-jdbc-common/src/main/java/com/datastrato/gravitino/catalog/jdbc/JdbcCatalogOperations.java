@@ -16,14 +16,14 @@ import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.TableAlreadyExistsException;
 import com.datastrato.gravitino.meta.CatalogEntity;
 import com.datastrato.gravitino.rel.Column;
-import com.datastrato.gravitino.rel.Distribution;
 import com.datastrato.gravitino.rel.SchemaChange;
-import com.datastrato.gravitino.rel.SortOrder;
 import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.TableCatalog;
 import com.datastrato.gravitino.rel.TableChange;
-import com.datastrato.gravitino.rel.transforms.Transform;
+import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
+import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
+import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -192,7 +192,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
    * @param columns The array of columns for the new table.
    * @param comment The comment for the new table.
    * @param properties The properties for the new table.
-   * @param partitions The partitioning for the new table.
+   * @param partitioning The partitioning for the new table.
    * @return The newly created JdbcTable instance.
    * @throws NoSuchSchemaException If the schema for the table does not exist.
    * @throws TableAlreadyExistsException If the table with the same name already exists.
@@ -203,7 +203,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
       Column[] columns,
       String comment,
       Map<String, String> properties,
-      Transform[] partitions,
+      Transform[] partitioning,
       Distribution distribution,
       SortOrder[] sortOrders)
       throws NoSuchSchemaException, TableAlreadyExistsException {

@@ -4,15 +4,13 @@
  */
 package com.datastrato.gravitino.dto.rel;
 
-import static com.datastrato.gravitino.dto.rel.PartitionUtils.toTransforms;
-
 import com.datastrato.gravitino.dto.AuditDTO;
-import com.datastrato.gravitino.dto.util.DTOConverters;
+import com.datastrato.gravitino.dto.rel.partitions.Partitioning;
 import com.datastrato.gravitino.rel.Column;
-import com.datastrato.gravitino.rel.Distribution;
-import com.datastrato.gravitino.rel.SortOrder;
 import com.datastrato.gravitino.rel.Table;
-import com.datastrato.gravitino.rel.transforms.Transform;
+import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
+import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
+import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import java.util.Map;
@@ -41,8 +39,8 @@ public class TableDTO implements Table {
   @JsonProperty("sortOrders")
   private SortOrderDTO[] sortOrders;
 
-  @JsonProperty("partitions")
-  private Partition[] partitions;
+  @JsonProperty("partitioning")
+  private Partitioning[] partitioning;
 
   private TableDTO() {}
 
@@ -54,7 +52,7 @@ public class TableDTO implements Table {
    * @param columns The columns of the table.
    * @param properties The properties associated with the table.
    * @param audit The audit information for the table.
-   * @param partitions The partitions of the table.
+   * @param partitioning The partitioning of the table.
    */
   private TableDTO(
       String name,
@@ -62,7 +60,7 @@ public class TableDTO implements Table {
       ColumnDTO[] columns,
       Map<String, String> properties,
       AuditDTO audit,
-      Partition[] partitions,
+      Partitioning[] partitioning,
       DistributionDTO distribution,
       SortOrderDTO[] sortOrderDTOs) {
     this.name = name;
@@ -72,7 +70,7 @@ public class TableDTO implements Table {
     this.audit = audit;
     this.distribution = distribution;
     this.sortOrders = sortOrderDTOs;
-    this.partitions = partitions;
+    this.partitioning = partitioning;
   }
 
   @Override
@@ -102,17 +100,17 @@ public class TableDTO implements Table {
 
   @Override
   public Transform[] partitioning() {
-    return toTransforms(partitions);
+    return partitioning;
   }
 
   @Override
   public SortOrder[] sortOrder() {
-    return DTOConverters.fromDTOs(sortOrders);
+    return sortOrders;
   }
 
   @Override
   public Distribution distribution() {
-    return DTOConverters.fromDTO(distribution);
+    return distribution;
   }
 
   /**
@@ -137,7 +135,7 @@ public class TableDTO implements Table {
     protected AuditDTO audit;
     protected SortOrderDTO[] sortOrderDTOs;
     protected DistributionDTO distributionDTO;
-    protected Partition[] partitions;
+    protected Partitioning[] Partitioning;
 
     public Builder() {}
 
@@ -206,8 +204,8 @@ public class TableDTO implements Table {
       return (S) this;
     }
 
-    public S withPartitions(Partition[] partitions) {
-      this.partitions = partitions;
+    public S withPartitioning(Partitioning[] Partitioning) {
+      this.Partitioning = Partitioning;
       return (S) this;
     }
 
@@ -224,7 +222,7 @@ public class TableDTO implements Table {
       Preconditions.checkArgument(audit != null, "audit cannot be null");
 
       return new TableDTO(
-          name, comment, columns, properties, audit, partitions, distributionDTO, sortOrderDTOs);
+          name, comment, columns, properties, audit, Partitioning, distributionDTO, sortOrderDTOs);
     }
   }
 }
