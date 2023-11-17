@@ -1,0 +1,26 @@
+version: '3'
+
+services:
+  gravitino-web:
+    container_name: gravitino-web
+    build:
+      context: ../../
+      dockerfile: docker/production/Dockerfile
+      # args:
+      #   ENV_VARIABLE: ${ENV_VARIABLE}
+      #   NEXT_PUBLIC_ENV_VARIABLE: ${NEXT_PUBLIC_ENV_VARIABLE}
+    env_file:
+      - ../../.env
+    restart: always
+    ports:
+      - 3000:3000
+    networks:
+      - gravitino_web_network
+
+  # Add more containers below (nginx, postgres, etc.)
+
+# Define a network, which allows containers to communicate
+# with each other, by using their container name as a hostname
+networks:
+  gravitino_web_network:
+    # external: true
