@@ -5,7 +5,6 @@
 
 package com.datastrato.gravitino.catalog.lakehouse.iceberg;
 
-import com.datastrato.gravitino.GravitinoEnv;
 import com.datastrato.gravitino.aux.GravitinoAuxiliaryService;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.ops.IcebergTableOps;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.web.IcebergExceptionMapper;
