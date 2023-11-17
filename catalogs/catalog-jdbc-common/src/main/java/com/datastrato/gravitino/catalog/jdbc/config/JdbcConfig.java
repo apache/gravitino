@@ -33,8 +33,8 @@ public class JdbcConfig extends Config {
           .stringConf()
           .createWithDefault(null);
 
-  public static final ConfigEntry<Integer> POOL_MIN_IDLE =
-      new ConfigBuilder("jdbc.connect-pool.min-idle")
+  public static final ConfigEntry<Integer> POOL_MIN_SIZE =
+      new ConfigBuilder("jdbc.connect-pool.min-size")
           .doc("The minimum number of connections in the pool")
           .version("0.3.0")
           .intConf()
@@ -59,8 +59,8 @@ public class JdbcConfig extends Config {
     return get(PASSWORD);
   }
 
-  public int getPoolMinIdle() {
-    return get(POOL_MIN_IDLE);
+  public int getPoolMinSize() {
+    return get(POOL_MIN_SIZE);
   }
 
   public int getPoolMaxSize() {

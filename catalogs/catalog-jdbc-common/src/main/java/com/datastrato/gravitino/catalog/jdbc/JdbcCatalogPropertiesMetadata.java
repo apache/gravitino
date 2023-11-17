@@ -28,11 +28,11 @@ public class JdbcCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
             stringReservedPropertyEntry(
                 JdbcConfig.PASSWORD.getKey(), JdbcConfig.PASSWORD.getDoc(), true),
             integerPropertyEntry(
-                JdbcConfig.POOL_MIN_IDLE.getKey(),
-                JdbcConfig.POOL_MIN_IDLE.getDoc(),
+                JdbcConfig.POOL_MIN_SIZE.getKey(),
+                JdbcConfig.POOL_MIN_SIZE.getDoc(),
                 false,
                 false,
-                JdbcConfig.POOL_MIN_IDLE.getDefaultValue(),
+                JdbcConfig.POOL_MIN_SIZE.getDefaultValue(),
                 true,
                 true),
             integerPropertyEntry(

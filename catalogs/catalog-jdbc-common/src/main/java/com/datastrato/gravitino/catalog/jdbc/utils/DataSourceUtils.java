@@ -47,7 +47,7 @@ public class DataSourceUtils {
       basicDataSource.setPassword(jdbcConfig.getPassword());
     }
     basicDataSource.setMaxTotal(jdbcConfig.getPoolMaxSize());
-    basicDataSource.setMinIdle(jdbcConfig.getPoolMinIdle());
+    basicDataSource.setMinIdle(jdbcConfig.getPoolMinSize());
     // Set each time a connection is taken out from the connection pool, a test statement will be
     // executed to confirm whether the connection is valid.
     basicDataSource.setTestOnBorrow(true);
