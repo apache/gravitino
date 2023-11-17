@@ -24,8 +24,8 @@ import org.slf4j.LoggerFactory;
  */
 public class MetricsSystem implements Closeable {
   private static final Logger LOG = LoggerFactory.getLogger(MetricsSystem.class);
-  private String name;
-  private MetricRegistry metricRegistry;
+  private final String name;
+  private final MetricRegistry metricRegistry;
   private HashMap<String, MetricsSource> metricSources = new HashMap<>();
   private List<Reporter> metricsReporters = new LinkedList<>();
 
@@ -78,14 +78,14 @@ public class MetricsSystem implements Closeable {
   }
 
   // We support JMX reporter for now, todo: support more reporters
-  private void startMetricsReporter() {
+  private void initAndStartMetricsReporter() {
     JmxReporter jmxReporter = JmxReporter.forRegistry(metricRegistry).build();
     jmxReporter.start();
     metricsReporters.add(jmxReporter);
   }
 
   public void start() {
-    startMetricsReporter();
+    initAndStartMetricsReporter();
   }
 
   public MetricRegistry getMetricRegistry() {
