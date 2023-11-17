@@ -10,19 +10,30 @@ import com.datastrato.gravitino.rel.expressions.Expression;
 public class SortOrders {
 
   /**
-   * Create a sort order by the given expression with the default sort direction(ascending) and null
-   * ordering(nulls first).
+   * Create a sort order by the given expression with the ascending sort direction and nulls first
+   * ordering.
    *
    * @param expression The expression to sort by
    * @return The created sort order
    */
-  public static SortImpl of(Expression expression) {
+  public static SortImpl ascending(Expression expression) {
     return of(expression, SortDirection.ASCENDING);
   }
 
   /**
+   * Create a sort order by the given expression with the descending sort direction and nulls last
+   * ordering.
+   *
+   * @param expression The expression to sort by
+   * @return The created sort order
+   */
+  public static SortImpl descending(Expression expression) {
+    return of(expression, SortDirection.DESCENDING);
+  }
+
+  /**
    * Create a sort order by the given expression with the given sort direction and default null
-   * ordering(nulls first).
+   * ordering.
    *
    * @param expression The expression to sort by
    * @param direction The sort direction
