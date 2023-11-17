@@ -22,6 +22,9 @@ class SimpleAuthenticator implements Authenticator {
 
   @Override
   public String authenticateToken(byte[] tokenData) {
+    if (tokenData == null) {
+      return Constants.UNKNOWN_USER_NAME;
+    }
     String authData = new String(tokenData);
     if (StringUtils.isBlank(authData)) {
       return Constants.UNKNOWN_USER_NAME;
