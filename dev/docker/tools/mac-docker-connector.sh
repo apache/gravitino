@@ -28,11 +28,6 @@ if [ ! -f "${bin}/docker-connector" ]; then
   rm -rf "${bin}/${DOCKER_CONNECTOR_PACKAGE_NAME}"
 fi
 
-# Create a docker-connector.conf file with the routes to the docker networks
-if [ ! -f "${bin}/docker-connector.conf" ]; then
-  docker network ls --filter driver=bridge --format "{{.ID}}" | xargs docker network inspect --format "route {{range .IPAM.Config}}{{.Subnet}}{{end}}" > ${bin}/docker-connector.conf
-fi
-
 # Start the Docker image on which the docker-connector server depends.
 docker stop desktop-connector 2>/dev/null
 docker rm desktop-connector 2>/dev/null

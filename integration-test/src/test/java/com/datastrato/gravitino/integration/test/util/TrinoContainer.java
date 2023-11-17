@@ -25,7 +25,7 @@ import org.testcontainers.containers.Network;
 public class TrinoContainer extends BaseContainer {
   public static final Logger LOG = LoggerFactory.getLogger(TrinoContainer.class);
 
-  public static final String DEFAULT_IMAGE = "datastrato/gravitino-ci-trino:0.1.0";
+  public static final String DEFAULT_IMAGE = System.getenv("GRAVITINO_CI_TRINO_DOCKER_IMAGE");
   public static final String HOST_NAME = "gravitino-ci-trino";
   public static final int TRINO_PORT = 8080;
 
