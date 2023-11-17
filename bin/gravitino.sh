@@ -4,20 +4,50 @@
 # This software is licensed under the Apache License version 2.
 #
 #set -ex
-USAGE="-e Usage: bin/gravitino.sh [--config <conf-dir>]\n\t
+USAGE="-e Usage: bin/gravitino.sh [--config <conf-dir>][--debug <port>]\n\t
         {start|stop|restart|status}"
 
-if [[ "$1" == "--config" ]]; then
+CONFIG_DIR=""
+DEBUG_PORT=""
+COMMAND=""
+while [[ "$#" -gt 0 ]]; do
+  case "$1" in
+    --config)
+      shift
+      if [[ "$#" -eq 0 ]]; then
+        echo "ERROR: Missing argument after --config" >&2
+        echo "${USAGE}" >&2
+        exit 1
+      fi
+      CONFIG_DIR="$1"
+      ;;
+    --debug)
+      shift
+      if [[ "$#" -eq 0 ]]; then
+        echo "ERROR: Missing argument after --debug" >&2
+        echo "${USAGE}" >&2
+        exit 1
+      fi
+      DEBUG_PORT="$1"
+      ;;
+    start|stop|restart|status)
+      COMMAND="$1"
+      ;;
+    *)
+      echo "ERROR: Invalid option: $1" >&2
+      echo "${USAGE}" >&2
+      exit 1
+      ;;
+  esac
   shift
-  conf_dir="$1"
-  if [[ ! -d "${conf_dir}" ]]; then
-    echo "ERROR : ${conf_dir} is not a directory"
-    echo ${USAGE}
-    exit 1
-  else
-    export GRAVITINO_CONF_DIR="${conf_dir}"
-  fi
-  shift
+done
+
+if [[ ! -z "$CONFIG_DIR" ]]; then
+  export GRAVITINO_CONF_DIR="$CONFIG_DIR"
+fi
+
+if [[ ! -z "$DEBUG_PORT" ]]; then
+  export GRAVITINO_DEBUG_PORT="$DEBUG_PORT"
 fi
 
 bin="$(dirname "${BASH_SOURCE-$0}")"
@@ -96,7 +126,13 @@ function start() {
     mkdir -p "${GRAVITINO_LOG_DIR}"
   fi
 
-  nohup ${JAVA_RUNNER} ${JAVA_OPTS} ${GRAVITINO_DEBUG_OPTS} -cp ${GRAVITINO_CLASSPATH} ${GRAVITINO_SERVER_NAME} >> "${GRAVITINO_OUTFILE}" 2>&1 &
+  local debug_arg=""
+    if [[ ! -z "$GRAVITINO_DEBUG_PORT" ]]; then
+      debug_arg="-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=${GRAVITINO_DEBUG_PORT}"
+      echo "Start debug mode, debug port is ${GRAVITINO_DEBUG_PORT}"
+    fi
+
+  nohup ${JAVA_RUNNER} ${JAVA_OPTS} ${GRAVITINO_DEBUG_OPTS} ${debug_arg} -cp ${GRAVITINO_CLASSPATH} ${GRAVITINO_SERVER_NAME} >> "${GRAVITINO_OUTFILE}" 2>&1 &
 
   pid=$!
   if [[ -z "${pid}" ]]; then
@@ -133,7 +169,7 @@ JAVA_OPTS+=" -Dgravitino.log.path=${GRAVITINO_LOG_DIR} ${GRAVITINO_MEM}"
 
 addJarInDir "${GRAVITINO_HOME}/libs"
 
-case "${1}" in
+case "${COMMAND}" in
   start)
     start
     ;;

@@ -68,6 +68,12 @@ To start the Gravitino server, please run:
 ./bin/gravitino.sh start
 ```
 
+To start the Gravitino server debug-mode, please run:
+
+```shell
+./bin/gravitino.sh --debug 5005 start
+```
+
 To stop the Gravitino server, please run:
 
 ```shell
