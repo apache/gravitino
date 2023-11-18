@@ -34,14 +34,14 @@ public class JdbcConfig extends Config {
           .createWithDefault(null);
 
   public static final ConfigEntry<Integer> POOL_MIN_SIZE =
-      new ConfigBuilder("jdbc.connect-pool.min-size")
+      new ConfigBuilder("jdbc.pool.min-size")
           .doc("The minimum number of connections in the pool")
           .version("0.3.0")
           .intConf()
           .createWithDefault(2);
 
   public static final ConfigEntry<Integer> POOL_MAX_SIZE =
-      new ConfigBuilder("jdbc.connect-pool.max-size")
+      new ConfigBuilder("jdbc.pool.max-size")
           .doc("The maximum number of connections in the pool")
           .version("0.3.0")
           .intConf()
