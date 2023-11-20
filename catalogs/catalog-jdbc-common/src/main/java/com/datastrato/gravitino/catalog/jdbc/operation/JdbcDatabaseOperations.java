@@ -1,0 +1,69 @@
+/*
+ * Copyright 2023 Datastrato.
+ * This software is licensed under the Apache License version 2.
+ */
+
+package com.datastrato.gravitino.catalog.jdbc.operation;
+
+import com.datastrato.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
+import com.datastrato.gravitino.catalog.jdbc.utils.JdbcConnectorUtils;
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.util.Map;
+import javax.sql.DataSource;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/** Operations for managing databases in a JDBC data store. */
+public abstract class JdbcDatabaseOperations implements DatabaseOperation {
+
+  public static final Logger LOG = LoggerFactory.getLogger(JdbcDatabaseOperations.class);
+
+  protected DataSource dataSource;
+  protected JdbcExceptionConverter exceptionMapper;
+
+  @Override
+  public void initialize(final DataSource dataSource, final JdbcExceptionConverter exceptionMapper)
+      throws RuntimeException {
+    this.dataSource = dataSource;
+    this.exceptionMapper = exceptionMapper;
+  }
+
+  @Override
+  public void create(String databaseName, String comment, Map<String, String> properties) {
+    LOG.info("Beginning to create database {}", databaseName);
+    try (final Connection connection = this.dataSource.getConnection()) {
+      JdbcConnectorUtils.executeUpdate(
+          connection, generateCreateDatabaseSql(databaseName, comment, properties));
+      LOG.info("Finished creating database {}", databaseName);
+    } catch (final SQLException se) {
+      throw this.exceptionMapper.toGravitinoException(se);
+    }
+  }
+
+  @Override
+  public void delete(String databaseName, boolean cascade) {
+    LOG.info("Beginning to drop database {}", databaseName);
+    try (final Connection connection = this.dataSource.getConnection()) {
+      JdbcConnectorUtils.executeUpdate(connection, generateDropDatabaseSql(databaseName, cascade));
+      LOG.info("Finished dropping database {}", databaseName);
+    } catch (final SQLException se) {
+      throw this.exceptionMapper.toGravitinoException(se);
+    }
+  }
+
+  /**
+   * @param databaseName The name of the database to create.
+   * @param comment The comment of the database to create.
+   * @return the SQL statement to create a database with the given name and comment.
+   */
+  abstract String generateCreateDatabaseSql(
+      String databaseName, String comment, Map<String, String> properties);
+
+  /**
+   * @param databaseName The name of the database.
+   * @param cascade cascade If set to true, drops all the tables in the schema as well.
+   * @return the SQL statement to drop a database with the given name.
+   */
+  abstract String generateDropDatabaseSql(String databaseName, boolean cascade);
+}

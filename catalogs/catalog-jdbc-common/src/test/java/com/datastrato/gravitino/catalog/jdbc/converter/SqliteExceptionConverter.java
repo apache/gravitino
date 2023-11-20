@@ -1,0 +1,23 @@
+/*
+ * Copyright 2023 Datastrato.
+ * This software is licensed under the Apache License version 2.
+ */
+package com.datastrato.gravitino.catalog.jdbc.converter;
+
+import com.datastrato.gravitino.exceptions.GravitinoRuntimeException;
+import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
+import java.sql.SQLException;
+
+public class SqliteExceptionConverter extends JdbcExceptionConverter {
+
+  public static final int SCHEMA_ALREADY_EXISTS_CODE = 1;
+
+  @Override
+  public GravitinoRuntimeException toGravitinoException(SQLException sqlException) {
+    if (sqlException.getErrorCode() == SCHEMA_ALREADY_EXISTS_CODE) {
+      return new SchemaAlreadyExistsException(sqlException.getMessage(), sqlException);
+    } else {
+      return super.toGravitinoException(sqlException);
+    }
+  }
+}

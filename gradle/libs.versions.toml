@@ -23,6 +23,7 @@ mockserver = "5.13.2"
 commons-lang3 = "3.12.0"
 commons-io = "2.11.0"
 commons-collections4 = "4.4"
+commons-dbcp2 = "2.9.0"
 caffeine = "2.9.3"
 rocksdbjni = "7.7.3"
 iceberg = '1.3.1'
@@ -100,6 +101,7 @@ scala-collection-compat =  { group = "org.scala-lang.modules", name = "scala-col
 sqlite-jdbc = { group = "org.xerial", name = "sqlite-jdbc", version.ref = "sqlite-jdbc" }
 testng = { group = "org.testng", name = "testng", version.ref = "testng" }
 spark-hive = { group = "org.apache.spark", name = "spark-hive_2.13", version.ref = "spark" }
+commons-dbcp2 = { group = "org.apache.commons", name = "commons-dbcp2", version.ref = "commons-dbcp2" }
 testcontainers = { group = "org.testcontainers", name = "testcontainers", version.ref = "testcontainers" }
 testcontainers-junit-jupiter = { group = "org.testcontainers", name = "junit-jupiter", version.ref = "testcontainers" }
 trino-jdbc = { group = "io.trino", name = "trino-jdbc", version.ref = "trino-jdbc" }
