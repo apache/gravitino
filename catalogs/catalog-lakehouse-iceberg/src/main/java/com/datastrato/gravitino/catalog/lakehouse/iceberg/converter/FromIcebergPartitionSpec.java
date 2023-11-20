@@ -4,8 +4,8 @@
  */
 package com.datastrato.gravitino.catalog.lakehouse.iceberg.converter;
 
-import com.datastrato.gravitino.rel.transforms.Transform;
-import com.datastrato.gravitino.rel.transforms.Transforms;
+import com.datastrato.gravitino.rel.expressions.transforms.Transform;
+import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Lists;
 import java.util.List;
@@ -31,37 +31,37 @@ public class FromIcebergPartitionSpec implements PartitionSpecVisitor<Transform>
 
   @Override
   public Transform identity(String sourceName, int sourceId) {
-    return Transforms.identity(new String[] {idToName.get(sourceId)});
+    return Transforms.identity(idToName.get(sourceId));
   }
 
   @Override
   public Transform bucket(String sourceName, int sourceId, int numBuckets) {
-    return Transforms.bucket(new String[] {idToName.get(sourceId)}, numBuckets);
+    return Transforms.bucket(numBuckets, new String[] {idToName.get(sourceId)});
   }
 
   @Override
   public Transform truncate(String sourceName, int sourceId, int width) {
-    return Transforms.truncate(new String[] {idToName.get(sourceId)}, width);
+    return Transforms.truncate(width, idToName.get(sourceId));
   }
 
   @Override
   public Transform year(String sourceName, int sourceId) {
-    return Transforms.year(new String[] {idToName.get(sourceId)});
+    return Transforms.year(idToName.get(sourceId));
   }
 
   @Override
   public Transform month(String sourceName, int sourceId) {
-    return Transforms.month(new String[] {idToName.get(sourceId)});
+    return Transforms.month(idToName.get(sourceId));
   }
 
   @Override
   public Transform day(String sourceName, int sourceId) {
-    return Transforms.day(new String[] {idToName.get(sourceId)});
+    return Transforms.day(idToName.get(sourceId));
   }
 
   @Override
   public Transform hour(String sourceName, int sourceId) {
-    return Transforms.hour(new String[] {idToName.get(sourceId)});
+    return Transforms.hour(idToName.get(sourceId));
   }
 
   @Override

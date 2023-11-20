@@ -4,25 +4,22 @@
  */
 package com.datastrato.gravitino.catalog.lakehouse.iceberg.converter;
 
-import static com.datastrato.gravitino.rel.transforms.Transforms.NAME_OF_BUCKET;
-import static com.datastrato.gravitino.rel.transforms.Transforms.NAME_OF_TRUNCATE;
-
-import com.datastrato.gravitino.rel.SortOrder;
-import com.datastrato.gravitino.rel.transforms.Transform;
-import com.datastrato.gravitino.rel.transforms.Transforms;
+import com.datastrato.gravitino.rel.expressions.Expression;
+import com.datastrato.gravitino.rel.expressions.FunctionExpression;
+import com.datastrato.gravitino.rel.expressions.Literal;
+import com.datastrato.gravitino.rel.expressions.NamedReference;
+import com.datastrato.gravitino.rel.expressions.sorts.NullOrdering;
+import com.datastrato.gravitino.rel.expressions.sorts.SortDirection;
+import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.google.common.base.Preconditions;
-import io.substrait.expression.Expression;
-import java.util.Arrays;
 import java.util.Locale;
-import java.util.stream.Collectors;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.iceberg.NullOrder;
 import org.apache.iceberg.Schema;
-import org.apache.iceberg.SortDirection;
 import org.apache.iceberg.expressions.Expressions;
 import org.apache.iceberg.expressions.UnboundTerm;
 
-/** Implement iceberg sort order converter to gravitino sort order. */
+/** Implement gravitino sort order converter to iceberg sort order. */
 public class ToIcebergSortOrder {
 
   private static final String DOT = ".";
@@ -41,70 +38,108 @@ public class ToIcebergSortOrder {
     org.apache.iceberg.SortOrder.Builder sortOrderBuilder =
         org.apache.iceberg.SortOrder.builderFor(schema);
     for (SortOrder sortOrder : sortOrders) {
-      Transform transform = sortOrder.getTransform();
-      if (transform instanceof Transforms.NamedReference) {
-        String fieldName = String.join(DOT, ((Transforms.NamedReference) transform).value());
+      if (sortOrder.expression() instanceof NamedReference.FieldReference) {
+        String fieldName =
+            String.join(DOT, ((NamedReference.FieldReference) sortOrder.expression()).fieldName());
         sortOrderBuilder.sortBy(
-            fieldName, toIceberg(sortOrder.getDirection()), toIceberg(sortOrder.getNullOrdering()));
-      } else if (transform instanceof Transforms.FunctionTrans) {
-        Preconditions.checkArgument(
-            transform.arguments().length == 1,
-            "Iceberg sort order does not support nested field",
-            transform);
-        String colName =
-            Arrays.stream(transform.arguments())
-                .map(t -> ((Transforms.NamedReference) t).value()[0])
-                .collect(Collectors.joining(DOT));
-        UnboundTerm<Object> expression;
-        switch (transform.name().toLowerCase(Locale.ROOT)) {
-          case NAME_OF_BUCKET:
-            int numBuckets =
-                ((Expression.I32Literal)
-                        ((Transforms.LiteralReference) transform.arguments()[0]).value())
-                    .value();
-            expression = Expressions.bucket(colName, numBuckets);
+            fieldName, toIceberg(sortOrder.direction()), toIceberg(sortOrder.nullOrdering()));
+        continue;
+      }
+
+      if (sortOrder.expression() instanceof FunctionExpression) {
+        FunctionExpression sortFunc = (FunctionExpression) sortOrder.expression();
+        UnboundTerm<Object> icebergExpression;
+        switch (sortFunc.functionName().toLowerCase(Locale.ROOT)) {
+          case "bucket":
+            Preconditions.checkArgument(
+                sortFunc.arguments().length == 2, "Bucket sort should have 2 arguments");
+
+            Expression firstArg = sortFunc.arguments()[0];
+            Preconditions.checkArgument(
+                firstArg instanceof Literal && ((Literal<?>) firstArg).value() instanceof Integer,
+                "Bucket sort's first argument must be a integer literal");
+            int numBuckets = (Integer) ((Literal<?>) firstArg).value();
+
+            Expression secondArg = sortFunc.arguments()[1];
+            Preconditions.checkArgument(
+                secondArg instanceof NamedReference.FieldReference,
+                "Bucket sort's second argument must be a field reference");
+            String fieldName =
+                String.join(DOT, ((NamedReference.FieldReference) secondArg).fieldName());
+
+            icebergExpression = Expressions.bucket(fieldName, numBuckets);
             break;
-          case NAME_OF_TRUNCATE:
-            int width =
-                ((Expression.I32Literal)
-                        ((Transforms.LiteralReference) transform.arguments()[0]).value())
-                    .value();
-            expression = Expressions.truncate(colName, width);
+          case "truncate":
+            Preconditions.checkArgument(
+                sortFunc.arguments().length == 2, "Truncate sort should have 2 arguments");
+
+            firstArg = sortFunc.arguments()[0];
+            Preconditions.checkArgument(
+                firstArg instanceof Literal && ((Literal<?>) firstArg).value() instanceof Integer,
+                "Truncate sort's first argument must be a integer literal");
+            int width = (Integer) ((Literal<?>) firstArg).value();
+
+            secondArg = sortFunc.arguments()[1];
+            Preconditions.checkArgument(
+                secondArg instanceof NamedReference.FieldReference,
+                "Truncate sort's second argument must be a field reference");
+            fieldName = String.join(DOT, ((NamedReference.FieldReference) secondArg).fieldName());
+
+            icebergExpression = Expressions.truncate(fieldName, width);
             break;
-          case Transforms.NAME_OF_YEAR:
-            expression = Expressions.year(colName);
+          case "year":
+            icebergExpression = Expressions.year(getValidSingleField("year", sortFunc.arguments()));
             break;
-          case Transforms.NAME_OF_MONTH:
-            expression = Expressions.month(colName);
+          case "month":
+            icebergExpression =
+                Expressions.month(getValidSingleField("month", sortFunc.arguments()));
             break;
-          case Transforms.NAME_OF_DAY:
-            expression = Expressions.day(colName);
+          case "day":
+            icebergExpression = Expressions.day(getValidSingleField("day", sortFunc.arguments()));
             break;
-          case Transforms.NAME_OF_HOUR:
-            expression = Expressions.hour(colName);
+          case "hour":
+            icebergExpression = Expressions.hour(getValidSingleField("hour", sortFunc.arguments()));
             break;
           default:
             throw new UnsupportedOperationException(
-                "Transform is not supported: " + transform.name());
+                "Sort function is not supported: " + sortFunc.functionName());
         }
         sortOrderBuilder.sortBy(
-            expression,
-            toIceberg(sortOrder.getDirection()),
-            toIceberg(sortOrder.getNullOrdering()));
-      } else {
-        throw new UnsupportedOperationException("Transform is not supported: " + transform.name());
+            icebergExpression,
+            toIceberg(sortOrder.direction()),
+            toIceberg(sortOrder.nullOrdering()));
+        continue;
       }
+
+      throw new UnsupportedOperationException(
+          "Sort expression is not supported: " + sortOrder.expression());
     }
     return sortOrderBuilder.build();
   }
 
-  private static NullOrder toIceberg(SortOrder.NullOrdering nullOrdering) {
-    return nullOrdering == SortOrder.NullOrdering.FIRST
-        ? NullOrder.NULLS_FIRST
-        : NullOrder.NULLS_LAST;
+  private static String getValidSingleField(String functionName, Expression[] arguments) {
+    Preconditions.checkArgument(
+        arguments.length == 1,
+        "Sort function %s should have 1 argument, but got %s",
+        functionName,
+        arguments.length);
+    Expression argument = arguments[0];
+    Preconditions.checkArgument(
+        argument instanceof NamedReference.FieldReference,
+        "Sort function %s's argument should be a field reference, but got %s",
+        functionName,
+        argument);
+    NamedReference.FieldReference fieldReference = (NamedReference.FieldReference) argument;
+    return String.join(DOT, fieldReference.fieldName());
   }
 
-  private static SortDirection toIceberg(SortOrder.Direction direction) {
-    return direction == SortOrder.Direction.ASC ? SortDirection.ASC : SortDirection.DESC;
+  private static NullOrder toIceberg(NullOrdering nullOrdering) {
+    return nullOrdering == NullOrdering.NULLS_FIRST ? NullOrder.NULLS_FIRST : NullOrder.NULLS_LAST;
+  }
+
+  private static org.apache.iceberg.SortDirection toIceberg(SortDirection direction) {
+    return direction == SortDirection.ASCENDING
+        ? org.apache.iceberg.SortDirection.ASC
+        : org.apache.iceberg.SortDirection.DESC;
   }
 }

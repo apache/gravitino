@@ -22,7 +22,7 @@ public class TestTable extends BaseTable {
       table.auditInfo = auditInfo;
       table.distribution = distribution;
       table.sortOrders = sortOrders;
-      table.partitions = partitions;
+      table.partitioning = partitioning;
       return table;
     }
   }

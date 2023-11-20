@@ -4,8 +4,8 @@
  */
 package com.datastrato.gravitino.catalog.lakehouse.iceberg.converter;
 
-import com.datastrato.gravitino.rel.transforms.Transform;
-import com.datastrato.gravitino.rel.transforms.Transforms;
+import com.datastrato.gravitino.rel.expressions.transforms.Transform;
+import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -59,15 +59,16 @@ public class TestFromIcebergPartitionSpec extends TestBaseConvert {
                     partitionField -> idToName.get(partitionField.sourceId())));
 
     for (Transform transform : transforms) {
-      if (transform instanceof Transforms.FunctionTrans) {
-        String colName = ((Transforms.NamedReference) transform.arguments()[0]).value()[0];
+      if (transform instanceof Transforms.TruncateTransform) {
+        String colName = ((Transforms.TruncateTransform) transform).fieldName()[0];
         String transformKey =
             String.join(
                 "_", colName, "truncate".equals(transform.name()) ? "trunc" : transform.name());
         Assertions.assertTrue(transformMapping.containsKey(transformKey));
         Assertions.assertEquals(transformMapping.get(transformKey), colName);
-      } else if (transform instanceof Transforms.NamedReference) {
-        Assertions.assertEquals("col_1", ((Transforms.NamedReference) transform).value()[0]);
+      } else if (transform instanceof Transforms.IdentityTransform) {
+        Assertions.assertEquals(
+            "col_1", ((Transform.SingleFieldTransform) transform).fieldName()[0]);
       }
     }
   }

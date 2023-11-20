@@ -25,7 +25,7 @@ import org.testcontainers.containers.Network;
 public class TrinoContainer extends BaseContainer {
   public static final Logger LOG = LoggerFactory.getLogger(TrinoContainer.class);
 
-  public static final String DEFAULT_IMAGE = "datastrato/gravitino-ci-trino:latest";
+  public static final String DEFAULT_IMAGE = System.getenv("GRAVITINO_CI_TRINO_DOCKER_IMAGE");
   public static final String HOST_NAME = "gravitino-ci-trino";
   public static final int TRINO_PORT = 8080;
 
@@ -117,17 +117,15 @@ public class TrinoContainer extends BaseContainer {
   // Check tha Trino has synchronized the catalog from Gravitino
   public boolean checkSyncCatalogFromGravitino(
       int retryLimit, String metalakeName, String catalogName) {
-    boolean catalogFoundInTrino = false;
     int nRetry = 0;
     int sleepTime = 5000;
-    while (!catalogFoundInTrino && nRetry++ < retryLimit) {
+    while (nRetry++ < retryLimit) {
       ArrayList<ArrayList<String>> queryData =
           executeQuerySQL(format("SHOW CATALOGS LIKE '%s.%s'", metalakeName, catalogName));
       for (ArrayList<String> record : queryData) {
         String columnValue = record.get(0);
         if (columnValue.equals(String.format("%s.%s", metalakeName, catalogName))) {
-          catalogFoundInTrino = true;
-          break;
+          return true;
         }
       }
       try {
@@ -139,7 +137,7 @@ public class TrinoContainer extends BaseContainer {
         // ignore
       }
     }
-    return catalogFoundInTrino;
+    return false;
   }
 
   private boolean testTrinoJdbcConnection() {

@@ -25,15 +25,17 @@ import com.datastrato.gravitino.exceptions.TableAlreadyExistsException;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.CatalogEntity;
 import com.datastrato.gravitino.rel.Column;
-import com.datastrato.gravitino.rel.Distribution;
 import com.datastrato.gravitino.rel.SchemaChange;
-import com.datastrato.gravitino.rel.SortOrder;
 import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.TableCatalog;
 import com.datastrato.gravitino.rel.TableChange;
-import com.datastrato.gravitino.rel.transforms.Transform;
-import com.datastrato.gravitino.rel.transforms.Transforms;
+import com.datastrato.gravitino.rel.expressions.NamedReference;
+import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
+import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
+import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
+import com.datastrato.gravitino.rel.expressions.transforms.Transform;
+import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
@@ -435,23 +437,23 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     }
   }
 
-  private void validatePartitionForCreate(Column[] columns, Transform[] partitions) {
-    int partitionStartIndex = columns.length - partitions.length;
+  private void validatePartitionForCreate(Column[] columns, Transform[] partitioning) {
+    int partitionStartIndex = columns.length - partitioning.length;
 
-    for (int i = 0; i < partitions.length; i++) {
+    for (int i = 0; i < partitioning.length; i++) {
       Preconditions.checkArgument(
-          partitions[i] instanceof Transforms.NamedReference,
+          partitioning[i] instanceof Transforms.IdentityTransform,
           "Hive partition only supports identity transform");
 
-      Transforms.NamedReference namedReference = (Transforms.NamedReference) partitions[i];
+      Transforms.IdentityTransform identity = (Transforms.IdentityTransform) partitioning[i];
       Preconditions.checkArgument(
-          namedReference.value().length == 1, "Hive partition does not support nested field");
+          identity.fieldName().length == 1, "Hive partition does not support nested field");
 
       // The partition field must be placed at the end of the columns in order.
       // For example, if the table has columns [a, b, c, d], then the partition field must be
       // [b, c, d] or [c, d] or [d].
       Preconditions.checkArgument(
-          columns[partitionStartIndex + i].name().equals(namedReference.value()[0]),
+          columns[partitionStartIndex + i].name().equals(identity.fieldName()[0]),
           "The partition field must be placed at the end of the columns in order");
     }
   }
@@ -516,18 +518,18 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
   }
 
   private void validateDistributionAndSort(Distribution distribution, SortOrder[] sortOrder) {
-    if (distribution != Distribution.NONE) {
+    if (distribution != Distributions.NONE) {
       boolean allNameReference =
-          Arrays.stream(distribution.transforms())
-              .allMatch(t -> t instanceof Transforms.NamedReference);
+          Arrays.stream(distribution.expressions())
+              .allMatch(t -> t instanceof NamedReference.FieldReference);
       Preconditions.checkArgument(
-          allNameReference, "Hive distribution only supports name reference");
+          allNameReference, "Hive distribution only supports field reference");
     }
 
     if (ArrayUtils.isNotEmpty(sortOrder)) {
       boolean allNameReference =
           Arrays.stream(sortOrder)
-              .allMatch(t -> t.getTransform() instanceof Transforms.NamedReference);
+              .allMatch(t -> t.expression() instanceof NamedReference.FieldReference);
       Preconditions.checkArgument(allNameReference, "Hive sort order only supports name reference");
     }
   }
@@ -539,7 +541,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
    * @param columns The array of columns for the new table.
    * @param comment The comment for the new table.
    * @param properties The properties for the new table.
-   * @param partitions The partitioning for the new table.
+   * @param partitioning The partitioning for the new table.
    * @return The newly created HiveTable instance.
    * @throws NoSuchSchemaException If the schema for the table does not exist.
    * @throws TableAlreadyExistsException If the table with the same name already exists.
@@ -550,13 +552,13 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       Column[] columns,
       String comment,
       Map<String, String> properties,
-      Transform[] partitions,
+      Transform[] partitioning,
       Distribution distribution,
       SortOrder[] sortOrders)
       throws NoSuchSchemaException, TableAlreadyExistsException {
     NameIdentifier schemaIdent = NameIdentifier.of(tableIdent.namespace().levels());
 
-    validatePartitionForCreate(columns, partitions);
+    validatePartitionForCreate(columns, partitioning);
     validateDistributionAndSort(distribution, sortOrders);
 
     Arrays.stream(columns).forEach(c -> validateColumnType(c.name(), c.dataType()));
@@ -586,7 +588,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
                       .withCreator(currentUser())
                       .withCreateTime(Instant.now())
                       .build())
-              .withPartitions(partitions)
+              .withPartitioning(partitioning)
               .build();
       clientPool.run(
           c -> {

@@ -6,10 +6,10 @@ package com.datastrato.gravitino.catalog.rel;
 
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.rel.Column;
-import com.datastrato.gravitino.rel.Distribution;
-import com.datastrato.gravitino.rel.SortOrder;
 import com.datastrato.gravitino.rel.Table;
-import com.datastrato.gravitino.rel.transforms.Transform;
+import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
+import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
+import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import java.util.Map;
 import javax.annotation.Nullable;
 import lombok.ToString;
@@ -28,7 +28,7 @@ public abstract class BaseTable implements Table {
 
   protected Column[] columns;
 
-  @Nullable protected Transform[] partitions;
+  @Nullable protected Transform[] partitioning;
 
   @Nullable protected SortOrder[] sortOrders;
 
@@ -68,7 +68,7 @@ public abstract class BaseTable implements Table {
   /** Returns the partitioning strategies of the table. */
   @Override
   public Transform[] partitioning() {
-    return partitions;
+    return partitioning;
   }
 
   /** Return the array of {@link SortOrder} of the table. */
@@ -105,7 +105,7 @@ public abstract class BaseTable implements Table {
 
     SELF withAuditInfo(AuditInfo auditInfo);
 
-    SELF withPartitions(Transform[] partitions);
+    SELF withPartitioning(Transform[] partitioning);
 
     SELF withSortOrders(SortOrder[] sortOrders);
 
@@ -127,7 +127,7 @@ public abstract class BaseTable implements Table {
     protected Map<String, String> properties;
     protected AuditInfo auditInfo;
     protected Column[] columns;
-    protected Transform[] partitions;
+    protected Transform[] partitioning;
     protected SortOrder[] sortOrders;
 
     protected Distribution distribution;
@@ -195,12 +195,12 @@ public abstract class BaseTable implements Table {
     /**
      * Sets the partitioning strategies of the table.
      *
-     * @param partitions The partitioning strategies of the table.
+     * @param partitioning The partitioning strategies of the table.
      * @return The builder instance.
      */
     @Override
-    public SELF withPartitions(Transform[] partitions) {
-      this.partitions = partitions;
+    public SELF withPartitioning(Transform[] partitioning) {
+      this.partitioning = partitioning;
       return self();
     }
 

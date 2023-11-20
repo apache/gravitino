@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-// Referred from Apache's connector/catalog implementation
+// Referred from Apache Spark's connector/catalog implementation
 // sql/catalyst/src/main/java/org/apache/spark/sql/connector/catalog/TableChange.java
 
 package com.datastrato.gravitino.rel;

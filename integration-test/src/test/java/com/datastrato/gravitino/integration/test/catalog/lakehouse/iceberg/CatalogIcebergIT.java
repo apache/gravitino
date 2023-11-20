@@ -4,8 +4,6 @@
  */
 package com.datastrato.gravitino.integration.test.catalog.lakehouse.iceberg;
 
-import static com.datastrato.gravitino.rel.transforms.Transforms.day;
-import static com.datastrato.gravitino.rel.transforms.Transforms.identity;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.datastrato.gravitino.Catalog;
@@ -18,24 +16,28 @@ import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergTable;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.ops.IcebergTableOpsHelper;
 import com.datastrato.gravitino.client.GravitinoMetaLake;
 import com.datastrato.gravitino.dto.rel.ColumnDTO;
+import com.datastrato.gravitino.dto.rel.SortOrderDTO;
+import com.datastrato.gravitino.dto.rel.expressions.FieldReferenceDTO;
+import com.datastrato.gravitino.dto.rel.partitions.DayPartitioningDTO;
+import com.datastrato.gravitino.dto.rel.partitions.IdentityPartitioningDTO;
+import com.datastrato.gravitino.dto.rel.partitions.Partitioning;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.TableAlreadyExistsException;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
 import com.datastrato.gravitino.rel.Column;
-import com.datastrato.gravitino.rel.Distribution;
 import com.datastrato.gravitino.rel.Schema;
 import com.datastrato.gravitino.rel.SchemaChange;
-import com.datastrato.gravitino.rel.SortOrder;
-import com.datastrato.gravitino.rel.SortOrder.Direction;
-import com.datastrato.gravitino.rel.SortOrder.NullOrdering;
 import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.TableCatalog;
 import com.datastrato.gravitino.rel.TableChange;
-import com.datastrato.gravitino.rel.transforms.Transform;
-import com.datastrato.gravitino.rel.transforms.Transforms;
+import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
+import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
+import com.datastrato.gravitino.rel.expressions.sorts.NullOrdering;
+import com.datastrato.gravitino.rel.expressions.sorts.SortDirection;
+import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import io.substrait.type.TypeCreator;
@@ -52,7 +54,6 @@ import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.iceberg.NullOrder;
 import org.apache.iceberg.PartitionField;
 import org.apache.iceberg.PartitionSpec;
-import org.apache.iceberg.SortDirection;
 import org.apache.iceberg.SortField;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.NoSuchNamespaceException;
@@ -299,7 +300,7 @@ public class CatalogIcebergIT extends AbstractIT {
                 table_comment,
                 createProperties(),
                 null,
-                Distribution.NONE,
+                Distributions.NONE,
                 null));
     // drop schema failed check.
     Assertions.assertFalse(schemas.dropSchema(schemaIdent, true));
@@ -318,21 +319,18 @@ public class CatalogIcebergIT extends AbstractIT {
 
     NameIdentifier tableIdentifier =
         NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
-    Distribution distribution = Distribution.NONE;
+    Distribution distribution = Distributions.NONE;
 
-    final SortOrder[] sortOrders =
-        new SortOrder[] {
-          SortOrder.builder()
-              .withNullOrdering(NullOrdering.FIRST)
-              .withDirection(Direction.DESC)
-              .withTransform(Transforms.field(new String[] {ICEBERG_COL_NAME2}))
+    final SortOrderDTO[] sortOrders =
+        new SortOrderDTO[] {
+          new SortOrderDTO.Builder()
+              .withNullOrder(NullOrdering.NULLS_FIRST)
+              .withDirection(SortDirection.DESCENDING)
+              .withSortTerm(FieldReferenceDTO.of(ICEBERG_COL_NAME2))
               .build()
         };
 
-    Transform[] partitioning =
-        new Transform[] {
-          day(new String[] {columns[1].name()}),
-        };
+    Partitioning[] partitioning = new Partitioning[] {DayPartitioningDTO.of(columns[1].name())};
 
     Map<String, String> properties = createProperties();
     TableCatalog tableCatalog = catalog.asTableCatalog();
@@ -406,7 +404,7 @@ public class CatalogIcebergIT extends AbstractIT {
                     columns,
                     table_comment,
                     properties,
-                    new Transform[0],
+                    Partitioning.EMPTY_PARTITIONING,
                     distribution,
                     sortOrders));
   }
@@ -424,8 +422,8 @@ public class CatalogIcebergIT extends AbstractIT {
         columns,
         table_comment,
         properties,
-        new Transform[0],
-        Distribution.NONE,
+        Partitioning.EMPTY_PARTITIONING,
+        Distributions.NONE,
         new SortOrder[0]);
     NameIdentifier[] nameIdentifiers =
         tableCatalog.listTables(Namespace.of(metalakeName, catalogName, schemaName));
@@ -443,8 +441,8 @@ public class CatalogIcebergIT extends AbstractIT {
         columns,
         table_comment,
         properties,
-        new Transform[0],
-        Distribution.NONE,
+        Partitioning.EMPTY_PARTITIONING,
+        Distributions.NONE,
         new SortOrder[0]);
     nameIdentifiers = tableCatalog.listTables(Namespace.of(metalakeName, catalogName, schemaName));
     Assertions.assertEquals(2, nameIdentifiers.length);
@@ -483,7 +481,7 @@ public class CatalogIcebergIT extends AbstractIT {
             columns,
             table_comment,
             createProperties(),
-            new Transform[] {identity(columns[0])});
+            new Partitioning[] {IdentityPartitioningDTO.of(columns[0].name())});
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () -> {
@@ -539,7 +537,8 @@ public class CatalogIcebergIT extends AbstractIT {
 
     Assertions.assertEquals(1, table.partitioning().length);
     Assertions.assertEquals(
-        columns[0].name(), ((Transforms.NamedReference) table.partitioning()[0]).value()[0]);
+        columns[0].name(),
+        ((Partitioning.SingleFieldPartitioning) table.partitioning()[0]).fieldName()[0]);
 
     ColumnDTO col1 =
         new ColumnDTO.Builder()
@@ -573,8 +572,8 @@ public class CatalogIcebergIT extends AbstractIT {
             newColumns,
             table_comment,
             ImmutableMap.of(),
-            new Transform[0],
-            Distribution.NONE,
+            Partitioning.EMPTY_PARTITIONING,
+            Distributions.NONE,
             new SortOrder[0]);
 
     IllegalArgumentException illegalArgumentException =
@@ -621,12 +620,20 @@ public class CatalogIcebergIT extends AbstractIT {
   void testPartitionAndSortOrderIcebergTable() {
     ColumnDTO[] columns = createColumns();
     String testTableName = GravitinoITUtils.genRandomName("test_table");
-    SortOrder[] sortOrders = {
-      SortOrder.fieldSortOrder(new String[] {columns[0].name()}, Direction.ASC, NullOrdering.FIRST),
-      SortOrder.fieldSortOrder(new String[] {columns[2].name()}, Direction.DESC, NullOrdering.LAST)
+    SortOrderDTO[] sortOrders = {
+      new SortOrderDTO.Builder()
+          .withSortTerm(FieldReferenceDTO.of(columns[0].name()))
+          .withDirection(SortDirection.ASCENDING)
+          .withNullOrder(NullOrdering.NULLS_FIRST)
+          .build(),
+      new SortOrderDTO.Builder()
+          .withSortTerm(FieldReferenceDTO.of(columns[2].name()))
+          .withDirection(SortDirection.DESCENDING)
+          .withNullOrder(NullOrdering.NULLS_LAST)
+          .build()
     };
-    Transform[] transforms = {
-      day(new String[] {columns[1].name()}), Transforms.identity(columns[2])
+    Partitioning[] partitioning = {
+      DayPartitioningDTO.of(columns[1].name()), IdentityPartitioningDTO.of(columns[2].name())
     };
     catalog
         .asTableCatalog()
@@ -635,8 +642,8 @@ public class CatalogIcebergIT extends AbstractIT {
             columns,
             table_comment,
             createProperties(),
-            transforms,
-            Distribution.NONE,
+            partitioning,
+            Distributions.NONE,
             sortOrders);
 
     TableIdentifier tableIdentifier = TableIdentifier.of(schemaName, testTableName);
@@ -654,9 +661,9 @@ public class CatalogIcebergIT extends AbstractIT {
     Assertions.assertEquals(2, sortFields.size());
     Assertions.assertEquals(columns[0].name(), idToName.get(sortFields.get(0).sourceId()));
     Assertions.assertEquals(columns[2].name(), idToName.get(sortFields.get(1).sourceId()));
-    Assertions.assertEquals(SortDirection.ASC, sortFields.get(0).direction());
+    Assertions.assertEquals(org.apache.iceberg.SortDirection.ASC, sortFields.get(0).direction());
     Assertions.assertEquals(NullOrder.NULLS_FIRST, sortFields.get(0).nullOrder());
-    Assertions.assertEquals(SortDirection.DESC, sortFields.get(1).direction());
+    Assertions.assertEquals(org.apache.iceberg.SortDirection.DESC, sortFields.get(1).direction());
     Assertions.assertEquals(NullOrder.NULLS_LAST, sortFields.get(1).nullOrder());
   }
 
@@ -665,11 +672,19 @@ public class CatalogIcebergIT extends AbstractIT {
     ColumnDTO[] columns = createColumns();
     String testTableName = GravitinoITUtils.genRandomName("test_table");
     SortOrder[] sortOrders = {
-      SortOrder.fieldSortOrder(new String[] {columns[0].name()}, Direction.ASC, NullOrdering.FIRST),
-      SortOrder.fieldSortOrder(new String[] {columns[2].name()}, Direction.DESC, NullOrdering.LAST)
+      new SortOrderDTO.Builder()
+          .withSortTerm(FieldReferenceDTO.of(columns[0].name()))
+          .withDirection(SortDirection.ASCENDING)
+          .withNullOrder(NullOrdering.NULLS_FIRST)
+          .build(),
+      new SortOrderDTO.Builder()
+          .withSortTerm(FieldReferenceDTO.of(columns[2].name()))
+          .withDirection(SortDirection.DESCENDING)
+          .withNullOrder(NullOrdering.NULLS_LAST)
+          .build()
     };
-    Transform[] transforms = {
-      day(new String[] {columns[1].name()}), Transforms.identity(columns[2])
+    Partitioning[] transforms = {
+      DayPartitioningDTO.of(columns[1].name()), IdentityPartitioningDTO.of(columns[2].name())
     };
     catalog
         .asTableCatalog()
@@ -679,7 +694,7 @@ public class CatalogIcebergIT extends AbstractIT {
             table_comment,
             createProperties(),
             transforms,
-            Distribution.NONE,
+            Distributions.NONE,
             sortOrders);
     TableIdentifier tableIdentifier = TableIdentifier.of(schemaName, testTableName);
     List<String> values = new ArrayList<>();

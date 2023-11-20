@@ -4,16 +4,11 @@
  */
 package com.datastrato.gravitino.catalog.lakehouse.iceberg.converter;
 
-import static com.datastrato.gravitino.rel.transforms.Transforms.NAME_OF_BUCKET;
-import static com.datastrato.gravitino.rel.transforms.Transforms.NAME_OF_TRUNCATE;
-
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergTable;
-import com.datastrato.gravitino.rel.transforms.Transform;
-import com.datastrato.gravitino.rel.transforms.Transforms;
+import com.datastrato.gravitino.rel.expressions.transforms.Transform;
+import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import io.substrait.expression.ImmutableExpression;
-import java.util.Locale;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
 
@@ -46,76 +41,35 @@ public class ToIcebergPartitionSpec {
     if (partitioning == null || partitioning.length == 0) {
       return PartitionSpec.unpartitioned();
     }
+
     PartitionSpec.Builder builder = PartitionSpec.builderFor(schema);
     for (Transform transform : partitioning) {
-      if (transform instanceof Transforms.NamedReference) {
-        String[] fieldName = ((Transforms.NamedReference) transform).value();
-        Preconditions.checkArgument(
-            fieldName.length == 1, "Iceberg partition does not support nested field", transform);
+      if (transform instanceof Transforms.IdentityTransform) {
+        String[] fieldName = ((Transforms.IdentityTransform) transform).fieldName();
         String colName = String.join(DOT, fieldName);
         builder.identity(colName);
-      } else if (transform instanceof Transforms.FunctionTrans) {
-        String colName =
-            String.join(DOT, ((Transforms.NamedReference) transform.arguments()[0]).value());
-        switch (transform.name().toLowerCase(Locale.ROOT)) {
-          case NAME_OF_BUCKET:
-            builder.bucket(colName, findWidth(transform));
-            break;
-          case Transforms.NAME_OF_YEAR:
-            builder.year(colName);
-            break;
-          case Transforms.NAME_OF_MONTH:
-            builder.month(colName);
-            break;
-          case Transforms.NAME_OF_DAY:
-            builder.day(colName);
-            break;
-          case Transforms.NAME_OF_HOUR:
-            builder.hour(colName);
-            break;
-          case NAME_OF_TRUNCATE:
-            builder.truncate(colName, findWidth(transform));
-            break;
-          default:
-            throw new UnsupportedOperationException(
-                "Transform is not supported: " + transform.name());
-        }
+      } else if (transform instanceof Transforms.BucketTransform) {
+        String[][] fieldNames = ((Transforms.BucketTransform) transform).fieldNames();
+        Preconditions.checkArgument(
+            fieldNames.length == 1, "Iceberg partition does not support multi fields", transform);
+        builder.bucket(
+            String.join(DOT, fieldNames[0]), ((Transforms.BucketTransform) transform).numBuckets());
+      } else if (transform instanceof Transforms.TruncateTransform) {
+        Transforms.TruncateTransform truncateTransform = (Transforms.TruncateTransform) transform;
+        builder.truncate(
+            String.join(DOT, truncateTransform.fieldName()), truncateTransform.width());
+      } else if (transform instanceof Transforms.YearTransform) {
+        builder.year(String.join(DOT, ((Transforms.YearTransform) transform).fieldName()));
+      } else if (transform instanceof Transforms.MonthTransform) {
+        builder.month(String.join(DOT, ((Transforms.MonthTransform) transform).fieldName()));
+      } else if (transform instanceof Transforms.DayTransform) {
+        builder.day(String.join(DOT, ((Transforms.DayTransform) transform).fieldName()));
+      } else if (transform instanceof Transforms.HourTransform) {
+        builder.hour(String.join(DOT, ((Transforms.HourTransform) transform).fieldName()));
       } else {
         throw new UnsupportedOperationException("Transform is not supported: " + transform.name());
       }
     }
     return builder.build();
-  }
-
-  private static int findWidth(Transform transform) {
-    // transform here format is: truncate(fieldName, width) or bucket(fieldName, numBuckets)
-    Transform expr = transform.arguments()[1];
-    if (expr instanceof Transforms.LiteralReference) {
-      Transforms.LiteralReference literalReference = (Transforms.LiteralReference) expr;
-      if (literalReference.value() instanceof ImmutableExpression.I8Literal) {
-        int val =
-            ((ImmutableExpression.I8Literal) ((Transforms.LiteralReference) expr).value()).value();
-        checkTransformArgument(val > 0, transform);
-        return val;
-      } else if (literalReference.value() instanceof ImmutableExpression.I16Literal) {
-        int val = ((ImmutableExpression.I16Literal) literalReference.value()).value();
-        checkTransformArgument(val > 0, transform);
-        return val;
-      } else if (literalReference.value() instanceof ImmutableExpression.I32Literal) {
-        int val = ((ImmutableExpression.I32Literal) literalReference.value()).value();
-        checkTransformArgument(val > 0, transform);
-        return val;
-
-      } else if (literalReference.value() instanceof ImmutableExpression.I64Literal) {
-        long val = ((ImmutableExpression.I64Literal) literalReference.value()).value();
-        checkTransformArgument(val > 0 && val < Integer.MAX_VALUE, transform);
-        return Math.toIntExact(val);
-      }
-    }
-    throw new IllegalArgumentException("Cannot find width for transform: " + transform.name());
-  }
-
-  private static void checkTransformArgument(boolean val, Transform transform) {
-    Preconditions.checkArgument(val, "Unsupported width for transform: %s", transform.name());
   }
 }
