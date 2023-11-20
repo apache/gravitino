@@ -132,6 +132,10 @@ public abstract class Config {
     return MapUtils.getPrefixMap(configMap, prefix);
   }
 
+  public Map<String, String> getAllConfig() {
+    return MapUtils.unmodifiableMap(configMap);
+  }
+
   /**
    * Sets the value of a configuration entry.
    *
