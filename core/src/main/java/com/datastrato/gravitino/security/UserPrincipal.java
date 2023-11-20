@@ -32,7 +32,8 @@ public class UserPrincipal implements Principal {
     if (this == o) {
       return true;
     }
-    if (o instanceof UserPrincipal that) {
+    if (o instanceof UserPrincipal) {
+      UserPrincipal that = (UserPrincipal) o;
       return this.username.equals(that.username);
     }
     return false;

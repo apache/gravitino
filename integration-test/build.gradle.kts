@@ -27,6 +27,7 @@ dependencies {
   implementation(libs.bundles.log4j)
   implementation(libs.bundles.jersey)
   implementation(libs.bundles.jetty)
+  implementation(libs.bundles.jwt)
   implementation(libs.httpclient5)
   implementation(libs.commons.io)
 
