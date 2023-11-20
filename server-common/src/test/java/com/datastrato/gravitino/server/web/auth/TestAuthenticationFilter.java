@@ -16,6 +16,7 @@ import static org.mockito.Mockito.when;
 import com.datastrato.gravitino.exceptions.UnauthorizedException;
 import com.datastrato.gravitino.security.AuthConstants;
 import com.datastrato.gravitino.security.Authenticator;
+import com.datastrato.gravitino.security.UserPrincipal;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.Vector;
@@ -23,8 +24,6 @@ import javax.servlet.FilterChain;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-
-import com.datastrato.gravitino.security.UserPrincipal;
 import org.junit.jupiter.api.Test;
 
 public class TestAuthenticationFilter {
