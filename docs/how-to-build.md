@@ -8,7 +8,7 @@ This software is licensed under the Apache License version 2."
 
 ## Prerequisites
 
-+ JDK 1.8 and JDK 1.17
++ JDK 1.8 and JDK 1.17, **set JDK 1.8 as the default JDK**.
 + Git
 
 Note: Gravitino uses Java 1.8 and Trino uses Java 1.17.
