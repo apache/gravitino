@@ -115,6 +115,7 @@ public class AbstractIT {
     } else {
       GravitinoITUtils.stopGravitinoServer();
     }
+    customConfigs.clear();
     LOG.info("Tearing down Gravitino Server");
   }
 
