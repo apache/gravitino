@@ -53,11 +53,11 @@ public class TestGravitinoConnector extends AbstractTestQueryFramework {
 
       queryRunner.createCatalog("gravitino", "gravitino", properties);
       server.setCatalogConnectorManager(GravitinoPlugin.catalogConnectorManager);
-      // Wait for the catalog to be created. Maximum wait time 30 seconds
-      int max_trise = 35;
-      while (GravitinoPlugin.catalogConnectorManager.getCatalogs().isEmpty() && max_trise > 0) {
-        Thread.sleep(max_trise--);
-        if (max_trise == 0) {
+      // Wait for the catalog to be created. Wait for at least 30 seconds.
+      int max_tries = 35;
+      while (GravitinoPlugin.catalogConnectorManager.getCatalogs().isEmpty() && max_tries > 0) {
+        Thread.sleep(1000);
+        if (max_tries-- == 0) {
           throw new Exception("Catalog memory load failed");
         }
       }
