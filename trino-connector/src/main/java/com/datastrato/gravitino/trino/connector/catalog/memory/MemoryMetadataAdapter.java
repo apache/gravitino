@@ -11,7 +11,7 @@ import java.util.List;
 /** Support trino memory connector for testing. */
 public class MemoryMetadataAdapter extends CatalogConnectorMetadataAdapter {
 
-  MemoryMetadataAdapter(
+  public MemoryMetadataAdapter(
       List<PropertyMetadata<?>> schemaProperties,
       List<PropertyMetadata<?>> tableProperties,
       List<PropertyMetadata<?>> columnProperties) {

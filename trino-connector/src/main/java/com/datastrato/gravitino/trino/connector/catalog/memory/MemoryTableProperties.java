@@ -2,23 +2,22 @@
  * Copyright 2023 Datastrato.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.gravitino.trino.connector.catalog.hive;
+package com.datastrato.gravitino.trino.connector.catalog.memory;
 
-import static io.trino.spi.session.PropertyMetadata.stringProperty;
+import static io.trino.spi.session.PropertyMetadata.integerProperty;
 
 import com.google.common.collect.ImmutableList;
 import io.trino.spi.session.PropertyMetadata;
 import java.util.List;
 
-public class HiveTableProperties {
+public class MemoryTableProperties {
 
   private final List<PropertyMetadata<?>> tablePropertyMetadata;
 
   // TODO yuhui Need to add table properties
-  HiveTableProperties() {
+  MemoryTableProperties() {
     tablePropertyMetadata =
-        ImmutableList.of(
-            stringProperty("format", "Hive storage format for the table", "TEXTFILE", false));
+        ImmutableList.of(integerProperty("max_ttl", "Max ttl days for the table.", 10, false));
   }
 
   public List<PropertyMetadata<?>> getTablePropertyMetadata() {

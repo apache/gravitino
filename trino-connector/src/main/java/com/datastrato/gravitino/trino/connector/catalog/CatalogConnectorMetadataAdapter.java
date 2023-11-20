@@ -41,7 +41,7 @@ public class CatalogConnectorMetadataAdapter {
   }
 
   public Map<String, Object> getSchemaProperties(GravitinoSchema schema) {
-    return normalizeProperties(schema.getProperties(), schemaProperties);
+    return toTrinoSchemaProperties(schema.getProperties());
   }
 
   /** Transform gravitino table metadata to trino ConnectorTableMetadata */
@@ -53,8 +53,7 @@ public class CatalogConnectorMetadataAdapter {
       columnMetadataList.add(getColumnMetadata(column));
     }
 
-    Map<String, Object> properties =
-        normalizeProperties(gravitinoTable.getProperties(), tableProperties);
+    Map<String, Object> properties = toTrinoTableProperties(gravitinoTable.getProperties());
     return new ConnectorTableMetadata(
         schemaTableName, columnMetadataList, properties, Optional.of(gravitinoTable.getComment()));
   }
@@ -64,7 +63,7 @@ public class CatalogConnectorMetadataAdapter {
     String tableName = tableMetadata.getTableSchema().getTable().getTableName();
     String schemaName = tableMetadata.getTableSchema().getTable().getSchemaName();
     String comment = tableMetadata.getComment().orElse("");
-    Map<String, String> properties = removeUnsetProperties(tableMetadata.getProperties());
+    Map<String, String> properties = toGravitonTableProperties(tableMetadata.getProperties());
 
     List<GravitinoColumn> columns = new ArrayList<>();
     for (int i = 0; i < tableMetadata.getColumns().size(); i++) {
@@ -81,12 +80,18 @@ public class CatalogConnectorMetadataAdapter {
 
   /** Transform trino schema metadata to gravitino schema metadata */
   public GravitinoSchema createSchema(String schemaName, Map<String, Object> properties) {
-    return new GravitinoSchema(schemaName, removeUnsetProperties(properties), "");
+    return new GravitinoSchema(schemaName, toGravitinoSchemaProperties(properties), "");
   }
 
   /** Transform gravitino column metadata to trino ColumnMetadata */
   public ColumnMetadata getColumnMetadata(GravitinoColumn column) {
-    return new ColumnMetadata(column.getName(), DataTypeTransformer.getTrinoType(column.getType()));
+    return ColumnMetadata.builder()
+        .setName(column.getName())
+        .setType(DataTypeTransformer.getTrinoType(column.getType()))
+        .setComment(Optional.ofNullable(column.getComment()))
+        .setNullable(column.isNullable())
+        .setHidden(column.isHidden())
+        .build();
   }
 
   /** Transform gravitino table properties to trino ConnectorTableProperties */
@@ -95,7 +100,7 @@ public class CatalogConnectorMetadataAdapter {
   }
 
   /** Normalize gravitino attributes for trino */
-  protected Map<String, Object> normalizeProperties(
+  private Map<String, Object> normalizeProperties(
       Map<String, String> properties, List<PropertyMetadata<?>> propertyTemplate) {
     // TODO yuhui redo this function once gravitino table properties are supported..
     // Trino only supports properties defined in the propertyTemplate.
@@ -109,10 +114,38 @@ public class CatalogConnectorMetadataAdapter {
     return validProperties;
   }
 
+  /** Normalize gravitino table attributes for trino */
+  public Map<String, Object> toTrinoTableProperties(Map<String, String> properties) {
+    return normalizeProperties(properties, tableProperties);
+  }
+
+  /** Normalize gravitino schema attributes for trino */
+  public Map<String, Object> toTrinoSchemaProperties(Map<String, String> properties) {
+    return normalizeProperties(properties, schemaProperties);
+  }
+
+  /** Normalize trino table attributes for gravitino */
+  public Map<String, String> toGravitonTableProperties(Map<String, Object> properties) {
+    return removeUnsetProperties(properties);
+  }
+
+  /** Normalize trino schema attributes for gravitino */
+  public Map<String, String> toGravitinoSchemaProperties(Map<String, Object> properties) {
+    return removeUnsetProperties(properties);
+  }
+
   /** Remove trino unset attributes fro gravitino */
-  protected Map<String, String> removeUnsetProperties(Map<String, Object> properties) {
+  private Map<String, String> removeUnsetProperties(Map<String, Object> properties) {
     return properties.entrySet().stream()
         .filter(e -> e.getValue() != null)
         .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().toString()));
+  }
+
+  public GravitinoColumn createColumn(ColumnMetadata column) {
+    return new GravitinoColumn(
+        column.getName(),
+        DataTypeTransformer.getGravitinoType(column.getType(), column.isNullable()),
+        -1,
+        column.getComment());
   }
 }
