@@ -60,7 +60,6 @@ public class KvEntityStore implements EntityStore {
   public static final ImmutableMap<String, String> KV_BACKENDS =
       ImmutableMap.of("RocksDBKvBackend", RocksDBKvBackend.class.getCanonicalName());
   public static final String LAYOUT_VERSION = "layout_version";
-  public static final StorageLayoutVersion DEFAULT_LAYOUT_VERSION = StorageLayoutVersion.V1;
 
   @Getter @VisibleForTesting private KvBackend backend;
 
@@ -73,7 +72,7 @@ public class KvEntityStore implements EntityStore {
   // We will use storageLayoutVersion to check whether the layout of the storage is compatible with
   // the current version of the code.
   // Note: If we change the layout of the storage in the future, please update the value of
-  // storageLayoutVersion.
+  // storageLayoutVersion if it's necessary.
   @VisibleForTesting StorageLayoutVersion storageLayoutVersion;
 
   @Override
@@ -400,9 +399,9 @@ public class KvEntityStore implements EntityStore {
         // If the layout version is not set, we will set it to the default version.
         backend.put(
             LAYOUT_VERSION.getBytes(StandardCharsets.UTF_8),
-            DEFAULT_LAYOUT_VERSION.getVersion().getBytes(StandardCharsets.UTF_8),
+            StorageLayoutVersion.V1.getVersion().getBytes(StandardCharsets.UTF_8),
             true);
-        return DEFAULT_LAYOUT_VERSION;
+        return StorageLayoutVersion.V1;
       }
 
       return StorageLayoutVersion.fromString(new String(bytes));

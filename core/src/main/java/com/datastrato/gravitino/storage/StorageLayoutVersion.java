@@ -26,6 +26,6 @@ public enum StorageLayoutVersion {
     }
     throw new StorageLayoutException(
         "Unknown storage version, maybe the data is broken, please "
-            + "check the RocksDB storage directory.");
+            + "check the storage directory.");
   }
 }
