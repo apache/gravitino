@@ -45,6 +45,11 @@ public class TestTransforms {
           public String comment() {
             return null;
           }
+
+          @Override
+          public boolean nullable() {
+            return true;
+          }
         };
     String[] fieldName = new String[] {column.name()};
 
@@ -86,6 +91,11 @@ public class TestTransforms {
           @Override
           public String comment() {
             return null;
+          }
+
+          @Override
+          public boolean nullable() {
+            return true;
           }
         };
     // partition by foo(col_1, 'bar')
