@@ -27,5 +27,8 @@ public interface Column {
   /** Returns the comment of this column, null if not specified. */
   String comment();
 
+  /** Returns true if this column may produce null values. Default is true. */
+  boolean nullable();
+
   // TODO. Support column default value. @Jerry
 }

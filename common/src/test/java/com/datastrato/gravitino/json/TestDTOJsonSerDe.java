@@ -42,7 +42,7 @@ public class TestDTOJsonSerDe {
 
   private final String metalakeJson = "{\"name\":%s,\"comment\":%s,\"properties\":%s,\"audit\":%s}";
 
-  private final String columnJson = "{\"name\":%s,\"type\":%s,\"comment\":%s}";
+  private final String columnJson = "{\"name\":%s,\"type\":%s,\"comment\":%s,\"nullable\":%s}";
 
   private final String tableJson =
       "{\"name\":%s,\"comment\":%s,\"columns\":[%s],\"properties\":%s,\"audit\":%s,\"distribution\":%s,\"sortOrders\":%s,\"partitioning\":%s}";
@@ -182,7 +182,8 @@ public class TestDTOJsonSerDe {
             columnJson,
             withQuotes(name),
             withQuotes(type.accept(new StringTypeVisitor())),
-            withQuotes(comment));
+            withQuotes(comment),
+            column.nullable());
     Assertions.assertEquals(expectedJson, serJson);
     ColumnDTO deserColumn = JsonUtils.objectMapper().readValue(serJson, ColumnDTO.class);
     Assertions.assertEquals(column, deserColumn);
@@ -202,7 +203,12 @@ public class TestDTOJsonSerDe {
     Map<String, String> properties = ImmutableMap.of("k1", "v1", "k2", "v2");
 
     ColumnDTO column =
-        ColumnDTO.builder().withName(name).withDataType(type).withComment(comment).build();
+        ColumnDTO.builder()
+            .withName(name)
+            .withDataType(type)
+            .withComment(comment)
+            .withNullable(false)
+            .build();
     TableDTO table =
         TableDTO.builder()
             .withName(tableName)
@@ -222,7 +228,8 @@ public class TestDTOJsonSerDe {
                 columnJson,
                 withQuotes(name),
                 withQuotes(type.accept(new StringTypeVisitor())),
-                withQuotes(comment)),
+                withQuotes(comment),
+                column.nullable()),
             JsonUtils.objectMapper().writeValueAsString(properties),
             String.format(auditJson, withQuotes(creator), withQuotes(now.toString()), null, null),
             null,
