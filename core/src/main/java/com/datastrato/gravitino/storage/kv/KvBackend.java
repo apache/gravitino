@@ -88,4 +88,9 @@ public interface KvBackend extends Closeable {
       throws E, IOException {
     throw new UnsupportedOperationException("Transaction not supported");
   }
+
+  /** Returns whether the backend is closed. */
+  default boolean isClosed() {
+    return false;
+  }
 }

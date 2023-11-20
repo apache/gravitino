@@ -22,6 +22,7 @@ import java.util.Map;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -302,7 +303,7 @@ class TestTransactionalKvBackend {
   }
 
   @ParameterizedTest
-  @ValueSource(ints = {16})
+  @ValueSource(ints = {1})
   void testTransactionIdGeneratorQPS(int threadNum) throws IOException, InterruptedException {
     KvBackend kvBackend = getKvBackEnd();
     TransactionIdGenerator transactionIdGenerator = new TransactionIdGeneratorImpl(kvBackend);
@@ -318,19 +319,50 @@ class TestTransactionalKvBackend {
                 .setNameFormat("testTransactionIdGenerator-%d")
                 .build());
 
+    AtomicLong atomicLong = new AtomicLong(0);
     for (int i = 0; i < threadNum; i++) {
       threadPoolExecutor.execute(
           () -> {
             long current = System.currentTimeMillis();
             while (System.currentTimeMillis() - current <= 3000) {
               transactionIdGenerator.nextId();
+              atomicLong.getAndIncrement();
             }
           });
     }
 
     Thread.currentThread().sleep(4000);
 
-    System.out.println(
-        String.format("%d thread qps is: %d/s", threadNum, transactionIdGenerator.nextId() / 3));
+    System.out.println(String.format("%d thread qps is: %d/s", threadNum, atomicLong.get() / 3));
+  }
+
+  @Test
+  void testTransactionId() throws IOException, InterruptedException {
+    KvBackend kvBackend = getKvBackEnd();
+    TransactionIdGenerator transactionIdGenerator = new TransactionIdGeneratorImpl(kvBackend);
+    ThreadPoolExecutor threadPoolExecutor =
+        new ThreadPoolExecutor(
+            10,
+            10,
+            1,
+            TimeUnit.MINUTES,
+            new LinkedBlockingQueue<>(1000),
+            new ThreadFactoryBuilder()
+                .setDaemon(true)
+                .setNameFormat("testTransactionIdGenerator-%d")
+                .build());
+
+    for (int i = 0; i < 10; i++) {
+      threadPoolExecutor.execute(
+          () -> {
+            try {
+              kvBackend.put("key1".getBytes(), "value1".getBytes(), true);
+            } catch (Exception e) {
+              e.printStackTrace();
+            }
+          });
+    }
+
+    Thread.currentThread().sleep(4000);
   }
 }

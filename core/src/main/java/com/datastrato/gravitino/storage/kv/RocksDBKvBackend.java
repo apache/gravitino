@@ -32,6 +32,7 @@ import org.slf4j.LoggerFactory;
 public class RocksDBKvBackend implements KvBackend {
   public static final Logger LOGGER = LoggerFactory.getLogger(RocksDBKvBackend.class);
   private TransactionDB db;
+  private volatile boolean hasClosed = false;
 
   /**
    * Initialize the RocksDB backend instance. We have used the {@link TransactionDB} to support
@@ -195,5 +196,11 @@ public class RocksDBKvBackend implements KvBackend {
   @Override
   public void close() throws IOException {
     db.close();
+    hasClosed = true;
+  }
+
+  @Override
+  public synchronized boolean isClosed() {
+    return hasClosed;
   }
 }

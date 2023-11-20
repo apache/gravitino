@@ -9,9 +9,11 @@ import com.datastrato.gravitino.storage.TransactionIdGenerator;
 import com.datastrato.gravitino.utils.ByteUtils;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -21,8 +23,9 @@ public class TransactionIdGeneratorImpl implements TransactionIdGenerator {
   private final KvBackend kvBackend;
   private static final String LAST_ID = "last_timestamp";
   private long incrementId = 0L;
+  private AtomicBoolean backendHasClosed = new AtomicBoolean(false);
 
-  private static final ScheduledExecutorService SCHEDULED_EXECUTOR_SERVICE =
+  private final ScheduledExecutorService idSaverScheduleExecutor =
       new ScheduledThreadPoolExecutor(
           1,
           new ThreadFactoryBuilder()
@@ -33,13 +36,19 @@ public class TransactionIdGeneratorImpl implements TransactionIdGenerator {
   public TransactionIdGeneratorImpl(KvBackend kvBackend) {
     this.kvBackend = kvBackend;
     init();
-    SCHEDULED_EXECUTOR_SERVICE.schedule(
+    idSaverScheduleExecutor.schedule(
         () -> {
+          if (kvBackend.isClosed()) {
+            return;
+          }
+
           int i = 0;
           while (i++ < 3) {
             try {
               kvBackend.put(
-                  LAST_ID.getBytes(), ByteUtils.longToByte(System.currentTimeMillis()), true);
+                  LAST_ID.getBytes(StandardCharsets.UTF_8),
+                  ByteUtils.longToByte(System.currentTimeMillis()),
+                  true);
               return;
             } catch (IOException e) {
               LOGGER.warn("Failed to initialize transaction id generator, retrying...", e);
@@ -77,7 +86,7 @@ public class TransactionIdGeneratorImpl implements TransactionIdGenerator {
   }
 
   private long getSavedTs() throws IOException {
-    byte[] oldIdBytes = kvBackend.get(LAST_ID.getBytes());
+    byte[] oldIdBytes = kvBackend.get(LAST_ID.getBytes(StandardCharsets.UTF_8));
     return oldIdBytes == null ? 0 : ByteUtils.byteToLong(oldIdBytes);
   }
 
