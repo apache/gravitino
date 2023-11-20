@@ -6,6 +6,7 @@
 package com.datastrato.gravitino.auth;
 
 import com.datastrato.gravitino.Config;
+import java.security.Principal;
 import java.util.Base64;
 import org.apache.commons.lang3.StringUtils;
 
@@ -15,35 +16,37 @@ import org.apache.commons.lang3.StringUtils;
  */
 class SimpleAuthenticator implements Authenticator {
 
+  private final Principal ANONYMOUS_PRINCIPAL = new UserPrincipal(AuthConstants.ANONYMOUS_USER);
+
   @Override
   public boolean isDataFromToken() {
     return true;
   }
 
   @Override
-  public String authenticateToken(byte[] tokenData) {
+  public Principal authenticateToken(byte[] tokenData) {
     if (tokenData == null) {
-      return AuthConstants.UNKNOWN_USER_NAME;
+      return ANONYMOUS_PRINCIPAL;
     }
     String authData = new String(tokenData);
     if (StringUtils.isBlank(authData)) {
-      return AuthConstants.UNKNOWN_USER_NAME;
+      return ANONYMOUS_PRINCIPAL;
     }
     if (!authData.startsWith(AuthConstants.AUTHORIZATION_BASIC_HEADER)) {
-      return AuthConstants.UNKNOWN_USER_NAME;
+      return ANONYMOUS_PRINCIPAL;
     }
     String credential = authData.substring(AuthConstants.AUTHORIZATION_BASIC_HEADER.length());
     if (StringUtils.isBlank(credential)) {
-      return AuthConstants.UNKNOWN_USER_NAME;
+      return ANONYMOUS_PRINCIPAL;
     }
     try {
       String[] userInformation = new String(Base64.getDecoder().decode(credential)).split(":");
       if (userInformation.length != 2) {
-        return AuthConstants.UNKNOWN_USER_NAME;
+        return ANONYMOUS_PRINCIPAL;
       }
-      return userInformation[0];
+      return new UserPrincipal(userInformation[0]);
     } catch (IllegalArgumentException ie) {
-      return AuthConstants.UNKNOWN_USER_NAME;
+      return ANONYMOUS_PRINCIPAL;
     }
   }
 

@@ -6,6 +6,7 @@
 package com.datastrato.gravitino.auth;
 
 import com.datastrato.gravitino.Config;
+import java.security.Principal;
 
 /** The interface provides authentication mechanism. */
 public interface Authenticator {
@@ -25,7 +26,7 @@ public interface Authenticator {
    * @param tokenData The data is used for authentication
    * @return The identifier of user
    */
-  default String authenticateToken(byte[] tokenData) {
+  default Principal authenticateToken(byte[] tokenData) {
     throw new UnsupportedOperationException(
         "Authenticator doesn't support to authenticate the data from the token");
   }

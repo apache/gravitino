@@ -19,6 +19,7 @@ import io.jsonwebtoken.security.Keys;
 import io.jsonwebtoken.security.SignatureException;
 import java.security.Key;
 import java.security.KeyFactory;
+import java.security.Principal;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.Base64;
 import java.util.List;
@@ -40,7 +41,7 @@ class OAuth2TokenAuthenticator implements Authenticator {
   }
 
   @Override
-  public String authenticateToken(byte[] tokenData) {
+  public Principal authenticateToken(byte[] tokenData) {
     if (tokenData == null) {
       throw new UnauthorizedException("Empty token authorization header");
     }
@@ -82,7 +83,7 @@ class OAuth2TokenAuthenticator implements Authenticator {
         throw new UnauthorizedException(
             "Audiences in token is not in expected format: " + audienceObject);
       }
-      return jwt.getBody().getSubject();
+      return new UserPrincipal(jwt.getBody().getSubject());
     } catch (ExpiredJwtException
         | UnsupportedJwtException
         | MalformedJwtException
@@ -107,18 +108,17 @@ class OAuth2TokenAuthenticator implements Authenticator {
       SignatureAlgorithmFamilyType algFamilyType =
           SignatureAlgorithmFamilyType.valueOf(SignatureAlgorithm.valueOf(algType).getFamilyName());
 
-      if (SignatureAlgorithmFamilyType.HMAC.equals(algFamilyType)) {
+      if (SignatureAlgorithmFamilyType.HMAC == algFamilyType) {
         return Keys.hmacShaKeyFor(key);
-      } else if (SignatureAlgorithmFamilyType.RSA.equals(algFamilyType)
-          || SignatureAlgorithmFamilyType.ECDSA.equals(algFamilyType)) {
+      } else if (SignatureAlgorithmFamilyType.RSA == algFamilyType
+          || SignatureAlgorithmFamilyType.ECDSA == algFamilyType) {
         X509EncodedKeySpec spec = new X509EncodedKeySpec(key);
         KeyFactory kf = KeyFactory.getInstance(algFamilyType.name());
         return kf.generatePublic(spec);
-      } else {
-        throw new IllegalArgumentException("Wrong signature algorithm type: " + algType);
       }
     } catch (Exception e) {
       throw new IllegalArgumentException("Failed to decode key", e);
     }
+    throw new IllegalArgumentException("Unsupported signature algorithm type: " + algType);
   }
 }

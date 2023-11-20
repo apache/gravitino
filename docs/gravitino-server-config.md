@@ -48,15 +48,6 @@ The following table lists the configuration items in the `gravitino.conf` file. 
 | `gravitino.catalog.cache.evictionIntervalMs`  | The interval in milliseconds to evict the catalog cache, default 3600000ms(1h)                                                                                                                          | `3600000`     | 0.1.0         |
 | `gravitino.catalog.classloader.isolated`      | Whether to use an isolated classloader for catalog, if it's true, all catalog-related libraries and configurations will be loaded by an isolated classloader NOT by AppClassLoader. Default value is `true` | `true`        | 0.1.0         |
 
-## Authentication
-
-| Configuration item                                | Description                                                                | Default value     | Since version |
-|---------------------------------------------------|----------------------------------------------------------------------------|-------------------|---------------|
-| `gravitino.authenticator`                         | The authenticator which Gravitino uses, setting as `simple` or `oauth`     | `simple`          | 0.3.0         |
-| `gravitino.authenicator.oauth.serviceAudience`    | The audience name when Gravitino uses oauth as the authenticator           | `GravitinoServer` | 0.3.0         |
-| `gravitino.authenticator.oauth.allowSkewSecs`     | The jwt allows skew seconds when Gravitino uses oauth as the authenticator | `0`               | 0.3.0         |
-| `gravitino.authenticator.oauth.defaultSignKey`    | The sign key of jwt when Gravitino uses oauth as the authenticator         | `null`            | 0.3.0         |
-| `gravitino.authenticator.oauth.signAlgorithmType` | The signature algorithm when Gravitino uses oauth as the authenticator     | `RS256`           | 0.3.0         |
 ## How to set up runtime environment variables
 
 Gravitino server also supports setting up runtime environment variables by editing the `gravitino-env.sh` file, which is located in the `conf` directory.

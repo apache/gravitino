@@ -12,5 +12,5 @@ public interface AuthConstants {
 
   String AUTHORIZATION_BASIC_HEADER = "Basic ";
 
-  String UNKNOWN_USER_NAME = "unknown";
+  String ANONYMOUS_USER = "anonymous";
 }

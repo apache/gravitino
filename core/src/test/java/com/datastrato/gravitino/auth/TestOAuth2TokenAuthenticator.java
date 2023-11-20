@@ -132,7 +132,10 @@ public class TestOAuth2TokenAuthenticator {
             .compact();
     Assertions.assertEquals(
         "gravitino",
-        auth2TokenAuthenticator.authenticateToken(
-            (AuthConstants.AUTHORIZATION_BEARER_HEADER + token5).getBytes(StandardCharsets.UTF_8)));
+        auth2TokenAuthenticator
+            .authenticateToken(
+                (AuthConstants.AUTHORIZATION_BEARER_HEADER + token5)
+                    .getBytes(StandardCharsets.UTF_8))
+            .getName());
   }
 }
