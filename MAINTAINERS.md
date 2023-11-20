@@ -14,3 +14,4 @@ This document lists the maintainers of the Project. Maintainers may be added onc
 | McHades       | mchades             | Datastrato       |
 | Xun Liu       | xunliu              | Datastrato       |
 | Xiaojing Fang | FANNG1              | Datastrato       |
+| Qi Yu         | yuqi1129            | Datastrato       |
