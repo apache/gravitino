@@ -492,7 +492,7 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
                           .withName(column.name())
                           .withType(column.dataType())
                           .withComment(column.comment())
-                          .withNullable(true)
+                          .withNullable(column.nullable())
                           .build())
               .toArray(IcebergColumn[]::new);
 
