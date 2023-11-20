@@ -22,4 +22,8 @@ public class MapUtils {
 
     return Collections.unmodifiableMap(configs);
   }
+
+  public static Map<String, String> unmodifiableMap(Map<String, String> m) {
+    return Collections.unmodifiableMap(m);
+  }
 }
