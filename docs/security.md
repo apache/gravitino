@@ -18,12 +18,12 @@ Then, for server side, users should set `gravitino.authenticator` as `oauth` and
 | Configuration item                                | Description                                                                | Default value     | Since version |
 |---------------------------------------------------|----------------------------------------------------------------------------|-------------------|---------------|
 | `gravitino.authenticator`                         | The authenticator which Gravitino uses, setting as `simple` or `oauth`     | `simple`          | 0.3.0         |
-| `gravitino.authenicator.oauth.serviceAudience`    | The audience name when Gravitino uses oauth as the authenticator           | `GravitinoServer` | 0.3.0         |
+| `gravitino.authenticator.oauth.serviceAudience`   | The audience name when Gravitino uses oauth as the authenticator           | `GravitinoServer` | 0.3.0         |
 | `gravitino.authenticator.oauth.allowSkewSecs`     | The jwt allows skew seconds when Gravitino uses oauth as the authenticator | `0`               | 0.3.0         |
 | `gravitino.authenticator.oauth.defaultSignKey`    | The sign key of jwt when Gravitino uses oauth as the authenticator         | `null`            | 0.3.0         |
 | `gravitino.authenticator.oauth.signAlgorithmType` | The signature algorithm when Gravitino uses oauth as the authenticator     | `RS256`           | 0.3.0         |
 
-The signature algorithm which Gravitino supports is a below:
+The signature algorithm which Gravitino supports is as below:
 
 | Name  | Description                                    |
 |-------|------------------------------------------------|
