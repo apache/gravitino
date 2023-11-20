@@ -26,12 +26,15 @@ import io.trino.spi.connector.RetryMode;
 import io.trino.spi.connector.SchemaTableName;
 import io.trino.spi.security.TrinoPrincipal;
 import io.trino.spi.statistics.ComputedStatistics;
+import io.trino.spi.type.Type;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
+import org.apache.commons.lang3.StringUtils;
 
 /**
  * The GravitinoMetadata class provides operations for Gravitino metadata on the Gravitino server.
@@ -172,8 +175,7 @@ public class GravitinoMetadata implements ConnectorMetadata {
   @Override
   public void dropTable(ConnectorSession session, ConnectorTableHandle tableHandle) {
     GravitinoTableHandle gravitinoTableHandle = (GravitinoTableHandle) tableHandle;
-    catalogConnectorMetadata.dropTable(
-        gravitinoTableHandle.getTableName(), gravitinoTableHandle.getTableName());
+    catalogConnectorMetadata.dropTable(gravitinoTableHandle.toSchemaTableName());
   }
 
   @Override
@@ -220,5 +222,96 @@ public class GravitinoMetadata implements ConnectorMetadata {
         gravitinoInsertTableHandle.getInternalInsertTableHandle(),
         fragments,
         computedStatistics);
+  }
+
+  @Override
+  public void renameSchema(ConnectorSession session, String source, String target) {
+    catalogConnectorMetadata.renameSchema(source, target);
+  }
+
+  @Override
+  public void renameTable(
+      ConnectorSession session, ConnectorTableHandle tableHandle, SchemaTableName newTableName) {
+    GravitinoTableHandle gravitinoTableHandle = (GravitinoTableHandle) tableHandle;
+    catalogConnectorMetadata.renameTable(gravitinoTableHandle.toSchemaTableName(), newTableName);
+  }
+
+  @Override
+  public void setTableComment(
+      ConnectorSession session, ConnectorTableHandle tableHandle, Optional<String> comment) {
+    GravitinoTableHandle gravitinoTableHandle = (GravitinoTableHandle) tableHandle;
+    catalogConnectorMetadata.setTableComment(
+        gravitinoTableHandle.toSchemaTableName(), comment.orElse(""));
+  }
+
+  @Override
+  public void setTableProperties(
+      ConnectorSession session,
+      ConnectorTableHandle tableHandle,
+      Map<String, Optional<Object>> properties) {
+    GravitinoTableHandle gravitinoTableHandle = (GravitinoTableHandle) tableHandle;
+    Map<String, Object> resultMap =
+        properties.entrySet().stream()
+            .filter(e -> e.getValue().isPresent())
+            .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().get()));
+    Map<String, String> allProps = metadataAdapter.toGravitonTableProperties(resultMap);
+    catalogConnectorMetadata.setTableProperties(gravitinoTableHandle.toSchemaTableName(), allProps);
+  }
+
+  @Override
+  public void addColumn(
+      ConnectorSession session, ConnectorTableHandle tableHandle, ColumnMetadata column) {
+    GravitinoTableHandle gravitinoTableHandle = (GravitinoTableHandle) tableHandle;
+    GravitinoColumn gravitinoColumn = metadataAdapter.createColumn(column);
+    catalogConnectorMetadata.addColumn(gravitinoTableHandle.toSchemaTableName(), gravitinoColumn);
+  }
+
+  @Override
+  public void dropColumn(
+      ConnectorSession session, ConnectorTableHandle tableHandle, ColumnHandle column) {
+    GravitinoTableHandle gravitinoTableHandle = (GravitinoTableHandle) tableHandle;
+    GravitinoColumnHandle gravitinoColumnHandle = (GravitinoColumnHandle) column;
+    catalogConnectorMetadata.dropColumn(
+        gravitinoTableHandle.toSchemaTableName(), gravitinoColumnHandle.getColumnName());
+  }
+
+  @Override
+  public void renameColumn(
+      ConnectorSession session,
+      ConnectorTableHandle tableHandle,
+      ColumnHandle source,
+      String target) {
+    GravitinoTableHandle gravitinoTableHandle = (GravitinoTableHandle) tableHandle;
+    GravitinoColumnHandle gravitinoColumnHandle = (GravitinoColumnHandle) source;
+    catalogConnectorMetadata.renameColumn(
+        gravitinoTableHandle.toSchemaTableName(), gravitinoColumnHandle.getColumnName(), target);
+  }
+
+  @Override
+  public void setColumnType(
+      ConnectorSession session, ConnectorTableHandle tableHandle, ColumnHandle column, Type type) {
+    GravitinoTableHandle gravitinoTableHandle = (GravitinoTableHandle) tableHandle;
+    GravitinoColumnHandle gravitinoColumnHandle = (GravitinoColumnHandle) column;
+    catalogConnectorMetadata.setColumnType(
+        gravitinoTableHandle.toSchemaTableName(), gravitinoColumnHandle.getColumnName(), type);
+  }
+
+  @Override
+  public void setColumnComment(
+      ConnectorSession session,
+      ConnectorTableHandle tableHandle,
+      ColumnHandle column,
+      Optional<String> comment) {
+    GravitinoTableHandle gravitinoTableHandle = (GravitinoTableHandle) tableHandle;
+    GravitinoColumnHandle gravitinoColumnHandle = (GravitinoColumnHandle) column;
+
+    String commentString = "";
+    if (comment.isPresent() && !StringUtils.isBlank(comment.get())) {
+      commentString = comment.get();
+    }
+    catalogConnectorMetadata.setColumnComment(
+        gravitinoTableHandle.toSchemaTableName(),
+        gravitinoColumnHandle.getColumnName(),
+        commentString);
   }
 }
