@@ -3,7 +3,7 @@
  * This software is licensed under the Apache License version 2.
  */
 
-package com.datastrato.gravitino.auth;
+package com.datastrato.gravitino.security;
 
 public interface AuthConstants {
   String HTTP_HEADER_AUTHORIZATION = "Authorization";

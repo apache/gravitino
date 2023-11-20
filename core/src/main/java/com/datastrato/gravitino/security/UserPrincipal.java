@@ -3,7 +3,7 @@
  * This software is licensed under the Apache License version 2.
  */
 
-package com.datastrato.gravitino.auth;
+package com.datastrato.gravitino.security;
 
 import com.google.common.base.Preconditions;
 import java.security.Principal;

@@ -13,9 +13,9 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.datastrato.gravitino.auth.AuthConstants;
-import com.datastrato.gravitino.auth.Authenticator;
 import com.datastrato.gravitino.exceptions.UnauthorizedException;
+import com.datastrato.gravitino.security.AuthConstants;
+import com.datastrato.gravitino.security.Authenticator;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.Vector;
@@ -23,6 +23,8 @@ import javax.servlet.FilterChain;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+
+import com.datastrato.gravitino.security.UserPrincipal;
 import org.junit.jupiter.api.Test;
 
 public class TestAuthenticationFilter {
@@ -38,7 +40,7 @@ public class TestAuthenticationFilter {
     when(mockRequest.getHeaders(AuthConstants.HTTP_HEADER_AUTHORIZATION))
         .thenReturn(new Vector<>(Collections.singletonList("user")).elements());
     when(authenticator.isDataFromToken()).thenReturn(true);
-    when(authenticator.authenticateToken(any())).thenReturn("user");
+    when(authenticator.authenticateToken(any())).thenReturn(new UserPrincipal("user"));
     filter.doFilter(mockRequest, mockResponse, mockChain);
     verify(mockResponse, never()).sendError(anyInt(), anyString());
   }

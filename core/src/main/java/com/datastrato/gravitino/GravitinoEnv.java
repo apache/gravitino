@@ -4,12 +4,12 @@
  */
 package com.datastrato.gravitino;
 
-import com.datastrato.gravitino.auth.Authenticator;
-import com.datastrato.gravitino.auth.AuthenticatorFactory;
 import com.datastrato.gravitino.aux.AuxiliaryServiceManager;
 import com.datastrato.gravitino.catalog.CatalogManager;
 import com.datastrato.gravitino.catalog.CatalogOperationDispatcher;
 import com.datastrato.gravitino.meta.MetalakeManager;
+import com.datastrato.gravitino.security.Authenticator;
+import com.datastrato.gravitino.security.AuthenticatorFactory;
 import com.datastrato.gravitino.storage.IdGenerator;
 import com.datastrato.gravitino.storage.RandomIdGenerator;
 import com.google.common.base.Preconditions;
