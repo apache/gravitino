@@ -6,7 +6,6 @@ package com.datastrato.gravitino.trino.connector.catalog;
 
 import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_CATALOG_NOT_EXISTS;
 import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_ILLEGAL_ARGUMENT;
-import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_INNER_CONNECTOR_EXCEPTION;
 import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_SCHEMA_ALREADY_EXISTS;
 import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_SCHEMA_NOT_EMPTY;
 import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_SCHEMA_NOT_EXISTS;
@@ -181,18 +180,13 @@ public class CatalogConnectorMetadata {
       throw new TrinoException(GRAVITINO_TABLE_NOT_EXISTS, "Table does not exist");
     } catch (IllegalArgumentException e) {
       // TODO yuhui need improve get the error message. From IllegalArgumentException.
-      // At present, the IllegalArgumentException cannot  get the error information clearly from the
+      // At present, the IllegalArgumentException cannot get the error information clearly from the
       // Graviton server.
       String message =
           e.getMessage().lines().toList().get(0) + e.getMessage().lines().toList().get(1);
       throw new TrinoException(GRAVITINO_ILLEGAL_ARGUMENT, message, e);
-    } catch (TrinoException e) {
-      throw new TrinoException(
-          GRAVITINO_INNER_CONNECTOR_EXCEPTION,
-          String.format("Inner connector error: %s", e.getMessage()),
-          e);
     }
-  };
+  }
 
   public void renameTable(SchemaTableName oldTableName, SchemaTableName newTableName) {
     if (!oldTableName.getSchemaName().equals(newTableName.getSchemaName())) {

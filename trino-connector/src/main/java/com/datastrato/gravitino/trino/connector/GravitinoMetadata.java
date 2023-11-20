@@ -34,6 +34,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.StringUtils;
 
 /**
  * The GravitinoMetadata class provides operations for Gravitino metadata on the Gravitino server.
@@ -303,9 +304,14 @@ public class GravitinoMetadata implements ConnectorMetadata {
       Optional<String> comment) {
     GravitinoTableHandle gravitinoTableHandle = (GravitinoTableHandle) tableHandle;
     GravitinoColumnHandle gravitinoColumnHandle = (GravitinoColumnHandle) column;
+
+    String commentString = "";
+    if (comment.isPresent() && !StringUtils.isBlank(comment.get())) {
+      commentString = comment.get();
+    }
     catalogConnectorMetadata.setColumnComment(
         gravitinoTableHandle.toSchemaTableName(),
         gravitinoColumnHandle.getColumnName(),
-        comment.orElse(""));
+        commentString);
   }
 }

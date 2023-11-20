@@ -12,15 +12,15 @@ import java.util.List;
 
 public class MemoryTableProperties {
 
-  private final List<PropertyMetadata<?>> tableProperties;
+  private final List<PropertyMetadata<?>> tablePropertyMetadata;
 
   // TODO yuhui Need to add table properties
   MemoryTableProperties() {
-    tableProperties =
+    tablePropertyMetadata =
         ImmutableList.of(integerProperty("max_ttl", "Max ttl days for the table.", 10, false));
   }
 
-  public List<PropertyMetadata<?>> getTableProperties() {
-    return tableProperties;
+  public List<PropertyMetadata<?>> getTablePropertyMetadata() {
+    return tablePropertyMetadata;
   }
 }

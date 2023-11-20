@@ -53,9 +53,13 @@ public class TestGravitinoConnector extends AbstractTestQueryFramework {
 
       queryRunner.createCatalog("gravitino", "gravitino", properties);
       server.setCatalogConnectorManager(GravitinoPlugin.catalogConnectorManager);
-      // Wait for the catalog to be created
-      while (GravitinoPlugin.catalogConnectorManager.getCatalogs().isEmpty()) {
-        Thread.sleep(100);
+      // Wait for the catalog to be created. Maximum wait time 30 seconds
+      int max_trise = 35;
+      while (GravitinoPlugin.catalogConnectorManager.getCatalogs().isEmpty() && max_trise > 0) {
+        Thread.sleep(max_trise--);
+        if (max_trise == 0) {
+          throw new Exception("Catalog memory load failed");
+        }
       }
 
     } catch (Exception e) {
@@ -177,11 +181,11 @@ public class TestGravitinoConnector extends AbstractTestQueryFramework {
     // test add column and drop column, but the memory connector is not supported these operations.
     assertQueryFails(
         String.format("alter table %s add column if not exists c varchar", fullTableName1),
-        format("Inner connector error: This connector does not support adding columns"));
+        format("This connector does not support adding columns"));
 
     assertQueryFails(
         String.format("alter table %s drop column a", fullTableName1),
-        format("Inner connector error: This connector does not support dropping columns"));
+        format("This connector does not support dropping columns"));
 
     // test set table comment
     assertUpdate(String.format("comment on table %s is 'test table comments'", fullTableName1));
@@ -191,11 +195,11 @@ public class TestGravitinoConnector extends AbstractTestQueryFramework {
     // test rename column, but the memory connector is not supported these operations.
     assertQueryFails(
         String.format("alter table %s rename column a to c ", fullTableName1),
-        format("Inner connector error: This connector does not support renaming columns"));
+        format("This connector does not support renaming columns"));
 
     assertQueryFails(
         String.format("alter table %s alter column a set DATA TYPE int", fullTableName1),
-        format("Inner connector error: This connector does not support setting column types"));
+        format("This connector does not support setting column types"));
 
     // test set column comment
     assertUpdate(String.format("comment on column %s.a is 'test column comments'", fullTableName1));
@@ -205,7 +209,7 @@ public class TestGravitinoConnector extends AbstractTestQueryFramework {
     // test set table properties, but the memory connector is not supported these operations.
     assertQueryFails(
         String.format("alter table %s set properties \"max_ttl\" = 20", fullTableName1),
-        format("Inner connector error: This connector does not support setting table properties"));
+        format("This connector does not support setting table properties"));
 
     dropTestTable(fullTableName1);
   }

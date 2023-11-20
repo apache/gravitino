@@ -33,11 +33,11 @@ public class GravitinoTable {
     this.schemaName = schemaName;
     this.tableName = tableName;
 
-    ImmutableList.Builder<GravitinoColumn> table_columns = ImmutableList.builder();
+    ImmutableList.Builder<GravitinoColumn> tableColumns = ImmutableList.builder();
     for (int i = 0; i < tableMetadata.columns().length; i++) {
-      table_columns.add(new GravitinoColumn(tableMetadata.columns()[i], i));
+      tableColumns.add(new GravitinoColumn(tableMetadata.columns()[i], i));
     }
-    this.columns = table_columns.build();
+    this.columns = tableColumns.build();
     this.comment = tableMetadata.comment();
     properties = tableMetadata.properties();
   }
@@ -63,11 +63,11 @@ public class GravitinoTable {
       Map<String, String> properties) {
     this.schemaName = schemaName;
     this.tableName = tableName;
-    ImmutableList.Builder<GravitinoColumn> table_columns = ImmutableList.builder();
+    ImmutableList.Builder<GravitinoColumn> tableColumns = ImmutableList.builder();
     for (int i = 0; i < columns.length; i++) {
-      table_columns.add(new GravitinoColumn(columns[i], i));
+      tableColumns.add(new GravitinoColumn(columns[i], i));
     }
-    this.columns = table_columns.build();
+    this.columns = tableColumns.build();
     this.comment = comment;
     this.properties = properties;
   }
@@ -104,7 +104,7 @@ public class GravitinoTable {
       throw new TrinoException(
           GRAVITINO_COLUMN_NOT_EXISTS, String.format("Column `%s` does not exist", columName));
     }
-    return entry.orElse(null);
+    return entry.get();
   }
 
   public String getSchemaName() {

@@ -35,11 +35,13 @@ public class MemoryConnectorAdapter implements CatalogConnectorAdapter {
   @Override
   public CatalogConnectorMetadataAdapter getMetadataAdapter() {
     return new MemoryMetadataAdapter(
-        tableProperties.getTableProperties(), Collections.emptyList(), Collections.emptyList());
+        tableProperties.getTablePropertyMetadata(),
+        Collections.emptyList(),
+        Collections.emptyList());
   }
 
   @Override
   public List<PropertyMetadata<?>> getTableProperties() {
-    return tableProperties.getTableProperties();
+    return tableProperties.getTablePropertyMetadata();
   }
 }

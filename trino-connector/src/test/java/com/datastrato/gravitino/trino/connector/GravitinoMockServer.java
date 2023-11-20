@@ -103,23 +103,9 @@ public class GravitinoMockServer implements AutoCloseable {
     when(catalog.name()).thenReturn(catalogName.name());
     when(catalog.provider()).thenReturn(testCatalogPrivate);
 
-    when(catalog.asTableCatalog())
-        .thenAnswer(
-            new Answer<TableCatalog>() {
-              @Override
-              public TableCatalog answer(InvocationOnMock invocation) throws Throwable {
-                return createTableCatalog(catalogName);
-              }
-            });
+    when(catalog.asTableCatalog()).thenAnswer(answer -> createTableCatalog(catalogName));
 
-    when(catalog.asSchemas())
-        .thenAnswer(
-            new Answer<SupportsSchemas>() {
-              @Override
-              public SupportsSchemas answer(InvocationOnMock invocation) throws Throwable {
-                return createSchemas(catalogName);
-              }
-            });
+    when(catalog.asSchemas()).thenAnswer(answer -> createSchemas(catalogName));
     return catalog;
   }
 
