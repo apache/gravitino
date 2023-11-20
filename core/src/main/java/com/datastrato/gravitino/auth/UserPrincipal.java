@@ -13,7 +13,7 @@ public class UserPrincipal implements Principal {
   private final String username;
 
   public UserPrincipal(final String username) {
-    Preconditions.checkNotNull(username);
+    Preconditions.checkNotNull(username, "UserPrincipal must have the username");
     this.username = username;
   }
 
