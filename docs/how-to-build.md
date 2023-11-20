@@ -8,8 +8,10 @@ This software is licensed under the Apache License version 2."
 
 ## Prerequisites
 
-+ JDK 1.8
++ JDK 1.8 and JDK 1.17
 + Git
+
+Note: Gravitino uses Java 1.8 and Trino uses Java 1.17.
 
 ## Quick Start
 
@@ -74,23 +76,25 @@ This software is licensed under the Apache License version 2."
 6. Assemble the Gravitino distribution package.
 
     ```shell
-   ./gradlew assembleDistribution
-   ```
-   
+    ./gradlew assembleDistribution
+    ```
+
    The `assembleDistribution` command will create `gravitino-{version}-bin.tar.gz` and `gravitino-{version}-bin.tar.gz.sha256` under the `distribution` directory.
-   
+
    You can deploy them to your production environment.
-   
+
    > Note: The `gravitino-{version}-bin.tar.gz` file is the Gravitino Server distribution package, and the `gravitino-{version}-bin.tar.gz.sha256` file is the sha256 checksum file for the Gravitino Server distribution package.
 
 7. Assemble Gravitino trino connector package
-    
+
    ```shell
     ./gradlew assembleTrinoConnector
     ```
-   or 
+
+   or
+
     ```shell
     ./gradlew assembleDistribution
     ```
-   
+
    It will create `gravitino-trino-connector-{version}.tar.gz` and `gravitino-trino-connector-{version}.tar.gz.sha256` under the `distribution` directory.
