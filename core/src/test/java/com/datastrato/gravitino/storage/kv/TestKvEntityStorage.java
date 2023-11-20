@@ -30,6 +30,7 @@ import com.datastrato.gravitino.meta.CatalogEntity;
 import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.meta.SchemaVersion;
 import com.datastrato.gravitino.meta.TableEntity;
+import com.datastrato.gravitino.storage.StorageLayoutVersion;
 import com.google.common.io.Files;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.File;
@@ -855,6 +856,35 @@ public class TestKvEntityStorage {
         }
       }
       Assertions.assertEquals(9, totalFailed);
+    }
+  }
+
+  @Test
+  void testStorageLayoutVersion() throws IOException {
+    Config config = Mockito.mock(Config.class);
+    File file = Files.createTempDir();
+    file.deleteOnExit();
+    Mockito.when(config.get(ENTITY_STORE)).thenReturn("kv");
+    Mockito.when(config.get(ENTITY_KV_STORE)).thenReturn(DEFAULT_ENTITY_KV_STORE);
+    Mockito.when(config.get(Configs.ENTITY_SERDE)).thenReturn("proto");
+    Mockito.when(config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)).thenReturn(file.getAbsolutePath());
+
+    // First time create entity store, the storage layout version should be DEFAULT_LAYOUT_VERSION
+    try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
+      store.initialize(config);
+      Assertions.assertTrue(store instanceof KvEntityStore);
+      store.setSerDe(EntitySerDeFactory.createEntitySerDe(config.get(Configs.ENTITY_SERDE)));
+      KvEntityStore entityStore = (KvEntityStore) store;
+      Assertions.assertEquals(StorageLayoutVersion.V1, entityStore.storageLayoutVersion);
+    }
+
+    // Second time create entity store, the storage layout version should be DEFAULT_LAYOUT_VERSION
+    try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
+      store.initialize(config);
+      Assertions.assertTrue(store instanceof KvEntityStore);
+      store.setSerDe(EntitySerDeFactory.createEntitySerDe(config.get(Configs.ENTITY_SERDE)));
+      KvEntityStore entityStore = (KvEntityStore) store;
+      Assertions.assertEquals(StorageLayoutVersion.V1, entityStore.storageLayoutVersion);
     }
   }
 }
