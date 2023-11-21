@@ -36,10 +36,6 @@ public class TransactionIdGeneratorImpl implements TransactionIdGenerator {
     init();
     idSaverScheduleExecutor.schedule(
         () -> {
-          if (kvBackend.isClosed()) {
-            return;
-          }
-
           int i = 0;
           while (i++ < 3) {
             try {
