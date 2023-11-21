@@ -21,19 +21,21 @@ public class TransactionIdGeneratorImpl implements TransactionIdGenerator {
 
   private final KvBackend kvBackend;
   private static final String LAST_ID = "last_timestamp";
-  private long incrementId = 0L;
-
-  private final ScheduledExecutorService idSaverScheduleExecutor =
-      new ScheduledThreadPoolExecutor(
-          1,
-          new ThreadFactoryBuilder()
-              .setDaemon(true)
-              .setNameFormat("testTransactionIdGenerator-%d")
-              .build());
+  private volatile long incrementId = 0L;
 
   public TransactionIdGeneratorImpl(KvBackend kvBackend) {
     this.kvBackend = kvBackend;
-    init();
+    initTSO();
+    ScheduledExecutorService idSaverScheduleExecutor =
+        new ScheduledThreadPoolExecutor(
+            1,
+            new ThreadFactoryBuilder()
+                .setDaemon(true)
+                .setNameFormat("TransactionIdGenerator-thread-%d")
+                .setUncaughtExceptionHandler(
+                    (t, e) -> LOGGER.error("Uncaught exception in thread {}", t, e))
+                .build());
+
     idSaverScheduleExecutor.schedule(
         () -> {
           int i = 0;
@@ -45,20 +47,18 @@ public class TransactionIdGeneratorImpl implements TransactionIdGenerator {
                   true);
               return;
             } catch (IOException e) {
-              LOGGER.warn("Failed to initialize transaction id generator, retrying...", e);
+              LOGGER.warn("Failed to save current timestamp to storage layer, retrying...", e);
             }
           }
 
-          if (i == 3) {
-            throw new RuntimeException(
-                "Failed to initialize transaction id generator after 3 retries");
-          }
+          throw new RuntimeException(
+              "Failed to save current timestamp to storage layer after 3 retries");
         },
         5,
         TimeUnit.SECONDS);
   }
 
-  private void init() {
+  private void initTSO() {
     long current = System.currentTimeMillis();
     long old;
     try {
