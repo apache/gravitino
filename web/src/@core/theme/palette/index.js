@@ -1,3 +1,8 @@
+/*
+ * Copyright 2023 Datastrato.
+ * This software is licensed under the Apache License version 2.
+ */
+
 const DefaultPalette = (mode, settings) => {
   const whiteColor = '#FFF'
   const lightColor = '50, 71, 92'

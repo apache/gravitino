@@ -1,6 +1,9 @@
-import Box from '@mui/material/Box'
+/*
+ * Copyright 2023 Datastrato.
+ * This software is licensed under the Apache License version 2.
+ */
 
-import themeConfig from 'src/configs/themeConfig'
+import Box from '@mui/material/Box'
 
 import HorizontalNavItems from './HorizontalNavItems'
 

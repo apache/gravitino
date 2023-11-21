@@ -1,3 +1,8 @@
+/*
+ * Copyright 2023 Datastrato.
+ * This software is licensed under the Apache License version 2.
+ */
+
 import { createContext, useState, useEffect } from 'react'
 
 import themeConfig from 'src/configs/themeConfig'

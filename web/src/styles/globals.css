@@ -1,3 +1,8 @@
+/*
+ * Copyright 2023 Datastrato.
+ * This software is licensed under the Apache License version 2.
+ */
+
 @import url('https://fonts.googleapis.com/css2?family=Alata&display=swap');
 
 html,
@@ -10,8 +15,19 @@ body {
 }
 
 code {
-  font-family: 'Public Sans', sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu',
-    'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue';
+  font-family:
+    'Public Sans',
+    sans-serif,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    'Roboto',
+    'Oxygen',
+    'Ubuntu',
+    'Cantarell',
+    'Fira Sans',
+    'Droid Sans',
+    'Helvetica Neue';
   padding: 0.1rem 0.4rem;
   font-size: 90%;
   color: #00a0ff;

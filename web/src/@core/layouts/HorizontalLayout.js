@@ -1,3 +1,8 @@
+/*
+ * Copyright 2023 Datastrato.
+ * This software is licensed under the Apache License version 2.
+ */
+
 import Fab from '@mui/material/Fab'
 import AppBar from '@mui/material/AppBar'
 import { styled } from '@mui/material/styles'

@@ -1,3 +1,8 @@
+/*
+ * Copyright 2023 Datastrato.
+ * This software is licensed under the Apache License version 2.
+ */
+
 import Zoom from '@mui/material/Zoom'
 import { styled } from '@mui/material/styles'
 import useScrollTrigger from '@mui/material/useScrollTrigger'

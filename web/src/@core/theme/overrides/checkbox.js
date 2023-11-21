@@ -1,3 +1,8 @@
+/*
+ * Copyright 2023 Datastrato.
+ * This software is licensed under the Apache License version 2.
+ */
+
 import { useTheme } from '@mui/material/styles'
 
 import { hexToRGBA } from 'src/@core/utils/hex-to-rgba'

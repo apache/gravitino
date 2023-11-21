@@ -1,3 +1,8 @@
+/*
+ * Copyright 2023 Datastrato.
+ * This software is licensed under the Apache License version 2.
+ */
+
 import MuiBadge from '@mui/material/Badge'
 
 import useBgColor from 'src/@core/hooks/useBgColor'

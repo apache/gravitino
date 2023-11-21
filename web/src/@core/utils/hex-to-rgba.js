@@ -1,3 +1,8 @@
+/*
+ * Copyright 2023 Datastrato.
+ * This software is licensed under the Apache License version 2.
+ */
+
 export const hexToRGBA = (hexCode, opacity) => {
   let hex = hexCode.replace('#', '')
   if (hex.length === 3) {

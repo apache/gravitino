@@ -1,4 +1,8 @@
-// ** Overrides Imports
+/*
+ * Copyright 2023 Datastrato.
+ * This software is licensed under the Apache License version 2.
+ */
+
 import MuiCard from './card'
 import MuiChip from './chip'
 import MuiLink from './link'

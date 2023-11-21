@@ -1,9 +1,14 @@
+/*
+ * Copyright 2023 Datastrato.
+ * This software is licensed under the Apache License version 2.
+ */
+
 const themeConfig = {
   templateName: 'Gravitino',
   layout: 'horizontal',
   mode: 'light',
   routingLoader: true,
-  navSubItemIcon: 'bxs:circle',
+  navSubItemIcon: 'mdi:dot',
   navCollapsed: false
 }
 

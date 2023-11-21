@@ -1,3 +1,8 @@
+/*
+ * Copyright 2023 Datastrato.
+ * This software is licensed under the Apache License version 2.
+ */
+
 import Head from 'next/head'
 import { Router } from 'next/router'
 
@@ -56,8 +61,8 @@ const App = props => {
     <Provider store={store}>
       <CacheProvider value={emotionCache}>
         <Head>
-          <title>{`${themeConfig.templateName} - Admin`}</title>
-          <meta name='description' content={`${themeConfig.templateName} - Admin - Datastrato.`} />
+          <title>{`${themeConfig.templateName}`}</title>
+          <meta name='description' content={`${themeConfig.templateName} - Datastrato.`} />
           <meta name='keywords' content='Gravitino, Datastrato' />
           <meta name='viewport' content='initial-scale=1, width=device-width' />
         </Head>

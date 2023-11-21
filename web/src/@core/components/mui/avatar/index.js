@@ -1,4 +1,8 @@
-// ** React Imports
+/*
+ * Copyright 2023 Datastrato.
+ * This software is licensed under the Apache License version 2.
+ */
+
 import { forwardRef } from 'react'
 
 import MuiAvatar from '@mui/material/Avatar'

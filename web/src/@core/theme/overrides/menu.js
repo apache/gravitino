@@ -1,3 +1,8 @@
+/*
+ * Copyright 2023 Datastrato.
+ * This software is licensed under the Apache License version 2.
+ */
+
 const Menu = skin => {
   const boxShadow = theme => {
     if (skin === 'bordered') {

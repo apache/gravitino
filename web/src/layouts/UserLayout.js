@@ -1,3 +1,8 @@
+/*
+ * Copyright 2023 Datastrato.
+ * This software is licensed under the Apache License version 2.
+ */
+
 import useMediaQuery from '@mui/material/useMediaQuery'
 
 import Layout from 'src/@core/layouts/Layout'

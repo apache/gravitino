@@ -1,4 +1,7 @@
-import { Fragment, useState } from 'react'
+/*
+ * Copyright 2023 Datastrato.
+ * This software is licensed under the Apache License version 2.
+ */
 
 import Drawer from '@mui/material/Drawer'
 import { styled } from '@mui/material/styles'

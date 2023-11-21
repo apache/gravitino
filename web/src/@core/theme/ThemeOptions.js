@@ -1,3 +1,8 @@
+/*
+ * Copyright 2023 Datastrato.
+ * This software is licensed under the Apache License version 2.
+ */
+
 import { deepmerge } from '@mui/utils'
 
 import palette from './palette'
