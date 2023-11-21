@@ -242,7 +242,7 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
     List<Pair<byte[], byte[]>> pairs =
         kvBackend.scan(
             new KvRangeScan.KvRangeScanBuilder()
-                .start(Bytes.concat(key, ByteUtils.longToByte(txId)))
+                .start(key)
                 .startInclusive(false)
                 .end(Bytes.increment(Bytes.wrap(key)).get())
                 .endInclusive(false)
