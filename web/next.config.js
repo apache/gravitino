@@ -5,6 +5,7 @@ const path = require('path')
 // console.log('output: ', process.env.OUTPUT_MODE)
 
 module.exports = {
+  distDir: 'dist',
   output: process.env.OUTPUT_MODE || 'standalone', // export/standalone
   trailingSlash: true,
   reactStrictMode: false,

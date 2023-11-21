@@ -13,7 +13,7 @@
     "rm:cache": "rm -rf ./out/ && rm -rf ./node_modules/ && rm -rf ./yarn.lock && yarn cache clean",
     "deploy": "yarn install && yarn export",
     "docker:export": "yarn deploy",
-    "docker:dev": "yarn install && yarn dev"
+    "docker:dev": "yarn deploy && yarn dev"
   },
   "dependencies": {
     "@emotion/cache": "11.11.0",
