@@ -142,7 +142,7 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
                 Pair.of(
                     constructKey(p.getKey()),
                     constructValue(p.getValue(), ValueStatusEnum.DELETED))));
-    return false;
+    return true;
   }
 
   @Override

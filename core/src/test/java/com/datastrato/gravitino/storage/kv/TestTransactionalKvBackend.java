@@ -6,6 +6,7 @@
 package com.datastrato.gravitino.storage.kv;
 
 import static com.datastrato.gravitino.Configs.ENTRY_KV_ROCKSDB_BACKEND_PATH;
+import static com.datastrato.gravitino.Configs.STORE_TRANSACTION_MAX_SKEW_TIME;
 
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Configs;
@@ -34,12 +35,17 @@ import org.mockito.Mockito;
 
 class TestTransactionalKvBackend {
 
-  private KvBackend getKvBackEnd() throws IOException {
-    Config config = Mockito.mock(Config.class);
+  private Config getConfig() {
     File file = Files.createTempDir();
     file.deleteOnExit();
+    Config config = Mockito.mock(Config.class);
     Mockito.when(config.get(Configs.ENTITY_SERDE)).thenReturn("proto");
     Mockito.when(config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)).thenReturn(file.getAbsolutePath());
+    Mockito.when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(3L);
+    return config;
+  }
+
+  private KvBackend getKvBackEnd(Config config) throws IOException {
     KvBackend kvBackend = new RocksDBKvBackend();
     kvBackend.initialize(config);
     return kvBackend;
@@ -47,9 +53,11 @@ class TestTransactionalKvBackend {
 
   @Test
   void testGet() throws IOException {
-    KvBackend kvBackend = getKvBackEnd();
+    Config config = getConfig();
+    KvBackend kvBackend = getKvBackEnd(config);
     TransactionalKvBackend transactionalKvBackend =
-        new TransactionalKvBackendImpl(kvBackend, new TransactionIdGeneratorImpl(kvBackend));
+        new TransactionalKvBackendImpl(
+            kvBackend, new TransactionIdGeneratorImpl(kvBackend, config));
     transactionalKvBackend.begin();
     transactionalKvBackend.put("key1".getBytes(), "value1".getBytes(), true);
     transactionalKvBackend.put("key2".getBytes(), "value2".getBytes(), true);
@@ -57,13 +65,15 @@ class TestTransactionalKvBackend {
     transactionalKvBackend.close();
 
     transactionalKvBackend =
-        new TransactionalKvBackendImpl(kvBackend, new TransactionIdGeneratorImpl(kvBackend));
+        new TransactionalKvBackendImpl(
+            kvBackend, new TransactionIdGeneratorImpl(kvBackend, config));
     transactionalKvBackend.begin();
     Assertions.assertEquals("value1", new String(transactionalKvBackend.get("key1".getBytes())));
     Assertions.assertEquals("value2", new String(transactionalKvBackend.get("key2".getBytes())));
 
     transactionalKvBackend =
-        new TransactionalKvBackendImpl(kvBackend, new TransactionIdGeneratorImpl(kvBackend));
+        new TransactionalKvBackendImpl(
+            kvBackend, new TransactionIdGeneratorImpl(kvBackend, config));
     transactionalKvBackend.begin();
     transactionalKvBackend.put("key1".getBytes(), "value3".getBytes(), true);
     transactionalKvBackend.put("key2".getBytes(), "value4".getBytes(), true);
@@ -71,7 +81,8 @@ class TestTransactionalKvBackend {
     transactionalKvBackend.close();
 
     transactionalKvBackend =
-        new TransactionalKvBackendImpl(kvBackend, new TransactionIdGeneratorImpl(kvBackend));
+        new TransactionalKvBackendImpl(
+            kvBackend, new TransactionIdGeneratorImpl(kvBackend, config));
     transactionalKvBackend.begin();
     Assertions.assertEquals("value3", new String(transactionalKvBackend.get("key1".getBytes())));
     Assertions.assertEquals("value4", new String(transactionalKvBackend.get("key2".getBytes())));
@@ -79,9 +90,11 @@ class TestTransactionalKvBackend {
 
   @Test
   void testDelete() throws IOException {
-    KvBackend kvBackend = getKvBackEnd();
+    Config config = getConfig();
+    KvBackend kvBackend = getKvBackEnd(config);
     TransactionalKvBackend transactionalKvBackend =
-        new TransactionalKvBackendImpl(kvBackend, new TransactionIdGeneratorImpl(kvBackend));
+        new TransactionalKvBackendImpl(
+            kvBackend, new TransactionIdGeneratorImpl(kvBackend, config));
     transactionalKvBackend.begin();
     transactionalKvBackend.put("key1".getBytes(), "value1".getBytes(), true);
     transactionalKvBackend.put("key2".getBytes(), "value2".getBytes(), true);
@@ -89,21 +102,24 @@ class TestTransactionalKvBackend {
     transactionalKvBackend.close();
 
     transactionalKvBackend =
-        new TransactionalKvBackendImpl(kvBackend, new TransactionIdGeneratorImpl(kvBackend));
+        new TransactionalKvBackendImpl(
+            kvBackend, new TransactionIdGeneratorImpl(kvBackend, config));
     transactionalKvBackend.begin();
     transactionalKvBackend.delete("key1".getBytes());
     transactionalKvBackend.commit();
     transactionalKvBackend.close();
 
     transactionalKvBackend =
-        new TransactionalKvBackendImpl(kvBackend, new TransactionIdGeneratorImpl(kvBackend));
+        new TransactionalKvBackendImpl(
+            kvBackend, new TransactionIdGeneratorImpl(kvBackend, config));
     transactionalKvBackend.begin();
     Assertions.assertNull(transactionalKvBackend.get("key1".getBytes()));
     Assertions.assertNotNull(transactionalKvBackend.get("key2".getBytes()));
     transactionalKvBackend.close();
 
     transactionalKvBackend =
-        new TransactionalKvBackendImpl(kvBackend, new TransactionIdGeneratorImpl(kvBackend));
+        new TransactionalKvBackendImpl(
+            kvBackend, new TransactionIdGeneratorImpl(kvBackend, config));
     transactionalKvBackend.begin();
     transactionalKvBackend.delete("key2".getBytes());
     transactionalKvBackend.commit();
@@ -115,9 +131,11 @@ class TestTransactionalKvBackend {
 
   @Test
   void testScan() throws IOException {
-    KvBackend kvBackend = getKvBackEnd();
+    Config config = getConfig();
+    KvBackend kvBackend = getKvBackEnd(config);
     TransactionalKvBackend transactionalKvBackend =
-        new TransactionalKvBackendImpl(kvBackend, new TransactionIdGeneratorImpl(kvBackend));
+        new TransactionalKvBackendImpl(
+            kvBackend, new TransactionIdGeneratorImpl(kvBackend, config));
     transactionalKvBackend.begin();
 
     transactionalKvBackend.put("key1".getBytes(), "value1".getBytes(), true);
@@ -136,7 +154,8 @@ class TestTransactionalKvBackend {
         };
 
     transactionalKvBackend =
-        new TransactionalKvBackendImpl(kvBackend, new TransactionIdGeneratorImpl(kvBackend));
+        new TransactionalKvBackendImpl(
+            kvBackend, new TransactionIdGeneratorImpl(kvBackend, config));
     transactionalKvBackend.begin();
     List<Pair<byte[], byte[]>> pairs =
         transactionalKvBackend.scan(
@@ -212,9 +231,11 @@ class TestTransactionalKvBackend {
 
   @Test
   void testDeleteRange() throws IOException {
-    KvBackend kvBackend = getKvBackEnd();
+    Config config = getConfig();
+    KvBackend kvBackend = getKvBackEnd(config);
     TransactionalKvBackend transactionalKvBackend =
-        new TransactionalKvBackendImpl(kvBackend, new TransactionIdGeneratorImpl(kvBackend));
+        new TransactionalKvBackendImpl(
+            kvBackend, new TransactionIdGeneratorImpl(kvBackend, config));
     transactionalKvBackend.begin();
     transactionalKvBackend.put("key1".getBytes(), "value1".getBytes(), true);
     transactionalKvBackend.put("key2".getBytes(), "value2".getBytes(), true);
@@ -223,7 +244,8 @@ class TestTransactionalKvBackend {
     transactionalKvBackend.close();
 
     transactionalKvBackend =
-        new TransactionalKvBackendImpl(kvBackend, new TransactionIdGeneratorImpl(kvBackend));
+        new TransactionalKvBackendImpl(
+            kvBackend, new TransactionIdGeneratorImpl(kvBackend, config));
     transactionalKvBackend.begin();
     transactionalKvBackend.deleteRange(
         new KvRangeScan.KvRangeScanBuilder()
@@ -236,7 +258,8 @@ class TestTransactionalKvBackend {
     transactionalKvBackend.close();
 
     transactionalKvBackend =
-        new TransactionalKvBackendImpl(kvBackend, new TransactionIdGeneratorImpl(kvBackend));
+        new TransactionalKvBackendImpl(
+            kvBackend, new TransactionIdGeneratorImpl(kvBackend, config));
     transactionalKvBackend.begin();
     Assertions.assertNull(transactionalKvBackend.get("key1".getBytes()));
     Assertions.assertNull(transactionalKvBackend.get("key2".getBytes()));
@@ -245,9 +268,11 @@ class TestTransactionalKvBackend {
 
   @Test
   void testException() throws IOException, InterruptedException {
-    KvBackend kvBackend = getKvBackEnd();
+    Config config = getConfig();
+    KvBackend kvBackend = getKvBackEnd(config);
     TransactionalKvBackendImpl kvTransactionManager =
-        new TransactionalKvBackendImpl(kvBackend, new TransactionIdGeneratorImpl(kvBackend));
+        new TransactionalKvBackendImpl(
+            kvBackend, new TransactionIdGeneratorImpl(kvBackend, config));
     kvTransactionManager.begin();
     List<Pair<byte[], byte[]>> pairs =
         Lists.newArrayList(
@@ -288,7 +313,8 @@ class TestTransactionalKvBackend {
       Assertions.assertThrows(Exception.class, kvTransactionManager::commit);
 
       kvTransactionManager =
-          new TransactionalKvBackendImpl(kvBackend, new TransactionIdGeneratorImpl(kvBackend));
+          new TransactionalKvBackendImpl(
+              kvBackend, new TransactionIdGeneratorImpl(kvBackend, config));
       kvTransactionManager.begin();
       Assertions.assertNull(kvTransactionManager.get("key1".getBytes()));
       Assertions.assertNull(kvTransactionManager.get("key2".getBytes()));
@@ -305,8 +331,10 @@ class TestTransactionalKvBackend {
   @ParameterizedTest
   @ValueSource(ints = {1})
   void testTransactionIdGeneratorQPS(int threadNum) throws IOException, InterruptedException {
-    KvBackend kvBackend = getKvBackEnd();
-    TransactionIdGenerator transactionIdGenerator = new TransactionIdGeneratorImpl(kvBackend);
+    Config config = getConfig();
+    KvBackend kvBackend = getKvBackEnd(config);
+    TransactionIdGenerator transactionIdGenerator =
+        new TransactionIdGeneratorImpl(kvBackend, config);
     ThreadPoolExecutor threadPoolExecutor =
         new ThreadPoolExecutor(
             threadNum,
@@ -334,35 +362,5 @@ class TestTransactionalKvBackend {
     Thread.currentThread().sleep(4000);
 
     System.out.println(String.format("%d thread qps is: %d/s", threadNum, atomicLong.get() / 3));
-  }
-
-  @Test
-  void testTransactionId() throws IOException, InterruptedException {
-    KvBackend kvBackend = getKvBackEnd();
-    TransactionIdGenerator transactionIdGenerator = new TransactionIdGeneratorImpl(kvBackend);
-    ThreadPoolExecutor threadPoolExecutor =
-        new ThreadPoolExecutor(
-            10,
-            10,
-            1,
-            TimeUnit.MINUTES,
-            new LinkedBlockingQueue<>(1000),
-            new ThreadFactoryBuilder()
-                .setDaemon(true)
-                .setNameFormat("testTransactionIdGenerator-%d")
-                .build());
-
-    for (int i = 0; i < 10; i++) {
-      threadPoolExecutor.execute(
-          () -> {
-            try {
-              kvBackend.put("key1".getBytes(), "value1".getBytes(), true);
-            } catch (Exception e) {
-              e.printStackTrace();
-            }
-          });
-    }
-
-    Thread.currentThread().sleep(4000);
   }
 }
