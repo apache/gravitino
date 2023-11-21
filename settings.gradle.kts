@@ -8,3 +8,4 @@ include("api", "common", "core", "meta", "server", "integration-test", "server-c
 include("catalogs:catalog-hive", "catalogs:catalog-lakehouse-iceberg", "catalogs:catalog-jdbc-common")
 include("clients:client-java", "clients:client-java-runtime")
 include("trino-connector")
+include("web")

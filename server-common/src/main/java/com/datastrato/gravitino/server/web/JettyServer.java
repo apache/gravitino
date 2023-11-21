@@ -4,7 +4,10 @@
  */
 package com.datastrato.gravitino.server.web;
 
+import java.io.File;
+import java.io.IOException;
 import java.net.BindException;
+import java.nio.file.Files;
 import java.util.EnumSet;
 import java.util.concurrent.LinkedBlockingQueue;
 import javax.servlet.DispatcherType;
@@ -19,13 +22,13 @@ import org.eclipse.jetty.server.handler.ErrorHandler;
 import org.eclipse.jetty.server.handler.HandlerCollection;
 import org.eclipse.jetty.servlet.DefaultServlet;
 import org.eclipse.jetty.servlet.FilterHolder;
-import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
 import org.eclipse.jetty.util.component.LifeCycle;
 import org.eclipse.jetty.util.thread.QueuedThreadPool;
 import org.eclipse.jetty.util.thread.ScheduledExecutorScheduler;
 import org.eclipse.jetty.util.thread.Scheduler;
 import org.eclipse.jetty.util.thread.ThreadPool;
+import org.eclipse.jetty.webapp.WebAppContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,7 +38,7 @@ public final class JettyServer {
 
   private Server server;
 
-  private ServletContextHandler servletContextHandler;
+  private WebAppContext servletContextHandler;
 
   private JettyServerConfig serverConfig;
 
@@ -153,7 +156,43 @@ public final class JettyServer {
   }
 
   private void initializeServletContextHandler(Server server) {
-    this.servletContextHandler = new ServletContextHandler();
+    this.servletContextHandler = new WebAppContext();
+
+    // Only Gravitino Server need to set war file.
+    if (!serverConfig.getWarFile().isEmpty()) {
+      // If development mode, you can set war file in the `GRAVITINO_WAR` environment variable.
+      String warPath = System.getenv("GRAVITINO_WAR");
+      if (warPath == null) {
+        // Default deploy mode, read from `gravitino/gravitino-web-{version}.war`
+        warPath =
+            String.join(File.separator, System.getenv("GRAVITINO_HOME"), serverConfig.getWarFile());
+      }
+
+      File warFile = new File(warPath);
+      if (warFile.exists()) {
+        if (warFile.isDirectory()) {
+          // Development mode, read from FS
+          servletContextHandler.setResourceBase(warFile.getPath());
+        } else {
+          // use packaged WAR
+          servletContextHandler.setWar(warFile.getAbsolutePath());
+          servletContextHandler.setExtractWAR(false);
+          try {
+            File warTempDirectory = Files.createTempDirectory("GravitinoWar").toFile();
+            warTempDirectory.mkdir();
+            LOG.info("Gravitino Webapp path: {}", warTempDirectory.getPath());
+            servletContextHandler.setTempDirectory(warTempDirectory);
+          } catch (IOException e) {
+            throw new RuntimeException(e);
+          }
+        }
+      } else {
+        servletContextHandler.setResourceBase("/");
+      }
+    } else {
+      servletContextHandler.setResourceBase("/");
+    }
+
     servletContextHandler.setContextPath("/");
     servletContextHandler.addServlet(DefaultServlet.class, "/");
 

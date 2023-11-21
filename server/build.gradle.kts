@@ -100,4 +100,7 @@ tasks {
   test {
     environment("GRAVITINO_HOME", rootDir.path)
   }
+  clean {
+    delete("${propertiesFile}")
+  }
 }

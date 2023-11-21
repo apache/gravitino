@@ -111,7 +111,8 @@ make sure you have installed the recent version of [Docker](https://www.docker.c
 
 > **⚠️ Important**
 >
-> All commands below are meant to be run in a `macOS` environment. If you are using a different system, you may encounter errors. Please modify the commands according to the system prompts. For example, if you are using `Windows`, replace `${PWD}` with `%cd%`, etc.
+> All commands below are meant to be run in a `macOS` environment. If you are using a different system, you may encounter errors. Please modify the commands according to the system prompts. 
+> For example, if you are using `Windows`, replace `${PWD}` with `%cd%`, etc.
 
 Only use Docker to build static `HTML\CSS\JS` files directory
 
@@ -120,14 +121,17 @@ Run below command in console:
 ```bash
 # ensure you are in the `web` directory
 docker run -it --rm --name gravitino-web-docker -v ${PWD}:/web -w /web node:20-slim /bin/bash -c "yarn install && yarn dist"
+docker run -it -p 3000:3000 -v ${PWD}:/web -w /web --name gravitino-web node:20-slim /bin/bash
+docker run -p 3000:3000 -v ${PWD}:/web --name gravitino-web node:20-slim /bin/bash -c "yarn install && yarn dist"
 ```
 
-This command will run `yarn install` to install the dependencies specified in the `package.json` file and then run `yarn export` to export a static version of the application. The exported files will be saved to the `dist` directory inside the container, which is mounted to the `dist` directory in the current directory of the host machine. This means that the exported files will be accessible on the host machine after the command is executed.
+This command will run `yarn install` to install the dependencies specified in the `package.json` file and then run `yarn export` to export a static version of the application. 
+The exported files will be saved to the `dist` directory inside the container, which is mounted to the `dist` directory in the current directory of the host machine. 
+This means that the exported files will be accessible on the host machine after the command is executed.
 
 If you also want to start a server to view with demo, please change to the following code:
 
 ```bash
 docker run -it --rm --name gravitino-web-docker -v ${PWD}:/web -p 3000:3000 -w /web node:20-slim /bin/bash -c "yarn install && yarn server"
-
-# Open http://localhost:3000
 ```
+You can access the Gravitino WEB UI by typing http://localhost:3000 in your browser

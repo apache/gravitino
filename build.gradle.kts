@@ -211,7 +211,12 @@ tasks.rat {
     "**/.github/**/*",
     "dev/docker/**/*.xml",
     "**/*.log",
-    "licenses/*txt"
+    "licenses/*txt",
+    "web/.**",
+    "web/node_modules/**/*",
+    "web/src/iconify-bundle/bundle-icons-react.js",
+    "web/src/iconify-bundle/icons-bundle-react.js",
+    "web/yarn.lock",
   )
 
   // Add .gitignore excludes to the Apache Rat exclusion list.
@@ -222,6 +227,8 @@ tasks.rat {
     }
     exclusions.addAll(gitIgnoreExcludes)
   }
+
+  dependsOn(":web:nodeSetup")
 
   verbose.set(true)
   failOnError.set(true)
@@ -245,8 +252,14 @@ tasks {
     outputs.dir(projectDir.dir("distribution/package"))
     doLast {
       copy {
-        from(projectDir.dir("conf")) { into("package/conf") }
+        from(projectDir.dir("conf")) {
+          into("package/conf")
+          filter { line ->
+            line.replace("{version}", "${version}")
+          }
+        }
         from(projectDir.dir("bin")) { into("package/bin") }
+        from(projectDir.dir("web/build/libs/gravitino-web-${version}.war")) { into("package") }
         into(outputDir)
         rename { fileName ->
           fileName.replace(".template", "")
@@ -363,6 +376,5 @@ tasks {
 
   clean {
     dependsOn(cleanDistribution)
-    delete("server/src/main/resources/project.properties")
   }
 }

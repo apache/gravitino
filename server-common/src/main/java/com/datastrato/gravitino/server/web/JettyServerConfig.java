@@ -79,9 +79,18 @@ public final class JettyServerConfig {
           .intConf()
           .createWithDefault(100);
 
+  public static final ConfigEntry<String> WEBSERVER_WAR =
+      new ConfigBuilder("war")
+          .doc("The war file of the Jetty web server")
+          .version("0.1.0")
+          .stringConf()
+          .createWithDefault("");
+
   private final String host;
 
   private final int httpPort;
+
+  private final String warFile;
 
   private final int minThreads;
 
@@ -105,6 +114,7 @@ public final class JettyServerConfig {
 
     this.host = internalConfig.get(WEBSERVER_HOST);
     this.httpPort = internalConfig.get(WEBSERVER_HTTP_PORT);
+    this.warFile = internalConfig.get(WEBSERVER_WAR);
 
     int minThreads = internalConfig.get(WEBSERVER_MIN_THREADS);
     int maxThreads = internalConfig.get(WEBSERVER_MAX_THREADS);
@@ -145,6 +155,10 @@ public final class JettyServerConfig {
 
   public int getHttpPort() {
     return httpPort;
+  }
+
+  public String getWarFile() {
+    return warFile;
   }
 
   public int getMinThreads() {
