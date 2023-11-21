@@ -51,4 +51,12 @@ public final class GravitinoColumn {
   public String getComment() {
     return comment;
   }
+
+  public boolean isNullable() {
+    return dataType.nullable();
+  }
+
+  public boolean isHidden() {
+    return false;
+  }
 }

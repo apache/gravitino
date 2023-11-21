@@ -131,15 +131,21 @@ public class IcebergTableOpsHelper {
   }
 
   private void doUpdateColumnType(
-      UpdateSchema icebergUpdateSchema, UpdateColumnType updateColumnType) {
-    org.apache.iceberg.types.Type type =
-        ConvertUtil.toIcebergType(updateColumnType.getNewDataType());
+      UpdateSchema icebergUpdateSchema,
+      UpdateColumnType updateColumnType,
+      Schema icebergTableSchema) {
+    String fieldName = DOT.join(updateColumnType.fieldNames());
     Preconditions.checkArgument(
-        type.isPrimitiveType(),
-        "Cannot update %s, not a primitive type: %s",
-        DOT.join(updateColumnType.fieldNames()),
-        type);
-    icebergUpdateSchema.updateColumn(DOT.join(updateColumnType.fieldNames()), (PrimitiveType) type);
+        icebergTableSchema.findField(fieldName) != null,
+        "Cannot update missing field: %s",
+        fieldName);
+
+    boolean nullable = icebergTableSchema.findField(fieldName).isOptional();
+    org.apache.iceberg.types.Type type =
+        ConvertUtil.toIcebergType(nullable, updateColumnType.getNewDataType());
+    Preconditions.checkArgument(
+        type.isPrimitiveType(), "Cannot update %s, not a primitive type: %s", fieldName, type);
+    icebergUpdateSchema.updateColumn(fieldName, (PrimitiveType) type);
   }
 
   private ColumnPosition getAddColumnPosition(StructType parent, ColumnPosition columnPosition) {
@@ -180,7 +186,8 @@ public class IcebergTableOpsHelper {
     icebergUpdateSchema.addColumn(
         getParentName(addColumn.fieldNames()),
         getLeafName(addColumn.fieldNames()),
-        ConvertUtil.toIcebergType(addColumn.getDataType()),
+        // TODO(minghuang): add nullable support in AddColumn
+        ConvertUtil.toIcebergType(true, addColumn.getDataType()),
         addColumn.getComment());
 
     ColumnPosition position = getAddColumnPosition(parentStruct, addColumn.getPosition());
@@ -218,7 +225,7 @@ public class IcebergTableOpsHelper {
       } else if (change instanceof RenameColumn) {
         doRenameColumn(icebergUpdateSchema, (RenameColumn) change);
       } else if (change instanceof UpdateColumnType) {
-        doUpdateColumnType(icebergUpdateSchema, (UpdateColumnType) change);
+        doUpdateColumnType(icebergUpdateSchema, (UpdateColumnType) change, icebergTableSchema);
       } else if (change instanceof UpdateColumnComment) {
         doUpdateColumnComment(icebergUpdateSchema, (UpdateColumnComment) change);
       } else {

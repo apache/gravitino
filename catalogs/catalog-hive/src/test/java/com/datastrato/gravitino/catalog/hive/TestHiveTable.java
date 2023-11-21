@@ -203,6 +203,7 @@ public class TestHiveTable extends MiniHiveMetastoreService {
             .withName("col_3")
             .withType(TypeCreator.REQUIRED.I8)
             .withComment(HIVE_COMMENT)
+            .withNullable(false)
             .build();
 
     exception =
@@ -449,38 +450,23 @@ public class TestHiveTable extends MiniHiveMetastoreService {
                         TableChange.updateColumnPosition(new String[] {"col_1"}, null)));
     Assertions.assertTrue(exception.getMessage().contains("Column position cannot be null"));
 
-    exception =
-        Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () ->
-                hiveCatalog
-                    .asTableCatalog()
-                    .alterTable(
-                        tableIdentifier,
-                        TableChange.addColumn(new String[] {"col_3"}, TypeCreator.REQUIRED.I8)));
-    Assertions.assertTrue(
-        exception
-            .getMessage()
-            .contains(
-                "The NOT NULL constraint for column is only supported since Hive 3.0, "
-                    + "but the current Gravitino Hive catalog only supports Hive 2.x"));
-
-    exception =
-        Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () ->
-                hiveCatalog
-                    .asTableCatalog()
-                    .alterTable(
-                        tableIdentifier,
-                        TableChange.updateColumnType(
-                            new String[] {"col_1"}, TypeCreator.REQUIRED.I8)));
-    Assertions.assertTrue(
-        exception
-            .getMessage()
-            .contains(
-                "The NOT NULL constraint for column is only supported since Hive 3.0, "
-                    + "but the current Gravitino Hive catalog only supports Hive 2.x"));
+    // TODO(minghuang): Uncomment below test after we support nullable in TableChange.addColumn
+    //    exception =
+    //        Assertions.assertThrows(
+    //            IllegalArgumentException.class,
+    //            () ->
+    //                hiveCatalog
+    //                    .asTableCatalog()
+    //                    .alterTable(
+    //                        tableIdentifier,
+    //                        TableChange.addColumn(new String[] {"col_3"},
+    // TypeCreator.REQUIRED.I8)));
+    //    Assertions.assertTrue(
+    //        exception
+    //            .getMessage()
+    //            .contains(
+    //                "The NOT NULL constraint for column is only supported since Hive 3.0, "
+    //                    + "but the current Gravitino Hive catalog only supports Hive 2.x"));
 
     exception =
         Assertions.assertThrows(

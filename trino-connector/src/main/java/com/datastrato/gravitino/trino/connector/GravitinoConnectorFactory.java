@@ -54,6 +54,12 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
           catalogConnectorManager =
               new CatalogConnectorManager(catalogInjector, catalogConnectorFactory);
           catalogConnectorManager.config(config);
+
+          // For testing
+          if (GravitinoPlugin.gravitinoClient != null) {
+            catalogConnectorManager.setGravitinoClient(GravitinoPlugin.gravitinoClient);
+            GravitinoPlugin.catalogConnectorManager = catalogConnectorManager;
+          }
           catalogConnectorManager.start();
 
         } catch (Exception e) {
@@ -71,10 +77,6 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
     CatalogConnectorContext catalogConnectorContext =
         catalogConnectorManager.getCatalogConnector(catalogName);
     Preconditions.checkNotNull(catalogConnectorContext, "catalogConnector is not null");
-
-    // For testing
-    GravitinoPlugin.internalTestingConnector = catalogConnectorContext.getInternalConnector();
-
     return catalogConnectorContext.getConnector();
   }
 }

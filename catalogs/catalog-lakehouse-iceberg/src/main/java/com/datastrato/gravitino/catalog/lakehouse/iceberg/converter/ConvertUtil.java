@@ -27,11 +27,12 @@ public class ConvertUtil {
   /**
    * Convert the Gravitino type to the Iceberg type.
    *
-   * @param gravitinoType
+   * @param nullable Whether the field is nullable.
+   * @param gravitinoType Gravitino type.
    * @return Iceberg type.
    */
-  public static Type toIcebergType(io.substrait.type.Type gravitinoType) {
-    return ToIcebergTypeVisitor.visit(gravitinoType, new ToIcebergType());
+  public static Type toIcebergType(boolean nullable, io.substrait.type.Type gravitinoType) {
+    return ToIcebergTypeVisitor.visit(gravitinoType, new ToIcebergType(nullable));
   }
 
   /**
@@ -54,7 +55,7 @@ public class ConvertUtil {
     return new IcebergColumn.Builder()
         .withId(nestedField.fieldId())
         .withName(nestedField.name())
-        .withOptional(nestedField.isOptional())
+        .withNullable(nestedField.isOptional())
         .withComment(nestedField.doc())
         .withType(ConvertUtil.formIcebergType(nestedField.type()))
         .build();
