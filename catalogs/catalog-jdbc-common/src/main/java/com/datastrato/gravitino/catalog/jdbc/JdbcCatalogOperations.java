@@ -277,7 +277,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
    *
    * @param tableIdent The identifier of the table to alter.
    * @param changes The changes to apply to the table.
-   * @return This method always throws UnsupportedOperationException.
+   * @return The altered JdbcTable instance representing the table.
    * @throws NoSuchTableException This exception will not be thrown in this method.
    * @throws IllegalArgumentException This exception will not be thrown in this method.
    */
