@@ -15,9 +15,14 @@ dependencies {
     exclude("com.fasterxml.jackson.core")
     exclude("com.fasterxml.jackson.datatype")
   }
+  implementation(project(":api"))
+  implementation(project(":core"))
+
   implementation(libs.guava)
+  implementation(libs.commons.lang3)
   implementation(libs.bundles.log4j)
   implementation(libs.bundles.jetty)
+  implementation(libs.bundles.jwt)
 
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
