@@ -11,7 +11,7 @@ import com.datastrato.gravitino.catalog.lakehouse.iceberg.web.IcebergExceptionMa
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.web.IcebergObjectMapperProvider;
 import com.datastrato.gravitino.server.web.JettyServer;
 import com.datastrato.gravitino.server.web.JettyServerConfig;
-import com.datastrato.gravitino.server.web.auth.AuthenticationFilter;
+import com.datastrato.gravitino.server.auth.AuthenticationFilter;
 import java.util.Map;
 import javax.servlet.Servlet;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;

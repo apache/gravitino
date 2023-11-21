@@ -2,11 +2,13 @@
  * Copyright 2023 Datastrato.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.gravitino.security;
+package com.datastrato.gravitino.server.auth;
 
 import com.datastrato.gravitino.Config;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
+
+import com.datastrato.gravitino.auth.AuthConstants;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 

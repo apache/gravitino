@@ -3,10 +3,11 @@
  * This software is licensed under the Apache License version 2.
  */
 
-package com.datastrato.gravitino.security;
+package com.datastrato.gravitino.server.auth;
 
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Configs;
+import com.datastrato.gravitino.auth.AuthenticatorType;
 import com.google.common.collect.ImmutableMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

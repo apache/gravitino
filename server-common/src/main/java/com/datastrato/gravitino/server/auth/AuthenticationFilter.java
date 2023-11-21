@@ -2,12 +2,10 @@
  * Copyright 2023 Datastrato.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.gravitino.server.web.auth;
+package com.datastrato.gravitino.server.auth;
 
-import com.datastrato.gravitino.GravitinoEnv;
 import com.datastrato.gravitino.exceptions.UnauthorizedException;
-import com.datastrato.gravitino.security.AuthConstants;
-import com.datastrato.gravitino.security.Authenticator;
+import com.datastrato.gravitino.auth.AuthConstants;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -43,7 +41,7 @@ public class AuthenticationFilter implements Filter {
     try {
       Authenticator authenticator;
       if (filterAuthenticator == null) {
-        authenticator = GravitinoEnv.getInstance().authenticator();
+        authenticator = ServerAuthenticator.getInstance().authenticator();
       } else {
         authenticator = filterAuthenticator;
       }

@@ -19,8 +19,10 @@ dependencies {
   implementation(project(":core"))
 
   implementation(libs.guava)
+  implementation(libs.commons.lang3)
   implementation(libs.bundles.log4j)
   implementation(libs.bundles.jetty)
+  implementation(libs.bundles.jwt)
 
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)

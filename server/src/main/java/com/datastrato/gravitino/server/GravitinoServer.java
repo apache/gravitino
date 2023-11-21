@@ -12,10 +12,12 @@ import com.datastrato.gravitino.server.web.JettyServer;
 import com.datastrato.gravitino.server.web.JettyServerConfig;
 import com.datastrato.gravitino.server.web.ObjectMapperProvider;
 import com.datastrato.gravitino.server.web.VersioningFilter;
-import com.datastrato.gravitino.server.web.auth.AuthenticationFilter;
+import com.datastrato.gravitino.server.auth.AuthenticationFilter;
 import java.io.File;
 import java.util.Properties;
 import javax.servlet.Servlet;
+
+import com.datastrato.gravitino.server.auth.ServerAuthenticator;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.jackson.JacksonFeature;
 import org.glassfish.jersey.server.ResourceConfig;
@@ -49,6 +51,8 @@ public class GravitinoServer extends ResourceConfig {
     JettyServerConfig jettyServerConfig =
         JettyServerConfig.fromConfig(serverConfig, WEBSERVER_CONF_PREFIX);
     server.initialize(jettyServerConfig, SERVER_NAME);
+
+    ServerAuthenticator.getInstance().initialize(serverConfig);
 
     gravitinoEnv.initialize(serverConfig);
 

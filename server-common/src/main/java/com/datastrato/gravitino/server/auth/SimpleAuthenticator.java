@@ -3,11 +3,13 @@
  * This software is licensed under the Apache License version 2.
  */
 
-package com.datastrato.gravitino.security;
+package com.datastrato.gravitino.server.auth;
 
 import com.datastrato.gravitino.Config;
 import java.security.Principal;
 import java.util.Base64;
+
+import com.datastrato.gravitino.auth.AuthConstants;
 import org.apache.commons.lang3.StringUtils;
 
 /**

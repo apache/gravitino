@@ -2,9 +2,10 @@
  * Copyright 2023 Datastrato.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.gravitino.security;
+package com.datastrato.gravitino.server.auth;
 
 import com.datastrato.gravitino.Config;
+import com.datastrato.gravitino.auth.AuthConstants;
 import com.datastrato.gravitino.exceptions.UnauthorizedException;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;

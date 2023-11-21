@@ -3,7 +3,7 @@
  * This software is licensed under the Apache License version 2.
  */
 
-package com.datastrato.gravitino.security;
+package com.datastrato.gravitino.auth;
 
 public enum SignatureAlgorithmFamilyType {
   HMAC,

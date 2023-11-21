@@ -3,7 +3,7 @@
  * This software is licensed under the Apache License version 2.
  */
 
-package com.datastrato.gravitino.server.web.auth;
+package com.datastrato.gravitino.server.auth;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -14,9 +14,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.datastrato.gravitino.exceptions.UnauthorizedException;
-import com.datastrato.gravitino.security.AuthConstants;
-import com.datastrato.gravitino.security.Authenticator;
-import com.datastrato.gravitino.security.UserPrincipal;
+import com.datastrato.gravitino.auth.AuthConstants;
+
 import java.io.IOException;
 import java.util.Collections;
 import java.util.Vector;
