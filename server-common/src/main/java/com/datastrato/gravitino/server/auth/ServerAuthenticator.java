@@ -26,6 +26,11 @@ public class ServerAuthenticator {
     return ServerAuthenticator.InstanceHolder.INSTANCE;
   }
 
+  /**
+   * Initialize the server authenticator.
+   *
+   * @param config The configuration object to initialize the authenticator.
+   */
   public void initialize(Config config) {
     // Create and initialize Authenticator related modules
     this.authenticator = AuthenticatorFactory.createAuthenticator(config);
