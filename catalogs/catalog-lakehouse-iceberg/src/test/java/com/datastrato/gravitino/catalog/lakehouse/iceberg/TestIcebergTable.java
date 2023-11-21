@@ -4,10 +4,10 @@
  */
 package com.datastrato.gravitino.catalog.lakehouse.iceberg;
 
-import static com.datastrato.gravitino.rel.transforms.Transforms.bucket;
-import static com.datastrato.gravitino.rel.transforms.Transforms.day;
-import static com.datastrato.gravitino.rel.transforms.Transforms.identity;
-import static com.datastrato.gravitino.rel.transforms.Transforms.truncate;
+import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.bucket;
+import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.day;
+import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.identity;
+import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.truncate;
 
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
@@ -16,15 +16,17 @@ import com.datastrato.gravitino.exceptions.TableAlreadyExistsException;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.CatalogEntity;
 import com.datastrato.gravitino.rel.Column;
-import com.datastrato.gravitino.rel.Distribution;
-import com.datastrato.gravitino.rel.SortOrder;
-import com.datastrato.gravitino.rel.SortOrder.Direction;
-import com.datastrato.gravitino.rel.SortOrder.NullOrdering;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.TableCatalog;
 import com.datastrato.gravitino.rel.TableChange;
-import com.datastrato.gravitino.rel.transforms.Transform;
-import com.datastrato.gravitino.rel.transforms.Transforms;
+import com.datastrato.gravitino.rel.expressions.NamedReference;
+import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
+import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
+import com.datastrato.gravitino.rel.expressions.sorts.NullOrdering;
+import com.datastrato.gravitino.rel.expressions.sorts.SortDirection;
+import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
+import com.datastrato.gravitino.rel.expressions.sorts.SortOrders;
+import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.google.common.collect.Maps;
 import io.substrait.type.TypeCreator;
 import java.io.IOException;
@@ -108,11 +110,8 @@ public class TestIcebergTable {
 
   private SortOrder[] createSortOrder() {
     return new SortOrder[] {
-      SortOrder.builder()
-          .withNullOrdering(NullOrdering.FIRST)
-          .withDirection(Direction.DESC)
-          .withTransform(Transforms.field(new String[] {"col_2"}))
-          .build()
+      SortOrders.of(
+          NamedReference.field("col_2"), SortDirection.DESCENDING, NullOrdering.NULLS_FIRST)
     };
   }
 
@@ -131,12 +130,14 @@ public class TestIcebergTable {
             .withName("col_1")
             .withType(TypeCreator.NULLABLE.I8)
             .withComment(ICEBERG_COMMENT)
+            .withNullable(true)
             .build();
     IcebergColumn col2 =
         new IcebergColumn.Builder()
             .withName("col_2")
             .withType(TypeCreator.NULLABLE.DATE)
             .withComment(ICEBERG_COMMENT)
+            .withNullable(false)
             .build();
     Column[] columns = new Column[] {col1, col2};
 
@@ -150,7 +151,7 @@ public class TestIcebergTable {
                 ICEBERG_COMMENT,
                 properties,
                 new Transform[0],
-                Distribution.NONE,
+                Distributions.NONE,
                 sortOrders);
     Assertions.assertEquals(tableIdentifier.name(), table.name());
     Assertions.assertEquals(ICEBERG_COMMENT, table.comment());
@@ -161,6 +162,8 @@ public class TestIcebergTable {
 
     Assertions.assertEquals("val1", loadedTable.properties().get("key1"));
     Assertions.assertEquals("val2", loadedTable.properties().get("key2"));
+    Assertions.assertTrue(loadedTable.columns()[0].nullable());
+    Assertions.assertFalse(loadedTable.columns()[1].nullable());
 
     Assertions.assertTrue(icebergCatalog.asTableCatalog().tableExists(tableIdentifier));
     NameIdentifier[] tableIdents =
@@ -169,10 +172,9 @@ public class TestIcebergTable {
 
     Assertions.assertEquals(sortOrders.length, loadedTable.sortOrder().length);
     for (int i = 0; i < loadedTable.sortOrder().length; i++) {
+      Assertions.assertEquals(sortOrders[i].direction(), loadedTable.sortOrder()[i].direction());
       Assertions.assertEquals(
-          sortOrders[i].getDirection(), loadedTable.sortOrder()[i].getDirection());
-      Assertions.assertEquals(
-          sortOrders[i].getTransform(), loadedTable.sortOrder()[i].getTransform());
+          (sortOrders[i]).expression(), loadedTable.sortOrder()[i].expression());
     }
     // Compare sort and order
 
@@ -189,7 +191,7 @@ public class TestIcebergTable {
                         ICEBERG_COMMENT,
                         properties,
                         new Transform[0],
-                        Distribution.NONE,
+                        Distributions.NONE,
                         sortOrders));
     Assertions.assertTrue(exception.getMessage().contains("Table already exists"));
   }
@@ -219,9 +221,7 @@ public class TestIcebergTable {
 
     Transform[] partitions =
         new Transform[] {
-          day(new String[] {col2.name()}),
-          bucket(new String[] {col1.name()}, 10),
-          truncate(new String[] {col1.name()}, 2)
+          day(col2.name()), bucket(10, new String[] {col1.name()}), truncate(2, col1.name())
         };
 
     Table table =
@@ -257,7 +257,7 @@ public class TestIcebergTable {
                         columns,
                         ICEBERG_COMMENT,
                         properties,
-                        new Transform[] {day(new String[] {col2.name()})}));
+                        new Transform[] {day(col2.name())}));
     Assertions.assertTrue(exception.getMessage().contains("Table already exists"));
 
     exception =
@@ -276,8 +276,7 @@ public class TestIcebergTable {
                         ICEBERG_COMMENT,
                         properties,
                         new Transform[] {identity(new String[] {col1.name(), col2.name()})}));
-    Assertions.assertTrue(
-        exception.getMessage().contains("Iceberg partition does not support nested field"));
+    Assertions.assertTrue(exception.getMessage().contains("Cannot find source column"));
 
     exception =
         Assertions.assertThrows(
@@ -294,7 +293,7 @@ public class TestIcebergTable {
                         columns,
                         ICEBERG_COMMENT,
                         properties,
-                        new Transform[] {identity(new String[] {"not_exist_field"})}));
+                        new Transform[] {identity("not_exist_field")}));
     Assertions.assertTrue(
         exception.getMessage().contains("Cannot find source column: not_exist_field"));
   }
@@ -330,7 +329,7 @@ public class TestIcebergTable {
             ICEBERG_COMMENT,
             properties,
             new Transform[0],
-            Distribution.NONE,
+            Distributions.NONE,
             new SortOrder[0]);
 
     Assertions.assertTrue(icebergCatalog.asTableCatalog().tableExists(tableIdentifier));
@@ -371,7 +370,7 @@ public class TestIcebergTable {
             .build();
     Column[] columns = new Column[] {col1, col2};
 
-    Distribution distribution = Distribution.NONE;
+    Distribution distribution = Distributions.NONE;
     SortOrder[] sortOrders = createSortOrder();
 
     Table createdTable =

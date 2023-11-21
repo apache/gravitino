@@ -5,88 +5,71 @@
 
 package com.datastrato.gravitino.dto.rel;
 
-import com.datastrato.gravitino.dto.rel.ExpressionPartitionDTO.Expression;
-import com.datastrato.gravitino.dto.rel.ExpressionPartitionDTO.FieldExpression;
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.annotation.JsonPropertyOrder;
-import com.fasterxml.jackson.annotation.JsonValue;
+import static com.datastrato.gravitino.dto.rel.expressions.FunctionArg.EMPTY_ARGS;
+
+import com.datastrato.gravitino.dto.rel.expressions.FunctionArg;
+import com.datastrato.gravitino.json.JsonUtils;
+import com.datastrato.gravitino.rel.expressions.Expression;
+import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
+import com.datastrato.gravitino.rel.expressions.distributions.Strategy;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
-import lombok.Getter;
-import org.apache.commons.lang3.ArrayUtils;
 
-@JsonPropertyOrder({"expressions", "number", "strategy"})
-@Getter
-public class DistributionDTO {
+@JsonSerialize(using = JsonUtils.DistributionSerializer.class)
+@JsonDeserialize(using = JsonUtils.DistributionDeserializer.class)
+public class DistributionDTO implements Distribution {
 
-  // NONE is used to indicate that there is no distribution.
   public static final DistributionDTO NONE =
-      new DistributionDTO(new Expression[0], 0, Strategy.HASH);
-
-  /**
-   * Create a distribution on a single column. Like distribute by (a) or (a, b), for complex like
-   * distributing by (func(a), b) or (func(a), func(b)), please use {@link Builder} to create.
-   *
-   * @param columnName column name
-   * @return
-   */
-  public static DistributionDTO nameReferenceDistribution(
-      Strategy strategy, int number, String... columnName) {
-    Expression[] expressions =
-        Arrays.stream(columnName)
-            .map(name -> new String[] {name})
-            .map(f -> new FieldExpression.Builder().withFieldName(f).build())
-            .toArray(Expression[]::new);
-    return new DistributionDTO(expressions, number, strategy);
-  }
-
-  public enum Strategy {
-    HASH,
-    EVEN,
-    RANGE;
-
-    @JsonCreator
-    public static Strategy fromString(String value) {
-      return Strategy.valueOf(value.toUpperCase());
-    }
-
-    @JsonValue
-    @Override
-    public String toString() {
-      return this.name().toLowerCase();
-    }
-  }
-
-  @JsonProperty("expressions")
-  private final Expression[] expressions;
-
-  // Number of buckets/distribution
-  @JsonProperty("number")
-  private final int number;
+      new Builder().withStrategy(Strategy.HASH).withNumber(0).withArgs(EMPTY_ARGS).build();
 
   // Distribution strategy/method
-  @JsonProperty("strategy")
   private final Strategy strategy;
 
-  private DistributionDTO(
-      @JsonProperty("expressions") Expression[] expressions,
-      @JsonProperty("number") int number,
-      @JsonProperty("strategy") Strategy strategy) {
-    this.expressions = expressions;
+  // Number of buckets/distribution
+  private final int number;
+
+  private final FunctionArg[] args;
+
+  private DistributionDTO(Strategy strategy, int number, FunctionArg[] args) {
+    this.args = args;
     this.number = number;
     this.strategy = strategy;
   }
 
+  public FunctionArg[] args() {
+    return args;
+  }
+
+  @Override
+  public Strategy strategy() {
+    return strategy;
+  }
+
+  @Override
+  public int number() {
+    return number;
+  }
+
+  @Override
+  public Expression[] expressions() {
+    return args;
+  }
+
+  public void validate(ColumnDTO[] columns) throws IllegalArgumentException {
+    Arrays.stream(args).forEach(expression -> expression.validate(columns));
+  }
+
   public static class Builder {
-    private Expression[] expressions;
-    private int number;
+    private FunctionArg[] args;
+    private int number = 0;
     private Strategy strategy;
 
     public Builder() {}
 
-    public Builder withExpressions(Expression[] expressions) {
-      this.expressions = expressions;
+    public Builder withArgs(FunctionArg... args) {
+      this.args = args;
       return this;
     }
 
@@ -103,10 +86,9 @@ public class DistributionDTO {
     public DistributionDTO build() {
       strategy = strategy == null ? Strategy.HASH : strategy;
 
-      Preconditions.checkState(
-          ArrayUtils.isNotEmpty(expressions), "expressions cannot be null or empty");
+      Preconditions.checkState(args != null, "expressions cannot be null");
       Preconditions.checkState(number >= 0, "bucketNum must be greater than 0");
-      return new DistributionDTO(expressions, number, strategy);
+      return new DistributionDTO(strategy, number, args);
     }
   }
 
@@ -125,7 +107,7 @@ public class DistributionDTO {
       return false;
     }
     // Probably incorrect - comparing Object[] arrays with Arrays.equals
-    if (!Arrays.equals(expressions, that.expressions)) {
+    if (!Arrays.equals(args, that.args)) {
       return false;
     }
     return strategy == that.strategy;
@@ -133,7 +115,7 @@ public class DistributionDTO {
 
   @Override
   public int hashCode() {
-    int result = Arrays.hashCode(expressions);
+    int result = Arrays.hashCode(args);
     result = 31 * result + number;
     result = 31 * result + (strategy != null ? strategy.hashCode() : 0);
     return result;

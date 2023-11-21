@@ -6,6 +6,7 @@ package com.datastrato.gravitino.catalog;
 
 import static com.datastrato.gravitino.Entity.EntityType.SCHEMA;
 import static com.datastrato.gravitino.Entity.EntityType.TABLE;
+import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.EMPTY_TRANSFORM;
 
 import com.datastrato.gravitino.EntityStore;
 import com.datastrato.gravitino.HasIdentifier;
@@ -26,17 +27,18 @@ import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.meta.TableEntity;
 import com.datastrato.gravitino.rel.Column;
-import com.datastrato.gravitino.rel.Distribution;
 import com.datastrato.gravitino.rel.Schema;
 import com.datastrato.gravitino.rel.SchemaChange;
-import com.datastrato.gravitino.rel.SortOrder;
 import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.TableCatalog;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.TableChange.RemoveProperty;
 import com.datastrato.gravitino.rel.TableChange.SetProperty;
-import com.datastrato.gravitino.rel.transforms.Transform;
+import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
+import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
+import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
+import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.storage.IdGenerator;
 import com.datastrato.gravitino.utils.ThrowableFunction;
 import com.google.common.annotations.VisibleForTesting;
@@ -440,8 +442,8 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
                         columns,
                         comment,
                         updatedProperties,
-                        partitions == null ? new Transform[0] : partitions,
-                        distribution == null ? Distribution.NONE : distribution,
+                        partitions == null ? EMPTY_TRANSFORM : partitions,
+                        distribution == null ? Distributions.NONE : distribution,
                         sortOrders == null ? new SortOrder[0] : sortOrders)),
         NoSuchSchemaException.class,
         TableAlreadyExistsException.class);

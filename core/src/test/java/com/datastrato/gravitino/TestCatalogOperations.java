@@ -16,15 +16,15 @@ import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.TableAlreadyExistsException;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.rel.Column;
-import com.datastrato.gravitino.rel.Distribution;
 import com.datastrato.gravitino.rel.Schema;
 import com.datastrato.gravitino.rel.SchemaChange;
-import com.datastrato.gravitino.rel.SortOrder;
 import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.TableCatalog;
 import com.datastrato.gravitino.rel.TableChange;
-import com.datastrato.gravitino.rel.transforms.Transform;
+import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
+import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
+import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.IOException;
@@ -95,7 +95,7 @@ public class TestCatalogOperations implements CatalogOperations, TableCatalog, S
             .withColumns(columns)
             .withDistribution(distribution)
             .withSortOrders(sortOrders)
-            .withPartitions(partitions)
+            .withPartitioning(partitions)
             .build();
 
     if (tables.containsKey(ident)) {
@@ -112,7 +112,7 @@ public class TestCatalogOperations implements CatalogOperations, TableCatalog, S
         .withColumns(columns)
         .withDistribution(distribution)
         .withSortOrders(sortOrders)
-        .withPartitions(partitions)
+        .withPartitioning(partitions)
         .build();
   }
 
@@ -154,7 +154,7 @@ public class TestCatalogOperations implements CatalogOperations, TableCatalog, S
             .withProperties(new HashMap<>(newProps))
             .withAuditInfo(updatedAuditInfo)
             .withColumns(table.columns())
-            .withPartitions(table.partitioning())
+            .withPartitioning(table.partitioning())
             .build();
 
     tables.put(ident, updatedTable);
@@ -164,7 +164,7 @@ public class TestCatalogOperations implements CatalogOperations, TableCatalog, S
         .withProperties(new HashMap<>(newProps))
         .withAuditInfo(updatedAuditInfo)
         .withColumns(table.columns())
-        .withPartitions(table.partitioning())
+        .withPartitioning(table.partitioning())
         .build();
   }
 

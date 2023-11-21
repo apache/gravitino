@@ -20,6 +20,7 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -55,7 +56,8 @@ public class BinaryEntityKeyEncoder implements EntityKeyEncoder<byte[]> {
   public static final String NAMESPACE_SEPARATOR = "/";
 
   @VisibleForTesting
-  static final byte[] BYTABLE_NAMESPACE_SEPARATOR = NAMESPACE_SEPARATOR.getBytes();
+  static final byte[] BYTABLE_NAMESPACE_SEPARATOR =
+      NAMESPACE_SEPARATOR.getBytes(StandardCharsets.UTF_8);
 
   static final String WILD_CARD = "*";
 
@@ -145,9 +147,13 @@ public class BinaryEntityKeyEncoder implements EntityKeyEncoder<byte[]> {
     byte[] bytes = new byte[0];
     for (int i = 0; i < namespaceTemplate.length; i++) {
       if (i != namespaceTemplate.length - 1) {
-        bytes = Bytes.concat(bytes, namespaceTemplate[i].getBytes(), ByteUtils.longToByte(ids[i]));
+        bytes =
+            Bytes.concat(
+                bytes,
+                namespaceTemplate[i].getBytes(StandardCharsets.UTF_8),
+                ByteUtils.longToByte(ids[i]));
       } else {
-        bytes = Bytes.concat(bytes, namespaceTemplate[i].getBytes());
+        bytes = Bytes.concat(bytes, namespaceTemplate[i].getBytes(StandardCharsets.UTF_8));
       }
     }
 
@@ -169,7 +175,10 @@ public class BinaryEntityKeyEncoder implements EntityKeyEncoder<byte[]> {
     byte[] bytes = new byte[0];
     for (int i = 0; i < ids.length; i++) {
       bytes =
-          Bytes.concat(bytes, nameIdentifierTemplate[i].getBytes(), ByteUtils.longToByte(ids[i]));
+          Bytes.concat(
+              bytes,
+              nameIdentifierTemplate[i].getBytes(StandardCharsets.UTF_8),
+              ByteUtils.longToByte(ids[i]));
     }
 
     return bytes;

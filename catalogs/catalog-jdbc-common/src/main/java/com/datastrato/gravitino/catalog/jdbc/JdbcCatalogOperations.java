@@ -4,27 +4,44 @@
  */
 package com.datastrato.gravitino.catalog.jdbc;
 
+import static com.datastrato.gravitino.catalog.BaseCatalog.CATALOG_BYPASS_PREFIX;
+
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
+import com.datastrato.gravitino.StringIdentifier;
 import com.datastrato.gravitino.catalog.CatalogOperations;
 import com.datastrato.gravitino.catalog.PropertiesMetadata;
+import com.datastrato.gravitino.catalog.jdbc.config.JdbcConfig;
+import com.datastrato.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
+import com.datastrato.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
+import com.datastrato.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
+import com.datastrato.gravitino.catalog.jdbc.utils.DataSourceUtils;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NoSuchTableException;
 import com.datastrato.gravitino.exceptions.NonEmptySchemaException;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.TableAlreadyExistsException;
+import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.CatalogEntity;
 import com.datastrato.gravitino.rel.Column;
-import com.datastrato.gravitino.rel.Distribution;
 import com.datastrato.gravitino.rel.SchemaChange;
-import com.datastrato.gravitino.rel.SortOrder;
 import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.TableCatalog;
 import com.datastrato.gravitino.rel.TableChange;
-import com.datastrato.gravitino.rel.transforms.Transform;
+import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
+import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
+import com.datastrato.gravitino.rel.expressions.transforms.Transform;
+import com.datastrato.gravitino.utils.MapUtils;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.Maps;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
+import javax.sql.DataSource;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,13 +58,31 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
 
   private final CatalogEntity entity;
 
+  private final JdbcExceptionConverter exceptionConverter;
+
+  private final JdbcTypeConverter jdbcTypeConverter;
+
+  private final JdbcDatabaseOperations jdbcDatabaseOperations;
+
+  private DataSource dataSource;
+
   /**
    * Constructs a new instance of JdbcCatalogOperations.
    *
    * @param entity The catalog entity associated with this operations instance.
+   * @param exceptionConverter The exception converter to be used by the operations.
+   * @param jdbcTypeConverter The type converter to be used by the operations.
+   * @param jdbcDatabaseOperations The database operations to be used by the operations.
    */
-  public JdbcCatalogOperations(CatalogEntity entity) {
+  public JdbcCatalogOperations(
+      CatalogEntity entity,
+      JdbcExceptionConverter exceptionConverter,
+      JdbcTypeConverter jdbcTypeConverter,
+      JdbcDatabaseOperations jdbcDatabaseOperations) {
     this.entity = entity;
+    this.exceptionConverter = exceptionConverter;
+    this.jdbcTypeConverter = jdbcTypeConverter;
+    this.jdbcDatabaseOperations = jdbcDatabaseOperations;
   }
 
   /**
@@ -58,6 +93,12 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
    */
   @Override
   public void initialize(Map<String, String> conf) throws RuntimeException {
+    // Key format like gravitino.bypass.a.b
+    Map<String, String> resultConf =
+        Maps.newHashMap(MapUtils.getPrefixMap(conf, CATALOG_BYPASS_PREFIX));
+    JdbcConfig jdbcConfig = new JdbcConfig(resultConf);
+    this.dataSource = DataSourceUtils.createDataSource(jdbcConfig);
+    this.jdbcDatabaseOperations.initialize(dataSource, exceptionConverter);
     this.jdbcCatalogPropertiesMetadata = new JdbcCatalogPropertiesMetadata();
     this.jdbcTablePropertiesMetadata = new JdbcTablePropertiesMetadata();
     this.jdbcSchemaPropertiesMetadata = new JdbcSchemaPropertiesMetadata();
@@ -65,7 +106,9 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
 
   /** Closes the Jdbc catalog and releases the associated client pool. */
   @Override
-  public void close() {}
+  public void close() {
+    DataSourceUtils.closeDataSource(dataSource);
+  }
 
   /**
    * Lists the schemas under the given namespace.
@@ -76,7 +119,10 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
    */
   @Override
   public NameIdentifier[] listSchemas(Namespace namespace) throws NoSuchCatalogException {
-    throw new UnsupportedOperationException();
+    List<String> schemaNames = jdbcDatabaseOperations.list();
+    return schemaNames.stream()
+        .map(db -> NameIdentifier.of(namespace, db))
+        .toArray(NameIdentifier[]::new);
   }
 
   /**
@@ -93,7 +139,27 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
   public JdbcSchema createSchema(
       NameIdentifier ident, String comment, Map<String, String> properties)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
-    throw new UnsupportedOperationException();
+    StringIdentifier identifier =
+        Preconditions.checkNotNull(
+            StringIdentifier.fromProperties(properties),
+            "The gravitino id attribute does not exist in properties");
+    String notAllowedKey =
+        properties.keySet().stream()
+            .filter(s -> !StringUtils.equals(s, StringIdentifier.ID_KEY))
+            .collect(Collectors.joining(","));
+    if (StringUtils.isNotEmpty(notAllowedKey)) {
+      LOG.warn("The properties [{}] are not allowed to be set in the jdbc schema", notAllowedKey);
+    }
+    HashMap<String, String> resultProperties = Maps.newHashMap(properties);
+    resultProperties.remove(StringIdentifier.ID_KEY);
+    jdbcDatabaseOperations.create(
+        ident.name(), StringIdentifier.addToComment(identifier, comment), resultProperties);
+    return new JdbcSchema.Builder()
+        .withName(ident.name())
+        .withProperties(resultProperties)
+        .withComment(comment)
+        .withAuditInfo(AuditInfo.EMPTY)
+        .build();
   }
 
   /**
@@ -105,7 +171,23 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
    */
   @Override
   public JdbcSchema loadSchema(NameIdentifier ident) throws NoSuchSchemaException {
-    throw new UnsupportedOperationException();
+    JdbcSchema load = jdbcDatabaseOperations.load(ident.name());
+    String comment = load.comment();
+    StringIdentifier id = StringIdentifier.fromComment(comment);
+    if (id == null) {
+      LOG.warn("The comment {} does not contain gravitino id attribute", comment);
+      return load;
+    } else {
+      Map<String, String> properties =
+          load.properties() == null ? Maps.newHashMap() : Maps.newHashMap(load.properties());
+      StringIdentifier.addToProperties(id, properties);
+      return new JdbcSchema.Builder()
+          .withAuditInfo(load.auditInfo())
+          .withName(load.name())
+          .withComment(load.comment())
+          .withProperties(properties)
+          .build();
+    }
   }
 
   /**
@@ -119,7 +201,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
   @Override
   public JdbcSchema alterSchema(NameIdentifier ident, SchemaChange... changes)
       throws NoSuchSchemaException {
-    throw new UnsupportedOperationException();
+    throw new UnsupportedOperationException("jdbc-catalog does not support alter the schema");
   }
 
   /**
@@ -132,7 +214,8 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
    */
   @Override
   public boolean dropSchema(NameIdentifier ident, boolean cascade) throws NonEmptySchemaException {
-    throw new UnsupportedOperationException();
+    jdbcDatabaseOperations.delete(ident.name(), cascade);
+    return true;
   }
 
   /**
@@ -192,7 +275,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
    * @param columns The array of columns for the new table.
    * @param comment The comment for the new table.
    * @param properties The properties for the new table.
-   * @param partitions The partitioning for the new table.
+   * @param partitioning The partitioning for the new table.
    * @return The newly created JdbcTable instance.
    * @throws NoSuchSchemaException If the schema for the table does not exist.
    * @throws TableAlreadyExistsException If the table with the same name already exists.
@@ -203,7 +286,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
       Column[] columns,
       String comment,
       Map<String, String> properties,
-      Transform[] partitions,
+      Transform[] partitioning,
       Distribution distribution,
       SortOrder[] sortOrders)
       throws NoSuchSchemaException, TableAlreadyExistsException {

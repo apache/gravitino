@@ -20,7 +20,6 @@ import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.
 import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.TEXT_INPUT_FORMAT_CLASS;
 import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.TOTAL_SIZE;
 import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.TRANSIENT_LAST_DDL_TIME;
-import static com.datastrato.gravitino.rel.transforms.Transforms.identity;
 import static org.apache.hadoop.hive.metastore.TableType.EXTERNAL_TABLE;
 import static org.apache.hadoop.hive.serde.serdeConstants.DATE_TYPE_NAME;
 import static org.apache.hadoop.hive.serde.serdeConstants.INT_TYPE_NAME;
@@ -35,21 +34,25 @@ import com.datastrato.gravitino.catalog.hive.HiveSchemaPropertiesMetadata;
 import com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata;
 import com.datastrato.gravitino.client.GravitinoMetaLake;
 import com.datastrato.gravitino.dto.rel.ColumnDTO;
+import com.datastrato.gravitino.dto.rel.DistributionDTO;
+import com.datastrato.gravitino.dto.rel.SortOrderDTO;
+import com.datastrato.gravitino.dto.rel.expressions.FieldReferenceDTO;
+import com.datastrato.gravitino.dto.rel.partitions.IdentityPartitioningDTO;
+import com.datastrato.gravitino.dto.rel.partitions.Partitioning;
 import com.datastrato.gravitino.exceptions.NoSuchTableException;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
-import com.datastrato.gravitino.rel.Distribution;
-import com.datastrato.gravitino.rel.Distribution.Strategy;
 import com.datastrato.gravitino.rel.Schema;
 import com.datastrato.gravitino.rel.SchemaChange;
-import com.datastrato.gravitino.rel.SortOrder;
-import com.datastrato.gravitino.rel.SortOrder.Direction;
-import com.datastrato.gravitino.rel.SortOrder.NullOrdering;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.TableChange;
-import com.datastrato.gravitino.rel.transforms.Transform;
-import com.datastrato.gravitino.rel.transforms.Transforms;
-import com.datastrato.gravitino.rel.transforms.Transforms.NamedReference;
+import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
+import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
+import com.datastrato.gravitino.rel.expressions.distributions.Strategy;
+import com.datastrato.gravitino.rel.expressions.sorts.NullOrdering;
+import com.datastrato.gravitino.rel.expressions.sorts.SortDirection;
+import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
+import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import io.substrait.type.TypeCreator;
@@ -90,18 +93,18 @@ public class CatalogHiveIT extends AbstractIT {
   public static String HIVE_COL_NAME2 = "hive_col_name2";
   public static String HIVE_COL_NAME3 = "hive_col_name3";
 
-  private static String HIVE_METASTORE_URIS = "thrift://localhost:9083";
+  private static final String HIVE_METASTORE_URIS = "thrift://localhost:9083";
   private static final String provider = "hive";
   private static HiveClientPool hiveClientPool;
   private static GravitinoMetaLake metalake;
   private static Catalog catalog;
   private static SparkSession sparkSession;
-  private static String SELECT_ALL_TEMPLATE = "SELECT * FROM %s.%s";
-  private static String INSERT_WITHOUT_PARTITION_TEMPLATE = "INSERT INTO %s.%s VALUES (%s)";
-  private static String INSERT_WITH_PARTITION_TEMPLATE =
+  private static final String SELECT_ALL_TEMPLATE = "SELECT * FROM %s.%s";
+  private static final String INSERT_WITHOUT_PARTITION_TEMPLATE = "INSERT INTO %s.%s VALUES (%s)";
+  private static final String INSERT_WITH_PARTITION_TEMPLATE =
       "INSERT INTO %s.%s PARTITION (%s) VALUES (%s)";
 
-  private static Map<String, String> typeConstant =
+  private static final Map<String, String> typeConstant =
       ImmutableMap.of(
           TINYINT_TYPE_NAME,
           "1",
@@ -143,7 +146,7 @@ public class CatalogHiveIT extends AbstractIT {
   }
 
   @AfterEach
-  private void resetSchema() throws TException, InterruptedException {
+  public void resetSchema() throws TException, InterruptedException {
     catalog.asSchemas().dropSchema(NameIdentifier.of(metalakeName, catalogName, schemaName), true);
     assertThrows(
         NoSuchObjectException.class,
@@ -209,19 +212,19 @@ public class CatalogHiveIT extends AbstractIT {
 
   private ColumnDTO[] createColumns() {
     ColumnDTO col1 =
-        new ColumnDTO.Builder()
+        new ColumnDTO.Builder<>()
             .withName(HIVE_COL_NAME1)
             .withDataType(TypeCreator.NULLABLE.I8)
             .withComment("col_1_comment")
             .build();
     ColumnDTO col2 =
-        new ColumnDTO.Builder()
+        new ColumnDTO.Builder<>()
             .withName(HIVE_COL_NAME2)
             .withDataType(TypeCreator.NULLABLE.DATE)
             .withComment("col_2_comment")
             .build();
     ColumnDTO col3 =
-        new ColumnDTO.Builder()
+        new ColumnDTO.Builder<>()
             .withName(HIVE_COL_NAME3)
             .withDataType(TypeCreator.NULLABLE.STRING)
             .withComment("col_3_comment")
@@ -268,19 +271,19 @@ public class CatalogHiveIT extends AbstractIT {
 
     NameIdentifier nameIdentifier =
         NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
-    Distribution distribution =
-        Distribution.builder()
+    DistributionDTO distribution =
+        new DistributionDTO.Builder()
             .withNumber(10)
-            .withTransforms(new Transform[] {Transforms.field(new String[] {HIVE_COL_NAME1})})
+            .withArgs(FieldReferenceDTO.of(HIVE_COL_NAME1))
             .withStrategy(Strategy.EVEN)
             .build();
 
-    final SortOrder[] sortOrders =
-        new SortOrder[] {
-          SortOrder.builder()
-              .withNullOrdering(NullOrdering.FIRST)
-              .withDirection(Direction.DESC)
-              .withTransform(Transforms.field(new String[] {HIVE_COL_NAME2}))
+    final SortOrderDTO[] sortOrders =
+        new SortOrderDTO[] {
+          new SortOrderDTO.Builder()
+              .withNullOrder(NullOrdering.NULLS_FIRST)
+              .withDirection(SortDirection.DESCENDING)
+              .withSortTerm(FieldReferenceDTO.of(HIVE_COL_NAME2))
               .build()
         };
 
@@ -293,7 +296,7 @@ public class CatalogHiveIT extends AbstractIT {
                 columns,
                 TABLE_COMMENT,
                 properties,
-                new Transform[0],
+                Partitioning.EMPTY_PARTITIONING,
                 distribution,
                 sortOrders);
 
@@ -312,7 +315,7 @@ public class CatalogHiveIT extends AbstractIT {
     Table createdTable1 =
         catalog
             .asTableCatalog()
-            .createTable(nameIdentifier, columns, TABLE_COMMENT, properties, (Transform[]) null);
+            .createTable(nameIdentifier, columns, TABLE_COMMENT, properties, (Partitioning[]) null);
 
     // Directly get table from hive metastore to check if the table is created successfully.
     org.apache.hadoop.hive.metastore.api.Table hiveTable1 =
@@ -327,11 +330,10 @@ public class CatalogHiveIT extends AbstractIT {
 
     // Test bad request
     // Bad name in distribution
-    final Distribution badDistribution =
-        Distribution.builder()
+    final DistributionDTO badDistribution =
+        new DistributionDTO.Builder()
             .withNumber(10)
-            .withTransforms(
-                new Transform[] {Transforms.field(new String[] {HIVE_COL_NAME1 + "bad_name"})})
+            .withArgs(FieldReferenceDTO.of(HIVE_COL_NAME1 + "bad_name"))
             .withStrategy(Strategy.EVEN)
             .build();
     Assertions.assertThrows(
@@ -344,17 +346,17 @@ public class CatalogHiveIT extends AbstractIT {
                   columns,
                   TABLE_COMMENT,
                   properties,
-                  new Transform[0],
+                  Partitioning.EMPTY_PARTITIONING,
                   badDistribution,
                   sortOrders);
         });
 
-    final SortOrder[] badSortOrders =
-        new SortOrder[] {
-          SortOrder.builder()
-              .withNullOrdering(NullOrdering.FIRST)
-              .withDirection(Direction.DESC)
-              .withTransform(Transforms.field(new String[] {HIVE_COL_NAME2 + "bad_name"}))
+    final SortOrderDTO[] badSortOrders =
+        new SortOrderDTO[] {
+          new SortOrderDTO.Builder()
+              .withNullOrder(NullOrdering.NULLS_FIRST)
+              .withDirection(SortDirection.DESCENDING)
+              .withSortTerm(FieldReferenceDTO.of(HIVE_COL_NAME2 + "bad_name"))
               .build()
         };
 
@@ -368,7 +370,7 @@ public class CatalogHiveIT extends AbstractIT {
                   columns,
                   TABLE_COMMENT,
                   properties,
-                  new Transform[0],
+                  Partitioning.EMPTY_PARTITIONING,
                   distribution,
                   badSortOrders);
         });
@@ -385,7 +387,12 @@ public class CatalogHiveIT extends AbstractIT {
     Table createdTable =
         catalog
             .asTableCatalog()
-            .createTable(nameIdentifier, columns, TABLE_COMMENT, properties, new Transform[0]);
+            .createTable(
+                nameIdentifier,
+                columns,
+                TABLE_COMMENT,
+                properties,
+                Partitioning.EMPTY_PARTITIONING);
 
     // Directly get table from hive metastore to check if the table is created successfully.
     org.apache.hadoop.hive.metastore.api.Table hiveTab =
@@ -402,7 +409,7 @@ public class CatalogHiveIT extends AbstractIT {
     Table createdTable1 =
         catalog
             .asTableCatalog()
-            .createTable(nameIdentifier, columns, TABLE_COMMENT, properties, (Transform[]) null);
+            .createTable(nameIdentifier, columns, TABLE_COMMENT, properties, (Partitioning[]) null);
 
     // Directly get table from hive metastore to check if the table is created successfully.
     org.apache.hadoop.hive.metastore.api.Table hiveTable1 =
@@ -426,7 +433,11 @@ public class CatalogHiveIT extends AbstractIT {
         catalog
             .asTableCatalog()
             .createTable(
-                nameIdentifier, columns, TABLE_COMMENT, ImmutableMap.of(), new Transform[0]);
+                nameIdentifier,
+                columns,
+                TABLE_COMMENT,
+                ImmutableMap.of(),
+                Partitioning.EMPTY_PARTITIONING);
     HiveTablePropertiesMetadata tablePropertiesMetadata = new HiveTablePropertiesMetadata();
     org.apache.hadoop.hive.metastore.api.Table actualTable =
         hiveClientPool.run(client -> client.getTable(schemaName, tableName));
@@ -451,7 +462,7 @@ public class CatalogHiveIT extends AbstractIT {
                     "textfile",
                     SERDE_LIB,
                     OPENCSV_SERDE_CLASS),
-                new Transform[0]);
+                Partitioning.EMPTY_PARTITIONING);
     org.apache.hadoop.hive.metastore.api.Table actualTable2 =
         hiveClientPool.run(client -> client.getTable(schemaName, table2));
 
@@ -508,7 +519,11 @@ public class CatalogHiveIT extends AbstractIT {
     catalog
         .asTableCatalog()
         .createTable(
-            tableIdent, createColumns(), TABLE_COMMENT, ImmutableMap.of(), new Transform[0]);
+            tableIdent,
+            createColumns(),
+            TABLE_COMMENT,
+            ImmutableMap.of(),
+            Partitioning.EMPTY_PARTITIONING);
     org.apache.hadoop.hive.metastore.api.Table actualTable =
         hiveClientPool.run(client -> client.getTable(schemaIdent.name(), tableIdent.name()));
     String actualTableLocation = actualTable.getSd().getLocation();
@@ -534,7 +549,10 @@ public class CatalogHiveIT extends AbstractIT {
                 columns,
                 TABLE_COMMENT,
                 properties,
-                new Transform[] {identity(columns[1]), identity(columns[2])});
+                new Partitioning[] {
+                  IdentityPartitioningDTO.of(columns[1].name()),
+                  IdentityPartitioningDTO.of(columns[2].name())
+                });
 
     // Directly get table from hive metastore to check if the table is created successfully.
     org.apache.hadoop.hive.metastore.api.Table hiveTab =
@@ -558,7 +576,10 @@ public class CatalogHiveIT extends AbstractIT {
                       columns,
                       TABLE_COMMENT,
                       properties,
-                      new Transform[] {identity(columns[0]), identity(columns[1])});
+                      new Partitioning[] {
+                        IdentityPartitioningDTO.of(columns[0].name()),
+                        IdentityPartitioningDTO.of(columns[1].name())
+                      });
             });
     Assertions.assertTrue(
         exception
@@ -597,24 +618,24 @@ public class CatalogHiveIT extends AbstractIT {
     List<String> resultDistributionCols =
         distribution == null
             ? Collections.emptyList()
-            : Arrays.stream(distribution.transforms())
-                .map(t -> ((NamedReference) t).value()[0])
+            : Arrays.stream(distribution.expressions())
+                .map(t -> ((FieldReferenceDTO) t).fieldName()[0])
                 .collect(Collectors.toList());
     Assertions.assertEquals(resultDistributionCols, hiveTab.getSd().getBucketCols());
 
     for (int i = 0; i < sortOrders.length; i++) {
       Assertions.assertEquals(
-          sortOrders[i].getDirection() == Direction.ASC ? 0 : 1,
+          sortOrders[i].direction() == SortDirection.ASCENDING ? 0 : 1,
           hiveTab.getSd().getSortCols().get(i).getOrder());
       Assertions.assertEquals(
-          ((NamedReference) sortOrders[i].getTransform()).value()[0],
+          ((FieldReferenceDTO) sortOrders[i].expression()).fieldName()[0],
           hiveTab.getSd().getSortCols().get(i).getCol());
     }
     Assertions.assertNotNull(createdTable.partitioning());
     Assertions.assertEquals(createdTable.partitioning().length, hiveTab.getPartitionKeys().size());
     List<String> partitionKeys =
         Arrays.stream(createdTable.partitioning())
-            .map(p -> ((Transforms.NamedReference) p).value()[0])
+            .map(p -> ((Partitioning.SingleFieldPartitioning) p).fieldName()[0])
             .collect(Collectors.toList());
     List<String> hivePartitionKeys =
         hiveTab.getPartitionKeys().stream().map(FieldSchema::getName).collect(Collectors.toList());
@@ -641,7 +662,7 @@ public class CatalogHiveIT extends AbstractIT {
             columns,
             TABLE_COMMENT,
             createProperties(),
-            new Transform[] {identity(columns[2])});
+            new Partitioning[] {IdentityPartitioningDTO.of(columns[2].name())});
     Table alteredTable =
         catalog
             .asTableCatalog()
@@ -733,7 +754,7 @@ public class CatalogHiveIT extends AbstractIT {
             TABLE_COMMENT,
             ImmutableMap.of(),
             new Transform[0],
-            Distribution.NONE,
+            Distributions.NONE,
             new SortOrder[0]);
 
     exception =

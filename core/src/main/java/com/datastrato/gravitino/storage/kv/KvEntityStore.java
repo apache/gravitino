@@ -26,6 +26,7 @@ import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.exceptions.NonEmptyEntityException;
 import com.datastrato.gravitino.storage.EntityKeyEncoder;
 import com.datastrato.gravitino.storage.NameMappingService;
+import com.datastrato.gravitino.storage.StorageLayoutVersion;
 import com.datastrato.gravitino.utils.Bytes;
 import com.datastrato.gravitino.utils.Executable;
 import com.google.common.annotations.VisibleForTesting;
@@ -34,6 +35,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -57,6 +59,7 @@ public class KvEntityStore implements EntityStore {
   public static final Logger LOGGER = LoggerFactory.getLogger(KvEntityStore.class);
   public static final ImmutableMap<String, String> KV_BACKENDS =
       ImmutableMap.of("RocksDBKvBackend", RocksDBKvBackend.class.getCanonicalName());
+  public static final String LAYOUT_VERSION = "layout_version";
 
   @Getter @VisibleForTesting private KvBackend backend;
 
@@ -66,6 +69,11 @@ public class KvEntityStore implements EntityStore {
   private EntityKeyEncoder<byte[]> entityKeyEncoder;
   private NameMappingService nameMappingService;
   private EntitySerDe serDe;
+  // We will use storageLayoutVersion to check whether the layout of the storage is compatible with
+  // the current version of the code.
+  // Note: If we change the layout of the storage in the future, please update the value of
+  // storageLayoutVersion if it's necessary.
+  @VisibleForTesting StorageLayoutVersion storageLayoutVersion;
 
   @Override
   public void initialize(Config config) throws RuntimeException {
@@ -75,6 +83,7 @@ public class KvEntityStore implements EntityStore {
     this.nameMappingService = new KvNameMappingService(backend);
     this.entityKeyEncoder = new BinaryEntityKeyEncoder(nameMappingService);
     this.reentrantReadWriteLock = new ReentrantReadWriteLock();
+    this.storageLayoutVersion = initStorageVersionInfo();
   }
 
   @Override
@@ -299,7 +308,7 @@ public class KvEntityStore implements EntityStore {
   private byte[] replacePrefixTypeInfo(byte[] encode, String subTypePrefix) {
     byte[] result = new byte[encode.length];
     System.arraycopy(encode, 0, result, 0, encode.length);
-    byte[] bytes = subTypePrefix.getBytes();
+    byte[] bytes = subTypePrefix.getBytes(StandardCharsets.UTF_8);
     result[0] = bytes[0];
     result[1] = bytes[1];
 
@@ -379,6 +388,25 @@ public class KvEntityStore implements EntityStore {
       LOGGER.error("Failed to create and initialize KvBackend by name '{}'.", backendName, e);
       throw new RuntimeException(
           "Failed to create and initialize KvBackend by name: " + backendName, e);
+    }
+  }
+
+  private StorageLayoutVersion initStorageVersionInfo() {
+    byte[] bytes;
+    try {
+      bytes = backend.get(LAYOUT_VERSION.getBytes(StandardCharsets.UTF_8));
+      if (bytes == null) {
+        // If the layout version is not set, we will set it to the default version.
+        backend.put(
+            LAYOUT_VERSION.getBytes(StandardCharsets.UTF_8),
+            StorageLayoutVersion.V1.getVersion().getBytes(StandardCharsets.UTF_8),
+            true);
+        return StorageLayoutVersion.V1;
+      }
+
+      return StorageLayoutVersion.fromString(new String(bytes));
+    } catch (IOException e) {
+      throw new IllegalStateException("Failed to get/put layout version information", e);
     }
   }
 

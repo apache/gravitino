@@ -21,9 +21,11 @@ import org.apache.iceberg.types.Types;
 public class ToIcebergType extends ToIcebergTypeVisitor<Type> {
   private final IcebergTable root;
   private int nextId = 0;
+  private boolean nullable;
 
-  public ToIcebergType() {
+  public ToIcebergType(boolean nullable) {
     this.root = null;
+    this.nullable = nullable;
   }
 
   public ToIcebergType(IcebergTable root) {
@@ -51,7 +53,7 @@ public class ToIcebergType extends ToIcebergTypeVisitor<Type> {
 
       // for new conversions, use ordinals for ids in the root struct
       int id = isRoot ? i : getNextId();
-      if (field.isOptional()) {
+      if (field.nullable()) {
         newFields.add(Types.NestedField.optional(id, field.name(), type, field.comment()));
       } else {
         newFields.add(Types.NestedField.required(id, field.name(), type, field.comment()));
@@ -67,7 +69,7 @@ public class ToIcebergType extends ToIcebergTypeVisitor<Type> {
 
   @Override
   public Type array(io.substrait.type.Type.ListType array, Type elementType) {
-    if (array.nullable()) {
+    if (nullable) {
       return Types.ListType.ofOptional(getNextId(), elementType);
     } else {
       return Types.ListType.ofRequired(getNextId(), elementType);
@@ -76,7 +78,7 @@ public class ToIcebergType extends ToIcebergTypeVisitor<Type> {
 
   @Override
   public Type map(io.substrait.type.Type.Map map, Type keyType, Type valueType) {
-    if (map.nullable()) {
+    if (nullable) {
       return Types.MapType.ofOptional(getNextId(), getNextId(), keyType, valueType);
     } else {
       return Types.MapType.ofRequired(getNextId(), getNextId(), keyType, valueType);

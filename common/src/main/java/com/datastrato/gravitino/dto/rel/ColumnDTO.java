@@ -30,6 +30,9 @@ public class ColumnDTO implements Column {
   @JsonProperty("comment")
   private String comment;
 
+  @JsonProperty("nullable")
+  private boolean nullable;
+
   private ColumnDTO() {}
 
   /**
@@ -40,9 +43,22 @@ public class ColumnDTO implements Column {
    * @param comment The comment associated with the column.
    */
   private ColumnDTO(String name, Type dataType, String comment) {
+    this(name, dataType, comment, true);
+  }
+
+  /**
+   * Constructs a Column DTO.
+   *
+   * @param name The name of the column.
+   * @param dataType The data type of the column.
+   * @param comment The comment associated with the column.
+   * @param nullable Whether the column value can be null.
+   */
+  private ColumnDTO(String name, Type dataType, String comment, boolean nullable) {
     this.name = name;
     this.dataType = dataType;
     this.comment = comment;
+    this.nullable = nullable;
   }
 
   @Override
@@ -58,6 +74,11 @@ public class ColumnDTO implements Column {
   @Override
   public String comment() {
     return comment;
+  }
+
+  @Override
+  public boolean nullable() {
+    return nullable;
   }
 
   /**
@@ -79,6 +100,7 @@ public class ColumnDTO implements Column {
     protected String name;
     protected Type dataType;
     protected String comment;
+    protected boolean nullable = true;
 
     public Builder() {}
 
@@ -116,6 +138,17 @@ public class ColumnDTO implements Column {
     }
 
     /**
+     * Sets whether the column value can be null.
+     *
+     * @param nullable Whether the column value can be null.
+     * @return The Builder instance.
+     */
+    public S withNullable(boolean nullable) {
+      this.nullable = nullable;
+      return (S) this;
+    }
+
+    /**
      * Builds a Column DTO based on the provided builder parameters.
      *
      * @return A new ColumnDTO instance.
@@ -124,7 +157,7 @@ public class ColumnDTO implements Column {
     public ColumnDTO build() {
       Preconditions.checkNotNull(name, "Column name cannot be null");
       Preconditions.checkNotNull(dataType, "Column data type cannot be null");
-      return new ColumnDTO(name, dataType, comment);
+      return new ColumnDTO(name, dataType, comment, nullable);
     }
   }
 }

@@ -14,7 +14,7 @@ import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.
 import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.SERDE_NAME;
 import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.SERDE_PARAMETER_PREFIX;
 import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.TABLE_TYPE;
-import static com.datastrato.gravitino.rel.transforms.Transforms.identity;
+import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.identity;
 import static org.apache.hadoop.hive.metastore.TableType.EXTERNAL_TABLE;
 import static org.apache.hadoop.hive.metastore.TableType.MANAGED_TABLE;
 
@@ -23,12 +23,15 @@ import com.datastrato.gravitino.catalog.hive.converter.ToHiveType;
 import com.datastrato.gravitino.catalog.rel.BaseTable;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.rel.Column;
-import com.datastrato.gravitino.rel.Distribution;
-import com.datastrato.gravitino.rel.SortOrder;
-import com.datastrato.gravitino.rel.SortOrder.Direction;
-import com.datastrato.gravitino.rel.transforms.Transform;
-import com.datastrato.gravitino.rel.transforms.Transforms;
-import com.datastrato.gravitino.rel.transforms.Transforms.NamedReference;
+import com.datastrato.gravitino.rel.expressions.Expression;
+import com.datastrato.gravitino.rel.expressions.NamedReference;
+import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
+import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
+import com.datastrato.gravitino.rel.expressions.sorts.SortDirection;
+import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
+import com.datastrato.gravitino.rel.expressions.sorts.SortOrders;
+import com.datastrato.gravitino.rel.expressions.transforms.Transform;
+import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import java.time.Instant;
@@ -75,36 +78,31 @@ public class HiveTable extends BaseTable {
       auditInfoBuilder.withCreateTime(Instant.ofEpochSecond(table.getCreateTime()));
     }
 
-    Distribution distribution = Distribution.NONE;
-    if (CollectionUtils.isNotEmpty(table.getSd().getBucketCols())) {
+    StorageDescriptor sd = table.getSd();
+    Distribution distribution = Distributions.NONE;
+    if (CollectionUtils.isNotEmpty(sd.getBucketCols())) {
+      // Hive table use hash strategy as bucketing strategy
       distribution =
-          Distribution.builder()
-              .withTransforms(
-                  table.getSd().getBucketCols().stream()
-                      .map(f -> new NamedReference(new String[] {f}))
-                      .toArray(Transform[]::new))
-              .withNumber(table.getSd().getNumBuckets())
-              // Hive table use hash strategy as bucketing strategy
-              .withStrategy(Distribution.Strategy.HASH)
-              .build();
+          Distributions.hash(
+              sd.getNumBuckets(),
+              sd.getBucketCols().stream().map(NamedReference::field).toArray(Expression[]::new));
     }
 
     SortOrder[] sortOrders = new SortOrder[0];
-    if (CollectionUtils.isNotEmpty(table.getSd().getSortCols())) {
+    if (CollectionUtils.isNotEmpty(sd.getSortCols())) {
       sortOrders =
-          table.getSd().getSortCols().stream()
+          sd.getSortCols().stream()
               .map(
                   f ->
-                      SortOrder.builder()
-                          .withTransform(new NamedReference(new String[] {f.getCol()}))
-                          .withDirection(f.getOrder() == 0 ? Direction.ASC : Direction.DESC)
-                          .build())
+                      SortOrders.of(
+                          NamedReference.field(f.getCol()),
+                          f.getOrder() == 0 ? SortDirection.ASCENDING : SortDirection.DESCENDING))
               .toArray(SortOrder[]::new);
     }
 
     Column[] columns =
         Stream.concat(
-                table.getSd().getCols().stream()
+                sd.getCols().stream()
                     .map(
                         f ->
                             new HiveColumn.Builder()
@@ -130,10 +128,10 @@ public class HiveTable extends BaseTable {
         .withDistribution(distribution)
         .withSortOrders(sortOrders)
         .withAuditInfo(auditInfoBuilder.build())
-        .withPartitions(
+        .withPartitioning(
             table.getPartitionKeys().stream()
-                .map(p -> identity(new String[] {p.getName()}))
-                .toArray(Transforms.NamedReference[]::new))
+                .map(p -> identity(p.getName()))
+                .toArray(Transform[]::new))
         .withSchemaName(table.getDbName())
         .build();
   }
@@ -203,8 +201,8 @@ public class HiveTable extends BaseTable {
   }
 
   private List<FieldSchema> buildPartitionKeys() {
-    return Arrays.stream(partitions)
-        .map(p -> getPartitionKey(((Transforms.NamedReference) p).value()))
+    return Arrays.stream(partitioning)
+        .map(p -> getPartitionKey(((Transforms.IdentityTransform) p).fieldName()))
         .collect(Collectors.toList());
   }
 
@@ -253,15 +251,16 @@ public class HiveTable extends BaseTable {
 
     if (ArrayUtils.isNotEmpty(sortOrders)) {
       for (SortOrder sortOrder : sortOrders) {
-        String columnName = ((NamedReference) sortOrder.getTransform()).value()[0];
-        sd.addToSortCols(new Order(columnName, sortOrder.getDirection() == Direction.ASC ? 0 : 1));
+        String columnName = ((NamedReference.FieldReference) sortOrder.expression()).fieldName()[0];
+        sd.addToSortCols(
+            new Order(columnName, sortOrder.direction() == SortDirection.ASCENDING ? 0 : 1));
       }
     }
 
-    if (!Distribution.NONE.equals(distribution)) {
+    if (!Distributions.NONE.equals(distribution)) {
       sd.setBucketCols(
-          Arrays.stream(distribution.transforms())
-              .map(t -> ((NamedReference) t).value()[0])
+          Arrays.stream(distribution.expressions())
+              .map(t -> ((NamedReference.FieldReference) t).fieldName()[0])
               .collect(Collectors.toList()));
       sd.setNumBuckets(distribution.number());
     }
@@ -320,7 +319,7 @@ public class HiveTable extends BaseTable {
       hiveTable.columns = columns;
       hiveTable.distribution = distribution;
       hiveTable.sortOrders = sortOrders;
-      hiveTable.partitions = partitions;
+      hiveTable.partitioning = partitioning;
       hiveTable.schemaName = schemaName;
 
       // HMS put table comment in parameters

@@ -63,4 +63,11 @@ public interface Configs {
           .version("0.1.0")
           .booleanConf()
           .createWithDefault(true);
+
+  ConfigEntry<String> AUTHENTICATOR =
+      new ConfigBuilder("gravitino.authenticator")
+          .doc("The authenticator which Gravitino uses")
+          .version("0.3.0")
+          .stringConf()
+          .createWithDefault("simple");
 }

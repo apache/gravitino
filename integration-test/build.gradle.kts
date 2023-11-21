@@ -27,6 +27,7 @@ dependencies {
   implementation(libs.bundles.log4j)
   implementation(libs.bundles.jersey)
   implementation(libs.bundles.jetty)
+  implementation(libs.bundles.jwt)
   implementation(libs.httpclient5)
   implementation(libs.commons.io)
 
@@ -243,6 +244,10 @@ tasks.test {
       environment("HADOOP_HOME", "/tmp")
       environment("PROJECT_VERSION", version)
       environment("TRINO_CONF_DIR", buildDir.path + "/trino-conf")
+
+      // Gravitino CI Docker image
+      environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-hive:0.1.5")
+      environment("GRAVITINO_CI_TRINO_DOCKER_IMAGE", "datastrato/gravitino-ci-trino:0.1.0")
 
       val testMode = project.properties["testMode"] as? String ?: "embedded"
       systemProperty("gravitino.log.path", buildDir.path + "/integration-test.log")

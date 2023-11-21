@@ -8,16 +8,9 @@ import com.datastrato.gravitino.catalog.rel.BaseColumn;
 
 /** Represents a column in the Jdbc column. */
 public class JdbcColumn extends BaseColumn {
-
-  private boolean optional;
-
   private String defaultValue;
 
   private JdbcColumn() {}
-
-  public boolean isOptional() {
-    return optional;
-  }
 
   public String getDefaultValue() {
     return defaultValue;
@@ -26,18 +19,10 @@ public class JdbcColumn extends BaseColumn {
   /** A builder class for constructing JdbcColumn instances. */
   public static class Builder extends BaseColumnBuilder<Builder, JdbcColumn> {
 
-    /** Can the corresponding value of this field be null. */
-    private boolean optional;
-
     /**
      * The default value for this field. This value will be used if the corresponding value is null.
      */
     private String defaultValue;
-
-    public Builder withOptional(boolean optional) {
-      this.optional = optional;
-      return this;
-    }
 
     public Builder withDefaultValue(String defaultValue) {
       this.defaultValue = defaultValue;
@@ -55,7 +40,7 @@ public class JdbcColumn extends BaseColumn {
       jdbcColumn.name = name;
       jdbcColumn.comment = comment;
       jdbcColumn.dataType = dataType;
-      jdbcColumn.optional = optional;
+      jdbcColumn.nullable = nullable;
       jdbcColumn.defaultValue = defaultValue;
       return jdbcColumn;
     }

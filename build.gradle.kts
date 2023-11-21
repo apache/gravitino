@@ -207,10 +207,11 @@ tasks.rat {
   inputDir.set(project.rootDir)
 
   val exclusions = mutableListOf(
-    // Ignore files we track but do not distribute
+    // Ignore files we track but do not need headers
     "**/.github/**/*",
     "dev/docker/**/*.xml",
     "**/*.log",
+    "licenses/*txt"
   )
 
   // Add .gitignore excludes to the Apache Rat exclusion list.
@@ -251,6 +252,16 @@ tasks {
           fileName.replace(".template", "")
         }
         fileMode = 0b111101101
+      }
+      copy {
+        from(projectDir.dir("licenses")) { into("package/licenses") }
+        from(projectDir.file("LICENSE.bin")) { into("package") }
+        from(projectDir.file("NOTICE.bin")) { into("package") }
+        from(projectDir.file("README.md")) { into("package") }
+        into(outputDir)
+        rename { fileName ->
+          fileName.replace(".bin", "")
+        }
       }
 
       // Create the directory 'data' for storage.

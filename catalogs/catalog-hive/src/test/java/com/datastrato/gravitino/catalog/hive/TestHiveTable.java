@@ -6,8 +6,8 @@ package com.datastrato.gravitino.catalog.hive;
 
 import static com.datastrato.gravitino.catalog.BaseCatalog.CATALOG_BYPASS_PREFIX;
 import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.METASTORE_URIS;
-import static com.datastrato.gravitino.rel.transforms.Transforms.day;
-import static com.datastrato.gravitino.rel.transforms.Transforms.identity;
+import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.day;
+import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.identity;
 
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
@@ -17,15 +17,16 @@ import com.datastrato.gravitino.exceptions.TableAlreadyExistsException;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.CatalogEntity;
 import com.datastrato.gravitino.rel.Column;
-import com.datastrato.gravitino.rel.Distribution;
-import com.datastrato.gravitino.rel.Distribution.Strategy;
-import com.datastrato.gravitino.rel.SortOrder;
-import com.datastrato.gravitino.rel.SortOrder.Direction;
-import com.datastrato.gravitino.rel.SortOrder.NullOrdering;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.TableChange;
-import com.datastrato.gravitino.rel.transforms.Transform;
-import com.datastrato.gravitino.rel.transforms.Transforms;
+import com.datastrato.gravitino.rel.expressions.NamedReference;
+import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
+import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
+import com.datastrato.gravitino.rel.expressions.sorts.NullOrdering;
+import com.datastrato.gravitino.rel.expressions.sorts.SortDirection;
+import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
+import com.datastrato.gravitino.rel.expressions.sorts.SortOrders;
+import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.google.common.collect.Maps;
 import io.substrait.type.TypeCreator;
 import java.time.Instant;
@@ -104,20 +105,13 @@ public class TestHiveTable extends MiniHiveMetastoreService {
   }
 
   private Distribution createDistribution() {
-    return Distribution.builder()
-        .withNumber(10)
-        .withTransforms(new Transform[] {Transforms.field(new String[] {"col_1"})})
-        .withStrategy(Strategy.EVEN)
-        .build();
+    return Distributions.hash(10, NamedReference.field("col_1"));
   }
 
   private SortOrder[] createSortOrder() {
-    return new SortOrder[] {
-      SortOrder.builder()
-          .withNullOrdering(NullOrdering.FIRST)
-          .withDirection(Direction.DESC)
-          .withTransform(Transforms.field(new String[] {"col_2"}))
-          .build()
+    return new SortOrders.SortImpl[] {
+      SortOrders.of(
+          NamedReference.field("col_2"), SortDirection.DESCENDING, NullOrdering.NULLS_FIRST)
     };
   }
 
@@ -179,14 +173,12 @@ public class TestHiveTable extends MiniHiveMetastoreService {
     // Compare sort and order
     Assertions.assertEquals(distribution.number(), loadedTable.distribution().number());
     Assertions.assertArrayEquals(
-        distribution.transforms(), loadedTable.distribution().transforms());
+        distribution.expressions(), loadedTable.distribution().expressions());
 
     Assertions.assertEquals(sortOrders.length, loadedTable.sortOrder().length);
     for (int i = 0; i < loadedTable.sortOrder().length; i++) {
-      Assertions.assertEquals(
-          sortOrders[i].getDirection(), loadedTable.sortOrder()[i].getDirection());
-      Assertions.assertEquals(
-          sortOrders[i].getTransform(), loadedTable.sortOrder()[i].getTransform());
+      Assertions.assertEquals(sortOrders[i].direction(), loadedTable.sortOrder()[i].direction());
+      Assertions.assertEquals(sortOrders[i].expression(), loadedTable.sortOrder()[i].expression());
     }
 
     // Test exception
@@ -211,6 +203,7 @@ public class TestHiveTable extends MiniHiveMetastoreService {
             .withName("col_3")
             .withType(TypeCreator.REQUIRED.I8)
             .withComment(HIVE_COMMENT)
+            .withNullable(false)
             .build();
 
     exception =
@@ -257,7 +250,7 @@ public class TestHiveTable extends MiniHiveMetastoreService {
             .build();
     Column[] columns = new Column[] {col1, col2};
 
-    Transform[] partitions = new Transform[] {identity(new String[] {col2.name()})};
+    Transform[] partitions = new Transform[] {identity(col2.name())};
 
     Table table =
         hiveCatalog
@@ -363,7 +356,7 @@ public class TestHiveTable extends MiniHiveMetastoreService {
             HIVE_COMMENT,
             properties,
             new Transform[0],
-            Distribution.NONE,
+            Distributions.NONE,
             new SortOrder[0]);
 
     Assertions.assertTrue(hiveCatalog.asTableCatalog().tableExists(tableIdentifier));
@@ -414,7 +407,7 @@ public class TestHiveTable extends MiniHiveMetastoreService {
                 columns,
                 HIVE_COMMENT,
                 properties,
-                new Transform[] {identity(col2)},
+                new Transform[] {identity(col2.name())},
                 distribution,
                 sortOrders);
     Assertions.assertTrue(hiveCatalog.asTableCatalog().tableExists(tableIdentifier));
@@ -457,38 +450,23 @@ public class TestHiveTable extends MiniHiveMetastoreService {
                         TableChange.updateColumnPosition(new String[] {"col_1"}, null)));
     Assertions.assertTrue(exception.getMessage().contains("Column position cannot be null"));
 
-    exception =
-        Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () ->
-                hiveCatalog
-                    .asTableCatalog()
-                    .alterTable(
-                        tableIdentifier,
-                        TableChange.addColumn(new String[] {"col_3"}, TypeCreator.REQUIRED.I8)));
-    Assertions.assertTrue(
-        exception
-            .getMessage()
-            .contains(
-                "The NOT NULL constraint for column is only supported since Hive 3.0, "
-                    + "but the current Gravitino Hive catalog only supports Hive 2.x"));
-
-    exception =
-        Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () ->
-                hiveCatalog
-                    .asTableCatalog()
-                    .alterTable(
-                        tableIdentifier,
-                        TableChange.updateColumnType(
-                            new String[] {"col_1"}, TypeCreator.REQUIRED.I8)));
-    Assertions.assertTrue(
-        exception
-            .getMessage()
-            .contains(
-                "The NOT NULL constraint for column is only supported since Hive 3.0, "
-                    + "but the current Gravitino Hive catalog only supports Hive 2.x"));
+    // TODO(minghuang): Uncomment below test after we support nullable in TableChange.addColumn
+    //    exception =
+    //        Assertions.assertThrows(
+    //            IllegalArgumentException.class,
+    //            () ->
+    //                hiveCatalog
+    //                    .asTableCatalog()
+    //                    .alterTable(
+    //                        tableIdentifier,
+    //                        TableChange.addColumn(new String[] {"col_3"},
+    // TypeCreator.REQUIRED.I8)));
+    //    Assertions.assertTrue(
+    //        exception
+    //            .getMessage()
+    //            .contains(
+    //                "The NOT NULL constraint for column is only supported since Hive 3.0, "
+    //                    + "but the current Gravitino Hive catalog only supports Hive 2.x"));
 
     exception =
         Assertions.assertThrows(
