@@ -45,7 +45,7 @@ public class AuthenticationOperationsIT extends AbstractIT {
         AuthConstants.AUTHORIZATION_BEARER_HEADER
             + Jwts.builder()
                 .setSubject("gravitino")
-                .setExpiration(new Date(System.currentTimeMillis() + 1000 * 100))
+                .setExpiration(new Date(System.currentTimeMillis() + 1000 * 1000))
                 .setAudience("service1")
                 .signWith(keyPair.getPrivate(), SignatureAlgorithm.RS256)
                 .compact();
