@@ -252,32 +252,34 @@ class TestTransactionalKvBackend {
     List<Pair<byte[], byte[]>> pairs =
         Lists.newArrayList(
             Pair.of(
-                kvTransactionManager.constructKey("key1".getBytes()),
+                kvTransactionManager.generateKey("key1".getBytes(), kvTransactionManager.txId),
                 kvTransactionManager.constructValue("value1".getBytes(), ValueStatusEnum.NORMAL)),
             Pair.of(
-                kvTransactionManager.constructKey("key2".getBytes()),
+                kvTransactionManager.generateKey("key2".getBytes(), kvTransactionManager.txId),
                 kvTransactionManager.constructValue("value2".getBytes(), ValueStatusEnum.NORMAL)),
             Pair.of(
-                kvTransactionManager.constructKey("key3".getBytes()),
+                kvTransactionManager.generateKey("key3".getBytes(), kvTransactionManager.txId),
                 kvTransactionManager.constructValue("value3".getBytes(), ValueStatusEnum.NORMAL)),
             Pair.of(
-                kvTransactionManager.constructKey("key4".getBytes()),
+                kvTransactionManager.generateKey("key4".getBytes(), kvTransactionManager.txId),
                 kvTransactionManager.constructValue("value4".getBytes(), ValueStatusEnum.NORMAL)),
             Pair.of(
-                kvTransactionManager.constructKey("key5".getBytes()),
+                kvTransactionManager.generateKey("key5".getBytes(), kvTransactionManager.txId),
                 kvTransactionManager.constructValue("value6".getBytes(), ValueStatusEnum.NORMAL)),
             Pair.of(
-                kvTransactionManager.constructKey("key6".getBytes()),
+                kvTransactionManager.generateKey("key6".getBytes(), kvTransactionManager.txId),
                 kvTransactionManager.constructValue("value7".getBytes(), ValueStatusEnum.NORMAL)),
             Pair.of(
-                kvTransactionManager.constructKey("key7".getBytes()),
+                kvTransactionManager.generateKey("key7".getBytes(), kvTransactionManager.txId),
                 kvTransactionManager.constructValue("value8".getBytes(), ValueStatusEnum.NORMAL)),
             Pair.of(
-                kvTransactionManager.constructKey("key8".getBytes()),
+                kvTransactionManager.generateKey("key8".getBytes(), kvTransactionManager.txId),
                 kvTransactionManager.constructValue("value9".getBytes(), ValueStatusEnum.NORMAL)),
 
             // Will throw NPE to roll back the transaction.
-            Pair.of(kvTransactionManager.constructKey("key9".getBytes()), null));
+            Pair.of(
+                kvTransactionManager.generateKey("key9".getBytes(), kvTransactionManager.txId),
+                null));
 
     Pair<byte[], byte[]>[] arrayPair = pairs.toArray(new Pair[0]);
 

@@ -77,6 +77,7 @@ public class KvEntityStore implements EntityStore {
   @VisibleForTesting StorageLayoutVersion storageLayoutVersion;
 
   private TransactionIdGenerator txIdGenerator;
+  private KvGarbageCollector kvGarbageCollector;
 
   @Override
   public void initialize(Config config) throws RuntimeException {
@@ -84,8 +85,12 @@ public class KvEntityStore implements EntityStore {
     // TODO(yuqi) Currently, KvNameMappingService and KvEntityStore shares the same backend
     //  instance, We should make it configurable in the future.
     this.txIdGenerator = new TransactionIdGeneratorImpl(backend);
+    this.kvGarbageCollector = new KvGarbageCollector(backend, config);
+    kvGarbageCollector.start();
+
     this.nameMappingService = new KvNameMappingService(backend, txIdGenerator);
     this.entityKeyEncoder = new BinaryEntityKeyEncoder(nameMappingService);
+
     this.reentrantReadWriteLock = new ReentrantReadWriteLock();
     this.storageLayoutVersion = initStorageVersionInfo();
   }

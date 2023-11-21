@@ -20,7 +20,7 @@ public class TransactionIdGeneratorImpl implements TransactionIdGenerator {
   public static final Logger LOGGER = LoggerFactory.getLogger(TransactionIdGeneratorImpl.class);
 
   private final KvBackend kvBackend;
-  private static final String LAST_ID = "last_timestamp";
+  public static final String LAST_ID = "last_timestamp";
   private long incrementId = 0L;
 
   private final ScheduledExecutorService idSaverScheduleExecutor =

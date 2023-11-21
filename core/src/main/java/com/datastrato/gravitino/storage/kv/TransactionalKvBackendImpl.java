@@ -13,9 +13,11 @@ import com.datastrato.gravitino.utils.Bytes;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Lists;
 import java.io.IOException;
+import java.io.Serializable;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.SerializationUtils;
 import org.apache.commons.lang3.tuple.Pair;
 
 /**
@@ -50,13 +52,13 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
   @VisibleForTesting final List<Pair<byte[], byte[]>> putPairs = Lists.newArrayList();
   private List<byte[]> originalKeys = Lists.newArrayList();
 
-  private long txId;
+  @VisibleForTesting long txId;
 
-  private static final String TRANSACTION_PREFIX = "tx ";
+  public static final String TRANSACTION_PREFIX = "tx ";
 
   private static final int VALUE_PREFIX_LENGTH = 20;
 
-  private static final byte[] SEPARATOR = " ".getBytes(StandardCharsets.UTF_8);
+  private static final byte[] REAL_KEY_AND_TX_ID_SEPARATOR = " ".getBytes(StandardCharsets.UTF_8);
 
   public TransactionalKvBackendImpl(
       KvBackend kvBackend, TransactionIdGenerator transactionIdGenerator) {
@@ -79,7 +81,7 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
       throw new EntityAlreadyExistsException(
           "Key already exists: " + ByteUtils.formatByteArray(key));
     }
-    putPairs.add(Pair.of(constructKey(key), constructValue(value, ValueStatusEnum.NORMAL)));
+    putPairs.add(Pair.of(generateKey(key, txId), constructValue(value, ValueStatusEnum.NORMAL)));
     originalKeys.add(key);
   }
 
@@ -90,7 +92,7 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
       return null;
     }
 
-    return getValue(rawValue);
+    return getRealValue(rawValue);
   }
 
   @Override
@@ -101,7 +103,7 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
     }
 
     byte[] deletedValue = constructValue(oldValue, ValueStatusEnum.DELETED);
-    putPairs.add(Pair.of(constructKey(key), deletedValue));
+    putPairs.add(Pair.of(generateKey(key, txId), deletedValue));
     originalKeys.add(key);
     return true;
   }
@@ -113,7 +115,7 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
         p ->
             putPairs.add(
                 Pair.of(
-                    constructKey(p.getKey()),
+                    generateKey(p.getKey(), txId),
                     constructValue(p.getValue(), ValueStatusEnum.DELETED))));
     return false;
   }
@@ -135,11 +137,8 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
             .endInclusive(endInclude)
             .predicate(
                 (k, v) -> {
-                  byte[] transactionId = ArrayUtils.subarray(k, k.length - 8, k.length);
-                  return kvBackend.get(
-                          Bytes.concat(
-                              TRANSACTION_PREFIX.getBytes(StandardCharsets.UTF_8), transactionId))
-                      != null;
+                  byte[] transactionId = getBinaryTransactionId(k);
+                  return kvBackend.get(generateCommitKey(transactionId)) != null;
                 })
             .limit(Integer.MAX_VALUE)
             .build();
@@ -151,7 +150,8 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
       Pair<byte[], byte[]> pair = rawPairs.get(j);
       byte[] rawKey = pair.getKey();
       byte[] realKey = ArrayUtils.subarray(rawKey, 0, rawKey.length - 9);
-      Bytes minNextKey = Bytes.increment(Bytes.wrap(Bytes.concat(realKey, SEPARATOR)));
+      Bytes minNextKey =
+          Bytes.increment(Bytes.wrap(Bytes.concat(realKey, REAL_KEY_AND_TX_ID_SEPARATOR)));
 
       if (!scanRange.isStartInclusive()
           && Bytes.wrap(realKey).compareTo(scanRange.getStart()) == 0) {
@@ -169,7 +169,7 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
         continue;
       }
 
-      byte[] value = getValue(pair.getValue());
+      byte[] value = getRealValue(pair.getValue());
       if (value != null) {
         result.add(Pair.of(realKey, value));
         i++;
@@ -190,14 +190,9 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
     for (Pair<byte[], byte[]> pair : putPairs) {
       kvBackend.put(pair.getKey(), pair.getValue(), true);
     }
-
     // Commit
     kvBackend.put(
-        Bytes.concat(
-            TRANSACTION_PREFIX.getBytes(StandardCharsets.UTF_8),
-            revert(ByteUtils.longToByte(txId))),
-        originalKeys.toString().getBytes(StandardCharsets.UTF_8),
-        true);
+        generateCommitKey(txId), SerializationUtils.serialize((Serializable) originalKeys), true);
   }
 
   public void rollback() throws IOException {
@@ -210,7 +205,7 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
   @Override
   public void close() throws IOException {}
 
-  private byte[] getValue(byte[] rawValue) {
+  public static byte[] getRealValue(byte[] rawValue) {
     byte[] firstFourType = ArrayUtils.subarray(rawValue, 0, 4);
     int statusCode = ByteUtils.byteToInt(firstFourType);
     ValueStatusEnum statusEnum = ValueStatusEnum.fromCode(statusCode);
@@ -229,11 +224,6 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
     return Bytes.concat(prefix, value);
   }
 
-  @VisibleForTesting
-  byte[] constructKey(byte[] key) {
-    return Bytes.concat(key, SEPARATOR, revert(ByteUtils.longToByte(txId)));
-  }
-
   /**
    * Get the latest readable value of the key as we support multi-version concurrency control
    * mechanism to keep multiple version data.
@@ -248,12 +238,8 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
                 .endInclusive(false)
                 .predicate(
                     (k, v) -> {
-                      byte[] transactionId = ArrayUtils.subarray(k, k.length - 8, k.length);
-                      return kvBackend.get(
-                              Bytes.concat(
-                                  TRANSACTION_PREFIX.getBytes(StandardCharsets.UTF_8),
-                                  transactionId))
-                          != null;
+                      byte[] transactionId = getBinaryTransactionId(k);
+                      return kvBackend.get(generateCommitKey(transactionId)) != null;
                     })
                 .limit(1)
                 .build());
@@ -262,10 +248,9 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
       return null;
     }
 
-    byte[] realKey = pairs.get(0).getKey();
-    byte[] transactionId = ArrayUtils.subarray(realKey, realKey.length - 8, realKey.length);
-    byte[] transactionFlag =
-        Bytes.concat(TRANSACTION_PREFIX.getBytes(StandardCharsets.UTF_8), transactionId);
+    byte[] rawKey = pairs.get(0).getKey();
+    byte[] transactionId = getBinaryTransactionId(rawKey);
+    byte[] transactionFlag = generateCommitKey(transactionId);
     if (kvBackend.get(transactionFlag) != null) {
       // Commit flag exists, the value is readable
       return pairs.get(0).getValue();
@@ -296,11 +281,41 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
    * <p>When we try to get the value of key1, we will first the value of key1 10 and can skip old
    * versions quickly.
    */
-  private static byte[] revert(byte[] bytes) {
+  private static byte[] revertByteArray(byte[] bytes) {
     for (int i = 0; i < bytes.length; i++) {
       bytes[i] = (byte) (bytes[i] ^ (byte) 0xff);
     }
 
     return bytes;
+  }
+
+  /** Generate a key of data for a specific transaction id. */
+  @VisibleForTesting
+  static byte[] generateKey(byte[] key, long transactionId) {
+    return generateKey(key, revertByteArray(ByteUtils.longToByte(transactionId)));
+  }
+
+  static byte[] generateKey(byte[] key, byte[] binaryTransactionId) {
+    return Bytes.concat(key, REAL_KEY_AND_TX_ID_SEPARATOR, binaryTransactionId);
+  }
+
+  /** Generate a commit key for a specific transaction id. */
+  static byte[] generateCommitKey(long transactionId) {
+    byte[] binaryTransactionId = ByteUtils.longToByte(transactionId);
+    return generateCommitKey(revertByteArray(binaryTransactionId));
+  }
+
+  static byte[] generateCommitKey(byte[] transactionId) {
+    return Bytes.concat(TRANSACTION_PREFIX.getBytes(StandardCharsets.UTF_8), transactionId);
+  }
+
+  /** Get the end of transaction id, we use this key to scan all commit marks. */
+  static byte[] endOfTransactionId() {
+    return Bytes.increment(Bytes.wrap(TRANSACTION_PREFIX.getBytes(StandardCharsets.UTF_8))).get();
+  }
+
+  /** Get the binary transaction id from the raw key. */
+  static byte[] getBinaryTransactionId(byte[] rawKey) {
+    return ArrayUtils.subarray(rawKey, rawKey.length - 8, rawKey.length);
   }
 }
