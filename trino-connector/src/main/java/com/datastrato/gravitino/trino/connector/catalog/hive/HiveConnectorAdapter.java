@@ -34,7 +34,7 @@ public class HiveConnectorAdapter implements CatalogConnectorAdapter {
 
   @Override
   public List<PropertyMetadata<?>> getTableProperties() {
-    return tableProperties.getTableProperties();
+    return tableProperties.getTablePropertyMetadata();
   }
 
   @Override

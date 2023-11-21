@@ -12,16 +12,16 @@ import java.util.List;
 
 public class HiveTableProperties {
 
-  private final List<PropertyMetadata<?>> tableProperties;
+  private final List<PropertyMetadata<?>> tablePropertyMetadata;
 
   // TODO yuhui Need to add table properties
   HiveTableProperties() {
-    tableProperties =
+    tablePropertyMetadata =
         ImmutableList.of(
             stringProperty("format", "Hive storage format for the table", "TEXTFILE", false));
   }
 
-  public List<PropertyMetadata<?>> getTableProperties() {
-    return tableProperties;
+  public List<PropertyMetadata<?>> getTablePropertyMetadata() {
+    return tablePropertyMetadata;
   }
 }

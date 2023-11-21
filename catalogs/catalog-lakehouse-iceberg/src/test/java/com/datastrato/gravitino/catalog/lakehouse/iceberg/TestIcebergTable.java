@@ -130,12 +130,14 @@ public class TestIcebergTable {
             .withName("col_1")
             .withType(TypeCreator.NULLABLE.I8)
             .withComment(ICEBERG_COMMENT)
+            .withNullable(true)
             .build();
     IcebergColumn col2 =
         new IcebergColumn.Builder()
             .withName("col_2")
             .withType(TypeCreator.NULLABLE.DATE)
             .withComment(ICEBERG_COMMENT)
+            .withNullable(false)
             .build();
     Column[] columns = new Column[] {col1, col2};
 
@@ -160,6 +162,8 @@ public class TestIcebergTable {
 
     Assertions.assertEquals("val1", loadedTable.properties().get("key1"));
     Assertions.assertEquals("val2", loadedTable.properties().get("key2"));
+    Assertions.assertTrue(loadedTable.columns()[0].nullable());
+    Assertions.assertFalse(loadedTable.columns()[1].nullable());
 
     Assertions.assertTrue(icebergCatalog.asTableCatalog().tableExists(tableIdentifier));
     NameIdentifier[] tableIdents =

@@ -28,6 +28,7 @@ public class HiveColumn extends BaseColumn {
       hiveColumn.name = name;
       hiveColumn.comment = comment;
       hiveColumn.dataType = dataType;
+      hiveColumn.nullable = nullable;
       return hiveColumn;
     }
   }

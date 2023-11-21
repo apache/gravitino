@@ -4,7 +4,10 @@
  */
 package com.datastrato.gravitino.trino.connector.metadata;
 
+import com.datastrato.gravitino.dto.AuditDTO;
+import com.datastrato.gravitino.dto.rel.SchemaDTO;
 import com.datastrato.gravitino.rel.Schema;
+import java.time.Instant;
 import java.util.Map;
 
 /** Help Gravitino connector access SchemaMetadata from gravitino client. */
@@ -36,5 +39,15 @@ public class GravitinoSchema {
 
   public String getComment() {
     return comment;
+  }
+
+  public SchemaDTO getSchemaDTO() {
+    return new SchemaDTO.Builder()
+        .withName(schemaName)
+        .withComment(comment)
+        .withProperties(properties)
+        .withAudit(
+            new AuditDTO.Builder().withCreator("creator").withCreateTime(Instant.now()).build())
+        .build();
   }
 }

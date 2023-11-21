@@ -8,6 +8,8 @@ import com.datastrato.gravitino.GravitinoEnv;
 import com.datastrato.gravitino.catalog.CatalogManager;
 import com.datastrato.gravitino.catalog.CatalogOperationDispatcher;
 import com.datastrato.gravitino.meta.MetalakeManager;
+import com.datastrato.gravitino.server.auth.AuthenticationFilter;
+import com.datastrato.gravitino.server.auth.ServerAuthenticator;
 import com.datastrato.gravitino.server.web.JettyServer;
 import com.datastrato.gravitino.server.web.JettyServerConfig;
 import com.datastrato.gravitino.server.web.ObjectMapperProvider;
@@ -49,6 +51,8 @@ public class GravitinoServer extends ResourceConfig {
         JettyServerConfig.fromConfig(serverConfig, WEBSERVER_CONF_PREFIX);
     server.initialize(jettyServerConfig, SERVER_NAME);
 
+    ServerAuthenticator.getInstance().initialize(serverConfig);
+
     gravitinoEnv.initialize(serverConfig);
 
     // initialize Jersey REST API resources.
@@ -73,6 +77,7 @@ public class GravitinoServer extends ResourceConfig {
     Servlet servlet = new ServletContainer(this);
     server.addServlet(servlet, "/api/*");
     server.addFilter(new VersioningFilter(), "/api/*");
+    server.addFilter(new AuthenticationFilter(), "/api/*");
   }
 
   public void start() throws Exception {

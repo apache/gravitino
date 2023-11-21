@@ -73,4 +73,11 @@ public interface Configs {
           .version("0.3.0")
           .longConf()
           .createWithDefault(DEFAULT_ENTITY_KV_TTL);
+
+  ConfigEntry<String> AUTHENTICATOR =
+      new ConfigBuilder("gravitino.authenticator")
+          .doc("The authenticator which Gravitino uses")
+          .version("0.3.0")
+          .stringConf()
+          .createWithDefault("simple");
 }

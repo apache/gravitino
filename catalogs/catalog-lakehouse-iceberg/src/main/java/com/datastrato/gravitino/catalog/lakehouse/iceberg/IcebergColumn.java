@@ -11,16 +11,10 @@ public class IcebergColumn extends BaseColumn {
 
   private int id;
 
-  private boolean optional;
-
   private IcebergColumn() {}
 
   public int getId() {
     return id;
-  }
-
-  public boolean isOptional() {
-    return optional;
   }
 
   /** A builder class for constructing IcebergColumn instances. */
@@ -29,16 +23,8 @@ public class IcebergColumn extends BaseColumn {
     /** The ID of this field. */
     private int id;
 
-    /** Can the corresponding value of this field be null. */
-    private boolean optional;
-
     public Builder withId(int id) {
       this.id = id;
-      return this;
-    }
-
-    public Builder withOptional(boolean optional) {
-      this.optional = optional;
       return this;
     }
 
@@ -54,7 +40,7 @@ public class IcebergColumn extends BaseColumn {
       icebergColumn.name = name;
       icebergColumn.comment = comment;
       icebergColumn.dataType = dataType;
-      icebergColumn.optional = optional;
+      icebergColumn.nullable = nullable;
       return icebergColumn;
     }
   }
