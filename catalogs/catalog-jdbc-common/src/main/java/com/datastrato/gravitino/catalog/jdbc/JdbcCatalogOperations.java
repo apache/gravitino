@@ -131,7 +131,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
    */
   @Override
   public NameIdentifier[] listSchemas(Namespace namespace) throws NoSuchCatalogException {
-    List<String> schemaNames = databaseOperation.list();
+    List<String> schemaNames = databaseOperation.listDatabases();
     return schemaNames.stream()
         .map(db -> NameIdentifier.of(namespace, db))
         .toArray(NameIdentifier[]::new);
@@ -239,7 +239,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
   @Override
   public NameIdentifier[] listTables(Namespace namespace) throws NoSuchSchemaException {
     String databaseName = NameIdentifier.of(namespace.levels()).name();
-    return tableOperation.list(databaseName).stream()
+    return tableOperation.listTables(databaseName).stream()
         .map(table -> NameIdentifier.of(namespace, table))
         .toArray(NameIdentifier[]::new);
   }
