@@ -67,23 +67,24 @@ public interface Configs {
           .booleanConf()
           .createWithDefault(true);
 
-  ConfigEntry<Long> ENTITY_KV_TTL =
-      new ConfigBuilder(ENTITY_KV_TTL_KEY_KEY)
-          .doc("The ttl(day) of kv entity store")
-          .version("0.3.0")
-          .longConf()
-          .createWithDefault(DEFAULT_ENTITY_KV_TTL);
-
   ConfigEntry<String> AUTHENTICATOR =
       new ConfigBuilder("gravitino.authenticator")
           .doc("The authenticator which Gravitino uses")
           .version("0.3.0")
           .stringConf()
           .createWithDefault("simple");
+
   ConfigEntry<Long> STORE_TRANSACTION_MAX_SKEW_TIME =
       new ConfigBuilder("gravitino.entity.store.transaction-max-skew-time")
           .doc("Max time skew allowed for transaction")
           .version("0.3.0")
           .longConf()
           .createWithDefault(2L);
+
+  ConfigEntry<Long> ENTITY_KV_TTL =
+      new ConfigBuilder(ENTITY_KV_TTL_KEY_KEY)
+          .doc("The ttl(day) of kv entity store")
+          .version("0.3.0")
+          .longConf()
+          .createWithDefault(DEFAULT_ENTITY_KV_TTL);
 }
