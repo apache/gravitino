@@ -70,6 +70,17 @@ public class AbstractIT {
     ITUtils.rewriteConfigFile(tmpPath.toString(), configPath.toString(), customConfigs);
   }
 
+  private static void recoverGravitinoServerConfig() throws IOException {
+    if (customConfigs.isEmpty()) return;
+
+    String gravitinoHome = System.getenv("GRAVITINO_HOME");
+    String tmpFileName = GravitinoServer.CONF_FILE + ".tmp";
+    Path tmpPath = Paths.get(gravitinoHome, "conf", tmpFileName);
+    Path configPath = Paths.get(gravitinoHome, "conf", GravitinoServer.CONF_FILE);
+    Files.deleteIfExists(configPath);
+    Files.move(tmpPath, configPath);
+  }
+
   @BeforeAll
   public static void startIntegrationTest() throws Exception {
     testMode =
@@ -115,6 +126,7 @@ public class AbstractIT {
     } else {
       GravitinoITUtils.stopGravitinoServer();
     }
+    recoverGravitinoServerConfig();
     customConfigs.clear();
     LOG.info("Tearing down Gravitino Server");
   }
