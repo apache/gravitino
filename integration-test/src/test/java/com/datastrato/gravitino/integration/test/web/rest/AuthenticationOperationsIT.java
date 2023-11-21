@@ -6,6 +6,8 @@ package com.datastrato.gravitino.integration.test.web.rest;
 
 import static com.datastrato.gravitino.server.GravitinoServer.WEBSERVER_CONF_PREFIX;
 
+import com.datastrato.gravitino.auth.AuthConstants;
+import com.datastrato.gravitino.auth.AuthenticatorType;
 import com.datastrato.gravitino.client.ErrorHandlers;
 import com.datastrato.gravitino.client.HTTPClient;
 import com.datastrato.gravitino.dto.responses.VersionResponse;
@@ -13,8 +15,6 @@ import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.CommandExecutor;
 import com.datastrato.gravitino.integration.test.util.ProcessData;
 import com.datastrato.gravitino.json.JsonUtils;
-import com.datastrato.gravitino.auth.AuthConstants;
-import com.datastrato.gravitino.auth.AuthenticatorType;
 import com.datastrato.gravitino.server.auth.OAuthConfig;
 import com.datastrato.gravitino.server.web.JettyServerConfig;
 import com.google.common.collect.Maps;

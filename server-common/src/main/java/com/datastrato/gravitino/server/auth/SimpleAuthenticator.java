@@ -6,10 +6,9 @@
 package com.datastrato.gravitino.server.auth;
 
 import com.datastrato.gravitino.Config;
+import com.datastrato.gravitino.auth.AuthConstants;
 import java.security.Principal;
 import java.util.Base64;
-
-import com.datastrato.gravitino.auth.AuthConstants;
 import org.apache.commons.lang3.StringUtils;
 
 /**

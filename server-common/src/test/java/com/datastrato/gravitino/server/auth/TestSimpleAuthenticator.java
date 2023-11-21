@@ -5,10 +5,9 @@
 package com.datastrato.gravitino.server.auth;
 
 import com.datastrato.gravitino.Config;
+import com.datastrato.gravitino.auth.AuthConstants;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
-
-import com.datastrato.gravitino.auth.AuthConstants;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 

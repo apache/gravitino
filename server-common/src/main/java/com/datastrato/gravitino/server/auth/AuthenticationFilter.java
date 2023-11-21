@@ -4,8 +4,8 @@
  */
 package com.datastrato.gravitino.server.auth;
 
-import com.datastrato.gravitino.exceptions.UnauthorizedException;
 import com.datastrato.gravitino.auth.AuthConstants;
+import com.datastrato.gravitino.exceptions.UnauthorizedException;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
