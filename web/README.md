@@ -50,6 +50,24 @@ yarn server
 
 - Visit <http://localhost:3000> to check it in your browser. You can start editing the page such as `pages/index.js`. The page auto-updates as you edit the file.
 
+### Development Scripts
+
+```bash
+yarn lint
+# This command runs ESLint to help you inspect the code. If errors are printed, please make modifications based on the provided prompts.
+```
+
+```bash
+yarn prettier:check
+# This command runs Prettier to help you check your code styles. you can manually to fix the code when errors are printed, or use `yarn format` to fix the code with Prettier CLI.
+```
+
+```bash
+yarn format
+# This command helps you automatically format the code.
+
+```
+
 ## Self-hosting Deployment
 
 ### Node.js Server
