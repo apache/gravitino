@@ -13,7 +13,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -23,7 +22,6 @@ public class TransactionIdGeneratorImpl implements TransactionIdGenerator {
   private final KvBackend kvBackend;
   private static final String LAST_ID = "last_timestamp";
   private long incrementId = 0L;
-  private AtomicBoolean backendHasClosed = new AtomicBoolean(false);
 
   private final ScheduledExecutorService idSaverScheduleExecutor =
       new ScheduledThreadPoolExecutor(

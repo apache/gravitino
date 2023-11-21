@@ -48,6 +48,7 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
   private final TransactionIdGenerator transactionIdGenerator;
 
   @VisibleForTesting final List<Pair<byte[], byte[]>> putPairs = Lists.newArrayList();
+  private List<byte[]> originalKeys = Lists.newArrayList();
 
   private long txId;
 
@@ -79,6 +80,7 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
           "Key already exists: " + ByteUtils.formatByteArray(key));
     }
     putPairs.add(Pair.of(constructKey(key), constructValue(value, ValueStatusEnum.NORMAL)));
+    originalKeys.add(key);
   }
 
   @Override
@@ -100,6 +102,7 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
 
     byte[] deletedValue = constructValue(oldValue, ValueStatusEnum.DELETED);
     putPairs.add(Pair.of(constructKey(key), deletedValue));
+    originalKeys.add(key);
     return true;
   }
 
@@ -193,7 +196,7 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
         Bytes.concat(
             TRANSACTION_PREFIX.getBytes(StandardCharsets.UTF_8),
             revert(ByteUtils.longToByte(txId))),
-        new byte[0],
+        originalKeys.toString().getBytes(StandardCharsets.UTF_8),
         true);
   }
 
