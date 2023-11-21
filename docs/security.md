@@ -7,13 +7,18 @@ This software is licensed under the Apache License version 2."
 
 ## Authentication
 Gravitino supports two kinds of authentication mechanism: simple and oauth.
+
+### Simple mode
 Simple mode is the default authentication option.
 Simple mode allows the client to use the environment variable `GRAVITINO_USER` as the user.
 If the environment variable `GRAVITINO_USER` is not set, client will use the user of the machine which sends requests.
+
+### OAuth mode
 Gravitino only supports external OAuth2.0 server now.
 First, users need to guarantee that the external OAuth 2.0 server supports Bearer JWT and is configured properly.
 Then, for server side, users should set `gravitino.authenticator` as `oauth` and give `gravitino.authenticator.oauth.defaultSignKey` a proper value.
 
+### Server configuration
 
 | Configuration item                                | Description                                                                | Default value     | Since version |
 |---------------------------------------------------|----------------------------------------------------------------------------|-------------------|---------------|
