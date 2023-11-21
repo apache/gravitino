@@ -40,7 +40,7 @@ yarn install
 
 ```bash
 # start development server
-yarn dev
+yarn server
 ```
 
 - Visit <http://localhost:3000> to check it in your browser. You can start editing the page such as `pages/index.js`. The page auto-updates as you edit the file.
@@ -54,7 +54,7 @@ Next.js can be deployed to any hosting provider that supports Node.js. Make sure
 ```json
 {
   "scripts": {
-    "dev": "next dev",
+    "server": "next dev",
     "build": "next build",
     "start": "next start"
   }
@@ -78,7 +78,7 @@ Command `next export` allows you to export your app to static HTML, which can be
 `next export` will generate an `dist` directory, which can be served by any static hosting service.
 
 ```bash
-yarn export
+yarn dist
 # then copy the files within the 'dist' directory to the root directory of the static server
 ```
 
@@ -96,7 +96,7 @@ Run below command in console:
 
 ```bash
 # ensure you are in the `web` directory
-docker run -it --rm --name gravitino-web-docker -v ${PWD}:/web -w /web node:20-slim /bin/bash -c "yarn docker:export"
+docker run -it --rm --name gravitino-web-docker -v ${PWD}:/web -w /web node:20-slim /bin/bash -c "yarn install && yarn dist"
 ```
 
 This command will run `yarn install` to install the dependencies specified in the `package.json` file and then run `yarn export` to export a static version of the application. The exported files will be saved to the `dist` directory inside the container, which is mounted to the `dist` directory in the current directory of the host machine. This means that the exported files will be accessible on the host machine after the command is executed.
@@ -104,7 +104,7 @@ This command will run `yarn install` to install the dependencies specified in th
 If you also want to start a server to view with demo, please change to the following code:
 
 ```bash
-docker run -it --rm --name gravitino-web-docker -v ${PWD}:/web -p 3000:3000 -w /web node:20-slim /bin/bash -c "yarn docker:dev"
+docker run -it --rm --name gravitino-web-docker -v ${PWD}:/web -p 3000:3000 -w /web node:20-slim /bin/bash -c "yarn install && yarn server"
 
 # Open http://localhost:3000
 ```

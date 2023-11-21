@@ -3,17 +3,15 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "server": "next dev",
     "build": "next build",
     "start": "next start",
-    "export": "env-cmd -f .env.static next build",
+    "dist": "env-cmd -f .env.static next build",
     "lint": "eslint --fix \"src/**/*.{js,jsx}\"",
     "format": "prettier --write \"src/**/*.{js,jsx}\"",
+    "prettier:check": "prettier --check \"src/**/*.{js,jsx}\"",
     "build:icons": "node src/iconify-bundle/bundle-icons-react.js",
-    "rm:cache": "rm -rf ./out/ && rm -rf ./node_modules/ && rm -rf ./yarn.lock && yarn cache clean",
-    "deploy": "yarn install && yarn export",
-    "docker:export": "yarn deploy",
-    "docker:dev": "yarn deploy && yarn dev"
+    "rm:cache": "rm -rf ./out/ && rm -rf ./node_modules/ && rm -rf ./yarn.lock && yarn cache clean"
   },
   "dependencies": {
     "@emotion/cache": "11.11.0",
