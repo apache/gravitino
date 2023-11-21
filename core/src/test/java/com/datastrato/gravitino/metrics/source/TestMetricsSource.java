@@ -68,8 +68,7 @@ public class TestMetricsSource extends MetricsSource {
     for (int i = 0; i < 100; i++) {
       Timer.Context context = timer.time();
       try {
-        // do logic
-        Thread.sleep(0);
+        // no ops
       } finally {
         context.stop();
       }
@@ -80,6 +79,7 @@ public class TestMetricsSource extends MetricsSource {
             .timer(TEST_METRICS_SOURCE + ".a.timer")
             .getSnapshot()
             .size();
+    // it's hard to check timer values, we just check the num
     Assertions.assertEquals(100, v);
   }
 
