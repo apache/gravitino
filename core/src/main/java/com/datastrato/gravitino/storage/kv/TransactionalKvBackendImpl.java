@@ -21,7 +21,7 @@ import org.apache.commons.lang3.SerializationUtils;
 import org.apache.commons.lang3.tuple.Pair;
 
 /**
- * KvTransactionManagerImpl is an implementation of {@link TransactionalKvBackend} that uses 2PC
+ * TransactionalKvBackendImpl is an implementation of {@link TransactionalKvBackend} that uses 2PC
  * (Two-Phase Commit) to support transaction.
  *
  * <p>Assuming we have a key-value pair (k1, v1) and a transaction id 1, the key-value pair will be
@@ -29,16 +29,17 @@ import org.apache.commons.lang3.tuple.Pair;
  *
  * <pre>
  *       KEY                         VALUE
- *   key1 + empty space + 1 --> status_code  + v1
- *   tx + empty space + 1 --> empty
+ *   key1 + separator + 1 --> status_code  + v1
+ *   tx + separator + 1 --> empty
  * </pre>
  *
- * tx + empty space + 1 is a flag to indicate that the transaction 1 has been successfully committed
- * and key1 is visible, if transaction 1 fails and there is no tx + empty space + 1, the key1 is not
+ * We use '0x1F' as the separator, the key1 + separator + 1 is the key of the value, the tx +
+ * separator+ 1 is a flag to indicate that the transaction 1 has been successfully committed and
+ * key1 is visible, if transaction 1 fails and there is no tx + empty space + 1, the key1 is not
  * visible.
  *
- * <p>The status_code is a 4-byte integer that indicates the status of the value. The status code
- * can be one of the following values:
+ * <p>The status_code is a 20-byte integer that indicates the status of the value. The first 4 bytes
+ * of status code can be one of the following values:
  *
  * <pre>
  *   0x00000000(Metrication: 0) -- NORMAL, the value is visible
@@ -54,11 +55,11 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
 
   @VisibleForTesting long txId;
 
-  public static final String TRANSACTION_PREFIX = "tx ";
+  private static final String TRANSACTION_PREFIX = "______tx";
 
   private static final int VALUE_PREFIX_LENGTH = 20;
 
-  private static final byte[] REAL_KEY_AND_TX_ID_SEPARATOR = " ".getBytes(StandardCharsets.UTF_8);
+  private static final byte[] SEPARATOR = new byte[] {0x1F};
 
   public TransactionalKvBackendImpl(
       KvBackend kvBackend, TransactionIdGenerator transactionIdGenerator) {
@@ -66,8 +67,29 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
     this.transactionIdGenerator = transactionIdGenerator;
   }
 
+  @Override
   public synchronized void begin() {
     txId = transactionIdGenerator.nextId();
+  }
+
+  @Override
+  public void commit() throws IOException {
+    // Prepare
+    for (Pair<byte[], byte[]> pair : putPairs) {
+      kvBackend.put(pair.getKey(), pair.getValue(), true);
+    }
+
+    // Commit
+    kvBackend.put(
+        generateCommitKey(txId), SerializationUtils.serialize((Serializable) originalKeys), true);
+  }
+
+  @Override
+  public void rollback() throws IOException {
+    // Delete the update value
+    for (Pair<byte[], byte[]> pair : putPairs) {
+      kvBackend.delete(pair.getKey());
+    }
   }
 
   @Override
@@ -117,7 +139,7 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
                 Pair.of(
                     generateKey(p.getKey(), txId),
                     constructValue(p.getValue(), ValueStatusEnum.DELETED))));
-    return false;
+    return true;
   }
 
   @Override
@@ -150,8 +172,7 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
       Pair<byte[], byte[]> pair = rawPairs.get(j);
       byte[] rawKey = pair.getKey();
       byte[] realKey = ArrayUtils.subarray(rawKey, 0, rawKey.length - 9);
-      Bytes minNextKey =
-          Bytes.increment(Bytes.wrap(Bytes.concat(realKey, REAL_KEY_AND_TX_ID_SEPARATOR)));
+      Bytes minNextKey = Bytes.increment(Bytes.wrap(Bytes.concat(realKey, SEPARATOR)));
 
       if (!scanRange.isStartInclusive()
           && Bytes.wrap(realKey).compareTo(scanRange.getStart()) == 0) {
@@ -183,23 +204,6 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
     }
 
     return result;
-  }
-
-  public void commit() throws IOException {
-    // Prepare
-    for (Pair<byte[], byte[]> pair : putPairs) {
-      kvBackend.put(pair.getKey(), pair.getValue(), true);
-    }
-    // Commit
-    kvBackend.put(
-        generateCommitKey(txId), SerializationUtils.serialize((Serializable) originalKeys), true);
-  }
-
-  public void rollback() throws IOException {
-    // Delete the update value
-    for (Pair<byte[], byte[]> pair : putPairs) {
-      kvBackend.delete(pair.getKey());
-    }
   }
 
   @Override
@@ -296,7 +300,7 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
   }
 
   static byte[] generateKey(byte[] key, byte[] binaryTransactionId) {
-    return Bytes.concat(key, REAL_KEY_AND_TX_ID_SEPARATOR, binaryTransactionId);
+    return Bytes.concat(key, SEPARATOR, binaryTransactionId);
   }
 
   /** Generate a commit key for a specific transaction id. */
@@ -306,12 +310,16 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
   }
 
   static byte[] generateCommitKey(byte[] transactionId) {
-    return Bytes.concat(TRANSACTION_PREFIX.getBytes(StandardCharsets.UTF_8), transactionId);
+    return Bytes.concat(
+        TRANSACTION_PREFIX.getBytes(StandardCharsets.UTF_8), SEPARATOR, transactionId);
   }
 
   /** Get the end of transaction id, we use this key to scan all commit marks. */
   static byte[] endOfTransactionId() {
-    return Bytes.increment(Bytes.wrap(TRANSACTION_PREFIX.getBytes(StandardCharsets.UTF_8))).get();
+    return Bytes.increment(
+            Bytes.wrap(
+                Bytes.concat(TRANSACTION_PREFIX.getBytes(StandardCharsets.UTF_8), SEPARATOR)))
+        .get();
   }
 
   /** Get the binary transaction id from the raw key. */

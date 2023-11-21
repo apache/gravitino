@@ -10,6 +10,7 @@ import static com.datastrato.gravitino.Configs.ENTITY_KV_STORE;
 import static com.datastrato.gravitino.Configs.ENTITY_KV_TTL;
 import static com.datastrato.gravitino.Configs.ENTITY_STORE;
 import static com.datastrato.gravitino.Configs.ENTRY_KV_ROCKSDB_BACKEND_PATH;
+import static com.datastrato.gravitino.Configs.STORE_TRANSACTION_MAX_SKEW_TIME;
 
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Configs;
@@ -33,20 +34,22 @@ class TestKvGarbageCollector {
     Mockito.when(config.get(Configs.ENTITY_SERDE)).thenReturn("proto");
     Mockito.when(config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)).thenReturn(file.getAbsolutePath());
     Mockito.when(config.get(ENTITY_KV_TTL)).thenReturn(0L);
+    Mockito.when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(3L);
     return config;
   }
 
-  private KvBackend getKvBackEnd() throws IOException {
+  private KvBackend getKvBackEnd(Config config) throws IOException {
     KvBackend kvBackend = new RocksDBKvBackend();
-    kvBackend.initialize(getConfig());
+    kvBackend.initialize(config);
     return kvBackend;
   }
 
   @Test
   void testCollectGarbage() throws IOException, InterruptedException {
     Config config = getConfig();
-    try (KvBackend kvBackend = getKvBackEnd()) {
-      TransactionIdGenerator transactionIdGenerator = new TransactionIdGeneratorImpl(kvBackend);
+    try (KvBackend kvBackend = getKvBackEnd(config)) {
+      TransactionIdGenerator transactionIdGenerator =
+          new TransactionIdGeneratorImpl(kvBackend, config);
       TransactionalKvBackendImpl transactionalKvBackend =
           new TransactionalKvBackendImpl(kvBackend, transactionIdGenerator);
       transactionalKvBackend.begin();

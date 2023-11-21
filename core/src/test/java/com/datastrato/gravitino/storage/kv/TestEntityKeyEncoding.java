@@ -9,6 +9,7 @@ import static com.datastrato.gravitino.Configs.DEFAULT_ENTITY_KV_STORE;
 import static com.datastrato.gravitino.Configs.ENTITY_KV_STORE;
 import static com.datastrato.gravitino.Configs.ENTITY_STORE;
 import static com.datastrato.gravitino.Configs.ENTRY_KV_ROCKSDB_BACKEND_PATH;
+import static com.datastrato.gravitino.Configs.STORE_TRANSACTION_MAX_SKEW_TIME;
 import static com.datastrato.gravitino.storage.kv.BinaryEntityKeyEncoder.BYTABLE_NAMESPACE_SEPARATOR;
 import static com.datastrato.gravitino.storage.kv.BinaryEntityKeyEncoder.WILD_CARD;
 
@@ -58,7 +59,8 @@ public class TestEntityKeyEncoding {
     ENTITY_STORE_INSTANCE.setSerDe(
         EntitySerDeFactory.createEntitySerDe(config.get(Configs.ENTITY_SERDE)));
     TransactionIdGenerator txIdGenerator =
-        new TransactionIdGeneratorImpl(((KvEntityStore) ENTITY_STORE_INSTANCE).getBackend());
+        new TransactionIdGeneratorImpl(
+            ((KvEntityStore) ENTITY_STORE_INSTANCE).getBackend(), config);
     NameMappingService nameMappingService =
         new KvNameMappingService(
             ((KvEntityStore) ENTITY_STORE_INSTANCE).getBackend(), txIdGenerator);
@@ -99,6 +101,7 @@ public class TestEntityKeyEncoding {
     Mockito.when(config.get(ENTITY_KV_STORE)).thenReturn(DEFAULT_ENTITY_KV_STORE);
     Mockito.when(config.get(Configs.ENTITY_SERDE)).thenReturn("proto");
     Mockito.when(config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)).thenReturn(ROCKS_DB_STORE_PATH);
+    Mockito.when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(3L);
   }
 
   @Test

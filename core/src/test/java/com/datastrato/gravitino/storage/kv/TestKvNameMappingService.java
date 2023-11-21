@@ -9,6 +9,7 @@ import static com.datastrato.gravitino.Configs.DEFAULT_ENTITY_KV_STORE;
 import static com.datastrato.gravitino.Configs.ENTITY_KV_STORE;
 import static com.datastrato.gravitino.Configs.ENTITY_STORE;
 import static com.datastrato.gravitino.Configs.ENTRY_KV_ROCKSDB_BACKEND_PATH;
+import static com.datastrato.gravitino.Configs.STORE_TRANSACTION_MAX_SKEW_TIME;
 
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Configs;
@@ -47,10 +48,11 @@ public class TestKvNameMappingService {
     Mockito.when(config.get(ENTITY_KV_STORE)).thenReturn(DEFAULT_ENTITY_KV_STORE);
     Mockito.when(config.get(Configs.ENTITY_SERDE)).thenReturn("proto");
     Mockito.when(config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)).thenReturn(kvPath);
+    Mockito.when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(3L);
 
     KvBackend backend = new RocksDBKvBackend();
     backend.initialize(config);
-    return new KvNameMappingService(backend, new TransactionIdGeneratorImpl(backend));
+    return new KvNameMappingService(backend, new TransactionIdGeneratorImpl(backend, config));
   }
 
   private IdGenerator getIdGeneratorByReflection(NameMappingService nameMappingService)
@@ -134,8 +136,11 @@ public class TestKvNameMappingService {
     Mockito.doThrow(new ArithmeticException())
         .when(spyKvBackend)
         .put(Mockito.any(), Mockito.any(), Mockito.anyBoolean());
+    Config config = Mockito.mock(Config.class);
+    Mockito.when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(3L);
     final NameMappingService mock =
-        new KvNameMappingService(spyKvBackend, new TransactionIdGeneratorImpl(spyKvBackend));
+        new KvNameMappingService(
+            spyKvBackend, new TransactionIdGeneratorImpl(spyKvBackend, config));
 
     // Now we try to use update. It should fail.
     Assertions.assertThrowsExactly(
