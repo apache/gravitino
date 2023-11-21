@@ -353,17 +353,12 @@ public class TestCatalogOperations implements CatalogOperations, TableCatalog, S
   }
 
   @Override
-  public boolean schemaNameCaseSensitivity() {
+  public boolean nameCaseSensitivity() {
     return false;
   }
 
   @Override
-  public boolean tableNameCaseSensitivity() {
-    return false;
-  }
-
-  @Override
-  public boolean columnNameCaseSensitivity() {
+  public boolean toUpperCaseIfNotSensitive() {
     return false;
   }
 }

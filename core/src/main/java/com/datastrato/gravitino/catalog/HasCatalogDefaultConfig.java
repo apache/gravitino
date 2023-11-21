@@ -36,19 +36,28 @@ public interface HasCatalogDefaultConfig {
    *
    * @return true if the schema name is case-sensitive, false otherwise.
    */
-  default boolean schemaNameCaseSensitivity() {
+  default boolean nameCaseSensitivity() {
     return true;
   }
 
-  default boolean tableNameCaseSensitivity() {
+  /**
+   * When {@link HasCatalogDefaultConfig#nameCaseSensitivity()} is false, we should convert names to
+   * lower-case or upper-case.
+   *
+   * <p>For example, Hive will use lower-case for all names and SQL Server will use upper-case for
+   * all names.
+   *
+   * <p>Note:If {@link HasCatalogDefaultConfig#nameCaseSensitivity()} is true, this method will be
+   * ignored.
+   *
+   * @return true if we should convert all names to upper-case and * false if we should convert
+   *     names to lower-case.
+   */
+  default boolean toUpperCaseIfNotSensitive() {
     return true;
   }
 
-  default boolean columnNameCaseSensitivity() {
-    return true;
-  }
-
-  default Pair<Boolean, Boolean> schemaAndTableNameCaseSensitivity() {
-    return Pair.of(schemaNameCaseSensitivity(), tableNameCaseSensitivity());
+  default Pair<Boolean, Boolean> caseConfiguration() {
+    return Pair.of(nameCaseSensitivity(), toUpperCaseIfNotSensitive());
   }
 }

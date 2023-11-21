@@ -918,18 +918,14 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
   }
 
   @Override
-  public boolean schemaNameCaseSensitivity() {
-    // If we want this to be more exact, we can create a database with a name to test this.
+  public boolean nameCaseSensitivity() {
+    // If we want this to be more exact, we can create a database with a name to test this
+    // configuration when initiation.
     return false;
   }
 
   @Override
-  public boolean tableNameCaseSensitivity() {
-    return false;
-  }
-
-  @Override
-  public boolean columnNameCaseSensitivity() {
+  public boolean toUpperCaseIfNotSensitive() {
     return false;
   }
 }

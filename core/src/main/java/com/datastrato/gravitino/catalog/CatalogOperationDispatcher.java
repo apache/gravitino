@@ -763,7 +763,7 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
   }
 
   private NameIdentifier identifierWithCaseSensitivity(
-      NameIdentifier ident, boolean schemaNameCaseSensitive, boolean tableNameCaseSensitive) {
+      NameIdentifier ident, boolean nameSensitive, boolean toUpper) {
     // The name of metalake/catalog are always case-sensitive, so we only need to handle schema and
     // table identifiers.
     String[] levels = ident.namespace().levels();
@@ -773,12 +773,20 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
 
     if (levels.length == 2) {
       String schemaName =
-          schemaNameCaseSensitive ? ident.name() : ident.name().toLowerCase(Locale.US);
+          nameSensitive
+              ? ident.name()
+              : toUpper ? ident.name().toUpperCase(Locale.US) : ident.name().toLowerCase(Locale.US);
       return NameIdentifier.of(levels[0], levels[1], schemaName);
     }
 
-    String schemaName = schemaNameCaseSensitive ? levels[2] : levels[2].toLowerCase(Locale.US);
-    String tableName = tableNameCaseSensitive ? ident.name() : ident.name().toLowerCase(Locale.US);
+    String schemaName =
+        nameSensitive
+            ? levels[2]
+            : toUpper ? levels[2].toUpperCase(Locale.US) : levels[2].toLowerCase(Locale.US);
+    String tableName =
+        toUpper
+            ? ident.name()
+            : toUpper ? ident.name().toUpperCase(Locale.US) : ident.name().toLowerCase(Locale.US);
     return NameIdentifier.of(levels[0], levels[1], schemaName, tableName);
   }
 
@@ -787,7 +795,7 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
     Pair<Boolean, Boolean> schemaAndTableNameCaseSensitivity =
         doWithCatalog(
             catalogIdentifier,
-            c -> c.doWithDefaultConfig(HasCatalogDefaultConfig::schemaAndTableNameCaseSensitivity),
+            c -> c.doWithDefaultConfig(HasCatalogDefaultConfig::caseConfiguration),
             IllegalArgumentException.class);
     return identifierWithCaseSensitivity(
         ident,
