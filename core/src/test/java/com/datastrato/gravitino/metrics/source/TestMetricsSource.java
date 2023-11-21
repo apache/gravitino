@@ -64,8 +64,8 @@ public class TestMetricsSource extends MetricsSource {
 
   @Test
   void testTimer() throws InterruptedException {
+    Timer timer = getTimer("a.timer");
     for (int i = 0; i < 100; i++) {
-      Timer timer = getTimer("a.timer");
       Timer.Context context = timer.time();
       try {
         // do logic
@@ -85,8 +85,8 @@ public class TestMetricsSource extends MetricsSource {
 
   @Test
   void testHistogram() {
+    Histogram histogram = getHistogram("a.histogram");
     for (int i = 0; i < 100; i++) {
-      Histogram histogram = getHistogram("a.histogram");
       histogram.update(i);
     }
 
