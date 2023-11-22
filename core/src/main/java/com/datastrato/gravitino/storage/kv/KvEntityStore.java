@@ -85,6 +85,8 @@ public class KvEntityStore implements EntityStore {
     // TODO(yuqi) Currently, KvNameMappingService and KvEntityStore shares the same backend
     //  instance, We should make it configurable in the future.
     this.txIdGenerator = new TransactionIdGeneratorImpl(backend, config);
+    txIdGenerator.start();
+
     this.kvGarbageCollector = new KvGarbageCollector(backend, config);
     kvGarbageCollector.start();
     this.nameMappingService = new KvNameMappingService(backend, txIdGenerator);

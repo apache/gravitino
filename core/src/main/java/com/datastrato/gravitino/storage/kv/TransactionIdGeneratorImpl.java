@@ -24,6 +24,7 @@ public class TransactionIdGeneratorImpl implements TransactionIdGenerator {
   private final KvBackend kvBackend;
   public static final String LAST_TIMESTAMP = "last_timestamp";
   private volatile long incrementId = 0L;
+  private volatile long lastTransactionId = 0L;
   private final Config config;
 
   public TransactionIdGeneratorImpl(KvBackend kvBackend, Config config) {
@@ -33,7 +34,11 @@ public class TransactionIdGeneratorImpl implements TransactionIdGenerator {
 
   public void start() {
     long maxSkewTime = config.get(Configs.STORE_TRANSACTION_MAX_SKEW_TIME);
-    checkTimeSkew(maxSkewTime);
+    // Why use maxSkewTime + 1? Because we will save the current timestamp to storage layer every
+    // maxSkewTime second and the save operation will also take a moment. Usually, it takes less
+    // than 1 millisecond, so we'd better wait maxSkewTime + 1 second to make sure the timestamp is
+    // OK.
+    checkTimeSkew(maxSkewTime + 1);
 
     ScheduledExecutorService idSaverScheduleExecutor =
         new ScheduledThreadPoolExecutor(
@@ -45,7 +50,7 @@ public class TransactionIdGeneratorImpl implements TransactionIdGenerator {
                     (t, e) -> LOGGER.error("Uncaught exception in thread {}", t, e))
                 .build());
 
-    idSaverScheduleExecutor.schedule(
+    idSaverScheduleExecutor.scheduleAtFixedRate(
         () -> {
           int i = 0;
           while (i++ < 3) {
@@ -64,6 +69,7 @@ public class TransactionIdGeneratorImpl implements TransactionIdGenerator {
               "Failed to save current timestamp to storage layer after 3 retries, please check"
                   + "whether the storage layer is healthy.");
         },
+        0,
         maxSkewTime,
         TimeUnit.SECONDS);
   }
@@ -107,17 +113,17 @@ public class TransactionIdGeneratorImpl implements TransactionIdGenerator {
    */
   @Override
   public synchronized long nextId() {
-    try {
-      long current = System.currentTimeMillis();
-      incrementId++;
-      if (incrementId >= (1 << 18 - 1)) {
-        Thread.sleep(1);
-        current = System.currentTimeMillis();
-        incrementId = 0;
+    incrementId++;
+    if (incrementId >= (1 << 18 - 1)) {
+      incrementId = 0;
+    }
+
+    while (true) {
+      long tmpId = (System.currentTimeMillis() << 18) + incrementId;
+      if (tmpId > lastTransactionId) {
+        lastTransactionId = tmpId;
+        return tmpId;
       }
-      return (current << 18) + incrementId;
-    } catch (InterruptedException e) {
-      throw new RuntimeException(e);
     }
   }
 }

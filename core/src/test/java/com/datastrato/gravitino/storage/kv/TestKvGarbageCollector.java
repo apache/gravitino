@@ -50,6 +50,7 @@ class TestKvGarbageCollector {
     try (KvBackend kvBackend = getKvBackEnd(config)) {
       TransactionIdGenerator transactionIdGenerator =
           new TransactionIdGeneratorImpl(kvBackend, config);
+      transactionIdGenerator.start();
       TransactionalKvBackendImpl transactionalKvBackend =
           new TransactionalKvBackendImpl(kvBackend, transactionIdGenerator);
       transactionalKvBackend.begin();
@@ -84,8 +85,8 @@ class TestKvGarbageCollector {
                   .endInclusive(false)
                   .build());
 
-      // 7 for real-data(3 testA, 2 testB, 2 testC), 3 commit marks
-      Assertions.assertEquals(10, allData.size());
+      // 7 for real-data(3 testA, 2 testB, 2 testC), 3 commit marks, 1 last_timestamp
+      Assertions.assertEquals(11, allData.size());
 
       KvGarbageCollector kvGarbageCollector = new KvGarbageCollector(kvBackend, config);
       kvGarbageCollector.collectGarbage();
@@ -99,9 +100,8 @@ class TestKvGarbageCollector {
                   .endInclusive(false)
                   .build());
       // Except version 3 of testA and version 2 of testB will be left, all will be removed, so the
-      // left
-      // key-value paris will be 2(real-data) + 2(commit marks) = 4
-      Assertions.assertEquals(4, allData.size());
+      // left key-value paris will be 2(real-data) + 2(commit marks) + 1 last_timestamp = 5
+      Assertions.assertEquals(5, allData.size());
       Assertions.assertEquals("v3", new String(transactionalKvBackend.get("testA".getBytes())));
       Assertions.assertEquals("v2", new String(transactionalKvBackend.get("testB".getBytes())));
       Assertions.assertNull(transactionalKvBackend.get("testC".getBytes()));

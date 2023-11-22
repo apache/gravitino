@@ -174,7 +174,7 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
     while (i < scanRange.getLimit() && j < rawPairs.size()) {
       Pair<byte[], byte[]> pair = rawPairs.get(j);
       byte[] rawKey = pair.getKey();
-      byte[] realKey = ArrayUtils.subarray(rawKey, 0, rawKey.length - 9);
+      byte[] realKey = getRealKey(rawKey);
       Bytes minNextKey = Bytes.increment(Bytes.wrap(Bytes.concat(realKey, SEPARATOR)));
 
       if (!scanRange.isStartInclusive()
@@ -323,6 +323,10 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
             Bytes.wrap(
                 Bytes.concat(TRANSACTION_PREFIX.getBytes(StandardCharsets.UTF_8), SEPARATOR)))
         .get();
+  }
+
+  static byte[] getRealKey(byte[] rawKey) {
+    return ArrayUtils.subarray(rawKey, 0, rawKey.length - 9);
   }
 
   /** Get the binary transaction id from the raw key. */
