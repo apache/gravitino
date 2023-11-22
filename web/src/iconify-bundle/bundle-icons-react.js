@@ -21,43 +21,32 @@ const { getIcons, stringToIcon, minifyIconSet } = require('@iconify/utils')
 const sources = {
   json: [
     // Iconify JSON file (@iconify/json is a package name, /json/ is directory where files are, then filename)
-    require.resolve('@iconify/json/json/bx.json'),
-    require.resolve('@iconify/json/json/bxl.json'),
-    require.resolve('@iconify/json/json/bxs.json'),
-
+    // require.resolve('@iconify/json/json/bx.json'),
+    // require.resolve('@iconify/json/json/bxl.json'),
+    // require.resolve('@iconify/json/json/bxs.json'),
     // Custom file with only few icons
-    {
-      filename: require.resolve('@iconify/json/json/line-md.json'),
-      icons: ['home-twotone-alt', 'github', 'document-list', 'document-code', 'image-twotone']
-    },
-    {
-      filename: require.resolve('@iconify/json/json/mdi.json'),
-      icons: [
-        'github',
-        'google',
-        'laravel',
-        'twitter',
-        'facebook',
-        'translate',
-        'star-circle',
-        'circle-small',
-        'reply-outline',
-        'arrow-down-left',
-        'plus-box-outline',
-        'close-box-outline',
-        'minus-box-outline',
-        'star-circle-outline',
-        'file-remove-outline',
-        'account-cog-outline',
-        'arrow-expand-vertical',
-        'arrow-collapse-vertical'
-      ]
-    }
-
+    // {
+    //   filename: require.resolve('@iconify/json/json/line-md.json'),
+    //   icons: []
+    // },
+    // {
+    //   filename: require.resolve('@iconify/json/json/mdi.json'),
+    //   icons: []
+    // }
     // Custom JSON file
     // 'json/gg.json'
   ],
-  icons: ['bi:airplane-engines', 'tabler:anchor', 'uit:adobe-alt', 'fa6-regular:comment', 'twemoji:auto-rickshaw'],
+  icons: [
+    'bx:up-arrow-alt',
+    'bx:chevron-down',
+    'bx:x',
+    'mdi:minus-circle-outline',
+    'mdi:plus-circle-outline',
+    'bx:show-alt',
+    'bx:bxs-plus-square'
+
+    //
+  ],
   svg: [
     /*
         {
