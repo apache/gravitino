@@ -59,10 +59,14 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
 
   // Why use 20? We use 20 bytes to represent the status code, the first 4 bytes are used to
   // Identify the status of the value, the rest 16 bytes are for future use.
-  private static final int VALUE_PREFIX_LENGTH = 20;
+  private static final int LENGTH_OF_VALUE_PREFIX = 20;
 
   // Why use 0x1F, 0x1F is a control character that is used as a delimiter in the text.
   private static final byte[] SEPARATOR = new byte[] {0x1F};
+
+  private static final int LENGTH_OF_TRANSACTION_ID = Long.BYTES;
+  private static final int LENGTH_OF_SEPARATOR = SEPARATOR.length;
+  private static final int LENGTH_OF_VALUE_STATUS = Integer.BYTES;
 
   public TransactionalKvBackendImpl(
       KvBackend kvBackend, TransactionIdGenerator transactionIdGenerator) {
@@ -177,7 +181,7 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
             .endInclusive(endInclude)
             .predicate(
                 (k, v) -> {
-                  byte[] transactionId = ArrayUtils.subarray(k, k.length - 8, k.length);
+                  byte[] transactionId = getBinaryTransactionId(k);
                   return kvBackend.get(
                           Bytes.concat(
                               TRANSACTION_PREFIX.getBytes(StandardCharsets.UTF_8),
@@ -233,20 +237,20 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
   public void close() throws IOException {}
 
   private byte[] getValue(byte[] rawValue) {
-    byte[] firstFourType = ArrayUtils.subarray(rawValue, 0, 4);
+    byte[] firstFourType = ArrayUtils.subarray(rawValue, 0, LENGTH_OF_VALUE_STATUS);
     int statusCode = ByteUtils.byteToInt(firstFourType);
     ValueStatusEnum statusEnum = ValueStatusEnum.fromCode(statusCode);
     if (statusEnum == ValueStatusEnum.DELETED) {
       // A deleted value is represented by a 4-byte integer with value 1
       return null;
     }
-    return ArrayUtils.subarray(rawValue, VALUE_PREFIX_LENGTH, rawValue.length);
+    return ArrayUtils.subarray(rawValue, LENGTH_OF_VALUE_PREFIX, rawValue.length);
   }
 
   @VisibleForTesting
   byte[] constructValue(byte[] value, ValueStatusEnum status) {
     byte[] statusCode = ByteUtils.intToByte(status.getCode());
-    byte[] prefix = new byte[VALUE_PREFIX_LENGTH];
+    byte[] prefix = new byte[LENGTH_OF_VALUE_PREFIX];
     System.arraycopy(statusCode, 0, prefix, 0, statusCode.length);
     return Bytes.concat(prefix, value);
   }
@@ -285,15 +289,7 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
       return null;
     }
 
-    byte[] realKey = pairs.get(0).getKey();
-    byte[] transactionId = getBinaryTransactionId(realKey);
-    byte[] transactionFlag =
-        Bytes.concat(TRANSACTION_PREFIX.getBytes(StandardCharsets.UTF_8), SEPARATOR, transactionId);
-    if (kvBackend.get(transactionFlag) != null) {
-      // Commit flag exists, the value is readable
-      return pairs.get(0).getValue();
-    }
-    return null;
+    return pairs.get(0).getValue();
   }
 
   /**
@@ -328,11 +324,12 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
   }
 
   static byte[] getRealKey(byte[] rawKey) {
-    return ArrayUtils.subarray(rawKey, 0, rawKey.length - 9);
+    return ArrayUtils.subarray(
+        rawKey, 0, rawKey.length - LENGTH_OF_TRANSACTION_ID - LENGTH_OF_SEPARATOR);
   }
 
   /** Get the binary transaction id from the raw key. */
   static byte[] getBinaryTransactionId(byte[] rawKey) {
-    return ArrayUtils.subarray(rawKey, rawKey.length - 8, rawKey.length);
+    return ArrayUtils.subarray(rawKey, rawKey.length - LENGTH_OF_TRANSACTION_ID, rawKey.length);
   }
 }
