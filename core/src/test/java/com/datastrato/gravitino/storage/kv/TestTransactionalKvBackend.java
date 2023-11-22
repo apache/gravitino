@@ -284,7 +284,10 @@ class TestTransactionalKvBackend {
     for (int i = 0; i < 10000; i++) {
       ArrayUtils.shuffle(arrayPair);
 
-      kvTransactionManager.putPairs.addAll(Arrays.stream(arrayPair).collect(Collectors.toList()));
+      kvTransactionManager
+          .putPairs
+          .get()
+          .addAll(Arrays.stream(arrayPair).collect(Collectors.toList()));
       Assertions.assertThrows(Exception.class, kvTransactionManager::commit);
 
       kvTransactionManager.begin();

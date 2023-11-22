@@ -13,22 +13,22 @@ package com.datastrato.gravitino.storage.kv;
  */
 public enum ValueStatusEnum {
   // The value is normal.
-  NORMAL(0),
+  NORMAL((byte) 0),
 
   // The value has been deleted.
-  DELETED(1);
+  DELETED((byte) 1);
 
-  private final int code;
+  private final byte code;
 
-  ValueStatusEnum(int code) {
+  ValueStatusEnum(byte code) {
     this.code = code;
   }
 
-  public int getCode() {
+  public byte getCode() {
     return code;
   }
 
-  public static ValueStatusEnum fromCode(int code) {
+  public static ValueStatusEnum fromCode(byte code) {
     for (ValueStatusEnum valueStatusEnum : ValueStatusEnum.values()) {
       if (valueStatusEnum.getCode() == code) {
         return valueStatusEnum;
