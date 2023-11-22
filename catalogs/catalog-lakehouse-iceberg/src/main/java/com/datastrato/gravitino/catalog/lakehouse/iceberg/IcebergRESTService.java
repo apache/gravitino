@@ -9,6 +9,7 @@ import com.datastrato.gravitino.aux.GravitinoAuxiliaryService;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.ops.IcebergTableOps;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.web.IcebergExceptionMapper;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.web.IcebergObjectMapperProvider;
+import com.datastrato.gravitino.server.auth.AuthenticationFilter;
 import com.datastrato.gravitino.server.web.JettyServer;
 import com.datastrato.gravitino.server.web.JettyServerConfig;
 import java.util.Map;
@@ -50,6 +51,7 @@ public class IcebergRESTService implements GravitinoAuxiliaryService {
 
     Servlet servlet = new ServletContainer(config);
     server.addServlet(servlet, "/iceberg/*");
+    server.addFilter(new AuthenticationFilter(), "/iceberg/*");
   }
 
   @Override
