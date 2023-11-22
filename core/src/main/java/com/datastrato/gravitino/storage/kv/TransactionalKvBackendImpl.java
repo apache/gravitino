@@ -14,7 +14,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.io.Serializable;
-import java.nio.charset.StandardCharsets;
 import java.util.List;
 import javax.annotation.concurrent.NotThreadSafe;
 import org.apache.commons.lang3.ArrayUtils;
@@ -52,23 +51,28 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
   private final KvBackend kvBackend;
   private final TransactionIdGenerator transactionIdGenerator;
 
-  @VisibleForTesting final List<Pair<byte[], byte[]>> putPairs = Lists.newArrayList();
-  private final List<byte[]> originalKeys = Lists.newArrayList();
+  @VisibleForTesting
+  final ThreadLocal<List<Pair<byte[], byte[]>>> putPairs =
+      ThreadLocal.withInitial(() -> Lists.newArrayList());
 
-  @VisibleForTesting long txId;
+  private final ThreadLocal<List<byte[]>> originalKeys =
+      ThreadLocal.withInitial(() -> Lists.newArrayList());
 
-  private static final String TRANSACTION_PREFIX = "______tx";
+  @VisibleForTesting final ThreadLocal<Long> txId = new ThreadLocal<>();
 
-  // Why use 20? We use 20 bytes to represent the status code, the first 4 bytes are used to
-  // Identify the status of the value, the rest 16 bytes are for future use.
-  private static final int LENGTH_OF_VALUE_PREFIX = 20;
+  // 0x1E is control character RS
+  private static final byte[] TRANSACTION_PREFIX = {0x1E};
+
+  // Why use 8? We use 8 bytes to represent the status code, the first byte is used to
+  // identify the status of the value, the rest 7 bytes are for future use.
+  private static final int LENGTH_OF_VALUE_PREFIX = 8;
 
   // Why use 0x1F, 0x1F is a control character that is used as a delimiter in the text.
   private static final byte[] SEPARATOR = new byte[] {0x1F};
 
   private static final int LENGTH_OF_TRANSACTION_ID = Long.BYTES;
   private static final int LENGTH_OF_SEPARATOR = SEPARATOR.length;
-  private static final int LENGTH_OF_VALUE_STATUS = Integer.BYTES;
+  private static final int LENGTH_OF_VALUE_STATUS = Byte.BYTES;
 
   public TransactionalKvBackendImpl(
       KvBackend kvBackend, TransactionIdGenerator transactionIdGenerator) {
@@ -78,35 +82,37 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
 
   @Override
   public synchronized void begin() {
-    if (!putPairs.isEmpty()) {
+    if (!putPairs.get().isEmpty()) {
       throw new IllegalStateException(
           "The transaction is has not committed or rollback yet, you should commit or rollback it first");
     }
 
-    txId = transactionIdGenerator.nextId();
+    txId.set(transactionIdGenerator.nextId());
   }
 
   @Override
   public void commit() throws IOException {
     try {
       // Prepare
-      for (Pair<byte[], byte[]> pair : putPairs) {
+      for (Pair<byte[], byte[]> pair : putPairs.get()) {
         kvBackend.put(pair.getKey(), pair.getValue(), true);
       }
 
       // Commit
       kvBackend.put(
-          generateCommitKey(txId), SerializationUtils.serialize((Serializable) originalKeys), true);
+          generateCommitKey(txId.get()),
+          SerializationUtils.serialize((Serializable) originalKeys.get()),
+          true);
     } finally {
-      putPairs.clear();
-      originalKeys.clear();
+      putPairs.get().clear();
+      originalKeys.get().clear();
     }
   }
 
   @Override
   public void rollback() throws IOException {
     // Delete the update value
-    for (Pair<byte[], byte[]> pair : putPairs) {
+    for (Pair<byte[], byte[]> pair : putPairs.get()) {
       kvBackend.delete(pair.getKey());
     }
   }
@@ -122,8 +128,10 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
       throw new EntityAlreadyExistsException(
           "Key already exists: " + ByteUtils.formatByteArray(key));
     }
-    putPairs.add(Pair.of(generateKey(key, txId), constructValue(value, ValueStatusEnum.NORMAL)));
-    originalKeys.add(key);
+    putPairs
+        .get()
+        .add(Pair.of(generateKey(key, txId.get()), constructValue(value, ValueStatusEnum.NORMAL)));
+    originalKeys.get().add(key);
   }
 
   @Override
@@ -144,8 +152,8 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
     }
 
     byte[] deletedValue = constructValue(oldValue, ValueStatusEnum.DELETED);
-    putPairs.add(Pair.of(generateKey(key, txId), deletedValue));
-    originalKeys.add(key);
+    putPairs.get().add(Pair.of(generateKey(key, txId.get()), deletedValue));
+    originalKeys.get().add(key);
     return true;
   }
 
@@ -154,10 +162,12 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
     List<Pair<byte[], byte[]>> pairs = scan(kvRangeScan);
     pairs.forEach(
         p ->
-            putPairs.add(
-                Pair.of(
-                    generateKey(p.getKey(), txId),
-                    constructValue(p.getValue(), ValueStatusEnum.DELETED))));
+            putPairs
+                .get()
+                .add(
+                    Pair.of(
+                        generateKey(p.getKey(), txId.get()),
+                        constructValue(p.getValue(), ValueStatusEnum.DELETED))));
     return true;
   }
 
@@ -228,10 +238,15 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
   @Override
   public void close() throws IOException {}
 
+  @Override
+  public void closeTransaction() {
+    putPairs.get().clear();
+    originalKeys.get().clear();
+  }
+
   public static byte[] getRealValue(byte[] rawValue) {
-    byte[] firstFourType = ArrayUtils.subarray(rawValue, 0, LENGTH_OF_VALUE_STATUS);
-    int statusCode = ByteUtils.byteToInt(firstFourType);
-    ValueStatusEnum statusEnum = ValueStatusEnum.fromCode(statusCode);
+    byte[] firstType = ArrayUtils.subarray(rawValue, 0, LENGTH_OF_VALUE_STATUS);
+    ValueStatusEnum statusEnum = ValueStatusEnum.fromCode(firstType[0]);
     if (statusEnum == ValueStatusEnum.DELETED) {
       // A deleted value is represented by a 4-byte integer with value 1
       return null;
@@ -241,10 +256,15 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
 
   @VisibleForTesting
   byte[] constructValue(byte[] value, ValueStatusEnum status) {
-    byte[] statusCode = ByteUtils.intToByte(status.getCode());
+    byte[] statusCode = new byte[] {status.getCode()};
     byte[] prefix = new byte[LENGTH_OF_VALUE_PREFIX];
     System.arraycopy(statusCode, 0, prefix, 0, statusCode.length);
     return Bytes.concat(prefix, value);
+  }
+
+  @VisibleForTesting
+  byte[] constructKey(byte[] key) {
+    return Bytes.concat(key, SEPARATOR, revertByteArray(ByteUtils.longToByte(txId.get())));
   }
 
   /**
@@ -322,16 +342,12 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
   }
 
   static byte[] generateCommitKey(byte[] transactionId) {
-    return Bytes.concat(
-        TRANSACTION_PREFIX.getBytes(StandardCharsets.UTF_8), SEPARATOR, transactionId);
+    return Bytes.concat(TRANSACTION_PREFIX, SEPARATOR, transactionId);
   }
 
   /** Get the end of transaction id, we use this key to scan all commit marks. */
   static byte[] endOfTransactionId() {
-    return Bytes.increment(
-            Bytes.wrap(
-                Bytes.concat(TRANSACTION_PREFIX.getBytes(StandardCharsets.UTF_8), SEPARATOR)))
-        .get();
+    return Bytes.increment(Bytes.wrap(Bytes.concat(TRANSACTION_PREFIX, SEPARATOR))).get();
   }
 
   static byte[] getRealKey(byte[] rawKey) {

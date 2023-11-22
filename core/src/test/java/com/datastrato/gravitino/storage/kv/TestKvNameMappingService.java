@@ -117,38 +117,40 @@ public class TestKvNameMappingService {
   @Order(3)
   public void testBindAndUnBind() throws Exception {
     idGenerator.nextId();
-    NameMappingService nameMappingService = createNameMappingService(ROCKS_DB_STORE_PATH + "/3");
-    IdGenerator idGenerator = getIdGeneratorByReflection(nameMappingService);
+    try (NameMappingService nameMappingService =
+        createNameMappingService(ROCKS_DB_STORE_PATH + "/3")) {
+      IdGenerator idGenerator = getIdGeneratorByReflection(nameMappingService);
 
-    Mockito.doReturn(1L).when(idGenerator).nextId();
-    nameMappingService.getOrCreateIdFromName("name1");
-    Assertions.assertNotNull(nameMappingService.getIdByName("name1"));
+      Mockito.doReturn(1L).when(idGenerator).nextId();
+      nameMappingService.getOrCreateIdFromName("name1");
+      Assertions.assertNotNull(nameMappingService.getIdByName("name1"));
 
-    boolean result = nameMappingService.unbindNameAndId("name1");
-    Assertions.assertTrue(result);
-    Assertions.assertNull(nameMappingService.getIdByName("name1"));
+      boolean result = nameMappingService.unbindNameAndId("name1");
+      Assertions.assertTrue(result);
+      Assertions.assertNull(nameMappingService.getIdByName("name1"));
 
-    Mockito.doReturn(2L).when(idGenerator).nextId();
-    nameMappingService.getOrCreateIdFromName("name2");
+      Mockito.doReturn(2L).when(idGenerator).nextId();
+      nameMappingService.getOrCreateIdFromName("name2");
 
-    KvBackend spyKvBackend = Mockito.spy(((KvNameMappingService) nameMappingService).backend);
-    // All deletes && puts will be converted to put operations.
-    Mockito.doThrow(new ArithmeticException())
-        .when(spyKvBackend)
-        .put(Mockito.any(), Mockito.any(), Mockito.anyBoolean());
-    Config config = Mockito.mock(Config.class);
-    Mockito.when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(3L);
-    final NameMappingService mock =
-        new KvNameMappingService(
-            spyKvBackend, new TransactionIdGeneratorImpl(spyKvBackend, config));
+      KvBackend spyKvBackend = Mockito.spy(((KvNameMappingService) nameMappingService).backend);
+      // All deletes && puts will be converted to put operations.
+      Mockito.doThrow(new ArithmeticException())
+          .when(spyKvBackend)
+          .put(Mockito.any(), Mockito.any(), Mockito.anyBoolean());
+      Config config = Mockito.mock(Config.class);
+      Mockito.when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(3L);
+      final NameMappingService mock =
+          new KvNameMappingService(
+              spyKvBackend, new TransactionIdGeneratorImpl(spyKvBackend, config));
 
-    // Now we try to use update. It should fail.
-    Assertions.assertThrowsExactly(
-        ArithmeticException.class, () -> mock.updateName("name2", "name3"));
-    Mockito.doCallRealMethod()
-        .when(spyKvBackend)
-        .put(Mockito.any(), Mockito.any(), Mockito.anyBoolean());
-    Assertions.assertNull(mock.getIdByName("name3"));
-    Assertions.assertNotNull(mock.getIdByName("name2"));
+      // Now we try to use update. It should fail.
+      Assertions.assertThrowsExactly(
+          ArithmeticException.class, () -> mock.updateName("name2", "name3"));
+      Mockito.doCallRealMethod()
+          .when(spyKvBackend)
+          .put(Mockito.any(), Mockito.any(), Mockito.anyBoolean());
+      Assertions.assertNull(mock.getIdByName("name3"));
+      Assertions.assertNotNull(mock.getIdByName("name2"));
+    }
   }
 }

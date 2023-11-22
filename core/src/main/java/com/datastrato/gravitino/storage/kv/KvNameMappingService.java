@@ -28,7 +28,6 @@ public class KvNameMappingService implements NameMappingService {
   @VisibleForTesting final KvBackend backend;
   private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
   @VisibleForTesting final IdGenerator idGenerator = new RandomIdGenerator();
-  private final TransactionIdGenerator txIdGenerator;
 
   // name prefix of name in name to id mapping,
   // e.g., name_metalake1 -> 1
@@ -40,21 +39,23 @@ public class KvNameMappingService implements NameMappingService {
   //       id_2 -> metalake2
   private static final byte[] ID_PREFIX = "id_".getBytes(StandardCharsets.UTF_8);
 
+  private final TransactionalKvBackend transactionalKvBackend;
+
   public KvNameMappingService(KvBackend backend, TransactionIdGenerator txIdGenerator) {
     this.backend = backend;
-    this.txIdGenerator = txIdGenerator;
+    transactionalKvBackend = new TransactionalKvBackendImpl(backend, txIdGenerator);
   }
 
   @Override
   public Long getIdByName(String name) throws IOException {
     lock.readLock().lock();
-    try (TransactionalKvBackend transactionalKvBackend =
-        new TransactionalKvBackendImpl(backend, txIdGenerator)) {
+    try {
       transactionalKvBackend.begin();
       byte[] nameByte = Bytes.concat(NAME_PREFIX, name.getBytes(StandardCharsets.UTF_8));
       byte[] idByte = transactionalKvBackend.get(nameByte);
       return idByte == null ? null : ByteUtils.byteToLong(idByte);
     } finally {
+      transactionalKvBackend.closeTransaction();
       lock.readLock().unlock();
     }
   }
@@ -63,15 +64,15 @@ public class KvNameMappingService implements NameMappingService {
     byte[] nameByte = Bytes.concat(NAME_PREFIX, name.getBytes(StandardCharsets.UTF_8));
     long id = idGenerator.nextId();
     lock.writeLock().lock();
-    try (TransactionalKvBackendImpl kvTransactionManager =
-        new TransactionalKvBackendImpl(backend, txIdGenerator)) {
-      kvTransactionManager.begin();
-      kvTransactionManager.put(nameByte, ByteUtils.longToByte(id), false);
+    try {
+      transactionalKvBackend.begin();
+      transactionalKvBackend.put(nameByte, ByteUtils.longToByte(id), false);
       byte[] idByte = Bytes.concat(ID_PREFIX, ByteUtils.longToByte(id));
-      kvTransactionManager.put(idByte, name.getBytes(StandardCharsets.UTF_8), false);
-      kvTransactionManager.commit();
+      transactionalKvBackend.put(idByte, name.getBytes(StandardCharsets.UTF_8), false);
+      transactionalKvBackend.commit();
       return id;
     } finally {
+      transactionalKvBackend.closeTransaction();
       lock.writeLock().unlock();
     }
   }
@@ -79,26 +80,26 @@ public class KvNameMappingService implements NameMappingService {
   @Override
   public boolean updateName(String oldName, String newName) throws IOException {
     lock.writeLock().lock();
-    try (TransactionalKvBackendImpl kvTransactionManager =
-        new TransactionalKvBackendImpl(backend, txIdGenerator)) {
-      kvTransactionManager.begin();
+    try {
+      transactionalKvBackend.begin();
       byte[] nameByte = Bytes.concat(NAME_PREFIX, oldName.getBytes(StandardCharsets.UTF_8));
-      byte[] oldIdValue = kvTransactionManager.get(nameByte);
+      byte[] oldIdValue = transactionalKvBackend.get(nameByte);
 
       // Old mapping has been deleted, no need to do it;
       if (oldIdValue == null) {
         return false;
       }
       // Delete old name --> id mapping
-      kvTransactionManager.delete(nameByte);
+      transactionalKvBackend.delete(nameByte);
 
-      kvTransactionManager.put(
+      transactionalKvBackend.put(
           Bytes.concat(NAME_PREFIX, newName.getBytes(StandardCharsets.UTF_8)), oldIdValue, false);
-      kvTransactionManager.put(
+      transactionalKvBackend.put(
           Bytes.concat(ID_PREFIX, oldIdValue), newName.getBytes(StandardCharsets.UTF_8), true);
-      kvTransactionManager.commit();
+      transactionalKvBackend.commit();
       return true;
     } finally {
+      transactionalKvBackend.closeTransaction();
       lock.writeLock().unlock();
     }
   }
@@ -108,21 +109,19 @@ public class KvNameMappingService implements NameMappingService {
     byte[] nameByte = Bytes.concat(NAME_PREFIX, name.getBytes(StandardCharsets.UTF_8));
 
     lock.writeLock().lock();
-    try (TransactionalKvBackendImpl kvTransactionManager =
-        new TransactionalKvBackendImpl(backend, txIdGenerator)) {
-      kvTransactionManager.begin();
-      boolean r = kvTransactionManager.delete(nameByte);
-      kvTransactionManager.commit();
+    try {
+      transactionalKvBackend.begin();
+      boolean r = transactionalKvBackend.delete(nameByte);
+      transactionalKvBackend.commit();
       return r;
     } finally {
+      transactionalKvBackend.closeTransaction();
       lock.writeLock().unlock();
     }
   }
 
   @Override
-  public void close() throws Exception {
-    backend.close();
-  }
+  public void close() throws Exception {}
 
   @Override
   public long getOrCreateIdFromName(String name) throws IOException {

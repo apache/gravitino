@@ -17,4 +17,7 @@ public interface TransactionalKvBackend extends KvBackend {
 
   /** Rollback the transaction if something goes wrong. */
   void rollback() throws IOException;
+
+  /** Close the current transaction. */
+  void closeTransaction();
 }

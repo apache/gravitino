@@ -32,7 +32,6 @@ import org.slf4j.LoggerFactory;
 public class RocksDBKvBackend implements KvBackend {
   public static final Logger LOGGER = LoggerFactory.getLogger(RocksDBKvBackend.class);
   private TransactionDB db;
-  private volatile boolean hasClosed = false;
 
   /**
    * Initialize the RocksDB backend instance. We have used the {@link TransactionDB} to support
@@ -75,11 +74,6 @@ public class RocksDBKvBackend implements KvBackend {
 
   @Override
   public void put(byte[] key, byte[] value, boolean overwrite) throws IOException {
-    if (hasClosed) {
-      throw new IllegalStateException(
-          "RocksDBKvBackend has been closed, put operation can't be perform...");
-    }
-
     try {
       handlePutWithoutTransaction(key, value, overwrite);
     } catch (EntityAlreadyExistsException e) {
@@ -107,11 +101,6 @@ public class RocksDBKvBackend implements KvBackend {
 
   @Override
   public byte[] get(byte[] key) throws IOException {
-    if (hasClosed) {
-      throw new IllegalStateException(
-          "RocksDBKvBackend has been closed, get operation can't be perform...");
-    }
-
     try {
       return db.get(key);
     } catch (RocksDBException e) {
@@ -121,11 +110,6 @@ public class RocksDBKvBackend implements KvBackend {
 
   @Override
   public List<Pair<byte[], byte[]>> scan(KvRangeScan scanRange) throws IOException {
-    if (hasClosed) {
-      throw new IllegalStateException(
-          "RocksDBKvBackend has been closed, scan operation can't be perform...");
-    }
-
     RocksIterator rocksIterator = db.newIterator();
     rocksIterator.seek(scanRange.getStart());
 
@@ -168,11 +152,6 @@ public class RocksDBKvBackend implements KvBackend {
 
   @Override
   public boolean delete(byte[] key) throws IOException {
-    if (hasClosed) {
-      throw new IllegalStateException(
-          "RocksDBKvBackend has been closed, delete operation can't be perform...");
-    }
-
     try {
       db.delete(key);
       return true;
@@ -183,11 +162,6 @@ public class RocksDBKvBackend implements KvBackend {
 
   @Override
   public boolean deleteRange(KvRangeScan deleteRange) throws IOException {
-    if (hasClosed) {
-      throw new IllegalStateException(
-          "RocksDBKvBackend has been closed, deleteRange operation can't be perform...");
-    }
-
     RocksIterator rocksIterator = db.newIterator();
     rocksIterator.seek(deleteRange.getStart());
 
@@ -221,6 +195,5 @@ public class RocksDBKvBackend implements KvBackend {
   @Override
   public void close() throws IOException {
     db.close();
-    hasClosed = true;
   }
 }

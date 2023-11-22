@@ -68,19 +68,20 @@ Assuming we want to put key-value pairs 'key1:value1' and 'key2:value2' to the s
 
 In prepare stage, we will put the following keys into the storage layer:
 ```
-KEY: 0x6B657931 1F FFFFFFFFFFFFFFFE  ---> VALUE: 0x00000000 00000000 00000000 00000000 00000000 76616C756531
-KEY: 0x6B657932 1F FFFFFFFFFFFFFFFE  ---> VALUE: 0x00000000 00000000 00000000 00000000 00000000 76616C756532
+KEY: 0x6B657931 1F FFFFFFFFFFFFFFFE  ---> VALUE: 0x00000000 00000000 76616C756531
+KEY: 0x6B657932 1F FFFFFFFFFFFFFFFE  ---> VALUE: 0x00000000 00000000 76616C756532
 ```
 - `6B657931`: the hex of 'key1'
 - `1F`: we use `1F` space as the separator of key and TSO.
 - `FFFFFFFFFFFFFFFE`: Represent tso 1. Note, we use 8 bytes to represent tso. How to convert 1 to `FFFFFFFFFFFFFFFE`? First we convert 1 to 0x0000000000000001, then we use `^` 0xFF to get the complement of 0x0000000000000001, then we get 0xFFFFFFFFFFFFFFFE.
-- `00000000 00000000 00000000 00000000 00000000 76616C756531`: the hex of 'value1', the first four bytes `00000000` means is put operation, if the value is '00000001', it means delete operation.
+  Why we need to do So? we want to make sure that the key-value pair with the same key and different tso can be sorted in descending order. that is: if tso1 >= tso2, then binary(tso1) <= binary(tso2).
+- `00000000 00000000 76616C756531`: the hex format of 'value1'. The first byte `0x00` means is put operation, if the value is '0x01', it marks the key-value pair has been deleted.
 
-In commit stage, we will put the following keys into the storage layer:
+In the commit stage, we will put the following keys into the storage layer:
 ```
-KEY: 0x74 78 1F FFFFFFFFFFFFFFFE  ---> VALUE: keys of the transaction involved. 
+KEY: 0x1E 1F FFFFFFFFFFFFFFFE  ---> VALUE: keys of the transaction involved. 
 ```
-- `74 78`: the hex of 'tx'
+- `1E`: prefix of transaction commit mark  
 - `1F`: separator
 - `FFFFFFFFFFFFFFFE`: Represent tso 1. Note, we use 8 bytes to represent tso. How to convert 1 to `FFFFFFFFFFFFFFFE`? First we convert 1 to 0x0000000000000001, then we use `^` 0xFF to get the complement of 0x0000000000000001, then we get 0xFFFFFFFFFFFFFFFE.
 
@@ -88,22 +89,31 @@ KEY: 0x74 78 1F FFFFFFFFFFFFFFFE  ---> VALUE: keys of the transaction involved.
 
 Assuming we have the following key-value pairs in storage layer:
 ```
-KEY: 0x6B657931 1F FFFFFFFFFFFFFFFD  ---> VALUE: 0x00000000 00000000 00000000 00000000 00000000 76616C756532
-KEY: 0x6B657931 1F FFFFFFFFFFFFFFFE  ---> VALUE: 0x00000000 00000000 00000000 00000000 00000000 76616C756531
-KEY: 0x74 78 1F FFFFFFFFFFFFFFFD  ---> VALUE: keys of the transaction involved. 
-KEY: 0x74 78 1F FFFFFFFFFFFFFFFE  ---> VALUE: keys of the transaction involved. 
+KEY: 0x6B657931 1F FFFFFFFFFFFFFFFD  ---> VALUE: 0x00000000 00000000 76616C756532
+KEY: 0x6B657931 1F FFFFFFFFFFFFFFFE  ---> VALUE: 0x00000000 00000000 76616C756531
+KEY: 0x1E 1F FFFFFFFFFFFFFFFD        ---> VALUE: keys of the transaction involved. 
+KEY: 0x1E 1F FFFFFFFFFFFFFFFE        ---> VALUE: keys of the transaction involved. 
 ```
 If we want to get the value of key1, the process is as follows:
 1. First, we will get a TSO(Timestamp oracle) 3 as the transaction id.
 2. Construct the start key to scan the storage layer: `0x6B657931 1F FFFFFFFFFFFFFFFC`
 3. Find the first key that with prefix `0x6B657931` and greater than start key `0x6B657931 1F FFFFFFFFFFFFFFFC`, we will get `0x6B657931 1F FFFFFFFFFFFFFFFD`
-4. If there exists the key `0x74 78 1F FFFFFFFFFFFFFFFE`, means the transaction is committed, then we will get the value of key1 from `0x6B657931 1F FFFFFFFFFFFFFFFD`.
+4. If there exists the key `0x1E 1F FFFFFFFFFFFFFFFE`, means the transaction is committed, then we will get the value of key1 from `0x6B657931 1F FFFFFFFFFFFFFFFD`.
 5. or repeat steps 3
-6. If the value of key `0x6B657931 1F FFFFFFFFFFFFFFFD` starts will `00000000`, then we will get the value of key1 from `0x6B657931 1F FFFFFFFFFFFFFFFD`. if the value of key `0x6B657931 1F FFFFFFFFFFFFFFFD` starts will `00000001`, it means this key-value pair has been removed, so we return null. 
+6. If the value of key `0x6B657931 1F FFFFFFFFFFFFFFFD` starts will `0x00`, then we will get the value of key1 from `0x6B657931 1F FFFFFFFFFFFFFFFD`. if the value of key `0x6B657931 1F FFFFFFFFFFFFFFFD` starts will `0x01`, it means this key-value pair has been removed, so we return null. 
 
 ### Delete process
-Delete steps are almost the same as that of write process except that we will put `00000001` to the value of key-value pair.
+Delete steps are almost the same as that of write process except that the prefix of it is `0x01` instead of `0x00`. 
 
+Put key 'test1':
+```
+KEY: 0x6B657931 1F FFFFFFFFFFFFFFFE  ---> VALUE: 0x00000000 00000000 76616C756531
+```
+
+Delete key 'test1':
+```
+KEY: 0x6B657931 1F FFFFFFFFFFFFFFFE  ---> VALUE: 0x01000000 00000000 76616C756531
+```
 
 ### Scan and range query process
 Scan and range query are almost the same as that of read process, for more detailed information, please see related implementation `TransactionalKvBackendImpl`.  

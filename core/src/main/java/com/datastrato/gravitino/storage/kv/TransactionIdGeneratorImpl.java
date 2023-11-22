@@ -27,6 +27,16 @@ public class TransactionIdGeneratorImpl implements TransactionIdGenerator {
   private volatile long lastTransactionId = 0L;
   private final Config config;
 
+  private final ScheduledExecutorService scheduledThreadPoolExecutor =
+      new ScheduledThreadPoolExecutor(
+          1,
+          new ThreadFactoryBuilder()
+              .setDaemon(true)
+              .setNameFormat("TransactionIdGenerator-thread-%d")
+              .setUncaughtExceptionHandler(
+                  (t, e) -> LOGGER.error("Uncaught exception in thread {}", t, e))
+              .build());
+
   public TransactionIdGeneratorImpl(KvBackend kvBackend, Config config) {
     this.kvBackend = kvBackend;
     this.config = config;
@@ -42,17 +52,7 @@ public class TransactionIdGeneratorImpl implements TransactionIdGenerator {
     // OK.
     checkTimeSkew(maxSkewTime + 1);
 
-    ScheduledExecutorService idSaverScheduleExecutor =
-        new ScheduledThreadPoolExecutor(
-            1,
-            new ThreadFactoryBuilder()
-                .setDaemon(true)
-                .setNameFormat("TransactionIdGenerator-thread-%d")
-                .setUncaughtExceptionHandler(
-                    (t, e) -> LOGGER.error("Uncaught exception in thread {}", t, e))
-                .build());
-
-    idSaverScheduleExecutor.scheduleAtFixedRate(
+    scheduledThreadPoolExecutor.scheduleAtFixedRate(
         () -> {
           int i = 0;
           while (i++ < 3) {
@@ -71,7 +71,7 @@ public class TransactionIdGeneratorImpl implements TransactionIdGenerator {
               "Failed to save current timestamp to storage layer after 3 retries, please check"
                   + "whether the storage layer is healthy.");
         },
-        0,
+        maxSkewTime * 2,
         maxSkewTime,
         TimeUnit.SECONDS);
   }
@@ -126,6 +126,18 @@ public class TransactionIdGeneratorImpl implements TransactionIdGenerator {
         lastTransactionId = tmpId;
         return tmpId;
       }
+    }
+  }
+
+  @Override
+  public void close() throws IOException {
+    scheduledThreadPoolExecutor.shutdownNow();
+    try {
+      scheduledThreadPoolExecutor.awaitTermination(10000, TimeUnit.SECONDS);
+    } catch (InterruptedException e) {
+      LOGGER.warn(
+          "Failed to close thread pool scheduledThreadPoolExecutor in TransactionIdGeneratorImpl",
+          e);
     }
   }
 }
