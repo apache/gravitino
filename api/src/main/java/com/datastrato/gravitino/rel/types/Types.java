@@ -535,6 +535,23 @@ public class Types {
       return separator.toString();
     }
 
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (o == null || getClass() != o.getClass()) {
+        return false;
+      }
+      StructType that = (StructType) o;
+      return Arrays.equals(fields, that.fields);
+    }
+
+    @Override
+    public int hashCode() {
+      return Arrays.hashCode(fields);
+    }
+
     public static class Field {
 
       /** Returns a NOT NULL {@link Field} with the given name, type and empty comment. */
@@ -601,6 +618,26 @@ public class Types {
         return comment;
       }
 
+      @Override
+      public boolean equals(Object o) {
+        if (this == o) {
+          return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+          return false;
+        }
+        Field field = (Field) o;
+        return nullable == field.nullable
+            && Objects.equals(name, field.name)
+            && Objects.equals(type, field.type)
+            && Objects.equals(comment, field.comment);
+      }
+
+      @Override
+      public int hashCode() {
+        return Objects.hash(name, type, nullable, comment);
+      }
+
       public String simpleString() {
         return String.format(
             "%s: %s %s COMMENT %s",
@@ -654,6 +691,24 @@ public class Types {
           ? "list<" + elementType.simpleString() + ">"
           : "list<" + elementType.simpleString() + ", NOT NULL>";
     }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (o == null || getClass() != o.getClass()) {
+        return false;
+      }
+      ListType listType = (ListType) o;
+      return elementNullable == listType.elementNullable
+          && Objects.equals(elementType, listType.elementType);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(elementType, elementNullable);
+    }
   }
 
   public static class MapType extends Type.ComplexType {
@@ -701,6 +756,25 @@ public class Types {
     public String simpleString() {
       return "map<" + keyType.simpleString() + "," + valueType.simpleString() + ">";
     }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (o == null || getClass() != o.getClass()) {
+        return false;
+      }
+      MapType mapType = (MapType) o;
+      return valueNullable == mapType.valueNullable
+          && Objects.equals(keyType, mapType.keyType)
+          && Objects.equals(valueType, mapType.valueType);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(keyType, valueType, valueNullable);
+    }
   }
 
   public static class UnionType extends Type.ComplexType {
@@ -729,6 +803,23 @@ public class Types {
       StringJoiner separator = new StringJoiner(",", "union<", ">");
       Arrays.stream(types).forEach(type -> separator.add(type.simpleString()));
       return separator.toString();
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (o == null || getClass() != o.getClass()) {
+        return false;
+      }
+      UnionType unionType = (UnionType) o;
+      return Arrays.equals(types, unionType.types);
+    }
+
+    @Override
+    public int hashCode() {
+      return Arrays.hashCode(types);
     }
   }
 }

@@ -142,19 +142,20 @@ public class TestTypes {
             Types.StructType.Field.nullableField("score", Types.DoubleType.get(), "score field"));
     Assertions.assertEquals(Type.Name.STRUCT, structType.name());
     Assertions.assertEquals(4, structType.fields().length);
-    System.out.println(structType.simpleString());
     Assertions.assertEquals(
         "struct<id: integer NOT NULL COMMENT ,"
             + "name: string NOT NULL COMMENT 'name field',"
             + "is_studying: boolean NULL COMMENT ,"
             + "score: double NULL COMMENT 'score field'>",
         structType.simpleString());
+    Assertions.assertEquals(structType, Types.StructType.of(structType.fields()));
 
     Types.ListType listType = Types.ListType.nullable(Types.IntegerType.get());
     Assertions.assertEquals(Type.Name.LIST, listType.name());
     Assertions.assertTrue(listType.elementNullable());
     Assertions.assertEquals(Types.IntegerType.get(), listType.elementType());
     Assertions.assertEquals("list<integer>", listType.simpleString());
+    Assertions.assertEquals(listType, Types.ListType.nullable(Types.IntegerType.get()));
 
     Types.MapType mapType =
         Types.MapType.valueNullable(Types.IntegerType.get(), Types.StringType.get());
@@ -162,6 +163,8 @@ public class TestTypes {
     Assertions.assertEquals(Types.IntegerType.get(), mapType.keyType());
     Assertions.assertEquals(Types.StringType.get(), mapType.valueType());
     Assertions.assertEquals("map<integer,string>", mapType.simpleString());
+    Assertions.assertEquals(
+        mapType, Types.MapType.valueNullable(Types.IntegerType.get(), Types.StringType.get()));
 
     Types.UnionType unionType =
         Types.UnionType.of(
@@ -169,5 +172,6 @@ public class TestTypes {
     Assertions.assertEquals(Type.Name.UNION, unionType.name());
     Assertions.assertEquals(3, unionType.types().length);
     Assertions.assertEquals("union<integer,string,boolean>", unionType.simpleString());
+    Assertions.assertEquals(unionType, Types.UnionType.of(unionType.types()));
   }
 }
