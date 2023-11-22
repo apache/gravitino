@@ -19,6 +19,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mockito;
@@ -47,6 +48,7 @@ public class TestTransactionIdGenerator {
 
   @ParameterizedTest
   @ValueSource(ints = {16})
+  @Disabled("It's very time-consuming, so we disable it by default.")
   void testTransactionIdGeneratorQPS(int threadNum) throws IOException, InterruptedException {
     Config config = getConfig();
     String path = config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH);

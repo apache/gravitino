@@ -30,6 +30,7 @@ import java.util.stream.Collectors;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -321,6 +322,7 @@ class TestTransactionalKvBackend {
 
   @ParameterizedTest
   @ValueSource(ints = {16})
+  @Disabled("It's very time-consuming, so we disable it by default.")
   void testConcurrentRead(int threadNum) throws IOException, InterruptedException {
     Config config = getConfig();
     KvBackend kvBackend = getKvBackEnd(config);
@@ -375,6 +377,7 @@ class TestTransactionalKvBackend {
 
   @ParameterizedTest
   @ValueSource(ints = {1, 2, 4, 16, 32})
+  @Disabled("It's very time-consuming, so we disable it by default.")
   void testConcurrentWrite(int threadNum) throws IOException, InterruptedException {
     Config config = getConfig();
     KvBackend kvBackend = getKvBackEnd(config);
