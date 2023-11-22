@@ -13,20 +13,33 @@ import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.storage.TransactionIdGenerator;
 import com.google.common.collect.Lists;
 import com.google.common.io.Files;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mockito;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 class TestTransactionalKvBackend {
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(TestTransactionalKvBackend.class);
 
   private Config getConfig() {
     File file = Files.createTempDir();
@@ -304,5 +317,105 @@ class TestTransactionalKvBackend {
     }
     Thread.sleep(1000);
     transactionIdGenerator.close();
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {16})
+  void testConcurrentRead(int threadNum) throws IOException, InterruptedException {
+    Config config = getConfig();
+    KvBackend kvBackend = getKvBackEnd(config);
+    TransactionIdGenerator transactionIdGenerator =
+        new TransactionIdGeneratorImpl(kvBackend, config);
+    TransactionalKvBackend transactionalKvBackend =
+        new TransactionalKvBackendImpl(kvBackend, transactionIdGenerator);
+    transactionalKvBackend.begin();
+    for (int i = 0; i < threadNum; i++) {
+      transactionalKvBackend.put(
+          ("key" + i).getBytes(StandardCharsets.UTF_8),
+          ("value" + i).getBytes(StandardCharsets.UTF_8),
+          true);
+    }
+    transactionalKvBackend.commit();
+    transactionalKvBackend.closeTransaction();
+
+    ThreadPoolExecutor threadPoolExecutor =
+        new ThreadPoolExecutor(
+            threadNum,
+            threadNum,
+            1,
+            TimeUnit.MINUTES,
+            new LinkedBlockingQueue<>(1000),
+            new ThreadFactoryBuilder()
+                .setDaemon(false)
+                .setNameFormat("testTransactionIdGenerator-%d")
+                .build());
+
+    ThreadLocalRandom random = ThreadLocalRandom.current();
+    long current = System.currentTimeMillis();
+    AtomicLong atomicLong = new AtomicLong(0);
+    threadPoolExecutor.submit(
+        () -> {
+          while (System.currentTimeMillis() - current <= 2000) {
+            transactionalKvBackend.begin();
+            int i = random.nextInt(threadNum) + 1;
+            byte[] binaryValue =
+                Assertions.assertDoesNotThrow(
+                    () -> transactionalKvBackend.get(("key" + i).getBytes(StandardCharsets.UTF_8)));
+            Assertions.assertEquals(("value" + i).getBytes(StandardCharsets.UTF_8), binaryValue);
+            transactionalKvBackend.closeTransaction();
+            atomicLong.getAndIncrement();
+          }
+        });
+
+    Thread.currentThread().sleep(100);
+    threadPoolExecutor.shutdown();
+    threadPoolExecutor.awaitTermination(5, TimeUnit.SECONDS);
+    LOGGER.info(String.format("%d thread qps is: %d/s", threadNum, atomicLong.get() / 2));
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {1, 2, 4, 16, 32})
+  void testConcurrentWrite(int threadNum) throws IOException, InterruptedException {
+    Config config = getConfig();
+    KvBackend kvBackend = getKvBackEnd(config);
+    TransactionIdGenerator transactionIdGenerator =
+        new TransactionIdGeneratorImpl(kvBackend, config);
+    TransactionalKvBackend transactionalKvBackend =
+        new TransactionalKvBackendImpl(kvBackend, transactionIdGenerator);
+    ThreadPoolExecutor threadPoolExecutor =
+        new ThreadPoolExecutor(
+            threadNum,
+            threadNum,
+            1,
+            TimeUnit.MINUTES,
+            new LinkedBlockingQueue<>(1000),
+            new ThreadFactoryBuilder()
+                .setDaemon(false)
+                .setNameFormat("testTransactionIdGenerator-%d")
+                .build());
+
+    ThreadLocalRandom random = ThreadLocalRandom.current();
+    long current = System.currentTimeMillis();
+    AtomicLong atomicLong = new AtomicLong(0);
+    threadPoolExecutor.submit(
+        () -> {
+          while (System.currentTimeMillis() - current <= 2000) {
+            transactionalKvBackend.begin();
+            int i = random.nextInt(threadNum) + 1;
+            Assertions.assertDoesNotThrow(
+                () ->
+                    transactionalKvBackend.put(
+                        ("key" + i).getBytes(StandardCharsets.UTF_8),
+                        ("value" + i).getBytes(StandardCharsets.UTF_8),
+                        true));
+            transactionalKvBackend.closeTransaction();
+            atomicLong.getAndIncrement();
+          }
+        });
+
+    Thread.currentThread().sleep(100);
+    threadPoolExecutor.shutdown();
+    threadPoolExecutor.awaitTermination(5, TimeUnit.SECONDS);
+    LOGGER.info(String.format("%d thread write qps is: %d/s", threadNum, atomicLong.get() / 2));
   }
 }

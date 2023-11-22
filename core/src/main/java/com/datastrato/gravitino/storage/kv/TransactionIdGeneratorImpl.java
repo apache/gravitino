@@ -40,10 +40,9 @@ public class TransactionIdGeneratorImpl implements TransactionIdGenerator {
   public TransactionIdGeneratorImpl(KvBackend kvBackend, Config config) {
     this.kvBackend = kvBackend;
     this.config = config;
-
-    start();
   }
 
+  @Override
   public void start() {
     long maxSkewTime = config.get(Configs.STORE_TRANSACTION_MAX_SKEW_TIME);
     // Why use maxSkewTime + 1? Because we will save the current timestamp to storage layer every
