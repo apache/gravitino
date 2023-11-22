@@ -27,7 +27,7 @@ public class HiveConnectorAdapter implements CatalogConnectorAdapter {
     config.put("connectorName", "hive");
 
     Map<String, Object> properties = new HashMap<>();
-    properties.put("hive.metastore.uri", catalog.getProperties("metastore.uris", ""));
+    properties.put("metastore.uri", catalog.getProperties("metastore.uris", ""));
     config.put("properties", properties);
     return config;
   }

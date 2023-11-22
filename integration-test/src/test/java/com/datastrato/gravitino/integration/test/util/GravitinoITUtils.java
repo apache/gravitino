@@ -59,7 +59,6 @@ public class GravitinoITUtils {
 
   public static HiveConf hiveConfig() {
     HiveConf hiveConf = new HiveConf();
-    hiveConf.set(HiveConf.ConfVars.METASTOREURIS.varname, HIVE_METASTORE_URIS);
 
     return hiveConf;
   }
@@ -67,7 +66,7 @@ public class GravitinoITUtils {
   public static Map<String, String> hiveConfigProperties() {
     Map<String, String> catalogProps = Maps.newHashMap();
     catalogProps.put("provider", "hive");
-    catalogProps.put(HiveConf.ConfVars.METASTOREURIS.varname, HIVE_METASTORE_URIS);
+    catalogProps.put("metastore.uris", HIVE_METASTORE_URIS);
     catalogProps.put(HiveConf.ConfVars.METASTORETHRIFTCONNECTIONRETRIES.varname, "30");
     catalogProps.put(HiveConf.ConfVars.METASTORETHRIFTFAILURERETRIES.varname, "30");
     catalogProps.put(HiveConf.ConfVars.METASTORE_CLIENT_CONNECT_RETRY_DELAY.varname, "5");
