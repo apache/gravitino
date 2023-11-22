@@ -30,16 +30,16 @@ import org.apache.commons.lang3.tuple.Pair;
  * <pre>
  *       KEY                         VALUE
  *   key1 + separator + 1 --> status_code  + v1
- *   tx + separator + 1 --> empty
+ *   tx + separator + 1 -->  binary that contains all keys involved in this tx
  * </pre>
  *
- * We use '0x1F' as the separator, the key1 + separator + 1 is the key of the value, the tx +
- * separator+ 1 is a flag to indicate that the transaction 1 has been successfully committed and
- * key1 is visible, if transaction 1 fails and there is no tx + empty space + 1, the key1 is not
- * visible.
+ * We use '0x1F' as the separator, '______tx' as the value of tx, key1 + separator + 1 as the key of
+ * the value, tx + separator + 1 as the flag to indicate that the transaction 1 has been
+ * successfully committed and key1 can be visible or not, if transaction 1 fails(fail to write tx +
+ * separator + 1) and there is no tx + separator + 1, the key1 is not visible.
  *
- * <p>The status_code is a 20-byte integer that indicates the status of the value. The first 4 bytes
- * of status code can be one of the following values:
+ * <p>The status_code is a 20-byte integer that indicates the status of the value. The first four
+ * bytes of status code can be one of the following values:
  *
  * <pre>
  *   0x00000000(Metrication: 0) -- NORMAL, the value is visible
@@ -51,14 +51,17 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
   private final TransactionIdGenerator transactionIdGenerator;
 
   @VisibleForTesting final List<Pair<byte[], byte[]>> putPairs = Lists.newArrayList();
-  private List<byte[]> originalKeys = Lists.newArrayList();
+  private final List<byte[]> originalKeys = Lists.newArrayList();
 
   @VisibleForTesting long txId;
 
   private static final String TRANSACTION_PREFIX = "______tx";
 
+  // Why use 20? We use 20 bytes to represent the status code, the first 4 bytes are used to
+  // Identify the status of the value, the rest 16 bytes are for future use.
   private static final int VALUE_PREFIX_LENGTH = 20;
 
+  // Why use 0x1F, 0x1F is a control character that is used as a delimiter in the text.
   private static final byte[] SEPARATOR = new byte[] {0x1F};
 
   public TransactionalKvBackendImpl(

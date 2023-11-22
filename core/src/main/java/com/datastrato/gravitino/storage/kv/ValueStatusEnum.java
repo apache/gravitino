@@ -5,6 +5,12 @@
 
 package com.datastrato.gravitino.storage.kv;
 
+/**
+ * The status of a value. The value can be normal or deleted. The deleted value is not visible to
+ * the user and can be garbage collected.
+ *
+ * <p>In the future, we may add more status, such as tombstone and so on.
+ */
 public enum ValueStatusEnum {
   // The value is normal.
   NORMAL(0),

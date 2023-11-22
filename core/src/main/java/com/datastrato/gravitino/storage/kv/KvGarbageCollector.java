@@ -6,7 +6,6 @@
 package com.datastrato.gravitino.storage.kv;
 
 import static com.datastrato.gravitino.Configs.ENTITY_KV_TTL;
-import static com.datastrato.gravitino.storage.kv.TransactionIdGeneratorImpl.LAST_ID;
 import static com.datastrato.gravitino.storage.kv.TransactionalKvBackendImpl.endOfTransactionId;
 import static com.datastrato.gravitino.storage.kv.TransactionalKvBackendImpl.generateCommitKey;
 import static com.datastrato.gravitino.storage.kv.TransactionalKvBackendImpl.generateKey;
@@ -76,7 +75,8 @@ public final class KvGarbageCollector {
                 .endInclusive(false)
                 .predicate(
                     (k, v) -> {
-                      if (LAST_ID.equals(new String(k, StandardCharsets.UTF_8))) {
+                      if (TransactionIdGeneratorImpl.LAST_TIMESTAMP.equals(
+                          new String(k, StandardCharsets.UTF_8))) {
                         return false;
                       }
 
