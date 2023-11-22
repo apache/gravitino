@@ -74,7 +74,7 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
   public synchronized void begin() {
     if (!putPairs.isEmpty()) {
       throw new IllegalStateException(
-          "The transaction is not committed or rollbacked, you should commit or rollback it first");
+          "The transaction is has not committed or rollback yet, you should commit or rollback it first");
     }
 
     txId = transactionIdGenerator.nextId();
