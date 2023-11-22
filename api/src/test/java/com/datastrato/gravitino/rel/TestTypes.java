@@ -65,6 +65,7 @@ public class TestTypes {
     Assertions.assertEquals(26, decimalType.precision());
     Assertions.assertEquals(10, decimalType.scale());
     Assertions.assertEquals("decimal(26,10)", decimalType.simpleString());
+    Assertions.assertEquals(decimalType, Types.DecimalType.of(26, 10));
 
     Types.DateType dateType = Types.DateType.get();
     Assertions.assertEquals(Type.Name.DATE, dateType.name());
@@ -112,16 +113,19 @@ public class TestTypes {
     Assertions.assertEquals(Type.Name.FIXED, fixedType.name());
     Assertions.assertEquals(10, fixedType.length());
     Assertions.assertEquals("fixed(10)", fixedType.simpleString());
+    Assertions.assertEquals(fixedType, Types.FixedType.of(10));
 
     Types.VarCharType varcharType = Types.VarCharType.of(20);
     Assertions.assertEquals(Type.Name.VARCHAR, varcharType.name());
     Assertions.assertEquals(20, varcharType.length());
     Assertions.assertEquals("varchar(20)", varcharType.simpleString());
+    Assertions.assertEquals(varcharType, Types.VarCharType.of(20));
 
     Types.FixedCharType fixedCharType = Types.FixedCharType.of(30);
     Assertions.assertEquals(Type.Name.FIXEDCHAR, fixedCharType.name());
     Assertions.assertEquals(30, fixedCharType.length());
     Assertions.assertEquals("char(30)", fixedCharType.simpleString());
+    Assertions.assertEquals(fixedCharType, Types.FixedCharType.of(30));
 
     Types.BinaryType binaryType = Types.BinaryType.get();
     Assertions.assertEquals(Type.Name.BINARY, binaryType.name());

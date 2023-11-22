@@ -6,6 +6,7 @@ package com.datastrato.gravitino.rel.types;
 
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
+import java.util.Objects;
 import java.util.StringJoiner;
 
 /** The helper class for {@link Type}. */
@@ -180,6 +181,23 @@ public class Types {
     @Override
     public String simpleString() {
       return String.format("decimal(%d,%d)", precision, scale);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (o == null || getClass() != o.getClass()) {
+        return false;
+      }
+      DecimalType that = (DecimalType) o;
+      return precision == that.precision && scale == that.scale;
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(precision, scale);
     }
   }
 
@@ -358,6 +376,23 @@ public class Types {
     public String simpleString() {
       return String.format("fixed(%d)", length);
     }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (o == null || getClass() != o.getClass()) {
+        return false;
+      }
+      FixedType fixedType = (FixedType) o;
+      return length == fixedType.length;
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(length);
+    }
   }
 
   public static class VarCharType extends Type.PrimitiveType {
@@ -386,6 +421,23 @@ public class Types {
     public String simpleString() {
       return String.format("varchar(%d)", length);
     }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (o == null || getClass() != o.getClass()) {
+        return false;
+      }
+      VarCharType that = (VarCharType) o;
+      return length == that.length;
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(length);
+    }
   }
 
   public static class FixedCharType extends Type.PrimitiveType {
@@ -413,6 +465,23 @@ public class Types {
     @Override
     public String simpleString() {
       return String.format("char(%d)", length);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (o == null || getClass() != o.getClass()) {
+        return false;
+      }
+      FixedCharType that = (FixedCharType) o;
+      return length == that.length;
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(length);
     }
   }
 
@@ -512,18 +581,22 @@ public class Types {
         this.comment = comment;
       }
 
+      /** Returns the name of the field. */
       public String name() {
         return name;
       }
 
+      /** Returns the type of the field. */
       public Type type() {
         return type;
       }
 
+      /** Returns whether the field is nullable. */
       public boolean nullable() {
         return nullable;
       }
 
+      /** Returns the comment of the field. May be null if not set. */
       public String comment() {
         return comment;
       }
