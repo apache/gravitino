@@ -14,6 +14,7 @@ import static com.datastrato.gravitino.storage.kv.TransactionalKvBackendImpl.get
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.utils.Bytes;
 import com.google.common.annotations.VisibleForTesting;
+import java.io.Closeable;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
@@ -31,12 +32,12 @@ import org.slf4j.LoggerFactory;
  * {@link KvGarbageCollector} is a garbage collector for the kv backend. It will collect the version
  * of data which is not committed or exceed the ttl.
  */
-public final class KvGarbageCollector {
+public final class KvGarbageCollector implements Closeable {
   private static final Logger LOGGER = LoggerFactory.getLogger(KvGarbageCollector.class);
   private final KvBackend kvBackend;
   private final Config config;
 
-  public static final ScheduledExecutorService GARBAGE_COLLECT_POOL =
+  public final ScheduledExecutorService garbageCollectorPool =
       new ScheduledThreadPoolExecutor(
           2,
           r -> new Thread(r, "KvEntityStore-Garbage-Collector-%d"),
@@ -48,7 +49,7 @@ public final class KvGarbageCollector {
   }
 
   public void start() {
-    GARBAGE_COLLECT_POOL.scheduleAtFixedRate(this::collectGarbage, 5, 10, TimeUnit.MINUTES);
+    garbageCollectorPool.scheduleAtFixedRate(this::collectGarbage, 5, 10, TimeUnit.MINUTES);
   }
 
   @VisibleForTesting
@@ -157,6 +158,16 @@ public final class KvGarbageCollector {
       if (keysDeletedCount == keysInTheTransaction.size()) {
         kvBackend.delete(kv.getKey());
       }
+    }
+  }
+
+  @Override
+  public void close() throws IOException {
+    garbageCollectorPool.shutdown();
+    try {
+      garbageCollectorPool.awaitTermination(5, TimeUnit.SECONDS);
+    } catch (InterruptedException e) {
+      LOGGER.error("Failed to close garbage collector", e);
     }
   }
 }

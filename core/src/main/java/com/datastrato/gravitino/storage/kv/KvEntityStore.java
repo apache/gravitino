@@ -424,6 +424,7 @@ public class KvEntityStore implements EntityStore {
   @Override
   public void close() throws IOException {
     txIdGenerator.close();
+    kvGarbageCollector.close();
     backend.close();
   }
 
