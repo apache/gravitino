@@ -602,11 +602,6 @@ public class Types {
         return of(name, type, true, comment);
       }
 
-      /** Returns a nullable {@link Field} with the given name, type and empty comment. */
-      public static Field of(String name, Type type) {
-        return of(name, type, true, null);
-      }
-
       /** Returns a nullable {@link Field} with the given name, type and comment. */
       public static Field of(String name, Type type, boolean nullable, String comment) {
         return new Field(name, type, nullable, comment);
