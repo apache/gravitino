@@ -5,8 +5,10 @@
 
 package com.datastrato.gravitino.storage;
 
+import java.io.Closeable;
+
 /** Generator id number as transaction, which will be used as MVCC version. */
-public interface TransactionIdGenerator {
+public interface TransactionIdGenerator extends Closeable {
 
   /**
    * Next transaction id. The transaction id is a monotonically increasing number, which is used as
