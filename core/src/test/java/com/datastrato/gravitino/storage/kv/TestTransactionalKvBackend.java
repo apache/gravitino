@@ -329,7 +329,7 @@ class TestTransactionalKvBackend {
   }
 
   @ParameterizedTest
-  @ValueSource(ints = {1})
+  @ValueSource(ints = {16})
   void testTransactionIdGeneratorQPS(int threadNum) throws IOException, InterruptedException {
     Config config = getConfig();
     KvBackend kvBackend = getKvBackEnd(config);

@@ -24,6 +24,7 @@ public class TransactionIdGeneratorImpl implements TransactionIdGenerator {
   private final KvBackend kvBackend;
   private static final String LAST_TIMESTAMP = "last_timestamp";
   private volatile long incrementId = 0L;
+  private volatile long lastTransactionId = 0L;
   private final Config config;
 
   public TransactionIdGeneratorImpl(KvBackend kvBackend, Config config) {
@@ -33,7 +34,7 @@ public class TransactionIdGeneratorImpl implements TransactionIdGenerator {
 
   public void start() {
     long maxSkewTime = config.get(Configs.STORE_TRANSACTION_MAX_SKEW_TIME);
-    checkTimeSkew(maxSkewTime);
+    checkTimeSkew(maxSkewTime + 1);
 
     ScheduledExecutorService idSaverScheduleExecutor =
         new ScheduledThreadPoolExecutor(
@@ -107,17 +108,17 @@ public class TransactionIdGeneratorImpl implements TransactionIdGenerator {
    */
   @Override
   public synchronized long nextId() {
-    try {
-      long current = System.currentTimeMillis();
-      incrementId++;
-      if (incrementId >= (1 << 18 - 1)) {
-        Thread.sleep(1);
-        current = System.currentTimeMillis();
-        incrementId = 0;
+    incrementId++;
+    if (incrementId >= (1 << 18 - 1)) {
+      incrementId = 0;
+    }
+
+    while (true) {
+      long tmpId = (System.currentTimeMillis() << 18) + incrementId;
+      if (tmpId > lastTransactionId) {
+        lastTransactionId = tmpId;
+        return tmpId;
       }
-      return (current << 18) + incrementId;
-    } catch (InterruptedException e) {
-      throw new RuntimeException(e);
     }
   }
 }
