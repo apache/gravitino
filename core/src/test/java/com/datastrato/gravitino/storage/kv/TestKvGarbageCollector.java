@@ -50,7 +50,6 @@ class TestKvGarbageCollector {
     try (KvBackend kvBackend = getKvBackEnd(config)) {
       TransactionIdGenerator transactionIdGenerator =
           new TransactionIdGeneratorImpl(kvBackend, config);
-      transactionIdGenerator.start();
       TransactionalKvBackendImpl transactionalKvBackend =
           new TransactionalKvBackendImpl(kvBackend, transactionIdGenerator);
       transactionalKvBackend.begin();
@@ -58,20 +57,18 @@ class TestKvGarbageCollector {
       transactionalKvBackend.put("testB".getBytes(), "v1".getBytes(), true);
       transactionalKvBackend.put("testC".getBytes(), "v1".getBytes(), true);
       transactionalKvBackend.commit();
-      transactionalKvBackend = new TransactionalKvBackendImpl(kvBackend, transactionIdGenerator);
+
       transactionalKvBackend.begin();
       transactionalKvBackend.put("testA".getBytes(), "v2".getBytes(), true);
       transactionalKvBackend.put("testB".getBytes(), "v2".getBytes(), true);
       transactionalKvBackend.commit();
 
-      transactionalKvBackend = new TransactionalKvBackendImpl(kvBackend, transactionIdGenerator);
       transactionalKvBackend.begin();
       transactionalKvBackend.put("testA".getBytes(), "v3".getBytes(), true);
       transactionalKvBackend.delete("testC".getBytes());
       transactionalKvBackend.commit();
 
       // Test data is OK
-      transactionalKvBackend = new TransactionalKvBackendImpl(kvBackend, transactionIdGenerator);
       transactionalKvBackend.begin();
       Assertions.assertEquals("v3", new String(transactionalKvBackend.get("testA".getBytes())));
       Assertions.assertEquals("v2", new String(transactionalKvBackend.get("testB".getBytes())));

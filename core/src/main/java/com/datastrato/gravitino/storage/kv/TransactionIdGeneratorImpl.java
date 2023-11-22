@@ -30,6 +30,8 @@ public class TransactionIdGeneratorImpl implements TransactionIdGenerator {
   public TransactionIdGeneratorImpl(KvBackend kvBackend, Config config) {
     this.kvBackend = kvBackend;
     this.config = config;
+
+    start();
   }
 
   public void start() {
