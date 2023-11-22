@@ -15,4 +15,7 @@ public interface TransactionIdGenerator extends Closeable {
    * MVCC version.
    */
   long nextId();
+
+  /** Start the generator. */
+  void start();
 }
