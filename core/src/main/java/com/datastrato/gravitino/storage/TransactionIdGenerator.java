@@ -13,4 +13,7 @@ public interface TransactionIdGenerator {
    * MVCC version.
    */
   long nextId();
+
+  /** Start the generator. */
+  void start();
 }

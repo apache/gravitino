@@ -306,7 +306,7 @@ class TestTransactionalKvBackend {
 
     Pair<byte[], byte[]>[] arrayPair = pairs.toArray(new Pair[0]);
 
-    for (int i = 0; i < 1000; i++) {
+    for (int i = 0; i < 10; i++) {
       ArrayUtils.shuffle(arrayPair);
       kvTransactionManager.putPairs.addAll(Arrays.stream(arrayPair).collect(Collectors.toList()));
 

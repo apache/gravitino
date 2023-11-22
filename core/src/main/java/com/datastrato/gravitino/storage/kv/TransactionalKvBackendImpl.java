@@ -182,7 +182,7 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
     while (i < scanRange.getLimit() && j < rawPairs.size()) {
       Pair<byte[], byte[]> pair = rawPairs.get(j);
       byte[] rawKey = pair.getKey();
-      byte[] realKey = ArrayUtils.subarray(rawKey, 0, rawKey.length - 9);
+      byte[] realKey = getRealKey(rawKey);
       Bytes minNextKey = Bytes.increment(Bytes.wrap(Bytes.concat(realKey, SEPARATOR)));
 
       if (!scanRange.isStartInclusive()
@@ -258,7 +258,7 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
                 .endInclusive(false)
                 .predicate(
                     (k, v) -> {
-                      byte[] transactionId = ArrayUtils.subarray(k, k.length - 8, k.length);
+                      byte[] transactionId = getBinaryTransactionId(k);
                       return kvBackend.get(
                               Bytes.concat(
                                   TRANSACTION_PREFIX.getBytes(StandardCharsets.UTF_8),
@@ -274,7 +274,7 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
     }
 
     byte[] realKey = pairs.get(0).getKey();
-    byte[] transactionId = ArrayUtils.subarray(realKey, realKey.length - 8, realKey.length);
+    byte[] transactionId = getBinaryTransactionId(realKey);
     byte[] transactionFlag =
         Bytes.concat(TRANSACTION_PREFIX.getBytes(StandardCharsets.UTF_8), SEPARATOR, transactionId);
     if (kvBackend.get(transactionFlag) != null) {
@@ -313,5 +313,14 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
     }
 
     return bytes;
+  }
+
+  static byte[] getRealKey(byte[] rawKey) {
+    return ArrayUtils.subarray(rawKey, 0, rawKey.length - 9);
+  }
+
+  /** Get the binary transaction id from the raw key. */
+  static byte[] getBinaryTransactionId(byte[] rawKey) {
+    return ArrayUtils.subarray(rawKey, rawKey.length - 8, rawKey.length);
   }
 }

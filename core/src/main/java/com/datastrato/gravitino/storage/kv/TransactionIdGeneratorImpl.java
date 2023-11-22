@@ -50,7 +50,7 @@ public class TransactionIdGeneratorImpl implements TransactionIdGenerator {
                     (t, e) -> LOGGER.error("Uncaught exception in thread {}", t, e))
                 .build());
 
-    idSaverScheduleExecutor.schedule(
+    idSaverScheduleExecutor.scheduleAtFixedRate(
         () -> {
           int i = 0;
           while (i++ < 3) {
@@ -69,6 +69,7 @@ public class TransactionIdGeneratorImpl implements TransactionIdGenerator {
               "Failed to save current timestamp to storage layer after 3 retries, please check"
                   + "whether the storage layer is healthy.");
         },
+        0,
         maxSkewTime,
         TimeUnit.SECONDS);
   }
