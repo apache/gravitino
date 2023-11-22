@@ -83,7 +83,7 @@ public interface Configs {
 
   ConfigEntry<Long> ENTITY_KV_TTL =
       new ConfigBuilder(ENTITY_KV_TTL_KEY_KEY)
-          .doc("The ttl(day) of kv entity store")
+          .doc("The TTL of old version kv entity store, unit: days")
           .version("0.3.0")
           .longConf()
           .createWithDefault(DEFAULT_ENTITY_KV_TTL);
