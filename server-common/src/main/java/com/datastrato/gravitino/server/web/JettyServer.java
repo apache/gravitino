@@ -22,6 +22,7 @@ import org.eclipse.jetty.server.handler.ErrorHandler;
 import org.eclipse.jetty.server.handler.HandlerCollection;
 import org.eclipse.jetty.servlet.DefaultServlet;
 import org.eclipse.jetty.servlet.FilterHolder;
+import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
 import org.eclipse.jetty.util.component.LifeCycle;
 import org.eclipse.jetty.util.thread.QueuedThreadPool;
@@ -38,7 +39,7 @@ public final class JettyServer {
 
   private Server server;
 
-  private WebAppContext servletContextHandler;
+  private ServletContextHandler servletContextHandler;
 
   private JettyServerConfig serverConfig;
 
@@ -46,7 +47,8 @@ public final class JettyServer {
 
   public JettyServer() {}
 
-  public synchronized void initialize(JettyServerConfig serverConfig, String serverName) {
+  public synchronized void initialize(
+      JettyServerConfig serverConfig, String serverName, boolean isWebApp) {
     this.serverConfig = serverConfig;
     this.serverName = serverName;
 
@@ -80,8 +82,12 @@ public final class JettyServer {
 
     // TODO. Create and set https connector @jerry
 
-    // Initialize ServletContextHandler
-    initializeServletContextHandler(server);
+    // Initialize ServletContextHandler or WebAppContext
+    if (isWebApp) {
+      initializeWebAppContext();
+    } else {
+      initializeServletContextHandler();
+    }
   }
 
   public synchronized void start() throws RuntimeException {
@@ -155,46 +161,56 @@ public final class JettyServer {
         new FilterHolder(filter), pathSpec, EnumSet.allOf(DispatcherType.class));
   }
 
-  private void initializeServletContextHandler(Server server) {
-    this.servletContextHandler = new WebAppContext();
-
-    // Only Gravitino Server need to set war file.
-    if (!serverConfig.getWarFile().isEmpty()) {
-      // If development mode, you can set war file in the `GRAVITINO_WAR` environment variable.
-      String warPath = System.getenv("GRAVITINO_WAR");
-      if (warPath == null) {
-        // Default deploy mode, read from `gravitino/gravitino-web-{version}.war`
-        warPath =
-            String.join(File.separator, System.getenv("GRAVITINO_HOME"), serverConfig.getWarFile());
-      }
-
-      File warFile = new File(warPath);
-      if (warFile.exists()) {
-        if (warFile.isDirectory()) {
-          // Development mode, read from FS
-          servletContextHandler.setResourceBase(warFile.getPath());
-        } else {
-          // use packaged WAR
-          servletContextHandler.setWar(warFile.getAbsolutePath());
-          servletContextHandler.setExtractWAR(false);
-          try {
-            File warTempDirectory = Files.createTempDirectory("GravitinoWar").toFile();
-            warTempDirectory.mkdir();
-            LOG.info("Gravitino Webapp path: {}", warTempDirectory.getPath());
-            servletContextHandler.setTempDirectory(warTempDirectory);
-          } catch (IOException e) {
-            throw new RuntimeException(e);
-          }
-        }
-      } else {
-        servletContextHandler.setResourceBase("/");
-      }
-    } else {
-      servletContextHandler.setResourceBase("/");
-    }
-
+  private void initializeServletContextHandler() {
+    servletContextHandler = new ServletContextHandler();
     servletContextHandler.setContextPath("/");
     servletContextHandler.addServlet(DefaultServlet.class, "/");
+
+    HandlerCollection handlers = new HandlerCollection();
+    handlers.addHandler(servletContextHandler);
+
+    server.setHandler(handlers);
+  }
+
+  private void initializeWebAppContext() {
+    servletContextHandler = new WebAppContext();
+
+    // If development mode, you can set war file or web/dist directory in the `GRAVITINO_WAR`
+    // environment variable.
+    String warPath = System.getenv("GRAVITINO_WAR");
+    if (warPath == null) {
+      // Default deploy mode, read from `gravitino-${version}/web/gravitino-web.war`
+      warPath =
+          String.join(File.separator, System.getenv("GRAVITINO_HOME"), "web", "gravitino-web.war");
+    }
+
+    File warFile = new File(warPath);
+    if (warFile.exists()) {
+      if (warFile.isDirectory()) {
+        // Development mode, read from FS
+        servletContextHandler.setResourceBase(warFile.getPath());
+        servletContextHandler.setContextPath("/");
+      } else {
+        // use packaged WAR
+        ((WebAppContext) servletContextHandler).setWar(warFile.getAbsolutePath());
+        ((WebAppContext) servletContextHandler).setExtractWAR(false);
+        try {
+          File warTempDirectory = Files.createTempDirectory("GravitinoWar").toFile();
+          LOG.info("Gravitino Webapp path: {}", warTempDirectory.getPath());
+          ((WebAppContext) servletContextHandler).setTempDirectory(warTempDirectory);
+        } catch (IOException e) {
+          throw new RuntimeException(e);
+        }
+      }
+    } else {
+      if (System.getenv("GRAVITINO_TEST") == null) {
+        // If not in test mode, throw exception
+        throw new RuntimeException("Gravitino web path not found in " + warPath);
+      } else {
+        // We don't have web files in the unit test, so only RESTful API are supported
+        servletContextHandler.setResourceBase("/");
+      }
+    }
 
     HandlerCollection handlers = new HandlerCollection();
     handlers.addHandler(servletContextHandler);

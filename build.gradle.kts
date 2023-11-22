@@ -259,7 +259,7 @@ tasks {
           }
         }
         from(projectDir.dir("bin")) { into("package/bin") }
-        from(projectDir.dir("web/build/libs/gravitino-web-${version}.war")) { into("package") }
+        from(projectDir.dir("web/build/libs/${rootProject.name}-web.war")) { into("package/web") }
         into(outputDir)
         rename { fileName ->
           fileName.replace(".template", "")

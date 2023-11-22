@@ -32,7 +32,7 @@ public class IcebergRESTService implements GravitinoAuxiliaryService {
   private void initServer(IcebergConfig icebergConfig) {
     JettyServerConfig serverConfig = JettyServerConfig.fromConfig(icebergConfig);
     server = new JettyServer();
-    server.initialize(serverConfig, SERVICE_NAME);
+    server.initialize(serverConfig, SERVICE_NAME, false);
 
     ResourceConfig config = new ResourceConfig();
     config.packages("com.datastrato.gravitino.catalog.lakehouse.iceberg.web.rest");

@@ -49,7 +49,7 @@ public class GravitinoServer extends ResourceConfig {
   public void initialize() {
     JettyServerConfig jettyServerConfig =
         JettyServerConfig.fromConfig(serverConfig, WEBSERVER_CONF_PREFIX);
-    server.initialize(jettyServerConfig, SERVER_NAME);
+    server.initialize(jettyServerConfig, SERVER_NAME, true);
 
     ServerAuthenticator.getInstance().initialize(serverConfig);
 

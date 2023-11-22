@@ -21,12 +21,13 @@ node {
 tasks {
   val buildwar by registering(War::class) {
     dependsOn("webpack")
-      from("src/WEB-INF") {
-        into("WEB-INF")
-      }
-      from("dist") {
-        into("")
-      }
+    from("src/WEB-INF") {
+      into("WEB-INF")
+    }
+    from("dist") {
+      into("")
+    }
+    this.archiveFileName.set("${rootProject.name}-web.war")
   }
 
   // Install dependencies

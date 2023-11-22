@@ -11,8 +11,6 @@ gravitino.server.shutdown.timeout = 3000
 gravitino.server.webserver.host = 0.0.0.0
 # The http port number of the built-in web server
 gravitino.server.webserver.httpPort = 8090
-# The war file of the Jetty web server
-gravitino.server.webserver.war = gravitino-web-{version}.war
 # The min thread size of the built-in web server
 gravitino.server.webserver.minThreads = 24
 # The max thread size of the built-in web server
