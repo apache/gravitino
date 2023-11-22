@@ -22,9 +22,9 @@ public class TransactionIdGeneratorImpl implements TransactionIdGenerator {
   private static final Logger LOGGER = LoggerFactory.getLogger(TransactionIdGeneratorImpl.class);
 
   private final KvBackend kvBackend;
-  private static final String LAST_ID = "last_timestamp";
+  private static final String LAST_TIMESTAMP = "last_timestamp";
   private volatile long incrementId = 0L;
-  private Config config;
+  private final Config config;
 
   public TransactionIdGeneratorImpl(KvBackend kvBackend, Config config) {
     this.kvBackend = kvBackend;
@@ -33,7 +33,7 @@ public class TransactionIdGeneratorImpl implements TransactionIdGenerator {
 
   public void start() {
     long maxSkewTime = config.get(Configs.STORE_TRANSACTION_MAX_SKEW_TIME);
-    initTSO(maxSkewTime);
+    checkTimeSkew(maxSkewTime);
 
     ScheduledExecutorService idSaverScheduleExecutor =
         new ScheduledThreadPoolExecutor(
@@ -51,7 +51,7 @@ public class TransactionIdGeneratorImpl implements TransactionIdGenerator {
           while (i++ < 3) {
             try {
               kvBackend.put(
-                  LAST_ID.getBytes(StandardCharsets.UTF_8),
+                  LAST_TIMESTAMP.getBytes(StandardCharsets.UTF_8),
                   ByteUtils.longToByte(System.currentTimeMillis()),
                   true);
               return;
@@ -61,39 +61,50 @@ public class TransactionIdGeneratorImpl implements TransactionIdGenerator {
           }
 
           throw new RuntimeException(
-              "Failed to save current timestamp to storage layer after 3 retries");
+              "Failed to save current timestamp to storage layer after 3 retries, please check"
+                  + "whether the storage layer is healthy.");
         },
         maxSkewTime,
         TimeUnit.SECONDS);
   }
 
-  private void initTSO(long maxSkewTimeInSecond) {
+  private void checkTimeSkew(long maxSkewTimeInSecond) {
     long current = System.currentTimeMillis();
     long old;
     try {
       old = getSavedTs();
-
-      // In case of time skew, we will wait 5 seconds
+      long maxSkewTimeInMills = maxSkewTimeInSecond * 1000;
+      // In case of time skew, we will wait maxSkewTimeInSecond(default 2) seconds.
       int retries = 0;
-      while (current <= old + maxSkewTimeInSecond * 1000 && retries++ < 50) {
+      while (current <= old + maxSkewTimeInMills && retries++ < maxSkewTimeInMills / 100) {
         Thread.sleep(100);
         current = System.currentTimeMillis();
       }
 
       if (current <= old + maxSkewTimeInSecond * 1000) {
         throw new RuntimeException(
-            "Failed to initialize transaction id generator after 5 seconds, time skew is too large");
+            String.format(
+                "Failed to initialize transaction id generator after %d seconds, time skew is too large",
+                maxSkewTimeInSecond));
       }
     } catch (IOException | InterruptedException e) {
       throw new RuntimeException(e);
     }
   }
 
+  /**
+   * Get the last saved timestamp from the storage layer. We will store the current timestamp to
+   * storage layer every 2(default) seconds.
+   */
   private long getSavedTs() throws IOException {
-    byte[] oldIdBytes = kvBackend.get(LAST_ID.getBytes(StandardCharsets.UTF_8));
+    byte[] oldIdBytes = kvBackend.get(LAST_TIMESTAMP.getBytes(StandardCharsets.UTF_8));
     return oldIdBytes == null ? 0 : ByteUtils.byteToLong(oldIdBytes);
   }
 
+  /**
+   * We use the timestamp as the high 48 bits and the incrementId as the low 16 bits. The timestamp
+   * is always incremental.
+   */
   @Override
   public synchronized long nextId() {
     try {

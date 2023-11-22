@@ -9,9 +9,8 @@ package com.datastrato.gravitino.storage;
 public interface TransactionIdGenerator {
 
   /**
-   * Next transaction id.
-   *
-   * @return
+   * Next transaction id. The transaction id is a monotonically increasing number, which is used as
+   * MVCC version.
    */
   long nextId();
 }

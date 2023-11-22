@@ -49,14 +49,17 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
   private final TransactionIdGenerator transactionIdGenerator;
 
   @VisibleForTesting final List<Pair<byte[], byte[]>> putPairs = Lists.newArrayList();
-  private List<byte[]> originalKeys = Lists.newArrayList();
+  private final List<byte[]> originalKeys = Lists.newArrayList();
 
   private long txId;
 
   private static final String TRANSACTION_PREFIX = "______tx";
 
+  // Why use 20? We use 20 bytes to represent the status code, the first 4 bytes are used to
+  // Identify the status of the value, the rest 16 bytes are for future use.
   private static final int VALUE_PREFIX_LENGTH = 20;
 
+  // Why use 0x1F, 0x1F is a control character that is used as a delimiter in the text.
   private static final byte[] SEPARATOR = new byte[] {0x1F};
 
   public TransactionalKvBackendImpl(
