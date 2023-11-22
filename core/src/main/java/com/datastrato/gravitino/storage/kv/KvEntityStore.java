@@ -84,7 +84,6 @@ public class KvEntityStore implements EntityStore {
     // TODO(yuqi) Currently, KvNameMappingService and KvEntityStore shares the same backend
     //  instance, We should make it configurable in the future.
     this.txIdGenerator = new TransactionIdGeneratorImpl(backend, config);
-    txIdGenerator.start();
     this.nameMappingService = new KvNameMappingService(backend, txIdGenerator);
     this.entityKeyEncoder = new BinaryEntityKeyEncoder(nameMappingService);
     this.reentrantReadWriteLock = new ReentrantReadWriteLock();

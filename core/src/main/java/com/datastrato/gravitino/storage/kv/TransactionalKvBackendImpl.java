@@ -15,6 +15,7 @@ import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import javax.annotation.concurrent.NotThreadSafe;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.tuple.Pair;
 
@@ -44,6 +45,7 @@ import org.apache.commons.lang3.tuple.Pair;
  *   0x00000001(Metrication: 1) -- DELETED, the value is deleted and not visible
  * </pre>
  */
+@NotThreadSafe
 public class TransactionalKvBackendImpl implements TransactionalKvBackend {
   private final KvBackend kvBackend;
   private final TransactionIdGenerator transactionIdGenerator;
@@ -70,24 +72,34 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
 
   @Override
   public synchronized void begin() {
+    if (!putPairs.isEmpty()) {
+      throw new IllegalStateException(
+          "The transaction is not committed or rollbacked, you should commit or rollback it first");
+    }
+
     txId = transactionIdGenerator.nextId();
   }
 
   @Override
   public void commit() throws IOException {
-    // Prepare
-    for (Pair<byte[], byte[]> pair : putPairs) {
-      kvBackend.put(pair.getKey(), pair.getValue(), true);
-    }
+    try {
+      // Prepare
+      for (Pair<byte[], byte[]> pair : putPairs) {
+        kvBackend.put(pair.getKey(), pair.getValue(), true);
+      }
 
-    // Commit
-    kvBackend.put(
-        Bytes.concat(
-            TRANSACTION_PREFIX.getBytes(StandardCharsets.UTF_8),
-            SEPARATOR,
-            revert(ByteUtils.longToByte(txId))),
-        originalKeys.toString().getBytes(StandardCharsets.UTF_8),
-        true);
+      // Commit
+      kvBackend.put(
+          Bytes.concat(
+              TRANSACTION_PREFIX.getBytes(StandardCharsets.UTF_8),
+              SEPARATOR,
+              revert(ByteUtils.longToByte(txId))),
+          originalKeys.toString().getBytes(StandardCharsets.UTF_8),
+          true);
+    } finally {
+      putPairs.clear();
+      originalKeys.clear();
+    }
   }
 
   @Override

@@ -62,27 +62,17 @@ class TestTransactionalKvBackend {
     transactionalKvBackend.put("key1".getBytes(), "value1".getBytes(), true);
     transactionalKvBackend.put("key2".getBytes(), "value2".getBytes(), true);
     transactionalKvBackend.commit();
-    transactionalKvBackend.close();
 
-    transactionalKvBackend =
-        new TransactionalKvBackendImpl(
-            kvBackend, new TransactionIdGeneratorImpl(kvBackend, config));
     transactionalKvBackend.begin();
     Assertions.assertEquals("value1", new String(transactionalKvBackend.get("key1".getBytes())));
     Assertions.assertEquals("value2", new String(transactionalKvBackend.get("key2".getBytes())));
 
-    transactionalKvBackend =
-        new TransactionalKvBackendImpl(
-            kvBackend, new TransactionIdGeneratorImpl(kvBackend, config));
     transactionalKvBackend.begin();
     transactionalKvBackend.put("key1".getBytes(), "value3".getBytes(), true);
     transactionalKvBackend.put("key2".getBytes(), "value4".getBytes(), true);
     transactionalKvBackend.commit();
     transactionalKvBackend.close();
 
-    transactionalKvBackend =
-        new TransactionalKvBackendImpl(
-            kvBackend, new TransactionIdGeneratorImpl(kvBackend, config));
     transactionalKvBackend.begin();
     Assertions.assertEquals("value3", new String(transactionalKvBackend.get("key1".getBytes())));
     Assertions.assertEquals("value4", new String(transactionalKvBackend.get("key2".getBytes())));
@@ -99,34 +89,22 @@ class TestTransactionalKvBackend {
     transactionalKvBackend.put("key1".getBytes(), "value1".getBytes(), true);
     transactionalKvBackend.put("key2".getBytes(), "value2".getBytes(), true);
     transactionalKvBackend.commit();
-    transactionalKvBackend.close();
 
-    transactionalKvBackend =
-        new TransactionalKvBackendImpl(
-            kvBackend, new TransactionIdGeneratorImpl(kvBackend, config));
     transactionalKvBackend.begin();
     transactionalKvBackend.delete("key1".getBytes());
     transactionalKvBackend.commit();
-    transactionalKvBackend.close();
 
-    transactionalKvBackend =
-        new TransactionalKvBackendImpl(
-            kvBackend, new TransactionIdGeneratorImpl(kvBackend, config));
     transactionalKvBackend.begin();
     Assertions.assertNull(transactionalKvBackend.get("key1".getBytes()));
     Assertions.assertNotNull(transactionalKvBackend.get("key2".getBytes()));
-    transactionalKvBackend.close();
 
-    transactionalKvBackend =
-        new TransactionalKvBackendImpl(
-            kvBackend, new TransactionIdGeneratorImpl(kvBackend, config));
     transactionalKvBackend.begin();
     transactionalKvBackend.delete("key2".getBytes());
     transactionalKvBackend.commit();
-    transactionalKvBackend.close();
 
     Assertions.assertNull(transactionalKvBackend.get("key1".getBytes()));
     Assertions.assertNull(transactionalKvBackend.get("key2".getBytes()));
+    transactionalKvBackend.close();
   }
 
   @Test
@@ -241,11 +219,7 @@ class TestTransactionalKvBackend {
     transactionalKvBackend.put("key2".getBytes(), "value2".getBytes(), true);
     transactionalKvBackend.put("key3".getBytes(), "value3".getBytes(), true);
     transactionalKvBackend.commit();
-    transactionalKvBackend.close();
 
-    transactionalKvBackend =
-        new TransactionalKvBackendImpl(
-            kvBackend, new TransactionIdGeneratorImpl(kvBackend, config));
     transactionalKvBackend.begin();
     transactionalKvBackend.deleteRange(
         new KvRangeScan.KvRangeScanBuilder()
@@ -255,19 +229,16 @@ class TestTransactionalKvBackend {
             .endInclusive(true)
             .build());
     transactionalKvBackend.commit();
-    transactionalKvBackend.close();
 
-    transactionalKvBackend =
-        new TransactionalKvBackendImpl(
-            kvBackend, new TransactionIdGeneratorImpl(kvBackend, config));
     transactionalKvBackend.begin();
     Assertions.assertNull(transactionalKvBackend.get("key1".getBytes()));
     Assertions.assertNull(transactionalKvBackend.get("key2".getBytes()));
     Assertions.assertNull(transactionalKvBackend.get("key3".getBytes()));
+    transactionalKvBackend.close();
   }
 
   @Test
-  void testException() throws IOException, InterruptedException {
+  void testException() throws IOException {
     Config config = getConfig();
     KvBackend kvBackend = getKvBackEnd(config);
     TransactionalKvBackendImpl kvTransactionManager =
@@ -306,15 +277,14 @@ class TestTransactionalKvBackend {
 
     Pair<byte[], byte[]>[] arrayPair = pairs.toArray(new Pair[0]);
 
-    for (int i = 0; i < 10; i++) {
+    kvTransactionManager =
+        new TransactionalKvBackendImpl(
+            kvBackend, new TransactionIdGeneratorImpl(kvBackend, config));
+    for (int i = 0; i < 10000; i++) {
       ArrayUtils.shuffle(arrayPair);
       kvTransactionManager.putPairs.addAll(Arrays.stream(arrayPair).collect(Collectors.toList()));
-
       Assertions.assertThrows(Exception.class, kvTransactionManager::commit);
 
-      kvTransactionManager =
-          new TransactionalKvBackendImpl(
-              kvBackend, new TransactionIdGeneratorImpl(kvBackend, config));
       kvTransactionManager.begin();
       Assertions.assertNull(kvTransactionManager.get("key1".getBytes()));
       Assertions.assertNull(kvTransactionManager.get("key2".getBytes()));
