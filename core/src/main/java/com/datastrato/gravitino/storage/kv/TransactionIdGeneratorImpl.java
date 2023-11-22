@@ -34,6 +34,10 @@ public class TransactionIdGeneratorImpl implements TransactionIdGenerator {
 
   public void start() {
     long maxSkewTime = config.get(Configs.STORE_TRANSACTION_MAX_SKEW_TIME);
+    // Why use maxSkewTime + 1? Because we will save the current timestamp to storage layer every
+    // maxSkewTime second and the save operation will also take a moment. Usually, it takes less
+    // than 1 millisecond, so we'd better wait maxSkewTime + 1 second to make sure the timestamp is
+    // OK.
     checkTimeSkew(maxSkewTime + 1);
 
     ScheduledExecutorService idSaverScheduleExecutor =
