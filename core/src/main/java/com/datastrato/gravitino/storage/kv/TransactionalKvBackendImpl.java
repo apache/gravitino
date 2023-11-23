@@ -170,6 +170,12 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
 
   @Override
   public List<Pair<byte[], byte[]>> scan(KvRangeScan scanRange) throws IOException {
+
+    // Why we need to change the end key? Because we use the transaction id to construct a row key
+    // Assuming the end key is 'a' and the value of endInclusive is true, if we want to scan the
+    // value
+    // of key a, then we need to change the end key to 'b' and set the value of endInclusive to
+    // false.
     byte[] end = scanRange.getEnd();
     boolean endInclude = scanRange.isEndInclusive();
     if (endInclude) {
@@ -185,7 +191,7 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
             .endInclusive(endInclude)
             .predicate(
                 (k, v) -> {
-                  byte[] transactionId = getBinaryTransactionId(k);
+                  byte[] transactionId = getBinaryTransactionId((byte[]) k);
                   return kvBackend.get(Bytes.concat(TRANSACTION_PREFIX, SEPARATOR, transactionId))
                       != null;
                 })
@@ -201,6 +207,7 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
       byte[] realKey = getRealKey(rawKey);
       Bytes minNextKey = Bytes.increment(Bytes.wrap(Bytes.concat(realKey, SEPARATOR)));
 
+      // If the start key is exclusive and the key is equal to the start key, we need to skip it.
       if (!scanRange.isStartInclusive()
           && Bytes.wrap(realKey).compareTo(scanRange.getStart()) == 0) {
         while (j < rawPairs.size() && minNextKey.compareTo(rawPairs.get(j).getKey()) >= 0) {
@@ -279,7 +286,7 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
                 .endInclusive(false)
                 .predicate(
                     (k, v) -> {
-                      byte[] transactionId = getBinaryTransactionId(k);
+                      byte[] transactionId = getBinaryTransactionId((byte[]) k);
                       return kvBackend.get(
                               Bytes.concat(TRANSACTION_PREFIX, SEPARATOR, transactionId))
                           != null;
