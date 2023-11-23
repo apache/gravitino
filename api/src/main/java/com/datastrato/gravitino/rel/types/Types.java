@@ -20,6 +20,8 @@ public class Types {
       return INSTANCE;
     }
 
+    private BooleanType() {}
+
     @Override
     public Name name() {
       return Name.BOOLEAN;
@@ -38,6 +40,8 @@ public class Types {
     public static ByteType get() {
       return INSTANCE;
     }
+
+    private ByteType() {}
 
     @Override
     public Name name() {
@@ -58,6 +62,8 @@ public class Types {
       return INSTANCE;
     }
 
+    private ShortType() {}
+
     @Override
     public Name name() {
       return Name.SHORT;
@@ -76,6 +82,8 @@ public class Types {
     public static IntegerType get() {
       return INSTANCE;
     }
+
+    private IntegerType() {}
 
     @Override
     public Name name() {
@@ -96,6 +104,8 @@ public class Types {
       return INSTANCE;
     }
 
+    private LongType() {}
+
     @Override
     public Name name() {
       return Name.LONG;
@@ -115,6 +125,8 @@ public class Types {
       return INSTANCE;
     }
 
+    private FloatType() {}
+
     @Override
     public Name name() {
       return Name.FLOAT;
@@ -133,6 +145,8 @@ public class Types {
     public static DoubleType get() {
       return INSTANCE;
     }
+
+    private DoubleType() {}
 
     @Override
     public Name name() {
@@ -209,6 +223,8 @@ public class Types {
       return INSTANCE;
     }
 
+    private DateType() {}
+
     @Override
     public Name name() {
       return Name.DATE;
@@ -227,6 +243,8 @@ public class Types {
     public static TimeType get() {
       return INSTANCE;
     }
+
+    private TimeType() {}
 
     @Override
     public Name name() {
@@ -282,6 +300,8 @@ public class Types {
       return INSTANCE;
     }
 
+    private IntervalYearType() {}
+
     @Override
     public Name name() {
       return Name.INTERVAL_YEAR;
@@ -300,6 +320,8 @@ public class Types {
     public static IntervalDayType get() {
       return INSTANCE;
     }
+
+    private IntervalDayType() {}
 
     @Override
     public Name name() {
@@ -320,6 +342,8 @@ public class Types {
       return INSTANCE;
     }
 
+    private StringType() {}
+
     @Override
     public Name name() {
       return Name.STRING;
@@ -338,6 +362,8 @@ public class Types {
     public static UUIDType get() {
       return INSTANCE;
     }
+
+    private UUIDType() {}
 
     @Override
     public Name name() {
@@ -492,6 +518,8 @@ public class Types {
     public static BinaryType get() {
       return INSTANCE;
     }
+
+    private BinaryType() {}
 
     @Override
     public Name name() {
