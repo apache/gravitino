@@ -218,12 +218,9 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
         continue;
       }
 
+      // If the end key is exclusive and the key is equal to the end key, we need to skip it.
       if (!scanRange.isEndInclusive() && Bytes.wrap(realKey).compareTo(scanRange.getEnd()) == 0) {
-        // Skip all versions of the same key.
-        while (j < rawPairs.size() && minNextKey.compareTo(rawPairs.get(j).getKey()) >= 0) {
-          j++;
-        }
-        continue;
+        break;
       }
 
       byte[] value = getValue(pair.getValue());

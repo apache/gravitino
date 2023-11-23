@@ -72,9 +72,9 @@ public interface Configs {
           .createWithDefault("simple");
 
   ConfigEntry<Long> STORE_TRANSACTION_MAX_SKEW_TIME =
-      new ConfigBuilder("gravitino.entity.store.transactionMaxSkewTime")
-          .doc("Max time skew allowed for transaction, Unit: second")
+      new ConfigBuilder("gravitino.entity.store.maxTransactionSkewTimeMs")
+          .doc("Max time skew allowed for transaction, Unit: millisecond")
           .version("0.3.0")
           .longConf()
-          .createWithDefault(2L);
+          .createWithDefault(2000L);
 }

@@ -47,9 +47,9 @@ public class TransactionIdGeneratorImpl implements TransactionIdGenerator {
     long maxSkewTime = config.get(Configs.STORE_TRANSACTION_MAX_SKEW_TIME);
     // Why use maxSkewTime + 1? Because we will save the current timestamp to storage layer every
     // maxSkewTime second and the save operation will also take a moment. Usually, it takes less
-    // than 1 millisecond, so we'd better wait maxSkewTime + 1 second to make sure the timestamp is
-    // OK.
-    checkTimeSkew(maxSkewTime + 1);
+    // than 1 millisecond, so we'd better wait maxSkewTime + 1000 millisecond to make sure the
+    // timestamp is OK.
+    checkTimeSkew(maxSkewTime + 1000);
 
     scheduledThreadPoolExecutor.scheduleAtFixedRate(
         () -> {
@@ -75,24 +75,23 @@ public class TransactionIdGeneratorImpl implements TransactionIdGenerator {
         TimeUnit.SECONDS);
   }
 
-  private void checkTimeSkew(long maxSkewTimeInSecond) {
+  private void checkTimeSkew(long maxSkewTimeInMs) {
     long current = System.currentTimeMillis();
     long old;
     try {
       old = getSavedTs();
-      long maxSkewTimeInMills = maxSkewTimeInSecond * 1000;
       // In case of time skew, we will wait maxSkewTimeInSecond(default 2) seconds.
       int retries = 0;
-      while (current <= old + maxSkewTimeInMills && retries++ < maxSkewTimeInMills / 100) {
+      while (current <= old + maxSkewTimeInMs && retries++ < maxSkewTimeInMs / 100) {
         Thread.sleep(100);
         current = System.currentTimeMillis();
       }
 
-      if (current <= old + maxSkewTimeInSecond * 1000) {
+      if (current <= old + maxSkewTimeInMs) {
         throw new RuntimeException(
             String.format(
-                "Failed to initialize transaction id generator after %d seconds, time skew is too large",
-                maxSkewTimeInSecond));
+                "Failed to initialize transaction id generator after %d milliseconds, time skew is too large",
+                maxSkewTimeInMs));
       }
     } catch (IOException | InterruptedException e) {
       throw new RuntimeException(e);

@@ -35,7 +35,7 @@ public class TestKvNameMappingService {
     Config config = Mockito.mock(Config.class);
     Mockito.when(config.get(Configs.ENTITY_SERDE)).thenReturn("proto");
     Mockito.when(config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)).thenReturn(file.getAbsolutePath());
-    Mockito.when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(3L);
+    Mockito.when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(3000L);
     Mockito.when(config.get(ENTITY_STORE)).thenReturn("kv");
     Mockito.when(config.get(ENTITY_KV_STORE)).thenReturn(DEFAULT_ENTITY_KV_STORE);
     return config;
@@ -132,7 +132,7 @@ public class TestKvNameMappingService {
           .when(spyKvBackend)
           .put(Mockito.any(), Mockito.any(), Mockito.anyBoolean());
       Config config = Mockito.mock(Config.class);
-      Mockito.when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(3L);
+      Mockito.when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(3000L);
       final NameMappingService mock =
           new KvNameMappingService(spyKvBackend, nameMappingService.lock);
 
