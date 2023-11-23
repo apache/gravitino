@@ -6,6 +6,7 @@ package com.datastrato.gravitino.catalog.jdbc.operation;
 
 import com.datastrato.gravitino.catalog.jdbc.JdbcColumn;
 import com.datastrato.gravitino.rel.TableChange;
+import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import java.sql.ResultSet;
 import java.util.Collections;
 import java.util.Map;
@@ -14,7 +15,11 @@ public class SqliteTableOperations extends JdbcTableOperations {
 
   @Override
   protected String generateCreateTableSql(
-      String tableName, JdbcColumn[] columns, String comment, Map<String, String> properties) {
+      String tableName,
+      JdbcColumn[] columns,
+      String comment,
+      Map<String, String> properties,
+      Transform[] partitioning) {
     StringBuilder sqlBuilder = new StringBuilder();
     sqlBuilder.append("CREATE TABLE ").append(tableName).append(" (");
 

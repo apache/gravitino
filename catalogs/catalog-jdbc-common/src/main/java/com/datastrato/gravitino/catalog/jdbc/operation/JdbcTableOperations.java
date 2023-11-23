@@ -60,7 +60,8 @@ public abstract class JdbcTableOperations implements TableOperation {
     LOG.info("Attempting to create table {} in database {}", tableName, databaseName);
     try (Connection connection = getConnection(databaseName)) {
       JdbcConnectorUtils.executeUpdate(
-          connection, generateCreateTableSql(tableName, columns, comment, properties));
+          connection,
+          generateCreateTableSql(tableName, columns, comment, properties, partitioning));
       LOG.info("Created table {} in database {}", tableName, databaseName);
     } catch (final SQLException se) {
       throw this.exceptionMapper.toGravitinoException(se);
@@ -199,7 +200,11 @@ public abstract class JdbcTableOperations implements TableOperation {
   protected abstract Map<String, String> extractPropertiesFromResultSet(ResultSet table);
 
   protected abstract String generateCreateTableSql(
-      String tableName, JdbcColumn[] columns, String comment, Map<String, String> properties);
+      String tableName,
+      JdbcColumn[] columns,
+      String comment,
+      Map<String, String> properties,
+      Transform[] partitioning);
 
   protected abstract String generateRenameTableSql(String oldTableName, String newTableName);
 
