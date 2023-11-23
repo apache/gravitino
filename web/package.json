@@ -1,12 +1,12 @@
 {
   "name": "gravitino-web",
-  "version": "0.1.0",
   "private": true,
   "scripts": {
     "server": "next dev",
-    "build": "next build",
+    "build": "yarn pre:build && next build",
     "start": "next start",
-    "dist": "env-cmd -f .env.static next build",
+    "dist": "env-cmd -f .env.static yarn build",
+    "pre:build": "yarn build:icons && yarn format",
     "lint": "eslint --fix \"src/**/*.{js,jsx}\"",
     "format": "prettier --write \"src/**/*.{js,jsx}\"",
     "prettier:check": "prettier --check \"src/**/*.{js,jsx}\"",

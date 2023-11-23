@@ -1,40 +1,31 @@
 /**
- * This is an advanced example for creating icon bundles for Iconify SVG Framework.
+ * * This is an advanced example for creating icon bundles for Iconify SVG Framework.
  *
- * It creates a bundle from:
- * - All SVG files in a directory.
- * - Custom JSON files.
- * - Iconify icon sets.
- * - SVG framework.
+ * * It creates a bundle from:
+ * * - All SVG files in a directory.
+ * * - Custom JSON files.
+ * * - Iconify icon sets.
+ * * - SVG framework.
  *
- * This example uses Iconify Tools to import and clean up icons.
- * For Iconify Tools documentation visit https://docs.iconify.design/tools/tools2/
+ * * This example uses Iconify Tools to import and clean up icons.
+ * * For Iconify Tools documentation visit https://docs.iconify.design/tools/tools2/
  */
 const { promises: fs } = require('fs')
 const { dirname } = require('path')
 
-// Installation: npm install --save-dev @iconify/tools @iconify/utils @iconify/json @iconify/iconify
+// ** Installation: npm install --save-dev @iconify/tools @iconify/utils @iconify/json @iconify/iconify
 const { importDirectory, cleanupSVG, parseColors, isEmptyColor, runSVGO } = require('@iconify/tools')
 const { getIcons, stringToIcon, minifyIconSet } = require('@iconify/utils')
 
 /* eslint-enable */
 const sources = {
   json: [
-    // Iconify JSON file (@iconify/json is a package name, /json/ is directory where files are, then filename)
-    // require.resolve('@iconify/json/json/bx.json'),
-    // require.resolve('@iconify/json/json/bxl.json'),
-    // require.resolve('@iconify/json/json/bxs.json'),
-    // Custom file with only few icons
-    // {
-    //   filename: require.resolve('@iconify/json/json/line-md.json'),
-    //   icons: []
-    // },
-    // {
-    //   filename: require.resolve('@iconify/json/json/mdi.json'),
-    //   icons: []
-    // }
-    // Custom JSON file
-    // 'json/gg.json'
+    // ** Iconify JSON file (@iconify/json is a package name, /json/ is directory where files are, then filename)
+    // ** Example code: require.resolve('@iconify/json/json/bx.json')
+    // ** Custom file with only few icons
+    // ** Example code: { filename: require.resolve('@iconify/json/json/line-md.json'), icons: [] }
+    // ** Custom JSON file
+    // ** Example code: 'json/gg.json'
   ],
   icons: [
     'bx:up-arrow-alt',
@@ -44,55 +35,41 @@ const sources = {
     'mdi:plus-circle-outline',
     'bx:show-alt',
     'bx:bxs-plus-square'
-
-    //
   ],
   svg: [
-    /*
-        {
-            dir: 'src/iconify-bundle/svg',
-            monotone: false,
-            prefix: 'custom'
-        }
-{
-          dir: 'src/iconify-bundle/emojis',
-          monotone: false,
-          prefix: 'emoji'
-        } */
+    // ** Example code: { dir: 'src/iconify-bundle/svg', monotone: false, prefix: 'custom' }
   ]
 }
 
-// Iconify component (this changes import statement in generated file)
-// Available options: '@iconify/react' for React, '@iconify/vue' for Vue 3, '@iconify/vue2' for Vue 2, '@iconify/svelte' for Svelte
+// ** Iconify component (this changes import statement in generated file)
+// ** Available options: '@iconify/react' for React, '@iconify/vue' for Vue 3, '@iconify/vue2' for Vue 2, '@iconify/svelte' for Svelte
 const component = '@iconify/react'
 
-// Set to true to use require() instead of import
+// ** Set to true to use require() instead of import
 const commonJS = false
 
-// File to save bundle to
+// ** File to save bundle to
 const target = 'src/iconify-bundle/icons-bundle-react.js'
 ;(async function () {
   let bundle = commonJS
     ? "const { addCollection } = require('" + component + "');\n\n"
     : "import { addCollection } from '" + component + "';\n\n"
 
-  // Create directory for output if missing
+  // ** Create directory for output if missing
   const dir = dirname(target)
   try {
     await fs.mkdir(dir, {
       recursive: true
     })
-  } catch (err) {
-    //
-  }
+  } catch (err) {}
 
   /**
-   * Convert sources.icons to sources.json
+   * * Convert sources.icons to sources.json
    */
   if (sources.icons) {
     const sourcesJSON = sources.json ? sources.json : (sources.json = [])
 
-    // Sort icons by prefix
+    // ** Sort icons by prefix
     const organizedList = organizeIconsList(sources.icons)
     for (const prefix in organizedList) {
       const filename = require.resolve(`@iconify/json/json/${prefix}.json`)
@@ -104,17 +81,17 @@ const target = 'src/iconify-bundle/icons-bundle-react.js'
   }
 
   /**
-   * Bundle JSON files
+   * * Bundle JSON files
    */
   if (sources.json) {
     for (let i = 0; i < sources.json.length; i++) {
       const item = sources.json[i]
 
-      // Load icon set
+      // ** Load icon set
       const filename = typeof item === 'string' ? item : item.filename
       let content = JSON.parse(await fs.readFile(filename, 'utf8'))
 
-      // Filter icons
+      // ** Filter icons
       if (typeof item !== 'string' && item.icons?.length) {
         const filteredContent = getIcons(content, item.icons)
         if (!filteredContent) {
@@ -123,7 +100,7 @@ const target = 'src/iconify-bundle/icons-bundle-react.js'
         content = filteredContent
       }
 
-      // Remove metadata and add to bundle
+      // ** Remove metadata and add to bundle
       removeMetaData(content)
       minifyIconSet(content)
       bundle += 'addCollection(' + JSON.stringify(content) + ');\n'
@@ -132,39 +109,39 @@ const target = 'src/iconify-bundle/icons-bundle-react.js'
   }
 
   /**
-   * Custom SVG
+   * * Custom SVG
    */
   if (sources.svg) {
     for (let i = 0; i < sources.svg.length; i++) {
       const source = sources.svg[i]
 
-      // Import icons
+      // ** Import icons
       const iconSet = await importDirectory(source.dir, {
         prefix: source.prefix
       })
 
-      // Validate, clean up, fix palette and optimise
+      // ** Validate, clean up, fix palette and optimize
       await iconSet.forEach(async (name, type) => {
         if (type !== 'icon') {
           return
         }
 
-        // Get SVG instance for parsing
+        // ** Get SVG instance for parsing
         const svg = iconSet.toSVG(name)
         if (!svg) {
-          // Invalid icon
+          // ** Invalid icon
           iconSet.remove(name)
 
           return
         }
 
-        // Clean up and optimise icons
+        // ** Clean up and optimize icons
         try {
-          // Clean up icon code
+          // ** Clean up icon code
           await cleanupSVG(svg)
           if (source.monotone) {
-            // Replace color with currentColor, add if missing
-            // If icon is not monotone, remove this code
+            // ** Replace color with currentColor, add if missing
+            // ** If icon is not monotone, remove this code
             await parseColors(svg, {
               defaultColor: 'currentColor',
               callback: (attr, colorStr, color) => {
@@ -173,28 +150,28 @@ const target = 'src/iconify-bundle/icons-bundle-react.js'
             })
           }
 
-          // Optimise
+          // ** Optimize
           await runSVGO(svg)
         } catch (err) {
-          // Invalid icon
+          // ** Invalid icon
           console.error(`Error parsing ${name} from ${source.dir}:`, err)
           iconSet.remove(name)
 
           return
         }
 
-        // Update icon from SVG instance
+        // ** Update icon from SVG instance
         iconSet.fromSVG(name, svg)
       })
       console.log(`Bundled ${iconSet.count()} icons from ${source.dir}`)
 
-      // Export to JSON
+      // ** Export to JSON
       const content = iconSet.export()
       bundle += 'addCollection(' + JSON.stringify(content) + ');\n'
     }
   }
 
-  // Save to file
+  // ** Save to file
   await fs.writeFile(target, bundle, 'utf8')
   console.log(`Saved ${target} (${bundle.length} bytes)`)
 })().catch(err => {
@@ -202,7 +179,7 @@ const target = 'src/iconify-bundle/icons-bundle-react.js'
 })
 
 /**
- * Remove metadata from icon set
+ * * Remove metadata from icon set
  */
 function removeMetaData(iconSet) {
   const props = ['info', 'chars', 'categories', 'themes', 'prefixes', 'suffixes']
@@ -212,7 +189,7 @@ function removeMetaData(iconSet) {
 }
 
 /**
- * Sort icon names by prefix
+ * * Sort icon names by prefix
  */
 function organizeIconsList(icons) {
   const sorted = Object.create(null)

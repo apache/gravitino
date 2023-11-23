@@ -29,14 +29,6 @@ const Header = styled(Box)(({ theme }) => ({
   backgroundColor: theme.palette.background.default
 }))
 
-const MUITableCell = styled(TableCell)(({ theme }) => ({
-  borderBottom: 0,
-  paddingLeft: '0 !important',
-  paddingRight: '0 !important',
-  paddingTop: `${theme.spacing(1)} !important`,
-  paddingBottom: `${theme.spacing(2)} !important`
-}))
-
 const DetailsDrawer = props => {
   const { openDrawer, setOpenDrawer, drawerData = {} } = props
 

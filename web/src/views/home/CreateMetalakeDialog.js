@@ -5,7 +5,6 @@
 
 import { useState, forwardRef } from 'react'
 
-// ** MUI Imports
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
 import Dialog from '@mui/material/Dialog'
@@ -81,10 +80,8 @@ const CreateMetalakeDialog = props => {
   const onSubmit = data => {
     const reqData = {
       ...data,
-      innerProps
+      properties: innerProps
     }
-
-    console.log(reqData)
 
     dispatch(createMetalake({ ...reqData }))
     handleClose()
