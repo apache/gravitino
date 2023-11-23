@@ -20,7 +20,6 @@ import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 import org.rocksdb.RocksIterator;
 import org.rocksdb.TransactionDB;
-import org.rocksdb.TransactionDBOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,13 +30,13 @@ import org.slf4j.LoggerFactory;
  */
 public class RocksDBKvBackend implements KvBackend {
   public static final Logger LOGGER = LoggerFactory.getLogger(RocksDBKvBackend.class);
-  private TransactionDB db;
+  private RocksDB db;
 
   /**
    * Initialize the RocksDB backend instance. We have used the {@link TransactionDB} to support
    * transaction instead of {@link RocksDB} instance.
    */
-  private TransactionDB initRocksDB(Config config) throws RocksDBException {
+  private RocksDB initRocksDB(Config config) throws RocksDBException {
     RocksDB.loadLibrary();
     final Options options = new Options();
     options.setCreateIfMissing(true);
@@ -50,9 +49,8 @@ public class RocksDBKvBackend implements KvBackend {
             String.format("Can't create RocksDB path '%s'", dbDir.getAbsolutePath()));
       }
       LOGGER.info("Rocksdb storage directory:{}", dbDir);
-      // TODO (yuqi), make options and transactionDBOptions configurable
-      TransactionDBOptions transactionDBOptions = new TransactionDBOptions();
-      return TransactionDB.open(options, transactionDBOptions, dbDir.getAbsolutePath());
+      // TODO (yuqi), make options configurable
+      return RocksDB.open(options, dbDir.getAbsolutePath());
     } catch (RocksDBException ex) {
       LOGGER.error(
           "Error initializing RocksDB, check configurations and permissions, exception: {}, message: {}, stackTrace: {}",
@@ -75,7 +73,7 @@ public class RocksDBKvBackend implements KvBackend {
   @Override
   public void put(byte[] key, byte[] value, boolean overwrite) throws IOException {
     try {
-      handlePutWithoutTransaction(key, value, overwrite);
+      handlePut(key, value, overwrite);
     } catch (EntityAlreadyExistsException e) {
       throw e;
     } catch (Exception e) {
@@ -83,8 +81,7 @@ public class RocksDBKvBackend implements KvBackend {
     }
   }
 
-  private void handlePutWithoutTransaction(byte[] key, byte[] value, boolean overwrite)
-      throws RocksDBException {
+  private void handlePut(byte[] key, byte[] value, boolean overwrite) throws RocksDBException {
     if (overwrite) {
       db.put(key, value);
       return;

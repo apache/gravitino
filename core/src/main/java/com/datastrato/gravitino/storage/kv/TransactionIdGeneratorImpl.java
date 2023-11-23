@@ -132,10 +132,10 @@ public class TransactionIdGeneratorImpl implements TransactionIdGenerator {
   public void close() throws IOException {
     scheduledThreadPoolExecutor.shutdownNow();
     try {
-      scheduledThreadPoolExecutor.awaitTermination(10000, TimeUnit.SECONDS);
+      scheduledThreadPoolExecutor.awaitTermination(2000, TimeUnit.MILLISECONDS);
     } catch (InterruptedException e) {
       LOGGER.warn(
-          "Failed to close thread pool scheduledThreadPoolExecutor in TransactionIdGeneratorImpl",
+          "Failed to close thread pool scheduledThreadPoolExecutor in TransactionIdGeneratorImpl with in 2000 milliseconds",
           e);
     }
   }

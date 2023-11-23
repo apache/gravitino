@@ -15,7 +15,7 @@ import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
-import javax.annotation.concurrent.NotThreadSafe;
+import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.tuple.Pair;
 
@@ -45,7 +45,7 @@ import org.apache.commons.lang3.tuple.Pair;
  *   0x00000001(Metrication: 1) -- DELETED, the value is deleted and not visible
  * </pre>
  */
-@NotThreadSafe
+@ThreadSafe
 public class TransactionalKvBackendImpl implements TransactionalKvBackend {
   private final KvBackend kvBackend;
   private final TransactionIdGenerator transactionIdGenerator;
@@ -80,7 +80,7 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
   }
 
   @Override
-  public synchronized void begin() {
+  public void begin() {
     if (!putPairs.get().isEmpty()) {
       throw new IllegalStateException(
           "The transaction is has not committed or rollback yet, you should commit or rollback it first");
@@ -170,12 +170,10 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
 
   @Override
   public List<Pair<byte[], byte[]>> scan(KvRangeScan scanRange) throws IOException {
-
     // Why we need to change the end key? Because we use the transaction id to construct a row key
     // Assuming the end key is 'a' and the value of endInclusive is true, if we want to scan the
-    // value
-    // of key a, then we need to change the end key to 'b' and set the value of endInclusive to
-    // false.
+    // value of key a, then we need to change the end key to 'b' and set the value of endInclusive
+    // to false.
     byte[] end = scanRange.getEnd();
     boolean endInclude = scanRange.isEndInclusive();
     if (endInclude) {

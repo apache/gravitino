@@ -35,11 +35,12 @@ The following table lists the configuration items in the `gravitino.conf` file. 
 
 ### Storage configuration
 
-| Configuration item                      | Description                                                                                                                                                                    | Default value                    | Since version |
-|-----------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------|---------------|
-| `gravitino.entity.store`                | Which storage implementation to use, currently we only support key-value pair storage, default value is `kv`.                                                                  | `kv`                             | 0.1.0         |
-| `gravitino.entity.store.kv`             | Detailed implementation of kv storage, currently we only support `RocksDB` storage implementation `RocksDBKvBackend`.                                                          | `RocksDBKvBackend`               | 0.1.0         |
-| `gravitino.entity.store.kv.rocksdbPath` | Directory path of `RocksDBKvBackend`, **we highly recommend you to change this default value** as it's under the deploy directory and version update operations may remove it. | `${GRAVITINO_HOME}/data/rocksdb` | 0.1.0         |
+| Configuration item                              | Description                                                                                                                                                                     | Default value                     | Since version |
+|-------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------|---------------|
+| `gravitino.entity.store`                        | Which storage implementation to use, currently we only support key-value pair storage, default value is `kv`.                                                                   | `kv`                              | 0.1.0         |
+| `gravitino.entity.store.kv`                     | Detailed implementation of kv storage, currently we only support `RocksDB` storage implementation `RocksDBKvBackend`.                                                           | `RocksDBKvBackend`                | 0.1.0         |
+| `gravitino.entity.store.kv.rocksdbPath`         | Directory path of `RocksDBKvBackend`, **we highly recommend you to change this default value** as it's under the deploy directory and version update operations may remove it.  | `${GRAVITINO_HOME}/data/rocksdb`  | 0.1.0         |
+| `gravitino.entity.store.transactionMaxSkewTime` | The max skew time of transaction, unit: second.                                                                                                                                 | `2`                               | 0.3.0         |
 
 ### Catalog configuration
 
