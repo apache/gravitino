@@ -54,7 +54,7 @@ public interface Type {
   abstract class ComplexType implements Type {}
 
   /** The base type of all integral types. */
-  abstract class Integral extends NumericType {}
+  abstract class IntegralType extends NumericType {}
 
   /** The base type of all fractional types. */
   abstract class FractionType extends NumericType {}

@@ -33,7 +33,7 @@ public class Types {
     }
   }
 
-  public static class ByteType extends Type.Integral {
+  public static class ByteType extends Type.IntegralType {
     private static final ByteType INSTANCE = new ByteType();
 
     /** Returns the singleton instance of {@link ByteType}. */
@@ -54,7 +54,7 @@ public class Types {
     }
   }
 
-  public static class ShortType extends Type.Integral {
+  public static class ShortType extends Type.IntegralType {
     private static final ShortType INSTANCE = new ShortType();
 
     /** Returns the singleton instance of {@link ShortType}. */
@@ -75,7 +75,7 @@ public class Types {
     }
   }
 
-  public static class IntegerType extends Type.Integral {
+  public static class IntegerType extends Type.IntegralType {
     private static final IntegerType INSTANCE = new IntegerType();
 
     /** Returns the singleton instance of {@link IntegerType}. */
@@ -96,7 +96,7 @@ public class Types {
     }
   }
 
-  public static class LongType extends Type.Integral {
+  public static class LongType extends Type.IntegralType {
     private static final LongType INSTANCE = new LongType();
 
     /** Returns the singleton instance of {@link LongType}. */
