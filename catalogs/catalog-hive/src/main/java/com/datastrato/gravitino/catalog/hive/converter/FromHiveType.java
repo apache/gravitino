@@ -7,9 +7,7 @@ package com.datastrato.gravitino.catalog.hive.converter;
 import static org.apache.hadoop.hive.serde.serdeConstants.BIGINT_TYPE_NAME;
 import static org.apache.hadoop.hive.serde.serdeConstants.BINARY_TYPE_NAME;
 import static org.apache.hadoop.hive.serde.serdeConstants.BOOLEAN_TYPE_NAME;
-import static org.apache.hadoop.hive.serde.serdeConstants.CHAR_TYPE_NAME;
 import static org.apache.hadoop.hive.serde.serdeConstants.DATE_TYPE_NAME;
-import static org.apache.hadoop.hive.serde.serdeConstants.DECIMAL_TYPE_NAME;
 import static org.apache.hadoop.hive.serde.serdeConstants.DOUBLE_TYPE_NAME;
 import static org.apache.hadoop.hive.serde.serdeConstants.FLOAT_TYPE_NAME;
 import static org.apache.hadoop.hive.serde.serdeConstants.INTERVAL_DAY_TIME_TYPE_NAME;
@@ -19,7 +17,6 @@ import static org.apache.hadoop.hive.serde.serdeConstants.SMALLINT_TYPE_NAME;
 import static org.apache.hadoop.hive.serde.serdeConstants.STRING_TYPE_NAME;
 import static org.apache.hadoop.hive.serde.serdeConstants.TIMESTAMP_TYPE_NAME;
 import static org.apache.hadoop.hive.serde.serdeConstants.TINYINT_TYPE_NAME;
-import static org.apache.hadoop.hive.serde.serdeConstants.VARCHAR_TYPE_NAME;
 import static org.apache.hadoop.hive.serde2.typeinfo.TypeInfoUtils.getTypeInfoFromTypeString;
 
 import com.datastrato.gravitino.rel.types.Type;
@@ -81,20 +78,26 @@ public class FromHiveType {
             return Types.DateType.get();
           case TIMESTAMP_TYPE_NAME:
             return Types.TimestampType.withoutTimeZone();
-          case DECIMAL_TYPE_NAME:
-            DecimalTypeInfo decimalTypeInfo = (DecimalTypeInfo) hiveTypeInfo;
-            return Types.DecimalType.of(decimalTypeInfo.precision(), decimalTypeInfo.scale());
-          case CHAR_TYPE_NAME:
-            return Types.FixedCharType.of(((CharTypeInfo) hiveTypeInfo).getLength());
           case BINARY_TYPE_NAME:
             return Types.BinaryType.get();
-          case VARCHAR_TYPE_NAME:
-            return Types.VarCharType.of(((VarcharTypeInfo) hiveTypeInfo).getLength());
           case INTERVAL_YEAR_MONTH_TYPE_NAME:
             return Types.IntervalYearType.get();
           case INTERVAL_DAY_TIME_TYPE_NAME:
             return Types.IntervalDayType.get();
           default:
+            if (hiveTypeInfo instanceof CharTypeInfo) {
+              return Types.FixedCharType.of(((CharTypeInfo) hiveTypeInfo).getLength());
+            }
+
+            if (hiveTypeInfo instanceof VarcharTypeInfo) {
+              return Types.VarCharType.of(((VarcharTypeInfo) hiveTypeInfo).getLength());
+            }
+
+            if (hiveTypeInfo instanceof DecimalTypeInfo) {
+              DecimalTypeInfo decimalTypeInfo = (DecimalTypeInfo) hiveTypeInfo;
+              return Types.DecimalType.of(decimalTypeInfo.precision(), decimalTypeInfo.scale());
+            }
+
             throw new IllegalArgumentException(
                 "Unknown Hive type: " + hiveTypeInfo.getQualifiedName());
         }
