@@ -92,6 +92,10 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
   @Override
   public void commit() throws IOException {
     try {
+      if (putPairs.get().isEmpty()) {
+        return;
+      }
+
       // Prepare
       for (Pair<byte[], byte[]> pair : putPairs.get()) {
         kvBackend.put(pair.getKey(), pair.getValue(), true);

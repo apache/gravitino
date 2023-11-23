@@ -21,8 +21,6 @@ import com.datastrato.gravitino.EntityStoreFactory;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.storage.IdGenerator;
-import com.datastrato.gravitino.storage.NameMappingService;
-import com.datastrato.gravitino.storage.TransactionIdGenerator;
 import com.datastrato.gravitino.utils.ByteUtils;
 import com.datastrato.gravitino.utils.Bytes;
 import com.google.common.io.Files;
@@ -80,11 +78,7 @@ public class TestEntityKeyEncoding {
       throws IOException, IllegalAccessException, NoSuchFieldException {
     Config config = getConfig();
     try (KvEntityStore kvEntityStore = getKvEntityStore(config)) {
-      TransactionIdGenerator txIdGenerator =
-          new TransactionIdGeneratorImpl(kvEntityStore.getBackend(), config);
-      NameMappingService nameMappingService =
-          new KvNameMappingService(kvEntityStore.getBackend(), txIdGenerator);
-      BinaryEntityKeyEncoder encoder = new BinaryEntityKeyEncoder(nameMappingService);
+      BinaryEntityKeyEncoder encoder = (BinaryEntityKeyEncoder) kvEntityStore.entityKeyEncoder;
 
       // Metalake
       // metalake1 --> 0
@@ -201,12 +195,7 @@ public class TestEntityKeyEncoding {
       throws IOException, IllegalAccessException, NoSuchFieldException {
     Config config = getConfig();
     try (KvEntityStore kvEntityStore = getKvEntityStore(config)) {
-      TransactionIdGenerator txIdGenerator =
-          new TransactionIdGeneratorImpl(kvEntityStore.getBackend(), config);
-      NameMappingService nameMappingService =
-          new KvNameMappingService(kvEntityStore.getBackend(), txIdGenerator);
-      BinaryEntityKeyEncoder encoder = new BinaryEntityKeyEncoder(nameMappingService);
-
+      BinaryEntityKeyEncoder encoder = (BinaryEntityKeyEncoder) kvEntityStore.entityKeyEncoder;
       // Scan all Metalake
       Namespace namespace = Namespace.of();
       IdGenerator mockIdGenerator = getIdGeneratorAndSpy(encoder);

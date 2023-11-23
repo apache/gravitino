@@ -5,10 +5,10 @@
 
 package com.datastrato.gravitino.storage.kv;
 
+import com.datastrato.gravitino.storage.FunctionUtils;
 import com.datastrato.gravitino.storage.IdGenerator;
 import com.datastrato.gravitino.storage.NameMappingService;
 import com.datastrato.gravitino.storage.RandomIdGenerator;
-import com.datastrato.gravitino.storage.TransactionIdGenerator;
 import com.datastrato.gravitino.utils.ByteUtils;
 import com.datastrato.gravitino.utils.Bytes;
 import com.google.common.annotations.VisibleForTesting;
@@ -24,9 +24,7 @@ import javax.annotation.concurrent.ThreadSafe;
 @ThreadSafe
 public class KvNameMappingService implements NameMappingService {
 
-  // TODO(yuqi) Make this configurable
-  @VisibleForTesting final KvBackend backend;
-  private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
+  @VisibleForTesting final ReentrantReadWriteLock lock;
   @VisibleForTesting final IdGenerator idGenerator = new RandomIdGenerator();
 
   // name prefix of name in name to id mapping,
@@ -39,85 +37,95 @@ public class KvNameMappingService implements NameMappingService {
   //       id_2 -> metalake2
   private static final byte[] ID_PREFIX = "id_".getBytes(StandardCharsets.UTF_8);
 
-  private final TransactionalKvBackend transactionalKvBackend;
+  @VisibleForTesting final TransactionalKvBackend transactionalKvBackend;
 
-  public KvNameMappingService(KvBackend backend, TransactionIdGenerator txIdGenerator) {
-    this.backend = backend;
-    transactionalKvBackend = new TransactionalKvBackendImpl(backend, txIdGenerator);
+  public KvNameMappingService(
+      TransactionalKvBackend transactionalKvBackend,
+      ReentrantReadWriteLock reentrantReadWriteLock) {
+    this.transactionalKvBackend = transactionalKvBackend;
+    this.lock = reentrantReadWriteLock;
   }
 
   @Override
   public Long getIdByName(String name) throws IOException {
-    lock.readLock().lock();
-    try {
-      transactionalKvBackend.begin();
-      byte[] nameByte = Bytes.concat(NAME_PREFIX, name.getBytes(StandardCharsets.UTF_8));
-      byte[] idByte = transactionalKvBackend.get(nameByte);
-      return idByte == null ? null : ByteUtils.byteToLong(idByte);
-    } finally {
-      transactionalKvBackend.closeTransaction();
-      lock.readLock().unlock();
-    }
+    return FunctionUtils.executeWithReadLock(
+        () ->
+            FunctionUtils.executeInTransaction(
+                () -> {
+                  byte[] nameByte =
+                      Bytes.concat(NAME_PREFIX, name.getBytes(StandardCharsets.UTF_8));
+                  byte[] idByte = transactionalKvBackend.get(nameByte);
+                  return idByte == null ? null : ByteUtils.byteToLong(idByte);
+                },
+                transactionalKvBackend),
+        lock);
   }
 
   private long bindNameAndId(String name) throws IOException {
     byte[] nameByte = Bytes.concat(NAME_PREFIX, name.getBytes(StandardCharsets.UTF_8));
     long id = idGenerator.nextId();
-    lock.writeLock().lock();
-    try {
-      transactionalKvBackend.begin();
-      transactionalKvBackend.put(nameByte, ByteUtils.longToByte(id), false);
-      byte[] idByte = Bytes.concat(ID_PREFIX, ByteUtils.longToByte(id));
-      transactionalKvBackend.put(idByte, name.getBytes(StandardCharsets.UTF_8), false);
-      transactionalKvBackend.commit();
-      return id;
-    } finally {
-      transactionalKvBackend.closeTransaction();
-      lock.writeLock().unlock();
-    }
+
+    return FunctionUtils.executeWithWriteLock(
+        () ->
+            FunctionUtils.executeInTransaction(
+                () -> {
+                  transactionalKvBackend.put(nameByte, ByteUtils.longToByte(id), false);
+                  byte[] idByte = Bytes.concat(ID_PREFIX, ByteUtils.longToByte(id));
+                  transactionalKvBackend.put(idByte, name.getBytes(StandardCharsets.UTF_8), false);
+                  return id;
+                },
+                transactionalKvBackend),
+        lock);
   }
 
   @Override
   public boolean updateName(String oldName, String newName) throws IOException {
-    lock.writeLock().lock();
-    try {
-      transactionalKvBackend.begin();
-      byte[] nameByte = Bytes.concat(NAME_PREFIX, oldName.getBytes(StandardCharsets.UTF_8));
-      byte[] oldIdValue = transactionalKvBackend.get(nameByte);
+    return FunctionUtils.executeWithWriteLock(
+        () ->
+            FunctionUtils.executeInTransaction(
+                () -> {
+                  byte[] nameByte =
+                      Bytes.concat(NAME_PREFIX, oldName.getBytes(StandardCharsets.UTF_8));
+                  byte[] oldIdValue = transactionalKvBackend.get(nameByte);
 
-      // Old mapping has been deleted, no need to do it;
-      if (oldIdValue == null) {
-        return false;
-      }
-      // Delete old name --> id mapping
-      transactionalKvBackend.delete(nameByte);
+                  // Old mapping has been deleted, no need to do it;
+                  if (oldIdValue == null) {
+                    return false;
+                  }
+                  // Delete old name --> id mapping
+                  transactionalKvBackend.delete(nameByte);
 
-      transactionalKvBackend.put(
-          Bytes.concat(NAME_PREFIX, newName.getBytes(StandardCharsets.UTF_8)), oldIdValue, false);
-      transactionalKvBackend.put(
-          Bytes.concat(ID_PREFIX, oldIdValue), newName.getBytes(StandardCharsets.UTF_8), true);
-      transactionalKvBackend.commit();
-      return true;
-    } finally {
-      transactionalKvBackend.closeTransaction();
-      lock.writeLock().unlock();
-    }
+                  transactionalKvBackend.put(
+                      Bytes.concat(NAME_PREFIX, newName.getBytes(StandardCharsets.UTF_8)),
+                      oldIdValue,
+                      false);
+                  transactionalKvBackend.put(
+                      Bytes.concat(ID_PREFIX, oldIdValue),
+                      newName.getBytes(StandardCharsets.UTF_8),
+                      true);
+                  return true;
+                },
+                transactionalKvBackend),
+        lock);
   }
 
   @Override
   public boolean unbindNameAndId(String name) throws IOException {
     byte[] nameByte = Bytes.concat(NAME_PREFIX, name.getBytes(StandardCharsets.UTF_8));
-
-    lock.writeLock().lock();
-    try {
-      transactionalKvBackend.begin();
-      boolean r = transactionalKvBackend.delete(nameByte);
-      transactionalKvBackend.commit();
-      return r;
-    } finally {
-      transactionalKvBackend.closeTransaction();
-      lock.writeLock().unlock();
-    }
+    return FunctionUtils.executeWithWriteLock(
+        () ->
+            FunctionUtils.executeInTransaction(
+                () -> {
+                  byte[] idByte = transactionalKvBackend.get(nameByte);
+                  if (idByte == null) {
+                    return false;
+                  }
+                  transactionalKvBackend.delete(nameByte);
+                  transactionalKvBackend.delete(Bytes.concat(ID_PREFIX, idByte));
+                  return true;
+                },
+                transactionalKvBackend),
+        lock);
   }
 
   @Override
