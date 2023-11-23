@@ -93,7 +93,7 @@ public class TestJsonUtils {
 
     type =
         Types.StructType.of(
-            Types.StructType.Field.nullableField("name", Types.StringType.get()),
+            Types.StructType.Field.nullableField("name", Types.StringType.get(), "name field"),
             Types.StructType.Field.notNullField("id", Types.IntegerType.get()));
     jsonValue = JsonUtils.objectMapper().writeValueAsString(type);
     expected =
@@ -104,13 +104,12 @@ public class TestJsonUtils {
             + "            \"name\": \"name\",\n"
             + "            \"type\": \"string\",\n"
             + "            \"nullable\": true,\n"
-            + "            \"comment\": \"\"\n"
+            + "            \"comment\": \"name field\"\n"
             + "        },\n"
             + "        {\n"
             + "            \"name\": \"id\",\n"
             + "            \"type\": \"integer\",\n"
-            + "            \"nullable\": false,\n"
-            + "            \"comment\": \"\"\n"
+            + "            \"nullable\": false\n"
             + "        }\n"
             + "    ]\n"
             + "}";

@@ -96,6 +96,31 @@ public class JsonUtils {
   private static final String MAP_KEY_TYPE = "keyType";
   private static final String MAP_VALUE_TYPE = "valueType";
   private static final String MAP_VALUE_NULLABLE = "valueContainsNull";
+  private static final ImmutableMap<String, Type.PrimitiveType> TYPES =
+      Maps.uniqueIndex(
+          ImmutableList.of(
+              Types.BooleanType.get(),
+              Types.ByteType.get(),
+              Types.ShortType.get(),
+              Types.IntegerType.get(),
+              Types.LongType.get(),
+              Types.FloatType.get(),
+              Types.DoubleType.get(),
+              Types.DateType.get(),
+              Types.TimeType.get(),
+              Types.TimestampType.withTimeZone(),
+              Types.TimestampType.withoutTimeZone(),
+              Types.StringType.get(),
+              Types.UUIDType.get(),
+              Types.BinaryType.get(),
+              Types.IntervalYearType.get(),
+              Types.IntervalDayType.get()),
+          Type.PrimitiveType::simpleString);
+  private static final Pattern FIXED = Pattern.compile("fixed\\(\\s*(\\d+)\\s*\\)");
+  private static final Pattern FIXEDCHAR = Pattern.compile("char\\(\\s*(\\d+)\\s*\\)");
+  private static final Pattern VARCHAR = Pattern.compile("varchar\\(\\s*(\\d+)\\s*\\)");
+  private static final Pattern DECIMAL =
+      Pattern.compile("decimal\\(\\s*(\\d+)\\s*,\\s*(\\d+)\\s*\\)");
 
   /**
    * Abstract iterator class for iterating over elements of a JSON array.
@@ -474,36 +499,11 @@ public class JsonUtils {
     gen.writeFieldName(TYPE);
     writeDataType(field.type(), gen);
     gen.writeBooleanField(STRUCT_FIELD_NULLABLE, field.nullable());
-    gen.writeStringField(STRUCT_FIELD_COMMENT, field.comment() == null ? "" : field.comment());
+    if (field.comment() != null) {
+      gen.writeStringField(STRUCT_FIELD_COMMENT, field.comment());
+    }
     gen.writeEndObject();
   }
-
-  private static final ImmutableMap<String, Type.PrimitiveType> TYPES =
-      Maps.uniqueIndex(
-          ImmutableList.of(
-              Types.BooleanType.get(),
-              Types.ByteType.get(),
-              Types.ShortType.get(),
-              Types.IntegerType.get(),
-              Types.LongType.get(),
-              Types.FloatType.get(),
-              Types.DoubleType.get(),
-              Types.DateType.get(),
-              Types.TimeType.get(),
-              Types.TimestampType.withTimeZone(),
-              Types.TimestampType.withoutTimeZone(),
-              Types.StringType.get(),
-              Types.UUIDType.get(),
-              Types.BinaryType.get(),
-              Types.IntervalYearType.get(),
-              Types.IntervalDayType.get()),
-          Type.PrimitiveType::simpleString);
-
-  private static final Pattern FIXED = Pattern.compile("fixed\\(\\s*(\\d+)\\s*\\)");
-  private static final Pattern FIXEDCHAR = Pattern.compile("char\\(\\s*(\\d+)\\s*\\)");
-  private static final Pattern VARCHAR = Pattern.compile("varchar\\(\\s*(\\d+)\\s*\\)");
-  private static final Pattern DECIMAL =
-      Pattern.compile("decimal\\(\\s*(\\d+)\\s*,\\s*(\\d+)\\s*\\)");
 
   private static Type.PrimitiveType fromPrimitiveTypeString(String typeString) {
     Type.PrimitiveType primitiveType = TYPES.get(typeString);
