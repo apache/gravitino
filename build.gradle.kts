@@ -252,14 +252,9 @@ tasks {
     outputs.dir(projectDir.dir("distribution/package"))
     doLast {
       copy {
-        from(projectDir.dir("conf")) {
-          into("package/conf")
-          filter { line ->
-            line.replace("{version}", "${version}")
-          }
-        }
+        from(projectDir.dir("conf")) { into("package/conf") }
         from(projectDir.dir("bin")) { into("package/bin") }
-        from(projectDir.dir("web/build/libs/${rootProject.name}-web.war")) { into("package/web") }
+        from(projectDir.dir("web/build/libs/${rootProject.name}-web-${version}.war")) { into("package/web") }
         into(outputDir)
         rename { fileName ->
           fileName.replace(".template", "")

@@ -27,7 +27,6 @@ tasks {
     from("dist") {
       into("")
     }
-    this.archiveFileName.set("${rootProject.name}-web.war")
   }
 
   // Install dependencies
