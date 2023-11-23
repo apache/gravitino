@@ -27,8 +27,8 @@ import com.datastrato.gravitino.rel.expressions.sorts.SortDirection;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrders;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
+import com.datastrato.gravitino.rel.types.Types;
 import com.google.common.collect.Maps;
-import io.substrait.type.TypeCreator;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Map;
@@ -127,13 +127,13 @@ public class TestHiveTable extends MiniHiveMetastoreService {
     HiveColumn col1 =
         new HiveColumn.Builder()
             .withName("col_1")
-            .withType(TypeCreator.NULLABLE.I8)
+            .withType(Types.ByteType.get())
             .withComment(HIVE_COMMENT)
             .build();
     HiveColumn col2 =
         new HiveColumn.Builder()
             .withName("col_2")
-            .withType(TypeCreator.NULLABLE.DATE)
+            .withType(Types.DateType.get())
             .withComment(HIVE_COMMENT)
             .build();
     Column[] columns = new Column[] {col1, col2};
@@ -201,7 +201,7 @@ public class TestHiveTable extends MiniHiveMetastoreService {
     HiveColumn illegalColumn =
         new HiveColumn.Builder()
             .withName("col_3")
-            .withType(TypeCreator.REQUIRED.I8)
+            .withType(Types.ByteType.get())
             .withComment(HIVE_COMMENT)
             .withNullable(false)
             .build();
@@ -239,13 +239,13 @@ public class TestHiveTable extends MiniHiveMetastoreService {
     HiveColumn col1 =
         new HiveColumn.Builder()
             .withName("city")
-            .withType(TypeCreator.NULLABLE.I8)
+            .withType(Types.ByteType.get())
             .withComment(HIVE_COMMENT)
             .build();
     HiveColumn col2 =
         new HiveColumn.Builder()
             .withName("dt")
-            .withType(TypeCreator.NULLABLE.DATE)
+            .withType(Types.DateType.get())
             .withComment(HIVE_COMMENT)
             .build();
     Column[] columns = new Column[] {col1, col2};
@@ -337,13 +337,13 @@ public class TestHiveTable extends MiniHiveMetastoreService {
     HiveColumn col1 =
         new HiveColumn.Builder()
             .withName("col_1")
-            .withType(TypeCreator.NULLABLE.I8)
+            .withType(Types.ByteType.get())
             .withComment(HIVE_COMMENT)
             .build();
     HiveColumn col2 =
         new HiveColumn.Builder()
             .withName("col_2")
-            .withType(TypeCreator.NULLABLE.DATE)
+            .withType(Types.DateType.get())
             .withComment(HIVE_COMMENT)
             .build();
     Column[] columns = new Column[] {col1, col2};
@@ -385,13 +385,13 @@ public class TestHiveTable extends MiniHiveMetastoreService {
     HiveColumn col1 =
         new HiveColumn.Builder()
             .withName("col_1")
-            .withType(TypeCreator.NULLABLE.I8)
+            .withType(Types.ByteType.get())
             .withComment(HIVE_COMMENT)
             .build();
     HiveColumn col2 =
         new HiveColumn.Builder()
             .withName("col_2")
-            .withType(TypeCreator.NULLABLE.DATE)
+            .withType(Types.DateType.get())
             .withComment(HIVE_COMMENT)
             .build();
     Column[] columns = new Column[] {col1, col2};
@@ -460,7 +460,7 @@ public class TestHiveTable extends MiniHiveMetastoreService {
     //                    .alterTable(
     //                        tableIdentifier,
     //                        TableChange.addColumn(new String[] {"col_3"},
-    // TypeCreator.REQUIRED.I8)));
+    // Types.ByteType.get())));
     //    Assertions.assertTrue(
     //        exception
     //            .getMessage()
@@ -476,7 +476,7 @@ public class TestHiveTable extends MiniHiveMetastoreService {
                     .asTableCatalog()
                     .alterTable(
                         tableIdentifier,
-                        TableChange.addColumn(new String[] {"col_1"}, TypeCreator.NULLABLE.I8)));
+                        TableChange.addColumn(new String[] {"col_1"}, Types.ByteType.get())));
     Assertions.assertTrue(
         exception.getMessage().contains("Cannot add column after partition column"));
 
@@ -490,7 +490,7 @@ public class TestHiveTable extends MiniHiveMetastoreService {
                         tableIdentifier,
                         TableChange.addColumn(
                             new String[] {col1.name()},
-                            TypeCreator.NULLABLE.I8,
+                            Types.ByteType.get(),
                             "comment",
                             TableChange.ColumnPosition.after(col1.name()))));
     Assertions.assertTrue(exception.getMessage().contains("Cannot add column with duplicate name"));
@@ -507,7 +507,7 @@ public class TestHiveTable extends MiniHiveMetastoreService {
             // columns current format: [col_1:I8:comment, col_2:DATE:comment]
             TableChange.addColumn(
                 new String[] {"col_3"},
-                TypeCreator.NULLABLE.STRING,
+                Types.StringType.get(),
                 null,
                 TableChange.ColumnPosition.after(col1.name())),
             // columns current format: [col_1:I8:comment, col_3:STRING:null, col_2:DATE:comment]
@@ -516,7 +516,7 @@ public class TestHiveTable extends MiniHiveMetastoreService {
             TableChange.updateColumnComment(new String[] {"col_1"}, HIVE_COMMENT + "_new"),
             // columns current format: [col_1:I8:comment_new, col_3_new:STRING:null,
             // col_2:DATE:comment]
-            TableChange.updateColumnType(new String[] {"col_1"}, TypeCreator.NULLABLE.I32),
+            TableChange.updateColumnType(new String[] {"col_1"}, Types.IntegerType.get()),
             // columns current format: [col_1:I32:comment_new, col_3_new:STRING:null,
             // col_2:DATE:comment]
             TableChange.updateColumnPosition(
@@ -542,17 +542,17 @@ public class TestHiveTable extends MiniHiveMetastoreService {
         new Column[] {
           new HiveColumn.Builder()
               .withName("col_3_new")
-              .withType(TypeCreator.NULLABLE.STRING)
+              .withType(Types.StringType.get())
               .withComment(null)
               .build(),
           new HiveColumn.Builder()
               .withName("col_1")
-              .withType(TypeCreator.NULLABLE.I32)
+              .withType(Types.IntegerType.get())
               .withComment(HIVE_COMMENT + "_new")
               .build(),
           new HiveColumn.Builder()
               .withName("col_2")
-              .withType(TypeCreator.NULLABLE.DATE)
+              .withType(Types.DateType.get())
               .withComment(HIVE_COMMENT)
               .build()
         };

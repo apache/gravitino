@@ -5,7 +5,7 @@
 package com.datastrato.gravitino.rel;
 
 import com.datastrato.gravitino.NameIdentifier;
-import io.substrait.type.Type;
+import com.datastrato.gravitino.rel.types.Type;
 import java.util.Map;
 
 /**

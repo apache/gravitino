@@ -5,12 +5,15 @@
 package com.datastrato.gravitino.catalog.hive.converter;
 
 import static org.apache.hadoop.hive.serde.serdeConstants.BIGINT_TYPE_NAME;
+import static org.apache.hadoop.hive.serde.serdeConstants.BINARY_TYPE_NAME;
 import static org.apache.hadoop.hive.serde.serdeConstants.BOOLEAN_TYPE_NAME;
 import static org.apache.hadoop.hive.serde.serdeConstants.CHAR_TYPE_NAME;
 import static org.apache.hadoop.hive.serde.serdeConstants.DATE_TYPE_NAME;
 import static org.apache.hadoop.hive.serde.serdeConstants.DECIMAL_TYPE_NAME;
 import static org.apache.hadoop.hive.serde.serdeConstants.DOUBLE_TYPE_NAME;
 import static org.apache.hadoop.hive.serde.serdeConstants.FLOAT_TYPE_NAME;
+import static org.apache.hadoop.hive.serde.serdeConstants.INTERVAL_DAY_TIME_TYPE_NAME;
+import static org.apache.hadoop.hive.serde.serdeConstants.INTERVAL_YEAR_MONTH_TYPE_NAME;
 import static org.apache.hadoop.hive.serde.serdeConstants.INT_TYPE_NAME;
 import static org.apache.hadoop.hive.serde.serdeConstants.SMALLINT_TYPE_NAME;
 import static org.apache.hadoop.hive.serde.serdeConstants.STRING_TYPE_NAME;
@@ -19,9 +22,10 @@ import static org.apache.hadoop.hive.serde.serdeConstants.TINYINT_TYPE_NAME;
 import static org.apache.hadoop.hive.serde.serdeConstants.VARCHAR_TYPE_NAME;
 import static org.apache.hadoop.hive.serde2.typeinfo.TypeInfoUtils.getTypeInfoFromTypeString;
 
-import io.substrait.type.Type;
-import io.substrait.type.TypeCreator;
-import java.util.stream.Collectors;
+import com.datastrato.gravitino.rel.types.Type;
+import com.datastrato.gravitino.rel.types.Types;
+import java.util.ArrayList;
+import java.util.stream.IntStream;
 import org.apache.hadoop.hive.serde2.typeinfo.CharTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.DecimalTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.ListTypeInfo;
@@ -31,84 +35,95 @@ import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.UnionTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.VarcharTypeInfo;
 
-/** Converts Hive data types to corresponding Substrait data types. */
+/** Converts Hive data types to corresponding Gravitino data types. */
 public class FromHiveType {
 
   /**
-   * Converts a Hive data type string to the corresponding Substrait data type.
+   * Converts a Hive data type string to the corresponding Gravitino data type.
    *
    * @param hiveType The Hive data type string to convert.
-   * @return The equivalent Substrait data type.
+   * @return The equivalent Gravitino data type.
    * @throws IllegalArgumentException If the Hive data type is unknown or unsupported.
    */
   public static Type convert(String hiveType) throws IllegalArgumentException {
     TypeInfo hiveTypeInfo = getTypeInfoFromTypeString(hiveType);
-    return toSubstraitType(hiveTypeInfo);
+    return toGravitinoType(hiveTypeInfo);
   }
 
   /**
-   * Converts a Hive TypeInfo object to the corresponding Substrait Type.
+   * Converts a Hive TypeInfo object to the corresponding Gravitino Type.
    *
    * @param hiveTypeInfo The Hive TypeInfo object to convert.
-   * @return The equivalent Substrait Type.
+   * @return The equivalent Gravitino Type.
    * @throws IllegalArgumentException if the Hive data type category is unknown or unsupported.
    */
-  private static Type toSubstraitType(TypeInfo hiveTypeInfo) throws IllegalArgumentException {
+  private static Type toGravitinoType(TypeInfo hiveTypeInfo) throws IllegalArgumentException {
     switch (hiveTypeInfo.getCategory()) {
       case PRIMITIVE:
         switch (hiveTypeInfo.getTypeName()) {
           case BOOLEAN_TYPE_NAME:
-            return TypeCreator.NULLABLE.BOOLEAN;
+            return Types.BooleanType.get();
           case TINYINT_TYPE_NAME:
-            return TypeCreator.NULLABLE.I8;
+            return Types.ByteType.get();
           case SMALLINT_TYPE_NAME:
-            return TypeCreator.NULLABLE.I16;
+            return Types.ShortType.get();
           case INT_TYPE_NAME:
-            return TypeCreator.NULLABLE.I32;
+            return Types.IntegerType.get();
           case BIGINT_TYPE_NAME:
-            return TypeCreator.NULLABLE.I64;
+            return Types.LongType.get();
           case FLOAT_TYPE_NAME:
-            return TypeCreator.NULLABLE.FP32;
+            return Types.FloatType.get();
           case DOUBLE_TYPE_NAME:
-            return TypeCreator.NULLABLE.FP64;
+            return Types.DoubleType.get();
           case STRING_TYPE_NAME:
-            return TypeCreator.NULLABLE.STRING;
+            return Types.StringType.get();
           case DATE_TYPE_NAME:
-            return TypeCreator.NULLABLE.DATE;
+            return Types.DateType.get();
           case TIMESTAMP_TYPE_NAME:
-            return TypeCreator.NULLABLE.TIMESTAMP;
+            return Types.TimestampType.withoutTimeZone();
           case DECIMAL_TYPE_NAME:
             DecimalTypeInfo decimalTypeInfo = (DecimalTypeInfo) hiveTypeInfo;
-            return TypeCreator.NULLABLE.decimal(
-                decimalTypeInfo.precision(), decimalTypeInfo.getScale());
+            return Types.DecimalType.of(decimalTypeInfo.precision(), decimalTypeInfo.scale());
           case CHAR_TYPE_NAME:
-            return TypeCreator.NULLABLE.fixedChar(((CharTypeInfo) hiveTypeInfo).getLength());
+            return Types.FixedCharType.of(((CharTypeInfo) hiveTypeInfo).getLength());
+          case BINARY_TYPE_NAME:
+            return Types.BinaryType.get();
           case VARCHAR_TYPE_NAME:
-            return TypeCreator.NULLABLE.varChar(((VarcharTypeInfo) hiveTypeInfo).getLength());
+            return Types.VarCharType.of(((VarcharTypeInfo) hiveTypeInfo).getLength());
+          case INTERVAL_YEAR_MONTH_TYPE_NAME:
+            return Types.IntervalYearType.get();
+          case INTERVAL_DAY_TIME_TYPE_NAME:
+            return Types.IntervalDayType.get();
           default:
             throw new IllegalArgumentException(
                 "Unknown Hive type: " + hiveTypeInfo.getQualifiedName());
         }
       case LIST:
-        return TypeCreator.NULLABLE.list(
-            toSubstraitType(((ListTypeInfo) hiveTypeInfo).getListElementTypeInfo()));
+        return Types.ListType.nullable(
+            toGravitinoType(((ListTypeInfo) hiveTypeInfo).getListElementTypeInfo()));
       case MAP:
         MapTypeInfo mapTypeInfo = (MapTypeInfo) hiveTypeInfo;
-        return TypeCreator.NULLABLE.map(
-            toSubstraitType(mapTypeInfo.getMapKeyTypeInfo()),
-            toSubstraitType(mapTypeInfo.getMapKeyTypeInfo()));
+        return Types.MapType.valueNullable(
+            toGravitinoType(mapTypeInfo.getMapKeyTypeInfo()),
+            toGravitinoType(mapTypeInfo.getMapValueTypeInfo()));
       case STRUCT:
-        return TypeCreator.NULLABLE.struct(
-            ((StructTypeInfo) hiveTypeInfo)
-                .getAllStructFieldTypeInfos().stream()
-                    .map(FromHiveType::toSubstraitType)
-                    .collect(Collectors.toList()));
+        StructTypeInfo structTypeInfo = (StructTypeInfo) hiveTypeInfo;
+        ArrayList<String> fieldNames = structTypeInfo.getAllStructFieldNames();
+        ArrayList<TypeInfo> typeInfos = structTypeInfo.getAllStructFieldTypeInfos();
+        Types.StructType.Field[] fields =
+            IntStream.range(0, fieldNames.size())
+                .mapToObj(
+                    i ->
+                        Types.StructType.Field.nullableField(
+                            fieldNames.get(i), toGravitinoType(typeInfos.get(i))))
+                .toArray(Types.StructType.Field[]::new);
+        return Types.StructType.of(fields);
       case UNION:
-        return TypeCreator.NULLABLE.struct(
-            ((UnionTypeInfo) hiveTypeInfo)
-                .getAllUnionObjectTypeInfos().stream()
-                    .map(FromHiveType::toSubstraitType)
-                    .collect(Collectors.toList()));
+        UnionTypeInfo unionTypeInfo = (UnionTypeInfo) hiveTypeInfo;
+        return Types.UnionType.of(
+            unionTypeInfo.getAllUnionObjectTypeInfos().stream()
+                .map(FromHiveType::toGravitinoType)
+                .toArray(Type[]::new));
       default:
         throw new IllegalArgumentException(
             "Unknown category of Hive type: " + hiveTypeInfo.getCategory());

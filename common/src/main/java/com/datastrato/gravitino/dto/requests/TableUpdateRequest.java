@@ -6,6 +6,7 @@ package com.datastrato.gravitino.dto.requests;
 
 import com.datastrato.gravitino.json.JsonUtils;
 import com.datastrato.gravitino.rel.TableChange;
+import com.datastrato.gravitino.rel.types.Type;
 import com.datastrato.gravitino.rest.RESTRequest;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -14,7 +15,6 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.google.common.base.Preconditions;
-import io.substrait.type.Type;
 import java.util.Arrays;
 import javax.annotation.Nullable;
 import lombok.EqualsAndHashCode;

@@ -18,7 +18,7 @@ import com.datastrato.gravitino.dto.rel.ColumnDTO;
 import com.datastrato.gravitino.dto.rel.SchemaDTO;
 import com.datastrato.gravitino.dto.rel.TableDTO;
 import com.datastrato.gravitino.dto.rel.partitions.Partitioning;
-import io.substrait.type.TypeCreator;
+import com.datastrato.gravitino.rel.types.Types;
 import java.time.Instant;
 import org.junit.jupiter.api.Test;
 
@@ -144,7 +144,7 @@ public class TestResponses {
     AuditDTO audit =
         new AuditDTO.Builder().withCreator("creator").withCreateTime(Instant.now()).build();
     ColumnDTO column =
-        new ColumnDTO.Builder().withName("ColumnA").withDataType(TypeCreator.NULLABLE.I8).build();
+        new ColumnDTO.Builder().withName("ColumnA").withDataType(Types.ByteType.get()).build();
     TableDTO table =
         new TableDTO.Builder()
             .withName("TableA")

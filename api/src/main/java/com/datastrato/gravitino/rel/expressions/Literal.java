@@ -20,8 +20,8 @@
 
 package com.datastrato.gravitino.rel.expressions;
 
-import io.substrait.type.Type;
-import io.substrait.type.TypeCreator;
+import com.datastrato.gravitino.rel.types.Type;
+import com.datastrato.gravitino.rel.types.Types;
 import java.util.Objects;
 
 /**
@@ -60,7 +60,7 @@ public interface Literal<T> extends Expression {
    * @return a new {@link Literal} instance
    */
   static LiteralImpl<Integer> integer(Integer value) {
-    return of(value, TypeCreator.REQUIRED.I32);
+    return of(value, Types.IntegerType.get());
   }
 
   /**
@@ -70,7 +70,7 @@ public interface Literal<T> extends Expression {
    * @return a new {@link Literal} instance
    */
   static LiteralImpl<String> string(String value) {
-    return of(value, TypeCreator.REQUIRED.STRING);
+    return of(value, Types.StringType.get());
   }
 
   final class LiteralImpl<T> implements Literal<T> {

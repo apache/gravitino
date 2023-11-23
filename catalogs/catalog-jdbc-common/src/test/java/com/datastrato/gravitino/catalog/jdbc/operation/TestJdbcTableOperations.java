@@ -15,9 +15,9 @@ import com.datastrato.gravitino.catalog.rel.BaseColumn;
 import com.datastrato.gravitino.exceptions.NoSuchTableException;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.TableChange;
+import com.datastrato.gravitino.rel.types.Type;
+import com.datastrato.gravitino.rel.types.Types;
 import com.google.common.collect.Maps;
-import io.substrait.type.Type;
-import io.substrait.type.TypeCreator;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -98,7 +98,7 @@ public class TestJdbcTableOperations {
         new JdbcColumn.Builder()
             .withName("col_a")
             .withNullable(true)
-            .withType(TypeCreator.NULLABLE.I32)
+            .withType(Types.IntegerType.get())
             .withComment(null)
             .withDefaultValue(null)
             .build();
@@ -106,7 +106,7 @@ public class TestJdbcTableOperations {
         new JdbcColumn.Builder()
             .withName("col_b")
             .withNullable(false)
-            .withType(TypeCreator.NULLABLE.STRING)
+            .withType(Types.StringType.get())
             .withComment(null)
             .withDefaultValue(null)
             .build();
@@ -163,8 +163,7 @@ public class TestJdbcTableOperations {
             JDBC_TABLE_OPERATIONS.alterTable(
                 DATABASE_NAME,
                 newName,
-                TableChange.updateColumnType(
-                    new String[] {col_a.name()}, TypeCreator.NULLABLE.STRING)));
+                TableChange.updateColumnType(new String[] {col_a.name()}, Types.StringType.get())));
 
     // delete table.
     JDBC_TABLE_OPERATIONS.drop(DATABASE_NAME, newName);
