@@ -404,7 +404,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
   }
 
   /**
-   * Perform name change operations on the Iceberg.
+   * Perform name change operations on the Jdbc.
    *
    * @param tableIdent tableIdent of this table.
    * @param renameTable Table Change to modify the table name.
