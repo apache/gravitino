@@ -14,8 +14,10 @@ import com.datastrato.gravitino.catalog.PropertiesMetadata;
 import com.datastrato.gravitino.catalog.jdbc.config.JdbcConfig;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
+import com.datastrato.gravitino.catalog.jdbc.operation.DatabaseOperation;
 import com.datastrato.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
 import com.datastrato.gravitino.catalog.jdbc.operation.JdbcTableOperations;
+import com.datastrato.gravitino.catalog.jdbc.operation.TableOperation;
 import com.datastrato.gravitino.catalog.jdbc.utils.DataSourceUtils;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
@@ -66,9 +68,9 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
 
   private final JdbcTypeConverter jdbcTypeConverter;
 
-  private final JdbcDatabaseOperations jdbcDatabaseOperations;
+  private final DatabaseOperation databaseOperation;
 
-  private final JdbcTableOperations jdbcTableOperations;
+  private final TableOperation tableOperation;
 
   private DataSource dataSource;
 
@@ -78,20 +80,20 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
    * @param entity The catalog entity associated with this operations instance.
    * @param exceptionConverter The exception converter to be used by the operations.
    * @param jdbcTypeConverter The type converter to be used by the operations.
-   * @param jdbcDatabaseOperations The database operations to be used by the operations.
-   * @param jdbcTableOperations The table operations to be used by the operations.
+   * @param databaseOperation The database operations to be used by the operations.
+   * @param tableOperation The table operations to be used by the operations.
    */
   public JdbcCatalogOperations(
       CatalogEntity entity,
       JdbcExceptionConverter exceptionConverter,
       JdbcTypeConverter jdbcTypeConverter,
-      JdbcDatabaseOperations jdbcDatabaseOperations,
-      JdbcTableOperations jdbcTableOperations) {
+      JdbcDatabaseOperations databaseOperation,
+      JdbcTableOperations tableOperation) {
     this.entity = entity;
     this.exceptionConverter = exceptionConverter;
     this.jdbcTypeConverter = jdbcTypeConverter;
-    this.jdbcDatabaseOperations = jdbcDatabaseOperations;
-    this.jdbcTableOperations = jdbcTableOperations;
+    this.databaseOperation = databaseOperation;
+    this.tableOperation = tableOperation;
   }
 
   /**
@@ -107,8 +109,8 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
         Maps.newHashMap(MapUtils.getPrefixMap(conf, CATALOG_BYPASS_PREFIX));
     JdbcConfig jdbcConfig = new JdbcConfig(resultConf);
     this.dataSource = DataSourceUtils.createDataSource(jdbcConfig);
-    this.jdbcDatabaseOperations.initialize(dataSource, exceptionConverter);
-    this.jdbcTableOperations.initialize(dataSource, exceptionConverter, jdbcTypeConverter);
+    this.databaseOperation.initialize(dataSource, exceptionConverter);
+    this.tableOperation.initialize(dataSource, exceptionConverter, jdbcTypeConverter);
     this.jdbcCatalogPropertiesMetadata = new JdbcCatalogPropertiesMetadata();
     this.jdbcTablePropertiesMetadata = new JdbcTablePropertiesMetadata();
     this.jdbcSchemaPropertiesMetadata = new JdbcSchemaPropertiesMetadata();
@@ -129,7 +131,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
    */
   @Override
   public NameIdentifier[] listSchemas(Namespace namespace) throws NoSuchCatalogException {
-    List<String> schemaNames = jdbcDatabaseOperations.list();
+    List<String> schemaNames = databaseOperation.list();
     return schemaNames.stream()
         .map(db -> NameIdentifier.of(namespace, db))
         .toArray(NameIdentifier[]::new);
@@ -162,7 +164,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
     }
     HashMap<String, String> resultProperties = Maps.newHashMap(properties);
     resultProperties.remove(StringIdentifier.ID_KEY);
-    jdbcDatabaseOperations.create(
+    databaseOperation.create(
         ident.name(), StringIdentifier.addToComment(identifier, comment), resultProperties);
     return new JdbcSchema.Builder()
         .withName(ident.name())
@@ -181,7 +183,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
    */
   @Override
   public JdbcSchema loadSchema(NameIdentifier ident) throws NoSuchSchemaException {
-    JdbcSchema load = jdbcDatabaseOperations.load(ident.name());
+    JdbcSchema load = databaseOperation.load(ident.name());
     String comment = load.comment();
     StringIdentifier id = StringIdentifier.fromComment(comment);
     if (id == null) {
@@ -223,7 +225,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
    */
   @Override
   public boolean dropSchema(NameIdentifier ident, boolean cascade) throws NonEmptySchemaException {
-    jdbcDatabaseOperations.delete(ident.name(), cascade);
+    databaseOperation.delete(ident.name(), cascade);
     return true;
   }
 
@@ -237,7 +239,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
   @Override
   public NameIdentifier[] listTables(Namespace namespace) throws NoSuchSchemaException {
     String databaseName = NameIdentifier.of(namespace.levels()).name();
-    return jdbcTableOperations.list(databaseName).stream()
+    return tableOperation.list(databaseName).stream()
         .map(table -> NameIdentifier.of(namespace, table))
         .toArray(NameIdentifier[]::new);
   }
@@ -253,7 +255,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
   public Table loadTable(NameIdentifier tableIdent) throws NoSuchTableException {
     String databaseName = NameIdentifier.of(tableIdent.namespace().levels()).name();
     String tableName = tableIdent.name();
-    JdbcTable load = jdbcTableOperations.load(databaseName, tableName);
+    JdbcTable load = tableOperation.load(databaseName, tableName);
     String comment = load.comment();
     StringIdentifier id = StringIdentifier.fromComment(comment);
     if (id == null) {
@@ -315,7 +317,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
   @Override
   public boolean dropTable(NameIdentifier tableIdent) {
     String databaseName = NameIdentifier.of(tableIdent.namespace().levels()).name();
-    jdbcTableOperations.drop(databaseName, tableIdent.name());
+    tableOperation.drop(databaseName, tableIdent.name());
     return true;
   }
 
@@ -369,7 +371,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
     String databaseName = NameIdentifier.of(tableIdent.namespace().levels()).name();
     String tableName = tableIdent.name();
 
-    jdbcTableOperations.create(
+    tableOperation.create(
         databaseName,
         tableName,
         jdbcColumns,
@@ -397,7 +399,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
   @Override
   public boolean purgeTable(NameIdentifier tableIdent) throws UnsupportedOperationException {
     String databaseName = NameIdentifier.of(tableIdent.namespace().levels()).name();
-    jdbcTableOperations.purge(databaseName, tableIdent.name());
+    tableOperation.purge(databaseName, tableIdent.name());
     return true;
   }
 
@@ -413,14 +415,14 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
   private Table renameTable(NameIdentifier tableIdent, TableChange.RenameTable renameTable)
       throws NoSuchTableException, IllegalArgumentException {
     String databaseName = NameIdentifier.of(tableIdent.namespace().levels()).name();
-    jdbcTableOperations.rename(databaseName, tableIdent.name(), renameTable.getNewName());
+    tableOperation.rename(databaseName, tableIdent.name(), renameTable.getNewName());
     return loadTable(NameIdentifier.of(tableIdent.namespace(), renameTable.getNewName()));
   }
 
   private Table internalAlterTable(NameIdentifier tableIdent, TableChange... changes)
       throws NoSuchTableException, IllegalArgumentException {
     String databaseName = NameIdentifier.of(tableIdent.namespace().levels()).name();
-    jdbcTableOperations.alterTable(databaseName, tableIdent.name(), changes);
+    tableOperation.alterTable(databaseName, tableIdent.name(), changes);
     return loadTable(tableIdent);
   }
 
