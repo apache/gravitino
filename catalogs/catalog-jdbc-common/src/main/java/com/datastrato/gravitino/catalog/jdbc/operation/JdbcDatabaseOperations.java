@@ -7,6 +7,8 @@ package com.datastrato.gravitino.catalog.jdbc.operation;
 
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import com.datastrato.gravitino.catalog.jdbc.utils.JdbcConnectorUtils;
+import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
+import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.Map;
@@ -23,14 +25,14 @@ public abstract class JdbcDatabaseOperations implements DatabaseOperation {
   protected JdbcExceptionConverter exceptionMapper;
 
   @Override
-  public void initialize(final DataSource dataSource, final JdbcExceptionConverter exceptionMapper)
-      throws RuntimeException {
+  public void initialize(DataSource dataSource, JdbcExceptionConverter exceptionMapper) {
     this.dataSource = dataSource;
     this.exceptionMapper = exceptionMapper;
   }
 
   @Override
-  public void create(String databaseName, String comment, Map<String, String> properties) {
+  public void create(String databaseName, String comment, Map<String, String> properties)
+      throws SchemaAlreadyExistsException {
     LOG.info("Beginning to create database {}", databaseName);
     try (final Connection connection = this.dataSource.getConnection()) {
       JdbcConnectorUtils.executeUpdate(
@@ -42,7 +44,7 @@ public abstract class JdbcDatabaseOperations implements DatabaseOperation {
   }
 
   @Override
-  public void delete(String databaseName, boolean cascade) {
+  public void delete(String databaseName, boolean cascade) throws NoSuchSchemaException {
     LOG.info("Beginning to drop database {}", databaseName);
     try (final Connection connection = this.dataSource.getConnection()) {
       JdbcConnectorUtils.executeUpdate(connection, generateDropDatabaseSql(databaseName, cascade));
@@ -53,8 +55,8 @@ public abstract class JdbcDatabaseOperations implements DatabaseOperation {
   }
 
   /**
-   * @param databaseName The name of the database to create.
-   * @param comment The comment of the database to create.
+   * @param databaseName The name of the database.
+   * @param comment The comment of the database.
    * @return the SQL statement to create a database with the given name and comment.
    */
   abstract String generateCreateDatabaseSql(

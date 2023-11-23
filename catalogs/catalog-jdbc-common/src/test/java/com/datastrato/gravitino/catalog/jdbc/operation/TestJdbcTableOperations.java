@@ -116,7 +116,9 @@ public class TestJdbcTableOperations {
 
     // create table.
     Assertions.assertDoesNotThrow(
-        () -> JDBC_TABLE_OPERATIONS.create(DATABASE_NAME, table1, jdbcColumns, null, properties));
+        () ->
+            JDBC_TABLE_OPERATIONS.create(
+                DATABASE_NAME, table1, jdbcColumns, null, properties, null));
 
     // list table.
     List<String> allTables = JDBC_TABLE_OPERATIONS.list(DATABASE_NAME);

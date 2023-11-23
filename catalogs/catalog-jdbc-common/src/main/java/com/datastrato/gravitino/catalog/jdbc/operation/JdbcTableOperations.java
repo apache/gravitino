@@ -12,7 +12,9 @@ import com.datastrato.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import com.datastrato.gravitino.catalog.jdbc.utils.JdbcConnectorUtils;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NoSuchTableException;
+import com.datastrato.gravitino.exceptions.TableAlreadyExistsException;
 import com.datastrato.gravitino.rel.TableChange;
+import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.google.common.collect.Lists;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
@@ -28,21 +30,19 @@ import org.slf4j.LoggerFactory;
 /** Operations for managing tables in a JDBC data store. */
 public abstract class JdbcTableOperations implements TableOperation {
 
-  protected static final String[] TABLE_TYPES = {"TABLE"};
+  protected static final Logger LOG = LoggerFactory.getLogger(JdbcTableOperations.class);
 
-  public static final Logger LOG = LoggerFactory.getLogger(JdbcTableOperations.class);
+  protected static final String[] TABLE_TYPES = {"TABLE"};
 
   protected DataSource dataSource;
   protected JdbcExceptionConverter exceptionMapper;
-
   protected JdbcTypeConverter typeConverter;
 
   @Override
   public void initialize(
       DataSource dataSource,
       JdbcExceptionConverter exceptionMapper,
-      JdbcTypeConverter jdbcTypeConverter)
-      throws RuntimeException {
+      JdbcTypeConverter jdbcTypeConverter) {
     this.dataSource = dataSource;
     this.exceptionMapper = exceptionMapper;
     this.typeConverter = jdbcTypeConverter;
@@ -54,7 +54,9 @@ public abstract class JdbcTableOperations implements TableOperation {
       String tableName,
       JdbcColumn[] columns,
       String comment,
-      Map<String, String> properties) {
+      Map<String, String> properties,
+      Transform[] partitioning)
+      throws TableAlreadyExistsException {
     LOG.info("Attempting to create table {} in database {}", tableName, databaseName);
     try (Connection connection = getConnection(databaseName)) {
       JdbcConnectorUtils.executeUpdate(
@@ -66,7 +68,7 @@ public abstract class JdbcTableOperations implements TableOperation {
   }
 
   @Override
-  public void drop(String databaseName, String tableName) {
+  public void drop(String databaseName, String tableName) throws NoSuchTableException {
     LOG.info("Attempting to delete table {} from database {}", tableName, databaseName);
     try (Connection connection = getConnection(databaseName)) {
       JdbcConnectorUtils.executeUpdate(connection, generateDropTableSql(tableName));
@@ -77,7 +79,7 @@ public abstract class JdbcTableOperations implements TableOperation {
   }
 
   @Override
-  public List<String> list(String databaseName) {
+  public List<String> list(String databaseName) throws NoSuchSchemaException {
     try (Connection connection = getConnection(databaseName)) {
       final List<String> names = Lists.newArrayList();
       try (ResultSet tables = getTables(connection)) {
@@ -93,7 +95,7 @@ public abstract class JdbcTableOperations implements TableOperation {
   }
 
   @Override
-  public JdbcTable load(String databaseName, String tableName) throws NoSuchSchemaException {
+  public JdbcTable load(String databaseName, String tableName) throws NoSuchTableException {
     try (Connection connection = getConnection(databaseName)) {
       String comment;
       Map<String, String> properties;
@@ -111,7 +113,7 @@ public abstract class JdbcTableOperations implements TableOperation {
           result.add(
               new JdbcColumn.Builder()
                   .withName(column.getString("COLUMN_NAME"))
-                  .withComment(null)
+                  .withComment(column.getString("REMARKS"))
                   .withType(typeConverter.toGravitinoType(column.getString("TYPE_NAME")))
                   .withNullable(column.getInt("NULLABLE") == DatabaseMetaData.columnNullable)
                   .withDefaultValue(column.getString("COLUMN_DEF"))
@@ -130,16 +132,11 @@ public abstract class JdbcTableOperations implements TableOperation {
     }
   }
 
-  /**
-   * @param table The result set of the table
-   * @return The properties extracted from the result set
-   */
-  protected abstract Map<String, String> extractPropertiesFromResultSet(ResultSet table);
-
   @Override
-  public void rename(String databaseName, String oldTableName, String newTableName) {
+  public void rename(String databaseName, String oldTableName, String newTableName)
+      throws NoSuchTableException {
     LOG.info(
-        "Attempting to re-name table {}/{} to {}/{}",
+        "Attempting to rename table {}/{} to {}/{}",
         databaseName,
         oldTableName,
         databaseName,
@@ -155,7 +152,8 @@ public abstract class JdbcTableOperations implements TableOperation {
   }
 
   @Override
-  public void alterTable(String databaseName, String tableName, TableChange... changes) {
+  public void alterTable(String databaseName, String tableName, TableChange... changes)
+      throws NoSuchTableException {
     LOG.info("Attempting to alter table {} from database {}", tableName, databaseName);
     try (Connection connection = getConnection(databaseName)) {
       JdbcConnectorUtils.executeUpdate(connection, generateAlterTableSql(tableName, changes));
@@ -166,7 +164,7 @@ public abstract class JdbcTableOperations implements TableOperation {
   }
 
   @Override
-  public void purge(String databaseName, String tableName) {
+  public void purge(String databaseName, String tableName) throws NoSuchTableException {
     LOG.info("Attempting to purge table {} from database {}", tableName, databaseName);
     try (Connection connection = getConnection(databaseName)) {
       JdbcConnectorUtils.executeUpdate(connection, generatePurgeTableSql(tableName));
@@ -193,6 +191,12 @@ public abstract class JdbcTableOperations implements TableOperation {
     String databaseName = connection.getSchema();
     return metaData.getColumns(databaseName, databaseName, tableName, null);
   }
+
+  /**
+   * @param table The result set of the table
+   * @return The properties extracted from the result set
+   */
+  protected abstract Map<String, String> extractPropertiesFromResultSet(ResultSet table);
 
   protected abstract String generateCreateTableSql(
       String tableName, JdbcColumn[] columns, String comment, Map<String, String> properties);
