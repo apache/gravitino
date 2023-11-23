@@ -99,5 +99,9 @@ tasks {
   }
   test {
     environment("GRAVITINO_HOME", rootDir.path)
+    environment("GRAVITINO_TEST", "true")
+  }
+  clean {
+    delete("${propertiesFile}")
   }
 }
