@@ -629,13 +629,12 @@ public class Types {
         Field field = (Field) o;
         return nullable == field.nullable
             && Objects.equals(name, field.name)
-            && Objects.equals(type, field.type)
-            && Objects.equals(comment, field.comment);
+            && Objects.equals(type, field.type);
       }
 
       @Override
       public int hashCode() {
-        return Objects.hash(name, type, nullable, comment);
+        return Objects.hash(name, type, nullable);
       }
 
       public String simpleString() {
