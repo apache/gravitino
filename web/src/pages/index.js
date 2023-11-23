@@ -6,7 +6,7 @@
 import Grid from '@mui/material/Grid'
 import Typography from '@mui/material/Typography'
 import PageHeader from 'src/@core/components/page-header'
-import Table from 'src/views/home/Table'
+import MetalakeList from 'src/views/home/MetalakeList'
 
 const Home = () => {
   return (
@@ -21,7 +21,7 @@ const Home = () => {
         }
       />
       <Grid item xs={12}>
-        <Table />
+        <MetalakeList />
       </Grid>
     </Grid>
   )
