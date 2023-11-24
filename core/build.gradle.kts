@@ -24,6 +24,7 @@ dependencies {
   implementation(libs.caffeine)
   implementation(libs.rocksdbjni)
   implementation(libs.bundles.metrics)
+  implementation(libs.bundles.prometheus)
 
   compileOnly(libs.lombok)
   annotationProcessor(libs.lombok)
@@ -34,4 +35,5 @@ dependencies {
   testImplementation(libs.junit.jupiter.params)
   testRuntimeOnly(libs.junit.jupiter.engine)
   testImplementation(libs.mockito.core)
+  testImplementation(libs.bundles.prometheus)
 }

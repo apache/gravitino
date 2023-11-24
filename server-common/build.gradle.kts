@@ -24,6 +24,7 @@ dependencies {
   implementation(libs.bundles.jetty)
   implementation(libs.bundles.jwt)
   implementation(libs.bundles.metrics)
+  implementation(libs.prometheus.servlet)
 
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)

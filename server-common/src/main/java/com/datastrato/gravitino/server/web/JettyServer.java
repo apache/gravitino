@@ -102,7 +102,11 @@ public final class JettyServer {
       MetricRegistry metricRegistry = metricsSystem.getMetricRegistry();
       servletContextHandler.setAttribute(
           "com.codahale.metrics.servlets.MetricsServlet.registry", metricRegistry);
-      servletContextHandler.addServlet(MetricsServlet.class, "/metrics");
+      servletContextHandler.addServlet(MetricsServlet.class, "/metrics-json");
+
+      io.prometheus.client.exporter.MetricsServlet metricsServlet =
+          metricsSystem.getPrometheusServlet();
+      servletContextHandler.addServlet(new ServletHolder(metricsServlet), "/metrics");
     }
 
     HandlerCollection handlers = new HandlerCollection();

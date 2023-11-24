@@ -11,8 +11,15 @@ import com.codahale.metrics.Reporter;
 import com.codahale.metrics.jmx.JmxReporter;
 import com.datastrato.gravitino.metrics.source.MetricsSource;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableMap;
+import io.prometheus.client.CollectorRegistry;
+import io.prometheus.client.dropwizard.DropwizardExports;
+import io.prometheus.client.dropwizard.samplebuilder.CustomMappingSampleBuilder;
+import io.prometheus.client.dropwizard.samplebuilder.MapperConfig;
+import io.prometheus.client.exporter.MetricsServlet;
 import java.io.Closeable;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -29,6 +36,7 @@ public class MetricsSystem implements Closeable {
   private final MetricRegistry metricRegistry;
   private HashMap<String, MetricsSource> metricSources = new HashMap<>();
   private List<Reporter> metricsReporters = new LinkedList<>();
+  private CollectorRegistry prometheusRegistry;
 
   public MetricsSystem() {
     this("");
@@ -37,6 +45,7 @@ public class MetricsSystem implements Closeable {
   public MetricsSystem(String name) {
     this.name = name;
     this.metricRegistry = new MetricRegistry();
+    this.prometheusRegistry = new CollectorRegistry();
   }
 
   /**
@@ -95,6 +104,7 @@ public class MetricsSystem implements Closeable {
   }
 
   public void start() {
+    registerMetricsToPrometheusRegistry();
     initAndStartMetricsReporter();
   }
 
@@ -113,5 +123,77 @@ public class MetricsSystem implements Closeable {
             LOG.warn("Close metrics reporter failed,", exception);
           }
         });
+  }
+
+  /*
+   * To extract metrics name and label from dropwizard metrics for Prometheus
+   *
+   * All extract rules must register to prometheus registry before start prometheus servlet.
+   * At this time, some MetricsSource may not register to MetricsSystem, such as
+   * HiveCatalogMetricsSource, so we place all rules in MetricsSystem not
+   * spread in separate MetricsSources.
+   *
+   * If a metric couldn't apply any rules, it will be constructed to Prometheus metrics
+   * name format, "ab.c-a.d" is transformed to "ab_c_a_d"
+   *
+   * MapperConfig is used to extract Prometheus metricsName and labels with signature:
+   * MapperConfig(final String match, final String name, final Map<String, String> labels)
+   *
+   * Match:
+   * Regex used to match incoming metric name.
+   * Uses a simplified glob syntax where only '*' are allowed.
+   * E.g:
+   * org.company.controller.*.status.*
+   * Will be used to match
+   * org.company.controller.controller1.status.200
+   * and
+   * org.company.controller.controller2.status.400
+   *
+   * Name:
+   * New metric name. Can contain placeholders to be replaced with actual values from the incoming metric name.
+   * Placeholders are in the ${n} format where n is the zero based index of the group to extract from the original
+  mric name.
+   * E.g.:
+   * match: test.dispatcher.*.*.*
+   * name: dispatcher_events_total_${1}
+      * <p>
+   * A metric "test.dispatcher.old.test.yay" will be converted in a new metric with name "dispatcher_events_total_test"
+   *
+   * Labels:
+   * Labels to be extracted from the metric name.
+   * They should contain placeholders to be replaced with actual values from the incoming metric name.
+   * Placeholders are in the ${n} format where n is the zero based index of the group to extract from the original metric name.
+   * E.g.:
+   * match: test.dispatcher.*.*
+   * name: dispatcher_events_total_${0}
+   * labels:
+   * label1: ${1}_t
+   * <p>
+   * A metric "test.dispatcher.sp1.yay" will be converted in a new metric with name "dispatcher_events_total_sp1" with label {label1: yay_t}
+   * <p>
+   * Label names have to match the regex ^[a-zA-Z_][a-zA-Z0-9_]+$
+   */
+  @VisibleForTesting
+  static List<MapperConfig> getMetricNameAndLabelRules() {
+    return Arrays.asList(
+        new MapperConfig(
+            MetricsSource.ICEBERG_REST_SERVER_METRIC_NAME + ".*.*",
+            MetricsSource.ICEBERG_REST_SERVER_METRIC_NAME + "_${1}",
+            ImmutableMap.of("operation", "${0}")),
+        new MapperConfig(
+            MetricsSource.GRAVITINO_SERVER_METRIC_NAME + ".*.*",
+            MetricsSource.GRAVITINO_SERVER_METRIC_NAME + "_${1}",
+            ImmutableMap.of("operation", "${0}")));
+  }
+
+  private void registerMetricsToPrometheusRegistry() {
+    CustomMappingSampleBuilder sampleBuilder =
+        new CustomMappingSampleBuilder(getMetricNameAndLabelRules());
+    DropwizardExports dropwizardExports = new DropwizardExports(metricRegistry, sampleBuilder);
+    dropwizardExports.register(prometheusRegistry);
+  }
+
+  public MetricsServlet getPrometheusServlet() {
+    return new MetricsServlet(prometheusRegistry);
   }
 }
