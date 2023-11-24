@@ -5,11 +5,13 @@
 
 import { configureStore } from '@reduxjs/toolkit'
 
-import metalake from 'src/store/metalake'
+import version from './version'
+import metalakes from './metalakes'
 
 export const store = configureStore({
   reducer: {
-    metalake
+    version,
+    metalakes
   },
   middleware: getDefaultMiddleware =>
     getDefaultMiddleware({

@@ -3,7 +3,7 @@
  * This software is licensed under the Apache License version 2.
  */
 
-import { useState, forwardRef } from 'react'
+import { useState, forwardRef, useEffect } from 'react'
 
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
@@ -24,6 +24,8 @@ import * as yup from 'yup'
 import { useForm, Controller } from 'react-hook-form'
 import { yupResolver } from '@hookform/resolvers/yup'
 
+import { genUpdateMetalakeUpdates } from 'src/@core/utils/func'
+
 const defaultValues = {
   name: '',
   comment: ''
@@ -38,13 +40,18 @@ const Transition = forwardRef(function Transition(props, ref) {
 })
 
 const CreateMetalakeDialog = props => {
-  const { open, setOpen, store, dispatch, createMetalake } = props
+  const { open, setOpen, type = 'create', data = {}, store, dispatch, createMetalake, updateMetalake } = props
+
+  const typeText = type === 'create' ? 'Create' : 'Update'
 
   const [innerProps, setInnerProps] = useState([])
+
+  const [cacheData, setCacheData] = useState()
 
   const {
     control,
     reset,
+    setValue,
     handleSubmit,
     formState: { errors }
   } = useForm({
@@ -78,15 +85,49 @@ const CreateMetalakeDialog = props => {
   }
 
   const onSubmit = data => {
-    const reqData = {
+    const properties = innerProps.reduce((acc, item) => {
+      acc[item.key] = item.value
+
+      return acc
+    }, {})
+
+    const metalakeData = {
       ...data,
-      properties: innerProps
+      properties
     }
 
-    dispatch(createMetalake({ ...reqData }))
+    if (type === 'create') {
+      dispatch(createMetalake({ ...metalakeData }))
+    } else {
+      const reqData = { updates: genUpdateMetalakeUpdates(cacheData, metalakeData) }
+
+      if (reqData.updates.length !== 0) {
+        dispatch(updateMetalake({ name: cacheData.name, data: reqData }))
+      }
+    }
+
     handleClose()
     reset()
   }
+
+  useEffect(() => {
+    if (open && JSON.stringify(data) !== '{}') {
+      setCacheData(data)
+      const { properties } = data
+
+      const propsArr = Object.keys(properties).map(item => {
+        return {
+          key: item,
+          value: properties[item]
+        }
+      })
+
+      setInnerProps(propsArr)
+
+      setValue('name', data.name)
+      setValue('comment', data.comment)
+    }
+  }, [open, data, setValue])
 
   return (
     <Dialog fullWidth maxWidth='sm' scroll='body' TransitionComponent={Transition} open={open} onClose={handleClose}>
@@ -108,7 +149,7 @@ const CreateMetalakeDialog = props => {
           </IconButton>
           <Box sx={{ mb: 8, textAlign: 'center' }}>
             <Typography variant='h5' sx={{ mb: 3 }}>
-              Create Metalake
+              {typeText} Metalake
             </Typography>
           </Box>
 
@@ -209,7 +250,7 @@ const CreateMetalakeDialog = props => {
           }}
         >
           <Button variant='contained' sx={{ mr: 1 }} type='submit'>
-            Create
+            {typeText}
           </Button>
           <Button variant='outlined' onClick={handleClose}>
             Cancel

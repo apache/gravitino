@@ -32,9 +32,23 @@ addCollection({
     },
     'plus-circle-outline': {
       body: '<path fill="currentColor" d="M12 20c-4.41 0-8-3.59-8-8s3.59-8 8-8s8 3.59 8 8s-3.59 8-8 8m0-18A10 10 0 0 0 2 12a10 10 0 0 0 10 10a10 10 0 0 0 10-10A10 10 0 0 0 12 2m1 5h-2v4H7v2h4v4h2v-4h4v-2h-4V7Z"/>'
+    },
+    'delete-outline': {
+      body: '<path fill="currentColor" d="M6 19a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7H6v12M8 9h8v10H8V9m7.5-5l-1-1h-5l-1 1H5v2h14V4h-3.5Z"/>'
     }
   },
   lastModified: 1698215149,
+  width: 24,
+  height: 24
+})
+addCollection({
+  prefix: 'tabler',
+  icons: {
+    'alert-circle': {
+      body: '<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0-18 0m9-4v4m0 4h.01"/>'
+    }
+  },
+  lastModified: 1698388788,
   width: 24,
   height: 24
 })
