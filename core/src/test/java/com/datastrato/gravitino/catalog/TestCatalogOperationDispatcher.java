@@ -39,10 +39,10 @@ import com.datastrato.gravitino.rel.SchemaChange;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
+import com.datastrato.gravitino.rel.types.Types;
 import com.datastrato.gravitino.storage.IdGenerator;
 import com.datastrato.gravitino.storage.RandomIdGenerator;
 import com.google.common.collect.ImmutableMap;
-import io.substrait.type.TypeCreator;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
@@ -326,8 +326,8 @@ public class TestCatalogOperationDispatcher {
     NameIdentifier tableIdent1 = NameIdentifier.of(tableNs, "table1");
     Column[] columns =
         new Column[] {
-          new TestColumn.Builder().withName("col1").withType(TypeCreator.NULLABLE.STRING).build(),
-          new TestColumn.Builder().withName("col2").withType(TypeCreator.NULLABLE.STRING).build()
+          new TestColumn.Builder().withName("col1").withType(Types.StringType.get()).build(),
+          new TestColumn.Builder().withName("col2").withType(Types.StringType.get()).build()
         };
 
     Table table1 = dispatcher.createTable(tableIdent1, columns, "comment", props, new Transform[0]);
@@ -402,8 +402,8 @@ public class TestCatalogOperationDispatcher {
     NameIdentifier tableIdent1 = NameIdentifier.of(tableNs, "table11");
     Column[] columns =
         new Column[] {
-          new TestColumn.Builder().withName("col1").withType(TypeCreator.NULLABLE.STRING).build(),
-          new TestColumn.Builder().withName("col2").withType(TypeCreator.NULLABLE.STRING).build()
+          new TestColumn.Builder().withName("col1").withType(Types.StringType.get()).build(),
+          new TestColumn.Builder().withName("col2").withType(Types.StringType.get()).build()
         };
 
     Table table1 = dispatcher.createTable(tableIdent1, columns, "comment", props, new Transform[0]);
@@ -458,8 +458,8 @@ public class TestCatalogOperationDispatcher {
     NameIdentifier tableIdent = NameIdentifier.of(tableNs, "table21");
     Column[] columns =
         new Column[] {
-          new TestColumn.Builder().withName("col1").withType(TypeCreator.NULLABLE.STRING).build(),
-          new TestColumn.Builder().withName("col2").withType(TypeCreator.NULLABLE.STRING).build()
+          new TestColumn.Builder().withName("col1").withType(Types.StringType.get()).build(),
+          new TestColumn.Builder().withName("col2").withType(Types.StringType.get()).build()
         };
 
     Table table = dispatcher.createTable(tableIdent, columns, "comment", props, new Transform[0]);
@@ -525,8 +525,8 @@ public class TestCatalogOperationDispatcher {
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
     Column[] columns =
         new Column[] {
-          new TestColumn.Builder().withName("col1").withType(TypeCreator.NULLABLE.STRING).build(),
-          new TestColumn.Builder().withName("col2").withType(TypeCreator.NULLABLE.STRING).build()
+          new TestColumn.Builder().withName("col1").withType(Types.StringType.get()).build(),
+          new TestColumn.Builder().withName("col2").withType(Types.StringType.get()).build()
         };
     Table table = dispatcher.createTable(tableIdent, columns, "comment", props, new Transform[0]);
 

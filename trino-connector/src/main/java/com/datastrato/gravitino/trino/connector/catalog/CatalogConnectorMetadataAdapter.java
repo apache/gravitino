@@ -71,9 +71,10 @@ public class CatalogConnectorMetadataAdapter {
       columns.add(
           new GravitinoColumn(
               column.getName(),
-              DataTypeTransformer.getGravitinoType(column.getType(), column.isNullable()),
+              DataTypeTransformer.getGravitinoType(column.getType()),
               i,
-              column.getComment()));
+              column.getComment(),
+              column.isNullable()));
     }
     return new GravitinoTable(schemaName, tableName, columns, comment, properties);
   }
@@ -144,8 +145,9 @@ public class CatalogConnectorMetadataAdapter {
   public GravitinoColumn createColumn(ColumnMetadata column) {
     return new GravitinoColumn(
         column.getName(),
-        DataTypeTransformer.getGravitinoType(column.getType(), column.isNullable()),
+        DataTypeTransformer.getGravitinoType(column.getType()),
         -1,
-        column.getComment());
+        column.getComment(),
+        column.isNullable());
   }
 }

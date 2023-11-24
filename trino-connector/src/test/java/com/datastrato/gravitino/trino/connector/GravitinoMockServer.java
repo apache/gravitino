@@ -394,7 +394,8 @@ public class GravitinoMockServer implements AutoCloseable {
     } else if (tableChange instanceof TableChange.AddColumn) {
       TableChange.AddColumn addColumn = (TableChange.AddColumn) tableChange;
       String fieldName = addColumn.fieldNames()[0];
-      GravitinoColumn column = new GravitinoColumn(fieldName, addColumn.getDataType(), -1, "");
+      GravitinoColumn column =
+          new GravitinoColumn(fieldName, addColumn.getDataType(), -1, "", true);
       CatalogConnectorMetadataAdapter metadataAdapter =
           catalogConnectorManager.getCatalogConnector(catalogName.toString()).getMetadataAdapter();
       metadata.addColumn(null, tableHandle, metadataAdapter.getColumnMetadata(column));
