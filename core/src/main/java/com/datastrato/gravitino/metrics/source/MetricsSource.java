@@ -19,7 +19,7 @@ import com.codahale.metrics.Timer;
 public abstract class MetricsSource {
 
   // metrics source name
-  public static final String ICEBERG_REST_SERVER_METRIC_NAME = "iceberg-rest";
+  public static final String ICEBERG_REST_SERVER_METRIC_NAME = "iceberg-rest-server";
   public static final String GRAVITINO_SERVER_METRIC_NAME = "gravitino-server";
   public static final String JVM_METRIC_NAME = "jvm";
   private final MetricRegistry metricRegistry;
