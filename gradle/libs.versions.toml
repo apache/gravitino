@@ -5,7 +5,6 @@
 [versions]
 junit = "5.8.1"
 protoc = "3.17.3"
-substrait = "0.9.0"
 jackson = "2.15.2"
 guava = "29.0-jre"
 lombok = "1.18.20"
@@ -48,7 +47,6 @@ metrics = "4.2.19"
 [libraries]
 protobuf-java = { group = "com.google.protobuf", name = "protobuf-java", version.ref = "protoc" }
 protobuf-java-util = { group = "com.google.protobuf", name = "protobuf-java-util", version.ref = "protoc" }
-substrait-java-core = { group = "io.substrait", name = "core", version.ref = "substrait" }
 jackson-databind = { group = "com.fasterxml.jackson.core", name = "jackson-databind", version.ref = "jackson" }
 jackson-annotations = { group = "com.fasterxml.jackson.core", name = "jackson-annotations", version.ref = "jackson" }
 jackson-datatype-jdk8 = { group = "com.fasterxml.jackson.datatype", name = "jackson-datatype-jdk8", version.ref = "jackson" }

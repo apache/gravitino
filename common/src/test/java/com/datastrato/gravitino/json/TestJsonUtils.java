@@ -25,10 +25,9 @@ public class TestJsonUtils {
   @BeforeAll
   static void setUp() {
     objectMapper = JsonUtils.objectMapper();
-    // TODO(minghuang): remove this once the old type serializer/deserializer is replaced.
     SimpleModule module = new SimpleModule();
-    module.addSerializer(Type.class, new JsonUtils.GravitinoTypeSerializer());
-    module.addDeserializer(Type.class, new JsonUtils.GravitinoTypeDeserializer());
+    module.addSerializer(Type.class, new JsonUtils.TypeSerializer());
+    module.addDeserializer(Type.class, new JsonUtils.TypeDeserializer());
     objectMapper.registerModule(module);
   }
 
