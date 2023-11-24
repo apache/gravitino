@@ -4,6 +4,9 @@
  */
 package com.datastrato.gravitino.catalog.lakehouse.iceberg.web;
 
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
@@ -41,5 +44,17 @@ public class IcebergRestUtils {
         .entity(errorResponse)
         .type(MediaType.APPLICATION_JSON)
         .build();
+  }
+
+  public static Instant calculateNewTimestamp(Instant currentTimestamp, int hours) {
+    LocalDateTime currentDateTime =
+        LocalDateTime.ofInstant(currentTimestamp, ZoneId.systemDefault());
+    LocalDateTime nextHourDateTime;
+    if (hours > 0) {
+      nextHourDateTime = currentDateTime.plusHours(hours);
+    } else {
+      nextHourDateTime = currentDateTime.minusHours(-hours);
+    }
+    return nextHourDateTime.atZone(ZoneId.systemDefault()).toInstant();
   }
 }

@@ -7,8 +7,9 @@ package com.datastrato.gravitino.catalog.lakehouse.iceberg.web.rest;
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.ops.IcebergTableOps;
-import com.datastrato.gravitino.catalog.lakehouse.iceberg.web.IcebergObjectMapperProvider;
+import com.datastrato.gravitino.catalog.lakehouse.iceberg.web.IcebergObjectMapper;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.web.IcebergRestUtils;
+import com.datastrato.gravitino.catalog.lakehouse.iceberg.web.metrics.IcebergMetricsManager;
 import com.datastrato.gravitino.metrics.MetricNames;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -43,16 +44,18 @@ public class IcebergTableOperations {
   private static final Logger LOG = LoggerFactory.getLogger(IcebergTableOperations.class);
 
   private IcebergTableOps icebergTableOps;
+  private IcebergMetricsManager icebergMetricsManager;
 
   private ObjectMapper icebergObjectMapper;
 
   @Context private HttpServletRequest httpRequest;
 
   @Inject
-  public IcebergTableOperations(IcebergTableOps icebergTableOps) {
+  public IcebergTableOperations(
+      IcebergTableOps icebergTableOps, IcebergMetricsManager icebergMetricsManager) {
     this.icebergTableOps = icebergTableOps;
-    this.icebergObjectMapper =
-        new IcebergObjectMapperProvider().getContext(IcebergTableOperations.class);
+    this.icebergObjectMapper = IcebergObjectMapper.getInstance();
+    this.icebergMetricsManager = icebergMetricsManager;
   }
 
   @GET
@@ -160,6 +163,7 @@ public class IcebergTableOperations {
       @PathParam("namespace") String namespace,
       @PathParam("table") String table,
       ReportMetricsRequest request) {
+    icebergMetricsManager.save(request.report());
     return IcebergRestUtils.noContent();
   }
 
