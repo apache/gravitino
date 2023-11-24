@@ -16,14 +16,6 @@ dependencies {
     exclude("com.google.guava", "guava")
       .because("Brings in Guava for Andriod, which we don't want (and breaks multimaps).")
   }
-  implementation(libs.substrait.java.core) {
-    exclude("org.slf4j")
-    exclude("com.fasterxml.jackson.core")
-    exclude("com.fasterxml.jackson.datatype")
-    exclude("com.fasterxml.jackson.dataformat")
-    exclude("com.google.code.findbugs")
-    exclude("com.google.protobuf")
-  }
   implementation(libs.jackson.databind)
   implementation(libs.jackson.annotations)
   implementation(libs.jackson.datatype.jdk8)

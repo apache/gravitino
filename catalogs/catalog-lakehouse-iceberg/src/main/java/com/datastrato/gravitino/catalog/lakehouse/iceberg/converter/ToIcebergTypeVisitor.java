@@ -7,8 +7,9 @@ package com.datastrato.gravitino.catalog.lakehouse.iceberg.converter;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergColumn;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergTable;
 import com.datastrato.gravitino.rel.Column;
+import com.datastrato.gravitino.rel.types.Type;
+import com.datastrato.gravitino.rel.types.Types;
 import com.google.common.collect.Lists;
-import io.substrait.type.Type;
 import java.util.List;
 
 /**
@@ -45,14 +46,14 @@ public class ToIcebergTypeVisitor<T> {
    * @param <T>
    */
   public static <T> T visit(Type type, ToIcebergTypeVisitor<T> visitor) {
-    if (type instanceof Type.Map) {
-      Type.Map map = (Type.Map) type;
-      return visitor.map(map, visit(map.key(), visitor), visit(map.value(), visitor));
-    } else if (type instanceof Type.ListType) {
-      Type.ListType list = (Type.ListType) type;
+    if (type instanceof Types.MapType) {
+      Types.MapType map = (Types.MapType) type;
+      return visitor.map(map, visit(map.keyType(), visitor), visit(map.valueType(), visitor));
+    } else if (type instanceof Types.ListType) {
+      Types.ListType list = (Types.ListType) type;
       return visitor.array(list, visit(list.elementType(), visitor));
     } else {
-      return visitor.atomic(type);
+      return visitor.atomic((Type.PrimitiveType) type);
     }
   }
 
@@ -64,15 +65,15 @@ public class ToIcebergTypeVisitor<T> {
     throw new UnsupportedOperationException();
   }
 
-  public T array(Type.ListType array, T elementResult) {
+  public T array(Types.ListType array, T elementResult) {
     throw new UnsupportedOperationException();
   }
 
-  public T map(Type.Map map, T keyResult, T valueResult) {
+  public T map(Types.MapType map, T keyResult, T valueResult) {
     throw new UnsupportedOperationException();
   }
 
-  public T atomic(Type primitive) {
+  public T atomic(Type.PrimitiveType primitive) {
     throw new UnsupportedOperationException();
   }
 }

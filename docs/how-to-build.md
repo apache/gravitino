@@ -63,6 +63,7 @@ Note: Gravitino uses Java 1.8 and Trino uses Java 1.17.
     ```shell
     distribution/package/bin/gravitino.sh start
     ```
+   You can access the Gravitino WEB UI by typing http://localhost:8090 in your browser
 
    > Note: If you need to debug the Gravitino Server, you can enable the `GRAVITINO_DEBUG_OPTS` environment variable in the `conf/gravitino-env.sh` file.
    Then you can create a `Remote JVM Debug` configuration in `IntelliJ IDEA` and debug `gravitino.server.main`.

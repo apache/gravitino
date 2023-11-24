@@ -21,8 +21,6 @@ import com.datastrato.gravitino.EntityStoreFactory;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.storage.IdGenerator;
-import com.datastrato.gravitino.storage.NameMappingService;
-import com.datastrato.gravitino.storage.TransactionIdGenerator;
 import com.datastrato.gravitino.utils.ByteUtils;
 import com.datastrato.gravitino.utils.Bytes;
 import com.google.common.io.Files;
@@ -48,7 +46,7 @@ public class TestEntityKeyEncoding {
     Config config = Mockito.mock(Config.class);
     Mockito.when(config.get(Configs.ENTITY_SERDE)).thenReturn("proto");
     Mockito.when(config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)).thenReturn(file.getAbsolutePath());
-    Mockito.when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(3L);
+    Mockito.when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(3000L);
     Mockito.when(config.get(ENTITY_STORE)).thenReturn("kv");
     Mockito.when(config.get(ENTITY_KV_STORE)).thenReturn(DEFAULT_ENTITY_KV_STORE);
     return config;
@@ -80,11 +78,7 @@ public class TestEntityKeyEncoding {
       throws IOException, IllegalAccessException, NoSuchFieldException {
     Config config = getConfig();
     try (KvEntityStore kvEntityStore = getKvEntityStore(config)) {
-      TransactionIdGenerator txIdGenerator =
-          new TransactionIdGeneratorImpl(kvEntityStore.getBackend(), config);
-      NameMappingService nameMappingService =
-          new KvNameMappingService(kvEntityStore.getBackend(), txIdGenerator);
-      BinaryEntityKeyEncoder encoder = new BinaryEntityKeyEncoder(nameMappingService);
+      BinaryEntityKeyEncoder encoder = (BinaryEntityKeyEncoder) kvEntityStore.entityKeyEncoder;
 
       // Metalake
       // metalake1 --> 0
@@ -201,12 +195,7 @@ public class TestEntityKeyEncoding {
       throws IOException, IllegalAccessException, NoSuchFieldException {
     Config config = getConfig();
     try (KvEntityStore kvEntityStore = getKvEntityStore(config)) {
-      TransactionIdGenerator txIdGenerator =
-          new TransactionIdGeneratorImpl(kvEntityStore.getBackend(), config);
-      NameMappingService nameMappingService =
-          new KvNameMappingService(kvEntityStore.getBackend(), txIdGenerator);
-      BinaryEntityKeyEncoder encoder = new BinaryEntityKeyEncoder(nameMappingService);
-
+      BinaryEntityKeyEncoder encoder = (BinaryEntityKeyEncoder) kvEntityStore.entityKeyEncoder;
       // Scan all Metalake
       Namespace namespace = Namespace.of();
       IdGenerator mockIdGenerator = getIdGeneratorAndSpy(encoder);

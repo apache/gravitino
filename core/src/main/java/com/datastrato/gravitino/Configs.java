@@ -75,11 +75,11 @@ public interface Configs {
           .createWithDefault("simple");
 
   ConfigEntry<Long> STORE_TRANSACTION_MAX_SKEW_TIME =
-      new ConfigBuilder("gravitino.entity.store.transaction-max-skew-time")
-          .doc("Max time skew allowed for transaction, Unit: second")
+      new ConfigBuilder("gravitino.entity.store.maxTransactionSkewTimeMs")
+          .doc("Max time skew allowed for transaction, Unit: millisecond")
           .version("0.3.0")
           .longConf()
-          .createWithDefault(2L);
+          .createWithDefault(2000L);
 
   ConfigEntry<Long> ENTITY_KV_TTL =
       new ConfigBuilder(ENTITY_KV_TTL_KEY_KEY)

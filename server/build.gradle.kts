@@ -26,11 +26,7 @@ dependencies {
   implementation(libs.bundles.log4j)
   implementation(libs.bundles.jetty)
   implementation(libs.bundles.jersey)
-  implementation(libs.substrait.java.core) {
-    exclude("org.slf4j")
-    exclude("com.fasterxml.jackson.core")
-    exclude("com.fasterxml.jackson.datatype")
-  }
+  implementation(libs.metrics.jersey2)
 
   compileOnly(libs.lombok)
   annotationProcessor(libs.lombok)
@@ -99,5 +95,9 @@ tasks {
   }
   test {
     environment("GRAVITINO_HOME", rootDir.path)
+    environment("GRAVITINO_TEST", "true")
+  }
+  clean {
+    delete("${propertiesFile}")
   }
 }

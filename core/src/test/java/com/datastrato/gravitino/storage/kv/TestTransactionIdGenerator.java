@@ -15,11 +15,14 @@ import com.google.common.io.Files;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mockito;
@@ -36,7 +39,7 @@ public class TestTransactionIdGenerator {
     Config config = Mockito.mock(Config.class);
     Mockito.when(config.get(Configs.ENTITY_SERDE)).thenReturn("proto");
     Mockito.when(config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)).thenReturn(file.getAbsolutePath());
-    Mockito.when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(3L);
+    Mockito.when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(3000L);
     return config;
   }
 
@@ -44,6 +47,20 @@ public class TestTransactionIdGenerator {
     KvBackend kvBackend = new RocksDBKvBackend();
     kvBackend.initialize(config);
     return kvBackend;
+  }
+
+  @Test
+  void testSchedulerAndSkewTime() throws IOException, InterruptedException {
+    Config config = getConfig();
+    Mockito.when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(1000L);
+    KvBackend kvBackend = getKvBackEnd(config);
+    TransactionIdGenerator transactionIdGenerator =
+        new TransactionIdGeneratorImpl(kvBackend, config);
+    transactionIdGenerator.start();
+    // Make sure the scheduler has schedule once
+    Thread.sleep(2000 + 500);
+    Assertions.assertNotNull(
+        kvBackend.get(TransactionIdGeneratorImpl.LAST_TIMESTAMP.getBytes(StandardCharsets.UTF_8)));
   }
 
   @ParameterizedTest

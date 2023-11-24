@@ -17,10 +17,15 @@ import com.codahale.metrics.Timer;
  * "{metricsSourceName}.{name}".
  */
 public abstract class MetricsSource {
+
+  // metrics source name
+  public static final String ICEBERG_REST_SERVER_METRIC_NAME = "iceberg-rest-server";
+  public static final String GRAVITINO_SERVER_METRIC_NAME = "gravitino-server";
+  public static final String JVM_METRIC_NAME = "jvm";
   private final MetricRegistry metricRegistry;
   private final String metricsSourceName;
 
-  MetricsSource(String name) {
+  public MetricsSource(String name) {
     this.metricsSourceName = name;
     metricRegistry = new MetricRegistry();
   }

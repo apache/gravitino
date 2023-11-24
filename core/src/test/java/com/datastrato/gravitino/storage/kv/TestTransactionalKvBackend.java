@@ -48,7 +48,7 @@ class TestTransactionalKvBackend {
     Config config = Mockito.mock(Config.class);
     Mockito.when(config.get(Configs.ENTITY_SERDE)).thenReturn("proto");
     Mockito.when(config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)).thenReturn(file.getAbsolutePath());
-    Mockito.when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(3L);
+    Mockito.when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(3000L);
     return config;
   }
 
@@ -262,36 +262,35 @@ class TestTransactionalKvBackend {
     TransactionalKvBackendImpl kvTransactionManager =
         new TransactionalKvBackendImpl(kvBackend, transactionIdGenerator);
     kvTransactionManager.begin();
-    long txId = kvTransactionManager.txId.get();
     List<Pair<byte[], byte[]>> pairs =
         Lists.newArrayList(
             Pair.of(
-                kvTransactionManager.generateKey("key1".getBytes(), txId),
+                kvTransactionManager.constructKey("key1".getBytes()),
                 kvTransactionManager.constructValue("value1".getBytes(), ValueStatusEnum.NORMAL)),
             Pair.of(
-                kvTransactionManager.generateKey("key2".getBytes(), txId),
+                kvTransactionManager.constructKey("key2".getBytes()),
                 kvTransactionManager.constructValue("value2".getBytes(), ValueStatusEnum.NORMAL)),
             Pair.of(
-                kvTransactionManager.generateKey("key3".getBytes(), txId),
+                kvTransactionManager.constructKey("key3".getBytes()),
                 kvTransactionManager.constructValue("value3".getBytes(), ValueStatusEnum.NORMAL)),
             Pair.of(
-                kvTransactionManager.generateKey("key4".getBytes(), txId),
+                kvTransactionManager.constructKey("key4".getBytes()),
                 kvTransactionManager.constructValue("value4".getBytes(), ValueStatusEnum.NORMAL)),
             Pair.of(
-                kvTransactionManager.generateKey("key5".getBytes(), txId),
+                kvTransactionManager.constructKey("key5".getBytes()),
                 kvTransactionManager.constructValue("value6".getBytes(), ValueStatusEnum.NORMAL)),
             Pair.of(
-                kvTransactionManager.generateKey("key6".getBytes(), txId),
+                kvTransactionManager.constructKey("key6".getBytes()),
                 kvTransactionManager.constructValue("value7".getBytes(), ValueStatusEnum.NORMAL)),
             Pair.of(
-                kvTransactionManager.generateKey("key7".getBytes(), txId),
+                kvTransactionManager.constructKey("key7".getBytes()),
                 kvTransactionManager.constructValue("value8".getBytes(), ValueStatusEnum.NORMAL)),
             Pair.of(
-                kvTransactionManager.generateKey("key8".getBytes(), txId),
+                kvTransactionManager.constructKey("key8".getBytes()),
                 kvTransactionManager.constructValue("value9".getBytes(), ValueStatusEnum.NORMAL)),
 
             // Will throw NPE to roll back the transaction.
-            Pair.of(kvTransactionManager.generateKey("key9".getBytes(), txId), null));
+            Pair.of(kvTransactionManager.constructKey("key9".getBytes()), null));
 
     Pair<byte[], byte[]>[] arrayPair = pairs.toArray(new Pair[0]);
 

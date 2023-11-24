@@ -4,7 +4,7 @@
  */
 package com.datastrato.gravitino.catalog.jdbc.converter;
 
-import io.substrait.type.Type;
+import com.datastrato.gravitino.rel.types.Type;
 
 public abstract class JdbcTypeConverter {
 
@@ -14,7 +14,7 @@ public abstract class JdbcTypeConverter {
    * @param type
    * @return
    */
-  abstract Type toGravitinoType(String type);
+  public abstract Type toGravitinoType(String type);
 
   /**
    * Convert from JDBC type to Gravitino type
@@ -22,5 +22,5 @@ public abstract class JdbcTypeConverter {
    * @param type
    * @return
    */
-  abstract String fromGravitinoType(Type type);
+  public abstract String fromGravitinoType(Type type);
 }

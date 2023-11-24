@@ -13,14 +13,14 @@ import static com.datastrato.gravitino.Configs.STORE_TRANSACTION_MAX_SKEW_TIME;
 
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Configs;
+import com.datastrato.gravitino.EntitySerDeFactory;
+import com.datastrato.gravitino.EntityStoreFactory;
 import com.datastrato.gravitino.storage.IdGenerator;
 import com.datastrato.gravitino.storage.NameMappingService;
-import com.datastrato.gravitino.storage.RandomIdGenerator;
-import java.io.IOException;
+import com.google.common.io.Files;
+import java.io.File;
 import java.lang.reflect.Field;
-import org.apache.commons.io.FileUtils;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.ClassOrderer.OrderAnnotation;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
@@ -29,30 +29,23 @@ import org.mockito.Mockito;
 
 @TestClassOrder(OrderAnnotation.class)
 public class TestKvNameMappingService {
-
-  public static final String ROCKS_DB_STORE_PATH = "/tmp/gravitino_name_mapping";
-  private final IdGenerator idGenerator = new RandomIdGenerator();
-
-  @BeforeEach
-  public void cleanEnv() {
-    try {
-      FileUtils.deleteDirectory(FileUtils.getFile(ROCKS_DB_STORE_PATH));
-    } catch (Exception e) {
-      // Ignore
-    }
-  }
-
-  private KvNameMappingService createNameMappingService(String kvPath) throws IOException {
+  private Config getConfig() {
+    File file = Files.createTempDir();
+    file.deleteOnExit();
     Config config = Mockito.mock(Config.class);
+    Mockito.when(config.get(Configs.ENTITY_SERDE)).thenReturn("proto");
+    Mockito.when(config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)).thenReturn(file.getAbsolutePath());
+    Mockito.when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(3000L);
     Mockito.when(config.get(ENTITY_STORE)).thenReturn("kv");
     Mockito.when(config.get(ENTITY_KV_STORE)).thenReturn(DEFAULT_ENTITY_KV_STORE);
-    Mockito.when(config.get(Configs.ENTITY_SERDE)).thenReturn("proto");
-    Mockito.when(config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)).thenReturn(kvPath);
-    Mockito.when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(3L);
+    return config;
+  }
 
-    KvBackend backend = new RocksDBKvBackend();
-    backend.initialize(config);
-    return new KvNameMappingService(backend, new TransactionIdGeneratorImpl(backend, config));
+  private KvEntityStore getKvEntityStore(Config config) {
+    KvEntityStore kvEntityStore = (KvEntityStore) EntityStoreFactory.createEntityStore(config);
+    kvEntityStore.initialize(config);
+    kvEntityStore.setSerDe(EntitySerDeFactory.createEntitySerDe(config.get(Configs.ENTITY_SERDE)));
+    return kvEntityStore;
   }
 
   private IdGenerator getIdGeneratorByReflection(NameMappingService nameMappingService)
@@ -68,8 +61,8 @@ public class TestKvNameMappingService {
   @Test
   @Order(1)
   public void testGetIdByName() throws Exception {
-    try (NameMappingService nameMappingService =
-        createNameMappingService(ROCKS_DB_STORE_PATH + "/1")) {
+    try (KvEntityStore kvEntityStore = getKvEntityStore(getConfig())) {
+      NameMappingService nameMappingService = kvEntityStore.nameMappingService;
       Assertions.assertNull(nameMappingService.getIdByName("name1"));
 
       IdGenerator spyIdGenerator = getIdGeneratorByReflection(nameMappingService);
@@ -90,8 +83,8 @@ public class TestKvNameMappingService {
   @Test
   @Order(2)
   public void testUpdateName() throws Exception {
-    try (NameMappingService nameMappingService =
-        createNameMappingService(ROCKS_DB_STORE_PATH + "/2")) {
+    try (KvEntityStore kvEntityStore = getKvEntityStore(getConfig())) {
+      NameMappingService nameMappingService = kvEntityStore.nameMappingService;
       IdGenerator idGenerator = getIdGeneratorByReflection(nameMappingService);
       Mockito.doReturn(1L).when(idGenerator).nextId();
       long name1IdRead = nameMappingService.getOrCreateIdFromName("name1");
@@ -116,9 +109,9 @@ public class TestKvNameMappingService {
   @Test
   @Order(3)
   public void testBindAndUnBind() throws Exception {
-    idGenerator.nextId();
-    try (NameMappingService nameMappingService =
-        createNameMappingService(ROCKS_DB_STORE_PATH + "/3")) {
+    try (KvEntityStore kvEntityStore = getKvEntityStore(getConfig())) {
+      KvNameMappingService nameMappingService =
+          (KvNameMappingService) kvEntityStore.nameMappingService;
       IdGenerator idGenerator = getIdGeneratorByReflection(nameMappingService);
 
       Mockito.doReturn(1L).when(idGenerator).nextId();
@@ -132,16 +125,16 @@ public class TestKvNameMappingService {
       Mockito.doReturn(2L).when(idGenerator).nextId();
       nameMappingService.getOrCreateIdFromName("name2");
 
-      KvBackend spyKvBackend = Mockito.spy(((KvNameMappingService) nameMappingService).backend);
+      TransactionalKvBackend spyKvBackend =
+          Mockito.spy(((KvNameMappingService) nameMappingService).transactionalKvBackend);
       // All deletes && puts will be converted to put operations.
       Mockito.doThrow(new ArithmeticException())
           .when(spyKvBackend)
           .put(Mockito.any(), Mockito.any(), Mockito.anyBoolean());
       Config config = Mockito.mock(Config.class);
-      Mockito.when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(3L);
+      Mockito.when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(3000L);
       final NameMappingService mock =
-          new KvNameMappingService(
-              spyKvBackend, new TransactionIdGeneratorImpl(spyKvBackend, config));
+          new KvNameMappingService(spyKvBackend, nameMappingService.lock);
 
       // Now we try to use update. It should fail.
       Assertions.assertThrowsExactly(

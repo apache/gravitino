@@ -9,6 +9,7 @@ import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.storage.TransactionIdGenerator;
 import com.datastrato.gravitino.utils.ByteUtils;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -22,7 +23,7 @@ public class TransactionIdGeneratorImpl implements TransactionIdGenerator {
   private static final Logger LOGGER = LoggerFactory.getLogger(TransactionIdGeneratorImpl.class);
 
   private final KvBackend kvBackend;
-  public static final String LAST_TIMESTAMP = "last_timestamp";
+  @VisibleForTesting static final String LAST_TIMESTAMP = "last_timestamp";
   private volatile long incrementId = 0L;
   private volatile long lastTransactionId = 0L;
   private final Config config;
@@ -47,9 +48,9 @@ public class TransactionIdGeneratorImpl implements TransactionIdGenerator {
     long maxSkewTime = config.get(Configs.STORE_TRANSACTION_MAX_SKEW_TIME);
     // Why use maxSkewTime + 1? Because we will save the current timestamp to storage layer every
     // maxSkewTime second and the save operation will also take a moment. Usually, it takes less
-    // than 1 millisecond, so we'd better wait maxSkewTime + 1 second to make sure the timestamp is
-    // OK.
-    checkTimeSkew(maxSkewTime + 1);
+    // than 1 millisecond, so we'd better wait maxSkewTime + 1000 millisecond to make sure the
+    // timestamp is OK.
+    checkTimeSkew(maxSkewTime + 1000);
 
     scheduledThreadPoolExecutor.scheduleAtFixedRate(
         () -> {
@@ -72,27 +73,26 @@ public class TransactionIdGeneratorImpl implements TransactionIdGenerator {
         },
         maxSkewTime * 2,
         maxSkewTime,
-        TimeUnit.SECONDS);
+        TimeUnit.MILLISECONDS);
   }
 
-  private void checkTimeSkew(long maxSkewTimeInSecond) {
+  private void checkTimeSkew(long maxSkewTimeInMs) {
     long current = System.currentTimeMillis();
     long old;
     try {
       old = getSavedTs();
-      long maxSkewTimeInMills = maxSkewTimeInSecond * 1000;
       // In case of time skew, we will wait maxSkewTimeInSecond(default 2) seconds.
       int retries = 0;
-      while (current <= old + maxSkewTimeInMills && retries++ < maxSkewTimeInMills / 100) {
+      while (current <= old + maxSkewTimeInMs && retries++ < maxSkewTimeInMs / 100) {
         Thread.sleep(100);
         current = System.currentTimeMillis();
       }
 
-      if (current <= old + maxSkewTimeInSecond * 1000) {
+      if (current <= old + maxSkewTimeInMs) {
         throw new RuntimeException(
             String.format(
-                "Failed to initialize transaction id generator after %d seconds, time skew is too large",
-                maxSkewTimeInSecond));
+                "Failed to initialize transaction id generator after %d milliseconds, time skew is too large",
+                maxSkewTimeInMs));
       }
     } catch (IOException | InterruptedException e) {
       throw new RuntimeException(e);
@@ -132,10 +132,10 @@ public class TransactionIdGeneratorImpl implements TransactionIdGenerator {
   public void close() throws IOException {
     scheduledThreadPoolExecutor.shutdownNow();
     try {
-      scheduledThreadPoolExecutor.awaitTermination(10000, TimeUnit.SECONDS);
+      scheduledThreadPoolExecutor.awaitTermination(2000, TimeUnit.MILLISECONDS);
     } catch (InterruptedException e) {
       LOGGER.warn(
-          "Failed to close thread pool scheduledThreadPoolExecutor in TransactionIdGeneratorImpl",
+          "Failed to close thread pool scheduledThreadPoolExecutor in TransactionIdGeneratorImpl with in 2000 milliseconds",
           e);
     }
   }

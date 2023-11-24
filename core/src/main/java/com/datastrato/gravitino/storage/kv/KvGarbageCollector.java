@@ -81,7 +81,7 @@ public final class KvGarbageCollector implements Closeable {
                         return false;
                       }
 
-                      byte[] transactionId = getBinaryTransactionId(k);
+                      byte[] transactionId = getBinaryTransactionId((byte[]) k);
                       return kvBackend.get(generateCommitKey(transactionId)) == null;
                     })
                 .limit(10000) /* Each time we only collect 10000 entities at most*/

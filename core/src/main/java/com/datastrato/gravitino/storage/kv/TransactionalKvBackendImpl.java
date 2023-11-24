@@ -15,7 +15,7 @@ import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.io.Serializable;
 import java.util.List;
-import javax.annotation.concurrent.NotThreadSafe;
+import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.SerializationUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -46,7 +46,7 @@ import org.apache.commons.lang3.tuple.Pair;
  *   0x00000001(Metrication: 1) -- DELETED, the value is deleted and not visible
  * </pre>
  */
-@NotThreadSafe
+@ThreadSafe
 public class TransactionalKvBackendImpl implements TransactionalKvBackend {
   private final KvBackend kvBackend;
   private final TransactionIdGenerator transactionIdGenerator;
@@ -93,6 +93,10 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
   @Override
   public void commit() throws IOException {
     try {
+      if (putPairs.get().isEmpty()) {
+        return;
+      }
+
       // Prepare
       for (Pair<byte[], byte[]> pair : putPairs.get()) {
         kvBackend.put(pair.getKey(), pair.getValue(), true);
@@ -173,6 +177,10 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
 
   @Override
   public List<Pair<byte[], byte[]>> scan(KvRangeScan scanRange) throws IOException {
+    // Why we need to change the end key? Because we use the transaction id to construct a row key
+    // Assuming the end key is 'a' and the value of endInclusive is true, if we want to scan the
+    // value of key a, then we need to change the end key to 'b' and set the value of endInclusive
+    // to false.
     byte[] end = scanRange.getEnd();
     boolean endInclude = scanRange.isEndInclusive();
     if (endInclude) {
@@ -203,6 +211,7 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
       byte[] realKey = getRealKey(rawKey);
       Bytes minNextKey = Bytes.increment(Bytes.wrap(Bytes.concat(realKey, SEPARATOR)));
 
+      // If the start key is exclusive and the key is equal to the start key, we need to skip it.
       if (!scanRange.isStartInclusive()
           && Bytes.wrap(realKey).compareTo(scanRange.getStart()) == 0) {
         while (j < rawPairs.size() && minNextKey.compareTo(rawPairs.get(j).getKey()) >= 0) {
@@ -211,12 +220,9 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
         continue;
       }
 
+      // If the end key is exclusive and the key is equal to the end key, we need to skip it.
       if (!scanRange.isEndInclusive() && Bytes.wrap(realKey).compareTo(scanRange.getEnd()) == 0) {
-        // Skip all versions of the same key.
-        while (j < rawPairs.size() && minNextKey.compareTo(rawPairs.get(j).getKey()) >= 0) {
-          j++;
-        }
-        continue;
+        break;
       }
 
       byte[] value = getRealValue(pair.getValue());
