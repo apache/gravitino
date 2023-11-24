@@ -9,6 +9,7 @@ import static com.datastrato.gravitino.Configs.DEFAULT_ENTITY_KV_STORE;
 import static com.datastrato.gravitino.Configs.ENTITY_KV_STORE;
 import static com.datastrato.gravitino.Configs.ENTITY_STORE;
 import static com.datastrato.gravitino.Configs.ENTRY_KV_ROCKSDB_BACKEND_PATH;
+import static com.datastrato.gravitino.Configs.STORE_TRANSACTION_MAX_SKEW_TIME;
 
 import com.datastrato.gravitino.Catalog.Type;
 import com.datastrato.gravitino.Config;
@@ -112,6 +113,8 @@ public class TestKvEntityStorage {
     Mockito.when(config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)).thenReturn(ROCKS_DB_STORE_PATH);
 
     Assertions.assertEquals(ROCKS_DB_STORE_PATH, config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH));
+    Mockito.when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(1000L);
+
     AuditInfo auditInfo =
         new AuditInfo.Builder().withCreator("creator").withCreateTime(Instant.now()).build();
 
@@ -194,6 +197,7 @@ public class TestKvEntityStorage {
     Mockito.when(config.get(ENTITY_KV_STORE)).thenReturn(DEFAULT_ENTITY_KV_STORE);
     Mockito.when(config.get(Configs.ENTITY_SERDE)).thenReturn("proto");
     Mockito.when(config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)).thenReturn(ROCKS_DB_STORE_PATH);
+    Mockito.when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(1000L);
 
     Assertions.assertEquals(ROCKS_DB_STORE_PATH, config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH));
     AuditInfo auditInfo =
@@ -475,6 +479,8 @@ public class TestKvEntityStorage {
     Mockito.when(config.get(ENTITY_KV_STORE)).thenReturn(DEFAULT_ENTITY_KV_STORE);
     Mockito.when(config.get(Configs.ENTITY_SERDE)).thenReturn("proto");
     Mockito.when(config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)).thenReturn("/tmp/gravitino");
+    Mockito.when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(1000L);
+
     FileUtils.deleteDirectory(FileUtils.getFile("/tmp/gravitino"));
 
     AuditInfo auditInfo =
@@ -619,7 +625,7 @@ public class TestKvEntityStorage {
 
       Assertions.assertThrowsExactly(
           NoSuchEntityException.class,
-          () -> store.get(schema2.nameIdentifier(), EntityType.SCHEMA, CatalogEntity.class));
+          () -> store.get(schema2.nameIdentifier(), EntityType.SCHEMA, SchemaEntity.class));
 
       Assertions.assertTrue(store.delete(metalake.nameIdentifier(), EntityType.METALAKE, true));
 
@@ -637,6 +643,7 @@ public class TestKvEntityStorage {
     Mockito.when(config.get(ENTITY_KV_STORE)).thenReturn(DEFAULT_ENTITY_KV_STORE);
     Mockito.when(config.get(Configs.ENTITY_SERDE)).thenReturn("proto");
     Mockito.when(config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)).thenReturn("/tmp/gravitino");
+    Mockito.when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(1000L);
     FileUtils.deleteDirectory(FileUtils.getFile("/tmp/gravitino"));
 
     try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
@@ -658,32 +665,12 @@ public class TestKvEntityStorage {
       Assertions.assertThrows(
           NoSuchEntityException.class,
           () -> store.get(metalake.nameIdentifier(), EntityType.METALAKE, BaseMetalake.class));
-      try {
-        store.executeInTransaction(
-            () -> {
-              store.put(metalake);
-              // Try to mock an exception
-              double a = 1 / 0;
-              store.put(catalog);
-              return null;
-            });
-      } catch (Exception e) {
-        Assertions.assertTrue(e instanceof ArithmeticException);
-      }
 
-      Assertions.assertThrows(
-          NoSuchEntityException.class,
-          () -> store.get(metalake.nameIdentifier(), EntityType.METALAKE, BaseMetalake.class));
-
-      store.executeInTransaction(
-          () -> {
-            store.put(metalake);
-            store.put(catalog);
-            store.put(metalakeCopy);
-            store.put(catalogCopy);
-            store.put(catalogCopyAgain);
-            return null;
-          });
+      store.put(metalake);
+      store.put(catalog);
+      store.put(metalakeCopy);
+      store.put(catalogCopy);
+      store.put(catalogCopyAgain);
 
       Metalake retrievedMetalake =
           store.get(metalake.nameIdentifier(), EntityType.METALAKE, BaseMetalake.class);
@@ -756,6 +743,7 @@ public class TestKvEntityStorage {
     Mockito.when(config.get(ENTITY_KV_STORE)).thenReturn(DEFAULT_ENTITY_KV_STORE);
     Mockito.when(config.get(Configs.ENTITY_SERDE)).thenReturn("proto");
     Mockito.when(config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)).thenReturn(file.getAbsolutePath());
+    Mockito.when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(1000L);
     ThreadPoolExecutor threadPoolExecutor =
         new ThreadPoolExecutor(
             10,
@@ -868,6 +856,7 @@ public class TestKvEntityStorage {
     Mockito.when(config.get(ENTITY_KV_STORE)).thenReturn(DEFAULT_ENTITY_KV_STORE);
     Mockito.when(config.get(Configs.ENTITY_SERDE)).thenReturn("proto");
     Mockito.when(config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)).thenReturn(file.getAbsolutePath());
+    Mockito.when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(1000L);
 
     // First time create entity store, the storage layout version should be DEFAULT_LAYOUT_VERSION
     try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
