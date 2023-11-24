@@ -23,7 +23,8 @@ import com.datastrato.gravitino.rel.TableChange.UpdateColumnComment;
 import com.datastrato.gravitino.rel.TableChange.UpdateColumnPosition;
 import com.datastrato.gravitino.rel.TableChange.UpdateColumnType;
 import com.datastrato.gravitino.rel.TableChange.UpdateComment;
-import io.substrait.type.Type;
+import com.datastrato.gravitino.rel.types.Type;
+import com.datastrato.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Test;
 
 public class TestTableChange {
@@ -67,7 +68,7 @@ public class TestTableChange {
   @Test
   public void testAddColumn() {
     String[] fieldNames = {"Name"};
-    Type dataType = Type.withNullability(false).STRING;
+    Type dataType = Types.StringType.get();
     String comment = "Person name";
     AddColumn addColumn = (AddColumn) TableChange.addColumn(fieldNames, dataType, comment);
 
@@ -80,7 +81,7 @@ public class TestTableChange {
   @Test
   public void testAddColumnWithPosition() {
     String[] fieldNames = {"Full Name", "First Name"};
-    Type dataType = Type.withNullability(false).STRING;
+    Type dataType = Types.StringType.get();
     String comment = "First or given name";
     TableChange.ColumnPosition position = TableChange.ColumnPosition.after("Address");
     AddColumn addColumn =
@@ -95,7 +96,7 @@ public class TestTableChange {
   @Test
   public void testAddColumnWithNullCommentAndPosition() {
     String[] fieldNames = {"Middle Name"};
-    Type dataType = Type.withNullability(false).STRING;
+    Type dataType = Types.StringType.get();
     AddColumn addColumn = (AddColumn) TableChange.addColumn(fieldNames, dataType, null, null);
 
     assertArrayEquals(fieldNames, addColumn.fieldNames());
@@ -191,7 +192,7 @@ public class TestTableChange {
   @Test
   public void testUpdateColumnType() {
     String[] fieldNames = {"existing_column"};
-    Type dataType = Type.withNullability(false).STRING;
+    Type dataType = Types.StringType.get();
     UpdateColumnType updateColumnType =
         (UpdateColumnType) TableChange.updateColumnType(fieldNames, dataType);
 
@@ -202,7 +203,7 @@ public class TestTableChange {
   @Test
   public void testUpdateNestedColumnType() {
     String[] fieldNames = {"nested", "existing_column"};
-    Type dataType = Type.withNullability(false).STRING;
+    Type dataType = Types.StringType.get();
     UpdateColumnType updateColumnType =
         (UpdateColumnType) TableChange.updateColumnType(fieldNames, dataType);
 
@@ -347,7 +348,7 @@ public class TestTableChange {
   @Test
   void testColumnUpdateTypeEqualsAndHashCode() {
     String[] nameA = {"First Name"};
-    Type dataType = Type.withNullability(false).STRING;
+    Type dataType = Types.StringType.get();
     UpdateColumnType columnA = (UpdateColumnType) TableChange.updateColumnType(nameA, dataType);
     String[] nameB = {"First Name"};
     UpdateColumnType columnB = (UpdateColumnType) TableChange.updateColumnType(nameB, dataType);
@@ -360,7 +361,7 @@ public class TestTableChange {
   @Test
   void testColumnUpdateTypeNotEqualsAndHashCode() {
     String[] nameA = {"First Name"};
-    Type dataType = Type.withNullability(false).STRING;
+    Type dataType = Types.StringType.get();
     UpdateColumnType columnA = (UpdateColumnType) TableChange.updateColumnType(nameA, dataType);
     String[] nameB = {"Given Name"};
     UpdateColumnType columnB = (UpdateColumnType) TableChange.updateColumnType(nameB, dataType);
@@ -492,11 +493,11 @@ public class TestTableChange {
   @Test
   void testAddColumnEqualsAndHashCode() {
     String[] fieldNamesA = {"Name"};
-    Type dataTypeA = Type.withNullability(false).STRING;
+    Type dataTypeA = Types.StringType.get();
     String commentA = "Person name";
     AddColumn columnA = (AddColumn) TableChange.addColumn(fieldNamesA, dataTypeA, commentA);
     String[] fieldNamesB = {"Name"};
-    Type dataTypeB = Type.withNullability(false).STRING;
+    Type dataTypeB = Types.StringType.get();
     String commentB = "Person name";
     AddColumn columnB = (AddColumn) TableChange.addColumn(fieldNamesB, dataTypeB, commentB);
 
@@ -508,11 +509,11 @@ public class TestTableChange {
   @Test
   void testAddColumnNotEqualsAndHashCode() {
     String[] fieldNamesA = {"Name"};
-    Type dataTypeA = Type.withNullability(false).STRING;
+    Type dataTypeA = Types.StringType.get();
     String commentA = "Person name";
     AddColumn columnA = (AddColumn) TableChange.addColumn(fieldNamesA, dataTypeA, commentA);
     String[] fieldNamesB = {"First Name"};
-    Type dataTypeB = Type.withNullability(false).STRING;
+    Type dataTypeB = Types.StringType.get();
     String commentB = "Person name";
     AddColumn columnB = (AddColumn) TableChange.addColumn(fieldNamesB, dataTypeB, commentB);
 

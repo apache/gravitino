@@ -6,7 +6,7 @@
 package com.datastrato.gravitino.catalog.rel;
 
 import com.datastrato.gravitino.rel.Column;
-import io.substrait.type.Type;
+import com.datastrato.gravitino.rel.types.Type;
 import javax.annotation.Nullable;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;

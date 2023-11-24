@@ -31,7 +31,8 @@ public class ConvertUtil {
    * @param gravitinoType Gravitino type.
    * @return Iceberg type.
    */
-  public static Type toIcebergType(boolean nullable, io.substrait.type.Type gravitinoType) {
+  public static Type toIcebergType(
+      boolean nullable, com.datastrato.gravitino.rel.types.Type gravitinoType) {
     return ToIcebergTypeVisitor.visit(gravitinoType, new ToIcebergType(nullable));
   }
 
@@ -41,7 +42,7 @@ public class ConvertUtil {
    * @param type Iceberg type of field.
    * @return
    */
-  public static io.substrait.type.Type formIcebergType(Type type) {
+  public static com.datastrato.gravitino.rel.types.Type formIcebergType(Type type) {
     return TypeUtil.visit(type, new FromIcebergType());
   }
 

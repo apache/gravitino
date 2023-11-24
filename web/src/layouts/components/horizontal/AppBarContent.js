@@ -4,9 +4,14 @@
  */
 
 import Box from '@mui/material/Box'
+import VersionView from '../VersionView'
 
 const AppBarContent = props => {
-  return <Box sx={{ display: 'flex', alignItems: 'center' }}></Box>
+  return (
+    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+      <VersionView />
+    </Box>
+  )
 }
 
 export default AppBarContent

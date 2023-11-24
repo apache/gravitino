@@ -275,14 +275,9 @@ public class CatalogConnectorMetadata {
   }
 
   public void setColumnType(SchemaTableName schemaTableName, String columnName, Type type) {
-    boolean isNullable =
-        getTable(schemaTableName.getSchemaName(), schemaTableName.getTableName())
-            .getColumn(columnName)
-            .isNullable();
     String[] columnNames = {columnName};
     applyAlter(
         schemaTableName,
-        TableChange.updateColumnType(
-            columnNames, DataTypeTransformer.getGravitinoType(type, isNullable)));
+        TableChange.updateColumnType(columnNames, DataTypeTransformer.getGravitinoType(type)));
   }
 }
