@@ -53,9 +53,9 @@ import com.datastrato.gravitino.rel.expressions.sorts.NullOrdering;
 import com.datastrato.gravitino.rel.expressions.sorts.SortDirection;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
+import com.datastrato.gravitino.rel.types.Types;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
-import io.substrait.type.TypeCreator;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -214,19 +214,19 @@ public class CatalogHiveIT extends AbstractIT {
     ColumnDTO col1 =
         new ColumnDTO.Builder<>()
             .withName(HIVE_COL_NAME1)
-            .withDataType(TypeCreator.NULLABLE.I8)
+            .withDataType(Types.ByteType.get())
             .withComment("col_1_comment")
             .build();
     ColumnDTO col2 =
         new ColumnDTO.Builder<>()
             .withName(HIVE_COL_NAME2)
-            .withDataType(TypeCreator.NULLABLE.DATE)
+            .withDataType(Types.DateType.get())
             .withComment("col_2_comment")
             .build();
     ColumnDTO col3 =
         new ColumnDTO.Builder<>()
             .withName(HIVE_COL_NAME3)
-            .withDataType(TypeCreator.NULLABLE.STRING)
+            .withDataType(Types.StringType.get())
             .withComment("col_3_comment")
             .build();
     return new ColumnDTO[] {col1, col2, col3};
@@ -674,13 +674,13 @@ public class CatalogHiveIT extends AbstractIT {
                 TableChange.setProperty("key2", "val2_new"),
                 TableChange.addColumn(
                     new String[] {"col_4"},
-                    TypeCreator.NULLABLE.STRING,
+                    Types.StringType.get(),
                     null,
                     TableChange.ColumnPosition.after(columns[1].name())),
                 TableChange.renameColumn(new String[] {HIVE_COL_NAME2}, "col_2_new"),
                 TableChange.updateColumnComment(new String[] {HIVE_COL_NAME1}, "comment_new"),
                 TableChange.updateColumnType(
-                    new String[] {HIVE_COL_NAME1}, TypeCreator.NULLABLE.I32));
+                    new String[] {HIVE_COL_NAME1}, Types.IntegerType.get()));
 
     // Direct get table from hive metastore to check if the table is altered successfully.
     org.apache.hadoop.hive.metastore.api.Table hiveTab =
@@ -716,7 +716,7 @@ public class CatalogHiveIT extends AbstractIT {
                   .alterTable(
                       NameIdentifier.of(metalakeName, catalogName, schemaName, ALTER_TABLE_NAME),
                       TableChange.updateColumnType(
-                          new String[] {HIVE_COL_NAME3}, TypeCreator.NULLABLE.I32));
+                          new String[] {HIVE_COL_NAME3}, Types.IntegerType.get()));
             });
     Assertions.assertTrue(exception.getMessage().contains("Cannot alter partition column"));
 
@@ -724,19 +724,19 @@ public class CatalogHiveIT extends AbstractIT {
     ColumnDTO col1 =
         new ColumnDTO.Builder()
             .withName("name")
-            .withDataType(TypeCreator.NULLABLE.STRING)
+            .withDataType(Types.StringType.get())
             .withComment("comment")
             .build();
     ColumnDTO col2 =
         new ColumnDTO.Builder()
             .withName("address")
-            .withDataType(TypeCreator.NULLABLE.STRING)
+            .withDataType(Types.StringType.get())
             .withComment("comment")
             .build();
     ColumnDTO col3 =
         new ColumnDTO.Builder()
             .withName("date_of_birth")
-            .withDataType(TypeCreator.NULLABLE.DATE)
+            .withDataType(Types.DateType.get())
             .withComment("comment")
             .build();
     ColumnDTO[] newColumns = new ColumnDTO[] {col1, col2, col3};

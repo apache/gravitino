@@ -48,9 +48,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
-import io.substrait.type.StringTypeVisitor;
-import io.substrait.type.parser.ParseToPojo;
-import io.substrait.type.parser.TypeStringParser;
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.List;
@@ -272,8 +269,7 @@ public class JsonUtils {
             node.has(LITERAL_VALUE),
             "Cannot parse literal arg from missing literal value: %s",
             node);
-        io.substrait.type.Type dataType =
-            TypeStringParser.parse(getString(DATA_TYPE, node), ParseToPojo::type);
+        Type dataType = readDataType(node.get(DATA_TYPE));
         String value = getString(LITERAL_VALUE, node);
         return new LiteralDTO.Builder().withDataType(dataType).withValue(value).build();
       case FIELD:
@@ -309,8 +305,8 @@ public class JsonUtils {
     gen.writeStringField(EXPRESSION_TYPE, arg.argType().name().toLowerCase());
     switch (arg.argType()) {
       case LITERAL:
-        gen.writeStringField(
-            DATA_TYPE, ((LiteralDTO) arg).dataType().accept(new StringTypeVisitor()));
+        gen.writeFieldName(DATA_TYPE);
+        writeDataType(((LiteralDTO) arg).dataType(), gen);
         gen.writeStringField(LITERAL_VALUE, ((LiteralDTO) arg).value());
         break;
       case FIELD:
@@ -610,7 +606,7 @@ public class JsonUtils {
   // Nested classes for custom serialization and deserialization
 
   /** Custom JSON serializer for Gravitino Type objects. */
-  public static class GravitinoTypeSerializer extends JsonSerializer<Type> {
+  public static class TypeSerializer extends JsonSerializer<Type> {
     @Override
     public void serialize(Type value, JsonGenerator gen, SerializerProvider serializers)
         throws IOException {
@@ -619,44 +615,11 @@ public class JsonUtils {
   }
 
   /** Custom JSON deserializer for Gravitino Type objects. */
-  public static class GravitinoTypeDeserializer extends JsonDeserializer<Type> {
+  public static class TypeDeserializer extends JsonDeserializer<Type> {
 
     @Override
     public Type deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
       return readDataType(p.getCodec().readTree(p));
-    }
-  }
-
-  public static class TypeSerializer extends JsonSerializer<io.substrait.type.Type> {
-
-    private final StringTypeVisitor visitor = new StringTypeVisitor();
-
-    @Override
-    public void serialize(
-        io.substrait.type.Type value, JsonGenerator gen, SerializerProvider serializers)
-        throws IOException {
-      try {
-        gen.writeString(value.accept(visitor));
-      } catch (Exception e) {
-        LOG.warn("Unable to serialize type {}.", value, e);
-        throw new IOException("Unable to serialize type " + value, e);
-      }
-    }
-  }
-
-  /** Custom JSON deserializer for Substrait Type objects. */
-  public static class TypeDeserializer extends JsonDeserializer<io.substrait.type.Type> {
-
-    @Override
-    public io.substrait.type.Type deserialize(JsonParser p, DeserializationContext ctxt)
-        throws IOException {
-      String s = p.getValueAsString();
-      try {
-        return TypeStringParser.parse(s, ParseToPojo::type);
-      } catch (Exception e) {
-        LOG.warn("Unable to parse string {}.", s.replace("\n", " \\n"), e);
-        throw new IOException("Unable to parse string " + s.replace("\n", " \\n"), e);
-      }
     }
   }
 

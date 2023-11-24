@@ -29,14 +29,6 @@ dependencies {
     implementation(libs.commons.lang3)
     implementation(libs.commons.io)
     implementation(libs.commons.collections4)
-    implementation(libs.substrait.java.core) {
-      exclude("com.fasterxml.jackson.core")
-      exclude("com.fasterxml.jackson.datatype")
-      exclude("com.fasterxml.jackson.dataformat")
-      exclude("com.google.protobuf")
-      exclude("com.google.code.findbugs")
-      exclude("org.slf4j")
-    }
     implementation(libs.iceberg.hive.metastore)
     implementation(libs.sqlite.jdbc)
 

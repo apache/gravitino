@@ -8,8 +8,7 @@ import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.ops.IcebergTableOpsHelper.IcebergTableChange;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.TableChange.ColumnPosition;
-import io.substrait.type.Type.I32;
-import io.substrait.type.Type.I64;
+import com.datastrato.gravitino.rel.types.Types;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.iceberg.Schema;
@@ -158,7 +157,7 @@ public class TestIcebergTableUpdate {
     TableChange addColumn =
         TableChange.addColumn(
             new String[] {addColumnNameAfter},
-            I32.builder().nullable(true).build(),
+            Types.IntegerType.get(),
             "",
             ColumnPosition.after(firstField[0]));
     LoadTableResponse loadTableResponse = updateTable(identifier, addColumn);
@@ -169,19 +168,14 @@ public class TestIcebergTableUpdate {
     String addColumnNameFirst = "add_column_first";
     addColumn =
         TableChange.addColumn(
-            new String[] {addColumnNameFirst},
-            I32.builder().nullable(true).build(),
-            "",
-            ColumnPosition.first());
+            new String[] {addColumnNameFirst}, Types.IntegerType.get(), "", ColumnPosition.first());
     loadTableResponse = updateTable(identifier, addColumn);
     columns = getColumnNames(loadTableResponse);
     Assertions.assertEquals(columns.get(0), addColumnNameFirst);
 
     // add to last
     String addColumnNameLast = "add_column_last";
-    addColumn =
-        TableChange.addColumn(
-            new String[] {addColumnNameLast}, I32.builder().nullable(true).build());
+    addColumn = TableChange.addColumn(new String[] {addColumnNameLast}, Types.IntegerType.get());
     loadTableResponse = updateTable(identifier, addColumn);
     columns = getColumnNames(loadTableResponse);
     Assertions.assertEquals(columns.get(columns.size() - 1), addColumnNameLast);
@@ -190,7 +184,7 @@ public class TestIcebergTableUpdate {
     addColumn =
         TableChange.addColumn(
             new String[] {fourthField[0], "element", "struct_after"},
-            I32.builder().nullable(true).build(),
+            Types.IntegerType.get(),
             "",
             ColumnPosition.after("struct_int"));
     loadTableResponse = updateTable(identifier, addColumn);
@@ -206,7 +200,7 @@ public class TestIcebergTableUpdate {
     addColumn =
         TableChange.addColumn(
             new String[] {fourthField[0], "element", "struct_first"},
-            I32.builder().nullable(true).build(),
+            Types.IntegerType.get(),
             "",
             ColumnPosition.first());
     loadTableResponse = updateTable(identifier, addColumn);
@@ -221,8 +215,7 @@ public class TestIcebergTableUpdate {
     // add to struct last
     addColumn =
         TableChange.addColumn(
-            new String[] {fourthField[0], "element", "struct_last"},
-            I32.builder().nullable(true).build());
+            new String[] {fourthField[0], "element", "struct_last"}, Types.IntegerType.get());
     loadTableResponse = updateTable(identifier, addColumn);
     t =
         (StructType)
@@ -236,8 +229,7 @@ public class TestIcebergTableUpdate {
     Assertions.assertThrowsExactly(
         IllegalArgumentException.class,
         () -> {
-          TableChange addColumn1 =
-              TableChange.addColumn(firstField, I32.builder().nullable(true).build(), "");
+          TableChange addColumn1 = TableChange.addColumn(firstField, Types.IntegerType.get(), "");
           updateTable(identifier, addColumn1);
         });
 
@@ -247,10 +239,7 @@ public class TestIcebergTableUpdate {
         () -> {
           TableChange addColumn1 =
               TableChange.addColumn(
-                  firstField,
-                  I32.builder().nullable(true).build(),
-                  "",
-                  ColumnPosition.after("not_exits"));
+                  firstField, Types.IntegerType.get(), "", ColumnPosition.after("not_exits"));
           updateTable(identifier, addColumn1);
         });
   }
@@ -291,8 +280,7 @@ public class TestIcebergTableUpdate {
 
   @Test
   public void testUpdateColumnType() {
-    TableChange updateColumnType =
-        TableChange.updateColumnType(thirdField, I64.builder().nullable(true).build());
+    TableChange updateColumnType = TableChange.updateColumnType(thirdField, Types.LongType.get());
     LoadTableResponse loadTableResponse = updateTable(identifier, updateColumnType);
     Assertions.assertEquals(
         LongType.get(), loadTableResponse.tableMetadata().schema().columns().get(2).type());
@@ -300,8 +288,7 @@ public class TestIcebergTableUpdate {
     // update struct_int from int to long
     updateColumnType =
         TableChange.updateColumnType(
-            new String[] {fourthField[0], "element", "struct_int"},
-            I64.builder().nullable(true).build());
+            new String[] {fourthField[0], "element", "struct_int"}, Types.LongType.get());
     loadTableResponse = updateTable(identifier, updateColumnType);
     StructType t =
         (StructType)
@@ -312,7 +299,7 @@ public class TestIcebergTableUpdate {
     Assertions.assertEquals(LongType.get(), t.fields().get(0).type());
 
     TableChange updateColumnType2 =
-        TableChange.updateColumnType(notExistField, I32.builder().nullable(true).build());
+        TableChange.updateColumnType(notExistField, Types.IntegerType.get());
     Assertions.assertThrowsExactly(
         IllegalArgumentException.class, () -> updateTable(identifier, updateColumnType2));
   }
