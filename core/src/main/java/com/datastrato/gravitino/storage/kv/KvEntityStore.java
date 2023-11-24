@@ -400,9 +400,7 @@ public class KvEntityStore implements EntityStore {
   @Override
   public <R, E extends Exception> R executeInTransaction(Executable<R, E> executable)
       throws E, IOException {
-    return FunctionUtils.executeWithWriteLock(
-        () -> FunctionUtils.executeInTransaction(executable, transactionalKvBackend),
-        reentrantReadWriteLock);
+    return FunctionUtils.executeInTransaction(executable, transactionalKvBackend);
   }
 
   @Override

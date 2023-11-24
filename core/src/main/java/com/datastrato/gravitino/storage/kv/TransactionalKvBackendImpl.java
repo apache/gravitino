@@ -81,7 +81,7 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
   }
 
   @Override
-  public synchronized void begin() {
+  public void begin() {
     if (!putPairs.get().isEmpty()) {
       throw new IllegalStateException(
           "The transaction is has not committed or rollback yet, you should commit or rollback it first");
