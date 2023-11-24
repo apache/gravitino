@@ -267,17 +267,13 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
             .build();
 
     try {
-      store.executeInTransaction(
-          () -> {
-            NameIdentifier metalakeIdent = NameIdentifier.of(ident.namespace().levels());
-            if (!store.exists(metalakeIdent, EntityType.METALAKE)) {
-              LOG.warn("Metalake {} does not exist", metalakeIdent);
-              throw new NoSuchMetalakeException("Metalake " + metalakeIdent + " does not exist");
-            }
+      NameIdentifier metalakeIdent = NameIdentifier.of(ident.namespace().levels());
+      if (!store.exists(metalakeIdent, EntityType.METALAKE)) {
+        LOG.warn("Metalake {} does not exist", metalakeIdent);
+        throw new NoSuchMetalakeException("Metalake " + metalakeIdent + " does not exist");
+      }
 
-            store.put(e, false /* overwrite */);
-            return null;
-          });
+      store.put(e, false /* overwrite */);
       CatalogWrapper wrapper = catalogCache.get(ident, id -> createCatalogWrapper(e));
       return wrapper.catalog;
     } catch (EntityAlreadyExistsException e1) {
