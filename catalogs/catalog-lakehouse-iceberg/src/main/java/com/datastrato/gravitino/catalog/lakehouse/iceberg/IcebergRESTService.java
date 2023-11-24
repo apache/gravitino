@@ -36,7 +36,7 @@ public class IcebergRESTService implements GravitinoAuxiliaryService {
   private void initServer(IcebergConfig icebergConfig) {
     JettyServerConfig serverConfig = JettyServerConfig.fromConfig(icebergConfig);
     server = new JettyServer();
-    MetricsSystem metricsSystem = GravitinoEnv.getInstance().getMetricsSystem();
+    MetricsSystem metricsSystem = GravitinoEnv.getInstance().metricsSystem();
     server.initialize(serverConfig, SERVICE_NAME, false, metricsSystem);
 
     ResourceConfig config = new ResourceConfig();

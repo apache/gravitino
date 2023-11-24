@@ -51,7 +51,7 @@ public class GravitinoServer extends ResourceConfig {
 
   public void initialize() {
     gravitinoEnv.initialize(serverConfig);
-    MetricsSystem metricsSystem = gravitinoEnv.getMetricsSystem();
+    MetricsSystem metricsSystem = gravitinoEnv.metricsSystem();
 
     JettyServerConfig jettyServerConfig =
         JettyServerConfig.fromConfig(serverConfig, WEBSERVER_CONF_PREFIX);
@@ -80,7 +80,7 @@ public class GravitinoServer extends ResourceConfig {
 
     HttpServerMetricsSource httpServerMetricsSource =
         new HttpServerMetricsSource(MetricsSource.GRAVITINO_SERVER_METRIC_NAME, this, server);
-    MetricsSystem metricsSystem = GravitinoEnv.getInstance().getMetricsSystem();
+    MetricsSystem metricsSystem = GravitinoEnv.getInstance().metricsSystem();
     metricsSystem.register(httpServerMetricsSource);
 
     Servlet servlet = new ServletContainer(this);
