@@ -4,6 +4,10 @@
  */
 package com.datastrato.gravitino.server.web;
 
+import com.codahale.metrics.MetricRegistry;
+import com.codahale.metrics.servlets.MetricsServlet;
+import com.datastrato.gravitino.GravitinoEnv;
+import com.datastrato.gravitino.metrics.MetricsSystem;
 import java.io.File;
 import java.io.IOException;
 import java.net.BindException;
@@ -87,10 +91,23 @@ public final class JettyServer {
 
     // Initialize ServletContextHandler or WebAppContext
     if (shouldEnableUI) {
-      initializeWebAppContext();
+      initializeWebAppServletContextHandler();
     } else {
-      initializeServletContextHandler();
+      initializeBasicServletContextHandler();
     }
+
+    MetricsSystem metricsSystem = GravitinoEnv.getInstance().metricsSystem();
+    // Metrics System could be null in UT.
+    if (metricsSystem != null) {
+      MetricRegistry metricRegistry = metricsSystem.getMetricRegistry();
+      servletContextHandler.setAttribute(
+          "com.codahale.metrics.servlets.MetricsServlet.registry", metricRegistry);
+      servletContextHandler.addServlet(MetricsServlet.class, "/metrics");
+    }
+
+    HandlerCollection handlers = new HandlerCollection();
+    handlers.addHandler(servletContextHandler);
+    server.setHandler(handlers);
   }
 
   public synchronized void start() throws RuntimeException {
@@ -164,18 +181,13 @@ public final class JettyServer {
         new FilterHolder(filter), pathSpec, EnumSet.allOf(DispatcherType.class));
   }
 
-  private void initializeServletContextHandler() {
+  private void initializeBasicServletContextHandler() {
     servletContextHandler = new ServletContextHandler();
     servletContextHandler.setContextPath("/");
     servletContextHandler.addServlet(DefaultServlet.class, "/");
-
-    HandlerCollection handlers = new HandlerCollection();
-    handlers.addHandler(servletContextHandler);
-
-    server.setHandler(handlers);
   }
 
-  private void initializeWebAppContext() {
+  private void initializeWebAppServletContextHandler() {
     servletContextHandler = new WebAppContext();
 
     boolean isUnitTest = System.getenv("GRAVITINO_TEST") != null;
@@ -231,11 +243,6 @@ public final class JettyServer {
         throw new RuntimeException(e);
       }
     }
-
-    HandlerCollection handlers = new HandlerCollection();
-    handlers.addHandler(servletContextHandler);
-
-    server.setHandler(handlers);
   }
 
   private ServerConnector createHttpServerConnector(
@@ -301,5 +308,9 @@ public final class JettyServer {
         };
     threadPool.setName(serverName);
     return threadPool;
+  }
+
+  public ThreadPool getThreadPool() {
+    return server.getThreadPool();
   }
 }

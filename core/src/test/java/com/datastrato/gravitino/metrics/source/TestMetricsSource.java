@@ -38,10 +38,11 @@ public class TestMetricsSource extends MetricsSource {
 
   @Test
   void testCounter() {
-    getCounter("a.b").inc();
-    long v = metricsSystem.getMetricRegistry().counter(TEST_METRICS_SOURCE + ".a.b").getCount();
+    getCounter("a.counter").inc();
+    long v =
+        metricsSystem.getMetricRegistry().counter(TEST_METRICS_SOURCE + ".a.counter").getCount();
     Assertions.assertEquals(1, v);
-    Assertions.assertEquals(1, getCounter("a.b").getCount());
+    Assertions.assertEquals(1, getCounter("a.counter").getCount());
   }
 
   private int getGaugeValue() {

@@ -4,8 +4,11 @@
  */
 package com.datastrato.gravitino.catalog.lakehouse.iceberg.web.rest;
 
+import com.codahale.metrics.annotation.ResponseMetered;
+import com.codahale.metrics.annotation.Timed;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.ops.IcebergTableOps;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.web.IcebergRestUtils;
+import com.datastrato.gravitino.metrics.MetricNames;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.Consumes;
@@ -49,6 +52,8 @@ public class IcebergNamespaceOperations {
 
   @GET
   @Produces(MediaType.APPLICATION_JSON)
+  @Timed(name = "list-namespace." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "list-namespace", absolute = true)
   public Response listNamespaces(@DefaultValue("") @QueryParam("parent") String parent) {
     Namespace parentNamespace =
         parent.isEmpty() ? Namespace.empty() : RESTUtil.decodeNamespace(parent);
@@ -59,6 +64,8 @@ public class IcebergNamespaceOperations {
   @GET
   @Path("{namespace}")
   @Produces(MediaType.APPLICATION_JSON)
+  @Timed(name = "load-namespace." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "load-namespace", absolute = true)
   public Response loadNamespace(@PathParam("namespace") String namespace) {
     GetNamespaceResponse getNamespaceResponse =
         icebergTableOps.loadNamespace(RESTUtil.decodeNamespace(namespace));
@@ -68,6 +75,8 @@ public class IcebergNamespaceOperations {
   @DELETE
   @Path("{namespace}")
   @Produces(MediaType.APPLICATION_JSON)
+  @Timed(name = "drop-namespace." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "drop-namespace", absolute = true)
   public Response dropNamespace(@PathParam("namespace") String namespace) {
     // todo check if table exists in namespace after table ops is added
     LOG.info("Drop Iceberg namespace: {}", namespace);
@@ -77,6 +86,8 @@ public class IcebergNamespaceOperations {
 
   @POST
   @Produces(MediaType.APPLICATION_JSON)
+  @Timed(name = "create-namespace." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "create-namespace", absolute = true)
   public Response createNamespace(CreateNamespaceRequest namespaceRequest) {
     LOG.info("Create Iceberg namespace: {}", namespaceRequest);
     CreateNamespaceResponse response = icebergTableOps.createNamespace(namespaceRequest);
@@ -86,6 +97,8 @@ public class IcebergNamespaceOperations {
   @POST
   @Path("{namespace}/properties")
   @Produces(MediaType.APPLICATION_JSON)
+  @Timed(name = "update-namespace." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "update-namespace", absolute = true)
   public Response updateNamespace(
       @PathParam("namespace") String namespace, UpdateNamespacePropertiesRequest request) {
     LOG.info("Update Iceberg namespace: {}, request: {}", namespace, request);
