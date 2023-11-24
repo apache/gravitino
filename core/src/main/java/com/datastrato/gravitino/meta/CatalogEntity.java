@@ -108,16 +108,6 @@ public class CatalogEntity implements Entity, Auditable, HasIdentifier {
   }
 
   /**
-   * Set namespace of the catalog entity.
-   *
-   * <p>Namespace is null when CatalogEntity is deserialized from entity store. Because namespace is
-   * not serialized to support rename metalake scene. So provide a method to fill up namespace.
-   */
-  public void fillupNamespace(Namespace namespace) {
-    this.namespace = namespace;
-  }
-
-  /**
    * The type of the entity.
    *
    * @return The {@link EntityType#CATALOG} value.
