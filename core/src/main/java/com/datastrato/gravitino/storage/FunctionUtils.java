@@ -16,13 +16,13 @@ public class FunctionUtils {
   private FunctionUtils() {}
 
   @FunctionalInterface
-  public interface IOExecutable<R, E extends Exception> {
+  public interface IOExecutable<R> {
 
-    R execute() throws IOException, E;
+    R execute() throws IOException;
   }
 
-  public static <R, E extends Exception> R executeWithReadLock(
-      IOExecutable<R, E> executable, ReentrantReadWriteLock lock) throws E, IOException {
+  public static <R> R executeWithReadLock(IOExecutable<R> executable, ReentrantReadWriteLock lock)
+      throws IOException {
     // It already held the write lock
     if (lock.isWriteLockedByCurrentThread()) {
       return executable.execute();
@@ -36,8 +36,8 @@ public class FunctionUtils {
     }
   }
 
-  public static <R, E extends Exception> R executeWithWriteLock(
-      IOExecutable<R, E> executable, ReentrantReadWriteLock lock) throws E, IOException {
+  public static <R> R executeWithWriteLock(IOExecutable<R> executable, ReentrantReadWriteLock lock)
+      throws IOException {
     lock.writeLock().lock();
     try {
       return executable.execute();

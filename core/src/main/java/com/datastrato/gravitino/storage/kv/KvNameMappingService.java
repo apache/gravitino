@@ -64,6 +64,7 @@ public class KvNameMappingService implements NameMappingService {
   private long bindNameAndId(String name) throws IOException {
     byte[] nameByte = Bytes.concat(NAME_PREFIX, name.getBytes(StandardCharsets.UTF_8));
     long id = idGenerator.nextId();
+
     return FunctionUtils.executeWithWriteLock(
         () ->
             FunctionUtils.executeInTransaction(
