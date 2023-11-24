@@ -9,6 +9,7 @@ import com.datastrato.gravitino.catalog.CatalogManager;
 import com.datastrato.gravitino.catalog.CatalogOperationDispatcher;
 import com.datastrato.gravitino.meta.MetalakeManager;
 import com.datastrato.gravitino.metrics.MetricsSystem;
+import com.datastrato.gravitino.metrics.source.JVMMetricsSource;
 import com.datastrato.gravitino.storage.IdGenerator;
 import com.datastrato.gravitino.storage.RandomIdGenerator;
 import com.google.common.base.Preconditions;
@@ -65,6 +66,7 @@ public class GravitinoEnv {
 
     this.config = config;
     this.metricsSystem = new MetricsSystem();
+    metricsSystem.register(new JVMMetricsSource());
 
     // Initialize EntitySerDe
     this.entitySerDe = EntitySerDeFactory.createEntitySerDe(config);

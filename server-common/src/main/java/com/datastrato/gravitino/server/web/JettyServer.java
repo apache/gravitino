@@ -6,6 +6,7 @@ package com.datastrato.gravitino.server.web;
 
 import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.servlets.MetricsServlet;
+import com.datastrato.gravitino.GravitinoEnv;
 import com.datastrato.gravitino.metrics.MetricsSystem;
 import java.io.File;
 import java.io.IOException;
@@ -54,10 +55,7 @@ public final class JettyServer {
   public JettyServer() {}
 
   public synchronized void initialize(
-      JettyServerConfig serverConfig,
-      String serverName,
-      boolean shouldEnableUI,
-      MetricsSystem metricsSystem) {
+      JettyServerConfig serverConfig, String serverName, boolean shouldEnableUI) {
     this.serverConfig = serverConfig;
     this.serverName = serverName;
 
@@ -98,10 +96,14 @@ public final class JettyServer {
       initializeBasicServletContextHandler();
     }
 
-    MetricRegistry metricRegistry = metricsSystem.getMetricRegistry();
-    servletContextHandler.setAttribute(
-        "com.codahale.metrics.servlets.MetricsServlet.registry", metricRegistry);
-    servletContextHandler.addServlet(MetricsServlet.class, "/metrics-json");
+    MetricsSystem metricsSystem = GravitinoEnv.getInstance().metricsSystem();
+    // Metrics System could be null in UT.
+    if (metricsSystem != null) {
+      MetricRegistry metricRegistry = metricsSystem.getMetricRegistry();
+      servletContextHandler.setAttribute(
+          "com.codahale.metrics.servlets.MetricsServlet.registry", metricRegistry);
+      servletContextHandler.addServlet(MetricsServlet.class, "/metrics");
+    }
 
     HandlerCollection handlers = new HandlerCollection();
     handlers.addHandler(servletContextHandler);

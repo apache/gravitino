@@ -51,11 +51,10 @@ public class GravitinoServer extends ResourceConfig {
 
   public void initialize() {
     gravitinoEnv.initialize(serverConfig);
-    MetricsSystem metricsSystem = gravitinoEnv.metricsSystem();
 
     JettyServerConfig jettyServerConfig =
         JettyServerConfig.fromConfig(serverConfig, WEBSERVER_CONF_PREFIX);
-    server.initialize(jettyServerConfig, SERVER_NAME, true, metricsSystem);
+    server.initialize(jettyServerConfig, SERVER_NAME, true /* shouldEnableUI */);
 
     ServerAuthenticator.getInstance().initialize(serverConfig);
 
