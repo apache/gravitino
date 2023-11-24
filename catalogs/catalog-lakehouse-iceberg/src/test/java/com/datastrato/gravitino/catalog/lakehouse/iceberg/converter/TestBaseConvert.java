@@ -35,9 +35,8 @@ public class TestBaseConvert {
 
   static {
     GRAVITINO_TYPE.put("BOOLEAN", com.datastrato.gravitino.rel.types.Types.BooleanType.get());
-    // Types not supported by iceberg
-    //    GRAVITINO_TYPE.put("I8", TypeCreator.NULLABLE.I8);
-    //    GRAVITINO_TYPE.put("I16", TypeCreator.NULLABLE.I16);
+    GRAVITINO_TYPE.put("I8", com.datastrato.gravitino.rel.types.Types.ByteType.get());
+    GRAVITINO_TYPE.put("I16", com.datastrato.gravitino.rel.types.Types.ShortType.get());
     GRAVITINO_TYPE.put("I32", com.datastrato.gravitino.rel.types.Types.IntegerType.get());
     GRAVITINO_TYPE.put("I64", com.datastrato.gravitino.rel.types.Types.LongType.get());
     GRAVITINO_TYPE.put("FP32", com.datastrato.gravitino.rel.types.Types.FloatType.get());
