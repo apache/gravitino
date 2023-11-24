@@ -3,6 +3,8 @@
  * This software is licensed under the Apache License version 2.
  */
 
+import { useEffect, useState } from 'react'
+
 import Drawer from '@mui/material/Drawer'
 import { styled } from '@mui/material/styles'
 import IconButton from '@mui/material/IconButton'
@@ -32,9 +34,26 @@ const Header = styled(Box)(({ theme }) => ({
 const DetailsDrawer = props => {
   const { openDrawer, setOpenDrawer, drawerData = {} } = props
 
+  const { audit } = drawerData
+
+  const [properties, setProperties] = useState([])
+
   const handleClose = () => {
     setOpenDrawer(false)
   }
+
+  useEffect(() => {
+    if (drawerData.properties) {
+      const propsData = Object.keys(drawerData.properties).map(item => {
+        return {
+          key: item,
+          value: drawerData.properties[item]
+        }
+      })
+
+      setProperties(propsData)
+    }
+  }, [drawerData.properties])
 
   return (
     <Drawer
@@ -77,14 +96,16 @@ const DetailsDrawer = props => {
           <Typography variant='body2' sx={{ mb: 2 }}>
             Last modified by
           </Typography>
-          <Typography sx={{ fontWeight: 500 }}>{drawerData.lastModifiedBy}</Typography>
+          <Typography sx={{ fontWeight: 500 }}>{audit?.lastModifier ? audit.lastModifier : ''}</Typography>
         </Grid>
 
         <Grid item xs={12} sx={{ mb: [0, 5] }}>
           <Typography variant='body2' sx={{ mb: 2 }}>
             Last modified at
           </Typography>
-          <Typography sx={{ fontWeight: 500 }}>{formatToDateTime(drawerData.lastModifiedAt)}</Typography>
+          <Typography sx={{ fontWeight: 500 }}>
+            {audit?.lastModifiedTime ? formatToDateTime(audit?.lastModifiedTime) : ''}
+          </Typography>
         </Grid>
 
         <Grid item xs={12} sx={{ mb: [0, 5] }}>
@@ -105,7 +126,7 @@ const DetailsDrawer = props => {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {(drawerData.properties || []).map((item, index) => {
+                {properties.map((item, index) => {
                   return (
                     <TableRow key={index}>
                       <TableCell sx={{ py: theme => `${theme.spacing(2.75)} !important` }}>{item.key}</TableCell>

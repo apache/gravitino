@@ -34,7 +34,10 @@ const sources = {
     'mdi:minus-circle-outline',
     'mdi:plus-circle-outline',
     'bx:show-alt',
-    'bx:bxs-plus-square'
+    'bx:bxs-plus-square',
+    'tabler:alert-circle',
+    'mdi:square-edit-outline',
+    'mdi:delete-outline'
   ],
   svg: [
     // ** Example code: { dir: 'src/iconify-bundle/svg', monotone: false, prefix: 'custom' }
