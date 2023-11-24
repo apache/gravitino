@@ -161,7 +161,7 @@ public class GravitinoEnv {
    *
    * @return The MetricsSystem instance.
    */
-  public MetricsSystem getMetricsSystem() {
+  public MetricsSystem metricsSystem() {
     return metricsSystem;
   }
 
