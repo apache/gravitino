@@ -23,6 +23,7 @@ dependencies {
   implementation(libs.bundles.log4j)
   implementation(libs.bundles.jetty)
   implementation(libs.bundles.jwt)
+  implementation(libs.bundles.metrics)
 
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)

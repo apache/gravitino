@@ -26,6 +26,7 @@ dependencies {
   implementation(libs.bundles.log4j)
   implementation(libs.bundles.jetty)
   implementation(libs.bundles.jersey)
+  implementation(libs.metrics.jersey2)
 
   compileOnly(libs.lombok)
   annotationProcessor(libs.lombok)
