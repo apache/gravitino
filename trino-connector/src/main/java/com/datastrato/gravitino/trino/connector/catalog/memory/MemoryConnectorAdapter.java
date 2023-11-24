@@ -19,8 +19,6 @@ import java.util.Map;
  */
 public class MemoryConnectorAdapter implements CatalogConnectorAdapter {
 
-  private final MemoryTableProperties tableProperties = new MemoryTableProperties();
-
   @Override
   public Map<String, Object> buildInternalConnectorConfig(GravitinoCatalog catalog) {
     Map<String, Object> config = new HashMap<>();
@@ -35,13 +33,11 @@ public class MemoryConnectorAdapter implements CatalogConnectorAdapter {
   @Override
   public CatalogConnectorMetadataAdapter getMetadataAdapter() {
     return new MemoryMetadataAdapter(
-        tableProperties.getTablePropertyMetadata(),
-        Collections.emptyList(),
-        Collections.emptyList());
+        getTableProperties(), Collections.emptyList(), Collections.emptyList());
   }
 
   @Override
   public List<PropertyMetadata<?>> getTableProperties() {
-    return tableProperties.getTablePropertyMetadata();
+    return MemoryTableProperties.INSTANCE.getPropertyMetadata();
   }
 }

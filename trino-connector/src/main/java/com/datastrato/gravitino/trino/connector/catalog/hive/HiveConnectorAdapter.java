@@ -15,10 +15,6 @@ import java.util.Map;
 
 /** Transforming Hive connector configuration and components into Gravitino connector. */
 public class HiveConnectorAdapter implements CatalogConnectorAdapter {
-
-  private final HiveTableProperties tableProperties = new HiveTableProperties();
-  private final HiveSchemaProperties schemaProperties = new HiveSchemaProperties();
-
   public HiveConnectorAdapter() {}
 
   public Map<String, Object> buildInternalConnectorConfig(GravitinoCatalog catalog) {
@@ -34,12 +30,12 @@ public class HiveConnectorAdapter implements CatalogConnectorAdapter {
 
   @Override
   public List<PropertyMetadata<?>> getTableProperties() {
-    return tableProperties.getTablePropertyMetadata();
+    return HiveTableProperties.INSTANCE.getPropertyMetadata();
   }
 
   @Override
   public List<PropertyMetadata<?>> getSchemaProperties() {
-    return schemaProperties.getSchemaProperties();
+    return HiveSchemaProperties.INSTANCE.getPropertyMetadata();
   }
 
   public CatalogConnectorMetadataAdapter getMetadataAdapter() {

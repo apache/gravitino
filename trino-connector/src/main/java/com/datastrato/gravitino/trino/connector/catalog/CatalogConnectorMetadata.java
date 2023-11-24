@@ -28,6 +28,7 @@ import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.TableCatalog;
 import com.datastrato.gravitino.rel.TableChange;
+import com.datastrato.gravitino.trino.connector.catalog.hive.HiveTableProperties;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoColumn;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoSchema;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoTable;
@@ -52,13 +53,13 @@ public class CatalogConnectorMetadata {
   private final String catalogName;
   private final SupportsSchemas schemaCatalog;
   private final TableCatalog tableCatalog;
+  private final Catalog catalog;
 
   public CatalogConnectorMetadata(GravitinoMetaLake metalake, NameIdentifier catalogIdentifier) {
     try {
       this.catalogName = catalogIdentifier.name();
       this.metalake = metalake;
-      Catalog catalog = metalake.loadCatalog(catalogIdentifier);
-
+      this.catalog = metalake.loadCatalog(catalogIdentifier);
       // Make sure the catalog support schema operations.
       this.schemaCatalog = catalog.asSchemas();
       this.tableCatalog = catalog.asTableCatalog();
@@ -99,7 +100,8 @@ public class CatalogConnectorMetadata {
       Table table =
           tableCatalog.loadTable(
               NameIdentifier.ofTable(metalake.name(), catalogName, schemaName, tableName));
-      return new GravitinoTable(schemaName, tableName, table);
+      Map<String, String> properties = convertToTrinoConfig(table.properties());
+      return new GravitinoTable(schemaName, tableName, table, properties);
     } catch (NoSuchTableException e) {
       throw new TrinoException(GRAVITINO_TABLE_NOT_EXISTS, "Table does not exist", e);
     }
@@ -126,13 +128,43 @@ public class CatalogConnectorMetadata {
             metalake.name(), catalogName, table.getSchemaName(), table.getName());
     ColumnDTO[] gravitinoColumns = table.getColumnDTOs();
     String comment = table.getComment();
-    Map<String, String> properties = table.getProperties();
+    Map<String, String> properties = convertToProviderConfig(table.getProperties());
     try {
       tableCatalog.createTable(identifier, gravitinoColumns, comment, properties);
     } catch (NoSuchSchemaException e) {
       throw new TrinoException(GRAVITINO_SCHEMA_NOT_EXISTS, "Schema does not exist", e);
     } catch (TableAlreadyExistsException e) {
       throw new TrinoException(GRAVITINO_TABLE_ALREADY_EXISTS, "Table already exists", e);
+    }
+  }
+
+  private Map<String, String> convertToProviderConfig(Map<String, String> properties) {
+    String provider = catalog.provider();
+    ConnectorType connectorType = ConnectorType.fromName(provider);
+    switch (connectorType) {
+      case HIVE:
+        return HiveTableProperties.INSTANCE.toGravitinoProperties(properties);
+      case ICEBERG:
+      case MEMORY:
+        return properties;
+      default:
+        throw new TrinoException(
+            GRAVITINO_UNSUPPORTED_OPERATION, "Unsupported connector type: " + provider);
+    }
+  }
+
+  private Map<String, String> convertToTrinoConfig(Map<String, String> properties) {
+    String provider = catalog.provider();
+    ConnectorType connectorType = ConnectorType.fromName(provider);
+    switch (connectorType) {
+      case HIVE:
+        return HiveTableProperties.INSTANCE.toTrinoProperties(properties);
+      case ICEBERG:
+      case MEMORY:
+        return properties;
+      default:
+        throw new TrinoException(
+            GRAVITINO_UNSUPPORTED_OPERATION, "Unsupported connector type: " + provider);
     }
   }
 
