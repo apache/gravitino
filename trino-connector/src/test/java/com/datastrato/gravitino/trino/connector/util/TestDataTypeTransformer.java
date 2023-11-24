@@ -26,29 +26,19 @@ public class TestDataTypeTransformer {
   @Test
   public void testGetGravitinoType() {
     assertEquals(DataTypeTransformer.getGravitinoType(VARCHAR), Types.StringType.get());
-    assertEquals(DataTypeTransformer.getGravitinoType(VARCHAR), Types.StringType.get());
 
-    assertEquals(DataTypeTransformer.getGravitinoType(BOOLEAN), Types.BooleanType.get());
     assertEquals(DataTypeTransformer.getGravitinoType(BOOLEAN), Types.BooleanType.get());
 
     assertEquals(DataTypeTransformer.getGravitinoType(INTEGER), Types.IntegerType.get());
-    assertEquals(DataTypeTransformer.getGravitinoType(INTEGER), Types.IntegerType.get());
 
-    assertEquals(DataTypeTransformer.getGravitinoType(BIGINT), Types.LongType.get());
     assertEquals(DataTypeTransformer.getGravitinoType(BIGINT), Types.LongType.get());
 
     assertEquals(DataTypeTransformer.getGravitinoType(DOUBLE), Types.DoubleType.get());
-    assertEquals(DataTypeTransformer.getGravitinoType(DOUBLE), Types.DoubleType.get());
 
-    assertEquals(DataTypeTransformer.getGravitinoType(VARBINARY), Types.BinaryType.get());
     assertEquals(DataTypeTransformer.getGravitinoType(VARBINARY), Types.BinaryType.get());
 
     assertEquals(DataTypeTransformer.getGravitinoType(DATE), Types.DateType.get());
-    assertEquals(DataTypeTransformer.getGravitinoType(DATE), Types.DateType.get());
 
-    assertEquals(
-        DataTypeTransformer.getGravitinoType(TIMESTAMP_SECONDS),
-        Types.TimestampType.withoutTimeZone());
     assertEquals(
         DataTypeTransformer.getGravitinoType(TIMESTAMP_SECONDS),
         Types.TimestampType.withoutTimeZone());
@@ -65,28 +55,19 @@ public class TestDataTypeTransformer {
   @Test
   public void testGetTrinoType() {
     assertEquals(DataTypeTransformer.getTrinoType(Types.StringType.get()), VARCHAR);
-    assertEquals(DataTypeTransformer.getTrinoType(Types.StringType.get()), VARCHAR);
 
-    assertEquals(DataTypeTransformer.getTrinoType(Types.BooleanType.get()), BOOLEAN);
     assertEquals(DataTypeTransformer.getTrinoType(Types.BooleanType.get()), BOOLEAN);
 
     assertEquals(DataTypeTransformer.getTrinoType(Types.IntegerType.get()), INTEGER);
-    assertEquals(DataTypeTransformer.getTrinoType(Types.IntegerType.get()), INTEGER);
 
     assertEquals(DataTypeTransformer.getTrinoType(Types.LongType.get()), BIGINT);
-    assertEquals(DataTypeTransformer.getTrinoType(Types.LongType.get()), BIGINT);
 
-    assertEquals(DataTypeTransformer.getTrinoType(Types.LongType.get()), BIGINT);
     assertEquals(DataTypeTransformer.getTrinoType(Types.LongType.get()), BIGINT);
 
     assertEquals(DataTypeTransformer.getTrinoType(Types.DoubleType.get()), DOUBLE);
-    assertEquals(DataTypeTransformer.getTrinoType(Types.DoubleType.get()), DOUBLE);
 
     assertEquals(DataTypeTransformer.getTrinoType(Types.DateType.get()), DATE);
-    assertEquals(DataTypeTransformer.getTrinoType(Types.DateType.get()), DATE);
 
-    assertEquals(
-        DataTypeTransformer.getTrinoType(Types.TimestampType.withoutTimeZone()), TIMESTAMP_SECONDS);
     assertEquals(
         DataTypeTransformer.getTrinoType(Types.TimestampType.withoutTimeZone()), TIMESTAMP_SECONDS);
 
