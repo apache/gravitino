@@ -36,7 +36,8 @@ out/**
 distribution
 server/src/main/resources/project.properties
 
-dev/docker/hive/packages
+dev/docker/*/packages
+dev/docker/gravitino/package
 docs/build
 
 dev/docker/tools/docker-connector

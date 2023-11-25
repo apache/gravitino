@@ -154,6 +154,10 @@ RUN chown -R datastrato:hadoop /home/datastrato
 RUN rm -rf /tmp/packages
 
 ################################################################################
+HEALTHCHECK --interval=30s --timeout=30s --retries=10 \
+  CMD /tmp/check-status.sh || exit 1
+
+################################################################################
 # expose port
 EXPOSE 22 3306 8088 9000 9083 10000 10002 50070 50075 50010
 

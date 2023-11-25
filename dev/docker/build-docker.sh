@@ -8,7 +8,7 @@ script_dir="$(dirname "${BASH_SOURCE-$0}")"
 script_dir="$(cd "${script_dir}">/dev/null; pwd)"
 
 # Build docker image for multi-arch
-USAGE="-e Usage: ./build-docker.sh --platform [all|linux/amd64|linux/arm64] --type [hive|trino] --image {image_name} --tag {tag_name} --latest"
+USAGE="-e Usage: ./build-docker.sh --platform [all|linux/amd64|linux/arm64] --type [hive|trino|gravitino] --image {image_name} --tag {tag_name} --latest"
 
 # Get platform type
 if [[ "$1" == "--platform" ]]; then
@@ -67,6 +67,8 @@ if [[ "${component_type}" == "hive" ]]; then
   build_args="--build-arg HADOOP_PACKAGE_NAME=${HADOOP_PACKAGE_NAME} --build-arg HIVE_PACKAGE_NAME=${HIVE_PACKAGE_NAME}"
 elif [ "${component_type}" == "trino" ]; then
   true # Placeholder, do nothing
+elif [ "${component_type}" == "gravitino" ]; then
+  . ${script_dir}/gravitino/gravitino-dependency.sh
 else
   echo "ERROR : ${component_type} is not a valid component type"
   echo ${USAGE}

@@ -1,0 +1,74 @@
+version: '3.3'
+services:
+  hive:
+    image: datastrato/gravitino-ci-hive:0.1.6
+    ports:
+      - "3306:3306"
+      - "8088:8088"
+      - "9000:9000"
+      - "9083:9083"
+      - "10000:10000"
+      - "10002:10002"
+      - "50070:50070"
+      - "50010:50010"
+    container_name: playground-hive
+    environment:
+      - HADOOP_USER_NAME=root
+    healthcheck:
+      test: ["CMD", "/tmp/check-status.sh"]
+      interval: 10s
+      timeout: 30s
+      retries: 10
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 1G
+
+  gravitino:
+    image: datastrato/gravitino:0.3.0-SNAPSHORT
+    ports:
+      - "8090:8090"
+    container_name: playground-gravition
+    depends_on:
+      hive :
+        condition: service_healthy
+    volumes:
+      - ./healthcheck:/tmp/healthcheck
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 500M
+    healthcheck:
+      test: ["CMD", "/tmp/healthcheck/gravitino-healthcheck.sh"]
+      interval: 10s
+      timeout: 30s
+      retries: 10
+
+  trino:
+    image: datastrato/gravitino-ci-trino:0.1.0
+    ports:
+      - "8080:8080"
+    container_name: playground-trino
+    environment:
+      - HADOOP_USER_NAME=root
+    volumes:
+      - ./packages/trino/conf:/etc/trino:ro
+      - ./packages/gravitino-trino-connector:/usr/lib/trino/plugin/gravitino:ro
+      - ./healthcheck:/tmp/healthcheck
+    depends_on:
+      hive :
+        condition: service_healthy
+      gravitino :
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 1G
+#    healthcheck:
+#      test: ["CMD", "/tmp/healthcheck/trino-healthcheck.sh"]
+#      interval: 30s
+#      timeout: 30s
+#      retries: 5
