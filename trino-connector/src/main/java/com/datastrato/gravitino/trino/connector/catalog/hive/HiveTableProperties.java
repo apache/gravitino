@@ -21,7 +21,7 @@ public class HiveTableProperties implements HasProperties {
 
   // Trino property key does not allow upper case character and '-', so we need to map it to
   // Gravitino
-  private static final TreeBidiMap<String, String> TRINO_HIVE_TO_GRAVITINO_HIVE =
+  private static final TreeBidiMap<String, String> TRINO_KEY_TO_GRAVITINO_KEY =
       new TreeBidiMap<>(
           new ImmutableMap.Builder<String, String>()
               .put("format", "format")
@@ -68,7 +68,7 @@ public class HiveTableProperties implements HasProperties {
     Map<String, String> hiveProperties = new HashMap<>();
     for (Map.Entry<String, String> entry : properties.entrySet()) {
       hiveProperties.put(
-          TRINO_HIVE_TO_GRAVITINO_HIVE.inverseBidiMap().get(entry.getKey()), entry.getValue());
+          TRINO_KEY_TO_GRAVITINO_KEY.inverseBidiMap().get(entry.getKey()), entry.getValue());
     }
     return hiveProperties;
   }
@@ -77,7 +77,7 @@ public class HiveTableProperties implements HasProperties {
   public Map<String, String> toGravitinoProperties(Map<String, String> properties) {
     Map<String, String> hiveProperties = new HashMap<>();
     for (Map.Entry<String, String> entry : properties.entrySet()) {
-      hiveProperties.put(TRINO_HIVE_TO_GRAVITINO_HIVE.get(entry.getKey()), entry.getValue());
+      hiveProperties.put(TRINO_KEY_TO_GRAVITINO_KEY.get(entry.getKey()), entry.getValue());
     }
     return hiveProperties;
   }
