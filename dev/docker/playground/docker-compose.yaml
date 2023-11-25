@@ -1,0 +1,64 @@
+version: '3.0'
+services:
+  hive:
+    image: datastrato/gravitino-ci-hive:0.1.6
+    ports:
+      - "3306:3306"
+      - "9000:9000"
+      - "9083:9083"
+    container_name: playground-hive
+    environment:
+      - HADOOP_USER_NAME=root
+    healthcheck:
+      test: ["CMD", "/tmp/check-status.sh"]
+      interval: 10s
+      timeout: 60s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 1G
+
+  gravitino:
+    image: datastrato/gravitino:0.3.0-SNAPSHOT
+    ports:
+      - "8090:8090"
+    container_name: playground-gravitino
+    depends_on:
+      hive :
+        condition: service_healthy
+    volumes:
+      - ./healthcheck:/tmp/healthcheck
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 500M
+    healthcheck:
+      test: ["CMD", "/tmp/healthcheck/gravitino-healthcheck.sh"]
+      interval: 5s
+      timeout: 10s
+      retries: 5
+
+  trino:
+    image: datastrato/gravitino-ci-trino:0.3.0-SNAPSHOT
+    ports:
+      - "8080:8080"
+    container_name: playground-trino
+    environment:
+      - HADOOP_USER_NAME=root
+      - GRAVITINO_HOST_IP=gravitino
+      - GRAVITINO_HOST_PORT=8090
+      - GRAVITINO_METALAKE_NAME=metalake_demo
+      - HIVE_HOST_IP=hive
+    depends_on:
+      hive :
+        condition: service_healthy
+      gravitino :
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 1G
