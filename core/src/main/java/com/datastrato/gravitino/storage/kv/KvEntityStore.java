@@ -6,10 +6,6 @@
 package com.datastrato.gravitino.storage.kv;
 
 import static com.datastrato.gravitino.Configs.ENTITY_KV_STORE;
-import static com.datastrato.gravitino.Entity.EntityType.CATALOG;
-import static com.datastrato.gravitino.Entity.EntityType.SCHEMA;
-import static com.datastrato.gravitino.Entity.EntityType.TABLE;
-import static com.datastrato.gravitino.storage.kv.BinaryEntityKeyEncoder.LOG;
 import static com.datastrato.gravitino.storage.kv.BinaryEntityKeyEncoder.NAMESPACE_SEPARATOR;
 import static com.datastrato.gravitino.storage.kv.KvNameMappingService.ID_PREFIX;
 import static com.datastrato.gravitino.storage.kv.KvNameMappingService.NAME_PREFIX;
@@ -40,7 +36,6 @@ import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -286,60 +281,6 @@ public class KvEntityStore implements EntityStore {
       throw new NoSuchEntityException(ident.toString());
     }
     return serDe.deserialize(value, e);
-  }
-
-  /**
-   * Get key prefix of all sub-entities under a specific entities. For example, as a metalake will
-   * start with `ml_{metalake_id}`, sub-entities under this metalake will have the prefix
-   *
-   * <pre>
-   *   catalog: ca_{metalake_id}
-   *   schema:  sc_{metalake_id}
-   *   table:   ta_{metalake_id}
-   * </pre>
-   *
-   * Why the sub-entities under this metalake start with those prefixes, please see {@link
-   * KvEntityStore} java class doc.
-   *
-   * @param ident identifier of an entity
-   * @param type type of entity
-   * @return list of sub-entities prefix
-   * @throws IOException if error occurs
-   */
-  private List<byte[]> getSubEntitiesPrefix(NameIdentifier ident, EntityType type)
-      throws IOException {
-    List<byte[]> prefixes = Lists.newArrayList();
-    byte[] encode = entityKeyEncoder.encode(ident, type, true);
-    switch (type) {
-      case METALAKE:
-        prefixes.add(replacePrefixTypeInfo(encode, CATALOG.getShortName()));
-        prefixes.add(replacePrefixTypeInfo(encode, SCHEMA.getShortName()));
-        prefixes.add(replacePrefixTypeInfo(encode, TABLE.getShortName()));
-        break;
-      case CATALOG:
-        prefixes.add(replacePrefixTypeInfo(encode, SCHEMA.getShortName()));
-        prefixes.add(replacePrefixTypeInfo(encode, TABLE.getShortName()));
-        break;
-      case SCHEMA:
-        prefixes.add(replacePrefixTypeInfo(encode, TABLE.getShortName()));
-        break;
-      case TABLE:
-        break;
-      default:
-        LOG.warn("Currently unknown type: {}, please check it", type);
-    }
-    Collections.reverse(prefixes);
-    return prefixes;
-  }
-
-  private byte[] replacePrefixTypeInfo(byte[] encode, String subTypePrefix) {
-    byte[] result = new byte[encode.length];
-    System.arraycopy(encode, 0, result, 0, encode.length);
-    byte[] bytes = subTypePrefix.getBytes(StandardCharsets.UTF_8);
-    result[0] = bytes[0];
-    result[1] = bytes[1];
-
-    return result;
   }
 
   @Override
