@@ -30,12 +30,12 @@ public class KvNameMappingService implements NameMappingService {
   // name prefix of name in name to id mapping,
   // e.g., name_metalake1 -> 1
   //       name_metalake2 -> 2
-  private static final byte[] NAME_PREFIX = "name_".getBytes(StandardCharsets.UTF_8);
+  static final byte[] NAME_PREFIX = "name_".getBytes(StandardCharsets.UTF_8);
 
   // id prefix of id in name to id mapping,
   // e.g., id_1 -> metalake1
   //       id_2 -> metalake2
-  private static final byte[] ID_PREFIX = "id_".getBytes(StandardCharsets.UTF_8);
+  static final byte[] ID_PREFIX = "id_".getBytes(StandardCharsets.UTF_8);
 
   @VisibleForTesting final TransactionalKvBackend transactionalKvBackend;
 

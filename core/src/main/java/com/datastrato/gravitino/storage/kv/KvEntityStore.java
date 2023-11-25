@@ -11,6 +11,8 @@ import static com.datastrato.gravitino.Entity.EntityType.SCHEMA;
 import static com.datastrato.gravitino.Entity.EntityType.TABLE;
 import static com.datastrato.gravitino.storage.kv.BinaryEntityKeyEncoder.LOG;
 import static com.datastrato.gravitino.storage.kv.BinaryEntityKeyEncoder.NAMESPACE_SEPARATOR;
+import static com.datastrato.gravitino.storage.kv.KvNameMappingService.ID_PREFIX;
+import static com.datastrato.gravitino.storage.kv.KvNameMappingService.NAME_PREFIX;
 
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Entity;
@@ -34,7 +36,6 @@ import com.datastrato.gravitino.utils.Executable;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -351,22 +352,26 @@ public class KvEntityStore implements EntityStore {
                   if (!exists(ident, entityType)) {
                     return false;
                   }
+                  // Get the prefix of the name to id mapping for sub-entities of this one
+                  String identNameToIdKey = generateKeyForMapping(ident);
+                  long id = nameMappingService.getIdByName(identNameToIdKey);
+                  String[] ids = identNameToIdKey.split(NAMESPACE_SEPARATOR);
+                  String[] realIds = ArrayUtils.remove(ids, ids.length - 1);
+                  realIds = ArrayUtils.add(realIds, String.valueOf(id));
+                  String subEntitiesPrefix =
+                      String.join(NAMESPACE_SEPARATOR, realIds) + NAMESPACE_SEPARATOR;
 
-                  byte[] dataKey = entityKeyEncoder.encode(ident, entityType, true);
-                  List<byte[]> subEntityPrefix = getSubEntitiesPrefix(ident, entityType);
-                  if (subEntityPrefix.isEmpty()) {
-                    // has no sub-entities
-                    return transactionalKvBackend.delete(dataKey);
-                  }
-
-                  byte[] directChild = Iterables.getLast(subEntityPrefix);
-                  byte[] endKey = Bytes.increment(Bytes.wrap(directChild)).get();
+                  // Scan underlying data
+                  byte[] binarySubEntitiesPrefix =
+                      subEntitiesPrefix.getBytes(StandardCharsets.UTF_8);
+                  byte[] nextIdentNameToIdKey =
+                      Bytes.increment(Bytes.wrap(binarySubEntitiesPrefix)).get();
                   List<Pair<byte[], byte[]>> kvs =
                       transactionalKvBackend.scan(
                           new KvRangeScan.KvRangeScanBuilder()
-                              .start(directChild)
-                              .end(endKey)
-                              .startInclusive(true)
+                              .start(Bytes.concat(NAME_PREFIX, binarySubEntitiesPrefix))
+                              .end(Bytes.concat(NAME_PREFIX, nextIdentNameToIdKey))
+                              .startInclusive(false)
                               .endInclusive(false)
                               .limit(1)
                               .build());
@@ -378,16 +383,19 @@ public class KvEntityStore implements EntityStore {
                             ident));
                   }
 
-                  for (byte[] prefix : subEntityPrefix) {
-                    transactionalKvBackend.deleteRange(
-                        new KvRangeScan.KvRangeScanBuilder()
-                            .start(prefix)
-                            .startInclusive(true)
-                            .end(Bytes.increment(Bytes.wrap(prefix)).get())
-                            .build());
-                  }
+                  // Remove data and id-name mapping, we will use GC to collect data of
+                  // sub-entities
+                  byte[] dataKey = entityKeyEncoder.encode(ident, entityType, true);
+                  transactionalKvBackend.delete(dataKey);
 
-                  return transactionalKvBackend.delete(dataKey);
+                  byte[] nameByte =
+                      Bytes.concat(NAME_PREFIX, identNameToIdKey.getBytes(StandardCharsets.UTF_8));
+                  byte[] idByte = transactionalKvBackend.get(nameByte);
+                  if (idByte == null) {
+                    return false;
+                  }
+                  transactionalKvBackend.delete(nameByte);
+                  return transactionalKvBackend.delete(Bytes.concat(ID_PREFIX, idByte));
                 }),
         reentrantReadWriteLock);
   }
