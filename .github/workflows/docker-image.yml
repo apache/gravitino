@@ -9,6 +9,7 @@ on:
         required: true
         default: 'gravitino-ci-hive'
         options:
+          - 'gravitino'
           - 'gravitino-ci-hive'
           - 'gravitino-ci-trino'
       tag:
@@ -36,6 +37,9 @@ jobs:
           elif [ "${{ github.event.inputs.image }}" == "gravitino-ci-trino" ]; then
             echo "image_type=trino" >> $GITHUB_ENV
             echo "image_name=datastrato/gravitino-ci-trino" >> $GITHUB_ENV
+          elif [ "${{ github.event.inputs.image }}" == "gravitino" ]; then
+            echo "image_type=gravitino" >> $GITHUB_ENV
+            echo "image_name=datastrato/gravitino" >> $GITHUB_ENV
           fi
 
       - uses: actions/checkout@v3
