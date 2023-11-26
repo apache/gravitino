@@ -29,3 +29,5 @@ sed -i '' 's/GRAVITINO_METALAKE_NAME/playground_metalake/g' "${playground_dir}/p
 
 # hive.metastore.uri = thrift://HIVE_HOST_IP:9083
 sed 's/HIVE_HOST_IP/hive/g' "${playground_dir}/packages/trino/conf/catalog/hive.properties.template" > "${playground_dir}/packages/trino/conf/catalog/hive.properties"
+
+docker-compose up
