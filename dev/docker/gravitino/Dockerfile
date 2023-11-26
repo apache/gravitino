@@ -9,7 +9,6 @@ WORKDIR /root/gravitino
 
 COPY /packages/gravitino /root/gravitino
 
-
 EXPOSE 8090
 
 ENTRYPOINT ["/bin/bash", "/root/gravitino/bin/gravitino.sh", "start"]
