@@ -15,7 +15,6 @@ import com.google.common.io.Files;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.File;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -59,8 +58,7 @@ public class TestTransactionIdGenerator {
     transactionIdGenerator.start();
     // Make sure the scheduler has schedule once
     Thread.sleep(2000 + 500);
-    Assertions.assertNotNull(
-        kvBackend.get(TransactionIdGeneratorImpl.LAST_TIMESTAMP.getBytes(StandardCharsets.UTF_8)));
+    Assertions.assertNotNull(kvBackend.get(TransactionIdGeneratorImpl.LAST_TIMESTAMP));
   }
 
   @ParameterizedTest
