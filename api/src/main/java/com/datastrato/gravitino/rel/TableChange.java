@@ -83,7 +83,7 @@ public interface TableChange {
    * @return A TableChange for the addition.
    */
   static TableChange addColumn(String[] fieldNames, Type dataType) {
-    return new AddColumn(fieldNames, dataType, null, null);
+    return new AddColumn(fieldNames, dataType, null, null, true);
   }
 
   /**
@@ -99,7 +99,7 @@ public interface TableChange {
    * @return A TableChange for the addition.
    */
   static TableChange addColumn(String[] fieldNames, Type dataType, String comment) {
-    return new AddColumn(fieldNames, dataType, comment, null);
+    return new AddColumn(fieldNames, dataType, comment, null, true);
   }
 
   /**
@@ -112,12 +112,51 @@ public interface TableChange {
    * @param fieldNames Field names of the new column.
    * @param dataType The new column's data type.
    * @param comment The new field's comment string.
-   * @param position The new columns's position.
+   * @param position The new column's position.
    * @return A TableChange for the addition.
    */
   static TableChange addColumn(
       String[] fieldNames, Type dataType, String comment, ColumnPosition position) {
-    return new AddColumn(fieldNames, dataType, comment, position);
+    return new AddColumn(fieldNames, dataType, comment, position, true);
+  }
+
+  /**
+   * Create a TableChange for adding a column.
+   *
+   * <p>If the field already exists, the change will result in an {@link IllegalArgumentException}.
+   * If the new field is nested and its parent does not exist or is not a struct, the change will
+   * result in an {@link IllegalArgumentException}.
+   *
+   * @param fieldNames Field names of the new column.
+   * @param dataType The new column's data type.
+   * @param nullable The new column's nullable.
+   * @return A TableChange for the addition.
+   */
+  static TableChange addColumn(String[] fieldNames, Type dataType, boolean nullable) {
+    return new AddColumn(fieldNames, dataType, null, null, nullable);
+  }
+
+  /**
+   * Create a TableChange for adding a column.
+   *
+   * <p>If the field already exists, the change will result in an {@link IllegalArgumentException}.
+   * If the new field is nested and its parent does not exist or is not a struct, the change will
+   * result in an {@link IllegalArgumentException}.
+   *
+   * @param fieldNames Field names of the new column.
+   * @param dataType The new column's data type.
+   * @param comment The new field's comment string.
+   * @param position The new column's position.
+   * @param nullable The new column's nullable.
+   * @return A TableChange for the addition.
+   */
+  static TableChange addColumn(
+      String[] fieldNames,
+      Type dataType,
+      String comment,
+      ColumnPosition position,
+      boolean nullable) {
+    return new AddColumn(fieldNames, dataType, comment, position, nullable);
   }
 
   /**
@@ -321,11 +360,19 @@ public interface TableChange {
 
     @Getter private final ColumnPosition position;
 
-    private AddColumn(String[] fieldNames, Type dataType, String comment, ColumnPosition position) {
+    @Getter private final boolean nullable;
+
+    private AddColumn(
+        String[] fieldNames,
+        Type dataType,
+        String comment,
+        ColumnPosition position,
+        boolean nullable) {
       this.fieldNames = fieldNames;
       this.dataType = dataType;
       this.comment = comment;
       this.position = position;
+      this.nullable = nullable;
     }
 
     @Override
