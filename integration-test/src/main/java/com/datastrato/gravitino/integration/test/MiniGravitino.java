@@ -8,7 +8,7 @@ import static com.datastrato.gravitino.Configs.ENTRY_KV_ROCKSDB_BACKEND_PATH;
 
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Configs;
-import com.datastrato.gravitino.auth.AuthConstants;
+import com.datastrato.gravitino.auth.AuthenticatorType;
 import com.datastrato.gravitino.aux.AuxiliaryServiceManager;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergRESTService;
 import com.datastrato.gravitino.client.ErrorHandlers;
@@ -17,16 +17,18 @@ import com.datastrato.gravitino.client.RESTClient;
 import com.datastrato.gravitino.dto.responses.VersionResponse;
 import com.datastrato.gravitino.exceptions.RESTException;
 import com.datastrato.gravitino.integration.test.util.ITUtils;
+import com.datastrato.gravitino.integration.test.util.OAuthMockDataProvider;
 import com.datastrato.gravitino.rest.RESTUtils;
 import com.datastrato.gravitino.server.GravitinoServer;
 import com.datastrato.gravitino.server.ServerConfig;
+import com.datastrato.gravitino.server.auth.OAuthConfig;
 import com.datastrato.gravitino.server.web.JettyServerConfig;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Maps;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
@@ -88,7 +90,19 @@ public class MiniGravitino {
     this.host = jettyServerConfig.getHost();
     this.port = jettyServerConfig.getHttpPort();
     String URI = String.format("http://%s:%d", host, port);
-    restClient = HTTPClient.builder(ImmutableMap.of()).uri(URI).build();
+    if (AuthenticatorType.OAUTH
+        .name()
+        .toLowerCase()
+        .equals(context.customConfig.get(OAuthConfig.AUTHENTICATOR.getKey()))) {
+      restClient =
+          HTTPClient.builder(ImmutableMap.of())
+              .uri(URI)
+              .withAuthDataProvider(OAuthMockDataProvider.getInstance())
+              .withAuthenticator("oauth")
+              .build();
+    } else {
+      restClient = HTTPClient.builder(ImmutableMap.of()).uri(URI).build();
+    }
 
     Future<?> future =
         executor.submit(
@@ -198,18 +212,14 @@ public class MiniGravitino {
     String URI = String.format("http://%s:%d", host, port);
     LOG.info("checkIfServerIsRunning() URI: {}", URI);
 
-    restClient = HTTPClient.builder(ImmutableMap.of()).uri(URI).build();
-    // TODO: We will refactor the test code after OAuth client's code is merged.
-    String token = context.customConfig.get(AuthConstants.HTTP_HEADER_AUTHORIZATION);
-    Map<String, String> headers = Maps.newHashMap();
-    if (token != null) {
-      headers.put(AuthConstants.HTTP_HEADER_AUTHORIZATION, token);
-    }
     VersionResponse response = null;
     try {
       response =
           restClient.get(
-              "api/version", VersionResponse.class, headers, ErrorHandlers.restErrorHandler());
+              "api/version",
+              VersionResponse.class,
+              Collections.emptyMap(),
+              ErrorHandlers.restErrorHandler());
     } catch (RESTException e) {
       LOG.warn("checkIfServerIsRunning() fails, GravitinoServer is not running");
     }

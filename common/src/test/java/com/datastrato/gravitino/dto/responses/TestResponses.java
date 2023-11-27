@@ -198,4 +198,28 @@ public class TestResponses {
     ErrorResponse error = ErrorResponse.unknownError("unknown error");
     error.validate(); // No exception thrown
   }
+
+  @Test
+  void testOAuthTokenResponse() throws IllegalArgumentException {
+    OAuthTokenResponse response = new OAuthTokenResponse("Bearer xx", null, "Bearer", null, null);
+    response.validate();
+  }
+
+  @Test
+  void testOAuthTokenException() throws IllegalArgumentException {
+    OAuthTokenResponse response = new OAuthTokenResponse();
+    assertThrows(IllegalArgumentException.class, () -> response.validate());
+  }
+
+  @Test
+  void testOAuthErrorResponse() throws IllegalArgumentException {
+    OAuthErrorResponse response = new OAuthErrorResponse("invalid_grant", "error");
+    response.validate(); // No exception thrown
+  }
+
+  @Test
+  void testOAuthErrorException() throws IllegalArgumentException {
+    OAuthErrorResponse response = new OAuthErrorResponse();
+    assertThrows(IllegalArgumentException.class, () -> response.validate());
+  }
 }

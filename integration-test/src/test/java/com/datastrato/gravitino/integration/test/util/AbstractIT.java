@@ -8,11 +8,13 @@ import static com.datastrato.gravitino.Configs.ENTRY_KV_ROCKSDB_BACKEND_PATH;
 import static com.datastrato.gravitino.server.GravitinoServer.WEBSERVER_CONF_PREFIX;
 
 import com.datastrato.gravitino.Config;
+import com.datastrato.gravitino.auth.AuthenticatorType;
 import com.datastrato.gravitino.client.GravitinoClient;
 import com.datastrato.gravitino.integration.test.MiniGravitino;
 import com.datastrato.gravitino.integration.test.MiniGravitinoContext;
 import com.datastrato.gravitino.server.GravitinoServer;
 import com.datastrato.gravitino.server.ServerConfig;
+import com.datastrato.gravitino.server.auth.OAuthConfig;
 import com.datastrato.gravitino.server.web.JettyServerConfig;
 import java.io.IOException;
 import java.net.InetAddress;
@@ -36,6 +38,8 @@ import org.slf4j.LoggerFactory;
 public class AbstractIT {
   public static final Logger LOG = LoggerFactory.getLogger(AbstractIT.class);
   protected static GravitinoClient client;
+
+  private static final OAuthMockDataProvider mockDataProvider = OAuthMockDataProvider.getInstance();
 
   private static MiniGravitino miniGravitino;
 
@@ -113,7 +117,18 @@ public class AbstractIT {
         JettyServerConfig.fromConfig(serverConfig, WEBSERVER_CONF_PREFIX);
 
     String uri = "http://" + jettyServerConfig.getHost() + ":" + jettyServerConfig.getHttpPort();
-    client = GravitinoClient.builder(uri).build();
+    if (AuthenticatorType.OAUTH
+        .name()
+        .toLowerCase()
+        .equals(customConfigs.get(OAuthConfig.AUTHENTICATOR.getKey()))) {
+      client =
+          GravitinoClient.builder(uri)
+              .withAuthenticator("oauth")
+              .withAuthDataProvider(mockDataProvider)
+              .build();
+    } else {
+      client = GravitinoClient.builder(uri).build();
+    }
   }
 
   @AfterAll
