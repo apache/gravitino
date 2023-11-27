@@ -12,7 +12,6 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -67,20 +66,7 @@ public class MysqlService {
                   "Database %s could not be found in information_schema.SCHEMATA", databaseName));
         }
         String schemaName = resultSet.getString("SCHEMA_NAME");
-        // Mysql currently only supports these two attributes
-        String characterSetName = resultSet.getString("DEFAULT_CHARACTER_SET_NAME");
-        String collationName = resultSet.getString("DEFAULT_COLLATION_NAME");
-        return new JdbcSchema.Builder()
-            .withName(schemaName)
-            .withProperties(
-                new HashMap<String, String>() {
-                  {
-                    put("CHARACTER SET", characterSetName);
-                    put("COLLATE", collationName);
-                  }
-                })
-            .withAuditInfo(AuditInfo.EMPTY)
-            .build();
+        return new JdbcSchema.Builder().withName(schemaName).withAuditInfo(AuditInfo.EMPTY).build();
       }
     } catch (final SQLException se) {
       throw new RuntimeException(se);

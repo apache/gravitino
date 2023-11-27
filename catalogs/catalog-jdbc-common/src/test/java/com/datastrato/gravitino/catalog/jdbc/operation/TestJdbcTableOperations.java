@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -86,7 +87,8 @@ public class TestJdbcTableOperations {
 
   private static void createJdbcDatabaseOperations() {
     JDBC_TABLE_OPERATIONS = new SqliteTableOperations();
-    JDBC_TABLE_OPERATIONS.initialize(DATA_SOURCE, EXCEPTION_CONVERTER, TYPE_CONVERTER);
+    JDBC_TABLE_OPERATIONS.initialize(
+        DATA_SOURCE, EXCEPTION_CONVERTER, TYPE_CONVERTER, Collections.emptyMap());
   }
 
   @Test

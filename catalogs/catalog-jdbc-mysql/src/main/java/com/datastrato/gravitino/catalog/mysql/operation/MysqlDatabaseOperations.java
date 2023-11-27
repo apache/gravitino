@@ -33,7 +33,7 @@ public class MysqlDatabaseOperations extends JdbcDatabaseOperations {
     // Append options
     if (MapUtils.isNotEmpty(properties)) {
       // TODO #804 Properties will be unified in the future.
-      LOG.warn("Ignoring properties option on database create.");
+      throw new UnsupportedOperationException("Properties are not supported yet");
       //      sqlBuilder.append("\n");
       //      sqlBuilder.append(
       //          properties.entrySet().stream()

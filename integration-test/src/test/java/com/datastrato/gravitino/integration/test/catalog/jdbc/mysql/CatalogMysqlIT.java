@@ -21,6 +21,7 @@ import com.datastrato.gravitino.integration.test.catalog.jdbc.mysql.service.Mysq
 import com.datastrato.gravitino.integration.test.catalog.jdbc.utils.JdbcDriverDownloader;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
+import com.datastrato.gravitino.integration.test.util.ITUtils;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.Schema;
 import com.datastrato.gravitino.rel.SupportsSchemas;
@@ -68,7 +69,7 @@ public class CatalogMysqlIT extends AbstractIT {
   public static String MYSQL_COL_NAME2 = "mysql_col_name2";
   public static String MYSQL_COL_NAME3 = "mysql_col_name3";
   private static final String provider = "jdbc-mysql";
-  private static final String DOWNLOAD_JDK_URL =
+  private static final String DOWNLOAD_JDBC_DRIVER_URL =
       "https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.27/mysql-connector-java-8.0.27.jar";
 
   private static GravitinoMetaLake metalake;
@@ -84,13 +85,14 @@ public class CatalogMysqlIT extends AbstractIT {
   @BeforeAll
   public static void startup() throws IOException {
 
-    String gravitinoHome = System.getenv("GRAVITINO_HOME");
-
-    Path tmpPath = Paths.get(gravitinoHome, "/catalogs/jdbc-mysql/libs");
-    JdbcDriverDownloader.downloadJdbcDriver(DOWNLOAD_JDK_URL, tmpPath.toString());
+    if (!ITUtils.EMBEDDED_TEST_MODE.equals(testMode)) {
+      String gravitinoHome = System.getenv("GRAVITINO_HOME");
+      Path tmpPath = Paths.get(gravitinoHome, "/catalogs/jdbc-mysql/libs");
+      JdbcDriverDownloader.downloadJdbcDriver(DOWNLOAD_JDBC_DRIVER_URL, tmpPath.toString());
+    }
 
     MYSQL_CONTAINER =
-        new MySQLContainer<>("mysql:latest")
+        new MySQLContainer<>("mysql:8.2.0")
             .withDatabaseName(TEST_DB_NAME)
             .withUsername("root")
             .withPassword("root");

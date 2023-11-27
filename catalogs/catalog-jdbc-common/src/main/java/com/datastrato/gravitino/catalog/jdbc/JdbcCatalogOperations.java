@@ -117,8 +117,8 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
 
     JdbcConfig jdbcConfig = new JdbcConfig(resultConf);
     this.dataSource = DataSourceUtils.createDataSource(jdbcConfig);
-    this.databaseOperation.initialize(dataSource, exceptionConverter);
-    this.tableOperation.initialize(dataSource, exceptionConverter, jdbcTypeConverter);
+    this.databaseOperation.initialize(dataSource, exceptionConverter, resultConf);
+    this.tableOperation.initialize(dataSource, exceptionConverter, jdbcTypeConverter, resultConf);
     this.jdbcTablePropertiesMetadata = new JdbcTablePropertiesMetadata();
     this.jdbcSchemaPropertiesMetadata = new JdbcSchemaPropertiesMetadata();
   }
@@ -281,6 +281,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
         .withAuditInfo(load.auditInfo())
         .withName(tableName)
         .withColumns(load.columns())
+        .withAuditInfo(load.auditInfo())
         // Remove id from comment
         .withComment(StringIdentifier.removeIdFromComment(load.comment()))
         .withProperties(properties)
