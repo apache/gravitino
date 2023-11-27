@@ -9,7 +9,6 @@ import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.storage.TransactionIdGenerator;
 import com.datastrato.gravitino.utils.ByteUtils;
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -23,7 +22,7 @@ public class TransactionIdGeneratorImpl implements TransactionIdGenerator {
   private static final Logger LOGGER = LoggerFactory.getLogger(TransactionIdGeneratorImpl.class);
 
   private final KvBackend kvBackend;
-  @VisibleForTesting static final String LAST_TIMESTAMP = "last_timestamp";
+  static final String LAST_TIMESTAMP = "last_timestamp";
   private volatile long incrementId = 0L;
   private volatile long lastTransactionId = 0L;
   private final Config config;

@@ -37,7 +37,8 @@ public final class KvGarbageCollector implements Closeable {
   private final KvBackend kvBackend;
   private final Config config;
 
-  public final ScheduledExecutorService garbageCollectorPool =
+  @VisibleForTesting
+  final ScheduledExecutorService garbageCollectorPool =
       new ScheduledThreadPoolExecutor(
           2,
           r -> new Thread(r, "KvEntityStore-Garbage-Collector-%d"),
@@ -49,24 +50,24 @@ public final class KvGarbageCollector implements Closeable {
   }
 
   public void start() {
-    garbageCollectorPool.scheduleAtFixedRate(this::collectGarbage, 5, 10, TimeUnit.MINUTES);
+    garbageCollectorPool.scheduleAtFixedRate(this::collectAndClean, 5, 10, TimeUnit.MINUTES);
   }
 
   @VisibleForTesting
-  void collectGarbage() {
+  void collectAndClean() {
     LOGGER.info("Start to collect garbage...");
     try {
-      LOGGER.info("start to collect uncommitted data...");
-      collectUncommittedData();
+      LOGGER.info("Start to collect and delete uncommitted data...");
+      collectAndRemoveUncommittedData();
 
-      LOGGER.info("start to collect old version data...");
-      collectOldVersionData();
+      LOGGER.info("Start to collect and delete old version data...");
+      collectAndRemoveOldVersionData();
     } catch (Exception e) {
       LOGGER.error("Failed to collect garbage", e);
     }
   }
 
-  private void collectUncommittedData() throws IOException {
+  private void collectAndRemoveUncommittedData() throws IOException {
     List<Pair<byte[], byte[]>> kvs =
         kvBackend.scan(
             new KvRangeScan.KvRangeScanBuilder()
@@ -81,22 +82,26 @@ public final class KvGarbageCollector implements Closeable {
                         return false;
                       }
 
-                      byte[] transactionId = getBinaryTransactionId((byte[]) k);
+                      byte[] transactionId = getBinaryTransactionId(k);
                       return kvBackend.get(generateCommitKey(transactionId)) == null;
                     })
                 .limit(10000) /* Each time we only collect 10000 entities at most*/
                 .build());
 
+    LOGGER.info("Start to remove {} uncommitted data", kvs.size());
     for (Pair<byte[], byte[]> pair : kvs) {
       kvBackend.delete(pair.getKey());
     }
   }
 
-  private void collectOldVersionData() throws IOException {
-    long deleteTimeLine =
-        System.currentTimeMillis() - TimeUnit.DAYS.toMillis(config.get(ENTITY_KV_TTL));
+  private void collectAndRemoveOldVersionData() throws IOException {
+    long deleteTimeLine = System.currentTimeMillis() - config.get(ENTITY_KV_TTL);
     // Why should we leave shift 18 bits? please refer to TransactionIdGeneratorImpl#nextId
+    // We can delete the data which is older than deleteTimeLine.(old data with transaction id that
+    // is
+    // smaller than transactionIdToDelete)
     long transactionIdToDelete = deleteTimeLine << 18;
+    LOGGER.info("Start to remove data which is older than {}", transactionIdToDelete);
     byte[] startKey = TransactionalKvBackendImpl.generateCommitKey(transactionIdToDelete);
     byte[] endKey = endOfTransactionId();
 
@@ -111,8 +116,10 @@ public final class KvGarbageCollector implements Closeable {
                 .endInclusive(false)
                 .build());
 
-    // Why should we reverse the order? Because we need to delete the data from the oldest to
-    // latest. kvs is sorted by transaction id in ascending order, so we need to reverse it.
+    // Why should we reverse the order? Because we need to delete the data from the oldest data to
+    // the latest ones. kvs is sorted by transaction id in ascending order (Keys with bigger
+    // transaction id
+    // is smaller than keys with smaller transaction id). So we need to reverse the order.
     Collections.sort(kvs, (o1, o2) -> Bytes.wrap(o2.getKey()).compareTo(o1.getKey()));
     for (Pair<byte[], byte[]> kv : kvs) {
       List<byte[]> keysInTheTransaction = SerializationUtils.deserialize(kv.getValue());
@@ -131,6 +138,8 @@ public final class KvGarbageCollector implements Closeable {
 
         // Value has deleted mark, we can remove it.
         if (null == TransactionalKvBackendImpl.getRealValue(rawValue)) {
+          LOGGER.info(
+              "Physically delete key that has marked deleted: {}", Bytes.wrap(key).toString());
           kvBackend.delete(rawKey);
           keysDeletedCount++;
         }
@@ -149,6 +158,10 @@ public final class KvGarbageCollector implements Closeable {
                     .build());
         if (!newVersionOfKey.isEmpty()) {
           // Has a newer version, we can remove it.
+          LOGGER.info(
+              "Physically delete key that has newer version: {}, a newer version {}",
+              Bytes.wrap(key).toString(),
+              Bytes.wrap(newVersionOfKey.get(0).getKey()).toString());
           kvBackend.delete(rawKey);
           keysDeletedCount++;
         }
@@ -163,7 +176,7 @@ public final class KvGarbageCollector implements Closeable {
 
   @Override
   public void close() throws IOException {
-    garbageCollectorPool.shutdown();
+    garbageCollectorPool.shutdownNow();
     try {
       garbageCollectorPool.awaitTermination(5, TimeUnit.SECONDS);
     } catch (InterruptedException e) {
