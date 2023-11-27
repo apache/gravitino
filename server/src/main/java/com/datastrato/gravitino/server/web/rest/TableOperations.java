@@ -7,6 +7,8 @@ package com.datastrato.gravitino.server.web.rest;
 import static com.datastrato.gravitino.dto.util.DTOConverters.fromDTO;
 import static com.datastrato.gravitino.dto.util.DTOConverters.fromDTOs;
 
+import com.codahale.metrics.annotation.ResponseMetered;
+import com.codahale.metrics.annotation.Timed;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.catalog.CatalogOperationDispatcher;
@@ -17,6 +19,7 @@ import com.datastrato.gravitino.dto.responses.DropResponse;
 import com.datastrato.gravitino.dto.responses.EntityListResponse;
 import com.datastrato.gravitino.dto.responses.TableResponse;
 import com.datastrato.gravitino.dto.util.DTOConverters;
+import com.datastrato.gravitino.metrics.MetricNames;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.server.web.Utils;
@@ -52,6 +55,8 @@ public class TableOperations {
 
   @GET
   @Produces("application/vnd.gravitino.v1+json")
+  @Timed(name = "list-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "list-table", absolute = true)
   public Response listTables(
       @PathParam("metalake") String metalake,
       @PathParam("catalog") String catalog,
@@ -68,6 +73,8 @@ public class TableOperations {
 
   @POST
   @Produces("application/vnd.gravitino.v1+json")
+  @Timed(name = "create-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "create-table", absolute = true)
   public Response createTable(
       @PathParam("metalake") String metalake,
       @PathParam("catalog") String catalog,
@@ -97,6 +104,8 @@ public class TableOperations {
   @GET
   @Path("{table}")
   @Produces("application/vnd.gravitino.v1+json")
+  @Timed(name = "load-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "load-table", absolute = true)
   public Response loadTable(
       @PathParam("metalake") String metalake,
       @PathParam("catalog") String catalog,
@@ -115,6 +124,8 @@ public class TableOperations {
   @PUT
   @Path("{table}")
   @Produces("application/vnd.gravitino.v1+json")
+  @Timed(name = "alter-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "alter-table", absolute = true)
   public Response alterTable(
       @PathParam("metalake") String metalake,
       @PathParam("catalog") String catalog,
@@ -139,6 +150,8 @@ public class TableOperations {
   @DELETE
   @Path("{table}")
   @Produces("application/vnd.gravitino.v1+json")
+  @Timed(name = "drop-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "drop-table", absolute = true)
   public Response dropTable(
       @PathParam("metalake") String metalake,
       @PathParam("catalog") String catalog,

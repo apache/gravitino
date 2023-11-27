@@ -9,7 +9,7 @@ import static org.testng.Assert.assertEquals;
 import com.datastrato.gravitino.dto.AuditDTO;
 import com.datastrato.gravitino.dto.rel.ColumnDTO;
 import com.datastrato.gravitino.dto.rel.TableDTO;
-import com.datastrato.gravitino.shaded.io.substrait.type.TypeCreator;
+import com.datastrato.gravitino.rel.types.Types;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
@@ -23,12 +23,12 @@ public class TestGravitinoTable {
         new ColumnDTO[] {
           new ColumnDTO.Builder()
               .withName("f1")
-              .withDataType(TypeCreator.NULLABLE.STRING)
+              .withDataType(Types.StringType.get())
               .withComment("f1 column")
               .build(),
           new ColumnDTO.Builder()
               .withName("f2")
-              .withDataType(TypeCreator.NULLABLE.I32)
+              .withDataType(Types.IntegerType.get())
               .withComment("f2 column")
               .build()
         };

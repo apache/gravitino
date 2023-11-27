@@ -778,7 +778,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
         targetPosition,
         new FieldSchema(
             change.fieldNames()[0],
-            change.getDataType().accept(ToHiveType.INSTANCE).getQualifiedName(),
+            ToHiveType.convert(change.getDataType()).getQualifiedName(),
             change.getComment()));
   }
 
@@ -826,8 +826,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     if (indexOfColumn == -1) {
       throw new IllegalArgumentException("UpdateColumnType does not exist: " + columnName);
     }
-    cols.get(indexOfColumn)
-        .setType(change.getNewDataType().accept(ToHiveType.INSTANCE).getQualifiedName());
+    cols.get(indexOfColumn).setType(ToHiveType.convert(change.getNewDataType()).getQualifiedName());
   }
 
   /**
