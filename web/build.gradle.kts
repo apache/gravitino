@@ -56,11 +56,7 @@ tasks {
     dependsOn(buildwar)
   }
   clean {
-    delete(".gradle")
-    delete(".next")
-    delete(".node")
     delete("build")
     delete("dist")
-    delete("node_modules")
   }
 }
