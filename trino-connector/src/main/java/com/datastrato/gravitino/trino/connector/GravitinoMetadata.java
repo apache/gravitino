@@ -254,7 +254,7 @@ public class GravitinoMetadata implements ConnectorMetadata {
         properties.entrySet().stream()
             .filter(e -> e.getValue().isPresent())
             .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().get()));
-    Map<String, String> allProps = metadataAdapter.toGravitonTableProperties(resultMap);
+    Map<String, String> allProps = metadataAdapter.toGravitinoTableProperties(resultMap);
     catalogConnectorMetadata.setTableProperties(gravitinoTableHandle.toSchemaTableName(), allProps);
   }
 
