@@ -18,7 +18,7 @@ public interface Configs {
 
   String ENTITY_KV_ROCKSDB_BACKEND_PATH_KEY = "gravitino.entity.store.kv.rocksdbPath";
 
-  Long DEFAULT_ENTITY_KV_TTL = 7L; // 7 days
+  Long DEFAULT_ENTITY_KV_TTL = 604800000L; // 7 days
   String ENTITY_KV_TTL_KEY_KEY = "gravitino.entity.store.kv.deleteAfterTimeMs";
 
   // Default path for RocksDB backend is "${GRAVITINO_HOME}/data/rocksdb"
