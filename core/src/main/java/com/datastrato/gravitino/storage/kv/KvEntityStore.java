@@ -302,7 +302,9 @@ public class KvEntityStore implements EntityStore {
                   // 1/2/schema1 ---> 3
                   // Then the prefix of the name to id mapping for sub-entities of this one is
                   // '1/2/3/'
+                  // identNameToIdKey in this example is '1/2/schema1'
                   String identNameToIdKey = generateKeyForMapping(ident);
+                  // id in this example is 3, ids in this example is ['1', '2', 'schema1']
                   long id = nameMappingService.getIdByName(identNameToIdKey);
                   String[] ids = identNameToIdKey.split(NAMESPACE_SEPARATOR);
                   String[] realIds = ArrayUtils.remove(ids, ids.length - 1);
