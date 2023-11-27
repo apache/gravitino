@@ -48,6 +48,10 @@ dependencies {
 
 fun getGitCommitId(): String {
   val gitFolder = rootDir.path + "/.git/"
+  val gitFolderFile = File(gitFolder)
+  if (!gitFolderFile.exists() || !gitFolderFile.isDirectory) {
+    return ""
+  }
   val head = File(gitFolder + "HEAD").readText().split(":")
   val isCommit = head.size == 1
   if (isCommit) {
