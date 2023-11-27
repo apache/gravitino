@@ -123,4 +123,4 @@ Scan and range query are almost the same as that of read process, for more detai
 - Key starts with 0x'1D0000' store the contents of id-name mapping. for more please refer to class `KvNameMappingService`.
 - Key starts with 0x'1D0001' stores the data of current timestamp which is used for generating transaction id, for more please refer to class `TransactionIdGeneratorImpl`.
 - Key starts with 0x'1E' stores transaction marks.
-- Other key spaces are used to gravitino entities like `metalakes`,`catalogs`, `scheams`, `tables` and so on.   
+- Other key spaces are used to store gravitino entities like `metalakes`,`catalogs`, `scheams`, `tables` and so on.   

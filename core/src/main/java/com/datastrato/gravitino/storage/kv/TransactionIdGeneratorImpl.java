@@ -25,8 +25,8 @@ public class TransactionIdGeneratorImpl implements TransactionIdGenerator {
 
   private final KvBackend kvBackend;
 
-  // We use three control characters 0x1D, 0x00, 0x00 to separate it from other keys.
-  private static final byte[] ID_GENERATOR_PREFIX = new byte[] {0x1D, 0x00, 0x00};
+  // We use three control characters 0x1D, 0x00, 0x01 to separate it from other keys.
+  private static final byte[] ID_GENERATOR_PREFIX = new byte[] {0x1D, 0x00, 0x01};
 
   @VisibleForTesting
   static final byte[] LAST_TIMESTAMP =
