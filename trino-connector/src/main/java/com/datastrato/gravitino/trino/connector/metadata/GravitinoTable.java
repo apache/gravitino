@@ -43,20 +43,6 @@ public class GravitinoTable {
   }
 
   public GravitinoTable(
-      String schemaName, String tableName, Table tableMetadata, Map<String, String> properties) {
-    this.schemaName = schemaName;
-    this.tableName = tableName;
-
-    ImmutableList.Builder<GravitinoColumn> tableColumns = ImmutableList.builder();
-    for (int i = 0; i < tableMetadata.columns().length; i++) {
-      tableColumns.add(new GravitinoColumn(tableMetadata.columns()[i], i));
-    }
-    this.columns = tableColumns.build();
-    this.comment = tableMetadata.comment();
-    this.properties = properties;
-  }
-
-  public GravitinoTable(
       String schemaName,
       String tableName,
       List<GravitinoColumn> columns,

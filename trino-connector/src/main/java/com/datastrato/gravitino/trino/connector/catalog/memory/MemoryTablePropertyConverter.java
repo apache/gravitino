@@ -6,27 +6,18 @@ package com.datastrato.gravitino.trino.connector.catalog.memory;
 
 import static io.trino.spi.session.PropertyMetadata.integerProperty;
 
-import com.datastrato.gravitino.trino.connector.catalog.HasProperties;
+import com.datastrato.gravitino.trino.connector.catalog.PropertyConverter;
 import com.google.common.collect.ImmutableList;
 import io.trino.spi.session.PropertyMetadata;
 import java.util.List;
 
-public class MemoryTableProperties implements HasProperties {
-  public static final MemoryTableProperties INSTANCE = new MemoryTableProperties();
+public class MemoryTablePropertyConverter implements PropertyConverter {
+  public static final MemoryTablePropertyConverter INSTANCE = new MemoryTablePropertyConverter();
   private final List<PropertyMetadata<?>> tablePropertyMetadata;
 
   // TODO yuhui Need to add table properties
-  MemoryTableProperties() {
+  MemoryTablePropertyConverter() {
     tablePropertyMetadata =
         ImmutableList.of(integerProperty("max_ttl", "Max ttl days for the table.", 10, false));
-  }
-
-  public List<PropertyMetadata<?>> getTablePropertyMetadata() {
-    return tablePropertyMetadata;
-  }
-
-  @Override
-  public List<PropertyMetadata<?>> getPropertyMetadata() {
-    return tablePropertyMetadata;
   }
 }

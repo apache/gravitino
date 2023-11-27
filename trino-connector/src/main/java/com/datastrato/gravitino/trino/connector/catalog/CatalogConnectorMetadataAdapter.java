@@ -20,6 +20,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.NotImplementedException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * This interface is used to handle different parts of catalog metadata from different catalog
@@ -27,6 +29,8 @@ import org.apache.commons.lang3.NotImplementedException;
  */
 public class CatalogConnectorMetadataAdapter {
 
+  private static final Logger LOGGER =
+      LoggerFactory.getLogger(CatalogConnectorMetadataAdapter.class);
   protected final List<PropertyMetadata<?>> schemaProperties;
   protected final List<PropertyMetadata<?>> tableProperties;
   protected final List<PropertyMetadata<?>> columnProperties;
@@ -63,7 +67,7 @@ public class CatalogConnectorMetadataAdapter {
     String tableName = tableMetadata.getTableSchema().getTable().getTableName();
     String schemaName = tableMetadata.getTableSchema().getTable().getSchemaName();
     String comment = tableMetadata.getComment().orElse("");
-    Map<String, String> properties = toGravitonTableProperties(tableMetadata.getProperties());
+    Map<String, String> properties = toGravitinoTableProperties(tableMetadata.getProperties());
 
     List<GravitinoColumn> columns = new ArrayList<>();
     for (int i = 0; i < tableMetadata.getColumns().size(); i++) {
@@ -110,6 +114,8 @@ public class CatalogConnectorMetadataAdapter {
       String name = propertyMetadata.getName();
       if (properties.containsKey(name)) {
         validProperties.put(name, properties.get(name));
+      } else {
+        LOGGER.warn("Property {} is not defined in trino, we will ignore it", name);
       }
     }
     return validProperties;
@@ -126,7 +132,7 @@ public class CatalogConnectorMetadataAdapter {
   }
 
   /** Normalize trino table attributes for gravitino */
-  public Map<String, String> toGravitonTableProperties(Map<String, Object> properties) {
+  public Map<String, String> toGravitinoTableProperties(Map<String, Object> properties) {
     return removeUnsetProperties(properties);
   }
 

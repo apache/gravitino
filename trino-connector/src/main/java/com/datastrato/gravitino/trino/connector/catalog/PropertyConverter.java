@@ -5,13 +5,10 @@
 
 package com.datastrato.gravitino.trino.connector.catalog;
 
-import com.google.common.collect.ImmutableList;
-import io.trino.spi.session.PropertyMetadata;
-import java.util.List;
 import java.util.Map;
 
-/** Transforming gravitino metadata to trino. */
-public interface HasProperties {
+/** Transforming between gravitino schema/table/column property and trino property. */
+public interface PropertyConverter {
 
   /** @return TableProperties list that used to validate table properties. */
   default Map<String, String> toTrinoProperties(Map<String, String> properties) {
@@ -19,11 +16,7 @@ public interface HasProperties {
   }
 
   /** @return SchemaProperties list that used to validate schema properties. */
-  default Map<String, String> toGravitinoProperties(Map<String, String> properties) {
+  default Map<String, Object> toGravitinoProperties(Map<String, Object> properties) {
     return properties;
-  }
-
-  default List<PropertyMetadata<?>> getPropertyMetadata() {
-    return ImmutableList.of();
   }
 }
