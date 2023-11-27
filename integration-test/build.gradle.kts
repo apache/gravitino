@@ -85,12 +85,6 @@ dependencies {
     exclude("*")
   }
 
-  testImplementation(libs.substrait.java.core) {
-    exclude("org.slf4j")
-    exclude("com.fasterxml.jackson.core")
-    exclude("com.fasterxml.jackson.datatype")
-  }
-
   testCompileOnly(libs.lombok)
   testAnnotationProcessor(libs.lombok)
   testImplementation(libs.guava)

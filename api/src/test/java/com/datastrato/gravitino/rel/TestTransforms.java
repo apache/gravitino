@@ -21,8 +21,8 @@ import com.datastrato.gravitino.rel.expressions.Expression;
 import com.datastrato.gravitino.rel.expressions.Literal;
 import com.datastrato.gravitino.rel.expressions.NamedReference;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
-import io.substrait.type.Type;
-import io.substrait.type.TypeCreator;
+import com.datastrato.gravitino.rel.types.Type;
+import com.datastrato.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -38,7 +38,7 @@ public class TestTransforms {
 
           @Override
           public Type dataType() {
-            return TypeCreator.NULLABLE.I8;
+            return Types.ByteType.get();
           }
 
           @Override
@@ -85,7 +85,7 @@ public class TestTransforms {
 
           @Override
           public Type dataType() {
-            return TypeCreator.NULLABLE.I8;
+            return Types.ByteType.get();
           }
 
           @Override

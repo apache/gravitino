@@ -4,8 +4,8 @@
  */
 package com.datastrato.gravitino.catalog.jdbc.converter;
 
-import io.substrait.type.Type;
-import io.substrait.type.TypeCreator;
+import com.datastrato.gravitino.rel.types.Type;
+import com.datastrato.gravitino.rel.types.Types;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
@@ -16,10 +16,10 @@ public class SqliteTypeConverter extends JdbcTypeConverter {
   protected static final Map<Type, String> GRAVITINO_TO_SQLITE_MAPPING = new HashMap<>();
 
   static {
-    GRAVITINO_TO_SQLITE_MAPPING.put(TypeCreator.NULLABLE.I8, "TINYINT");
-    GRAVITINO_TO_SQLITE_MAPPING.put(TypeCreator.NULLABLE.I32, "INTEGER");
-    GRAVITINO_TO_SQLITE_MAPPING.put(TypeCreator.NULLABLE.STRING, "TEXT");
-    GRAVITINO_TO_SQLITE_MAPPING.put(TypeCreator.NULLABLE.BINARY, "BLOB");
+    GRAVITINO_TO_SQLITE_MAPPING.put(Types.ByteType.get(), "TINYINT");
+    GRAVITINO_TO_SQLITE_MAPPING.put(Types.IntegerType.get(), "INTEGER");
+    GRAVITINO_TO_SQLITE_MAPPING.put(Types.StringType.get(), "TEXT");
+    GRAVITINO_TO_SQLITE_MAPPING.put(Types.BinaryType.get(), "BLOB");
   }
 
   @Override

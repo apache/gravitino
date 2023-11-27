@@ -28,16 +28,32 @@ const sources = {
     // ** Example code: 'json/gg.json'
   ],
   icons: [
+    'mdi:brightness-4',
+    'mdi:account',
+    'bx:menu',
+    'mdi:filter-variant',
+    'mdi:arrow-left',
     'bx:up-arrow-alt',
+    'mdi:arrow-top-right',
     'bx:chevron-down',
+    'bx:chevron-right',
     'bx:x',
+    'bx:search',
+    'mdi:refresh',
     'mdi:minus-circle-outline',
     'mdi:plus-circle-outline',
     'bx:show-alt',
     'bx:bxs-plus-square',
     'tabler:alert-circle',
     'mdi:square-edit-outline',
-    'mdi:delete-outline'
+    'mdi:delete-outline',
+    'bx:home',
+    'bx:book',
+    'bx:coin-stack',
+    'bx:table',
+    'mdi:code-tags',
+    'mdi:list-box-outline',
+    'mdi:clipboard-text-outline'
   ],
   svg: [
     // ** Example code: { dir: 'src/iconify-bundle/svg', monotone: false, prefix: 'custom' }

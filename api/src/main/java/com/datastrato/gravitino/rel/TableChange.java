@@ -20,7 +20,7 @@
 
 package com.datastrato.gravitino.rel;
 
-import io.substrait.type.Type;
+import com.datastrato.gravitino.rel.types.Type;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 

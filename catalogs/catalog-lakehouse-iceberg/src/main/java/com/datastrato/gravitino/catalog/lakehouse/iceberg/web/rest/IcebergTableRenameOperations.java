@@ -4,8 +4,11 @@
  */
 package com.datastrato.gravitino.catalog.lakehouse.iceberg.web.rest;
 
+import com.codahale.metrics.annotation.ResponseMetered;
+import com.codahale.metrics.annotation.Timed;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.ops.IcebergTableOps;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.web.IcebergRestUtils;
+import com.datastrato.gravitino.metrics.MetricNames;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.Consumes;
@@ -33,6 +36,8 @@ public class IcebergTableRenameOperations {
 
   @POST
   @Produces(MediaType.APPLICATION_JSON)
+  @Timed(name = "rename-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "rename-table", absolute = true)
   public Response renameTable(RenameTableRequest renameTableRequest) {
     icebergTableOps.renameTable(renameTableRequest);
     return IcebergRestUtils.okWithoutContent();
