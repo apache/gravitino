@@ -45,3 +45,6 @@ RUN rm -rf /usr/lib/trino/plugin/accumulo  \
     && rm -rf /usr/lib/trino/plugin/redis \
     && rm -rf /usr/lib/trino/plugin/session-property-managers \
     && rm -rf /usr/lib/trino/plugin/teradata-functions
+
+COPY --chown=trino:trino packages/trino/conf /etc/trino
+COPY --chown=trino:trino packages/gravitino-trino-connector /usr/lib/trino/plugin/gravitino

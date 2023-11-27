@@ -104,4 +104,4 @@ docker run --rm -it -p 8080:8080 datastrato/gravitino-ci-trino
 ### trino:426-gravitino-0.3.0-SNAPSHOT
 - Docker image `datastrato/trino:426-gravitino-0.3.0-SNAPSHOT`
 - Base on `trino:462`
-- Add `Gravitino` `trino-connector` `0.3.0-SNAPSHOT` to Trino plugin directory
+- Added Gravitino trino-connector-0.3.0-SNAPSHOT libs into the `/usr/lib/trino/plugin/gravitino`
