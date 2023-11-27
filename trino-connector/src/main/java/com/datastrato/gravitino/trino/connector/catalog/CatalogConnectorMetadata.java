@@ -99,7 +99,7 @@ public class CatalogConnectorMetadata {
       Table table =
           tableCatalog.loadTable(
               NameIdentifier.ofTable(metalake.name(), catalogName, schemaName, tableName));
-      return new GravitinoTable(schemaName, tableName, table, table.properties());
+      return new GravitinoTable(schemaName, tableName, table);
     } catch (NoSuchTableException e) {
       throw new TrinoException(GRAVITINO_TABLE_NOT_EXISTS, "Table does not exist", e);
     }
