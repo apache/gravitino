@@ -7,7 +7,7 @@ LABEL maintainer="support@datastrato.com"
 
 WORKDIR /root/gravitino
 
-COPY /packages/gravitino /root/gravitino
+COPY packages/gravitino /root/gravitino
 
 EXPOSE 8090
 

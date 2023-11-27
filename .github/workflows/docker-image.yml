@@ -68,18 +68,6 @@ jobs:
           java-version: '8'
           distribution: 'temurin'
 
-      - name: Setup Gradle
-        uses: gradle/gradle-build-action@v2
-        if: ${{ github.event.inputs.image == 'gravitino' }}
-        with:
-          gradle-version: '8.2'
-
-      - name: Package Gravitino
-        if: ${{ github.event.inputs.image == 'gravitino' }}
-        run: |
-          gradle --version
-          gradle compileDistribution -x test
-
       - name: Build and Push the main branch Docker image
         if: ${{ github.ref_name == 'main' }}
         run: ./dev/docker/build-docker.sh --platform all --type ${image_type} --image ${image_name} --tag ${{ github.event.inputs.tag }} --latest

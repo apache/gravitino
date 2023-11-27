@@ -9,7 +9,7 @@ gravitino_dir="$(cd "${gravitino_dir}">/dev/null; pwd)"
 gravitino_home="$(cd "${gravitino_dir}/../../..">/dev/null; pwd)"
 
 # Prepare compile Gravitino packages
-${gravitino_home}/gradlew compileDistribution -x test
+${gravitino_home}/gradlew clean compileDistribution -x test
 
 # Removed old packages, Avoid multiple re-executions using the wrong file
 rm -rf "${gravitino_dir}/packages"
