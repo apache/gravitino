@@ -128,7 +128,7 @@ public class TestIcebergTable {
     IcebergColumn col1 =
         new IcebergColumn.Builder()
             .withName("col_1")
-            .withType(Types.ByteType.get())
+            .withType(Types.IntegerType.get())
             .withComment(ICEBERG_COMMENT)
             .withNullable(true)
             .build();
@@ -208,7 +208,7 @@ public class TestIcebergTable {
     IcebergColumn col1 =
         new IcebergColumn.Builder()
             .withName("city")
-            .withType(Types.ByteType.get())
+            .withType(Types.IntegerType.get())
             .withComment(ICEBERG_COMMENT)
             .build();
     IcebergColumn col2 =
@@ -310,7 +310,7 @@ public class TestIcebergTable {
     IcebergColumn col1 =
         new IcebergColumn.Builder()
             .withName("col_1")
-            .withType(Types.ByteType.get())
+            .withType(Types.IntegerType.get())
             .withComment(ICEBERG_COMMENT)
             .build();
     IcebergColumn col2 =
@@ -359,7 +359,7 @@ public class TestIcebergTable {
     IcebergColumn col1 =
         new IcebergColumn.Builder()
             .withName("col_1")
-            .withType(Types.ByteType.get())
+            .withType(Types.IntegerType.get())
             .withComment(ICEBERG_COMMENT)
             .build();
     IcebergColumn col2 =
