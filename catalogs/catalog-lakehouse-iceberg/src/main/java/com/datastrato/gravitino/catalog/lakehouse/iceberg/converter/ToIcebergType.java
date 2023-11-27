@@ -91,8 +91,10 @@ public class ToIcebergType extends ToIcebergTypeVisitor<Type> {
     if (primitive instanceof com.datastrato.gravitino.rel.types.Types.BooleanType) {
       return Types.BooleanType.get();
     } else if (primitive instanceof com.datastrato.gravitino.rel.types.Types.ByteType
-        || primitive instanceof com.datastrato.gravitino.rel.types.Types.ShortType
-        || primitive instanceof com.datastrato.gravitino.rel.types.Types.IntegerType) {
+        || primitive instanceof com.datastrato.gravitino.rel.types.Types.ShortType) {
+      throw new IllegalArgumentException(
+          "Iceberg do not support Byte and Short Type, use Integer instead");
+    } else if (primitive instanceof com.datastrato.gravitino.rel.types.Types.IntegerType) {
       return Types.IntegerType.get();
     } else if (primitive instanceof com.datastrato.gravitino.rel.types.Types.LongType) {
       return Types.LongType.get();
