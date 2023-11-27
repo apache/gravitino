@@ -126,8 +126,9 @@ public class CatalogConnectorMetadata {
             metalake.name(), catalogName, table.getSchemaName(), table.getName());
     ColumnDTO[] gravitinoColumns = table.getColumnDTOs();
     String comment = table.getComment();
+    Map<String, String> properties = table.getProperties();
     try {
-      tableCatalog.createTable(identifier, gravitinoColumns, comment, table.getProperties());
+      tableCatalog.createTable(identifier, gravitinoColumns, comment, properties);
     } catch (NoSuchSchemaException e) {
       throw new TrinoException(GRAVITINO_SCHEMA_NOT_EXISTS, "Schema does not exist", e);
     } catch (TableAlreadyExistsException e) {
