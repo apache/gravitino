@@ -11,9 +11,6 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class HiveTablePropertyConverter implements PropertyConverter {
-
-  public static final HiveTablePropertyConverter INSTANCE = new HiveTablePropertyConverter();
-
   // Trino property key does not allow upper case character and '-', so we need to map it to
   // Gravitino
   private static final TreeBidiMap<String, String> TRINO_HIVE_TO_GRAVITINO_HIVE =
