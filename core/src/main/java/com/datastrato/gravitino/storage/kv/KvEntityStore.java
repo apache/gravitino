@@ -294,6 +294,14 @@ public class KvEntityStore implements EntityStore {
                     return false;
                   }
                   // Get the prefix of the name to id mapping for sub-entities of this one
+                  // According to KvNameMappingService, if the entity is
+                  // 'mataleke1.catalog1.schema1',
+                  // and the name to id mapping is as following:
+                  // metalake1   ---> 1
+                  // 1/catalog1  ---> 2
+                  // 1/2/schema1 ---> 3
+                  // Then the prefix of the name to id mapping for sub-entities of this one is
+                  // '1/2/3/'
                   String identNameToIdKey = generateKeyForMapping(ident);
                   long id = nameMappingService.getIdByName(identNameToIdKey);
                   String[] ids = identNameToIdKey.split(NAMESPACE_SEPARATOR);
