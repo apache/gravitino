@@ -41,6 +41,14 @@ jobs:
       - name: Build with Gradle
         run: gradle build -PskipITs
 
+      - name: Upload unit tests report
+        uses: actions/upload-artifact@v3
+        if: failure()
+        with:
+          name: unit test logs
+          path: 
+            build/reports
+
       - name: Jacoco Report to PR
         id: jacoco
         uses: madrapps/jacoco-report@v1.6.1

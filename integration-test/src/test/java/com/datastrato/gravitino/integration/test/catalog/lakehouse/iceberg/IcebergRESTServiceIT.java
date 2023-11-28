@@ -142,11 +142,11 @@ public class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
     String properties = m.getOrDefault("Properties", "");
     switch (catalogType) {
       case MEMORY:
-        Assertions.assertEquals("((id,2))", properties);
+        Assertions.assertEquals("((id,333))", properties);
         break;
       default:
         // ((hive.metastore.database.owner,hive), (hive.metastore.database.owner-type,USER), (id,2))
-        Assertions.assertTrue(properties.contains("(id,2)"));
+        Assertions.assertTrue(properties.contains("(id,2333)"));
     }
   }
 
