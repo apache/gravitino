@@ -15,6 +15,10 @@ public class GravitinoCatalog {
     this.catalog = catalog;
   }
 
+  public Catalog getCatalog() {
+    return catalog;
+  }
+
   public String getProvider() {
     return catalog.provider();
   }

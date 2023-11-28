@@ -7,6 +7,7 @@ package com.datastrato.gravitino.trino.connector.catalog.hive;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorAdapter;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
 import com.datastrato.gravitino.trino.connector.catalog.HasPropertyMeta;
+import com.datastrato.gravitino.trino.connector.catalog.PropertyConverter;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoCatalog;
 import io.trino.spi.session.PropertyMetadata;
 import java.util.Collections;
@@ -18,9 +19,11 @@ import java.util.Map;
 public class HiveConnectorAdapter implements CatalogConnectorAdapter {
 
   private final HasPropertyMeta propertyMetadata;
+  private final PropertyConverter catalogConverter;
 
   public HiveConnectorAdapter() {
     this.propertyMetadata = new HivePropertyMeta();
+    this.catalogConverter = new HiveCatalogPropertyConverter();
   }
 
   public Map<String, Object> buildInternalConnectorConfig(GravitinoCatalog catalog) {
@@ -30,6 +33,8 @@ public class HiveConnectorAdapter implements CatalogConnectorAdapter {
 
     Map<String, Object> properties = new HashMap<>();
     properties.put("hive.metastore.uri", catalog.getProperties("metastore.uris", ""));
+    Map<String, String> trinoProperty = catalogConverter.toTrinoProperties(catalog.getCatalog().properties());
+    properties.putAll(trinoProperty);
     config.put("properties", properties);
     return config;
   }
