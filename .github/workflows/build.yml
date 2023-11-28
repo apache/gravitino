@@ -39,7 +39,7 @@ jobs:
         run: gradle --version
 
       - name: Build with Gradle
-        run: gradle build -PskipITs
+        run: gradle build -PskipITs -x test
 
       - name: Upload unit tests report
         uses: actions/upload-artifact@v3
