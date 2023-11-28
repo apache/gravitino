@@ -39,9 +39,9 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 /** This class is used to transform datatype between gravitino and trino */
-public class DataTypeTransformer {
+public class GeneralDataTypeTransformer {
 
-  public static Type getTrinoType(com.datastrato.gravitino.rel.types.Type type) {
+  public Type getTrinoType(com.datastrato.gravitino.rel.types.Type type) {
     switch (type.name()) {
       case BOOLEAN:
         return BOOLEAN;
@@ -94,7 +94,7 @@ public class DataTypeTransformer {
     }
   }
 
-  private static RowType gravitinoRowTypeToTrinoRowType(Types.StructType structType) {
+  private RowType gravitinoRowTypeToTrinoRowType(Types.StructType structType) {
     List<Field> fields =
         Arrays.stream(structType.fields())
             .map(field -> new RowType.Field(Optional.of(field.name()), getTrinoType(field.type())))
@@ -102,7 +102,7 @@ public class DataTypeTransformer {
     return RowType.from(fields);
   }
 
-  private static StructType trinoRowTypeToGravitinoRowType(RowType rowType) {
+  private StructType trinoRowTypeToGravitinoRowType(RowType rowType) {
     StructType.Field[] fields =
         rowType.getFields().stream()
             .map(
@@ -114,7 +114,7 @@ public class DataTypeTransformer {
     return StructType.of(fields);
   }
 
-  public static com.datastrato.gravitino.rel.types.Type getGravitinoType(Type type) {
+  public com.datastrato.gravitino.rel.types.Type getGravitinoType(Type type) {
     Class<? extends Type> typeClass = type.getClass();
 
     if (typeClass == io.trino.spi.type.BooleanType.class) {

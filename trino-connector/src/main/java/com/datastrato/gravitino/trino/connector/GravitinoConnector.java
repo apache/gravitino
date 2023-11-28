@@ -65,7 +65,8 @@ public class GravitinoConnector implements Connector {
     GravitinoMetaLake metalake = catalogConnectorContext.getMetalake();
 
     CatalogConnectorMetadata catalogConnectorMetadata =
-        new CatalogConnectorMetadata(metalake, catalogIdentifier);
+        new CatalogConnectorMetadata(
+            metalake, catalogIdentifier, catalogConnectorContext.getMetadataAdapter());
 
     return new GravitinoMetadata(
         catalogConnectorMetadata, catalogConnectorContext.getMetadataAdapter(), internalMetadata);

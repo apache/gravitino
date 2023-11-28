@@ -31,7 +31,6 @@ import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoColumn;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoSchema;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoTable;
-import com.datastrato.gravitino.trino.connector.util.DataTypeTransformer;
 import com.google.common.base.Strings;
 import io.trino.spi.TrinoException;
 import io.trino.spi.connector.SchemaTableName;
@@ -52,8 +51,12 @@ public class CatalogConnectorMetadata {
   private final String catalogName;
   private final SupportsSchemas schemaCatalog;
   private final TableCatalog tableCatalog;
+  private final CatalogConnectorMetadataAdapter catalogConnectorMetadataAdapter;
 
-  public CatalogConnectorMetadata(GravitinoMetaLake metalake, NameIdentifier catalogIdentifier) {
+  public CatalogConnectorMetadata(
+      GravitinoMetaLake metalake,
+      NameIdentifier catalogIdentifier,
+      CatalogConnectorMetadataAdapter catalogConnectorMetadataAdapter) {
     try {
       this.catalogName = catalogIdentifier.name();
       this.metalake = metalake;
@@ -62,6 +65,7 @@ public class CatalogConnectorMetadata {
       // Make sure the catalog support schema operations.
       this.schemaCatalog = catalog.asSchemas();
       this.tableCatalog = catalog.asTableCatalog();
+      this.catalogConnectorMetadataAdapter = catalogConnectorMetadataAdapter;
     } catch (NoSuchCatalogException e) {
       throw new TrinoException(GRAVITINO_CATALOG_NOT_EXISTS, "Catalog does not exist", e);
     } catch (UnsupportedOperationException e) {
@@ -246,6 +250,8 @@ public class CatalogConnectorMetadata {
     String[] columnNames = {columnName};
     applyAlter(
         schemaTableName,
-        TableChange.updateColumnType(columnNames, DataTypeTransformer.getGravitinoType(type)));
+        TableChange.updateColumnType(
+            columnNames,
+            catalogConnectorMetadataAdapter.getDataTypeTransformer().getGravitinoType(type)));
   }
 }

@@ -36,50 +36,52 @@ import org.testng.annotations.Test;
 
 public class TestDataTypeTransformer {
 
+  GeneralDataTypeTransformer dataTypeTransformer = new GeneralDataTypeTransformer();
+
   @Test
   public void testGetGravitinoType() {
     assertEquals(
-        DataTypeTransformer.getGravitinoType(BooleanType.BOOLEAN), Types.BooleanType.get());
+        dataTypeTransformer.getGravitinoType(BooleanType.BOOLEAN), Types.BooleanType.get());
 
-    assertEquals(DataTypeTransformer.getGravitinoType(TinyintType.TINYINT), Types.ByteType.get());
+    assertEquals(dataTypeTransformer.getGravitinoType(TinyintType.TINYINT), Types.ByteType.get());
     assertEquals(
-        DataTypeTransformer.getGravitinoType(SmallintType.SMALLINT), Types.ShortType.get());
+        dataTypeTransformer.getGravitinoType(SmallintType.SMALLINT), Types.ShortType.get());
     assertEquals(
-        DataTypeTransformer.getGravitinoType(IntegerType.INTEGER), Types.IntegerType.get());
-    assertEquals(DataTypeTransformer.getGravitinoType(BigintType.BIGINT), Types.LongType.get());
+        dataTypeTransformer.getGravitinoType(IntegerType.INTEGER), Types.IntegerType.get());
+    assertEquals(dataTypeTransformer.getGravitinoType(BigintType.BIGINT), Types.LongType.get());
 
-    assertEquals(DataTypeTransformer.getGravitinoType(RealType.REAL), Types.FloatType.get());
-    assertEquals(DataTypeTransformer.getGravitinoType(DoubleType.DOUBLE), Types.DoubleType.get());
+    assertEquals(dataTypeTransformer.getGravitinoType(RealType.REAL), Types.FloatType.get());
+    assertEquals(dataTypeTransformer.getGravitinoType(DoubleType.DOUBLE), Types.DoubleType.get());
     assertEquals(
-        DataTypeTransformer.getGravitinoType(DecimalType.createDecimalType(10, 2)),
+        dataTypeTransformer.getGravitinoType(DecimalType.createDecimalType(10, 2)),
         Types.DecimalType.of(10, 2));
 
     assertEquals(
-        DataTypeTransformer.getGravitinoType(CharType.createCharType(10)),
+        dataTypeTransformer.getGravitinoType(CharType.createCharType(10)),
         Types.FixedCharType.of(10));
     assertEquals(
-        DataTypeTransformer.getGravitinoType(VarcharType.createVarcharType(10)),
+        dataTypeTransformer.getGravitinoType(VarcharType.createVarcharType(10)),
         Types.VarCharType.of(10));
     assertEquals(
-        DataTypeTransformer.getGravitinoType(VarcharType.createVarcharType(VarcharType.MAX_LENGTH)),
+        dataTypeTransformer.getGravitinoType(VarcharType.createVarcharType(VarcharType.MAX_LENGTH)),
         Types.VarCharType.of(Integer.MAX_VALUE - 1));
 
-    assertEquals(DataTypeTransformer.getGravitinoType(DateType.DATE), Types.DateType.get());
-    assertEquals(DataTypeTransformer.getGravitinoType(TimeType.TIME_MILLIS), Types.TimeType.get());
+    assertEquals(dataTypeTransformer.getGravitinoType(DateType.DATE), Types.DateType.get());
+    assertEquals(dataTypeTransformer.getGravitinoType(TimeType.TIME_MILLIS), Types.TimeType.get());
     assertEquals(
-        DataTypeTransformer.getGravitinoType(TimestampType.TIMESTAMP_MILLIS),
+        dataTypeTransformer.getGravitinoType(TimestampType.TIMESTAMP_MILLIS),
         Types.TimestampType.withoutTimeZone());
 
     assertEquals(
-        DataTypeTransformer.getGravitinoType(new ArrayType(IntegerType.INTEGER)),
+        dataTypeTransformer.getGravitinoType(new ArrayType(IntegerType.INTEGER)),
         Types.ListType.nullable(Types.IntegerType.get()));
     assertEquals(
-        DataTypeTransformer.getGravitinoType(
+        dataTypeTransformer.getGravitinoType(
             new MapType(SmallintType.SMALLINT, IntegerType.INTEGER, new TypeOperators())),
         Types.MapType.of(Types.ShortType.get(), Types.IntegerType.get(), true));
 
     assertEquals(
-        DataTypeTransformer.getGravitinoType(
+        dataTypeTransformer.getGravitinoType(
             RowType.from(
                 ImmutableList.of(
                     new Field(Optional.of("a"), IntegerType.INTEGER),
@@ -88,10 +90,10 @@ public class TestDataTypeTransformer {
             Types.StructType.Field.nullableField("a", Types.IntegerType.get()),
             Types.StructType.Field.nullableField("b", Types.VarCharType.of(10))));
 
-    assertEquals(DataTypeTransformer.getGravitinoType(UuidType.UUID), Types.UUIDType.get());
+    assertEquals(dataTypeTransformer.getGravitinoType(UuidType.UUID), Types.UUIDType.get());
 
     try {
-      DataTypeTransformer.getGravitinoType(HyperLogLogType.HYPER_LOG_LOG);
+      dataTypeTransformer.getGravitinoType(HyperLogLogType.HYPER_LOG_LOG);
     } catch (TrinoException e) {
       if (e.getErrorCode() != GRAVITINO_UNSUPPORTED_TRINO_DATATYPE.toErrorCode()) {
         throw e;
@@ -101,45 +103,45 @@ public class TestDataTypeTransformer {
 
   @Test
   public void testGetTrinoType() {
-    assertEquals(DataTypeTransformer.getTrinoType(Types.BooleanType.get()), BooleanType.BOOLEAN);
+    assertEquals(dataTypeTransformer.getTrinoType(Types.BooleanType.get()), BooleanType.BOOLEAN);
 
-    assertEquals(DataTypeTransformer.getTrinoType(Types.ByteType.get()), TinyintType.TINYINT);
-    assertEquals(DataTypeTransformer.getTrinoType(Types.ShortType.get()), SmallintType.SMALLINT);
-    assertEquals(DataTypeTransformer.getTrinoType(Types.IntegerType.get()), IntegerType.INTEGER);
-    assertEquals(DataTypeTransformer.getTrinoType(Types.LongType.get()), BigintType.BIGINT);
+    assertEquals(dataTypeTransformer.getTrinoType(Types.ByteType.get()), TinyintType.TINYINT);
+    assertEquals(dataTypeTransformer.getTrinoType(Types.ShortType.get()), SmallintType.SMALLINT);
+    assertEquals(dataTypeTransformer.getTrinoType(Types.IntegerType.get()), IntegerType.INTEGER);
+    assertEquals(dataTypeTransformer.getTrinoType(Types.LongType.get()), BigintType.BIGINT);
 
-    assertEquals(DataTypeTransformer.getTrinoType(Types.FloatType.get()), RealType.REAL);
-    assertEquals(DataTypeTransformer.getTrinoType(Types.DoubleType.get()), DoubleType.DOUBLE);
+    assertEquals(dataTypeTransformer.getTrinoType(Types.FloatType.get()), RealType.REAL);
+    assertEquals(dataTypeTransformer.getTrinoType(Types.DoubleType.get()), DoubleType.DOUBLE);
     assertEquals(
-        DataTypeTransformer.getTrinoType(Types.DecimalType.of(10, 2)),
+        dataTypeTransformer.getTrinoType(Types.DecimalType.of(10, 2)),
         DecimalType.createDecimalType(10, 2));
 
     assertEquals(
-        DataTypeTransformer.getTrinoType(Types.FixedCharType.of(10)), CharType.createCharType(10));
+        dataTypeTransformer.getTrinoType(Types.FixedCharType.of(10)), CharType.createCharType(10));
     assertEquals(
-        DataTypeTransformer.getTrinoType(Types.VarCharType.of(10)),
+        dataTypeTransformer.getTrinoType(Types.VarCharType.of(10)),
         VarcharType.createVarcharType(10));
     assertEquals(
-        DataTypeTransformer.getTrinoType(Types.VarCharType.of(Integer.MAX_VALUE - 1)),
+        dataTypeTransformer.getTrinoType(Types.VarCharType.of(Integer.MAX_VALUE - 1)),
         VarcharType.createVarcharType(VarcharType.MAX_LENGTH));
 
-    assertEquals(DataTypeTransformer.getTrinoType(Types.DateType.get()), DateType.DATE);
-    assertEquals(DataTypeTransformer.getTrinoType(Types.TimeType.get()), TimeType.TIME_MILLIS);
+    assertEquals(dataTypeTransformer.getTrinoType(Types.DateType.get()), DateType.DATE);
+    assertEquals(dataTypeTransformer.getTrinoType(Types.TimeType.get()), TimeType.TIME_MILLIS);
     assertEquals(
-        DataTypeTransformer.getTrinoType(Types.TimestampType.withoutTimeZone()),
+        dataTypeTransformer.getTrinoType(Types.TimestampType.withoutTimeZone()),
         TimestampType.TIMESTAMP_MILLIS);
 
     assertEquals(
-        DataTypeTransformer.getTrinoType(Types.ListType.nullable(Types.IntegerType.get())),
+        dataTypeTransformer.getTrinoType(Types.ListType.nullable(Types.IntegerType.get())),
         new ArrayType(IntegerType.INTEGER));
 
     assertEquals(
         Types.MapType.of(Types.ShortType.get(), Types.IntegerType.get(), true),
-        DataTypeTransformer.getGravitinoType(
+        dataTypeTransformer.getGravitinoType(
             new MapType(SmallintType.SMALLINT, IntegerType.INTEGER, new TypeOperators())));
 
     assertEquals(
-        DataTypeTransformer.getTrinoType(
+        dataTypeTransformer.getTrinoType(
             Types.StructType.of(
                 Types.StructType.Field.nullableField("a", Types.IntegerType.get()),
                 Types.StructType.Field.nullableField("b", Types.VarCharType.of(10)))),
@@ -148,10 +150,10 @@ public class TestDataTypeTransformer {
                 new Field(Optional.of("a"), IntegerType.INTEGER),
                 new Field(Optional.of("b"), VarcharType.createVarcharType(10)))));
 
-    assertEquals(DataTypeTransformer.getTrinoType(Types.UUIDType.get()), UuidType.UUID);
+    assertEquals(dataTypeTransformer.getTrinoType(Types.UUIDType.get()), UuidType.UUID);
 
     try {
-      DataTypeTransformer.getTrinoType(Types.BinaryType.get());
+      dataTypeTransformer.getTrinoType(Types.BinaryType.get());
     } catch (TrinoException e) {
       if (e.getErrorCode() != GRAVITINO_UNSUPPORTED_GRAVITINO_DATATYPE.toErrorCode()) {
         throw e;
