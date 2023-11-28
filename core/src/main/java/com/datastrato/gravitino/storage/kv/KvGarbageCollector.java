@@ -146,6 +146,7 @@ public final class KvGarbageCollector implements Closeable {
           LOG.info("Physically delete key that has marked deleted: {}", Bytes.wrap(key));
           kvBackend.delete(rawKey);
           keysDeletedCount++;
+          continue;
         }
 
         // If the key is not marked as deleted, then we need to check whether there is a newer
