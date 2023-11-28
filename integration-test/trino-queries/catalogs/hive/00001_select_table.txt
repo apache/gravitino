@@ -1,0 +1,20 @@
+CREATE SCHEMA
+
+CREATE TABLE
+
+INSERT: 1 row
+
+INSERT: 1 row
+
+INSERT: 2 rows
+
+"bob","14"
+"jerry","13"
+"sam","11"
+"tom","12"
+
+DROP TABLE
+
+DROP SCHEMA
+
+

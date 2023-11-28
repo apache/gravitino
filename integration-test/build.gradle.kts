@@ -116,6 +116,10 @@ dependencies {
   testImplementation(libs.testcontainers)
   testImplementation(libs.testcontainers.junit.jupiter)
   testImplementation(libs.trino.jdbc)
+  testImplementation(libs.trino.cli)
+  testImplementation(libs.trino.client)
+  testImplementation(libs.jline.terminal)
+  testImplementation(libs.okhttp3.loginterceptor)
 }
 
 /* Optimizing integration test execution conditions */
