@@ -86,7 +86,6 @@ jobs:
       - name: Integration Test
         id: integrationTest
         run: |
-          gradle test --rerun-tasks -PskipTests -PtestMode=embedded
           gradle test --rerun-tasks -PskipTests -PtestMode=deploy
 
       - name: Upload integrate tests reports
