@@ -139,6 +139,20 @@ public interface TableChange {
   /**
    * Create a TableChange for adding a column.
    *
+   * @param fieldNames Field names of the new column.
+   * @param dataType The new column's data type.
+   * @param comment The new field's comment string.
+   * @param nullable The new column's nullable.
+   * @return A TableChange for the addition.
+   */
+  static TableChange addColumn(
+      String[] fieldNames, Type dataType, String comment, boolean nullable) {
+    return new AddColumn(fieldNames, dataType, comment, null, nullable);
+  }
+
+  /**
+   * Create a TableChange for adding a column.
+   *
    * <p>If the field already exists, the change will result in an {@link IllegalArgumentException}.
    * If the new field is nested and its parent does not exist or is not a struct, the change will
    * result in an {@link IllegalArgumentException}.
