@@ -17,9 +17,9 @@ mkdir -p "${gravitino_dir}/packages"
 
 cp -r "${gravitino_home}/distribution/package" "${gravitino_dir}/packages/gravitino"
 
-# Let gravitino.sh can not quit
+# Keeping the container running at all times
 cat <<EOF >> "${gravitino_dir}/packages/gravitino/bin/gravitino.sh"
 
-# persist the container
+# Keeping a process running in the background
 tail -f /dev/null
 EOF
