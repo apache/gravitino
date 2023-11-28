@@ -10,9 +10,7 @@ import com.datastrato.gravitino.rel.types.Type.Name;
 import com.datastrato.gravitino.rel.types.Types;
 import com.datastrato.gravitino.trino.connector.util.GeneralDataTypeTransformer;
 
-/**
- * Type transformer between Hive and Trino
- */
+/** Type transformer between Hive and Trino */
 public class HiveDataTypeTransformer extends GeneralDataTypeTransformer {
   // Hive varchar max length of 65535
   private static final int HIVE_VARCHAR_MAX_LENGTH = 65535;

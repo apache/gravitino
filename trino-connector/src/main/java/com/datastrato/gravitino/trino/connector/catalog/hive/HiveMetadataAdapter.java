@@ -15,7 +15,6 @@ public class HiveMetadataAdapter extends CatalogConnectorMetadataAdapter {
       List<PropertyMetadata<?>> schemaProperties,
       List<PropertyMetadata<?>> tableProperties,
       List<PropertyMetadata<?>> columnProperties) {
-    super(
-        schemaProperties, tableProperties, columnProperties, new HiveDataTypeTransformer());
+    super(schemaProperties, tableProperties, columnProperties, new HiveDataTypeTransformer());
   }
 }
