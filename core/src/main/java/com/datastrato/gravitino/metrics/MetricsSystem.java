@@ -126,7 +126,7 @@ public class MetricsSystem implements Closeable {
   }
 
   /*
-   * To extract metrics name and label from dropwizard metrics for Prometheus
+   * Extract metrics name and label from dropwizard metrics for Prometheus
    *
    * All extract rules must register to prometheus registry before start prometheus servlet.
    * At this time, some MetricsSource may not register to MetricsSystem, such as
@@ -139,38 +139,17 @@ public class MetricsSystem implements Closeable {
    * MapperConfig is used to extract Prometheus metricsName and labels with signature:
    * MapperConfig(final String match, final String name, final Map<String, String> labels)
    *
-   * Match:
-   * Regex used to match incoming metric name.
-   * Uses a simplified glob syntax where only '*' are allowed.
-   * E.g:
-   * org.company.controller.*.status.*
-   * Will be used to match
-   * org.company.controller.controller1.status.200
-   * and
-   * org.company.controller.controller2.status.400
-   *
-   * Name:
-   * New metric name. Can contain placeholders to be replaced with actual values from the incoming metric name.
-   * Placeholders are in the ${n} format where n is the zero based index of the group to extract from the original
-  mric name.
+   * Match is regex used to match incoming metric name. It uses a simplified glob syntax where
+   * only '*' are allowed. Name is New metric name. Can contain placeholders to be replaced with
+   * actual values from the incoming metric name. Placeholders are in the ${n} format where n
+   * is the zero based index of the group to extract from the original metric name. Labels are the
+   * label to be extracted from, they should contain placeholders too.
    * E.g.:
-   * match: test.dispatcher.*.*.*
-   * name: dispatcher_events_total_${1}
-      * <p>
-   * A metric "test.dispatcher.old.test.yay" will be converted in a new metric with name "dispatcher_events_total_test"
-   *
-   * Labels:
-   * Labels to be extracted from the metric name.
-   * They should contain placeholders to be replaced with actual values from the incoming metric name.
-   * Placeholders are in the ${n} format where n is the zero based index of the group to extract from the original metric name.
-   * E.g.:
-   * match: test.dispatcher.*.*
-   * name: dispatcher_events_total_${0}
-   * labels:
-   * label1: ${1}_t
-   * <p>
-   * A metric "test.dispatcher.sp1.yay" will be converted in a new metric with name "dispatcher_events_total_sp1" with label {label1: yay_t}
-   * <p>
+   * Match: gravitino.dispatcher.*.*
+   * Name: dispatcher_events_total_${0}
+   * Labels: label1: ${1}_t
+   * A metric "gravitino.dispatcher.sp1.yay" will be converted in a new metric with name
+   * "dispatcher_events_total_sp1" with label {label1: yay_t}
    * Label names have to match the regex ^[a-zA-Z_][a-zA-Z0-9_]+$
    */
   @VisibleForTesting
