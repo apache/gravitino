@@ -139,7 +139,7 @@ public final class KvGarbageCollector implements Closeable {
         // Value has deleted mark, we can remove it.
         if (null == TransactionalKvBackendImpl.getRealValue(rawValue)) {
           LOGGER.info(
-              "Physically delete key that has marked deleted: {}", Bytes.wrap(key).toString());
+              "Physically delete key that has marked deleted: {}", Bytes.wrap(key));
           kvBackend.delete(rawKey);
           keysDeletedCount++;
         }
@@ -160,8 +160,8 @@ public final class KvGarbageCollector implements Closeable {
           // Has a newer version, we can remove it.
           LOGGER.info(
               "Physically delete key that has newer version: {}, a newer version {}",
-              Bytes.wrap(key).toString(),
-              Bytes.wrap(newVersionOfKey.get(0).getKey()).toString());
+              Bytes.wrap(key),
+              Bytes.wrap(newVersionOfKey.get(0).getKey()));
           kvBackend.delete(rawKey);
           keysDeletedCount++;
         }
