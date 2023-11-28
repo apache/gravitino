@@ -79,6 +79,41 @@ public final class JettyServerConfig {
           .intConf()
           .createWithDefault(100);
 
+  public static final ConfigEntry<Boolean> HTTPS_ENABLED =
+      new ConfigBuilder("httpsEnabled")
+          .doc("Enables https")
+          .version("0.3.0")
+          .booleanConf()
+          .createWithDefault(false);
+
+  public static final ConfigEntry<Integer> WEBSERVER_HTTPS_PORT =
+      new ConfigBuilder("httpsPort")
+          .doc("The https port number of the Jetty web server")
+          .version("0.3.0")
+          .intConf()
+          .createWithDefault(8433);
+
+  public static final ConfigEntry<String> SSL_KEYSTORE_PATH =
+      new ConfigBuilder("keyStorePath")
+          .doc("Path to the key store file")
+          .version("0.3.0")
+          .stringConf()
+          .createWithDefault("");
+
+  public static final ConfigEntry<String> SSL_KEYSTORE_PASSWORD =
+      new ConfigBuilder("keyStorePassword")
+          .doc("Password to the key store")
+          .version("0.3.0")
+          .stringConf()
+          .createWithDefault("");
+
+  public static final ConfigEntry<String> SSL_MANAGER_PASSWORD =
+      new ConfigBuilder("managerPassword")
+          .doc("Manager password to the key store")
+          .version("0.3.0")
+          .stringConf()
+          .createWithDefault("");
+
   private final String host;
 
   private final int httpPort;
@@ -97,6 +132,11 @@ public final class JettyServerConfig {
 
   private final int threadPoolWorkQueueSize;
 
+  private final int httpsPort;
+  private final String keyStorePath;
+  private final String keyStorePassword;
+  private final String managerPassword;
+  private final boolean httpsEnabled;
   private final Config internalConfig;
 
   private JettyServerConfig(Map<String, String> configs) {
@@ -128,6 +168,12 @@ public final class JettyServerConfig {
     this.requestHeaderSize = internalConfig.get(WEBSERVER_REQUEST_HEADER_SIZE);
     this.responseHeaderSize = internalConfig.get(WEBSERVER_RESPONSE_HEADER_SIZE);
     this.threadPoolWorkQueueSize = internalConfig.get(WEBSERVER_THREAD_POOL_WORK_QUEUE_SIZE);
+
+    this.httpsEnabled = internalConfig.get(HTTPS_ENABLED);
+    this.httpsPort = internalConfig.get(WEBSERVER_HTTPS_PORT);
+    this.keyStorePath = internalConfig.get(SSL_KEYSTORE_PATH);
+    this.keyStorePassword = internalConfig.get(SSL_KEYSTORE_PASSWORD);
+    this.managerPassword = internalConfig.get(SSL_MANAGER_PASSWORD);
   }
 
   public static JettyServerConfig fromConfig(Config config, String prefix) {
@@ -173,5 +219,25 @@ public final class JettyServerConfig {
 
   public int getIdleTimeout() {
     return idleTimeout;
+  }
+
+  public int getHttpsPort() {
+    return httpsPort;
+  }
+
+  public String getKeyStorePath() {
+    return keyStorePath;
+  }
+
+  public String getKeyStorePassword() {
+    return keyStorePassword;
+  }
+
+  public String getManagerPassword() {
+    return managerPassword;
+  }
+
+  public boolean isHttpsEnabled() {
+    return httpsEnabled;
   }
 }

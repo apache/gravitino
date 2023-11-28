@@ -8,6 +8,7 @@ import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.servlets.MetricsServlet;
 import com.datastrato.gravitino.GravitinoEnv;
 import com.datastrato.gravitino.metrics.MetricsSystem;
+import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.net.BindException;
@@ -20,11 +21,14 @@ import java.util.concurrent.LinkedBlockingQueue;
 import javax.servlet.DispatcherType;
 import javax.servlet.Filter;
 import javax.servlet.Servlet;
+import org.apache.commons.lang3.StringUtils;
 import org.eclipse.jetty.server.ConnectionFactory;
 import org.eclipse.jetty.server.HttpConfiguration;
 import org.eclipse.jetty.server.HttpConnectionFactory;
+import org.eclipse.jetty.server.SecureRequestCustomizer;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.ServerConnector;
+import org.eclipse.jetty.server.SslConnectionFactory;
 import org.eclipse.jetty.server.handler.ErrorHandler;
 import org.eclipse.jetty.server.handler.HandlerCollection;
 import org.eclipse.jetty.servlet.DefaultServlet;
@@ -32,6 +36,7 @@ import org.eclipse.jetty.servlet.FilterHolder;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
 import org.eclipse.jetty.util.component.LifeCycle;
+import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.eclipse.jetty.util.thread.QueuedThreadPool;
 import org.eclipse.jetty.util.thread.ScheduledExecutorScheduler;
 import org.eclipse.jetty.util.thread.Scheduler;
@@ -43,6 +48,10 @@ import org.slf4j.LoggerFactory;
 public final class JettyServer {
 
   private static final Logger LOG = LoggerFactory.getLogger(JettyServer.class);
+
+  private static final String HTTP = "http";
+  private static final String HTTPS = "https";
+  private static final String HTTP_PROTOCOL = "http/1.1";
 
   private Server server;
 
@@ -87,7 +96,30 @@ public final class JettyServer {
             serverConfig.getIdleTimeout());
     server.addConnector(httpConnector);
 
-    // TODO. Create and set https connector @jerry
+    if (serverConfig.isHttpsEnabled()) {
+      // Create and set Https ServerConnector
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(serverConfig.getKeyStorePath()),
+          "If enables https, must set keyStorePath");
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(serverConfig.getKeyStorePassword()),
+          "If enables https, must set keyStorePassword");
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(serverConfig.getManagerPassword()),
+          "If enables http, must set managerPassword");
+      ServerConnector httpsConnector =
+          createHttpsServerConnector(
+              server,
+              serverConfig.getRequestHeaderSize(),
+              serverConfig.getResponseHeaderSize(),
+              serverConfig.getHost(),
+              serverConfig.getHttpsPort(),
+              serverConfig.getIdleTimeout(),
+              serverConfig.getKeyStorePath(),
+              serverConfig.getKeyStorePassword(),
+              serverConfig.getManagerPassword());
+      server.addConnector(httpsConnector);
+    }
 
     // Initialize ServletContextHandler or WebAppContext
     if (shouldEnableUI) {
@@ -127,11 +159,20 @@ public final class JettyServer {
       throw new RuntimeException("Failed to start " + serverName + " web server.", e);
     }
 
-    LOG.info(
-        "{} web server started on host {} port {}.",
-        serverName,
-        serverConfig.getHost(),
-        serverConfig.getHttpPort());
+    if (serverConfig.isHttpsEnabled()) {
+      LOG.info(
+          "{} web server started on host {} http port {} https port {}.",
+          serverName,
+          serverConfig.getHost(),
+          serverConfig.getHttpPort(),
+          serverConfig.getHttpsPort());
+    } else {
+      LOG.info(
+          "{} web server started on host {} port {}.",
+          serverName,
+          serverConfig.getHost(),
+          serverConfig.getHttpPort());
+    }
   }
 
   public synchronized void join() {
@@ -157,12 +198,20 @@ public final class JettyServer {
         if (threadPool instanceof LifeCycle) {
           ((LifeCycle) threadPool).stop();
         }
-
-        LOG.info(
-            "{} web server stopped on host {} port {}.",
-            serverName,
-            serverConfig.getHost(),
-            serverConfig.getHttpPort());
+        if (serverConfig.isHttpsEnabled()) {
+          LOG.info(
+              "{} web server stopped on host {} http port {} https port {}.",
+              serverName,
+              serverConfig.getHost(),
+              serverConfig.getHttpPort(),
+              serverConfig.getHttpsPort());
+        } else {
+          LOG.info(
+              "{} web server stopped on host {} port {}.",
+              serverName,
+              serverConfig.getHost(),
+              serverConfig.getHttpPort());
+        }
       } catch (Exception e) {
         // Swallow the exception.
         LOG.warn("Failed to stop {} web server.", serverName, e);
@@ -260,7 +309,7 @@ public final class JettyServer {
 
     HttpConnectionFactory httpConnectionFactory = new HttpConnectionFactory(httpConfig);
     ServerConnector connector =
-        creatorServerConnector(server, new ConnectionFactory[] {httpConnectionFactory});
+        createServerConnector(server, HTTP, new ConnectionFactory[] {httpConnectionFactory});
     connector.setHost(host);
     connector.setPort(port);
     connector.setReuseAddress(true);
@@ -268,10 +317,47 @@ public final class JettyServer {
     return connector;
   }
 
-  private ServerConnector creatorServerConnector(
-      Server server, ConnectionFactory[] connectionFactories) {
+  private ServerConnector createHttpsServerConnector(
+      Server server,
+      int reqHeaderSize,
+      int respHeaderSize,
+      String host,
+      int port,
+      int idleTimeout,
+      String keyStorePath,
+      String keyStorePassword,
+      String keyManagerPassword) {
+    HttpConfiguration httpConfig = new HttpConfiguration();
+    httpConfig.setSecureScheme(HTTPS);
+    httpConfig.setRequestHeaderSize(reqHeaderSize);
+    httpConfig.setResponseHeaderSize(respHeaderSize);
+    httpConfig.setSendServerVersion(true);
+    httpConfig.setIdleTimeout(idleTimeout);
+    httpConfig.setSecurePort(port);
+
+    SslContextFactory sslContextFactory = new SslContextFactory.Server();
+    sslContextFactory.setKeyStorePath(keyStorePath);
+    sslContextFactory.setKeyStorePassword(keyStorePassword);
+    sslContextFactory.setKeyManagerPassword(keyManagerPassword);
+    SecureRequestCustomizer src = new SecureRequestCustomizer();
+    httpConfig.addCustomizer(src);
+    HttpConnectionFactory httpConnectionFactory = new HttpConnectionFactory(httpConfig);
+    SslConnectionFactory sslConnectionFactory =
+        new SslConnectionFactory(sslContextFactory, HTTP_PROTOCOL);
+    ServerConnector connector =
+        createServerConnector(
+            server, HTTPS, new ConnectionFactory[] {sslConnectionFactory, httpConnectionFactory});
+    connector.setHost(host);
+    connector.setPort(port);
+    connector.setReuseAddress(true);
+    return connector;
+  }
+
+  private ServerConnector createServerConnector(
+      Server server, String type, ConnectionFactory[] connectionFactories) {
     Scheduler serverExecutor =
-        new ScheduledExecutorScheduler(serverName + "-webserver-JettyScheduler", true);
+        new ScheduledExecutorScheduler(
+            String.format("%s-%s-webserver-JettyScheduler", serverName, type), true);
 
     return new ServerConnector(server, null, serverExecutor, null, -1, -1, connectionFactories);
   }

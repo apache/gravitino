@@ -44,3 +44,26 @@ The signature algorithm which Gravitino supports is as below:
 | PS256 | RSASSA-PSS using SHA-256 and MGF1 with SHA-256 |
 | PS384 | RSASSA-PSS using SHA-384 and MGF1 with SHA-384 |
 | PS512 | RSASSA-PSS using SHA-512 and MGF1 with SHA-512 |
+
+## HTTPS configuration
+Users would better use HTTPS instead of HTTP if users choose OAuth 2.0 as the authenticator.
+Because HTTPS will protect the header of request from smuggling and HTTPS will be safer.
+Both Gravitino server and Iceberg rest service can configure HTTPS.
+
+### Gravitino server's configuration
+| Configuration item                            | Description                                   | Default value | Since version |
+|-----------------------------------------------|-----------------------------------------------|---------------|---------------|
+| `gravitino.server.webserver.httpsEnable`      | Enables https                                 | `false`       | 0.3.0         |
+| `gravitino.server.webserver.httpsPort`        | The https port number of the Jetty web server | `8433`        | 0.3.0         |
+| `gravitino.server.webserver.keyStorePath`     | Path to the key store file                    | ``            | 0.3.0         |
+| `gravitino.server.webserver.keyStorePassword` | Password to the key store                     | ``            | 0.3.0         |
+| `gravitino.server.webserver.managerPassword`  | Manager password to the key store             | ``            | 0.3.0         |
+
+### Iceberg rest service's configuration
+| Configuration item                                   | Description                                   | Default value | Since version |
+|------------------------------------------------------|-----------------------------------------------|---------------|---------------|
+| `gravitino.auxService.iceberg-rest.httpsEnable`      | Enables https                                 | `false`       | 0.3.0         |
+| `gravitino.auxService.iceberg-rest.httpsPort`        | The https port number of the Jetty web server | `8433`        | 0.3.0         |
+| `gravitino.auxService.iceberg-rest.keyStorePath`     | Path to the key store file                    | ``            | 0.3.0         |
+| `gravitino.auxService.iceberg-rest.keyStorePassword` | Password to the key store                     | ``            | 0.3.0         |
+| `gravitino.auxService.iceberg-rest.managerPassword`  | Manager password to the key store             | ``            | 0.3.0         |
