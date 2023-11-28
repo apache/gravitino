@@ -47,18 +47,22 @@ dependencies {
 }
 
 fun getGitCommitId(): String {
-  val gitFolder = rootDir.path + "/.git/"
-  val gitFolderFile = File(gitFolder)
-  if (!gitFolderFile.exists() || !gitFolderFile.isDirectory) {
-    return ""
+  var gitCommitId = "";
+  try {
+    val gitFolder = rootDir.path + "/.git/"
+    val head = File(gitFolder + "HEAD").readText().split(":")
+    val isCommit = head.size == 1
+    gitCommitId = if (isCommit) {
+      head[0].trim()
+    } else {
+      val refHead = File(gitFolder + head[1].trim())
+      refHead.readText().trim()
+    }
+  } catch (e: Exception) {
+    println("WARN: Unable to get Git commit id : ${e.message}")
+    gitCommitId = ""
   }
-  val head = File(gitFolder + "HEAD").readText().split(":")
-  val isCommit = head.size == 1
-  if (isCommit) {
-    return head[0].trim()
-  }
-  val refHead = File(gitFolder + head[1].trim())
-  return refHead.readText().trim()
+  return gitCommitId
 }
 
 val propertiesFile = "src/main/resources/project.properties"
