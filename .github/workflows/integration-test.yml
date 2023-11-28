@@ -95,7 +95,9 @@ jobs:
         with:
           name: integrate test reports 
           path: |
+            not-exits
             build/reports
+            a
             integration-test/build/integration-test.log
             distribution/package/logs/gravitino-server.out
             distribution/package/logs/gravitino-server.log
