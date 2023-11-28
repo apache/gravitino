@@ -41,7 +41,7 @@ The following table lists the configuration items in the `gravitino.conf` file. 
 | `gravitino.entity.store.kv`                       | Detailed implementation of kv storage, currently we only support `RocksDB` storage implementation `RocksDBKvBackend`.                                                          | `RocksDBKvBackend`               | 0.1.0         |
 | `gravitino.entity.store.kv.rocksdbPath`           | Directory path of `RocksDBKvBackend`, **we highly recommend you to change this default value** as it's under the deploy directory and version update operations may remove it. | `${GRAVITINO_HOME}/data/rocksdb` | 0.1.0         |
 | `gravitino.entity.store.maxTransactionSkewTimeMs` | The max skew time of transaction, unit: millisecond.                                                                                                                           | `2000`                           | 0.3.0         |
-| `gravitino.entity.store.kv.deleteAfterTimeMs`     | The max time that the deleted data and old version data will keep, unit: millisecond.                                                                                          | `604800000`(7 days)              | 0.3.0         |
+| `gravitino.entity.store.kv.deleteAfterTimeMs`     | The max time that the deleted data and old version data will keep, unit: millisecond. At least 10 minutes and should not larger than 30 days                                   | `604800000`(7 days)              | 0.3.0         |
 
 ### Catalog configuration
 

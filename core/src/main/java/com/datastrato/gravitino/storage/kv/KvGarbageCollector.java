@@ -5,7 +5,7 @@
 
 package com.datastrato.gravitino.storage.kv;
 
-import static com.datastrato.gravitino.Configs.ENTITY_KV_TTL;
+import static com.datastrato.gravitino.Configs.KV_DELETE_AFTER_TIME;
 import static com.datastrato.gravitino.storage.kv.TransactionalKvBackendImpl.endOfTransactionId;
 import static com.datastrato.gravitino.storage.kv.TransactionalKvBackendImpl.generateCommitKey;
 import static com.datastrato.gravitino.storage.kv.TransactionalKvBackendImpl.generateKey;
@@ -16,7 +16,6 @@ import com.datastrato.gravitino.utils.Bytes;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.Closeable;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ScheduledExecutorService;
@@ -33,9 +32,12 @@ import org.slf4j.LoggerFactory;
  * of data which is not committed or exceed the ttl.
  */
 public final class KvGarbageCollector implements Closeable {
-  private static final Logger LOGGER = LoggerFactory.getLogger(KvGarbageCollector.class);
+  private static final Logger LOG = LoggerFactory.getLogger(KvGarbageCollector.class);
   private final KvBackend kvBackend;
   private final Config config;
+
+  private static final long MAX_DELETE_TIME_ALLOW = 1000 * 60 * 60 * 24 * 30L; // 30 days
+  private static final long MIN_DELETE_TIME_ALLOW = 1000 * 60 * 10L; // 10 minutes
 
   @VisibleForTesting
   final ScheduledExecutorService garbageCollectorPool =
@@ -47,6 +49,15 @@ public final class KvGarbageCollector implements Closeable {
   public KvGarbageCollector(KvBackend kvBackend, Config config) {
     this.kvBackend = kvBackend;
     this.config = config;
+
+    long deleteTimeLine = config.get(KV_DELETE_AFTER_TIME);
+    if (deleteTimeLine > MAX_DELETE_TIME_ALLOW || deleteTimeLine < MIN_DELETE_TIME_ALLOW) {
+      throw new IllegalArgumentException(
+          "The delete time line is too long or too short, "
+              + "please check it. The delete time line is "
+              + deleteTimeLine
+              + " ms");
+    }
   }
 
   public void start() {
@@ -55,15 +66,15 @@ public final class KvGarbageCollector implements Closeable {
 
   @VisibleForTesting
   void collectAndClean() {
-    LOGGER.info("Start to collect garbage...");
+    LOG.info("Start to collect garbage...");
     try {
-      LOGGER.info("Start to collect and delete uncommitted data...");
+      LOG.info("Start to collect and delete uncommitted data...");
       collectAndRemoveUncommittedData();
 
-      LOGGER.info("Start to collect and delete old version data...");
+      LOG.info("Start to collect and delete old version data...");
       collectAndRemoveOldVersionData();
     } catch (Exception e) {
-      LOGGER.error("Failed to collect garbage", e);
+      LOG.error("Failed to collect garbage", e);
     }
   }
 
@@ -71,37 +82,31 @@ public final class KvGarbageCollector implements Closeable {
     List<Pair<byte[], byte[]>> kvs =
         kvBackend.scan(
             new KvRangeScan.KvRangeScanBuilder()
-                .start(new byte[] {0x00})
-                .end(new byte[] {0x7F})
+                .start(new byte[] {0x20}) // below 0x20 is control character
+                .end(new byte[] {0x7F}) // above 0x7F is control character
                 .startInclusive(true)
                 .endInclusive(false)
                 .predicate(
                     (k, v) -> {
-                      if (TransactionIdGeneratorImpl.LAST_TIMESTAMP.equals(
-                          new String(k, StandardCharsets.UTF_8))) {
-                        return false;
-                      }
-
                       byte[] transactionId = getBinaryTransactionId(k);
                       return kvBackend.get(generateCommitKey(transactionId)) == null;
                     })
                 .limit(10000) /* Each time we only collect 10000 entities at most*/
                 .build());
 
-    LOGGER.info("Start to remove {} uncommitted data", kvs.size());
+    LOG.info("Start to remove {} uncommitted data", kvs.size());
     for (Pair<byte[], byte[]> pair : kvs) {
       kvBackend.delete(pair.getKey());
     }
   }
 
   private void collectAndRemoveOldVersionData() throws IOException {
-    long deleteTimeLine = System.currentTimeMillis() - config.get(ENTITY_KV_TTL);
+    long deleteTimeLine = System.currentTimeMillis() - config.get(KV_DELETE_AFTER_TIME);
     // Why should we leave shift 18 bits? please refer to TransactionIdGeneratorImpl#nextId
     // We can delete the data which is older than deleteTimeLine.(old data with transaction id that
-    // is
-    // smaller than transactionIdToDelete)
+    // is smaller than transactionIdToDelete)
     long transactionIdToDelete = deleteTimeLine << 18;
-    LOGGER.info("Start to remove data which is older than {}", transactionIdToDelete);
+    LOG.info("Start to remove data which is older than {}", transactionIdToDelete);
     byte[] startKey = TransactionalKvBackendImpl.generateCommitKey(transactionIdToDelete);
     byte[] endKey = endOfTransactionId();
 
@@ -138,8 +143,7 @@ public final class KvGarbageCollector implements Closeable {
 
         // Value has deleted mark, we can remove it.
         if (null == TransactionalKvBackendImpl.getRealValue(rawValue)) {
-          LOGGER.info(
-              "Physically delete key that has marked deleted: {}", Bytes.wrap(key));
+          LOG.info("Physically delete key that has marked deleted: {}", Bytes.wrap(key));
           kvBackend.delete(rawKey);
           keysDeletedCount++;
         }
@@ -158,7 +162,7 @@ public final class KvGarbageCollector implements Closeable {
                     .build());
         if (!newVersionOfKey.isEmpty()) {
           // Has a newer version, we can remove it.
-          LOGGER.info(
+          LOG.info(
               "Physically delete key that has newer version: {}, a newer version {}",
               Bytes.wrap(key),
               Bytes.wrap(newVersionOfKey.get(0).getKey()));
@@ -180,7 +184,7 @@ public final class KvGarbageCollector implements Closeable {
     try {
       garbageCollectorPool.awaitTermination(5, TimeUnit.SECONDS);
     } catch (InterruptedException e) {
-      LOGGER.error("Failed to close garbage collector", e);
+      LOG.error("Failed to close garbage collector", e);
     }
   }
 }

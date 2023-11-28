@@ -18,8 +18,8 @@ public interface Configs {
 
   String ENTITY_KV_ROCKSDB_BACKEND_PATH_KEY = "gravitino.entity.store.kv.rocksdbPath";
 
-  Long DEFAULT_ENTITY_KV_TTL = 604800000L; // 7 days
-  String ENTITY_KV_TTL_KEY_KEY = "gravitino.entity.store.kv.deleteAfterTimeMs";
+  Long DEFAULT_KV_DELETE_AFTER_TIME = 604800000L; // 7 days
+  String KV_DELETE_AFTER_TIME_KEY = "gravitino.entity.store.kv.deleteAfterTimeMs";
 
   // Default path for RocksDB backend is "${GRAVITINO_HOME}/data/rocksdb"
   String DEFAULT_KV_ROCKSDB_BACKEND_PATH =
@@ -81,10 +81,11 @@ public interface Configs {
           .longConf()
           .createWithDefault(2000L);
 
-  ConfigEntry<Long> ENTITY_KV_TTL =
-      new ConfigBuilder(ENTITY_KV_TTL_KEY_KEY)
-          .doc("The TTL of old version kv entity store, unit: millisecond")
+  ConfigEntry<Long> KV_DELETE_AFTER_TIME =
+      new ConfigBuilder(KV_DELETE_AFTER_TIME_KEY)
+          .doc(
+              "The max time that the deleted data and old version data will keep, unit: millisecond. At least 10 minutes and should not larger than 30 days ")
           .version("0.3.0")
           .longConf()
-          .createWithDefault(DEFAULT_ENTITY_KV_TTL);
+          .createWithDefault(DEFAULT_KV_DELETE_AFTER_TIME);
 }

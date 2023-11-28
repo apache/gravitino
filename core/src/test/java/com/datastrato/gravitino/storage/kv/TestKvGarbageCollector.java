@@ -7,9 +7,9 @@ package com.datastrato.gravitino.storage.kv;
 
 import static com.datastrato.gravitino.Configs.DEFAULT_ENTITY_KV_STORE;
 import static com.datastrato.gravitino.Configs.ENTITY_KV_STORE;
-import static com.datastrato.gravitino.Configs.ENTITY_KV_TTL;
 import static com.datastrato.gravitino.Configs.ENTITY_STORE;
 import static com.datastrato.gravitino.Configs.ENTRY_KV_ROCKSDB_BACKEND_PATH;
+import static com.datastrato.gravitino.Configs.KV_DELETE_AFTER_TIME;
 import static com.datastrato.gravitino.Configs.STORE_TRANSACTION_MAX_SKEW_TIME;
 
 import com.datastrato.gravitino.Config;
@@ -34,7 +34,7 @@ class TestKvGarbageCollector {
     Mockito.when(config.get(Configs.ENTITY_SERDE)).thenReturn("proto");
     Mockito.when(config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)).thenReturn(file.getAbsolutePath());
     Mockito.when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(3L);
-    Mockito.when(config.get(ENTITY_KV_TTL)).thenReturn(2000L);
+    Mockito.when(config.get(KV_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
     return config;
   }
 
@@ -90,6 +90,7 @@ class TestKvGarbageCollector {
       Assertions.assertEquals(7, allData.size());
 
       KvGarbageCollector kvGarbageCollector = new KvGarbageCollector(kvBackend, config);
+      Mockito.doReturn(2000L).when(config).get(KV_DELETE_AFTER_TIME);
 
       // Wait TTL time to make sure the data is expired, please see ENTITY_KV_TTL
       Thread.sleep(3000);
