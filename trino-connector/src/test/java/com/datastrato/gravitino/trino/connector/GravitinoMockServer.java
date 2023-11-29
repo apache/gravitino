@@ -271,6 +271,9 @@ public class GravitinoMockServer implements AutoCloseable {
               }
             });
 
+    when(tableCatalog.purgeTable(any(NameIdentifier.class)))
+        .thenThrow(new UnsupportedOperationException());
+
     when(tableCatalog.listTables(any(Namespace.class)))
         .thenAnswer(
             new Answer<NameIdentifier[]>() {
