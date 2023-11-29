@@ -241,7 +241,7 @@ tasks.test {
       environment("TRINO_CONF_DIR", buildDir.path + "/trino-conf")
 
       // Gravitino CI Docker image
-      environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-hive:0.1.5")
+      environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-hive:0.1.6")
       environment("GRAVITINO_CI_TRINO_DOCKER_IMAGE", "datastrato/gravitino-ci-trino:0.1.0")
 
       val testMode = project.properties["testMode"] as? String ?: "embedded"
