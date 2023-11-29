@@ -28,7 +28,7 @@ To begin using Gravitino on AWS, follow these steps:
     ssh ubuntu@<IP_address> -i ~/Downloads/Gravitino.pem
     ```
 
-   Note you may need to adjust the permissions on your .pem file using `chmod 700` to enable SSH connections.
+   Note you may need to adjust the permissions on your .pem file using `chmod 400` to enable SSH connections.
 
 3. Update the Ubuntu OS to ensure it's up to date:
 
