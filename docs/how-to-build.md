@@ -23,7 +23,8 @@ Note:
 * Gravitino uses Docker to run integration tests, please make sure you have installed Docker in 
   your environment, otherwise some docker related tests will be skipped.
 * On macOS, we will use "docker-connector" to make the Gravitino Trino connector work with Docker 
-  for Mac. For the details of "docker-connector", please see [docker-connector](https://github.com/wenjunxiao/mac-docker-connector).
+  for Mac. For the details of "docker-connector", please see [docker-connector](https://github.com/wenjunxiao/mac-docker-connector) 
+  and [here](../dev/docker/tools/README.md).
 
 ## Quick Start
 

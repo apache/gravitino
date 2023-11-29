@@ -134,7 +134,7 @@ fun printDockerCheckInfo() {
   if (dockerRunning && hiveContainerRunning) {
     EXCLUDE_DOCKER_TEST = false
   }
-  if (dockerRunning || (OperatingSystem.current().isMacOsX && dockerRunning && macDockerConnector)) {
+  if ((OperatingSystem.current().isMacOsX && dockerRunning && macDockerConnector) || dockerRunning) {
     EXCLUDE_TRINO_TEST = false
   }
 
