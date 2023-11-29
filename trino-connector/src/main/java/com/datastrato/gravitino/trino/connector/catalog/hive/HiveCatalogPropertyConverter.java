@@ -10,9 +10,7 @@ import com.datastrato.gravitino.trino.connector.catalog.PropertyConverter;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 
-/**
- * Convert hive properties between trino and gravitino.
- */
+/** Convert hive properties between trino and gravitino. */
 public class HiveCatalogPropertyConverter implements PropertyConverter {
 
   private static final TreeBidiMap<String, String> TRINO_HIVE_TO_GRAVITINO_HIVE =

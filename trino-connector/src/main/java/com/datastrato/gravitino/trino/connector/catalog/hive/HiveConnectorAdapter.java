@@ -33,7 +33,8 @@ public class HiveConnectorAdapter implements CatalogConnectorAdapter {
 
     Map<String, Object> properties = new HashMap<>();
     properties.put("hive.metastore.uri", catalog.getProperties("metastore.uris", ""));
-    Map<String, String> trinoProperty = catalogConverter.toTrinoProperties(catalog.getCatalog().properties());
+    Map<String, String> trinoProperty =
+        catalogConverter.toTrinoProperties(catalog.getCatalog().properties());
     properties.putAll(trinoProperty);
     config.put("properties", properties);
     return config;
