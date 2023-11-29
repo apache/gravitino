@@ -22,7 +22,6 @@ public class HiveContainer extends BaseContainer {
   public static final String DEFAULT_IMAGE = System.getenv("GRAVITINO_CI_HIVE_DOCKER_IMAGE");
   public static final String HOST_NAME = "gravitino-ci-hive";
   private static final int MYSQL_PORT = 3306;
-  private static final int YARN_SERVICE_PORT = 8088;
   private static final int HDFS_DEFAULTFS_PORT = 9000;
   public static final int HIVE_METASTORE_PORT = 9083;
   private static final int HIVESERVER2_PORT = 10000;
@@ -96,7 +95,6 @@ public class HiveContainer extends BaseContainer {
       this.exposePorts =
           ImmutableSet.of(
               MYSQL_PORT,
-              YARN_SERVICE_PORT,
               HDFS_DEFAULTFS_PORT,
               HIVE_METASTORE_PORT,
               HIVESERVER2_PORT,
