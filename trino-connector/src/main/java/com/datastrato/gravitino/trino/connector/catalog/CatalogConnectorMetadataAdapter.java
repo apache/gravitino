@@ -29,8 +29,7 @@ import org.slf4j.LoggerFactory;
  */
 public class CatalogConnectorMetadataAdapter {
 
-  private static final Logger LOGGER =
-      LoggerFactory.getLogger(CatalogConnectorMetadataAdapter.class);
+  private static final Logger LOG = LoggerFactory.getLogger(CatalogConnectorMetadataAdapter.class);
   protected final List<PropertyMetadata<?>> schemaProperties;
   protected final List<PropertyMetadata<?>> tableProperties;
   protected final List<PropertyMetadata<?>> columnProperties;
@@ -123,7 +122,7 @@ public class CatalogConnectorMetadataAdapter {
       if (properties.containsKey(name)) {
         validProperties.put(name, properties.get(name));
       } else {
-        LOGGER.warn("Property {} is not defined in trino, we will ignore it", name);
+        LOG.warn("Property {} is not defined in trino, we will ignore it", name);
       }
     }
     return validProperties;
