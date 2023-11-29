@@ -159,11 +159,21 @@ public class CatalogConnectorMetadata {
   }
 
   public void dropTable(SchemaTableName tableName) {
-    boolean dropped =
-        tableCatalog.dropTable(
-            NameIdentifier.ofTable(
-                metalake.name(), catalogName, tableName.getSchemaName(), tableName.getTableName()));
-    if (!dropped) throw new TrinoException(GRAVITINO_TABLE_NOT_EXISTS, "Table does not exist");
+    try {
+      tableCatalog.purgeTable(
+          NameIdentifier.ofTable(
+              metalake.name(), catalogName, tableName.getSchemaName(), tableName.getTableName()));
+    } catch (UnsupportedOperationException e) {
+      LOG.warn("Purge table is not supported", e);
+      boolean dropped =
+          tableCatalog.dropTable(
+              NameIdentifier.ofTable(
+                  metalake.name(),
+                  catalogName,
+                  tableName.getSchemaName(),
+                  tableName.getTableName()));
+      if (!dropped) throw new TrinoException(GRAVITINO_TABLE_NOT_EXISTS, "Table does not exist");
+    }
   }
 
   public void renameSchema(String source, String target) {

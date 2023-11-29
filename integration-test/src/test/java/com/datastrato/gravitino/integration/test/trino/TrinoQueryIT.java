@@ -9,8 +9,10 @@ import static java.lang.Thread.sleep;
 
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.client.GravitinoClient;
 import com.datastrato.gravitino.client.GravitinoMetaLake;
+import com.datastrato.gravitino.rel.SupportsSchemas;
 import io.trino.cli.Query;
 import io.trino.cli.QueryRunner;
 import io.trino.cli.TerminalUtils;
@@ -73,6 +75,26 @@ public class TrinoQueryIT {
     try {
       client = GravitinoClient.builder(gravitinoUri).build();
       trinoQueryRunner = new TrinoQueryRunner();
+
+      createMetalake();
+
+      {
+        dropCatalog("hive");
+        HashMap<String, String> properties = new HashMap<>();
+        properties.put("metastore.uris", hiveMetastoreUri);
+
+        createCatalog("hive", "hive", properties);
+      }
+
+      {
+        dropCatalog("lakehouse-iceberg");
+        HashMap<String, String> properties = new HashMap<>();
+        properties.put("uri", hiveMetastoreUri);
+        properties.put("catalog-backend", "hive");
+        properties.put("warehouse", "hdfs://localhost:9000/user/iceberg/warehouse");
+        createCatalog("lakehouse-iceberg", "lakehouse-iceberg", properties);
+      }
+
       isDockerRunning = true;
     } catch (Exception e) {
       LOG.error("Services are not connected", e);
@@ -165,12 +187,26 @@ public class TrinoQueryIT {
     }
   }
 
-  private static void dropCatalogs(String catalog) {
-    boolean exists = metalake.catalogExists(NameIdentifier.of(metalakeName));
+  private static void dropCatalog(String catalogName) {
+    boolean exists = metalake.catalogExists(NameIdentifier.of(metalakeName, catalogName));
     if (!exists) {
       return;
     }
-    metalake.dropCatalog(NameIdentifier.of(metalakeName, catalog));
+    SupportsSchemas schemas =
+        metalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName)).asSchemas();
+    Arrays.stream(schemas.listSchemas(Namespace.ofSchema(metalakeName, catalogName)))
+        .filter(schema -> !schema.name().equals("default"))
+        .forEach(
+            schema -> {
+              try {
+                schemas.dropSchema(
+                    NameIdentifier.ofSchema(metalakeName, catalogName, schema.name()), true);
+              } catch (Exception e) {
+                LOG.error("Failed to drop schema {}", schema, e);
+              }
+            });
+
+    metalake.dropCatalog(NameIdentifier.of(metalakeName, catalogName));
   }
 
   private String[] readCatalogs() throws Exception {
@@ -317,9 +353,9 @@ public class TrinoQueryIT {
     private URI uri = new URI("http://192.168.215.2:8080");
 
     TrinoQueryRunner() throws Exception {
+      this.uri = new URI(trinoUri);
       this.queryRunner = createQueryRunner();
       this.terminal = TerminalUtils.getTerminal();
-      this.uri = new URI(trinoUri);
     }
 
     private QueryRunner createQueryRunner() throws Exception {

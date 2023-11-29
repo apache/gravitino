@@ -8,7 +8,6 @@ import static java.util.Collections.emptyList;
 
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorAdapter;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
-import com.datastrato.gravitino.trino.connector.catalog.hive.HiveMetadataAdapter;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoCatalog;
 import java.util.HashMap;
 import java.util.Map;
@@ -34,6 +33,6 @@ public class IcebergConnectorAdapter implements CatalogConnectorAdapter {
 
   public CatalogConnectorMetadataAdapter getMetadataAdapter() {
     // TODO yuhui Need to improve schema table and column properties
-    return new HiveMetadataAdapter(getSchemaProperties(), getTableProperties(), emptyList());
+    return new IcebergMetadataAdapter(getSchemaProperties(), getTableProperties(), emptyList());
   }
 }

@@ -16,6 +16,6 @@ public class IcebergMetadataAdapter extends CatalogConnectorMetadataAdapter {
       List<PropertyMetadata<?>> tableProperties,
       List<PropertyMetadata<?>> columnProperties) {
 
-    super(schemaProperties, tableProperties, columnProperties);
+    super(schemaProperties, tableProperties, columnProperties, new IcebergDataTypeTransformer());
   }
 }
