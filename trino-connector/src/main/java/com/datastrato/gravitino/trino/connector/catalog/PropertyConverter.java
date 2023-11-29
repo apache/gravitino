@@ -10,12 +10,12 @@ import java.util.Map;
 /** Transforming between gravitino schema/table/column property and trino property. */
 public interface PropertyConverter {
 
-  /** @return TableProperties list that used to validate table properties. */
+  /** Convert trino properties to gravitino properties. */
   default Map<String, String> toTrinoProperties(Map<String, String> properties) {
     return properties;
   }
 
-  /** @return SchemaProperties list that used to validate schema properties. */
+  /** Convert gravitino properties to trino properties. */
   default Map<String, Object> toGravitinoProperties(Map<String, Object> properties) {
     return properties;
   }
