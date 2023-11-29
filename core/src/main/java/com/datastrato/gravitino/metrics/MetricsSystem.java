@@ -126,31 +126,33 @@ public class MetricsSystem implements Closeable {
   }
 
   /*
-   * Extract a metric name and label from dropwizard metrics for Prometheus
+   * Extracts a metric name and labels from Dropwizard metrics for Prometheus.
    *
-   * All extract rules must register with the prometheus registry before starting the prometheus
-   * servlet. At this time, some MetricsSource may not register with MetricsSystem, such as
-   * HiveCatalogMetricsSource, so we place all rules in MetricsSystem not spread in separate
-   * MetricsSources.
+   * All extraction rules must be registered with the Prometheus registry before starting the Prometheus
+   * servlet. At times, certain MetricsSources, like HiveCatalogMetricsSource, may not register with
+   * MetricsSystem. Therefore, all rules are consolidated in MetricsSystem instead of being spread across
+   * separate MetricsSources.
    *
-   * If a metric name can't apply any rules, it will be constructed to Prometheus metrics
-   * name format, "ab.c-a.d" is transformed to "ab_c_a_d"
+   * If a metric name doesn't match any rules, it will be constructed to the Prometheus metrics
+   * name format. For example, "ab.c-a.d" transforms into "ab_c_a_d".
    *
-   * MapperConfig is used to extract Prometheus metricsName and labels with signature:
-   * MapperConfig(final String match, final String name, final Map<String, String> labels)
-   *
-   * Match is regex used to match incoming metric name. It uses a simplified glob syntax where
-   * only '*' are allowed. Name is New metric name. Can contain placeholders to be replaced with
-   * actual values from the incoming metric name. Placeholders are in the ${n} format where n
-   * is the zero based index of the group to extract from the original metric name. Labels are the
-   * label to be extracted from, they should contain placeholders too.
+   * The MapperConfig is utilized to extract Prometheus metricsName and labels with the following signature:
+   * `MapperConfig(final String match, final String name, final Map<String, String> labels)`
+   * - `match` is a regex used to match the incoming metric name. It employs a simplified glob syntax where
+   *   only '*' is allowed.
+   * - `name` is the new metric name, which can contain placeholders to be replaced with
+   *   actual values from the incoming metric name. Placeholders are in the ${n} format, where n
+   *   is the zero-based index of the group to extract from the original metric name.
+   * - `labels` are the labels to be extracted, and they should also contain placeholders.
    * E.g.:
    * Match: gravitino.dispatcher.*.*
    * Name: dispatcher_events_total_${0}
    * Labels: label1: ${1}_t
-   * A metric "gravitino.dispatcher.sp1.yay" will be converted in a new metric with name
-   * "dispatcher_events_total_sp1" with label {label1: yay_t}
-   * Label names have to match the regex ^[a-zA-Z_][a-zA-Z0-9_]+$
+   * A metric "gravitino.dispatcher.sp1.yay" will be converted to a new metric with name
+   * "dispatcher_events_total_sp1" with label {label1: yay_t}.
+   * Metric names MUST adhere to the regex [a-zA-Z_:]([a-zA-Z0-9_:])*.
+   * Label names MUST adhere to the regex [a-zA-Z_]([a-zA-Z0-9_])*.
+   * Label values MAY be any sequence of UTF-8 characters .
    */
   @VisibleForTesting
   static List<MapperConfig> getMetricNameAndLabelRules() {
