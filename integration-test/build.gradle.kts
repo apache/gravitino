@@ -267,7 +267,7 @@ tasks.test {
         if (EXCLUDE_TRINO_TEST) {
           val redColor = "\u001B[31m"
           val resetColor = "\u001B[0m"
-          println("${redColor}mac-docker-connector is not running locally, all integration test cases tagged with 'gravitino-trino-it' will be excluded.${resetColor}")
+          println("${redColor}Gravitino-trino-docker is not running locally, all integration test cases tagged with 'gravitino-trino-it' will be excluded.${resetColor}")
           excludeTags("gravitino-trino-it")
         }
       }
