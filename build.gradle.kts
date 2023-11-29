@@ -214,6 +214,7 @@ tasks.rat {
     "licenses/*txt",
     "web/.**",
     "web/node_modules/**/*",
+    "web/dist/**/*",
     "web/src/iconify-bundle/bundle-icons-react.js",
     "web/src/iconify-bundle/icons-bundle-react.js",
     "web/yarn.lock",

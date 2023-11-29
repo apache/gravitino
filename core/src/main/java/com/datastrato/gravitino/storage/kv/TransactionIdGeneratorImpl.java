@@ -9,6 +9,7 @@ import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.storage.TransactionIdGenerator;
 import com.datastrato.gravitino.utils.ByteUtils;
+import com.datastrato.gravitino.utils.Bytes;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.IOException;
@@ -23,7 +24,14 @@ public class TransactionIdGeneratorImpl implements TransactionIdGenerator {
   private static final Logger LOGGER = LoggerFactory.getLogger(TransactionIdGeneratorImpl.class);
 
   private final KvBackend kvBackend;
-  @VisibleForTesting static final String LAST_TIMESTAMP = "last_timestamp";
+
+  // We use three control characters 0x1D, 0x00, 0x01 to separate it from other keys.
+  private static final byte[] ID_GENERATOR_PREFIX = new byte[] {0x1D, 0x00, 0x01};
+
+  @VisibleForTesting
+  static final byte[] LAST_TIMESTAMP =
+      Bytes.concat(ID_GENERATOR_PREFIX, "last_timestamp".getBytes(StandardCharsets.UTF_8));
+
   private volatile long incrementId = 0L;
   private volatile long lastTransactionId = 0L;
   private final Config config;
@@ -57,10 +65,7 @@ public class TransactionIdGeneratorImpl implements TransactionIdGenerator {
           int i = 0;
           while (i++ < 3) {
             try {
-              kvBackend.put(
-                  LAST_TIMESTAMP.getBytes(StandardCharsets.UTF_8),
-                  ByteUtils.longToByte(System.currentTimeMillis()),
-                  true);
+              kvBackend.put(LAST_TIMESTAMP, ByteUtils.longToByte(System.currentTimeMillis()), true);
               return;
             } catch (IOException e) {
               LOGGER.warn("Failed to save current timestamp to storage layer, retrying...", e);
@@ -104,7 +109,7 @@ public class TransactionIdGeneratorImpl implements TransactionIdGenerator {
    * storage layer every 2(default) seconds.
    */
   private long getSavedTs() throws IOException {
-    byte[] oldIdBytes = kvBackend.get(LAST_TIMESTAMP.getBytes(StandardCharsets.UTF_8));
+    byte[] oldIdBytes = kvBackend.get(LAST_TIMESTAMP);
     return oldIdBytes == null ? 0 : ByteUtils.byteToLong(oldIdBytes);
   }
 
