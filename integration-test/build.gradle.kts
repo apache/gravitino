@@ -4,6 +4,7 @@
  */
 import java.io.IOException
 import org.gradle.internal.os.OperatingSystem
+import java.util.*
 
 plugins {
   `maven-publish`
@@ -119,10 +120,12 @@ dependencies {
 var DOCKER_IT_TEST = false
 project.extra["dockerRunning"] = false
 project.extra["macDockerConnector"] = false
+project.extra["isOrbStack"] = false
 
 fun printDockerCheckInfo() {
   checkMacDockerConnector()
   checkDockerStatus()
+  checkOrbStackStatus()
 
   val testMode = project.properties["testMode"] as? String ?: "embedded"
   if (testMode != "deploy" && testMode != "embedded") {
@@ -130,8 +133,11 @@ fun printDockerCheckInfo() {
   }
   val dockerRunning = project.extra["dockerRunning"] as? Boolean ?: false
   val macDockerConnector = project.extra["macDockerConnector"] as? Boolean ?: false
+  val isOrbStack = project.extra["isOrbStack"] as? Boolean ?: false
 
-  if (OperatingSystem.current().isMacOsX() && dockerRunning && macDockerConnector) {
+  if (OperatingSystem.current().isMacOsX()
+      && dockerRunning
+      && (macDockerConnector || isOrbStack)) {
     DOCKER_IT_TEST = true
   } else if (OperatingSystem.current().isLinux() && dockerRunning) {
     DOCKER_IT_TEST = true
@@ -140,7 +146,8 @@ fun printDockerCheckInfo() {
   println("------------------ Check Docker environment ---------------------")
   println("Docker server status ............................................ [${if (dockerRunning) "running" else "stop"}]")
   if (OperatingSystem.current().isMacOsX()) {
-    println("mac-docker-connector server status .............................. [${if (macDockerConnector) "running" else "stop"}]")
+    println("mac-docker-connector status ..................................... [${if (macDockerConnector) "running" else "stop"}]")
+    println("OrbStack status ................................................. [${if (isOrbStack) "yes" else "no"}]")
   }
   if (!DOCKER_IT_TEST) {
     println("Run test cases without `gravitino-docker-it` tag ................ [$testMode test]")
@@ -151,7 +158,7 @@ fun printDockerCheckInfo() {
 
   // Print help message if Docker server or mac-docker-connector is not running
   printDockerServerTip()
-  printMacDockerConnectorTip()
+  printMacDockerTip()
 }
 
 fun printDockerServerTip() {
@@ -163,12 +170,15 @@ fun printDockerServerTip() {
   }
 }
 
-fun printMacDockerConnectorTip() {
+fun printMacDockerTip() {
   val macDockerConnector = project.extra["macDockerConnector"] as? Boolean ?: false
-  if (OperatingSystem.current().isMacOsX() && !macDockerConnector) {
+  val isOrbStack = project.extra["isOrbStack"] as? Boolean ?: false
+  if (OperatingSystem.current().isMacOsX() && !macDockerConnector && !isOrbStack) {
     val redColor = "\u001B[31m"
     val resetColor = "\u001B[0m"
-    println("Tip: Please make sure to execute the ${redColor}`dev/docker/tools/mac-docker-connector.sh`${resetColor} script before running the integration test in MacOS.")
+    println("Tip: Please make sure to use ${redColor}OrbStack${resetColor} or execute the " +
+        "${redColor}`dev/docker/tools/mac-docker-connector.sh`${resetColor} script before running" +
+        " the integration test on macOS.")
   }
 }
 
@@ -205,6 +215,26 @@ fun checkDockerStatus() {
     }
   } catch (e: IOException) {
     println("checkDockerStatus command execution failed: ${e.message}")
+  }
+}
+
+fun checkOrbStackStatus() {
+  if (OperatingSystem.current().isLinux()) {
+    return
+  }
+
+  try {
+    val process = ProcessBuilder("docker", "context", "show").start();
+    val exitCode = process.waitFor()
+    if (exitCode == 0) {
+      val currentContext = process.inputStream.bufferedReader().readText()
+      println("Current docker context is: $currentContext")
+      project.extra["isOrbStack"] = currentContext.lowercase(Locale.getDefault()).contains("orbstack")
+    } else {
+        println("checkOrbStackStatus Command execution failed with exit code $exitCode")
+    }
+  } catch (e: IOException) {
+    println("checkOrbStackStatus command execution failed: ${e.message}")
   }
 }
 
