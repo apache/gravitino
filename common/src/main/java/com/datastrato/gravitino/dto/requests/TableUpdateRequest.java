@@ -202,16 +202,31 @@ public interface TableUpdateRequest extends RESTRequest {
     @Nullable
     private final TableChange.ColumnPosition position;
 
+    @Getter
+    @JsonProperty(value = "nullable", defaultValue = "true")
+    private final boolean nullable;
+
+    // For Jackson deserialization
+    public AddTableColumnRequest() {
+      this(null, null, null, null, true);
+    }
+
     public AddTableColumnRequest(
-        String[] fieldName, Type dataType, String comment, TableChange.ColumnPosition position) {
+        String[] fieldName,
+        Type dataType,
+        String comment,
+        TableChange.ColumnPosition position,
+        boolean nullable) {
       this.fieldName = fieldName;
       this.dataType = dataType;
       this.comment = comment;
       this.position = position;
+      this.nullable = nullable;
     }
 
-    public AddTableColumnRequest() {
-      this(null, null, null, null);
+    public AddTableColumnRequest(
+        String[] fieldName, Type dataType, String comment, TableChange.ColumnPosition position) {
+      this(fieldName, dataType, comment, position, true);
     }
 
     @Override
@@ -227,7 +242,7 @@ public interface TableUpdateRequest extends RESTRequest {
 
     @Override
     public TableChange tableChange() {
-      return TableChange.addColumn(fieldName, dataType, comment, position);
+      return TableChange.addColumn(fieldName, dataType, comment, position, nullable);
     }
   }
 
