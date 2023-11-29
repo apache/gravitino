@@ -134,17 +134,17 @@ fun printDockerCheckInfo() {
   if (dockerRunning && hiveContainerRunning) {
     EXCLUDE_DOCKER_TEST = false
   }
-  if (dockerRunning && macDockerConnector) {
+  if (dockerRunning || (OperatingSystem.current().isMacOsX && dockerRunning && macDockerConnector)) {
     EXCLUDE_TRINO_TEST = false
   }
 
   println("------------------ Check Docker environment ---------------------")
   println("Docker server status ............................................ [${if (dockerRunning) "running" else "stop"}]")
   println("Gravitino IT Docker container is already running ................ [${if (hiveContainerRunning) "yes" else "no"}]")
-  if (OperatingSystem.current().isMacOsX() && !(dockerRunning && macDockerConnector)) {
+  if (!EXCLUDE_TRINO_TEST) {
     println("Run test cases without `gravitino-trino-it` tag ................. [$testMode test]")
   }
-  if (dockerRunning && hiveContainerRunning) {
+  if (EXCLUDE_DOCKER_TEST) {
     println("Using Gravitino IT Docker container to run all integration tests. [$testMode test]")
   } else {
     println("Run test cases without `gravitino-docker-it` tag ................ [$testMode test]")
