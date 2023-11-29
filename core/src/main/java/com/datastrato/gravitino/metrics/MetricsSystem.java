@@ -126,17 +126,17 @@ public class MetricsSystem implements Closeable {
   }
 
   /*
-   * Extracts a metric name and labels from Dropwizard metrics for Prometheus.
+   * Extract a metric name and labels from Dropwizard metrics for Prometheus.
    *
    * All extraction rules must be registered with the Prometheus registry before starting the Prometheus
    * servlet. At times, certain MetricsSources, like HiveCatalogMetricsSource, may not register with
    * MetricsSystem. Therefore, all rules are consolidated in MetricsSystem instead of being spread across
    * separate MetricsSources.
    *
-   * If a metric name doesn't match any rules, it will be constructed to the Prometheus metrics
+   * If a metric name doesn't match any rules, it will be converted to the Prometheus metrics
    * name format. For example, "ab.c-a.d" transforms into "ab_c_a_d".
    *
-   * The MapperConfig is utilized to extract Prometheus metricsName and labels with the following signature:
+   * The MapperConfig is utilized to extract Prometheus metricsName and labels with the following method:
    * `MapperConfig(final String match, final String name, final Map<String, String> labels)`
    * - `match` is a regex used to match the incoming metric name. It employs a simplified glob syntax where
    *   only '*' is allowed.
