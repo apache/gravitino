@@ -293,7 +293,9 @@ public class GravitinoMetadata implements ConnectorMetadata {
     GravitinoTableHandle gravitinoTableHandle = (GravitinoTableHandle) tableHandle;
     GravitinoColumnHandle gravitinoColumnHandle = (GravitinoColumnHandle) column;
     catalogConnectorMetadata.setColumnType(
-        gravitinoTableHandle.toSchemaTableName(), gravitinoColumnHandle.getColumnName(), type);
+        gravitinoTableHandle.toSchemaTableName(),
+        gravitinoColumnHandle.getColumnName(),
+        metadataAdapter.getDataTypeTransformer().getGravitinoType(type));
   }
 
   @Override
