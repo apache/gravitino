@@ -21,7 +21,7 @@ node {
 tasks {
   val buildwar by registering(War::class) {
     dependsOn("webpack")
-    from("src/WEB-INF") {
+    from("./WEB-INF") {
       into("WEB-INF")
     }
     from("dist") {
@@ -56,7 +56,6 @@ tasks {
     dependsOn(buildwar)
   }
   clean {
-    delete("build")
     delete("dist")
   }
 }
