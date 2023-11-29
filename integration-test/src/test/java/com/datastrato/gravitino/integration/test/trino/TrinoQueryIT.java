@@ -14,6 +14,8 @@ import com.datastrato.gravitino.client.GravitinoClient;
 import com.datastrato.gravitino.client.GravitinoMetaLake;
 import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.datastrato.gravitino.rel.TableCatalog;
+import com.datastrato.gravitino.client.GravitinoClient;
+import com.datastrato.gravitino.client.GravitinoMetaLake;
 import io.trino.cli.Query;
 import io.trino.cli.QueryRunner;
 import io.trino.cli.TerminalUtils;
@@ -377,8 +379,6 @@ public class TrinoQueryIT {
           testCount.get(),
           totalCount.get());
     }
-
-    queryRunner.stop();
   }
 
   static class TrinoQueryRunner {
