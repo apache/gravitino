@@ -131,11 +131,12 @@ fun printDockerCheckInfo() {
   val dockerRunning = project.extra["dockerRunning"] as? Boolean ?: false
   val hiveContainerRunning = project.extra["hiveContainerRunning"] as? Boolean ?: false
   val macDockerConnector = project.extra["macDockerConnector"] as? Boolean ?: false
-  if (dockerRunning && hiveContainerRunning) {
-    EXCLUDE_DOCKER_TEST = false
-  }
-  if ((OperatingSystem.current().isMacOsX && dockerRunning && macDockerConnector) || dockerRunning) {
-    EXCLUDE_TRINO_TEST = false
+
+  EXCLUDE_DOCKER_TEST = !(dockerRunning && hiveContainerRunning)
+  EXCLUDE_TRINO_TEST = if (OperatingSystem.current().isMacOsX) {
+    !(dockerRunning && macDockerConnector)
+  } else {
+    !dockerRunning
   }
 
   println("------------------ Check Docker environment ---------------------")
