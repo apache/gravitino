@@ -5,7 +5,7 @@
 package com.datastrato.gravitino.rel;
 
 import com.datastrato.gravitino.NameIdentifier;
-import io.substrait.type.Type;
+import com.datastrato.gravitino.rel.types.Type;
 import java.util.Map;
 
 /**
@@ -26,6 +26,9 @@ public interface Column {
 
   /** Returns the comment of this column, null if not specified. */
   String comment();
+
+  /** Returns true if this column may produce null values. Default is true. */
+  boolean nullable();
 
   // TODO. Support column default value. @Jerry
 }

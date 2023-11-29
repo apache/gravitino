@@ -101,22 +101,26 @@ Example JSON:
         {
             "name": "id",
             "type": "i32?",
-            "comment": "id column comment"
+            "comment": "id column comment",
+            "nullable": true
         },
         {
             "name": "name",
             "type": "string?",
-            "comment": "name column comment"
+            "comment": "name column comment",
+            "nullable": true
         },
         {
             "name": "age",
             "type": "i32?",
-            "comment": "age column comment"
+            "comment": "age column comment",
+            "nullable": true
         },
         {
             "name": "dt",
             "type": "date?",
-            "comment": "dt column comment"
+            "comment": "dt column comment",
+            "nullable": true
         }
     ],
     "partitions": [

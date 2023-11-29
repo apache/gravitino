@@ -63,4 +63,18 @@ public interface Configs {
           .version("0.1.0")
           .booleanConf()
           .createWithDefault(true);
+
+  ConfigEntry<String> AUTHENTICATOR =
+      new ConfigBuilder("gravitino.authenticator")
+          .doc("The authenticator which Gravitino uses")
+          .version("0.3.0")
+          .stringConf()
+          .createWithDefault("simple");
+
+  ConfigEntry<Long> STORE_TRANSACTION_MAX_SKEW_TIME =
+      new ConfigBuilder("gravitino.entity.store.maxTransactionSkewTimeMs")
+          .doc("Max time skew allowed for transaction, Unit: millisecond")
+          .version("0.3.0")
+          .longConf()
+          .createWithDefault(2000L);
 }

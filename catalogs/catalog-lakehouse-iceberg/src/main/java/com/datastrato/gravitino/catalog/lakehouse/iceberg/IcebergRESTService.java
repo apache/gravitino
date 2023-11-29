@@ -5,10 +5,15 @@
 
 package com.datastrato.gravitino.catalog.lakehouse.iceberg;
 
+import com.datastrato.gravitino.GravitinoEnv;
 import com.datastrato.gravitino.aux.GravitinoAuxiliaryService;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.ops.IcebergTableOps;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.web.IcebergExceptionMapper;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.web.IcebergObjectMapperProvider;
+import com.datastrato.gravitino.metrics.MetricsSystem;
+import com.datastrato.gravitino.metrics.source.MetricsSource;
+import com.datastrato.gravitino.server.auth.AuthenticationFilter;
+import com.datastrato.gravitino.server.web.HttpServerMetricsSource;
 import com.datastrato.gravitino.server.web.JettyServer;
 import com.datastrato.gravitino.server.web.JettyServerConfig;
 import java.util.Map;
@@ -31,13 +36,17 @@ public class IcebergRESTService implements GravitinoAuxiliaryService {
   private void initServer(IcebergConfig icebergConfig) {
     JettyServerConfig serverConfig = JettyServerConfig.fromConfig(icebergConfig);
     server = new JettyServer();
-    server.initialize(serverConfig, SERVICE_NAME);
+    MetricsSystem metricsSystem = GravitinoEnv.getInstance().metricsSystem();
+    server.initialize(serverConfig, SERVICE_NAME, false /* shouldEnableUI */);
 
     ResourceConfig config = new ResourceConfig();
     config.packages("com.datastrato.gravitino.catalog.lakehouse.iceberg.web.rest");
 
     config.register(IcebergObjectMapperProvider.class).register(JacksonFeature.class);
     config.register(IcebergExceptionMapper.class);
+    HttpServerMetricsSource httpServerMetricsSource =
+        new HttpServerMetricsSource(MetricsSource.ICEBERG_REST_SERVER_METRIC_NAME, config, server);
+    metricsSystem.register(httpServerMetricsSource);
 
     IcebergTableOps icebergTableOps = new IcebergTableOps(icebergConfig);
     config.register(
@@ -50,6 +59,7 @@ public class IcebergRESTService implements GravitinoAuxiliaryService {
 
     Servlet servlet = new ServletContainer(config);
     server.addServlet(servlet, "/iceberg/*");
+    server.addFilter(new AuthenticationFilter(), "/iceberg/*");
   }
 
   @Override

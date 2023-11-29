@@ -7,7 +7,7 @@ package com.datastrato.gravitino.catalog.rel;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
-import io.substrait.type.TypeCreator;
+import com.datastrato.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Test;
 
 final class BaseColumnExtension extends BaseColumn {
@@ -21,6 +21,7 @@ final class BaseColumnExtension extends BaseColumn {
       column.name = name;
       column.comment = comment;
       column.dataType = dataType;
+      column.nullable = nullable;
       return column;
     }
   }
@@ -34,12 +35,12 @@ public class TestBaseColumn {
         new BaseColumnExtension.Builder()
             .withName("testColumnName")
             .withComment("testColumnComment")
-            .withType(TypeCreator.NULLABLE.STRING)
+            .withType(Types.IntegerType.get())
             .build();
 
     assertEquals("testColumnName", column.name());
     assertEquals("testColumnComment", column.comment());
-    assertEquals(TypeCreator.NULLABLE.STRING, column.dataType());
+    assertEquals(Types.IntegerType.get(), column.dataType());
   }
 
   @Test
@@ -48,28 +49,28 @@ public class TestBaseColumn {
         new BaseColumnExtension.Builder()
             .withName("testColumnName")
             .withComment("testColumnComment")
-            .withType(TypeCreator.NULLABLE.STRING)
+            .withType(Types.StringType.get())
             .build();
 
     BaseColumn column2 =
         new BaseColumnExtension.Builder()
             .withName("testColumnName")
             .withComment("testColumnComment")
-            .withType(TypeCreator.NULLABLE.STRING)
+            .withType(Types.StringType.get())
             .build();
 
     BaseColumn column3 =
         new BaseColumnExtension.Builder()
             .withName("differentColumnName")
             .withComment("testColumnComment")
-            .withType(TypeCreator.NULLABLE.STRING)
+            .withType(Types.StringType.get())
             .build();
 
     BaseColumn column4 =
         new BaseColumnExtension.Builder()
             .withName("testColumnName")
             .withComment("testColumnComment")
-            .withType(TypeCreator.NULLABLE.I32)
+            .withType(Types.IntegerType.get())
             .build();
 
     assertEquals(column1, column2);

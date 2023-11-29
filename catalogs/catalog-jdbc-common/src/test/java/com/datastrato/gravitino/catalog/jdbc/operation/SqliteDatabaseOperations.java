@@ -9,6 +9,7 @@ import static com.datastrato.gravitino.catalog.jdbc.converter.SqliteExceptionCon
 import com.datastrato.gravitino.catalog.jdbc.JdbcSchema;
 import com.datastrato.gravitino.catalog.jdbc.utils.JdbcConnectorUtils;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
+import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.sql.Connection;
@@ -29,7 +30,8 @@ public class SqliteDatabaseOperations extends JdbcDatabaseOperations {
   }
 
   @Override
-  public void create(String databaseName, String comment, Map<String, String> properties) {
+  public void create(String databaseName, String comment, Map<String, String> properties)
+      throws SchemaAlreadyExistsException {
     try {
       if (exist(databaseName)) {
         throw new SQLException(
@@ -70,7 +72,7 @@ public class SqliteDatabaseOperations extends JdbcDatabaseOperations {
   }
 
   @Override
-  public void delete(String databaseName, boolean cascade) {
+  public void delete(String databaseName, boolean cascade) throws NoSuchSchemaException {
     delete(databaseName);
   }
 

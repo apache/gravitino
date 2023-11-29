@@ -5,7 +5,6 @@
 [versions]
 junit = "5.8.1"
 protoc = "3.17.3"
-substrait = "0.9.0"
 jackson = "2.15.2"
 guava = "29.0-jre"
 lombok = "1.18.20"
@@ -34,6 +33,7 @@ sqlite-jdbc = "3.42.0.0"
 testng = "7.5.1"
 testcontainers = "1.19.0"
 trino-jdbc = "426"
+jwt = "0.11.1"
 
 protobuf-plugin = "0.9.2"
 spotless-plugin = '6.11.0'
@@ -41,12 +41,12 @@ gradle-extensions-plugin = '1.74'
 publish-plugin = '1.2.0'
 rat-plugin = '0.8.0'
 shadow-plugin = "8.1.1"
+metrics = "4.2.19"
 
 
 [libraries]
 protobuf-java = { group = "com.google.protobuf", name = "protobuf-java", version.ref = "protoc" }
 protobuf-java-util = { group = "com.google.protobuf", name = "protobuf-java-util", version.ref = "protoc" }
-substrait-java-core = { group = "io.substrait", name = "core", version.ref = "substrait" }
 jackson-databind = { group = "com.fasterxml.jackson.core", name = "jackson-databind", version.ref = "jackson" }
 jackson-annotations = { group = "com.fasterxml.jackson.core", name = "jackson-annotations", version.ref = "jackson" }
 jackson-datatype-jdk8 = { group = "com.fasterxml.jackson.datatype", name = "jackson-datatype-jdk8", version.ref = "jackson" }
@@ -64,6 +64,7 @@ log4j-core = { group = "org.apache.logging.log4j", name = "log4j-core", version.
 log4j-12-api = { group = "org.apache.logging.log4j", name = "log4j-1.2-api", version.ref = "log4j" }
 jetty-server = { group = "org.eclipse.jetty", name = "jetty-server", version.ref = "jetty" }
 jetty-servlet = { group = "org.eclipse.jetty", name = "jetty-servlet", version.ref = "jetty" }
+jetty-webapp = { group = "org.eclipse.jetty", name = "jetty-webapp", version.ref = "jetty" }
 jersey-server = { group = "org.glassfish.jersey.core", name = "jersey-server", version.ref = "jersey" }
 jersey-container-servlet-core = { group = "org.glassfish.jersey.containers", name = "jersey-container-servlet-core", version.ref = "jersey" }
 jersey-container-jetty-http = { group = "org.glassfish.jersey.containers", name = "jersey-container-jetty-http", version.ref = "jersey" }
@@ -105,12 +106,22 @@ commons-dbcp2 = { group = "org.apache.commons", name = "commons-dbcp2", version.
 testcontainers = { group = "org.testcontainers", name = "testcontainers", version.ref = "testcontainers" }
 testcontainers-junit-jupiter = { group = "org.testcontainers", name = "junit-jupiter", version.ref = "testcontainers" }
 trino-jdbc = { group = "io.trino", name = "trino-jdbc", version.ref = "trino-jdbc" }
+jwt-api = { group = "io.jsonwebtoken", name = "jjwt-api", version.ref = "jwt"}
+jwt-impl = { group = "io.jsonwebtoken", name = "jjwt-impl", version.ref = "jwt"}
+jwt-gson = { group = "io.jsonwebtoken", name = "jjwt-gson", version.ref = "jwt"}
+metrics-core = { group = "io.dropwizard.metrics", name = "metrics-core", version.ref = "metrics" }
+metrics-jersey2 = { group = "io.dropwizard.metrics", name = "metrics-jersey2", version.ref = "metrics" }
+metrics-jvm = { group = "io.dropwizard.metrics", name = "metrics-jvm", version.ref = "metrics" }
+metrics-jmx = { group = "io.dropwizard.metrics", name = "metrics-jmx", version.ref = "metrics" }
+metrics-servlets = { group = "io.dropwizard.metrics", name = "metrics-servlets", version.ref = "metrics" }
 
 [bundles]
 log4j = ["slf4j-api", "log4j-slf4j2-impl", "log4j-api", "log4j-core", "log4j-12-api"]
-jetty = ["jetty-server", "jetty-servlet"]
+jetty = ["jetty-server", "jetty-servlet", "jetty-webapp"]
 jersey = ["jersey-server", "jersey-container-servlet-core", "jersey-container-jetty-http", "jersey-media-json-jackson", "jersey-hk2"]
 iceberg = ["iceberg-core", "iceberg-api"]
+jwt = ["jwt-api", "jwt-impl", "jwt-gson"]
+metrics = ["metrics-core", "metrics-jersey2", "metrics-jvm", "metrics-jmx", "metrics-servlets"]
 
 [plugins]
 protobuf = { id = "com.google.protobuf", version.ref = "protobuf-plugin" }

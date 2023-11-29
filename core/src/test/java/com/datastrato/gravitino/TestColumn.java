@@ -23,6 +23,7 @@ public class TestColumn extends BaseColumn {
       column.name = name;
       column.comment = comment;
       column.dataType = dataType;
+      column.nullable = nullable;
 
       return column;
     }

@@ -20,28 +20,10 @@
 
 ## Design choices
 
-1. We choose to leverage Substrait’s type system into our entities’ type system. The main considerations are here:
-    1. The goal of Substrait is to build a generic intermediate layer, its type system is relatively complete.
-    2. We will further use Substrait to represent our logical plans (for example, like view, function and others), so using Substrait’s type system will reduce some converting works later on.
-2. We choose JSON protocol as our user-faced protocol, which is easy to debug for users and systems.
-3. We choose Protobuf binary layout to store the schema, the main considerations are here:
+1. We choose JSON protocol as our user-faced protocol, which is easy to debug for users and systems.
+2. We choose Protobuf binary layout to store the schema, the main considerations are here:
     1. Binary layout is much more concise compared to HMS’s schema layout.
     2. A general-purpose NoSQL database can be used to store the schema, which will get better performance and scalability compared to Hive Metastore.
-
-## Type System
-
-We use Substrait’s type system to define our schema’s type, the advantages of using Substrait’s type system is that:
-
-1. Substrait’s type system is generic enough to cover major type kinds of DWS, DBS, and other type system.
-2. Substrait supports extending the type systems to user-defined types.
-3. Substrait support serializing and deserializing using Google protobuf.
-
-Disadvantages:
-
-1. Substrait is still in fast iteration, the spec is not fully defined yet, also the project is not mature enough. So we potentially have the risk of breaking backward compatibility.
-2. Also Substrait lacks best practices, the learning curve is relatively high.
-
-Substrait’s type system can be referred here https://substrait.io/types/type_system/.
 
 ## Meta System
 

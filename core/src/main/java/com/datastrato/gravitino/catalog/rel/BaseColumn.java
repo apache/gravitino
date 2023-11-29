@@ -6,7 +6,7 @@
 package com.datastrato.gravitino.catalog.rel;
 
 import com.datastrato.gravitino.rel.Column;
-import io.substrait.type.Type;
+import com.datastrato.gravitino.rel.types.Type;
 import javax.annotation.Nullable;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
@@ -21,6 +21,8 @@ public abstract class BaseColumn implements Column {
   @Nullable protected String comment;
 
   protected Type dataType;
+
+  protected boolean nullable;
 
   /**
    * Returns the name of the column.
@@ -53,6 +55,12 @@ public abstract class BaseColumn implements Column {
     return comment;
   }
 
+  /** Returns true if the column value can be null. */
+  @Override
+  public boolean nullable() {
+    return nullable;
+  }
+
   /**
    * Builder interface for creating instances of {@link BaseColumn}.
    *
@@ -65,6 +73,8 @@ public abstract class BaseColumn implements Column {
     SELF withComment(String comment);
 
     SELF withType(Type dataType);
+
+    SELF withNullable(boolean nullable);
 
     T build();
   }
@@ -81,6 +91,7 @@ public abstract class BaseColumn implements Column {
     protected String name;
     protected String comment;
     protected Type dataType;
+    protected boolean nullable = true;
 
     /**
      * Sets the name of the column.
@@ -115,6 +126,18 @@ public abstract class BaseColumn implements Column {
     @Override
     public SELF withType(Type dataType) {
       this.dataType = dataType;
+      return self();
+    }
+
+    /**
+     * Sets nullable of the column value.
+     *
+     * @param nullable Nullable of the column.
+     * @return The builder instance.
+     */
+    @Override
+    public SELF withNullable(boolean nullable) {
+      this.nullable = nullable;
       return self();
     }
 

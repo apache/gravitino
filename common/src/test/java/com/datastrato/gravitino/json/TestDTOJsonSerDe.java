@@ -25,11 +25,11 @@ import com.datastrato.gravitino.dto.rel.partitions.Partitioning;
 import com.datastrato.gravitino.dto.rel.partitions.RangePartitioningDTO;
 import com.datastrato.gravitino.dto.rel.partitions.TruncatePartitioningDTO;
 import com.datastrato.gravitino.dto.rel.partitions.YearPartitioningDTO;
+import com.datastrato.gravitino.rel.types.Type;
+import com.datastrato.gravitino.rel.types.Types;
 import com.fasterxml.jackson.databind.cfg.EnumFeature;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.google.common.collect.ImmutableMap;
-import io.substrait.type.StringTypeVisitor;
-import io.substrait.type.TypeCreator;
 import java.time.Instant;
 import java.util.Map;
 import org.junit.jupiter.api.Assertions;
@@ -42,7 +42,7 @@ public class TestDTOJsonSerDe {
 
   private final String metalakeJson = "{\"name\":%s,\"comment\":%s,\"properties\":%s,\"audit\":%s}";
 
-  private final String columnJson = "{\"name\":%s,\"type\":%s,\"comment\":%s}";
+  private final String columnJson = "{\"name\":%s,\"type\":%s,\"comment\":%s,\"nullable\":%s}";
 
   private final String tableJson =
       "{\"name\":%s,\"comment\":%s,\"columns\":[%s],\"properties\":%s,\"audit\":%s,\"distribution\":%s,\"sortOrders\":%s,\"partitioning\":%s}";
@@ -170,7 +170,7 @@ public class TestDTOJsonSerDe {
   @Test
   public void testColumnDTOSerDe() throws Exception {
     String name = "column";
-    io.substrait.type.Type type = TypeCreator.NULLABLE.I8;
+    Type type = Types.ByteType.get();
     String comment = "comment";
 
     // Test required fields
@@ -181,8 +181,9 @@ public class TestDTOJsonSerDe {
         String.format(
             columnJson,
             withQuotes(name),
-            withQuotes(type.accept(new StringTypeVisitor())),
-            withQuotes(comment));
+            withQuotes(type.simpleString()),
+            withQuotes(comment),
+            column.nullable());
     Assertions.assertEquals(expectedJson, serJson);
     ColumnDTO deserColumn = JsonUtils.objectMapper().readValue(serJson, ColumnDTO.class);
     Assertions.assertEquals(column, deserColumn);
@@ -191,7 +192,7 @@ public class TestDTOJsonSerDe {
   @Test
   public void testTableDTOSerDe() throws Exception {
     String name = "column";
-    io.substrait.type.Type type = TypeCreator.NULLABLE.I8;
+    Type type = Types.ByteType.get();
     String comment = "comment";
     String creator = "creator";
     Instant now = Instant.now();
@@ -202,7 +203,12 @@ public class TestDTOJsonSerDe {
     Map<String, String> properties = ImmutableMap.of("k1", "v1", "k2", "v2");
 
     ColumnDTO column =
-        ColumnDTO.builder().withName(name).withDataType(type).withComment(comment).build();
+        ColumnDTO.builder()
+            .withName(name)
+            .withDataType(type)
+            .withComment(comment)
+            .withNullable(false)
+            .build();
     TableDTO table =
         TableDTO.builder()
             .withName(tableName)
@@ -221,8 +227,9 @@ public class TestDTOJsonSerDe {
             String.format(
                 columnJson,
                 withQuotes(name),
-                withQuotes(type.accept(new StringTypeVisitor())),
-                withQuotes(comment)),
+                withQuotes(type.simpleString()),
+                withQuotes(comment),
+                column.nullable()),
             JsonUtils.objectMapper().writeValueAsString(properties),
             String.format(auditJson, withQuotes(creator), withQuotes(now.toString()), null, null),
             null,
@@ -268,7 +275,7 @@ public class TestDTOJsonSerDe {
     FunctionArg arg1 = FieldReferenceDTO.of(field1);
     FunctionArg arg2 =
         new LiteralDTO.Builder()
-            .withDataType(TypeCreator.REQUIRED.STRING)
+            .withDataType(Types.StringType.get())
             .withValue("Asia/Shanghai")
             .build();
     FunctionArg toDateFunc =

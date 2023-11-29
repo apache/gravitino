@@ -5,6 +5,7 @@
 package com.datastrato.gravitino.trino.connector.catalog;
 
 import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_CATALOG_NOT_EXISTS;
+import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_ILLEGAL_ARGUMENT;
 import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_SCHEMA_ALREADY_EXISTS;
 import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_SCHEMA_NOT_EMPTY;
 import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_SCHEMA_NOT_EXISTS;
@@ -26,12 +27,19 @@ import com.datastrato.gravitino.rel.Schema;
 import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.TableCatalog;
+import com.datastrato.gravitino.rel.TableChange;
+import com.datastrato.gravitino.trino.connector.metadata.GravitinoColumn;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoSchema;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoTable;
+import com.datastrato.gravitino.trino.connector.util.DataTypeTransformer;
+import com.google.common.base.Strings;
 import io.trino.spi.TrinoException;
+import io.trino.spi.connector.SchemaTableName;
+import io.trino.spi.type.Type;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.lang3.NotImplementedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -150,10 +158,94 @@ public class CatalogConnectorMetadata {
     }
   }
 
-  public void dropTable(String schemaName, String tableName) {
+  public void dropTable(SchemaTableName tableName) {
     boolean dropped =
         tableCatalog.dropTable(
-            NameIdentifier.ofTable(metalake.name(), catalogName, schemaName, tableName));
+            NameIdentifier.ofTable(
+                metalake.name(), catalogName, tableName.getSchemaName(), tableName.getTableName()));
     if (!dropped) throw new TrinoException(GRAVITINO_TABLE_NOT_EXISTS, "Table does not exist");
+  }
+
+  public void renameSchema(String source, String target) {
+    throw new NotImplementedException();
+  }
+
+  private void applyAlter(SchemaTableName tableName, TableChange change) {
+    try {
+      tableCatalog.alterTable(
+          NameIdentifier.ofTable(
+              metalake.name(), catalogName, tableName.getSchemaName(), tableName.getTableName()),
+          change);
+    } catch (NoSuchTableException e) {
+      throw new TrinoException(GRAVITINO_TABLE_NOT_EXISTS, "Table does not exist");
+    } catch (IllegalArgumentException e) {
+      // TODO yuhui need improve get the error message. From IllegalArgumentException.
+      // At present, the IllegalArgumentException cannot get the error information clearly from the
+      // Graviton server.
+      String message =
+          e.getMessage().lines().toList().get(0) + e.getMessage().lines().toList().get(1);
+      throw new TrinoException(GRAVITINO_ILLEGAL_ARGUMENT, message, e);
+    }
+  }
+
+  public void renameTable(SchemaTableName oldTableName, SchemaTableName newTableName) {
+    if (!oldTableName.getSchemaName().equals(newTableName.getSchemaName())) {
+      throw new TrinoException(
+          GRAVITINO_UNSUPPORTED_OPERATION, "Cannot rename table across schemas");
+    }
+    if (oldTableName.getTableName().equals(newTableName.getTableName())) {
+      return;
+    }
+    applyAlter(oldTableName, TableChange.rename(newTableName.getTableName()));
+  }
+
+  public void setTableComment(SchemaTableName schemaTableName, String comment) {
+    applyAlter(schemaTableName, TableChange.updateComment(comment));
+  }
+
+  public void setTableProperties(SchemaTableName schemaTableName, Map<String, String> properties) {
+    Map<String, String> oldProperties =
+        getTable(schemaTableName.getSchemaName(), schemaTableName.getTableName()).getProperties();
+    for (Map.Entry<String, String> entry : properties.entrySet()) {
+      if (!entry.getValue().equals(oldProperties.get(entry.getKey()))) {
+        applyAlter(schemaTableName, TableChange.setProperty(entry.getKey(), entry.getValue()));
+      }
+    }
+  }
+
+  public void addColumn(SchemaTableName schemaTableName, GravitinoColumn column) {
+    String[] columnNames = {column.getName()};
+    if (Strings.isNullOrEmpty(column.getComment()))
+      applyAlter(schemaTableName, TableChange.addColumn(columnNames, column.getType()));
+    else {
+      applyAlter(
+          schemaTableName,
+          TableChange.addColumn(columnNames, column.getType(), column.getComment()));
+    }
+  }
+
+  public void dropColumn(SchemaTableName schemaTableName, String columnName) {
+    String[] columnNames = {columnName};
+    applyAlter(schemaTableName, TableChange.deleteColumn(columnNames, true));
+  }
+
+  public void setColumnComment(SchemaTableName schemaTableName, String columnName, String comment) {
+    String[] columnNames = {columnName};
+    applyAlter(schemaTableName, TableChange.updateColumnComment(columnNames, comment));
+  }
+
+  public void renameColumn(SchemaTableName schemaTableName, String columnName, String target) {
+    if (columnName.equals(target)) {
+      return;
+    }
+    String[] columnNames = {columnName};
+    applyAlter(schemaTableName, TableChange.renameColumn(columnNames, target));
+  }
+
+  public void setColumnType(SchemaTableName schemaTableName, String columnName, Type type) {
+    String[] columnNames = {columnName};
+    applyAlter(
+        schemaTableName,
+        TableChange.updateColumnType(columnNames, DataTypeTransformer.getGravitinoType(type)));
   }
 }

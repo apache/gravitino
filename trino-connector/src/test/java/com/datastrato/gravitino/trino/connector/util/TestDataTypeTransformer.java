@@ -17,7 +17,7 @@ import static io.trino.spi.type.VarbinaryType.VARBINARY;
 import static io.trino.spi.type.VarcharType.VARCHAR;
 import static org.testng.Assert.assertEquals;
 
-import com.datastrato.gravitino.shaded.io.substrait.type.TypeCreator;
+import com.datastrato.gravitino.rel.types.Types;
 import io.trino.spi.TrinoException;
 import org.testng.annotations.Test;
 
@@ -25,39 +25,26 @@ public class TestDataTypeTransformer {
 
   @Test
   public void testGetGravitinoType() {
-    assertEquals(DataTypeTransformer.getGravitinoType(VARCHAR, true), TypeCreator.NULLABLE.STRING);
-    assertEquals(DataTypeTransformer.getGravitinoType(VARCHAR, false), TypeCreator.REQUIRED.STRING);
+    assertEquals(DataTypeTransformer.getGravitinoType(VARCHAR), Types.StringType.get());
 
-    assertEquals(DataTypeTransformer.getGravitinoType(BOOLEAN, true), TypeCreator.NULLABLE.BOOLEAN);
-    assertEquals(
-        DataTypeTransformer.getGravitinoType(BOOLEAN, false), TypeCreator.REQUIRED.BOOLEAN);
+    assertEquals(DataTypeTransformer.getGravitinoType(BOOLEAN), Types.BooleanType.get());
 
-    assertEquals(DataTypeTransformer.getGravitinoType(INTEGER, true), TypeCreator.NULLABLE.I32);
-    assertEquals(DataTypeTransformer.getGravitinoType(INTEGER, false), TypeCreator.REQUIRED.I32);
+    assertEquals(DataTypeTransformer.getGravitinoType(INTEGER), Types.IntegerType.get());
 
-    assertEquals(DataTypeTransformer.getGravitinoType(BIGINT, true), TypeCreator.NULLABLE.I64);
-    assertEquals(DataTypeTransformer.getGravitinoType(BIGINT, false), TypeCreator.REQUIRED.I64);
+    assertEquals(DataTypeTransformer.getGravitinoType(BIGINT), Types.LongType.get());
 
-    assertEquals(DataTypeTransformer.getGravitinoType(DOUBLE, true), TypeCreator.NULLABLE.FP64);
-    assertEquals(DataTypeTransformer.getGravitinoType(DOUBLE, false), TypeCreator.REQUIRED.FP64);
+    assertEquals(DataTypeTransformer.getGravitinoType(DOUBLE), Types.DoubleType.get());
+
+    assertEquals(DataTypeTransformer.getGravitinoType(VARBINARY), Types.BinaryType.get());
+
+    assertEquals(DataTypeTransformer.getGravitinoType(DATE), Types.DateType.get());
 
     assertEquals(
-        DataTypeTransformer.getGravitinoType(VARBINARY, true), TypeCreator.NULLABLE.BINARY);
-    assertEquals(
-        DataTypeTransformer.getGravitinoType(VARBINARY, false), TypeCreator.REQUIRED.BINARY);
-
-    assertEquals(DataTypeTransformer.getGravitinoType(DATE, true), TypeCreator.NULLABLE.DATE);
-    assertEquals(DataTypeTransformer.getGravitinoType(DATE, false), TypeCreator.REQUIRED.DATE);
-
-    assertEquals(
-        DataTypeTransformer.getGravitinoType(TIMESTAMP_SECONDS, true),
-        TypeCreator.NULLABLE.TIMESTAMP);
-    assertEquals(
-        DataTypeTransformer.getGravitinoType(TIMESTAMP_SECONDS, false),
-        TypeCreator.REQUIRED.TIMESTAMP);
+        DataTypeTransformer.getGravitinoType(TIMESTAMP_SECONDS),
+        Types.TimestampType.withoutTimeZone());
 
     try {
-      DataTypeTransformer.getGravitinoType(HYPER_LOG_LOG, true);
+      DataTypeTransformer.getGravitinoType(HYPER_LOG_LOG);
     } catch (TrinoException e) {
       if (e.getErrorCode() != GRAVITINO_UNSUPPORTED_TRINO_DATATYPE.toErrorCode()) {
         throw e;
@@ -67,34 +54,25 @@ public class TestDataTypeTransformer {
 
   @Test
   public void testGetTrinoType() {
-    assertEquals(DataTypeTransformer.getTrinoType(TypeCreator.NULLABLE.STRING), VARCHAR);
-    assertEquals(DataTypeTransformer.getTrinoType(TypeCreator.REQUIRED.STRING), VARCHAR);
+    assertEquals(DataTypeTransformer.getTrinoType(Types.StringType.get()), VARCHAR);
 
-    assertEquals(DataTypeTransformer.getTrinoType(TypeCreator.NULLABLE.BOOLEAN), BOOLEAN);
-    assertEquals(DataTypeTransformer.getTrinoType(TypeCreator.REQUIRED.BOOLEAN), BOOLEAN);
+    assertEquals(DataTypeTransformer.getTrinoType(Types.BooleanType.get()), BOOLEAN);
 
-    assertEquals(DataTypeTransformer.getTrinoType(TypeCreator.NULLABLE.I32), INTEGER);
-    assertEquals(DataTypeTransformer.getTrinoType(TypeCreator.REQUIRED.I32), INTEGER);
+    assertEquals(DataTypeTransformer.getTrinoType(Types.IntegerType.get()), INTEGER);
 
-    assertEquals(DataTypeTransformer.getTrinoType(TypeCreator.NULLABLE.I64), BIGINT);
-    assertEquals(DataTypeTransformer.getTrinoType(TypeCreator.REQUIRED.I64), BIGINT);
+    assertEquals(DataTypeTransformer.getTrinoType(Types.LongType.get()), BIGINT);
 
-    assertEquals(DataTypeTransformer.getTrinoType(TypeCreator.NULLABLE.I64), BIGINT);
-    assertEquals(DataTypeTransformer.getTrinoType(TypeCreator.REQUIRED.I64), BIGINT);
+    assertEquals(DataTypeTransformer.getTrinoType(Types.LongType.get()), BIGINT);
 
-    assertEquals(DataTypeTransformer.getTrinoType(TypeCreator.NULLABLE.FP64), DOUBLE);
-    assertEquals(DataTypeTransformer.getTrinoType(TypeCreator.REQUIRED.FP64), DOUBLE);
+    assertEquals(DataTypeTransformer.getTrinoType(Types.DoubleType.get()), DOUBLE);
 
-    assertEquals(DataTypeTransformer.getTrinoType(TypeCreator.NULLABLE.DATE), DATE);
-    assertEquals(DataTypeTransformer.getTrinoType(TypeCreator.REQUIRED.DATE), DATE);
+    assertEquals(DataTypeTransformer.getTrinoType(Types.DateType.get()), DATE);
 
     assertEquals(
-        DataTypeTransformer.getTrinoType(TypeCreator.NULLABLE.TIMESTAMP), TIMESTAMP_SECONDS);
-    assertEquals(
-        DataTypeTransformer.getTrinoType(TypeCreator.REQUIRED.TIMESTAMP), TIMESTAMP_SECONDS);
+        DataTypeTransformer.getTrinoType(Types.TimestampType.withoutTimeZone()), TIMESTAMP_SECONDS);
 
     try {
-      DataTypeTransformer.getTrinoType(TypeCreator.NULLABLE.BINARY);
+      DataTypeTransformer.getTrinoType(Types.BinaryType.get());
     } catch (TrinoException e) {
       if (e.getErrorCode() != GRAVITINO_UNSUPPORTED_GRAVITINO_DATATYPE.toErrorCode()) {
         throw e;

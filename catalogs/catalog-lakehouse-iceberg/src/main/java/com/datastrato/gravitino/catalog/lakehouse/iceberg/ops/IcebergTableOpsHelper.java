@@ -131,15 +131,21 @@ public class IcebergTableOpsHelper {
   }
 
   private void doUpdateColumnType(
-      UpdateSchema icebergUpdateSchema, UpdateColumnType updateColumnType) {
-    org.apache.iceberg.types.Type type =
-        ConvertUtil.toIcebergType(updateColumnType.getNewDataType());
+      UpdateSchema icebergUpdateSchema,
+      UpdateColumnType updateColumnType,
+      Schema icebergTableSchema) {
+    String fieldName = DOT.join(updateColumnType.fieldNames());
     Preconditions.checkArgument(
-        type.isPrimitiveType(),
-        "Cannot update %s, not a primitive type: %s",
-        DOT.join(updateColumnType.fieldNames()),
-        type);
-    icebergUpdateSchema.updateColumn(DOT.join(updateColumnType.fieldNames()), (PrimitiveType) type);
+        icebergTableSchema.findField(fieldName) != null,
+        "Cannot update missing field: %s",
+        fieldName);
+
+    boolean nullable = icebergTableSchema.findField(fieldName).isOptional();
+    org.apache.iceberg.types.Type type =
+        ConvertUtil.toIcebergType(nullable, updateColumnType.getNewDataType());
+    Preconditions.checkArgument(
+        type.isPrimitiveType(), "Cannot update %s, not a primitive type: %s", fieldName, type);
+    icebergUpdateSchema.updateColumn(fieldName, (PrimitiveType) type);
   }
 
   private ColumnPosition getAddColumnPosition(StructType parent, ColumnPosition columnPosition) {
@@ -159,7 +165,6 @@ public class IcebergTableOpsHelper {
 
   private void doAddColumn(
       UpdateSchema icebergUpdateSchema, AddColumn addColumn, Schema icebergTableSchema) {
-    // todo(xiaojing) check new column is nullable
     String parentName = getParentName(addColumn.fieldNames());
     StructType parentStruct;
     if (parentName != null) {
@@ -177,11 +182,21 @@ public class IcebergTableOpsHelper {
       parentStruct = icebergTableSchema.asStruct();
     }
 
-    icebergUpdateSchema.addColumn(
-        getParentName(addColumn.fieldNames()),
-        getLeafName(addColumn.fieldNames()),
-        ConvertUtil.toIcebergType(addColumn.getDataType()),
-        addColumn.getComment());
+    if (addColumn.isNullable()) {
+      icebergUpdateSchema.addColumn(
+          getParentName(addColumn.fieldNames()),
+          getLeafName(addColumn.fieldNames()),
+          ConvertUtil.toIcebergType(addColumn.isNullable(), addColumn.getDataType()),
+          addColumn.getComment());
+    } else {
+      // TODO: figure out how to enable users to add required columns
+      // icebergUpdateSchema.allowIncompatibleChanges();
+      icebergUpdateSchema.addRequiredColumn(
+          getParentName(addColumn.fieldNames()),
+          getLeafName(addColumn.fieldNames()),
+          ConvertUtil.toIcebergType(addColumn.isNullable(), addColumn.getDataType()),
+          addColumn.getComment());
+    }
 
     ColumnPosition position = getAddColumnPosition(parentStruct, addColumn.getPosition());
     doMoveColumn(icebergUpdateSchema, addColumn.fieldNames(), position);
@@ -218,7 +233,7 @@ public class IcebergTableOpsHelper {
       } else if (change instanceof RenameColumn) {
         doRenameColumn(icebergUpdateSchema, (RenameColumn) change);
       } else if (change instanceof UpdateColumnType) {
-        doUpdateColumnType(icebergUpdateSchema, (UpdateColumnType) change);
+        doUpdateColumnType(icebergUpdateSchema, (UpdateColumnType) change, icebergTableSchema);
       } else if (change instanceof UpdateColumnComment) {
         doUpdateColumnComment(icebergUpdateSchema, (UpdateColumnComment) change);
       } else {

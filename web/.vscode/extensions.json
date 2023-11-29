@@ -1,0 +1,27 @@
+{
+  "recommendations": [
+    "dsznajder.es7-react-js-snippets",
+    "gamunu.vscode-yarn",
+    "jasonnutter.search-node-modules",
+    "mrmlnc.vscode-scss",
+    "syler.sass-indented",
+    "christian-kohler.npm-intellisense",
+    "xabikos.javascriptsnippets",
+    "zignd.html-css-class-completion",
+    "esbenp.prettier-vscode",
+    "dbaeumer.vscode-eslint",
+    "eamodio.gitlens",
+    "kisstkondoros.vscode-codemetrics",
+    "quicktype.quicktype",
+    "streetsidesoftware.code-spell-checker",
+    "editorconfig.editorconfig",
+    "usernamehw.errorlens",
+    "aaron-bond.better-comments",
+    "formulahendry.auto-close-tag",
+    "formulahendry.auto-rename-tag",
+    "yzhang.markdown-all-in-one",
+    "davidanson.vscode-markdownlint",
+    "chakrounanas.turbo-console-log",
+    "planbcoding.vscode-react-refactor",
+  ]
+}

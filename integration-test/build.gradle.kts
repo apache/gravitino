@@ -27,6 +27,7 @@ dependencies {
   implementation(libs.bundles.log4j)
   implementation(libs.bundles.jersey)
   implementation(libs.bundles.jetty)
+  implementation(libs.bundles.jwt)
   implementation(libs.httpclient5)
   implementation(libs.commons.io)
 
@@ -82,12 +83,6 @@ dependencies {
   }
   testImplementation(libs.hadoop2.common) {
     exclude("*")
-  }
-
-  testImplementation(libs.substrait.java.core) {
-    exclude("org.slf4j")
-    exclude("com.fasterxml.jackson.core")
-    exclude("com.fasterxml.jackson.datatype")
   }
 
   testCompileOnly(libs.lombok)
