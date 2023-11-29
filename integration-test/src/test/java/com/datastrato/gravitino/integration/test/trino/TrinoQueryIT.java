@@ -13,6 +13,7 @@ import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.client.GravitinoClient;
 import com.datastrato.gravitino.client.GravitinoMetaLake;
 import com.datastrato.gravitino.rel.SupportsSchemas;
+import com.datastrato.gravitino.rel.TableCatalog;
 import io.trino.cli.Query;
 import io.trino.cli.QueryRunner;
 import io.trino.cli.TerminalUtils;
@@ -56,9 +57,9 @@ public class TrinoQueryIT {
   private static final Logger LOG = LoggerFactory.getLogger(TrinoQueryIT.class);
 
   private static boolean isDockerRunning = false;
-  private static String gravitinoUri = "http://localhost:8090";
-  private static String trinoUri = "http://localhost:8080";
-  private static String hiveMetastoreUri = "thrift://localhost:9083";
+  private static String gravitinoUri = "http://192.168.215.2:8090";
+  private static String trinoUri = "http://192.168.215.2:8080";
+  private static String hiveMetastoreUri = "thrift://192.168.215.2:9083";
 
   private static final String metalakeName = "test";
 
@@ -68,6 +69,7 @@ public class TrinoQueryIT {
   private static AtomicInteger testCount = new AtomicInteger(0);
   private static AtomicInteger totalCount = new AtomicInteger(0);
   static TrinoQueryRunner trinoQueryRunner;
+  private static String targetCatalog = null;
 
   @BeforeAll
   public static void setup() throws Exception {
@@ -78,7 +80,7 @@ public class TrinoQueryIT {
 
       createMetalake();
 
-      {
+      if (targetCatalog == null || targetCatalog.equals("hive")) {
         dropCatalog("hive");
         HashMap<String, String> properties = new HashMap<>();
         properties.put("metastore.uris", hiveMetastoreUri);
@@ -86,7 +88,7 @@ public class TrinoQueryIT {
         createCatalog("hive", "hive", properties);
       }
 
-      {
+      if (targetCatalog == null || targetCatalog.equals("lakehouse-iceberg")) {
         dropCatalog("lakehouse-iceberg");
         HashMap<String, String> properties = new HashMap<>();
         properties.put("uri", hiveMetastoreUri);
@@ -132,7 +134,15 @@ public class TrinoQueryIT {
   }
 
   @AfterAll
-  public static void cleanup() {}
+  public static void cleanup() {
+    trinoQueryRunner.stop();
+    if (targetCatalog == null || targetCatalog.equals("hive")) {
+      dropCatalog("hive");
+    }
+    if (targetCatalog == null || targetCatalog.equals("lakehouse-iceberg")) {
+      dropCatalog("lakehouse-iceberg");
+    }
+  }
 
   private static void createMetalake() {
     boolean exists = client.metalakeExists(NameIdentifier.of(metalakeName));
@@ -192,21 +202,48 @@ public class TrinoQueryIT {
     if (!exists) {
       return;
     }
-    SupportsSchemas schemas =
-        metalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName)).asSchemas();
+    Catalog catalog = metalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
+    SupportsSchemas schemas = catalog.asSchemas();
     Arrays.stream(schemas.listSchemas(Namespace.ofSchema(metalakeName, catalogName)))
         .filter(schema -> !schema.name().equals("default"))
         .forEach(
             schema -> {
               try {
+                TableCatalog tableCatalog = catalog.asTableCatalog();
+                Arrays.stream(
+                        tableCatalog.listTables(
+                            Namespace.ofTable(metalakeName, catalogName, schema.name())))
+                    .forEach(
+                        table -> {
+                          try {
+                            tableCatalog.purgeTable(
+                                NameIdentifier.ofTable(
+                                    metalakeName, catalogName, schema.name(), table.name()));
+                          } catch (UnsupportedOperationException e) {
+                            tableCatalog.dropTable(
+                                NameIdentifier.ofTable(
+                                    metalakeName, catalogName, schema.name(), table.name()));
+                          } catch (Exception e) {
+                            LOG.error("Failed to drop table {}", table);
+                          }
+                          LOG.info(
+                              "Drop table \"{}.{}\".{}.{}",
+                              metalakeName,
+                              catalogName,
+                              schema.name(),
+                              table.name());
+                        });
+
                 schemas.dropSchema(
                     NameIdentifier.ofSchema(metalakeName, catalogName, schema.name()), true);
               } catch (Exception e) {
-                LOG.error("Failed to drop schema {}", schema, e);
+                LOG.error("Failed to drop schema {}", schema);
               }
+              LOG.info("Drop schema \"{}.{}\".{}", metalakeName, catalogName, schema.name());
             });
 
     metalake.dropCatalog(NameIdentifier.of(metalakeName, catalogName));
+    LOG.info("Drop catalog \"{}.{}\"", metalakeName, catalogName);
   }
 
   private String[] readCatalogs() throws Exception {
@@ -328,6 +365,7 @@ public class TrinoQueryIT {
               sql,
               expectResult,
               result);
+          queryRunner.stop();
           Assertions.fail();
         } else {
           LOG.debug(
@@ -345,6 +383,8 @@ public class TrinoQueryIT {
           testCount.get(),
           totalCount.get());
     }
+
+    queryRunner.stop();
   }
 
   static class TrinoQueryRunner {
@@ -383,28 +423,53 @@ public class TrinoQueryIT {
           false);
       return outputStream.toString();
     }
+
+    boolean stop() {
+      try {
+        queryRunner.close();
+        terminal.close();
+        return true;
+      } catch (Exception e) {
+        LOG.error("Failed to stop query runner", e);
+        return false;
+      }
+    }
   }
 
   public static void main(String[] args) {
-    String testId = null;
-    String testDirName = null;
+    String targetTestId = null;
     try {
-      setup();
 
-      if (args.length > 1) {
-        testDirName = args[0];
-        testId = args[1];
-
+      if (args.length == 1) {
+        // e.g.: args = hive
+        // run hive all the test cases
+        targetCatalog = args[0];
+        setup();
         TrinoQueryIT testRunner = new TrinoQueryIT();
-        testRunner.runQueriesAndCheck(testDirName, testId);
-      } else {
+        testRunner.runQueriesAndCheck(targetCatalog, targetTestId);
+
+      } else if (args.length == 2) {
+        // e.g: args = hive 00001
+        // run hive test case 00001
+        targetCatalog = args[0];
+        targetTestId = args[1];
+
+        setup();
+        TrinoQueryIT testRunner = new TrinoQueryIT();
+        testRunner.runQueriesAndCheck(targetCatalog, targetTestId);
+      } else if (args.length == 0) {
+        // e.g.: empty args
+        // run all catalogs all the test cases
+        setup();
         TrinoQueryIT testRunner = new TrinoQueryIT();
         testRunner.testSql();
       }
+
     } catch (Exception e) {
       LOG.error("", e);
     } finally {
       cleanup();
+      System.exit(0);
     }
   }
 }
