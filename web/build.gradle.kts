@@ -56,6 +56,7 @@ tasks {
     dependsOn(buildwar)
   }
   clean {
+    delete("build")
     delete("dist")
   }
 }
