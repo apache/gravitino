@@ -485,16 +485,19 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
               if (c instanceof TableChange.AddColumn) {
                 TableChange.AddColumn addColumn = (TableChange.AddColumn) c;
 
-                if ((addColumn.getPosition() == null && !partitionFields.isEmpty())
-                    || (afterPartitionColumn(partitionFields, addColumn.getPosition()))) {
-                  throw new IllegalArgumentException("Cannot add column after partition column");
-                }
-
                 if (existingFields.contains(fieldToAdd)) {
                   throw new IllegalArgumentException(
                       "Cannot add column with duplicate name: " + fieldToAdd);
-                } else {
-                  existingFields.add(fieldToAdd);
+                }
+
+                if (addColumn.getPosition() == null) {
+                  // If the position is not specified, the column will be added to the end of the
+                  // non-partition columns.
+                  return;
+                }
+
+                if ((afterPartitionColumn(partitionFields, addColumn.getPosition()))) {
+                  throw new IllegalArgumentException("Cannot add column after partition column");
                 }
               }
             });
