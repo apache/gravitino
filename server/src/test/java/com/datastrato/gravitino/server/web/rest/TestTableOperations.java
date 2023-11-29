@@ -513,10 +513,11 @@ public class TestTableOperations extends JerseyTest {
             new String[] {"col3"},
             Types.StringType.get(),
             "mock comment",
-            TableChange.ColumnPosition.first());
+            TableChange.ColumnPosition.first(),
+            false);
     Column[] columns =
         new Column[] {
-          mockColumn("col3", Types.StringType.get()),
+          mockColumn("col3", Types.StringType.get(), false),
           mockColumn("col1", Types.StringType.get()),
           mockColumn("col2", Types.ByteType.get())
         };
@@ -532,7 +533,8 @@ public class TestTableOperations extends JerseyTest {
             new String[] {"col1"},
             Types.StringType.get(),
             "mock comment",
-            TableChange.ColumnPosition.after("col2"));
+            TableChange.ColumnPosition.after("col2"),
+            true);
     Column[] columns =
         new Column[] {
           mockColumn("col1", Types.StringType.get()),
@@ -578,8 +580,7 @@ public class TestTableOperations extends JerseyTest {
             new String[] {"col1"}, "new comment");
     Column[] columns =
         new Column[] {
-          mockColumn("col1", Types.StringType.get(), "new comment"),
-          mockColumn("col2", Types.ByteType.get())
+          mockColumn("col1", Types.StringType.get()), mockColumn("col2", Types.ByteType.get())
         };
     Table table =
         mockTable("table1", columns, "mock comment", ImmutableMap.of("k1", "v1"), new Transform[0]);
@@ -760,14 +761,19 @@ public class TestTableOperations extends JerseyTest {
   }
 
   private static Column mockColumn(String name, Type type) {
-    return mockColumn(name, type, "mock comment");
+    return mockColumn(name, type, true);
   }
 
-  private static Column mockColumn(String name, Type type, String comment) {
+  private static Column mockColumn(String name, Type type, boolean nullable) {
+    return mockColumn(name, type, "mock comment", nullable);
+  }
+
+  private static Column mockColumn(String name, Type type, String comment, boolean nullable) {
     Column column = mock(Column.class);
     when(column.name()).thenReturn(name);
     when(column.dataType()).thenReturn(type);
     when(column.comment()).thenReturn(comment);
+    when(column.nullable()).thenReturn(nullable);
     return column;
   }
 

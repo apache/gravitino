@@ -450,23 +450,26 @@ public class TestHiveTable extends MiniHiveMetastoreService {
                         TableChange.updateColumnPosition(new String[] {"col_1"}, null)));
     Assertions.assertTrue(exception.getMessage().contains("Column position cannot be null"));
 
-    // TODO(minghuang): Uncomment below test after we support nullable in TableChange.addColumn
-    //    exception =
-    //        Assertions.assertThrows(
-    //            IllegalArgumentException.class,
-    //            () ->
-    //                hiveCatalog
-    //                    .asTableCatalog()
-    //                    .alterTable(
-    //                        tableIdentifier,
-    //                        TableChange.addColumn(new String[] {"col_3"},
-    // Types.ByteType.get())));
-    //    Assertions.assertTrue(
-    //        exception
-    //            .getMessage()
-    //            .contains(
-    //                "The NOT NULL constraint for column is only supported since Hive 3.0, "
-    //                    + "but the current Gravitino Hive catalog only supports Hive 2.x"));
+    exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                hiveCatalog
+                    .asTableCatalog()
+                    .alterTable(
+                        tableIdentifier,
+                        TableChange.addColumn(
+                            new String[] {"col_3"},
+                            Types.ByteType.get(),
+                            null,
+                            TableChange.ColumnPosition.first(),
+                            false)));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains(
+                "The NOT NULL constraint for column is only supported since Hive 3.0, "
+                    + "but the current Gravitino Hive catalog only supports Hive 2.x"));
 
     exception =
         Assertions.assertThrows(

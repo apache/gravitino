@@ -33,7 +33,7 @@ public interface OAuthConfig extends Configs {
           .doc("The sign key of jwt when Gravitino uses oauth as the authenticator")
           .version("0.3.0")
           .stringConf()
-          .createWithDefault(null);
+          .createWithDefault("");
 
   ConfigEntry<String> SIGNATURE_ALGORITHM_TYPE =
       new ConfigBuilder(OAUTH_CONFIG_PREFIX + "signAlgorithmType")

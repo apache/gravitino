@@ -695,7 +695,7 @@ public class TestRelationalCatalog extends TestBase {
     ColumnDTO[] columns =
         new ColumnDTO[] {
           createMockColumn("col1", Types.ByteType.get(), "comment1"),
-          createMockColumn("col2", Types.StringType.get(), "comment2")
+          createMockColumn("col2", Types.StringType.get(), "comment2", false)
         };
 
     DistributionDTO distributionDTO = createMockDistributionDTO("col2", 10);
@@ -716,7 +716,8 @@ public class TestRelationalCatalog extends TestBase {
             new String[] {"col2"},
             Types.StringType.get(),
             "comment2",
-            TableChange.ColumnPosition.after("col1"));
+            TableChange.ColumnPosition.after("col1"),
+            false);
 
     testAlterTable(tableId, req, expectedTable);
   }
@@ -947,7 +948,17 @@ public class TestRelationalCatalog extends TestBase {
   }
 
   private static ColumnDTO createMockColumn(String name, Type type, String comment) {
-    return new ColumnDTO.Builder<>().withName(name).withDataType(type).withComment(comment).build();
+    return createMockColumn(name, type, comment, true);
+  }
+
+  private static ColumnDTO createMockColumn(
+      String name, Type type, String comment, boolean nullable) {
+    return new ColumnDTO.Builder<>()
+        .withName(name)
+        .withDataType(type)
+        .withComment(comment)
+        .withNullable(nullable)
+        .build();
   }
 
   private static TableDTO createMockTable(
