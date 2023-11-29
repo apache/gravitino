@@ -57,9 +57,9 @@ public class TrinoQueryIT {
   private static final Logger LOG = LoggerFactory.getLogger(TrinoQueryIT.class);
 
   private static boolean isDockerRunning = false;
-  private static String gravitinoUri = "http://192.168.215.2:8090";
-  private static String trinoUri = "http://192.168.215.2:8080";
-  private static String hiveMetastoreUri = "thrift://192.168.215.2:9083";
+  private static String gravitinoUri = "http://127.0.0.1:8090";
+  private static String trinoUri = "http://127.0.0.1:8080";
+  private static String hiveMetastoreUri = "thrift://127.0.0.1:9083";
 
   private static final String metalakeName = "test";
 
@@ -136,12 +136,6 @@ public class TrinoQueryIT {
   @AfterAll
   public static void cleanup() {
     trinoQueryRunner.stop();
-    if (targetCatalog == null || targetCatalog.equals("hive")) {
-      dropCatalog("hive");
-    }
-    if (targetCatalog == null || targetCatalog.equals("lakehouse-iceberg")) {
-      dropCatalog("lakehouse-iceberg");
-    }
   }
 
   private static void createMetalake() {
@@ -368,7 +362,7 @@ public class TrinoQueryIT {
           queryRunner.stop();
           Assertions.fail();
         } else {
-          LOG.debug(
+          LOG.info(
               "Test {} success.\nSql:\n{};\nExpect:\n{}\nActual:\n{}",
               testDirName + testFileName.substring(testFileName.lastIndexOf('/')),
               sql,
