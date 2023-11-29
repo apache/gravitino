@@ -8,7 +8,7 @@ import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorMetadata
 import io.trino.spi.session.PropertyMetadata;
 import java.util.List;
 
-/** Support trino iceberg connector for testing. */
+/** Transforming gravitino Iceberg metadata to trino. */
 public class IcebergMetadataAdapter extends CatalogConnectorMetadataAdapter {
 
   public IcebergMetadataAdapter(

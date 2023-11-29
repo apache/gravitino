@@ -33,6 +33,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.CompletionService;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -49,6 +52,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.mortbay.log.Log;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -257,32 +261,34 @@ public class TrinoQueryIT {
     String[] catalogNames = readCatalogs();
 
     ExecutorService executor = Executors.newFixedThreadPool(catalogNames.length);
-    Thread.setDefaultUncaughtExceptionHandler(
-        (t, e) -> {
-          executor.shutdownNow();
-        });
+    CompletionService completionService = new ExecutorCompletionService<>(executor);
 
-    List<Future<?>> futures = new ArrayList<>();
-    for (String catalogName : catalogNames) {
+    List<Future<Integer>> futures = new ArrayList<>();
+    for (int i = 0; i < catalogNames.length; i++) {
+      int finalI = i;
       futures.add(
-          executor.submit(
+          completionService.submit(
               () -> {
                 try {
-                  runQueriesAndCheck(catalogName, null);
-                } catch (Throwable t) {
-                  throw new RuntimeException(t);
+                  runQueriesAndCheck(catalogNames[finalI], null);
+                } catch (Exception e) {
+                  throw new RuntimeException(e);
                 }
+                LOG.debug("Catalog {} test run completed", catalogNames[finalI]);
+                return finalI;
               }));
     }
-
-    for (Future<?> future : futures) {
+    for (int i = 0; i < catalogNames.length; i++) {
       try {
-        future.get();
-      } catch (Exception e) {
-        LOG.error("Test Failed", e);
+        Future<Integer> completedTask = completionService.take();
+        Integer taskId = completedTask.get();
+      } catch (InterruptedException | ExecutionException e) {
+        LOG.error("Test Failed: ", e);
         Assertions.fail();
       }
     }
+
+    Log.info("All tests completed");
     executor.shutdownNow();
     executor.awaitTermination(3, TimeUnit.SECONDS);
   }
@@ -290,18 +296,17 @@ public class TrinoQueryIT {
   private String[] loadAllTestFiles(String dirName, String filterPrefix) {
     String targetDir = testQueriesDir + "/" + dirName;
     File targetDirFile = new File(targetDir);
-    String[] files = null;
-    if (targetDirFile.exists()) {
-      if (filterPrefix != null) {
-        files = targetDirFile.list((dir, name) -> name.startsWith(filterPrefix));
-        totalCount.addAndGet(files.length / 2);
-        return files;
-      }
-      files = targetDirFile.list();
-      totalCount.addAndGet(files.length / 2);
-      return files;
+    if (!targetDirFile.exists()) {
+      return new String[0];
     }
-    return new String[0];
+
+    String[] files =
+        Arrays.stream(targetDirFile.list())
+            .filter(name -> filterPrefix == null || name.startsWith(filterPrefix))
+            .toArray(String[]::new);
+
+    totalCount.addAndGet(files.length / 2);
+    return files;
   }
 
   private String readFileToString(String filename) throws IOException {
@@ -352,7 +357,14 @@ public class TrinoQueryIT {
           match = expectResult.trim().equals(result.trim());
         }
 
-        if (!match) {
+        if (match) {
+          LOG.info(
+              "Test {} success.\nSql:\n{};\nExpect:\n{}\nActual:\n{}",
+              testDirName + testFileName.substring(testFileName.lastIndexOf('/')),
+              sql,
+              expectResult,
+              result);
+        } else {
           LOG.error(
               "Test {} failed for query.\nSql:\n{}\nExpect:\n{}\nActual:\n{}",
               testDirName + testFileName.substring(testFileName.lastIndexOf('/')),
@@ -361,13 +373,6 @@ public class TrinoQueryIT {
               result);
           queryRunner.stop();
           Assertions.fail();
-        } else {
-          LOG.info(
-              "Test {} success.\nSql:\n{};\nExpect:\n{}\nActual:\n{}",
-              testDirName + testFileName.substring(testFileName.lastIndexOf('/')),
-              sql,
-              expectResult,
-              result);
         }
       }
       testCount.incrementAndGet();
@@ -377,6 +382,7 @@ public class TrinoQueryIT {
           testCount.get(),
           totalCount.get());
     }
+    queryRunner.stop();
   }
 
   static class TrinoQueryRunner {
