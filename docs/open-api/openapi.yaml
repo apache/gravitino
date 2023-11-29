@@ -1,0 +1,98 @@
+#
+# Copyright 2023 Datastrato.
+# This software is licensed under the Apache License version 2.
+#
+
+---
+openapi: 3.0.3
+info:
+  title: Gravitino REST API
+  license:
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0.html
+  version: 0.0.1
+  description: |
+    Defines the specification for the first version of the Gravitino REST API.
+
+servers:
+  - url: "{scheme}://{host}:{port}/{basePath}"
+    description: Generic base server URL, with all parts configurable.
+    variables:
+      scheme:
+        description: The scheme of the URI, either http or https.
+        default: http
+      host:
+        description: The host address for the specified server
+        default: localhost
+      port:
+        description: The port used when addressing the host
+        default: "8090"
+      basePath:
+        description: Optional prefix to be appended to all routes
+        default: "api"
+
+security:
+  - BearerAuth: []
+
+paths:
+  /metalakes:
+    # escape the path name by replacing `/` with `~1`
+    $ref: "./metalakes.yaml#/paths/~1metalakes"
+
+  /metalakes/{name}:
+    # escape the path name by replacing `{ }` with `%7B %7D`
+    $ref: "./metalakes.yaml#/paths/~1metalakes~1%7Bname%7D"
+
+components:
+
+  schemas:
+
+    Audit:
+      type: object
+      description: Audit information for a Gravitino resource.
+      properties:
+        creator:
+          type: string
+          description: The user who created the resource
+        createTime:
+          type: string
+          format: date-time
+          description: The time the resource was created
+        lastModifier:
+          type: string
+          description: The user who last modified the resource
+        lastModifiedTime:
+          type: string
+          format: date-time
+          description: The time the resource was last modified
+
+    ErrorModel:
+      type: object
+      description: JSON error payload returned in a response with further details on the error
+      required:
+        - message
+        - type
+        - code
+      properties:
+        code:
+          type: integer
+          minimum: 1000
+          maximum: 1100
+          description: HTTP response code
+          example: 1002
+        type:
+          type: string
+          description: Internal type definition of the error
+        message:
+          type: string
+          description: A human-readable message
+        stack:
+          type: array
+          items:
+            type: string
+
+  securitySchemes:
+    # todo: add OAuth2 security schema
+    BearerAuth:
+      type: http
+      scheme: bearer
