@@ -141,10 +141,10 @@ fun printDockerCheckInfo() {
   println("------------------ Check Docker environment ---------------------")
   println("Docker server status ............................................ [${if (dockerRunning) "running" else "stop"}]")
   println("Gravitino IT Docker container is already running ................ [${if (hiveContainerRunning) "yes" else "no"}]")
-  if (!EXCLUDE_TRINO_TEST) {
+  if (EXCLUDE_TRINO_TEST) {
     println("Run test cases without `gravitino-trino-it` tag ................. [$testMode test]")
   }
-  if (EXCLUDE_DOCKER_TEST) {
+  if (!EXCLUDE_DOCKER_TEST) {
     println("Using Gravitino IT Docker container to run all integration tests. [$testMode test]")
   } else {
     println("Run test cases without `gravitino-docker-it` tag ................ [$testMode test]")
@@ -264,7 +264,7 @@ tasks.test {
           println("${redColor}Gravitino-docker is not running locally, all integration test cases tagged with 'gravitino-docker-it' will be excluded.${resetColor}")
           excludeTags("gravitino-docker-it")
         }
-        if (EXCLUDE_TRINO_TEST && OperatingSystem.current().isMacOsX()) {
+        if (EXCLUDE_TRINO_TEST) {
           val redColor = "\u001B[31m"
           val resetColor = "\u001B[0m"
           println("${redColor}mac-docker-connector is not running locally, all integration test cases tagged with 'gravitino-trino-it' will be excluded.${resetColor}")
