@@ -9,10 +9,10 @@ WITH (
   format = 'TEXTFILE'
 );
 
-alter table "test.hive".db1.tb01 rename to "test.hive".db1.tb02;
+alter table "test.hive".db1.tb01 rename to "test.hive".db1.tb03;
 show tables from "test.hive".db1;
 
-alter table "test.hive".db1.tb02 rename to "test.hive".db1.tb01;
+alter table "test.hive".db1.tb03 rename to "test.hive".db1.tb01;
 show tables from "test.hive".db1;
 
 alter table "test.hive".db1.tb01 drop column city;

@@ -13,6 +13,17 @@ INSERT: 2 rows
 "sam","11"
 "tom","12"
 
+CREATE TABLE
+
+INSERT: 4 rows
+
+"bob","14"
+"jerry","13"
+"sam","11"
+"tom","12"
+
+DROP TABLE
+
 DROP TABLE
 
 DROP SCHEMA
