@@ -45,6 +45,22 @@ class TestKvGarbageCollector {
   }
 
   @Test
+  void testScheduler() {
+    Config config = getConfig();
+    Mockito.when(config.get(KV_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L); // 20 minutes
+    long dateTimeLineMinute = config.get(KV_DELETE_AFTER_TIME) / 1000 / 60;
+    Assertions.assertEquals(10, Math.max(dateTimeLineMinute / 10, 10));
+
+    Mockito.when(config.get(KV_DELETE_AFTER_TIME)).thenReturn(2 * 60 * 60 * 1000L); // 2 hours
+    dateTimeLineMinute = config.get(KV_DELETE_AFTER_TIME) / 1000 / 60;
+    Assertions.assertEquals(12, Math.max(dateTimeLineMinute / 10, 10));
+
+    Mockito.when(config.get(KV_DELETE_AFTER_TIME)).thenReturn(2 * 60 * 60 * 24 * 1000L); // 2 days
+    dateTimeLineMinute = config.get(KV_DELETE_AFTER_TIME) / 1000 / 60;
+    Assertions.assertEquals(288, Math.max(dateTimeLineMinute / 10, 10));
+  }
+
+  @Test
   void testCollectGarbage() throws IOException, InterruptedException {
     Config config = getConfig();
     try (KvBackend kvBackend = getKvBackEnd(config)) {

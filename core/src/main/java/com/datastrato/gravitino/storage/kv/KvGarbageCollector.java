@@ -53,15 +53,23 @@ public final class KvGarbageCollector implements Closeable {
     long deleteTimeLine = config.get(KV_DELETE_AFTER_TIME);
     if (deleteTimeLine > MAX_DELETE_TIME_ALLOW || deleteTimeLine < MIN_DELETE_TIME_ALLOW) {
       throw new IllegalArgumentException(
-          "The delete time line is too long or too short, "
-              + "please check it. The delete time line is "
-              + deleteTimeLine
-              + " ms");
+          String.format(
+              "The delete time line is too long or too short, "
+                  + "please check it. The delete time line is %s ms,"
+                  + "max delete time allow is %s ms(30 days),"
+                  + "min delete time allow is %s ms(10 minutes)",
+              deleteTimeLine, MAX_DELETE_TIME_ALLOW, MIN_DELETE_TIME_ALLOW));
     }
   }
 
   public void start() {
-    garbageCollectorPool.scheduleAtFixedRate(this::collectAndClean, 5, 10, TimeUnit.MINUTES);
+    long dateTimeLineMinute = config.get(KV_DELETE_AFTER_TIME) / 1000 / 60;
+
+    // We will collect garbage every 10 minutes at least. If the dateTimeLineMinute is larger than
+    // 100
+    // minutes, we would collect garbage every dateTimeLineMinute/10 minutes.
+    long frequency = Math.max(dateTimeLineMinute / 10, 10);
+    garbageCollectorPool.scheduleAtFixedRate(this::collectAndClean, 5, frequency, TimeUnit.MINUTES);
   }
 
   @VisibleForTesting
