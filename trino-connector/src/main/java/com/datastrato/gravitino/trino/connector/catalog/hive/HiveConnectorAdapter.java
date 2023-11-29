@@ -9,15 +9,19 @@ import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorMetadata
 import com.datastrato.gravitino.trino.connector.catalog.HasPropertyMeta;
 import com.datastrato.gravitino.trino.connector.catalog.PropertyConverter;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoCatalog;
+import com.google.common.collect.Maps;
 import io.trino.spi.session.PropertyMetadata;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** Transforming Hive connector configuration and components into Gravitino connector. */
 public class HiveConnectorAdapter implements CatalogConnectorAdapter {
 
+  private static final Logger LOG = LoggerFactory.getLogger(HiveConnectorAdapter.class);
   private final HasPropertyMeta propertyMetadata;
   private final PropertyConverter catalogConverter;
 
@@ -35,7 +39,17 @@ public class HiveConnectorAdapter implements CatalogConnectorAdapter {
     properties.put("hive.metastore.uri", catalog.getProperties("metastore.uris", ""));
     Map<String, String> trinoProperty =
         catalogConverter.toTrinoProperties(catalog.getCatalog().properties());
-    properties.putAll(trinoProperty);
+
+    // Trino only supports properties that define in catalogPropertyMeta
+    Map<String, PropertyMetadata<?>> catalogPropertyMeta =
+        Maps.uniqueIndex(
+            propertyMetadata.getCatalogPropertyMeta(),
+            propertyMetadata -> propertyMetadata.getName().replace("_", "."));
+
+    trinoProperty.entrySet().stream()
+        .filter(entry -> catalogPropertyMeta.containsKey(entry.getKey()))
+        .forEach(entry -> properties.put(entry.getKey(), entry.getValue()));
+
     config.put("properties", properties);
     return config;
   }

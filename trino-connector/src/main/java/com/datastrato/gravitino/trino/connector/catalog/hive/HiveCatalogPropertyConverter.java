@@ -16,6 +16,7 @@ public class HiveCatalogPropertyConverter implements PropertyConverter {
   private static final TreeBidiMap<String, String> TRINO_HIVE_TO_GRAVITINO_HIVE =
       new TreeBidiMap<>(
           new ImmutableMap.Builder<String, String>()
+              // Key is the trino property, value is the gravitino property
               .put("hive.storage-format", "hive.storage-format")
               .put("hive.compression-codec", "hive.compression-codec")
               .build());
@@ -24,10 +25,11 @@ public class HiveCatalogPropertyConverter implements PropertyConverter {
   public Map<String, String> toTrinoProperties(Map<String, String> properties) {
     ImmutableMap.Builder<String, String> builder = ImmutableMap.builder();
     for (Map.Entry<String, String> entry : properties.entrySet()) {
-      if (TRINO_HIVE_TO_GRAVITINO_HIVE.containsKey(entry.getKey())) {
-        builder.put(TRINO_HIVE_TO_GRAVITINO_HIVE.get(entry.getKey()), entry.getValue());
+      if (TRINO_HIVE_TO_GRAVITINO_HIVE.inverseBidiMap().containsKey(entry.getKey())) {
+        builder.put(
+            TRINO_HIVE_TO_GRAVITINO_HIVE.inverseBidiMap().get(entry.getKey()), entry.getValue());
       } else {
-        // If not recognized, just put it back...
+        // Let other properties pass through
         builder.put(entry.getKey(), entry.getValue());
       }
     }
