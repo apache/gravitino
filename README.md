@@ -49,11 +49,6 @@ Or:
 
 to build a compressed distribution package.
 
-Note:
-
-1. Build Gravitino against JDK8 and ensure that you have installed JDK8 in your environment.
-2. Build the Gravitino trino-connector against JDK17 and ensure that you have installed JDK17 in your environment.
-
 For the details of building and testing Gravitino, please see [How to build Gravitino](docs/how-to-build.md).
 
 ## Quick start
