@@ -8,10 +8,23 @@ This software is licensed under the Apache License version 2."
 
 ## Prerequisites
 
-+ JDK 1.8 and JDK 1.17, **set JDK 1.8 as the default JDK**.
++ Linux or macOS operating system
 + Git
++ A JDK8 or later version installed in your environment to launch Gradle
++ Docker (optional) to run integration tests
 
-Note: Gravitino uses Java 1.8 and Trino uses Java 1.17.
+Note:
+
+* Gravitino itself uses JDK8 to build, Gravitino Trino connector uses JDK17 to build. You don't 
+  have to preinstall JDK8 or JDK17, Gradle will detect the JDK version and download it automatically.
+* Gravitino uses Gradle Java Toolchain to detect and manage JDK version, you can check the 
+  installed JDK by running `./gradlew javaToolchains` command. For the details of Gradle Java 
+  Toolchain, please see [Gradle Java Toolchain](https://docs.gradle.org/current/userguide/toolchains.html#sec:java_toolchain).
+* Gravitino uses Docker to run integration tests, please make sure you have installed Docker in 
+  your environment, otherwise some docker related tests will be skipped.
+* On macOS, we will use "docker-connector" to make the Gravitino Trino connector work with Docker 
+  for Mac. For the details of "docker-connector", please see [docker-connector](https://github.com/wenjunxiao/mac-docker-connector) 
+  and [here](../dev/docker/tools/README.md).
 
 ## Quick Start
 

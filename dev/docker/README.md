@@ -11,10 +11,23 @@ It can be utilized to test all catalog and connector modules within Gravitino.
 
 ## How to build Docker image
 ```
-./build-docker.sh --platform [all|linux/amd64|linux/arm64] --type [hive|trino] --image {image_name} --tag {tag_name} --latest
+./build-docker.sh --platform [all|linux/amd64|linux/arm64] --type [gravitino|hive|trino] --image {image_name} --tag {tag_name} --latest
 ```
 
 # Version change history
+
+## Gravitino
+
+### Container startup commands
+```
+docker run --rm -d -p 8090:8090 datastrato/gravitino
+```
+
+### 0.3.0-SNAPSHOT
+- Gravitino Server
+- Expose ports:
+  - `8090` Gravitino Web UI
+
 ## Gravitino CI Hive
 
 ### Container startup commands

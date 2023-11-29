@@ -242,6 +242,19 @@ public class TestIcebergTableUpdate {
                   firstField, Types.IntegerType.get(), "", ColumnPosition.after("not_exits"));
           updateTable(identifier, addColumn1);
         });
+
+    // add required column
+    IllegalArgumentException exception =
+        Assertions.assertThrowsExactly(
+            IllegalArgumentException.class,
+            () -> {
+              TableChange addColumn1 =
+                  TableChange.addColumn(
+                      new String[] {"required_column"}, Types.IntegerType.get(), false);
+              updateTable(identifier, addColumn1);
+            });
+    Assertions.assertTrue(
+        exception.getMessage().contains("Incompatible change: cannot add required column:"));
   }
 
   @Test
