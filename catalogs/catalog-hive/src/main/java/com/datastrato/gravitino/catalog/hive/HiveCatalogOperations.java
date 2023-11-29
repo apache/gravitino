@@ -554,7 +554,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     validatePartitionForCreate(columns, partitioning);
     validateDistributionAndSort(distribution, sortOrders);
 
-    Arrays.stream(columns).forEach(this::validateColumnType);
+    Arrays.stream(columns).forEach(c -> validateNullable(c.name(), c.nullable()));
 
     TableType tableType = (TableType) tablePropertiesMetadata.getOrDefault(properties, TABLE_TYPE);
     Preconditions.checkArgument(
@@ -649,7 +649,9 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
           List<FieldSchema> cols = sd.getCols();
 
           if (change instanceof TableChange.AddColumn) {
-            doAddColumn(cols, (TableChange.AddColumn) change);
+            TableChange.AddColumn addColumn = (TableChange.AddColumn) change;
+            validateNullable(String.join(".", addColumn.fieldNames()), addColumn.isNullable());
+            doAddColumn(cols, addColumn);
 
           } else if (change instanceof TableChange.DeleteColumn) {
             doDeleteColumn(cols, (TableChange.DeleteColumn) change);
@@ -706,14 +708,14 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     }
   }
 
-  private void validateColumnType(Column column) {
+  private void validateNullable(String fieldName, boolean nullable) {
     // The NOT NULL constraint for column is supported since Hive3.0, see
     // https://issues.apache.org/jira/browse/HIVE-16575
-    if (!column.nullable()) {
+    if (!nullable) {
       throw new IllegalArgumentException(
           "The NOT NULL constraint for column is only supported since Hive 3.0, "
               + "but the current Gravitino Hive catalog only supports Hive 2.x. Illegal column: "
-              + column.name());
+              + fieldName);
     }
   }
 
@@ -778,7 +780,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
         targetPosition,
         new FieldSchema(
             change.fieldNames()[0],
-            change.getDataType().accept(ToHiveType.INSTANCE).getQualifiedName(),
+            ToHiveType.convert(change.getDataType()).getQualifiedName(),
             change.getComment()));
   }
 
@@ -826,8 +828,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     if (indexOfColumn == -1) {
       throw new IllegalArgumentException("UpdateColumnType does not exist: " + columnName);
     }
-    cols.get(indexOfColumn)
-        .setType(change.getNewDataType().accept(ToHiveType.INSTANCE).getQualifiedName());
+    cols.get(indexOfColumn).setType(ToHiveType.convert(change.getNewDataType()).getQualifiedName());
   }
 
   /**

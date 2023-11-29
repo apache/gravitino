@@ -13,11 +13,6 @@ plugins {
 
 dependencies {
   implementation(libs.protobuf.java)
-  implementation(libs.substrait.java.core) {
-    exclude("org.slf4j")
-    exclude("com.fasterxml.jackson.core")
-    exclude("com.fasterxml.jackson.datatype")
-  }
 }
 
 sourceSets {

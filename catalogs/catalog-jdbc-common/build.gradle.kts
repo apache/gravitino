@@ -24,14 +24,6 @@ dependencies {
     implementation(libs.commons.lang3)
     implementation(libs.commons.collections4)
     implementation(libs.commons.dbcp2)
-    implementation(libs.substrait.java.core) {
-        exclude("com.fasterxml.jackson.core")
-        exclude("com.fasterxml.jackson.datatype")
-        exclude("com.fasterxml.jackson.dataformat")
-        exclude("com.google.protobuf")
-        exclude("com.google.code.findbugs")
-        exclude("org.slf4j")
-    }
 
     testImplementation(libs.commons.io)
     testImplementation(libs.sqlite.jdbc)

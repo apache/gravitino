@@ -68,7 +68,7 @@ public class ToIcebergType extends ToIcebergTypeVisitor<Type> {
   }
 
   @Override
-  public Type array(io.substrait.type.Type.ListType array, Type elementType) {
+  public Type array(com.datastrato.gravitino.rel.types.Types.ListType array, Type elementType) {
     if (nullable) {
       return Types.ListType.ofOptional(getNextId(), elementType);
     } else {
@@ -77,7 +77,8 @@ public class ToIcebergType extends ToIcebergTypeVisitor<Type> {
   }
 
   @Override
-  public Type map(io.substrait.type.Type.Map map, Type keyType, Type valueType) {
+  public Type map(
+      com.datastrato.gravitino.rel.types.Types.MapType map, Type keyType, Type valueType) {
     if (nullable) {
       return Types.MapType.ofOptional(getNextId(), getNextId(), keyType, valueType);
     } else {
@@ -86,39 +87,43 @@ public class ToIcebergType extends ToIcebergTypeVisitor<Type> {
   }
 
   @Override
-  public Type atomic(io.substrait.type.Type primitive) {
-    if (primitive instanceof io.substrait.type.Type.Bool) {
+  public Type atomic(com.datastrato.gravitino.rel.types.Type.PrimitiveType primitive) {
+    if (primitive instanceof com.datastrato.gravitino.rel.types.Types.BooleanType) {
       return Types.BooleanType.get();
-    } else if (primitive instanceof io.substrait.type.Type.I8
-        || primitive instanceof io.substrait.type.Type.I16
-        || primitive instanceof io.substrait.type.Type.I32) {
+    } else if (primitive instanceof com.datastrato.gravitino.rel.types.Types.ByteType
+        || primitive instanceof com.datastrato.gravitino.rel.types.Types.ShortType) {
+      throw new IllegalArgumentException(
+          "Iceberg do not support Byte and Short Type, use Integer instead");
+    } else if (primitive instanceof com.datastrato.gravitino.rel.types.Types.IntegerType) {
       return Types.IntegerType.get();
-    } else if (primitive instanceof io.substrait.type.Type.I64) {
+    } else if (primitive instanceof com.datastrato.gravitino.rel.types.Types.LongType) {
       return Types.LongType.get();
-    } else if (primitive instanceof io.substrait.type.Type.FP32) {
+    } else if (primitive instanceof com.datastrato.gravitino.rel.types.Types.FloatType) {
       return Types.FloatType.get();
-    } else if (primitive instanceof io.substrait.type.Type.FP64) {
+    } else if (primitive instanceof com.datastrato.gravitino.rel.types.Types.DoubleType) {
       return Types.DoubleType.get();
-    } else if (primitive instanceof io.substrait.type.Type.Str
-        || primitive instanceof io.substrait.type.Type.VarChar) {
+    } else if (primitive instanceof com.datastrato.gravitino.rel.types.Types.StringType) {
       return Types.StringType.get();
-    } else if (primitive instanceof io.substrait.type.Type.Date) {
+    } else if (primitive instanceof com.datastrato.gravitino.rel.types.Types.DateType) {
       return Types.DateType.get();
-    } else if (primitive instanceof io.substrait.type.Type.Time) {
+    } else if (primitive instanceof com.datastrato.gravitino.rel.types.Types.TimeType) {
       return Types.TimeType.get();
-    } else if (primitive instanceof io.substrait.type.Type.TimestampTZ) {
-      return Types.TimestampType.withZone();
-    } else if (primitive instanceof io.substrait.type.Type.Timestamp) {
-      return Types.TimestampType.withoutZone();
-    } else if (primitive instanceof io.substrait.type.Type.Decimal) {
+    } else if (primitive instanceof com.datastrato.gravitino.rel.types.Types.TimestampType) {
+      if (((com.datastrato.gravitino.rel.types.Types.TimestampType) primitive).hasTimeZone()) {
+        return Types.TimestampType.withZone();
+      } else {
+        return Types.TimestampType.withoutZone();
+      }
+    } else if (primitive instanceof com.datastrato.gravitino.rel.types.Types.DecimalType) {
       return Types.DecimalType.of(
-          ((io.substrait.type.Type.Decimal) primitive).precision(),
-          ((io.substrait.type.Type.Decimal) primitive).scale());
-    } else if (primitive instanceof io.substrait.type.Type.FixedChar) {
-      return Types.FixedType.ofLength(((io.substrait.type.Type.FixedChar) primitive).length());
-    } else if (primitive instanceof io.substrait.type.Type.Binary) {
+          ((com.datastrato.gravitino.rel.types.Types.DecimalType) primitive).precision(),
+          ((com.datastrato.gravitino.rel.types.Types.DecimalType) primitive).scale());
+    } else if (primitive instanceof com.datastrato.gravitino.rel.types.Types.FixedType) {
+      return Types.FixedType.ofLength(
+          ((com.datastrato.gravitino.rel.types.Types.FixedType) primitive).length());
+    } else if (primitive instanceof com.datastrato.gravitino.rel.types.Types.BinaryType) {
       return Types.BinaryType.get();
-    } else if (primitive instanceof io.substrait.type.Type.UUID) {
+    } else if (primitive instanceof com.datastrato.gravitino.rel.types.Types.UUIDType) {
       return Types.UUIDType.get();
     }
     throw new UnsupportedOperationException("Not a supported type: " + primitive.toString());

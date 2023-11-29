@@ -4,8 +4,11 @@
  */
 package com.datastrato.gravitino.catalog.lakehouse.iceberg.web.rest;
 
+import com.codahale.metrics.annotation.ResponseMetered;
+import com.codahale.metrics.annotation.Timed;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.ops.IcebergTableOps;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.web.IcebergRestUtils;
+import com.datastrato.gravitino.metrics.MetricNames;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.Consumes;
@@ -47,12 +50,16 @@ public class IcebergTableOperations {
 
   @GET
   @Produces(MediaType.APPLICATION_JSON)
+  @Timed(name = "list-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "list-table", absolute = true)
   public Response listTable(@PathParam("namespace") String namespace) {
     return IcebergRestUtils.ok(icebergTableOps.listTable(RESTUtil.decodeNamespace(namespace)));
   }
 
   @POST
   @Produces(MediaType.APPLICATION_JSON)
+  @Timed(name = "create-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "create-table", absolute = true)
   public Response createTable(
       @PathParam("namespace") String namespace, CreateTableRequest createTableRequest) {
     LOG.info(
@@ -66,6 +73,8 @@ public class IcebergTableOperations {
   @POST
   @Path("{table}")
   @Produces(MediaType.APPLICATION_JSON)
+  @Timed(name = "update-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "update-table", absolute = true)
   public Response updateTable(
       @PathParam("namespace") String namespace,
       @PathParam("table") String table,
@@ -83,6 +92,8 @@ public class IcebergTableOperations {
   @DELETE
   @Path("{table}")
   @Produces(MediaType.APPLICATION_JSON)
+  @Timed(name = "drop-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "drop-table", absolute = true)
   public Response dropTable(
       @PathParam("namespace") String namespace,
       @PathParam("table") String table,
@@ -105,6 +116,8 @@ public class IcebergTableOperations {
   @GET
   @Path("{table}")
   @Produces(MediaType.APPLICATION_JSON)
+  @Timed(name = "load-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "load-table", absolute = true)
   public Response loadTable(
       @PathParam("namespace") String namespace,
       @PathParam("table") String table,
@@ -118,6 +131,8 @@ public class IcebergTableOperations {
   @HEAD
   @Path("{table}")
   @Produces(MediaType.APPLICATION_JSON)
+  @Timed(name = "table-exists." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "table-exits", absolute = true)
   public Response tableExists(
       @PathParam("namespace") String namespace, @PathParam("table") String table) {
     TableIdentifier tableIdentifier =
@@ -132,6 +147,8 @@ public class IcebergTableOperations {
   @POST
   @Path("{table}/metrics")
   @Produces(MediaType.APPLICATION_JSON)
+  @Timed(name = "report-table-metrics." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "report-table-metrics", absolute = true)
   public Response reportTableMetrics(
       @PathParam("namespace") String namespace,
       @PathParam("table") String table,

@@ -34,14 +34,6 @@ licenseReport {
 }
 repositories { mavenCentral() }
 
-java {
-  toolchain {
-    languageVersion.set(JavaLanguageVersion.of(8))
-    withJavadocJar()
-    withSourcesJar()
-  }
-}
-
 allprojects {
   repositories {
     mavenCentral()
@@ -82,6 +74,16 @@ subprojects {
   repositories {
     mavenCentral()
     mavenLocal()
+  }
+
+  java {
+    toolchain {
+      if (project.name == "trino-connector") {
+        languageVersion.set(JavaLanguageVersion.of(17))
+      } else {
+        languageVersion.set(JavaLanguageVersion.of(8))
+      }
+    }
   }
 
   val sourcesJar by tasks.registering(Jar::class) {
@@ -178,7 +180,10 @@ subprojects {
   plugins.withType<SpotlessPlugin>().configureEach {
     configure<SpotlessExtension> {
       java {
-        googleJavaFormat()
+        // Fix the Google Java Format version to 1.7. Since JDK8 only support Google Java Format
+        // 1.7, which is not compatible with JDK17. We will use a newer version when we upgrade to
+        // JDK17.
+        googleJavaFormat("1.7")
         removeUnusedImports()
         trimTrailingWhitespace()
         replaceRegex(
@@ -231,6 +236,8 @@ tasks.rat {
     exclusions.addAll(gitIgnoreExcludes)
   }
 
+  dependsOn(":web:nodeSetup")
+
   verbose.set(true)
   failOnError.set(true)
   setExcludes(exclusions)
@@ -255,6 +262,7 @@ tasks {
       copy {
         from(projectDir.dir("conf")) { into("package/conf") }
         from(projectDir.dir("bin")) { into("package/bin") }
+        from(projectDir.dir("web/build/libs/${rootProject.name}-web-${version}.war")) { into("package/web") }
         into(outputDir)
         rename { fileName ->
           fileName.replace(".template", "")
@@ -371,6 +379,5 @@ tasks {
 
   clean {
     dependsOn(cleanDistribution)
-    delete("server/src/main/resources/project.properties")
   }
 }

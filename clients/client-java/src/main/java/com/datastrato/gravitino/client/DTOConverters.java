@@ -148,7 +148,8 @@ class DTOConverters {
           addColumn.fieldNames(),
           addColumn.getDataType(),
           addColumn.getComment(),
-          addColumn.getPosition());
+          addColumn.getPosition(),
+          addColumn.isNullable());
 
     } else if (change instanceof TableChange.RenameColumn) {
       TableChange.RenameColumn renameColumn = (TableChange.RenameColumn) change;

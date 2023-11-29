@@ -6,6 +6,7 @@ package com.datastrato.gravitino.dto.requests;
 
 import com.datastrato.gravitino.json.JsonUtils;
 import com.datastrato.gravitino.rel.TableChange;
+import com.datastrato.gravitino.rel.types.Type;
 import com.datastrato.gravitino.rest.RESTRequest;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -14,7 +15,6 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.google.common.base.Preconditions;
-import io.substrait.type.Type;
 import java.util.Arrays;
 import javax.annotation.Nullable;
 import lombok.EqualsAndHashCode;
@@ -202,16 +202,31 @@ public interface TableUpdateRequest extends RESTRequest {
     @Nullable
     private final TableChange.ColumnPosition position;
 
+    @Getter
+    @JsonProperty(value = "nullable", defaultValue = "true")
+    private final boolean nullable;
+
+    // For Jackson deserialization
+    public AddTableColumnRequest() {
+      this(null, null, null, null, true);
+    }
+
     public AddTableColumnRequest(
-        String[] fieldName, Type dataType, String comment, TableChange.ColumnPosition position) {
+        String[] fieldName,
+        Type dataType,
+        String comment,
+        TableChange.ColumnPosition position,
+        boolean nullable) {
       this.fieldName = fieldName;
       this.dataType = dataType;
       this.comment = comment;
       this.position = position;
+      this.nullable = nullable;
     }
 
-    public AddTableColumnRequest() {
-      this(null, null, null, null);
+    public AddTableColumnRequest(
+        String[] fieldName, Type dataType, String comment, TableChange.ColumnPosition position) {
+      this(fieldName, dataType, comment, position, true);
     }
 
     @Override
@@ -227,7 +242,7 @@ public interface TableUpdateRequest extends RESTRequest {
 
     @Override
     public TableChange tableChange() {
-      return TableChange.addColumn(fieldName, dataType, comment, position);
+      return TableChange.addColumn(fieldName, dataType, comment, position, nullable);
     }
   }
 

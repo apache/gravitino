@@ -26,11 +26,7 @@ dependencies {
   implementation(libs.bundles.log4j)
   implementation(libs.bundles.jetty)
   implementation(libs.bundles.jersey)
-  implementation(libs.substrait.java.core) {
-    exclude("org.slf4j")
-    exclude("com.fasterxml.jackson.core")
-    exclude("com.fasterxml.jackson.datatype")
-  }
+  implementation(libs.metrics.jersey2)
 
   compileOnly(libs.lombok)
   annotationProcessor(libs.lombok)
@@ -51,14 +47,22 @@ dependencies {
 }
 
 fun getGitCommitId(): String {
-  val gitFolder = rootDir.path + "/.git/"
-  val head = File(gitFolder + "HEAD").readText().split(":")
-  val isCommit = head.size == 1
-  if (isCommit) {
-    return head[0].trim()
+  var gitCommitId = "";
+  try {
+    val gitFolder = rootDir.path + "/.git/"
+    val head = File(gitFolder + "HEAD").readText().split(":")
+    val isCommit = head.size == 1
+    gitCommitId = if (isCommit) {
+      head[0].trim()
+    } else {
+      val refHead = File(gitFolder + head[1].trim())
+      refHead.readText().trim()
+    }
+  } catch (e: Exception) {
+    println("WARN: Unable to get Git commit id : ${e.message}")
+    gitCommitId = ""
   }
-  val refHead = File(gitFolder + head[1].trim())
-  return refHead.readText().trim()
+  return gitCommitId
 }
 
 val propertiesFile = "src/main/resources/project.properties"
@@ -99,5 +103,9 @@ tasks {
   }
   test {
     environment("GRAVITINO_HOME", rootDir.path)
+    environment("GRAVITINO_TEST", "true")
+  }
+  clean {
+    delete("${propertiesFile}")
   }
 }

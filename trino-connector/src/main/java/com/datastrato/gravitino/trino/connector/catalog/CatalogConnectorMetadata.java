@@ -28,14 +28,13 @@ import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.TableCatalog;
 import com.datastrato.gravitino.rel.TableChange;
+import com.datastrato.gravitino.rel.types.Type;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoColumn;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoSchema;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoTable;
-import com.datastrato.gravitino.trino.connector.util.DataTypeTransformer;
 import com.google.common.base.Strings;
 import io.trino.spi.TrinoException;
 import io.trino.spi.connector.SchemaTableName;
-import io.trino.spi.type.Type;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -253,14 +252,7 @@ public class CatalogConnectorMetadata {
   }
 
   public void setColumnType(SchemaTableName schemaTableName, String columnName, Type type) {
-    boolean isNullable =
-        getTable(schemaTableName.getSchemaName(), schemaTableName.getTableName())
-            .getColumn(columnName)
-            .isNullable();
     String[] columnNames = {columnName};
-    applyAlter(
-        schemaTableName,
-        TableChange.updateColumnType(
-            columnNames, DataTypeTransformer.getGravitinoType(type, isNullable)));
+    applyAlter(schemaTableName, TableChange.updateColumnType(columnNames, type));
   }
 }

@@ -5,6 +5,7 @@
 
 package com.datastrato.gravitino.storage.kv;
 
+import com.datastrato.gravitino.storage.BiPredicate;
 import com.datastrato.gravitino.utils.Bytes;
 import com.google.common.base.Preconditions;
 import lombok.Builder;
@@ -20,6 +21,7 @@ public class KvRangeScan {
   private boolean endInclusive;
 
   private int limit;
+  private BiPredicate predicate;
 
   /**
    * Constructs a KvRangeScan instance with the specified parameters.
@@ -29,9 +31,15 @@ public class KvRangeScan {
    * @param startInclusive True if the start key is inclusive, false otherwise.
    * @param endInclusive True if the end key is inclusive, false otherwise.
    * @param limit The maximum number of results to retrieve.
+   * @param predicate The predicate to use to filter key-value pairs.
    */
   public KvRangeScan(
-      byte[] start, byte[] end, boolean startInclusive, boolean endInclusive, int limit) {
+      byte[] start,
+      byte[] end,
+      boolean startInclusive,
+      boolean endInclusive,
+      int limit,
+      BiPredicate<byte[], byte[]> predicate) {
     Preconditions.checkArgument(start != null, "start cannot be null");
     Preconditions.checkArgument(end != null, "start cannot be null");
     Preconditions.checkArgument(
@@ -47,5 +55,6 @@ public class KvRangeScan {
     this.startInclusive = startInclusive;
     this.endInclusive = endInclusive;
     this.limit = limit;
+    this.predicate = predicate == null ? (k, v) -> true : predicate;
   }
 }
