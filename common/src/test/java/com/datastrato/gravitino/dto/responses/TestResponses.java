@@ -201,7 +201,8 @@ public class TestResponses {
 
   @Test
   void testOAuthTokenResponse() throws IllegalArgumentException {
-    OAuthTokenResponse response = new OAuthTokenResponse("Bearer xx", null, "Bearer", null, null);
+    OAuthTokenResponse response =
+        new OAuthTokenResponse("Bearer xx", null, "Bearer", null, null, null);
     response.validate();
   }
 

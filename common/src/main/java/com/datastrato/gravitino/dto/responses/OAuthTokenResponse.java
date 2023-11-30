@@ -19,7 +19,9 @@
 
 package com.datastrato.gravitino.dto.responses;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
+import javax.annotation.Nullable;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
@@ -31,23 +33,39 @@ import org.apache.commons.lang3.StringUtils;
 @EqualsAndHashCode(callSuper = true)
 @ToString
 public class OAuthTokenResponse extends BaseResponse {
+  @JsonProperty("access_token")
   private final String accessToken;
+
+  @Nullable
+  @JsonProperty("issued_token_type")
   private final String issuedTokenType;
+
+  @JsonProperty("token_type")
   private final String tokenType;
+
+  @JsonProperty("expires_in")
   private final Integer expiresIn;
+
+  @JsonProperty("scope")
   private final String scope;
+
+  @Nullable
+  @JsonProperty("refresh_token")
+  private final String refreshToken;
 
   public OAuthTokenResponse(
       String accessToken,
       String issuedTokenType,
       String tokenType,
       Integer expiresIn,
-      String scope) {
+      String scope,
+      String refreshToken) {
     this.accessToken = accessToken;
     this.issuedTokenType = issuedTokenType;
     this.tokenType = tokenType;
     this.expiresIn = expiresIn;
     this.scope = scope;
+    this.refreshToken = refreshToken;
   }
 
   // This is the constructor that is used by Jackson deserializer
@@ -58,6 +76,7 @@ public class OAuthTokenResponse extends BaseResponse {
     this.tokenType = null;
     this.expiresIn = null;
     this.scope = null;
+    this.refreshToken = null;
   }
 
   @Override

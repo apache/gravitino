@@ -70,12 +70,12 @@ public class TestOAuthDataProvider {
       mockServer.when(any(), Times.exactly(1)).respond(mockResponse);
       Assertions.assertThrows(BadRequestException.class, () -> provider.initialize(props));
       mockResponse = HttpResponse.response().withStatusCode(HttpStatus.SC_OK);
-      OAuthTokenResponse response = new OAuthTokenResponse("1", "2", "3", 1, "test");
+      OAuthTokenResponse response = new OAuthTokenResponse("1", "2", "3", 1, "test", null);
       respJson = JsonUtils.objectMapper().writeValueAsString(response);
       mockResponse = mockResponse.withBody(respJson);
       mockServer.when(any(), Times.exactly(1)).respond(mockResponse);
       Assertions.assertThrows(IllegalArgumentException.class, () -> provider.initialize(props));
-      response = new OAuthTokenResponse("1", "2", "bearer", 1, "test");
+      response = new OAuthTokenResponse("1", "2", "bearer", 1, "test", null);
       respJson = JsonUtils.objectMapper().writeValueAsString(response);
       mockResponse = mockResponse.withBody(respJson);
       mockServer.when(any(), Times.exactly(1)).respond(mockResponse);
@@ -91,7 +91,7 @@ public class TestOAuthDataProvider {
               .signWith(keyPair.getPrivate(), SignatureAlgorithm.RS256)
               .compact();
 
-      response = new OAuthTokenResponse(oldAccessToken, "2", "bearer", 1, "test");
+      response = new OAuthTokenResponse(oldAccessToken, "2", "bearer", 1, "test", null);
       respJson = JsonUtils.objectMapper().writeValueAsString(response);
       mockResponse = mockResponse.withBody(respJson);
       mockServer.when(any(), Times.exactly(1)).respond(mockResponse);
@@ -104,7 +104,7 @@ public class TestOAuthDataProvider {
               .signWith(keyPair.getPrivate(), SignatureAlgorithm.RS256)
               .compact();
       ;
-      response = new OAuthTokenResponse(accessToken, "2", "bearer", 1, "test");
+      response = new OAuthTokenResponse(accessToken, "2", "bearer", 1, "test", null);
       respJson = JsonUtils.objectMapper().writeValueAsString(response);
       mockResponse = mockResponse.withBody(respJson);
       mockServer.when(any(), Times.exactly(1)).respond(mockResponse);
