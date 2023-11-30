@@ -10,7 +10,11 @@ import com.datastrato.gravitino.catalog.jdbc.utils.JdbcConnectorUtils;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
 import java.sql.Connection;
+import java.sql.DatabaseMetaData;
+import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import javax.sql.DataSource;
 import org.slf4j.Logger;
@@ -54,12 +58,29 @@ public abstract class JdbcDatabaseOperations implements DatabaseOperation {
     }
   }
 
+  @Override
+  public List<String> listDatabases() {
+    List<String> databaseNames = new ArrayList<>();
+    try (final Connection connection = this.dataSource.getConnection()) {
+      DatabaseMetaData metaData = connection.getMetaData();
+      ResultSet resultSet = metaData.getCatalogs();
+      while (resultSet.next()) {
+        String databaseName = resultSet.getString("TABLE_CAT");
+        databaseNames.add(databaseName);
+      }
+      return databaseNames;
+    } catch (final SQLException se) {
+      throw this.exceptionMapper.toGravitinoException(se);
+    }
+  }
+
   /**
    * @param databaseName The name of the database.
    * @param comment The comment of the database.
+   * @param properties The properties of the database.
    * @return the SQL statement to create a database with the given name and comment.
    */
-  abstract String generateCreateDatabaseSql(
+  protected abstract String generateCreateDatabaseSql(
       String databaseName, String comment, Map<String, String> properties);
 
   /**
@@ -67,5 +88,5 @@ public abstract class JdbcDatabaseOperations implements DatabaseOperation {
    * @param cascade cascade If set to true, drops all the tables in the schema as well.
    * @return the SQL statement to drop a database with the given name.
    */
-  abstract String generateDropDatabaseSql(String databaseName, boolean cascade);
+  protected abstract String generateDropDatabaseSql(String databaseName, boolean cascade);
 }

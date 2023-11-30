@@ -43,7 +43,8 @@ rat-plugin = '0.8.0'
 shadow-plugin = "8.1.1"
 metrics = "4.2.19"
 prometheus = "0.16.0"
-
+jsqlparser = "4.2"
+mysql = "8.0.23"
 
 [libraries]
 protobuf-java = { group = "com.google.protobuf", name = "protobuf-java", version.ref = "protoc" }
@@ -105,6 +106,7 @@ testng = { group = "org.testng", name = "testng", version.ref = "testng" }
 spark-hive = { group = "org.apache.spark", name = "spark-hive_2.13", version.ref = "spark" }
 commons-dbcp2 = { group = "org.apache.commons", name = "commons-dbcp2", version.ref = "commons-dbcp2" }
 testcontainers = { group = "org.testcontainers", name = "testcontainers", version.ref = "testcontainers" }
+testcontainers-mysql = { group = "org.testcontainers", name = "mysql", version.ref = "testcontainers" }
 testcontainers-junit-jupiter = { group = "org.testcontainers", name = "junit-jupiter", version.ref = "testcontainers" }
 trino-jdbc = { group = "io.trino", name = "trino-jdbc", version.ref = "trino-jdbc" }
 jwt-api = { group = "io.jsonwebtoken", name = "jjwt-api", version.ref = "jwt"}
@@ -118,6 +120,8 @@ metrics-servlets = { group = "io.dropwizard.metrics", name = "metrics-servlets",
 prometheus-client = { group = "io.prometheus", name = "simpleclient", version.ref = "prometheus" }
 prometheus-dropwizard = { group = "io.prometheus", name = "simpleclient_dropwizard", version.ref = "prometheus" }
 prometheus-servlet = { group = "io.prometheus", name = "simpleclient_servlet", version.ref = "prometheus" }
+jsqlparser = { group = "com.github.jsqlparser", name = "jsqlparser", version.ref = "jsqlparser" }
+mysql-driver = { group = "mysql", name = "mysql-connector-java", version.ref = "mysql" }
 
 [bundles]
 log4j = ["slf4j-api", "log4j-slf4j2-impl", "log4j-api", "log4j-core", "log4j-12-api"]

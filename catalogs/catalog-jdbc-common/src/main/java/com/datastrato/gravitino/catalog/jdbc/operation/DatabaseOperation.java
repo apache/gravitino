@@ -39,7 +39,7 @@ public interface DatabaseOperation {
   void delete(String databaseName, boolean cascade) throws NoSuchSchemaException;
 
   /** @return The list name of databases. */
-  List<String> list();
+  List<String> listDatabases();
 
   /**
    * @param databaseName The name of the database to check.
