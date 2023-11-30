@@ -5,10 +5,6 @@
 
 import axios from 'axios'
 
-import { getCatalogsApi } from '../catalogs'
-import { getSchemasApi } from '../schemas'
-import { getTablesApi } from '../tables'
-
 const Apis = {
   GET: '/api/metalakes',
   CREATE: '/api/metalakes',
@@ -56,54 +52,4 @@ export const updateMetalakeApi = ({ name, data }) => {
     },
     data
   })
-}
-
-export const getMetalakeTreeFromApi = async metalake => {
-  const tree = []
-
-  const catalogsData = await getCatalogsApi({ metalake })
-
-  const { identifiers: catalogs } = catalogsData.data
-
-  for (const catalog of catalogs) {
-    const catalogNode = {
-      node: 'catalog',
-      id: `${metalake}-${catalog.name}`,
-      name: catalog.name,
-      schemas: []
-    }
-
-    const schemasData = await getSchemasApi({ metalake, catalog: catalog.name })
-
-    const { identifiers: schemas } = schemasData.data
-
-    for (const schema of schemas) {
-      const schemaNode = {
-        node: 'schema',
-        id: `${metalake}-${catalog.name}-${schema.name}`,
-        name: schema.name,
-        tables: []
-      }
-
-      const tablesData = await getTablesApi({ metalake, catalog: catalog.name, schema: schema.name })
-
-      const { identifiers: tables } = tablesData.data
-
-      for (const table of tables) {
-        const tableNode = {
-          node: 'table',
-          id: `${metalake}-${catalog.name}-${schema.name}--${table.name}`,
-          name: table.name
-        }
-
-        schemaNode.tables.push(tableNode)
-      }
-
-      catalogNode.schemas.push(schemaNode)
-    }
-
-    tree.push(catalogNode)
-  }
-
-  return tree
 }
