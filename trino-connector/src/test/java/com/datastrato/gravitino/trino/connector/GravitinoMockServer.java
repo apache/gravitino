@@ -27,10 +27,11 @@ import com.datastrato.gravitino.rel.TableCatalog;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorManager;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
+import com.datastrato.gravitino.trino.connector.catalog.hive.HiveDataTypeTransformer;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoColumn;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoSchema;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoTable;
-import com.datastrato.gravitino.trino.connector.util.DataTypeTransformer;
+import com.datastrato.gravitino.trino.connector.util.GeneralDataTypeTransformer;
 import com.google.common.base.Preconditions;
 import io.trino.plugin.memory.MemoryConnector;
 import io.trino.spi.connector.ColumnHandle;
@@ -52,6 +53,7 @@ public class GravitinoMockServer implements AutoCloseable {
 
   private boolean start = true;
   private CatalogConnectorManager catalogConnectorManager;
+  private GeneralDataTypeTransformer dataTypeTransformer = new HiveDataTypeTransformer();
 
   public void setCatalogConnectorManager(CatalogConnectorManager catalogConnectorManager) {
     this.catalogConnectorManager = catalogConnectorManager;
@@ -420,7 +422,7 @@ public class GravitinoMockServer implements AutoCloseable {
           null,
           tableHandle,
           columnHandle,
-          DataTypeTransformer.getTrinoType(updateColumnType.getNewDataType()));
+          dataTypeTransformer.getTrinoType(updateColumnType.getNewDataType()));
 
     } else if (tableChange instanceof TableChange.UpdateComment) {
       TableChange.UpdateComment updateComment = (TableChange.UpdateComment) tableChange;

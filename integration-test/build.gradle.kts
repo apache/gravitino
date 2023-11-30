@@ -2,9 +2,7 @@
  * Copyright 2023 Datastrato.
  * This software is licensed under the Apache License version 2.
  */
-
 import java.io.IOException
-import kotlin.io.*
 import org.gradle.internal.os.OperatingSystem
 
 plugins {
@@ -23,6 +21,8 @@ dependencies {
   implementation(project(":core"))
   implementation(project(":catalogs:catalog-hive"))
   implementation(project(":catalogs:catalog-lakehouse-iceberg"))
+  implementation(project(":catalogs:catalog-jdbc-common"))
+  implementation(project(":catalogs:catalog-jdbc-mysql"))
   implementation(libs.guava)
   implementation(libs.bundles.log4j)
   implementation(libs.bundles.jersey)
@@ -109,111 +109,102 @@ dependencies {
   testImplementation(libs.spark.hive)
   testImplementation(libs.testcontainers)
   testImplementation(libs.testcontainers.junit.jupiter)
+  testImplementation(libs.testcontainers.mysql)
   testImplementation(libs.trino.jdbc)
+  testImplementation(libs.mysql.driver)
 }
 
 /* Optimizing integration test execution conditions */
 // Use this variable to control if we need to run docker test or not.
-var HIVE_IMAGE_NAME = "datastrato/gravitino-ci-hive"
-var HIVE_IMAGE_TAG_NAME = "${HIVE_IMAGE_NAME}:0.1.2"
-var EXCLUDE_DOCKER_TEST = true
-var EXCLUDE_TRINO_TEST = true
-// Use these 3 variables allow for more detailed control in the future.
+var DOCKER_IT_TEST = false
 project.extra["dockerRunning"] = false
-project.extra["hiveContainerRunning"] = false
 project.extra["macDockerConnector"] = false
 
 fun printDockerCheckInfo() {
+  checkMacDockerConnector()
+  checkDockerStatus()
+
   val testMode = project.properties["testMode"] as? String ?: "embedded"
   if (testMode != "deploy" && testMode != "embedded") {
     return
   }
   val dockerRunning = project.extra["dockerRunning"] as? Boolean ?: false
-  val hiveContainerRunning = project.extra["hiveContainerRunning"] as? Boolean ?: false
   val macDockerConnector = project.extra["macDockerConnector"] as? Boolean ?: false
-  if (dockerRunning && hiveContainerRunning) {
-    EXCLUDE_DOCKER_TEST = false
-  }
-  if (dockerRunning && macDockerConnector) {
-    EXCLUDE_TRINO_TEST = false
+
+  if (OperatingSystem.current().isMacOsX() && dockerRunning && macDockerConnector) {
+    DOCKER_IT_TEST = true
+  } else if (OperatingSystem.current().isLinux() && dockerRunning) {
+    DOCKER_IT_TEST = true
   }
 
   println("------------------ Check Docker environment ---------------------")
   println("Docker server status ............................................ [${if (dockerRunning) "running" else "stop"}]")
-  println("Gravitino IT Docker container is already running ................ [${if (hiveContainerRunning) "yes" else "no"}]")
-  if (OperatingSystem.current().isMacOsX() && !(dockerRunning && macDockerConnector)) {
-    println("Run test cases without `gravitino-trino-it` tag ................. [$testMode test]")
+  if (OperatingSystem.current().isMacOsX()) {
+    println("mac-docker-connector server status .............................. [${if (macDockerConnector) "running" else "stop"}]")
   }
-  if (dockerRunning && hiveContainerRunning) {
-    println("Using Gravitino IT Docker container to run all integration tests. [$testMode test]")
-  } else {
+  if (!DOCKER_IT_TEST) {
     println("Run test cases without `gravitino-docker-it` tag ................ [$testMode test]")
+  } else {
+    println("Using Gravitino IT Docker container to run all integration tests. [$testMode test]")
   }
   println("-----------------------------------------------------------------")
+
+  // Print help message if Docker server or mac-docker-connector is not running
+  printDockerServerTip()
+  printMacDockerConnectorTip()
 }
 
-tasks {
-  register("isMacDockerConnectorRunning") {
-    doLast {
-      val processName = "docker-connector"
-      val command = "pgrep -x ${processName}"
+fun printDockerServerTip() {
+  val dockerRunning = project.extra["dockerRunning"] as? Boolean ?: false
+  if (!dockerRunning) {
+    val redColor = "\u001B[31m"
+    val resetColor = "\u001B[0m"
+    println("Tip: Please make sure to start the ${redColor}Docker server${resetColor} before running the integration tests.")
+  }
+}
 
-      try {
-        val execResult = project.exec {
-          commandLine("bash", "-c", command)
-        }
-        if (execResult.exitValue == 0) {
-          project.extra["macDockerConnector"] = true
-        } else {
-          project.extra["macDockerConnector"] = false
-        }
-      } catch (e: Exception) {
-        project.extra["macDockerConnector"] = false
-      }
-    }
+fun printMacDockerConnectorTip() {
+  val macDockerConnector = project.extra["macDockerConnector"] as? Boolean ?: false
+  if (OperatingSystem.current().isMacOsX() && !macDockerConnector) {
+    val redColor = "\u001B[31m"
+    val resetColor = "\u001B[0m"
+    println("Tip: Please make sure to execute the ${redColor}`dev/docker/tools/mac-docker-connector.sh`${resetColor} script before running the integration test in MacOS.")
+  }
+}
+
+fun checkMacDockerConnector() {
+  if (OperatingSystem.current().isLinux()) {
+    // Linux does not require the use of `docker-connector`
+    return
   }
 
-  // Use this task to check if docker container is running
-  register("checkContainerRunning") {
-    doLast {
-      try {
-        val process = ProcessBuilder("docker", "ps", "--format='{{.Image}}'").start()
-        val exitCode = process.waitFor()
+  try {
+    val processName = "docker-connector"
+    val command = "pgrep -x -q ${processName}"
 
-        if (exitCode == 0) {
-          val output = process.inputStream.bufferedReader().readText()
-          val haveHiveContainer = output.contains("${HIVE_IMAGE_NAME}")
-          if (haveHiveContainer) {
-            project.extra["hiveContainerRunning"] = true
-          }
-        } else {
-          println("checkContainerRunning command execution failed with exit code $exitCode")
-        }
-      } catch (e: IOException) {
-        println("checkContainerRunning command execution failed: ${e.message}")
-      }
+    val execResult = project.exec {
+      commandLine("bash", "-c", command)
     }
+    if (execResult.exitValue == 0) {
+      project.extra["macDockerConnector"] = true
+    }
+  } catch (e: Exception) {
+    println("checkContainerRunning command execution failed: ${e.message}")
   }
+}
 
-  // Use this task to check if docker is running
-  register("checkDockerRunning") {
-    dependsOn("checkContainerRunning", "isMacDockerConnectorRunning")
+fun checkDockerStatus() {
+  try {
+    val process = ProcessBuilder("docker", "info").start()
+    val exitCode = process.waitFor()
 
-    doLast {
-      try {
-        val process = ProcessBuilder("docker", "info").start()
-        val exitCode = process.waitFor()
-
-        if (exitCode == 0) {
-          project.extra["dockerRunning"] = true
-        } else {
-          println("checkDockerRunning Command execution failed with exit code $exitCode")
-        }
-      } catch (e: IOException) {
-        println("checkDockerRunning command execution failed: ${e.message}")
-      }
-      printDockerCheckInfo()
+    if (exitCode == 0) {
+      project.extra["dockerRunning"] = true
+    } else {
+      println("checkDockerStatus command execution failed with exit code $exitCode")
     }
+  } catch (e: IOException) {
+    println("checkDockerStatus command execution failed: ${e.message}")
   }
 }
 
@@ -222,9 +213,9 @@ tasks.test {
   if (skipITs) {
     exclude("**/integration/test/**")
   } else {
-    dependsOn("checkDockerRunning")
-
     doFirst {
+      printDockerCheckInfo()
+
       copy {
         from("${project.rootDir}/dev/docker/trino/conf")
         into("build/trino-conf")
@@ -240,7 +231,7 @@ tasks.test {
       environment("TRINO_CONF_DIR", buildDir.path + "/trino-conf")
 
       // Gravitino CI Docker image
-      environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-hive:0.1.5")
+      environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-hive:0.1.6")
       environment("GRAVITINO_CI_TRINO_DOCKER_IMAGE", "datastrato/gravitino-ci-trino:0.1.0")
 
       val testMode = project.properties["testMode"] as? String ?: "embedded"
@@ -258,17 +249,8 @@ tasks.test {
       }
 
       useJUnitPlatform {
-        if (EXCLUDE_DOCKER_TEST) {
-          val redColor = "\u001B[31m"
-          val resetColor = "\u001B[0m"
-          println("${redColor}Gravitino-docker is not running locally, all integration test cases tagged with 'gravitino-docker-it' will be excluded.${resetColor}")
+        if (!DOCKER_IT_TEST) {
           excludeTags("gravitino-docker-it")
-        }
-        if (EXCLUDE_TRINO_TEST && OperatingSystem.current().isMacOsX()) {
-          val redColor = "\u001B[31m"
-          val resetColor = "\u001B[0m"
-          println("${redColor}mac-docker-connector is not running locally, all integration test cases tagged with 'gravitino-trino-it' will be excluded.${resetColor}")
-          excludeTags("gravitino-trino-it")
         }
       }
     }

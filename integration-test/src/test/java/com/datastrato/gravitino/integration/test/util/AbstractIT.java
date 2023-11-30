@@ -36,10 +36,12 @@ import org.slf4j.LoggerFactory;
 
 @ExtendWith(PrintFuncNameExtension.class)
 public class AbstractIT {
-  public static final Logger LOG = LoggerFactory.getLogger(AbstractIT.class);
+  private static final Logger LOG = LoggerFactory.getLogger(AbstractIT.class);
   protected static GravitinoClient client;
 
   private static final OAuthMockDataProvider mockDataProvider = OAuthMockDataProvider.getInstance();
+
+  protected static final CloseableGroup closer = CloseableGroup.create();
 
   private static MiniGravitino miniGravitino;
 

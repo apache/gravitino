@@ -52,9 +52,9 @@ public class TestBaseConvert {
     GRAVITINO_TYPE.put("TIME", com.datastrato.gravitino.rel.types.Types.TimeType.get());
     GRAVITINO_TYPE.put("UUID", com.datastrato.gravitino.rel.types.Types.UUIDType.get());
     // Types not supported by iceberg
-    //        ICEBERG_TYPE.put("INTERVAL_DAY", GRAVITINO_TYPE.put("I16",
+    //    GRAVITINO_TYPE.put("INTERVAL_DAY",
     // com.datastrato.gravitino.rel.types.Types.IntervalDayType.get());
-    //        ICEBERG_TYPE.put("INTERVAL_YEAR", GRAVITINO_TYPE.put("I16",
+    //    GRAVITINO_TYPE.put("INTERVAL_YEAR",
     // com.datastrato.gravitino.rel.types.Types.IntervalYearType.get());
 
     ICEBERG_TYPE.put("BOOLEAN", org.apache.iceberg.types.Types.BooleanType.get());

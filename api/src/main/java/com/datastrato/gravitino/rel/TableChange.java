@@ -21,6 +21,8 @@
 package com.datastrato.gravitino.rel;
 
 import com.datastrato.gravitino.rel.types.Type;
+import java.util.Arrays;
+import java.util.Objects;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 
@@ -83,7 +85,7 @@ public interface TableChange {
    * @return A TableChange for the addition.
    */
   static TableChange addColumn(String[] fieldNames, Type dataType) {
-    return new AddColumn(fieldNames, dataType, null, null);
+    return new AddColumn(fieldNames, dataType, null, null, true);
   }
 
   /**
@@ -99,7 +101,23 @@ public interface TableChange {
    * @return A TableChange for the addition.
    */
   static TableChange addColumn(String[] fieldNames, Type dataType, String comment) {
-    return new AddColumn(fieldNames, dataType, comment, null);
+    return new AddColumn(fieldNames, dataType, comment, null, true);
+  }
+
+  /**
+   * Create a TableChange for adding a column.
+   *
+   * <p>If the field already exists, the change will result in an {@link IllegalArgumentException}.
+   * If the new field is nested and its parent does not exist or is not a struct, the change will
+   * result in an {@link IllegalArgumentException}.
+   *
+   * @param fieldNames The field names of the new column.
+   * @param dataType The new column's data type.
+   * @param position The new column's position.
+   * @return A TableChange for the addition.
+   */
+  static TableChange addColumn(String[] fieldNames, Type dataType, ColumnPosition position) {
+    return new AddColumn(fieldNames, dataType, null, position, true);
   }
 
   /**
@@ -112,12 +130,65 @@ public interface TableChange {
    * @param fieldNames Field names of the new column.
    * @param dataType The new column's data type.
    * @param comment The new field's comment string.
-   * @param position The new columns's position.
+   * @param position The new column's position.
    * @return A TableChange for the addition.
    */
   static TableChange addColumn(
       String[] fieldNames, Type dataType, String comment, ColumnPosition position) {
-    return new AddColumn(fieldNames, dataType, comment, position);
+    return new AddColumn(fieldNames, dataType, comment, position, true);
+  }
+
+  /**
+   * Create a TableChange for adding a column.
+   *
+   * <p>If the field already exists, the change will result in an {@link IllegalArgumentException}.
+   * If the new field is nested and its parent does not exist or is not a struct, the change will
+   * result in an {@link IllegalArgumentException}.
+   *
+   * @param fieldNames Field names of the new column.
+   * @param dataType The new column's data type.
+   * @param nullable The new column's nullable.
+   * @return A TableChange for the addition.
+   */
+  static TableChange addColumn(String[] fieldNames, Type dataType, boolean nullable) {
+    return new AddColumn(fieldNames, dataType, null, null, nullable);
+  }
+
+  /**
+   * Create a TableChange for adding a column.
+   *
+   * @param fieldNames Field names of the new column.
+   * @param dataType The new column's data type.
+   * @param comment The new field's comment string.
+   * @param nullable The new column's nullable.
+   * @return A TableChange for the addition.
+   */
+  static TableChange addColumn(
+      String[] fieldNames, Type dataType, String comment, boolean nullable) {
+    return new AddColumn(fieldNames, dataType, comment, null, nullable);
+  }
+
+  /**
+   * Create a TableChange for adding a column.
+   *
+   * <p>If the field already exists, the change will result in an {@link IllegalArgumentException}.
+   * If the new field is nested and its parent does not exist or is not a struct, the change will
+   * result in an {@link IllegalArgumentException}.
+   *
+   * @param fieldNames Field names of the new column.
+   * @param dataType The new column's data type.
+   * @param comment The new field's comment string.
+   * @param position The new column's position.
+   * @param nullable The new column's nullable.
+   * @return A TableChange for the addition.
+   */
+  static TableChange addColumn(
+      String[] fieldNames,
+      Type dataType,
+      String comment,
+      ColumnPosition position,
+      boolean nullable) {
+    return new AddColumn(fieldNames, dataType, comment, position, nullable);
   }
 
   /**
@@ -194,6 +265,21 @@ public interface TableChange {
    */
   static TableChange deleteColumn(String[] fieldNames, Boolean ifExists) {
     return new DeleteColumn(fieldNames, ifExists);
+  }
+
+  /**
+   * Create a TableChange for updating the nullability of a field.
+   *
+   * <p>The name are used to find the field to update.
+   *
+   * <p>If the field does not exist, the change will result in an {@link IllegalArgumentException}.
+   *
+   * @param fieldNames The field names of the column to update.
+   * @param nullable The new nullability.
+   * @return A TableChange for the update.
+   */
+  static TableChange updateColumnNullability(String[] fieldNames, boolean nullable) {
+    return new UpdateColumnNullability(fieldNames, nullable);
   }
 
   /** A TableChange to rename a table. */
@@ -321,11 +407,19 @@ public interface TableChange {
 
     @Getter private final ColumnPosition position;
 
-    private AddColumn(String[] fieldNames, Type dataType, String comment, ColumnPosition position) {
+    @Getter private final boolean nullable;
+
+    private AddColumn(
+        String[] fieldNames,
+        Type dataType,
+        String comment,
+        ColumnPosition position,
+        boolean nullable) {
       this.fieldNames = fieldNames;
       this.dataType = dataType;
       this.comment = comment;
       this.position = position;
+      this.nullable = nullable;
     }
 
     @Override
@@ -450,6 +544,52 @@ public interface TableChange {
     @Override
     public String[] fieldNames() {
       return fieldNames;
+    }
+  }
+
+  /**
+   * A TableChange to update the nullability of a field.
+   *
+   * <p>The field names are used to find the field to update.
+   *
+   * <p>If the field does not exist, the change must result in an {@link IllegalArgumentException}.
+   */
+  final class UpdateColumnNullability implements ColumnChange {
+    private final String[] fieldNames;
+
+    private final boolean nullable;
+
+    private UpdateColumnNullability(String[] fieldNames, boolean nullable) {
+      this.fieldNames = fieldNames;
+      this.nullable = nullable;
+    }
+
+    @Override
+    public String[] fieldNames() {
+      return fieldNames;
+    }
+
+    public boolean nullable() {
+      return nullable;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (o == null || getClass() != o.getClass()) {
+        return false;
+      }
+      UpdateColumnNullability that = (UpdateColumnNullability) o;
+      return nullable == that.nullable && Arrays.equals(fieldNames, that.fieldNames);
+    }
+
+    @Override
+    public int hashCode() {
+      int result = Objects.hash(nullable);
+      result = 31 * result + Arrays.hashCode(fieldNames);
+      return result;
     }
   }
 }

@@ -242,6 +242,19 @@ public class TestIcebergTableUpdate {
                   firstField, Types.IntegerType.get(), "", ColumnPosition.after("not_exits"));
           updateTable(identifier, addColumn1);
         });
+
+    // add required column
+    IllegalArgumentException exception =
+        Assertions.assertThrowsExactly(
+            IllegalArgumentException.class,
+            () -> {
+              TableChange addColumn1 =
+                  TableChange.addColumn(
+                      new String[] {"required_column"}, Types.IntegerType.get(), false);
+              updateTable(identifier, addColumn1);
+            });
+    Assertions.assertTrue(
+        exception.getMessage().contains("Incompatible change: cannot add required column:"));
   }
 
   @Test
@@ -276,6 +289,26 @@ public class TestIcebergTableUpdate {
     LoadTableResponse loadTableResponse = updateTable(identifier, updateColumnComment);
     Assertions.assertEquals(
         loadTableResponse.tableMetadata().schema().columns().get(0).doc(), newComment);
+  }
+
+  @Test
+  public void testUpdateColumnNullability() {
+    TableChange updateColumnNullability = TableChange.updateColumnNullability(firstField, true);
+    LoadTableResponse loadTableResponse = updateTable(identifier, updateColumnNullability);
+    Assertions.assertTrue(loadTableResponse.tableMetadata().schema().columns().get(0).isOptional());
+
+    // update struct_int from optional to required
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                updateTable(
+                    identifier,
+                    TableChange.updateColumnNullability(
+                        new String[] {fourthField[0], "element", "struct_map"}, false)));
+    Assertions.assertEquals(
+        "Cannot change column nullability: foo_struct.element.struct_map: optional -> required",
+        exception.getMessage());
   }
 
   @Test

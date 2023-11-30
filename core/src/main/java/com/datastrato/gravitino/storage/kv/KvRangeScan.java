@@ -21,7 +21,7 @@ public class KvRangeScan {
   private boolean endInclusive;
 
   private int limit;
-  private BiPredicate predicate;
+  private BiPredicate<byte[], byte[]> predicate;
 
   /**
    * Constructs a KvRangeScan instance with the specified parameters.

@@ -450,23 +450,26 @@ public class TestHiveTable extends MiniHiveMetastoreService {
                         TableChange.updateColumnPosition(new String[] {"col_1"}, null)));
     Assertions.assertTrue(exception.getMessage().contains("Column position cannot be null"));
 
-    // TODO(minghuang): Uncomment below test after we support nullable in TableChange.addColumn
-    //    exception =
-    //        Assertions.assertThrows(
-    //            IllegalArgumentException.class,
-    //            () ->
-    //                hiveCatalog
-    //                    .asTableCatalog()
-    //                    .alterTable(
-    //                        tableIdentifier,
-    //                        TableChange.addColumn(new String[] {"col_3"},
-    // Types.ByteType.get())));
-    //    Assertions.assertTrue(
-    //        exception
-    //            .getMessage()
-    //            .contains(
-    //                "The NOT NULL constraint for column is only supported since Hive 3.0, "
-    //                    + "but the current Gravitino Hive catalog only supports Hive 2.x"));
+    exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                hiveCatalog
+                    .asTableCatalog()
+                    .alterTable(
+                        tableIdentifier,
+                        TableChange.addColumn(
+                            new String[] {"col_3"},
+                            Types.ByteType.get(),
+                            null,
+                            TableChange.ColumnPosition.first(),
+                            false)));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains(
+                "The NOT NULL constraint for column is only supported since Hive 3.0, "
+                    + "but the current Gravitino Hive catalog only supports Hive 2.x"));
 
     exception =
         Assertions.assertThrows(
@@ -476,7 +479,10 @@ public class TestHiveTable extends MiniHiveMetastoreService {
                     .asTableCatalog()
                     .alterTable(
                         tableIdentifier,
-                        TableChange.addColumn(new String[] {"col_1"}, Types.ByteType.get())));
+                        TableChange.addColumn(
+                            new String[] {"col_3"},
+                            Types.ByteType.get(),
+                            TableChange.ColumnPosition.after(col2.name()))));
     Assertions.assertTrue(
         exception.getMessage().contains("Cannot add column after partition column"));
 
@@ -495,6 +501,18 @@ public class TestHiveTable extends MiniHiveMetastoreService {
                             TableChange.ColumnPosition.after(col1.name()))));
     Assertions.assertTrue(exception.getMessage().contains("Cannot add column with duplicate name"));
 
+    exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                hiveCatalog
+                    .asTableCatalog()
+                    .alterTable(
+                        tableIdentifier,
+                        TableChange.updateColumnNullability(new String[] {"col_1"}, false)));
+    Assertions.assertEquals(
+        "Hive does not support altering column nullability", exception.getMessage());
+
     // test alter
     hiveCatalog
         .asTableCatalog()
@@ -505,11 +523,7 @@ public class TestHiveTable extends MiniHiveMetastoreService {
             TableChange.removeProperty("key1"),
             TableChange.setProperty("key2", "val2_new"),
             // columns current format: [col_1:I8:comment, col_2:DATE:comment]
-            TableChange.addColumn(
-                new String[] {"col_3"},
-                Types.StringType.get(),
-                null,
-                TableChange.ColumnPosition.after(col1.name())),
+            TableChange.addColumn(new String[] {"col_3"}, Types.StringType.get()),
             // columns current format: [col_1:I8:comment, col_3:STRING:null, col_2:DATE:comment]
             TableChange.renameColumn(new String[] {"col_3"}, "col_3_new"),
             // columns current format: [col_1:I8:comment, col_3_new:STRING:null, col_2:DATE:comment]

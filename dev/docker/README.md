@@ -11,15 +11,28 @@ It can be utilized to test all catalog and connector modules within Gravitino.
 
 ## How to build Docker image
 ```
-./build-docker.sh --platform [all|linux/amd64|linux/arm64] --type [hive|trino] --image {image_name} --tag {tag_name} --latest
+./build-docker.sh --platform [all|linux/amd64|linux/arm64] --type [gravitino|hive|trino] --image {image_name} --tag {tag_name} --latest
 ```
 
 # Version change history
+
+## Gravitino
+
+### Container startup commands
+```
+docker run --rm -d -p 8090:8090 datastrato/gravitino
+```
+
+### 0.3.0-SNAPSHOT
+- Gravitino Server
+- Expose ports:
+  - `8090` Gravitino Web UI
+
 ## Gravitino CI Hive
 
 ### Container startup commands
 ```
-docker run --rm -d -p 8022:22 -p 8088:8088 -p 9000:9000 -p 9083:9083 -p 10000:10000 -p 10002:10002 -p 50070:50070 -p 50075:50075 -p 50010:50010 datastrato/gravitino-ci-hive
+docker run --rm -d -p 9000:9000 -p 9083:9083 -p 10000:10000 -p 10002:10002 -p 50010:50010 -p 50070:50070 -p 50075:50075 datastrato/gravitino-ci-hive
 ```
 
 ### 0.1.0
@@ -59,6 +72,12 @@ docker run --rm -d -p 8022:22 -p 8088:8088 -p 9000:9000 -p 9083:9083 -p 10000:10
 
 ### 0.1.5
 - Rollback `Map container hostname to 127.0.0.1 before starting Hadoop` of `datastrato/gravitino-ci-hive:0.1.4`
+
+### 0.1.6
+- No start YARN when container startup
+- Removed expose ports:
+  - `22` SSH
+  - `8088` YARN Service
 
 ## Gravitino CI Trino
 

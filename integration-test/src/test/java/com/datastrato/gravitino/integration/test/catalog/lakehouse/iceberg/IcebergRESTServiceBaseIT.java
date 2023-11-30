@@ -10,6 +10,8 @@ import com.datastrato.gravitino.aux.AuxiliaryServiceManager;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergConfig;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergRESTService;
+import com.datastrato.gravitino.integration.test.container.ContainerSuite;
+import com.datastrato.gravitino.integration.test.container.HiveContainer;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
 import com.datastrato.gravitino.server.web.JettyServerConfig;
@@ -41,6 +43,7 @@ import org.slf4j.LoggerFactory;
 @TestInstance(Lifecycle.PER_CLASS)
 public class IcebergRESTServiceBaseIT extends AbstractIT {
   public static final Logger LOG = LoggerFactory.getLogger(IcebergRESTServiceBaseIT.class);
+  private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
   private SparkSession sparkSession;
   protected IcebergCatalogBackend catalogType = IcebergCatalogBackend.MEMORY;
 
@@ -154,7 +157,11 @@ public class IcebergRESTServiceBaseIT extends AbstractIT {
             + IcebergRESTService.SERVICE_NAME
             + "."
             + IcebergConfig.CATALOG_WAREHOUSE.getKey(),
-        GravitinoITUtils.genRandomName("hdfs://127.0.0.1:9000/user/hive/warehouse-jdbc-sqlite"));
+        GravitinoITUtils.genRandomName(
+            String.format(
+                "hdfs://%s:%d/user/hive/warehouse-jdbc-sqlite",
+                containerSuite.getHiveContainer().getContainerIpAddress(),
+                HiveContainer.HDFS_DEFAULTFS_PORT)));
 
     return configMap;
   }
@@ -173,14 +180,21 @@ public class IcebergRESTServiceBaseIT extends AbstractIT {
             + IcebergRESTService.SERVICE_NAME
             + "."
             + IcebergConfig.CATALOG_URI.getKey(),
-        "thrift://127.0.0.1:9083");
+        String.format(
+            "thrift://%s:%d",
+            containerSuite.getHiveContainer().getContainerIpAddress(),
+            HiveContainer.HIVE_METASTORE_PORT));
 
     customConfigs.put(
         AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
             + IcebergRESTService.SERVICE_NAME
             + "."
             + IcebergConfig.CATALOG_WAREHOUSE.getKey(),
-        GravitinoITUtils.genRandomName("hdfs://127.0.0.1:9000/user/hive/warehouse-hive"));
+        GravitinoITUtils.genRandomName(
+            String.format(
+                "hdfs://%s:%d/user/hive/warehouse-hive",
+                containerSuite.getHiveContainer().getContainerIpAddress(),
+                HiveContainer.HDFS_DEFAULTFS_PORT)));
     return customConfigs;
   }
 

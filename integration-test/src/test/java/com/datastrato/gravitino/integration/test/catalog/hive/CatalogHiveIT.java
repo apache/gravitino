@@ -4,7 +4,6 @@
  */
 package com.datastrato.gravitino.integration.test.catalog.hive;
 
-import static com.datastrato.gravitino.catalog.BaseCatalog.CATALOG_BYPASS_PREFIX;
 import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.METASTORE_URIS;
 import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.COMMENT;
 import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.EXTERNAL;
@@ -40,6 +39,8 @@ import com.datastrato.gravitino.dto.rel.expressions.FieldReferenceDTO;
 import com.datastrato.gravitino.dto.rel.partitions.IdentityPartitioningDTO;
 import com.datastrato.gravitino.dto.rel.partitions.Partitioning;
 import com.datastrato.gravitino.exceptions.NoSuchTableException;
+import com.datastrato.gravitino.integration.test.container.ContainerSuite;
+import com.datastrato.gravitino.integration.test.container.HiveContainer;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
 import com.datastrato.gravitino.rel.Schema;
@@ -77,24 +78,28 @@ import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Tag("gravitino-docker-it")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class CatalogHiveIT extends AbstractIT {
-  public static String metalakeName = GravitinoITUtils.genRandomName("CatalogHiveIT_metalake");
-  public static String catalogName = GravitinoITUtils.genRandomName("CatalogHiveIT_catalog");
-  public static String SCHEMA_PREFIX = "CatalogHiveIT_schema";
-  public static String schemaName = GravitinoITUtils.genRandomName(SCHEMA_PREFIX);
-  public static String TABLE_PREFIX = "CatalogHiveIT_table";
-  public static String tableName = GravitinoITUtils.genRandomName(TABLE_PREFIX);
-  public static String ALTER_TABLE_NAME = "alert_table_name";
-  public static String TABLE_COMMENT = "table_comment";
-  public static String HIVE_COL_NAME1 = "hive_col_name1";
-  public static String HIVE_COL_NAME2 = "hive_col_name2";
-  public static String HIVE_COL_NAME3 = "hive_col_name3";
-
-  private static final String HIVE_METASTORE_URIS = "thrift://localhost:9083";
+  private static final Logger LOG = LoggerFactory.getLogger(CatalogHiveIT.class);
+  public static final String metalakeName =
+      GravitinoITUtils.genRandomName("CatalogHiveIT_metalake");
+  public static final String catalogName = GravitinoITUtils.genRandomName("CatalogHiveIT_catalog");
+  public static final String SCHEMA_PREFIX = "CatalogHiveIT_schema";
+  public static final String schemaName = GravitinoITUtils.genRandomName(SCHEMA_PREFIX);
+  public static final String TABLE_PREFIX = "CatalogHiveIT_table";
+  public static final String tableName = GravitinoITUtils.genRandomName(TABLE_PREFIX);
+  public static final String ALTER_TABLE_NAME = "alert_table_name";
+  public static final String TABLE_COMMENT = "table_comment";
+  public static final String HIVE_COL_NAME1 = "hive_col_name1";
+  public static final String HIVE_COL_NAME2 = "hive_col_name2";
+  public static final String HIVE_COL_NAME3 = "hive_col_name3";
+  private static String HIVE_METASTORE_URIS;
   private static final String provider = "hive";
+  private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
   private static HiveClientPool hiveClientPool;
   private static GravitinoMetaLake metalake;
   private static Catalog catalog;
@@ -117,13 +122,33 @@ public class CatalogHiveIT extends AbstractIT {
 
   @BeforeAll
   public static void startup() throws Exception {
-    HiveConf hiveConf = GravitinoITUtils.hiveConfig();
+    containerSuite.startHiveContainer();
+
+    HIVE_METASTORE_URIS =
+        String.format(
+            "thrift://%s:%d",
+            containerSuite.getHiveContainer().getContainerIpAddress(),
+            HiveContainer.HIVE_METASTORE_PORT);
+
+    HiveConf hiveConf = new HiveConf();
+    hiveConf.set(HiveConf.ConfVars.METASTOREURIS.varname, HIVE_METASTORE_URIS);
+
+    // Check if hive client can connect to hive metastore
     hiveClientPool = new HiveClientPool(1, hiveConf);
+    List<String> dbs = hiveClientPool.run(client -> client.getAllDatabases());
+    Assertions.assertTrue(dbs.size() > 0);
+
     sparkSession =
         SparkSession.builder()
             .master("local[1]")
             .appName("Hive Catalog integration test")
             .config("hive.metastore.uris", HIVE_METASTORE_URIS)
+            .config(
+                "spark.sql.warehouse.dir",
+                String.format(
+                    "hdfs://%s:%d/user/hive/warehouse",
+                    containerSuite.getHiveContainer().getContainerIpAddress(),
+                    HiveContainer.HDFS_DEFAULTFS_PORT))
             .config("spark.sql.storeAssignmentPolicy", "LEGACY")
             .config("mapreduce.input.fileinputformat.input.dir.recursive", "true")
             .enableHiveSupport()
@@ -142,6 +167,11 @@ public class CatalogHiveIT extends AbstractIT {
 
     if (sparkSession != null) {
       sparkSession.close();
+    }
+    try {
+      closer.close();
+    } catch (Exception e) {
+      LOG.error("Failed to close CloseableGroup", e);
     }
   }
 
@@ -169,13 +199,6 @@ public class CatalogHiveIT extends AbstractIT {
   private static void createCatalog() {
     Map<String, String> properties = Maps.newHashMap();
     properties.put(METASTORE_URIS, HIVE_METASTORE_URIS);
-    properties.put(
-        CATALOG_BYPASS_PREFIX + HiveConf.ConfVars.METASTORETHRIFTCONNECTIONRETRIES.varname, "30");
-    properties.put(
-        CATALOG_BYPASS_PREFIX + HiveConf.ConfVars.METASTORETHRIFTFAILURERETRIES.varname, "30");
-    properties.put(
-        CATALOG_BYPASS_PREFIX + HiveConf.ConfVars.METASTORE_CLIENT_CONNECT_RETRY_DELAY.varname,
-        "5");
 
     metalake.createCatalog(
         NameIdentifier.of(metalakeName, catalogName),
@@ -192,6 +215,13 @@ public class CatalogHiveIT extends AbstractIT {
     Map<String, String> properties = Maps.newHashMap();
     properties.put("key1", "val1");
     properties.put("key2", "val2");
+    properties.put(
+        "location",
+        String.format(
+            "hdfs://%s:%d/user/hive/warehouse/%s.db",
+            containerSuite.getHiveContainer().getContainerIpAddress(),
+            HiveContainer.HDFS_DEFAULTFS_PORT,
+            schemaName.toLowerCase()));
     String comment = "comment";
 
     catalog.asSchemas().createSchema(ident, comment, properties);
@@ -457,7 +487,10 @@ public class CatalogHiveIT extends AbstractIT {
                     TABLE_TYPE,
                     "external_table",
                     LOCATION,
-                    "/tmp",
+                    String.format(
+                        "hdfs://%s:%d/tmp",
+                        containerSuite.getHiveContainer().getContainerIpAddress(),
+                        HiveContainer.HDFS_DEFAULTFS_PORT),
                     FORMAT,
                     "textfile",
                     SERDE_LIB,
@@ -502,7 +535,12 @@ public class CatalogHiveIT extends AbstractIT {
     NameIdentifier schemaIdent =
         NameIdentifier.of(metalakeName, catalogName, GravitinoITUtils.genRandomName(SCHEMA_PREFIX));
     Map<String, String> properties = Maps.newHashMap();
-    String expectedSchemaLocation = "/tmp";
+    String expectedSchemaLocation =
+        String.format(
+            "hdfs://%s:%d/tmp",
+            containerSuite.getHiveContainer().getContainerIpAddress(),
+            HiveContainer.HDFS_DEFAULTFS_PORT);
+
     properties.put(HiveSchemaPropertiesMetadata.LOCATION, expectedSchemaLocation);
     catalog.asSchemas().createSchema(schemaIdent, "comment", properties);
 

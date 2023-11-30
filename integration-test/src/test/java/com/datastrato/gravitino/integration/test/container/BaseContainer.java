@@ -2,7 +2,7 @@
  * Copyright 2023 Datastrato.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.gravitino.integration.test.util;
+package com.datastrato.gravitino.integration.test.container;
 
 import static java.util.Objects.requireNonNull;
 import static org.testcontainers.utility.MountableFile.forHostPath;
@@ -28,7 +28,6 @@ import org.testcontainers.containers.Network;
 import org.testcontainers.containers.output.OutputFrame;
 import org.testcontainers.containers.startupcheck.IsRunningStartupCheckStrategy;
 import org.testcontainers.containers.wait.strategy.Wait;
-import org.testcontainers.images.PullPolicy;
 
 /**
  * The BaseContainer is the base for all containers. It's contains the common methods and settings
@@ -89,7 +88,6 @@ public abstract class BaseContainer implements AutoCloseable {
         .withCreateContainerCmdModifier(c -> c.withHostName(hostName))
         .withStartupCheckStrategy(new IsRunningStartupCheckStrategy())
         .waitingFor(Wait.forListeningPort())
-        .withImagePullPolicy(PullPolicy.alwaysPull())
         .withStartupTimeout(Duration.ofMinutes(5));
     network.ifPresent(net -> container.withNetwork(net).withNetworkAliases(hostName));
   }

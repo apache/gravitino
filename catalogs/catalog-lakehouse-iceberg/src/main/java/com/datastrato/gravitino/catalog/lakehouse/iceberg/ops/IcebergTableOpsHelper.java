@@ -96,6 +96,18 @@ public class IcebergTableOpsHelper {
         DOT.join(updateColumnComment.fieldNames()), updateColumnComment.getNewComment());
   }
 
+  private void doUpdateColumnNullability(
+      UpdateSchema icebergUpdateSchema,
+      TableChange.UpdateColumnNullability updateColumnNullability) {
+    if (updateColumnNullability.nullable()) {
+      icebergUpdateSchema.makeColumnOptional(DOT.join(updateColumnNullability.fieldNames()));
+    } else {
+      // TODO: figure out how to enable users to make column required
+      // icebergUpdateSchema.allowIncompatibleChanges();
+      icebergUpdateSchema.requireColumn(DOT.join(updateColumnNullability.fieldNames()));
+    }
+  }
+
   private void doSetProperty(UpdateProperties icebergUpdateProperties, SetProperty setProperty) {
     icebergUpdateProperties.set(setProperty.getProperty(), setProperty.getValue());
   }
@@ -165,7 +177,6 @@ public class IcebergTableOpsHelper {
 
   private void doAddColumn(
       UpdateSchema icebergUpdateSchema, AddColumn addColumn, Schema icebergTableSchema) {
-    // todo(xiaojing) check new column is nullable
     String parentName = getParentName(addColumn.fieldNames());
     StructType parentStruct;
     if (parentName != null) {
@@ -183,12 +194,21 @@ public class IcebergTableOpsHelper {
       parentStruct = icebergTableSchema.asStruct();
     }
 
-    icebergUpdateSchema.addColumn(
-        getParentName(addColumn.fieldNames()),
-        getLeafName(addColumn.fieldNames()),
-        // TODO(minghuang): add nullable support in AddColumn
-        ConvertUtil.toIcebergType(true, addColumn.getDataType()),
-        addColumn.getComment());
+    if (addColumn.isNullable()) {
+      icebergUpdateSchema.addColumn(
+          getParentName(addColumn.fieldNames()),
+          getLeafName(addColumn.fieldNames()),
+          ConvertUtil.toIcebergType(addColumn.isNullable(), addColumn.getDataType()),
+          addColumn.getComment());
+    } else {
+      // TODO: figure out how to enable users to add required columns
+      // icebergUpdateSchema.allowIncompatibleChanges();
+      icebergUpdateSchema.addRequiredColumn(
+          getParentName(addColumn.fieldNames()),
+          getLeafName(addColumn.fieldNames()),
+          ConvertUtil.toIcebergType(addColumn.isNullable(), addColumn.getDataType()),
+          addColumn.getComment());
+    }
 
     ColumnPosition position = getAddColumnPosition(parentStruct, addColumn.getPosition());
     doMoveColumn(icebergUpdateSchema, addColumn.fieldNames(), position);
@@ -228,6 +248,9 @@ public class IcebergTableOpsHelper {
         doUpdateColumnType(icebergUpdateSchema, (UpdateColumnType) change, icebergTableSchema);
       } else if (change instanceof UpdateColumnComment) {
         doUpdateColumnComment(icebergUpdateSchema, (UpdateColumnComment) change);
+      } else if (change instanceof TableChange.UpdateColumnNullability) {
+        doUpdateColumnNullability(
+            icebergUpdateSchema, (TableChange.UpdateColumnNullability) change);
       } else {
         throw new NotSupportedException(
             "Iceberg doesn't support " + change.getClass().getSimpleName() + " for now");

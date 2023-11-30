@@ -475,6 +475,11 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
                       || !partitionFields.contains(fieldToAdd),
                   "Cannot alter partition column: " + fieldToAdd);
 
+              if (c instanceof TableChange.UpdateColumnNullability) {
+                throw new IllegalArgumentException(
+                    "Hive does not support altering column nullability");
+              }
+
               if (c instanceof TableChange.UpdateColumnPosition
                   && afterPartitionColumn(
                       partitionFields, ((TableChange.UpdateColumnPosition) c).getPosition())) {
@@ -485,16 +490,19 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
               if (c instanceof TableChange.AddColumn) {
                 TableChange.AddColumn addColumn = (TableChange.AddColumn) c;
 
-                if ((addColumn.getPosition() == null && !partitionFields.isEmpty())
-                    || (afterPartitionColumn(partitionFields, addColumn.getPosition()))) {
-                  throw new IllegalArgumentException("Cannot add column after partition column");
-                }
-
                 if (existingFields.contains(fieldToAdd)) {
                   throw new IllegalArgumentException(
                       "Cannot add column with duplicate name: " + fieldToAdd);
-                } else {
-                  existingFields.add(fieldToAdd);
+                }
+
+                if (addColumn.getPosition() == null) {
+                  // If the position is not specified, the column will be added to the end of the
+                  // non-partition columns.
+                  return;
+                }
+
+                if ((afterPartitionColumn(partitionFields, addColumn.getPosition()))) {
+                  throw new IllegalArgumentException("Cannot add column after partition column");
                 }
               }
             });
@@ -554,7 +562,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     validatePartitionForCreate(columns, partitioning);
     validateDistributionAndSort(distribution, sortOrders);
 
-    Arrays.stream(columns).forEach(this::validateColumnType);
+    Arrays.stream(columns).forEach(c -> validateNullable(c.name(), c.nullable()));
 
     TableType tableType = (TableType) tablePropertiesMetadata.getOrDefault(properties, TABLE_TYPE);
     Preconditions.checkArgument(
@@ -649,7 +657,9 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
           List<FieldSchema> cols = sd.getCols();
 
           if (change instanceof TableChange.AddColumn) {
-            doAddColumn(cols, (TableChange.AddColumn) change);
+            TableChange.AddColumn addColumn = (TableChange.AddColumn) change;
+            validateNullable(String.join(".", addColumn.fieldNames()), addColumn.isNullable());
+            doAddColumn(cols, addColumn);
 
           } else if (change instanceof TableChange.DeleteColumn) {
             doDeleteColumn(cols, (TableChange.DeleteColumn) change);
@@ -706,14 +716,14 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     }
   }
 
-  private void validateColumnType(Column column) {
+  private void validateNullable(String fieldName, boolean nullable) {
     // The NOT NULL constraint for column is supported since Hive3.0, see
     // https://issues.apache.org/jira/browse/HIVE-16575
-    if (!column.nullable()) {
+    if (!nullable) {
       throw new IllegalArgumentException(
           "The NOT NULL constraint for column is only supported since Hive 3.0, "
               + "but the current Gravitino Hive catalog only supports Hive 2.x. Illegal column: "
-              + column.name());
+              + fieldName);
     }
   }
 
@@ -771,9 +781,16 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
   }
 
   private void doAddColumn(List<FieldSchema> cols, TableChange.AddColumn change) {
-    // add to the end by default
-    int targetPosition =
-        change.getPosition() == null ? cols.size() : columnPosition(cols, change.getPosition());
+    int targetPosition;
+    if (change.getPosition() == null) {
+      // add to the end by default
+      targetPosition = cols.size();
+      LOG.info(
+          "Add position is null, add column {} to the end of non-partition columns",
+          change.fieldNames()[0]);
+    } else {
+      targetPosition = columnPosition(cols, change.getPosition());
+    }
     cols.add(
         targetPosition,
         new FieldSchema(
