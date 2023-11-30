@@ -46,20 +46,27 @@ public class TestOAuthDataProvider {
   }
 
   @Test
-  public void testAuthentication() throws Exception {
+  public void testProviderInitException() throws Exception {
+
     try (AuthDataProvider provider = new OAuthDataProvider()) {
-      Assertions.assertThrows(IllegalStateException.class, provider::hasTokenData);
-      Assertions.assertThrows(IllegalStateException.class, provider::hasTokenData);
       Map<String, String> props = Maps.newHashMap();
+      Assertions.assertThrows(IllegalStateException.class, provider::hasTokenData);
       Assertions.assertThrows(IllegalArgumentException.class, () -> provider.initialize(props));
+    }
+  }
+
+  @Test
+  public void testAuthenticationError() throws Exception {
+    try (AuthDataProvider provider = new OAuthDataProvider()) {
+      Map<String, String> props = Maps.newHashMap();
       props.put(OAuth2ClientUtil.CREDENTIAL, "yy:xx");
       props.put(OAuth2ClientUtil.URI, String.format("http://127.0.0.1:%d", PORT));
       props.put(OAuth2ClientUtil.PATH, "oauth/token");
       props.put(OAuth2ClientUtil.SCOPE, "test");
       HttpResponse mockResponse =
-          HttpResponse.response().withStatusCode(HttpStatus.SC_INTERNAL_SERVER_ERROR);
+              HttpResponse.response().withStatusCode(HttpStatus.SC_INTERNAL_SERVER_ERROR);
       OAuthErrorResponse respBody =
-          new OAuthErrorResponse(OAuth2ClientUtil.INVALID_CLIENT_ERROR, "invalid");
+              new OAuthErrorResponse(OAuth2ClientUtil.INVALID_CLIENT_ERROR, "invalid");
       String respJson = JsonUtils.objectMapper().writeValueAsString(respBody);
       mockResponse = mockResponse.withBody(respJson);
       mockServer.when(any(), Times.exactly(1)).respond(mockResponse);
@@ -69,9 +76,20 @@ public class TestOAuthDataProvider {
       mockResponse = mockResponse.withBody(respJson);
       mockServer.when(any(), Times.exactly(1)).respond(mockResponse);
       Assertions.assertThrows(BadRequestException.class, () -> provider.initialize(props));
-      mockResponse = HttpResponse.response().withStatusCode(HttpStatus.SC_OK);
+    }
+  }
+
+  @Test
+  public void testAuthenticationNormal() throws Exception {
+    try (AuthDataProvider provider = new OAuthDataProvider()) {
+      Map<String, String> props = Maps.newHashMap();
+      props.put(OAuth2ClientUtil.CREDENTIAL, "yy:xx");
+      props.put(OAuth2ClientUtil.URI, String.format("http://127.0.0.1:%d", PORT));
+      props.put(OAuth2ClientUtil.PATH, "oauth/token");
+      props.put(OAuth2ClientUtil.SCOPE, "test");
+      HttpResponse mockResponse = HttpResponse.response().withStatusCode(HttpStatus.SC_OK);
       OAuthTokenResponse response = new OAuthTokenResponse("1", "2", "3", 1, "test", null);
-      respJson = JsonUtils.objectMapper().writeValueAsString(response);
+      String respJson = JsonUtils.objectMapper().writeValueAsString(response);
       mockResponse = mockResponse.withBody(respJson);
       mockServer.when(any(), Times.exactly(1)).respond(mockResponse);
       Assertions.assertThrows(IllegalArgumentException.class, () -> provider.initialize(props));

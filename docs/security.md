@@ -13,7 +13,7 @@ Simple mode is the default authentication option.
 Simple mode allows the client to use the environment variable `GRAVITINO_USER` as the user.
 If the environment variable `GRAVITINO_USER` is not set, client will use the user of the machine which sends requests.
 For client side, users can enable `simple` mode by the code as below:
-```
+```java
 Gravitino client = GravitinoClient.builder(uri)
     .withAuthenticator("simple")
     .build();
@@ -24,7 +24,7 @@ Gravitino only supports external OAuth 2.0 server now.
 First, users need to guarantee that the external OAuth 2.0 server supports Bearer JWT and is configured properly.
 Then, for server side, users should set `gravitino.authenticator` as `oauth` and give `gravitino.authenticator.oauth.defaultSignKey` a proper value.
 Next, for client side, users can enable `oauth` mode by the code as below:
-```
+```java
 AuthDataProvider authDataProvider = new OAuthDataProvider();
 Map<String, String> props = Maps.newHashMap();
 // The client crendential for the OAuth 2.0 authorization server
