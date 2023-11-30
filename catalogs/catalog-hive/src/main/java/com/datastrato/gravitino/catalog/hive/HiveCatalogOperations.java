@@ -475,6 +475,11 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
                       || !partitionFields.contains(fieldToAdd),
                   "Cannot alter partition column: " + fieldToAdd);
 
+              if (c instanceof TableChange.UpdateColumnNullability) {
+                throw new IllegalArgumentException(
+                    "Hive does not support altering column nullability");
+              }
+
               if (c instanceof TableChange.UpdateColumnPosition
                   && afterPartitionColumn(
                       partitionFields, ((TableChange.UpdateColumnPosition) c).getPosition())) {
