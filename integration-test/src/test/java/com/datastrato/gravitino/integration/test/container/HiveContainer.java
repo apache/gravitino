@@ -2,7 +2,7 @@
  * Copyright 2023 Datastrato.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.gravitino.integration.test.util;
+package com.datastrato.gravitino.integration.test.container;
 
 import static java.lang.String.format;
 
@@ -22,13 +22,8 @@ public class HiveContainer extends BaseContainer {
   public static final String DEFAULT_IMAGE = System.getenv("GRAVITINO_CI_HIVE_DOCKER_IMAGE");
   public static final String HOST_NAME = "gravitino-ci-hive";
   private static final int MYSQL_PORT = 3306;
-  private static final int HDFS_DEFAULTFS_PORT = 9000;
+  public static final int HDFS_DEFAULTFS_PORT = 9000;
   public static final int HIVE_METASTORE_PORT = 9083;
-  private static final int HIVESERVER2_PORT = 10000;
-  private static final int HIVESERVER2_HTTP_PORT = 10002;
-  private static final int HDFS_NAMENODE_PORT = 50070;
-  private static final int HDFS_DATANODE_HTTP_SERVER_PORT = 50075;
-  private static final int HDFS_DATANODE_DATA_TRANSFER_PORT = 50010;
 
   public static Builder builder() {
     return new Builder();
@@ -92,16 +87,7 @@ public class HiveContainer extends BaseContainer {
     private Builder() {
       this.image = DEFAULT_IMAGE;
       this.hostName = HOST_NAME;
-      this.exposePorts =
-          ImmutableSet.of(
-              MYSQL_PORT,
-              HDFS_DEFAULTFS_PORT,
-              HIVE_METASTORE_PORT,
-              HIVESERVER2_PORT,
-              HIVESERVER2_HTTP_PORT,
-              HDFS_NAMENODE_PORT,
-              HDFS_DATANODE_HTTP_SERVER_PORT,
-              HDFS_DATANODE_DATA_TRANSFER_PORT);
+      this.exposePorts = ImmutableSet.of(MYSQL_PORT, HDFS_DEFAULTFS_PORT, HIVE_METASTORE_PORT);
     }
 
     @Override

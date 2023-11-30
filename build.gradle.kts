@@ -385,7 +385,8 @@ tasks {
 
   val copyCatalogLibAndConfigs by registering(Copy::class) {
     dependsOn(":catalogs:catalog-hive:copyLibAndConfig",
-            ":catalogs:catalog-lakehouse-iceberg:copyLibAndConfig")
+            ":catalogs:catalog-lakehouse-iceberg:copyLibAndConfig",
+            ":catalogs:catalog-jdbc-mysql:copyLibAndConfig")
   }
 
   clean {

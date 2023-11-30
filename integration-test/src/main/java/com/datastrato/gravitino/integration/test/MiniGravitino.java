@@ -106,11 +106,11 @@ public class MiniGravitino {
     long beginTime = System.currentTimeMillis();
     boolean started = false;
     while (System.currentTimeMillis() - beginTime < 1000 * 60 * 3) {
-      Thread.sleep(500);
       started = checkIfServerIsRunning();
       if (started || future.isDone()) {
         break;
       }
+      Thread.sleep(500);
     }
     if (!started) {
       throw new RuntimeException("Can not start Gravitino server");
