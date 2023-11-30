@@ -35,6 +35,8 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.tuple.Pair;
 
+// Referred from Apache Iceberg's OAuth2Util implementation
+// core/src/main/java/org/apache/iceberg/rest/OAuth2Util.java
 public class OAuth2ClientUtil {
 
   public static final String CREDENTIAL = "credential";

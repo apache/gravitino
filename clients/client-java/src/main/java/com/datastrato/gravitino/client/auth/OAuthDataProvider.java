@@ -32,14 +32,14 @@ public class OAuthDataProvider implements AuthDataProvider {
   @Override
   public void initialize(Map<String, String> properties) {
     this.credential = properties.get(OAuth2ClientUtil.CREDENTIAL);
-    Preconditions.checkArgument(StringUtils.isNotBlank(this.credential), "");
+    Preconditions.checkArgument(StringUtils.isNotBlank(this.credential), "OAuthDataProvider must contain credential");
     this.uri = properties.get(OAuth2ClientUtil.URI);
-    Preconditions.checkArgument(StringUtils.isNotBlank(this.uri), "");
+    Preconditions.checkArgument(StringUtils.isNotBlank(this.uri), "OAuthDataProvider must contain url");
     this.scope = properties.get(OAuth2ClientUtil.SCOPE);
-    Preconditions.checkArgument(StringUtils.isNotBlank(this.scope), "");
+    Preconditions.checkArgument(StringUtils.isNotBlank(this.scope), "OAuthDataProvider must contain scope");
     this.client = HTTPClient.builder(Collections.emptyMap()).uri(this.uri).build();
     this.path = properties.get(OAuth2ClientUtil.PATH);
-    Preconditions.checkArgument(StringUtils.isNotBlank(this.path), "");
+    Preconditions.checkArgument(StringUtils.isNotBlank(this.path), "OAuthDataProvider must contain path");
     OAuthTokenResponse response =
         OAuth2ClientUtil.fetchToken(client, Collections.emptyMap(), credential, scope, path);
     response.validate();
