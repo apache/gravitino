@@ -14,6 +14,7 @@ import com.datastrato.gravitino.integration.test.MiniGravitinoContext;
 import com.datastrato.gravitino.server.GravitinoServer;
 import com.datastrato.gravitino.server.ServerConfig;
 import com.datastrato.gravitino.server.web.JettyServerConfig;
+import java.io.File;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
@@ -158,9 +159,39 @@ public class AbstractIT {
     return hostIP;
   }
 
-  protected boolean gitIsInstalled() {
+  private boolean gitIsInstalled() {
     Object ret =
         CommandExecutor.executeCommandLocalHost("which git", false, ProcessData.TypesOfData.OUTPUT);
     return !ret.toString().trim().isEmpty();
+  }
+
+  protected String readCommitId() {
+    try {
+      if (gitIsInstalled()) {
+        // Read commit id by git
+        Object ret =
+            CommandExecutor.executeCommandLocalHost(
+                "git rev-parse HEAD", false, ProcessData.TypesOfData.OUTPUT);
+        return ret.toString().replace("\n", "");
+      } else {
+        // Read commit id from .git file
+        return readGitCommitIdFromGitFile();
+      }
+    } catch (IOException e) {
+      LOG.info("Can't get git commit id for:", e);
+      return "";
+    }
+  }
+
+  private String readGitCommitIdFromGitFile() throws IOException {
+    String gravitinoHome = System.getenv("GRAVITINO_HOME");
+    String gitFolder = gravitinoHome + File.pathSeparator + ".git" + File.pathSeparator;
+    String headFileContent = FileUtils.readFileToString(new File(gitFolder + "HEAD"), "UTF-8");
+    String[] refAndBranch = headFileContent.split(":");
+    if (refAndBranch.length == 1) {
+      return refAndBranch[0];
+    }
+
+    return FileUtils.readFileToString(new File(gitFolder + refAndBranch[1].trim()), "UTF-8").trim();
   }
 }
