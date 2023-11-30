@@ -39,18 +39,10 @@ To begin using Gravitino on AWS, follow these steps:
 
     You may need to reboot the instance for all changes to take effect.
 
-4. Install the required Java Development Kits for Gravitino:
+4. Install the required Java Development Kit for Gravitino:
 
     ```shell
-    sudo apt install openjdk-17-jdk-headless
     sudo apt install openjdk-8-jdk-headless
-    ```
-
-    List installed Java versions and use Java 8 for now.
-
-    ```shell
-    update-java-alternatives --list
-    sudo update-java-alternatives --set /usr/lib/jvm/java-1.8.0-openjdk-amd64
     ```
 
    Verify the Java version with:
@@ -110,10 +102,9 @@ To begin using Gravitino on AWS, follow these steps:
 
 To use Gravitino locally on OSX, follow similar steps:
 
-1. Install the required Java Development Kits using Homebrew:
+1. Install the required Java Development Kit using Homebrew:
 
     ```shell
-    brew install openjdk@17
     brew install openjdk@8
     ```
 
