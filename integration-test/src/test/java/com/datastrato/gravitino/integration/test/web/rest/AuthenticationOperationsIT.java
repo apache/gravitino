@@ -29,6 +29,7 @@ import java.util.Map;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIf;
 
 public class AuthenticationOperationsIT extends AbstractIT {
 
@@ -59,6 +60,7 @@ public class AuthenticationOperationsIT extends AbstractIT {
   }
 
   @Test
+  @EnabledIf("gitIsInstalled")
   public void testAuthenticationApi() throws Exception {
     Object ret =
         CommandExecutor.executeCommandLocalHost(

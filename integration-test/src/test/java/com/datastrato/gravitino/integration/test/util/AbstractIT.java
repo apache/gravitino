@@ -157,4 +157,10 @@ public class AbstractIT {
     }
     return hostIP;
   }
+
+  protected boolean gitIsInstalled() {
+    Object ret =
+        CommandExecutor.executeCommandLocalHost("which git", false, ProcessData.TypesOfData.OUTPUT);
+    return !ret.toString().trim().isEmpty();
+  }
 }

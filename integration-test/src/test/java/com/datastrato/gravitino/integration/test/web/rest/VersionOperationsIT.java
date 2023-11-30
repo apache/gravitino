@@ -10,9 +10,11 @@ import com.datastrato.gravitino.integration.test.util.CommandExecutor;
 import com.datastrato.gravitino.integration.test.util.ProcessData;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIf;
 
 public class VersionOperationsIT extends AbstractIT {
   @Test
+  @EnabledIf("gitIsInstalled")
   public void testGetVersion() {
     Object ret =
         CommandExecutor.executeCommandLocalHost(
