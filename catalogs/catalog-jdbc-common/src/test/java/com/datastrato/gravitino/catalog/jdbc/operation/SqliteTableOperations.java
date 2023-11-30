@@ -8,6 +8,7 @@ import com.datastrato.gravitino.catalog.jdbc.JdbcColumn;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.Collections;
 import java.util.Map;
 
@@ -68,8 +69,20 @@ public class SqliteTableOperations extends JdbcTableOperations {
   }
 
   @Override
-  protected String generateAlterTableSql(String tableName, TableChange... changes) {
+  protected String generateAlterTableSql(
+      String databaseName, String tableName, TableChange... changes) {
     throw new UnsupportedOperationException("Alter table is not supported in sqlite.");
+  }
+
+  @Override
+  protected JdbcColumn extractJdbcColumnFromResultSet(ResultSet resultSet) throws SQLException {
+    return new JdbcColumn.Builder()
+        .withName(resultSet.getString("COLUMN_NAME"))
+        .withComment(null)
+        .withType(typeConverter.toGravitinoType(resultSet.getString("TYPE_NAME")))
+        .withNullable(resultSet.getBoolean("NULLABLE"))
+        .withDefaultValue(resultSet.getString("COLUMN_DEF"))
+        .build();
   }
 
   @Override

@@ -55,7 +55,7 @@ public class SqliteDatabaseOperations extends JdbcDatabaseOperations {
   }
 
   @Override
-  public List<String> list() {
+  public List<String> listDatabases() {
     File file = new File(dbPath);
     Preconditions.checkArgument(file.exists(), "Database path %s does not exist", dbPath);
     return Arrays.stream(Objects.requireNonNull(file.listFiles()))
@@ -81,13 +81,13 @@ public class SqliteDatabaseOperations extends JdbcDatabaseOperations {
   }
 
   @Override
-  String generateCreateDatabaseSql(
+  public String generateCreateDatabaseSql(
       String databaseName, String comment, Map<String, String> properties) {
     return null;
   }
 
   @Override
-  String generateDropDatabaseSql(String databaseName, boolean cascade) {
+  public String generateDropDatabaseSql(String databaseName, boolean cascade) {
     return null;
   }
 }
