@@ -85,17 +85,6 @@ public final class JettyServer {
     errorHandler.setServer(server);
     server.addBean(errorHandler);
 
-    // Create and set Http ServerConnector
-    ServerConnector httpConnector =
-        createHttpServerConnector(
-            server,
-            serverConfig.getRequestHeaderSize(),
-            serverConfig.getResponseHeaderSize(),
-            serverConfig.getHost(),
-            serverConfig.getHttpPort(),
-            serverConfig.getIdleTimeout());
-    server.addConnector(httpConnector);
-
     if (serverConfig.isHttpsEnabled()) {
       // Create and set Https ServerConnector
       Preconditions.checkArgument(
@@ -106,7 +95,7 @@ public final class JettyServer {
           "If enables https, must set keyStorePassword");
       Preconditions.checkArgument(
           StringUtils.isNotBlank(serverConfig.getManagerPassword()),
-          "If enables http, must set managerPassword");
+          "If enables https, must set managerPassword");
       ServerConnector httpsConnector =
           createHttpsServerConnector(
               server,
@@ -119,6 +108,17 @@ public final class JettyServer {
               serverConfig.getKeyStorePassword(),
               serverConfig.getManagerPassword());
       server.addConnector(httpsConnector);
+    } else {
+      // Create and set Http ServerConnector
+      ServerConnector httpConnector =
+          createHttpServerConnector(
+              server,
+              serverConfig.getRequestHeaderSize(),
+              serverConfig.getResponseHeaderSize(),
+              serverConfig.getHost(),
+              serverConfig.getHttpPort(),
+              serverConfig.getIdleTimeout());
+      server.addConnector(httpConnector);
     }
 
     // Initialize ServletContextHandler or WebAppContext
@@ -159,20 +159,8 @@ public final class JettyServer {
       throw new RuntimeException("Failed to start " + serverName + " web server.", e);
     }
 
-    if (serverConfig.isHttpsEnabled()) {
-      LOG.info(
-          "{} web server started on host {} http port {} https port {}.",
-          serverName,
-          serverConfig.getHost(),
-          serverConfig.getHttpPort(),
-          serverConfig.getHttpsPort());
-    } else {
-      LOG.info(
-          "{} web server started on host {} port {}.",
-          serverName,
-          serverConfig.getHost(),
-          serverConfig.getHttpPort());
-    }
+    LOG.info(
+        "{} web server started on host {} port {}.", serverName, serverConfig.getHost(), getPort());
   }
 
   public synchronized void join() {
@@ -198,20 +186,12 @@ public final class JettyServer {
         if (threadPool instanceof LifeCycle) {
           ((LifeCycle) threadPool).stop();
         }
-        if (serverConfig.isHttpsEnabled()) {
-          LOG.info(
-              "{} web server stopped on host {} http port {} https port {}.",
-              serverName,
-              serverConfig.getHost(),
-              serverConfig.getHttpPort(),
-              serverConfig.getHttpsPort());
-        } else {
-          LOG.info(
-              "{} web server stopped on host {} port {}.",
-              serverName,
-              serverConfig.getHost(),
-              serverConfig.getHttpPort());
-        }
+
+        LOG.info(
+            "{} web server stopped on host {} port {}.",
+            serverName,
+            serverConfig.getHost(),
+            getPort());
       } catch (Exception e) {
         // Swallow the exception.
         LOG.warn("Failed to stop {} web server.", serverName, e);
@@ -315,6 +295,14 @@ public final class JettyServer {
     connector.setReuseAddress(true);
 
     return connector;
+  }
+
+  private int getPort() {
+    if (serverConfig.isHttpsEnabled()) {
+      return serverConfig.getHttpsPort();
+    } else {
+      return serverConfig.getHttpPort();
+    }
   }
 
   private ServerConnector createHttpsServerConnector(
