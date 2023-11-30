@@ -29,7 +29,6 @@ import java.util.Map;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.EnabledIf;
 
 public class AuthenticationOperationsIT extends AbstractIT {
 
@@ -60,13 +59,7 @@ public class AuthenticationOperationsIT extends AbstractIT {
   }
 
   @Test
-  @EnabledIf("gitIsInstalled")
   public void testAuthenticationApi() throws Exception {
-    Object ret =
-        CommandExecutor.executeCommandLocalHost(
-            "git rev-parse HEAD", false, ProcessData.TypesOfData.OUTPUT);
-    String gitCommitId = ret.toString().replace("\n", "");
-
     JettyServerConfig jettyServerConfig =
         JettyServerConfig.fromConfig(serverConfig, WEBSERVER_CONF_PREFIX);
 
@@ -88,7 +81,14 @@ public class AuthenticationOperationsIT extends AbstractIT {
       String respGitCommit = resp.getVersion().gitCommit();
       Assertions.assertEquals(System.getenv("PROJECT_VERSION"), version);
       Assertions.assertFalse(compileDate.isEmpty());
-      Assertions.assertEquals(gitCommitId, respGitCommit);
+
+      if (gitIsInstalled()) {
+        Object ret =
+            CommandExecutor.executeCommandLocalHost(
+                "git rev-parse HEAD", false, ProcessData.TypesOfData.OUTPUT);
+        String gitCommitId = ret.toString().replace("\n", "");
+        Assertions.assertEquals(gitCommitId, respGitCommit);
+      }
     }
   }
 }

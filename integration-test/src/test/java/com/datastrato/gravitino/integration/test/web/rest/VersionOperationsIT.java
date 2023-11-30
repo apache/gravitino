@@ -10,20 +10,19 @@ import com.datastrato.gravitino.integration.test.util.CommandExecutor;
 import com.datastrato.gravitino.integration.test.util.ProcessData;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.EnabledIf;
 
 public class VersionOperationsIT extends AbstractIT {
   @Test
-  @EnabledIf("gitIsInstalled")
   public void testGetVersion() {
-    Object ret =
-        CommandExecutor.executeCommandLocalHost(
-            "git rev-parse HEAD", false, ProcessData.TypesOfData.OUTPUT);
-    String gitCommitId = ret.toString().replace("\n", "");
-
     GravitinoVersion gravitinoVersion = client.getVersion();
     Assertions.assertEquals(System.getenv("PROJECT_VERSION"), gravitinoVersion.version());
     Assertions.assertFalse(gravitinoVersion.compileDate().isEmpty());
-    Assertions.assertEquals(gitCommitId, gravitinoVersion.gitCommit());
+    if (gitIsInstalled()) {
+      Object ret =
+          CommandExecutor.executeCommandLocalHost(
+              "git rev-parse HEAD", false, ProcessData.TypesOfData.OUTPUT);
+      String gitCommitId = ret.toString().replace("\n", "");
+      Assertions.assertEquals(gitCommitId, gravitinoVersion.gitCommit());
+    }
   }
 }
