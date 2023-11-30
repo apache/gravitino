@@ -190,6 +190,17 @@ public class TestTableChange {
   }
 
   @Test
+  public void testUpdateColumnNullability() {
+    String[] fieldNames = {"existing_column"};
+    TableChange.UpdateColumnNullability updateColumnType =
+        (TableChange.UpdateColumnNullability)
+            TableChange.updateColumnNullability(fieldNames, false);
+
+    assertArrayEquals(fieldNames, updateColumnType.fieldNames());
+    assertFalse(updateColumnType.nullable());
+  }
+
+  @Test
   public void testUpdateColumnType() {
     String[] fieldNames = {"existing_column"};
     Type dataType = Types.StringType.get();
