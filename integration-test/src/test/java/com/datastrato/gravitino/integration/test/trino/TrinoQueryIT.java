@@ -180,7 +180,7 @@ public class TrinoQueryIT {
 
     boolean catalogCreated = false;
     int tries = 30;
-    while (!catalogCreated && tries >= 0) {
+    while (!catalogCreated && tries-- >= 0) {
       String result = trinoQueryRunner.runQuery("show catalogs");
       if (result.contains(metalakeName + "." + catalogName)) {
         catalogCreated = true;
@@ -221,15 +221,15 @@ public class TrinoQueryIT {
                             tableCatalog.dropTable(
                                 NameIdentifier.ofTable(
                                     metalakeName, catalogName, schema.name(), table.name()));
+                            LOG.info(
+                                "Drop table \"{}.{}\".{}.{}",
+                                metalakeName,
+                                catalogName,
+                                schema.name(),
+                                table.name());
                           } catch (Exception e) {
                             LOG.error("Failed to drop table {}", table);
                           }
-                          LOG.info(
-                              "Drop table \"{}.{}\".{}.{}",
-                              metalakeName,
-                              catalogName,
-                              schema.name(),
-                              table.name());
                         });
 
                 schemas.dropSchema(
@@ -244,7 +244,7 @@ public class TrinoQueryIT {
     LOG.info("Drop catalog \"{}.{}\"", metalakeName, catalogName);
   }
 
-  private String[] readCatalogs() throws Exception {
+  private String[] readCatalogNames() throws Exception {
     File dir = new File(testQueriesDir);
     if (dir.exists()) {
       return dir.list();
@@ -258,7 +258,7 @@ public class TrinoQueryIT {
       return;
     }
 
-    String[] catalogNames = readCatalogs();
+    String[] catalogNames = readCatalogNames();
 
     ExecutorService executor = Executors.newFixedThreadPool(catalogNames.length);
     CompletionService completionService = new ExecutorCompletionService<>(executor);
@@ -310,10 +310,7 @@ public class TrinoQueryIT {
   }
 
   private String readFileToString(String filename) throws IOException {
-    String fileContent = "";
-    fileContent = new String(Files.readAllBytes(Paths.get(filename)));
-    fileContent += "\n\n";
-    return fileContent;
+    return new String(Files.readAllBytes(Paths.get(filename))) + "\n\n";
   }
 
   private void runQueriesAndCheck(String testDirName, String testerId) throws Exception {

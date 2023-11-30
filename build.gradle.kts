@@ -220,6 +220,7 @@ tasks.rat {
     "licenses/*txt",
     "integration-test/**",
     "web/.**",
+    "web/dist/**/*",
     "web/node_modules/**/*",
     "web/src/iconify-bundle/bundle-icons-react.js",
     "web/src/iconify-bundle/icons-bundle-react.js",
