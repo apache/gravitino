@@ -109,6 +109,22 @@ public interface TableChange {
    * If the new field is nested and its parent does not exist or is not a struct, the change will
    * result in an {@link IllegalArgumentException}.
    *
+   * @param fieldNames The field names of the new column.
+   * @param dataType The new column's data type.
+   * @param position The new column's position.
+   * @return A TableChange for the addition.
+   */
+  static TableChange addColumn(String[] fieldNames, Type dataType, ColumnPosition position) {
+    return new AddColumn(fieldNames, dataType, null, position, true);
+  }
+
+  /**
+   * Create a TableChange for adding a column.
+   *
+   * <p>If the field already exists, the change will result in an {@link IllegalArgumentException}.
+   * If the new field is nested and its parent does not exist or is not a struct, the change will
+   * result in an {@link IllegalArgumentException}.
+   *
    * @param fieldNames Field names of the new column.
    * @param dataType The new column's data type.
    * @param comment The new field's comment string.
