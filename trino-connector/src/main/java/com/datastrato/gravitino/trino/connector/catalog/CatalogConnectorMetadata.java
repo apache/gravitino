@@ -51,13 +51,13 @@ public class CatalogConnectorMetadata {
   private final String catalogName;
   private final SupportsSchemas schemaCatalog;
   private final TableCatalog tableCatalog;
+  private final Catalog catalog;
 
   public CatalogConnectorMetadata(GravitinoMetaLake metalake, NameIdentifier catalogIdentifier) {
     try {
       this.catalogName = catalogIdentifier.name();
       this.metalake = metalake;
-      Catalog catalog = metalake.loadCatalog(catalogIdentifier);
-
+      this.catalog = metalake.loadCatalog(catalogIdentifier);
       // Make sure the catalog support schema operations.
       this.schemaCatalog = catalog.asSchemas();
       this.tableCatalog = catalog.asTableCatalog();
