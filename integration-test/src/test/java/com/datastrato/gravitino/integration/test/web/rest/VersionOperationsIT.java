@@ -15,7 +15,7 @@ public class VersionOperationsIT extends AbstractIT {
     GravitinoVersion gravitinoVersion = client.getVersion();
     Assertions.assertEquals(System.getenv("PROJECT_VERSION"), gravitinoVersion.version());
     Assertions.assertFalse(gravitinoVersion.compileDate().isEmpty());
-    final String gitCommitId = readCommitId();
+    final String gitCommitId = readGitCommitIdFromGitFile();
     Assertions.assertEquals(gitCommitId, gravitinoVersion.gitCommit());
   }
 }

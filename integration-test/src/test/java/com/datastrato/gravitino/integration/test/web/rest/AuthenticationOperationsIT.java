@@ -80,7 +80,7 @@ public class AuthenticationOperationsIT extends AbstractIT {
       Assertions.assertEquals(System.getenv("PROJECT_VERSION"), version);
       Assertions.assertFalse(compileDate.isEmpty());
 
-      final String gitCommitId = readCommitId();
+      final String gitCommitId = readGitCommitIdFromGitFile();
       Assertions.assertEquals(gitCommitId, respGitCommit);
     }
   }

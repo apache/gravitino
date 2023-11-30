@@ -159,39 +159,20 @@ public class AbstractIT {
     return hostIP;
   }
 
-  private boolean gitIsInstalled() {
-    Object ret =
-        CommandExecutor.executeCommandLocalHost("which git", false, ProcessData.TypesOfData.OUTPUT);
-    return !ret.toString().trim().isEmpty();
-  }
-
-  protected String readCommitId() {
+  protected String readGitCommitIdFromGitFile() {
     try {
-      if (gitIsInstalled()) {
-        // Read commit id by git
-        Object ret =
-            CommandExecutor.executeCommandLocalHost(
-                "git rev-parse HEAD", false, ProcessData.TypesOfData.OUTPUT);
-        return ret.toString().replace("\n", "");
-      } else {
-        // Read commit id from .git file
-        return readGitCommitIdFromGitFile();
+      String gravitinoHome = System.getenv("GRAVITINO_HOME");
+      String gitFolder = gravitinoHome + File.separator + ".git" + File.separator;
+      String headFileContent = FileUtils.readFileToString(new File(gitFolder + "HEAD"), "UTF-8");
+      String[] refAndBranch = headFileContent.split(":");
+      if (refAndBranch.length == 1) {
+        return refAndBranch[0];
       }
+      return FileUtils.readFileToString(new File(gitFolder + refAndBranch[1].trim()), "UTF-8")
+          .trim();
     } catch (IOException e) {
-      LOG.info("Can't get git commit id for:", e);
+      LOG.warn("Can't get git commit id for:", e);
       return "";
     }
-  }
-
-  private String readGitCommitIdFromGitFile() throws IOException {
-    String gravitinoHome = System.getenv("GRAVITINO_HOME");
-    String gitFolder = gravitinoHome + File.pathSeparator + ".git" + File.pathSeparator;
-    String headFileContent = FileUtils.readFileToString(new File(gitFolder + "HEAD"), "UTF-8");
-    String[] refAndBranch = headFileContent.split(":");
-    if (refAndBranch.length == 1) {
-      return refAndBranch[0];
-    }
-
-    return FileUtils.readFileToString(new File(gitFolder + refAndBranch[1].trim()), "UTF-8").trim();
   }
 }
