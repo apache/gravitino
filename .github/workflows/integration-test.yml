@@ -61,7 +61,7 @@ jobs:
       - name: Package Gravitino
         run: |
           gradle build -x test
-          gradle compileDistribution
+          gradle compileDistribution -x test
 
       - name: Check docker container status
         uses: nick-fields/retry@v2
@@ -89,18 +89,16 @@ jobs:
           gradle test --rerun-tasks -PskipTests -PtestMode=embedded
           gradle test --rerun-tasks -PskipTests -PtestMode=deploy
 
-      - name: Print logs when Gravitino integration tests failure
+      - name: Upload integrate tests reports
+        uses: actions/upload-artifact@v3
         if: ${{ failure() && steps.integrationTest.outcome == 'failure' }}
-        run: |
-          if [ -f "integration-test/build/integration-test.log" ]; then
-            cat integration-test/build/integration-test.log
-          fi
-          if [ -f "distribution/package/logs/gravitino-server.out" ]; then
-            cat distribution/package/logs/gravitino-server.out
-          fi
-          if [ -f "distribution/package/logs/gravitino-server.log" ]; then
-            cat distribution/package/logs/gravitino-server.log
-          fi
+        with:
+          name: integrate test reports 
+          path: |
+            build/reports
+            integration-test/build/integration-test.log
+            distribution/package/logs/gravitino-server.out
+            distribution/package/logs/gravitino-server.log
 
       - name: Stop and remove container
         run: |

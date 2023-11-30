@@ -13,6 +13,7 @@ import com.github.jk1.license.render.ReportRenderer
 import com.github.jk1.license.render.InventoryHtmlReportRenderer
 import com.github.jk1.license.filter.DependencyFilter
 import com.github.jk1.license.filter.LicenseBundleNormalizer
+import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 
 plugins {
   `maven-publish`
@@ -139,6 +140,13 @@ subprojects {
   }
 
   tasks.configureEach<Test> {
+    testLogging {
+      exceptionFormat = TestExceptionFormat.FULL
+      showExceptions = true
+      showCauses = true
+      showStackTraces = true
+    }
+    reports.html.outputLocation.set(file("${rootProject.projectDir}/build/reports/"))
     val skipTests = project.hasProperty("skipTests")
     if (!skipTests) {
       if (project.name == "trino-connector") {
