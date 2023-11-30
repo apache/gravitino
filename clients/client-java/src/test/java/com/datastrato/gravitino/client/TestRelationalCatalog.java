@@ -799,6 +799,29 @@ public class TestRelationalCatalog extends TestBase {
   }
 
   @Test
+  public void testUpdateTableColumnNullability() throws JsonProcessingException {
+    NameIdentifier tableId = NameIdentifier.of(metalakeName, catalogName, "schema1", "table1");
+    ColumnDTO[] columns =
+        new ColumnDTO[] {createMockColumn("col1", Types.StringType.get(), "comment1")};
+
+    DistributionDTO distributionDTO = createMockDistributionDTO("col1", 10);
+    SortOrderDTO[] sortOrderDTOs = createMockSortOrderDTO("col1", DESCENDING);
+    TableDTO expectedTable =
+        createMockTable(
+            "table1",
+            columns,
+            "comment",
+            Collections.emptyMap(),
+            EMPTY_PARTITIONING,
+            distributionDTO,
+            sortOrderDTOs);
+    TableUpdateRequest.UpdateTableColumnNullabilityRequest req =
+        new TableUpdateRequest.UpdateTableColumnNullabilityRequest(new String[] {"col1"}, true);
+
+    testAlterTable(tableId, req, expectedTable);
+  }
+
+  @Test
   public void testUpdateTableColumnPosition() throws JsonProcessingException {
     NameIdentifier tableId = NameIdentifier.of(metalakeName, catalogName, "schema1", "table1");
     ColumnDTO[] columns =
@@ -911,6 +934,8 @@ public class TestRelationalCatalog extends TestBase {
           updatedTable.columns()[i].dataType(), alteredTable.columns()[i].dataType());
       Assertions.assertEquals(
           updatedTable.columns()[i].comment(), alteredTable.columns()[i].comment());
+      Assertions.assertEquals(
+          updatedTable.columns()[i].nullable(), alteredTable.columns()[i].nullable());
     }
 
     Assertions.assertArrayEquals(updatedTable.partitioning(), alteredTable.partitioning());
@@ -959,11 +984,6 @@ public class TestRelationalCatalog extends TestBase {
         .withComment(comment)
         .withNullable(nullable)
         .build();
-  }
-
-  private static TableDTO createMockTable(
-      String name, ColumnDTO[] columns, String comment, Map<String, String> properties) {
-    return createMockTable(name, columns, comment, properties, EMPTY_PARTITIONING, null, null);
   }
 
   private static TableDTO createMockTable(
