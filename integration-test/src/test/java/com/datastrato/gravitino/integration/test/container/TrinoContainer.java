@@ -2,11 +2,15 @@
  * Copyright 2023 Datastrato.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.gravitino.integration.test.util;
+package com.datastrato.gravitino.integration.test.container;
 
 import static java.lang.String.format;
 
+import com.datastrato.gravitino.integration.test.util.ITUtils;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
@@ -49,8 +53,13 @@ public class TrinoContainer extends BaseContainer {
       Map<String, String> extraHosts,
       Map<String, String> filesToMount,
       Map<String, String> envVars,
-      Optional<Network> network) {
+      Optional<Network> network,
+      String trinoConfDir,
+      InetSocketAddress gravitinoServerAddress,
+      String metalakeName,
+      String hiveContainerIP) {
     super(image, hostName, ports, extraHosts, filesToMount, envVars, network);
+    updateTrinoConfigFile(trinoConfDir, gravitinoServerAddress, metalakeName, hiveContainerIP);
   }
 
   @Override
@@ -99,6 +108,37 @@ public class TrinoContainer extends BaseContainer {
     }
 
     super.close();
+  }
+
+  private void updateTrinoConfigFile(
+      String trinoConfDir,
+      InetSocketAddress gravitinoServerAddress,
+      String metalakeName,
+      String hiveContainerIP) {
+    try {
+      ITUtils.rewriteConfigFile(
+          trinoConfDir + "/catalog/gravitino.properties.template",
+          trinoConfDir + "/catalog/gravitino.properties",
+          ImmutableMap.<String, String>builder()
+              .put(
+                  TrinoContainer.TRINO_CONF_GRAVITINO_URI,
+                  String.format(
+                      "http://%s:%d",
+                      gravitinoServerAddress.getAddress().getHostAddress(),
+                      gravitinoServerAddress.getPort()))
+              .put(TrinoContainer.TRINO_CONF_GRAVITINO_METALAKE, metalakeName)
+              .build());
+
+      ITUtils.rewriteConfigFile(
+          trinoConfDir + "/catalog/hive.properties.template",
+          trinoConfDir + "/catalog/hive.properties",
+          ImmutableMap.of(
+              TrinoContainer.TRINO_CONF_HIVE_METASTORE_URI,
+              String.format("thrift://%s:%d", hiveContainerIP, HiveContainer.HIVE_METASTORE_PORT)));
+    } catch (IOException e) {
+      LOG.error("Failed to update Trino config file: ", e);
+      throw new RuntimeException(e);
+    }
   }
 
   public boolean initTrinoJdbcConnection() {
@@ -189,16 +229,52 @@ public class TrinoContainer extends BaseContainer {
 
   public static class Builder
       extends BaseContainer.Builder<TrinoContainer.Builder, TrinoContainer> {
+    protected String trinoConfDir;
+    protected InetSocketAddress gravitinoServerAddress;
+    protected String metalakeName;
+    protected String hiveContainerIP;
+
     private Builder() {
       this.image = DEFAULT_IMAGE;
       this.hostName = HOST_NAME;
       this.exposePorts = ImmutableSet.of();
     }
 
+    public TrinoContainer.Builder withTrinoConfDir(String trinoConfDir) {
+      this.trinoConfDir = trinoConfDir;
+      return self;
+    }
+
+    public TrinoContainer.Builder withGravitinoServerAddress(
+        InetSocketAddress gravitinoServerAddress) {
+      this.gravitinoServerAddress = gravitinoServerAddress;
+      return self;
+    }
+
+    public TrinoContainer.Builder withMetalakeName(String metalakeName) {
+      this.metalakeName = metalakeName;
+      return self;
+    }
+
+    public TrinoContainer.Builder withHiveContainerIP(String hiveContainerIP) {
+      this.hiveContainerIP = hiveContainerIP;
+      return self;
+    }
+
     @Override
     public TrinoContainer build() {
       return new TrinoContainer(
-          image, hostName, exposePorts, extraHosts, filesToMount, envVars, network);
+          image,
+          hostName,
+          exposePorts,
+          extraHosts,
+          filesToMount,
+          envVars,
+          network,
+          trinoConfDir,
+          gravitinoServerAddress,
+          metalakeName,
+          hiveContainerIP);
     }
   }
 }
