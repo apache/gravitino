@@ -138,11 +138,19 @@ You have two modes to debug the Gravitino server and integration tests: `embedde
   - Stop the Docker image to clean up.
 
 ## Test Failure
-If a test fails, valuable information can be retrieved from the logs and test report.Test reports 
-are stored in the `./build/reports` directory.The integration test logs are situated in the 
+If a test fails, valuable information can be retrieved from the logs and test report. Test reports 
+are stored in the `./build/reports` directory. The integration test logs are situated in the 
 `./integrate-test/build` directory. In deploy mode, Gravitino server logs can be found at 
 `./distribution/package/logs/` directory. In the event of a test failure within the GitHub workflow, 
 both logs and the test report are archived. To obtain the archive, please follow these steps:
 1. Click the `detail` link associated with the failed integrate test in the pull request (PR). This will redirect you to the job page.
+
+   ![pr page Image](assets/test-fail-pr.png)
+
 2. On the job page, locate the `Summary` button on the left-hand side and click it to access the workflow summary page.
+
+   ![job page Image](assets/test-fail-job.png)
+
 3. Look for the Artifacts item on the summary page and download the archive from there.
+
+   ![summary page Image](assets/test-fail-summary.png)
