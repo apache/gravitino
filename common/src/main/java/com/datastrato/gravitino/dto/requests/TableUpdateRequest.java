@@ -49,6 +49,9 @@ import org.apache.commons.lang3.StringUtils;
       value = TableUpdateRequest.UpdateTableColumnPositionRequest.class,
       name = "updateColumnPosition"),
   @JsonSubTypes.Type(
+      value = TableUpdateRequest.UpdateTableColumnNullabilityRequest.class,
+      name = "updateColumnNullability"),
+  @JsonSubTypes.Type(
       value = TableUpdateRequest.DeleteTableColumnRequest.class,
       name = "deleteColumn")
 })
@@ -402,6 +405,43 @@ public interface TableUpdateRequest extends RESTRequest {
     @Override
     public TableChange tableChange() {
       return TableChange.updateColumnPosition(fieldName, newPosition);
+    }
+  }
+
+  @EqualsAndHashCode
+  @ToString
+  class UpdateTableColumnNullabilityRequest implements TableUpdateRequest {
+
+    @Getter
+    @JsonProperty("fieldName")
+    private final String[] fieldName;
+
+    @Getter
+    @JsonProperty("newNullable")
+    private final boolean newNullable;
+
+    public UpdateTableColumnNullabilityRequest(String[] fieldName, boolean newNullable) {
+      this.fieldName = fieldName;
+      this.newNullable = newNullable;
+    }
+
+    // For Jackson deserialization
+    public UpdateTableColumnNullabilityRequest() {
+      this(null, true);
+    }
+
+    @Override
+    public TableChange tableChange() {
+      return TableChange.updateColumnNullability(fieldName, newNullable);
+    }
+
+    @Override
+    public void validate() throws IllegalArgumentException {
+      Preconditions.checkArgument(
+          fieldName != null
+              && fieldName.length > 0
+              && Arrays.stream(fieldName).allMatch(StringUtils::isNotBlank),
+          "\"fieldName\" field is required and cannot be empty");
     }
   }
 
