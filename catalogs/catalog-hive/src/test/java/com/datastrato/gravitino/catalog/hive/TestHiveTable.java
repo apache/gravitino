@@ -479,7 +479,10 @@ public class TestHiveTable extends MiniHiveMetastoreService {
                     .asTableCatalog()
                     .alterTable(
                         tableIdentifier,
-                        TableChange.addColumn(new String[] {"col_1"}, Types.ByteType.get())));
+                        TableChange.addColumn(
+                            new String[] {"col_3"},
+                            Types.ByteType.get(),
+                            TableChange.ColumnPosition.after(col2.name()))));
     Assertions.assertTrue(
         exception.getMessage().contains("Cannot add column after partition column"));
 
@@ -508,11 +511,7 @@ public class TestHiveTable extends MiniHiveMetastoreService {
             TableChange.removeProperty("key1"),
             TableChange.setProperty("key2", "val2_new"),
             // columns current format: [col_1:I8:comment, col_2:DATE:comment]
-            TableChange.addColumn(
-                new String[] {"col_3"},
-                Types.StringType.get(),
-                null,
-                TableChange.ColumnPosition.after(col1.name())),
+            TableChange.addColumn(new String[] {"col_3"}, Types.StringType.get()),
             // columns current format: [col_1:I8:comment, col_3:STRING:null, col_2:DATE:comment]
             TableChange.renameColumn(new String[] {"col_3"}, "col_3_new"),
             // columns current format: [col_1:I8:comment, col_3_new:STRING:null, col_2:DATE:comment]

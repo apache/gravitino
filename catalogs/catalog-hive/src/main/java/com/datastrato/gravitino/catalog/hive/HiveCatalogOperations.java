@@ -485,16 +485,19 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
               if (c instanceof TableChange.AddColumn) {
                 TableChange.AddColumn addColumn = (TableChange.AddColumn) c;
 
-                if ((addColumn.getPosition() == null && !partitionFields.isEmpty())
-                    || (afterPartitionColumn(partitionFields, addColumn.getPosition()))) {
-                  throw new IllegalArgumentException("Cannot add column after partition column");
-                }
-
                 if (existingFields.contains(fieldToAdd)) {
                   throw new IllegalArgumentException(
                       "Cannot add column with duplicate name: " + fieldToAdd);
-                } else {
-                  existingFields.add(fieldToAdd);
+                }
+
+                if (addColumn.getPosition() == null) {
+                  // If the position is not specified, the column will be added to the end of the
+                  // non-partition columns.
+                  return;
+                }
+
+                if ((afterPartitionColumn(partitionFields, addColumn.getPosition()))) {
+                  throw new IllegalArgumentException("Cannot add column after partition column");
                 }
               }
             });
@@ -773,9 +776,16 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
   }
 
   private void doAddColumn(List<FieldSchema> cols, TableChange.AddColumn change) {
-    // add to the end by default
-    int targetPosition =
-        change.getPosition() == null ? cols.size() : columnPosition(cols, change.getPosition());
+    int targetPosition;
+    if (change.getPosition() == null) {
+      // add to the end by default
+      targetPosition = cols.size();
+      LOG.info(
+          "Add position is null, add column {} to the end of non-partition columns",
+          change.fieldNames()[0]);
+    } else {
+      targetPosition = columnPosition(cols, change.getPosition());
+    }
     cols.add(
         targetPosition,
         new FieldSchema(

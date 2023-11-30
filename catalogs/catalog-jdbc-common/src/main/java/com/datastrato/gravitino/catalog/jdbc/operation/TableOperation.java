@@ -59,7 +59,7 @@ public interface TableOperation {
    * @param databaseName The name of the database.
    * @return A list of table names in the database.
    */
-  List<String> list(String databaseName) throws NoSuchSchemaException;
+  List<String> listTables(String databaseName) throws NoSuchSchemaException;
 
   /**
    * @param databaseName The name of the database.

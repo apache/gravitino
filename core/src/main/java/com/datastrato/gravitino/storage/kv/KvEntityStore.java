@@ -78,6 +78,7 @@ public class KvEntityStore implements EntityStore {
   @VisibleForTesting StorageLayoutVersion storageLayoutVersion;
 
   private TransactionIdGenerator txIdGenerator;
+  private KvGarbageCollector kvGarbageCollector;
   private TransactionalKvBackend transactionalKvBackend;
 
   @Override
@@ -87,9 +88,13 @@ public class KvEntityStore implements EntityStore {
     //  instance, We should make it configurable in the future.
     this.txIdGenerator = new TransactionIdGeneratorImpl(backend, config);
     txIdGenerator.start();
+
     this.transactionalKvBackend = new TransactionalKvBackendImpl(backend, txIdGenerator);
 
+    this.kvGarbageCollector = new KvGarbageCollector(backend, config);
+    kvGarbageCollector.start();
     this.reentrantReadWriteLock = new ReentrantReadWriteLock();
+
     this.nameMappingService =
         new KvNameMappingService(transactionalKvBackend, reentrantReadWriteLock);
     this.entityKeyEncoder = new BinaryEntityKeyEncoder(nameMappingService);
@@ -401,6 +406,7 @@ public class KvEntityStore implements EntityStore {
   @Override
   public void close() throws IOException {
     txIdGenerator.close();
+    kvGarbageCollector.close();
     backend.close();
   }
 
