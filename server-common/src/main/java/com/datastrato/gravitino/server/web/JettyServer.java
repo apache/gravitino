@@ -289,7 +289,7 @@ public final class JettyServer {
 
     HttpConnectionFactory httpConnectionFactory = new HttpConnectionFactory(httpConfig);
     ServerConnector connector =
-        createServerConnector(server, HTTP, new ConnectionFactory[] {httpConnectionFactory});
+        createServerConnector(server, new ConnectionFactory[] {httpConnectionFactory});
     connector.setHost(host);
     connector.setPort(port);
     connector.setReuseAddress(true);
@@ -334,7 +334,7 @@ public final class JettyServer {
         new SslConnectionFactory(sslContextFactory, HTTP_PROTOCOL);
     ServerConnector connector =
         createServerConnector(
-            server, HTTPS, new ConnectionFactory[] {sslConnectionFactory, httpConnectionFactory});
+            server, new ConnectionFactory[] {sslConnectionFactory, httpConnectionFactory});
     connector.setHost(host);
     connector.setPort(port);
     connector.setReuseAddress(true);
@@ -342,10 +342,9 @@ public final class JettyServer {
   }
 
   private ServerConnector createServerConnector(
-      Server server, String type, ConnectionFactory[] connectionFactories) {
+      Server server, ConnectionFactory[] connectionFactories) {
     Scheduler serverExecutor =
-        new ScheduledExecutorScheduler(
-            String.format("%s-%s-webserver-JettyScheduler", serverName, type), true);
+        new ScheduledExecutorScheduler(serverName + "-webserver-JettyScheduler", true);
 
     return new ServerConnector(server, null, serverExecutor, null, -1, -1, connectionFactories);
   }
