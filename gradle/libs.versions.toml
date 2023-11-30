@@ -42,6 +42,7 @@ publish-plugin = '1.2.0'
 rat-plugin = '0.8.0'
 shadow-plugin = "8.1.1"
 metrics = "4.2.19"
+prometheus = "0.16.0"
 
 
 [libraries]
@@ -114,6 +115,9 @@ metrics-jersey2 = { group = "io.dropwizard.metrics", name = "metrics-jersey2", v
 metrics-jvm = { group = "io.dropwizard.metrics", name = "metrics-jvm", version.ref = "metrics" }
 metrics-jmx = { group = "io.dropwizard.metrics", name = "metrics-jmx", version.ref = "metrics" }
 metrics-servlets = { group = "io.dropwizard.metrics", name = "metrics-servlets", version.ref = "metrics" }
+prometheus-client = { group = "io.prometheus", name = "simpleclient", version.ref = "prometheus" }
+prometheus-dropwizard = { group = "io.prometheus", name = "simpleclient_dropwizard", version.ref = "prometheus" }
+prometheus-servlet = { group = "io.prometheus", name = "simpleclient_servlet", version.ref = "prometheus" }
 
 [bundles]
 log4j = ["slf4j-api", "log4j-slf4j2-impl", "log4j-api", "log4j-core", "log4j-12-api"]
@@ -122,6 +126,7 @@ jersey = ["jersey-server", "jersey-container-servlet-core", "jersey-container-je
 iceberg = ["iceberg-core", "iceberg-api"]
 jwt = ["jwt-api", "jwt-impl", "jwt-gson"]
 metrics = ["metrics-core", "metrics-jersey2", "metrics-jvm", "metrics-jmx", "metrics-servlets"]
+prometheus = ["prometheus-servlet", "prometheus-dropwizard", "prometheus-client"]
 
 [plugins]
 protobuf = { id = "com.google.protobuf", version.ref = "protobuf-plugin" }
