@@ -53,11 +53,11 @@ http://{GravitinoServerHost}:8090/api/metalakes/{Your_metalake_name}/catalogs
 
 ### catalog configuration
 
-| Configuration item                | Description                                      | value                                                                                                |
-|-----------------------------------|--------------------------------------------------|------------------------------------------------------------------------------------------------------|
-| `catalog-backend` | Catalog backend of Gravitino Iceberg             | `hive` or `jdbc`                                                                                     |
-| `uri` | Hive metadata address or JDBC connection address | `thrift://127.0.0.1:9083` or `jdbc:postgresql://127.0.0.1:5432/` or `jdbc:mysql://127.0.0.1:3306/test`        |
-| `warehouse` | Warehouse directory of Catalog                   | `/user/hive/warehouse-hive/`  or `hdfs://namespace/hdfs/path`                                        |
+| Configuration item | Description                                      | value                                                                                                  |
+|--------------------|--------------------------------------------------|--------------------------------------------------------------------------------------------------------|
+| `catalog-backend`  | Catalog backend of Gravitino Iceberg             | `hive` or `jdbc`                                                                                       |
+| `uri`              | Hive metadata address or JDBC connection address | `thrift://127.0.0.1:9083` or `jdbc:postgresql://127.0.0.1:5432/` or `jdbc:mysql://127.0.0.1:3306/test` |
+| `warehouse`        | Warehouse directory of Catalog                   | `/user/hive/warehouse-hive/`  or `hdfs://namespace/hdfs/path`                                          |
 
 ### HDFS configuration
 
@@ -80,7 +80,7 @@ Example JSON:
     "columns": [
         {
             "name": "id",
-            "type": "i32",
+            "type": "integer",
             "comment": "id column comment",
             "nullable": false
         },
@@ -92,7 +92,7 @@ Example JSON:
         },
         {
             "name": "age",
-            "type": "i32",
+            "type": "integer",
             "comment": "age column comment",
             "nullable": false
         },
@@ -137,15 +137,15 @@ Iceberg lacks distribution support. For buckets, consider using partitions inste
 ### table properties
 Gravitino reserves the following fields and they cannot be passed in properties.
 
-| Configuration item                                                            | Description                                                                                                                                                                                |
-|-------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `comment`                                                                     | The table comment.                                                                                                                                                                         |
-| `creator`                                                                     | The table creator.                                                                                                                                                                         |
-| `location`                                                                    | Iceberg location for table storage.                                                                         |
-| `current-snapshot-id`                                                         | The snapshot representing the current state of the table.                    |
-| `cherry-pick-snapshot-id`                                                     | Selecting a specific snapshots in a merge operation. |
-| `sort-order`                                                                  | Selecting a specific snapshots in a merge operation.         |
-| `identifier-fields`                                                                            | The identifier field(s) for defining the table.                                                                                                                                           |
+| Configuration item        | Description                                               |
+|---------------------------|-----------------------------------------------------------|
+| `comment`                 | The table comment.                                        |
+| `creator`                 | The table creator.                                        |
+| `location`                | Iceberg location for table storage.                       |
+| `current-snapshot-id`     | The snapshot representing the current state of the table. |
+| `cherry-pick-snapshot-id` | Selecting a specific snapshots in a merge operation.      |
+| `sort-order`              | Selecting a specific snapshots in a merge operation.      |
+| `identifier-fields`       | The identifier field(s) for defining the table.           |
 
 Regarding Iceberg's properties, you can refer to [official documentation](https://iceberg.apache.org/docs/1.3.1/configuration/).
 
