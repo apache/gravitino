@@ -89,7 +89,7 @@ public class TestTableUpdatesRequest {
             + "      \"fieldName\": [\n"
             + "        \"column\"\n"
             + "      ],\n"
-            + "      \"newNullable\": false\n"
+            + "      \"nullable\": false\n"
             + "    },\n"
             + "    {\n"
             + "      \"@type\": \"deleteColumn\",\n"

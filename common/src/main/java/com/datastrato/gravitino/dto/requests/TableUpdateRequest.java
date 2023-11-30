@@ -417,12 +417,12 @@ public interface TableUpdateRequest extends RESTRequest {
     private final String[] fieldName;
 
     @Getter
-    @JsonProperty("newNullable")
-    private final boolean newNullable;
+    @JsonProperty("nullable")
+    private final boolean nullable;
 
-    public UpdateTableColumnNullabilityRequest(String[] fieldName, boolean newNullable) {
+    public UpdateTableColumnNullabilityRequest(String[] fieldName, boolean nullable) {
       this.fieldName = fieldName;
-      this.newNullable = newNullable;
+      this.nullable = nullable;
     }
 
     // For Jackson deserialization
@@ -432,7 +432,7 @@ public interface TableUpdateRequest extends RESTRequest {
 
     @Override
     public TableChange tableChange() {
-      return TableChange.updateColumnNullability(fieldName, newNullable);
+      return TableChange.updateColumnNullability(fieldName, nullable);
     }
 
     @Override
