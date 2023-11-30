@@ -46,56 +46,45 @@ The Gravitino server can be deployed locally to run the integration tests. Follo
 Some integration test cases depend on the Gravitino CI Docker environment.
 
 If an integration test relies on the specific Gravitino CI Docker environment,
-you need to set the `@tag(CI-DOCKER-NAME)` annotation in the test class.
+you need to set the `@tag(gravitino-docker-it)` annotation in the test class.
 For example, the `integration-test/src/test/.../CatalogHiveIT.java` test needs to connect to
 the `datastrato/gravitino-ci-hive` Docker container for testing the Hive data source.
-Therefore, it should have the following `@tag` annotation:`@tag(CI-DOCKER-NAME)`, This annotation
+Therefore, it should have the following `@tag` annotation:`@tag(gravitino-docker-it)`, This annotation
 helps identify the specific Docker container required for the integration test.
 For example:
 
 ```java
-@Tag("gravitino-ci-hive")
+@Tag("gravitino-docker-it")
 public class CatalogHiveIT extends AbstractIT {
 ...
 }
 ```
 
-If you have Docker installed and a special CI Docker container running, the `./gradlew test -PtestMode=[embedded|deploy]`
+### Running all integration tests
+If you're running `Docker server` and `mac-docker-connector` (only macOS need to run `mac-docker-connector`), the `./gradlew test -PtestMode=[embedded|deploy]`
 command will automatically execute all the test cases.
 
 ```text
 ------------------- Check Docker environment --------------------
 Docker server status ............................................ [running]
-Gravitino IT Docker container is already running ................ [yes]
-Using Gravitino IT Docker container to run all integration tests. [embbeded|deploy test]
+mac-docker-connector server status .............................. [running]
+Using Gravitino IT Docker container to run all integration tests. [embedded test]
 -----------------------------------------------------------------
 ```
 
-If Docker is not installed or the special CI Docker container is not running, the `./gradlew test -PtestMode=[embedded|deploy]`
-command will skip the test cases that depend on the special Docker environment.
+### Docker server or mac-docker-connector not running
+If `Docker server` or `mac-docker-connector` is not running (only required to run in macOS), the `./gradlew test -PtestMode=[embedded|deploy]`
+command will run test cases without `gravitino-docker-it` tag.
 
 ```text
 ------------------- Check Docker environment ------------------
-Docker server status .......................................... [running]
-Gravitino IT Docker container is already running .............. [no]
-Run only test cases where a tag is set `gravitino-docker-it`.   [embbeded|deploy test]
+Docker server status ............................................ [stop]
+mac-docker-connector server status .............................. [stop]
+Run test cases without `gravitino-docker-it` tag ................ [embedded test]
 ---------------------------------------------------------------
+Tip: Please make sure to start the `Docker server before` running the integration tests.
+Tip: Please make sure to execute the `dev/docker/tools/mac-docker-connector.sh` script before running the integration test in MacOS.
 ```
-
-> Gravitino will run all integration test cases in the GitHub Actions environment.
-
-### Running Gravitino CI Docker Environment
-
-Before running the tests, make sure Docker is installed.
-
-#### Running Gravitino Hive CI Docker Environment
-
-1. Run a hive docker test environment container locally using the `docker run --rm -d -p 9000:9000 -p 9083:9083 -p 10000:10000 -p 10002:10002 -p 50010:50010 -p 50070:50070 -p 50075:50075 datastrato/gravitino-ci-hive:0.1.4` command.
-
-The Gravitino server and Docker runtime environments will also use certain ports. Ensure that these ports are not already in use:
-
-- Gravitino server: Port `8090`
-- Hive Docker runtime environment: Ports are `9000`, `9083`, `10000`, `10002`, `50010`, `50070`, and `50075`
 
 ## Debugging Gravitino Server and Integration Tests
 
@@ -127,15 +116,11 @@ You have two modes to debug the Gravitino server and integration tests: `embedde
 - Test results can be viewed in the `Actions` tab of the pull request page.
 - The integration tests are executed in several steps:
 
-  - If you set the `build docker image` label in the pull request, GitHub Actions will trigger the build of all Docker
-    images under the `./dev/docker/` directory. This step usually takes around 10 minutes. If you have changed the Dockerfile,
-    you need to set the `build docker image` label in the pull request.
-  - Otherwise, GitHub Actions will pull the Docker image `datastrato/gravitino-ci-hive` from the Docker Hub repository. This step usually takes around 15 seconds.
+  - Gravitino integration tests will pull the CI Docker image from the Docker Hub repository. This step usually takes around 15 seconds.
   - If you set the `debug action` label in the pull request, GitHub Actions will run an SSH server with
     `csexton/debugger-action@master`, allows you to log in to the Actions environment for remote debugging.
   - The Gravitino project is compiled and packaged in the `distribution` directory using the `./gradlew compileDistribution` command.
   - Execution the `./gradlew test -PtestMode=[embedded|deploy]` command.
-  - Stop the Docker image to clean up.
 
 ## Test Failure
 If a test fails, valuable information can be retrieved from the logs and test report. Test reports 
