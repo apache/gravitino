@@ -714,11 +714,23 @@ public class HTTPClient implements RESTClient {
       return this;
     }
 
+    /**
+     * Sets the authenticator for the HTTP client.
+     *
+     * @param authenticator The authenticator to be used for authentication.
+     * @return This Builder instance for method chaining.
+     */
     public Builder withAuthenticator(String authenticator) {
       this.authenticator = authenticator;
       return this;
     }
 
+    /**
+     * Sets the AuthDataProvider for the HTTP client.
+     *
+     * @param authDataProvider The authDataProvider provide the data used to authenticate.
+     * @return This Builder instance for method chaining.
+     */
     public Builder withAuthDataProvider(AuthDataProvider authDataProvider) {
       this.authDataProvider = authDataProvider;
       return this;
