@@ -124,7 +124,7 @@ public class HTTPClient implements RESTClient {
    *
    * <p>According to the spec, the only currently defined/used "success" responses are 200 and 202.
    *
-   * @param response The reponse to check for success.
+   * @param response The response to check for success.
    * @return True if the response is successful, false otherwise.
    */
   private boolean isSuccessful(CloseableHttpResponse response) {
@@ -135,11 +135,11 @@ public class HTTPClient implements RESTClient {
   }
 
   /**
-   * Builds an error reponse based on the provided HTTP response.
+   * Builds an error response based on the provided HTTP response.
    *
    * <p>This method extracts the reason phrase from the response and uses it as the message for the
    * ErrorResponse. If the reason phrase doesn't exist, it retrieves the standard reason phrase from
-   * teh English phrase catalog.
+   * the English phrase catalog.
    *
    * @param response The response from which the ErrorResponse is built.
    * @return An ErrorResponse object representing the REST error response.

@@ -29,7 +29,7 @@ public interface SchemaChange {
    * SchemaChange class to set the property and value pairs for the schema.
    *
    * @param property The property name to set.
-   * @param value The value to set teh property to.
+   * @param value The value to set the property to.
    * @return The SchemaChange object.
    */
   static SchemaChange setProperty(String property, String value) {
