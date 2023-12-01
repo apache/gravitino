@@ -43,7 +43,7 @@ public class AbstractIT {
 
   protected static Config serverConfig;
 
-  static String testMode = "";
+  public static String testMode = "";
 
   protected static Map<String, String> customConfigs = new HashMap<>();
 

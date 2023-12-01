@@ -12,6 +12,7 @@ import com.datastrato.gravitino.client.ErrorHandlers;
 import com.datastrato.gravitino.client.HTTPClient;
 import com.datastrato.gravitino.dto.responses.VersionResponse;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
+import com.datastrato.gravitino.integration.test.util.ITUtils;
 import com.datastrato.gravitino.json.JsonUtils;
 import com.datastrato.gravitino.server.auth.OAuthConfig;
 import com.datastrato.gravitino.server.web.JettyServerConfig;
@@ -80,8 +81,11 @@ public class AuthenticationOperationsIT extends AbstractIT {
       Assertions.assertEquals(System.getenv("PROJECT_VERSION"), version);
       Assertions.assertFalse(compileDate.isEmpty());
 
-      final String gitCommitId = readGitCommitIdFromGitFile();
-      Assertions.assertEquals(gitCommitId, respGitCommit);
+      // Only in embedded will we have the git commit id.
+      if (testMode.equals(ITUtils.EMBEDDED_TEST_MODE)) {
+        final String gitCommitId = readGitCommitIdFromGitFile();
+        Assertions.assertEquals(gitCommitId, respGitCommit);
+      }
     }
   }
 }
