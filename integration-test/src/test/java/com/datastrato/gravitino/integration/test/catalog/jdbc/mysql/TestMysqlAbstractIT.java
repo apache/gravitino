@@ -2,7 +2,7 @@
  * Copyright 2023 Datastrato.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.gravitino.integration.test.catalog.mysql.operation;
+package com.datastrato.gravitino.integration.test.catalog.jdbc.mysql;
 
 import com.datastrato.gravitino.catalog.jdbc.config.JdbcConfig;
 import com.datastrato.gravitino.catalog.jdbc.utils.DataSourceUtils;
@@ -15,9 +15,11 @@ import javax.sql.DataSource;
 import org.apache.commons.lang3.RandomUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Tag;
 import org.testcontainers.containers.MySQLContainer;
 import org.testcontainers.shaded.com.google.common.collect.Maps;
 
+@Tag("gravitino-docker-it")
 public class TestMysqlAbstractIT {
 
   private static MySQLContainer<?> MYSQL_CONTAINER;

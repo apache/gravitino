@@ -2,7 +2,7 @@
  * Copyright 2023 Datastrato.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.gravitino.integration.test.catalog.mysql.operation;
+package com.datastrato.gravitino.integration.test.catalog.jdbc.mysql;
 
 import static com.datastrato.gravitino.catalog.mysql.operation.MysqlTableOperations.AUTO_INCREMENT;
 import static com.datastrato.gravitino.catalog.mysql.operation.MysqlTableOperations.PRIMARY_KEY;
@@ -20,8 +20,10 @@ import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.RandomUtils;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
+@Tag("gravitino-docker-it")
 public class TestMysqlTableOperations extends TestMysqlAbstractIT {
 
   private static Type VARCHAR = Types.VarCharType.of(255);
