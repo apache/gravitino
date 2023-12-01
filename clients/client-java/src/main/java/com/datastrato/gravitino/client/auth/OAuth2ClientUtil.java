@@ -39,10 +39,7 @@ import org.apache.commons.lang3.tuple.Pair;
 // core/src/main/java/org/apache/iceberg/rest/OAuth2Util.java
 public class OAuth2ClientUtil {
 
-  public static final String CREDENTIAL = "credential";
   public static final String SCOPE = "scope";
-  public static final String URI = "uri";
-  public static final String PATH = "path";
   private static final Splitter CREDENTIAL_SPLITTER = Splitter.on(":").limit(2).trimResults();
   private static final String GRANT_TYPE = "grant_type";
   private static final String CLIENT_CREDENTIALS = "client_credentials";

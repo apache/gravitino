@@ -6,7 +6,6 @@ package com.datastrato.gravitino.integration.test.util;
 
 import com.datastrato.gravitino.client.auth.AuthDataProvider;
 import java.io.IOException;
-import java.util.Map;
 
 public class OAuthMockDataProvider implements AuthDataProvider {
 
@@ -19,11 +18,6 @@ public class OAuthMockDataProvider implements AuthDataProvider {
   }
 
   private byte[] token;
-
-  @Override
-  public void initialize(Map<String, String> properties) {
-    // no op
-  }
 
   @Override
   public boolean hasTokenData() {

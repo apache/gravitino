@@ -6,7 +6,6 @@ package com.datastrato.gravitino.client.auth;
 
 import java.io.IOException;
 import java.util.Base64;
-import java.util.Collections;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -17,7 +16,6 @@ public class TestSimpleAuthDataProvider {
     try (AuthDataProvider provider = new SimpleAuthDataProvider()) {
       Assertions.assertThrows(IllegalStateException.class, provider::hasTokenData);
       Assertions.assertThrows(IllegalStateException.class, provider::getTokenData);
-      provider.initialize(Collections.emptyMap());
       Assertions.assertTrue(provider.hasTokenData());
       String user = System.getenv("GRAVITINO_USER");
       String tokenString = new String(Base64.getDecoder().decode(provider.getTokenData()));

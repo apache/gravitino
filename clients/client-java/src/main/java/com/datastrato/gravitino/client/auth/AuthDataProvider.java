@@ -6,17 +6,9 @@
 package com.datastrato.gravitino.client.auth;
 
 import java.io.Closeable;
-import java.util.Map;
 
 /** The provider of authentication data */
 public interface AuthDataProvider extends Closeable {
-
-  /**
-   * Use the properties to initialize the AuthDataProvider.
-   *
-   * @param properties The properties which are used for initialize.
-   */
-  void initialize(Map<String, String> properties);
 
   /**
    * Judge whether AuthDataProvider can provide token data.

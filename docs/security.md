@@ -14,7 +14,7 @@ Simple mode allows the client to use the environment variable `GRAVITINO_USER` a
 If the environment variable `GRAVITINO_USER` is not set, client will use the user of the machine which sends requests.
 For client side, users can enable `simple` mode by the code as below:
 ```java
-Gravitino client = GravitinoClient.builder(uri)
+GravitinoClient client = GravitinoClient.builder(uri)
     .withAuthenticator("simple")
     .build();
 ```
@@ -25,18 +25,13 @@ First, users need to guarantee that the external OAuth 2.0 server supports Beare
 Then, for server side, users should set `gravitino.authenticator` as `oauth` and give `gravitino.authenticator.oauth.defaultSignKey` a proper value.
 Next, for client side, users can enable `oauth` mode by the code as below:
 ```java
-AuthDataProvider authDataProvider = new OAuthDataProvider();
-Map<String, String> props = Maps.newHashMap();
-// The client crendential for the OAuth 2.0 authorization server
-props.put(OAuth2ClientUtil.CREDENTIAL, "clientId:clientSecret");
-// The server url of the OAuth 2.0 authorization server
-props.put(OAuth2ClientUtil.URI, String.format("http://127.0.0.1:%d", PORT));
-// The path of requesting the access token
-props.put(OAuth2ClientUtil.PATH, "oauth/token");
-// The scope of client
-props.put(OAuth2ClientUtil.SCOPE, "test");
-auDataProvider.initialize(props);
-Gravitino client = GravitinoClient.builder(uri).
+AuthDataProvider authDataProvider = OAuthDataProvider.builder("oauth server uri")
+    .withCredential("yy:xx")
+    .withPath("oauth/token")
+    .withScope("test")
+    .build();
+
+GravitinoClient client = GravitinoClient.builder(uri)
     .withAuthenticator("oauth")
     .withAuthDataProvider(authDataProvider)
     .build();

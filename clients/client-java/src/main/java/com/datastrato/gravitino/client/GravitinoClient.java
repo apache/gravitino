@@ -247,7 +247,8 @@ public class GravitinoClient implements SupportsMetalakes, Closeable {
     }
 
     /**
-     * Sets the authenticator for the HTTP client.
+     * Sets the authenticator for the HTTP client. setting as `simple` or `oauth`. If we choose
+     * simple as the authenticator, we shouldn't set AuthDataProvider.
      *
      * @param authenticator The authenticator to be used for authentication.
      * @return This Builder instance for method chaining.
@@ -258,7 +259,9 @@ public class GravitinoClient implements SupportsMetalakes, Closeable {
     }
 
     /**
-     * Sets the AuthDataProvider for the HTTP client.
+     * Sets the AuthDataProvider for the HTTP client. If we choose `simple` as the authenticator, we
+     * shouldn't set AuthDataProvider. If we choose `oauth` as the authenticator, we should build a
+     * OAuthDataProvider object and pass it as the parameter of this method.
      *
      * @param authDataProvider The authDataProvider provide the data used to authenticate.
      * @return This Builder instance for method chaining.

@@ -38,7 +38,6 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.util.Collections;
 import java.util.Map;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
@@ -715,7 +714,8 @@ public class HTTPClient implements RESTClient {
     }
 
     /**
-     * Sets the authenticator for the HTTP client.
+     * Sets the authenticator for the HTTP client. setting as `simple` or `oauth`. If we choose
+     * simple as the authenticator, we shouldn't set AuthDataProvider.
      *
      * @param authenticator The authenticator to be used for authentication.
      * @return This Builder instance for method chaining.
@@ -726,7 +726,9 @@ public class HTTPClient implements RESTClient {
     }
 
     /**
-     * Sets the AuthDataProvider for the HTTP client.
+     * Sets the AuthDataProvider for the HTTP client. If we choose `simple` as the authenticator, we
+     * shouldn't set AuthDataProvider. If we choose `oauth` as the authenticator, we should build a
+     * OAuthDataProvider object and pass it as the parameter of this method.
      *
      * @param authDataProvider The authDataProvider provide the data used to authenticate.
      * @return This Builder instance for method chaining.
@@ -748,7 +750,6 @@ public class HTTPClient implements RESTClient {
         AuthClientUtil.checkAuthArgument(authenticatorType, authDataProvider);
         if (authenticatorType.equals(AuthenticatorType.SIMPLE)) {
           authDataProvider = new SimpleAuthDataProvider();
-          authDataProvider.initialize(Collections.emptyMap());
         }
       }
       return new HTTPClient(uri, baseHeaders, mapper, authenticatorType, authDataProvider);
