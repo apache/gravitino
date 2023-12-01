@@ -124,7 +124,7 @@ public class HTTPClient implements RESTClient {
    *
    * <p>According to the spec, the only currently defined/used "success" responses are 200 and 202.
    *
-   * @param response The reponse to check for success.
+   * @param response The response to check for success.
    * @return True if the response is successful, false otherwise.
    */
   private boolean isSuccessful(CloseableHttpResponse response) {
