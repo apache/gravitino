@@ -40,7 +40,7 @@ public class CatalogResponse extends BaseResponse {
   /**
    * Validates the response data.
    *
-   * @throws IllegalArgumentException if teh catalog name, type or audit is not set.
+   * @throws IllegalArgumentException if the catalog name, type or audit is not set.
    */
   @Override
   public void validate() throws IllegalArgumentException {
