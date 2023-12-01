@@ -12,8 +12,7 @@ import com.datastrato.gravitino.client.ErrorHandlers;
 import com.datastrato.gravitino.client.HTTPClient;
 import com.datastrato.gravitino.dto.responses.VersionResponse;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
-import com.datastrato.gravitino.integration.test.util.CommandExecutor;
-import com.datastrato.gravitino.integration.test.util.ProcessData;
+import com.datastrato.gravitino.integration.test.util.ITUtils;
 import com.datastrato.gravitino.json.JsonUtils;
 import com.datastrato.gravitino.server.auth.OAuthConfig;
 import com.datastrato.gravitino.server.web.JettyServerConfig;
@@ -60,11 +59,6 @@ public class AuthenticationOperationsIT extends AbstractIT {
 
   @Test
   public void testAuthenticationApi() throws Exception {
-    Object ret =
-        CommandExecutor.executeCommandLocalHost(
-            "git rev-parse HEAD", false, ProcessData.TypesOfData.OUTPUT);
-    String gitCommitId = ret.toString().replace("\n", "");
-
     JettyServerConfig jettyServerConfig =
         JettyServerConfig.fromConfig(serverConfig, WEBSERVER_CONF_PREFIX);
 
@@ -86,7 +80,12 @@ public class AuthenticationOperationsIT extends AbstractIT {
       String respGitCommit = resp.getVersion().gitCommit();
       Assertions.assertEquals(System.getenv("PROJECT_VERSION"), version);
       Assertions.assertFalse(compileDate.isEmpty());
-      Assertions.assertEquals(gitCommitId, respGitCommit);
+
+      // Only in embedded will we have the git commit id.
+      if (testMode.equals(ITUtils.EMBEDDED_TEST_MODE)) {
+        final String gitCommitId = readGitCommitIdFromGitFile();
+        Assertions.assertEquals(gitCommitId, respGitCommit);
+      }
     }
   }
 }

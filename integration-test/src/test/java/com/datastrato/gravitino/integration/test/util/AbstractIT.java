@@ -14,6 +14,7 @@ import com.datastrato.gravitino.integration.test.MiniGravitinoContext;
 import com.datastrato.gravitino.server.GravitinoServer;
 import com.datastrato.gravitino.server.ServerConfig;
 import com.datastrato.gravitino.server.web.JettyServerConfig;
+import java.io.File;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
@@ -42,7 +43,7 @@ public class AbstractIT {
 
   protected static Config serverConfig;
 
-  static String testMode = "";
+  public static String testMode = "";
 
   protected static Map<String, String> customConfigs = new HashMap<>();
 
@@ -157,5 +158,22 @@ public class AbstractIT {
       LOG.error(e.getMessage(), e);
     }
     return hostIP;
+  }
+
+  protected String readGitCommitIdFromGitFile() {
+    try {
+      String gravitinoHome = System.getenv("GRAVITINO_HOME");
+      String gitFolder = gravitinoHome + File.separator + ".git" + File.separator;
+      String headFileContent = FileUtils.readFileToString(new File(gitFolder + "HEAD"), "UTF-8");
+      String[] refAndBranch = headFileContent.split(":");
+      if (refAndBranch.length == 1) {
+        return refAndBranch[0].trim();
+      }
+      return FileUtils.readFileToString(new File(gitFolder + refAndBranch[1].trim()), "UTF-8")
+          .trim();
+    } catch (IOException e) {
+      LOG.warn("Can't get git commit id for:", e);
+      return "";
+    }
   }
 }
