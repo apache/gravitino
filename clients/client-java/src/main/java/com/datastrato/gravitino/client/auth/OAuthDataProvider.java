@@ -119,7 +119,7 @@ public class OAuthDataProvider implements AuthDataProvider {
     /**
      * Sets the credential for the HTTP token requests.
      *
-     * @param credential The credential for the token HTTP request.
+     * @param credential The credential for the HTTP token requests.
      * @return This Builder instance for method chaining.
      */
     public Builder withCredential(String credential) {
