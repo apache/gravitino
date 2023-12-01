@@ -5,7 +5,7 @@
 FROM trinodb/trino:426
 LABEL maintainer="support@datastrato.com"
 
-# Only mysql, hudi, iceberg, mariadb, jmx, memory, tpch, tpcds, hive plugin are kept
+# Only mysql, hudi, iceberg, mariadb, jmx, memory, tpch, tpcds, postgresql, hive plugin are kept
 RUN rm -rf /usr/lib/trino/plugin/accumulo  \
     && rm -rf /usr/lib/trino/plugin/blackhole \
     && rm -rf /usr/lib/trino/plugin/delta-lake \
@@ -41,10 +41,16 @@ RUN rm -rf /usr/lib/trino/plugin/accumulo  \
     && rm -rf /usr/lib/trino/plugin/hudi \
     && rm -rf /usr/lib/trino/plugin/kudu \
     && rm -rf /usr/lib/trino/plugin/password-authenticators \
-    && rm -rf /usr/lib/trino/plugin/postgresql \
     && rm -rf /usr/lib/trino/plugin/redis \
     && rm -rf /usr/lib/trino/plugin/session-property-managers \
     && rm -rf /usr/lib/trino/plugin/teradata-functions
 
 COPY --chown=trino:trino packages/trino/conf /etc/trino
 COPY --chown=trino:trino packages/gravitino-trino-connector /usr/lib/trino/plugin/gravitino
+
+# Use ARGs to update trino conf and start Trino server
+ARG GRAVITINO_HOST_IP
+ARG GRAVITINO_HOST_PORT
+ARG GRAVITINO_METALAKE_NAME
+ARG HIVE_HOST_IP
+ENTRYPOINT ["/bin/bash", "-c", "/etc/trino/update-trino-conf.sh && /usr/lib/trino/bin/run-trino"]
