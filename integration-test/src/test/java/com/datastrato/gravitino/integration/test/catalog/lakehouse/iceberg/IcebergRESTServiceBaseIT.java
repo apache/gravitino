@@ -222,6 +222,8 @@ public class IcebergRESTServiceBaseIT extends AbstractIT {
             .config("spark.sql.catalog.rest", "org.apache.iceberg.spark.SparkCatalog")
             .config("spark.sql.catalog.rest.type", "rest")
             .config("spark.sql.catalog.rest.uri", IcebergRESTUri)
+            // drop Iceberg table purge may hang in spark local mode
+            .config("spark.locality.wait.node", "0")
             .getOrCreate();
   }
 
