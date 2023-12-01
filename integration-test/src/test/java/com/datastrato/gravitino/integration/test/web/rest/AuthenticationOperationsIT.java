@@ -51,7 +51,6 @@ public class AuthenticationOperationsIT extends AbstractIT {
     configs.put(AuthConstants.HTTP_HEADER_AUTHORIZATION, token);
     registerCustomConfigs(configs);
     OAuthMockDataProvider mockDataProvider = OAuthMockDataProvider.getInstance();
-    mockDataProvider.initialize(Collections.emptyMap());
     mockDataProvider.setTokenData(token.getBytes(StandardCharsets.UTF_8));
     AbstractIT.startIntegrationTest();
   }
