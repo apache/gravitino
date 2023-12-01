@@ -166,7 +166,7 @@ public class AbstractIT {
       String headFileContent = FileUtils.readFileToString(new File(gitFolder + "HEAD"), "UTF-8");
       String[] refAndBranch = headFileContent.split(":");
       if (refAndBranch.length == 1) {
-        return refAndBranch[0];
+        return refAndBranch[0].trim();
       }
       return FileUtils.readFileToString(new File(gitFolder + refAndBranch[1].trim()), "UTF-8")
           .trim();
