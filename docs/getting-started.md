@@ -129,7 +129,7 @@ To begin using Gravitino on AWS, follow these steps:
     java -version
     ```
 
-   You should see information about OpenJDK 11.
+   You should see information about OpenJDK 8.
 
 5. Clone the Gravitino source from GitHub:
 
