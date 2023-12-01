@@ -5,6 +5,7 @@
 
 package com.datastrato.gravitino.client.auth;
 
+import com.datastrato.gravitino.auth.AuthenticatorType;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
@@ -13,7 +14,7 @@ import java.util.Base64;
  * SimpleAuthProvider will use the environment variable `GRAVITINO_USER` or
  * the user of the system to generate a basic token for every request.
  */
-public class SimpleAuthDataProvider implements AuthDataProvider {
+public final class SimpleAuthDataProvider implements AuthDataProvider {
 
   private final byte[] token;
 
@@ -39,5 +40,10 @@ public class SimpleAuthDataProvider implements AuthDataProvider {
   @Override
   public void close() throws IOException {
     // no op
+  }
+
+  @Override
+  public AuthenticatorType getAuthType() {
+    return AuthenticatorType.SIMPLE;
   }
 }

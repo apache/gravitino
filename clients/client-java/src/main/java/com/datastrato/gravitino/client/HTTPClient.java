@@ -21,9 +21,7 @@ package com.datastrato.gravitino.client;
 
 import com.datastrato.gravitino.auth.AuthConstants;
 import com.datastrato.gravitino.auth.AuthenticatorType;
-import com.datastrato.gravitino.client.auth.AuthClientUtil;
 import com.datastrato.gravitino.client.auth.AuthDataProvider;
-import com.datastrato.gravitino.client.auth.SimpleAuthDataProvider;
 import com.datastrato.gravitino.dto.responses.ErrorResponse;
 import com.datastrato.gravitino.exceptions.RESTException;
 import com.datastrato.gravitino.json.JsonUtils;
@@ -659,7 +657,7 @@ public class HTTPClient implements RESTClient {
     private final Map<String, String> baseHeaders = Maps.newHashMap();
     private String uri;
     private ObjectMapper mapper = JsonUtils.objectMapper();
-    private String authenticator;
+    private AuthenticatorType authenticator;
     private AuthDataProvider authDataProvider;
 
     private Builder(Map<String, String> properties) {
@@ -714,21 +712,18 @@ public class HTTPClient implements RESTClient {
     }
 
     /**
-     * Sets the authenticator for the HTTP client, setting as `simple` or `oauth`. If users choose
-     * simple as the authenticator, users shouldn't set AuthDataProvider.
+     * Sets the authenticator for the HTTP client, setting as `simple` or `oauth`.
      *
      * @param authenticator The authenticator to be used for authentication.
      * @return This Builder instance for method chaining.
      */
-    public Builder withAuthenticator(String authenticator) {
+    public Builder withAuthenticator(AuthenticatorType authenticator) {
       this.authenticator = authenticator;
       return this;
     }
 
     /**
-     * Sets the AuthDataProvider for the HTTP client. If users choose `simple` as the authenticator,
-     * users shouldn't set AuthDataProvider. If users choose `oauth` as the authenticator, users
-     * should build a OAuthDataProvider object and pass it as the parameter of this method.
+     * Sets the AuthDataProvider for the HTTP client.
      *
      * @param authDataProvider The authDataProvider provide the data used to authenticate.
      * @return This Builder instance for method chaining.
@@ -744,15 +739,8 @@ public class HTTPClient implements RESTClient {
      * @return An instance of HTTPClient with the configured options.
      */
     public HTTPClient build() {
-      AuthenticatorType authenticatorType = AuthenticatorType.NONE;
-      if (authenticator != null) {
-        authenticatorType = AuthenticatorType.valueOf(authenticator.toUpperCase());
-        AuthClientUtil.checkAuthArgument(authenticatorType, authDataProvider);
-        if (authenticatorType.equals(AuthenticatorType.SIMPLE)) {
-          authDataProvider = new SimpleAuthDataProvider();
-        }
-      }
-      return new HTTPClient(uri, baseHeaders, mapper, authenticatorType, authDataProvider);
+
+      return new HTTPClient(uri, baseHeaders, mapper, authenticator, authDataProvider);
     }
   }
 

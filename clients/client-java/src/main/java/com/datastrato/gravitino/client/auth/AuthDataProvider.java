@@ -5,6 +5,7 @@
 
 package com.datastrato.gravitino.client.auth;
 
+import com.datastrato.gravitino.auth.AuthenticatorType;
 import java.io.Closeable;
 
 /** The provider of authentication data */
@@ -27,4 +28,11 @@ public interface AuthDataProvider extends Closeable {
   default byte[] getTokenData() {
     return null;
   }
+
+  /**
+   * Acquire the type of the authenticator
+   *
+   * @return the type of the authenticator
+   */
+  AuthenticatorType getAuthType();
 }

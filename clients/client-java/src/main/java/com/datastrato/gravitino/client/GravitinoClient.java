@@ -11,6 +11,7 @@ import com.datastrato.gravitino.SupportsMetalakes;
 import com.datastrato.gravitino.auth.AuthenticatorType;
 import com.datastrato.gravitino.client.auth.AuthClientUtil;
 import com.datastrato.gravitino.client.auth.AuthDataProvider;
+import com.datastrato.gravitino.client.auth.SimpleAuthDataProvider;
 import com.datastrato.gravitino.dto.requests.MetalakeCreateRequest;
 import com.datastrato.gravitino.dto.requests.MetalakeUpdateRequest;
 import com.datastrato.gravitino.dto.requests.MetalakeUpdatesRequest;
@@ -54,7 +55,8 @@ public class GravitinoClient implements SupportsMetalakes, Closeable {
    * @param authenticator The type of authenticator.
    * @param authDataProvider The provider of the data which is used for authentication.
    */
-  private GravitinoClient(String uri, String authenticator, AuthDataProvider authDataProvider) {
+  private GravitinoClient(
+      String uri, AuthenticatorType authenticator, AuthDataProvider authDataProvider) {
     this.restClient =
         HTTPClient.builder(Collections.emptyMap())
             .uri(uri)
@@ -280,12 +282,15 @@ public class GravitinoClient implements SupportsMetalakes, Closeable {
     public GravitinoClient build() {
       Preconditions.checkArgument(
           uri != null && !uri.isEmpty(), "The argument 'uri' must be a valid URI");
+      AuthenticatorType authenticatorType = null;
       if (authenticator != null) {
-        AuthenticatorType authenticatorType =
-            AuthenticatorType.valueOf(authenticator.toUpperCase());
+        authenticatorType = AuthenticatorType.valueOf(authenticator.toUpperCase());
         AuthClientUtil.checkAuthArgument(authenticatorType, authDataProvider);
+        if (authenticatorType == AuthenticatorType.SIMPLE) {
+          authDataProvider = new SimpleAuthDataProvider();
+        }
       }
-      return new GravitinoClient(uri, authenticator, authDataProvider);
+      return new GravitinoClient(uri, authenticatorType, authDataProvider);
     }
   }
 }

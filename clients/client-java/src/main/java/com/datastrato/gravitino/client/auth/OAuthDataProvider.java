@@ -5,6 +5,7 @@
 
 package com.datastrato.gravitino.client.auth;
 
+import com.datastrato.gravitino.auth.AuthenticatorType;
 import com.datastrato.gravitino.client.HTTPClient;
 import com.datastrato.gravitino.dto.responses.OAuthTokenResponse;
 import com.google.common.base.Preconditions;
@@ -66,6 +67,11 @@ public class OAuthDataProvider implements AuthDataProvider {
     }
   }
 
+  @Override
+  public AuthenticatorType getAuthType() {
+    return AuthenticatorType.OAUTH;
+  }
+
   public static Builder builder(String uri) {
     return new Builder(uri);
   }
@@ -84,7 +90,7 @@ public class OAuthDataProvider implements AuthDataProvider {
      * @param uri The base URI to be used for all HTTP requests.
      * @return This Builder instance for method chaining.
      */
-    private Builder(String uri) {
+    protected Builder(String uri) {
       this.uri = uri;
     }
 
@@ -94,7 +100,7 @@ public class OAuthDataProvider implements AuthDataProvider {
      * @param scope The scope for the HTTP token requests.
      * @return This Builder instance for method chaining.
      */
-    Builder withScope(String scope) {
+    public Builder withScope(String scope) {
       this.scope = scope;
       return this;
     }
@@ -105,7 +111,7 @@ public class OAuthDataProvider implements AuthDataProvider {
      * @param path The path for the HTTP token requests.
      * @return This Builder instance for method chaining.
      */
-    Builder withPath(String path) {
+    public Builder withPath(String path) {
       this.path = path;
       return this;
     }
@@ -116,12 +122,12 @@ public class OAuthDataProvider implements AuthDataProvider {
      * @param credential The credential for the token HTTP request.
      * @return This Builder instance for method chaining.
      */
-    Builder withCredential(String credential) {
+    public Builder withCredential(String credential) {
       this.credential = credential;
       return this;
     }
 
-    OAuthDataProvider build() {
+    public OAuthDataProvider build() {
       Preconditions.checkArgument(
           StringUtils.isNotBlank(uri), "OAuthDataProvider must contain url");
       Preconditions.checkArgument(

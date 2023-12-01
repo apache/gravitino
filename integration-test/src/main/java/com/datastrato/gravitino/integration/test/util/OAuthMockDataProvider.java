@@ -4,6 +4,7 @@
  */
 package com.datastrato.gravitino.integration.test.util;
 
+import com.datastrato.gravitino.auth.AuthenticatorType;
 import com.datastrato.gravitino.client.auth.AuthDataProvider;
 import java.io.IOException;
 
@@ -36,5 +37,10 @@ public class OAuthMockDataProvider implements AuthDataProvider {
 
   public void setTokenData(byte[] tokenData) {
     this.token = tokenData;
+  }
+
+  @Override
+  public AuthenticatorType getAuthType() {
+    return AuthenticatorType.OAUTH;
   }
 }
