@@ -60,6 +60,8 @@ public class TrinoQueryIT {
   private static final Logger LOG = LoggerFactory.getLogger(TrinoQueryIT.class);
 
   private static boolean isDockerRunning = false;
+
+  // TODO(yuhui) redo get the configs after we have the Docker image ready for testing.
   private static String gravitinoUri = "http://127.0.0.1:8090";
   private static String trinoUri = "http://127.0.0.1:8080";
   private static String hiveMetastoreUri = "thrift://127.0.0.1:9083";
