@@ -158,11 +158,21 @@ public class CatalogConnectorMetadata {
   }
 
   public void dropTable(SchemaTableName tableName) {
-    boolean dropped =
-        tableCatalog.dropTable(
-            NameIdentifier.ofTable(
-                metalake.name(), catalogName, tableName.getSchemaName(), tableName.getTableName()));
-    if (!dropped) throw new TrinoException(GRAVITINO_TABLE_NOT_EXISTS, "Table does not exist");
+    try {
+      tableCatalog.purgeTable(
+          NameIdentifier.ofTable(
+              metalake.name(), catalogName, tableName.getSchemaName(), tableName.getTableName()));
+    } catch (UnsupportedOperationException e) {
+      LOG.warn("Purge table is not supported", e);
+      boolean dropped =
+          tableCatalog.dropTable(
+              NameIdentifier.ofTable(
+                  metalake.name(),
+                  catalogName,
+                  tableName.getSchemaName(),
+                  tableName.getTableName()));
+      if (!dropped) throw new TrinoException(GRAVITINO_TABLE_NOT_EXISTS, "Table does not exist");
+    }
   }
 
   public void renameSchema(String source, String target) {
@@ -180,7 +190,7 @@ public class CatalogConnectorMetadata {
     } catch (IllegalArgumentException e) {
       // TODO yuhui need improve get the error message. From IllegalArgumentException.
       // At present, the IllegalArgumentException cannot get the error information clearly from the
-      // Graviton server.
+      // Gravitino server.
       String message =
           e.getMessage().lines().toList().get(0) + e.getMessage().lines().toList().get(1);
       throw new TrinoException(GRAVITINO_ILLEGAL_ARGUMENT, message, e);
