@@ -71,7 +71,7 @@ public class CatalogConnectorMetadataAdapter {
     String tableName = tableMetadata.getTableSchema().getTable().getTableName();
     String schemaName = tableMetadata.getTableSchema().getTable().getSchemaName();
     String comment = tableMetadata.getComment().orElse("");
-    Map<String, String> properties = toGravitonTableProperties(tableMetadata.getProperties());
+    Map<String, String> properties = toGravitinoTableProperties(tableMetadata.getProperties());
 
     List<GravitinoColumn> columns = new ArrayList<>();
     for (int i = 0; i < tableMetadata.getColumns().size(); i++) {
@@ -134,7 +134,7 @@ public class CatalogConnectorMetadataAdapter {
   }
 
   /** Normalize trino table attributes for gravitino */
-  public Map<String, String> toGravitonTableProperties(Map<String, Object> properties) {
+  public Map<String, String> toGravitinoTableProperties(Map<String, Object> properties) {
     return removeUnsetProperties(properties);
   }
 

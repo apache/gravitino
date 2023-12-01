@@ -49,7 +49,7 @@ import org.mockito.stubbing.Answer;
 public class GravitinoMockServer implements AutoCloseable {
   private final String testMetalake = "test";
   private final String testCatalog = "memory";
-  private final String testCatalogPrivate = "memory";
+  private final String testCatalogProvider = "memory";
 
   private boolean start = true;
   private CatalogConnectorManager catalogConnectorManager;
@@ -103,7 +103,7 @@ public class GravitinoMockServer implements AutoCloseable {
   private Catalog createGravitinoCatalog(NameIdentifier catalogName) {
     Catalog catalog = mock(Catalog.class);
     when(catalog.name()).thenReturn(catalogName.name());
-    when(catalog.provider()).thenReturn(testCatalogPrivate);
+    when(catalog.provider()).thenReturn(testCatalogProvider);
 
     when(catalog.asTableCatalog()).thenAnswer(answer -> createTableCatalog(catalogName));
 
@@ -272,6 +272,9 @@ public class GravitinoMockServer implements AutoCloseable {
                 return true;
               }
             });
+
+    when(tableCatalog.purgeTable(any(NameIdentifier.class)))
+        .thenThrow(new UnsupportedOperationException());
 
     when(tableCatalog.listTables(any(Namespace.class)))
         .thenAnswer(

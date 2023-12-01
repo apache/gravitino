@@ -111,6 +111,12 @@ dependencies {
   testImplementation(libs.testcontainers.junit.jupiter)
   testImplementation(libs.testcontainers.mysql)
   testImplementation(libs.trino.jdbc)
+  testImplementation(libs.trino.cli)
+  testImplementation(libs.trino.client) {
+    exclude("jakarta.annotation")
+  }
+  testImplementation(libs.jline.terminal)
+  testImplementation(libs.okhttp3.loginterceptor)
   testImplementation(libs.mysql.driver)
 }
 

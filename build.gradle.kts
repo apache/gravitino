@@ -151,6 +151,7 @@ subprojects {
     if (!skipTests) {
       if (project.name == "trino-connector") {
         useTestNG()
+        maxHeapSize = "2G"
       } else {
         useJUnitPlatform()
       }
@@ -225,12 +226,14 @@ tasks.rat {
     "dev/docker/**/*.xml",
     "**/*.log",
     "licenses/*txt",
+    "integration-test/**",
     "web/.**",
-    "web/node_modules/**/*",
     "web/dist/**/*",
+    "web/node_modules/**/*",
     "web/src/iconify-bundle/bundle-icons-react.js",
     "web/src/iconify-bundle/icons-bundle-react.js",
     "web/yarn.lock",
+    "integration-test/**"
   )
 
   // Add .gitignore excludes to the Apache Rat exclusion list.
