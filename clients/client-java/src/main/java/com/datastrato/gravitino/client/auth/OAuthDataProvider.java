@@ -85,7 +85,7 @@ public class OAuthDataProvider implements AuthDataProvider {
     private String path;
 
     /**
-     * Set the base URI for the HTTP client.
+     * Sets the base URI for the HTTP client.
      *
      * @param uri The base URI to be used for all HTTP requests.
      * @return This Builder instance for method chaining.
@@ -95,7 +95,7 @@ public class OAuthDataProvider implements AuthDataProvider {
     }
 
     /**
-     * Set the scope for the HTTP token requests.
+     * Sets the scope for the HTTP token requests.
      *
      * @param scope The scope for the HTTP token requests.
      * @return This Builder instance for method chaining.
@@ -106,7 +106,7 @@ public class OAuthDataProvider implements AuthDataProvider {
     }
 
     /**
-     * Set the path for the HTTP token requests.
+     * Sets the path for the HTTP token requests.
      *
      * @param path The path for the HTTP token requests.
      * @return This Builder instance for method chaining.
@@ -117,7 +117,7 @@ public class OAuthDataProvider implements AuthDataProvider {
     }
 
     /**
-     * Set the credential for the HTTP token requests.
+     * Sets the credential for the HTTP token requests.
      *
      * @param credential The credential for the token HTTP request.
      * @return This Builder instance for method chaining.
