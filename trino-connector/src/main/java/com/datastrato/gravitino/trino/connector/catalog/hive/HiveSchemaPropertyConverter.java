@@ -6,11 +6,16 @@ package com.datastrato.gravitino.trino.connector.catalog.hive;
 
 import com.datastrato.gravitino.shaded.org.apache.commons.collections4.bidimap.TreeBidiMap;
 import com.datastrato.gravitino.trino.connector.catalog.PropertyConverter;
+import com.google.common.collect.ImmutableMap;
 
 public class HiveSchemaPropertyConverter extends PropertyConverter {
 
+  private static final TreeBidiMap<String, String> TRINO_SCHEMA_TO_GRAVITINO_SCHEMA =
+      new TreeBidiMap<>(
+          new ImmutableMap.Builder<String, String>().put("location", "location").build());
+
   @Override
   public TreeBidiMap<String, String> trinoPropertyKeyToGravitino() {
-    return new TreeBidiMap<>();
+    return TRINO_SCHEMA_TO_GRAVITINO_SCHEMA;
   }
 }

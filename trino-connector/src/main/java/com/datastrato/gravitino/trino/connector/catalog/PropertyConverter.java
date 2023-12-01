@@ -8,10 +8,13 @@ package com.datastrato.gravitino.trino.connector.catalog;
 import com.datastrato.gravitino.shaded.org.apache.commons.collections4.bidimap.TreeBidiMap;
 import java.util.HashMap;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** Transforming between gravitino schema/table/column property and trino property. */
 public abstract class PropertyConverter {
 
+  private static final Logger LOG = LoggerFactory.getLogger(PropertyConverter.class);
   /**
    * Convert trino properties to gravitino properties. It will return a map that hods the mapping
    * between trino and gravitino properties.
@@ -24,7 +27,13 @@ public abstract class PropertyConverter {
     Map<String, String> trinoProperties = new HashMap<>();
     Map<String, String> gravitinoToTrinoMapping = trinoPropertyKeyToGravitino().inverseBidiMap();
     for (Map.Entry<String, String> entry : properties.entrySet()) {
-      trinoProperties.put(gravitinoToTrinoMapping.get(entry.getKey()), entry.getValue());
+      String trinoKey = gravitinoToTrinoMapping.get(entry.getKey());
+      if (trinoKey != null) {
+        trinoProperties.put(trinoKey, entry.getValue());
+      } else {
+        LOG.warn("Property {} is not supported in trino", trinoKey);
+      }
+
     }
     return trinoProperties;
   }
@@ -34,7 +43,12 @@ public abstract class PropertyConverter {
     Map<String, Object> gravitinoProperties = new HashMap<>();
     Map<String, String> trinoToGravitinoMapping = trinoPropertyKeyToGravitino();
     for (Map.Entry<String, Object> entry : properties.entrySet()) {
-      gravitinoProperties.put(trinoToGravitinoMapping.get(entry.getKey()), entry.getValue());
+      String gravitinoKey = trinoToGravitinoMapping.get(entry.getKey());
+      if (gravitinoKey != null) {
+        gravitinoProperties.put(gravitinoKey, entry.getValue());
+      } else {
+        LOG.warn("Property {} is not supported in gravitino", gravitinoKey);
+      }
     }
     return gravitinoProperties;
   }
