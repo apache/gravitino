@@ -33,7 +33,6 @@ public abstract class PropertyConverter {
       } else {
         LOG.warn("Property {} is not supported in trino", trinoKey);
       }
-
     }
     return trinoProperties;
   }
