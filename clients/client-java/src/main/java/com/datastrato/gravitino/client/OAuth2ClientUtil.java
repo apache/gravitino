@@ -16,10 +16,8 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.datastrato.gravitino.client.auth;
+package com.datastrato.gravitino.client;
 
-import com.datastrato.gravitino.client.ErrorHandlers;
-import com.datastrato.gravitino.client.RESTClient;
 import com.datastrato.gravitino.dto.responses.OAuthTokenResponse;
 import com.datastrato.gravitino.json.JsonUtils;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -37,7 +35,7 @@ import org.apache.commons.lang3.tuple.Pair;
 
 // Referred from Apache Iceberg's OAuth2Util implementation
 // core/src/main/java/org/apache/iceberg/rest/OAuth2Util.java
-public class OAuth2ClientUtil {
+class OAuth2ClientUtil {
 
   public static final String SCOPE = "scope";
   private static final Splitter CREDENTIAL_SPLITTER = Splitter.on(":").limit(2).trimResults();

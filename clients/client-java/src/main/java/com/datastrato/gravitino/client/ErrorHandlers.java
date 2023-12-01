@@ -4,7 +4,6 @@
  */
 package com.datastrato.gravitino.client;
 
-import com.datastrato.gravitino.client.auth.OAuth2ClientUtil;
 import com.datastrato.gravitino.dto.responses.ErrorConstants;
 import com.datastrato.gravitino.dto.responses.ErrorResponse;
 import com.datastrato.gravitino.dto.responses.OAuthErrorResponse;

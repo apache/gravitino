@@ -124,11 +124,7 @@ public class AbstractIT {
         .name()
         .toLowerCase()
         .equals(customConfigs.get(OAuthConfig.AUTHENTICATOR.getKey()))) {
-      client =
-          GravitinoClient.builder(uri)
-              .withAuthenticator("oauth")
-              .withAuthDataProvider(mockDataProvider)
-              .build();
+      client = GravitinoClient.builder(uri).withOAuth2(mockDataProvider).build();
     } else {
       client = GravitinoClient.builder(uri).build();
     }

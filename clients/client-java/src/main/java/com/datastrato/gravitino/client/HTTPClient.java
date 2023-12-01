@@ -20,8 +20,6 @@
 package com.datastrato.gravitino.client;
 
 import com.datastrato.gravitino.auth.AuthConstants;
-import com.datastrato.gravitino.auth.AuthenticatorType;
-import com.datastrato.gravitino.client.auth.AuthDataProvider;
 import com.datastrato.gravitino.dto.responses.ErrorResponse;
 import com.datastrato.gravitino.exceptions.RESTException;
 import com.datastrato.gravitino.json.JsonUtils;
@@ -78,7 +76,6 @@ public class HTTPClient implements RESTClient {
   private final String uri;
   private final CloseableHttpClient httpClient;
   private final ObjectMapper mapper;
-  private final AuthenticatorType authenticatorType;
   private final AuthDataProvider authDataProvider;
 
   /**
@@ -87,14 +84,12 @@ public class HTTPClient implements RESTClient {
    * @param uri The base URI of the REST API.
    * @param baseHeaders A map of base headers to be included in all HTTP requests.
    * @param objectMapper The ObjectMapper used for JSON serialization and deserialization.
-   * @param authenticatorType The type of the authentication mechanism.
    * @param authDataProvider The provider of authentication data.
    */
   private HTTPClient(
       String uri,
       Map<String, String> baseHeaders,
       ObjectMapper objectMapper,
-      AuthenticatorType authenticatorType,
       AuthDataProvider authDataProvider) {
     this.uri = uri;
     this.mapper = objectMapper;
@@ -110,7 +105,6 @@ public class HTTPClient implements RESTClient {
 
     this.httpClient = clientBuilder.build();
     this.authDataProvider = authDataProvider;
-    this.authenticatorType = authenticatorType;
   }
 
   /**
@@ -336,14 +330,9 @@ public class HTTPClient implements RESTClient {
     } else {
       addRequestHeaders(request, headers, ContentType.APPLICATION_JSON.getMimeType());
     }
-    if (AuthenticatorType.OAUTH.equals(authenticatorType)) {
+    if (authDataProvider != null) {
       request.setHeader(
-          AuthConstants.HTTP_HEADER_AUTHORIZATION,
-          AuthConstants.AUTHORIZATION_BEARER_HEADER + new String(authDataProvider.getTokenData()));
-    } else if (AuthenticatorType.SIMPLE.equals(authenticatorType)) {
-      request.setHeader(
-          AuthConstants.HTTP_HEADER_AUTHORIZATION,
-          AuthConstants.AUTHORIZATION_BASIC_HEADER + new String(authDataProvider.getTokenData()));
+          AuthConstants.HTTP_HEADER_AUTHORIZATION, new String(authDataProvider.getTokenData()));
     }
 
     try (CloseableHttpResponse response = httpClient.execute(request)) {
@@ -657,7 +646,6 @@ public class HTTPClient implements RESTClient {
     private final Map<String, String> baseHeaders = Maps.newHashMap();
     private String uri;
     private ObjectMapper mapper = JsonUtils.objectMapper();
-    private AuthenticatorType authenticator;
     private AuthDataProvider authDataProvider;
 
     private Builder(Map<String, String> properties) {
@@ -712,17 +700,6 @@ public class HTTPClient implements RESTClient {
     }
 
     /**
-     * Sets the authenticator for the HTTP client, setting as `simple` or `oauth`.
-     *
-     * @param authenticator The authenticator to be used for authentication.
-     * @return This Builder instance for method chaining.
-     */
-    public Builder withAuthenticator(AuthenticatorType authenticator) {
-      this.authenticator = authenticator;
-      return this;
-    }
-
-    /**
      * Sets the AuthDataProvider for the HTTP client.
      *
      * @param authDataProvider The authDataProvider providing the data used to authenticate.
@@ -740,7 +717,7 @@ public class HTTPClient implements RESTClient {
      */
     public HTTPClient build() {
 
-      return new HTTPClient(uri, baseHeaders, mapper, authenticator, authDataProvider);
+      return new HTTPClient(uri, baseHeaders, mapper, authDataProvider);
     }
   }
 

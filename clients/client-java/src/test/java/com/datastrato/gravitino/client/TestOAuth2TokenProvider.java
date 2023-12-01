@@ -3,7 +3,7 @@
  * This software is licensed under the Apache License version 2.
  */
 
-package com.datastrato.gravitino.client.auth;
+package com.datastrato.gravitino.client;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockserver.integration.ClientAndServer.startClientAndServer;
@@ -28,7 +28,7 @@ import org.mockserver.integration.ClientAndServer;
 import org.mockserver.matchers.Times;
 import org.mockserver.model.HttpResponse;
 
-public class TestOAuthDataProvider {
+public class TestOAuth2TokenProvider {
 
   private static final int PORT = 1082;
   private static ClientAndServer mockServer;
@@ -47,13 +47,19 @@ public class TestOAuthDataProvider {
   public void testProviderInitException() throws Exception {
 
     Assertions.assertThrows(
-        IllegalArgumentException.class, () -> OAuthDataProvider.builder("test").build());
+        IllegalArgumentException.class,
+        () -> DefaultOAuth2TokenProvider.builder().withUri("test").build());
     Assertions.assertThrows(
         IllegalArgumentException.class,
-        () -> OAuthDataProvider.builder("test").withCredential("xx").build());
+        () -> DefaultOAuth2TokenProvider.builder().withUri("test").withCredential("xx").build());
     Assertions.assertThrows(
         IllegalArgumentException.class,
-        () -> OAuthDataProvider.builder("test").withCredential("xx").withScope("test").build());
+        () ->
+            DefaultOAuth2TokenProvider.builder()
+                .withUri("test")
+                .withCredential("xx")
+                .withScope("test")
+                .build());
   }
 
   @Test
@@ -66,8 +72,9 @@ public class TestOAuthDataProvider {
     String respJson = JsonUtils.objectMapper().writeValueAsString(respBody);
     mockResponse = mockResponse.withBody(respJson);
     mockServer.when(any(), Times.exactly(1)).respond(mockResponse);
-    OAuthDataProvider.Builder builder =
-        OAuthDataProvider.builder(String.format("http://127.0.0.1:%d", PORT))
+    OAuth2TokenProvider.Builder builder =
+        DefaultOAuth2TokenProvider.builder()
+            .withUri(String.format("http://127.0.0.1:%d", PORT))
             .withCredential("yy:xx")
             .withPath("oauth/token")
             .withScope("test");
@@ -82,8 +89,9 @@ public class TestOAuthDataProvider {
 
   @Test
   public void testAuthenticationNormal() throws Exception {
-    OAuthDataProvider.Builder builder =
-        OAuthDataProvider.builder(String.format("http://127.0.0.1:%d", PORT))
+    OAuth2TokenProvider.Builder builder =
+        DefaultOAuth2TokenProvider.builder()
+            .withUri(String.format("http://127.0.0.1:%d", PORT))
             .withCredential("yy:xx")
             .withPath("oauth/token")
             .withScope("test");
@@ -98,7 +106,7 @@ public class TestOAuthDataProvider {
     respJson = JsonUtils.objectMapper().writeValueAsString(response);
     mockResponse = mockResponse.withBody(respJson);
     mockServer.when(any(), Times.exactly(1)).respond(mockResponse);
-    OAuthDataProvider provider = builder.build();
+    OAuth2TokenProvider provider = builder.build();
     Assertions.assertTrue(provider.hasTokenData());
     Assertions.assertNull(provider.getTokenData());
     KeyPair keyPair = Keys.keyPairFor(SignatureAlgorithm.RS256);

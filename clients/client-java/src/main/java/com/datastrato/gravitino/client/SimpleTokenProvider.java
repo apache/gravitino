@@ -3,9 +3,9 @@
  * This software is licensed under the Apache License version 2.
  */
 
-package com.datastrato.gravitino.client.auth;
+package com.datastrato.gravitino.client;
 
-import com.datastrato.gravitino.auth.AuthenticatorType;
+import com.datastrato.gravitino.auth.AuthConstants;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
@@ -14,17 +14,21 @@ import java.util.Base64;
  * SimpleAuthProvider will use the environment variable `GRAVITINO_USER` or
  * the user of the system to generate a basic token for every request.
  */
-public final class SimpleAuthDataProvider implements AuthDataProvider {
+final class SimpleTokenProvider implements AuthDataProvider {
 
   private final byte[] token;
 
-  public SimpleAuthDataProvider() {
+  public SimpleTokenProvider() {
     String gravitinoUser = System.getenv("GRAVITINO_USER");
     if (gravitinoUser == null) {
       gravitinoUser = System.getProperty("user.name");
     }
     String userInformation = gravitinoUser + ":dummy";
-    this.token = Base64.getEncoder().encode(userInformation.getBytes(StandardCharsets.UTF_8));
+    this.token =
+        (AuthConstants.AUTHORIZATION_BASIC_HEADER
+                + new String(
+                    Base64.getEncoder().encode(userInformation.getBytes(StandardCharsets.UTF_8))))
+            .getBytes(StandardCharsets.UTF_8);
   }
 
   @Override
@@ -40,10 +44,5 @@ public final class SimpleAuthDataProvider implements AuthDataProvider {
   @Override
   public void close() throws IOException {
     // no op
-  }
-
-  @Override
-  public AuthenticatorType getAuthType() {
-    return AuthenticatorType.SIMPLE;
   }
 }

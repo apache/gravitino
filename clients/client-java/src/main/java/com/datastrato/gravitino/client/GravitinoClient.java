@@ -8,10 +8,6 @@ package com.datastrato.gravitino.client;
 import com.datastrato.gravitino.MetalakeChange;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.SupportsMetalakes;
-import com.datastrato.gravitino.auth.AuthenticatorType;
-import com.datastrato.gravitino.client.auth.AuthClientUtil;
-import com.datastrato.gravitino.client.auth.AuthDataProvider;
-import com.datastrato.gravitino.client.auth.SimpleAuthDataProvider;
 import com.datastrato.gravitino.dto.requests.MetalakeCreateRequest;
 import com.datastrato.gravitino.dto.requests.MetalakeUpdateRequest;
 import com.datastrato.gravitino.dto.requests.MetalakeUpdatesRequest;
@@ -55,12 +51,10 @@ public class GravitinoClient implements SupportsMetalakes, Closeable {
    * @param authenticator The type of authenticator.
    * @param authDataProvider The provider of the data which is used for authentication.
    */
-  private GravitinoClient(
-      String uri, AuthenticatorType authenticator, AuthDataProvider authDataProvider) {
+  private GravitinoClient(String uri, AuthDataProvider authDataProvider) {
     this.restClient =
         HTTPClient.builder(Collections.emptyMap())
             .uri(uri)
-            .withAuthenticator(authenticator)
             .withAuthDataProvider(authDataProvider)
             .build();
   }
@@ -236,7 +230,6 @@ public class GravitinoClient implements SupportsMetalakes, Closeable {
   public static class Builder {
 
     private String uri;
-    private String authenticator;
     private AuthDataProvider authDataProvider;
 
     /**
@@ -248,25 +241,13 @@ public class GravitinoClient implements SupportsMetalakes, Closeable {
       this.uri = uri;
     }
 
-    /**
-     * Sets the authenticator for the HTTP client, setting as `simple` or `oauth`.
-     *
-     * @param authenticator The authenticator to be used for authentication.
-     * @return This Builder instance for method chaining.
-     */
-    public Builder withAuthenticator(String authenticator) {
-      this.authenticator = authenticator;
+    public Builder withSimpleAuth() {
+      this.authDataProvider = new SimpleTokenProvider();
       return this;
     }
 
-    /**
-     * Sets the AuthDataProvider for the HTTP client.
-     *
-     * @param authDataProvider The authDataProvider providing the data used to authenticate.
-     * @return This Builder instance for method chaining.
-     */
-    public Builder withAuthDataProvider(AuthDataProvider authDataProvider) {
-      this.authDataProvider = authDataProvider;
+    public Builder withOAuth2(OAuth2TokenProvider dataProvider) {
+      this.authDataProvider = dataProvider;
       return this;
     }
 
@@ -279,15 +260,8 @@ public class GravitinoClient implements SupportsMetalakes, Closeable {
     public GravitinoClient build() {
       Preconditions.checkArgument(
           uri != null && !uri.isEmpty(), "The argument 'uri' must be a valid URI");
-      AuthenticatorType authenticatorType = null;
-      if (authenticator != null) {
-        authenticatorType = AuthenticatorType.valueOf(authenticator.toUpperCase());
-        AuthClientUtil.checkAuthArgument(authenticatorType, authDataProvider);
-        if (authenticatorType == AuthenticatorType.SIMPLE) {
-          authDataProvider = new SimpleAuthDataProvider();
-        }
-      }
-      return new GravitinoClient(uri, authenticatorType, authDataProvider);
+
+      return new GravitinoClient(uri, authDataProvider);
     }
   }
 }

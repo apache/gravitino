@@ -98,7 +98,6 @@ public class MiniGravitino {
           HTTPClient.builder(ImmutableMap.of())
               .uri(URI)
               .withAuthDataProvider(OAuthMockDataProvider.getInstance())
-              .withAuthenticator(AuthenticatorType.OAUTH)
               .build();
     } else {
       restClient = HTTPClient.builder(ImmutableMap.of()).uri(URI).build();
