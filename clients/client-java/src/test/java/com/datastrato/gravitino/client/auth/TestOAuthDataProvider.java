@@ -121,7 +121,7 @@ public class TestOAuthDataProvider {
               .setAudience("service1")
               .signWith(keyPair.getPrivate(), SignatureAlgorithm.RS256)
               .compact();
-      ;
+
       response = new OAuthTokenResponse(accessToken, "2", "bearer", 1, "test", null);
       respJson = JsonUtils.objectMapper().writeValueAsString(response);
       mockResponse = mockResponse.withBody(respJson);
