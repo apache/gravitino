@@ -726,9 +726,9 @@ public class HTTPClient implements RESTClient {
     }
 
     /**
-     * Sets the AuthDataProvider for the HTTP client. If users choose `simple` as the authenticator, users
-     * shouldn't set AuthDataProvider. If users choose `oauth` as the authenticator, users should build a
-     * OAuthDataProvider object and pass it as the parameter of this method.
+     * Sets the AuthDataProvider for the HTTP client. If users choose `simple` as the authenticator,
+     * users shouldn't set AuthDataProvider. If users choose `oauth` as the authenticator, users
+     * should build a OAuthDataProvider object and pass it as the parameter of this method.
      *
      * @param authDataProvider The authDataProvider provide the data used to authenticate.
      * @return This Builder instance for method chaining.

@@ -19,7 +19,6 @@ import io.jsonwebtoken.security.Keys;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyPair;
 import java.util.Base64;
-import java.util.Collections;
 import java.util.Date;
 import java.util.Map;
 import org.junit.jupiter.api.Assertions;
