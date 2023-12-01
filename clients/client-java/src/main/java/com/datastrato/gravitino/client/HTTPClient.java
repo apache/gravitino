@@ -725,7 +725,7 @@ public class HTTPClient implements RESTClient {
     /**
      * Sets the AuthDataProvider for the HTTP client.
      *
-     * @param authDataProvider The authDataProvider provide the data used to authenticate.
+     * @param authDataProvider The authDataProvider providing the data used to authenticate.
      * @return This Builder instance for method chaining.
      */
     public Builder withAuthDataProvider(AuthDataProvider authDataProvider) {
