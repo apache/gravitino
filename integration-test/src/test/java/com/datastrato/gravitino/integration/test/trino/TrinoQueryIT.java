@@ -257,8 +257,8 @@ public class TrinoQueryIT {
         Future<Integer> completedTask = completionService.take();
         Integer taskId = completedTask.get();
       } catch (InterruptedException | ExecutionException e) {
-        LOG.error("Test Failed: ", e);
-        Assertions.fail();
+        LOG.error("Test failed: ", e);
+        Assertions.fail("Test failed: " + e.getMessage());
       }
     }
 
@@ -343,7 +343,7 @@ public class TrinoQueryIT {
               sql,
               expectResult,
               result);
-          Assertions.fail();
+          Assertions.fail("Test failed by the mismatched query results: \n" + sql);
         }
       }
       testCount.incrementAndGet();
