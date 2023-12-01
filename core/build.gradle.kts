@@ -24,6 +24,7 @@ dependencies {
   implementation(libs.caffeine)
   implementation(libs.rocksdbjni)
   implementation(libs.bundles.metrics)
+  implementation(libs.bundles.prometheus)
 
   compileOnly(libs.lombok)
   annotationProcessor(libs.lombok)
