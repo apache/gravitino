@@ -60,7 +60,10 @@ public class MysqlTableOperations extends JdbcTableOperations {
     for (ColumnDefinition columnDefinition : createTable.getColumnDefinitions()) {
       // Assemble column information.
       String columnName = getColumnName(columnDefinition);
-      String[] columnSpecs = columnDefinition.getColumnSpecs().toArray(new String[0]);
+      String[] columnSpecs =
+          columnDefinition.getColumnSpecs() == null
+              ? new String[0]
+              : columnDefinition.getColumnSpecs().toArray(new String[0]);
       String columnProperties = String.join(SPACE, columnSpecs);
       boolean nullable = !columnProperties.contains(NOT_NULL);
       String defaultValue = findPropertiesValue(columnSpecs, DEFAULT);
@@ -100,7 +103,10 @@ public class MysqlTableOperations extends JdbcTableOperations {
       if (!StringUtils.equals(colName, columnName)) {
         continue;
       }
-      String[] columnSpecs = columnDefinition.getColumnSpecs().toArray(new String[0]);
+      String[] columnSpecs =
+          columnDefinition.getColumnSpecs() == null
+              ? new String[0]
+              : columnDefinition.getColumnSpecs().toArray(new String[0]);
       String columnProperties = String.join(SPACE, columnSpecs);
       boolean nullable = !columnProperties.contains(NOT_NULL);
       String defaultValue = findPropertiesValue(columnSpecs, DEFAULT);
@@ -128,7 +134,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
   private CreateTable loadCreateTable(String databaseName, String tableName) {
     try (Connection connection = getConnection(databaseName)) {
       try (Statement statement = connection.createStatement()) {
-        String showCreateTableSQL = "SHOW CREATE TABLE " + tableName;
+        String showCreateTableSQL = String.format("SHOW CREATE TABLE %s", tableName);
         ResultSet resultSet = statement.executeQuery(showCreateTableSQL);
 
         if (!resultSet.next()) {
@@ -245,7 +251,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
 
   @Override
   protected String generateRenameTableSql(String oldTableName, String newTableName) {
-    return "RENAME TABLE " + oldTableName + " TO " + newTableName;
+    return String.format("RENAME TABLE %s TO %s", oldTableName, newTableName);
   }
 
   @Override
@@ -380,7 +386,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
     String col = addColumn.fieldName()[0];
 
     StringBuilder columnDefinition = new StringBuilder();
-    columnDefinition.append("ADD COLUMN ").append(col).append(SPACE).append(dataType);
+    columnDefinition.append("ADD COLUMN ").append(col).append(SPACE).append(dataType).append(SPACE);
     // Append comment if available
     if (StringUtils.isNotEmpty(addColumn.getComment())) {
       columnDefinition.append("COMMENT '").append(addColumn.getComment()).append("' ");
