@@ -9,9 +9,9 @@ There are several options for getting started with Gravitino. Installing and con
 
 If you want to download and compile Gravitino, on AWS see [Getting started on Amazon Web Services](#getting-started-on-amazon-web-services) and on OSX see [Getting started locally on OSX](#getting-started-locally-on-osx).
 
-If you have your own Gravitino setup and want to use Apache Hive in Docker on AWS see [Installing Apache Hive Trino and Gravitino on AWS](#installing-apache-hive-trino-and-gravitino-on-aws) or locally on OSX see [Installing Apache Hive Trino and Gravitino on OSX](#installing-apache-hive-trino-and-gravitino-on-osx)
+If you have your own Gravitino setup and want to use Apache Hive in Docker on AWS see [Installing Apache Hive Trino and Gravitino on AWS](#installing-apache-hive-trino-and-gravitino-on-aws) or locally on OSX see [Installing Apache Hive Trino and Gravitino on OSX](#installing-apache-hive-trino-and-gravitino-on-osx).
 
-If you prefer to get started quickly and use Docker for Gravitino, Apache Hive and Trino on AWS see [Installing Apache Hive on AWS](#installing-apache-hive-on-aws) or locally on OSX see [Installing Apache Hive on OSX](#installing-apache-hive-on-osx).
+If you prefer to get started quickly and use Docker for Gravitino, Apache Hive and Trino on AWS see [Installing Apache Hive on AWS](#installing-apache-hive-on-aws) or locally on OSX see [Installing Apache Hive on OSX](#installing-apache-hive-on-osx). Gravitino requires JDK8 for compilation.
 
 If you are using AWS and want to access the instance remotely, be sure to read [Accessing Gravitino on AWS externally](#accessing-gravitino-on-aws-externally)
 
@@ -108,7 +108,42 @@ To use Gravitino locally on OSX, follow similar steps:
     brew install openjdk@8
     ```
 
-2. Continue with the steps *5* to *8* for AWS to download, compile, and start a Gravitino server.
+2. Clone the Gravitino source from GitHub:
+
+    ```shell
+    git clone git@github.com:datastrato/gravitino.git
+    cd gravitino
+    ```
+
+   Or, download the latest Gravitino release and extract the source:
+
+    ```shell
+    curl -L https://github.com/datastrato/gravitino/releases/download/v0.2.0/gravitino.0.2.0.tar.gz > gravitino.0.2.0.tar.gz
+    tar -xvf gravitino.0.2.0.tar.gz
+    cd gravitino.0.2.0
+    ```
+
+3. Build Gravitino and run tests:
+
+    ```shell
+    ./gradlew build
+    ```
+
+    You can ignore the tests if you want by appending `-x test`.
+
+4. Build a runnable distribution:
+
+    ```shell
+    ./gradlew compileDistribution
+    ```
+
+    Again, you can ignore the tests if you want by appending `-x test`.
+
+5. Start Gravitino using the gravitino.sh script:
+
+    ```shell
+    distribution/package/bin/gravitino.sh start
+    ```
 
 ## Installing Apache Hive on AWS
 
