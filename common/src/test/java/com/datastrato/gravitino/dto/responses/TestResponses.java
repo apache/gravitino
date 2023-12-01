@@ -82,8 +82,8 @@ public class TestResponses {
 
   @Test
   void testMetalakeResponseException() throws IllegalArgumentException {
-    MetalakeResponse reponse = new MetalakeResponse();
-    assertThrows(IllegalArgumentException.class, () -> reponse.validate());
+    MetalakeResponse response = new MetalakeResponse();
+    assertThrows(IllegalArgumentException.class, () -> response.validate());
   }
 
   @Test
@@ -97,8 +97,8 @@ public class TestResponses {
 
   @Test
   void testMetalakeListResponseException() throws IllegalArgumentException {
-    MetalakeListResponse reponse = new MetalakeListResponse();
-    assertThrows(IllegalArgumentException.class, () -> reponse.validate());
+    MetalakeListResponse response = new MetalakeListResponse();
+    assertThrows(IllegalArgumentException.class, () -> response.validate());
   }
 
   @Test

@@ -48,15 +48,13 @@ public class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
     purgeAllIcebergTestNamespaces();
   }
 
-  // Spark purge Iceberg table may hang, so use drop table instead
-  // https://github.com/datastrato/gravitino/issues/547 tracks purge table issue
-  private void dropTable(String namespace, String table) {
-    sql(String.format("DROP TABLE %s.%s", namespace, table));
+  private void purgeTable(String namespace, String table) {
+    sql(String.format("DROP TABLE %s.%s PURGE", namespace, table));
   }
 
   private void purgeNameSpace(String namespace) {
     Set<String> tables = convertToStringSet(sql("SHOW TABLES IN " + namespace), 1);
-    tables.forEach(table -> dropTable(namespace, table));
+    tables.forEach(table -> purgeTable(namespace, table));
     sql("DROP database " + namespace);
   }
 

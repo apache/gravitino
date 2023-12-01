@@ -105,6 +105,7 @@ public class CatalogIcebergIT extends AbstractIT {
 
   @BeforeAll
   public static void startup() {
+    containerSuite.startHiveContainer();
     HIVE_METASTORE_URIS =
         String.format(
             "thrift://%s:%d",
