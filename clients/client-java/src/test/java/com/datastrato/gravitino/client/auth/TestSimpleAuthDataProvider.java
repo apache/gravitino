@@ -14,8 +14,6 @@ public class TestSimpleAuthDataProvider {
   @Test
   public void testAuthentication() throws IOException {
     try (AuthDataProvider provider = new SimpleAuthDataProvider()) {
-      Assertions.assertThrows(IllegalStateException.class, provider::hasTokenData);
-      Assertions.assertThrows(IllegalStateException.class, provider::getTokenData);
       Assertions.assertTrue(provider.hasTokenData());
       String user = System.getenv("GRAVITINO_USER");
       String tokenString = new String(Base64.getDecoder().decode(provider.getTokenData()));
