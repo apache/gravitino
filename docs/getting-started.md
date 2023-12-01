@@ -7,11 +7,11 @@ This software is licensed under the Apache License version 2."
 
 There are several options for getting started with Gravitino. Installing and configuring Hive and Trino can be a little complex, so if you are unfamiliar with the technologies it would be best to use Docker.
 
-If you want to download and compile Gravitino, on AWS see [Getting started on Amazon Web Services](#getting-started-on-amazon-web-services) and on OSX see [Getting started locally on OSX](#getting-started-locally-on-osx).
+If you want to download and compile Gravitino, on AWS see [Getting started on Amazon Web Services](#getting-started-on-amazon-web-services) or Google Cloud Platform see [Getting started on Google Cloud Platform](#getting-started-on-google-cloud-platform) or on OSX see [Getting started locally on OSX](#getting-started-locally-on-osx).
 
-If you have your own Gravitino setup and want to use Apache Hive in Docker on AWS see [Installing Apache Hive Trino and Gravitino on AWS or Google Cloud](#installing-apache-hive-trino-and-gravitino-on-aws-or-google-cloud) or locally on OSX see [Installing Apache Hive Trino and Gravitino on OSX](#installing-apache-hive-trino-and-gravitino-on-osx).
+If you have your own Gravitino setup and want to use Apache Hive in Docker on AWS or Google Cloud Platform see [Installing Apache Hive Trino and Gravitino on AWS or Google Cloud Platform](#installing-apache-hive-trino-and-gravitino-on-aws-or-google-cloud-platform) or locally on OSX see [Installing Apache Hive Trino and Gravitino on OSX](#installing-apache-hive-trino-and-gravitino-on-osx).
 
-If you prefer to get started quickly and use Docker for Gravitino, Apache Hive and Trino on AWS see [Installing Apache Hive on AWS or Google Cloud](#installing-apache-hive-on-aws-or-google-cloud) or locally on OSX see [Installing Apache Hive on OSX](#installing-apache-hive-on-osx). Gravitino requires JDK8 for compilation.
+If you prefer to get started quickly and use Docker for Gravitino, Apache Hive and Trino on AWS or Google Cloud Platform see [Installing Apache Hive on AWS or Google Cloud Platform](#installing-apache-hive-on-aws-or-google-cloud-platform) or locally on OSX see [Installing Apache Hive on OSX](#installing-apache-hive-on-osx). Gravitino requires JDK8 for compilation.
 
 If you are using AWS and want to access the instance remotely, be sure to read [Accessing Gravitino on AWS externally](#accessing-gravitino-on-aws-externally)
 
@@ -98,7 +98,7 @@ To begin using Gravitino on AWS, follow these steps:
     distribution/package/bin/gravitino.sh start
     ```
 
-## Getting started on Google Cloud
+## Getting started on Google Cloud Platform
 
 To begin using Gravitino on AWS, follow these steps:
 
@@ -217,7 +217,7 @@ To use Gravitino locally on OSX, follow similar steps:
     distribution/package/bin/gravitino.sh start
     ```
 
-## Installing Apache Hive on AWS or Google Cloud
+## Installing Apache Hive on AWS or Google Cloud Platform
 
 Installing and configuring Hive can be a little complex. If you don't already have Hive setup and running you can use the Docker container Datastrato provide to get Gravitino up and running.
 
@@ -241,7 +241,7 @@ The same Docker container operates on OSX.
 docker run --name gravitino-container -d -p 9000:9000 -p 8088:8088 -p 50010:50010 -p 50070:50070 -p 50075:50075 -p 10000:10000 -p 10002:10002 -p 8888:8888 -p 9083:9083 -p 8022:22 datastrato/gravitino-ci-hive
 ```
 
-## Installing Apache Hive Trino and Gravitino on AWS or Google Cloud
+## Installing Apache Hive Trino and Gravitino on AWS or Google Cloud Platform
 
 Installing Docker and Docker Compose is a requirement to using the playground.
 
