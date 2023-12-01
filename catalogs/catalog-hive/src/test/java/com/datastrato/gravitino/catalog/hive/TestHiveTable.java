@@ -501,6 +501,18 @@ public class TestHiveTable extends MiniHiveMetastoreService {
                             TableChange.ColumnPosition.after(col1.name()))));
     Assertions.assertTrue(exception.getMessage().contains("Cannot add column with duplicate name"));
 
+    exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                hiveCatalog
+                    .asTableCatalog()
+                    .alterTable(
+                        tableIdentifier,
+                        TableChange.updateColumnNullability(new String[] {"col_1"}, false)));
+    Assertions.assertEquals(
+        "Hive does not support altering column nullability", exception.getMessage());
+
     // test alter
     hiveCatalog
         .asTableCatalog()

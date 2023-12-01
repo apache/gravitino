@@ -96,6 +96,18 @@ public class IcebergTableOpsHelper {
         DOT.join(updateColumnComment.fieldNames()), updateColumnComment.getNewComment());
   }
 
+  private void doUpdateColumnNullability(
+      UpdateSchema icebergUpdateSchema,
+      TableChange.UpdateColumnNullability updateColumnNullability) {
+    if (updateColumnNullability.nullable()) {
+      icebergUpdateSchema.makeColumnOptional(DOT.join(updateColumnNullability.fieldNames()));
+    } else {
+      // TODO: figure out how to enable users to make column required
+      // icebergUpdateSchema.allowIncompatibleChanges();
+      icebergUpdateSchema.requireColumn(DOT.join(updateColumnNullability.fieldNames()));
+    }
+  }
+
   private void doSetProperty(UpdateProperties icebergUpdateProperties, SetProperty setProperty) {
     icebergUpdateProperties.set(setProperty.getProperty(), setProperty.getValue());
   }
@@ -236,6 +248,9 @@ public class IcebergTableOpsHelper {
         doUpdateColumnType(icebergUpdateSchema, (UpdateColumnType) change, icebergTableSchema);
       } else if (change instanceof UpdateColumnComment) {
         doUpdateColumnComment(icebergUpdateSchema, (UpdateColumnComment) change);
+      } else if (change instanceof TableChange.UpdateColumnNullability) {
+        doUpdateColumnNullability(
+            icebergUpdateSchema, (TableChange.UpdateColumnNullability) change);
       } else {
         throw new NotSupportedException(
             "Iceberg doesn't support " + change.getClass().getSimpleName() + " for now");
