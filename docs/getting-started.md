@@ -9,9 +9,9 @@ There are several options for getting started with Gravitino. Installing and con
 
 If you want to download and compile Gravitino, on AWS see [Getting started on Amazon Web Services](#getting-started-on-amazon-web-services) and on OSX see [Getting started locally on OSX](#getting-started-locally-on-osx).
 
-If you have your own Gravitino setup and want to use Apache Hive in Docker on AWS see [Installing Apache Hive Trino and Gravitino on AWS](#installing-apache-hive-trino-and-gravitino-on-aws) or locally on OSX see [Installing Apache Hive Trino and Gravitino on OSX](#installing-apache-hive-trino-and-gravitino-on-osx).
+If you have your own Gravitino setup and want to use Apache Hive in Docker on AWS see [Installing Apache Hive Trino and Gravitino on AWS or Google Cloud](#installing-apache-hive-trino-and-gravitino-on-aws-or-google-cloud) or locally on OSX see [Installing Apache Hive Trino and Gravitino on OSX](#installing-apache-hive-trino-and-gravitino-on-osx).
 
-If you prefer to get started quickly and use Docker for Gravitino, Apache Hive and Trino on AWS see [Installing Apache Hive on AWS](#installing-apache-hive-on-aws) or locally on OSX see [Installing Apache Hive on OSX](#installing-apache-hive-on-osx). Gravitino requires JDK8 for compilation.
+If you prefer to get started quickly and use Docker for Gravitino, Apache Hive and Trino on AWS see [Installing Apache Hive on AWS or Google Cloud](#installing-apache-hive-on-aws-or-google-cloud) or locally on OSX see [Installing Apache Hive on OSX](#installing-apache-hive-on-osx). Gravitino requires JDK8 for compilation.
 
 If you are using AWS and want to access the instance remotely, be sure to read [Accessing Gravitino on AWS externally](#accessing-gravitino-on-aws-externally)
 
@@ -98,6 +98,78 @@ To begin using Gravitino on AWS, follow these steps:
     distribution/package/bin/gravitino.sh start
     ```
 
+## Getting started on Google Cloud
+
+To begin using Gravitino on AWS, follow these steps:
+
+1. In the Google Cloud console, launch a new instance. Select `e2-standard-4` as the instance type and 20 GB for the boot disk size. Allow HTTP and HTTPS traffic, if you want to connect to the instance remotely. Leave all other settings as their defaults. Other operating systems and instance types may work, but they have yet to be fully tested.
+
+2. Start the instance and connect to it via the SSH-in-browser tool.
+
+3. Update the Debian OS to ensure it's up to date:
+
+    ```shell
+    sudo apt update
+    sudo apt upgrade
+    ```
+
+    You may need to reboot the instance for all changes to take effect.
+
+4. Install the required Java Development Kit for Gravitino:
+
+    ```shell
+    wget -O - https://apt.corretto.aws/corretto.key | sudo gpg --dearmor -o /usr/share/keyrings/corretto-keyring.gpg && echo "deb [signed-by=/usr/share/keyrings/corretto-keyring.gpg] https://apt.corretto.aws stable main" | sudo tee /etc/apt/sources.list.d/corretto.list
+    sudo apt-get update
+    sudo apt-get install -y java-1.8.0-amazon-corretto-jdk
+    ```
+
+   Verify the Java version with:
+
+    ```shell
+    java -version
+    ```
+
+   You should see information about OpenJDK 11.
+
+5. Clone the Gravitino source from GitHub:
+
+    ```shell
+    git clone git@github.com:datastrato/gravitino.git
+    cd gravitino
+    ```
+
+   Or, download the latest Gravitino release and extract the source:
+
+    ```shell
+    curl -L https://github.com/datastrato/gravitino/releases/download/v0.2.0/gravitino.0.2.0.tar.gz > gravitino.0.2.0.tar.gz
+    tar -xvf gravitino.0.2.0.tar.gz
+    cd gravitino.0.2.0
+    ```
+
+    Or, download, and copy the release to your instance via File upload in the SSH-in-browser tool.
+
+6. Build Gravitino and run tests:
+
+    ```shell
+    ./gradlew build
+    ```
+
+    You can ignore the tests if you want by appending `-x test`.
+
+7. Build a runnable distribution:
+
+    ```shell
+    ./gradlew compileDistribution
+    ```
+
+    Again, you can ignore the tests if you want by appending `-x test`.
+
+8. Start Gravitino using the gravitino.sh script:
+
+    ```shell
+    distribution/package/bin/gravitino.sh start
+    ```
+
 ## Getting started locally on OSX
 
 To use Gravitino locally on OSX, follow similar steps:
@@ -145,7 +217,7 @@ To use Gravitino locally on OSX, follow similar steps:
     distribution/package/bin/gravitino.sh start
     ```
 
-## Installing Apache Hive on AWS
+## Installing Apache Hive on AWS or Google Cloud
 
 Installing and configuring Hive can be a little complex. If you don't already have Hive setup and running you can use the Docker container Datastrato provide to get Gravitino up and running.
 
@@ -169,7 +241,7 @@ The same Docker container operates on OSX.
 docker run --name gravitino-container -d -p 9000:9000 -p 8088:8088 -p 50010:50010 -p 50070:50070 -p 50075:50075 -p 10000:10000 -p 10002:10002 -p 8888:8888 -p 9083:9083 -p 8022:22 datastrato/gravitino-ci-hive
 ```
 
-## Installing Apache Hive Trino and Gravitino on AWS
+## Installing Apache Hive Trino and Gravitino on AWS or Google Cloud
 
 Installing Docker and Docker Compose is a requirement to using the playground.
 
