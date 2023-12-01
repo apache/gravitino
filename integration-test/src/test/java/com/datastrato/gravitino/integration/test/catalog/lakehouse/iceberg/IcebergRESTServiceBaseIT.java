@@ -49,6 +49,7 @@ public class IcebergRESTServiceBaseIT extends AbstractIT {
 
   @BeforeAll
   void initIcebergTestEnv() throws Exception {
+    containerSuite.startHiveContainer();
     registerIcebergCatalogConfig();
     AbstractIT.startIntegrationTest();
     initSparkEnv();
