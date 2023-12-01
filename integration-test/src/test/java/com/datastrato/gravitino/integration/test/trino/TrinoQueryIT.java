@@ -337,13 +337,15 @@ public class TrinoQueryIT {
               result);
         } else {
           queryRunner.stop();
-          LOG.error(
-              "Test {} failed for query.\nSql:\n{}\nExpect:\n{}\nActual:\n{}",
-              testDirName + testFileName.substring(testFileName.lastIndexOf('/')),
-              sql,
-              expectResult,
-              result);
-          Assertions.fail("Test failed by the mismatched query results: \n" + sql);
+          String errorMessage =
+              String.format(
+                  "Test %s failed for query.\nSql:\n%s\nExpect:\n%s\nActual:\n%s",
+                  testDirName + testFileName.substring(testFileName.lastIndexOf('/')),
+                  sql,
+                  expectResult,
+                  result);
+          LOG.error(errorMessage);
+          Assertions.fail(errorMessage);
         }
       }
       testCount.incrementAndGet();
