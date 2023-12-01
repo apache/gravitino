@@ -5,18 +5,37 @@
 
 package com.datastrato.gravitino.trino.connector.catalog;
 
+import com.datastrato.gravitino.shaded.org.apache.commons.collections4.bidimap.TreeBidiMap;
+import java.util.HashMap;
 import java.util.Map;
 
 /** Transforming between gravitino schema/table/column property and trino property. */
-public interface PropertyConverter {
+public abstract class PropertyConverter {
 
+  /**
+   * Convert trino properties to gravitino properties. It will return a map that hods the mapping
+   * between trino and gravitino properties.
+   *
+   * @return a map that holds the mapping from trino to gravitino properties.
+   */
+  public abstract TreeBidiMap<String, String> trinoPropertyKeyToGravitino();
   /** Convert trino properties to gravitino properties. */
-  default Map<String, String> toTrinoProperties(Map<String, String> properties) {
-    return properties;
+  public Map<String, String> toTrinoProperties(Map<String, String> properties) {
+    Map<String, String> trinoProperties = new HashMap<>();
+    Map<String, String> gravitinoToTrinoMapping = trinoPropertyKeyToGravitino().inverseBidiMap();
+    for (Map.Entry<String, String> entry : properties.entrySet()) {
+      trinoProperties.put(gravitinoToTrinoMapping.get(entry.getKey()), entry.getValue());
+    }
+    return trinoProperties;
   }
 
   /** Convert gravitino properties to trino properties. */
-  default Map<String, Object> toGravitinoProperties(Map<String, Object> properties) {
-    return properties;
+  public Map<String, Object> toGravitinoProperties(Map<String, Object> properties) {
+    Map<String, Object> gravitinoProperties = new HashMap<>();
+    Map<String, String> trinoToGravitinoMapping = trinoPropertyKeyToGravitino();
+    for (Map.Entry<String, Object> entry : properties.entrySet()) {
+      gravitinoProperties.put(trinoToGravitinoMapping.get(entry.getKey()), entry.getValue());
+    }
+    return gravitinoProperties;
   }
 }

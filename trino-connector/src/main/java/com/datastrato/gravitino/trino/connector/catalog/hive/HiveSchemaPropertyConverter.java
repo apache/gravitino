@@ -4,18 +4,13 @@
  */
 package com.datastrato.gravitino.trino.connector.catalog.hive;
 
+import com.datastrato.gravitino.shaded.org.apache.commons.collections4.bidimap.TreeBidiMap;
 import com.datastrato.gravitino.trino.connector.catalog.PropertyConverter;
-import java.util.Map;
 
-public class HiveSchemaPropertyConverter implements PropertyConverter {
-
-  @Override
-  public Map<String, String> toTrinoProperties(Map<String, String> properties) {
-    return PropertyConverter.super.toTrinoProperties(properties);
-  }
+public class HiveSchemaPropertyConverter extends PropertyConverter {
 
   @Override
-  public Map<String, Object> toGravitinoProperties(Map<String, Object> properties) {
-    return PropertyConverter.super.toGravitinoProperties(properties);
+  public TreeBidiMap<String, String> trinoPropertyKeyToGravitino() {
+    return new TreeBidiMap<>();
   }
 }
