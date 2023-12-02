@@ -201,26 +201,26 @@ public class TestResponses {
 
   @Test
   void testOAuthTokenResponse() throws IllegalArgumentException {
-    OAuthTokenResponse response =
-        new OAuthTokenResponse("Bearer xx", null, "Bearer", null, null, null);
+    OAuth2TokenResponse response =
+        new OAuth2TokenResponse("Bearer xx", null, "Bearer", null, null, null);
     response.validate();
   }
 
   @Test
   void testOAuthTokenException() throws IllegalArgumentException {
-    OAuthTokenResponse response = new OAuthTokenResponse();
+    OAuth2TokenResponse response = new OAuth2TokenResponse();
     assertThrows(IllegalArgumentException.class, () -> response.validate());
   }
 
   @Test
   void testOAuthErrorResponse() throws IllegalArgumentException {
-    OAuthErrorResponse response = new OAuthErrorResponse("invalid_grant", "error");
+    OAuth2ErrorResponse response = new OAuth2ErrorResponse("invalid_grant", "error");
     response.validate(); // No exception thrown
   }
 
   @Test
   void testOAuthErrorException() throws IllegalArgumentException {
-    OAuthErrorResponse response = new OAuthErrorResponse();
+    OAuth2ErrorResponse response = new OAuth2ErrorResponse();
     assertThrows(IllegalArgumentException.class, () -> response.validate());
   }
 }

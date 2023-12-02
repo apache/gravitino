@@ -14,7 +14,7 @@ import lombok.Getter;
 
 @Getter
 @EqualsAndHashCode
-public class OAuthErrorResponse implements RESTResponse {
+public class OAuth2ErrorResponse implements RESTResponse {
   @JsonProperty("error")
   private String type;
 
@@ -22,13 +22,13 @@ public class OAuthErrorResponse implements RESTResponse {
   @JsonProperty("error_description")
   private String message;
 
-  public OAuthErrorResponse(String type, String message) {
+  public OAuth2ErrorResponse(String type, String message) {
     this.type = type;
     this.message = message;
   }
 
   // This is the constructor that is used by Jackson deserializer
-  public OAuthErrorResponse() {}
+  public OAuth2ErrorResponse() {}
 
   @Override
   public void validate() throws IllegalArgumentException {

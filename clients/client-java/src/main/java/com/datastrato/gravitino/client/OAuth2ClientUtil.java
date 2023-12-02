@@ -18,7 +18,7 @@
  */
 package com.datastrato.gravitino.client;
 
-import com.datastrato.gravitino.dto.responses.OAuthTokenResponse;
+import com.datastrato.gravitino.dto.responses.OAuth2TokenResponse;
 import com.datastrato.gravitino.json.JsonUtils;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Joiner;
@@ -55,7 +55,7 @@ class OAuth2ClientUtil {
 
   private OAuth2ClientUtil() {}
 
-  public static OAuthTokenResponse fetchToken(
+  public static OAuth2TokenResponse fetchToken(
       RESTClient client,
       Map<String, String> headers,
       String credential,
@@ -65,9 +65,9 @@ class OAuth2ClientUtil {
         clientCredentialsRequest(
             credential, scope != null ? ImmutableList.of(scope) : ImmutableList.of());
 
-    OAuthTokenResponse response =
+    OAuth2TokenResponse response =
         client.postForm(
-            path, request, OAuthTokenResponse.class, headers, ErrorHandlers.oauthErrorHandler());
+            path, request, OAuth2TokenResponse.class, headers, ErrorHandlers.oauthErrorHandler());
     response.validate();
 
     return response;

@@ -32,7 +32,7 @@ import org.apache.commons.lang3.StringUtils;
 @Getter
 @EqualsAndHashCode(callSuper = true)
 @ToString
-public class OAuthTokenResponse extends BaseResponse {
+public class OAuth2TokenResponse extends BaseResponse {
   @JsonProperty("access_token")
   private final String accessToken;
 
@@ -53,7 +53,7 @@ public class OAuthTokenResponse extends BaseResponse {
   @JsonProperty("refresh_token")
   private final String refreshToken;
 
-  public OAuthTokenResponse(
+  public OAuth2TokenResponse(
       String accessToken,
       String issuedTokenType,
       String tokenType,
@@ -69,7 +69,7 @@ public class OAuthTokenResponse extends BaseResponse {
   }
 
   // This is the constructor that is used by Jackson deserializer
-  public OAuthTokenResponse() {
+  public OAuth2TokenResponse() {
     super();
     this.accessToken = null;
     this.issuedTokenType = null;

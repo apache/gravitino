@@ -6,7 +6,7 @@ package com.datastrato.gravitino.client;
 
 import com.datastrato.gravitino.dto.responses.ErrorConstants;
 import com.datastrato.gravitino.dto.responses.ErrorResponse;
-import com.datastrato.gravitino.dto.responses.OAuthErrorResponse;
+import com.datastrato.gravitino.dto.responses.OAuth2ErrorResponse;
 import com.datastrato.gravitino.exceptions.BadRequestException;
 import com.datastrato.gravitino.exceptions.CatalogAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.MetalakeAlreadyExistsException;
@@ -244,7 +244,7 @@ public class ErrorHandlers {
     @Override
     public ErrorResponse parseResponse(int code, String json, ObjectMapper mapper) {
       try {
-        OAuthErrorResponse response = mapper.readValue(json, OAuthErrorResponse.class);
+        OAuth2ErrorResponse response = mapper.readValue(json, OAuth2ErrorResponse.class);
         return ErrorResponse.oauthError(code, response.getType(), response.getMessage());
       } catch (Exception x) {
         LOG.warn("Unable to parse error response", x);
