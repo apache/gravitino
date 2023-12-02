@@ -8,6 +8,7 @@ import com.google.common.base.Preconditions;
 import java.util.Collections;
 import org.apache.commons.lang3.StringUtils;
 
+/** This class is the default implement of OAuth2TokenProvider. */
 public class DefaultOAuth2TokenProvider extends OAuth2TokenProvider {
 
   private String credential;
@@ -38,6 +39,7 @@ public class DefaultOAuth2TokenProvider extends OAuth2TokenProvider {
     return new Builder();
   }
 
+  /* Builder class for configuring and creating instances of DefaultOAuth2TokenProvider. */
   public static class Builder
       extends OAuth2TokenProviderBuilder<Builder, DefaultOAuth2TokenProvider> {
 
@@ -81,11 +83,10 @@ public class DefaultOAuth2TokenProvider extends OAuth2TokenProvider {
     @Override
     protected DefaultOAuth2TokenProvider internalBuild() {
       Preconditions.checkArgument(
-          StringUtils.isNotBlank(credential), "OAuthDataProvider must contain credential");
+          StringUtils.isNotBlank(credential), "OAuthDataProvider must set credential");
       Preconditions.checkArgument(
-          StringUtils.isNotBlank(scope), "OAuthDataProvider must contain scope");
-      Preconditions.checkArgument(
-          StringUtils.isNotBlank(path), "OAuthDataProvider must contain path");
+          StringUtils.isNotBlank(scope), "OAuthDataProvider must set scope");
+      Preconditions.checkArgument(StringUtils.isNotBlank(path), "OAuthDataProvider must set path");
       DefaultOAuth2TokenProvider provider = new DefaultOAuth2TokenProvider();
       provider.client = client;
       provider.credential = credential;

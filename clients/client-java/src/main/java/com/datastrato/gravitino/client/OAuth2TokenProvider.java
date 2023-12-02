@@ -20,11 +20,21 @@ public abstract class OAuth2TokenProvider implements AuthDataProvider {
 
   protected HTTPClient client;
 
+  /**
+   * Judge whether AuthDataProvider can provide token data.
+   *
+   * @return true if the AuthDataProvider can provide token data otherwise false.
+   */
   @Override
   public boolean hasTokenData() {
     return true;
   }
 
+  /**
+   * Acquire the data of token for authentication
+   *
+   * @return the token data is used for authentication
+   */
   @Override
   public byte[] getTokenData() {
     String accessToken = getAccessToken();
@@ -35,6 +45,7 @@ public abstract class OAuth2TokenProvider implements AuthDataProvider {
         .getBytes(StandardCharsets.UTF_8);
   }
 
+  /** Closes the OAuth2TokenProvider and releases any underlying resources. */
   @Override
   public void close() throws IOException {
     if (client != null) {
@@ -50,6 +61,12 @@ public abstract class OAuth2TokenProvider implements AuthDataProvider {
     T build();
   }
 
+  /**
+   * Builder interface for creating instances of {@link OAuth2TokenProvider}.
+   *
+   * @param <SELF> The type of the builder.
+   * @param <T> The type of the OAuth2TokenProvider being built.
+   */
   public abstract static class OAuth2TokenProviderBuilder<
           SELF extends Builder<SELF, T>, T extends OAuth2TokenProvider>
       implements Builder<SELF, T> {
@@ -57,16 +74,26 @@ public abstract class OAuth2TokenProvider implements AuthDataProvider {
     private String uri;
     protected HTTPClient client;
 
+    /**
+     * Sets the uri of the OAuth2TokenProvider
+     *
+     * @param uri The uri of oauth server .
+     * @return The builder instance.
+     */
     @Override
     public SELF withUri(String uri) {
       this.uri = uri;
       return self();
     }
 
+    /**
+     * Builds the instance of the OAuth2TokenProvider.
+     *
+     * @return The built OAuth2TokenProvider instance.
+     */
     @Override
     public T build() {
-      Preconditions.checkArgument(
-          StringUtils.isNotBlank(uri), "OAuthDataProvider must contain url");
+      Preconditions.checkArgument(StringUtils.isNotBlank(uri), "OAuthDataProvider must set url");
       client = HTTPClient.builder(Collections.emptyMap()).uri(uri).build();
       T t = internalBuild();
       return t;

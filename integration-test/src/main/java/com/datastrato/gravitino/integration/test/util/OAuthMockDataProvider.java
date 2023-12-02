@@ -24,6 +24,7 @@ public class OAuthMockDataProvider extends OAuth2TokenProvider {
 
   private byte[] token;
 
+  /** Close the resource of OAuthTokenProvider */
   @Override
   public void close() throws IOException {
     // no op
