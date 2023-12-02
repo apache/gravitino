@@ -246,7 +246,7 @@ public class GravitinoClient implements SupportsMetalakes, Closeable {
       return this;
     }
 
-    public Builder withOAuth2(OAuth2TokenProvider dataProvider) {
+    public Builder withOAuth(OAuth2TokenProvider dataProvider) {
       this.authDataProvider = dataProvider;
       return this;
     }

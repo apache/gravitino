@@ -25,8 +25,8 @@ First, users need to guarantee that the external OAuth 2.0 server supports Beare
 Then, for server side, users should set `gravitino.authenticator` as `oauth` and give `gravitino.authenticator.oauth.defaultSignKey` a proper value.
 Next, for client side, users can enable `oauth` mode by the code as below:
 ```java
-AuthDataProvider authDataProvider = DefaultOAuth2TokenProvider.builder()
-    .uri("oauth server uri")
+DefaultOAuth2TokenProvider authDataProvider = DefaultOAuth2TokenProvider.builder()
+    .withUri("oauth server uri")
     .withCredential("yy:xx")
     .withPath("oauth/token")
     .withScope("test")
