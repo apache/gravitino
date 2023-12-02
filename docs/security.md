@@ -48,7 +48,8 @@ The signature algorithm which Gravitino supports is as below:
 ## HTTPS configuration
 Users would better use HTTPS instead of HTTP if users choose OAuth 2.0 as the authenticator.
 Because HTTPS will protect the header of request from smuggling and HTTPS will be safer.
-Both Gravitino server and Iceberg rest service can configure HTTPS.
+If users choose to enable HTTPS, Gravitino won't provide the ability of HTTP service.
+Both Gravitino server and Iceberg REST service can configure HTTPS.
 
 ### Gravitino server's configuration
 | Configuration item                            | Description                                   | Default value | Since version |
@@ -59,7 +60,7 @@ Both Gravitino server and Iceberg rest service can configure HTTPS.
 | `gravitino.server.webserver.keyStorePassword` | Password to the key store                     | ``            | 0.3.0         |
 | `gravitino.server.webserver.managerPassword`  | Manager password to the key store             | ``            | 0.3.0         |
 
-### Iceberg rest service's configuration
+### Iceberg REST service's configuration
 | Configuration item                                   | Description                                   | Default value | Since version |
 |------------------------------------------------------|-----------------------------------------------|---------------|---------------|
 | `gravitino.auxService.iceberg-rest.httpsEnable`      | Enables https                                 | `false`       | 0.3.0         |

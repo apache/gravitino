@@ -8,6 +8,7 @@ import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.servlets.MetricsServlet;
 import com.datastrato.gravitino.GravitinoEnv;
 import com.datastrato.gravitino.metrics.MetricsSystem;
+import com.datastrato.gravitino.server.auth.AuthenticatorUtil;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
@@ -49,7 +50,6 @@ public final class JettyServer {
 
   private static final Logger LOG = LoggerFactory.getLogger(JettyServer.class);
 
-  private static final String HTTP = "http";
   private static final String HTTPS = "https";
   private static final String HTTP_PROTOCOL = "http/1.1";
 
@@ -157,6 +157,11 @@ public final class JettyServer {
     } catch (Exception e) {
       LOG.error("Failed to start {} web server.", serverName, e);
       throw new RuntimeException("Failed to start " + serverName + " web server.", e);
+    }
+
+    if (!serverConfig.isHttpsEnabled() && (AuthenticatorUtil.isEnableOAuth2())) {
+      LOG.warn(
+          "Users would better use HTTPS to void token data leak if users choose OAuth 2.0 as the authenticator.");
     }
 
     LOG.info(
