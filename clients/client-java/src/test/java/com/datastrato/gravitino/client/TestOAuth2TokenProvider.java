@@ -8,6 +8,7 @@ package com.datastrato.gravitino.client;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockserver.integration.ClientAndServer.startClientAndServer;
 
+import com.datastrato.gravitino.auth.AuthConstants;
 import com.datastrato.gravitino.dto.responses.OAuth2ErrorResponse;
 import com.datastrato.gravitino.dto.responses.OAuth2TokenResponse;
 import com.datastrato.gravitino.exceptions.BadRequestException;
@@ -136,6 +137,8 @@ public class TestOAuth2TokenProvider {
     mockResponse = mockResponse.withBody(respJson);
     mockServer.when(any(), Times.exactly(1)).respond(mockResponse);
     Assertions.assertNotEquals(accessToken, oldAccessToken);
-    Assertions.assertEquals(accessToken, new String(provider.getTokenData()));
+    Assertions.assertEquals(
+        AuthConstants.AUTHORIZATION_BEARER_HEADER + accessToken,
+        new String(provider.getTokenData()));
   }
 }
