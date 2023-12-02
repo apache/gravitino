@@ -21,7 +21,7 @@ Once the playground environment has started, you can open http://localhost:8090 
 docker exec -it playground-trino bash
 ````
 
-2. Open Trion CLI in the container.
+2. Open Trino CLI in the container.
 
 ```shell
 trino@d2bbfccc7432:/$ trino

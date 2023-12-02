@@ -7,7 +7,13 @@ set -ex
 
 # Since trino-connector needs to connect Gravitino service, get the default metalake
 # Create metalake
-curl -X POST -H "Content-Type: application/json" -d '{"name":"metalake_demo","comment":"comment","properties":{}}' http://127.0.0.1:8090/api/metalakes
+response=$(curl -X POST -H "Content-Type: application/json" -d '{"name":"metalake_demo","comment":"comment","properties":{}}' http://127.0.0.1:8090/api/metalakes)
+if echo "$response" | grep -q "\"code\":0"; then
+  true # Placeholder, do nothing
+else
+  echo "Matalake metalake_demo create failed"
+  exit 1
+fi
 
 # Check metalake if created
 response=$(curl -X GET -H "Content-Type: application/json" http://127.0.0.1:8090/api/metalakes)
