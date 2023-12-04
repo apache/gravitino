@@ -1,13 +1,13 @@
 ---
-title: "How to use Gravitino to manage Iceberg metadata"
+title: "How to use Gravitino to manage Apache Iceberg metadata"
 date: 2023-10-18
 license: "Copyright 2023 Datastrato.
 This software is licensed under the Apache License version 2."
 ---
 
-## Using Iceberg as a Catalog in Gravitino
+## Using Apache Iceberg as a Catalog in Gravitino
 
-Gravitino provides the ability to use Iceberg as a catalog for managing your data. This guide will walk you through the steps to create a catalog using Iceberg within Gravitino.
+Gravitino provides the ability to use Apache Iceberg as a catalog for managing your data. This guide will walk you through the steps to create a catalog using Iceberg within Gravitino.
 
 ### Capabilities
 
@@ -15,7 +15,7 @@ Gravitino provides the ability to use Iceberg as a catalog for managing your dat
 * The integrated Iceberg version used is 1.3.1.
 * Before creating a catalogue, ensure you have already created a Metalake. If you still need to, please follow the Metalake creation steps.
 
-## Creating an Iceberg Catalog
+## Creating an Apache Iceberg Catalog
 
 To create an Iceberg catalog, use the following steps:
 

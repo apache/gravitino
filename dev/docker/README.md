@@ -28,7 +28,7 @@ docker run --rm -d -p 8090:8090 datastrato/gravitino
 - Expose ports:
   - `8090` Gravitino Web UI
 
-## Gravitino CI Hive
+## Gravitino CI Apache Hive
 
 ### Container startup commands
 ```
