@@ -4,7 +4,7 @@ date: 2023-10-03T09:03:20-08:00
 license: "Copyright 2023 Datastrato.
 This software is licensed under the Apache License version 2."
 ---
-## Gravitino Documentation
+## Gravitino documentation
 
 ## Launch Gravitino document website
 
@@ -26,8 +26,9 @@ Execute `./launch-docs-website.sh` scripts. The script will create the Gravitino
 To add a new document to the Gravitino website, follow these steps:
 
 1. Create a new markdown file in the `docs` directory.
-2. For the markdown file, include the following header at the beginning as `Hugo` will use it to create the website link list.
-    ```
+2. For the markdown file, include the following header at the beginning as `Hugo` uses it to create the website links list.
+
+    ```text
     ---
     title: "Article Title"
     date: Writing date
@@ -35,6 +36,7 @@ To add a new document to the Gravitino website, follow these steps:
     This software is licensed under the Apache License version 2."
     ---
     ```
-3. To insert an image into a markdown file, you must save all the referenced images in the `docs/assets` directory. 
+
+3. To insert an image into a markdown file, you must save all the referenced images in the `docs/assets` directory.
    Additionally, you must use the following format: `![](assets/...`
 4. Execute `./launch-docs-website.sh update` scripts to update the Gravitino document website.

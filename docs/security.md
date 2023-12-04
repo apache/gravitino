@@ -6,13 +6,16 @@ This software is licensed under the Apache License version 2."
 ---
 
 ## Authentication
-Gravitino supports two kinds of authentication mechanism: simple and oauth.
+
+Gravitino supports two kinds of authentication mechanisms: simple and OAuth.
 
 ### Simple mode
+
 Simple mode is the default authentication option.
 Simple mode allows the client to use the environment variable `GRAVITINO_USER` as the user.
-If the environment variable `GRAVITINO_USER` is not set, client will use the user of the machine which sends requests.
-For client side, users can enable `simple` mode by the code as below:
+If the environment variable `GRAVITINO_USER` isn't set, the client uses the user of the machine that sends requests.
+For the client side, users can enable `simple` mode by the following code:
+
 ```java
 GravitinoClient client = GravitinoClient.builder(uri)
     .withSimpleAuth()
@@ -20,10 +23,12 @@ GravitinoClient client = GravitinoClient.builder(uri)
 ```
 
 ### OAuth mode
-Gravitino only supports external OAuth 2.0 server now.
-First, users need to guarantee that the external OAuth 2.0 server supports Bearer JWT and is configured properly.
-Then, for server side, users should set `gravitino.authenticator` as `oauth` and give `gravitino.authenticator.oauth.defaultSignKey` a proper value.
-Next, for client side, users can enable `oauth` mode by the code as below:
+
+Gravitino only supports external OAuth 2.0 servers.
+First, users need to guarantee that the external correctly configured OAuth 2.0 server supports Bearer JWT.
+Then, on the server side, users should set `gravitino.authenticator` as `oauth` and give `gravitino.authenticator.oauth.defaultSignKey` a proper value.
+Next, for the client side, users can enable `OAuth` mode by the following code:
+
 ```java
 DefaultOAuth2TokenProvider authDataProvider = DefaultOAuth2TokenProvider.builder()
     .withUri("oauth server uri")
@@ -37,18 +42,17 @@ GravitinoClient client = GravitinoClient.builder(uri)
     .build();
 ```
 
-
 ### Server configuration
 
 | Configuration item                                | Description                                                                | Default value     | Since version |
 |---------------------------------------------------|----------------------------------------------------------------------------|-------------------|---------------|
 | `gravitino.authenticator`                         | The authenticator which Gravitino uses, setting as `simple` or `oauth`     | `simple`          | 0.3.0         |
-| `gravitino.authenticator.oauth.serviceAudience`   | The audience name when Gravitino uses oauth as the authenticator           | `GravitinoServer` | 0.3.0         |
-| `gravitino.authenticator.oauth.allowSkewSecs`     | The jwt allows skew seconds when Gravitino uses oauth as the authenticator | `0`               | 0.3.0         |
-| `gravitino.authenticator.oauth.defaultSignKey`    | The sign key of jwt when Gravitino uses oauth as the authenticator         | ``                | 0.3.0         |
-| `gravitino.authenticator.oauth.signAlgorithmType` | The signature algorithm when Gravitino uses oauth as the authenticator     | `RS256`           | 0.3.0         |
+| `gravitino.authenticator.oauth.serviceAudience`   | The audience name when Gravitino uses OAuth as the authenticator           | `GravitinoServer` | 0.3.0         |
+| `gravitino.authenticator.oauth.allowSkewSecs`     | The JWT allows skew seconds when Gravitino uses OAuth as the authenticator | `0`               | 0.3.0         |
+| `gravitino.authenticator.oauth.defaultSignKey`    | The signing key of JWT when Gravitino uses OAuth as the authenticator         | ``                | 0.3.0         |
+| `gravitino.authenticator.oauth.signAlgorithmType` | The signature algorithm when Gravitino uses OAuth as the authenticator     | `RS256`           | 0.3.0         |
 
-The signature algorithm which Gravitino supports is as below:
+The signature algorithms that Gravitino supports follows:
 
 | Name  | Description                                    |
 |-------|------------------------------------------------|

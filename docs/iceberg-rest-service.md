@@ -71,7 +71,6 @@ The `clients` property for example:
 |-----------------------------------|-----------------------------------------------------------------------------------------------------------------------------|---------------|
 | `gravitino.auxService.iceberg-rest.clients` | The client pool size of the catalog. | `2` |
 
-
 ### HDFS configuration
 
 The Gravitino Iceberg REST server adds the HDFS configuration files, `core-site.xml` and `hdfs-site.xml` from the directory defined by `gravitino.auxService.iceberg-rest.classpath`, for example, `catalogs/lakehouse-iceberg/conf`, to the classpath.
@@ -97,6 +96,7 @@ curl  http://127.0.0.1:9001/iceberg/application.wadl
 Follow the [Spark Iceberg start guide](https://iceberg.apache.org/docs/latest/getting-started/) to setup Apache Spark's and Apache Iceberg's environment. Please keep the Spark version consistent with the `spark-iceberg-runtime` version.
 
 ### Starting the Apache Spark client with the Apache Iceberg REST catalog
+
 | Configuration item                | Description                                                                                                                 |
 |-----------------------------------|-----------------------------------------------------------------------------------------------------------------------------|
 | `spark.sql.catalog.${catalog-name}.type` | The Spark catalog type, should set to `rest`. |
