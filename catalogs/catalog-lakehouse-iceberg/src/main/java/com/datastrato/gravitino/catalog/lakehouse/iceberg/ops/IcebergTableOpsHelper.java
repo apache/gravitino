@@ -160,7 +160,7 @@ public class IcebergTableOpsHelper {
   }
 
   private ColumnPosition getAddColumnPosition(StructType parent, ColumnPosition columnPosition) {
-    if ((!(columnPosition instanceof TableChange.Default))) {
+    if (!(columnPosition instanceof TableChange.Default)) {
       return columnPosition;
     }
 
