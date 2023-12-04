@@ -361,6 +361,7 @@ public class TrinoConnectorIT extends AbstractIT {
             "comment",
             properties);
     Catalog loadCatalog = metalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
+    Assertions.assertEquals(createdCatalog, loadCatalog);
 
     catalog = loadCatalog;
   }
