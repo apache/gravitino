@@ -36,6 +36,10 @@ trino-jdbc = "426"
 jwt = "0.11.1"
 jline = "3.21.0"
 okhttp3 = "4.11.0"
+metrics = "4.2.19"
+prometheus = "0.16.0"
+jsqlparser = "4.2"
+mysql = "8.0.23"
 
 protobuf-plugin = "0.9.2"
 spotless-plugin = '6.11.0'
@@ -43,10 +47,6 @@ gradle-extensions-plugin = '1.74'
 publish-plugin = '1.2.0'
 rat-plugin = '0.8.0'
 shadow-plugin = "8.1.1"
-metrics = "4.2.19"
-prometheus = "0.16.0"
-jsqlparser = "4.2"
-mysql = "8.0.23"
 
 [libraries]
 protobuf-java = { group = "com.google.protobuf", name = "protobuf-java", version.ref = "protoc" }

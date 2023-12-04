@@ -183,6 +183,7 @@ public class BinaryEntityKeyEncoder implements EntityKeyEncoder<byte[]> {
 
     return bytes;
   }
+
   /**
    * Encodes an entity object into a byte array for use as a key in a key-value store.
    *
