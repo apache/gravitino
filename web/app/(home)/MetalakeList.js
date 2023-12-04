@@ -12,7 +12,7 @@ import { DataGrid } from '@mui/x-data-grid'
 
 import Icon from '@/components/Icon'
 
-import { useDispatch, useSelector } from 'react-redux'
+import { useAppDispatch, useAppSelector } from '@/lib/hooks/useStore'
 import { fetchMetalakes, setFilteredMetalakes, deleteMetalake, updateMetalake } from '@/lib/store/metalakes'
 
 import { formatToDateTime } from '@/lib/utils/date'
@@ -22,8 +22,8 @@ import CreateMetalakeDialog from './CreateMetalakeDialog'
 import ConfirmDeleteDialog from '@/components/ConfirmDeleteDialog'
 
 const MetalakeList = () => {
-  const dispatch = useDispatch()
-  const store = useSelector(state => state.metalakes)
+  const dispatch = useAppDispatch()
+  const store = useAppSelector(state => state.metalakes)
 
   const [value, setValue] = useState('')
   const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 10 })
@@ -91,7 +91,7 @@ const MetalakeList = () => {
             <Typography
               noWrap
               component={Link}
-              href={`/metalakes/${name}`}
+              href={`/metalakes/?metalake=${name}`}
               sx={{
                 fontWeight: 500,
                 color: 'primary.main',
@@ -199,7 +199,6 @@ const MetalakeList = () => {
       <CreateMetalakeDialog
         open={openDialog}
         setOpen={setOpenDialog}
-        dispatch={dispatch}
         updateMetalake={updateMetalake}
         data={dialogData}
         type={dialogType}

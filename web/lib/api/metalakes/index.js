@@ -22,6 +22,16 @@ export const getMetalakesApi = () => {
   })
 }
 
+export const getMetalakeDetailsApi = name => {
+  return axios({
+    url: `${Apis.GET}/${name}`,
+    method: 'get',
+    headers: {
+      Accept: 'application/vnd.gravitino.v1+json'
+    }
+  })
+}
+
 export const createMetalakeApi = data => {
   return axios({
     url: `${Apis.CREATE}`,
