@@ -12,16 +12,6 @@ ssh-keyscan 0.0.0.0 >> /root/.ssh/known_hosts
 # start hdfs
 ${HADOOP_HOME}/sbin/start-dfs.sh
 
-${HADOOP_HOME}/bin/hdfs dfs -mkdir /tmp
-${HADOOP_HOME}/bin/hdfs dfs -chmod 1777 /tmp
-${HADOOP_HOME}/bin/hdfs dfs -mkdir -p /user/hive/warehouse
-${HADOOP_HOME}/bin/hdfs dfs -chown -R hive:hive /user/hive
-${HADOOP_HOME}/bin/hdfs dfs -chmod -R 775 /user/hive
-${HADOOP_HOME}/bin/hdfs dfs -mkdir -p /user/datastrato
-${HADOOP_HOME}/bin/hdfs dfs -chown -R datastrato:hdfs /user/datastrato
-${HADOOP_HOME}/bin/hdfs dfs -chmod 755 /user/datastrato
-${HADOOP_HOME}/bin/hdfs dfs -chmod -R 777 /user/hive/tmp
-
 # start mysql and create databases/users for hive
 chown -R mysql:mysql /var/lib/mysql
 usermod -d /var/lib/mysql/ mysql

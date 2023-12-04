@@ -8,6 +8,7 @@ LABEL maintainer="support@datastrato.com"
 
 ARG HADOOP_PACKAGE_NAME
 ARG HIVE_PACKAGE_NAME
+ARG JDBC_DIVER_PACKAGE_NAME
 
 WORKDIR /
 
@@ -129,10 +130,7 @@ RUN sed -i "s/.*bind-address.*/bind-address = 0.0.0.0/" /etc/mysql/mysql.conf.d/
 
 ################################################################################
 # add mysql jdbc driver
-RUN wget https://downloads.mysql.com/archives/get/p/3/file/mysql-connector-java-8.0.15.tar.gz
-RUN tar -xzf mysql-connector-java-8.0.15.tar.gz
-RUN cp mysql-connector-java-8.0.15/mysql-connector-java-8.0.15.jar ${HIVE_HOME}/lib
-RUN rm -rf mysql-connector-java-8.0.15 mysql-connector-java-8.0.15.tar.gz
+RUN tar -xz -C ${HIVE_HOME}/lib --strip-components 1 -f /tmp/packages/${JDBC_DIVER_PACKAGE_NAME}
 
 ################################################################################
 # add users and groups

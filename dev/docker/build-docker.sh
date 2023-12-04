@@ -64,7 +64,7 @@ fi
 
 if [[ "${component_type}" == "hive" ]]; then
   . ${script_dir}/hive/hive-dependency.sh
-  build_args="--build-arg HADOOP_PACKAGE_NAME=${HADOOP_PACKAGE_NAME} --build-arg HIVE_PACKAGE_NAME=${HIVE_PACKAGE_NAME}"
+  build_args="--build-arg HADOOP_PACKAGE_NAME=${HADOOP_PACKAGE_NAME} --build-arg HIVE_PACKAGE_NAME=${HIVE_PACKAGE_NAME} --build-arg JDBC_DIVER_PACKAGE_NAME=${JDBC_DIVER_PACKAGE_NAME}"
 elif [ "${component_type}" == "trino" ]; then
   true # Placeholder, do nothing
 elif [ "${component_type}" == "gravitino" ]; then

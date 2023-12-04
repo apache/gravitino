@@ -79,6 +79,10 @@ docker run --rm -d -p 9000:9000 -p 9083:9083 -p 10000:10000 -p 10002:10002 -p 50
   - `22` SSH
   - `8088` YARN Service
 
+### 0.1.7
+- Download Mysql JDBC driver before building the Docker image
+- Set `hdfs` as HDFS superuser group
+
 ## Gravitino CI Trino
 
 ### Container startup commands

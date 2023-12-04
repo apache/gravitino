@@ -259,14 +259,13 @@ tasks.test {
 
       // Default use MiniGravitino to run integration tests
       environment("GRAVITINO_ROOT_DIR", rootDir.path)
-      // TODO: use hive user instead after we fix the permission issue #554
-      environment("HADOOP_USER_NAME", "root")
+      environment("HADOOP_USER_NAME", "datastrato")
       environment("HADOOP_HOME", "/tmp")
       environment("PROJECT_VERSION", version)
       environment("TRINO_CONF_DIR", buildDir.path + "/trino-conf")
 
       // Gravitino CI Docker image
-      environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-hive:0.1.6")
+      environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-hive:0.1.7")
       environment("GRAVITINO_CI_TRINO_DOCKER_IMAGE", "datastrato/gravitino-ci-trino:0.1.0")
 
       val testMode = project.properties["testMode"] as? String ?: "embedded"
