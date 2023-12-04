@@ -237,6 +237,8 @@
    ./common/src/main/java/com/datastrato/gravitino/rest/RESTMessage.java
    ./core/src/main/java/com/datastrato/gravitino/util/ClientPool.java
    ./core/src/main/java/com/datastrato/gravitino/util/ClientPoolImpl.java
+   ./common/src/main/java/com/datastrato/gravitino/dto/responses/OAuth2TokenResponse.java
+   ./clients/client-java/src/main/java/com/datastrato/gravitino/client/OAuth2ClientUtil.java
 
 
    Apache Hive

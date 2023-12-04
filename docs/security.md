@@ -12,11 +12,31 @@ Gravitino supports two kinds of authentication mechanism: simple and oauth.
 Simple mode is the default authentication option.
 Simple mode allows the client to use the environment variable `GRAVITINO_USER` as the user.
 If the environment variable `GRAVITINO_USER` is not set, client will use the user of the machine which sends requests.
+For client side, users can enable `simple` mode by the code as below:
+```java
+GravitinoClient client = GravitinoClient.builder(uri)
+    .withSimpleAuth()
+    .build();
+```
 
 ### OAuth mode
-Gravitino only supports external OAuth2.0 server now.
+Gravitino only supports external OAuth 2.0 server now.
 First, users need to guarantee that the external OAuth 2.0 server supports Bearer JWT and is configured properly.
 Then, for server side, users should set `gravitino.authenticator` as `oauth` and give `gravitino.authenticator.oauth.defaultSignKey` a proper value.
+Next, for client side, users can enable `oauth` mode by the code as below:
+```java
+DefaultOAuth2TokenProvider authDataProvider = DefaultOAuth2TokenProvider.builder()
+    .withUri("oauth server uri")
+    .withCredential("yy:xx")
+    .withPath("oauth/token")
+    .withScope("test")
+    .build();
+
+GravitinoClient client = GravitinoClient.builder(uri)
+    .withOAuth(authDataProvider)
+    .build();
+```
+
 
 ### Server configuration
 
@@ -25,7 +45,7 @@ Then, for server side, users should set `gravitino.authenticator` as `oauth` and
 | `gravitino.authenticator`                         | The authenticator which Gravitino uses, setting as `simple` or `oauth`     | `simple`          | 0.3.0         |
 | `gravitino.authenticator.oauth.serviceAudience`   | The audience name when Gravitino uses oauth as the authenticator           | `GravitinoServer` | 0.3.0         |
 | `gravitino.authenticator.oauth.allowSkewSecs`     | The jwt allows skew seconds when Gravitino uses oauth as the authenticator | `0`               | 0.3.0         |
-| `gravitino.authenticator.oauth.defaultSignKey`    | The sign key of jwt when Gravitino uses oauth as the authenticator         | `null`            | 0.3.0         |
+| `gravitino.authenticator.oauth.defaultSignKey`    | The sign key of jwt when Gravitino uses oauth as the authenticator         | ``                | 0.3.0         |
 | `gravitino.authenticator.oauth.signAlgorithmType` | The signature algorithm when Gravitino uses oauth as the authenticator     | `RS256`           | 0.3.0         |
 
 The signature algorithm which Gravitino supports is as below:

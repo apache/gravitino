@@ -9,8 +9,8 @@ service ssh start
 ssh-keyscan localhost > /root/.ssh/known_hosts
 ssh-keyscan 0.0.0.0 >> /root/.ssh/known_hosts
 
-# start hadoop
-${HADOOP_HOME}/sbin/start-all.sh
+# start hdfs
+${HADOOP_HOME}/sbin/start-dfs.sh
 
 ${HADOOP_HOME}/bin/hdfs dfs -mkdir /tmp
 ${HADOOP_HOME}/bin/hdfs dfs -chmod 1777 /tmp

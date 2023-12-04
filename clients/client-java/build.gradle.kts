@@ -36,4 +36,5 @@ dependencies {
   testImplementation(libs.mockito.core)
   testImplementation(libs.mockserver.netty)
   testImplementation(libs.mockserver.client.java)
+  testImplementation(libs.bundles.jwt)
 }

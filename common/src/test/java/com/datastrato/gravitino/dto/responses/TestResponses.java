@@ -82,8 +82,8 @@ public class TestResponses {
 
   @Test
   void testMetalakeResponseException() throws IllegalArgumentException {
-    MetalakeResponse reponse = new MetalakeResponse();
-    assertThrows(IllegalArgumentException.class, () -> reponse.validate());
+    MetalakeResponse response = new MetalakeResponse();
+    assertThrows(IllegalArgumentException.class, () -> response.validate());
   }
 
   @Test
@@ -97,8 +97,8 @@ public class TestResponses {
 
   @Test
   void testMetalakeListResponseException() throws IllegalArgumentException {
-    MetalakeListResponse reponse = new MetalakeListResponse();
-    assertThrows(IllegalArgumentException.class, () -> reponse.validate());
+    MetalakeListResponse response = new MetalakeListResponse();
+    assertThrows(IllegalArgumentException.class, () -> response.validate());
   }
 
   @Test
@@ -197,5 +197,30 @@ public class TestResponses {
   void testUnknownErrorResponse() throws IllegalArgumentException {
     ErrorResponse error = ErrorResponse.unknownError("unknown error");
     error.validate(); // No exception thrown
+  }
+
+  @Test
+  void testOAuthTokenResponse() throws IllegalArgumentException {
+    OAuth2TokenResponse response =
+        new OAuth2TokenResponse("Bearer xx", null, "Bearer", null, null, null);
+    response.validate();
+  }
+
+  @Test
+  void testOAuthTokenException() throws IllegalArgumentException {
+    OAuth2TokenResponse response = new OAuth2TokenResponse();
+    assertThrows(IllegalArgumentException.class, () -> response.validate());
+  }
+
+  @Test
+  void testOAuthErrorResponse() throws IllegalArgumentException {
+    OAuth2ErrorResponse response = new OAuth2ErrorResponse("invalid_grant", "error");
+    response.validate(); // No exception thrown
+  }
+
+  @Test
+  void testOAuthErrorException() throws IllegalArgumentException {
+    OAuth2ErrorResponse response = new OAuth2ErrorResponse();
+    assertThrows(IllegalArgumentException.class, () -> response.validate());
   }
 }

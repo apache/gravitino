@@ -19,6 +19,7 @@
 
 package com.datastrato.gravitino.client;
 
+import com.datastrato.gravitino.auth.AuthConstants;
 import com.datastrato.gravitino.dto.responses.ErrorResponse;
 import com.datastrato.gravitino.exceptions.RESTException;
 import com.datastrato.gravitino.json.JsonUtils;
@@ -75,6 +76,7 @@ public class HTTPClient implements RESTClient {
   private final String uri;
   private final CloseableHttpClient httpClient;
   private final ObjectMapper mapper;
+  private final AuthDataProvider authDataProvider;
 
   /**
    * Constructs an instance of HTTPClient with the provided information.
@@ -82,8 +84,13 @@ public class HTTPClient implements RESTClient {
    * @param uri The base URI of the REST API.
    * @param baseHeaders A map of base headers to be included in all HTTP requests.
    * @param objectMapper The ObjectMapper used for JSON serialization and deserialization.
+   * @param authDataProvider The provider of authentication data.
    */
-  private HTTPClient(String uri, Map<String, String> baseHeaders, ObjectMapper objectMapper) {
+  private HTTPClient(
+      String uri,
+      Map<String, String> baseHeaders,
+      ObjectMapper objectMapper,
+      AuthDataProvider authDataProvider) {
     this.uri = uri;
     this.mapper = objectMapper;
 
@@ -97,6 +104,7 @@ public class HTTPClient implements RESTClient {
     }
 
     this.httpClient = clientBuilder.build();
+    this.authDataProvider = authDataProvider;
   }
 
   /**
@@ -124,7 +132,7 @@ public class HTTPClient implements RESTClient {
    *
    * <p>According to the spec, the only currently defined/used "success" responses are 200 and 202.
    *
-   * @param response The reponse to check for success.
+   * @param response The response to check for success.
    * @return True if the response is successful, false otherwise.
    */
   private boolean isSuccessful(CloseableHttpResponse response) {
@@ -135,11 +143,11 @@ public class HTTPClient implements RESTClient {
   }
 
   /**
-   * Builds an error reponse based on the provided HTTP response.
+   * Builds an error response based on the provided HTTP response.
    *
    * <p>This method extracts the reason phrase from the response and uses it as the message for the
    * ErrorResponse. If the reason phrase doesn't exist, it retrieves the standard reason phrase from
-   * teh English phrase catalog.
+   * the English phrase catalog.
    *
    * @param response The response from which the ErrorResponse is built.
    * @return An ErrorResponse object representing the REST error response.
@@ -321,6 +329,10 @@ public class HTTPClient implements RESTClient {
       request.setEntity(toJson(requestBody));
     } else {
       addRequestHeaders(request, headers, ContentType.APPLICATION_JSON.getMimeType());
+    }
+    if (authDataProvider != null) {
+      request.setHeader(
+          AuthConstants.HTTP_HEADER_AUTHORIZATION, new String(authDataProvider.getTokenData()));
     }
 
     try (CloseableHttpResponse response = httpClient.execute(request)) {
@@ -607,6 +619,9 @@ public class HTTPClient implements RESTClient {
    */
   @Override
   public void close() throws IOException {
+    if (authDataProvider != null) {
+      authDataProvider.close();
+    }
     httpClient.close(CloseMode.GRACEFUL);
   }
 
@@ -631,6 +646,7 @@ public class HTTPClient implements RESTClient {
     private final Map<String, String> baseHeaders = Maps.newHashMap();
     private String uri;
     private ObjectMapper mapper = JsonUtils.objectMapper();
+    private AuthDataProvider authDataProvider;
 
     private Builder(Map<String, String> properties) {
       this.properties = properties;
@@ -684,12 +700,24 @@ public class HTTPClient implements RESTClient {
     }
 
     /**
+     * Sets the AuthDataProvider for the HTTP client.
+     *
+     * @param authDataProvider The authDataProvider providing the data used to authenticate.
+     * @return This Builder instance for method chaining.
+     */
+    public Builder withAuthDataProvider(AuthDataProvider authDataProvider) {
+      this.authDataProvider = authDataProvider;
+      return this;
+    }
+
+    /**
      * Builds and returns an instance of the HTTPClient with the configured options.
      *
      * @return An instance of HTTPClient with the configured options.
      */
     public HTTPClient build() {
-      return new HTTPClient(uri, baseHeaders, mapper);
+
+      return new HTTPClient(uri, baseHeaders, mapper, authDataProvider);
     }
   }
 

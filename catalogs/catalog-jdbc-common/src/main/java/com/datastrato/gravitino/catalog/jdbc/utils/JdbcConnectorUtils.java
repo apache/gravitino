@@ -10,6 +10,8 @@ import java.sql.Statement;
 
 public final class JdbcConnectorUtils {
 
+  public static final String[] TABLE_TYPES = {"TABLE"};
+
   private JdbcConnectorUtils() {}
 
   /**

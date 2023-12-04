@@ -13,6 +13,7 @@ import com.github.jk1.license.render.ReportRenderer
 import com.github.jk1.license.render.InventoryHtmlReportRenderer
 import com.github.jk1.license.filter.DependencyFilter
 import com.github.jk1.license.filter.LicenseBundleNormalizer
+import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 
 plugins {
   `maven-publish`
@@ -33,14 +34,6 @@ licenseReport {
     filters = arrayOf<DependencyFilter>(LicenseBundleNormalizer())
 }
 repositories { mavenCentral() }
-
-java {
-  toolchain {
-    languageVersion.set(JavaLanguageVersion.of(8))
-    withJavadocJar()
-    withSourcesJar()
-  }
-}
 
 allprojects {
   repositories {
@@ -82,6 +75,16 @@ subprojects {
   repositories {
     mavenCentral()
     mavenLocal()
+  }
+
+  java {
+    toolchain {
+      if (project.name == "trino-connector") {
+        languageVersion.set(JavaLanguageVersion.of(17))
+      } else {
+        languageVersion.set(JavaLanguageVersion.of(8))
+      }
+    }
   }
 
   val sourcesJar by tasks.registering(Jar::class) {
@@ -137,10 +140,18 @@ subprojects {
   }
 
   tasks.configureEach<Test> {
+    testLogging {
+      exceptionFormat = TestExceptionFormat.FULL
+      showExceptions = true
+      showCauses = true
+      showStackTraces = true
+    }
+    reports.html.outputLocation.set(file("${rootProject.projectDir}/build/reports/"))
     val skipTests = project.hasProperty("skipTests")
     if (!skipTests) {
       if (project.name == "trino-connector") {
         useTestNG()
+        maxHeapSize = "2G"
       } else {
         useJUnitPlatform()
       }
@@ -177,7 +188,10 @@ subprojects {
   plugins.withType<SpotlessPlugin>().configureEach {
     configure<SpotlessExtension> {
       java {
-        googleJavaFormat()
+        // Fix the Google Java Format version to 1.7. Since JDK8 only support Google Java Format
+        // 1.7, which is not compatible with JDK17. We will use a newer version when we upgrade to
+        // JDK17.
+        googleJavaFormat("1.7")
         removeUnusedImports()
         trimTrailingWhitespace()
         replaceRegex(
@@ -212,12 +226,14 @@ tasks.rat {
     "dev/docker/**/*.xml",
     "**/*.log",
     "licenses/*txt",
+    "integration-test/**",
     "web/.**",
-    "web/node_modules/**/*",
     "web/dist/**/*",
+    "web/node_modules/**/*",
     "web/src/iconify-bundle/bundle-icons-react.js",
     "web/src/iconify-bundle/icons-bundle-react.js",
     "web/yarn.lock",
+    "integration-test/**"
   )
 
   // Add .gitignore excludes to the Apache Rat exclusion list.
@@ -367,7 +383,8 @@ tasks {
 
   val copyCatalogLibAndConfigs by registering(Copy::class) {
     dependsOn(":catalogs:catalog-hive:copyLibAndConfig",
-            ":catalogs:catalog-lakehouse-iceberg:copyLibAndConfig")
+            ":catalogs:catalog-lakehouse-iceberg:copyLibAndConfig",
+            ":catalogs:catalog-jdbc-mysql:copyLibAndConfig")
   }
 
   clean {

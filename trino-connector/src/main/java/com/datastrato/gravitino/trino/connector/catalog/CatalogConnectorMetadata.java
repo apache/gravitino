@@ -28,14 +28,13 @@ import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.TableCatalog;
 import com.datastrato.gravitino.rel.TableChange;
+import com.datastrato.gravitino.rel.types.Type;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoColumn;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoSchema;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoTable;
-import com.datastrato.gravitino.trino.connector.util.DataTypeTransformer;
 import com.google.common.base.Strings;
 import io.trino.spi.TrinoException;
 import io.trino.spi.connector.SchemaTableName;
-import io.trino.spi.type.Type;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -159,11 +158,21 @@ public class CatalogConnectorMetadata {
   }
 
   public void dropTable(SchemaTableName tableName) {
-    boolean dropped =
-        tableCatalog.dropTable(
-            NameIdentifier.ofTable(
-                metalake.name(), catalogName, tableName.getSchemaName(), tableName.getTableName()));
-    if (!dropped) throw new TrinoException(GRAVITINO_TABLE_NOT_EXISTS, "Table does not exist");
+    try {
+      tableCatalog.purgeTable(
+          NameIdentifier.ofTable(
+              metalake.name(), catalogName, tableName.getSchemaName(), tableName.getTableName()));
+    } catch (UnsupportedOperationException e) {
+      LOG.warn("Purge table is not supported", e);
+      boolean dropped =
+          tableCatalog.dropTable(
+              NameIdentifier.ofTable(
+                  metalake.name(),
+                  catalogName,
+                  tableName.getSchemaName(),
+                  tableName.getTableName()));
+      if (!dropped) throw new TrinoException(GRAVITINO_TABLE_NOT_EXISTS, "Table does not exist");
+    }
   }
 
   public void renameSchema(String source, String target) {
@@ -181,7 +190,7 @@ public class CatalogConnectorMetadata {
     } catch (IllegalArgumentException e) {
       // TODO yuhui need improve get the error message. From IllegalArgumentException.
       // At present, the IllegalArgumentException cannot get the error information clearly from the
-      // Graviton server.
+      // Gravitino server.
       String message =
           e.getMessage().lines().toList().get(0) + e.getMessage().lines().toList().get(1);
       throw new TrinoException(GRAVITINO_ILLEGAL_ARGUMENT, message, e);
@@ -244,8 +253,6 @@ public class CatalogConnectorMetadata {
 
   public void setColumnType(SchemaTableName schemaTableName, String columnName, Type type) {
     String[] columnNames = {columnName};
-    applyAlter(
-        schemaTableName,
-        TableChange.updateColumnType(columnNames, DataTypeTransformer.getGravitinoType(type)));
+    applyAlter(schemaTableName, TableChange.updateColumnType(columnNames, type));
   }
 }

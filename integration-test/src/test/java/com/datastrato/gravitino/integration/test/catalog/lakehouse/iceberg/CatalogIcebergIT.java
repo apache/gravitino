@@ -24,6 +24,8 @@ import com.datastrato.gravitino.dto.rel.partitions.Partitioning;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.TableAlreadyExistsException;
+import com.datastrato.gravitino.integration.test.container.ContainerSuite;
+import com.datastrato.gravitino.integration.test.container.HiveContainer;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
 import com.datastrato.gravitino.rel.Column;
@@ -85,9 +87,10 @@ public class CatalogIcebergIT extends AbstractIT {
   public static String ICEBERG_COL_NAME2 = "iceberg_col_name2";
   public static String ICEBERG_COL_NAME3 = "iceberg_col_name3";
   private static final String provider = "lakehouse-iceberg";
-  private static final String WAREHOUSE =
-      "hdfs://127.0.0.1:9000/user/hive/warehouse-catalog-iceberg/";
-  private static final String URI = "thrift://127.0.0.1:9083";
+
+  private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
+  private static String WAREHOUSE;
+  private static String HIVE_METASTORE_URIS;
 
   private static String SELECT_ALL_TEMPLATE = "SELECT * FROM iceberg.%s";
   private static String INSERT_BATCH_WITHOUT_PARTITION_TEMPLATE =
@@ -102,6 +105,19 @@ public class CatalogIcebergIT extends AbstractIT {
 
   @BeforeAll
   public static void startup() {
+    containerSuite.startHiveContainer();
+    HIVE_METASTORE_URIS =
+        String.format(
+            "thrift://%s:%d",
+            containerSuite.getHiveContainer().getContainerIpAddress(),
+            HiveContainer.HIVE_METASTORE_PORT);
+
+    WAREHOUSE =
+        String.format(
+            "hdfs://%s:%d/user/hive/warehouse-catalog-iceberg/",
+            containerSuite.getHiveContainer().getContainerIpAddress(),
+            HiveContainer.HDFS_DEFAULTFS_PORT);
+
     createMetalake();
     createCatalog();
     createSchema();
@@ -111,7 +127,7 @@ public class CatalogIcebergIT extends AbstractIT {
             .appName("Iceberg Catalog integration test")
             .config("spark.sql.warehouse.dir", WAREHOUSE)
             .config("spark.sql.catalog.iceberg", "org.apache.iceberg.spark.SparkCatalog")
-            .config("spark.sql.catalog.iceberg.uri", URI)
+            .config("spark.sql.catalog.iceberg.uri", HIVE_METASTORE_URIS)
             .config("spark.sql.catalog.iceberg.type", "hive")
             .config(
                 "spark.sql.extensions",
@@ -161,11 +177,11 @@ public class CatalogIcebergIT extends AbstractIT {
 
     catalogProperties.put(
         IcebergConfig.CATALOG_BACKEND.getKey(), IcebergCatalogBackend.HIVE.name());
-    catalogProperties.put(IcebergConfig.CATALOG_URI.getKey(), URI);
+    catalogProperties.put(IcebergConfig.CATALOG_URI.getKey(), HIVE_METASTORE_URIS);
     catalogProperties.put(IcebergConfig.CATALOG_WAREHOUSE.getKey(), WAREHOUSE);
 
     Map<String, String> hiveProperties = Maps.newHashMap();
-    hiveProperties.put(IcebergConfig.CATALOG_URI.getKey(), URI);
+    hiveProperties.put(IcebergConfig.CATALOG_URI.getKey(), HIVE_METASTORE_URIS);
     hiveProperties.put(IcebergConfig.CATALOG_WAREHOUSE.getKey(), WAREHOUSE);
 
     hiveCatalog = new HiveCatalog();

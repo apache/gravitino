@@ -35,12 +35,13 @@ The following table lists the configuration items in the `gravitino.conf` file. 
 
 ### Storage configuration
 
-| Configuration item                                | Description                                                                                                                                                                      | Default value                    | Since version |
-|---------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------|---------------|
-| `gravitino.entity.store`                          | Which storage implementation to use, currently we only support key-value pair storage, default value is `kv`.                                                                    | `kv`                             | 0.1.0         |
-| `gravitino.entity.store.kv`                       | Detailed implementation of kv storage, currently we only support `RocksDB` storage implementation `RocksDBKvBackend`.                                                            | `RocksDBKvBackend`               | 0.1.0         |
-| `gravitino.entity.store.kv.rocksdbPath`           | Directory path of `RocksDBKvBackend`, **we highly recommend you to change this default value** as it's under the deploy directory and version update operations may remove it.   | `${GRAVITINO_HOME}/data/rocksdb` | 0.1.0         |
-| `gravitino.entity.store.maxTransactionSkewTimeMs` | The max skew time of transaction, unit: millisecond.                                                                                                                             | `2000`                           | 0.3.0         |
+| Configuration item                                | Description                                                                                                                                                                    | Default value                    | Since version |
+|---------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------|---------------|
+| `gravitino.entity.store`                          | Which storage implementation to use, currently we only support key-value pair storage, default value is `kv`.                                                                  | `kv`                             | 0.1.0         |
+| `gravitino.entity.store.kv`                       | Detailed implementation of kv storage, currently we only support `RocksDB` storage implementation `RocksDBKvBackend`.                                                          | `RocksDBKvBackend`               | 0.1.0         |
+| `gravitino.entity.store.kv.rocksdbPath`           | Directory path of `RocksDBKvBackend`, **we highly recommend you to change this default value** as it's under the deploy directory and version update operations may remove it. | `${GRAVITINO_HOME}/data/rocksdb` | 0.1.0         |
+| `gravitino.entity.store.maxTransactionSkewTimeMs` | The max skew time of transaction, unit: millisecond.                                                                                                                           | `2000`                           | 0.3.0         |
+| `gravitino.entity.store.kv.deleteAfterTimeMs`     | The max time that the deleted data and old version data will keep, unit: millisecond. At least 10 minutes and should not larger than 30 days                                   | `604800000`(7 days)              | 0.3.0         |
 
 ### Catalog configuration
 
@@ -53,10 +54,10 @@ The following table lists the configuration items in the `gravitino.conf` file. 
 
 Gravitino server also supports setting up runtime environment variables by editing the `gravitino-env.sh` file, which is located in the `conf` directory.
 
-### How to access Hadoop
+### How to access Apache Hadoop
 
 Currently, due to the absence of a comprehensive user permission system, Gravitino can only use a single username for
-Hadoop access. Please ensure that the user starting the Gravitino server has Hadoop (HDFS, YARN, etc.) access
+Apache Hadoop access. Please ensure that the user starting the Gravitino server has Hadoop (HDFS, YARN, etc.) access
 permissions; otherwise, you may encounter a `Permission denied` error. There are also several ways to resolve this error:
 * Granting the Gravitino startup user permissions in Hadoop
 * Specify the authorized Hadoop username in the environment variables `HADOOP_USER_NAME` before starting the Gravitino server.
