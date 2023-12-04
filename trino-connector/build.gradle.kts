@@ -26,6 +26,7 @@ dependencies {
   implementation(libs.trino.toolkit) {
     exclude("org.apache.logging.log4j")
   }
+  implementation(libs.mysql.driver)
   testImplementation(libs.mockito.core)
   testImplementation(libs.trino.testing) {
     exclude("org.apache.logging.log4j")
