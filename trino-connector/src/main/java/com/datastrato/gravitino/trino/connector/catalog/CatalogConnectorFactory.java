@@ -12,6 +12,7 @@ import com.datastrato.gravitino.client.GravitinoMetaLake;
 import com.datastrato.gravitino.trino.connector.catalog.hive.HiveConnectorAdapter;
 import com.datastrato.gravitino.trino.connector.catalog.iceberg.IcebergConnectorAdapter;
 import com.datastrato.gravitino.trino.connector.catalog.memory.MemoryConnectorAdapter;
+import com.datastrato.gravitino.trino.connector.catalog.mysql.MySQLConnectorAdapter;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoCatalog;
 import io.trino.spi.TrinoException;
 import io.trino.spi.connector.Connector;
@@ -34,6 +35,8 @@ public class CatalogConnectorFactory {
         "memory", new CatalogConnectorContext.Builder(new MemoryConnectorAdapter()));
     catalogBuilders.put(
         "lakehouse-iceberg", new CatalogConnectorContext.Builder(new IcebergConnectorAdapter()));
+    catalogBuilders.put(
+        "jdbc-mysql", new CatalogConnectorContext.Builder(new MySQLConnectorAdapter()));
   }
 
   public CatalogConnectorContext loadCatalogConnector(

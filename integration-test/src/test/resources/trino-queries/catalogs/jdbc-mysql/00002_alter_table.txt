@@ -1,0 +1,33 @@
+CREATE SCHEMA
+
+CREATE TABLE
+
+RENAME TABLE
+
+"tb03"
+
+RENAME TABLE
+
+"tb01"
+
+DROP COLUMN
+
+"CREATE TABLE ""test.jdbc-mysql"".gt_db1.tb01 (
+   name varchar,
+   salary integer
+)
+COMMENT ''"
+
+SET COLUMN TYPE
+
+"CREATE TABLE ""test.jdbc-mysql"".gt_db1.tb01 (
+   name varchar,
+   salary bigint
+)
+COMMENT ''"
+
+DROP TABLE
+
+DROP SCHEMA
+
+

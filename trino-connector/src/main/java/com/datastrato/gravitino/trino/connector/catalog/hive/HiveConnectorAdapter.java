@@ -21,13 +21,14 @@ public class HiveConnectorAdapter implements CatalogConnectorAdapter {
 
   public HiveConnectorAdapter() {}
 
-  public Map<String, Object> buildInternalConnectorConfig(GravitinoCatalog catalog) {
+  public Map<String, Object> buildInternalConnectorConfig(GravitinoCatalog catalog)
+      throws Exception {
     Map<String, Object> config = new HashMap<>();
     config.put("catalogHandle", catalog.getName() + ":normal:default");
     config.put("connectorName", "hive");
 
     Map<String, Object> properties = new HashMap<>();
-    properties.put("hive.metastore.uri", catalog.getProperties("metastore.uris", ""));
+    properties.put("hive.metastore.uri", catalog.getRequiredProperty("metastore.uris"));
     config.put("properties", properties);
     return config;
   }

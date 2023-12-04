@@ -91,7 +91,7 @@ public class CatalogConnectorContext {
       return new Builder(connectorAdapter);
     }
 
-    public Map<String, Object> buildConfig(GravitinoCatalog catalog) {
+    public Map<String, Object> buildConfig(GravitinoCatalog catalog) throws Exception {
       return connectorAdapter.buildInternalConnectorConfig(catalog);
     }
 
