@@ -23,7 +23,7 @@ const nextConfig = {
       }),
   output: process.env.OUTPUT_MODE || 'standalone',
   distDir: 'dist',
-  trailingSlash: true,
+  trailingSlash: false,
   reactStrictMode: false
 }
 

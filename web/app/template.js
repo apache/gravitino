@@ -4,7 +4,7 @@
  */
 
 const Template = ({ children }) => {
-  return <div className={'root-template'}>{children}</div>
+  return <div className={'root-template twc-h-full'}>{children}</div>
 }
 
 export default Template

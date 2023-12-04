@@ -22,6 +22,9 @@ import {
 
 import Icon from '@/components/Icon'
 
+import { useAppDispatch } from '@/lib/hooks/useStore'
+import { createMetalake } from '@/lib/store/metalakes'
+
 import * as yup from 'yup'
 import { useForm, Controller } from 'react-hook-form'
 import { yupResolver } from '@hookform/resolvers/yup'
@@ -42,9 +45,10 @@ const Transition = forwardRef(function Transition(props, ref) {
 })
 
 const CreateMetalakeDialog = props => {
-  const { open, setOpen, data = {}, store, dispatch, createMetalake, updateMetalake, type = 'create' } = props
+  const { open, setOpen, data = {}, updateMetalake, type = 'create' } = props
 
-  // const [type, setType] = useState('create')
+  const dispatch = useAppDispatch()
+
   const [innerProps, setInnerProps] = useState([])
   const [cacheData, setCacheData] = useState()
 
