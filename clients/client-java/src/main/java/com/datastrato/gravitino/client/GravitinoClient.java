@@ -241,11 +241,23 @@ public class GravitinoClient implements SupportsMetalakes, Closeable {
       this.uri = uri;
     }
 
+    /**
+     * Sets the simple mode authentication for the Graivitno
+     *
+     * @return This Builder instance for method chaining.
+     */
     public Builder withSimpleAuth() {
       this.authDataProvider = new SimpleTokenProvider();
       return this;
     }
 
+    /**
+     * Sets OAuth2TokenProvider for the GravitinoClient.
+     *
+     * @param dataProvider The OAuth2TokenProvider used as the provider of authentication data for
+     *     GravitinoClient.
+     * @return This Builder instance for method chaining.
+     */
     public Builder withOAuth(OAuth2TokenProvider dataProvider) {
       this.authDataProvider = dataProvider;
       return this;

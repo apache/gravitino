@@ -31,9 +31,11 @@ public abstract class OAuth2TokenProvider implements AuthDataProvider {
   }
 
   /**
-   * Acquire the data of token for authentication
+   * Acquire the data of token for authentication. The client will set the token data as HTTP header
+   * Authorization directly. So the return value should ensure token data contain the token header
+   * (eg: Bearer, Basic) if necessary.
    *
-   * @return the token data is used for authentication
+   * @return the token data is used for authentication.
    */
   @Override
   public byte[] getTokenData() {
