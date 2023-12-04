@@ -5,7 +5,7 @@
 version: '3.0'
 services:
   hive:
-    image: datastrato/gravitino-ci-hive:0.1.6
+    image: datastrato/hive:2.7.3-no-yarn
     ports:
       - "3306:3306"
       - "9000:9000"
@@ -46,7 +46,7 @@ services:
       retries: 5
 
   trino:
-    image: datastrato/gravitino-ci-trino:0.3.0-SNAPSHOT
+    image: datastrato/trino:426-gravitino-0.3.0-SNAPSHOT
     ports:
       - "8080:8080"
     container_name: playground-trino
