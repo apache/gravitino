@@ -17,6 +17,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.EnumSet;
+import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.LinkedBlockingQueue;
 import javax.servlet.DispatcherType;
 import javax.servlet.Filter;
@@ -95,6 +97,14 @@ public final class JettyServer {
       Preconditions.checkArgument(
           StringUtils.isNotBlank(serverConfig.getManagerPassword()),
           "If enables https, must set managerPassword");
+      if (serverConfig.isEnableClientAuth()) {
+        Preconditions.checkArgument(
+            StringUtils.isNotBlank(serverConfig.getTrustStorePath()),
+            "If enables the authentication of the client, must set trustStorePath");
+        Preconditions.checkArgument(
+            StringUtils.isNotBlank(serverConfig.getTrustStorePasword()),
+            "If enables the authentication of the client, must set trustStorePassword");
+      }
       ServerConnector httpsConnector =
           createHttpsServerConnector(
               server,
@@ -105,7 +115,14 @@ public final class JettyServer {
               serverConfig.getIdleTimeout(),
               serverConfig.getKeyStorePath(),
               serverConfig.getKeyStorePassword(),
-              serverConfig.getManagerPassword());
+              serverConfig.getManagerPassword(),
+              serverConfig.getKeyStoreType(),
+              serverConfig.getTlsProtocol(),
+              serverConfig.getSupportedAlgorithms(),
+              serverConfig.isEnableClientAuth(),
+              serverConfig.getTrustStorePath(),
+              serverConfig.getTrustStorePasword(),
+              serverConfig.getTrustStoreType());
       server.addConnector(httpsConnector);
     } else {
       // Create and set Http ServerConnector
@@ -317,7 +334,14 @@ public final class JettyServer {
       int idleTimeout,
       String keyStorePath,
       String keyStorePassword,
-      String keyManagerPassword) {
+      String keyManagerPassword,
+      String keyStoreType,
+      Optional<String> tlsProtocol,
+      Set<String> supportedAlgorithms,
+      boolean isEnableClientAuth,
+      String trustStorePath,
+      String trustStorePassword,
+      String trustStoreType) {
     HttpConfiguration httpConfig = new HttpConfiguration();
     httpConfig.setSecureScheme(HTTPS);
     httpConfig.setRequestHeaderSize(reqHeaderSize);
@@ -330,6 +354,14 @@ public final class JettyServer {
     sslContextFactory.setKeyStorePath(keyStorePath);
     sslContextFactory.setKeyStorePassword(keyStorePassword);
     sslContextFactory.setKeyManagerPassword(keyManagerPassword);
+    sslContextFactory.setKeyStoreType(keyStoreType);
+    tlsProtocol.ifPresent(sslContextFactory::setProtocol);
+    if (!supportedAlgorithms.isEmpty()) {
+      sslContextFactory.setIncludeCipherSuites(supportedAlgorithms.toArray(new String[0]));
+    }
+    if (isEnableClientAuth) {
+      sslContextFactory.setNeedClientAuth(true);
+    }
     SecureRequestCustomizer src = new SecureRequestCustomizer();
     httpConfig.addCustomizer(src);
     HttpConnectionFactory httpConnectionFactory = new HttpConnectionFactory(httpConfig);
