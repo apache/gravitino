@@ -4,24 +4,15 @@
  */
 'use client'
 
-import { useRef, useEffect } from 'react'
+import { useEffect } from 'react'
 
 import Typography from '@mui/material/Typography'
 
-import { useAppStore, useAppDispatch } from '../hooks/useStore'
-
-import { useDispatch, useSelector } from 'react-redux'
+import { useAppStore, useAppDispatch, useAppSelector } from '@/lib/hooks/useStore'
 import { initialVersion, setVersion } from '@/lib/store/version'
 
 const VersionView = () => {
-  const store = useAppStore()
-  const initialized = useRef(false)
-  if (!initialized.current) {
-    store.dispatch(initialVersion())
-    initialized.current = true
-  }
-
-  const version = useSelector(state => state.version)
+  const version = useAppSelector(state => state.version)
   const dispatch = useAppDispatch()
 
   useEffect(() => {

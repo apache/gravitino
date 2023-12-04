@@ -3,8 +3,14 @@
  * This software is licensed under the Apache License version 2.
  */
 
+import { Box } from '@mui/material'
+
 const Template = ({ children }) => {
-  return <div className={'root-template twc-h-full'}>{children}</div>
+  return (
+    <Box className={'metalake-template'} style={{ height: 'calc(100vh - 11rem)' }}>
+      {children}
+    </Box>
+  )
 }
 
 export default Template

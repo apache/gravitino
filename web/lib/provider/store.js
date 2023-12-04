@@ -8,12 +8,12 @@
 import { useRef } from 'react'
 import { Provider } from 'react-redux'
 
-import { makeStore } from '../store'
+import store from '@/lib/store'
 
 const StoreProvider = ({ children }) => {
   const storeRef = useRef()
   if (!storeRef.current) {
-    storeRef.current = makeStore()
+    storeRef.current = store
   }
 
   return <Provider store={storeRef.current}>{children}</Provider>

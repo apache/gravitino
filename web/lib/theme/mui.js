@@ -672,7 +672,8 @@ const createMuiTheme = (config = {}) => {
               paddingLeft: `${theme.spacing(3.25)} !important`
             }),
             columnHeaders: ({ theme }) => ({
-              borderTop: `1px solid ${theme.palette.divider}`
+              borderTop: `1px solid ${theme.palette.divider}`,
+              backgroundColor: theme.palette.action.hover
             }),
             columnHeader: ({ theme }) => ({
               '&:not(.MuiDataGrid-columnHeaderCheckbox)': {
