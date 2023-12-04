@@ -52,19 +52,33 @@ If users choose to enable HTTPS, Gravitino won't provide the ability of HTTP ser
 Both Gravitino server and Iceberg REST service can configure HTTPS.
 
 ### Gravitino server's configuration
-| Configuration item                            | Description                                   | Default value | Since version |
-|-----------------------------------------------|-----------------------------------------------|---------------|---------------|
-| `gravitino.server.webserver.enableHttps`      | Enables https                                 | `false`       | 0.3.0         |
-| `gravitino.server.webserver.httpsPort`        | The https port number of the Jetty web server | `8433`        | 0.3.0         |
-| `gravitino.server.webserver.keyStorePath`     | Path to the key store file                    | ``            | 0.3.0         |
-| `gravitino.server.webserver.keyStorePassword` | Password to the key store                     | ``            | 0.3.0         |
-| `gravitino.server.webserver.managerPassword`  | Manager password to the key store             | ``            | 0.3.0         |
+| Configuration item                                  | Description                                                | Default value | Since version |
+|-----------------------------------------------------|------------------------------------------------------------|---------------|---------------|
+| `gravitino.server.webserver.enableHttps`            | Enables https                                              | `false`       | 0.3.0         |
+| `gravitino.server.webserver.httpsPort`              | The https port number of the Jetty web server              | `8433`        | 0.3.0         |
+| `gravitino.server.webserver.keyStorePath`           | Path to the key store file                                 | ``            | 0.3.0         |
+| `gravitino.server.webserver.keyStorePassword`       | Password to the key store                                  | ``            | 0.3.0         |
+| `gravitino.server.webserver.keyStoreType`           | The type to the key store                                  | `JKS`         | 0.3.0         |
+| `gravitino.server.webserver.managerPassword`        | Manager password to the key store                          | ``            | 0.3.0         |
+| `gravitino.server.webserver.tlsProtocol`            | TLS protocol to use. The protocol must be supported by JVM | none          | 0.3.0         |
+| `gravitino.server.webserver.enableCipherAlgorithms` | he collection of the cipher algorithms which are enabled   | ``            | 0.3.0         |
+| `gravitino.server.webserver.enableClientAuth`       | Enables the authentication of the client                   | `false`       | 0.3.0         |
+| `gravitino.server.webserver.trustStorePath`         | Path to the trust store file                               | ``            | 0.3.0         |
+| `gravitino.server.webserver.trustStorePassword`     | Password to the trust store                                | ``            | 0.3.0         |
+| `gravitino.server.webserver.trustStoreType`         | The type to the trust store                                | `JKS`         | 0.3.0         |
 
 ### Iceberg REST service's configuration
-| Configuration item                                   | Description                                   | Default value | Since version |
-|------------------------------------------------------|-----------------------------------------------|---------------|---------------|
-| `gravitino.auxService.iceberg-rest.enableHttps`      | Enables https                                 | `false`       | 0.3.0         |
-| `gravitino.auxService.iceberg-rest.httpsPort`        | The https port number of the Jetty web server | `8433`        | 0.3.0         |
-| `gravitino.auxService.iceberg-rest.keyStorePath`     | Path to the key store file                    | ``            | 0.3.0         |
-| `gravitino.auxService.iceberg-rest.keyStorePassword` | Password to the key store                     | ``            | 0.3.0         |
-| `gravitino.auxService.iceberg-rest.managerPassword`  | Manager password to the key store             | ``            | 0.3.0         |
+| Configuration item                                         | Description                                                | Default value | Since version |
+|------------------------------------------------------------|------------------------------------------------------------|---------------|---------------|
+| `gravitino.auxService.iceberg-rest.enableHttps`            | Enables https                                              | `false`       | 0.3.0         |
+| `gravitino.auxService.iceberg-rest.httpsPort`              | The https port number of the Jetty web server              | `8433`        | 0.3.0         |
+| `gravitino.auxService.iceberg-rest.keyStorePath`           | Path to the key store file                                 | ``            | 0.3.0         |
+| `gravitino.auxService.iceberg-rest.keyStorePassword`       | Password to the key store                                  | ``            | 0.3.0         |
+| `gravitino.uxService.iceberg-rest.keyStoreType`            | The type to the key store                                  | `JKS`         | 0.3.0         |
+| `gravitino.auxService.iceberg-rest.managerPassword`        | Manager password to the key store                          | ``            | 0.3.0         |
+| `gravitino.auxService.iceberg-rest.tlsProtocol`            | TLS protocol to use. The protocol must be supported by JVM | none          | 0.3.0         |
+| `gravitino.auxService.iceberg-rest.enableCipherAlgorithms` | he collection of the cipher algorithms which are enabled   | ``            | 0.3.0         |
+| `gravitino.auxService.iceberg-rest.enableClientAuth`       | Enables the authentication of the client                   | `false`       | 0.3.0         |
+| `gravitino.auxService.iceberg-rest.trustStorePath`         | Path to the trust store file                               | ``            | 0.3.0         |
+| `gravitino.auxService.iceberg-rest.trustStorePassword`     | Password to the trust store                                | ``            | 0.3.0         |
+| `gravitino.auxService.iceberg-rest.trustStoreType`         | The type to the trust store                                | `JKS`         | 0.3.0         |
