@@ -67,12 +67,12 @@ public class TestTableChange {
 
   @Test
   public void testAddColumn() {
-    String[] fieldNames = {"Name"};
+    String[] fieldName = {"Name"};
     Type dataType = Types.StringType.get();
     String comment = "Person name";
-    AddColumn addColumn = (AddColumn) TableChange.addColumn(fieldNames, dataType, comment);
+    AddColumn addColumn = (AddColumn) TableChange.addColumn(fieldName, dataType, comment);
 
-    assertArrayEquals(fieldNames, addColumn.fieldNames());
+    assertArrayEquals(fieldName, addColumn.fieldName());
     assertEquals(dataType, addColumn.getDataType());
     assertEquals(comment, addColumn.getComment());
     assertNull(addColumn.getPosition());
@@ -80,14 +80,13 @@ public class TestTableChange {
 
   @Test
   public void testAddColumnWithPosition() {
-    String[] fieldNames = {"Full Name", "First Name"};
+    String[] fieldName = {"Full Name", "First Name"};
     Type dataType = Types.StringType.get();
     String comment = "First or given name";
     TableChange.ColumnPosition position = TableChange.ColumnPosition.after("Address");
-    AddColumn addColumn =
-        (AddColumn) TableChange.addColumn(fieldNames, dataType, comment, position);
+    AddColumn addColumn = (AddColumn) TableChange.addColumn(fieldName, dataType, comment, position);
 
-    assertArrayEquals(fieldNames, addColumn.fieldNames());
+    assertArrayEquals(fieldName, addColumn.fieldName());
     assertEquals(dataType, addColumn.getDataType());
     assertEquals(comment, addColumn.getComment());
     assertEquals(position, addColumn.getPosition());
@@ -95,11 +94,11 @@ public class TestTableChange {
 
   @Test
   public void testAddColumnWithNullCommentAndPosition() {
-    String[] fieldNames = {"Middle Name"};
+    String[] fieldName = {"Middle Name"};
     Type dataType = Types.StringType.get();
-    AddColumn addColumn = (AddColumn) TableChange.addColumn(fieldNames, dataType, null, null);
+    AddColumn addColumn = (AddColumn) TableChange.addColumn(fieldName, dataType, null, null);
 
-    assertArrayEquals(fieldNames, addColumn.fieldNames());
+    assertArrayEquals(fieldName, addColumn.fieldName());
     assertEquals(dataType, addColumn.getDataType());
     assertNull(addColumn.getComment());
     assertNull(addColumn.getPosition());
@@ -107,118 +106,117 @@ public class TestTableChange {
 
   @Test
   public void testRenameColumn() {
-    String[] fieldNames = {"Last Name"};
+    String[] fieldName = {"Last Name"};
     String newName = "Family Name";
-    RenameColumn renameColumn = (RenameColumn) TableChange.renameColumn(fieldNames, newName);
+    RenameColumn renameColumn = (RenameColumn) TableChange.renameColumn(fieldName, newName);
 
-    assertArrayEquals(fieldNames, renameColumn.fieldNames());
+    assertArrayEquals(fieldName, renameColumn.fieldName());
     assertEquals(newName, renameColumn.getNewName());
   }
 
   @Test
   public void testRenameNestedColumn() {
-    String[] fieldNames = {"Name", "First Name"};
+    String[] fieldName = {"Name", "First Name"};
     String newName = "Name.first";
-    RenameColumn renameColumn = (RenameColumn) TableChange.renameColumn(fieldNames, newName);
+    RenameColumn renameColumn = (RenameColumn) TableChange.renameColumn(fieldName, newName);
 
-    assertArrayEquals(fieldNames, renameColumn.fieldNames());
+    assertArrayEquals(fieldName, renameColumn.fieldName());
     assertEquals(newName, renameColumn.getNewName());
   }
 
   @Test
   public void testUpdateColumnPosition() {
-    String[] fieldNames = {"First Name"};
+    String[] fieldName = {"First Name"};
     ColumnPosition newPosition = TableChange.ColumnPosition.first();
     UpdateColumnPosition updateColumnPosition =
-        (UpdateColumnPosition) TableChange.updateColumnPosition(fieldNames, newPosition);
+        (UpdateColumnPosition) TableChange.updateColumnPosition(fieldName, newPosition);
 
-    assertArrayEquals(fieldNames, updateColumnPosition.fieldNames());
+    assertArrayEquals(fieldName, updateColumnPosition.fieldName());
     assertEquals(newPosition, updateColumnPosition.getPosition());
   }
 
   @Test
   public void testUpdateNestedColumnPosition() {
-    String[] fieldNames = {"Name", "Last Name"};
+    String[] fieldName = {"Name", "Last Name"};
     ColumnPosition newPosition = TableChange.ColumnPosition.after("First Name");
     UpdateColumnPosition updateColumnPosition =
-        (UpdateColumnPosition) TableChange.updateColumnPosition(fieldNames, newPosition);
+        (UpdateColumnPosition) TableChange.updateColumnPosition(fieldName, newPosition);
 
-    assertArrayEquals(fieldNames, updateColumnPosition.fieldNames());
+    assertArrayEquals(fieldName, updateColumnPosition.fieldName());
     assertEquals(newPosition, updateColumnPosition.getPosition());
   }
 
   @Test
   public void testUpdateColumnComment() {
-    String[] fieldNames = {"First Name"};
+    String[] fieldName = {"First Name"};
     String newComment = "First or given name";
     UpdateColumnComment updateColumnComment =
-        (UpdateColumnComment) TableChange.updateColumnComment(fieldNames, newComment);
+        (UpdateColumnComment) TableChange.updateColumnComment(fieldName, newComment);
 
-    assertArrayEquals(fieldNames, updateColumnComment.fieldNames());
+    assertArrayEquals(fieldName, updateColumnComment.fieldName());
     assertEquals(newComment, updateColumnComment.getNewComment());
   }
 
   @Test
   public void testUpdateNestedColumnComment() {
-    String[] fieldNames = {"Name", "Last Name"};
+    String[] fieldName = {"Name", "Last Name"};
     String newComment = "Last or family name";
     UpdateColumnComment updateColumnComment =
-        (UpdateColumnComment) TableChange.updateColumnComment(fieldNames, newComment);
+        (UpdateColumnComment) TableChange.updateColumnComment(fieldName, newComment);
 
-    assertArrayEquals(fieldNames, updateColumnComment.fieldNames());
+    assertArrayEquals(fieldName, updateColumnComment.fieldName());
     assertEquals(newComment, updateColumnComment.getNewComment());
   }
 
   @Test
   public void testDeleteColumn() {
-    String[] fieldNames = {"existing_column"};
+    String[] fieldName = {"existing_column"};
     Boolean ifExists = true;
-    DeleteColumn deleteColumn = (DeleteColumn) TableChange.deleteColumn(fieldNames, ifExists);
+    DeleteColumn deleteColumn = (DeleteColumn) TableChange.deleteColumn(fieldName, ifExists);
 
-    assertArrayEquals(fieldNames, deleteColumn.fieldNames());
+    assertArrayEquals(fieldName, deleteColumn.fieldName());
     assertEquals(ifExists, deleteColumn.getIfExists());
   }
 
   @Test
   public void testDeleteNestedColumn() {
-    String[] fieldNames = {"nested", "existing_column"};
+    String[] fieldName = {"nested", "existing_column"};
     Boolean ifExists = false;
-    DeleteColumn deleteColumn = (DeleteColumn) TableChange.deleteColumn(fieldNames, ifExists);
+    DeleteColumn deleteColumn = (DeleteColumn) TableChange.deleteColumn(fieldName, ifExists);
 
-    assertArrayEquals(fieldNames, deleteColumn.fieldNames());
+    assertArrayEquals(fieldName, deleteColumn.fieldName());
     assertEquals(ifExists, deleteColumn.getIfExists());
   }
 
   @Test
   public void testUpdateColumnNullability() {
-    String[] fieldNames = {"existing_column"};
+    String[] fieldName = {"existing_column"};
     TableChange.UpdateColumnNullability updateColumnType =
-        (TableChange.UpdateColumnNullability)
-            TableChange.updateColumnNullability(fieldNames, false);
+        (TableChange.UpdateColumnNullability) TableChange.updateColumnNullability(fieldName, false);
 
-    assertArrayEquals(fieldNames, updateColumnType.fieldNames());
+    assertArrayEquals(fieldName, updateColumnType.fieldName());
     assertFalse(updateColumnType.nullable());
   }
 
   @Test
   public void testUpdateColumnType() {
-    String[] fieldNames = {"existing_column"};
+    String[] fieldName = {"existing_column"};
     Type dataType = Types.StringType.get();
     UpdateColumnType updateColumnType =
-        (UpdateColumnType) TableChange.updateColumnType(fieldNames, dataType);
+        (UpdateColumnType) TableChange.updateColumnType(fieldName, dataType);
 
-    assertArrayEquals(fieldNames, updateColumnType.fieldNames());
+    assertArrayEquals(fieldName, updateColumnType.fieldName());
     assertEquals(dataType, updateColumnType.getNewDataType());
   }
 
   @Test
   public void testUpdateNestedColumnType() {
-    String[] fieldNames = {"nested", "existing_column"};
+    String[] fieldName = {"nested", "existing_column"};
     Type dataType = Types.StringType.get();
     UpdateColumnType updateColumnType =
-        (UpdateColumnType) TableChange.updateColumnType(fieldNames, dataType);
+        (UpdateColumnType) TableChange.updateColumnType(fieldName, dataType);
 
-    assertArrayEquals(fieldNames, updateColumnType.fieldNames());
+    assertArrayEquals(fieldName, updateColumnType.fieldName());
     assertEquals(dataType, updateColumnType.getNewDataType());
   }
 
@@ -443,13 +441,13 @@ public class TestTableChange {
 
   @Test
   void testUpdateColumnPositionEqualsAndHashCode() {
-    String[] fieldNamesA = {"First Name"};
+    String[] fieldNameA = {"First Name"};
     ColumnPosition newPosition = TableChange.ColumnPosition.first();
     UpdateColumnPosition changeA =
-        (UpdateColumnPosition) TableChange.updateColumnPosition(fieldNamesA, newPosition);
-    String[] fieldNamesB = {"First Name"};
+        (UpdateColumnPosition) TableChange.updateColumnPosition(fieldNameA, newPosition);
+    String[] fieldNameB = {"First Name"};
     UpdateColumnPosition changeB =
-        (UpdateColumnPosition) TableChange.updateColumnPosition(fieldNamesB, newPosition);
+        (UpdateColumnPosition) TableChange.updateColumnPosition(fieldNameB, newPosition);
 
     assertTrue(changeA.equals(changeB));
     assertTrue(changeB.equals(changeA));
@@ -458,13 +456,13 @@ public class TestTableChange {
 
   @Test
   void testUpdateColumnPositionNotEqualsAndHashCode() {
-    String[] fieldNamesA = {"First Name"};
+    String[] fieldNameA = {"First Name"};
     ColumnPosition newPosition = TableChange.ColumnPosition.first();
     UpdateColumnPosition changeA =
-        (UpdateColumnPosition) TableChange.updateColumnPosition(fieldNamesA, newPosition);
-    String[] fieldNamesB = {"Last Name"};
+        (UpdateColumnPosition) TableChange.updateColumnPosition(fieldNameA, newPosition);
+    String[] fieldNameB = {"Last Name"};
     UpdateColumnPosition changeB =
-        (UpdateColumnPosition) TableChange.updateColumnPosition(fieldNamesB, newPosition);
+        (UpdateColumnPosition) TableChange.updateColumnPosition(fieldNameB, newPosition);
 
     assertFalse(changeA.equals(null));
     assertFalse(changeA.equals(changeB));
@@ -503,14 +501,14 @@ public class TestTableChange {
 
   @Test
   void testAddColumnEqualsAndHashCode() {
-    String[] fieldNamesA = {"Name"};
+    String[] fieldNameA = {"Name"};
     Type dataTypeA = Types.StringType.get();
     String commentA = "Person name";
-    AddColumn columnA = (AddColumn) TableChange.addColumn(fieldNamesA, dataTypeA, commentA);
-    String[] fieldNamesB = {"Name"};
+    AddColumn columnA = (AddColumn) TableChange.addColumn(fieldNameA, dataTypeA, commentA);
+    String[] fieldNameB = {"Name"};
     Type dataTypeB = Types.StringType.get();
     String commentB = "Person name";
-    AddColumn columnB = (AddColumn) TableChange.addColumn(fieldNamesB, dataTypeB, commentB);
+    AddColumn columnB = (AddColumn) TableChange.addColumn(fieldNameB, dataTypeB, commentB);
 
     assertTrue(columnA.equals(columnB));
     assertTrue(columnB.equals(columnA));
@@ -519,14 +517,14 @@ public class TestTableChange {
 
   @Test
   void testAddColumnNotEqualsAndHashCode() {
-    String[] fieldNamesA = {"Name"};
+    String[] fieldNameA = {"Name"};
     Type dataTypeA = Types.StringType.get();
     String commentA = "Person name";
-    AddColumn columnA = (AddColumn) TableChange.addColumn(fieldNamesA, dataTypeA, commentA);
-    String[] fieldNamesB = {"First Name"};
+    AddColumn columnA = (AddColumn) TableChange.addColumn(fieldNameA, dataTypeA, commentA);
+    String[] fieldNameB = {"First Name"};
     Type dataTypeB = Types.StringType.get();
     String commentB = "Person name";
-    AddColumn columnB = (AddColumn) TableChange.addColumn(fieldNamesB, dataTypeB, commentB);
+    AddColumn columnB = (AddColumn) TableChange.addColumn(fieldNameB, dataTypeB, commentB);
 
     assertFalse(columnA.equals(null));
     assertFalse(columnA.equals(columnB));

@@ -353,10 +353,10 @@ public class MysqlTableOperations extends JdbcTableOperations {
   private String updateColumnCommentFieldDefinition(
       TableChange.UpdateColumnComment updateColumnComment, CreateTable createTable) {
     String newComment = updateColumnComment.getNewComment();
-    if (updateColumnComment.fieldNames().length > 1) {
+    if (updateColumnComment.fieldName().length > 1) {
       throw new UnsupportedOperationException("Mysql does not support nested column names.");
     }
-    String col = updateColumnComment.fieldNames()[0];
+    String col = updateColumnComment.fieldName()[0];
     JdbcColumn column = getJdbcColumnFromCreateTable(createTable, col);
     column.getProperties().remove(PRIMARY_KEY);
     JdbcColumn updateColumn =
@@ -374,10 +374,10 @@ public class MysqlTableOperations extends JdbcTableOperations {
   private String addColumnFieldDefinition(
       TableChange.AddColumn addColumn, CreateTable createTable) {
     String dataType = (String) typeConverter.fromGravitinoType(addColumn.getDataType());
-    if (addColumn.fieldNames().length > 1) {
+    if (addColumn.fieldName().length > 1) {
       throw new UnsupportedOperationException("Mysql does not support nested column names.");
     }
-    String col = addColumn.fieldNames()[0];
+    String col = addColumn.fieldName()[0];
 
     StringBuilder columnDefinition = new StringBuilder();
     columnDefinition.append("ADD COLUMN ").append(col).append(SPACE).append(dataType);
@@ -406,11 +406,11 @@ public class MysqlTableOperations extends JdbcTableOperations {
   }
 
   private String renameColumnFieldDefinition(TableChange.RenameColumn renameColumn) {
-    if (renameColumn.fieldNames().length > 1) {
+    if (renameColumn.fieldName().length > 1) {
       throw new UnsupportedOperationException("Mysql does not support nested column names.");
     }
     return "RENAME COLUMN "
-        + renameColumn.fieldNames()[0]
+        + renameColumn.fieldName()[0]
         + SPACE
         + "TO"
         + SPACE
@@ -419,10 +419,10 @@ public class MysqlTableOperations extends JdbcTableOperations {
 
   private String updateColumnPositionFieldDefinition(
       TableChange.UpdateColumnPosition updateColumnPosition, CreateTable createTable) {
-    if (updateColumnPosition.fieldNames().length > 1) {
+    if (updateColumnPosition.fieldName().length > 1) {
       throw new UnsupportedOperationException("Mysql does not support nested column names.");
     }
-    String col = updateColumnPosition.fieldNames()[0];
+    String col = updateColumnPosition.fieldName()[0];
     JdbcColumn column = getJdbcColumnFromCreateTable(createTable, col);
     StringBuilder columnDefinition = new StringBuilder();
     columnDefinition.append("MODIFY COLUMN ").append(col);
@@ -445,19 +445,19 @@ public class MysqlTableOperations extends JdbcTableOperations {
   }
 
   private String deleteColumnFieldDefinition(TableChange.DeleteColumn deleteColumn) {
-    if (deleteColumn.fieldNames().length > 1) {
+    if (deleteColumn.fieldName().length > 1) {
       throw new UnsupportedOperationException("Mysql does not support nested column names.");
     }
-    String col = deleteColumn.fieldNames()[0];
+    String col = deleteColumn.fieldName()[0];
     return "DROP COLUMN " + col;
   }
 
   private String updateColumnTypeFieldDefinition(
       TableChange.UpdateColumnType updateColumnType, CreateTable createTable) {
-    if (updateColumnType.fieldNames().length > 1) {
+    if (updateColumnType.fieldName().length > 1) {
       throw new UnsupportedOperationException("Mysql does not support nested column names.");
     }
-    String col = updateColumnType.fieldNames()[0];
+    String col = updateColumnType.fieldName()[0];
     JdbcColumn column = getJdbcColumnFromCreateTable(createTable, col);
     StringBuilder sqlBuilder = new StringBuilder("MODIFY COLUMN " + col);
     JdbcColumn newColumn =
