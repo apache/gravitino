@@ -24,11 +24,11 @@ Gravitino aims to provide several key features:
 
 ![Gravitino Model and Arch](assets/gravitino-model-arch.png)
 
-* **Functionality Layer**: Gravitino provides a set of APIs for users to manage and govern the 
+* **Functionality Layer**: Gravitino provides a set of APIs for users to manage and govern the
   metadata, including standard metadata creation, update, and delete operations. In the meantime, it also provides the ability to govern the metadata in a unified way, including access control, discovery, and others.
-* **Interface Layer**: Gravitino provides standard REST APIs as the interface layer for users. It will also provide Thrift and JDBC interfaces in the future. 
+* **Interface Layer**: Gravitino provides standard REST APIs as the interface layer for users. It will also provide Thrift and JDBC interfaces in the future.
 * **Core Object Model**: Gravitino defines a generic metadata model to represent the metadata in different sources and types and manages them in a unified way.
-* **Connection Layer**: In the connection layer, Gravitino provides a set of connectors to connect to different metadata sources, including Hive, MySQL, PostgreSQL, and others. It also allows connecting and managing heterogeneous metadata other than Tabular data.
+* **Connection Layer**: In the connection layer, Gravitino provides a set of connectors to connect to different metadata sources, including Apache Hive, MySQL, PostgreSQL, and others. It also allows connecting and managing heterogeneous metadata other than Tabular data.
 
 ## Terminology
 
@@ -38,6 +38,6 @@ The model of Gravitino
 
 * **Metalake**: The top-level container for metadata. Typically, one group has one metalake to manage all the metadata in it. Each metalake exposes a three-level namespace(catalog.schema.table) to organize the data.
 * **Catalog**: catalog is a collection of metadata from a specific metadata source. Each catalog will have a related connector to connect to the specific metadata source.
-* **Schema**: Schema is equivalent to a database, Schemas only exist in the specific catalogs that support relational metadata sources, such as Hive, MySQL, PostgreSQL, and others.
+* **Schema**: Schema is equivalent to a database, Schemas only exist in the specific catalogs that support relational metadata sources, such as Apache Hive, MySQL, PostgreSQL, and others.
 * **Table**: The lowest level in the object hierarchy for catalogs that support relational metadata sources. Tables can be created in the specific schemas in the catalogs.
 * **Model**: Model represents the metadata in the specific catalogs that support model management.
