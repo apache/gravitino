@@ -426,7 +426,6 @@ public class TrinoQueryIT {
   public static void main(String[] args) {
     String targetTestId = null;
     try {
-
       if (args.length == 1) {
         // e.g.: args = hive
         // run hive all the test cases
@@ -436,7 +435,6 @@ public class TrinoQueryIT {
         TrinoQueryIT testRunner = new TrinoQueryIT();
         testRunner.runQueriesAndCheck(catalog, targetTestId);
 
-        testCatalogs.stream().forEach(c -> dropCatalog(c));
       } else if (args.length == 2) {
         // e.g: args = hive 00001
         // run hive test case 00001
@@ -448,14 +446,18 @@ public class TrinoQueryIT {
         TrinoQueryIT testRunner = new TrinoQueryIT();
         testRunner.runQueriesAndCheck(catalog, targetTestId);
 
-        testCatalogs.stream().forEach(c -> dropCatalog(c));
       } else if (args.length == 0) {
         // e.g.: empty args
         // run all catalogs all the test cases
         setup();
         TrinoQueryIT testRunner = new TrinoQueryIT();
         testRunner.testSql();
+        return;
+      } else {
+        throw new IllegalArgumentException("Invalid args: " + Arrays.toString(args) + "\n" + "Usage: ./run [catalog] [testId]");
       }
+      Log.info("All tests completed");
+      testCatalogs.stream().forEach(c -> dropCatalog(c));
     } catch (Exception e) {
       LOG.error("", e);
     } finally {
