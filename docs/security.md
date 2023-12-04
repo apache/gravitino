@@ -54,7 +54,7 @@ Both Gravitino server and Iceberg REST service can configure HTTPS.
 ### Gravitino server's configuration
 | Configuration item                            | Description                                   | Default value | Since version |
 |-----------------------------------------------|-----------------------------------------------|---------------|---------------|
-| `gravitino.server.webserver.httpsEnable`      | Enables https                                 | `false`       | 0.3.0         |
+| `gravitino.server.webserver.enableHttps`      | Enables https                                 | `false`       | 0.3.0         |
 | `gravitino.server.webserver.httpsPort`        | The https port number of the Jetty web server | `8433`        | 0.3.0         |
 | `gravitino.server.webserver.keyStorePath`     | Path to the key store file                    | ``            | 0.3.0         |
 | `gravitino.server.webserver.keyStorePassword` | Password to the key store                     | ``            | 0.3.0         |
@@ -63,7 +63,7 @@ Both Gravitino server and Iceberg REST service can configure HTTPS.
 ### Iceberg REST service's configuration
 | Configuration item                                   | Description                                   | Default value | Since version |
 |------------------------------------------------------|-----------------------------------------------|---------------|---------------|
-| `gravitino.auxService.iceberg-rest.httpsEnable`      | Enables https                                 | `false`       | 0.3.0         |
+| `gravitino.auxService.iceberg-rest.enableHttps`      | Enables https                                 | `false`       | 0.3.0         |
 | `gravitino.auxService.iceberg-rest.httpsPort`        | The https port number of the Jetty web server | `8433`        | 0.3.0         |
 | `gravitino.auxService.iceberg-rest.keyStorePath`     | Path to the key store file                    | ``            | 0.3.0         |
 | `gravitino.auxService.iceberg-rest.keyStorePassword` | Password to the key store                     | ``            | 0.3.0         |

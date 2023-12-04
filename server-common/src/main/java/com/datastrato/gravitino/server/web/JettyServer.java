@@ -8,7 +8,6 @@ import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.servlets.MetricsServlet;
 import com.datastrato.gravitino.GravitinoEnv;
 import com.datastrato.gravitino.metrics.MetricsSystem;
-import com.datastrato.gravitino.server.auth.AuthenticatorUtil;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
@@ -85,7 +84,7 @@ public final class JettyServer {
     errorHandler.setServer(server);
     server.addBean(errorHandler);
 
-    if (serverConfig.isHttpsEnabled()) {
+    if (serverConfig.isEnableHttps()) {
       // Create and set Https ServerConnector
       Preconditions.checkArgument(
           StringUtils.isNotBlank(serverConfig.getKeyStorePath()),
@@ -159,9 +158,8 @@ public final class JettyServer {
       throw new RuntimeException("Failed to start " + serverName + " web server.", e);
     }
 
-    if (!serverConfig.isHttpsEnabled() && (AuthenticatorUtil.isEnableOAuth2())) {
-      LOG.warn(
-          "Users would better use HTTPS to void token data leak if users choose OAuth 2.0 as the authenticator.");
+    if (!serverConfig.isEnableHttps()) {
+      LOG.warn("Users would better use HTTPS to void token data leak.");
     }
 
     LOG.info(
@@ -303,7 +301,7 @@ public final class JettyServer {
   }
 
   private int getPort() {
-    if (serverConfig.isHttpsEnabled()) {
+    if (serverConfig.isEnableHttps()) {
       return serverConfig.getHttpsPort();
     } else {
       return serverConfig.getHttpPort();

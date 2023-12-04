@@ -79,8 +79,8 @@ public final class JettyServerConfig {
           .intConf()
           .createWithDefault(100);
 
-  public static final ConfigEntry<Boolean> HTTPS_ENABLED =
-      new ConfigBuilder("httpsEnabled")
+  public static final ConfigEntry<Boolean> ENABLE_HTTPS =
+      new ConfigBuilder("enableHttps")
           .doc("Enables https")
           .version("0.3.0")
           .booleanConf()
@@ -136,7 +136,7 @@ public final class JettyServerConfig {
   private final String keyStorePath;
   private final String keyStorePassword;
   private final String managerPassword;
-  private final boolean httpsEnabled;
+  private final boolean enableHttps;
   private final Config internalConfig;
 
   private JettyServerConfig(Map<String, String> configs) {
@@ -169,7 +169,7 @@ public final class JettyServerConfig {
     this.responseHeaderSize = internalConfig.get(WEBSERVER_RESPONSE_HEADER_SIZE);
     this.threadPoolWorkQueueSize = internalConfig.get(WEBSERVER_THREAD_POOL_WORK_QUEUE_SIZE);
 
-    this.httpsEnabled = internalConfig.get(HTTPS_ENABLED);
+    this.enableHttps = internalConfig.get(ENABLE_HTTPS);
     this.httpsPort = internalConfig.get(WEBSERVER_HTTPS_PORT);
     this.keyStorePath = internalConfig.get(SSL_KEYSTORE_PATH);
     this.keyStorePassword = internalConfig.get(SSL_KEYSTORE_PASSWORD);
@@ -237,7 +237,7 @@ public final class JettyServerConfig {
     return managerPassword;
   }
 
-  public boolean isHttpsEnabled() {
-    return httpsEnabled;
+  public boolean isEnableHttps() {
+    return enableHttps;
   }
 }
