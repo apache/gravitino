@@ -43,6 +43,8 @@ public class TestCatalogOperations implements CatalogOperations, TableCatalog, S
   private final BasePropertiesMetadata schemaPropertiesMetadata;
   private Map<String, String> config;
 
+  public static final String FAIL_CREATE = "fail-create";
+
   public TestCatalogOperations(Map<String, String> config) {
     tables = Maps.newHashMap();
     schemas = Maps.newHashMap();
@@ -327,6 +329,16 @@ public class TestCatalogOperations implements CatalogOperations, TableCatalog, S
                   "hidden_key",
                   PropertyEntry.stringPropertyEntry(
                       "hidden_key", "hidden_key", false, false, "hidden_value", true, false))
+              .put(
+                  FAIL_CREATE,
+                  PropertyEntry.booleanPropertyEntry(
+                      FAIL_CREATE,
+                      "Whether an exception needs to be thrown on creation",
+                      false,
+                      false,
+                      false,
+                      false,
+                      false))
               .build();
         }
       };
