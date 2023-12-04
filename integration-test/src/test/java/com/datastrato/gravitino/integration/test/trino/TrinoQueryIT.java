@@ -45,7 +45,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import jodd.io.StringOutputStream;
 import okhttp3.logging.HttpLoggingInterceptor;
-import org.apache.logging.log4j.util.Strings;
 import org.jline.terminal.Terminal;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
@@ -61,6 +60,8 @@ public class TrinoQueryIT {
   private static final Logger LOG = LoggerFactory.getLogger(TrinoQueryIT.class);
 
   private static boolean isDockerRunning = false;
+
+  // TODO(yuhui) redo get the configs after we have the Docker image ready for testing.
   private static String gravitinoUri = "http://127.0.0.1:8090";
   private static String trinoUri = "http://127.0.0.1:8080";
   private static String hiveMetastoreUri = "thrift://127.0.0.1:9083";
@@ -97,7 +98,7 @@ public class TrinoQueryIT {
         HashMap<String, String> properties = new HashMap<>();
         properties.put("uri", hiveMetastoreUri);
         properties.put("catalog-backend", "hive");
-        properties.put("warehouse", "hdfs://localhost:9000/user/iceberg/warehouse");
+        properties.put("warehouse", "hdfs://localhost:9000/user/iceberg/warehouse/TrinoQueryIT");
         createCatalog("lakehouse-iceberg", "lakehouse-iceberg", properties);
       }
 
@@ -107,34 +108,9 @@ public class TrinoQueryIT {
       return;
     }
 
-    testQueriesDir = System.getenv("GRAVITINO_ROOT_DIR");
-    if (Strings.isBlank(testQueriesDir)) {
-      testQueriesDir = System.getProperty("user.dir");
-    }
-
-    if (testQueriesDir.endsWith("integration-test")) {
-      testQueriesDir += "/trino-queries/catalogs";
-    } else {
-      testQueriesDir += "/integration-test/trino-queries/catalogs";
-    }
-
+    testQueriesDir =
+        TrinoQueryIT.class.getClassLoader().getResource("trino-queries/catalogs").getPath();
     LOG.info("Test Queries directory is {}", testQueriesDir);
-
-    createMetalake();
-
-    {
-      HashMap<String, String> properties = new HashMap<>();
-      properties.put("metastore.uris", hiveMetastoreUri);
-      createCatalog("hive", "hive", properties);
-    }
-
-    {
-      HashMap<String, String> properties = new HashMap<>();
-      properties.put("uri", hiveMetastoreUri);
-      properties.put("catalog-backend", "hive");
-      properties.put("warehouse", "hdfs://localhost:9000/user/iceberg/warehouse");
-      createCatalog("lakehouse-iceberg", "lakehouse-iceberg", properties);
-    }
   }
 
   @AfterAll
@@ -283,8 +259,8 @@ public class TrinoQueryIT {
         Future<Integer> completedTask = completionService.take();
         Integer taskId = completedTask.get();
       } catch (InterruptedException | ExecutionException e) {
-        LOG.error("Test Failed: ", e);
-        Assertions.fail();
+        LOG.error("Test failed: ", e);
+        Assertions.fail("Test failed: " + e.getMessage());
       }
     }
 
@@ -362,14 +338,16 @@ public class TrinoQueryIT {
               expectResult,
               result);
         } else {
-          LOG.error(
-              "Test {} failed for query.\nSql:\n{}\nExpect:\n{}\nActual:\n{}",
-              testDirName + testFileName.substring(testFileName.lastIndexOf('/')),
-              sql,
-              expectResult,
-              result);
           queryRunner.stop();
-          Assertions.fail();
+          String errorMessage =
+              String.format(
+                  "Test %s failed for query.\nSql:\n%s\nExpect:\n%s\nActual:\n%s",
+                  testDirName + testFileName.substring(testFileName.lastIndexOf('/')),
+                  sql,
+                  expectResult,
+                  result);
+          LOG.error(errorMessage);
+          Assertions.fail(errorMessage);
         }
       }
       testCount.incrementAndGet();

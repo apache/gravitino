@@ -11,6 +11,7 @@ import com.datastrato.gravitino.catalog.jdbc.operation.JdbcTableOperations;
 import com.datastrato.gravitino.exceptions.GravitinoRuntimeException;
 import com.datastrato.gravitino.exceptions.NoSuchColumnException;
 import com.datastrato.gravitino.exceptions.NoSuchTableException;
+import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import java.sql.Connection;
@@ -85,6 +86,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
         .withColumns(jdbcColumns.toArray(new JdbcColumn[0]))
         .withComment(remove)
         .withProperties(properties)
+        .withAuditInfo(AuditInfo.EMPTY)
         .build();
   }
 
