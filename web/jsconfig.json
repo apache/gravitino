@@ -1,8 +1,22 @@
 {
   "compilerOptions": {
-    "baseUrl": "."
+    "paths": {
+      "@/*": ["./*"]
+    }
   },
-  "include": [
-    "src"
+  "exclude": [
+    ".git",
+    ".next",
+    ".app-cache",
+    ".npm",
+    ".npm-tmp",
+    "dist",
+    "dist*",
+    "node_modules",
+    "**/dist/*",
+    "**/node_modules/*",
+    ".gradle",
+    ".node",
+    "build"
   ]
 }

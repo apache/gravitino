@@ -3,4 +3,5 @@
 # This software is licensed under the Apache License version 2.
 #
 
-engine-strict=true
+.next
+node_modules
