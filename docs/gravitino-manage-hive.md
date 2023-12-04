@@ -1,21 +1,21 @@
 ---
-title: "How to use Gravitino to manage Apache Hive metadata"
+title: "How to use Gravitino to manage Hive metadata"
 date: 2023-10-20
 license: "Copyright 2023 Datastrato.
 This software is licensed under the Apache License version 2."
 ---
-## Using Apache Hive as a Catalog in Gravitino
+## Using Hive as a Catalog in Gravitino
 
-Gravitino offers the functionality to utilize Apache Hive as a catalog for metadata management. This guide will lead you through the process of creating a catalog using Hive in Gravitino.
+Gravitino offers the functionality to utilize Hive as a catalog for metadata management. This guide will lead you through the process of creating a catalog using Hive in Gravitino.
 
 ### Requirements:
 
-* The Hive catalog requires a Hive Metastore Service (HMS), or a compatible implementation of the HMS, such as AWS Glue.
+* The Hive catalog requires a Hive Metastore Service(HMS), or a compatible implementation of the HMS, such as AWS Glue.
 * The Gravitino must have network access to the Hive metastore service with the Thrift protocol.
 * Apache Hive 2.x is supported.
 * Before you create a Hive catalog, make sure you have already created a Metalake. If you haven't done so, please follow the Metalake creation steps.
 
-## Creating a Apache Hive Catalog
+## Creating a Hive Catalog
 
 To create a Hive catalog, use the following steps:
 
@@ -53,7 +53,7 @@ Example JSON:
 | `client.pool-size`  | The maximum number of Hive metastore clients in the pool for Gravitino. 1 by default value.                                  | 1                                                                                                                        | 0.2.0         |
 | `gravitino.bypass.` | Property name with this prefix will be passed down to the underlying HMS client for use. Empty by default value.             | `gravitino.bypass.hive.metastore.failure.retries = 3` indicate 3 times of retries upon failure of Thrift metastore calls | 0.2.0         |
 
-## Creating an Apache Hive Schema
+## Creating a Hive Schema
 
 After the catalog is created, you can submit a schema JSON example to the Gravitino server using the URL format:
 
@@ -83,7 +83,7 @@ Example JSON:
 |---------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------|---------------|
 | `location`          | The directory for Hive database storage. Not required, HMS will use the value of `hive.metastore.warehouse.dir` in the Hive conf file hive-site.xml by default. | `/user/hive/warehouse`                   | 0.1.0         |
 
-## Creating an Apache Hive Table
+## Creating a Hive Table
 
 After the schema is created, you can submit a table JSON example to the Gravitino server using the URL format:
 

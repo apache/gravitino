@@ -54,10 +54,10 @@ The following table lists the configuration items in the `gravitino.conf` file. 
 
 Gravitino server also supports setting up runtime environment variables by editing the `gravitino-env.sh` file, which is located in the `conf` directory.
 
-### How to access Apache Hadoop
+### How to access Hadoop
 
 Currently, due to the absence of a comprehensive user permission system, Gravitino can only use a single username for
-Apache Hadoop access. Please ensure that the user starting the Gravitino server has Hadoop (HDFS, YARN, etc.) access
+Hadoop access. Please ensure that the user starting the Gravitino server has Hadoop (HDFS, YARN, etc.) access
 permissions; otherwise, you may encounter a `Permission denied` error. There are also several ways to resolve this error:
 * Granting the Gravitino startup user permissions in Hadoop
 * Specify the authorized Hadoop username in the environment variables `HADOOP_USER_NAME` before starting the Gravitino server.

@@ -1,5 +1,5 @@
 ---
-title: "How to set up Gravitino and Apache Iceberg REST server"
+title: "How to set up Gravitino Iceberg REST server"
 date: 2023-10-18T09:03:20-08:00
 license: "Copyright 2023 Datastrato.
 This software is licensed under the Apache License version 2."
@@ -7,21 +7,21 @@ This software is licensed under the Apache License version 2."
 
 ## Background
 
-The Gravitino Iceberg REST Server follows the [Apache Iceberg REST API specification](https://github.com/apache/iceberg/blob/main/open-api/rest-catalog-open-api.yaml) and acts as an Iceberg REST catalog server.
+The Gravitino Iceberg REST Server follows the [Iceberg REST API specification](https://github.com/apache/iceberg/blob/main/open-api/rest-catalog-open-api.yaml) and acts as an Iceberg REST catalog server.
 
 ### Capabilities
 
-* Supports the Apache Iceberg REST API defined in Iceberg 1.3.1, and supports the namespace and table interfaces. `Token`, `ReportMetrics`, and `Config` interfaces aren't supported yet.
+* Supports the Iceberg REST API defined in Iceberg 1.3.1, and supports the namespace and table interfaces. `Token`, `ReportMetrics`, and `Config` interfaces aren't supported yet.
 * Works as a catalog proxy, supporting HiveCatalog and JDBCCatalog.
 * Built with Iceberg `1.3.1`. The Iceberg table format version is `1` by default.
 * When writing to HDFS, the Gravitino Iceberg REST server can only operate as the specified HDFS user and
-  it doesn't support proxying to other HDFS users. See *How to access Apache Hadoop* in the *How to customize Gravitino server configurations* document for more details.
+  it doesn't support proxying to other HDFS users. See *How to access Hadoop* in the *How to customize Gravitino server configurations* document for more details.
 
-## How to start the Gravitino and Apache Iceberg REST server
+## How to start the Gravitino Iceberg REST server
 
 Deploy the Gravitino server to the `GRAVITINO_HOME` directory. You can find the configuration options in [`$GRAVITINO_HOME/conf/gravitino.conf`](gravitino-server-config.md).
 
-### Basic Gravitino and Apache Iceberg server configuration
+### Basic Gravitino Iceberg server configuration
 
 | Configuration item                | Description                                                                                                                                                                                                          | Default value                                                                | Since Version |
 |-----------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------|---------------|
@@ -37,11 +37,11 @@ Deploy the Gravitino server to the `GRAVITINO_HOME` directory. You can find the 
 | `gravitino.auxService.iceberg-rest.requestHeaderSize` | The maximum size of an HTTP request.                                                                                                                                                                                            | `131072`                                                                     | 0.2.0         |
 | `gravitino.auxService.iceberg-rest.responseHeaderSize` | The maximum size of an HTTP response.                                                                                                                                                                                           | `131072`                                                                     | 0.2.0         |
 
-### Apache Iceberg catalog configuration
+### Iceberg catalog configuration
 
-Not recommended for production environments the Gravitino Iceberg REST server defaults to using a memory catalog. You can instead specify an Apache Hive or JDBC catalog.
+Not recommended for production environments the Gravitino Iceberg REST server defaults to using a memory catalog. You can instead specify a Hive or JDBC catalog.
 
-#### Apache Hive catalog configuration
+#### Hive catalog configuration
 
 | Configuration item                | Description                                                                                                                 | Default value |  Since Version |
 |-----------------------------------|-----------------------------------------------------------------------------------------------------------------------------|---------------|-----|
@@ -62,7 +62,7 @@ Not recommended for production environments the Gravitino Iceberg REST server de
 
 If using a JDBC catalog, you must **download the corresponding JDBC driver jars, and place them in the Gravitino Iceberg REST server classpath**, such as `catalogs/lakehouse-iceberg/libs`.
 
-### Other Apache Iceberg catalog properties
+### Other Iceberg catalog properties
 
 You can add other properties defined in [CatalogProperties of Iceberg](https://github.com/apache/iceberg/blob/main/core/src/main/java/org/apache/iceberg/CatalogProperties.java), please note that `catalog-impl` has no effect.
 The `clients` property for example:
@@ -76,7 +76,7 @@ The `clients` property for example:
 
 The Gravitino Iceberg REST server adds the HDFS configuration files, `core-site.xml` and `hdfs-site.xml` from the directory defined by `gravitino.auxService.iceberg-rest.classpath`, for example, `catalogs/lakehouse-iceberg/conf`, to the classpath.
 
-## Starting the Gravitino and Apache Iceberg REST server
+## Starting the Gravitino Iceberg REST server
 
 Starting the Gravitino Iceberg REST server:
 
@@ -90,13 +90,13 @@ How to find out whether the Gravitino Iceberg REST server has started:
 curl  http://127.0.0.1:9001/iceberg/application.wadl
 ```
 
-## Exploring the Gravitino and Apache Iceberg REST server with Apache Spark
+## Exploring the Gravitino Iceberg REST server with Spark
 
-### Deploying Apache Spark with Apache Iceberg support
+### Deploying Spark with Iceberg support
 
-Follow the [Spark Iceberg start guide](https://iceberg.apache.org/docs/latest/getting-started/) to setup Apache Spark's and Apache Iceberg's environment. Please keep the Spark version consistent with the `spark-iceberg-runtime` version.
+Follow the [Spark Iceberg start guide](https://iceberg.apache.org/docs/latest/getting-started/) to setup Spark's and Iceberg's environment. Please keep the Spark version consistent with the `spark-iceberg-runtime` version.
 
-### Starting the Apache Spark client with the Apache Iceberg REST catalog
+### Starting the Spark client with the Iceberg REST catalog
 | Configuration item                | Description                                                                                                                 |
 |-----------------------------------|-----------------------------------------------------------------------------------------------------------------------------|
 | `spark.sql.catalog.${catalog-name}.type` | The Spark catalog type, should set to `rest`. |
@@ -112,7 +112,7 @@ For example:
 --conf spark.sql.catalog.rest.uri=http://127.0.0.1:9001/iceberg/
 ```
 
-### Exploring Apache Iceberg with Apache Spark SQL
+### Exploring Iceberg with Spark SQL
 
 ```sql
 // First change to use the `rest` catalog
