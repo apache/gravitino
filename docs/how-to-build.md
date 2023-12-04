@@ -60,7 +60,7 @@ Note:
         ├── bin/gravitino.sh            # Gravitino Server Launching scripts.
         ├── catalogs
         │   └── hive/                   # Hive catalog dependencies and configurations.
-        │   └── lakehouse-iceberg/      # Iceberg catalog dependencies and configurations.
+        │   └── lakehouse-iceberg/      # Apache Iceberg catalog dependencies and configurations.
         ├── conf/                       # All configuration for Gravitino.
         |   ├── gravitino.conf          # Gravitino Server configuration.
         |   ├── gravitino-env.sh        # Environment variables, etc., JAVA_HOME, GRAVITINO_HOME, and more.
