@@ -347,8 +347,10 @@ public final class JettyServerConfig {
 
   private SSLContext getSSLContextInstance(String protocol) {
     try {
-      return SSLContext.getInstance(protocol);
-    } catch (NoSuchAlgorithmException nsa) {
+      SSLContext context = SSLContext.getInstance(protocol);
+      context.init(null, null, null);
+      return context;
+    } catch (NoSuchAlgorithmException | KeyManagementException e) {
       return null;
     }
   }
@@ -357,19 +359,14 @@ public final class JettyServerConfig {
     if (enableCipherAlgorithms.isEmpty()) {
       return Collections.emptySet();
     }
-    try {
-      SSLContext context =
-          tlsProtocol.map(this::getSSLContextInstance).orElseGet(this::getDefaultSSLContext);
-      if (context == null) {
-        return Collections.emptySet();
-      }
-      context.init(null, null, null);
-      Set<String> supportedAlgorithms = Sets.newHashSet(enableCipherAlgorithms);
-      supportedAlgorithms.retainAll(
-          Sets.newHashSet(context.getServerSocketFactory().getSupportedCipherSuites()));
-      return supportedAlgorithms;
-    } catch (KeyManagementException e) {
+    SSLContext context =
+        tlsProtocol.map(this::getSSLContextInstance).orElseGet(this::getDefaultSSLContext);
+    if (context == null) {
       return Collections.emptySet();
     }
+    Set<String> supportedAlgorithms = Sets.newHashSet(enableCipherAlgorithms);
+    supportedAlgorithms.retainAll(
+        Sets.newHashSet(context.getServerSocketFactory().getSupportedCipherSuites()));
+    return supportedAlgorithms;
   }
 }
