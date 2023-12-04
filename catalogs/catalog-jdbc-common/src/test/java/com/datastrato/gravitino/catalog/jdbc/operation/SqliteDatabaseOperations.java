@@ -10,6 +10,7 @@ import com.datastrato.gravitino.catalog.jdbc.JdbcSchema;
 import com.datastrato.gravitino.catalog.jdbc.utils.JdbcConnectorUtils;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
+import com.datastrato.gravitino.meta.AuditInfo;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.sql.Connection;
@@ -66,7 +67,7 @@ public class SqliteDatabaseOperations extends JdbcDatabaseOperations {
   @Override
   public JdbcSchema load(String databaseName) throws NoSuchSchemaException {
     if (exist(databaseName)) {
-      return new JdbcSchema.Builder().withName(databaseName).build();
+      return new JdbcSchema.Builder().withName(databaseName).withAuditInfo(AuditInfo.EMPTY).build();
     }
     return null;
   }

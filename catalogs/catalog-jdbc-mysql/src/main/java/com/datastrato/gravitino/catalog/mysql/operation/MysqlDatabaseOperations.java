@@ -7,6 +7,7 @@ package com.datastrato.gravitino.catalog.mysql.operation;
 import com.datastrato.gravitino.catalog.jdbc.JdbcSchema;
 import com.datastrato.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
+import com.datastrato.gravitino.meta.AuditInfo;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -80,6 +81,7 @@ public class MysqlDatabaseOperations extends JdbcDatabaseOperations {
                       put("COLLATE", collationName);
                     }
                   })
+              .withAuditInfo(AuditInfo.EMPTY)
               .build();
         }
       }

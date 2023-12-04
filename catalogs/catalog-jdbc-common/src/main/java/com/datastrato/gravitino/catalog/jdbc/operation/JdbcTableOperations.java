@@ -12,6 +12,7 @@ import com.datastrato.gravitino.catalog.jdbc.utils.JdbcConnectorUtils;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NoSuchTableException;
 import com.datastrato.gravitino.exceptions.TableAlreadyExistsException;
+import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.google.common.collect.Lists;
@@ -117,6 +118,7 @@ public abstract class JdbcTableOperations implements TableOperation {
           .withColumns(jdbcColumns)
           .withComment(comment)
           .withProperties(properties)
+          .withAuditInfo(AuditInfo.EMPTY)
           .build();
     } catch (final SQLException se) {
       throw this.exceptionMapper.toGravitinoException(se);
