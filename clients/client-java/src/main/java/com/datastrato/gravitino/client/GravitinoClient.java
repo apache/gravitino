@@ -45,13 +45,18 @@ public class GravitinoClient implements SupportsMetalakes, Closeable {
   private final RESTClient restClient;
 
   /**
-   * Constructs a new GravitinoClient with the given URI.
+   * Constructs a new GravitinoClient with the given URI, authenticator and AuthDataProvider.
    *
    * @param uri The base URI for the Gravitino API.
+   * @param authenticator The type of authenticator.
+   * @param authDataProvider The provider of the data which is used for authentication.
    */
-  private GravitinoClient(String uri) {
+  private GravitinoClient(String uri, AuthDataProvider authDataProvider) {
     this.restClient =
-        HTTPClient.builder(Collections.emptyMap()).uri(uri).withObjectMapper(MAPPER).build();
+        HTTPClient.builder(Collections.emptyMap())
+            .uri(uri)
+            .withAuthDataProvider(authDataProvider)
+            .build();
   }
 
   /**
@@ -225,6 +230,7 @@ public class GravitinoClient implements SupportsMetalakes, Closeable {
   public static class Builder {
 
     private String uri;
+    private AuthDataProvider authDataProvider;
 
     /**
      * Private constructor for the Builder class.
@@ -233,6 +239,28 @@ public class GravitinoClient implements SupportsMetalakes, Closeable {
      */
     private Builder(String uri) {
       this.uri = uri;
+    }
+
+    /**
+     * Sets the simple mode authentication for the Graivitno
+     *
+     * @return This Builder instance for method chaining.
+     */
+    public Builder withSimpleAuth() {
+      this.authDataProvider = new SimpleTokenProvider();
+      return this;
+    }
+
+    /**
+     * Sets OAuth2TokenProvider for the GravitinoClient.
+     *
+     * @param dataProvider The OAuth2TokenProvider used as the provider of authentication data for
+     *     GravitinoClient.
+     * @return This Builder instance for method chaining.
+     */
+    public Builder withOAuth(OAuth2TokenProvider dataProvider) {
+      this.authDataProvider = dataProvider;
+      return this;
     }
 
     /**
@@ -245,7 +273,7 @@ public class GravitinoClient implements SupportsMetalakes, Closeable {
       Preconditions.checkArgument(
           uri != null && !uri.isEmpty(), "The argument 'uri' must be a valid URI");
 
-      return new GravitinoClient(uri);
+      return new GravitinoClient(uri, authDataProvider);
     }
   }
 }

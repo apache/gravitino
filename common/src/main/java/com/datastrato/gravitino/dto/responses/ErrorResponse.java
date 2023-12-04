@@ -134,6 +134,10 @@ public class ErrorResponse extends BaseResponse {
         ErrorConstants.UNKNOWN_ERROR_CODE, RuntimeException.class.getSimpleName(), message, null);
   }
 
+  public static ErrorResponse oauthError(int code, String type, String message) {
+    return new ErrorResponse(code, type, message, null);
+  }
+
   private static List<String> getStackTrace(Throwable throwable) {
     if (throwable == null) {
       return null;

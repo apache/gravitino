@@ -253,6 +253,17 @@ public class JsonUtils {
     return pNode.asInt();
   }
 
+  public static long getLong(String property, JsonNode node) {
+    Preconditions.checkArgument(node.has(property), "Cannot parse missing property: %s", property);
+    JsonNode pNode = node.get(property);
+    Preconditions.checkArgument(
+        pNode != null && !pNode.isNull() && pNode.isIntegralNumber() && pNode.canConvertToLong(),
+        "Cannot parse to an long value %s: %s",
+        property,
+        pNode);
+    return pNode.asLong();
+  }
+
   public static FunctionArg readFunctionArg(JsonNode node) {
     Preconditions.checkArgument(
         node != null && !node.isNull() && node.isObject(),
