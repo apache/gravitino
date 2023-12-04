@@ -251,7 +251,12 @@ tasks.rat {
   failOnError.set(true)
   setExcludes(exclusions)
 }
+
 tasks.check.get().dependsOn(tasks.rat)
+
+tasks.cyclonedxBom {
+  setIncludeConfigs(listOf("runtimeClasspath"))
+}
 
 jacoco {
   toolVersion = "0.8.10"
