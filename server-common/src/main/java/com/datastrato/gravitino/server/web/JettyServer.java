@@ -361,6 +361,9 @@ public final class JettyServer {
     }
     if (isEnableClientAuth) {
       sslContextFactory.setNeedClientAuth(true);
+      sslContextFactory.setTrustStorePath(trustStorePath);
+      sslContextFactory.setTrustStorePassword(trustStorePassword);
+      sslContextFactory.setTrustStoreType(trustStoreType);
     }
     SecureRequestCustomizer src = new SecureRequestCustomizer();
     httpConfig.addCustomizer(src);

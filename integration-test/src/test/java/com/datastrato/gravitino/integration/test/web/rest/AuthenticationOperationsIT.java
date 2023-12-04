@@ -54,6 +54,15 @@ public class AuthenticationOperationsIT extends AbstractIT {
     configs.put(OAuthConfig.DEFAULT_SIGN_KEY.getKey(), publicKey);
     configs.put(OAuthConfig.ALLOW_SKEW_SECONDS.getKey(), "6");
     configs.put(AuthConstants.HTTP_HEADER_AUTHORIZATION, token);
+    configs.put(WEBSERVER_CONF_PREFIX + JettyServerConfig.ENABLE_HTTPS.getKey(), "true");
+    configs.put(WEBSERVER_CONF_PREFIX + JettyServerConfig.ENABLE_CLIENT_AUTH.getKey(), "true");
+    configs.put(WEBSERVER_CONF_PREFIX + JettyServerConfig.SSL_TRUST_STORE_PATH.getKey(), "/Users/roryqi/Library/Java/JavaVirtualMachines/corretto-1.8.0_392/Contents/Home/localhost.crt");
+
+    configs.put(WEBSERVER_CONF_PREFIX + JettyServerConfig.SSL_TRUST_STORE_PASSWORD.getKey(), "localhost");
+    configs.put(WEBSERVER_CONF_PREFIX + JettyServerConfig.SSL_KEYSTORE_PASSWORD.getKey(), "localhost");
+    configs.put(WEBSERVER_CONF_PREFIX + JettyServerConfig.SSL_MANAGER_PASSWORD.getKey(), "localhost");
+    configs.put(WEBSERVER_CONF_PREFIX + JettyServerConfig.SSL_KEYSTORE_PATH.getKey(), "/Users/roryqi/Library/Java/JavaVirtualMachines/corretto-1.8.0_392/Contents/Home/localhost.jks");
+
     registerCustomConfigs(configs);
     AbstractIT.startIntegrationTest();
   }
