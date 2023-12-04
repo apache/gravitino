@@ -6,10 +6,20 @@ package com.datastrato.gravitino.integration.test.container;
 
 import static java.lang.String.format;
 
+import com.datastrato.gravitino.catalog.hive.HiveClientPool;
 import com.google.common.collect.ImmutableSet;
+import java.io.IOException;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.metastore.IMetaStoreClient;
+import org.apache.thrift.TException;
 import org.rnorth.ducttape.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -80,7 +90,57 @@ public class HiveContainer extends BaseContainer {
         // ignore
       }
     }
-    return isHiveContainerReady;
+
+    // Test hive client if it can connect to hive server
+    boolean isHiveConnectSuccess = false;
+    HiveConf hiveConf = new HiveConf();
+    String hiveMetastoreUris =
+        String.format("thrift://%s:%d", getContainerIpAddress(), HiveContainer.HIVE_METASTORE_PORT);
+    hiveConf.set(HiveConf.ConfVars.METASTOREURIS.varname, hiveMetastoreUris);
+    HiveClientPool hiveClientPool = new HiveClientPool(1, hiveConf);
+
+    nRetry = 0;
+    while (nRetry++ < retryLimit) {
+      try {
+        List<String> databases = hiveClientPool.run(IMetaStoreClient::getAllDatabases);
+        if (databases.size() > 0) {
+          isHiveConnectSuccess = true;
+          break;
+        }
+        Thread.sleep(3000);
+      } catch (TException | InterruptedException e) {
+        LOG.warn("Failed to connect to hive server, retrying...", e);
+      }
+    }
+
+    // Test HDFS client if it can connect to HDFS server
+    boolean isHdfsConnectSuccess = false;
+    nRetry = 0;
+    Configuration conf = new Configuration();
+    conf.set(
+        "fs.defaultFS",
+        String.format("hdfs://%s:%d", getContainerIpAddress(), HiveContainer.HDFS_DEFAULTFS_PORT));
+    while (nRetry++ < retryLimit) {
+      try (FileSystem fs = FileSystem.get(conf)) {
+        Path directoryPath = new Path("/");
+        FileStatus[] fileStatuses = fs.listStatus(directoryPath);
+        if (fileStatuses.length > 0) {
+          isHdfsConnectSuccess = true;
+          break;
+        }
+        Thread.sleep(3000);
+      } catch (IOException | InterruptedException e) {
+        LOG.warn("Failed to connect to HDFS server, retrying...", e);
+      }
+    }
+
+    LOG.info(
+        "Hive container status: isHiveContainerReady={}, isHiveConnectSuccess={}, isHdfsConnectSuccess={}",
+        isHiveContainerReady,
+        isHiveConnectSuccess,
+        isHdfsConnectSuccess);
+
+    return isHiveContainerReady && isHiveConnectSuccess && isHdfsConnectSuccess;
   }
 
   public static class Builder extends BaseContainer.Builder<HiveContainer.Builder, HiveContainer> {
