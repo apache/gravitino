@@ -8,6 +8,7 @@ import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.servlets.MetricsServlet;
 import com.datastrato.gravitino.GravitinoEnv;
 import com.datastrato.gravitino.metrics.MetricsSystem;
+import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.net.BindException;
@@ -16,15 +17,20 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.EnumSet;
+import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.LinkedBlockingQueue;
 import javax.servlet.DispatcherType;
 import javax.servlet.Filter;
 import javax.servlet.Servlet;
+import org.apache.commons.lang3.StringUtils;
 import org.eclipse.jetty.server.ConnectionFactory;
 import org.eclipse.jetty.server.HttpConfiguration;
 import org.eclipse.jetty.server.HttpConnectionFactory;
+import org.eclipse.jetty.server.SecureRequestCustomizer;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.ServerConnector;
+import org.eclipse.jetty.server.SslConnectionFactory;
 import org.eclipse.jetty.server.handler.ErrorHandler;
 import org.eclipse.jetty.server.handler.HandlerCollection;
 import org.eclipse.jetty.servlet.DefaultServlet;
@@ -32,6 +38,7 @@ import org.eclipse.jetty.servlet.FilterHolder;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
 import org.eclipse.jetty.util.component.LifeCycle;
+import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.eclipse.jetty.util.thread.QueuedThreadPool;
 import org.eclipse.jetty.util.thread.ScheduledExecutorScheduler;
 import org.eclipse.jetty.util.thread.Scheduler;
@@ -43,6 +50,9 @@ import org.slf4j.LoggerFactory;
 public final class JettyServer {
 
   private static final Logger LOG = LoggerFactory.getLogger(JettyServer.class);
+
+  private static final String HTTPS = "https";
+  private static final String HTTP_PROTOCOL = "http/1.1";
 
   private Server server;
 
@@ -76,18 +86,56 @@ public final class JettyServer {
     errorHandler.setServer(server);
     server.addBean(errorHandler);
 
-    // Create and set Http ServerConnector
-    ServerConnector httpConnector =
-        createHttpServerConnector(
-            server,
-            serverConfig.getRequestHeaderSize(),
-            serverConfig.getResponseHeaderSize(),
-            serverConfig.getHost(),
-            serverConfig.getHttpPort(),
-            serverConfig.getIdleTimeout());
-    server.addConnector(httpConnector);
-
-    // TODO. Create and set https connector @jerry
+    if (serverConfig.isEnableHttps()) {
+      // Create and set Https ServerConnector
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(serverConfig.getKeyStorePath()),
+          "If enables https, must set keyStorePath");
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(serverConfig.getKeyStorePassword()),
+          "If enables https, must set keyStorePassword");
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(serverConfig.getManagerPassword()),
+          "If enables https, must set managerPassword");
+      if (serverConfig.isEnableClientAuth()) {
+        Preconditions.checkArgument(
+            StringUtils.isNotBlank(serverConfig.getTrustStorePath()),
+            "If enables the authentication of the client, must set trustStorePath");
+        Preconditions.checkArgument(
+            StringUtils.isNotBlank(serverConfig.getTrustStorePasword()),
+            "If enables the authentication of the client, must set trustStorePassword");
+      }
+      ServerConnector httpsConnector =
+          createHttpsServerConnector(
+              server,
+              serverConfig.getRequestHeaderSize(),
+              serverConfig.getResponseHeaderSize(),
+              serverConfig.getHost(),
+              serverConfig.getHttpsPort(),
+              serverConfig.getIdleTimeout(),
+              serverConfig.getKeyStorePath(),
+              serverConfig.getKeyStorePassword(),
+              serverConfig.getManagerPassword(),
+              serverConfig.getKeyStoreType(),
+              serverConfig.getTlsProtocol(),
+              serverConfig.getSupportedAlgorithms(),
+              serverConfig.isEnableClientAuth(),
+              serverConfig.getTrustStorePath(),
+              serverConfig.getTrustStorePasword(),
+              serverConfig.getTrustStoreType());
+      server.addConnector(httpsConnector);
+    } else {
+      // Create and set Http ServerConnector
+      ServerConnector httpConnector =
+          createHttpServerConnector(
+              server,
+              serverConfig.getRequestHeaderSize(),
+              serverConfig.getResponseHeaderSize(),
+              serverConfig.getHost(),
+              serverConfig.getHttpPort(),
+              serverConfig.getIdleTimeout());
+      server.addConnector(httpConnector);
+    }
 
     // Initialize ServletContextHandler or WebAppContext
     if (shouldEnableUI) {
@@ -130,11 +178,12 @@ public final class JettyServer {
       throw new RuntimeException("Failed to start " + serverName + " web server.", e);
     }
 
+    if (!serverConfig.isEnableHttps()) {
+      LOG.warn("Users would better use HTTPS to void token data leak.");
+    }
+
     LOG.info(
-        "{} web server started on host {} port {}.",
-        serverName,
-        serverConfig.getHost(),
-        serverConfig.getHttpPort());
+        "{} web server started on host {} port {}.", serverName, serverConfig.getHost(), getPort());
   }
 
   public synchronized void join() {
@@ -165,7 +214,7 @@ public final class JettyServer {
             "{} web server stopped on host {} port {}.",
             serverName,
             serverConfig.getHost(),
-            serverConfig.getHttpPort());
+            getPort());
       } catch (Exception e) {
         // Swallow the exception.
         LOG.warn("Failed to stop {} web server.", serverName, e);
@@ -263,7 +312,7 @@ public final class JettyServer {
 
     HttpConnectionFactory httpConnectionFactory = new HttpConnectionFactory(httpConfig);
     ServerConnector connector =
-        creatorServerConnector(server, new ConnectionFactory[] {httpConnectionFactory});
+        createServerConnector(server, new ConnectionFactory[] {httpConnectionFactory});
     connector.setHost(host);
     connector.setPort(port);
     connector.setReuseAddress(true);
@@ -271,7 +320,69 @@ public final class JettyServer {
     return connector;
   }
 
-  private ServerConnector creatorServerConnector(
+  private int getPort() {
+    if (serverConfig.isEnableHttps()) {
+      return serverConfig.getHttpsPort();
+    } else {
+      return serverConfig.getHttpPort();
+    }
+  }
+
+  private ServerConnector createHttpsServerConnector(
+      Server server,
+      int reqHeaderSize,
+      int respHeaderSize,
+      String host,
+      int port,
+      int idleTimeout,
+      String keyStorePath,
+      String keyStorePassword,
+      String keyManagerPassword,
+      String keyStoreType,
+      Optional<String> tlsProtocol,
+      Set<String> supportedAlgorithms,
+      boolean isEnableClientAuth,
+      String trustStorePath,
+      String trustStorePassword,
+      String trustStoreType) {
+    HttpConfiguration httpConfig = new HttpConfiguration();
+    httpConfig.setSecureScheme(HTTPS);
+    httpConfig.setRequestHeaderSize(reqHeaderSize);
+    httpConfig.setResponseHeaderSize(respHeaderSize);
+    httpConfig.setSendServerVersion(true);
+    httpConfig.setIdleTimeout(idleTimeout);
+    httpConfig.setSecurePort(port);
+
+    SslContextFactory sslContextFactory = new SslContextFactory.Server();
+    sslContextFactory.setKeyStorePath(keyStorePath);
+    sslContextFactory.setKeyStorePassword(keyStorePassword);
+    sslContextFactory.setKeyManagerPassword(keyManagerPassword);
+    sslContextFactory.setKeyStoreType(keyStoreType);
+    tlsProtocol.ifPresent(sslContextFactory::setProtocol);
+    if (!supportedAlgorithms.isEmpty()) {
+      sslContextFactory.setIncludeCipherSuites(supportedAlgorithms.toArray(new String[0]));
+    }
+    if (isEnableClientAuth) {
+      sslContextFactory.setNeedClientAuth(true);
+      sslContextFactory.setTrustStorePath(trustStorePath);
+      sslContextFactory.setTrustStorePassword(trustStorePassword);
+      sslContextFactory.setTrustStoreType(trustStoreType);
+    }
+    SecureRequestCustomizer src = new SecureRequestCustomizer();
+    httpConfig.addCustomizer(src);
+    HttpConnectionFactory httpConnectionFactory = new HttpConnectionFactory(httpConfig);
+    SslConnectionFactory sslConnectionFactory =
+        new SslConnectionFactory(sslContextFactory, HTTP_PROTOCOL);
+    ServerConnector connector =
+        createServerConnector(
+            server, new ConnectionFactory[] {sslConnectionFactory, httpConnectionFactory});
+    connector.setHost(host);
+    connector.setPort(port);
+    connector.setReuseAddress(true);
+    return connector;
+  }
+
+  private ServerConnector createServerConnector(
       Server server, ConnectionFactory[] connectionFactories) {
     Scheduler serverExecutor =
         new ScheduledExecutorScheduler(serverName + "-webserver-JettyScheduler", true);

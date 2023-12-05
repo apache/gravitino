@@ -47,6 +47,7 @@ public class AuthenticationOperationsIT extends AbstractIT {
     configs.put(OAuthConfig.DEFAULT_SIGN_KEY.getKey(), publicKey);
     configs.put(OAuthConfig.ALLOW_SKEW_SECONDS.getKey(), "6");
     configs.put(AuthConstants.HTTP_HEADER_AUTHORIZATION, token);
+
     registerCustomConfigs(configs);
     OAuthMockDataProvider mockDataProvider = OAuthMockDataProvider.getInstance();
     mockDataProvider.setTokenData(token.getBytes(StandardCharsets.UTF_8));
