@@ -5,16 +5,30 @@
 
 import axios from 'axios'
 
-const Apis = {
-  GET: '/api/version'
-}
+const defHttp = axios.create({
+  baseURL: '/',
+  headers: {
+    Accept: 'application/vnd.gravitino.v1+json'
+  }
+})
 
-export const getVersionApi = () => {
-  return axios({
-    url: `${Apis.GET}`,
-    method: 'get',
-    headers: {
-      Accept: 'application/vnd.gravitino.v1+json'
-    }
-  })
-}
+defHttp.interceptors.request.use(config => {
+  const accessToken = typeof window !== 'undefined' ? window.localStorage.getItem('accessToken') : null
+
+  if (accessToken) {
+    config.headers.Authorization = `Bearer ${accessToken}`
+  }
+
+  return config
+})
+
+defHttp.interceptors.response.use(
+  res => {
+    return res
+  },
+  err => {
+    console.error(err)
+  }
+)
+
+export default defHttp

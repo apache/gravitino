@@ -5,7 +5,7 @@
 
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit'
 
-import { getVersionApi } from '@/lib/api'
+import { getVersionApi } from '@/lib/api/version'
 
 export const initialVersion = createAsyncThunk('sys/fetchVersion', async (params, { getState }) => {
   const response = await getVersionApi()
@@ -25,7 +25,7 @@ export const initialVersion = createAsyncThunk('sys/fetchVersion', async (params
 export const sysSlice = createSlice({
   name: 'sys',
   initialState: {
-    version: ''
+    version: null
   },
   reducers: {
     setVersion(state, action) {

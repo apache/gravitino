@@ -29,7 +29,7 @@ import * as yup from 'yup'
 import { useForm, Controller } from 'react-hook-form'
 import { yupResolver } from '@hookform/resolvers/yup'
 
-import { genUpdateMetalakeUpdates } from '@/lib/utils'
+import { genUpdates } from '@/lib/utils'
 
 const defaultValues = {
   name: '',
@@ -105,7 +105,7 @@ const CreateMetalakeDialog = props => {
     if (type === 'create') {
       dispatch(createMetalake({ ...metalakeData }))
     } else {
-      const reqData = { updates: genUpdateMetalakeUpdates(cacheData, metalakeData) }
+      const reqData = { updates: genUpdates(cacheData, metalakeData) }
 
       if (reqData.updates.length !== 0) {
         dispatch(updateMetalake({ name: cacheData.name, data: reqData }))
