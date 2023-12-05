@@ -38,7 +38,6 @@ RUN rm -rf /usr/lib/trino/plugin/accumulo  \
     && rm -rf /usr/lib/trino/plugin/clickhouse \
     && rm -rf /usr/lib/trino/plugin/elasticsearch \
     && rm -rf /usr/lib/trino/plugin/exchange-hdfs \
-    && rm -rf /usr/lib/trino/plugin/hudi \
     && rm -rf /usr/lib/trino/plugin/kudu \
     && rm -rf /usr/lib/trino/plugin/password-authenticators \
     && rm -rf /usr/lib/trino/plugin/redis \

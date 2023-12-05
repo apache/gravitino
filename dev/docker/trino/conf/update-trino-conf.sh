@@ -9,7 +9,7 @@ trino_conf_dir="$(dirname "${BASH_SOURCE-$0}")"
 trino_conf_dir="$(cd "${trino_conf_dir}">/dev/null; pwd)"
 
 # Update `gravitino.uri = http://GRAVITINO_HOST_IP:GRAVITINO_HOST_PORT` in the `conf/catalog/gravitino.properties`
-sed "s/GRAVITINO_HOST_IP:GRAVITINO_HOST_PORT/${GRAVITINO_HOST_IP}:${GRAVITINO_HOST_PORT}/g" "${trino_conf_dir}/catalog/gravitino.properties.template" > "${trino_conf_dir}/catalog/gravitino.properties.1"
+sed "s/GRAVITINO_HOST_IP:GRAVITINO_HOST_PORT/${GRAVITINO_HOST_IP}:${GRAVITINO_HOST_PORT}/g" "${trino_conf_dir}/catalog/gravitino.properties.template" > "${trino_conf_dir}/catalog/gravitino.properties.tmp"
 # Update `gravitino.metalake = GRAVITINO_METALAKE_NAME` in the `conf/catalog/gravitino.properties`
-sed "s/GRAVITINO_METALAKE_NAME/${GRAVITINO_METALAKE_NAME}/g" "${trino_conf_dir}/catalog/gravitino.properties.1" > "${trino_conf_dir}/catalog/gravitino.properties"
-rm "${trino_conf_dir}/catalog/gravitino.properties.1"
+sed "s/GRAVITINO_METALAKE_NAME/${GRAVITINO_METALAKE_NAME}/g" "${trino_conf_dir}/catalog/gravitino.properties.tmp" > "${trino_conf_dir}/catalog/gravitino.properties"
+rm "${trino_conf_dir}/catalog/gravitino.properties.tmp"
