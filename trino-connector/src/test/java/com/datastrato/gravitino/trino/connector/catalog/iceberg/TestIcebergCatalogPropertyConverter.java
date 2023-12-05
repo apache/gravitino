@@ -48,7 +48,7 @@ public class TestIcebergCatalogPropertyConverter {
         "jdbc:mysql://127.0.0.1:3306/metastore_db?createDatabaseIfNotExist=true");
     Assert.assertEquals(hiveBackendConfig.get("iceberg.jdbc-catalog.connection-user"), "zhangsan");
     Assert.assertEquals(hiveBackendConfig.get("iceberg.jdbc-catalog.connection-password"), "lisi");
-    Assert.assertEquals(hiveBackendConfig.get("other-key"), "other");
+    Assert.assertNull(hiveBackendConfig.get("other-key"));
     Assert.assertEquals(hiveBackendConfig.get("iceberg.catalog.type"), "jdbc");
     Assert.assertEquals(
         hiveBackendConfig.get("iceberg.jdbc-catalog.driver-class"), "com.mysql.cj.jdbc.Driver");
