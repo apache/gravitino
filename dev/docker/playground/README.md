@@ -3,8 +3,7 @@
   This software is licensed under the Apache License version 2.
 -->
 # Playground
-This is a complete Gravitino runtime environment with `Hive`, `Hdfs`, `Trino`, and `Gravitno` Server. just execute the `./launch-playground.sh` script.
-It will automatically start the `gravitino-ci-hive`, `gravitino-ci-trino`, and `Gravitino` Docker containers on the local host. 
+This is a complete Gravitino Docker runtime environment with `Hive`, `Hdfs`, `Trino`, and `Gravitno` Server. just execute the `./launch-playground.sh` script.
 Depending on your network, the startup may take 3-5 minutes.
 Once the playground environment has started, you can open http://localhost:8090 to access the Gravitino Web UI.
 
