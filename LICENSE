@@ -201,9 +201,8 @@
    limitations under the License.
 
 
-
    This product bundles various third-party components also under the
-   Apache Software Foundation License 2.0
+   Apache Software License 2.0.
 
    Gradle Wrapper
    ./gradlew
@@ -230,23 +229,22 @@
    ./catalogs/catalog-hive/src/test/java/com/datastrato/gravitino/catalog/hive/miniHMS/MiniHiveMetastoreService.java
    ./catalogs/catalog-hive/src/test/java/com/datastrato/gravitino/catalog/hive/miniHMS/ScriptRunner.java
    ./catalogs/catalog-lakehouse-iceberg/src/main/java/com/datastrato/gravitino/catalog/lakehouse/iceberg/web/IcebergExceptionMapper.java
-   ./client-java/src/main/java/com/datastrato/gravitino/client/HTTPClient.java
-   ./client-java/src/main/java/com/datastrato/gravitino/client/RESTClient.java
-   ./client-java/src/test/java/com/datastrato/gravitino/client/TestHTTPClient.java
+   ./clients/client-java/src/main/java/com/datastrato/gravitino/client/HTTPClient.java
+   ./clients/client-java/src/main/java/com/datastrato/gravitino/client/RESTClient.java
+   ./clients/client-java/src/test/java/com/datastrato/gravitino/client/TestHTTPClient.java
    ./common/src/main/java/com/datastrato/gravitino/rest/RESTUtils.java
    ./common/src/main/java/com/datastrato/gravitino/rest/RESTMessage.java
-   ./core/src/main/java/com/datastrato/gravitino/util/ClientPool.java
-   ./core/src/main/java/com/datastrato/gravitino/util/ClientPoolImpl.java
+   ./core/src/main/java/com/datastrato/gravitino/utils/ClientPool.java
+   ./core/src/main/java/com/datastrato/gravitino/utils/ClientPoolImpl.java
    ./common/src/main/java/com/datastrato/gravitino/dto/responses/OAuth2TokenResponse.java
    ./clients/client-java/src/main/java/com/datastrato/gravitino/client/OAuth2ClientUtil.java
-
 
    Apache Hive
    ./catalogs/catalog-hive/src/test/resources/hive-schema-3.1.0.derby.sql
 
    Apache Zeppelin
-   ./integration-test/src/test/java/com/datastrato/gravitino/integration/util/CommandExecutor.java
-   ./integration-test/src/test/java/com/datastrato/gravitino/integration/util/ProcessData.java
+   ./integration-test/src/test/java/com/datastrato/gravitino/integration/test/util/CommandExecutor.java
+   ./integration-test/src/test/java/com/datastrato/gravitino/integration/test/util/ProcessData.java
 
    Apache Hadoop
    ./dev/docker/hive/hadoop-env.sh
