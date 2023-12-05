@@ -339,11 +339,16 @@ public class TrinoConnectorIT extends AbstractIT {
     String schemaName = GravitinoITUtils.genRandomName("schema").toLowerCase();
 
     String createSchemaSql =
-        String.format("CREATE SCHEMA \"%s.%s\".%s with( location = 'hdfs://localhost:9000/user/hive/warehouse/hive_schema_1123123')", metalakeName, catalogName, schemaName);
+        String.format(
+            "CREATE SCHEMA \"%s.%s\".%s with( location = 'hdfs://localhost:9000/user/hive/warehouse/hive_schema_1123123')",
+            metalakeName, catalogName, schemaName);
     containerSuite.getTrinoContainer().executeUpdateSQL(createSchemaSql);
 
-    Schema schema = catalog.asSchemas().loadSchema(NameIdentifier.of(metalakeName, catalogName, schemaName));
-    Assertions.assertEquals("hdfs://localhost:9000/user/hive/warehouse/hive_schema_1123123", schema.properties().get("location"));
+    Schema schema =
+        catalog.asSchemas().loadSchema(NameIdentifier.of(metalakeName, catalogName, schemaName));
+    Assertions.assertEquals(
+        "hdfs://localhost:9000/user/hive/warehouse/hive_schema_1123123",
+        schema.properties().get("location"));
   }
 
   @Test
@@ -372,7 +377,6 @@ public class TrinoConnectorIT extends AbstractIT {
         table.properties().get("location"));
   }
 
-
   @Test
   void testHiveSchemaCreatedByGravitino() throws InterruptedException {
     String catalogName = GravitinoITUtils.genRandomName("catalog").toLowerCase();
@@ -400,21 +404,22 @@ public class TrinoConnectorIT extends AbstractIT {
                 NameIdentifier.of(metalakeName, catalogName, schemaName),
                 "Created by gravitino client",
                 ImmutableMap.<String, String>builder()
-                    .put("location", "hdfs://localhost:9000/user/hive/warehouse/hive_schema_1223445.db")
-                    .build()
-            );
+                    .put(
+                        "location",
+                        "hdfs://localhost:9000/user/hive/warehouse/hive_schema_1223445.db")
+                    .build());
 
     Thread.sleep(6000);
 
     String sql =
-        String.format(
-            "show create schema \"%s.%s\".%s", metalakeName, catalogName, schemaName);
+        String.format("show create schema \"%s.%s\".%s", metalakeName, catalogName, schemaName);
 
     String data = containerSuite.getTrinoContainer().executeQuerySQL(sql).get(0).get(0);
 
-    Assertions.assertTrue(data.contains("location = 'hdfs://localhost:9000/user/hive/warehouse/hive_schema_1223445.db'"));
+    Assertions.assertTrue(
+        data.contains(
+            "location = 'hdfs://localhost:9000/user/hive/warehouse/hive_schema_1223445.db'"));
   }
-
 
   @Test
   void testHiveTableCreatedByGravitino() throws InterruptedException {
