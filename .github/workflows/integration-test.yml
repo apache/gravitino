@@ -36,7 +36,7 @@ jobs:
   # Integration test for AMD64 architecture
   test-amd64-arch:
     needs: changes
-    if: jobs.changes.outputs.source_changes == true
+    if: needs.changes.outputs.source_changes == true
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
