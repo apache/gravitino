@@ -11,16 +11,16 @@ response=$(curl -X POST -H "Content-Type: application/json" -d '{"name":"metalak
 if echo "$response" | grep -q "\"code\":0"; then
   true # Placeholder, do nothing
 else
-  echo "Matalake metalake_demo create failed"
+  echo "Metalake metalake_demo create failed"
   exit 1
 fi
 
 # Check metalake if created
 response=$(curl -X GET -H "Content-Type: application/json" http://127.0.0.1:8090/api/metalakes)
 if echo "$response" | grep -q "metalake_demo"; then
-  echo "Matalake metalake_demo successfully created"
+  echo "Metalake metalake_demo successfully created"
 else
-  echo "Matalake metalake_demo create failed"
+  echo "Metalake metalake_demo create failed"
   exit 1
 fi
 

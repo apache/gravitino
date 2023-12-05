@@ -5,7 +5,7 @@
 #
 set -ex
 
-# Because trino-connector must first synchronize a default metealake from the Gravitino server
+# Because trino-connector must first synchronize a default metalake from the Gravitino server
 response=$(trino --execute "SHOW CATALOGS LIKE 'metalake_demo.catalog_demo'")
 if echo "$response" | grep -q "metalake_demo.catalog_demo"; then
   echo "Gravitino Trino connector has finished synchronizing metadata"
