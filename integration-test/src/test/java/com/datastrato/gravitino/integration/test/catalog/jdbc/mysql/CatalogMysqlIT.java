@@ -86,7 +86,7 @@ public class CatalogMysqlIT extends AbstractIT {
 
     String gravitinoHome = System.getenv("GRAVITINO_HOME");
 
-    Path tmpPath = Paths.get(gravitinoHome, "/catalogs/jdbc-mysql/lib");
+    Path tmpPath = Paths.get(gravitinoHome, "/catalogs/jdbc-mysql/libs");
     JdbcDriverDownloader.downloadJdbcDriver(DOWNLOAD_JDK_URL, tmpPath.toString());
 
     MYSQL_CONTAINER =
