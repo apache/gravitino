@@ -246,6 +246,7 @@
    Apache Zeppelin
    ./integration-test/src/test/java/com/datastrato/gravitino/integration/test/util/CommandExecutor.java
    ./integration-test/src/test/java/com/datastrato/gravitino/integration/test/util/ProcessData.java
+   ./web/WEB-INF/web.xml
 
    Apache Hadoop
    ./dev/docker/hive/hadoop-env.sh
