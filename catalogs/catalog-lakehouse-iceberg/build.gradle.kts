@@ -5,9 +5,9 @@
 description = "catalog-lakehouse-iceberg"
 
 plugins {
-    `maven-publish`
-    id("java")
-    id("idea")
+  `maven-publish`
+  id("java")
+  id("idea")
 }
 
 dependencies {
