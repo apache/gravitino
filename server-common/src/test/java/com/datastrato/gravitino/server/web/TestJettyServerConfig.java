@@ -8,6 +8,7 @@ import com.datastrato.gravitino.Config;
 import com.google.common.collect.Sets;
 import java.util.Collections;
 import java.util.Optional;
+import java.util.Set;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -22,7 +23,9 @@ public class TestJettyServerConfig {
     Assertions.assertIterableEquals(
         Collections.emptySet(), jettyServerConfig.getSupportedAlgorithms());
 
-    String algorithm = "TLS_ECDH_RSA_WITH_AES_256_GCM_SHA384";
+    Set<String> supportAlgorithms = jettyServerConfig.getSupportedCipherSuites();
+    Assertions.assertFalse(supportAlgorithms.isEmpty());
+    String algorithm = supportAlgorithms.iterator().next();
     Config containConfig = new Config() {};
     containConfig.set(JettyServerConfig.ENABLE_CIPHER_ALGORITHMS, algorithm);
     jettyServerConfig = JettyServerConfig.fromConfig(containConfig, "");
