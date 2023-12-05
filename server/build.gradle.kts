@@ -10,7 +10,6 @@ plugins {
   `maven-publish`
   id("java")
   id("idea")
-  id("com.diffplug.spotless")
 }
 
 dependencies {
