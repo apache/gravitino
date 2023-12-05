@@ -7,6 +7,8 @@ This software is licensed under the Apache License version 2."
 
 ## Apache Hadoop
 
+
+
 - An open source distributed storage and processing framework.
 
 ## Apache Hive
