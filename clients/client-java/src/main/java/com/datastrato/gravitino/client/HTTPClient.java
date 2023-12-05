@@ -303,6 +303,7 @@ public class HTTPClient implements RESTClient {
    *     request or response processing, or if the errorHandler does not throw an exception for
    *     server error responses.
    */
+  @SuppressWarnings("deprecation")
   private <T> T execute(
       Method method,
       String path,

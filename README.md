@@ -82,3 +82,5 @@ Gravitino provides a Trino connector to access the metadata in Gravitino. To use
 ## License
 
 Gravitino is under the Apache License Version 2.0, See the [LICENSE](LICENSE) for the details.
+
+<sub>Apache®, Apache Hadoop&reg;, Apache Hive&trade;, Apache Iceberg&trade;, Apache Kafka&reg;, Apache Spark&trade;, Apache Submarine&trade;, Apache Thrift&trade; and Apache Zeppelin&trade; are either registered trademarks or trademarks of the Apache Software Foundation in the United States and/or other countries.</sub>

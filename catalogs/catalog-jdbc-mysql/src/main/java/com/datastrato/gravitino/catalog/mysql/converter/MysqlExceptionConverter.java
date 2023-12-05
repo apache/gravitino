@@ -23,6 +23,7 @@ public class MysqlExceptionConverter extends JdbcExceptionConverter {
       case 1050:
         return new TableAlreadyExistsException(se.getMessage(), se);
       case 1008:
+      case 1049:
         return new NoSuchSchemaException(se.getMessage(), se);
       case 1146:
       case 1051:

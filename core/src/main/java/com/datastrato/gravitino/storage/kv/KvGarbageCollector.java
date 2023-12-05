@@ -43,7 +43,11 @@ public final class KvGarbageCollector implements Closeable {
   final ScheduledExecutorService garbageCollectorPool =
       new ScheduledThreadPoolExecutor(
           2,
-          r -> new Thread(r, "KvEntityStore-Garbage-Collector-%d"),
+          r -> {
+            Thread t = new Thread(r, "KvEntityStore-Garbage-Collector-%d");
+            t.setDaemon(true);
+            return t;
+          },
           new ThreadPoolExecutor.AbortPolicy());
 
   public KvGarbageCollector(KvBackend kvBackend, Config config) {
@@ -104,6 +108,8 @@ public final class KvGarbageCollector implements Closeable {
 
     LOG.info("Start to remove {} uncommitted data", kvs.size());
     for (Pair<byte[], byte[]> pair : kvs) {
+      // Remove is a high-risk operation, So we log every delete operation
+      LOG.info("Remove uncommitted data: Key {}", Bytes.wrap(pair.getKey()));
       kvBackend.delete(pair.getKey());
     }
   }
@@ -173,7 +179,7 @@ public final class KvGarbageCollector implements Closeable {
           // Has a newer version, we can remove it.
           LOG.info(
               "Physically delete key that has newer version: {}, a newer version {}",
-              Bytes.wrap(key),
+              Bytes.wrap(rawKey),
               Bytes.wrap(newVersionOfKey.get(0).getKey()));
           kvBackend.delete(rawKey);
           keysDeletedCount++;

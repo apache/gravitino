@@ -203,17 +203,19 @@
 
 
    This product bundles various third-party components also under the
-   Apache Software Foundation License 2.0 from:
+   Apache Software License 2.0 from:
 
    Gradle Wrapper
-   Apache Spark
-   Apache Iceberg
-   Apache Hive
-   Apache Zeppelin
    Apache Hadoop
+   Apache Hive
+   Apache Iceberg
+   Apache Kafka
+   Apache Spark
+   Apache Submarine
+   Apache Zeppelin
 
    This product bundles various third-party components also under the
-   Apache Software Foundation License 2.0
+   Apache Software License 2.0
 
    Java Classmate
    Jackson Annotations

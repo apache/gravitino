@@ -12,7 +12,7 @@ import com.datastrato.gravitino.catalog.mysql.operation.MysqlDatabaseOperations;
 import com.datastrato.gravitino.catalog.mysql.operation.MysqlTableOperations;
 import java.util.HashMap;
 import javax.sql.DataSource;
-import org.apache.commons.lang3.RandomUtils;
+import org.apache.commons.lang.math.RandomUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
@@ -30,12 +30,12 @@ public class TestMysqlAbstractIT {
 
   private static DataSource DATA_SOURCE;
 
-  protected static final String TEST_DB_NAME = RandomUtils.nextInt(0, 10000) + "_test_db";
+  protected static final String TEST_DB_NAME = RandomUtils.nextInt(10000) + "_test_db";
 
   @BeforeAll
   public static void startup() {
     MYSQL_CONTAINER =
-        new MySQLContainer<>("mysql:latest")
+        new MySQLContainer<>("mysql:8.2.0")
             .withDatabaseName(TEST_DB_NAME)
             .withUsername("root")
             .withPassword("root");

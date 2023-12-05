@@ -2,15 +2,14 @@
  * Copyright 2023 Datastrato.
  * This software is licensed under the Apache License version 2.
  */
-import java.io.IOException
 import org.gradle.internal.os.OperatingSystem
+import java.io.IOException
 import java.util.*
 
 plugins {
   `maven-publish`
   id("java")
   id("idea")
-  id("com.diffplug.spotless")
 }
 
 dependencies {
@@ -141,9 +140,10 @@ fun printDockerCheckInfo() {
   val macDockerConnector = project.extra["macDockerConnector"] as? Boolean ?: false
   val isOrbStack = project.extra["isOrbStack"] as? Boolean ?: false
 
-  if (OperatingSystem.current().isMacOsX()
-      && dockerRunning
-      && (macDockerConnector || isOrbStack)) {
+  if (OperatingSystem.current().isMacOsX() &&
+    dockerRunning &&
+    (macDockerConnector || isOrbStack)
+  ) {
     DOCKER_IT_TEST = true
   } else if (OperatingSystem.current().isLinux() && dockerRunning) {
     DOCKER_IT_TEST = true
@@ -172,7 +172,7 @@ fun printDockerServerTip() {
   if (!dockerRunning) {
     val redColor = "\u001B[31m"
     val resetColor = "\u001B[0m"
-    println("Tip: Please make sure to start the ${redColor}Docker server${resetColor} before running the integration tests.")
+    println("Tip: Please make sure to start the ${redColor}Docker server$resetColor before running the integration tests.")
   }
 }
 
@@ -182,9 +182,11 @@ fun printMacDockerTip() {
   if (OperatingSystem.current().isMacOsX() && !macDockerConnector && !isOrbStack) {
     val redColor = "\u001B[31m"
     val resetColor = "\u001B[0m"
-    println("Tip: Please make sure to use ${redColor}OrbStack${resetColor} or execute the " +
-        "${redColor}`dev/docker/tools/mac-docker-connector.sh`${resetColor} script before running" +
-        " the integration test on macOS.")
+    println(
+      "Tip: Please make sure to use ${redColor}OrbStack$resetColor or execute the " +
+        "$redColor`dev/docker/tools/mac-docker-connector.sh`$resetColor script before running" +
+        " the integration test on macOS."
+    )
   }
 }
 
@@ -196,7 +198,7 @@ fun checkMacDockerConnector() {
 
   try {
     val processName = "docker-connector"
-    val command = "pgrep -x -q ${processName}"
+    val command = "pgrep -x -q $processName"
 
     val execResult = project.exec {
       commandLine("bash", "-c", command)
@@ -230,14 +232,14 @@ fun checkOrbStackStatus() {
   }
 
   try {
-    val process = ProcessBuilder("docker", "context", "show").start();
+    val process = ProcessBuilder("docker", "context", "show").start()
     val exitCode = process.waitFor()
     if (exitCode == 0) {
       val currentContext = process.inputStream.bufferedReader().readText()
       println("Current docker context is: $currentContext")
       project.extra["isOrbStack"] = currentContext.lowercase(Locale.getDefault()).contains("orbstack")
     } else {
-        println("checkOrbStackStatus Command execution failed with exit code $exitCode")
+      println("checkOrbStackStatus Command execution failed with exit code $exitCode")
     }
   } catch (e: IOException) {
     println("checkOrbStackStatus command execution failed: ${e.message}")

@@ -108,7 +108,6 @@ public abstract class BaseContainer implements AutoCloseable {
     InspectContainerResponse containerResponse =
         dockerClient.inspectContainerCmd(container.getContainerId()).exec();
 
-    String ipAddress = containerResponse.getNetworkSettings().getIpAddress();
     Map<String, ContainerNetwork> containerNetworkMap =
         containerResponse.getNetworkSettings().getNetworks();
     Preconditions.checkArgument(
@@ -118,7 +117,7 @@ public abstract class BaseContainer implements AutoCloseable {
       return entry.getValue().getIpAddress();
     }
 
-    return ipAddress;
+    throw new RuntimeException("Impossible to reach here");
   }
 
   public void start() {

@@ -19,7 +19,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.commons.lang3.RandomUtils;
+import org.apache.commons.lang.math.RandomUtils;
 import org.apache.iceberg.types.Types;
 
 /** Provide some basic usage methods and test classes for basic fields. */
@@ -123,7 +123,7 @@ public class TestBaseConvert {
   private static Type getRandomGravitinoType() {
     Collection<Type> values = GRAVITINO_TYPE.values();
     return values.stream()
-        .skip(RandomUtils.nextInt(0, values.size()))
+        .skip(RandomUtils.nextInt(values.size()))
         .findFirst()
         .orElseThrow(() -> new RuntimeException("No type found"));
   }
@@ -131,7 +131,7 @@ public class TestBaseConvert {
   private static org.apache.iceberg.types.Type getRandomIcebergType() {
     Collection<org.apache.iceberg.types.Type> values = ICEBERG_TYPE.values();
     return values.stream()
-        .skip(RandomUtils.nextInt(0, values.size()))
+        .skip(RandomUtils.nextInt(values.size()))
         .findFirst()
         .orElseThrow(() -> new RuntimeException("No type found"));
   }
