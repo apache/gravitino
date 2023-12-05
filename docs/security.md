@@ -83,6 +83,5 @@ Both Gravitino server and Iceberg REST service can configure HTTPS.
 | `gravitino.auxService.iceberg-rest.trustStorePassword`     | Password to the trust store                                | ``            | 0.3.0         |
 | `gravitino.auxService.iceberg-rest.trustStoreType`         | The type to the trust store                                | `JKS`         | 0.3.0         |
 
-About `tlsProtocol`, the reference list of protocols can be found in the "Additional JSSE Standard Names" section of the Java security guide. The list for Java 8 can be found at <a href="https://docs.oracle.com/javase/8/docs/technotes/guides/security/StandardNames.html#jssenames">this</a>.
-About `enableCipherAlgorithms`, the reference list of protocols can be found in the "JSSE Cipher Suite Names" section of the Java security guide. The list for Java 8 can be found at
-<a href="https://docs.oracle.com/javase/8/docs/technotes/guides/security/StandardNames.html#ciphersuites">this</a>
+About `tlsProtocol`, the reference list of protocols can be found in the "Additional JSSE Standard Names" section of the Java security guide. The list for Java 8 can be found at [this](https://docs.oracle.com/javase/8/docs/technotes/guides/security/StandardNames.html#jssenames).
+About `enableCipherAlgorithms`, the reference list of protocols can be found in the "JSSE Cipher Suite Names" section of the Java security guide. The list for Java 8 can be found at [this](https://docs.oracle.com/javase/8/docs/technotes/guides/security/StandardNames.html#ciphersuites)
