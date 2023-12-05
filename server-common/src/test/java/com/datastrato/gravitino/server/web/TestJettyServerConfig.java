@@ -8,6 +8,7 @@ import com.datastrato.gravitino.Config;
 import com.google.common.collect.Sets;
 import java.util.Collections;
 import java.util.Optional;
+import java.util.Set;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -21,22 +22,26 @@ public class TestJettyServerConfig {
 
     Assertions.assertIterableEquals(
         Collections.emptySet(), jettyServerConfig.getSupportedAlgorithms());
+
+    Set<String> supportAlgorithms = jettyServerConfig.getSupportedCipherSuites();
+    Assertions.assertFalse(supportAlgorithms.isEmpty());
+    String algorithm = supportAlgorithms.iterator().next();
     Config containConfig = new Config() {};
-    containConfig.set(JettyServerConfig.ENABLE_CIPHER_ALGORITHMS, "TLS_AES_256_GCM_SHA384");
+    containConfig.set(JettyServerConfig.ENABLE_CIPHER_ALGORITHMS, algorithm);
     jettyServerConfig = JettyServerConfig.fromConfig(containConfig, "");
     Assertions.assertIterableEquals(
-        Sets.newHashSet("TLS_AES_256_GCM_SHA384"), jettyServerConfig.getSupportedAlgorithms());
+        Sets.newHashSet(algorithm), jettyServerConfig.getSupportedAlgorithms());
     Config partConfig = new Config() {};
-    partConfig.set(JettyServerConfig.ENABLE_CIPHER_ALGORITHMS, "TLS_AES_256_GCM_SHA384,test1");
+    partConfig.set(JettyServerConfig.ENABLE_CIPHER_ALGORITHMS, algorithm + ",test1");
     jettyServerConfig = JettyServerConfig.fromConfig(partConfig, "");
     Assertions.assertIterableEquals(
-        Sets.newHashSet("TLS_AES_256_GCM_SHA384"), jettyServerConfig.getSupportedAlgorithms());
+        Sets.newHashSet(algorithm), jettyServerConfig.getSupportedAlgorithms());
 
     Config protocolConfig = new Config() {};
     protocolConfig.set(JettyServerConfig.SSL_PROTOCOL, Optional.of("TLS"));
-    protocolConfig.set(JettyServerConfig.ENABLE_CIPHER_ALGORITHMS, "TLS_AES_256_GCM_SHA384,test1");
+    protocolConfig.set(JettyServerConfig.ENABLE_CIPHER_ALGORITHMS, algorithm + ",test1");
     jettyServerConfig = JettyServerConfig.fromConfig(protocolConfig, "");
     Assertions.assertIterableEquals(
-        Sets.newHashSet("TLS_AES_256_GCM_SHA384"), jettyServerConfig.getSupportedAlgorithms());
+        Sets.newHashSet(algorithm), jettyServerConfig.getSupportedAlgorithms());
   }
 }

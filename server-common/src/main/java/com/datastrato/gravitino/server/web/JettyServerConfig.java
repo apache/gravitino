@@ -7,6 +7,7 @@ package com.datastrato.gravitino.server.web;
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.config.ConfigBuilder;
 import com.datastrato.gravitino.config.ConfigEntry;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Sets;
 import java.security.KeyManagementException;
@@ -359,14 +360,19 @@ public final class JettyServerConfig {
     if (enableCipherAlgorithms.isEmpty()) {
       return Collections.emptySet();
     }
+
+    Set<String> supportedAlgorithms = Sets.newHashSet(enableCipherAlgorithms);
+    supportedAlgorithms.retainAll(getSupportedCipherSuites());
+    return supportedAlgorithms;
+  }
+
+  @VisibleForTesting
+  Set<String> getSupportedCipherSuites() {
     SSLContext context =
         tlsProtocol.map(this::getSSLContextInstance).orElseGet(this::getDefaultSSLContext);
     if (context == null) {
       return Collections.emptySet();
     }
-    Set<String> supportedAlgorithms = Sets.newHashSet(enableCipherAlgorithms);
-    supportedAlgorithms.retainAll(
-        Sets.newHashSet(context.getServerSocketFactory().getSupportedCipherSuites()));
-    return supportedAlgorithms;
+    return Sets.newHashSet(context.getServerSocketFactory().getSupportedCipherSuites());
   }
 }
