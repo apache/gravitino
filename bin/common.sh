@@ -15,6 +15,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+# Referred from Apache Submarine's common.sh implementation
+# bin/common.sh
 
 if [ -L "${BASH_SOURCE-$0}" ]; then
   FWDIR=$(dirname "$(readlink "${BASH_SOURCE-$0}")")
