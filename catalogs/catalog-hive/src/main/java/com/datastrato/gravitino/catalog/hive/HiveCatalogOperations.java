@@ -782,11 +782,11 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
   private void doAddColumn(List<FieldSchema> cols, TableChange.AddColumn change) {
     int targetPosition;
-    if (change.getPosition() == null) {
+    if (change.getPosition() instanceof TableChange.Default) {
       // add to the end by default
       targetPosition = cols.size();
       LOG.info(
-          "Add position is null, add column {} to the end of non-partition columns",
+          "Hive catalog add column {} to the end of non-partition columns by default",
           change.fieldName()[0]);
     } else {
       targetPosition = columnPosition(cols, change.getPosition());

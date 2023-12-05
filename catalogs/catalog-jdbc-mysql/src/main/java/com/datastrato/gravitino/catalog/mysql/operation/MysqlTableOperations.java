@@ -387,20 +387,15 @@ public class MysqlTableOperations extends JdbcTableOperations {
     }
 
     // Append position if available
-    if (addColumn.getPosition() != null) {
-      if (addColumn.getPosition() instanceof TableChange.First) {
-        columnDefinition.append("FIRST");
-      } else if (addColumn.getPosition() instanceof TableChange.After) {
-        TableChange.After afterPosition = (TableChange.After) addColumn.getPosition();
-        columnDefinition.append("AFTER ").append(afterPosition.getColumn());
-      }
+    if (addColumn.getPosition() instanceof TableChange.First) {
+      columnDefinition.append("FIRST");
+    } else if (addColumn.getPosition() instanceof TableChange.After) {
+      TableChange.After afterPosition = (TableChange.After) addColumn.getPosition();
+      columnDefinition.append("AFTER ").append(afterPosition.getColumn());
+    } else if (addColumn.getPosition() instanceof TableChange.Default) {
+      // do nothing, follow the default behavior of mysql
     } else {
-      List<ColumnDefinition> columnDefinitions = createTable.getColumnDefinitions();
-      if (CollectionUtils.isNotEmpty(columnDefinitions)) {
-        columnDefinition
-            .append("AFTER ")
-            .append(getColumnName(columnDefinitions.get(columnDefinitions.size() - 1)));
-      }
+      throw new IllegalArgumentException("Invalid column position.");
     }
     return columnDefinition.toString();
   }

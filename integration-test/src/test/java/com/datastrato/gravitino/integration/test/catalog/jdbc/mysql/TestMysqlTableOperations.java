@@ -300,22 +300,19 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
 
     newComment = "txt3";
     String newCol2Comment = "xxx";
-    // update column position 、comment and add column、set table properties
+    // update column position 、comment and add column(by default position)、set table properties
     MYSQL_TABLE_OPERATIONS.alterTable(
         TEST_DB_NAME,
         tableName,
         TableChange.updateColumnPosition(
             new String[] {newColName_1}, TableChange.ColumnPosition.after(newColName_2)),
         TableChange.updateComment(newComment),
-        TableChange.addColumn(
-            new String[] {"col_3"}, VARCHAR, "txt3", TableChange.ColumnPosition.first()),
+        TableChange.addColumn(new String[] {"col_3"}, VARCHAR, "txt3"),
         TableChange.updateColumnComment(new String[] {newColName_2}, newCol2Comment));
     load = MYSQL_TABLE_OPERATIONS.load(TEST_DB_NAME, tableName);
 
     columns.clear();
 
-    columns.add(
-        new JdbcColumn.Builder().withName("col_3").withType(VARCHAR).withComment("txt3").build());
     columns.add(
         new JdbcColumn.Builder()
             .withName(col_2.name())
@@ -326,6 +323,8 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
             .withNullable(col_2.nullable())
             .build());
     columns.add(col_1);
+    columns.add(
+        new JdbcColumn.Builder().withName("col_3").withType(VARCHAR).withComment("txt3").build());
     //    properties.put("ROW_FORMAT", "DYNAMIC");
     assertionsTableInfo(tableName, newComment, columns, properties, load);
 
