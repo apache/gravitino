@@ -30,7 +30,7 @@ import java.util.function.Supplier;
  * contains ProtectionDomains that may reference the context classloader - and remembers it for the
  * lifetime of the Thread.
  *
- * <p>Referred from org/eclipse/jetty/util/thread/PrivilegedThreadFactory.java;
+ * <p>Referred from org/eclipse/jetty/util/thread/PrivilegedThreadFactory.java of jetty-9.4.51.v20230217;
  */
 class PrivilegedThreadFactory {
   /**
