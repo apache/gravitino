@@ -22,5 +22,5 @@ sourceSets {
 }
 
 protobuf {
-  protoc { artifact = "com.google.protobuf:protoc:${libs.versions.protoc.get()}"}
+  protoc { artifact = "com.google.protobuf:protoc:${libs.versions.protoc.get()}" }
 }
