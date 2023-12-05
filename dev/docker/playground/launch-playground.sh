@@ -11,7 +11,7 @@ if command -v docker-compose &> /dev/null
 then
   true # Placeholder, do nothing
 else
-  echo "ERROR: No docker service environment found, please install docker compose first."
+  echo "ERROR: No docker service environment found, please install docker-compose first."
   exit
 fi
 
