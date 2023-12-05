@@ -121,7 +121,7 @@ public class TestJdbcTableOperations {
                 DATABASE_NAME, table1, jdbcColumns, null, properties, null));
 
     // list table.
-    List<String> allTables = JDBC_TABLE_OPERATIONS.list(DATABASE_NAME);
+    List<String> allTables = JDBC_TABLE_OPERATIONS.listTables(DATABASE_NAME);
     Assertions.assertEquals(1, allTables.size());
     Assertions.assertEquals(table1, allTables.get(0));
 
@@ -129,7 +129,7 @@ public class TestJdbcTableOperations {
     JdbcTable loadTable = JDBC_TABLE_OPERATIONS.load(DATABASE_NAME, table1);
     Assertions.assertNotNull(loadTable);
     Assertions.assertEquals(table1, loadTable.name());
-    Assertions.assertEquals(null, loadTable.comment());
+    Assertions.assertNull(loadTable.comment());
     Assertions.assertEquals(properties, loadTable.properties());
     Assertions.assertEquals(jdbcColumns.length, loadTable.columns().length);
     Map<String, JdbcColumn> createColumnMap =
@@ -140,7 +140,7 @@ public class TestJdbcTableOperations {
       Assertions.assertEquals(jdbcColumn.name(), column.name());
       Assertions.assertEquals(jdbcColumn.comment(), column.comment());
       Assertions.assertEquals(jdbcColumn.dataType(), column.dataType());
-      Assertions.assertEquals(jdbcColumn.nullable(), ((JdbcColumn) column).nullable());
+      Assertions.assertEquals(jdbcColumn.nullable(), column.nullable());
       Assertions.assertEquals(
           jdbcColumn.getDefaultValue(), ((JdbcColumn) column).getDefaultValue());
     }
@@ -153,7 +153,7 @@ public class TestJdbcTableOperations {
     Assertions.assertThrows(
         NoSuchTableException.class,
         () -> JDBC_TABLE_OPERATIONS.rename(DATABASE_NAME, "no_exist", newName));
-    allTables = JDBC_TABLE_OPERATIONS.list(DATABASE_NAME);
+    allTables = JDBC_TABLE_OPERATIONS.listTables(DATABASE_NAME);
     Assertions.assertEquals(newName, allTables.get(0));
 
     // Sqlite does not support modifying the column type of table
@@ -167,7 +167,7 @@ public class TestJdbcTableOperations {
 
     // delete table.
     JDBC_TABLE_OPERATIONS.drop(DATABASE_NAME, newName);
-    allTables = JDBC_TABLE_OPERATIONS.list(DATABASE_NAME);
+    allTables = JDBC_TABLE_OPERATIONS.listTables(DATABASE_NAME);
     Assertions.assertEquals(0, allTables.size());
   }
 

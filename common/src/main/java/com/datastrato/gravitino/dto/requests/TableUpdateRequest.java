@@ -49,6 +49,9 @@ import org.apache.commons.lang3.StringUtils;
       value = TableUpdateRequest.UpdateTableColumnPositionRequest.class,
       name = "updateColumnPosition"),
   @JsonSubTypes.Type(
+      value = TableUpdateRequest.UpdateTableColumnNullabilityRequest.class,
+      name = "updateColumnNullability"),
+  @JsonSubTypes.Type(
       value = TableUpdateRequest.DeleteTableColumnRequest.class,
       name = "deleteColumn")
 })
@@ -211,6 +214,15 @@ public interface TableUpdateRequest extends RESTRequest {
       this(null, null, null, null, true);
     }
 
+    /**
+     * Constructor for AddTableColumnRequest.
+     *
+     * @param fieldName the field name to add
+     * @param dataType the data type of the field to add
+     * @param comment the comment of the field to add
+     * @param position the position of the field to add, null for default position
+     * @param nullable whether the field to add is nullable
+     */
     public AddTableColumnRequest(
         String[] fieldName,
         Type dataType,
@@ -220,13 +232,32 @@ public interface TableUpdateRequest extends RESTRequest {
       this.fieldName = fieldName;
       this.dataType = dataType;
       this.comment = comment;
-      this.position = position;
+      this.position = position == null ? TableChange.ColumnPosition.defaultPos() : position;
       this.nullable = nullable;
     }
 
+    /**
+     * Constructor for AddTableColumnRequest with default nullable value(true).
+     *
+     * @param fieldName the field name to add
+     * @param dataType the data type of the field to add
+     * @param comment the comment of the field to add
+     * @param position the position of the field to add
+     */
     public AddTableColumnRequest(
         String[] fieldName, Type dataType, String comment, TableChange.ColumnPosition position) {
       this(fieldName, dataType, comment, position, true);
+    }
+
+    /**
+     * Constructor for AddTableColumnRequest with default position and nullable value(true).
+     *
+     * @param fieldName the field name to add
+     * @param dataType the data type of the field to add
+     * @param comment the comment of the field to add
+     */
+    public AddTableColumnRequest(String[] fieldName, Type dataType, String comment) {
+      this(fieldName, dataType, comment, TableChange.ColumnPosition.defaultPos());
     }
 
     @Override
@@ -402,6 +433,43 @@ public interface TableUpdateRequest extends RESTRequest {
     @Override
     public TableChange tableChange() {
       return TableChange.updateColumnPosition(fieldName, newPosition);
+    }
+  }
+
+  @EqualsAndHashCode
+  @ToString
+  class UpdateTableColumnNullabilityRequest implements TableUpdateRequest {
+
+    @Getter
+    @JsonProperty("fieldName")
+    private final String[] fieldName;
+
+    @Getter
+    @JsonProperty("nullable")
+    private final boolean nullable;
+
+    public UpdateTableColumnNullabilityRequest(String[] fieldName, boolean nullable) {
+      this.fieldName = fieldName;
+      this.nullable = nullable;
+    }
+
+    // For Jackson deserialization
+    public UpdateTableColumnNullabilityRequest() {
+      this(null, true);
+    }
+
+    @Override
+    public TableChange tableChange() {
+      return TableChange.updateColumnNullability(fieldName, nullable);
+    }
+
+    @Override
+    public void validate() throws IllegalArgumentException {
+      Preconditions.checkArgument(
+          fieldName != null
+              && fieldName.length > 0
+              && Arrays.stream(fieldName).allMatch(StringUtils::isNotBlank),
+          "\"fieldName\" field is required and cannot be empty");
     }
   }
 

@@ -1,57 +1,33 @@
 {
-  // ** JS
-  "javascript.updateImportsOnFileMove.enabled": "always",
-  // ** JSON
-  "[json]": {
-    "editor.defaultFormatter": "vscode.json-language-features"
-  },
-  "[jsonc]": {
-    "editor.defaultFormatter": "vscode.json-language-features"
-  },
-  // ** Extension: Git
-  "git.rebaseWhenSync": true,
-  "git.autofetch": true,
-  "git.enableSmartCommit": true,
-  // ** Extension: Prettier
   "prettier.requireConfig": true,
   "editor.defaultFormatter": "esbenp.prettier-vscode",
   "editor.formatOnSave": true,
-  // ** Extension: ESLint
   "editor.codeActionsOnSave": {
     "source.fixAll.eslint": true,
-    "source.organizeImports": false,
+    "source.organizeImports": false
   },
-  "eslint.validate": [
-    "javascript",
-    "typescript",
-    "javascriptreact",
-    "typescriptreact"
-  ],
+  "eslint.validate": ["javascript", "javascriptreact"],
   "eslint.format.enable": true,
-  // ** Package manager Configs
   "npm.packageManager": "yarn",
-  // ** Extension: cSpell
   "cSpell.words": [
-    "Alata",
-    "Cheyne",
     "clsx",
-    "csstype",
-    "Customizer",
     "Datastrato",
-    "deepmerge",
     "Gravitino",
+    "headlessui",
+    "heroicons",
     "hookform",
     "iconify",
-    "Metalake",
-    "Metalakes",
-    "metastore",
+    "metalake",
+    "metalakes",
     "Neue",
+    "nextui",
     "nprogress",
     "reduxjs",
     "Roboto",
     "Segoe",
-    "tabler"
+    "tabler",
+    "tailwindcss"
   ],
   "search-node-modules.path": "node_modules",
-  "markdown.extension.toc.updateOnSave": false
+  "tailwindCSS.experimental.classRegex": [["clsx\\(([^)]*)\\)", "(?:'|\"|`)([^']*)(?:'|\"|`)"]]
 }

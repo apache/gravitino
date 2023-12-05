@@ -78,22 +78,34 @@ public class IcebergTableOpsHelper {
 
   private void doDeleteColumn(
       UpdateSchema icebergUpdateSchema, DeleteColumn deleteColumn, Schema icebergTableSchema) {
-    NestedField deleteField = icebergTableSchema.findField(DOT.join(deleteColumn.fieldNames()));
+    NestedField deleteField = icebergTableSchema.findField(DOT.join(deleteColumn.fieldName()));
     if (deleteField == null) {
       if (deleteColumn.getIfExists()) {
         return;
       } else {
         throw new IllegalArgumentException(
-            "delete column not exists: " + DOT.join(deleteColumn.fieldNames()));
+            "delete column not exists: " + DOT.join(deleteColumn.fieldName()));
       }
     }
-    icebergUpdateSchema.deleteColumn(DOT.join(deleteColumn.fieldNames()));
+    icebergUpdateSchema.deleteColumn(DOT.join(deleteColumn.fieldName()));
   }
 
   private void doUpdateColumnComment(
       UpdateSchema icebergUpdateSchema, UpdateColumnComment updateColumnComment) {
     icebergUpdateSchema.updateColumnDoc(
-        DOT.join(updateColumnComment.fieldNames()), updateColumnComment.getNewComment());
+        DOT.join(updateColumnComment.fieldName()), updateColumnComment.getNewComment());
+  }
+
+  private void doUpdateColumnNullability(
+      UpdateSchema icebergUpdateSchema,
+      TableChange.UpdateColumnNullability updateColumnNullability) {
+    if (updateColumnNullability.nullable()) {
+      icebergUpdateSchema.makeColumnOptional(DOT.join(updateColumnNullability.fieldName()));
+    } else {
+      // TODO: figure out how to enable users to make column required
+      // icebergUpdateSchema.allowIncompatibleChanges();
+      icebergUpdateSchema.requireColumn(DOT.join(updateColumnNullability.fieldName()));
+    }
   }
 
   private void doSetProperty(UpdateProperties icebergUpdateProperties, SetProperty setProperty) {
@@ -106,18 +118,17 @@ public class IcebergTableOpsHelper {
   }
 
   private void doRenameColumn(UpdateSchema icebergUpdateSchema, RenameColumn renameColumn) {
-    icebergUpdateSchema.renameColumn(
-        DOT.join(renameColumn.fieldNames()), renameColumn.getNewName());
+    icebergUpdateSchema.renameColumn(DOT.join(renameColumn.fieldName()), renameColumn.getNewName());
   }
 
   private void doMoveColumn(
-      UpdateSchema icebergUpdateSchema, String[] fieldNames, ColumnPosition columnPosition) {
+      UpdateSchema icebergUpdateSchema, String[] fieldName, ColumnPosition columnPosition) {
     if (columnPosition instanceof TableChange.After) {
       After after = (After) columnPosition;
-      String peerName = getSiblingName(fieldNames, after.getColumn());
-      icebergUpdateSchema.moveAfter(DOT.join(fieldNames), peerName);
+      String peerName = getSiblingName(fieldName, after.getColumn());
+      icebergUpdateSchema.moveAfter(DOT.join(fieldName), peerName);
     } else if (columnPosition instanceof TableChange.First) {
-      icebergUpdateSchema.moveFirst(DOT.join(fieldNames));
+      icebergUpdateSchema.moveFirst(DOT.join(fieldName));
     } else {
       throw new NotSupportedException(
           "Iceberg doesn't support column position: " + columnPosition.getClass().getSimpleName());
@@ -127,14 +138,14 @@ public class IcebergTableOpsHelper {
   private void doUpdateColumnPosition(
       UpdateSchema icebergUpdateSchema, UpdateColumnPosition updateColumnPosition) {
     doMoveColumn(
-        icebergUpdateSchema, updateColumnPosition.fieldNames(), updateColumnPosition.getPosition());
+        icebergUpdateSchema, updateColumnPosition.fieldName(), updateColumnPosition.getPosition());
   }
 
   private void doUpdateColumnType(
       UpdateSchema icebergUpdateSchema,
       UpdateColumnType updateColumnType,
       Schema icebergTableSchema) {
-    String fieldName = DOT.join(updateColumnType.fieldNames());
+    String fieldName = DOT.join(updateColumnType.fieldName());
     Preconditions.checkArgument(
         icebergTableSchema.findField(fieldName) != null,
         "Cannot update missing field: %s",
@@ -149,7 +160,7 @@ public class IcebergTableOpsHelper {
   }
 
   private ColumnPosition getAddColumnPosition(StructType parent, ColumnPosition columnPosition) {
-    if (columnPosition != null) {
+    if (!(columnPosition instanceof TableChange.Default)) {
       return columnPosition;
     }
 
@@ -165,7 +176,7 @@ public class IcebergTableOpsHelper {
 
   private void doAddColumn(
       UpdateSchema icebergUpdateSchema, AddColumn addColumn, Schema icebergTableSchema) {
-    String parentName = getParentName(addColumn.fieldNames());
+    String parentName = getParentName(addColumn.fieldName());
     StructType parentStruct;
     if (parentName != null) {
       org.apache.iceberg.types.Type parent = icebergTableSchema.findType(parentName);
@@ -184,22 +195,22 @@ public class IcebergTableOpsHelper {
 
     if (addColumn.isNullable()) {
       icebergUpdateSchema.addColumn(
-          getParentName(addColumn.fieldNames()),
-          getLeafName(addColumn.fieldNames()),
+          getParentName(addColumn.fieldName()),
+          getLeafName(addColumn.fieldName()),
           ConvertUtil.toIcebergType(addColumn.isNullable(), addColumn.getDataType()),
           addColumn.getComment());
     } else {
       // TODO: figure out how to enable users to add required columns
       // icebergUpdateSchema.allowIncompatibleChanges();
       icebergUpdateSchema.addRequiredColumn(
-          getParentName(addColumn.fieldNames()),
-          getLeafName(addColumn.fieldNames()),
+          getParentName(addColumn.fieldName()),
+          getLeafName(addColumn.fieldName()),
           ConvertUtil.toIcebergType(addColumn.isNullable(), addColumn.getDataType()),
           addColumn.getComment());
     }
 
     ColumnPosition position = getAddColumnPosition(parentStruct, addColumn.getPosition());
-    doMoveColumn(icebergUpdateSchema, addColumn.fieldNames(), position);
+    doMoveColumn(icebergUpdateSchema, addColumn.fieldName(), position);
   }
 
   private void alterTableProperty(
@@ -236,6 +247,9 @@ public class IcebergTableOpsHelper {
         doUpdateColumnType(icebergUpdateSchema, (UpdateColumnType) change, icebergTableSchema);
       } else if (change instanceof UpdateColumnComment) {
         doUpdateColumnComment(icebergUpdateSchema, (UpdateColumnComment) change);
+      } else if (change instanceof TableChange.UpdateColumnNullability) {
+        doUpdateColumnNullability(
+            icebergUpdateSchema, (TableChange.UpdateColumnNullability) change);
       } else {
         throw new NotSupportedException(
             "Iceberg doesn't support " + change.getClass().getSimpleName() + " for now");
@@ -358,13 +372,13 @@ public class IcebergTableOpsHelper {
   }
 
   @VisibleForTesting
-  static String getSiblingName(String[] fieldNames, String fieldName) {
-    if (fieldNames.length > 1) {
-      String[] peerNames = Arrays.copyOf(fieldNames, fieldNames.length);
-      peerNames[fieldNames.length - 1] = fieldName;
+  static String getSiblingName(String[] originalField, String targetField) {
+    if (originalField.length > 1) {
+      String[] peerNames = Arrays.copyOf(originalField, originalField.length);
+      peerNames[originalField.length - 1] = targetField;
       return DOT.join(peerNames);
     }
-    return fieldName;
+    return targetField;
   }
 
   @VisibleForTesting

@@ -6,6 +6,8 @@ package com.datastrato.gravitino.client;
 
 import com.datastrato.gravitino.dto.responses.ErrorConstants;
 import com.datastrato.gravitino.dto.responses.ErrorResponse;
+import com.datastrato.gravitino.dto.responses.OAuth2ErrorResponse;
+import com.datastrato.gravitino.exceptions.BadRequestException;
 import com.datastrato.gravitino.exceptions.CatalogAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.MetalakeAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
@@ -17,6 +19,7 @@ import com.datastrato.gravitino.exceptions.NotFoundException;
 import com.datastrato.gravitino.exceptions.RESTException;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.TableAlreadyExistsException;
+import com.datastrato.gravitino.exceptions.UnauthorizedException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Joiner;
 import java.util.List;
@@ -71,6 +74,10 @@ public class ErrorHandlers {
    */
   public static Consumer<ErrorResponse> restErrorHandler() {
     return RestErrorHandler.INSTANCE;
+  }
+
+  public static Consumer<ErrorResponse> oauthErrorHandler() {
+    return OAuthErrorHandler.INSTANCE;
   }
 
   private ErrorHandlers() {}
@@ -227,6 +234,44 @@ public class ErrorHandlers {
           throw new RuntimeException(errorMessage);
       }
 
+      super.accept(errorResponse);
+    }
+  }
+
+  public static class OAuthErrorHandler extends RestErrorHandler {
+    private static final ErrorHandler INSTANCE = new OAuthErrorHandler();
+
+    @Override
+    public ErrorResponse parseResponse(int code, String json, ObjectMapper mapper) {
+      try {
+        OAuth2ErrorResponse response = mapper.readValue(json, OAuth2ErrorResponse.class);
+        return ErrorResponse.oauthError(code, response.getType(), response.getMessage());
+      } catch (Exception x) {
+        LOG.warn("Unable to parse error response", x);
+      }
+      String errorMsg = String.format("Error code: %d, message: %s", code, json);
+      return ErrorResponse.unknownError(errorMsg);
+    }
+
+    @Override
+    public void accept(ErrorResponse errorResponse) {
+      if (errorResponse.getType() != null) {
+        switch (errorResponse.getType()) {
+          case OAuth2ClientUtil.INVALID_CLIENT_ERROR:
+            throw new UnauthorizedException(
+                String.format(
+                    "Not authorized: %s: %s", errorResponse.getType(), errorResponse.getMessage()));
+          case OAuth2ClientUtil.INVALID_REQUEST_ERROR:
+          case OAuth2ClientUtil.INVALID_GRANT_ERROR:
+          case OAuth2ClientUtil.UNAUTHORIZED_CLIENT_ERROR:
+          case OAuth2ClientUtil.UNSUPPORTED_GRANT_TYPE_ERROR:
+          case OAuth2ClientUtil.INVALID_SCOPE_ERROR:
+            throw new BadRequestException(
+                String.format(
+                    "Malformed request: %s: %s",
+                    errorResponse.getType(), errorResponse.getMessage()));
+        }
+      }
       super.accept(errorResponse);
     }
   }

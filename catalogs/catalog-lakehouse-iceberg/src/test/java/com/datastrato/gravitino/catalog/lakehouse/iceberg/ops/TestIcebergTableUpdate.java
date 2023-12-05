@@ -292,6 +292,26 @@ public class TestIcebergTableUpdate {
   }
 
   @Test
+  public void testUpdateColumnNullability() {
+    TableChange updateColumnNullability = TableChange.updateColumnNullability(firstField, true);
+    LoadTableResponse loadTableResponse = updateTable(identifier, updateColumnNullability);
+    Assertions.assertTrue(loadTableResponse.tableMetadata().schema().columns().get(0).isOptional());
+
+    // update struct_int from optional to required
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                updateTable(
+                    identifier,
+                    TableChange.updateColumnNullability(
+                        new String[] {fourthField[0], "element", "struct_map"}, false)));
+    Assertions.assertEquals(
+        "Cannot change column nullability: foo_struct.element.struct_map: optional -> required",
+        exception.getMessage());
+  }
+
+  @Test
   public void testUpdateColumnType() {
     TableChange updateColumnType = TableChange.updateColumnType(thirdField, Types.LongType.get());
     LoadTableResponse loadTableResponse = updateTable(identifier, updateColumnType);

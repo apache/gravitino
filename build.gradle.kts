@@ -2,8 +2,6 @@
  * Copyright 2023 Datastrato.
  * This software is licensed under the Apache License version 2.
  */
-import com.diffplug.gradle.spotless.SpotlessExtension
-import com.diffplug.gradle.spotless.SpotlessPlugin
 import com.github.vlsi.gradle.dsl.configureEach
 import java.util.Locale
 import java.io.File
@@ -13,6 +11,7 @@ import com.github.jk1.license.render.ReportRenderer
 import com.github.jk1.license.render.InventoryHtmlReportRenderer
 import com.github.jk1.license.filter.DependencyFilter
 import com.github.jk1.license.filter.LicenseBundleNormalizer
+import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 
 plugins {
   `maven-publish`
@@ -20,7 +19,18 @@ plugins {
   id("idea")
   id("jacoco")
   alias(libs.plugins.gradle.extensions)
-  alias(libs.plugins.spotless)
+
+  // Spotless version < 6.19.0 (https://github.com/diffplug/spotless/issues/1819) has an issue
+  // running against JDK21, but we cannot upgrade the spotless to 6.19.0 or later since it only
+  // support JDK11+. So we don't support JDK21 and thrown an exception for now.
+  if (JavaVersion.current() >= JavaVersion.VERSION_1_8
+      && JavaVersion.current() <= JavaVersion.VERSION_17) {
+    alias(libs.plugins.spotless)
+  } else {
+    throw GradleException("Gravitino Gradle current doesn't support " +
+        "Java version: ${JavaVersion.current()}. Please use JDK8 to 17.")
+  }
+
   alias(libs.plugins.publish)
   // Apply one top level rat plugin to perform any required license enforcement analysis
   alias(libs.plugins.rat)
@@ -70,6 +80,7 @@ subprojects {
   apply(plugin = "jacoco")
   apply(plugin = "maven-publish")
   apply(plugin = "java")
+  apply(plugin = "com.diffplug.spotless")
 
   repositories {
     mavenCentral()
@@ -139,10 +150,18 @@ subprojects {
   }
 
   tasks.configureEach<Test> {
+    testLogging {
+      exceptionFormat = TestExceptionFormat.FULL
+      showExceptions = true
+      showCauses = true
+      showStackTraces = true
+    }
+    reports.html.outputLocation.set(file("${rootProject.projectDir}/build/reports/"))
     val skipTests = project.hasProperty("skipTests")
     if (!skipTests) {
       if (project.name == "trino-connector") {
         useTestNG()
+        maxHeapSize = "2G"
       } else {
         useJUnitPlatform()
       }
@@ -176,8 +195,8 @@ subprojects {
     }
   }
 
-  plugins.withType<SpotlessPlugin>().configureEach {
-    configure<SpotlessExtension> {
+  plugins.withType<com.diffplug.gradle.spotless.SpotlessPlugin>().configureEach {
+    configure<com.diffplug.gradle.spotless.SpotlessExtension> {
       java {
         // Fix the Google Java Format version to 1.7. Since JDK8 only support Google Java Format
         // 1.7, which is not compatible with JDK17. We will use a newer version when we upgrade to
@@ -217,12 +236,14 @@ tasks.rat {
     "dev/docker/**/*.xml",
     "**/*.log",
     "licenses/*txt",
+    "integration-test/**",
     "web/.**",
-    "web/node_modules/**/*",
     "web/dist/**/*",
+    "web/node_modules/**/*",
     "web/src/iconify-bundle/bundle-icons-react.js",
     "web/src/iconify-bundle/icons-bundle-react.js",
     "web/yarn.lock",
+    "integration-test/**"
   )
 
   // Add .gitignore excludes to the Apache Rat exclusion list.
@@ -240,7 +261,12 @@ tasks.rat {
   failOnError.set(true)
   setExcludes(exclusions)
 }
+
 tasks.check.get().dependsOn(tasks.rat)
+
+tasks.cyclonedxBom {
+  setIncludeConfigs(listOf("runtimeClasspath"))
+}
 
 jacoco {
   toolVersion = "0.8.10"
@@ -372,7 +398,8 @@ tasks {
 
   val copyCatalogLibAndConfigs by registering(Copy::class) {
     dependsOn(":catalogs:catalog-hive:copyLibAndConfig",
-            ":catalogs:catalog-lakehouse-iceberg:copyLibAndConfig")
+            ":catalogs:catalog-lakehouse-iceberg:copyLibAndConfig",
+            ":catalogs:catalog-jdbc-mysql:copyLibAndConfig")
   }
 
   clean {
