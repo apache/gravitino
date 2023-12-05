@@ -11,11 +11,13 @@ public class HiveSchemaPropertyConverter implements PropertyConverter {
 
   @Override
   public Map<String, String> toTrinoProperties(Map<String, String> properties) {
+    // TODO(yuqi) we may need to convert the schema properties from Gravitino to Trino
     return PropertyConverter.super.toTrinoProperties(properties);
   }
 
   @Override
   public Map<String, Object> toGravitinoProperties(Map<String, Object> properties) {
+    // TODO(yuqi) we may need to convert the schema properties from Trino to Gravitino
     return PropertyConverter.super.toGravitinoProperties(properties);
   }
 }
