@@ -33,4 +33,4 @@ We use Github Actions to publish the docker images to the DockerHub repository.
 
 ## The Version of Gravitino Docker images
 
-+ [Gravitino Docker images](docker-image-changelog.md)
++ [Gravitino Docker images](../dev/docker/README.md)
