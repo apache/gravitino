@@ -16,25 +16,23 @@ concurrency:
 jobs:
   changes:
     runs-on: ubuntu-latest
-    outputs:
-      output1: ${{ steps.filter.outputs.workflows }}
-      steps:
-        - uses: actions/checkout@v3
-        - uses: dorny/paths-filter@v2
-          id: filter
-          with:
-            filters: |
-              source_changes:
-                    - api/**
-                    - catalogs/**
-                    - clients/**
-                    - common/**
-                    - core/**
-                    - integration-test/**
-                    - meta/**
-                    - server-common/**
-                    - trino-connect/**
-                    - web/**
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dorny/paths-filter@v2
+        id: filter
+        with:
+          filters: |
+            source_changes:
+              - api/**
+              - catalogs/**
+              - clients/**
+              - common/**
+              - core/**
+              - integration-test/**
+              - meta/**
+              - server-common/**
+              - trino-connect/**
+              - web/**
 
   # This workflow contains a single job called "build"
   build:
