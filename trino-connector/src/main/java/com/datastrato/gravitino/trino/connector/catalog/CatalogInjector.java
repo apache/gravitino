@@ -207,9 +207,9 @@ public class CatalogInjector {
             Object catalogConnector =
                 createCatalogMethod.invoke(catalogFactory, catalogPropertiesObject);
 
-            Field catelogField = catalogConnector.getClass().getDeclaredField("catalog");
-            catelogField.setAccessible(true);
-            Object catalog = catelogField.get(catalogConnector);
+            Field catalogField = catalogConnector.getClass().getDeclaredField("catalog");
+            catalogField.setAccessible(true);
+            Object catalog = catalogField.get(catalogConnector);
             activeCatalogs.put(catalogName, catalog);
 
             Field catelogHandleField =

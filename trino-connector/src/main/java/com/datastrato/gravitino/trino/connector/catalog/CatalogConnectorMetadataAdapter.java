@@ -20,6 +20,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.NotImplementedException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * This interface is used to handle different parts of catalog metadata from different catalog
@@ -27,11 +29,12 @@ import org.apache.commons.lang3.NotImplementedException;
  */
 public class CatalogConnectorMetadataAdapter {
 
+  private static final Logger LOG = LoggerFactory.getLogger(CatalogConnectorMetadataAdapter.class);
   protected final List<PropertyMetadata<?>> schemaProperties;
   protected final List<PropertyMetadata<?>> tableProperties;
   protected final List<PropertyMetadata<?>> columnProperties;
 
-  private GeneralDataTypeTransformer dataTypeTransformer;
+  private final GeneralDataTypeTransformer dataTypeTransformer;
 
   protected CatalogConnectorMetadataAdapter(
       List<PropertyMetadata<?>> schemaProperties,
@@ -118,6 +121,8 @@ public class CatalogConnectorMetadataAdapter {
       String name = propertyMetadata.getName();
       if (properties.containsKey(name)) {
         validProperties.put(name, properties.get(name));
+      } else {
+        LOG.warn("Property {} is not defined in trino, we will ignore it", name);
       }
     }
     return validProperties;
