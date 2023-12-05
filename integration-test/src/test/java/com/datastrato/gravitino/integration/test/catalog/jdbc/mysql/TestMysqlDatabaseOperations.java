@@ -9,7 +9,7 @@ import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.commons.lang3.RandomUtils;
+import org.apache.commons.lang.math.RandomUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -19,7 +19,7 @@ public class TestMysqlDatabaseOperations extends TestMysqlAbstractIT {
 
   @Test
   public void testBaseOperationDatabase() {
-    String databaseName = RandomUtils.nextInt(0, 10000) + "_ct_db";
+    String databaseName = RandomUtils.nextInt(10000) + "_ct_db";
     Map<String, String> properties = new HashMap<>();
     // TODO #804 Properties will be unified in the future.
     //    properties.put("CHARACTER SET", "utf8mb3");

@@ -18,7 +18,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.commons.lang3.RandomUtils;
+import org.apache.commons.lang.math.RandomUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -31,7 +31,7 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
 
   @Test
   public void testOperationTable() {
-    String tableName = RandomUtils.nextLong(1, 10000) + "_op_table";
+    String tableName = RandomUtils.nextInt(10000) + "_op_table";
     String tableComment = "test_comment";
     List<JdbcColumn> columns = new ArrayList<>();
     columns.add(
@@ -156,7 +156,7 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
 
   @Test
   public void testAlterTable() {
-    String tableName = RandomUtils.nextLong(1, 10000) + "_al_table";
+    String tableName = RandomUtils.nextInt(10000) + "_al_table";
     String tableComment = "test_comment";
     List<JdbcColumn> columns = new ArrayList<>();
     JdbcColumn col_1 =
@@ -340,7 +340,7 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
 
   @Test
   public void testCreateAndLoadTable() {
-    String tableName = RandomUtils.nextLong(1, 10000) + "_cl_table";
+    String tableName = RandomUtils.nextInt(10000) + "_cl_table";
     String tableComment = "test_comment";
     List<JdbcColumn> columns = new ArrayList<>();
     columns.add(

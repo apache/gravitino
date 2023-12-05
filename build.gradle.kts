@@ -131,6 +131,12 @@ subprojects {
     }
   }
 
+  gradle.projectsEvaluated {
+    tasks.withType<JavaCompile> {
+      options.compilerArgs.addAll(arrayOf("-Xlint:deprecation", "-Werror"))
+    }
+  }
+
   val sourcesJar by tasks.registering(Jar::class) {
     from(sourceSets.named("main").get().allSource)
     archiveClassifier.set("sources")
@@ -211,7 +217,7 @@ subprojects {
     }
   }
 
-  val allDeps by tasks.registering(DependencyReportTask::class)
+  tasks.register("allDeps", DependencyReportTask::class)
 
   group = "com.datastrato.gravitino"
   version = "$version"
@@ -378,7 +384,7 @@ tasks {
     delete(outputDir)
   }
 
-  val copySubprojectDependencies by registering(Copy::class) {
+  register("copySubprojectDependencies", Copy::class) {
     subprojects.forEach() {
       if (!it.name.startsWith("catalog") &&
         !it.name.startsWith("client") && it.name != "trino-connector" &&
@@ -390,7 +396,7 @@ tasks {
     }
   }
 
-  val copySubprojectLib by registering(Copy::class) {
+  register("copySubprojectLib", Copy::class) {
     subprojects.forEach() {
       if (!it.name.startsWith("catalog") &&
         !it.name.startsWith("client") &&
@@ -406,7 +412,7 @@ tasks {
     }
   }
 
-  val copyCatalogLibAndConfigs by registering(Copy::class) {
+  register("copyCatalogLibAndConfigs", Copy::class) {
     dependsOn(
       ":catalogs:catalog-hive:copyLibAndConfig",
       ":catalogs:catalog-lakehouse-iceberg:copyLibAndConfig",

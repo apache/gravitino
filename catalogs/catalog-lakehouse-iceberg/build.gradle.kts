@@ -105,7 +105,7 @@ tasks {
     }
   }
 
-  val copyLibAndConfig by registering(Copy::class) {
+  register("copyLibAndConfig", Copy::class) {
     dependsOn(copyCatalogLibs, copyCatalogConfig)
   }
 }
