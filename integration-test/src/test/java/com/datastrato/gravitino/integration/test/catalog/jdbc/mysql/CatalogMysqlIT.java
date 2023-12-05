@@ -41,7 +41,7 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
-import org.apache.commons.lang3.RandomUtils;
+import org.apache.commons.lang.math.RandomUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -79,7 +79,7 @@ public class CatalogMysqlIT extends AbstractIT {
 
   private static MySQLContainer<?> MYSQL_CONTAINER;
 
-  protected static final String TEST_DB_NAME = RandomUtils.nextInt(0, 10000) + "_test_db";
+  protected static final String TEST_DB_NAME = RandomUtils.nextInt(10000) + "_test_db";
 
   @BeforeAll
   public static void startup() throws IOException {

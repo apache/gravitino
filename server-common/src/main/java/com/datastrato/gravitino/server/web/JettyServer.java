@@ -328,6 +328,7 @@ public final class JettyServer {
     }
   }
 
+  @SuppressWarnings("deprecation")
   private ServerConnector createHttpsServerConnector(
       Server server,
       int reqHeaderSize,

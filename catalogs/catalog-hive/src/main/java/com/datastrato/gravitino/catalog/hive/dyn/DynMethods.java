@@ -99,9 +99,10 @@ public class DynMethods {
         }
 
       } catch (InvocationTargetException e) {
-        Throwables.propagateIfInstanceOf(e.getCause(), Exception.class);
-        Throwables.propagateIfInstanceOf(e.getCause(), RuntimeException.class);
-        throw Throwables.propagate(e.getCause());
+        Throwables.throwIfInstanceOf(e.getCause(), Exception.class);
+        Throwables.throwIfInstanceOf(e.getCause(), RuntimeException.class);
+        Throwables.throwIfUnchecked(e.getCause());
+        throw new RuntimeException(e.getCause());
       }
     }
 
@@ -109,8 +110,9 @@ public class DynMethods {
       try {
         return this.invokeChecked(target, args);
       } catch (Exception e) {
-        Throwables.propagateIfInstanceOf(e, RuntimeException.class);
-        throw Throwables.propagate(e);
+        Throwables.throwIfInstanceOf(e, RuntimeException.class);
+        Throwables.throwIfUnchecked(e);
+        throw new RuntimeException(e);
       }
     }
 

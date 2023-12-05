@@ -19,8 +19,31 @@ node {
 }
 
 tasks {
-  val buildwar by registering(War::class) {
-    dependsOn("webpack")
+  // Install dependencies
+  val yarnInstall by registering(YarnTask::class) {
+    args = listOf("install")
+  }
+
+  // Check for lint errors
+  val lintCheck by registering(YarnTask::class) {
+    dependsOn(yarnInstall)
+    args = listOf("lint")
+  }
+
+  // Check for prettier errors
+  val prettierCheck by registering(YarnTask::class) {
+    dependsOn(yarnInstall)
+    args = listOf("prettier:check")
+  }
+
+  val webpack by registering(YarnTask::class) {
+    dependsOn(lintCheck, prettierCheck)
+    args = listOf("dist")
+    environment.put("NODE_ENV", "production")
+  }
+
+  val buildWar by registering(War::class) {
+    dependsOn(webpack)
     from("./WEB-INF") {
       into("WEB-INF")
     }
@@ -29,32 +52,10 @@ tasks {
     }
   }
 
-  // Install dependencies
-  val yarnInstall by registering(YarnTask::class) {
-    args = listOf("install")
-  }
-
-  // Check for lint errors
-  val lintCheck by registering(YarnTask::class) {
-    dependsOn("yarnInstall")
-    args = listOf("lint")
-  }
-
-  // Check for prettier errors
-  val prettierCheck by registering(YarnTask::class) {
-    dependsOn("yarnInstall")
-    args = listOf("prettier:check")
-  }
-
-  val webpack by registering(YarnTask::class) {
-    dependsOn("lintCheck", "prettierCheck")
-    args = listOf("dist")
-    environment.put("NODE_ENV", "production")
-  }
-
   build {
-    dependsOn(buildwar)
+    dependsOn(buildWar)
   }
+
   clean {
     delete("build")
     delete("dist")

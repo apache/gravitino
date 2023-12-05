@@ -46,7 +46,7 @@ dependencies {
 }
 
 fun getGitCommitId(): String {
-  var gitCommitId = ""
+  var gitCommitId: String
   try {
     val gitFolder = rootDir.path + "/.git/"
     val head = File(gitFolder + "HEAD").readText().split(":")

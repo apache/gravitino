@@ -18,9 +18,10 @@ import com.datastrato.gravitino.EntitySerDeFactory;
 import com.datastrato.gravitino.EntityStoreFactory;
 import com.datastrato.gravitino.storage.IdGenerator;
 import com.datastrato.gravitino.storage.NameMappingService;
-import com.google.common.io.Files;
 import java.io.File;
+import java.io.IOException;
 import java.lang.reflect.Field;
+import java.nio.file.Files;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.ClassOrderer.OrderAnnotation;
 import org.junit.jupiter.api.Order;
@@ -30,8 +31,9 @@ import org.mockito.Mockito;
 
 @TestClassOrder(OrderAnnotation.class)
 public class TestKvNameMappingService {
-  private Config getConfig() {
-    File file = Files.createTempDir();
+  private Config getConfig() throws IOException {
+    File baseDir = new File(System.getProperty("java.io.tmpdir"));
+    File file = Files.createTempDirectory(baseDir.toPath(), "test").toFile();
     file.deleteOnExit();
     Config config = Mockito.mock(Config.class);
     Mockito.when(config.get(Configs.ENTITY_SERDE)).thenReturn("proto");
