@@ -454,7 +454,8 @@ public class TrinoQueryIT {
         testRunner.testSql();
         return;
       } else {
-        throw new IllegalArgumentException("Invalid args: " + Arrays.toString(args) + "\n" + "Usage: ./run [catalog] [testId]");
+        throw new IllegalArgumentException(
+            "Invalid args: " + Arrays.toString(args) + "\n" + "Usage: ./run [catalog] [testId]");
       }
       Log.info("All tests completed");
       testCatalogs.stream().forEach(c -> dropCatalog(c));
