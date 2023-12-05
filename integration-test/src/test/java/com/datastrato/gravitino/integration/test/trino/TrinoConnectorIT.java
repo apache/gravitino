@@ -441,6 +441,28 @@ public class TrinoConnectorIT extends AbstractIT {
             "location = 'hdfs://localhost:9000/user/hive/warehouse/hive_schema.db/hive_table'"));
   }
 
+  @Test
+  void testHiveCatalogCreatedByGravitino() {
+    String catalogName = GravitinoITUtils.genRandomName("catalog").toLowerCase();
+    GravitinoMetaLake createdMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
+    createdMetalake.createCatalog(
+        NameIdentifier.of(metalakeName, catalogName),
+        Catalog.Type.RELATIONAL,
+        "hive",
+        "comment",
+        ImmutableMap.<String, String>builder()
+            .put(
+                "metastore.uris",
+                String.format(
+                    "thrift://%s:%s",
+                    containerSuite.getHiveContainer().getContainerIpAddress(),
+                    HiveContainer.HIVE_METASTORE_PORT))
+            .put("hive.immutable-partitions", "true")
+            .build());
+    Catalog catalog = createdMetalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
+    Assertions.assertEquals("true", catalog.properties().get("hive.immutable-partitions"));
+  }
+
   private static void createMetalake() {
     GravitinoMetaLake[] gravitinoMetaLakes = client.listMetalakes();
     Assertions.assertEquals(0, gravitinoMetaLakes.length);

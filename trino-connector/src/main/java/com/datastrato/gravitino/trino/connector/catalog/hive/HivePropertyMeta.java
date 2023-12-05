@@ -74,6 +74,7 @@ public class HivePropertyMeta implements HasPropertyMeta {
   }
 
   // Hive catalog properties contain '.' and PropertyMetadata does not allow '.'
+  // Those configurations are referred from Trino hive connector
   private static final List<PropertyMetadata<?>> CATALOG_PROPERTY_META =
       ImmutableList.of(
           enumProperty(
