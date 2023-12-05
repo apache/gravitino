@@ -63,7 +63,8 @@ public class JsonUtils {
   private static final String NAMESPACE = "namespace";
   private static final String NAME = "name";
   private static final String POSITION_FIRST = "first";
-  private static final String POSITION_LAST = "last";
+  private static final String POSITION_AFTER = "after";
+  private static final String POSITION_DEFAULT = "default";
   private static final String STRATEGY = "strategy";
   private static final String FIELD_NAME = "fieldName";
   private static final String FIELD_NAMES = "fieldNames";
@@ -679,9 +680,11 @@ public class JsonUtils {
       } else if (value instanceof TableChange.After) {
         gen.writeStartObject();
         TableChange.After after = (TableChange.After) value;
-        gen.writeStringField(POSITION_LAST, after.getColumn());
+        gen.writeStringField(POSITION_AFTER, after.getColumn());
         gen.writeEndObject();
 
+      } else if (value instanceof TableChange.Default) {
+        gen.writeString(POSITION_DEFAULT);
       } else {
         throw new IOException("Unknown column position: " + value);
       }
@@ -701,8 +704,10 @@ public class JsonUtils {
           node);
       if (node.isTextual() && node.asText().equals(POSITION_FIRST)) {
         return TableChange.ColumnPosition.first();
+      } else if (node.isTextual() && node.asText().equals(POSITION_DEFAULT)) {
+        return TableChange.ColumnPosition.defaultPos();
       } else if (node.isObject()) {
-        String afterColumn = getString(POSITION_LAST, node);
+        String afterColumn = getString(POSITION_AFTER, node);
         return TableChange.ColumnPosition.after(afterColumn);
       } else {
         throw new IOException("Unknown json column position: " + node);

@@ -2,18 +2,16 @@
  * Copyright 2023 Datastrato.
  * This software is licensed under the Apache License version 2.
  */
-import com.diffplug.gradle.spotless.SpotlessExtension
-import com.diffplug.gradle.spotless.SpotlessPlugin
-import com.github.vlsi.gradle.dsl.configureEach
-import java.util.Locale
-import java.io.File
-import org.gradle.internal.hash.ChecksumService
-import org.gradle.kotlin.dsl.support.serviceOf
-import com.github.jk1.license.render.ReportRenderer
-import com.github.jk1.license.render.InventoryHtmlReportRenderer
 import com.github.jk1.license.filter.DependencyFilter
 import com.github.jk1.license.filter.LicenseBundleNormalizer
+import com.github.jk1.license.render.InventoryHtmlReportRenderer
+import com.github.jk1.license.render.ReportRenderer
+import com.github.vlsi.gradle.dsl.configureEach
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
+import org.gradle.internal.hash.ChecksumService
+import org.gradle.kotlin.dsl.support.serviceOf
+import java.io.File
+import java.util.Locale
 
 plugins {
   `maven-publish`
@@ -21,7 +19,21 @@ plugins {
   id("idea")
   id("jacoco")
   alias(libs.plugins.gradle.extensions)
-  alias(libs.plugins.spotless)
+
+  // Spotless version < 6.19.0 (https://github.com/diffplug/spotless/issues/1819) has an issue
+  // running against JDK21, but we cannot upgrade the spotless to 6.19.0 or later since it only
+  // support JDK11+. So we don't support JDK21 and thrown an exception for now.
+  if (JavaVersion.current() >= JavaVersion.VERSION_1_8 &&
+    JavaVersion.current() <= JavaVersion.VERSION_17
+  ) {
+    alias(libs.plugins.spotless)
+  } else {
+    throw GradleException(
+      "Gravitino Gradle current doesn't support " +
+        "Java version: ${JavaVersion.current()}. Please use JDK8 to 17."
+    )
+  }
+
   alias(libs.plugins.publish)
   // Apply one top level rat plugin to perform any required license enforcement analysis
   alias(libs.plugins.rat)
@@ -30,15 +42,47 @@ plugins {
 }
 
 licenseReport {
-    renderers = arrayOf<ReportRenderer>(InventoryHtmlReportRenderer("report.html", "Backend"))
-    filters = arrayOf<DependencyFilter>(LicenseBundleNormalizer())
+  renderers = arrayOf<ReportRenderer>(InventoryHtmlReportRenderer("report.html", "Backend"))
+  filters = arrayOf<DependencyFilter>(LicenseBundleNormalizer())
 }
 repositories { mavenCentral() }
 
 allprojects {
+  apply(plugin = "com.diffplug.spotless")
+
   repositories {
     mavenCentral()
     mavenLocal()
+  }
+
+  plugins.withType<com.diffplug.gradle.spotless.SpotlessPlugin>().configureEach {
+    configure<com.diffplug.gradle.spotless.SpotlessExtension> {
+      java {
+        // Fix the Google Java Format version to 1.7. Since JDK8 only support Google Java Format
+        // 1.7, which is not compatible with JDK17. We will use a newer version when we upgrade to
+        // JDK17.
+        googleJavaFormat("1.7")
+        removeUnusedImports()
+        trimTrailingWhitespace()
+        replaceRegex(
+          "Remove wildcard imports",
+          "import\\s+[^\\*\\s]+\\*;(\\r\\n|\\r|\\n)",
+          "$1"
+        )
+        replaceRegex(
+          "Remove static wildcard imports",
+          "import\\s+(?:static\\s+)?[^*\\s]+\\*;(\\r\\n|\\r|\\n)",
+          "$1"
+        )
+
+        targetExclude("**/build/**")
+      }
+
+      kotlinGradle {
+        target("*.gradle.kts")
+        ktlint().editorConfigOverride(mapOf("indent_size" to 2))
+      }
+    }
   }
 }
 
@@ -49,11 +93,11 @@ nexusPublishing {
       snapshotRepositoryUrl.set(uri("https://s01.oss.sonatype.org/content/repositories/snapshots/"))
 
       val sonatypeUser =
-              System.getenv("SONATYPE_USER").takeUnless { it.isNullOrEmpty() }
-                      ?: extra["SONATYPE_USER"].toString()
+        System.getenv("SONATYPE_USER").takeUnless { it.isNullOrEmpty() }
+          ?: extra["SONATYPE_USER"].toString()
       val sonatypePassword =
-              System.getenv("SONATYPE_PASSWORD").takeUnless { it.isNullOrEmpty() }
-                      ?: extra["SONATYPE_PASSWORD"].toString()
+        System.getenv("SONATYPE_PASSWORD").takeUnless { it.isNullOrEmpty() }
+          ?: extra["SONATYPE_PASSWORD"].toString()
 
       username.set(sonatypeUser)
       password.set(sonatypePassword)
@@ -170,7 +214,7 @@ subprojects {
   val allDeps by tasks.registering(DependencyReportTask::class)
 
   group = "com.datastrato.gravitino"
-  version = "${version}"
+  version = "$version"
 
   tasks.withType<Jar> {
     archiveBaseName.set("${rootProject.name.lowercase(Locale.getDefault())}-${project.name}")
@@ -182,31 +226,6 @@ subprojects {
     if (project.name != "integration-test") {
       exclude("log4j2.properties")
       exclude("test/**")
-    }
-  }
-
-  plugins.withType<SpotlessPlugin>().configureEach {
-    configure<SpotlessExtension> {
-      java {
-        // Fix the Google Java Format version to 1.7. Since JDK8 only support Google Java Format
-        // 1.7, which is not compatible with JDK17. We will use a newer version when we upgrade to
-        // JDK17.
-        googleJavaFormat("1.7")
-        removeUnusedImports()
-        trimTrailingWhitespace()
-        replaceRegex(
-          "Remove wildcard imports",
-          "import\\s+[^\\*\\s]+\\*;(\\r\\n|\\r|\\n)",
-          "$1"
-        )
-        replaceRegex(
-          "Remove static wildcard imports",
-          "import\\s+(?:static\\s+)?[^*\\s]+\\*;(\\r\\n|\\r|\\n)",
-          "$1"
-        )
-
-        targetExclude("**/build/**")
-      }
     }
   }
 }
@@ -251,7 +270,12 @@ tasks.rat {
   failOnError.set(true)
   setExcludes(exclusions)
 }
+
 tasks.check.get().dependsOn(tasks.rat)
+
+tasks.cyclonedxBom {
+  setIncludeConfigs(listOf("runtimeClasspath"))
+}
 
 jacoco {
   toolVersion = "0.8.10"
@@ -271,7 +295,7 @@ tasks {
       copy {
         from(projectDir.dir("conf")) { into("package/conf") }
         from(projectDir.dir("bin")) { into("package/bin") }
-        from(projectDir.dir("web/build/libs/${rootProject.name}-web-${version}.war")) { into("package/web") }
+        from(projectDir.dir("web/build/libs/${rootProject.name}-web-$version.war")) { into("package/web") }
         into(outputDir)
         rename { fileName ->
           fileName.replace(".template", "")
@@ -299,10 +323,10 @@ tasks {
     dependsOn("assembleTrinoConnector")
     group = "gravitino distribution"
     finalizedBy("checksumDistribution")
-    into("${rootProject.name}-${version}-bin")
+    into("${rootProject.name}-$version-bin")
     from(compileDistribution.map { it.outputs.files.single() })
     compression = Compression.GZIP
-    archiveFileName.set("${rootProject.name}-${version}-bin.tar.gz")
+    archiveFileName.set("${rootProject.name}-$version-bin.tar.gz")
     destinationDirectory.set(projectDir.dir("distribution"))
   }
 
@@ -310,10 +334,10 @@ tasks {
     dependsOn("trino-connector:copyLibs")
     group = "gravitino distribution"
     finalizedBy("checksumTrinoConnector")
-    into("${rootProject.name}-trino-connector-${version}")
+    into("${rootProject.name}-trino-connector-$version")
     from("trino-connector/build/libs")
     compression = Compression.GZIP
-    archiveFileName.set("${rootProject.name}-trino-connector-${version}.tar.gz")
+    archiveFileName.set("${rootProject.name}-trino-connector-$version.tar.gz")
     destinationDirectory.set(projectDir.dir("distribution"))
   }
 
@@ -344,7 +368,7 @@ tasks {
     outputs.file(checksumFile)
     doLast {
       checksumFile.get().writeText(
-              serviceOf<ChecksumService>().sha256(archiveFile.get().asFile).toString()
+        serviceOf<ChecksumService>().sha256(archiveFile.get().asFile).toString()
       )
     }
   }
@@ -356,10 +380,10 @@ tasks {
 
   val copySubprojectDependencies by registering(Copy::class) {
     subprojects.forEach() {
-      if (!it.name.startsWith("catalog")
-          && !it.name.startsWith("client") 
-          && it.name != "trino-connector"
-          && it.name != "integration-test") {
+      if (!it.name.startsWith("catalog") &&
+        !it.name.startsWith("client") && it.name != "trino-connector" &&
+        it.name != "integration-test"
+      ) {
         from(it.configurations.runtimeClasspath)
         into("distribution/package/libs")
       }
@@ -368,10 +392,11 @@ tasks {
 
   val copySubprojectLib by registering(Copy::class) {
     subprojects.forEach() {
-      if (!it.name.startsWith("catalog")
-          && !it.name.startsWith("client")
-          && it.name != "trino-connector"
-          && it.name != "integration-test") {
+      if (!it.name.startsWith("catalog") &&
+        !it.name.startsWith("client") &&
+        it.name != "trino-connector" &&
+        it.name != "integration-test"
+      ) {
         dependsOn("${it.name}:build")
         from("${it.name}/build/libs")
         into("distribution/package/libs")
@@ -382,9 +407,11 @@ tasks {
   }
 
   val copyCatalogLibAndConfigs by registering(Copy::class) {
-    dependsOn(":catalogs:catalog-hive:copyLibAndConfig",
-            ":catalogs:catalog-lakehouse-iceberg:copyLibAndConfig",
-            ":catalogs:catalog-jdbc-mysql:copyLibAndConfig")
+    dependsOn(
+      ":catalogs:catalog-hive:copyLibAndConfig",
+      ":catalogs:catalog-lakehouse-iceberg:copyLibAndConfig",
+      ":catalogs:catalog-jdbc-mysql:copyLibAndConfig"
+    )
   }
 
   clean {

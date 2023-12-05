@@ -16,10 +16,11 @@
 ### Preparation | Framework & Dependencies
 
 - [Node.js](https://nodejs.org)(v20.x+) & [npm](https://www.npmjs.com/) / [yarn](https://yarnpkg.com/)
-- React
-- Next.js
-- MUI
-- `react-redux`
+- [React](https://react.dev/)
+- [Next.js](https://nextjs.org)
+- [MUI](https://mui.com/)
+- [tailwindcss](https://tailwindcss.com/)
+- [`react-redux`](https://react-redux.js.org/)
 
 > **TIP**
 >

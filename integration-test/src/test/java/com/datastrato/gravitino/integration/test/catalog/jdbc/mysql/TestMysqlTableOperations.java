@@ -300,22 +300,19 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
 
     newComment = "txt3";
     String newCol2Comment = "xxx";
-    // update column position 、comment and add column、set table properties
+    // update column position 、comment and add column(by default position)、set table properties
     MYSQL_TABLE_OPERATIONS.alterTable(
         TEST_DB_NAME,
         tableName,
         TableChange.updateColumnPosition(
             new String[] {newColName_1}, TableChange.ColumnPosition.after(newColName_2)),
         TableChange.updateComment(newComment),
-        TableChange.addColumn(
-            new String[] {"col_3"}, VARCHAR, "txt3", TableChange.ColumnPosition.first()),
+        TableChange.addColumn(new String[] {"col_3"}, VARCHAR, "txt3"),
         TableChange.updateColumnComment(new String[] {newColName_2}, newCol2Comment));
     load = MYSQL_TABLE_OPERATIONS.load(TEST_DB_NAME, tableName);
 
     columns.clear();
 
-    columns.add(
-        new JdbcColumn.Builder().withName("col_3").withType(VARCHAR).withComment("txt3").build());
     columns.add(
         new JdbcColumn.Builder()
             .withName(col_2.name())
@@ -326,6 +323,8 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
             .withNullable(col_2.nullable())
             .build());
     columns.add(col_1);
+    columns.add(
+        new JdbcColumn.Builder().withName("col_3").withType(VARCHAR).withComment("txt3").build());
     //    properties.put("ROW_FORMAT", "DYNAMIC");
     assertionsTableInfo(tableName, newComment, columns, properties, load);
 
@@ -387,6 +386,52 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
 
     JdbcTable loaded = MYSQL_TABLE_OPERATIONS.load(TEST_DB_NAME, tableName);
     assertionsTableInfo(tableName, tableComment, columns, properties, loaded);
+  }
+
+  @Test
+  public void testCreateMultipleTables() {
+    String test_table_1 = "test_table_1";
+    MYSQL_TABLE_OPERATIONS.create(
+        TEST_DB_NAME,
+        test_table_1,
+        new JdbcColumn[] {
+          new JdbcColumn.Builder()
+              .withName("col_1")
+              .withType(Types.DecimalType.of(10, 2))
+              .withComment("test_decimal")
+              .withNullable(false)
+              .withDefaultValue("0.00")
+              .build()
+        },
+        "test_comment",
+        null,
+        null);
+
+    String testDb = "test_db_2";
+
+    MYSQL_DATABASE_OPERATIONS.create(testDb, null, null);
+    List<String> tables = MYSQL_TABLE_OPERATIONS.listTables(testDb);
+    Assertions.assertFalse(tables.contains(test_table_1));
+
+    String test_table_2 = "test_table_2";
+    MYSQL_TABLE_OPERATIONS.create(
+        testDb,
+        test_table_2,
+        new JdbcColumn[] {
+          new JdbcColumn.Builder()
+              .withName("col_1")
+              .withType(Types.DecimalType.of(10, 2))
+              .withComment("test_decimal")
+              .withNullable(false)
+              .withDefaultValue("0.00")
+              .build()
+        },
+        "test_comment",
+        null,
+        null);
+
+    tables = MYSQL_TABLE_OPERATIONS.listTables(TEST_DB_NAME);
+    Assertions.assertFalse(tables.contains(test_table_2));
   }
 
   private static void assertionsTableInfo(
