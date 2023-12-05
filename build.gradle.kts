@@ -2,8 +2,6 @@
  * Copyright 2023 Datastrato.
  * This software is licensed under the Apache License version 2.
  */
-import com.diffplug.gradle.spotless.SpotlessExtension
-import com.diffplug.gradle.spotless.SpotlessPlugin
 import com.github.vlsi.gradle.dsl.configureEach
 import java.util.Locale
 import java.io.File
@@ -21,7 +19,18 @@ plugins {
   id("idea")
   id("jacoco")
   alias(libs.plugins.gradle.extensions)
-  alias(libs.plugins.spotless)
+
+  // Spotless version < 6.19.0 (https://github.com/diffplug/spotless/issues/1819) has an issue
+  // running against JDK21, but we cannot upgrade the spotless to 6.19.0 or later since it only
+  // support JDK11+. So we don't support JDK21 and thrown an exception for now.
+  if (JavaVersion.current() >= JavaVersion.VERSION_1_8
+      && JavaVersion.current() <= JavaVersion.VERSION_17) {
+    alias(libs.plugins.spotless)
+  } else {
+    throw GradleException("Gravitino Gradle current doesn't support " +
+        "Java version: ${JavaVersion.current()}. Please use JDK8 to 17.")
+  }
+
   alias(libs.plugins.publish)
   // Apply one top level rat plugin to perform any required license enforcement analysis
   alias(libs.plugins.rat)
@@ -71,6 +80,7 @@ subprojects {
   apply(plugin = "jacoco")
   apply(plugin = "maven-publish")
   apply(plugin = "java")
+  apply(plugin = "com.diffplug.spotless")
 
   repositories {
     mavenCentral()
@@ -185,8 +195,8 @@ subprojects {
     }
   }
 
-  plugins.withType<SpotlessPlugin>().configureEach {
-    configure<SpotlessExtension> {
+  plugins.withType<com.diffplug.gradle.spotless.SpotlessPlugin>().configureEach {
+    configure<com.diffplug.gradle.spotless.SpotlessExtension> {
       java {
         // Fix the Google Java Format version to 1.7. Since JDK8 only support Google Java Format
         // 1.7, which is not compatible with JDK17. We will use a newer version when we upgrade to
