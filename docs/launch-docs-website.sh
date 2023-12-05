@@ -46,7 +46,7 @@ function copy_docs() {
 
   # Copy all markdown files to the Hugo website docs directory
   # 1. Copy all root directory markdown files
-  rsync -av --exclude='README.md' ${bin}/*.md ${bin}/build/web/content/docs
+  rsync -av --exclude='docker-image-changelog.md' ${bin}/*.md ${bin}/build/web/content/docs
 
   # 2. Copy all subdirectory markdown files
   subDirs=$(find "${bin}" -type d -mindepth 1 -maxdepth 1)

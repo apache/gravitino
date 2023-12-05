@@ -306,7 +306,7 @@ tasks {
         from(projectDir.dir("licenses")) { into("package/licenses") }
         from(projectDir.file("LICENSE.bin")) { into("package") }
         from(projectDir.file("NOTICE.bin")) { into("package") }
-        from(projectDir.file("README.md")) { into("package") }
+        from(projectDir.file("docker-image-changelog.md")) { into("package") }
         into(outputDir)
         rename { fileName ->
           fileName.replace(".bin", "")
