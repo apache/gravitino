@@ -150,4 +150,20 @@ public class TestStringIdentifier {
     StringIdentifier stringIdFromComment2 = StringIdentifier.fromComment(comment1);
     Assertions.assertNull(stringIdFromComment2);
   }
+
+  @Test
+  public void testRemoveIdFromComment() {
+    String blankComment = "";
+    StringIdentifier identifier = StringIdentifier.fromId(123123L);
+    String commentWithoutId = StringIdentifier.removeIdFromComment(blankComment);
+    Assertions.assertEquals(blankComment, commentWithoutId);
+
+    String addIdComment = StringIdentifier.addToComment(identifier, blankComment);
+
+    Assertions.assertEquals(blankComment, StringIdentifier.removeIdFromComment(addIdComment));
+
+    String comment = "This is a comment";
+    String commentWithId = StringIdentifier.addToComment(identifier, comment);
+    Assertions.assertEquals(comment, StringIdentifier.removeIdFromComment(commentWithId));
+  }
 }

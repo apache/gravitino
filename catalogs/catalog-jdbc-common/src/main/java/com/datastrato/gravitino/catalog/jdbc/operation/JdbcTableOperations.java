@@ -212,9 +212,9 @@ public abstract class JdbcTableOperations implements TableOperation {
   protected abstract String generateAlterTableSql(
       String databaseName, String tableName, TableChange... changes);
 
-  protected Connection getConnection(String schema) throws SQLException {
+  protected Connection getConnection(String catalog) throws SQLException {
     Connection connection = dataSource.getConnection();
-    connection.setSchema(schema);
+    connection.setCatalog(catalog);
     return connection;
   }
 }
