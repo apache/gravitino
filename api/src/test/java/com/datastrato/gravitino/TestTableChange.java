@@ -75,7 +75,7 @@ public class TestTableChange {
     assertArrayEquals(fieldName, addColumn.fieldName());
     assertEquals(dataType, addColumn.getDataType());
     assertEquals(comment, addColumn.getComment());
-    assertNull(addColumn.getPosition());
+    assertEquals(ColumnPosition.defaultPos(), addColumn.getPosition());
   }
 
   @Test
@@ -101,7 +101,7 @@ public class TestTableChange {
     assertArrayEquals(fieldName, addColumn.fieldName());
     assertEquals(dataType, addColumn.getDataType());
     assertNull(addColumn.getComment());
-    assertNull(addColumn.getPosition());
+    assertEquals(ColumnPosition.defaultPos(), addColumn.getPosition());
   }
 
   @Test

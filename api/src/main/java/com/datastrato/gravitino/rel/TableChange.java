@@ -345,6 +345,10 @@ public interface TableChange {
     static ColumnPosition after(String column) {
       return new After(column);
     }
+
+    static ColumnPosition defaultPos() {
+      return Default.INSTANCE;
+    }
   }
 
   /**
@@ -384,6 +388,21 @@ public interface TableChange {
     }
   }
 
+  /**
+   * Column position DEFAULT means the position of the column was ignored by the user, and should be
+   * determined by the catalog implementation.
+   */
+  final class Default implements ColumnPosition {
+    private static final Default INSTANCE = new Default();
+
+    private Default() {}
+
+    @Override
+    public String toString() {
+      return "DEFAULT";
+    }
+  }
+
   interface ColumnChange extends TableChange {
     String[] fieldName();
   }
@@ -418,7 +437,7 @@ public interface TableChange {
       this.fieldName = fieldName;
       this.dataType = dataType;
       this.comment = comment;
-      this.position = position;
+      this.position = position == null ? ColumnPosition.defaultPos() : position;
       this.nullable = nullable;
     }
 

@@ -214,6 +214,15 @@ public interface TableUpdateRequest extends RESTRequest {
       this(null, null, null, null, true);
     }
 
+    /**
+     * Constructor for AddTableColumnRequest.
+     *
+     * @param fieldName the field name to add
+     * @param dataType the data type of the field to add
+     * @param comment the comment of the field to add
+     * @param position the position of the field to add, null for default position
+     * @param nullable whether the field to add is nullable
+     */
     public AddTableColumnRequest(
         String[] fieldName,
         Type dataType,
@@ -223,13 +232,32 @@ public interface TableUpdateRequest extends RESTRequest {
       this.fieldName = fieldName;
       this.dataType = dataType;
       this.comment = comment;
-      this.position = position;
+      this.position = position == null ? TableChange.ColumnPosition.defaultPos() : position;
       this.nullable = nullable;
     }
 
+    /**
+     * Constructor for AddTableColumnRequest with default nullable value(true).
+     *
+     * @param fieldName the field name to add
+     * @param dataType the data type of the field to add
+     * @param comment the comment of the field to add
+     * @param position the position of the field to add
+     */
     public AddTableColumnRequest(
         String[] fieldName, Type dataType, String comment, TableChange.ColumnPosition position) {
       this(fieldName, dataType, comment, position, true);
+    }
+
+    /**
+     * Constructor for AddTableColumnRequest with default position and nullable value(true).
+     *
+     * @param fieldName the field name to add
+     * @param dataType the data type of the field to add
+     * @param comment the comment of the field to add
+     */
+    public AddTableColumnRequest(String[] fieldName, Type dataType, String comment) {
+      this(fieldName, dataType, comment, TableChange.ColumnPosition.defaultPos());
     }
 
     @Override
