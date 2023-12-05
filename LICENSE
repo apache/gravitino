@@ -258,8 +258,5 @@
    Apache Submarine
    ./bin/common.sh
 
-   Jetty
-   ./server-common/src/main/java/com/datastrato/gravitino/server/web/PrivilegedThreadFactory.java
-
    Trino
    ./integration-test/src/main/java/com/datastrato/gravitino/integration/test/util/CloseableGroup.java

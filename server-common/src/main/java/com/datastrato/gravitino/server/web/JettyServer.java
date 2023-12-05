@@ -16,6 +16,8 @@ import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.security.AccessController;
+import java.security.PrivilegedAction;
 import java.util.EnumSet;
 import java.util.Optional;
 import java.util.Set;
@@ -401,22 +403,25 @@ public final class JettyServer {
 
           @Override
           public Thread newThread(Runnable runnable) {
-            return PrivilegedThreadFactory.newThread(
-                () -> {
-                  Thread thread = new Thread(runnable);
-                  thread.setDaemon(true);
-                  thread.setPriority(getThreadsPriority());
-                  thread.setName(getName() + "-" + thread.getId());
-                  thread.setUncaughtExceptionHandler(
-                      (t, throwable) -> {
-                        LOG.error("{} uncaught exception:", t.getName(), throwable);
-                      });
-                  // JettyServer maybe used by Gravitino server and Iceberg REST server with
-                  // different classloaders, we use the classloader of current thread to
-                  // replace the classloader of QueuedThreadPool.class.
-                  // thread.setContextClassLoader(getClass().getClassLoader()) is removed
-                  thread.setContextClassLoader(classLoader);
-                  return thread;
+            return AccessController.doPrivileged(
+                new PrivilegedAction<Thread>() {
+                  @Override
+                  public Thread run() {
+                    Thread thread = new Thread(runnable);
+                    thread.setDaemon(true);
+                    thread.setPriority(getThreadsPriority());
+                    thread.setName(getName() + "-" + thread.getId());
+                    thread.setUncaughtExceptionHandler(
+                        (t, throwable) -> {
+                          LOG.error("{} uncaught exception:", t.getName(), throwable);
+                        });
+                    // JettyServer maybe used by Gravitino server and Iceberg REST server with
+                    // different classloaders, we use the classloader of current thread to
+                    // replace the classloader of QueuedThreadPool.class.
+                    // thread.setContextClassLoader(getClass().getClassLoader()) is removed
+                    thread.setContextClassLoader(classLoader);
+                    return thread;
+                  }
                 });
           }
         };
