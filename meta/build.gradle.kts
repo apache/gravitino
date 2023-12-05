@@ -8,7 +8,6 @@ plugins {
   id("java")
   id("idea")
   alias(libs.plugins.protobuf)
-  alias(libs.plugins.spotless)
 }
 
 dependencies {
