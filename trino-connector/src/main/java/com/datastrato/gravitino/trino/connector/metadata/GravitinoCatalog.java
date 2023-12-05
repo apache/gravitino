@@ -5,6 +5,7 @@
 package com.datastrato.gravitino.trino.connector.metadata;
 
 import com.datastrato.gravitino.Catalog;
+import java.util.Map;
 
 /** Help Gravitino connector access CatalogMetadata from gravitino client. */
 public class GravitinoCatalog {
@@ -13,10 +14,6 @@ public class GravitinoCatalog {
 
   public GravitinoCatalog(Catalog catalog) {
     this.catalog = catalog;
-  }
-
-  public Catalog getCatalog() {
-    return catalog;
   }
 
   public String getProvider() {
@@ -29,5 +26,9 @@ public class GravitinoCatalog {
 
   public String getProperties(String name, String defaultValue) {
     return catalog.properties().getOrDefault(name, defaultValue);
+  }
+
+  public Map<String, String> getProperties() {
+    return catalog.properties();
   }
 }
