@@ -2,6 +2,8 @@
  * Copyright 2023 Datastrato.
  * This software is licensed under the Apache License version 2.
  */
+// Referred from Apache Trino's AutoCloseableCloser implementation
+// core/trino-main/src/main/java/io/trino/util/AutoCloseableCloser.java
 package com.datastrato.gravitino.integration.test.util;
 
 import static com.google.common.base.Throwables.propagateIfPossible;
