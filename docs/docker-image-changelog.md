@@ -2,26 +2,9 @@
   Copyright 2023 Datastrato.
   This software is licensed under the Apache License version 2.
 -->
-# Gravitino Docker images
-This Docker image is designed to facilitate Gravitino integration testing.
-It can be utilized to test all catalog and connector modules within Gravitino.
-
-# Datastrato Docker hub repository
-- [Datastrato Docker hub repository address](https://hub.docker.com/r/datastrato)
-
-## How to build Docker image
-```
-./build-docker.sh --platform [all|linux/amd64|linux/arm64] --type [gravitino|hive|trino] --image {image_name} --tag {tag_name} --latest
-```
-
-# Version change history
+# Docker image change log
 
 ## Gravitino
-
-### Container startup commands
-```
-docker run --rm -d -p 8090:8090 datastrato/gravitino
-```
 
 ### gravitino:0.3.0-SNAPSHOT
 - Docker image `datastrato/gravitino:0.3.0-SNAPSHOT`
@@ -29,12 +12,7 @@ docker run --rm -d -p 8090:8090 datastrato/gravitino
 - Expose ports:
   - `8090` Gravitino Web UI
 
-## Gravitino CI Apache Hive
-
-### Container startup commands
-```
-docker run --rm -d -p 9000:9000 -p 9083:9083 -p 10000:10000 -p 10002:10002 -p 50010:50010 -p 50070:50070 -p 50075:50075 datastrato/gravitino-ci-hive
-```
+## Gravitino development image with Apache Hive
 
 ### gravitino-ci-hive:0.1.0
 - Docker image `datastrato/gravitino-ci-hive:0.1.0`
@@ -80,12 +58,7 @@ docker run --rm -d -p 9000:9000 -p 9083:9083 -p 10000:10000 -p 10002:10002 -p 50
   - `22` SSH
   - `8088` YARN Service
 
-## Gravitino CI Trino
-
-### Container startup commands
-```
-docker run --rm -it -p 8080:8080 datastrato/gravitino-ci-trino
-```
+## Gravitino development image with Trino
 
 ### gravitino-ci-trino:0.1.0
 - Docker image `datastrato/gravitino-ci-trino:0.1.0`
@@ -93,14 +66,14 @@ docker run --rm -it -p 8080:8080 datastrato/gravitino-ci-trino
 - Expose ports:
   - `8080` Trino JDBC port
 
-## Hive (For experience only)
+## Hive (For playground image only)
 ### hive:2.7.3-no-yarn
 - Docker image `datastrato/hive:2.7.3-no-yarn`
 - `hadoop-2.7.3`
 - `hive-2.3.9`
 - Not start YARN when container startup
 
-## Trino (For experience only)
+## Trino (For playground image only)
 ### trino:426-gravitino-0.3.0-SNAPSHOT
 - Docker image `datastrato/trino:426-gravitino-0.3.0-SNAPSHOT`
 - Base on `trino:462`
