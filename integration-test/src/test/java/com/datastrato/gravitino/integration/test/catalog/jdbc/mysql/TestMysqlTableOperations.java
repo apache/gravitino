@@ -389,6 +389,52 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
     assertionsTableInfo(tableName, tableComment, columns, properties, loaded);
   }
 
+  @Test
+  public void testCreateMultipleTables() {
+    String test_table_1 = "test_table_1";
+    MYSQL_TABLE_OPERATIONS.create(
+        TEST_DB_NAME,
+        test_table_1,
+        new JdbcColumn[] {
+          new JdbcColumn.Builder()
+              .withName("col_1")
+              .withType(Types.DecimalType.of(10, 2))
+              .withComment("test_decimal")
+              .withNullable(false)
+              .withDefaultValue("0.00")
+              .build()
+        },
+        "test_comment",
+        null,
+        null);
+
+    String testDb = "test_db_2";
+
+    MYSQL_DATABASE_OPERATIONS.create(testDb, null, null);
+    List<String> tables = MYSQL_TABLE_OPERATIONS.listTables(testDb);
+    Assertions.assertFalse(tables.contains(test_table_1));
+
+    String test_table_2 = "test_table_2";
+    MYSQL_TABLE_OPERATIONS.create(
+        testDb,
+        test_table_2,
+        new JdbcColumn[] {
+          new JdbcColumn.Builder()
+              .withName("col_1")
+              .withType(Types.DecimalType.of(10, 2))
+              .withComment("test_decimal")
+              .withNullable(false)
+              .withDefaultValue("0.00")
+              .build()
+        },
+        "test_comment",
+        null,
+        null);
+
+    tables = MYSQL_TABLE_OPERATIONS.listTables(TEST_DB_NAME);
+    Assertions.assertFalse(tables.contains(test_table_2));
+  }
+
   private static void assertionsTableInfo(
       String tableName,
       String tableComment,

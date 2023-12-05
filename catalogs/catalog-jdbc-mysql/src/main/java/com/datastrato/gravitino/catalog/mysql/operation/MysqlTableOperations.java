@@ -10,6 +10,7 @@ import com.datastrato.gravitino.catalog.jdbc.JdbcTable;
 import com.datastrato.gravitino.catalog.jdbc.operation.JdbcTableOperations;
 import com.datastrato.gravitino.exceptions.GravitinoRuntimeException;
 import com.datastrato.gravitino.exceptions.NoSuchColumnException;
+import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NoSuchTableException;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.rel.TableChange;
@@ -91,6 +92,26 @@ public class MysqlTableOperations extends JdbcTableOperations {
         .withProperties(properties)
         .withAuditInfo(AuditInfo.EMPTY)
         .build();
+  }
+
+  @Override
+  public List<String> listTables(String databaseName) throws NoSuchSchemaException {
+    try (Connection connection = getConnection(databaseName)) {
+      try (Statement statement = connection.createStatement()) {
+        String showTablesQuery = "SHOW TABLES";
+        ResultSet resultSet = statement.executeQuery(showTablesQuery);
+        List<String> names = new ArrayList<>();
+        while (resultSet.next()) {
+          String tableName = resultSet.getString(1);
+          names.add(tableName);
+        }
+        LOG.info(
+            "Finished listing tables size {} for database name {} ", names.size(), databaseName);
+        return names;
+      }
+    } catch (final SQLException se) {
+      throw this.exceptionMapper.toGravitinoException(se);
+    }
   }
 
   private JdbcColumn getJdbcColumnFromCreateTable(CreateTable createTable, String colName) {
