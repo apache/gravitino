@@ -8,10 +8,6 @@ on:
   pull_request:
     branches: [ "main", "branch-*" ]
 
-concurrency:
-  group: ${{ github.worklfow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_requests' }}
-
 jobs:
   changes:
     runs-on: ubuntu-latest
