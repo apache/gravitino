@@ -35,7 +35,7 @@ public class TestMysqlAbstractIT {
   @BeforeAll
   public static void startup() {
     MYSQL_CONTAINER =
-        new MySQLContainer<>("mysql:latest")
+        new MySQLContainer<>("mysql:8.2.0")
             .withDatabaseName(TEST_DB_NAME)
             .withUsername("root")
             .withPassword("root");

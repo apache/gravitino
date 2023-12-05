@@ -10,6 +10,7 @@ import com.datastrato.gravitino.catalog.jdbc.JdbcTable;
 import com.datastrato.gravitino.catalog.jdbc.operation.JdbcTableOperations;
 import com.datastrato.gravitino.exceptions.GravitinoRuntimeException;
 import com.datastrato.gravitino.exceptions.NoSuchColumnException;
+import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NoSuchTableException;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.rel.TableChange;
@@ -60,7 +61,10 @@ public class MysqlTableOperations extends JdbcTableOperations {
     for (ColumnDefinition columnDefinition : createTable.getColumnDefinitions()) {
       // Assemble column information.
       String columnName = getColumnName(columnDefinition);
-      String[] columnSpecs = columnDefinition.getColumnSpecs().toArray(new String[0]);
+      String[] columnSpecs =
+          columnDefinition.getColumnSpecs() == null
+              ? new String[0]
+              : columnDefinition.getColumnSpecs().toArray(new String[0]);
       String columnProperties = String.join(SPACE, columnSpecs);
       boolean nullable = !columnProperties.contains(NOT_NULL);
       String defaultValue = findPropertiesValue(columnSpecs, DEFAULT);
@@ -90,6 +94,26 @@ public class MysqlTableOperations extends JdbcTableOperations {
         .build();
   }
 
+  @Override
+  public List<String> listTables(String databaseName) throws NoSuchSchemaException {
+    try (Connection connection = getConnection(databaseName)) {
+      try (Statement statement = connection.createStatement()) {
+        String showTablesQuery = "SHOW TABLES";
+        ResultSet resultSet = statement.executeQuery(showTablesQuery);
+        List<String> names = new ArrayList<>();
+        while (resultSet.next()) {
+          String tableName = resultSet.getString(1);
+          names.add(tableName);
+        }
+        LOG.info(
+            "Finished listing tables size {} for database name {} ", names.size(), databaseName);
+        return names;
+      }
+    } catch (final SQLException se) {
+      throw this.exceptionMapper.toGravitinoException(se);
+    }
+  }
+
   private JdbcColumn getJdbcColumnFromCreateTable(CreateTable createTable, String colName) {
     // Assemble index information.
     Map<String, Set<String>> indexGroupByName =
@@ -100,7 +124,10 @@ public class MysqlTableOperations extends JdbcTableOperations {
       if (!StringUtils.equals(colName, columnName)) {
         continue;
       }
-      String[] columnSpecs = columnDefinition.getColumnSpecs().toArray(new String[0]);
+      String[] columnSpecs =
+          columnDefinition.getColumnSpecs() == null
+              ? new String[0]
+              : columnDefinition.getColumnSpecs().toArray(new String[0]);
       String columnProperties = String.join(SPACE, columnSpecs);
       boolean nullable = !columnProperties.contains(NOT_NULL);
       String defaultValue = findPropertiesValue(columnSpecs, DEFAULT);
@@ -128,7 +155,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
   private CreateTable loadCreateTable(String databaseName, String tableName) {
     try (Connection connection = getConnection(databaseName)) {
       try (Statement statement = connection.createStatement()) {
-        String showCreateTableSQL = "SHOW CREATE TABLE " + tableName;
+        String showCreateTableSQL = String.format("SHOW CREATE TABLE %s", tableName);
         ResultSet resultSet = statement.executeQuery(showCreateTableSQL);
 
         if (!resultSet.next()) {
@@ -245,7 +272,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
 
   @Override
   protected String generateRenameTableSql(String oldTableName, String newTableName) {
-    return "RENAME TABLE " + oldTableName + " TO " + newTableName;
+    return String.format("RENAME TABLE %s TO %s", oldTableName, newTableName);
   }
 
   @Override
@@ -380,7 +407,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
     String col = addColumn.fieldName()[0];
 
     StringBuilder columnDefinition = new StringBuilder();
-    columnDefinition.append("ADD COLUMN ").append(col).append(SPACE).append(dataType);
+    columnDefinition.append("ADD COLUMN ").append(col).append(SPACE).append(dataType).append(SPACE);
     // Append comment if available
     if (StringUtils.isNotEmpty(addColumn.getComment())) {
       columnDefinition.append("COMMENT '").append(addColumn.getComment()).append("' ");
