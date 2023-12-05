@@ -16,18 +16,18 @@ Gravitino is a high-performance, geo-distributed, and federated metadata lake. I
 
 Gravitino aims to provide several key features:
 
-* SSOT (Single Source of Truth) for multi-regional data with geo-distributed architecture support.
+* Single Source of Truth for multi-regional data with geo-distributed architecture support.
 * Unified Data and AI asset management for both users and engines.
 * Security in one place, centralizing the security for different sources.
 * Built-in data management and data access management.
 
-## Online Documentation
+## Online documentation
 
 You can find the latest Gravitino documentation here in the [doc folder](docs), The README file only contains basic setup instructions.
 
 ## Building Gravitino
 
-Gravitino is built using Gradle. To build Gravitino, please run:
+Gravitino builds Gradle. To build Gravitino, please run:
 
 ```shell
 ./gradlew clean build
@@ -49,18 +49,13 @@ Or:
 
 to build a compressed distribution package.
 
-Note:
-
-1. Gravitino is built against JDK8, please make sure JDK8 is installed in your environment.
-2. Gravitino trino-connector is built against JDK17. Please also make sure JDK17 is installed in your environment.
-
 For the details of building and testing Gravitino, please see [How to build Gravitino](docs/how-to-build.md).
 
-## Quick Start
+## Quick start
 
 ### Configure and start the Gravitino server
 
-Gravitino server configuration file `gravitino.conf` is located under `conf` and follows the typical property file format. You can change the configuration in this file.
+The Gravitino server configuration file, `gravitino.conf`, located in the `conf` directory and follows the standard property file format. You can modify the configuration within this file.
 
 To start the Gravitino server, please run:
 
@@ -87,3 +82,5 @@ Gravitino provides a Trino connector to access the metadata in Gravitino. To use
 ## License
 
 Gravitino is under the Apache License Version 2.0, See the [LICENSE](LICENSE) for the details.
+
+<sub>Apache®, Apache Hadoop&reg;, Apache Hive&trade;, Apache Iceberg&trade;, Apache Kafka&reg;, Apache Spark&trade;, Apache Submarine&trade;, Apache Thrift&trade; and Apache Zeppelin&trade; are either registered trademarks or trademarks of the Apache Software Foundation in the United States and/or other countries.</sub>

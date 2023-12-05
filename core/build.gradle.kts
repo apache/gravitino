@@ -6,7 +6,6 @@ plugins {
   `maven-publish`
   id("java")
   id("idea")
-  id("com.diffplug.spotless")
 }
 
 dependencies {
@@ -24,6 +23,7 @@ dependencies {
   implementation(libs.caffeine)
   implementation(libs.rocksdbjni)
   implementation(libs.bundles.metrics)
+  implementation(libs.bundles.prometheus)
 
   compileOnly(libs.lombok)
   annotationProcessor(libs.lombok)

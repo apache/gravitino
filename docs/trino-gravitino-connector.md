@@ -30,7 +30,7 @@ Please refer to the [Deploying Trino documentation](https://trino.io/docs/curren
 1. Download Gravitino connector tarball and unpack it.
    The tarball contains a single top-level directory `gravitino-trino-connector-xxx`,
    which we call the connector directory.
-   [Download the graviton-connector](https://github.com/datastrato/gravitino/releases). 
+   [Download the gravitino-connector](https://github.com/datastrato/gravitino/releases). 
 2. Copy the connector directory to trino plugin's directory.
    Normally, the directory location is `Trino-server-xxx/plugin`, and the directory contains other catalogs used by Trino.
 3. Add trino jvm arguments `-Dlog4j.configurationFile=file:///xxx/log4j2.properties` to enable logging for the Gravitino connector.

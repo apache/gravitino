@@ -7,10 +7,13 @@ on:
         type: choice
         description: 'Choose the image to build'
         required: true
-        default: 'gravitino-ci-hive'
+        default: 'gravitino'
         options:
+          - 'gravitino'
           - 'gravitino-ci-hive'
           - 'gravitino-ci-trino'
+          - 'trino'
+          - 'hive'
       tag:
         description: 'Docker tag to apply to this image'
         required: true
@@ -36,9 +39,16 @@ jobs:
           elif [ "${{ github.event.inputs.image }}" == "gravitino-ci-trino" ]; then
             echo "image_type=trino" >> $GITHUB_ENV
             echo "image_name=datastrato/gravitino-ci-trino" >> $GITHUB_ENV
+          elif [ "${{ github.event.inputs.image }}" == "gravitino" ]; then
+            echo "image_type=gravitino" >> $GITHUB_ENV
+            echo "image_name=datastrato/gravitino" >> $GITHUB_ENV
+          elif [ "${{ github.event.inputs.image }}" == "trino" ]; then
+            echo "image_type=trino" >> $GITHUB_ENV
+            echo "image_name=datastrato/trino" >> $GITHUB_ENV
+          elif [ "${{ github.event.inputs.image }}" == "hive" ]; then
+            echo "image_type=hive" >> $GITHUB_ENV
+            echo "image_name=datastrato/hive" >> $GITHUB_ENV
           fi
-
-      - uses: actions/checkout@v3
 
       - name: Check publish Docker token
         run: |
@@ -58,6 +68,13 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
+
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-java@v3
+        with:
+          java-version: '8'
+          distribution: 'temurin'
 
       - name: Build and Push the main branch Docker image
         if: ${{ github.ref_name == 'main' }}

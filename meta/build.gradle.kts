@@ -8,7 +8,6 @@ plugins {
   id("java")
   id("idea")
   alias(libs.plugins.protobuf)
-  alias(libs.plugins.spotless)
 }
 
 dependencies {
@@ -23,5 +22,5 @@ sourceSets {
 }
 
 protobuf {
-  protoc { artifact = "com.google.protobuf:protoc:${libs.versions.protoc.get()}"}
+  protoc { artifact = "com.google.protobuf:protoc:${libs.versions.protoc.get()}" }
 }

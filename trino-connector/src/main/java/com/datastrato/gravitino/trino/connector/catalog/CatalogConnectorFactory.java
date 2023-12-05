@@ -10,6 +10,7 @@ import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVIT
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.client.GravitinoMetaLake;
 import com.datastrato.gravitino.trino.connector.catalog.hive.HiveConnectorAdapter;
+import com.datastrato.gravitino.trino.connector.catalog.iceberg.IcebergConnectorAdapter;
 import com.datastrato.gravitino.trino.connector.catalog.memory.MemoryConnectorAdapter;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoCatalog;
 import io.trino.spi.TrinoException;
@@ -31,6 +32,8 @@ public class CatalogConnectorFactory {
     catalogBuilders.put("hive", new CatalogConnectorContext.Builder(new HiveConnectorAdapter()));
     catalogBuilders.put(
         "memory", new CatalogConnectorContext.Builder(new MemoryConnectorAdapter()));
+    catalogBuilders.put(
+        "lakehouse-iceberg", new CatalogConnectorContext.Builder(new IcebergConnectorAdapter()));
   }
 
   public CatalogConnectorContext loadCatalogConnector(

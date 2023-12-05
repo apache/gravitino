@@ -84,18 +84,34 @@ public class TestConvertUtil extends TestBaseConvert {
 
   @Test
   public void testToPrimitiveType() {
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                ConvertUtil.toIcebergType(
+                    true, com.datastrato.gravitino.rel.types.Types.ByteType.get()));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains("Iceberg do not support Byte and Short Type, use Integer instead"));
+
+    exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                ConvertUtil.toIcebergType(
+                    true, com.datastrato.gravitino.rel.types.Types.ShortType.get()));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains("Iceberg do not support Byte and Short Type, use Integer instead"));
+
     Assertions.assertTrue(
         ConvertUtil.toIcebergType(true, com.datastrato.gravitino.rel.types.Types.BooleanType.get())
             instanceof Types.BooleanType);
     Assertions.assertTrue(
         ConvertUtil.toIcebergType(true, com.datastrato.gravitino.rel.types.Types.StringType.get())
             instanceof Types.StringType);
-    Assertions.assertTrue(
-        ConvertUtil.toIcebergType(true, com.datastrato.gravitino.rel.types.Types.ByteType.get())
-            instanceof Types.IntegerType);
-    Assertions.assertTrue(
-        ConvertUtil.toIcebergType(true, com.datastrato.gravitino.rel.types.Types.ShortType.get())
-            instanceof Types.IntegerType);
     Assertions.assertTrue(
         ConvertUtil.toIcebergType(true, com.datastrato.gravitino.rel.types.Types.IntegerType.get())
             instanceof Types.IntegerType);

@@ -13,5 +13,5 @@ import java.io.IOException;
  */
 @FunctionalInterface
 public interface BiPredicate<T1, T2> {
-  boolean test(T1 v1, T2 value) throws IOException;
+  boolean test(T1 v1, T2 v2) throws IOException;
 }

@@ -4,10 +4,13 @@
  */
 package com.datastrato.gravitino;
 
+import static com.datastrato.gravitino.TestCatalogOperations.FAIL_CREATE;
+
 import com.datastrato.gravitino.catalog.BaseCatalog;
 import com.datastrato.gravitino.catalog.CatalogOperations;
 import com.datastrato.gravitino.rel.TableCatalog;
 import java.util.Map;
+import java.util.Objects;
 
 public class TestCatalog extends BaseCatalog<TestCatalog> {
 
@@ -20,6 +23,9 @@ public class TestCatalog extends BaseCatalog<TestCatalog> {
 
   @Override
   protected CatalogOperations newOps(Map<String, String> config) {
+    if (Objects.equals(config.get(FAIL_CREATE), "true")) {
+      throw new RuntimeException("Failed to create Test catalog");
+    }
     return new TestCatalogOperations(config);
   }
 

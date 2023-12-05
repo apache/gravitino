@@ -61,7 +61,9 @@ public class KvEntityStore implements EntityStore {
   public static final Logger LOGGER = LoggerFactory.getLogger(KvEntityStore.class);
   public static final ImmutableMap<String, String> KV_BACKENDS =
       ImmutableMap.of("RocksDBKvBackend", RocksDBKvBackend.class.getCanonicalName());
-  public static final String LAYOUT_VERSION = "layout_version";
+  public static final byte[] LAYOUT_VERSION_KEY =
+      Bytes.concat(
+          new byte[] {0x1D, 0x00, 0x02}, "layout_version".getBytes(StandardCharsets.UTF_8));
 
   @Getter @VisibleForTesting private KvBackend backend;
 
@@ -78,6 +80,7 @@ public class KvEntityStore implements EntityStore {
   @VisibleForTesting StorageLayoutVersion storageLayoutVersion;
 
   private TransactionIdGenerator txIdGenerator;
+  private KvGarbageCollector kvGarbageCollector;
   private TransactionalKvBackend transactionalKvBackend;
 
   @Override
@@ -87,9 +90,13 @@ public class KvEntityStore implements EntityStore {
     //  instance, We should make it configurable in the future.
     this.txIdGenerator = new TransactionIdGeneratorImpl(backend, config);
     txIdGenerator.start();
+
     this.transactionalKvBackend = new TransactionalKvBackendImpl(backend, txIdGenerator);
 
+    this.kvGarbageCollector = new KvGarbageCollector(backend, config);
+    kvGarbageCollector.start();
     this.reentrantReadWriteLock = new ReentrantReadWriteLock();
+
     this.nameMappingService =
         new KvNameMappingService(transactionalKvBackend, reentrantReadWriteLock);
     this.entityKeyEncoder = new BinaryEntityKeyEncoder(nameMappingService);
@@ -401,6 +408,7 @@ public class KvEntityStore implements EntityStore {
   @Override
   public void close() throws IOException {
     txIdGenerator.close();
+    kvGarbageCollector.close();
     backend.close();
   }
 
@@ -425,11 +433,11 @@ public class KvEntityStore implements EntityStore {
   private StorageLayoutVersion initStorageVersionInfo() {
     byte[] bytes;
     try {
-      bytes = backend.get(LAYOUT_VERSION.getBytes(StandardCharsets.UTF_8));
+      bytes = backend.get(LAYOUT_VERSION_KEY);
       if (bytes == null) {
         // If the layout version is not set, we will set it to the default version.
         backend.put(
-            LAYOUT_VERSION.getBytes(StandardCharsets.UTF_8),
+            LAYOUT_VERSION_KEY,
             StorageLayoutVersion.V1.getVersion().getBytes(StandardCharsets.UTF_8),
             true);
         return StorageLayoutVersion.V1;

@@ -27,10 +27,11 @@ import com.datastrato.gravitino.rel.TableCatalog;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorManager;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
+import com.datastrato.gravitino.trino.connector.catalog.hive.HiveDataTypeTransformer;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoColumn;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoSchema;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoTable;
-import com.datastrato.gravitino.trino.connector.util.DataTypeTransformer;
+import com.datastrato.gravitino.trino.connector.util.GeneralDataTypeTransformer;
 import com.google.common.base.Preconditions;
 import io.trino.plugin.memory.MemoryConnector;
 import io.trino.spi.connector.ColumnHandle;
@@ -48,10 +49,11 @@ import org.mockito.stubbing.Answer;
 public class GravitinoMockServer implements AutoCloseable {
   private final String testMetalake = "test";
   private final String testCatalog = "memory";
-  private final String testCatalogPrivate = "memory";
+  private final String testCatalogProvider = "memory";
 
   private boolean start = true;
   private CatalogConnectorManager catalogConnectorManager;
+  private GeneralDataTypeTransformer dataTypeTransformer = new HiveDataTypeTransformer();
 
   public void setCatalogConnectorManager(CatalogConnectorManager catalogConnectorManager) {
     this.catalogConnectorManager = catalogConnectorManager;
@@ -101,7 +103,7 @@ public class GravitinoMockServer implements AutoCloseable {
   private Catalog createGravitinoCatalog(NameIdentifier catalogName) {
     Catalog catalog = mock(Catalog.class);
     when(catalog.name()).thenReturn(catalogName.name());
-    when(catalog.provider()).thenReturn(testCatalogPrivate);
+    when(catalog.provider()).thenReturn(testCatalogProvider);
 
     when(catalog.asTableCatalog()).thenAnswer(answer -> createTableCatalog(catalogName));
 
@@ -271,6 +273,9 @@ public class GravitinoMockServer implements AutoCloseable {
               }
             });
 
+    when(tableCatalog.purgeTable(any(NameIdentifier.class)))
+        .thenThrow(new UnsupportedOperationException());
+
     when(tableCatalog.listTables(any(Namespace.class)))
         .thenAnswer(
             new Answer<NameIdentifier[]>() {
@@ -393,7 +398,7 @@ public class GravitinoMockServer implements AutoCloseable {
 
     } else if (tableChange instanceof TableChange.AddColumn) {
       TableChange.AddColumn addColumn = (TableChange.AddColumn) tableChange;
-      String fieldName = addColumn.fieldNames()[0];
+      String fieldName = addColumn.fieldName()[0];
       GravitinoColumn column =
           new GravitinoColumn(fieldName, addColumn.getDataType(), -1, "", true);
       CatalogConnectorMetadataAdapter metadataAdapter =
@@ -402,25 +407,25 @@ public class GravitinoMockServer implements AutoCloseable {
 
     } else if (tableChange instanceof TableChange.DeleteColumn) {
       TableChange.DeleteColumn deleteColumn = (TableChange.DeleteColumn) tableChange;
-      String fieldName = deleteColumn.fieldNames()[0];
+      String fieldName = deleteColumn.fieldName()[0];
       ColumnHandle columnHandle = metadata.getColumnHandles(null, tableHandle).get(fieldName);
       metadata.dropColumn(null, tableHandle, columnHandle);
 
     } else if (tableChange instanceof TableChange.RenameColumn) {
       TableChange.RenameColumn renameColumn = (TableChange.RenameColumn) tableChange;
-      String fieldName = renameColumn.fieldNames()[0];
+      String fieldName = renameColumn.fieldName()[0];
       ColumnHandle columnHandle = metadata.getColumnHandles(null, tableHandle).get(fieldName);
       metadata.renameColumn(null, tableHandle, columnHandle, renameColumn.getNewName());
 
     } else if (tableChange instanceof TableChange.UpdateColumnType) {
       TableChange.UpdateColumnType updateColumnType = (TableChange.UpdateColumnType) tableChange;
-      String fieldName = updateColumnType.fieldNames()[0];
+      String fieldName = updateColumnType.fieldName()[0];
       ColumnHandle columnHandle = metadata.getColumnHandles(null, tableHandle).get(fieldName);
       metadata.setColumnType(
           null,
           tableHandle,
           columnHandle,
-          DataTypeTransformer.getTrinoType(updateColumnType.getNewDataType()));
+          dataTypeTransformer.getTrinoType(updateColumnType.getNewDataType()));
 
     } else if (tableChange instanceof TableChange.UpdateComment) {
       TableChange.UpdateComment updateComment = (TableChange.UpdateComment) tableChange;
@@ -430,7 +435,7 @@ public class GravitinoMockServer implements AutoCloseable {
       TableChange.UpdateColumnComment updateColumnComment =
           (TableChange.UpdateColumnComment) tableChange;
       ColumnHandle columnHandle =
-          metadata.getColumnHandles(null, tableHandle).get(updateColumnComment.fieldNames()[0]);
+          metadata.getColumnHandles(null, tableHandle).get(updateColumnComment.fieldName()[0]);
       metadata.setColumnComment(
           null, tableHandle, columnHandle, Optional.of(updateColumnComment.getNewComment()));
 

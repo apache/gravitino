@@ -469,11 +469,16 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
         .filter(c -> c instanceof TableChange.ColumnChange)
         .forEach(
             c -> {
-              String fieldToAdd = String.join(".", ((TableChange.ColumnChange) c).fieldNames());
+              String fieldToAdd = String.join(".", ((TableChange.ColumnChange) c).fieldName());
               Preconditions.checkArgument(
                   c instanceof TableChange.UpdateColumnComment
                       || !partitionFields.contains(fieldToAdd),
                   "Cannot alter partition column: " + fieldToAdd);
+
+              if (c instanceof TableChange.UpdateColumnNullability) {
+                throw new IllegalArgumentException(
+                    "Hive does not support altering column nullability");
+              }
 
               if (c instanceof TableChange.UpdateColumnPosition
                   && afterPartitionColumn(
@@ -485,16 +490,19 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
               if (c instanceof TableChange.AddColumn) {
                 TableChange.AddColumn addColumn = (TableChange.AddColumn) c;
 
-                if ((addColumn.getPosition() == null && !partitionFields.isEmpty())
-                    || (afterPartitionColumn(partitionFields, addColumn.getPosition()))) {
-                  throw new IllegalArgumentException("Cannot add column after partition column");
-                }
-
                 if (existingFields.contains(fieldToAdd)) {
                   throw new IllegalArgumentException(
                       "Cannot add column with duplicate name: " + fieldToAdd);
-                } else {
-                  existingFields.add(fieldToAdd);
+                }
+
+                if (addColumn.getPosition() == null) {
+                  // If the position is not specified, the column will be added to the end of the
+                  // non-partition columns.
+                  return;
+                }
+
+                if ((afterPartitionColumn(partitionFields, addColumn.getPosition()))) {
+                  throw new IllegalArgumentException("Cannot add column after partition column");
                 }
               }
             });
@@ -554,7 +562,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     validatePartitionForCreate(columns, partitioning);
     validateDistributionAndSort(distribution, sortOrders);
 
-    Arrays.stream(columns).forEach(this::validateColumnType);
+    Arrays.stream(columns).forEach(c -> validateNullable(c.name(), c.nullable()));
 
     TableType tableType = (TableType) tablePropertiesMetadata.getOrDefault(properties, TABLE_TYPE);
     Preconditions.checkArgument(
@@ -649,7 +657,9 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
           List<FieldSchema> cols = sd.getCols();
 
           if (change instanceof TableChange.AddColumn) {
-            doAddColumn(cols, (TableChange.AddColumn) change);
+            TableChange.AddColumn addColumn = (TableChange.AddColumn) change;
+            validateNullable(String.join(".", addColumn.fieldName()), addColumn.isNullable());
+            doAddColumn(cols, addColumn);
 
           } else if (change instanceof TableChange.DeleteColumn) {
             doDeleteColumn(cols, (TableChange.DeleteColumn) change);
@@ -706,14 +716,14 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     }
   }
 
-  private void validateColumnType(Column column) {
+  private void validateNullable(String fieldName, boolean nullable) {
     // The NOT NULL constraint for column is supported since Hive3.0, see
     // https://issues.apache.org/jira/browse/HIVE-16575
-    if (!column.nullable()) {
+    if (!nullable) {
       throw new IllegalArgumentException(
           "The NOT NULL constraint for column is only supported since Hive 3.0, "
               + "but the current Gravitino Hive catalog only supports Hive 2.x. Illegal column: "
-              + column.name());
+              + fieldName);
     }
   }
 
@@ -771,26 +781,33 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
   }
 
   private void doAddColumn(List<FieldSchema> cols, TableChange.AddColumn change) {
-    // add to the end by default
-    int targetPosition =
-        change.getPosition() == null ? cols.size() : columnPosition(cols, change.getPosition());
+    int targetPosition;
+    if (change.getPosition() instanceof TableChange.Default) {
+      // add to the end by default
+      targetPosition = cols.size();
+      LOG.info(
+          "Hive catalog add column {} to the end of non-partition columns by default",
+          change.fieldName()[0]);
+    } else {
+      targetPosition = columnPosition(cols, change.getPosition());
+    }
     cols.add(
         targetPosition,
         new FieldSchema(
-            change.fieldNames()[0],
+            change.fieldName()[0],
             ToHiveType.convert(change.getDataType()).getQualifiedName(),
             change.getComment()));
   }
 
   private void doDeleteColumn(List<FieldSchema> cols, TableChange.DeleteColumn change) {
-    String columnName = change.fieldNames()[0];
+    String columnName = change.fieldName()[0];
     if (!cols.removeIf(c -> c.getName().equals(columnName)) && !change.getIfExists()) {
       throw new IllegalArgumentException("DeleteColumn does not exist: " + columnName);
     }
   }
 
   private void doRenameColumn(List<FieldSchema> cols, TableChange.RenameColumn change) {
-    String columnName = change.fieldNames()[0];
+    String columnName = change.fieldName()[0];
     if (indexOfColumn(cols, columnName) == -1) {
       throw new IllegalArgumentException("RenameColumn does not exist: " + columnName);
     }
@@ -804,12 +821,12 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
   private void doUpdateColumnComment(
       List<FieldSchema> cols, TableChange.UpdateColumnComment change) {
-    cols.get(indexOfColumn(cols, change.fieldNames()[0])).setComment(change.getNewComment());
+    cols.get(indexOfColumn(cols, change.fieldName()[0])).setComment(change.getNewComment());
   }
 
   private void doUpdateColumnPosition(
       List<FieldSchema> cols, TableChange.UpdateColumnPosition change) {
-    String columnName = change.fieldNames()[0];
+    String columnName = change.fieldName()[0];
     int sourceIndex = indexOfColumn(cols, columnName);
     if (sourceIndex == -1) {
       throw new IllegalArgumentException("UpdateColumnPosition does not exist: " + columnName);
@@ -821,7 +838,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
   }
 
   private void doUpdateColumnType(List<FieldSchema> cols, TableChange.UpdateColumnType change) {
-    String columnName = change.fieldNames()[0];
+    String columnName = change.fieldName()[0];
     int indexOfColumn = indexOfColumn(cols, columnName);
     if (indexOfColumn == -1) {
       throw new IllegalArgumentException("UpdateColumnType does not exist: " + columnName);

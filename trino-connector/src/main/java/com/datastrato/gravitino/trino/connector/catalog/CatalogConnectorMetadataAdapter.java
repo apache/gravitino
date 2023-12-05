@@ -7,7 +7,7 @@ package com.datastrato.gravitino.trino.connector.catalog;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoColumn;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoSchema;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoTable;
-import com.datastrato.gravitino.trino.connector.util.DataTypeTransformer;
+import com.datastrato.gravitino.trino.connector.util.GeneralDataTypeTransformer;
 import io.trino.spi.connector.ColumnMetadata;
 import io.trino.spi.connector.ConnectorTableMetadata;
 import io.trino.spi.connector.ConnectorTableProperties;
@@ -29,23 +29,30 @@ import org.slf4j.LoggerFactory;
  */
 public class CatalogConnectorMetadataAdapter {
 
-  private static final Logger LOGGER =
-      LoggerFactory.getLogger(CatalogConnectorMetadataAdapter.class);
+  private static final Logger LOG = LoggerFactory.getLogger(CatalogConnectorMetadataAdapter.class);
   protected final List<PropertyMetadata<?>> schemaProperties;
   protected final List<PropertyMetadata<?>> tableProperties;
   protected final List<PropertyMetadata<?>> columnProperties;
 
+  private final GeneralDataTypeTransformer dataTypeTransformer;
+
   protected CatalogConnectorMetadataAdapter(
       List<PropertyMetadata<?>> schemaProperties,
       List<PropertyMetadata<?>> tableProperties,
-      List<PropertyMetadata<?>> columnProperties) {
+      List<PropertyMetadata<?>> columnProperties,
+      GeneralDataTypeTransformer dataTypeTransformer) {
     this.schemaProperties = schemaProperties;
     this.tableProperties = tableProperties;
     this.columnProperties = columnProperties;
+    this.dataTypeTransformer = dataTypeTransformer;
   }
 
   public Map<String, Object> getSchemaProperties(GravitinoSchema schema) {
     return toTrinoSchemaProperties(schema.getProperties());
+  }
+
+  public GeneralDataTypeTransformer getDataTypeTransformer() {
+    return dataTypeTransformer;
   }
 
   /** Transform gravitino table metadata to trino ConnectorTableMetadata */
@@ -75,7 +82,7 @@ public class CatalogConnectorMetadataAdapter {
       columns.add(
           new GravitinoColumn(
               column.getName(),
-              DataTypeTransformer.getGravitinoType(column.getType()),
+              dataTypeTransformer.getGravitinoType(column.getType()),
               i,
               column.getComment(),
               column.isNullable()));
@@ -92,7 +99,7 @@ public class CatalogConnectorMetadataAdapter {
   public ColumnMetadata getColumnMetadata(GravitinoColumn column) {
     return ColumnMetadata.builder()
         .setName(column.getName())
-        .setType(DataTypeTransformer.getTrinoType(column.getType()))
+        .setType(dataTypeTransformer.getTrinoType(column.getType()))
         .setComment(Optional.ofNullable(column.getComment()))
         .setNullable(column.isNullable())
         .setHidden(column.isHidden())
@@ -115,7 +122,7 @@ public class CatalogConnectorMetadataAdapter {
       if (properties.containsKey(name)) {
         validProperties.put(name, properties.get(name));
       } else {
-        LOGGER.warn("Property {} is not defined in trino, we will ignore it", name);
+        LOG.warn("Property {} is not defined in trino, we will ignore it", name);
       }
     }
     return validProperties;
@@ -151,7 +158,7 @@ public class CatalogConnectorMetadataAdapter {
   public GravitinoColumn createColumn(ColumnMetadata column) {
     return new GravitinoColumn(
         column.getName(),
-        DataTypeTransformer.getGravitinoType(column.getType()),
+        dataTypeTransformer.getGravitinoType(column.getType()),
         -1,
         column.getComment(),
         column.isNullable());

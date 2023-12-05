@@ -10,18 +10,18 @@ import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.catalog.hive.HiveClientPool;
 import com.datastrato.gravitino.client.GravitinoMetaLake;
+import com.datastrato.gravitino.dto.rel.ColumnDTO;
+import com.datastrato.gravitino.integration.test.container.ContainerSuite;
+import com.datastrato.gravitino.integration.test.container.HiveContainer;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
-import com.datastrato.gravitino.integration.test.util.CloseableGroup;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
-import com.datastrato.gravitino.integration.test.util.HiveContainer;
-import com.datastrato.gravitino.integration.test.util.ITUtils;
-import com.datastrato.gravitino.integration.test.util.TrinoContainer;
 import com.datastrato.gravitino.rel.Schema;
 import com.datastrato.gravitino.rel.Table;
+import com.datastrato.gravitino.rel.types.Types;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -37,25 +37,15 @@ import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
-import org.rnorth.ducttape.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testcontainers.containers.Network;
 
-@Tag("gravitino-trino-it")
+@Tag("gravitino-docker-it")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class TrinoConnectorIT extends AbstractIT {
   public static final Logger LOG = LoggerFactory.getLogger(TrinoConnectorIT.class);
-  private static final CloseableGroup closer = CloseableGroup.create();
 
-  // The subnet must match the configuration in `dev/docker/tools/mac-docker-connector.conf`
-  private static final String CONTAINER_NETWORK_SUBNET = "10.0.0.0/22";
-  private static final String CONTAINER_NETWORK_GATEWAY = "10.0.0.1";
-  private static final String CONTAINER_NETWORK_IPRANGE = "10.0.0.100/22";
-
-  public static TrinoContainer trinoContainer;
-
-  public static HiveContainer hiveContainer;
+  private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
   private static HiveClientPool hiveClientPool;
 
   public static String metalakeName =
@@ -72,48 +62,19 @@ public class TrinoConnectorIT extends AbstractIT {
   private static GravitinoMetaLake metalake;
   private static Catalog catalog;
 
-  static final String TRINO_CONNECTOR_LIB_DIR =
-      System.getenv("GRAVITINO_ROOT_DIR") + "/trino-connector/build/libs";
-
   @BeforeAll
   public static void startDockerContainer() throws IOException, TException, InterruptedException {
     String trinoConfDir = System.getenv("TRINO_CONF_DIR");
 
-    // Let containers assign addresses in a fixed subnet to avoid `mac-docker-connector` needing to
-    // refresh the configuration
-    com.github.dockerjava.api.model.Network.Ipam.Config ipamConfig =
-        new com.github.dockerjava.api.model.Network.Ipam.Config();
-    ipamConfig
-        .withSubnet(CONTAINER_NETWORK_SUBNET)
-        .withGateway(CONTAINER_NETWORK_GATEWAY)
-        .withIpRange(CONTAINER_NETWORK_IPRANGE);
-
-    Network network =
-        closer.register(
-            Network.builder()
-                .createNetworkCmdModifier(
-                    cmd ->
-                        cmd.withIpam(
-                            new com.github.dockerjava.api.model.Network.Ipam()
-                                .withConfig(ipamConfig)))
-                .build());
-
-    // Start Hive container
-    HiveContainer.Builder hiveBuilder =
-        HiveContainer.builder()
-            .withHostName("gravitino-ci-hive")
-            .withEnvVars(
-                ImmutableMap.<String, String>builder().put("HADOOP_USER_NAME", "root").build())
-            .withNetwork(network);
-    hiveContainer = closer.register(hiveBuilder.build());
-    hiveContainer.start();
+    containerSuite.startHiveContainer();
 
     // Initial hive client
     HiveConf hiveConf = new HiveConf();
     String hiveMetastoreUris =
         String.format(
             "thrift://%s:%d",
-            getPrimaryNICIp(), hiveContainer.getMappedPort(HiveContainer.HIVE_METASTORE_PORT));
+            containerSuite.getHiveContainer().getContainerIpAddress(),
+            HiveContainer.HIVE_METASTORE_PORT);
     hiveConf.set(HiveConf.ConfVars.METASTOREURIS.varname, hiveMetastoreUris);
     hiveClientPool = closer.register(new HiveClientPool(1, hiveConf));
 
@@ -121,35 +82,12 @@ public class TrinoConnectorIT extends AbstractIT {
     createMetalake();
     createCatalog();
 
-    // Configure Trino config file
-    updateTrinoConfigFile();
-
-    // Start Trino container
-    String hiveContainerIp = hiveContainer.getContainerIpAddress();
-    TrinoContainer.Builder trinoBuilder =
-        TrinoContainer.builder()
-            .withEnvVars(
-                ImmutableMap.<String, String>builder().put("HADOOP_USER_NAME", "root").build())
-            .withNetwork(network)
-            .withExtraHosts(
-                ImmutableMap.<String, String>builder()
-                    .put(hiveContainerIp, hiveContainerIp)
-                    .build())
-            .withFilesToMount(
-                ImmutableMap.<String, String>builder()
-                    .put(TrinoContainer.TRINO_CONTAINER_CONF_DIR, trinoConfDir)
-                    .put(
-                        TrinoContainer.TRINO_CONTAINER_PLUGIN_GRAVITINO_DIR,
-                        TRINO_CONNECTOR_LIB_DIR)
-                    .build())
-            .withExposePorts(ImmutableSet.of(TrinoContainer.TRINO_PORT));
-
-    trinoContainer = closer.register(trinoBuilder.build());
-    trinoContainer.start();
-
-    Preconditions.check(
-        "Check sync Catalog from Gravitino failed!",
-        trinoContainer.checkSyncCatalogFromGravitino(5, metalakeName, catalogName));
+    containerSuite.startTrinoContainer(
+        trinoConfDir,
+        System.getenv("GRAVITINO_ROOT_DIR") + "/trino-connector/build/libs",
+        new InetSocketAddress(AbstractIT.getPrimaryNICIp(), getGravitinoServerPort()),
+        metalakeName);
+    containerSuite.getTrinoContainer().checkSyncCatalogFromGravitino(5, metalakeName, catalogName);
 
     createSchema();
   }
@@ -167,14 +105,15 @@ public class TrinoConnectorIT extends AbstractIT {
     String sql1 =
         String.format(
             "CREATE SCHEMA \"%s.%s\".%s WITH (\n"
-                + "  location = 'hdfs://%s:9000/user/hive/warehouse/%s.db'\n"
+                + "  location = 'hdfs://%s:%d/user/hive/warehouse/%s.db'\n"
                 + ")",
             metalakeName,
             catalogName,
             databaseName,
-            hiveContainer.getContainerIpAddress(),
+            containerSuite.getHiveContainer().getContainerIpAddress(),
+            HiveContainer.HDFS_DEFAULTFS_PORT,
             databaseName);
-    trinoContainer.executeUpdateSQL(sql1);
+    containerSuite.getTrinoContainer().executeUpdateSQL(sql1);
     NameIdentifier idSchema = NameIdentifier.of(metalakeName, catalogName, databaseName);
     Schema schema = catalog.asSchemas().loadSchema(idSchema);
     Assertions.assertEquals(schema.name(), databaseName);
@@ -188,7 +127,8 @@ public class TrinoConnectorIT extends AbstractIT {
     String sql =
         String.format(
             "SHOW SCHEMAS FROM \"%s.%s\" LIKE '%s'", metalakeName, catalogName, databaseName);
-    ArrayList<ArrayList<String>> queryData = trinoContainer.executeQuerySQL(sql);
+    ArrayList<ArrayList<String>> queryData =
+        containerSuite.getTrinoContainer().executeQuerySQL(sql);
     Assertions.assertEquals(queryData.get(0).get(0), databaseName);
   }
 
@@ -206,7 +146,7 @@ public class TrinoConnectorIT extends AbstractIT {
                 + "  format = 'TEXTFILE'\n"
                 + ")",
             metalakeName, catalogName, databaseName, tab1Name);
-    trinoContainer.executeUpdateSQL(sql3);
+    containerSuite.getTrinoContainer().executeUpdateSQL(sql3);
 
     // Verify in Gravitino Server
     NameIdentifier idTable1 = NameIdentifier.of(metalakeName, catalogName, databaseName, tab1Name);
@@ -227,7 +167,8 @@ public class TrinoConnectorIT extends AbstractIT {
         String.format(
             "SHOW TABLES FROM \"%s.%s\".%s LIKE '%s'",
             metalakeName, catalogName, databaseName, tab1Name);
-    ArrayList<ArrayList<String>> queryData = trinoContainer.executeQuerySQL(sql);
+    ArrayList<ArrayList<String>> queryData =
+        containerSuite.getTrinoContainer().executeQuerySQL(sql);
     Assertions.assertEquals(queryData.get(0).get(0), tab1Name);
   }
 
@@ -251,7 +192,7 @@ public class TrinoConnectorIT extends AbstractIT {
                 + "  format = 'TEXTFILE'\n"
                 + ")",
             metalakeName, catalogName, databaseName, scenarioTab1Name);
-    trinoContainer.executeUpdateSQL(sql3);
+    containerSuite.getTrinoContainer().executeUpdateSQL(sql3);
 
     // Verify in Gravitino Server
     NameIdentifier idTable1 =
@@ -287,14 +228,15 @@ public class TrinoConnectorIT extends AbstractIT {
         sql5.deleteCharAt(sql5.length() - 1);
       }
     }
-    trinoContainer.executeUpdateSQL(sql5.toString());
+    containerSuite.getTrinoContainer().executeUpdateSQL(sql5.toString());
 
     // Select data from table1 and verify it
     String sql6 =
         String.format(
             "SELECT user_name, gender, age, phone FROM \"%s.%s\".%s.%s ORDER BY user_name",
             metalakeName, catalogName, databaseName, scenarioTab1Name);
-    ArrayList<ArrayList<String>> table1QueryData = trinoContainer.executeQuerySQL(sql6);
+    ArrayList<ArrayList<String>> table1QueryData =
+        containerSuite.getTrinoContainer().executeQuerySQL(sql6);
     Assertions.assertEquals(table1Data, table1QueryData);
   }
 
@@ -315,7 +257,7 @@ public class TrinoConnectorIT extends AbstractIT {
                 + "  format = 'TEXTFILE'\n"
                 + ")",
             metalakeName, catalogName, databaseName, scenarioTab2Name);
-    trinoContainer.executeUpdateSQL(sql4);
+    containerSuite.getTrinoContainer().executeUpdateSQL(sql4);
 
     // Verify in Gravitino Server
     NameIdentifier idTable2 =
@@ -351,14 +293,15 @@ public class TrinoConnectorIT extends AbstractIT {
         sql7.deleteCharAt(sql7.length() - 1);
       }
     }
-    trinoContainer.executeUpdateSQL(sql7.toString());
+    containerSuite.getTrinoContainer().executeUpdateSQL(sql7.toString());
 
     // Select data from table1 and verify it
     String sql8 =
         String.format(
             "SELECT user_name, consumer, recharge, event_time FROM \"%s.%s\".%s.%s ORDER BY user_name",
             metalakeName, catalogName, databaseName, scenarioTab2Name);
-    ArrayList<ArrayList<String>> table2QueryData = trinoContainer.executeQuerySQL(sql8);
+    ArrayList<ArrayList<String>> table2QueryData =
+        containerSuite.getTrinoContainer().executeQuerySQL(sql8);
     Assertions.assertEquals(table2Data, table2QueryData);
   }
 
@@ -372,7 +315,8 @@ public class TrinoConnectorIT extends AbstractIT {
                 + "    (SELECT user_name, consumer, recharge, event_time FROM \"%1$s.%2$s\".%3$s.%5$s) AS t2\n"
                 + "        ON t1.user_name = t2.user_name) ORDER BY user_name",
             metalakeName, catalogName, databaseName, scenarioTab1Name, scenarioTab2Name);
-    ArrayList<ArrayList<String>> joinQueryData = trinoContainer.executeQuerySQL(sql9);
+    ArrayList<ArrayList<String>> joinQueryData =
+        containerSuite.getTrinoContainer().executeQuerySQL(sql9);
     ArrayList<ArrayList<String>> joinData = new ArrayList<>();
     joinData.add(
         new ArrayList<>(
@@ -388,6 +332,113 @@ public class TrinoConnectorIT extends AbstractIT {
         new ArrayList<>(
             Arrays.asList("sam", "man", "18", "+1 8157809623", "$27.03", "", "22nd,July,2023")));
     Assertions.assertEquals(joinData, joinQueryData);
+  }
+
+  @Test
+  void testHiveSchemaAndTableCreatedByTrino() {
+    String schemaName = GravitinoITUtils.genRandomName("schema").toLowerCase();
+    String tableName = GravitinoITUtils.genRandomName("table").toLowerCase();
+
+    String createSchemaSql =
+        String.format("CREATE SCHEMA \"%s.%s\".%s", metalakeName, catalogName, schemaName);
+    containerSuite.getTrinoContainer().executeUpdateSQL(createSchemaSql);
+
+    String createTableSql =
+        String.format(
+            "CREATE TABLE \"%s.%s\".%s.%s (id int, name varchar)"
+                + " with ( serde_name = '123455', location = 'hdfs://localhost:9000/user/hive/warehouse/hive_schema.db/hive_table')",
+            metalakeName, catalogName, schemaName, tableName);
+    containerSuite.getTrinoContainer().executeUpdateSQL(createTableSql);
+
+    Table table =
+        catalog
+            .asTableCatalog()
+            .loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, tableName));
+    Assertions.assertEquals("123455", table.properties().get("serde-name"));
+    Assertions.assertEquals(
+        "hdfs://localhost:9000/user/hive/warehouse/hive_schema.db/hive_table",
+        table.properties().get("location"));
+  }
+
+  @Test
+  void testHiveSchemaAndTableCreatedByGravitino() throws InterruptedException {
+    String catalogName = GravitinoITUtils.genRandomName("catalog").toLowerCase();
+    String schemaName = GravitinoITUtils.genRandomName("schema").toLowerCase();
+    String tableName = GravitinoITUtils.genRandomName("table").toLowerCase();
+
+    GravitinoMetaLake createdMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
+    Catalog catalog =
+        createdMetalake.createCatalog(
+            NameIdentifier.of(metalakeName, catalogName),
+            Catalog.Type.RELATIONAL,
+            "hive",
+            "comment",
+            ImmutableMap.<String, String>builder()
+                .put(
+                    "metastore.uris",
+                    String.format(
+                        "thrift://%s:%s",
+                        containerSuite.getHiveContainer().getContainerIpAddress(),
+                        HiveContainer.HIVE_METASTORE_PORT))
+                .build());
+
+    Schema schema =
+        catalog
+            .asSchemas()
+            .createSchema(
+                NameIdentifier.of(metalakeName, catalogName, schemaName),
+                "Created by gravitino client",
+                ImmutableMap.<String, String>builder().build());
+
+    Assertions.assertNotNull(schema);
+
+    catalog
+        .asTableCatalog()
+        .createTable(
+            NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
+            new ColumnDTO[] {
+              new ColumnDTO.Builder<>()
+                  .withComment("xx1")
+                  .withName("id")
+                  .withDataType(Types.IntegerType.get())
+                  .build(),
+              new ColumnDTO.Builder<>()
+                  .withComment("xx2")
+                  .withName("name")
+                  .withDataType(Types.IntegerType.get())
+                  .build()
+            },
+            "Created by gravitino client",
+            ImmutableMap.<String, String>builder()
+                .put("format", "ORC")
+                .put(
+                    "location",
+                    "hdfs://localhost:9000/user/hive/warehouse/hive_schema.db/hive_table")
+                .put("serde-name", "yuqi11")
+                .put("table-type", "EXTERNAL_TABLE")
+                .build());
+    LOG.info("create table \"{}.{}\".{}.{}", metalakeName, catalogName, schemaName, tableName);
+
+    Table table =
+        catalog
+            .asTableCatalog()
+            .loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, tableName));
+    Assertions.assertNotNull(table);
+    // Now we need to wait at least 3 seconds for trino to sync the metadata from gravitino
+    Thread.sleep(6000);
+
+    String sql =
+        String.format(
+            "show create table \"%s.%s\".%s.%s", metalakeName, catalogName, schemaName, tableName);
+
+    String data = containerSuite.getTrinoContainer().executeQuerySQL(sql).get(0).get(0);
+
+    Assertions.assertTrue(data.contains("serde_name = 'yuqi11'"));
+    Assertions.assertTrue(data.contains("table_type = 'EXTERNAL_TABLE'"));
+    Assertions.assertTrue(data.contains("serde_lib = 'org.apache.hadoop.hive.ql.io.orc.OrcSerde'"));
+    Assertions.assertTrue(
+        data.contains(
+            "location = 'hdfs://localhost:9000/user/hive/warehouse/hive_schema.db/hive_table'"));
   }
 
   private static void createMetalake() {
@@ -407,7 +458,8 @@ public class TrinoConnectorIT extends AbstractIT {
     String hiveMetastoreUris =
         String.format(
             "thrift://%s:%d",
-            hiveContainer.getContainerIpAddress(), HiveContainer.HIVE_METASTORE_PORT);
+            containerSuite.getHiveContainer().getContainerIpAddress(),
+            HiveContainer.HIVE_METASTORE_PORT);
     LOG.debug("hiveMetastoreUris is {}", hiveMetastoreUris);
     properties.put(METASTORE_URIS, hiveMetastoreUris);
 
@@ -419,29 +471,8 @@ public class TrinoConnectorIT extends AbstractIT {
             "comment",
             properties);
     Catalog loadCatalog = metalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
+    Assertions.assertEquals(createdCatalog, loadCatalog);
 
     catalog = loadCatalog;
-  }
-
-  private static void updateTrinoConfigFile() throws IOException {
-    String trinoConfDir = System.getenv("TRINO_CONF_DIR");
-    ITUtils.rewriteConfigFile(
-        trinoConfDir + "/catalog/gravitino.properties.template",
-        trinoConfDir + "/catalog/gravitino.properties",
-        ImmutableMap.<String, String>builder()
-            .put(
-                TrinoContainer.TRINO_CONF_GRAVITINO_URI,
-                String.format(
-                    "http://%s:%d", AbstractIT.getPrimaryNICIp(), getGravitinoServerPort()))
-            .put(TrinoContainer.TRINO_CONF_GRAVITINO_METALAKE, metalakeName)
-            .build());
-    ITUtils.rewriteConfigFile(
-        trinoConfDir + "/catalog/hive.properties.template",
-        trinoConfDir + "/catalog/hive.properties",
-        ImmutableMap.of(
-            TrinoContainer.TRINO_CONF_HIVE_METASTORE_URI,
-            String.format(
-                "thrift://%s:%d",
-                hiveContainer.getContainerIpAddress(), HiveContainer.HIVE_METASTORE_PORT)));
   }
 }

@@ -10,7 +10,6 @@ plugins {
   `maven-publish`
   id("java")
   id("idea")
-  id("com.diffplug.spotless")
 }
 
 dependencies {
@@ -47,21 +46,29 @@ dependencies {
 }
 
 fun getGitCommitId(): String {
-  val gitFolder = rootDir.path + "/.git/"
-  val head = File(gitFolder + "HEAD").readText().split(":")
-  val isCommit = head.size == 1
-  if (isCommit) {
-    return head[0].trim()
+  var gitCommitId = ""
+  try {
+    val gitFolder = rootDir.path + "/.git/"
+    val head = File(gitFolder + "HEAD").readText().split(":")
+    val isCommit = head.size == 1
+    gitCommitId = if (isCommit) {
+      head[0].trim()
+    } else {
+      val refHead = File(gitFolder + head[1].trim())
+      refHead.readText().trim()
+    }
+  } catch (e: Exception) {
+    println("WARN: Unable to get Git commit id : ${e.message}")
+    gitCommitId = ""
   }
-  val refHead = File(gitFolder + head[1].trim())
-  return refHead.readText().trim()
+  return gitCommitId
 }
 
 val propertiesFile = "src/main/resources/project.properties"
 fun writeProjectPropertiesFile() {
   val propertiesFile = file(propertiesFile)
   if (propertiesFile.exists()) {
-    propertiesFile.delete();
+    propertiesFile.delete()
   }
 
   val dateFormat = SimpleDateFormat("dd/MM/yyyy HH:mm:ss")
@@ -73,10 +80,12 @@ fun writeProjectPropertiesFile() {
   propertiesFile.parentFile.mkdirs()
   propertiesFile.createNewFile()
   propertiesFile.writer().use { writer ->
-    writer.write("#\n" +
-            "# Copyright 2023 Datastrato.\n" +
-            "# This software is licensed under the Apache License version 2.\n" +
-            "#\n")
+    writer.write(
+      "#\n" +
+        "# Copyright 2023 Datastrato.\n" +
+        "# This software is licensed under the Apache License version 2.\n" +
+        "#\n"
+    )
     writer.write("project.version=$projectVersion\n")
     writer.write("compile.date=$compileDate\n")
     writer.write("git.commit.id=$commitId\n")
@@ -98,6 +107,6 @@ tasks {
     environment("GRAVITINO_TEST", "true")
   }
   clean {
-    delete("${propertiesFile}")
+    delete("$propertiesFile")
   }
 }
