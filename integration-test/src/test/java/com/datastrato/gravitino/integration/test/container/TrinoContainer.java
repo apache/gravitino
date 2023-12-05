@@ -128,13 +128,6 @@ public class TrinoContainer extends BaseContainer {
                       gravitinoServerAddress.getPort()))
               .put(TrinoContainer.TRINO_CONF_GRAVITINO_METALAKE, metalakeName)
               .build());
-
-      ITUtils.rewriteConfigFile(
-          trinoConfDir + "/catalog/hive.properties.template",
-          trinoConfDir + "/catalog/hive.properties",
-          ImmutableMap.of(
-              TrinoContainer.TRINO_CONF_HIVE_METASTORE_URI,
-              String.format("thrift://%s:%d", hiveContainerIP, HiveContainer.HIVE_METASTORE_PORT)));
     } catch (IOException e) {
       LOG.error("Failed to update Trino config file: ", e);
       throw new RuntimeException(e);
