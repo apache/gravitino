@@ -133,7 +133,7 @@ subprojects {
 
   gradle.projectsEvaluated {
     tasks.withType<JavaCompile> {
-      options.compilerArgs.addAll(arrayOf("-Xlint:deprecation"))
+      options.compilerArgs.addAll(arrayOf("-Xlint:deprecation", "-Werror"))
     }
   }
 
