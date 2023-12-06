@@ -39,7 +39,9 @@ public class HiveConnectorAdapter implements CatalogConnectorAdapter {
     properties.put("hive.metastore.uri", catalog.getProperties("metastore.uris", ""));
     Map<String, String> trinoProperty = catalogConverter.toTrinoProperties(catalog.getProperties());
 
-    // Trino only supports properties that define in catalogPropertyMeta
+    // Trino only supports properties that define in catalogPropertyMeta, the name of entries in
+    // catalogPropertyMeta is in the format of "catalogName_propertyName", so we need to replace
+    // '_' with '.' to align with the name in trino.
     Map<String, PropertyMetadata<?>> catalogPropertyMeta =
         Maps.uniqueIndex(
             propertyMetadata.getCatalogPropertyMeta(),
