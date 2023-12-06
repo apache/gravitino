@@ -9,7 +9,7 @@ import { Typography } from '@mui/material'
 import { useAppSelector } from '@/lib/hooks/useStore'
 
 const VersionView = () => {
-  const store = useAppSelector(state => state.version)
+  const store = useAppSelector(state => state.sys)
 
   return <Typography variant='subtitle2'>{store.version}</Typography>
 }

@@ -5,9 +5,16 @@
 
 import axios from 'axios'
 
-export const loginApi = params => {
+export const getAuthConfigsApi = () => {
   return axios({
-    url: '/oauth2/token',
+    url: `/configs`,
+    method: 'get'
+  })
+}
+
+export const loginApi = (url, params) => {
+  return axios({
+    url,
     method: 'post',
     params
   })

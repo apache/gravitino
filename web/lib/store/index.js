@@ -9,12 +9,14 @@ import { configureStore } from '@reduxjs/toolkit'
 
 import { isDevEnv } from '@/lib/utils'
 
-import version from './version'
+import sys from './sys'
+import auth from './auth'
 import metalakes from './metalakes'
 
 export const store = configureStore({
   reducer: {
-    version,
+    sys,
+    auth,
     metalakes
   },
   devTools: true,

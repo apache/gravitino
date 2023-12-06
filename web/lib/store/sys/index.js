@@ -5,19 +5,23 @@
 
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit'
 
+import { to } from '@/lib/utils'
+
 import { getVersionApi } from '@/lib/api/version'
 
 export const initialVersion = createAsyncThunk('sys/fetchVersion', async (params, { getState }) => {
-  const response = await getVersionApi()
+  let version = null
+  const [err, res] = await to(getVersionApi())
 
-  const { version } = response.data
+  if (!err && res) {
+    version = res.data.version
+    sessionStorage.setItem('version', version.version)
 
-  sessionStorage.setItem('version', version.version)
-
-  console.log(
-    `Gravitino Version: %c${version.version}`,
-    `color: white; background-color: #6062E0; padding: 2px; border-radius: 4px;`
-  )
+    console.log(
+      `Gravitino Version: %c${version.version}`,
+      `color: white; background-color: #6062E0; padding: 2px; border-radius: 4px;`
+    )
+  }
 
   return version
 })

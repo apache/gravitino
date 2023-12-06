@@ -17,6 +17,9 @@ import { yupResolver } from '@hookform/resolvers/yup'
 import { useAuth } from '@/lib/provider/session'
 import { useLocalStorage } from 'react-use'
 
+import { useAppDispatch, useAppSelector } from '@/lib/hooks/useStore'
+import { getAuthConfigs } from '@/lib/store/auth'
+
 const defaultValues = {
   grant_type: 'client_credentials',
   client_id: '',
@@ -38,6 +41,9 @@ const LoginPage = () => {
 
   const [version] = useLocalStorage('version')
 
+  const dispatch = useAppDispatch()
+  const authStore = useAppSelector(state => state.auth)
+
   const {
     control,
     handleSubmit,
@@ -53,6 +59,8 @@ const LoginPage = () => {
   }
 
   useEffect(() => {
+    dispatch(getAuthConfigs())
+
     const check = version && pathname === '/login'
     if (check) {
       router.push('/')
