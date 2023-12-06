@@ -11,18 +11,18 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** Transforming between gravitino schema/table/column property and trino property. */
+/** Transforming between gravitino schema/table/column property and Trino property. */
 public abstract class PropertyConverter {
 
   private static final Logger LOG = LoggerFactory.getLogger(PropertyConverter.class);
   /**
-   * Convert trino properties to gravitino properties. It will return a map that holds the mapping
-   * between trino and gravitino properties.
+   * Convert Trino properties to Gravitino properties. It will return a map that holds the mapping
+   * between Trino and gravitino properties.
    *
-   * @return a map that holds the mapping from trino to gravitino properties.
+   * @return a map that holds the mapping from Trino to Gravitino properties.
    */
   public abstract TreeBidiMap<String, String> trinoPropertyKeyToGravitino();
-  /** Convert trino properties to gravitino properties. */
+  /** Convert Trino properties to Gravitino properties. */
   public Map<String, String> toTrinoProperties(Map<String, String> properties) {
     Map<String, String> trinoProperties = new HashMap<>();
     Map<String, String> gravitinoToTrinoMapping = trinoPropertyKeyToGravitino().inverseBidiMap();
@@ -31,13 +31,13 @@ public abstract class PropertyConverter {
       if (trinoKey != null) {
         trinoProperties.put(trinoKey, entry.getValue());
       } else {
-        LOG.warn("Property {} is not supported in trino", trinoKey);
+        LOG.warn("Property {} is not supported in Trino", trinoKey);
       }
     }
     return trinoProperties;
   }
 
-  /** Convert gravitino properties to trino properties. */
+  /** Convert Gravitino properties to Trino properties. */
   public Map<String, Object> toGravitinoProperties(Map<String, Object> properties) {
     Map<String, Object> gravitinoProperties = new HashMap<>();
     Map<String, String> trinoToGravitinoMapping = trinoPropertyKeyToGravitino();
@@ -46,7 +46,7 @@ public abstract class PropertyConverter {
       if (gravitinoKey != null) {
         gravitinoProperties.put(gravitinoKey, entry.getValue());
       } else {
-        LOG.warn("Property {} is not supported in gravitino", gravitinoKey);
+        LOG.warn("Property {} is not supported in Gravitino", gravitinoKey);
       }
     }
     return gravitinoProperties;

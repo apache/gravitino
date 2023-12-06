@@ -9,7 +9,7 @@ import com.datastrato.gravitino.trino.connector.util.GeneralDataTypeTransformer;
 import io.trino.spi.session.PropertyMetadata;
 import java.util.List;
 
-/** Support trino memory connector for testing. */
+/** Support Trino memory connector for testing. */
 public class MemoryMetadataAdapter extends CatalogConnectorMetadataAdapter {
 
   public MemoryMetadataAdapter(
