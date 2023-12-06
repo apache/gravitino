@@ -8,12 +8,11 @@ package com.datastrato.gravitino.trino.connector.catalog.hive;
 import com.datastrato.gravitino.shaded.org.apache.commons.collections4.bidimap.TreeBidiMap;
 import com.datastrato.gravitino.trino.connector.catalog.PropertyConverter;
 import com.google.common.collect.ImmutableMap;
-import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /** Convert hive properties between trino and gravitino. */
-public class HiveCatalogPropertyConverter implements PropertyConverter {
+public class HiveCatalogPropertyConverter extends PropertyConverter {
 
   public static final Logger LOG = LoggerFactory.getLogger(HiveCatalogPropertyConverter.class);
 
@@ -42,17 +41,7 @@ public class HiveCatalogPropertyConverter implements PropertyConverter {
               .build());
 
   @Override
-  public Map<String, String> toTrinoProperties(Map<String, String> properties) {
-    ImmutableMap.Builder<String, String> builder = ImmutableMap.builder();
-    for (Map.Entry<String, String> entry : properties.entrySet()) {
-      if (GRAVITINO_HIVE_TO_TRINO_HIVE.containsKey(entry.getKey())) {
-        builder.put(GRAVITINO_HIVE_TO_TRINO_HIVE.get(entry.getKey()), entry.getValue());
-      } else {
-        // Let other properties pass through
-        LOG.warn("No mapping for property {} in Hive catalog", entry.getKey());
-      }
-    }
-
-    return builder.build();
+  public TreeBidiMap<String, String> trinoPropertyKeyToGravitino() {
+    return GRAVITINO_HIVE_TO_TRINO_HIVE;
   }
 }
