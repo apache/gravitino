@@ -43,13 +43,6 @@ import org.apache.commons.lang3.StringUtils;
 public class MysqlTableOperations extends JdbcTableOperations {
 
   public static final String AUTO_INCREMENT = "AUTO_INCREMENT";
-  public static final String PRIMARY_KEY = "PRIMARY KEY";
-
-  private static final String COMMENT = "COMMENT";
-  private static final String SPACE = " ";
-
-  private static final String NOT_NULL = "NOT NULL";
-  private static final String DEFAULT = "DEFAULT";
 
   @Override
   public JdbcTable load(String databaseName, String tableName) throws NoSuchTableException {
@@ -244,7 +237,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
     // Add table properties if any
     if (MapUtils.isNotEmpty(properties)) {
       // TODO #804 Properties will be unified in the future.
-      LOG.warn("Ignoring properties option on table create.");
+      throw new UnsupportedOperationException("Properties are not supported yet");
       //      StringJoiner joiner = new StringJoiner(SPACE + SPACE);
       //      for (Map.Entry<String, String> entry : properties.entrySet()) {
       //        joiner.add(entry.getKey() + "=" + entry.getValue());
@@ -303,7 +296,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
         setProperties.add(((TableChange.SetProperty) change));
       } else if (change instanceof TableChange.RemoveProperty) {
         // mysql does not support deleting table attributes, it can be replaced by Set Property
-        throw new UnsupportedOperationException("Remove property is not supported yet");
+        throw new IllegalArgumentException("Remove property is not supported yet");
       } else if (change instanceof TableChange.AddColumn) {
         TableChange.AddColumn addColumn = (TableChange.AddColumn) change;
         lazyLoadCreateTable = getOrCreateTable(databaseName, tableName, lazyLoadCreateTable);
@@ -343,12 +336,9 @@ public class MysqlTableOperations extends JdbcTableOperations {
         CreateTable createTable = getOrCreateTable(databaseName, tableName, lazyLoadCreateTable);
         Map<String, String> properties =
             parseOrderedKeyValuePairs(createTable.getTableOptionsStrings().toArray(new String[0]));
-        String oldComment = properties.get(COMMENT);
-        if (StringUtils.isNotEmpty(oldComment)) {
-          StringIdentifier identifier = StringIdentifier.fromComment(oldComment);
-          if (null != identifier) {
-            newComment = StringIdentifier.addToComment(identifier, newComment);
-          }
+        StringIdentifier identifier = StringIdentifier.fromComment(properties.get(COMMENT));
+        if (null != identifier) {
+          newComment = StringIdentifier.addToComment(identifier, newComment);
         }
       }
       alterSql.add("COMMENT '" + newComment + "'");

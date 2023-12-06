@@ -23,6 +23,7 @@ dependencies {
   implementation(project(":catalogs:catalog-lakehouse-iceberg"))
   implementation(project(":catalogs:catalog-jdbc-common"))
   implementation(project(":catalogs:catalog-jdbc-mysql"))
+  implementation(project(":catalogs:catalog-jdbc-postgresql"))
   implementation(libs.guava)
   implementation(libs.bundles.log4j)
   implementation(libs.bundles.jersey)
@@ -110,6 +111,7 @@ dependencies {
   testImplementation(libs.testcontainers)
   testImplementation(libs.testcontainers.junit.jupiter)
   testImplementation(libs.testcontainers.mysql)
+  testImplementation(libs.testcontainers.postgresql)
   testImplementation(libs.trino.jdbc)
   testImplementation(libs.trino.cli)
   testImplementation(libs.trino.client) {
@@ -118,6 +120,7 @@ dependencies {
   testImplementation(libs.jline.terminal)
   testImplementation(libs.okhttp3.loginterceptor)
   testImplementation(libs.mysql.driver)
+  testImplementation(libs.postgresql.driver)
 }
 
 /* Optimizing integration test execution conditions */

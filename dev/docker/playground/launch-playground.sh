@@ -7,11 +7,11 @@
 playground_dir="$(dirname "${BASH_SOURCE-$0}")"
 playground_dir="$(cd "${playground_dir}">/dev/null; pwd)"
 
-if command -v docker &> /dev/null
+if command -v docker-compose &> /dev/null
 then
   true # Placeholder, do nothing
 else
-  echo "ERROR: No docker service environment found, please install docker first."
+  echo "ERROR: No docker service environment found, please install docker-compose first."
   exit
 fi
 

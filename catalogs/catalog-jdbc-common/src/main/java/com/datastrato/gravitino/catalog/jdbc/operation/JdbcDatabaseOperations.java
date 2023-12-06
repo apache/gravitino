@@ -29,7 +29,8 @@ public abstract class JdbcDatabaseOperations implements DatabaseOperation {
   protected JdbcExceptionConverter exceptionMapper;
 
   @Override
-  public void initialize(DataSource dataSource, JdbcExceptionConverter exceptionMapper) {
+  public void initialize(
+      DataSource dataSource, JdbcExceptionConverter exceptionMapper, Map<String, String> conf) {
     this.dataSource = dataSource;
     this.exceptionMapper = exceptionMapper;
   }
@@ -38,7 +39,7 @@ public abstract class JdbcDatabaseOperations implements DatabaseOperation {
   public void create(String databaseName, String comment, Map<String, String> properties)
       throws SchemaAlreadyExistsException {
     LOG.info("Beginning to create database {}", databaseName);
-    try (final Connection connection = this.dataSource.getConnection()) {
+    try (final Connection connection = getConnection()) {
       JdbcConnectorUtils.executeUpdate(
           connection, generateCreateDatabaseSql(databaseName, comment, properties));
       LOG.info("Finished creating database {}", databaseName);
@@ -50,7 +51,7 @@ public abstract class JdbcDatabaseOperations implements DatabaseOperation {
   @Override
   public void delete(String databaseName, boolean cascade) throws NoSuchSchemaException {
     LOG.info("Beginning to drop database {}", databaseName);
-    try (final Connection connection = this.dataSource.getConnection()) {
+    try (final Connection connection = getConnection()) {
       JdbcConnectorUtils.executeUpdate(connection, generateDropDatabaseSql(databaseName, cascade));
       LOG.info("Finished dropping database {}", databaseName);
     } catch (final SQLException se) {
@@ -89,4 +90,8 @@ public abstract class JdbcDatabaseOperations implements DatabaseOperation {
    * @return the SQL statement to drop a database with the given name.
    */
   protected abstract String generateDropDatabaseSql(String databaseName, boolean cascade);
+
+  protected Connection getConnection() throws SQLException {
+    return dataSource.getConnection();
+  }
 }

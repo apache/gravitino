@@ -26,11 +26,13 @@ public interface TableOperation {
    * @param dataSource The data source to use for the operations.
    * @param exceptionMapper The exception mapper to use for the operations.
    * @param jdbcTypeConverter The type converter to use for the operations.
+   * @param conf The configuration to use for the operations.
    */
   void initialize(
       DataSource dataSource,
       JdbcExceptionConverter exceptionMapper,
-      JdbcTypeConverter jdbcTypeConverter);
+      JdbcTypeConverter jdbcTypeConverter,
+      Map<String, String> conf);
 
   /**
    * @param databaseName The name of the database.
