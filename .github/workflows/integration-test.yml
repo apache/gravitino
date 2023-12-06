@@ -22,17 +22,17 @@ jobs:
         with:
           filters: |
             source_changes:
-              - api/**
-              - catalogs/**
-              - clients/**
-              - common/**
-              - core/**
-              - integration-test/**
-              - meta/**
-              - server/**
-              - server-common/**
-              - trino-connect/**
-              - web/**
+              - 'api/**'
+              - 'catalogs/**'
+              - 'clients/**'
+              - 'common/**'
+              - 'core/**'
+              - 'integration-test/**'
+              - 'meta/**'
+              - 'server/**'
+              - 'server-common/**'
+              - 'trino-connect/**'
+              - 'web/**'
 
   # Integration test for AMD64 architecture
   test-amd64-arch:
