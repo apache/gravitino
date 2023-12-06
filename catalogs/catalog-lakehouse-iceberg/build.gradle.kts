@@ -51,10 +51,13 @@ dependencies {
     exclude("org.apache.hadoop", "hadoop-yarn-server-web-proxy")
     exclude("org.apache.hadoop", "hadoop-yarn-api")
     exclude("org.apache.hadoop", "hadoop-yarn-server-resourcemanager")
+    exclude("com.github.spotbugs")
   }
 
   implementation(libs.hadoop2.hdfs)
-  implementation(libs.hadoop2.common)
+  implementation(libs.hadoop2.common) {
+    exclude("com.github.spotbugs")
+  }
   implementation(libs.hadoop2.mapreduce.client.core)
   implementation(libs.metrics.jersey2)
 

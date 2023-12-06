@@ -36,6 +36,7 @@ dependencies {
     exclude("com.github.joshelser")
     exclude("io.dropwizard.metricss")
     exclude("org.slf4j")
+    exclude("org.openjdk.jol")
   }
 
   implementation(libs.hive2.exec) {
@@ -55,6 +56,7 @@ dependencies {
     exclude("org.apache.curator")
     exclude("org.pentaho")
     exclude("org.slf4j")
+    exclude("org.openjdk.jol")
   }
 
   implementation(libs.hadoop2.mapreduce.client.core) {
