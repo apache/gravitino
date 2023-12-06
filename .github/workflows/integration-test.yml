@@ -29,6 +29,7 @@ jobs:
               - core/**
               - integration-test/**
               - meta/**
+              - server/**
               - server-common/**
               - trino-connect/**
               - web/**
