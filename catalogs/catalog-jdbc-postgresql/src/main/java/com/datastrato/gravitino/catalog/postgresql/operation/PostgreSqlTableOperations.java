@@ -348,7 +348,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
             updateColumnNullabilityDefinition(
                 (TableChange.UpdateColumnNullability) change, tableName));
       } else {
-        throw new UnsupportedOperationException(
+        throw new IllegalArgumentException(
             "Unsupported table change type: " + change.getClass().getName());
       }
     }
