@@ -335,6 +335,7 @@ public class TrinoConnectorIT extends AbstractIT {
   }
 
   @Test
+  @Order(7)
   void testHiveSchemaCreatedByTrino() {
     String schemaName = GravitinoITUtils.genRandomName("schema").toLowerCase();
 
@@ -352,6 +353,7 @@ public class TrinoConnectorIT extends AbstractIT {
   }
 
   @Test
+  @Order(8)
   void testHiveTableCreatedByTrino() {
     String schemaName = GravitinoITUtils.genRandomName("schema").toLowerCase();
     String tableName = GravitinoITUtils.genRandomName("table").toLowerCase();
@@ -378,6 +380,7 @@ public class TrinoConnectorIT extends AbstractIT {
   }
 
   @Test
+  @Order(9)
   void testHiveSchemaCreatedByGravitino() throws InterruptedException {
     String catalogName = GravitinoITUtils.genRandomName("catalog").toLowerCase();
     String schemaName = GravitinoITUtils.genRandomName("schema").toLowerCase();
@@ -409,10 +412,12 @@ public class TrinoConnectorIT extends AbstractIT {
                         "hdfs://localhost:9000/user/hive/warehouse/hive_schema_1223445.db")
                     .build());
 
-    Thread.sleep(6000);
-
     String sql =
         String.format("show create schema \"%s.%s\".%s", metalakeName, catalogName, schemaName);
+    boolean success = checkTrinoHasLoaded(sql, 30);
+    if (!success) {
+      Assertions.fail("Trino fail to load schema created by gravitino: " + sql);
+    }
 
     String data = containerSuite.getTrinoContainer().executeQuerySQL(sql).get(0).get(0);
 
@@ -421,7 +426,30 @@ public class TrinoConnectorIT extends AbstractIT {
             "location = 'hdfs://localhost:9000/user/hive/warehouse/hive_schema_1223445.db'"));
   }
 
+  private static boolean checkTrinoHasLoaded(String sql, long maxWaitTimeSec)
+      throws InterruptedException {
+    long current = System.currentTimeMillis();
+    while (System.currentTimeMillis() - current <= maxWaitTimeSec * 1000) {
+      try {
+        ArrayList<ArrayList<String>> lists =
+            containerSuite.getTrinoContainer().executeQuerySQL(sql);
+        if (!lists.isEmpty()) {
+          return true;
+        }
+
+        LOG.info("Trino has not load the data yet, wait 200ms and retry. The SQL is '{}'", sql);
+      } catch (Exception e) {
+        LOG.warn("Failed to execute sql: {}", sql, e);
+      }
+
+      Thread.sleep(200);
+    }
+
+    return false;
+  }
+
   @Test
+  @Order(10)
   void testHiveTableCreatedByGravitino() throws InterruptedException {
     String catalogName = GravitinoITUtils.genRandomName("catalog").toLowerCase();
     String schemaName = GravitinoITUtils.genRandomName("schema").toLowerCase();
@@ -475,7 +503,7 @@ public class TrinoConnectorIT extends AbstractIT {
                 .put(
                     "location",
                     "hdfs://localhost:9000/user/hive/warehouse/hive_schema.db/hive_table")
-                .put("serde-name", "yuqi11")
+                .put("serde-name", "mock11")
                 .put("table-type", "EXTERNAL_TABLE")
                 .build());
     LOG.info("create table \"{}.{}\".{}.{}", metalakeName, catalogName, schemaName, tableName);
@@ -485,21 +513,97 @@ public class TrinoConnectorIT extends AbstractIT {
             .asTableCatalog()
             .loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, tableName));
     Assertions.assertNotNull(table);
-    // Now we need to wait at least 3 seconds for trino to sync the metadata from gravitino
-    Thread.sleep(6000);
 
     String sql =
         String.format(
             "show create table \"%s.%s\".%s.%s", metalakeName, catalogName, schemaName, tableName);
+    boolean success = checkTrinoHasLoaded(sql, 30);
+    if (!success) {
+      Assertions.fail("Trino fail to load table created by gravitino: " + sql);
+    }
 
     String data = containerSuite.getTrinoContainer().executeQuerySQL(sql).get(0).get(0);
 
-    Assertions.assertTrue(data.contains("serde_name = 'yuqi11'"));
+    Assertions.assertTrue(data.contains("serde_name = 'mock11'"));
     Assertions.assertTrue(data.contains("table_type = 'EXTERNAL_TABLE'"));
     Assertions.assertTrue(data.contains("serde_lib = 'org.apache.hadoop.hive.ql.io.orc.OrcSerde'"));
     Assertions.assertTrue(
         data.contains(
             "location = 'hdfs://localhost:9000/user/hive/warehouse/hive_schema.db/hive_table'"));
+  }
+
+  @Test
+  @Order(11)
+  void testHiveCatalogCreatedByGravitino() throws InterruptedException {
+    String catalogName = GravitinoITUtils.genRandomName("catalog").toLowerCase();
+    GravitinoMetaLake createdMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
+    createdMetalake.createCatalog(
+        NameIdentifier.of(metalakeName, catalogName),
+        Catalog.Type.RELATIONAL,
+        "hive",
+        "comment",
+        ImmutableMap.<String, String>builder()
+            .put(
+                "metastore.uris",
+                String.format(
+                    "thrift://%s:%s",
+                    containerSuite.getHiveContainer().getContainerIpAddress(),
+                    HiveContainer.HIVE_METASTORE_PORT))
+            .put("hive.immutable-partitions", "true")
+            .put("hive.target-max-file-size", "1GB")
+            .put("hive.create-empty-bucket-files", "true")
+            .put("hive.validate-bucketing", "true")
+            .build());
+    Catalog catalog = createdMetalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
+    Assertions.assertEquals("true", catalog.properties().get("hive.immutable-partitions"));
+    Assertions.assertEquals("1GB", catalog.properties().get("hive.target-max-file-size"));
+    Assertions.assertEquals("true", catalog.properties().get("hive.create-empty-bucket-files"));
+    Assertions.assertEquals("true", catalog.properties().get("hive.validate-bucketing"));
+
+    String sql = String.format("show catalogs like '%s.%s'", metalakeName, catalogName);
+    boolean success = checkTrinoHasLoaded(sql, 30);
+    if (!success) {
+      Assertions.fail("Trino fail to load catalogs created by gravitino: " + sql);
+    }
+
+    // Because we assign 'hive.target-max-file-size' a wrong value, trino can't load the catalog
+    String data = containerSuite.getTrinoContainer().executeQuerySQL(sql).get(0).get(0);
+    Assertions.assertEquals(metalakeName + "." + catalogName, data);
+  }
+
+  @Test
+  //  @Disabled("Wrong value of hive.target-max-file-size")
+  void testWrongHiveCatalogProperty() throws InterruptedException {
+    String catalogName = GravitinoITUtils.genRandomName("catalog").toLowerCase();
+    GravitinoMetaLake createdMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
+    createdMetalake.createCatalog(
+        NameIdentifier.of(metalakeName, catalogName),
+        Catalog.Type.RELATIONAL,
+        "hive",
+        "comment",
+        ImmutableMap.<String, String>builder()
+            .put(
+                "metastore.uris",
+                String.format(
+                    "thrift://%s:%s",
+                    containerSuite.getHiveContainer().getContainerIpAddress(),
+                    HiveContainer.HIVE_METASTORE_PORT))
+            .put("hive.immutable-partitions", "true")
+            // it should be like '1GB, 1MB', we make it wrong purposely.
+            .put("hive.target-max-file-size", "xxxx")
+            .put("hive.create-empty-bucket-files", "true")
+            .put("hive.validate-bucketing", "true")
+            .build());
+    Catalog catalog = createdMetalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
+    Assertions.assertEquals("true", catalog.properties().get("hive.immutable-partitions"));
+    Assertions.assertEquals("xxxx", catalog.properties().get("hive.target-max-file-size"));
+    Assertions.assertEquals("true", catalog.properties().get("hive.create-empty-bucket-files"));
+    Assertions.assertEquals("true", catalog.properties().get("hive.validate-bucketing"));
+
+    String sql = String.format("show catalogs like '%s.%s'", metalakeName, catalogName);
+    checkTrinoHasLoaded(sql, 6);
+    // Because we assign 'hive.target-max-file-size' a wrong value, trino can't load the catalog
+    Assertions.assertTrue(containerSuite.getTrinoContainer().executeQuerySQL(sql).isEmpty());
   }
 
   private static void createMetalake() {

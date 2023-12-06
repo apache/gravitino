@@ -3,7 +3,11 @@
  * This software is licensed under the Apache License version 2.
  */
 
-import { Box, Fab } from '@mui/material'
+'use client'
+
+import { Suspense } from 'react'
+
+import { Box, Fab, CircularProgress } from '@mui/material'
 
 import Icon from '@/components/Icon'
 
@@ -11,6 +15,15 @@ import AppBar from './AppBar'
 import Footer from './Footer'
 import MainContent from './MainContent'
 import ScrollToTop from './ScrollToTop'
+import { NavigationEvents } from './navigation-events'
+
+const Loading = () => {
+  return (
+    <Box className={`twc-h-[100vh] twc-flex twc-items-center twc-flex-col twc-justify-center`}>
+      <CircularProgress disableShrink sx={{ mt: 6 }} />
+    </Box>
+  )
+}
 
 const Layout = ({ children, scrollToTop }) => {
   return (
@@ -22,7 +35,10 @@ const Layout = ({ children, scrollToTop }) => {
           }
         />
         <AppBar />
-        <MainContent>{children}</MainContent>
+        <Suspense fallback={<Loading />}>
+          <NavigationEvents />
+          <MainContent>{children}</MainContent>
+        </Suspense>
         <Footer />
         {scrollToTop ? (
           scrollToTop(props)

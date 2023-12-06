@@ -7,20 +7,27 @@ package com.datastrato.gravitino.trino.connector.catalog.hive;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorAdapter;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
 import com.datastrato.gravitino.trino.connector.catalog.HasPropertyMeta;
+import com.datastrato.gravitino.trino.connector.catalog.PropertyConverter;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoCatalog;
+import com.google.common.collect.Maps;
 import io.trino.spi.session.PropertyMetadata;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** Transforming Hive connector configuration and components into Gravitino connector. */
 public class HiveConnectorAdapter implements CatalogConnectorAdapter {
 
+  private static final Logger LOG = LoggerFactory.getLogger(HiveConnectorAdapter.class);
   private final HasPropertyMeta propertyMetadata;
+  private final PropertyConverter catalogConverter;
 
   public HiveConnectorAdapter() {
     this.propertyMetadata = new HivePropertyMeta();
+    this.catalogConverter = new HiveCatalogPropertyConverter();
   }
 
   public Map<String, Object> buildInternalConnectorConfig(GravitinoCatalog catalog)
@@ -31,6 +38,20 @@ public class HiveConnectorAdapter implements CatalogConnectorAdapter {
 
     Map<String, Object> properties = new HashMap<>();
     properties.put("hive.metastore.uri", catalog.getRequiredProperty("metastore.uris"));
+    Map<String, String> trinoProperty = catalogConverter.toTrinoProperties(catalog.getProperties());
+
+    // Trino only supports properties that define in catalogPropertyMeta, the name of entries in
+    // catalogPropertyMeta is in the format of "catalogName_propertyName", so we need to replace
+    // '_' with '.' to align with the name in trino.
+    Map<String, PropertyMetadata<?>> catalogPropertyMeta =
+        Maps.uniqueIndex(
+            propertyMetadata.getCatalogPropertyMeta(),
+            propertyMetadata -> propertyMetadata.getName().replace("_", "."));
+
+    trinoProperty.entrySet().stream()
+        .filter(entry -> catalogPropertyMeta.containsKey(entry.getKey()))
+        .forEach(entry -> properties.put(entry.getKey(), entry.getValue()));
+
     config.put("properties", properties);
     return config;
   }

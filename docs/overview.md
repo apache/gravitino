@@ -37,7 +37,7 @@ The model of Gravitino
 ![Gravitino Model](assets/metadata-model.png)
 
 * **Metalake**: The top-level container for metadata. Typically, one group has one metalake to manage all the metadata in it. Each metalake exposes a three-level namespace(catalog.schema.table) to organize the data.
-* **Catalog**: catalog is a collection of metadata from a specific metadata source. Each catalog will have a related connector to connect to the specific metadata source.
+* **Catalog**: catalog is a collection of metadata from a specific metadata source. Each catalog has a related connector to connect to the specific metadata source.
 * **Schema**: Schema is equivalent to a database, Schemas only exist in the specific catalogs that support relational metadata sources, such as Apache Hive, MySQL, PostgreSQL, and others.
-* **Table**: The lowest level in the object hierarchy for catalogs that support relational metadata sources. Tables can be created in the specific schemas in the catalogs.
+* **Table**: The lowest level in the object hierarchy for catalogs that support relational metadata sources. You can create Tables in specific schemas in the catalogs.
 * **Model**: Model represents the metadata in the specific catalogs that support model management.

@@ -82,6 +82,8 @@ public class CatalogMysqlIT extends AbstractIT {
 
   protected static final String TEST_DB_NAME = RandomUtils.nextInt(10000) + "_test_db";
 
+  public static final String mysqlImageName = "mysql:8.0";
+
   @BeforeAll
   public static void startup() throws IOException {
 
@@ -92,7 +94,7 @@ public class CatalogMysqlIT extends AbstractIT {
     }
 
     MYSQL_CONTAINER =
-        new MySQLContainer<>("mysql:8.2.0")
+        new MySQLContainer<>(mysqlImageName)
             .withDatabaseName(TEST_DB_NAME)
             .withUsername("root")
             .withPassword("root");

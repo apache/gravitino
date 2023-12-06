@@ -8,6 +8,7 @@ import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVIT
 
 import com.datastrato.gravitino.Catalog;
 import io.trino.spi.TrinoException;
+import java.util.Map;
 import org.apache.logging.log4j.util.Strings;
 
 /** Help Gravitino connector access CatalogMetadata from gravitino client. */
@@ -37,5 +38,9 @@ public class GravitinoCatalog {
       throw new TrinoException(GRAVITINO_MISSING_CONFIG, "Missing required config: " + name);
     }
     return value;
+  }
+
+  public Map<String, String> getProperties() {
+    return catalog.properties();
   }
 }

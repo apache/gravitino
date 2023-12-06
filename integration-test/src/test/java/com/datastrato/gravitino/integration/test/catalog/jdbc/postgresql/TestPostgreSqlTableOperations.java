@@ -151,6 +151,32 @@ public class TestPostgreSqlTableOperations extends TestPostgreSqlAbstractIT {
     alterColumns.add(newColumn);
     assertionsTableInfo(newName, tableComment, alterColumns, properties, load);
 
+    // alter column Nullability
+    TABLE_OPERATIONS.alterTable(
+        TEST_DB_NAME,
+        newName,
+        TableChange.updateColumnNullability(new String[] {"col_1_new"}, false),
+        TableChange.updateColumnNullability(new String[] {"col_2"}, true));
+    load = TABLE_OPERATIONS.load(TEST_DB_NAME, newName);
+    alterColumns.clear();
+    alterColumns.add(
+        new JdbcColumn.Builder()
+            .withName("col_1_new")
+            .withType(VARCHAR)
+            .withComment("test_new_comment")
+            .withNullable(false)
+            .build());
+    alterColumns.add(
+        new JdbcColumn.Builder()
+            .withName("col_2")
+            .withType(Types.DoubleType.get())
+            .withNullable(true)
+            .withComment("set test key")
+            .build());
+    alterColumns.add(columns.get(3));
+    alterColumns.add(newColumn);
+    assertionsTableInfo(newName, tableComment, alterColumns, properties, load);
+
     // delete column
     TABLE_OPERATIONS.alterTable(
         TEST_DB_NAME, newName, TableChange.deleteColumn(new String[] {newColumn.name()}, true));

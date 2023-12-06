@@ -163,13 +163,6 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
             .withName("col_1")
             .withType(INT)
             .withComment("id")
-            .withProperties(
-                new ArrayList<String>() {
-                  {
-                    add(AUTO_INCREMENT);
-                    add(PRIMARY_KEY);
-                  }
-                })
             .withNullable(false)
             .build();
     columns.add(col_1);
@@ -178,20 +171,12 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
             .withName("col_2")
             .withType(VARCHAR)
             .withComment("name")
-            .withProperties(
-                new ArrayList<String>() {
-                  {
-                    add("UNIQUE KEY");
-                  }
-                })
             .withDefaultValue("hello world")
             .withNullable(false)
             .build();
     columns.add(col_2);
     Map<String, String> properties = new HashMap<>();
-    // TODO #804 Properties will be unified in the future.
-    //    properties.put("ENGINE", "InnoDB");
-    //    properties.put(AUTO_INCREMENT, "10");
+
     // create table
     TABLE_OPERATIONS.create(
         TEST_DB_NAME,
@@ -218,12 +203,6 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
             .withName(col_1.name())
             .withType(VARCHAR)
             .withComment(col_1.comment())
-            .withProperties(
-                new ArrayList<String>() {
-                  {
-                    add(PRIMARY_KEY);
-                  }
-                })
             .withNullable(col_1.nullable())
             .withDefaultValue(col_1.getDefaultValue())
             .build();
@@ -322,18 +301,37 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
             .withNullable(col_2.nullable())
             .build());
     columns.add(col_1);
+    JdbcColumn col_3 =
+        new JdbcColumn.Builder()
+            .withName("col_3")
+            .withType(VARCHAR)
+            .withNullable(true)
+            .withComment("txt3")
+            .build();
     columns.add(
         new JdbcColumn.Builder().withName("col_3").withType(VARCHAR).withComment("txt3").build());
-    //    properties.put("ROW_FORMAT", "DYNAMIC");
     assertionsTableInfo(tableName, newComment, columns, properties, load);
 
     TABLE_OPERATIONS.alterTable(
         TEST_DB_NAME,
         tableName,
-        TableChange.updateColumnPosition(new String[] {columns.get(0).name()}, null));
+        TableChange.updateColumnPosition(new String[] {columns.get(0).name()}, null),
+        TableChange.updateColumnNullability(new String[] {col_3.name()}, !col_3.nullable()));
 
     load = TABLE_OPERATIONS.load(TEST_DB_NAME, tableName);
-    columns.add(columns.remove(0));
+    col_2 = columns.remove(0);
+    columns.clear();
+
+    columns.add(col_1);
+    columns.add(
+        new JdbcColumn.Builder()
+            .withName("col_3")
+            .withType(VARCHAR)
+            .withNullable(false)
+            .withComment("txt3")
+            .build());
+    columns.add(col_2);
+
     assertionsTableInfo(tableName, newComment, columns, properties, load);
   }
 
@@ -362,8 +360,10 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
         new JdbcColumn.Builder()
             .withName("col_3")
             .withType(Types.TimestampType.withoutTimeZone())
-            .withNullable(true)
+            // MySQL 5.7 doesn't support nullable timestamp
+            .withNullable(false)
             .withComment("timestamp")
+            .withDefaultValue("2013-01-01 00:00:00")
             .build());
     columns.add(
         new JdbcColumn.Builder()
@@ -373,7 +373,7 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
             .withComment("date")
             .build());
     Map<String, String> properties = new HashMap<>();
-    //    properties.put("ENGINE", "InnoDB");
+
     // create table
     TABLE_OPERATIONS.create(
         TEST_DB_NAME,
