@@ -57,8 +57,6 @@ public abstract class TestJdbcAbstractIT {
 
     Assertions.assertEquals(databaseName, load.name());
     Assertions.assertEquals(comment, load.comment());
-
-    //    Assertions.assertTrue(properties.values().containsAll(load.properties().values()));
   }
 
   protected static void testDropDatabase(String databaseName) {
@@ -86,24 +84,24 @@ public abstract class TestJdbcAbstractIT {
       String tableComment,
       List<JdbcColumn> columns,
       Map<String, String> properties,
-      JdbcTable load) {
-    Assertions.assertEquals(tableName, load.name());
-    Assertions.assertEquals(tableComment, load.comment());
-    Assertions.assertEquals(columns.size(), load.columns().length);
+      JdbcTable table) {
+    Assertions.assertEquals(tableName, table.name());
+    Assertions.assertEquals(tableComment, table.comment());
+    Assertions.assertEquals(columns.size(), table.columns().length);
     for (int i = 0; i < columns.size(); i++) {
-      Assertions.assertEquals(columns.get(i).name(), load.columns()[i].name());
-      Assertions.assertEquals(columns.get(i).dataType(), load.columns()[i].dataType());
-      Assertions.assertEquals(columns.get(i).nullable(), load.columns()[i].nullable());
-      Assertions.assertEquals(columns.get(i).comment(), load.columns()[i].comment());
+      Assertions.assertEquals(columns.get(i).name(), table.columns()[i].name());
+      Assertions.assertEquals(columns.get(i).dataType(), table.columns()[i].dataType());
+      Assertions.assertEquals(columns.get(i).nullable(), table.columns()[i].nullable());
+      Assertions.assertEquals(columns.get(i).comment(), table.columns()[i].comment());
       Assertions.assertEquals(
-          columns.get(i).getDefaultValue(), ((JdbcColumn) load.columns()[i]).getDefaultValue());
+          columns.get(i).getDefaultValue(), ((JdbcColumn) table.columns()[i]).getDefaultValue());
       if (null != columns.get(i).getProperties()) {
         Assertions.assertEquals(
-            columns.get(i).getProperties(), ((JdbcColumn) load.columns()[i]).getProperties());
+            columns.get(i).getProperties(), ((JdbcColumn) table.columns()[i]).getProperties());
       }
     }
     for (Map.Entry<String, String> entry : properties.entrySet()) {
-      Assertions.assertEquals(entry.getValue(), load.properties().get(entry.getKey()));
+      Assertions.assertEquals(entry.getValue(), table.properties().get(entry.getKey()));
     }
   }
 
