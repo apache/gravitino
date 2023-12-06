@@ -52,7 +52,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
           + "    AND c.relname = ?";
 
   private static final String SHOW_COLUMN_INFO_SQL =
-      "select * FROM information_schema.columns WHERE table_name = ?";
+      "select * FROM information_schema.columns WHERE table_name = ? order by ordinal_position";
 
   private static final String SHOW_TABLE_COMMENT_SQL =
       "SELECT tb.table_name, d.description\n"

@@ -79,6 +79,8 @@ public class CatalogPostgreSqlIT extends AbstractIT {
 
   protected static final String TEST_DB_NAME = GravitinoITUtils.genRandomName("test_db");
 
+  public static final String POSTGRES_IMAGE = "postgres:13";
+
   @BeforeAll
   public static void startup() throws IOException {
 
@@ -89,7 +91,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     }
 
     POSTGRESQL_CONTAINER =
-        new PostgreSQLContainer<>("postgres:9.6.12")
+        new PostgreSQLContainer<>(POSTGRES_IMAGE)
             .withDatabaseName(TEST_DB_NAME)
             .withUsername("root")
             .withPassword("root");
