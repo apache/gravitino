@@ -61,7 +61,6 @@ import com.google.common.collect.ImmutableMap;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.Map;
 import org.apache.hc.core5.http.Method;
 import org.junit.jupiter.api.Assertions;
@@ -919,8 +918,8 @@ public class TestRelationalCatalog extends TestBase {
   public void testPurgeTable() throws JsonProcessingException {
     NameIdentifier tableId = NameIdentifier.of(metalakeName, catalogName, "schema1", "table1");
     String tablePath =
-            withSlash(
-                    RelationalCatalog.formatTableRequestPath(tableId.namespace()) + "/" + tableId.name());
+        withSlash(
+            RelationalCatalog.formatTableRequestPath(tableId.namespace()) + "/" + tableId.name());
     DropResponse resp = new DropResponse(true);
     buildMockResource(Method.DELETE, tablePath, null, resp, SC_OK);
 
