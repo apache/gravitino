@@ -409,7 +409,7 @@ public class TrinoConnectorIT extends AbstractIT {
                         "hdfs://localhost:9000/user/hive/warehouse/hive_schema_1223445.db")
                     .build());
 
-    Thread.sleep(6000);
+    Thread.sleep(4000);
 
     String sql =
         String.format("show create schema \"%s.%s\".%s", metalakeName, catalogName, schemaName);
@@ -475,7 +475,7 @@ public class TrinoConnectorIT extends AbstractIT {
                 .put(
                     "location",
                     "hdfs://localhost:9000/user/hive/warehouse/hive_schema.db/hive_table")
-                .put("serde-name", "yuqi11")
+                .put("serde-name", "mock11")
                 .put("table-type", "EXTERNAL_TABLE")
                 .build());
     LOG.info("create table \"{}.{}\".{}.{}", metalakeName, catalogName, schemaName, tableName);
@@ -486,7 +486,7 @@ public class TrinoConnectorIT extends AbstractIT {
             .loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, tableName));
     Assertions.assertNotNull(table);
     // Now we need to wait at least 3 seconds for trino to sync the metadata from gravitino
-    Thread.sleep(6000);
+    Thread.sleep(4000);
 
     String sql =
         String.format(
@@ -494,7 +494,7 @@ public class TrinoConnectorIT extends AbstractIT {
 
     String data = containerSuite.getTrinoContainer().executeQuerySQL(sql).get(0).get(0);
 
-    Assertions.assertTrue(data.contains("serde_name = 'yuqi11'"));
+    Assertions.assertTrue(data.contains("serde_name = 'mock11'"));
     Assertions.assertTrue(data.contains("table_type = 'EXTERNAL_TABLE'"));
     Assertions.assertTrue(data.contains("serde_lib = 'org.apache.hadoop.hive.ql.io.orc.OrcSerde'"));
     Assertions.assertTrue(
@@ -519,9 +519,15 @@ public class TrinoConnectorIT extends AbstractIT {
                     containerSuite.getHiveContainer().getContainerIpAddress(),
                     HiveContainer.HIVE_METASTORE_PORT))
             .put("hive.immutable-partitions", "true")
+            .put("hive.target-max-file-size", "2GB")
+            .put("hive.create-empty-bucket-files", "true")
+            .put("hive.validate-bucketing", "true")
             .build());
     Catalog catalog = createdMetalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
     Assertions.assertEquals("true", catalog.properties().get("hive.immutable-partitions"));
+    Assertions.assertEquals("2GB", catalog.properties().get("hive.immutable-partitions"));
+    Assertions.assertEquals("true", catalog.properties().get("hive.create-empty-bucket-files"));
+    Assertions.assertEquals("true", catalog.properties().get("hive.validate-bucketing"));
   }
 
   private static void createMetalake() {

@@ -20,10 +20,13 @@ public class TestHiveCatalogPropertyConverter {
         ImmutableMap.<String, String>builder()
             .put("hive.immutable-partitions", "true")
             .put("hive.compression-codec", "ZSTD")
+            .put("hive.unknown-key", "1")
             .build();
 
     Map<String, String> re = hiveCatalogPropertyConverter.toTrinoProperties(map);
     Assert.assertEquals(re.get("hive.immutable-partitions"), "true");
     Assert.assertEquals(re.get("hive.compression-codec"), "ZSTD");
+    // The unknown key should be passed through, and they will not be recognized by Trino
+    Assert.assertEquals(re.get("hive.unknown-key"), "1");
   }
 }
