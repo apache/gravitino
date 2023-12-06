@@ -5,6 +5,9 @@
 
 const isProdEnv = process.env.NODE_ENV === 'production'
 
+const apiUrl = process.env.NEXT_PUBLIC_API_URL
+const oauthUrl = process.env.NEXT_PUBLIC_OAUTH_URL
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   ...(isProdEnv
@@ -15,7 +18,11 @@ const nextConfig = {
             fallback: [
               {
                 source: '/api/:path*',
-                destination: 'http://localhost:8090/api/:path*'
+                destination: `${apiUrl}/:path*`
+              },
+              {
+                source: '/oauth2/token',
+                destination: `${oauthUrl}`
               }
             ]
           }

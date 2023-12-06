@@ -5,6 +5,7 @@
 
 'use client'
 
+import AuthProvider from './session'
 import StoreProvider from './store'
 import EmotionProvider from './emotion'
 import ThemeProvider from './theme'
@@ -13,7 +14,9 @@ const Provider = ({ children }) => {
   return (
     <StoreProvider>
       <EmotionProvider>
-        <ThemeProvider>{children}</ThemeProvider>
+        <AuthProvider>
+          <ThemeProvider>{children}</ThemeProvider>
+        </AuthProvider>
       </EmotionProvider>
     </StoreProvider>
   )

@@ -4,6 +4,7 @@
  */
 
 import '@/lib/styles/globals.css'
+
 import Provider from '@/lib/provider'
 import Layout from '@/lib/layout/Layout'
 

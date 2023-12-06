@@ -3,7 +3,7 @@
  * This software is licensed under the Apache License version 2.
  */
 
-import axios from 'axios'
+import defHttp from '@/lib/api'
 
 const Apis = {
   GET: '/api/metalakes',
@@ -13,53 +13,38 @@ const Apis = {
 }
 
 export const getMetalakesApi = () => {
-  return axios({
+  return defHttp.request({
     url: `${Apis.GET}`,
-    method: 'get',
-    headers: {
-      Accept: 'application/vnd.gravitino.v1+json'
-    }
+    method: 'get'
   })
 }
 
 export const getMetalakeDetailsApi = name => {
-  return axios({
+  return defHttp.request({
     url: `${Apis.GET}/${name}`,
-    method: 'get',
-    headers: {
-      Accept: 'application/vnd.gravitino.v1+json'
-    }
+    method: 'get'
   })
 }
 
 export const createMetalakeApi = data => {
-  return axios({
+  return defHttp.request({
     url: `${Apis.CREATE}`,
     method: 'post',
-    data,
-    headers: {
-      Accept: 'application/vnd.gravitino.v1+json'
-    }
+    data
   })
 }
 
 export const deleteMetalakeApi = name => {
-  return axios({
+  return defHttp.request({
     url: `${Apis.DELETE}/${name}`,
-    method: 'delete',
-    headers: {
-      Accept: 'application/vnd.gravitino.v1+json'
-    }
+    method: 'delete'
   })
 }
 
 export const updateMetalakeApi = ({ name, data }) => {
-  return axios({
+  return defHttp.request({
     url: `${Apis.UPDATE}/${name}`,
     method: 'put',
-    headers: {
-      Accept: 'application/vnd.gravitino.v1+json'
-    },
     data
   })
 }
