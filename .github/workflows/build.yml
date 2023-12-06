@@ -39,6 +39,7 @@ jobs:
               - server-common/**
               - trino-connector/**
               - web/**
+              - build.gradle.kts
               - gradle.properties
               - gradlew
               - setting.gradle.kts
