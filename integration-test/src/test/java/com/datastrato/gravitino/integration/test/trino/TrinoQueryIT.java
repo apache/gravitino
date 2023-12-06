@@ -64,11 +64,11 @@ public class TrinoQueryIT {
   private static boolean isDockerRunning = false;
 
   // TODO(yuhui) redo get the configs after we have the Docker image ready for testing.
-  private static String gravitinoUri = "http://192.168.215.2:8090";
-  private static String trinoUri = "http://192.168.215.2:8080";
-  private static String hiveMetastoreUri = "thrift://192.168.215.2:9083";
-  private static String mysqlUri = "jdbc:mysql://192.168.215.2?useSSL=false";
-  private static String postgresqlUri = "jdbc:postgresql://192.168.215.2/mydb";
+  private static String gravitinoUri = "http://127.0.0.1:8090";
+  private static String trinoUri = "http://127.0.0.1:8080";
+  private static String hiveMetastoreUri = "thrift://127.0.0.1:9083";
+  private static String mysqlUri = "jdbc:mysql://127.0.0.1?useSSL=false";
+  private static String postgresqlUri = "jdbc:postgresql://127.0.0.1/mydb";
 
   private static final String metalakeName = "test";
   private static final Set<String> testCatalogs = new HashSet<>();
