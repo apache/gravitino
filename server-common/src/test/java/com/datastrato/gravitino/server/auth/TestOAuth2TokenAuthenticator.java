@@ -35,6 +35,8 @@ public class TestOAuth2TokenAuthenticator {
         IllegalArgumentException.class, () -> auth2TokenAuthenticator.initialize(config));
     config.set(OAuthConfig.DEFAULT_SIGN_KEY, publicKey);
     config.set(OAuthConfig.ALLOW_SKEW_SECONDS, 6L);
+    config.set(OAuthConfig.DEFAULT_TOKEN_PATH, "test");
+    config.set(OAuthConfig.DEFAULT_SERVER_URI, "test");
     auth2TokenAuthenticator.initialize(config);
     Assertions.assertTrue(auth2TokenAuthenticator.isDataFromToken());
     Exception e =
