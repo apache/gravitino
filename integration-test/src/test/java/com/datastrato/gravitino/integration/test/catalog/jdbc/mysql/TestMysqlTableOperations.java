@@ -301,18 +301,37 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
             .withNullable(col_2.nullable())
             .build());
     columns.add(col_1);
+    JdbcColumn col_3 =
+        new JdbcColumn.Builder()
+            .withName("col_3")
+            .withType(VARCHAR)
+            .withNullable(true)
+            .withComment("txt3")
+            .build();
     columns.add(
         new JdbcColumn.Builder().withName("col_3").withType(VARCHAR).withComment("txt3").build());
-    //    properties.put("ROW_FORMAT", "DYNAMIC");
     assertionsTableInfo(tableName, newComment, columns, properties, load);
 
     TABLE_OPERATIONS.alterTable(
         TEST_DB_NAME,
         tableName,
-        TableChange.updateColumnPosition(new String[] {columns.get(0).name()}, null));
+        TableChange.updateColumnPosition(new String[] {columns.get(0).name()}, null),
+        TableChange.updateColumnNullability(new String[] {col_3.name()}, !col_3.nullable()));
 
     load = TABLE_OPERATIONS.load(TEST_DB_NAME, tableName);
-    columns.add(columns.remove(0));
+    col_2 = columns.remove(0);
+    columns.clear();
+
+    columns.add(col_1);
+    columns.add(
+        new JdbcColumn.Builder()
+            .withName("col_3")
+            .withType(VARCHAR)
+            .withNullable(false)
+            .withComment("txt3")
+            .build());
+    columns.add(col_2);
+
     assertionsTableInfo(tableName, newComment, columns, properties, load);
   }
 
