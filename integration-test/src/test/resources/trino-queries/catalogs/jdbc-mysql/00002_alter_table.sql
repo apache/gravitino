@@ -18,6 +18,9 @@ show create table "test.jdbc-mysql".gt_db1.tb01;
 alter table "test.jdbc-mysql".gt_db1.tb01 alter column salary set data type bigint;
 show create table "test.jdbc-mysql".gt_db1.tb01;
 
+alter table "test.jdbc-mysql".gt_db1.tb01 add column city varchar comment 'aaa';
+show create table "test.jdbc-mysql".gt_db1.tb01;
+
 drop table "test.jdbc-mysql".gt_db1.tb01;
 
 drop schema "test.jdbc-mysql".gt_db1;

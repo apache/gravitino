@@ -5,7 +5,7 @@ CREATE TABLE "test.jdbc-mysql".gt_db1.tb01 (
     salary int
 );
 
-alter table "test.jdbc-mysql".gt_db1.tb01 rename to "test.jdbc-mysql".gt_db1.tb03;
+alter table "test.jdbc-mysql".gt_db1.tb01 rename column name to s;
 show tables from "test.jdbc-mysql".gt_db1;
 
 comment on table "test.jdbc-mysql".gt_db1.tb01 is 'test table comments';

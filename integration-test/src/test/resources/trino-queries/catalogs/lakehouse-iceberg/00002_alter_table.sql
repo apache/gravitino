@@ -27,6 +27,9 @@ show create table "test.lakehouse-iceberg".gt_db2.tb01;
 comment on column "test.lakehouse-iceberg".gt_db2.tb01.s is 'test column comments';
 show create table "test.lakehouse-iceberg".gt_db2.tb01;
 
+alter table "test.lakehouse-iceberg".gt_db2.tb01 add column city varchar comment 'aaa';
+show create table "test.lakehouse-iceberg".gt_db2.tb01;
+
 drop table "test.lakehouse-iceberg".gt_db2.tb01;
 
 drop schema "test.lakehouse-iceberg".gt_db2;

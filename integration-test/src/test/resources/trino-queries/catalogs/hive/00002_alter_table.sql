@@ -30,6 +30,9 @@ show create table "test.hive".gt_db1.tb01;
 comment on column "test.hive".gt_db1.tb01.s is 'test column comments';
 show create table "test.hive".gt_db1.tb01;
 
+alter table "test.hive".gt_db1.tb01 add column city varchar comment 'aaa';
+show create table "test.hive".gt_db1.tb01;
+
 drop table "test.hive".gt_db1.tb01;
 
 drop schema "test.hive".gt_db1;
