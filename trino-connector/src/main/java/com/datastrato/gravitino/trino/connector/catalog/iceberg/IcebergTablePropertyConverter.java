@@ -10,16 +10,11 @@ import com.datastrato.gravitino.trino.connector.catalog.PropertyConverter;
 import com.google.common.collect.ImmutableMap;
 
 public class IcebergTablePropertyConverter extends PropertyConverter {
+
+  // TODO (yuqi) add more properties
   private static final TreeBidiMap<String, String> TRINO_ICEBERG_TO_GRAVITON_ICEBERG =
       new TreeBidiMap<>(
           new ImmutableMap.Builder<String, String>()
-              .put("location", "location")
-              .put("comment", "comment")
-              .put("creator", "creator")
-              .put("current-snapshot-id", "current-snapshot-id")
-              .put("cherry-pick-snapshot-id", "cherry-pick-snapshot-id")
-              .put("sort-order", "sort-order")
-              .put("identifier-fields", "identifier-fields")
               .build());
 
   @Override

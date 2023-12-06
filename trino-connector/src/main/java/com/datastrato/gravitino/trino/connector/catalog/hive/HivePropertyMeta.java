@@ -39,7 +39,6 @@ public class HivePropertyMeta implements HasPropertyMeta {
               "The output format class for the table",
               "org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat",
               false),
-          stringProperty("transient_last_ddl_time", "Last DDL time", null, false),
           stringProperty(
               "serde_lib",
               "The serde library class for the table",

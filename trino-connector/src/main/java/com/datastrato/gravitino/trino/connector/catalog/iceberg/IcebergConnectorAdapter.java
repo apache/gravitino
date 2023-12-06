@@ -23,14 +23,15 @@ public class IcebergConnectorAdapter implements CatalogConnectorAdapter {
     this.propertyMetadata = new IcebergPropertyMeta();
   }
 
-  public Map<String, Object> buildInternalConnectorConfig(GravitinoCatalog catalog) {
+  public Map<String, Object> buildInternalConnectorConfig(GravitinoCatalog catalog)
+      throws Exception {
     Map<String, Object> config = new HashMap<>();
     config.put("catalogHandle", catalog.getName() + ":normal:default");
     config.put("connectorName", "iceberg");
 
     Map<String, Object> properties = new HashMap<>();
     properties.put("iceberg.catalog.type", "hive_metastore");
-    properties.put("hive.metastore.uri", catalog.getProperties("uri", ""));
+    properties.put("hive.metastore.uri", catalog.getRequiredProperty("uri"));
     config.put("properties", properties);
     return config;
   }

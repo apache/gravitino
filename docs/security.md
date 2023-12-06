@@ -26,7 +26,7 @@ GravitinoClient client = GravitinoClient.builder(uri)
 
 Gravitino only supports external OAuth 2.0 servers.
 First, users need to guarantee that the external correctly configured OAuth 2.0 server supports Bearer JWT.
-Then, on the server side, users should set `gravitino.authenticator` as `oauth` and give `gravitino.authenticator.oauth.defaultSignKey` a proper value.
+Then, on the server side, users should set `gravitino.authenticator` as `oauth` and give `gravitino.authenticator.oauth.defaultSignKey`, `gravitino.authenticator.oauth.serverURI` and `gravitino.authenticator.oauth.tokenPath`  a proper value.
 Next, for the client side, users can enable `OAuth` mode by the following code:
 
 ```java
@@ -44,13 +44,14 @@ GravitinoClient client = GravitinoClient.builder(uri)
 
 ### Server configuration
 
-| Configuration item                                | Description                                                                | Default value     | Since version |
-|---------------------------------------------------|----------------------------------------------------------------------------|-------------------|---------------|
-| `gravitino.authenticator`                         | The authenticator which Gravitino uses, setting as `simple` or `oauth`     | `simple`          | 0.3.0         |
-| `gravitino.authenticator.oauth.serviceAudience`   | The audience name when Gravitino uses OAuth as the authenticator           | `GravitinoServer` | 0.3.0         |
-| `gravitino.authenticator.oauth.allowSkewSecs`     | The JWT allows skew seconds when Gravitino uses OAuth as the authenticator | `0`               | 0.3.0         |
-| `gravitino.authenticator.oauth.defaultSignKey`    | The signing key of JWT when Gravitino uses OAuth as the authenticator         | ``                | 0.3.0         |
-| `gravitino.authenticator.oauth.signAlgorithmType` | The signature algorithm when Gravitino uses OAuth as the authenticator     | `RS256`           | 0.3.0         |
+| Configuration item                              | Description                                                                | Default value     | Since version |
+|-------------------------------------------------|----------------------------------------------------------------------------|-------------------|---------------|
+| `gravitino.authenticator`                       | The authenticator which Gravitino uses, setting as `simple` or `oauth`     | `simple`          | 0.3.0         |
+| `gravitino.authenticator.oauth.serviceAudience` | The audience name when Gravitino uses OAuth as the authenticator           | `GravitinoServer` | 0.3.0         |
+| `gravitino.authenticator.oauth.allowSkewSecs`   | The JWT allows skew seconds when Gravitino uses OAuth as the authenticator | `0`               | 0.3.0         |
+| `gravitino.authenticator.oauth.defaultSignKey`  | The signing key of JWT when Gravitino uses OAuth as the authenticator      | ``                | 0.3.0         |
+| `gravitino.authenticator.oauth.serverUri`       | The uri of the default OAuth server                                        | ``                | 0.3.0         |
+| `gravitino.authenticator.oauth.tokenPath`       | The path for token of the default OAuth server                             | ``                | 0.3.0         |
 
 The signature algorithms that Gravitino supports follows:
 

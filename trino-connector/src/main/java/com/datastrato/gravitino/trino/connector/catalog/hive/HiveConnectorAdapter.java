@@ -30,13 +30,14 @@ public class HiveConnectorAdapter implements CatalogConnectorAdapter {
     this.catalogConverter = new HiveCatalogPropertyConverter();
   }
 
-  public Map<String, Object> buildInternalConnectorConfig(GravitinoCatalog catalog) {
+  public Map<String, Object> buildInternalConnectorConfig(GravitinoCatalog catalog)
+      throws Exception {
     Map<String, Object> config = new HashMap<>();
     config.put("catalogHandle", catalog.getName() + ":normal:default");
     config.put("connectorName", "hive");
 
     Map<String, Object> properties = new HashMap<>();
-    properties.put("hive.metastore.uri", catalog.getProperties("metastore.uris", ""));
+    properties.put("hive.metastore.uri", catalog.getRequiredProperty("metastore.uris"));
     Map<String, String> trinoProperty = catalogConverter.toTrinoProperties(catalog.getProperties());
 
     // Trino only supports properties that define in catalogPropertyMeta, the name of entries in
