@@ -221,7 +221,6 @@
    Jackson Annotations
    Jackson Core
    Jackson Databind
-   Jackson Dataformat Yaml
    Jackson Datatype Guava
    Jackson Datatype JDK8
    Jackson Datatype Joda
@@ -282,6 +281,8 @@
    ApacheDS I18n
    ApacheDS Protocol Kerberos Codec
    Apache Hadoop
+   Apache Hadoop HDFS Client
+   Apache Hadoop Yarn Client
    Apache Hive
    Apache HTrace
    Apache HttpClient
@@ -296,6 +297,7 @@
    Apache Thrift
    Apache Velocity
    Apache Groovy
+   Apache Yetus
    Jackson JSON processor
    DataNucleus
    Modernizer Maven Plugin
@@ -311,6 +313,7 @@
    Apache Xerces Java
    Apache XML Commons XML APIs
    Jettison
+   Woodstox Core
 
    This product bundles various third-party components also under the
    Apache Software Foundation License 1.1
@@ -330,11 +333,13 @@
    Jakarta XML Binding
    JLine
    XMLenc
+   Stax2 API
 
    This product bundles various third-party components also under the
    MIT license
 
    SLF4J
+   SLF4J-API
    Checker Framework
    Janino Common Compiler
    Protocol Buffers
@@ -358,6 +363,8 @@
 
    Logback
    Eclipse Jetty
+   Eclipse Jetty Webapp
+   Eclipse Jetty XML
    JTA
 
    This product bundles various third-party components also under the
