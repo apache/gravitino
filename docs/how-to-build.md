@@ -84,7 +84,7 @@ Note:
     distribution/package/bin/gravitino.sh start
     ```
 
-   You can access the Gravitino WEB UI by typing http://localhost:8090 in your browser
+   You can access the Gravitino Web UI by typing http://localhost:8090 in your browser
 
    > Note: 
    > 
