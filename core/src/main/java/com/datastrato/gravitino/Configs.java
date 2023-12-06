@@ -27,21 +27,21 @@ public interface Configs {
 
   ConfigEntry<String> ENTITY_STORE =
       new ConfigBuilder(ENTITY_STORE_KEY)
-          .doc("The entity store to use")
+          .doc("Which storage implementation to use")
           .version("0.1.0")
           .stringConf()
           .createWithDefault(DEFAULT_ENTITY_STORE);
 
   ConfigEntry<String> ENTITY_KV_STORE =
       new ConfigBuilder(ENTITY_KV_STORE_KEY)
-          .doc("The kv entity store to use")
+          .doc("Detailed implementation of Kv storage")
           .version("0.1.0")
           .stringConf()
           .createWithDefault(DEFAULT_ENTITY_KV_STORE);
 
   ConfigEntry<String> ENTRY_KV_ROCKSDB_BACKEND_PATH =
       new ConfigBuilder(ENTITY_KV_ROCKSDB_BACKEND_PATH_KEY)
-          .doc("The RocksDB backend path for entity store")
+          .doc("Directory path of `RocksDBKvBackend`")
           .version("0.1.0")
           .stringConf()
           .createWithDefault(DEFAULT_KV_ROCKSDB_BACKEND_PATH);
@@ -76,7 +76,7 @@ public interface Configs {
 
   ConfigEntry<Long> STORE_TRANSACTION_MAX_SKEW_TIME =
       new ConfigBuilder("gravitino.entity.store.maxTransactionSkewTimeMs")
-          .doc("Max time skew allowed for transaction, Unit: millisecond")
+          .doc("The maximum skew time of transactions in milliseconds")
           .version("0.3.0")
           .longConf()
           .createWithDefault(2000L);
@@ -84,7 +84,7 @@ public interface Configs {
   ConfigEntry<Long> KV_DELETE_AFTER_TIME =
       new ConfigBuilder(KV_DELETE_AFTER_TIME_KEY)
           .doc(
-              "The max time that the deleted data and old version data will keep, unit: millisecond. At least 10 minutes and should not larger than 30 days ")
+              "The maximum time in milliseconds that the deleted data and old version data is kept")
           .version("0.3.0")
           .longConf()
           .createWithDefault(DEFAULT_KV_DELETE_AFTER_TIME);

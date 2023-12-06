@@ -78,9 +78,9 @@ Example JSON:
 
 ### Schema properties
 
-| Property name       | Description                                                                                                                                                     | example value                            | Since version |
-|---------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------|---------------|
-| `location`          | Hive uses the value hive.metastore.warehouse.dir in the Hive configuration file hive-site.xml by default for the directory of Hive database storage. | `/user/hive/warehouse`                   | 0.1.0         |
+| Property name       | Description                                                                                                                                  | example value                            | Since version |
+|---------------------|----------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------|---------------|
+| `location`          | The directory for Hive database storage. Not required, HMS uses the value of `hive.metastore.warehouse.dir` in the hive-site.xml by default. | `/user/hive/warehouse`                   | 0.1.0         |
 
 ## Creating an Apache Hive Table
 

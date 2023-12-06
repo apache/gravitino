@@ -53,11 +53,11 @@ http://{GravitinoServerHost}:8090/api/metalakes/{Your_metalake_name}/catalogs
 
 ### Catalog configuration
 
-| Configuration item | Description                                      | value                                                                                                  |
-|--------------------|--------------------------------------------------|--------------------------------------------------------------------------------------------------------|
-| `catalog-backend`  | Catalog backend of Gravitino Iceberg             | `hive` or `jdbc`                                                                                       |
-| `uri`              | Hive metadata address or JDBC connection address | `thrift://127.0.0.1:9083` or `jdbc:postgresql://127.0.0.1:5432/` or `jdbc:mysql://127.0.0.1:3306/test` |
-| `warehouse`        | Warehouse directory of Catalog                   | `/user/hive/warehouse-hive/`  or `hdfs://namespace/hdfs/path`                                          |
+| Configuration item | Description                                   | value                                                                                                  |
+|--------------------|-----------------------------------------------|--------------------------------------------------------------------------------------------------------|
+| `catalog-backend`  | Catalog backend of Gravitino Iceberg catalog. | `hive` or `jdbc`                                                                                       |
+| `uri`              | The uri config of the Iceberg catalog.        | `thrift://127.0.0.1:9083` or `jdbc:postgresql://127.0.0.1:5432/` or `jdbc:mysql://127.0.0.1:3306/test` |
+| `warehouse`        | Warehouse directory of catalog.               | `/user/hive/warehouse-hive/`  or `hdfs://namespace/hdfs/path`                                          |
 
 ### HDFS configuration
 
@@ -138,15 +138,15 @@ Iceberg lacks distribution support. For buckets, consider using partitions inste
 
 Gravitino reserves the following fields, and you can't pass them in properties.
 
-| Configuration item        | Description                                               |
-|---------------------------|-----------------------------------------------------------|
-| `comment`                 | The table comment.                                        |
-| `creator`                 | The table creator.                                        |
-| `location`                | Iceberg location for table storage.                       |
+| Configuration item        | Description                                             |
+|---------------------------|---------------------------------------------------------|
+| `comment`                 | The table comment.                                      |
+| `creator`                 | The table creator.                                      |
+| `location`                | Iceberg location for table storage.                     |
 | `current-snapshot-id`     | The snapshot represents the current state of the table. |
-| `cherry-pick-snapshot-id` | Selecting a specific snapshot in a merge operation.      |
-| `sort-order`              | Selecting a specific snapshot in a merge operation.      |
-| `identifier-fields`       | The identifier fields for defining the table.           |
+| `cherry-pick-snapshot-id` | Selecting a specific snapshot in a merge operation.     |
+| `sort-order`              | Selecting a specific snapshot in a merge operation.     |
+| `identifier-fields`       | The identifier field(s) for defining the table.         |
 
 Regarding Iceberg's properties, you can refer to [official documentation](https://iceberg.apache.org/docs/1.3.1/configuration/).
 
