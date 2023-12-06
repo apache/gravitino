@@ -230,7 +230,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
     // Add table properties if any
     if (MapUtils.isNotEmpty(properties)) {
       // TODO #804 will add properties
-      throw new UnsupportedOperationException("Properties are not supported yet");
+      throw new IllegalArgumentException("Properties are not supported yet");
     }
 
     sqlBuilder.append(";");
@@ -287,7 +287,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
     // Add column properties if specified
     if (CollectionUtils.isNotEmpty(column.getProperties())) {
       // TODO #804 will add properties
-      throw new UnsupportedOperationException("Properties are not supported yet");
+      throw new IllegalArgumentException("Properties are not supported yet");
     }
     return sqlBuilder;
   }
@@ -319,7 +319,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
         lazyLoadTable = getOrCreateTable(schemaName, tableName, lazyLoadTable);
         alterSql.add(updateCommentDefinition((TableChange.UpdateComment) change, lazyLoadTable));
       } else if (change instanceof TableChange.SetProperty) {
-        throw new UnsupportedOperationException("Set property is not supported yet");
+        throw new IllegalArgumentException("Set property is not supported yet");
       } else if (change instanceof TableChange.RemoveProperty) {
         // PostgreSQL does not support deleting table attributes, it can be replaced by Set Property
         throw new IllegalArgumentException("Remove property is not supported yet");
@@ -453,7 +453,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
 
     // Append position if available
     if (!(addColumn.getPosition() instanceof TableChange.Default)) {
-      throw new UnsupportedOperationException(
+      throw new IllegalArgumentException(
           "PostgreSQL does not support column position in gravitino.");
     }
     result.add(columnDefinition.append(";").toString());
