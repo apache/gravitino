@@ -42,6 +42,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -228,6 +229,29 @@ public class RelationalCatalog extends CatalogDTO implements TableCatalog, Suppo
 
     } catch (Exception e) {
       LOG.warn("Failed to drop table {}", ident, e);
+      return false;
+    }
+  }
+
+  @Override
+  public boolean purgeTable(NameIdentifier ident) throws UnsupportedOperationException {
+    NameIdentifier.checkTable(ident);
+
+    Map<String, String> params = new HashMap<>();
+    params.put("purge", "true");
+    try {
+      DropResponse resp =
+          restClient.delete(
+              formatTableRequestPath(ident.namespace()) + "/" + ident.name(),
+              params,
+              DropResponse.class,
+              Collections.emptyMap(),
+              ErrorHandlers.tableErrorHandler());
+      resp.validate();
+      return resp.dropped();
+
+    } catch (Exception e) {
+      LOG.warn("Failed to purge table {}", ident, e);
       return false;
     }
   }

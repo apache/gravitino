@@ -61,6 +61,7 @@ import com.google.common.collect.ImmutableMap;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 import org.apache.hc.core5.http.Method;
 import org.junit.jupiter.api.Assertions;
@@ -912,6 +913,29 @@ public class TestRelationalCatalog extends TestBase {
     buildMockResource(Method.DELETE, tablePath, null, errorResp, SC_INTERNAL_SERVER_ERROR);
 
     Assertions.assertFalse(catalog.asTableCatalog().dropTable(tableId));
+  }
+
+  @Test
+  public void testPurgeTable() throws JsonProcessingException {
+    NameIdentifier tableId = NameIdentifier.of(metalakeName, catalogName, "schema1", "table1");
+    String tablePath =
+            withSlash(
+                    RelationalCatalog.formatTableRequestPath(tableId.namespace()) + "/" + tableId.name());
+    DropResponse resp = new DropResponse(true);
+    buildMockResource(Method.DELETE, tablePath, null, resp, SC_OK);
+
+    Assertions.assertTrue(catalog.asTableCatalog().purgeTable(tableId));
+
+    // return false
+    resp = new DropResponse(false);
+    buildMockResource(Method.DELETE, tablePath, null, resp, SC_OK);
+    Assertions.assertFalse(catalog.asTableCatalog().purgeTable(tableId));
+
+    // Test with exception
+    ErrorResponse errorResp = ErrorResponse.internalError("internal error");
+    buildMockResource(Method.DELETE, tablePath, null, errorResp, SC_INTERNAL_SERVER_ERROR);
+
+    Assertions.assertFalse(catalog.asTableCatalog().purgeTable(tableId));
   }
 
   private void testAlterTable(NameIdentifier ident, TableUpdateRequest req, TableDTO updatedTable)

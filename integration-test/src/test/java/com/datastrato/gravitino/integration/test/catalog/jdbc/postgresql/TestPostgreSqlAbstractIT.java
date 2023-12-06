@@ -22,7 +22,7 @@ public class TestPostgreSqlAbstractIT extends TestJdbcAbstractIT {
   @BeforeAll
   public static void startup() {
     CONTAINER =
-        new PostgreSQLContainer<>()
+        new PostgreSQLContainer<>("postgres:9.6.12")
             .withDatabaseName(TEST_DB_NAME)
             .withUsername("root")
             .withPassword("root");
