@@ -33,6 +33,8 @@ jobs:
               - server-common/**
               - trino-connect/**
               - web/**
+    outputs:
+      source_changes: ${{ steps.filter.outputs.source_changes }}
 
   # Integration test for AMD64 architecture
   test-amd64-arch:
