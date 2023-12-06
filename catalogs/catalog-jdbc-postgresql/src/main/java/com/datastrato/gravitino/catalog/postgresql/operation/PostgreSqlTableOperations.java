@@ -339,8 +339,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
             updateColumnCommentFieldDefinition(
                 (TableChange.UpdateColumnComment) change, tableName));
       } else if (change instanceof TableChange.UpdateColumnPosition) {
-        throw new UnsupportedOperationException(
-            "PostgreSQL does not support column position in gravitino.");
+        throw new IllegalArgumentException("PostgreSQL does not support column position.");
       } else if (change instanceof TableChange.DeleteColumn) {
         TableChange.DeleteColumn deleteColumn = (TableChange.DeleteColumn) change;
         alterSql.add(deleteColumnFieldDefinition(deleteColumn, tableName));
