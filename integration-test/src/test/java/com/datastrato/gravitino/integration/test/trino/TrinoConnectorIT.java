@@ -503,7 +503,7 @@ public class TrinoConnectorIT extends AbstractIT {
   }
 
   @Test
-  void testHiveCatalogCreatedByGravitino() {
+  void testHiveCatalogCreatedByGravitino() throws InterruptedException {
     String catalogName = GravitinoITUtils.genRandomName("catalog").toLowerCase();
     GravitinoMetaLake createdMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
     createdMetalake.createCatalog(
@@ -519,15 +519,45 @@ public class TrinoConnectorIT extends AbstractIT {
                     containerSuite.getHiveContainer().getContainerIpAddress(),
                     HiveContainer.HIVE_METASTORE_PORT))
             .put("hive.immutable-partitions", "true")
-            .put("hive.target-max-file-size", "2GB")
+            // it should be like '1GB, 1MB', we make it wrong purposely.
+            .put("hive.target-max-file-size", "xxxx")
             .put("hive.create-empty-bucket-files", "true")
             .put("hive.validate-bucketing", "true")
             .build());
     Catalog catalog = createdMetalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
     Assertions.assertEquals("true", catalog.properties().get("hive.immutable-partitions"));
-    Assertions.assertEquals("2GB", catalog.properties().get("hive.immutable-partitions"));
+    Assertions.assertEquals("xxxx", catalog.properties().get("hive.target-max-file-size"));
     Assertions.assertEquals("true", catalog.properties().get("hive.create-empty-bucket-files"));
     Assertions.assertEquals("true", catalog.properties().get("hive.validate-bucketing"));
+
+    Thread.sleep(4000);
+
+    String sql = String.format("show catalogs like '%s.%s'", metalakeName, catalogName);
+    // Because we assign 'hive.target-max-file-size' a wrong value, trino can't load the catalog
+    Assertions.assertTrue(containerSuite.getTrinoContainer().executeQuerySQL(sql).isEmpty());
+
+    createdMetalake.createCatalog(
+        NameIdentifier.of(metalakeName, catalogName + "_good"),
+        Catalog.Type.RELATIONAL,
+        "hive",
+        "comment",
+        ImmutableMap.<String, String>builder()
+            .put(
+                "metastore.uris",
+                String.format(
+                    "thrift://%s:%s",
+                    containerSuite.getHiveContainer().getContainerIpAddress(),
+                    HiveContainer.HIVE_METASTORE_PORT))
+            .put("hive.immutable-partitions", "true")
+            // it should be like '1GB, 1MB', we make it wrong purposely.
+            .put("hive.create-empty-bucket-files", "true")
+            .put("hive.validate-bucketing", "true")
+            .build());
+
+    Thread.sleep(4000);
+    sql = String.format("show catalogs like '%s.%s'", metalakeName, catalogName + "_good");
+    String data = containerSuite.getTrinoContainer().executeQuerySQL(sql).get(0).get(0);
+    Assertions.assertEquals(metalakeName + "." + catalogName + "_good", data);
   }
 
   private static void createMetalake() {
