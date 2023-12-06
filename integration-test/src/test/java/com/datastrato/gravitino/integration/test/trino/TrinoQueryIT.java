@@ -103,6 +103,7 @@ public class TrinoQueryIT {
         properties.put("uri", hiveMetastoreUri);
         properties.put("catalog-backend", "hive");
         properties.put("warehouse", "hdfs://localhost:9000/user/iceberg/warehouse/TrinoQueryIT");
+
         createCatalog("lakehouse-iceberg", "lakehouse-iceberg", properties);
       }
 
@@ -187,6 +188,9 @@ public class TrinoQueryIT {
   }
 
   private static void dropCatalog(String catalogName) {
+    if (metalake == null) {
+      return;
+    }
     boolean exists = metalake.catalogExists(NameIdentifier.of(metalakeName, catalogName));
     if (!exists) {
       return;

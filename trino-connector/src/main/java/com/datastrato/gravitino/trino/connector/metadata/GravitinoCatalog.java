@@ -32,7 +32,7 @@ public class GravitinoCatalog {
   }
 
   public String getRequiredProperty(String name) throws Exception {
-    String value = catalog.properties().getOrDefault(name, null);
+    String value = catalog.properties().getOrDefault(name, "");
     if (Strings.isBlank(value)) {
       throw new TrinoException(GRAVITINO_MISSING_CONFIG, "Missing required config: " + name);
     }
