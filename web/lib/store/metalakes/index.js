@@ -13,7 +13,7 @@ import {
   getMetalakeDetailsApi
 } from '@/lib/api/metalakes'
 
-import { getCatalogsApi, getCatalogDetailsApi } from '@/lib/api/catalogs'
+import { getCatalogsApi, getCatalogDetailsApi, createCatalogApi } from '@/lib/api/catalogs'
 import { getSchemasApi, getSchemaDetailsApi } from '@/lib/api/schemas'
 import { getTablesApi, getTableDetailsApi } from '@/lib/api/tables'
 
@@ -151,7 +151,7 @@ export const initMetalakeTree = createAsyncThunk(
 
 export const setIntoTreeAction = createAsyncThunk(
   'appMetalakes/setIntoTreeAction',
-  async (nodeIds, { getState, dispatch }) => {
+  async ({ catalogItem, nodeIds }, { getState, dispatch }) => {
     const nodeArr = nodeIds[0].split('____')
     const [metalake, catalog, schema, table] = nodeArr
 
@@ -159,6 +159,8 @@ export const setIntoTreeAction = createAsyncThunk(
       updated: '',
       id: nodeIds[0],
       metalake,
+      catalogs: [],
+      catalogItem,
       catalog,
       schemas: [],
       schema,
@@ -166,7 +168,15 @@ export const setIntoTreeAction = createAsyncThunk(
       table
     }
 
-    if (nodeArr.length === 2) {
+    if (nodeArr.length === 1) {
+      const catalogs = await dispatch(fetchCatalogs({ metalake }))
+
+      data.updated = 'metalake'
+      data.catalogs = catalogs.payload.catalogs
+      data.catalogItem = catalogItem
+
+      return data
+    } else if (nodeArr.length === 2) {
       const schemas = await dispatch(fetchSchemas({ metalake, catalog }))
 
       data.updated = 'catalog'
@@ -231,6 +241,23 @@ export const getCatalogDetails = createAsyncThunk('appMetalakes/getCatalogDetail
 
   return resCatalog
 })
+
+export const createCatalog = createAsyncThunk(
+  'appMetalakes/createCatalog',
+  async ({ data, metalake }, { dispatch }) => {
+    try {
+      const response = await createCatalogApi({ data, metalake })
+
+      const { catalog: catalogItem } = response.data
+
+      dispatch(setIntoTreeAction({ catalogItem, nodeIds: [metalake] }))
+
+      return response.catalog
+    } catch (error) {
+      throw new Error(error)
+    }
+  }
+)
 
 export const fetchSchemas = createAsyncThunk('appMetalakes/fetchSchemas', async ({ init, page, metalake, catalog }) => {
   try {
@@ -344,6 +371,21 @@ export const appMetalakesSlice = createSlice({
       state.metalakeTree = action.payload
     })
     builder.addCase(setIntoTreeAction.fulfilled, (state, action) => {
+      if (action.payload.updated === 'metalake') {
+        const catalogItem = {
+          namespace: [action.payload.metalake],
+          node: 'catalog',
+          id: `${action.payload.metalake}____${action.payload.catalogItem.name}`,
+          path: `?${new URLSearchParams({
+            metalake: action.payload.metalake,
+            catalog: action.payload.catalogItem.name
+          }).toString()}`,
+          name: action.payload.catalogItem.name,
+          schemas: []
+        }
+        state.metalakeTree.push(catalogItem)
+        state.tableData = action.payload.catalogs
+      }
       if (action.payload.updated === 'catalog') {
         const catalogIndex = state.metalakeTree.findIndex(i => i.id === action.payload.id)
         state.metalakeTree[catalogIndex].schemas = action.payload.schemas

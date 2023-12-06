@@ -27,7 +27,6 @@ const MetalakePage = () => {
       schema: params.get('schema'),
       table: params.get('table')
     })
-    console.log(params)
   }, [params])
 
   // console.log(params.get('metalake'))
