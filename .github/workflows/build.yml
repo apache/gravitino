@@ -24,16 +24,23 @@ jobs:
           filters: |
             source_changes:
               - api/**
+              - bin/**
               - catalogs/**
               - clients/**
               - common/**
+              - conf/**
               - core/**
+              - dev/**
+              - gradle/**
               - integration-test/**
               - meta/**
               - server/**
               - server-common/**
-              - trino-connect/**
+              - trino-connector/**
               - web/**
+              - gradle.properties
+              - gradlew
+              - setting.gradle.kts
     outputs:
       source_changes: ${{ steps.filter.outputs.source_changes }}
 
