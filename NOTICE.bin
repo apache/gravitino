@@ -75,20 +75,26 @@ This product includes software developed by
 The Android Open Source Project
 
 Apache Commons BeanUtils
-Copyright 2000-2008 The Apache Software Foundation
+Copyright 2000-2019 The Apache Software Foundation
 
 Apache Commons CLI
 Copyright 2001-2009 The Apache Software Foundation
 
 Apache Commons Codec
-Copyright 2002-2013 The Apache Software Foundation
+Copyright 2002-2017 The Apache Software Foundation
 
 src/test/org/apache/commons/codec/language/DoubleMetaphoneTest.java
 contains test data from http://aspell.net/test/orig/batch0.tab.
 Copyright (C) 2002 Kevin Atkinson (kevina@gnu.org)
 
+The content of package org.apache.commons.codec.language.bm has been translated
+from the original php source code available at http://stevemorse.org/phoneticinfo.htm
+with permission from the original authors.
+Original source copyright:
+Copyright (c) 2008 Alexander Beider & Stephen P. Morse.
+
 Apache Commons Collections
-Copyright 2001-2019 The Apache Software Foundation
+Copyright 2001-2015 The Apache Software Foundation
 
 Apache Commons Configuration
 Copyright 2001-2008 The Apache Software Foundation
@@ -106,10 +112,10 @@ Apache Jakarta HttpClient
 Copyright 1999-2007 The Apache Software Foundation
 
 Apache Commons IO
-Copyright 2002-2021 The Apache Software Foundation
+Copyright 2002-2023 The Apache Software Foundation
 
 Apache Commons Lang
-Copyright 2001-2021 The Apache Software Foundation
+Copyright 2001-2023 The Apache Software Foundation
 
 Apache Commons Logging
 Copyright 2003-2014 The Apache Software Foundation
@@ -231,14 +237,11 @@ WebSocket and HTTP server:
 Apache Java Data Objects (JDO)
 Copyright 2005-2006 The Apache Software Foundation
 
-=============================================================================
-= NOTICE file corresponding to section 4d of the Apache License Version 2.0 =
-=============================================================================
 This product includes software developed by
 Joda.org (https://www.joda.org/).
 
 Apache log4j
-Copyright 2007 The Apache Software Foundation
+Copyright 2010 The Apache Software Foundation
 
 Byte Buddy
 Copyright 2014 - Present Rafael Winterhalter
@@ -262,6 +265,10 @@ Copyright (C) 2005 Dynamo BI Corporation
 Apache Ant
 Copyright 1999-2013 The Apache Software Foundation
 
+The <sync> task is based on code Copyright (c) 2002, Landmark
+Graphics Corp that has been kindly donated to the Apache Software
+Foundation.
+
 Apache Avro
 Copyright 2009-2022 The Apache Software Foundation
 
@@ -272,13 +279,13 @@ Apache Commons Math
 Copyright 2001-2012 The Apache Software Foundation
 
 Curator Client
-Copyright 2011-2015 The Apache Software Foundation
+Copyright 2011-2018 The Apache Software Foundation
 
 Curator Framework
-Copyright 2011-2015 The Apache Software Foundation
+Copyright 2011-2018 The Apache Software Foundation
 
 Curator Recipes
-Copyright 2011-2015 The Apache Software Foundation
+Copyright 2011-2018 The Apache Software Foundation
 
 Apache Derby
 Copyright 2004-2014 The Apache Software Foundation
@@ -458,8 +465,8 @@ Copyright 2021 The Apache Software Foundation
 Hive Shims Scheduler
 Copyright 2021 The Apache Software Foundation
 
-htrace-core
-Copyright 2015 The Apache Software Foundation
+htrace-core4
+Copyright 2016 The Apache Software Foundation
 
 Apache HttpClient
 Copyright 1999-2021 The Apache Software Foundation
@@ -561,7 +568,7 @@ Portions of this software were originally based on the following:
     software copyright (c) 1999.
 
 Apache XML Commons XML APIs
-Copyright 2006 The Apache Software Foundation.
+Copyright 1999-2009 The Apache Software Foundation.
 
 Portions of this software were originally based on the following:
   - software copyright (c) 1999, IBM Corporation., http://www.ibm.com.
@@ -570,8 +577,9 @@ Portions of this software were originally based on the following:
 
 Apache Yetus
 Copyright 2008-2022 The Apache Software Foundation
-This product includes software developed by The Apache Software
-Foundation (http://www.apache.org/).
+
+Apache Yetus - Audience Annotations
+Copyright 2015-2017 The Apache Software Foundation
 
 The binary distribution of this product bundles binaries of Gson 2.2.4.
 
@@ -756,7 +764,7 @@ Xerces2 Java Parser 2.9.1,
 which has the following notices:
 
    Apache Xerces Java
-   Copyright 1999-2007 The Apache Software Foundation
+   Copyright 1999-2018 The Apache Software Foundation
 
    Portions of this software were originally based on the following:
      - software copyright (c) 1999, IBM Corporation., http://www.ibm.com.
@@ -764,3 +772,22 @@ which has the following notices:
      - voluntary contributions made by Paul Eng on behalf of the
        Apache Software Foundation that were originally developed at iClick, Inc.,
        software copyright (c) 1999.
+
+Prometheus instrumentation library for JVM applications
+Copyright 2012-2015 The Prometheus Authors
+
+This product includes software developed at
+Boxever Ltd. (http://www.boxever.com/).
+
+This product includes software developed at
+SoundCloud Ltd. (http://soundcloud.com/).
+
+This product includes software developed as part of the
+Ocelli project by Netflix Inc. (https://github.com/Netflix/ocelli/).
+
+Apache ZooKeeper
+Copyright 2009-2022 The Apache Software Foundation
+
+This product includes software components originally
+developed for Airlift (https://github.com/airlift/airlift),
+licensed under the Apache 2.0 license.
