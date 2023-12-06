@@ -15,50 +15,18 @@ import java.util.Map;
 public class IcebergPropertyMeta implements HasPropertyMeta {
 
   // Value is whether this property is reserved and cannot be used by users
+  // TODO (yuqi) add more properties
   public static final Map<PropertyMetadata<?>, Boolean> TABLE_PROPERTY_TO_RESERVED_MAP =
-      new ImmutableMap.Builder()
-          .put(
-              PropertyMetadata.stringProperty(
-                  "location", "Iceberg location for table storage", null, false),
-              true)
-          .put(PropertyMetadata.stringProperty("comment", "Table comment", null, false), true)
-          .put(PropertyMetadata.stringProperty("creator", "Table creator info", null, false), true)
-          .put(
-              PropertyMetadata.stringProperty(
-                  "current-snapshot-id",
-                  "The snapshot representing the current state of the table",
-                  null,
-                  false),
-              true)
-          .put(
-              PropertyMetadata.stringProperty(
-                  "cherry-pick-snapshot-id",
-                  "Selecting a specific snapshots in a merge operation",
-                  null,
-                  false),
-              true)
-          .put(
-              PropertyMetadata.stringProperty(
-                  "sort-order", "Selecting a specific snapshots in a merge operation", null, false),
-              true)
-          .put(
-              PropertyMetadata.stringProperty(
-                  "identifier-fields",
-                  "The identifier field(s) for defining the table",
-                  null,
-                  false),
-              true)
-          .build();
+      new ImmutableMap.Builder().build();
 
   public static final List<PropertyMetadata<?>> TABLE_PROPERTY_META =
       TABLE_PROPERTY_TO_RESERVED_MAP.entrySet().stream()
           .map(Map.Entry::getKey)
           .collect(ImmutableList.toImmutableList());
 
+  // TODO (yuqi) add more properties
   public static final Map<PropertyMetadata<?>, Boolean> SCHEMA_PROPERTY_TO_RESERVED_MAP =
-      new ImmutableMap.Builder()
-          .put(PropertyMetadata.stringProperty("comment", "schema comment", null, false), true)
-          .build();
+      new ImmutableMap.Builder().build();
 
   public static final List<PropertyMetadata<?>> SCHEMA_PROPERTY_META =
       SCHEMA_PROPERTY_TO_RESERVED_MAP.entrySet().stream()

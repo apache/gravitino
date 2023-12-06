@@ -13,8 +13,7 @@ public class IcebergSchemaPropertyConverter extends PropertyConverter {
 
   // TODO (yuqi) add more properties
   private static final TreeBidiMap<String, String> TRINO_ICEBERG_TO_GRAVITINO_ICEBERG =
-      new TreeBidiMap<>(
-          new ImmutableMap.Builder<String, String>().build());
+      new TreeBidiMap<>(new ImmutableMap.Builder<String, String>().build());
 
   @Override
   public TreeBidiMap<String, String> trinoPropertyKeyToGravitino() {
