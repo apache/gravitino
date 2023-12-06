@@ -233,29 +233,6 @@ public class RelationalCatalog extends CatalogDTO implements TableCatalog, Suppo
     }
   }
 
-  @Override
-  public boolean purgeTable(NameIdentifier ident) throws UnsupportedOperationException {
-    NameIdentifier.checkTable(ident);
-
-    Map<String, String> params = new HashMap<>();
-    params.put("purge", "true");
-    try {
-      DropResponse resp =
-          restClient.delete(
-              formatTableRequestPath(ident.namespace()) + "/" + ident.name(),
-              params,
-              DropResponse.class,
-              Collections.emptyMap(),
-              ErrorHandlers.tableErrorHandler());
-      resp.validate();
-      return resp.dropped();
-
-    } catch (Exception e) {
-      LOG.warn("Failed to purge table {}", ident, e);
-      return false;
-    }
-  }
-
   /**
    * Purge the table with specified identifier.
    *
