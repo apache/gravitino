@@ -16,28 +16,28 @@ public interface OAuthConfig extends Configs {
 
   ConfigEntry<String> SERVICE_AUDIENCE =
       new ConfigBuilder(OAUTH_CONFIG_PREFIX + "serviceAudience")
-          .doc("The audience name when Gravitino uses oauth as the authenticator")
+          .doc("The audience name when Gravitino uses OAuth as the authenticator")
           .version("0.3.0")
           .stringConf()
           .createWithDefault("GravitinoServer");
 
   ConfigEntry<Long> ALLOW_SKEW_SECONDS =
       new ConfigBuilder(OAUTH_CONFIG_PREFIX + "allowSkewSecs")
-          .doc("The jwt allows skew seconds when Gravitino uses oauth as the authenticator")
+          .doc("The JWT allows skew seconds when Gravitino uses OAuth as the authenticator")
           .version("0.3.0")
           .longConf()
           .createWithDefault(0L);
 
   ConfigEntry<String> DEFAULT_SIGN_KEY =
       new ConfigBuilder(OAUTH_CONFIG_PREFIX + "defaultSignKey")
-          .doc("The sign key of jwt when Gravitino uses oauth as the authenticator")
+          .doc("The signing key of JWT when Gravitino uses OAuth as the authenticator")
           .version("0.3.0")
           .stringConf()
           .createWithDefault("");
 
   ConfigEntry<String> SIGNATURE_ALGORITHM_TYPE =
       new ConfigBuilder(OAUTH_CONFIG_PREFIX + "signAlgorithmType")
-          .doc("The signature algorithm when Gravitino uses oauth as the authenticator")
+          .doc("The signature algorithm when Gravitino uses OAuth as the authenticator")
           .version("0.3.0")
           .stringConf()
           .createWithDefault(SignatureAlgorithm.RS256.name());
