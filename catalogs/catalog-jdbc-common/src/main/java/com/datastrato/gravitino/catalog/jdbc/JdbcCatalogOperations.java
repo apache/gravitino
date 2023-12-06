@@ -40,6 +40,7 @@ import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.utils.MapUtils;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -105,13 +106,19 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
   @Override
   public void initialize(Map<String, String> conf) throws RuntimeException {
     // Key format like gravitino.bypass.a.b
-    Map<String, String> resultConf =
-        Maps.newHashMap(MapUtils.getPrefixMap(conf, CATALOG_BYPASS_PREFIX));
+    Map<String, String> prefixMap = MapUtils.getPrefixMap(conf, CATALOG_BYPASS_PREFIX);
+
+    // Hold keys that lie in JDBC_IMMUTABLE_PROPERTIES
+    this.jdbcCatalogPropertiesMetadata = new JdbcCatalogPropertiesMetadata();
+    Map<String, String> gravitinoConfig =
+        this.jdbcCatalogPropertiesMetadata.transformProperties(conf);
+    Map<String, String> resultConf = Maps.newHashMap(prefixMap);
+    resultConf.putAll(gravitinoConfig);
+
     JdbcConfig jdbcConfig = new JdbcConfig(resultConf);
     this.dataSource = DataSourceUtils.createDataSource(jdbcConfig);
-    this.databaseOperation.initialize(dataSource, exceptionConverter);
-    this.tableOperation.initialize(dataSource, exceptionConverter, jdbcTypeConverter);
-    this.jdbcCatalogPropertiesMetadata = new JdbcCatalogPropertiesMetadata();
+    this.databaseOperation.initialize(dataSource, exceptionConverter, resultConf);
+    this.tableOperation.initialize(dataSource, exceptionConverter, jdbcTypeConverter, resultConf);
     this.jdbcTablePropertiesMetadata = new JdbcTablePropertiesMetadata();
     this.jdbcSchemaPropertiesMetadata = new JdbcSchemaPropertiesMetadata();
   }
@@ -131,7 +138,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
    */
   @Override
   public NameIdentifier[] listSchemas(Namespace namespace) throws NoSuchCatalogException {
-    List<String> schemaNames = databaseOperation.list();
+    List<String> schemaNames = databaseOperation.listDatabases();
     return schemaNames.stream()
         .map(db -> NameIdentifier.of(namespace, db))
         .toArray(NameIdentifier[]::new);
@@ -170,7 +177,11 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
         .withName(ident.name())
         .withProperties(resultProperties)
         .withComment(comment)
-        .withAuditInfo(AuditInfo.EMPTY)
+        .withAuditInfo(
+            new AuditInfo.Builder()
+                .withCreator(currentUser())
+                .withCreateTime(Instant.now())
+                .build())
         .build();
   }
 
@@ -196,7 +207,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
     return new JdbcSchema.Builder()
         .withAuditInfo(load.auditInfo())
         .withName(load.name())
-        .withComment(load.comment())
+        .withComment(StringIdentifier.removeIdFromComment(load.comment()))
         .withProperties(properties)
         .build();
   }
@@ -239,7 +250,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
   @Override
   public NameIdentifier[] listTables(Namespace namespace) throws NoSuchSchemaException {
     String databaseName = NameIdentifier.of(namespace.levels()).name();
-    return tableOperation.list(databaseName).stream()
+    return tableOperation.listTables(databaseName).stream()
         .map(table -> NameIdentifier.of(namespace, table))
         .toArray(NameIdentifier[]::new);
   }
@@ -270,7 +281,9 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
         .withAuditInfo(load.auditInfo())
         .withName(tableName)
         .withColumns(load.columns())
-        .withComment(load.comment())
+        .withAuditInfo(load.auditInfo())
+        // Remove id from comment
+        .withComment(StringIdentifier.removeIdFromComment(load.comment()))
         .withProperties(properties)
         .build();
   }
@@ -380,7 +393,11 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
         partitioning);
 
     return new JdbcTable.Builder()
-        .withAuditInfo(AuditInfo.EMPTY)
+        .withAuditInfo(
+            new AuditInfo.Builder()
+                .withCreator(currentUser())
+                .withCreateTime(Instant.now())
+                .build())
         .withName(tableName)
         .withColumns(columns)
         .withComment(comment)

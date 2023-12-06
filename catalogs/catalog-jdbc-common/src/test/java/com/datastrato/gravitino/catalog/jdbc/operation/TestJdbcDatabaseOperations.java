@@ -13,6 +13,7 @@ import com.google.common.collect.Maps;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import javax.sql.DataSource;
@@ -65,7 +66,7 @@ public class TestJdbcDatabaseOperations {
 
   private static void createJdbcDatabaseOperations() {
     JDBC_DATABASE_OPERATIONS = new SqliteDatabaseOperations(BASE_FILE_DIR.getPath());
-    JDBC_DATABASE_OPERATIONS.initialize(DATA_SOURCE, EXCEPTION_MAPPER);
+    JDBC_DATABASE_OPERATIONS.initialize(DATA_SOURCE, EXCEPTION_MAPPER, Collections.emptyMap());
   }
 
   @Test
@@ -83,14 +84,14 @@ public class TestJdbcDatabaseOperations {
     Assertions.assertDoesNotThrow(() -> JDBC_DATABASE_OPERATIONS.create(database2, null, null));
 
     // list database
-    List<String> listDatabases = JDBC_DATABASE_OPERATIONS.list();
+    List<String> listDatabases = JDBC_DATABASE_OPERATIONS.listDatabases();
     Assertions.assertEquals(2, listDatabases.size());
     Assertions.assertTrue(listDatabases.contains(database1));
     Assertions.assertTrue(listDatabases.contains(database2));
 
     // drop database
     JDBC_DATABASE_OPERATIONS.delete(database1);
-    List<String> databases = JDBC_DATABASE_OPERATIONS.list();
+    List<String> databases = JDBC_DATABASE_OPERATIONS.listDatabases();
     Assertions.assertFalse(databases.contains(database1));
     Assertions.assertNotNull(JDBC_DATABASE_OPERATIONS.load(database2));
     JDBC_DATABASE_OPERATIONS.delete(database2);

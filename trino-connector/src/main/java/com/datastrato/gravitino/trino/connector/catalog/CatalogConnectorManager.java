@@ -42,7 +42,7 @@ import org.slf4j.LoggerFactory;
 public class CatalogConnectorManager {
   private static final Logger LOG = LoggerFactory.getLogger(CatalogConnectorManager.class);
 
-  private static final int CATALOG_LOAD_FREQUENCY_SECOND = 30;
+  private static final int CATALOG_LOAD_FREQUENCY_SECOND = 3;
   private static final int NUMBER_EXECUTOR_THREAD = 1;
 
   private final ScheduledExecutorService executorService;

@@ -273,8 +273,9 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
         throw new NoSuchMetalakeException("Metalake " + metalakeIdent + " does not exist");
       }
 
-      store.put(e, false /* overwrite */);
+      // TODO: should avoid a race condition here
       CatalogWrapper wrapper = catalogCache.get(ident, id -> createCatalogWrapper(e));
+      store.put(e, false /* overwrite */);
       return wrapper.catalog;
     } catch (EntityAlreadyExistsException e1) {
       LOG.warn("Catalog {} already exists", ident, e1);
@@ -282,6 +283,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
     } catch (IllegalArgumentException | NoSuchMetalakeException e2) {
       throw e2;
     } catch (Exception e3) {
+      catalogCache.invalidate(ident);
       LOG.error("Failed to create catalog {}", ident, e3);
       throw new RuntimeException(e3);
     }

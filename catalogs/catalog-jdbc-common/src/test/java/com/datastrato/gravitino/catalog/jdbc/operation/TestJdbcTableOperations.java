@@ -23,14 +23,15 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.stream.Collectors;
 import javax.sql.DataSource;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.ArrayUtils;
-import org.apache.commons.lang3.RandomUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -86,7 +87,8 @@ public class TestJdbcTableOperations {
 
   private static void createJdbcDatabaseOperations() {
     JDBC_TABLE_OPERATIONS = new SqliteTableOperations();
-    JDBC_TABLE_OPERATIONS.initialize(DATA_SOURCE, EXCEPTION_CONVERTER, TYPE_CONVERTER);
+    JDBC_TABLE_OPERATIONS.initialize(
+        DATA_SOURCE, EXCEPTION_CONVERTER, TYPE_CONVERTER, Collections.emptyMap());
   }
 
   @Test
@@ -121,7 +123,7 @@ public class TestJdbcTableOperations {
                 DATABASE_NAME, table1, jdbcColumns, null, properties, null));
 
     // list table.
-    List<String> allTables = JDBC_TABLE_OPERATIONS.list(DATABASE_NAME);
+    List<String> allTables = JDBC_TABLE_OPERATIONS.listTables(DATABASE_NAME);
     Assertions.assertEquals(1, allTables.size());
     Assertions.assertEquals(table1, allTables.get(0));
 
@@ -129,7 +131,7 @@ public class TestJdbcTableOperations {
     JdbcTable loadTable = JDBC_TABLE_OPERATIONS.load(DATABASE_NAME, table1);
     Assertions.assertNotNull(loadTable);
     Assertions.assertEquals(table1, loadTable.name());
-    Assertions.assertEquals(null, loadTable.comment());
+    Assertions.assertNull(loadTable.comment());
     Assertions.assertEquals(properties, loadTable.properties());
     Assertions.assertEquals(jdbcColumns.length, loadTable.columns().length);
     Map<String, JdbcColumn> createColumnMap =
@@ -140,7 +142,7 @@ public class TestJdbcTableOperations {
       Assertions.assertEquals(jdbcColumn.name(), column.name());
       Assertions.assertEquals(jdbcColumn.comment(), column.comment());
       Assertions.assertEquals(jdbcColumn.dataType(), column.dataType());
-      Assertions.assertEquals(jdbcColumn.nullable(), ((JdbcColumn) column).nullable());
+      Assertions.assertEquals(jdbcColumn.nullable(), column.nullable());
       Assertions.assertEquals(
           jdbcColumn.getDefaultValue(), ((JdbcColumn) column).getDefaultValue());
     }
@@ -153,7 +155,7 @@ public class TestJdbcTableOperations {
     Assertions.assertThrows(
         NoSuchTableException.class,
         () -> JDBC_TABLE_OPERATIONS.rename(DATABASE_NAME, "no_exist", newName));
-    allTables = JDBC_TABLE_OPERATIONS.list(DATABASE_NAME);
+    allTables = JDBC_TABLE_OPERATIONS.listTables(DATABASE_NAME);
     Assertions.assertEquals(newName, allTables.get(0));
 
     // Sqlite does not support modifying the column type of table
@@ -167,18 +169,19 @@ public class TestJdbcTableOperations {
 
     // delete table.
     JDBC_TABLE_OPERATIONS.drop(DATABASE_NAME, newName);
-    allTables = JDBC_TABLE_OPERATIONS.list(DATABASE_NAME);
+    allTables = JDBC_TABLE_OPERATIONS.listTables(DATABASE_NAME);
     Assertions.assertEquals(0, allTables.size());
   }
 
   private static JdbcColumn[] generateRandomColumn(int minSize, int maxSize) {
+    Random r = new Random();
     String prefixColName = "col_";
-    JdbcColumn[] columns = new JdbcColumn[RandomUtils.nextInt(minSize, maxSize)];
+    JdbcColumn[] columns = new JdbcColumn[r.nextInt(maxSize - minSize) + minSize];
     for (int j = 0; j < columns.length; j++) {
       columns[j] =
           new JdbcColumn.Builder()
               .withName(prefixColName + (j + 1))
-              .withNullable(RandomUtils.nextBoolean())
+              .withNullable(r.nextBoolean())
               .withType(getRandomGravitinoType())
               .build();
     }
@@ -187,8 +190,9 @@ public class TestJdbcTableOperations {
 
   private static Type getRandomGravitinoType() {
     Collection<Type> values = TYPE_CONVERTER.getGravitinoTypes();
+    Random r = new Random();
     return values.stream()
-        .skip(RandomUtils.nextInt(0, values.size()))
+        .skip(r.nextInt(values.size()))
         .findFirst()
         .orElseThrow(() -> new RuntimeException("No type found"));
   }

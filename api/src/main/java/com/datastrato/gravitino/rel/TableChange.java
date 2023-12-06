@@ -21,6 +21,8 @@
 package com.datastrato.gravitino.rel;
 
 import com.datastrato.gravitino.rel.types.Type;
+import java.util.Arrays;
+import java.util.Objects;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 
@@ -78,12 +80,12 @@ public interface TableChange {
    * If the new field is nested and its parent does not exist or is not a struct, the change will
    * result in an {@link IllegalArgumentException}.
    *
-   * @param fieldNames The field names of the new column.
+   * @param fieldName The field name of the new column.
    * @param dataType The new column's data type.
    * @return A TableChange for the addition.
    */
-  static TableChange addColumn(String[] fieldNames, Type dataType) {
-    return new AddColumn(fieldNames, dataType, null, null, true);
+  static TableChange addColumn(String[] fieldName, Type dataType) {
+    return new AddColumn(fieldName, dataType, null, null, true);
   }
 
   /**
@@ -93,13 +95,13 @@ public interface TableChange {
    * If the new field is nested and its parent does not exist or is not a struct, the change will
    * result in an {@link IllegalArgumentException}.
    *
-   * @param fieldNames The field names of the new column.
+   * @param fieldName The field name of the new column.
    * @param dataType The new column's data type.
    * @param comment The new field's comment string.
    * @return A TableChange for the addition.
    */
-  static TableChange addColumn(String[] fieldNames, Type dataType, String comment) {
-    return new AddColumn(fieldNames, dataType, comment, null, true);
+  static TableChange addColumn(String[] fieldName, Type dataType, String comment) {
+    return new AddColumn(fieldName, dataType, comment, null, true);
   }
 
   /**
@@ -109,15 +111,31 @@ public interface TableChange {
    * If the new field is nested and its parent does not exist or is not a struct, the change will
    * result in an {@link IllegalArgumentException}.
    *
-   * @param fieldNames Field names of the new column.
+   * @param fieldName The field name of the new column.
+   * @param dataType The new column's data type.
+   * @param position The new column's position.
+   * @return A TableChange for the addition.
+   */
+  static TableChange addColumn(String[] fieldName, Type dataType, ColumnPosition position) {
+    return new AddColumn(fieldName, dataType, null, position, true);
+  }
+
+  /**
+   * Create a TableChange for adding a column.
+   *
+   * <p>If the field already exists, the change will result in an {@link IllegalArgumentException}.
+   * If the new field is nested and its parent does not exist or is not a struct, the change will
+   * result in an {@link IllegalArgumentException}.
+   *
+   * @param fieldName Field name of the new column.
    * @param dataType The new column's data type.
    * @param comment The new field's comment string.
    * @param position The new column's position.
    * @return A TableChange for the addition.
    */
   static TableChange addColumn(
-      String[] fieldNames, Type dataType, String comment, ColumnPosition position) {
-    return new AddColumn(fieldNames, dataType, comment, position, true);
+      String[] fieldName, Type dataType, String comment, ColumnPosition position) {
+    return new AddColumn(fieldName, dataType, comment, position, true);
   }
 
   /**
@@ -127,27 +145,27 @@ public interface TableChange {
    * If the new field is nested and its parent does not exist or is not a struct, the change will
    * result in an {@link IllegalArgumentException}.
    *
-   * @param fieldNames Field names of the new column.
+   * @param fieldName Field name of the new column.
    * @param dataType The new column's data type.
    * @param nullable The new column's nullable.
    * @return A TableChange for the addition.
    */
-  static TableChange addColumn(String[] fieldNames, Type dataType, boolean nullable) {
-    return new AddColumn(fieldNames, dataType, null, null, nullable);
+  static TableChange addColumn(String[] fieldName, Type dataType, boolean nullable) {
+    return new AddColumn(fieldName, dataType, null, null, nullable);
   }
 
   /**
    * Create a TableChange for adding a column.
    *
-   * @param fieldNames Field names of the new column.
+   * @param fieldName Field name of the new column.
    * @param dataType The new column's data type.
    * @param comment The new field's comment string.
    * @param nullable The new column's nullable.
    * @return A TableChange for the addition.
    */
   static TableChange addColumn(
-      String[] fieldNames, Type dataType, String comment, boolean nullable) {
-    return new AddColumn(fieldNames, dataType, comment, null, nullable);
+      String[] fieldName, Type dataType, String comment, boolean nullable) {
+    return new AddColumn(fieldName, dataType, comment, null, nullable);
   }
 
   /**
@@ -157,7 +175,7 @@ public interface TableChange {
    * If the new field is nested and its parent does not exist or is not a struct, the change will
    * result in an {@link IllegalArgumentException}.
    *
-   * @param fieldNames Field names of the new column.
+   * @param fieldName Field name of the new column.
    * @param dataType The new column's data type.
    * @param comment The new field's comment string.
    * @param position The new column's position.
@@ -165,12 +183,12 @@ public interface TableChange {
    * @return A TableChange for the addition.
    */
   static TableChange addColumn(
-      String[] fieldNames,
+      String[] fieldName,
       Type dataType,
       String comment,
       ColumnPosition position,
       boolean nullable) {
-    return new AddColumn(fieldNames, dataType, comment, position, nullable);
+    return new AddColumn(fieldName, dataType, comment, position, nullable);
   }
 
   /**
@@ -181,27 +199,27 @@ public interface TableChange {
    *
    * <p>If the field does not exist, the change will result in an {@link IllegalArgumentException}.
    *
-   * @param fieldNames The current field names.
+   * @param fieldName The current field name.
    * @param newName The new name.
    * @return A TableChange for the rename.
    */
-  static TableChange renameColumn(String[] fieldNames, String newName) {
-    return new RenameColumn(fieldNames, newName);
+  static TableChange renameColumn(String[] fieldName, String newName) {
+    return new RenameColumn(fieldName, newName);
   }
 
   /**
    * Create a TableChange for updating the type of a field that is nullable.
    *
-   * <p>The field names are used to find the field to update.
+   * <p>The field name are used to find the field to update.
    *
    * <p>If the field does not exist, the change will result in an {@link IllegalArgumentException}.
    *
-   * @param fieldNames The field names of the column to update.
+   * @param fieldName The field name of the column to update.
    * @param newDataType The new data type.
    * @return A TableChange for the update.
    */
-  static TableChange updateColumnType(String[] fieldNames, Type newDataType) {
-    return new UpdateColumnType(fieldNames, newDataType);
+  static TableChange updateColumnType(String[] fieldName, Type newDataType) {
+    return new UpdateColumnType(fieldName, newDataType);
   }
 
   /**
@@ -211,12 +229,12 @@ public interface TableChange {
    *
    * <p>If the field does not exist, the change will result in an {@link IllegalArgumentException}.
    *
-   * @param fieldNames The field names of the column to update.
+   * @param fieldName The field name of the column to update.
    * @param newComment The new comment.
    * @return A TableChange for the update.
    */
-  static TableChange updateColumnComment(String[] fieldNames, String newComment) {
-    return new UpdateColumnComment(fieldNames, newComment);
+  static TableChange updateColumnComment(String[] fieldName, String newComment) {
+    return new UpdateColumnComment(fieldName, newComment);
   }
 
   /**
@@ -226,12 +244,12 @@ public interface TableChange {
    *
    * <p>If the field does not exist, the change will result in an {@link IllegalArgumentException}.
    *
-   * @param fieldNames The field names of the column to update.
+   * @param fieldName The field name of the column to update.
    * @param newPosition The new position.
    * @return A TableChange for the update.
    */
-  static TableChange updateColumnPosition(String[] fieldNames, ColumnPosition newPosition) {
-    return new UpdateColumnPosition(fieldNames, newPosition);
+  static TableChange updateColumnPosition(String[] fieldName, ColumnPosition newPosition) {
+    return new UpdateColumnPosition(fieldName, newPosition);
   }
 
   /**
@@ -240,13 +258,28 @@ public interface TableChange {
    * <p>If the field does not exist, the change will result in an {@link IllegalArgumentException}
    * unless {@code ifExists} is true.
    *
-   * @param fieldNames Field names of the column to delete.
+   * @param fieldName Field name of the column to delete.
    * @param ifExists If true, silence the error if column does not exist during drop. Otherwise, an
    *     {@link IllegalArgumentException} will be thrown.
    * @return A TableChange for the delete.
    */
-  static TableChange deleteColumn(String[] fieldNames, Boolean ifExists) {
-    return new DeleteColumn(fieldNames, ifExists);
+  static TableChange deleteColumn(String[] fieldName, Boolean ifExists) {
+    return new DeleteColumn(fieldName, ifExists);
+  }
+
+  /**
+   * Create a TableChange for updating the nullability of a field.
+   *
+   * <p>The name are used to find the field to update.
+   *
+   * <p>If the field does not exist, the change will result in an {@link IllegalArgumentException}.
+   *
+   * @param fieldName The field name of the column to update.
+   * @param nullable The new nullability.
+   * @return A TableChange for the update.
+   */
+  static TableChange updateColumnNullability(String[] fieldName, boolean nullable) {
+    return new UpdateColumnNullability(fieldName, nullable);
   }
 
   /** A TableChange to rename a table. */
@@ -312,6 +345,10 @@ public interface TableChange {
     static ColumnPosition after(String column) {
       return new After(column);
     }
+
+    static ColumnPosition defaultPos() {
+      return Default.INSTANCE;
+    }
   }
 
   /**
@@ -351,8 +388,23 @@ public interface TableChange {
     }
   }
 
+  /**
+   * Column position DEFAULT means the position of the column was ignored by the user, and should be
+   * determined by the catalog implementation.
+   */
+  final class Default implements ColumnPosition {
+    private static final Default INSTANCE = new Default();
+
+    private Default() {}
+
+    @Override
+    public String toString() {
+      return "DEFAULT";
+    }
+  }
+
   interface ColumnChange extends TableChange {
-    String[] fieldNames();
+    String[] fieldName();
   }
 
   /**
@@ -366,7 +418,7 @@ public interface TableChange {
    */
   @EqualsAndHashCode
   final class AddColumn implements ColumnChange {
-    private final String[] fieldNames;
+    private final String[] fieldName;
 
     @Getter private final Type dataType;
 
@@ -377,21 +429,21 @@ public interface TableChange {
     @Getter private final boolean nullable;
 
     private AddColumn(
-        String[] fieldNames,
+        String[] fieldName,
         Type dataType,
         String comment,
         ColumnPosition position,
         boolean nullable) {
-      this.fieldNames = fieldNames;
+      this.fieldName = fieldName;
       this.dataType = dataType;
       this.comment = comment;
-      this.position = position;
+      this.position = position == null ? ColumnPosition.defaultPos() : position;
       this.nullable = nullable;
     }
 
     @Override
-    public String[] fieldNames() {
-      return fieldNames;
+    public String[] fieldName() {
+      return fieldName;
     }
   }
 
@@ -405,18 +457,18 @@ public interface TableChange {
    */
   @EqualsAndHashCode
   final class RenameColumn implements ColumnChange {
-    private final String[] fieldNames;
+    private final String[] fieldName;
 
     @Getter private final String newName;
 
-    private RenameColumn(String[] fieldNames, String newName) {
-      this.fieldNames = fieldNames;
+    private RenameColumn(String[] fieldName, String newName) {
+      this.fieldName = fieldName;
       this.newName = newName;
     }
 
     @Override
-    public String[] fieldNames() {
-      return fieldNames;
+    public String[] fieldName() {
+      return fieldName;
     }
   }
 
@@ -429,18 +481,18 @@ public interface TableChange {
    */
   @EqualsAndHashCode
   final class UpdateColumnType implements ColumnChange {
-    private final String[] fieldNames;
+    private final String[] fieldName;
 
     @Getter private final Type newDataType;
 
-    private UpdateColumnType(String[] fieldNames, Type newDataType) {
-      this.fieldNames = fieldNames;
+    private UpdateColumnType(String[] fieldName, Type newDataType) {
+      this.fieldName = fieldName;
       this.newDataType = newDataType;
     }
 
     @Override
-    public String[] fieldNames() {
-      return fieldNames;
+    public String[] fieldName() {
+      return fieldName;
     }
   }
 
@@ -453,18 +505,18 @@ public interface TableChange {
    */
   @EqualsAndHashCode
   final class UpdateColumnComment implements ColumnChange {
-    private final String[] fieldNames;
+    private final String[] fieldName;
 
     @Getter private final String newComment;
 
-    private UpdateColumnComment(String[] fieldNames, String newComment) {
-      this.fieldNames = fieldNames;
+    private UpdateColumnComment(String[] fieldName, String newComment) {
+      this.fieldName = fieldName;
       this.newComment = newComment;
     }
 
     @Override
-    public String[] fieldNames() {
-      return fieldNames;
+    public String[] fieldName() {
+      return fieldName;
     }
   }
 
@@ -477,18 +529,18 @@ public interface TableChange {
    */
   @EqualsAndHashCode
   final class UpdateColumnPosition implements ColumnChange {
-    private final String[] fieldNames;
+    private final String[] fieldName;
 
     @Getter private final ColumnPosition position;
 
-    private UpdateColumnPosition(String[] fieldNames, ColumnPosition position) {
-      this.fieldNames = fieldNames;
+    private UpdateColumnPosition(String[] fieldName, ColumnPosition position) {
+      this.fieldName = fieldName;
       this.position = position;
     }
 
     @Override
-    public String[] fieldNames() {
-      return fieldNames;
+    public String[] fieldName() {
+      return fieldName;
     }
   }
 
@@ -499,18 +551,64 @@ public interface TableChange {
    */
   @EqualsAndHashCode
   final class DeleteColumn implements ColumnChange {
-    private final String[] fieldNames;
+    private final String[] fieldName;
 
     @Getter private final Boolean ifExists;
 
-    private DeleteColumn(String[] fieldNames, Boolean ifExists) {
-      this.fieldNames = fieldNames;
+    private DeleteColumn(String[] fieldName, Boolean ifExists) {
+      this.fieldName = fieldName;
       this.ifExists = ifExists;
     }
 
     @Override
-    public String[] fieldNames() {
-      return fieldNames;
+    public String[] fieldName() {
+      return fieldName;
+    }
+  }
+
+  /**
+   * A TableChange to update the nullability of a field.
+   *
+   * <p>The field names are used to find the field to update.
+   *
+   * <p>If the field does not exist, the change must result in an {@link IllegalArgumentException}.
+   */
+  final class UpdateColumnNullability implements ColumnChange {
+    private final String[] fieldName;
+
+    private final boolean nullable;
+
+    private UpdateColumnNullability(String[] fieldName, boolean nullable) {
+      this.fieldName = fieldName;
+      this.nullable = nullable;
+    }
+
+    @Override
+    public String[] fieldName() {
+      return fieldName;
+    }
+
+    public boolean nullable() {
+      return nullable;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (o == null || getClass() != o.getClass()) {
+        return false;
+      }
+      UpdateColumnNullability that = (UpdateColumnNullability) o;
+      return nullable == that.nullable && Arrays.equals(fieldName, that.fieldName);
+    }
+
+    @Override
+    public int hashCode() {
+      int result = Objects.hash(nullable);
+      result = 31 * result + Arrays.hashCode(fieldName);
+      return result;
     }
   }
 }

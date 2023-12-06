@@ -32,7 +32,16 @@ function hugo_image_path_process() {
       hugo_image_path_process "${file}"
     elif [[ -f ${file} ]]; then
       # Replace `![](assets/` with `![](/assets/`, so that the images can be displayed correctly in the Hugo website.
-      sed -i '' 's/!\[\](assets\//!\[\](\/assets\//g' ${file}
+      # macOS's sed is not GNU standard sed, it's -i option needs to be followed by a string. So
+      # using if...else to distinguish between macOS and Linux.
+      if [[ "$OS" == "Darwin" ]]; then
+        sed -i '' 's/!\[\](assets\//!\[\](\/assets\//g' ${file}
+      elif [[ "$OS" == 'Linux' ]]; then
+        sed -i 's/!\[\](assets\//!\[\](\/assets\//g' ${file}
+      else
+        echo "Currently only support macOS or Linux."
+        exit 1
+      fi
     fi
   done
 }

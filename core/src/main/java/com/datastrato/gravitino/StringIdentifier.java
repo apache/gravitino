@@ -136,4 +136,26 @@ public class StringIdentifier {
     String idString = comment.substring(index + STRING_COMMENT.length() + 1, comment.length() - 1);
     return fromString(idString);
   }
+
+  public static String removeIdFromComment(String comment) {
+    if (StringUtils.isBlank(comment)) {
+      return comment;
+    }
+
+    StringIdentifier identifier = fromComment(comment);
+    if (identifier != null) {
+      String format = String.format(STRING_COMMENT_FORMAT, " ", STRING_COMMENT, identifier);
+      int indexOf = comment.indexOf(format);
+
+      if (indexOf == -1) {
+        format = String.format(STRING_COMMENT_FORMAT, "", STRING_COMMENT, identifier);
+        indexOf = comment.indexOf(format);
+      }
+
+      if (indexOf != -1) {
+        return comment.substring(0, indexOf);
+      }
+    }
+    return comment;
+  }
 }

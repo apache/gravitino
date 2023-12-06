@@ -26,11 +26,13 @@ public interface TableOperation {
    * @param dataSource The data source to use for the operations.
    * @param exceptionMapper The exception mapper to use for the operations.
    * @param jdbcTypeConverter The type converter to use for the operations.
+   * @param conf The configuration to use for the operations.
    */
   void initialize(
       DataSource dataSource,
       JdbcExceptionConverter exceptionMapper,
-      JdbcTypeConverter jdbcTypeConverter);
+      JdbcTypeConverter jdbcTypeConverter,
+      Map<String, String> conf);
 
   /**
    * @param databaseName The name of the database.
@@ -59,7 +61,7 @@ public interface TableOperation {
    * @param databaseName The name of the database.
    * @return A list of table names in the database.
    */
-  List<String> list(String databaseName) throws NoSuchSchemaException;
+  List<String> listTables(String databaseName) throws NoSuchSchemaException;
 
   /**
    * @param databaseName The name of the database.

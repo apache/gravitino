@@ -351,7 +351,7 @@ public interface RESTClient extends Closeable {
       Consumer<ErrorResponse> errorHandler);
 
   /**
-   * Perform a POST request with form data on the specified path with teh given information.
+   * Perform a POST request with form data on the specified path with the given information.
    *
    * @param path The path to be requested.
    * @param formData The form data to be included in the POST request body.

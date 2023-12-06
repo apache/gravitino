@@ -2,7 +2,6 @@
  * Copyright 2023 Datastrato.
  * This software is licensed under the Apache License version 2.
  */
-
 package com.datastrato.gravitino.catalog.jdbc.operation;
 
 import com.datastrato.gravitino.catalog.jdbc.JdbcColumn;
@@ -13,6 +12,7 @@ import com.datastrato.gravitino.catalog.jdbc.utils.JdbcConnectorUtils;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NoSuchTableException;
 import com.datastrato.gravitino.exceptions.TableAlreadyExistsException;
+import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.google.common.collect.Lists;
@@ -29,10 +29,15 @@ import org.slf4j.LoggerFactory;
 
 /** Operations for managing tables in a JDBC data store. */
 public abstract class JdbcTableOperations implements TableOperation {
+  public static final String PRIMARY_KEY = "PRIMARY KEY";
+
+  public static final String COMMENT = "COMMENT";
+  public static final String SPACE = " ";
+
+  public static final String NOT_NULL = "NOT NULL";
+  public static final String DEFAULT = "DEFAULT";
 
   protected static final Logger LOG = LoggerFactory.getLogger(JdbcTableOperations.class);
-
-  protected static final String[] TABLE_TYPES = {"TABLE"};
 
   protected DataSource dataSource;
   protected JdbcExceptionConverter exceptionMapper;
@@ -42,7 +47,8 @@ public abstract class JdbcTableOperations implements TableOperation {
   public void initialize(
       DataSource dataSource,
       JdbcExceptionConverter exceptionMapper,
-      JdbcTypeConverter jdbcTypeConverter) {
+      JdbcTypeConverter jdbcTypeConverter,
+      Map<String, String> conf) {
     this.dataSource = dataSource;
     this.exceptionMapper = exceptionMapper;
     this.typeConverter = jdbcTypeConverter;
@@ -80,7 +86,7 @@ public abstract class JdbcTableOperations implements TableOperation {
   }
 
   @Override
-  public List<String> list(String databaseName) throws NoSuchSchemaException {
+  public List<String> listTables(String databaseName) throws NoSuchSchemaException {
     try (Connection connection = getConnection(databaseName)) {
       final List<String> names = Lists.newArrayList();
       try (ResultSet tables = getTables(connection)) {
@@ -111,14 +117,7 @@ public abstract class JdbcTableOperations implements TableOperation {
       try (ResultSet column = getColumns(connection, tableName)) {
         List<JdbcColumn> result = new ArrayList<>();
         while (column.next()) {
-          result.add(
-              new JdbcColumn.Builder()
-                  .withName(column.getString("COLUMN_NAME"))
-                  .withComment(column.getString("REMARKS"))
-                  .withType(typeConverter.toGravitinoType(column.getString("TYPE_NAME")))
-                  .withNullable(column.getInt("NULLABLE") == DatabaseMetaData.columnNullable)
-                  .withDefaultValue(column.getString("COLUMN_DEF"))
-                  .build());
+          result.add(extractJdbcColumnFromResultSet(column));
         }
         jdbcColumns = result.toArray(new JdbcColumn[0]);
       }
@@ -127,6 +126,7 @@ public abstract class JdbcTableOperations implements TableOperation {
           .withColumns(jdbcColumns)
           .withComment(comment)
           .withProperties(properties)
+          .withAuditInfo(AuditInfo.EMPTY)
           .build();
     } catch (final SQLException se) {
       throw this.exceptionMapper.toGravitinoException(se);
@@ -157,7 +157,8 @@ public abstract class JdbcTableOperations implements TableOperation {
       throws NoSuchTableException {
     LOG.info("Attempting to alter table {} from database {}", tableName, databaseName);
     try (Connection connection = getConnection(databaseName)) {
-      JdbcConnectorUtils.executeUpdate(connection, generateAlterTableSql(tableName, changes));
+      JdbcConnectorUtils.executeUpdate(
+          connection, generateAlterTableSql(databaseName, tableName, changes));
       LOG.info("Alter table {} from database {}", tableName, databaseName);
     } catch (final SQLException se) {
       throw this.exceptionMapper.toGravitinoException(se);
@@ -178,13 +179,14 @@ public abstract class JdbcTableOperations implements TableOperation {
   protected ResultSet getTables(Connection connection) throws SQLException {
     final DatabaseMetaData metaData = connection.getMetaData();
     String databaseName = connection.getSchema();
-    return metaData.getTables(databaseName, databaseName, null, TABLE_TYPES);
+    return metaData.getTables(databaseName, databaseName, null, JdbcConnectorUtils.TABLE_TYPES);
   }
 
   protected ResultSet getTable(Connection connection, String tableName) throws SQLException {
     final DatabaseMetaData metaData = connection.getMetaData();
     String databaseName = connection.getSchema();
-    return metaData.getTables(databaseName, databaseName, tableName, TABLE_TYPES);
+    return metaData.getTables(
+        databaseName, databaseName, tableName, JdbcConnectorUtils.TABLE_TYPES);
   }
 
   protected ResultSet getColumns(Connection connection, String tableName) throws SQLException {
@@ -199,6 +201,9 @@ public abstract class JdbcTableOperations implements TableOperation {
    */
   protected abstract Map<String, String> extractPropertiesFromResultSet(ResultSet table);
 
+  protected abstract JdbcColumn extractJdbcColumnFromResultSet(ResultSet column)
+      throws SQLException;
+
   protected abstract String generateCreateTableSql(
       String tableName,
       JdbcColumn[] columns,
@@ -212,11 +217,12 @@ public abstract class JdbcTableOperations implements TableOperation {
 
   protected abstract String generatePurgeTableSql(String tableName);
 
-  protected abstract String generateAlterTableSql(String tableName, TableChange... changes);
+  protected abstract String generateAlterTableSql(
+      String databaseName, String tableName, TableChange... changes);
 
-  protected Connection getConnection(String schema) throws SQLException {
+  protected Connection getConnection(String catalog) throws SQLException {
     Connection connection = dataSource.getConnection();
-    connection.setSchema(schema);
+    connection.setCatalog(catalog);
     return connection;
   }
 }

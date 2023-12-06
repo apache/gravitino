@@ -20,8 +20,10 @@ public interface DatabaseOperation {
    *
    * @param dataSource The data source to use for the operations.
    * @param exceptionMapper The exception mapper to use for the operations.
+   * @param conf The configuration for the operations.
    */
-  void initialize(DataSource dataSource, JdbcExceptionConverter exceptionMapper);
+  void initialize(
+      DataSource dataSource, JdbcExceptionConverter exceptionMapper, Map<String, String> conf);
 
   /**
    * Creates a database with the given name and comment.
@@ -39,7 +41,7 @@ public interface DatabaseOperation {
   void delete(String databaseName, boolean cascade) throws NoSuchSchemaException;
 
   /** @return The list name of databases. */
-  List<String> list();
+  List<String> listDatabases();
 
   /**
    * @param databaseName The name of the database to check.

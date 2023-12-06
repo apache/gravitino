@@ -100,7 +100,14 @@ class OAuth2TokenAuthenticator implements Authenticator {
     this.serviceAudience = config.get(OAuthConfig.SERVICE_AUDIENCE);
     this.allowSkewSeconds = config.get(OAuthConfig.ALLOW_SKEW_SECONDS);
     String configuredSignKey = config.get(OAuthConfig.DEFAULT_SIGN_KEY);
-    Preconditions.checkNotNull(configuredSignKey, "Default signing key can't be null");
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(configuredSignKey), "Default signing key can't be blank");
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(config.get(OAuthConfig.DEFAULT_TOKEN_PATH)),
+        "The path for token of the default OAuth server can't be blank");
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(config.get(OAuthConfig.DEFAULT_SERVER_URI)),
+        "The uri of the default OAuth server can't be blank");
     String algType = config.get(OAuthConfig.SIGNATURE_ALGORITHM_TYPE);
     this.defaultSigningKey = decodeSignKey(Base64.getDecoder().decode(configuredSignKey), algType);
   }

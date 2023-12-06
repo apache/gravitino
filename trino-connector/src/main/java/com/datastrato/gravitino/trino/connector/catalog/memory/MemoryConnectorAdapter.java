@@ -6,6 +6,7 @@ package com.datastrato.gravitino.trino.connector.catalog.memory;
 
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorAdapter;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
+import com.datastrato.gravitino.trino.connector.catalog.HasPropertyMeta;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoCatalog;
 import io.trino.spi.session.PropertyMetadata;
 import java.util.Collections;
@@ -19,7 +20,11 @@ import java.util.Map;
  */
 public class MemoryConnectorAdapter implements CatalogConnectorAdapter {
 
-  private final MemoryTableProperties tableProperties = new MemoryTableProperties();
+  private final HasPropertyMeta propertyMetadata;
+
+  public MemoryConnectorAdapter() {
+    this.propertyMetadata = new MemoryPropertyMeta();
+  }
 
   @Override
   public Map<String, Object> buildInternalConnectorConfig(GravitinoCatalog catalog) {
@@ -35,13 +40,11 @@ public class MemoryConnectorAdapter implements CatalogConnectorAdapter {
   @Override
   public CatalogConnectorMetadataAdapter getMetadataAdapter() {
     return new MemoryMetadataAdapter(
-        tableProperties.getTablePropertyMetadata(),
-        Collections.emptyList(),
-        Collections.emptyList());
+        getTableProperties(), Collections.emptyList(), Collections.emptyList());
   }
 
   @Override
   public List<PropertyMetadata<?>> getTableProperties() {
-    return tableProperties.getTablePropertyMetadata();
+    return propertyMetadata.getTablePropertyMetadata();
   }
 }
