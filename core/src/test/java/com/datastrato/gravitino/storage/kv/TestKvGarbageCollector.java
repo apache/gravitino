@@ -15,9 +15,9 @@ import static com.datastrato.gravitino.Configs.STORE_TRANSACTION_MAX_SKEW_TIME;
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.storage.TransactionIdGenerator;
-import com.google.common.io.Files;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.util.List;
 import org.apache.commons.lang3.tuple.Pair;
 import org.junit.jupiter.api.Assertions;
@@ -25,9 +25,10 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 class TestKvGarbageCollector {
-  public Config getConfig() {
+  public Config getConfig() throws IOException {
     Config config = Mockito.mock(Config.class);
-    File file = Files.createTempDir();
+    File baseDir = new File(System.getProperty("java.io.tmpdir"));
+    File file = Files.createTempDirectory(baseDir.toPath(), "test").toFile();
     file.deleteOnExit();
     Mockito.when(config.get(ENTITY_STORE)).thenReturn("kv");
     Mockito.when(config.get(ENTITY_KV_STORE)).thenReturn(DEFAULT_ENTITY_KV_STORE);
@@ -45,7 +46,7 @@ class TestKvGarbageCollector {
   }
 
   @Test
-  void testScheduler() {
+  void testScheduler() throws IOException {
     Config config = getConfig();
     Mockito.when(config.get(KV_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L); // 20 minutes
     long dateTimeLineMinute = config.get(KV_DELETE_AFTER_TIME) / 1000 / 60;
