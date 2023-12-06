@@ -13,8 +13,42 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_requests' }}
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dorny/paths-filter@v2
+        id: filter
+        with:
+          filters: |
+            source_changes:
+              - .github/**
+              - api/**
+              - bin/**
+              - catalogs/**
+              - clients/**
+              - common/**
+              - conf/**
+              - core/**
+              - dev/**
+              - gradle/**
+              - integration-test/**
+              - meta/**
+              - server/**
+              - server-common/**
+              - trino-connector/**
+              - web/**
+              - build.gradle.kts
+              - gradle.properties
+              - gradlew
+              - setting.gradle.kts
+    outputs:
+      source_changes: ${{ steps.filter.outputs.source_changes }}
+
   # Integration test for AMD64 architecture
   test-amd64-arch:
+    needs: changes
+    if: needs.changes.outputs.source_changes == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
