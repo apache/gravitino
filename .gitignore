@@ -42,3 +42,6 @@ docs/build
 dev/docker/tools/docker-connector
 
 include web/.gitignore
+
+# node env
+.node

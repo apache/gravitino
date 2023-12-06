@@ -7,15 +7,10 @@ import com.github.gradle.node.yarn.task.YarnTask
 
 plugins {
   id("war")
-  id("com.github.node-gradle.node") version "3.1.0"
 }
 
-node {
-  version = "20.9.0"
-  npmVersion = "10.1.0"
-  yarnVersion = "1.22.19"
-  workDir = file("${project.projectDir}/.node")
-  download = true
+tasks.withType(YarnTask::class) {
+  workingDir.set(file("${project.projectDir}"))
 }
 
 tasks {
