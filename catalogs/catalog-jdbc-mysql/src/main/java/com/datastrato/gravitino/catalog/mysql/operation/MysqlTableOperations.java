@@ -322,6 +322,14 @@ public class MysqlTableOperations extends JdbcTableOperations {
       } else if (change instanceof TableChange.DeleteColumn) {
         TableChange.DeleteColumn deleteColumn = (TableChange.DeleteColumn) change;
         alterSql.add(deleteColumnFieldDefinition(deleteColumn));
+      } else if (change instanceof TableChange.UpdateColumnNullability) {
+        lazyLoadCreateTable = getOrCreateTable(databaseName, tableName, lazyLoadCreateTable);
+        alterSql.add(
+            updateColumnNullabilityDefinition(
+                (TableChange.UpdateColumnNullability) change, lazyLoadCreateTable));
+      } else {
+        throw new UnsupportedOperationException(
+            "Unsupported table change type: " + change.getClass().getName());
       }
     }
     if (!setProperties.isEmpty()) {
@@ -348,6 +356,26 @@ public class MysqlTableOperations extends JdbcTableOperations {
     String result = "ALTER TABLE " + tableName + "\n" + String.join(",\n", alterSql) + ";";
     LOG.info("Generated alter table:{} sql: {}", databaseName + "." + tableName, result);
     return result;
+  }
+
+  private String updateColumnNullabilityDefinition(
+      TableChange.UpdateColumnNullability change, CreateTable table) {
+    if (change.fieldName().length > 1) {
+      throw new UnsupportedOperationException("Mysql does not support nested column names.");
+    }
+    String col = change.fieldName()[0];
+    JdbcColumn column = getJdbcColumnFromCreateTable(table, col);
+    column.getProperties().remove(PRIMARY_KEY);
+    JdbcColumn updateColumn =
+        new JdbcColumn.Builder()
+            .withName(col)
+            .withDefaultValue(column.getDefaultValue())
+            .withNullable(change.nullable())
+            .withProperties(column.getProperties())
+            .withType(column.dataType())
+            .withComment(column.comment())
+            .build();
+    return "MODIFY COLUMN " + col + appendColumnDefinition(updateColumn, new StringBuilder());
   }
 
   private String generateTableProperties(List<TableChange.SetProperty> setProperties) {

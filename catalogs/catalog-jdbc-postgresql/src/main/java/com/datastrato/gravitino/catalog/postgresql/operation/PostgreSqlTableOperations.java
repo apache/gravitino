@@ -343,6 +343,13 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
       } else if (change instanceof TableChange.DeleteColumn) {
         TableChange.DeleteColumn deleteColumn = (TableChange.DeleteColumn) change;
         alterSql.add(deleteColumnFieldDefinition(deleteColumn, tableName));
+      } else if (change instanceof TableChange.UpdateColumnNullability) {
+        alterSql.add(
+            updateColumnNullabilityDefinition(
+                (TableChange.UpdateColumnNullability) change, tableName));
+      } else {
+        throw new UnsupportedOperationException(
+            "Unsupported table change type: " + change.getClass().getName());
       }
     }
 
@@ -350,6 +357,19 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
     String result = String.join("\n", alterSql);
     LOG.info("Generated alter table:{}.{} sql: {}", schemaName, tableName, result);
     return result;
+  }
+
+  private String updateColumnNullabilityDefinition(
+      TableChange.UpdateColumnNullability updateColumnNullability, String tableName) {
+    if (updateColumnNullability.fieldName().length > 1) {
+      throw new UnsupportedOperationException("PostgreSQL does not support nested column names.");
+    }
+    String col = updateColumnNullability.fieldName()[0];
+    if (updateColumnNullability.nullable()) {
+      return "ALTER TABLE " + tableName + " ALTER COLUMN " + col + " DROP NOT NULL;";
+    } else {
+      return "ALTER TABLE " + tableName + " ALTER COLUMN " + col + " SET NOT NULL;";
+    }
   }
 
   private String updateCommentDefinition(
