@@ -26,4 +26,8 @@ public interface HasPropertyMeta {
   default List<PropertyMetadata<?>> getColumnPropertyMetadata() {
     return ImmutableList.of();
   }
+
+  default List<PropertyMetadata<?>> getCatalogPropertyMeta() {
+    return ImmutableList.of();
+  }
 }
