@@ -14,6 +14,9 @@
   ~ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
   ~ See the License for the specific language governing permissions and
   ~ limitations under the License.
+  ~
+  ~ Referred from Apache Zeppelin's web.xml implementation
+  ~ zeppelin-web/src/WEB-INF/web.xml
   -->
 
 <web-app xmlns="http://java.sun.com/xml/ns/javaee"
