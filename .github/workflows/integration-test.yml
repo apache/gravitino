@@ -22,22 +22,22 @@ jobs:
         with:
           filters: |
             source_changes:
-              - 'api/**'
-              - 'catalogs/**'
-              - 'clients/**'
-              - 'common/**'
-              - 'core/**'
-              - 'integration-test/**'
-              - 'meta/**'
-              - 'server/**'
-              - 'server-common/**'
-              - 'trino-connect/**'
-              - 'web/**'
+              - api/**
+              - catalogs/**
+              - clients/**
+              - common/**
+              - core/**
+              - integration-test/**
+              - meta/**
+              - server/**
+              - server-common/**
+              - trino-connect/**
+              - web/**
 
   # Integration test for AMD64 architecture
   test-amd64-arch:
     needs: changes
-    if: needs.changes.outputs.source_changes == true
+    if: needs.changes.outputs.source_changes == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
