@@ -41,6 +41,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.SerializerProvider;
 import com.fasterxml.jackson.databind.cfg.EnumFeature;
+import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.google.common.base.Preconditions;
@@ -63,7 +64,8 @@ public class JsonUtils {
   private static final String NAMESPACE = "namespace";
   private static final String NAME = "name";
   private static final String POSITION_FIRST = "first";
-  private static final String POSITION_LAST = "last";
+  private static final String POSITION_AFTER = "after";
+  private static final String POSITION_DEFAULT = "default";
   private static final String STRATEGY = "strategy";
   private static final String FIELD_NAME = "fieldName";
   private static final String FIELD_NAMES = "fieldNames";
@@ -191,11 +193,12 @@ public class JsonUtils {
       synchronized (JsonUtils.class) {
         if (mapper == null) {
           mapper =
-              new ObjectMapper()
-                  .registerModule(new JavaTimeModule())
+              JsonMapper.builder()
                   .configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false)
                   .configure(EnumFeature.WRITE_ENUMS_TO_LOWERCASE, true)
-                  .enable(MapperFeature.ACCEPT_CASE_INSENSITIVE_ENUMS);
+                  .enable(MapperFeature.ACCEPT_CASE_INSENSITIVE_ENUMS)
+                  .build()
+                  .registerModule(new JavaTimeModule());
         }
       }
     }
@@ -679,9 +682,11 @@ public class JsonUtils {
       } else if (value instanceof TableChange.After) {
         gen.writeStartObject();
         TableChange.After after = (TableChange.After) value;
-        gen.writeStringField(POSITION_LAST, after.getColumn());
+        gen.writeStringField(POSITION_AFTER, after.getColumn());
         gen.writeEndObject();
 
+      } else if (value instanceof TableChange.Default) {
+        gen.writeString(POSITION_DEFAULT);
       } else {
         throw new IOException("Unknown column position: " + value);
       }
@@ -701,8 +706,10 @@ public class JsonUtils {
           node);
       if (node.isTextual() && node.asText().equals(POSITION_FIRST)) {
         return TableChange.ColumnPosition.first();
+      } else if (node.isTextual() && node.asText().equals(POSITION_DEFAULT)) {
+        return TableChange.ColumnPosition.defaultPos();
       } else if (node.isObject()) {
-        String afterColumn = getString(POSITION_LAST, node);
+        String afterColumn = getString(POSITION_AFTER, node);
         return TableChange.ColumnPosition.after(afterColumn);
       } else {
         throw new IOException("Unknown json column position: " + node);

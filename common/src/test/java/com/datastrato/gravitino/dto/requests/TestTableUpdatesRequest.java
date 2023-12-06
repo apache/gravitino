@@ -103,4 +103,72 @@ public class TestTableUpdatesRequest {
     Assertions.assertEquals(
         JsonUtils.objectMapper().readTree(expected), JsonUtils.objectMapper().readTree(jsonString));
   }
+
+  @Test
+  public void testAddTableColumnRequest() throws JsonProcessingException {
+    TableUpdateRequest addTableColumnRequest =
+        new TableUpdateRequest.AddTableColumnRequest(
+            new String[] {"column"},
+            Types.StringType.get(),
+            "comment",
+            TableChange.ColumnPosition.after("afterColumn"),
+            false);
+    String jsonString = JsonUtils.objectMapper().writeValueAsString(addTableColumnRequest);
+    String expected =
+        "{\n"
+            + "  \"@type\": \"addColumn\",\n"
+            + "  \"fieldName\": [\n"
+            + "    \"column\"\n"
+            + "  ],\n"
+            + "  \"type\": \"string\",\n"
+            + "  \"comment\": \"comment\",\n"
+            + "  \"position\": {\n"
+            + "    \"after\": \"afterColumn\"\n"
+            + "  },\n"
+            + "  \"nullable\": false\n"
+            + "}";
+    Assertions.assertEquals(
+        JsonUtils.objectMapper().readTree(expected), JsonUtils.objectMapper().readTree(jsonString));
+
+    // test default nullability
+    addTableColumnRequest =
+        new TableUpdateRequest.AddTableColumnRequest(
+            new String[] {"column"},
+            Types.StringType.get(),
+            "test default nullability",
+            TableChange.ColumnPosition.first());
+    jsonString = JsonUtils.objectMapper().writeValueAsString(addTableColumnRequest);
+    expected =
+        "{\n"
+            + "  \"@type\": \"addColumn\",\n"
+            + "  \"fieldName\": [\n"
+            + "    \"column\"\n"
+            + "  ],\n"
+            + "  \"type\": \"string\",\n"
+            + "  \"comment\": \"test default nullability\",\n"
+            + "  \"position\": \"first\",\n"
+            + "  \"nullable\": true\n"
+            + "}";
+    Assertions.assertEquals(
+        JsonUtils.objectMapper().readTree(expected), JsonUtils.objectMapper().readTree(jsonString));
+
+    // test default position
+    addTableColumnRequest =
+        new TableUpdateRequest.AddTableColumnRequest(
+            new String[] {"column"}, Types.StringType.get(), "test default position");
+    jsonString = JsonUtils.objectMapper().writeValueAsString(addTableColumnRequest);
+    expected =
+        "{\n"
+            + "  \"@type\": \"addColumn\",\n"
+            + "  \"fieldName\": [\n"
+            + "    \"column\"\n"
+            + "  ],\n"
+            + "  \"type\": \"string\",\n"
+            + "  \"comment\": \"test default position\",\n"
+            + "  \"position\": \"default\",\n"
+            + "  \"nullable\": true\n"
+            + "}";
+    Assertions.assertEquals(
+        JsonUtils.objectMapper().readTree(expected), JsonUtils.objectMapper().readTree(jsonString));
+  }
 }

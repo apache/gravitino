@@ -125,9 +125,10 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
   @Override
   public NameIdentifier[] listSchemas(Namespace namespace) throws NoSuchCatalogException {
     try {
+      List<org.apache.iceberg.catalog.Namespace> namespaces =
+          icebergTableOps.listNamespace(IcebergTableOpsHelper.getIcebergNamespace()).namespaces();
 
-      return icebergTableOps.listNamespace(IcebergTableOpsHelper.getIcebergNamespace()).namespaces()
-          .stream()
+      return namespaces.stream()
           .map(icebergNamespace -> NameIdentifier.of(icebergNamespace.levels()))
           .toArray(NameIdentifier[]::new);
     } catch (NoSuchNamespaceException e) {

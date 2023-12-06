@@ -398,7 +398,7 @@ public class GravitinoMockServer implements AutoCloseable {
 
     } else if (tableChange instanceof TableChange.AddColumn) {
       TableChange.AddColumn addColumn = (TableChange.AddColumn) tableChange;
-      String fieldName = addColumn.fieldNames()[0];
+      String fieldName = addColumn.fieldName()[0];
       GravitinoColumn column =
           new GravitinoColumn(fieldName, addColumn.getDataType(), -1, "", true);
       CatalogConnectorMetadataAdapter metadataAdapter =
@@ -407,19 +407,19 @@ public class GravitinoMockServer implements AutoCloseable {
 
     } else if (tableChange instanceof TableChange.DeleteColumn) {
       TableChange.DeleteColumn deleteColumn = (TableChange.DeleteColumn) tableChange;
-      String fieldName = deleteColumn.fieldNames()[0];
+      String fieldName = deleteColumn.fieldName()[0];
       ColumnHandle columnHandle = metadata.getColumnHandles(null, tableHandle).get(fieldName);
       metadata.dropColumn(null, tableHandle, columnHandle);
 
     } else if (tableChange instanceof TableChange.RenameColumn) {
       TableChange.RenameColumn renameColumn = (TableChange.RenameColumn) tableChange;
-      String fieldName = renameColumn.fieldNames()[0];
+      String fieldName = renameColumn.fieldName()[0];
       ColumnHandle columnHandle = metadata.getColumnHandles(null, tableHandle).get(fieldName);
       metadata.renameColumn(null, tableHandle, columnHandle, renameColumn.getNewName());
 
     } else if (tableChange instanceof TableChange.UpdateColumnType) {
       TableChange.UpdateColumnType updateColumnType = (TableChange.UpdateColumnType) tableChange;
-      String fieldName = updateColumnType.fieldNames()[0];
+      String fieldName = updateColumnType.fieldName()[0];
       ColumnHandle columnHandle = metadata.getColumnHandles(null, tableHandle).get(fieldName);
       metadata.setColumnType(
           null,
@@ -435,7 +435,7 @@ public class GravitinoMockServer implements AutoCloseable {
       TableChange.UpdateColumnComment updateColumnComment =
           (TableChange.UpdateColumnComment) tableChange;
       ColumnHandle columnHandle =
-          metadata.getColumnHandles(null, tableHandle).get(updateColumnComment.fieldNames()[0]);
+          metadata.getColumnHandles(null, tableHandle).get(updateColumnComment.fieldName()[0]);
       metadata.setColumnComment(
           null, tableHandle, columnHandle, Optional.of(updateColumnComment.getNewComment()));
 

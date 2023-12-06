@@ -26,11 +26,11 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.stream.Collectors;
 import javax.sql.DataSource;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.ArrayUtils;
-import org.apache.commons.lang3.RandomUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -172,13 +172,14 @@ public class TestJdbcTableOperations {
   }
 
   private static JdbcColumn[] generateRandomColumn(int minSize, int maxSize) {
+    Random r = new Random();
     String prefixColName = "col_";
-    JdbcColumn[] columns = new JdbcColumn[RandomUtils.nextInt(minSize, maxSize)];
+    JdbcColumn[] columns = new JdbcColumn[r.nextInt(maxSize - minSize) + minSize];
     for (int j = 0; j < columns.length; j++) {
       columns[j] =
           new JdbcColumn.Builder()
               .withName(prefixColName + (j + 1))
-              .withNullable(RandomUtils.nextBoolean())
+              .withNullable(r.nextBoolean())
               .withType(getRandomGravitinoType())
               .build();
     }
@@ -187,8 +188,9 @@ public class TestJdbcTableOperations {
 
   private static Type getRandomGravitinoType() {
     Collection<Type> values = TYPE_CONVERTER.getGravitinoTypes();
+    Random r = new Random();
     return values.stream()
-        .skip(RandomUtils.nextInt(0, values.size()))
+        .skip(r.nextInt(values.size()))
         .findFirst()
         .orElseThrow(() -> new RuntimeException("No type found"));
   }

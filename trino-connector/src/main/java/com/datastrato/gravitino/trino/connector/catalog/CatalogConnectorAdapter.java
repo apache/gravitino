@@ -27,7 +27,7 @@ public interface CatalogConnectorAdapter {
   /** @return SchemaProperties list that used to validate schema properties. */
   default List<PropertyMetadata<?>> getSchemaProperties() {
     return emptyList();
-  };
+  }
 
   /** @return Return MetadataAdapter for special catalog connector. */
   CatalogConnectorMetadataAdapter getMetadataAdapter();

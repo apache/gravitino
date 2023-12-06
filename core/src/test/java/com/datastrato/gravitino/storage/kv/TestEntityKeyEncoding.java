@@ -24,7 +24,6 @@ import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.storage.IdGenerator;
 import com.datastrato.gravitino.utils.ByteUtils;
 import com.datastrato.gravitino.utils.Bytes;
-import com.google.common.io.Files;
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Field;
@@ -41,8 +40,9 @@ import org.mockito.Mockito;
 @TestInstance(Lifecycle.PER_CLASS)
 @TestClassOrder(OrderAnnotation.class)
 public class TestEntityKeyEncoding {
-  private Config getConfig() {
-    File file = Files.createTempDir();
+  private Config getConfig() throws IOException {
+    File baseDir = new File(System.getProperty("java.io.tmpdir"));
+    File file = java.nio.file.Files.createTempDirectory(baseDir.toPath(), "test").toFile();
     file.deleteOnExit();
     Config config = Mockito.mock(Config.class);
     Mockito.when(config.get(Configs.ENTITY_SERDE)).thenReturn("proto");
