@@ -12,31 +12,31 @@ RENAME TABLE
 
 DROP COLUMN
 
-"CREATE TABLE ""test.lakehouse-iceberg"".gt_db2.tb01 (
+"CREATE TABLE ""test.jdbc-postgresql"".gt_db1.tb01 (
    name varchar,
-   salary integer
-)
-COMMENT ''"
-
-RENAME COLUMN
-
-"CREATE TABLE ""test.lakehouse-iceberg"".gt_db2.tb01 (
-   s varchar,
    salary integer
 )
 COMMENT ''"
 
 SET COLUMN TYPE
 
-"CREATE TABLE ""test.lakehouse-iceberg"".gt_db2.tb01 (
-   s varchar,
+"CREATE TABLE ""test.jdbc-postgresql"".gt_db1.tb01 (
+   name varchar,
    salary bigint
 )
 COMMENT ''"
 
 COMMENT
 
-"CREATE TABLE ""test.lakehouse-iceberg"".gt_db2.tb01 (
+"CREATE TABLE ""test.jdbc-postgresql"".gt_db1.tb01 (
+   name varchar,
+   salary bigint
+)
+COMMENT 'test table comments'"
+
+RENAME COLUMN
+
+"CREATE TABLE ""test.jdbc-postgresql"".gt_db1.tb01 (
    s varchar,
    salary bigint
 )
@@ -44,7 +44,7 @@ COMMENT 'test table comments'"
 
 COMMENT
 
-"CREATE TABLE ""test.lakehouse-iceberg"".gt_db2.tb01 (
+"CREATE TABLE ""test.jdbc-postgresql"".gt_db1.tb01 (
    s varchar COMMENT 'test column comments',
    salary bigint
 )
@@ -52,7 +52,7 @@ COMMENT 'test table comments'"
 
 ADD COLUMN
 
-"CREATE TABLE ""test.lakehouse-iceberg"".gt_db2.tb01 (
+"CREATE TABLE ""test.jdbc-postgresql"".gt_db1.tb01 (
    s varchar COMMENT 'test column comments',
    salary bigint,
    city varchar COMMENT 'aaa'

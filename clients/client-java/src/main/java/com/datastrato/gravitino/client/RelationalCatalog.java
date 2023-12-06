@@ -257,6 +257,35 @@ public class RelationalCatalog extends CatalogDTO implements TableCatalog, Suppo
   }
 
   /**
+   * Purge the table with specified identifier.
+   *
+   * @param ident The identifier of the table.
+   * @return true if the table is purged successfully, false otherwise.
+   */
+  @Override
+  public boolean purgeTable(NameIdentifier ident) throws UnsupportedOperationException {
+    NameIdentifier.checkTable(ident);
+
+    Map<String, String> params = new HashMap<>();
+    params.put("purge", "true");
+    try {
+      DropResponse resp =
+          restClient.delete(
+              formatTableRequestPath(ident.namespace()) + "/" + ident.name(),
+              params,
+              DropResponse.class,
+              Collections.emptyMap(),
+              ErrorHandlers.tableErrorHandler());
+      resp.validate();
+      return resp.dropped();
+
+    } catch (Exception e) {
+      LOG.warn("Failed to purge table {}", ident, e);
+      return false;
+    }
+  }
+
+  /**
    * List all the schemas under the given catalog namespace.
    *
    * @param namespace The namespace of the catalog.

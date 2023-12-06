@@ -1,10 +1,10 @@
-CREATE SCHEMA "test.lakehouse-iceberg".db2;
+CREATE SCHEMA "test.lakehouse-iceberg".gt_db2;
 
-CREATE TABLE "test.lakehouse-iceberg".db2.tb01 (
+CREATE TABLE "test.lakehouse-iceberg".gt_db2.tb01 (
     name varchar,
     salary int
 );
 
-drop table "test.lakehouse-iceberg".db2.tb01;
+drop table "test.lakehouse-iceberg".gt_db2.tb01;
 
-drop schema "test.lakehouse-iceberg".db2;
+drop schema "test.lakehouse-iceberg".gt_db2;

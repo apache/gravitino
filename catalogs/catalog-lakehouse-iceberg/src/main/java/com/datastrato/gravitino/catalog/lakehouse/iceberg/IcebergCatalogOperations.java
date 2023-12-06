@@ -536,8 +536,8 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
   @Override
   public boolean purgeTable(NameIdentifier tableIdent) throws UnsupportedOperationException {
     try {
-      icebergTableOps.purgeTable(
-          TableIdentifier.of(ArrayUtils.add(tableIdent.namespace().levels(), tableIdent.name())));
+      String schema = NameIdentifier.of(tableIdent.namespace().levels()).name();
+      icebergTableOps.purgeTable(TableIdentifier.of(schema, tableIdent.name()));
       LOG.info("Purge Iceberg table {}", tableIdent.name());
       return true;
     } catch (org.apache.iceberg.exceptions.NoSuchTableException e) {
