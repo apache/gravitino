@@ -131,10 +131,15 @@ public class HiveTablePropertiesMetadata extends BasePropertiesMetadata {
             booleanReservedPropertyEntry(
                 EXTERNAL, "Indicate whether it is an external table", false, true),
             stringImmutablePropertyEntry(
-                LOCATION, "HDFS location for table storage", false, null, false, false),
+                LOCATION,
+                "The location for table storage. Not required, HMS will use the database location as the parent directory by default",
+                false,
+                null,
+                false,
+                false),
             enumImmutablePropertyEntry(
                 TABLE_TYPE,
-                "The type of Hive table",
+                "Type of the table",
                 false,
                 TableType.class,
                 MANAGED_TABLE,
@@ -142,7 +147,7 @@ public class HiveTablePropertiesMetadata extends BasePropertiesMetadata {
                 false),
             enumImmutablePropertyEntry(
                 FORMAT,
-                "The table storage format",
+                "The table file format",
                 false,
                 StorageFormat.class,
                 TEXTFILE,
