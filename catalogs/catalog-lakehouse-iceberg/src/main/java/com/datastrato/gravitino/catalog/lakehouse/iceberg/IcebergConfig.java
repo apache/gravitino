@@ -27,7 +27,7 @@ public class IcebergConfig extends Config {
 
   public static final ConfigEntry<String> CATALOG_WAREHOUSE =
       new ConfigBuilder(WAREHOUSE)
-          .doc("Warehouse directory of Catalog")
+          .doc("Warehouse directory of catalog")
           .version("0.2.0")
           .stringConf()
           .createWithDefault(null);
