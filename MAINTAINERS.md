@@ -17,3 +17,4 @@ This document lists the maintainers of the Project. Maintainers may be added onc
 | Xiaojing Fang | FANNG1              | Datastrato       |
 | Qi Yu         | yuqi1129            | Datastrato       |
 | Clearvive     | Clearvive           | Datastrato       |
+| Cheyne        | ch3yne              | Datastrato       |
