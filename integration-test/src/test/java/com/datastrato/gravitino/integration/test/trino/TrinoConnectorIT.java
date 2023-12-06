@@ -335,6 +335,7 @@ public class TrinoConnectorIT extends AbstractIT {
   }
 
   @Test
+  @Order(7)
   void testHiveSchemaCreatedByTrino() {
     String schemaName = GravitinoITUtils.genRandomName("schema").toLowerCase();
 
@@ -352,6 +353,7 @@ public class TrinoConnectorIT extends AbstractIT {
   }
 
   @Test
+  @Order(8)
   void testHiveTableCreatedByTrino() {
     String schemaName = GravitinoITUtils.genRandomName("schema").toLowerCase();
     String tableName = GravitinoITUtils.genRandomName("table").toLowerCase();
@@ -378,6 +380,7 @@ public class TrinoConnectorIT extends AbstractIT {
   }
 
   @Test
+  @Order(9)
   void testHiveSchemaCreatedByGravitino() throws InterruptedException {
     String catalogName = GravitinoITUtils.genRandomName("catalog").toLowerCase();
     String schemaName = GravitinoITUtils.genRandomName("schema").toLowerCase();
@@ -422,6 +425,7 @@ public class TrinoConnectorIT extends AbstractIT {
   }
 
   @Test
+  @Order(10)
   void testHiveTableCreatedByGravitino() throws InterruptedException {
     String catalogName = GravitinoITUtils.genRandomName("catalog").toLowerCase();
     String schemaName = GravitinoITUtils.genRandomName("schema").toLowerCase();
@@ -503,6 +507,7 @@ public class TrinoConnectorIT extends AbstractIT {
   }
 
   @Test
+  @Order(11)
   void testHiveCatalogCreatedByGravitino() throws InterruptedException {
     String catalogName = GravitinoITUtils.genRandomName("catalog").toLowerCase();
     GravitinoMetaLake createdMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
