@@ -212,6 +212,7 @@
    ./api/src/main/java/com/datastrato/gravitino/rel/SupportsSchemas.java
    ./api/src/main/java/com/datastrato/gravitino/rel/TableCatalog.java
    ./api/src/main/java/com/datastrato/gravitino/rel/TableChange.java
+   ./api/src/main/java/com/datastrato/gravitino/rel/expressions/Literal.java
    ./api/src/main/java/com/datastrato/gravitino/rel/expressions/sorts/NullOrdering.java
    ./api/src/main/java/com/datastrato/gravitino/rel/expressions/sorts/SortDirection.java
    ./api/src/main/java/com/datastrato/gravitino/rel/expressions/sorts/SortOrder.java
@@ -245,6 +246,7 @@
    Apache Zeppelin
    ./integration-test/src/test/java/com/datastrato/gravitino/integration/test/util/CommandExecutor.java
    ./integration-test/src/test/java/com/datastrato/gravitino/integration/test/util/ProcessData.java
+   ./web/WEB-INF/web.xml
 
    Apache Hadoop
    ./dev/docker/hive/hadoop-env.sh
@@ -255,3 +257,6 @@
 
    Apache Submarine
    ./bin/common.sh
+
+   Trino
+   ./integration-test/src/main/java/com/datastrato/gravitino/integration/test/util/CloseableGroup.java

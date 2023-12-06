@@ -7,7 +7,7 @@ export const isDevEnv = process.env.NODE_ENV === 'development'
 
 export const isProdEnv = process.env.NODE_ENV === 'production'
 
-export const genUpdateMetalakeUpdates = (originalData, newData) => {
+export const genUpdates = (originalData, newData) => {
   const updates = []
 
   if (originalData.name !== newData.name) {
@@ -38,4 +38,8 @@ export const genUpdateMetalakeUpdates = (originalData, newData) => {
   }
 
   return updates
+}
+
+export const hasNull = obj => {
+  return Object.keys(obj).some(key => obj[key] === null)
 }

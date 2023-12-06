@@ -3,7 +3,7 @@
  * This software is licensed under the Apache License version 2.
  */
 
-import axios from 'axios'
+import defHttp from '@/lib/api'
 
 const Apis = {
   GET: ({ metalake, catalog, schema }) => `/api/metalakes/${metalake}/catalogs/${catalog}/schemas/${schema}/tables`,
@@ -12,21 +12,15 @@ const Apis = {
 }
 
 export const getTablesApi = params => {
-  return axios({
+  return defHttp.request({
     url: `${Apis.GET(params)}`,
-    method: 'get',
-    headers: {
-      Accept: 'application/vnd.gravitino.v1+json'
-    }
+    method: 'get'
   })
 }
 
 export const getTableDetailsApi = ({ metalake, catalog, schema, table }) => {
-  return axios({
+  return defHttp.request({
     url: `${Apis.GET_DETAIL({ metalake, catalog, schema, table })}`,
-    method: 'get',
-    headers: {
-      Accept: 'application/vnd.gravitino.v1+json'
-    }
+    method: 'get'
   })
 }

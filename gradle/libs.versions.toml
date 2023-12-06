@@ -40,6 +40,7 @@ metrics = "4.2.19"
 prometheus = "0.16.0"
 jsqlparser = "4.2"
 mysql = "8.0.23"
+postgresql = "42.6.0"
 
 protobuf-plugin = "0.9.2"
 spotless-plugin = '6.11.0'
@@ -111,6 +112,7 @@ spark-hive = { group = "org.apache.spark", name = "spark-hive_2.13", version.ref
 commons-dbcp2 = { group = "org.apache.commons", name = "commons-dbcp2", version.ref = "commons-dbcp2" }
 testcontainers = { group = "org.testcontainers", name = "testcontainers", version.ref = "testcontainers" }
 testcontainers-mysql = { group = "org.testcontainers", name = "mysql", version.ref = "testcontainers" }
+testcontainers-postgresql = { group = "org.testcontainers", name = "postgresql", version.ref = "testcontainers" }
 testcontainers-junit-jupiter = { group = "org.testcontainers", name = "junit-jupiter", version.ref = "testcontainers" }
 trino-jdbc = { group = "io.trino", name = "trino-jdbc", version.ref = "trino-jdbc" }
 jwt-api = { group = "io.jsonwebtoken", name = "jjwt-api", version.ref = "jwt"}
@@ -128,6 +130,7 @@ prometheus-dropwizard = { group = "io.prometheus", name = "simpleclient_dropwiza
 prometheus-servlet = { group = "io.prometheus", name = "simpleclient_servlet", version.ref = "prometheus" }
 jsqlparser = { group = "com.github.jsqlparser", name = "jsqlparser", version.ref = "jsqlparser" }
 mysql-driver = { group = "mysql", name = "mysql-connector-java", version.ref = "mysql" }
+postgresql-driver = { group = "org.postgresql", name = "postgresql", version.ref = "postgresql" }
 
 [bundles]
 log4j = ["slf4j-api", "log4j-slf4j2-impl", "log4j-api", "log4j-core", "log4j-12-api"]

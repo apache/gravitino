@@ -79,7 +79,7 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
     //    properties.put("ENGINE", "InnoDB");
     //    properties.put(AUTO_INCREMENT, "10");
     // create table
-    MYSQL_TABLE_OPERATIONS.create(
+    TABLE_OPERATIONS.create(
         TEST_DB_NAME,
         tableName,
         columns.toArray(new JdbcColumn[0]),
@@ -88,18 +88,17 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
         null);
 
     // list table
-    List<String> tables = MYSQL_TABLE_OPERATIONS.listTables(TEST_DB_NAME);
+    List<String> tables = TABLE_OPERATIONS.listTables(TEST_DB_NAME);
     Assertions.assertTrue(tables.contains(tableName));
 
     // load table
-    JdbcTable load = MYSQL_TABLE_OPERATIONS.load(TEST_DB_NAME, tableName);
+    JdbcTable load = TABLE_OPERATIONS.load(TEST_DB_NAME, tableName);
     assertionsTableInfo(tableName, tableComment, columns, properties, load);
 
     // rename table
     String newName = "new_table";
-    Assertions.assertDoesNotThrow(
-        () -> MYSQL_TABLE_OPERATIONS.rename(TEST_DB_NAME, tableName, newName));
-    Assertions.assertDoesNotThrow(() -> MYSQL_TABLE_OPERATIONS.load(TEST_DB_NAME, newName));
+    Assertions.assertDoesNotThrow(() -> TABLE_OPERATIONS.rename(TEST_DB_NAME, tableName, newName));
+    Assertions.assertDoesNotThrow(() -> TABLE_OPERATIONS.load(TEST_DB_NAME, newName));
 
     // alter table
     JdbcColumn newColumn =
@@ -109,7 +108,7 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
             .withComment("new_add")
             .withNullable(true)
             .build();
-    MYSQL_TABLE_OPERATIONS.alterTable(
+    TABLE_OPERATIONS.alterTable(
         TEST_DB_NAME,
         newName,
         TableChange.addColumn(
@@ -117,7 +116,7 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
             newColumn.dataType(),
             newColumn.comment(),
             TableChange.ColumnPosition.after("col_1")));
-    load = MYSQL_TABLE_OPERATIONS.load(TEST_DB_NAME, newName);
+    load = TABLE_OPERATIONS.load(TEST_DB_NAME, newName);
     List<JdbcColumn> alterColumns =
         new ArrayList<JdbcColumn>() {
           {
@@ -131,16 +130,16 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
     assertionsTableInfo(newName, tableComment, alterColumns, properties, load);
 
     // delete column
-    MYSQL_TABLE_OPERATIONS.alterTable(
+    TABLE_OPERATIONS.alterTable(
         TEST_DB_NAME, newName, TableChange.deleteColumn(new String[] {newColumn.name()}, true));
-    load = MYSQL_TABLE_OPERATIONS.load(TEST_DB_NAME, newName);
+    load = TABLE_OPERATIONS.load(TEST_DB_NAME, newName);
     assertionsTableInfo(newName, tableComment, columns, properties, load);
 
     GravitinoRuntimeException gravitinoRuntimeException =
         Assertions.assertThrows(
             GravitinoRuntimeException.class,
             () ->
-                MYSQL_TABLE_OPERATIONS.alterTable(
+                TABLE_OPERATIONS.alterTable(
                     TEST_DB_NAME,
                     newName,
                     TableChange.deleteColumn(new String[] {newColumn.name()}, true)));
@@ -149,9 +148,9 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
         gravitinoRuntimeException
             .getMessage()
             .contains("Can't DROP 'col_5'; check that column/key exists"));
-    Assertions.assertDoesNotThrow(() -> MYSQL_TABLE_OPERATIONS.purge(TEST_DB_NAME, newName));
+    Assertions.assertDoesNotThrow(() -> TABLE_OPERATIONS.purge(TEST_DB_NAME, newName));
     Assertions.assertThrows(
-        NoSuchTableException.class, () -> MYSQL_TABLE_OPERATIONS.purge(TEST_DB_NAME, newName));
+        NoSuchTableException.class, () -> TABLE_OPERATIONS.purge(TEST_DB_NAME, newName));
   }
 
   @Test
@@ -164,13 +163,6 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
             .withName("col_1")
             .withType(INT)
             .withComment("id")
-            .withProperties(
-                new ArrayList<String>() {
-                  {
-                    add(AUTO_INCREMENT);
-                    add(PRIMARY_KEY);
-                  }
-                })
             .withNullable(false)
             .build();
     columns.add(col_1);
@@ -179,37 +171,29 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
             .withName("col_2")
             .withType(VARCHAR)
             .withComment("name")
-            .withProperties(
-                new ArrayList<String>() {
-                  {
-                    add("UNIQUE KEY");
-                  }
-                })
             .withDefaultValue("hello world")
             .withNullable(false)
             .build();
     columns.add(col_2);
     Map<String, String> properties = new HashMap<>();
-    // TODO #804 Properties will be unified in the future.
-    //    properties.put("ENGINE", "InnoDB");
-    //    properties.put(AUTO_INCREMENT, "10");
+
     // create table
-    MYSQL_TABLE_OPERATIONS.create(
+    TABLE_OPERATIONS.create(
         TEST_DB_NAME,
         tableName,
         columns.toArray(new JdbcColumn[0]),
         tableComment,
         properties,
         null);
-    JdbcTable load = MYSQL_TABLE_OPERATIONS.load(TEST_DB_NAME, tableName);
+    JdbcTable load = TABLE_OPERATIONS.load(TEST_DB_NAME, tableName);
     assertionsTableInfo(tableName, tableComment, columns, properties, load);
 
-    MYSQL_TABLE_OPERATIONS.alterTable(
+    TABLE_OPERATIONS.alterTable(
         TEST_DB_NAME,
         tableName,
         TableChange.updateColumnType(new String[] {col_1.name()}, VARCHAR));
 
-    load = MYSQL_TABLE_OPERATIONS.load(TEST_DB_NAME, tableName);
+    load = TABLE_OPERATIONS.load(TEST_DB_NAME, tableName);
 
     // After modifying the type, some attributes of the corresponding column are not supported.
     columns.clear();
@@ -219,12 +203,6 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
             .withName(col_1.name())
             .withType(VARCHAR)
             .withComment(col_1.comment())
-            .withProperties(
-                new ArrayList<String>() {
-                  {
-                    add(PRIMARY_KEY);
-                  }
-                })
             .withNullable(col_1.nullable())
             .withDefaultValue(col_1.getDefaultValue())
             .build();
@@ -234,12 +212,12 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
 
     String newComment = "new_comment";
     // update table comment and column comment
-    MYSQL_TABLE_OPERATIONS.alterTable(
+    TABLE_OPERATIONS.alterTable(
         TEST_DB_NAME,
         tableName,
         TableChange.updateColumnType(new String[] {col_1.name()}, INT),
         TableChange.updateColumnComment(new String[] {col_2.name()}, newComment));
-    load = MYSQL_TABLE_OPERATIONS.load(TEST_DB_NAME, tableName);
+    load = TABLE_OPERATIONS.load(TEST_DB_NAME, tableName);
 
     columns.clear();
     col_1 =
@@ -267,13 +245,13 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
     String newColName_1 = "new_col_1";
     String newColName_2 = "new_col_2";
     // rename column
-    MYSQL_TABLE_OPERATIONS.alterTable(
+    TABLE_OPERATIONS.alterTable(
         TEST_DB_NAME,
         tableName,
         TableChange.renameColumn(new String[] {col_1.name()}, newColName_1),
         TableChange.renameColumn(new String[] {col_2.name()}, newColName_2));
 
-    load = MYSQL_TABLE_OPERATIONS.load(TEST_DB_NAME, tableName);
+    load = TABLE_OPERATIONS.load(TEST_DB_NAME, tableName);
 
     columns.clear();
     col_1 =
@@ -300,8 +278,8 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
 
     newComment = "txt3";
     String newCol2Comment = "xxx";
-    // update column position 、comment and add column(by default position)、set table properties
-    MYSQL_TABLE_OPERATIONS.alterTable(
+    // update column position 、comment and add column、set table properties
+    TABLE_OPERATIONS.alterTable(
         TEST_DB_NAME,
         tableName,
         TableChange.updateColumnPosition(
@@ -309,7 +287,7 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
         TableChange.updateComment(newComment),
         TableChange.addColumn(new String[] {"col_3"}, VARCHAR, "txt3"),
         TableChange.updateColumnComment(new String[] {newColName_2}, newCol2Comment));
-    load = MYSQL_TABLE_OPERATIONS.load(TEST_DB_NAME, tableName);
+    load = TABLE_OPERATIONS.load(TEST_DB_NAME, tableName);
 
     columns.clear();
 
@@ -323,18 +301,37 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
             .withNullable(col_2.nullable())
             .build());
     columns.add(col_1);
+    JdbcColumn col_3 =
+        new JdbcColumn.Builder()
+            .withName("col_3")
+            .withType(VARCHAR)
+            .withNullable(true)
+            .withComment("txt3")
+            .build();
     columns.add(
         new JdbcColumn.Builder().withName("col_3").withType(VARCHAR).withComment("txt3").build());
-    //    properties.put("ROW_FORMAT", "DYNAMIC");
     assertionsTableInfo(tableName, newComment, columns, properties, load);
 
-    MYSQL_TABLE_OPERATIONS.alterTable(
+    TABLE_OPERATIONS.alterTable(
         TEST_DB_NAME,
         tableName,
-        TableChange.updateColumnPosition(new String[] {columns.get(0).name()}, null));
+        TableChange.updateColumnPosition(new String[] {columns.get(0).name()}, null),
+        TableChange.updateColumnNullability(new String[] {col_3.name()}, !col_3.nullable()));
 
-    load = MYSQL_TABLE_OPERATIONS.load(TEST_DB_NAME, tableName);
-    columns.add(columns.remove(0));
+    load = TABLE_OPERATIONS.load(TEST_DB_NAME, tableName);
+    col_2 = columns.remove(0);
+    columns.clear();
+
+    columns.add(col_1);
+    columns.add(
+        new JdbcColumn.Builder()
+            .withName("col_3")
+            .withType(VARCHAR)
+            .withNullable(false)
+            .withComment("txt3")
+            .build());
+    columns.add(col_2);
+
     assertionsTableInfo(tableName, newComment, columns, properties, load);
   }
 
@@ -363,8 +360,10 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
         new JdbcColumn.Builder()
             .withName("col_3")
             .withType(Types.TimestampType.withoutTimeZone())
-            .withNullable(true)
+            // MySQL 5.7 doesn't support nullable timestamp
+            .withNullable(false)
             .withComment("timestamp")
+            .withDefaultValue("2013-01-01 00:00:00")
             .build());
     columns.add(
         new JdbcColumn.Builder()
@@ -374,9 +373,9 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
             .withComment("date")
             .build());
     Map<String, String> properties = new HashMap<>();
-    //    properties.put("ENGINE", "InnoDB");
+
     // create table
-    MYSQL_TABLE_OPERATIONS.create(
+    TABLE_OPERATIONS.create(
         TEST_DB_NAME,
         tableName,
         columns.toArray(new JdbcColumn[0]),
@@ -384,14 +383,14 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
         properties,
         null);
 
-    JdbcTable loaded = MYSQL_TABLE_OPERATIONS.load(TEST_DB_NAME, tableName);
+    JdbcTable loaded = TABLE_OPERATIONS.load(TEST_DB_NAME, tableName);
     assertionsTableInfo(tableName, tableComment, columns, properties, loaded);
   }
 
   @Test
   public void testCreateMultipleTables() {
     String test_table_1 = "test_table_1";
-    MYSQL_TABLE_OPERATIONS.create(
+    TABLE_OPERATIONS.create(
         TEST_DB_NAME,
         test_table_1,
         new JdbcColumn[] {
@@ -409,12 +408,12 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
 
     String testDb = "test_db_2";
 
-    MYSQL_DATABASE_OPERATIONS.create(testDb, null, null);
-    List<String> tables = MYSQL_TABLE_OPERATIONS.listTables(testDb);
+    DATABASE_OPERATIONS.create(testDb, null, null);
+    List<String> tables = TABLE_OPERATIONS.listTables(testDb);
     Assertions.assertFalse(tables.contains(test_table_1));
 
     String test_table_2 = "test_table_2";
-    MYSQL_TABLE_OPERATIONS.create(
+    TABLE_OPERATIONS.create(
         testDb,
         test_table_2,
         new JdbcColumn[] {
@@ -430,33 +429,7 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
         null,
         null);
 
-    tables = MYSQL_TABLE_OPERATIONS.listTables(TEST_DB_NAME);
+    tables = TABLE_OPERATIONS.listTables(TEST_DB_NAME);
     Assertions.assertFalse(tables.contains(test_table_2));
-  }
-
-  private static void assertionsTableInfo(
-      String tableName,
-      String tableComment,
-      List<JdbcColumn> columns,
-      Map<String, String> properties,
-      JdbcTable load) {
-    Assertions.assertEquals(tableName, load.name());
-    Assertions.assertEquals(tableComment, load.comment());
-    Assertions.assertEquals(columns.size(), load.columns().length);
-    for (int i = 0; i < columns.size(); i++) {
-      Assertions.assertEquals(columns.get(i).name(), load.columns()[i].name());
-      Assertions.assertEquals(columns.get(i).dataType(), load.columns()[i].dataType());
-      Assertions.assertEquals(columns.get(i).nullable(), load.columns()[i].nullable());
-      Assertions.assertEquals(columns.get(i).comment(), load.columns()[i].comment());
-      Assertions.assertEquals(
-          columns.get(i).getDefaultValue(), ((JdbcColumn) load.columns()[i]).getDefaultValue());
-      if (null != columns.get(i).getProperties()) {
-        Assertions.assertEquals(
-            columns.get(i).getProperties(), ((JdbcColumn) load.columns()[i]).getProperties());
-      }
-    }
-    for (Map.Entry<String, String> entry : properties.entrySet()) {
-      Assertions.assertEquals(entry.getValue(), load.properties().get(entry.getKey()));
-    }
   }
 }

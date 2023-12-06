@@ -13,10 +13,10 @@ Gravitino is a high-performance, geo-distributed, and federated metadata lake. I
 
 You can build from [Github](https://github.com/datastrato/gravitino), see [how to build](/docs/how-to-build) for instructions, or use our docker images at [datastrato](https://hub.docker.com/u/datastrato) DockerHub repository. You can also stop and start a local Gravitino server via ``bin/gravitino.sh start`` and ``bin/gravitino.sh stop`` in a Gravitino distribution, see [how to build](/docs/how-to-build) for more instructions.
 
-## Where is the Documentation?
+## Where is the documentation?
 
 Gravitino has a local documentation website that you can view by following the instructions in ``README.md``.
 
 ## How to contribute to Gravitino?
 
-Gravitino is open source software under the Apache License version 2, contributions to our report on [GitHub](https://github.com/datastrato/gravitino) are welcome.
+Gravitino is open source software under the Apache License version 2, contributions to the repository in [GitHub](https://github.com/datastrato/gravitino) are welcome.

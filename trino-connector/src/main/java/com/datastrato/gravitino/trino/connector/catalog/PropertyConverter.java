@@ -16,7 +16,7 @@ public abstract class PropertyConverter {
 
   private static final Logger LOG = LoggerFactory.getLogger(PropertyConverter.class);
   /**
-   * Convert trino properties to gravitino properties. It will return a map that hods the mapping
+   * Convert trino properties to gravitino properties. It will return a map that holds the mapping
    * between trino and gravitino properties.
    *
    * @return a map that holds the mapping from trino to gravitino properties.
