@@ -262,6 +262,9 @@ const CreateCatalogDialog = props => {
                       labelId='select-catalog-provider'
                     >
                       <MenuItem value={'hive'}>hive</MenuItem>
+                      <MenuItem value={'lakehouse-iceberg'}>iceberg</MenuItem>
+                      <MenuItem value={'jdbc-mysql'}>mysql</MenuItem>
+                      <MenuItem value={'jdbc-postgresql'}>postgresql</MenuItem>
                     </Select>
                   )}
                 />
