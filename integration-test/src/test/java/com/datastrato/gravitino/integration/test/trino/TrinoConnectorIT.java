@@ -422,6 +422,7 @@ public class TrinoConnectorIT extends AbstractIT {
   }
 
   @Test
+  @Order(7)
   void testHiveTableCreatedByGravitino() throws InterruptedException {
     String catalogName = GravitinoITUtils.genRandomName("catalog").toLowerCase();
     String schemaName = GravitinoITUtils.genRandomName("schema").toLowerCase();
@@ -475,7 +476,7 @@ public class TrinoConnectorIT extends AbstractIT {
                 .put(
                     "location",
                     "hdfs://localhost:9000/user/hive/warehouse/hive_schema.db/hive_table")
-                .put("serde-name", "yuqi11")
+                .put("serde-name", "mock11")
                 .put("table-type", "EXTERNAL_TABLE")
                 .build());
     LOG.info("create table \"{}.{}\".{}.{}", metalakeName, catalogName, schemaName, tableName);
@@ -493,7 +494,7 @@ public class TrinoConnectorIT extends AbstractIT {
             "show create table \"%s.%s\".%s.%s", metalakeName, catalogName, schemaName, tableName);
     String data = containerSuite.getTrinoContainer().executeQuerySQL(sql).get(0).get(0);
 
-    Assertions.assertTrue(data.contains("serde_name = 'yuqi11'"));
+    Assertions.assertTrue(data.contains("serde_name = 'mock11'"));
     Assertions.assertTrue(data.contains("table_type = 'EXTERNAL_TABLE'"));
     Assertions.assertTrue(data.contains("serde_lib = 'org.apache.hadoop.hive.ql.io.orc.OrcSerde'"));
     Assertions.assertTrue(
@@ -502,6 +503,7 @@ public class TrinoConnectorIT extends AbstractIT {
   }
 
   @Test
+  @Order(8)
   void testIcebergTableAndSchemaCreatedByGravitino() throws InterruptedException {
     String catalogName = GravitinoITUtils.genRandomName("catalog").toLowerCase();
     String schemaName = GravitinoITUtils.genRandomName("schema").toLowerCase();
