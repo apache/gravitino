@@ -41,4 +41,18 @@ public interface OAuthConfig extends Configs {
           .version("0.3.0")
           .stringConf()
           .createWithDefault(SignatureAlgorithm.RS256.name());
+
+  ConfigEntry<String> DEFAULT_SERVER_URI =
+      new ConfigBuilder(OAUTH_CONFIG_PREFIX + "serverUri")
+          .doc("The uri of the default OAuth server")
+          .version("0.3.0")
+          .stringConf()
+          .createWithDefault("");
+
+  ConfigEntry<String> DEFAULT_TOKEN_PATH =
+      new ConfigBuilder(OAUTH_CONFIG_PREFIX + "tokenPath")
+          .doc("The path for token of the default OAuth server")
+          .version("0.3.0")
+          .stringConf()
+          .createWithDefault("");
 }
