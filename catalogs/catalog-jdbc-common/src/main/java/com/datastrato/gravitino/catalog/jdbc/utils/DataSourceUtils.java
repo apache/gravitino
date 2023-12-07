@@ -40,7 +40,7 @@ public class DataSourceUtils {
     BasicDataSource basicDataSource =
         BasicDataSourceFactory.createDataSource(getProperties(jdbcConfig));
     basicDataSource.setUrl(jdbcConfig.getJdbcUrl());
-    basicDataSource.setDriverClassName(jdbcConfig.getJdbcDriver());
+    jdbcConfig.getJdbcDriverOptional().ifPresent(basicDataSource::setDriverClassName);
     jdbcConfig.getUsernameOptional().ifPresent(basicDataSource::setUsername);
     jdbcConfig.getPasswordOptional().ifPresent(basicDataSource::setPassword);
     basicDataSource.setMaxTotal(jdbcConfig.getPoolMaxSize());
