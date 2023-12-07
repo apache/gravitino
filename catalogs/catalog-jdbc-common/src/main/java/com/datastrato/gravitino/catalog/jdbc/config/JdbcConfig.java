@@ -27,12 +27,12 @@ public class JdbcConfig extends Config {
           .stringConf()
           .createWithOptional();
 
-  public static final ConfigEntry<Optional<String>> JDBC_DRIVER =
+  public static final ConfigEntry<String> JDBC_DRIVER =
       new ConfigBuilder("jdbc-driver")
           .doc("The driver of the jdbc connection")
           .version("0.3.0")
           .stringConf()
-          .createWithOptional();
+          .createWithDefault(null);
 
   public static final ConfigEntry<Optional<String>> USERNAME =
       new ConfigBuilder("jdbc-user")
@@ -70,7 +70,7 @@ public class JdbcConfig extends Config {
     return get(JDBC_DATABASE);
   }
 
-  public Optional<String> getJdbcDriverOptional() {
+  public String getJdbcDriver() {
     return get(JDBC_DRIVER);
   }
 
