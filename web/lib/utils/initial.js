@@ -47,7 +47,8 @@ export const providers = [
       {
         key: 'jdbc-url',
         value: '',
-        required: true
+        required: true,
+        description: 'e.g. jdbc:mysql://localhost:3306'
       },
       {
         key: 'jdbc-user',
@@ -68,7 +69,8 @@ export const providers = [
       {
         key: 'jdbc-url',
         value: '',
-        required: true
+        required: true,
+        description: 'e.g. jdbc:postgresql://localhost:5432/your_database'
       },
       {
         key: 'jdbc-user',

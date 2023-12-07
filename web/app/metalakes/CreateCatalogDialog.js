@@ -308,9 +308,6 @@ const CreateCatalogDialog = props => {
                               disabled={item.required}
                               onChange={event => handleFormChange(index, event)}
                             />
-                            {item.required && item.value === '' && (
-                              <FormHelperText sx={{ color: 'error.main' }}> </FormHelperText>
-                            )}
                           </Box>
                           <Box>
                             <TextField
@@ -321,9 +318,6 @@ const CreateCatalogDialog = props => {
                               value={item.value}
                               onChange={event => handleFormChange(index, event)}
                             />
-                            {item.required && item.value === '' && (
-                              <FormHelperText sx={{ color: 'error.main' }}>{'this is a required field'}</FormHelperText>
-                            )}
                           </Box>
 
                           {!item.required ? (
@@ -337,6 +331,9 @@ const CreateCatalogDialog = props => {
                           )}
                         </Box>
                       </Box>
+                      <FormHelperText sx={{ color: item.required && item.value === '' ? 'error.main' : 'text.main' }}>
+                        {item.description}
+                      </FormHelperText>
                     </FormControl>
                   </Grid>
                 )
