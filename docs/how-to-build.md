@@ -48,7 +48,7 @@ Note:
     ./gradlew build
     ```
 
-   > Note: The first time you build the project, downloading the dependencies may take a while.
+   > Note: The first time you build the project, downloading the dependencies may take a while. You can add `-x test` to skip the test, like `./gradlew build -x test`.
 
 3. Deploy the Gravitino project in your local environment.
 
