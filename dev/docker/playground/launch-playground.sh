@@ -7,7 +7,8 @@
 playground_dir="$(dirname "${BASH_SOURCE-$0}")"
 playground_dir="$(cd "${playground_dir}">/dev/null; pwd)"
 
-if command -v docker-compose &> /dev/null
+isExist=`which docker-compose`
+if [ $isExist ]
 then
   true # Placeholder, do nothing
 else
