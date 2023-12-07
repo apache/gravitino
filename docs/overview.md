@@ -1,7 +1,7 @@
 ---
 title: "Overview"
 date: 2023-10-19T15:33:00-08:00
-license: "Copyright 2023 Datastrato.
+license: "Copyright 2023 DATASTRATO Pvt Ltd.
 This software is licensed under the Apache License version 2."
 ---
 

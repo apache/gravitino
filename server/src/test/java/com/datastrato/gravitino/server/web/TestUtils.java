@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Datastrato.
+ * Copyright 2023 DATASTRATO Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 package com.datastrato.gravitino.server.web;
@@ -16,7 +16,7 @@ import javax.ws.rs.core.Response;
 import org.junit.jupiter.api.Test;
 
 /*
- * Copyright 2023 Datastrato.
+ * Copyright 2023 DATASTRATO Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 public class TestUtils {

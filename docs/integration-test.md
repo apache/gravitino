@@ -1,7 +1,7 @@
 ---
 title: "How to Run Integration Tests"
 date: 2023-10-02T09:03:20-08:00
-license: "Copyright 2023 Datastrato.
+license: "Copyright 2023 DATASTRATO Pvt Ltd.
 This software is licensed under the Apache License version 2."
 ---
 ## How to run integration tests

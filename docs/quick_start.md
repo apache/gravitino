@@ -1,7 +1,7 @@
 ---
 title: "Gravitino Quick Start"
 date: 2023-10-20T17:00:00-11:00
-license: "Copyright 2023 Datastrato.
+license: "Copyright 2023 DATASTRATO Pvt Ltd.
 This software is licensed under the Apache License version 2."
 ---
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Datastrato.
+ * Copyright 2023 DATASTRATO Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 import com.github.gradle.node.NodeExtension
@@ -256,7 +256,7 @@ subprojects {
 }
 
 tasks.rat {
-  substringMatcher("DS", "Datastrato", "Copyright 2023 Datastrato.")
+  substringMatcher("DS", "Datastrato", "Copyright 2023 DATASTRATO Pvt Ltd.")
   approvedLicense("Datastrato")
   approvedLicense("Apache License Version 2.0")
 

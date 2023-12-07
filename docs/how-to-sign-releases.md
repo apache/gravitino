@@ -1,7 +1,7 @@
 ---
 title: "How to Sign and Verify a Gravitino Releases"
 date: 2023-11-01T014:00:00+11:00
-license: "Copyright 2023 Datastrato.
+license: "Copyright 2023 DATASTRATO Pvt Ltd.
 This software is licensed under the Apache License version 2."
 ---
 
