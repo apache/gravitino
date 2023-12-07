@@ -75,6 +75,7 @@ public class TestMultipleJdbcLoad extends AbstractIT {
     String database = new URI(jdbcUrl.substring(jdbcUrl.lastIndexOf("/") + 1)).getPath();
     pgConf.put(JdbcConfig.JDBC_URL.getKey(), jdbcUrl);
     pgConf.put(JdbcConfig.JDBC_DATABASE.getKey(), database);
+    pgConf.put(JdbcConfig.JDBC_DRIVER.getKey(), postgreSQLContainer.getDriverClassName());
     pgConf.put(JdbcConfig.USERNAME.getKey(), postgreSQLContainer.getUsername());
     pgConf.put(JdbcConfig.PASSWORD.getKey(), postgreSQLContainer.getPassword());
 
@@ -92,6 +93,7 @@ public class TestMultipleJdbcLoad extends AbstractIT {
         JdbcConfig.JDBC_URL.getKey(),
         StringUtils.substring(
             mySQLContainer.getJdbcUrl(), 0, mySQLContainer.getJdbcUrl().lastIndexOf("/")));
+    pgConf.put(JdbcConfig.JDBC_DRIVER.getKey(), mySQLContainer.getDriverClassName());
     mysqlConf.put(JdbcConfig.USERNAME.getKey(), mySQLContainer.getUsername());
     mysqlConf.put(JdbcConfig.PASSWORD.getKey(), mySQLContainer.getPassword());
     String mysqlCatalogName = GravitinoITUtils.genRandomName("it_mysql");
