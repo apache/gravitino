@@ -18,7 +18,6 @@ ${gravitino_home}/gradlew clean assembleTrinoConnector -x test
 cp -r "${gravitino_home}/distribution/gravitino-trino-connector" "${trino_dir}/packages/gravitino-trino-connector"
 
 # Download MySQL jdbc driver
-cp -r "${gravitino_home}/catalogs/jdbc-mysql/libs/mysql-connector-java-*.jar" "${trino_dir}/packages/gravitino-trino-connector/"
 cd "${trino_dir}/packages/gravitino-trino-connector/" && curl -O "https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.27/mysql-connector-java-8.0.27.jar" && cd -
 
 # Download PostgreSQL jdbc driver
