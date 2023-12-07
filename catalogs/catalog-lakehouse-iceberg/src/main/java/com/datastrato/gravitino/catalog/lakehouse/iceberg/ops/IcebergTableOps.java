@@ -8,12 +8,6 @@ import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergConfig;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.ops.IcebergTableOpsHelper.IcebergTableChange;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.utils.IcebergCatalogUtil;
 import com.google.common.base.Preconditions;
-import java.sql.Driver;
-import java.sql.DriverManager;
-import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.Enumeration;
-import java.util.List;
 import java.util.Optional;
 import javax.ws.rs.NotSupportedException;
 import org.apache.iceberg.Transaction;
@@ -43,8 +37,6 @@ public class IcebergTableOps implements AutoCloseable {
   protected Catalog catalog;
   private SupportsNamespaces asNamespaceCatalog;
 
-  private List<Driver> drivers = new ArrayList<>();
-
   public IcebergTableOps(IcebergConfig icebergConfig) {
     String catalogType = icebergConfig.get(IcebergConfig.CATALOG_BACKEND);
     icebergConfig
@@ -56,10 +48,6 @@ public class IcebergTableOps implements AutoCloseable {
                 Class.forName(driverClassName);
               } catch (ClassNotFoundException e) {
                 throw new IllegalArgumentException("Couldn't load jdbc driver " + driverClassName);
-              }
-              Enumeration<Driver> driverEnumeration = DriverManager.getDrivers();
-              while (driverEnumeration.hasMoreElements()) {
-                drivers.add(driverEnumeration.nextElement());
               }
             });
     catalog =
@@ -159,15 +147,9 @@ public class IcebergTableOps implements AutoCloseable {
 
   @Override
   public void close() throws Exception {
-    if (!drivers.isEmpty()) {
-      for (Driver driver : drivers) {
-        try {
-          DriverManager.deregisterDriver(driver);
-        } catch (SQLException ignore) {
-
-        }
-      }
-      drivers.clear();
+    if (catalog instanceof AutoCloseable) {
+      // JdbcCatalog need close.
+      ((AutoCloseable) catalog).close();
     }
   }
 }
