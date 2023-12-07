@@ -6,9 +6,13 @@ package com.datastrato.gravitino.catalog.jdbc.utils;
 
 import com.datastrato.gravitino.catalog.jdbc.config.JdbcConfig;
 import com.datastrato.gravitino.exceptions.GravitinoRuntimeException;
+import java.sql.Driver;
 import java.sql.SQLException;
+import java.util.Iterator;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Properties;
+import java.util.ServiceLoader;
 import javax.sql.DataSource;
 import org.apache.commons.dbcp2.BasicDataSource;
 import org.apache.commons.dbcp2.BasicDataSourceFactory;
@@ -40,12 +44,23 @@ public class DataSourceUtils {
     BasicDataSource basicDataSource =
         BasicDataSourceFactory.createDataSource(getProperties(jdbcConfig));
     basicDataSource.setUrl(jdbcConfig.getJdbcUrl());
-    if (null != jdbcConfig.getUsername()) {
-      basicDataSource.setUsername(jdbcConfig.getUsername());
+    Optional<String> jdbcDriverOptional = jdbcConfig.getJdbcDriverOptional();
+    if (jdbcDriverOptional.isPresent()) {
+      basicDataSource.setDriverClassName(jdbcDriverOptional.get());
+    } else {
+      // Automatically load driver
+      ServiceLoader<Driver> loadedDrivers = ServiceLoader.load(Driver.class);
+      Iterator<Driver> iterator = loadedDrivers.iterator();
+      try {
+        while (iterator.hasNext()) {
+          iterator.next();
+        }
+      } catch (Throwable t) {
+        // Do nothing
+      }
     }
-    if (null != jdbcConfig.getPassword()) {
-      basicDataSource.setPassword(jdbcConfig.getPassword());
-    }
+    jdbcConfig.getUsernameOptional().ifPresent(basicDataSource::setUsername);
+    jdbcConfig.getPasswordOptional().ifPresent(basicDataSource::setPassword);
     basicDataSource.setMaxTotal(jdbcConfig.getPoolMaxSize());
     basicDataSource.setMinIdle(jdbcConfig.getPoolMinSize());
     // Set each time a connection is taken out from the connection pool, a test statement will be
