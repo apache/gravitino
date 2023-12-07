@@ -1,12 +1,12 @@
 ---
-title: "Gravitino metrics"
-date: 2023-12-06T09:03:20-08:00
-license: "Copyright 2023 Datastrato.
-This software is licensed under the Apache License version 2."
+title: Gravition metrics
+slug: /metrics
+keywords:
+  - metrics
 ---
 
 ## Introduction
-Gravitino Metrics is built upon the foundation of [Dropwizard Metrics](https://metrics.dropwizard.io/). These metrics are exported through both JMX and an HTTP server, supporting JSON and Prometheus formats. You can retrieve them via HTTP requests, as illustrated below:
+Gravitino Metrics is built upon the [Dropwizard Metrics](https://metrics.dropwizard.io/). These metrics are exported through both JMX and an HTTP server, supporting JSON and Prometheus formats. You can retrieve them via HTTP requests, as illustrated below:
 ```
 // Use Gravitino Server address or Iceberg REST server address to replace 127.0.0.1:8090
 // Get metrics in json format
@@ -39,4 +39,4 @@ Please note that metrics with the `gravitino-server` prefix pertain to the Gravi
 
 #### JVM metrics
 JVM metrics source using [JVM instrumentation](https://metrics.dropwizard.io/4.2.0/manual/jvm.html) with BufferPoolMetricSet, GarbageCollectorMetricSet and MemoryUsageGaugeSet.
-These metrics start with the `jvm` prefix, like `jvm.heap.used` in json format, `jvm_head_used` in prometheus format
+These metrics start with the `jvm` prefix, like `jvm.heap.used` in json format, `jvm_head_used` in Prometheus format.
