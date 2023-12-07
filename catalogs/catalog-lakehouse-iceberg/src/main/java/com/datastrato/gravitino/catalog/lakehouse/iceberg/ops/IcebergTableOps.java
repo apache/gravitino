@@ -54,12 +54,12 @@ public class IcebergTableOps implements AutoCloseable {
               try {
                 // Load the jdbc driver
                 Class.forName(driverClassName);
-                Enumeration<Driver> driverEnumeration = DriverManager.getDrivers();
-                while (driverEnumeration.hasMoreElements()) {
-                  drivers.add(driverEnumeration.nextElement());
-                }
-              } catch (ClassNotFoundException | ClassCastException e) {
+              } catch (ClassNotFoundException e) {
                 throw new IllegalArgumentException("Couldn't load jdbc driver " + driverClassName);
+              }
+              Enumeration<Driver> driverEnumeration = DriverManager.getDrivers();
+              while (driverEnumeration.hasMoreElements()) {
+                drivers.add(driverEnumeration.nextElement());
               }
             });
     catalog =
