@@ -8,6 +8,12 @@ import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergConfig;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.ops.IcebergTableOpsHelper.IcebergTableChange;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.utils.IcebergCatalogUtil;
 import com.google.common.base.Preconditions;
+import java.sql.Driver;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.Enumeration;
+import java.util.List;
 import java.util.Optional;
 import javax.ws.rs.NotSupportedException;
 import org.apache.iceberg.Transaction;
@@ -30,15 +36,32 @@ import org.apache.iceberg.rest.responses.UpdateNamespacePropertiesResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class IcebergTableOps {
+public class IcebergTableOps implements AutoCloseable {
 
   private static final Logger LOG = LoggerFactory.getLogger(IcebergTableOps.class);
 
   protected Catalog catalog;
   private SupportsNamespaces asNamespaceCatalog;
 
+  private List<Driver> drivers = new ArrayList<>();
+
   public IcebergTableOps(IcebergConfig icebergConfig) {
     String catalogType = icebergConfig.get(IcebergConfig.CATALOG_BACKEND);
+    icebergConfig
+        .getJdbcDriverOptional()
+        .ifPresent(
+            driverClassName -> {
+              try {
+                // Load the jdbc driver
+                Class.forName(driverClassName);
+                Enumeration<Driver> driverEnumeration = DriverManager.getDrivers();
+                while (driverEnumeration.hasMoreElements()) {
+                  drivers.add(driverEnumeration.nextElement());
+                }
+              } catch (ClassNotFoundException e) {
+                throw new IllegalArgumentException("Couldn't load jdbc driver " + driverClassName);
+              }
+            });
     catalog =
         IcebergCatalogUtil.loadCatalogBackend(catalogType, icebergConfig.getConfigsWithPrefix(""));
     if (catalog instanceof SupportsNamespaces) {
@@ -132,5 +155,18 @@ public class IcebergTableOps {
     Transaction transaction = icebergTableChange.getTransaction();
     transaction.commitTransaction();
     return loadTable(icebergTableChange.getTableIdentifier());
+  }
+
+  @Override
+  public void close() throws Exception {
+    if (!drivers.isEmpty()) {
+      for (Driver driver : drivers) {
+        try {
+          DriverManager.deregisterDriver(driver);
+        } catch (SQLException ignore) {
+
+        }
+      }
+    }
   }
 }
