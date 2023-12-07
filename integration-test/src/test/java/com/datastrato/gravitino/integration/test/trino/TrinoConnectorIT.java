@@ -29,10 +29,10 @@ import java.util.Map;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.thrift.TException;
-import org.junit.Ignore;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Tag;
@@ -712,7 +712,7 @@ public class TrinoConnectorIT extends AbstractIT {
 
   @Test
   @Order(11)
-  @Ignore("We need to add jdbc-connecotor-jar to trino container Iceberg connector")
+  @Disabled("We need to add jdbc-connecotor-jar to trino container Iceberg connector")
   void testIcebergCatalogCreatedByGravitino() throws InterruptedException {
     String catalogName = GravitinoITUtils.genRandomName("iceberg_catalog").toLowerCase();
     GravitinoMetaLake createdMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
