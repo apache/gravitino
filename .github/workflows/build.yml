@@ -68,7 +68,9 @@ jobs:
         uses: actions/cache@v2
         with:
           path: ~/.m2/repository
-          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          key: ${{ runner.os }}-m2-it
+          restore-keys: |
+            ${{ runner.os }}-m2-it
 
       - name: Build with Gradle
         run: ./gradlew build -PskipITs

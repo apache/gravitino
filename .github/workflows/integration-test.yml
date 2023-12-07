@@ -68,16 +68,41 @@ jobs:
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
 
-      - name: Cache Docker images
-        id: cache_docker_image
+      - name: Cache Docker Hive image
+        id: cache_hive_docker_image
         uses: actions/cache@v2
         with:
-          path: |
-            docker-gravitino-ci-hive.tar
-            docker-gravitino-ci-trino.tar
-            docker-mysql.tar
-            docker-postgres.tar
-          key: ${{ runner.os }}-docker-${{ hashFiles('**/Dockerfile') }}
+          path: docker-gravitino-ci-hive.tar
+          key: ${{ runner.os }}-docker-hive
+          restore-keys: |
+            ${{ runner.os }}-docker-hive
+
+      - name: Cache Docker Trino image
+        id: cache_trino_docker_image
+        uses: actions/cache@v2
+        with:
+          path: docker-gravitino-ci-trino.tar
+          key: ${{ runner.os }}-docker-trino
+          restore-keys: |
+            ${{ runner.os }}-docker-trino
+
+      - name: Cache Docker MySQL image
+        id: cache_mysql_docker_image
+        uses: actions/cache@v2
+        with:
+          path: docker-mysql.tar
+          key: ${{ runner.os }}-docker-mysql
+          restore-keys: |
+            ${{ runner.os }}-docker-mysql 
+
+      - name: Cache Docker PostgreSQL image
+        id: cache_postgresql_image
+        uses: actions/cache@v2
+        with:
+          path: docker-postgres.tar
+          key: ${{ runner.os }}-docker-postgres
+          restore-keys: |
+            ${{ runner.os }}-docker-postgres   
 
       - name: Load Docker images
         run: |
@@ -114,7 +139,9 @@ jobs:
         uses: actions/cache@v2
         with:
           path: ~/.m2/repository
-          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          key: ${{ runner.os }}-m2-it
+          restore-keys: |
+            ${{ runner.os }}-m2-it
 
       - name: Package Gravitino
         run: |
