@@ -29,10 +29,6 @@ public class IcebergCatalogPropertyConverter extends PropertyConverter {
   @Override
   public Map<String, String> toTrinoProperties(Map<String, String> properties) {
     String backend = properties.get("catalog-backend");
-    if ("hive".equalsIgnoreCase(backend)) {
-      return buildHiveBackendProperties(properties);
-    }
-
     switch (backend) {
       case "hive":
         return buildHiveBackendProperties(properties);
