@@ -22,9 +22,10 @@ export const providers = [
     defaultProps: [
       {
         key: 'catalog-backend',
-        value: '',
+        value: 'hive',
         required: true,
-        description: 'Iceberg catalog type choose properties'
+        description: 'Iceberg catalog type choose properties',
+        select: ['hive', 'jdbc']
       },
       {
         key: 'uri',
@@ -37,6 +38,25 @@ export const providers = [
         value: '',
         required: true,
         description: 'Iceberg catalog warehouse config'
+      },
+      {
+        key: 'jdbc-driver',
+        value: '',
+        required: true,
+        hide: 'hive',
+        description: `"com.mysql.jdbc.Driver" or "com.mysql.cj.jdbc.Driver" for MySQL, "org.postgresql.Driver" for PostgreSQL`
+      },
+      {
+        key: 'jdbc-user',
+        value: '',
+        required: true,
+        hide: 'hive'
+      },
+      {
+        key: 'jdbc-password',
+        value: '',
+        required: true,
+        hide: 'hive'
       }
     ]
   },
@@ -44,6 +64,12 @@ export const providers = [
     label: 'mysql',
     value: 'jdbc-mysql',
     defaultProps: [
+      {
+        key: 'jdbc-driver',
+        value: '',
+        required: true,
+        description: 'e.g. com.mysql.jdbc.Driver or com.mysql.cj.jdbc.Driver'
+      },
       {
         key: 'jdbc-url',
         value: '',
@@ -66,6 +92,12 @@ export const providers = [
     label: 'postgresql',
     value: 'jdbc-postgresql',
     defaultProps: [
+      {
+        key: 'jdbc-driver',
+        value: '',
+        required: true,
+        description: 'e.g. org.postgresql.Driver'
+      },
       {
         key: 'jdbc-url',
         value: '',

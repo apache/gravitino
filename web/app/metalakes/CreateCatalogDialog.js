@@ -5,7 +5,7 @@
 
 'use client'
 
-import { useState, forwardRef, useEffect } from 'react'
+import { useState, forwardRef, useEffect, Fragment } from 'react'
 
 import {
   Box,
@@ -93,7 +93,7 @@ const CreateCatalogDialog = props => {
 
   const providerSelect = watch('provider')
 
-  const handleFormChange = (index, event) => {
+  const handleFormChange = ({ index, event }) => {
     let data = [...innerProps]
     data[index][event.target.name] = event.target.value
     setInnerProps(data)
@@ -112,6 +112,16 @@ const CreateCatalogDialog = props => {
     data.splice(index, 1)
     setInnerProps(data)
     setValue('propItems', data)
+  }
+
+  const hideField = field => {
+    if (!field) {
+      return true
+    }
+    const parentField = innerProps.find(i => i.key === 'catalog-backend')
+    const check = parentField && parentField.value === field.hide
+
+    return check
   }
 
   const handleClose = () => {
@@ -295,47 +305,72 @@ const CreateCatalogDialog = props => {
               </Typography>
               {innerProps.map((item, index) => {
                 return (
-                  <Grid item xs={12} key={index} sx={{ '& + &': { mt: 2 } }}>
-                    <FormControl fullWidth>
-                      <Box>
-                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  !hideField(item) && (
+                    <Fragment key={index}>
+                      <Grid item xs={12} sx={{ '& + &': { mt: 2 } }}>
+                        <FormControl fullWidth>
                           <Box>
-                            <TextField
-                              size='small'
-                              name='key'
-                              label='Key'
-                              value={item.key}
-                              disabled={item.required}
-                              onChange={event => handleFormChange(index, event)}
-                            />
-                          </Box>
-                          <Box>
-                            <TextField
-                              size='small'
-                              name='value'
-                              label='Value'
-                              error={item.required && item.value === ''}
-                              value={item.value}
-                              onChange={event => handleFormChange(index, event)}
-                            />
-                          </Box>
+                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                              <Box>
+                                <TextField
+                                  size='small'
+                                  name='key'
+                                  label='Key'
+                                  value={item.key}
+                                  disabled={item.required}
+                                  onChange={event => handleFormChange({ index, event })}
+                                />
+                              </Box>
+                              <Box>
+                                {item.select ? (
+                                  <Select
+                                    name='value'
+                                    value={item.value}
+                                    size='small'
+                                    sx={{ width: 195 }}
+                                    onChange={event => handleFormChange({ index, event })}
+                                  >
+                                    {item.select.map(selectItem => (
+                                      <MenuItem key={selectItem} value={selectItem}>
+                                        {selectItem}
+                                      </MenuItem>
+                                    ))}
+                                  </Select>
+                                ) : (
+                                  <TextField
+                                    size='small'
+                                    name='value'
+                                    label='Value'
+                                    error={item.required && item.value === ''}
+                                    value={item.value}
+                                    onChange={event => handleFormChange({ index, event })}
+                                  />
+                                )}
+                              </Box>
 
-                          {!item.required ? (
-                            <Box sx={{ minWidth: 40 }}>
-                              <IconButton onClick={() => removeFields(index)}>
-                                <Icon icon='mdi:minus-circle-outline' />
-                              </IconButton>
+                              {!item.required ? (
+                                <Box sx={{ minWidth: 40 }}>
+                                  <IconButton onClick={() => removeFields(index)}>
+                                    <Icon icon='mdi:minus-circle-outline' />
+                                  </IconButton>
+                                </Box>
+                              ) : (
+                                <Box sx={{ minWidth: 40 }}></Box>
+                              )}
                             </Box>
-                          ) : (
-                            <Box sx={{ minWidth: 40 }}></Box>
-                          )}
-                        </Box>
-                      </Box>
-                      <FormHelperText sx={{ color: item.required && item.value === '' ? 'error.main' : 'text.main' }}>
-                        {item.description}
-                      </FormHelperText>
-                    </FormControl>
-                  </Grid>
+                          </Box>
+                          <FormHelperText
+                            sx={{
+                              color: item.required && item.value === '' ? 'error.main' : 'text.main',
+                              maxWidth: 'calc(100% - 40px)'
+                            }}
+                          >
+                            {item.description}
+                          </FormHelperText>
+                        </FormControl>
+                      </Grid>
+                    </Fragment>
+                  )
                 )
               })}
             </Grid>
