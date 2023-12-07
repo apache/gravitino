@@ -1,5 +1,5 @@
 ---
-title: Gravition metrics
+title: Gravitino metrics
 slug: /metrics
 keywords:
   - metrics
