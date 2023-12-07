@@ -63,6 +63,13 @@ jobs:
           java-version: '8'
           distribution: 'temurin'
 
+      - name: Cache Maven dependencies
+        id: cache
+        uses: actions/cache@v2
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+
       - name: Build with Gradle
         run: ./gradlew build -PskipITs
 

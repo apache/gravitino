@@ -108,6 +108,14 @@ jobs:
             docker pull postgres:9.6.12
             docker save postgres:9.6.12 -o docker-postgres.tar
           fi
+
+      - name: Cache Maven dependencies
+        id: cache
+        uses: actions/cache@v2
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+
       - name: Package Gravitino
         run: |
           ./gradlew build -x test
