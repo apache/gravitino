@@ -46,6 +46,8 @@ RUN rm -rf /usr/lib/trino/plugin/accumulo  \
 
 COPY --chown=trino:trino packages/trino/conf /etc/trino
 COPY --chown=trino:trino packages/gravitino-trino-connector /usr/lib/trino/plugin/gravitino
+COPY --chown=trino:trino packages/gravitino-trino-connector/mysql-connector-java-8.0.27.jar /usr/lib/trino/plugin/iceberg/
+COPY --chown=trino:trino packages/gravitino-trino-connector/postgresql-42.7.0.jar /usr/lib/trino/plugin/iceberg/
 
 # Use ARGs to update trino conf and start Trino server
 ARG GRAVITINO_HOST_IP
