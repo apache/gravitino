@@ -10,14 +10,15 @@ import { createContext, useEffect, useState, useContext } from 'react'
 import { useRouter } from 'next/navigation'
 
 import { useAppDispatch, useAppSelector } from '@/lib/hooks/useStore'
-import { setVersion as setStoreVersion } from '@/lib/store/sys'
+import { initialVersion, setVersion as setStoreVersion } from '@/lib/store/sys'
 
 import { useLocalStorage } from 'react-use'
 
 import { getVersionApi } from '@/lib/api/version'
 import { loginApi } from '@/lib/api/auth'
 
-import { isProdEnv } from '../utils'
+import { isProdEnv, to } from '../utils'
+import { getAuthConfigs } from '../store/auth'
 
 const devOauthUrl = process.env.NEXT_PUBLIC_OAUTH_PATH
 
@@ -42,11 +43,7 @@ const AuthProvider = ({ children }) => {
   const dispatch = useAppDispatch()
 
   const handleLogin = async params => {
-    let oauthUrl = ''
-
-    if (typeof window !== 'undefined') {
-      oauthUrl = window.localStorage.getItem('oauthUrl')
-    }
+    let oauthUrl = authStore.oauthUrl
 
     try {
       const response = await loginApi(isProdEnv ? oauthUrl : devOauthUrl, params)
@@ -84,31 +81,37 @@ const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     const initAuth = async () => {
-      if (token) {
-        setLoading(true)
+      const [authConfigsErr, resAuthConfigs] = await to(dispatch(getAuthConfigs()))
+      const { authType, oauthUrl } = resAuthConfigs.payload
 
-        getVersionApi()
-          .then(res => {
-            setLoading(false)
-            const { version } = res.data
-            console.log(
-              `Gravitino Version: %c${version.version}`,
-              `color: white; background-color: #6062E0; padding: 2px; border-radius: 4px;`
-            )
-            setVersion(version)
-            dispatch(setStoreVersion(version.version))
-          })
-          .catch(() => {
-            localStorage.removeItem('version')
-            localStorage.removeItem('accessToken')
-            setLoading(false)
+      if (authType !== 'simple') {
+        if (token) {
+          setLoading(true)
 
-            // setVersion(null)
-            router.replace('/login')
-          })
+          getVersionApi()
+            .then(res => {
+              setLoading(false)
+              const { version } = res.data
+              console.log(
+                `Gravitino Version: %c${version.version}`,
+                `color: white; background-color: #6062E0; padding: 2px; border-radius: 4px;`
+              )
+              setVersion(version)
+              dispatch(setStoreVersion(version.version))
+            })
+            .catch(() => {
+              localStorage.removeItem('version')
+              localStorage.removeItem('accessToken')
+              setLoading(false)
+
+              router.replace('/login')
+            })
+        } else {
+          setLoading(false)
+          router.replace('/login')
+        }
       } else {
-        setLoading(false)
-        router.replace('/login')
+        dispatch(initialVersion())
       }
     }
 
