@@ -45,15 +45,15 @@ Note:
 
     ```shell
     cd gravitino
-    ./gradlew build -x test
+    ./gradlew build
     ```
 
-   > Note: The first time you build the project, downloading the dependencies may take a while.
+   > Note: The first time you build the project, downloading the dependencies may take a while. You can add `-x test` to skip the test, like `./gradlew build -x test`.
 
 3. Deploy the Gravitino project in your local environment.
 
     ```shell
-    ./gradlew compileDistribution -x test
+    ./gradlew compileDistribution
     ```
 
    The `compileDistribution` command creates a `distribution` directory in the Gravitino root directory.
@@ -105,7 +105,7 @@ Note:
 6. Assemble the Gravitino distribution package.
 
     ```shell
-    ./gradlew assembleDistribution -x test
+    ./gradlew assembleDistribution
     ```
 
    The `assembleDistribution` command creates `gravitino-{version}-bin.tar.gz` and `gravitino-{version}-bin.tar.gz.sha256` under the `distribution` directory.
@@ -123,7 +123,7 @@ Note:
    or
 
     ```shell
-    ./gradlew assembleDistribution -x test
+    ./gradlew assembleDistribution
     ```
 
    This creates `gravitino-trino-connector-{version}.tar.gz` and `gravitino-trino-connector-{version}.tar.gz.sha256` under the `distribution` directory.
