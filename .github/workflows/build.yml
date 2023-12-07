@@ -64,7 +64,7 @@ jobs:
           distribution: 'temurin'
 
       - name: Cache Maven dependencies
-        id: cache
+        id: cache_maven
         uses: actions/cache@v2
         with:
           path: ~/.m2/repository
