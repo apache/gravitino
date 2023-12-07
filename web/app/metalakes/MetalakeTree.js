@@ -143,7 +143,7 @@ const MetalakeTree = props => {
     const isExpanding = nodeIds.some(nodeId => !store.expendedTreeNode.includes(nodeId))
 
     if (isExpanding) {
-      dispatch(setIntoTreeAction(nodeIds))
+      dispatch(setIntoTreeAction({ nodeIds }))
     }
 
     dispatch(setExpandedTreeNode(nodeIds))

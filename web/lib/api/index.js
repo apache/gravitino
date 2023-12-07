@@ -5,6 +5,8 @@
 
 import axios from 'axios'
 
+import { useRouter } from 'next/navigation'
+
 const defHttp = axios.create({
   baseURL: '/',
   headers: {
@@ -28,6 +30,14 @@ defHttp.interceptors.response.use(
   },
   err => {
     console.error(err)
+    if (err.response.status === 401) {
+      if (typeof window !== 'undefined') {
+        window.localStorage.removeItem('accessToken')
+        window.localStorage.removeItem('version')
+        const router = useRouter()
+        router.replace('/login')
+      }
+    }
   }
 )
 

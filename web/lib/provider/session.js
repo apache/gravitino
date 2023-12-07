@@ -86,8 +86,6 @@ const AuthProvider = ({ children }) => {
 
       if (authType !== 'simple') {
         if (token) {
-          setLoading(true)
-
           getVersionApi()
             .then(res => {
               setLoading(false)
