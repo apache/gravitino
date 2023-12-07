@@ -30,13 +30,13 @@ You can find the latest Gravitino documentation here in the [doc folder](docs), 
 Gravitino builds Gradle. To build Gravitino, please run:
 
 ```shell
-./gradlew clean build
+./gradlew clean build -x test
 ```
 
 If you want to build a distribution package, please run:
 
 ```shell
-./gradlew compileDistribution
+./gradlew compileDistribution -x test
 ```
 
 to build a distribution package.
@@ -44,7 +44,7 @@ to build a distribution package.
 Or:
 
 ```shell
-./gradlew assembleDistribution
+./gradlew assembleDistribution -x test
 ```
 
 to build a compressed distribution package.
