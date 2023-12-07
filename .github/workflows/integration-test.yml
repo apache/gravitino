@@ -68,6 +68,46 @@ jobs:
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
 
+      - name: Cache Docker images
+        id: cache
+        uses: actions/cache@v2
+        with:
+          path: |
+            docker-gravitino-ci-hive.tar
+            docker-gravitino-ci-trino.tar
+            docker-mysql.tar
+            docker-postgres.tar
+          key: ${{ runner.os }}-docker-${{ hashFiles('**/Dockerfile') }}
+
+      - name: Load Docker images
+        run: |
+          if [ -f "docker-gravitino-ci-hive.tar" ]; then
+            docker load -i docker-gravitino-ci-hive.tar
+          else
+            docker pull datastrato/gravitino-ci-hive:0.1.6
+            docker save datastrato/gravitino-ci-hive:0.1.6 -o docker-gravitino-ci-hive.tar
+          fi
+
+          if [ -f "docker-gravitino-ci-trino.tar" ]; then
+            docker load -i docker-gravitino-ci-trino.tar
+          else
+            docker pull datastrato/gravitino-ci-trino:0.1.0
+            docker save datastrato/gravitino-ci-trino:0.1.0 -o docker-gravitino-ci-trino.tar
+          fi
+          
+          if [ -f "docker-mysql.tar" ]; then
+            docker load -i docker-mysql.tar
+          else
+            docker pull mysql:8.0
+            docker save mysql:8.0 -o docker-mysql.tar
+          fi
+          
+          if [ -f "docker-postgres.tar" ]; then
+            docker load -i docker-postgres.tar
+          else
+            docker pull postgres:9.6.12
+            docker save postgres:9.6.12 -o docker-postgres.tar
+          fi
       - name: Package Gravitino
         run: |
           ./gradlew build -x test
