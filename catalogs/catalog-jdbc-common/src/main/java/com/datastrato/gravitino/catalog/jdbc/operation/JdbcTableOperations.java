@@ -29,6 +29,13 @@ import org.slf4j.LoggerFactory;
 
 /** Operations for managing tables in a JDBC data store. */
 public abstract class JdbcTableOperations implements TableOperation {
+  public static final String PRIMARY_KEY = "PRIMARY KEY";
+
+  public static final String COMMENT = "COMMENT";
+  public static final String SPACE = " ";
+
+  public static final String NOT_NULL = "NOT NULL";
+  public static final String DEFAULT = "DEFAULT";
 
   protected static final Logger LOG = LoggerFactory.getLogger(JdbcTableOperations.class);
 
@@ -40,7 +47,8 @@ public abstract class JdbcTableOperations implements TableOperation {
   public void initialize(
       DataSource dataSource,
       JdbcExceptionConverter exceptionMapper,
-      JdbcTypeConverter jdbcTypeConverter) {
+      JdbcTypeConverter jdbcTypeConverter,
+      Map<String, String> conf) {
     this.dataSource = dataSource;
     this.exceptionMapper = exceptionMapper;
     this.typeConverter = jdbcTypeConverter;
@@ -212,9 +220,9 @@ public abstract class JdbcTableOperations implements TableOperation {
   protected abstract String generateAlterTableSql(
       String databaseName, String tableName, TableChange... changes);
 
-  protected Connection getConnection(String schema) throws SQLException {
+  protected Connection getConnection(String catalog) throws SQLException {
     Connection connection = dataSource.getConnection();
-    connection.setSchema(schema);
+    connection.setCatalog(catalog);
     return connection;
   }
 }

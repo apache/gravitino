@@ -143,10 +143,18 @@ public class StringIdentifier {
     }
 
     StringIdentifier identifier = fromComment(comment);
-    if (null != identifier) {
-      return comment.substring(
-          0,
-          comment.indexOf(String.format(STRING_COMMENT_FORMAT, " ", STRING_COMMENT, identifier)));
+    if (identifier != null) {
+      String format = String.format(STRING_COMMENT_FORMAT, " ", STRING_COMMENT, identifier);
+      int indexOf = comment.indexOf(format);
+
+      if (indexOf == -1) {
+        format = String.format(STRING_COMMENT_FORMAT, "", STRING_COMMENT, identifier);
+        indexOf = comment.indexOf(format);
+      }
+
+      if (indexOf != -1) {
+        return comment.substring(0, indexOf);
+      }
     }
     return comment;
   }

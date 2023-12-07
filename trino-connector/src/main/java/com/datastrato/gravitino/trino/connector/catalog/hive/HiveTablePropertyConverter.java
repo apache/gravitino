@@ -9,6 +9,7 @@ import com.datastrato.gravitino.trino.connector.catalog.PropertyConverter;
 import com.google.common.collect.ImmutableMap;
 
 public class HiveTablePropertyConverter extends PropertyConverter {
+
   // Trino property key does not allow upper case character and '-', so we need to map it to
   // Gravitino
   private static final TreeBidiMap<String, String> TRINO_HIVE_TO_GRAVITINO_HIVE =
@@ -22,7 +23,6 @@ public class HiveTablePropertyConverter extends PropertyConverter {
               .put("table_type", "table-type")
               .put("input_format", "input-format")
               .put("output_format", "output-format")
-              .put("transient_last_ddl_time", "transient_lastDdlTime")
               .put("serde_lib", "serde-lib")
               .put("serde_name", "serde-name")
               .build());

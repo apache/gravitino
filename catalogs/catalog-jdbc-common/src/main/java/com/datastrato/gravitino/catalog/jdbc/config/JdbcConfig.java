@@ -19,6 +19,13 @@ public class JdbcConfig extends Config {
           .stringConf()
           .createWithDefault(null);
 
+  public static final ConfigEntry<String> JDBC_DATABASE =
+      new ConfigBuilder("jdbc-database")
+          .doc("The database of the jdbc connection")
+          .version("0.3.0")
+          .stringConf()
+          .createWithDefault(null);
+
   public static final ConfigEntry<String> USERNAME =
       new ConfigBuilder("jdbc-user")
           .doc("The username of the Jdbc connection")
@@ -51,6 +58,10 @@ public class JdbcConfig extends Config {
     return get(JDBC_URL);
   }
 
+  public String getJdbcDatabase() {
+    return get(JDBC_DATABASE);
+  }
+
   public String getUsername() {
     return get(USERNAME);
   }
@@ -70,6 +81,5 @@ public class JdbcConfig extends Config {
   public JdbcConfig(Map<String, String> properties) {
     super(false);
     loadFromMap(properties, k -> true);
-    assert null != getJdbcUrl();
   }
 }

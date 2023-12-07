@@ -20,14 +20,14 @@ public class IcebergConfig extends Config {
 
   public static final ConfigEntry<String> CATALOG_BACKEND =
       new ConfigBuilder(CATALOG_BACKEND_NAME)
-          .doc("Choose the implementation of the Iceberg catalog")
+          .doc("Catalog backend of Gravitino Iceberg catalog")
           .version("0.2.0")
           .stringConf()
           .createWithDefault("memory");
 
   public static final ConfigEntry<String> CATALOG_WAREHOUSE =
       new ConfigBuilder(WAREHOUSE)
-          .doc("The warehouse config of the Iceberg catalog")
+          .doc("Warehouse directory of catalog")
           .version("0.2.0")
           .stringConf()
           .createWithDefault(null);

@@ -12,6 +12,7 @@ import com.datastrato.gravitino.metrics.MetricsSystem;
 import com.datastrato.gravitino.metrics.source.MetricsSource;
 import com.datastrato.gravitino.server.auth.AuthenticationFilter;
 import com.datastrato.gravitino.server.auth.ServerAuthenticator;
+import com.datastrato.gravitino.server.web.ConfigServlet;
 import com.datastrato.gravitino.server.web.HttpServerMetricsSource;
 import com.datastrato.gravitino.server.web.JettyServer;
 import com.datastrato.gravitino.server.web.JettyServerConfig;
@@ -84,6 +85,8 @@ public class GravitinoServer extends ResourceConfig {
 
     Servlet servlet = new ServletContainer(this);
     server.addServlet(servlet, "/api/*");
+    Servlet configServlet = new ConfigServlet(serverConfig);
+    server.addServlet(configServlet, "/configs");
     server.addFilter(new VersioningFilter(), "/api/*");
     server.addFilter(new AuthenticationFilter(), "/api/*");
   }

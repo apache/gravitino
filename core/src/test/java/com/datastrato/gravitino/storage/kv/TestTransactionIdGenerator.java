@@ -11,10 +11,10 @@ import static com.datastrato.gravitino.Configs.STORE_TRANSACTION_MAX_SKEW_TIME;
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.storage.TransactionIdGenerator;
-import com.google.common.io.Files;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -32,8 +32,9 @@ public class TestTransactionIdGenerator {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(TestTransactionalKvBackend.class);
 
-  private Config getConfig() {
-    File file = Files.createTempDir();
+  private Config getConfig() throws IOException {
+    File baseDir = new File(System.getProperty("java.io.tmpdir"));
+    File file = Files.createTempDirectory(baseDir.toPath(), "test").toFile();
     file.deleteOnExit();
     Config config = Mockito.mock(Config.class);
     Mockito.when(config.get(Configs.ENTITY_SERDE)).thenReturn("proto");

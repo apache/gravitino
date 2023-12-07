@@ -26,12 +26,13 @@ public class IcebergConnectorAdapter implements CatalogConnectorAdapter {
     this.catalogConverter = new IcebergCatalogPropertyConverter();
   }
 
-  public Map<String, Object> buildInternalConnectorConfig(GravitinoCatalog catalog) {
+  public Map<String, Object> buildInternalConnectorConfig(GravitinoCatalog catalog)
+      throws Exception {
     Map<String, Object> config = new HashMap<>();
     config.put("catalogHandle", catalog.getName() + ":normal:default");
     config.put("connectorName", "iceberg");
 
-    Map<String, String> properties = catalogConverter.toTrinoProperties(catalog.getPropertyMap());
+    Map<String, String> properties = catalogConverter.toTrinoProperties(catalog.getProperties());
     config.put("properties", properties);
     return config;
   }

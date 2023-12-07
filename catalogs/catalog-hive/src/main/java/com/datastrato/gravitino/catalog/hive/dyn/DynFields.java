@@ -58,7 +58,8 @@ public class DynFields {
       try {
         return (T) field.get(target);
       } catch (IllegalAccessException e) {
-        throw Throwables.propagate(e);
+        Throwables.throwIfUnchecked(e);
+        throw new RuntimeException(e);
       }
     }
 
@@ -66,7 +67,8 @@ public class DynFields {
       try {
         field.set(target, value);
       } catch (IllegalAccessException e) {
-        throw Throwables.propagate(e);
+        Throwables.throwIfUnchecked(e);
+        throw new RuntimeException(e);
       }
     }
 

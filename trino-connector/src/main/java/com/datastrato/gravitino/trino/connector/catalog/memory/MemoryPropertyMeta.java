@@ -13,9 +13,11 @@ import io.trino.spi.session.PropertyMetadata;
 import java.util.List;
 
 public class MemoryPropertyMeta implements HasPropertyMeta {
+  public static final List<PropertyMetadata<?>> MEMORY_TABLE_PROPERTY =
+      ImmutableList.of(integerProperty("max_ttl", "Max ttl days for the table.", 10, false));
 
   @Override
   public List<PropertyMetadata<?>> getTablePropertyMetadata() {
-    return ImmutableList.of(integerProperty("max_ttl", "Max ttl days for the table.", 10, false));
+    return MEMORY_TABLE_PROPERTY;
   }
 }

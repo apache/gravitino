@@ -10,12 +10,14 @@ import com.google.common.collect.ImmutableMap;
 
 public class HiveSchemaPropertyConverter extends PropertyConverter {
 
-  private static final TreeBidiMap<String, String> TRINO_SCHEMA_TO_GRAVITINO_SCHEMA =
+  // Trino property key does not allow upper case character and '-', so we need to map it to
+  // Gravitino
+  private static final TreeBidiMap<String, String> TRINO_KEY_TO_GRAVITINO_KEY =
       new TreeBidiMap<>(
           new ImmutableMap.Builder<String, String>().put("location", "location").build());
 
   @Override
   public TreeBidiMap<String, String> trinoPropertyKeyToGravitino() {
-    return TRINO_SCHEMA_TO_GRAVITINO_SCHEMA;
+    return TRINO_KEY_TO_GRAVITINO_KEY;
   }
 }

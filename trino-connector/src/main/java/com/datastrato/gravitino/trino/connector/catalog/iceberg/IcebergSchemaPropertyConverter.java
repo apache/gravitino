@@ -11,12 +11,14 @@ import com.google.common.collect.ImmutableMap;
 
 public class IcebergSchemaPropertyConverter extends PropertyConverter {
 
+  // TODO (yuqi) add more properties
   private static final TreeBidiMap<String, String> TRINO_ICEBERG_TO_GRAVITINO_ICEBERG =
-      new TreeBidiMap<>(
-          new ImmutableMap.Builder<String, String>().put("comment", "comment").build());
+      new TreeBidiMap<>(new ImmutableMap.Builder<String, String>().build());
 
   @Override
   public TreeBidiMap<String, String> trinoPropertyKeyToGravitino() {
+    // Note: As the properties for Iceberg table loaded from Gravitino are always empty currently,
+    // no matter what the mapping is, the properties will be empty.
     return TRINO_ICEBERG_TO_GRAVITINO_ICEBERG;
   }
 }

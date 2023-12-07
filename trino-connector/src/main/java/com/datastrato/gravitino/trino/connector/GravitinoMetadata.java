@@ -4,6 +4,8 @@
  */
 package com.datastrato.gravitino.trino.connector;
 
+import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_TABLE_NOT_EXISTS;
+
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorMetadata;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoColumn;
@@ -13,6 +15,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import io.airlift.slice.Slice;
+import io.trino.spi.TrinoException;
 import io.trino.spi.connector.ColumnHandle;
 import io.trino.spi.connector.ColumnMetadata;
 import io.trino.spi.connector.ConnectorInsertTableHandle;
@@ -82,6 +85,12 @@ public class GravitinoMetadata implements ConnectorMetadata {
 
     ConnectorTableHandle internalTableHandle =
         internalMetadata.getTableHandle(session, tableName, startVersion, endVersion);
+
+    if (internalTableHandle == null) {
+      throw new TrinoException(
+          GRAVITINO_TABLE_NOT_EXISTS,
+          String.format("Table %s does not exist in the internal connector", tableName));
+    }
     return new GravitinoTableHandle(
         tableName.getSchemaName(), tableName.getTableName(), internalTableHandle);
   }

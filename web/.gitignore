@@ -9,17 +9,17 @@
 /node_modules
 /.pnp
 .pnp.js
-/.node
-
+.yarn/install-state.gz
 /.gradle
+/.node
 
 # testing
 /coverage
 
 # next.js
-/.next
-/out
-/dist
+/.next/
+/out/
+/dist/
 
 # production
 /build
@@ -41,3 +41,4 @@ yarn-error.log*
 
 # typescript
 *.tsbuildinfo
+next-env.d.ts

@@ -6,15 +6,14 @@ plugins {
   `maven-publish`
   id("java")
   id("idea")
-  id("com.diffplug.spotless")
 }
 
 repositories {
-    mavenCentral()
+  mavenCentral()
 }
 
 dependencies {
-  implementation(project(":clients:client-java-runtime", configuration="shadow"))
+  implementation(project(":clients:client-java-runtime", configuration = "shadow"))
   implementation(libs.jackson.databind)
   implementation(libs.jackson.annotations)
   implementation(libs.guava)
@@ -38,21 +37,21 @@ dependencies {
 }
 
 tasks.named("generateMetadataFileForMavenJavaPublication") {
-    dependsOn(":trino-connector:copyDepends")
+  dependsOn(":trino-connector:copyDepends")
 }
 
 tasks {
-    val copyDepends by registering(Copy::class) {
-        from(configurations.runtimeClasspath)
-        into("build/libs")
-    }
-    jar {
-     finalizedBy(copyDepends)
-    }
+  val copyDepends by registering(Copy::class) {
+    from(configurations.runtimeClasspath)
+    into("build/libs")
+  }
+  jar {
+    finalizedBy(copyDepends)
+  }
 
-    val copyLibs by registering(Copy::class) {
-        dependsOn(copyDepends, "build")
-        from("build/libs")
-        into("${rootDir}/distribution/${rootProject.name}-trino-connector")
-    }
+  register("copyLibs", Copy::class) {
+    dependsOn(copyDepends, "build")
+    from("build/libs")
+    into("$rootDir/distribution/${rootProject.name}-trino-connector")
+  }
 }

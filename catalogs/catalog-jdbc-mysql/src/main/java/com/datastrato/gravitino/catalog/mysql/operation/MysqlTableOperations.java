@@ -10,6 +10,7 @@ import com.datastrato.gravitino.catalog.jdbc.JdbcTable;
 import com.datastrato.gravitino.catalog.jdbc.operation.JdbcTableOperations;
 import com.datastrato.gravitino.exceptions.GravitinoRuntimeException;
 import com.datastrato.gravitino.exceptions.NoSuchColumnException;
+import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NoSuchTableException;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.rel.TableChange;
@@ -42,13 +43,6 @@ import org.apache.commons.lang3.StringUtils;
 public class MysqlTableOperations extends JdbcTableOperations {
 
   public static final String AUTO_INCREMENT = "AUTO_INCREMENT";
-  public static final String PRIMARY_KEY = "PRIMARY KEY";
-
-  private static final String COMMENT = "COMMENT";
-  private static final String SPACE = " ";
-
-  private static final String NOT_NULL = "NOT NULL";
-  private static final String DEFAULT = "DEFAULT";
 
   @Override
   public JdbcTable load(String databaseName, String tableName) throws NoSuchTableException {
@@ -60,7 +54,10 @@ public class MysqlTableOperations extends JdbcTableOperations {
     for (ColumnDefinition columnDefinition : createTable.getColumnDefinitions()) {
       // Assemble column information.
       String columnName = getColumnName(columnDefinition);
-      String[] columnSpecs = columnDefinition.getColumnSpecs().toArray(new String[0]);
+      String[] columnSpecs =
+          columnDefinition.getColumnSpecs() == null
+              ? new String[0]
+              : columnDefinition.getColumnSpecs().toArray(new String[0]);
       String columnProperties = String.join(SPACE, columnSpecs);
       boolean nullable = !columnProperties.contains(NOT_NULL);
       String defaultValue = findPropertiesValue(columnSpecs, DEFAULT);
@@ -90,6 +87,26 @@ public class MysqlTableOperations extends JdbcTableOperations {
         .build();
   }
 
+  @Override
+  public List<String> listTables(String databaseName) throws NoSuchSchemaException {
+    try (Connection connection = getConnection(databaseName)) {
+      try (Statement statement = connection.createStatement()) {
+        String showTablesQuery = "SHOW TABLES";
+        ResultSet resultSet = statement.executeQuery(showTablesQuery);
+        List<String> names = new ArrayList<>();
+        while (resultSet.next()) {
+          String tableName = resultSet.getString(1);
+          names.add(tableName);
+        }
+        LOG.info(
+            "Finished listing tables size {} for database name {} ", names.size(), databaseName);
+        return names;
+      }
+    } catch (final SQLException se) {
+      throw this.exceptionMapper.toGravitinoException(se);
+    }
+  }
+
   private JdbcColumn getJdbcColumnFromCreateTable(CreateTable createTable, String colName) {
     // Assemble index information.
     Map<String, Set<String>> indexGroupByName =
@@ -100,7 +117,10 @@ public class MysqlTableOperations extends JdbcTableOperations {
       if (!StringUtils.equals(colName, columnName)) {
         continue;
       }
-      String[] columnSpecs = columnDefinition.getColumnSpecs().toArray(new String[0]);
+      String[] columnSpecs =
+          columnDefinition.getColumnSpecs() == null
+              ? new String[0]
+              : columnDefinition.getColumnSpecs().toArray(new String[0]);
       String columnProperties = String.join(SPACE, columnSpecs);
       boolean nullable = !columnProperties.contains(NOT_NULL);
       String defaultValue = findPropertiesValue(columnSpecs, DEFAULT);
@@ -128,7 +148,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
   private CreateTable loadCreateTable(String databaseName, String tableName) {
     try (Connection connection = getConnection(databaseName)) {
       try (Statement statement = connection.createStatement()) {
-        String showCreateTableSQL = "SHOW CREATE TABLE " + tableName;
+        String showCreateTableSQL = String.format("SHOW CREATE TABLE %s", tableName);
         ResultSet resultSet = statement.executeQuery(showCreateTableSQL);
 
         if (!resultSet.next()) {
@@ -217,7 +237,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
     // Add table properties if any
     if (MapUtils.isNotEmpty(properties)) {
       // TODO #804 Properties will be unified in the future.
-      LOG.warn("Ignoring properties option on table create.");
+      throw new UnsupportedOperationException("Properties are not supported yet");
       //      StringJoiner joiner = new StringJoiner(SPACE + SPACE);
       //      for (Map.Entry<String, String> entry : properties.entrySet()) {
       //        joiner.add(entry.getKey() + "=" + entry.getValue());
@@ -245,7 +265,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
 
   @Override
   protected String generateRenameTableSql(String oldTableName, String newTableName) {
-    return "RENAME TABLE " + oldTableName + " TO " + newTableName;
+    return String.format("RENAME TABLE %s TO %s", oldTableName, newTableName);
   }
 
   @Override
@@ -276,14 +296,15 @@ public class MysqlTableOperations extends JdbcTableOperations {
         setProperties.add(((TableChange.SetProperty) change));
       } else if (change instanceof TableChange.RemoveProperty) {
         // mysql does not support deleting table attributes, it can be replaced by Set Property
-        throw new UnsupportedOperationException("Remove property is not supported yet");
+        throw new IllegalArgumentException("Remove property is not supported yet");
       } else if (change instanceof TableChange.AddColumn) {
         TableChange.AddColumn addColumn = (TableChange.AddColumn) change;
         lazyLoadCreateTable = getOrCreateTable(databaseName, tableName, lazyLoadCreateTable);
         alterSql.add(addColumnFieldDefinition(addColumn, lazyLoadCreateTable));
       } else if (change instanceof TableChange.RenameColumn) {
+        lazyLoadCreateTable = getOrCreateTable(databaseName, tableName, lazyLoadCreateTable);
         TableChange.RenameColumn renameColumn = (TableChange.RenameColumn) change;
-        alterSql.add(renameColumnFieldDefinition(renameColumn));
+        alterSql.add(renameColumnFieldDefinition(renameColumn, lazyLoadCreateTable));
       } else if (change instanceof TableChange.UpdateColumnType) {
         lazyLoadCreateTable = getOrCreateTable(databaseName, tableName, lazyLoadCreateTable);
         TableChange.UpdateColumnType updateColumnType = (TableChange.UpdateColumnType) change;
@@ -302,6 +323,14 @@ public class MysqlTableOperations extends JdbcTableOperations {
       } else if (change instanceof TableChange.DeleteColumn) {
         TableChange.DeleteColumn deleteColumn = (TableChange.DeleteColumn) change;
         alterSql.add(deleteColumnFieldDefinition(deleteColumn));
+      } else if (change instanceof TableChange.UpdateColumnNullability) {
+        lazyLoadCreateTable = getOrCreateTable(databaseName, tableName, lazyLoadCreateTable);
+        alterSql.add(
+            updateColumnNullabilityDefinition(
+                (TableChange.UpdateColumnNullability) change, lazyLoadCreateTable));
+      } else {
+        throw new IllegalArgumentException(
+            "Unsupported table change type: " + change.getClass().getName());
       }
     }
     if (!setProperties.isEmpty()) {
@@ -316,12 +345,9 @@ public class MysqlTableOperations extends JdbcTableOperations {
         CreateTable createTable = getOrCreateTable(databaseName, tableName, lazyLoadCreateTable);
         Map<String, String> properties =
             parseOrderedKeyValuePairs(createTable.getTableOptionsStrings().toArray(new String[0]));
-        String oldComment = properties.get(COMMENT);
-        if (StringUtils.isNotEmpty(oldComment)) {
-          StringIdentifier identifier = StringIdentifier.fromComment(oldComment);
-          if (null != identifier) {
-            newComment = StringIdentifier.addToComment(identifier, newComment);
-          }
+        StringIdentifier identifier = StringIdentifier.fromComment(properties.get(COMMENT));
+        if (null != identifier) {
+          newComment = StringIdentifier.addToComment(identifier, newComment);
         }
       }
       alterSql.add("COMMENT '" + newComment + "'");
@@ -331,6 +357,26 @@ public class MysqlTableOperations extends JdbcTableOperations {
     String result = "ALTER TABLE " + tableName + "\n" + String.join(",\n", alterSql) + ";";
     LOG.info("Generated alter table:{} sql: {}", databaseName + "." + tableName, result);
     return result;
+  }
+
+  private String updateColumnNullabilityDefinition(
+      TableChange.UpdateColumnNullability change, CreateTable table) {
+    if (change.fieldName().length > 1) {
+      throw new UnsupportedOperationException("Mysql does not support nested column names.");
+    }
+    String col = change.fieldName()[0];
+    JdbcColumn column = getJdbcColumnFromCreateTable(table, col);
+    column.getProperties().remove(PRIMARY_KEY);
+    JdbcColumn updateColumn =
+        new JdbcColumn.Builder()
+            .withName(col)
+            .withDefaultValue(column.getDefaultValue())
+            .withNullable(change.nullable())
+            .withProperties(column.getProperties())
+            .withType(column.dataType())
+            .withComment(column.comment())
+            .build();
+    return "MODIFY COLUMN " + col + appendColumnDefinition(updateColumn, new StringBuilder());
   }
 
   private String generateTableProperties(List<TableChange.SetProperty> setProperties) {
@@ -353,10 +399,10 @@ public class MysqlTableOperations extends JdbcTableOperations {
   private String updateColumnCommentFieldDefinition(
       TableChange.UpdateColumnComment updateColumnComment, CreateTable createTable) {
     String newComment = updateColumnComment.getNewComment();
-    if (updateColumnComment.fieldNames().length > 1) {
+    if (updateColumnComment.fieldName().length > 1) {
       throw new UnsupportedOperationException("Mysql does not support nested column names.");
     }
-    String col = updateColumnComment.fieldNames()[0];
+    String col = updateColumnComment.fieldName()[0];
     JdbcColumn column = getJdbcColumnFromCreateTable(createTable, col);
     column.getProperties().remove(PRIMARY_KEY);
     JdbcColumn updateColumn =
@@ -374,55 +420,61 @@ public class MysqlTableOperations extends JdbcTableOperations {
   private String addColumnFieldDefinition(
       TableChange.AddColumn addColumn, CreateTable createTable) {
     String dataType = (String) typeConverter.fromGravitinoType(addColumn.getDataType());
-    if (addColumn.fieldNames().length > 1) {
+    if (addColumn.fieldName().length > 1) {
       throw new UnsupportedOperationException("Mysql does not support nested column names.");
     }
-    String col = addColumn.fieldNames()[0];
+    String col = addColumn.fieldName()[0];
 
     StringBuilder columnDefinition = new StringBuilder();
-    columnDefinition.append("ADD COLUMN ").append(col).append(SPACE).append(dataType);
+    columnDefinition.append("ADD COLUMN ").append(col).append(SPACE).append(dataType).append(SPACE);
     // Append comment if available
     if (StringUtils.isNotEmpty(addColumn.getComment())) {
       columnDefinition.append("COMMENT '").append(addColumn.getComment()).append("' ");
     }
 
     // Append position if available
-    if (addColumn.getPosition() != null) {
-      if (addColumn.getPosition() instanceof TableChange.First) {
-        columnDefinition.append("FIRST");
-      } else if (addColumn.getPosition() instanceof TableChange.After) {
-        TableChange.After afterPosition = (TableChange.After) addColumn.getPosition();
-        columnDefinition.append("AFTER ").append(afterPosition.getColumn());
-      }
+    if (addColumn.getPosition() instanceof TableChange.First) {
+      columnDefinition.append("FIRST");
+    } else if (addColumn.getPosition() instanceof TableChange.After) {
+      TableChange.After afterPosition = (TableChange.After) addColumn.getPosition();
+      columnDefinition.append("AFTER ").append(afterPosition.getColumn());
+    } else if (addColumn.getPosition() instanceof TableChange.Default) {
+      // do nothing, follow the default behavior of mysql
     } else {
-      List<ColumnDefinition> columnDefinitions = createTable.getColumnDefinitions();
-      if (CollectionUtils.isNotEmpty(columnDefinitions)) {
-        columnDefinition
-            .append("AFTER ")
-            .append(getColumnName(columnDefinitions.get(columnDefinitions.size() - 1)));
-      }
+      throw new IllegalArgumentException("Invalid column position.");
     }
     return columnDefinition.toString();
   }
 
-  private String renameColumnFieldDefinition(TableChange.RenameColumn renameColumn) {
-    if (renameColumn.fieldNames().length > 1) {
+  private String renameColumnFieldDefinition(
+      TableChange.RenameColumn renameColumn, CreateTable createTable) {
+    if (renameColumn.fieldName().length > 1) {
       throw new UnsupportedOperationException("Mysql does not support nested column names.");
     }
-    return "RENAME COLUMN "
-        + renameColumn.fieldNames()[0]
-        + SPACE
-        + "TO"
-        + SPACE
-        + renameColumn.getNewName();
+
+    String oldColumnName = renameColumn.fieldName()[0];
+    String newColumnName = renameColumn.getNewName();
+    JdbcColumn column = getJdbcColumnFromCreateTable(createTable, oldColumnName);
+    StringBuilder sqlBuilder =
+        new StringBuilder("CHANGE COLUMN " + oldColumnName + SPACE + newColumnName);
+    JdbcColumn newColumn =
+        new JdbcColumn.Builder()
+            .withName(newColumnName)
+            .withType(column.dataType())
+            .withComment(column.comment())
+            .withProperties(column.getProperties())
+            .withDefaultValue(column.getDefaultValue())
+            .withNullable(column.nullable())
+            .build();
+    return appendColumnDefinition(newColumn, sqlBuilder).toString();
   }
 
   private String updateColumnPositionFieldDefinition(
       TableChange.UpdateColumnPosition updateColumnPosition, CreateTable createTable) {
-    if (updateColumnPosition.fieldNames().length > 1) {
+    if (updateColumnPosition.fieldName().length > 1) {
       throw new UnsupportedOperationException("Mysql does not support nested column names.");
     }
-    String col = updateColumnPosition.fieldNames()[0];
+    String col = updateColumnPosition.fieldName()[0];
     JdbcColumn column = getJdbcColumnFromCreateTable(createTable, col);
     StringBuilder columnDefinition = new StringBuilder();
     columnDefinition.append("MODIFY COLUMN ").append(col);
@@ -445,19 +497,19 @@ public class MysqlTableOperations extends JdbcTableOperations {
   }
 
   private String deleteColumnFieldDefinition(TableChange.DeleteColumn deleteColumn) {
-    if (deleteColumn.fieldNames().length > 1) {
+    if (deleteColumn.fieldName().length > 1) {
       throw new UnsupportedOperationException("Mysql does not support nested column names.");
     }
-    String col = deleteColumn.fieldNames()[0];
+    String col = deleteColumn.fieldName()[0];
     return "DROP COLUMN " + col;
   }
 
   private String updateColumnTypeFieldDefinition(
       TableChange.UpdateColumnType updateColumnType, CreateTable createTable) {
-    if (updateColumnType.fieldNames().length > 1) {
+    if (updateColumnType.fieldName().length > 1) {
       throw new UnsupportedOperationException("Mysql does not support nested column names.");
     }
-    String col = updateColumnType.fieldNames()[0];
+    String col = updateColumnType.fieldName()[0];
     JdbcColumn column = getJdbcColumnFromCreateTable(createTable, col);
     StringBuilder sqlBuilder = new StringBuilder("MODIFY COLUMN " + col);
     JdbcColumn newColumn =

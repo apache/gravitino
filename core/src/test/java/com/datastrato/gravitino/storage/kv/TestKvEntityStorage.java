@@ -33,10 +33,10 @@ import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.meta.SchemaVersion;
 import com.datastrato.gravitino.meta.TableEntity;
 import com.datastrato.gravitino.storage.StorageLayoutVersion;
-import com.google.common.io.Files;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -743,7 +743,8 @@ public class TestKvEntityStorage {
   @Test
   void testConcurrentIssues() throws IOException, ExecutionException, InterruptedException {
     Config config = Mockito.mock(Config.class);
-    File file = Files.createTempDir();
+    File baseDir = new File(System.getProperty("java.io.tmpdir"));
+    File file = Files.createTempDirectory(baseDir.toPath(), "test").toFile();
     file.deleteOnExit();
     Mockito.when(config.get(ENTITY_STORE)).thenReturn("kv");
     Mockito.when(config.get(ENTITY_KV_STORE)).thenReturn(DEFAULT_ENTITY_KV_STORE);
@@ -858,7 +859,8 @@ public class TestKvEntityStorage {
   @Test
   void testStorageLayoutVersion() throws IOException {
     Config config = Mockito.mock(Config.class);
-    File file = Files.createTempDir();
+    File baseDir = new File(System.getProperty("java.io.tmpdir"));
+    File file = Files.createTempDirectory(baseDir.toPath(), "test").toFile();
     file.deleteOnExit();
     Mockito.when(config.get(ENTITY_STORE)).thenReturn("kv");
     Mockito.when(config.get(ENTITY_KV_STORE)).thenReturn(DEFAULT_ENTITY_KV_STORE);

@@ -6,13 +6,16 @@ This software is licensed under the Apache License version 2."
 ---
 
 ## Authentication
-Gravitino supports two kinds of authentication mechanism: simple and oauth.
+
+Gravitino supports two kinds of authentication mechanisms: simple and OAuth.
 
 ### Simple mode
+
 Simple mode is the default authentication option.
 Simple mode allows the client to use the environment variable `GRAVITINO_USER` as the user.
-If the environment variable `GRAVITINO_USER` is not set, client will use the user of the machine which sends requests.
-For client side, users can enable `simple` mode by the code as below:
+If the environment variable `GRAVITINO_USER` isn't set, the client uses the user of the machine that sends requests.
+For the client side, users can enable `simple` mode by the following code:
+
 ```java
 GravitinoClient client = GravitinoClient.builder(uri)
     .withSimpleAuth()
@@ -20,10 +23,14 @@ GravitinoClient client = GravitinoClient.builder(uri)
 ```
 
 ### OAuth mode
-Gravitino only supports external OAuth 2.0 server now.
-First, users need to guarantee that the external OAuth 2.0 server supports Bearer JWT and is configured properly.
-Then, for server side, users should set `gravitino.authenticator` as `oauth` and give `gravitino.authenticator.oauth.defaultSignKey` a proper value.
-Next, for client side, users can enable `oauth` mode by the code as below:
+
+Gravitino only supports external OAuth 2.0 servers.
+First, users need to guarantee that the external correctly configured OAuth 2.0 server supports Bearer JWT.
+Then, on the server side, users should set `gravitino.authenticator` as `oauth` and give 
+`gravitino.authenticator.oauth.defaultSignKey`, `gravitino.authenticator.oauth.serverUri` and 
+`gravitino.authenticator.oauth.tokenPath`  a proper value.
+Next, for the client side, users can enable `OAuth` mode by the following code:
+
 ```java
 DefaultOAuth2TokenProvider authDataProvider = DefaultOAuth2TokenProvider.builder()
     .withUri("oauth server uri")
@@ -37,18 +44,19 @@ GravitinoClient client = GravitinoClient.builder(uri)
     .build();
 ```
 
-
 ### Server configuration
 
-| Configuration item                                | Description                                                                | Default value     | Since version |
-|---------------------------------------------------|----------------------------------------------------------------------------|-------------------|---------------|
-| `gravitino.authenticator`                         | The authenticator which Gravitino uses, setting as `simple` or `oauth`     | `simple`          | 0.3.0         |
-| `gravitino.authenticator.oauth.serviceAudience`   | The audience name when Gravitino uses oauth as the authenticator           | `GravitinoServer` | 0.3.0         |
-| `gravitino.authenticator.oauth.allowSkewSecs`     | The jwt allows skew seconds when Gravitino uses oauth as the authenticator | `0`               | 0.3.0         |
-| `gravitino.authenticator.oauth.defaultSignKey`    | The sign key of jwt when Gravitino uses oauth as the authenticator         | ``                | 0.3.0         |
-| `gravitino.authenticator.oauth.signAlgorithmType` | The signature algorithm when Gravitino uses oauth as the authenticator     | `RS256`           | 0.3.0         |
+| Configuration item                                | Description                                                                 | Default value     | Since version |
+|---------------------------------------------------|-----------------------------------------------------------------------------|-------------------|---------------|
+| `gravitino.authenticator`                         | The authenticator which Gravitino uses, setting as `simple` or `oauth`.     | `simple`          | 0.3.0         |
+| `gravitino.authenticator.oauth.serviceAudience`   | The audience name when Gravitino uses OAuth as the authenticator.           | `GravitinoServer` | 0.3.0         |
+| `gravitino.authenticator.oauth.allowSkewSecs`     | The JWT allows skew seconds when Gravitino uses OAuth as the authenticator. | `0`               | 0.3.0         |
+| `gravitino.authenticator.oauth.defaultSignKey`    | The signing key of JWT when Gravitino uses OAuth as the authenticator.      | ``                | 0.3.0         |
+| `gravitino.authenticator.oauth.signAlgorithmType` | The signature algorithm when Gravitino uses OAuth as the authenticator.     | `RS256`           | 0.3.0         |
+| `gravitino.authenticator.oauth.serverUri`         | The uri of the default OAuth server                                         | ``                | 0.3.0         |
+| `gravitino.authenticator.oauth.tokenPath`         | The path for token of the default OAuth server                              | ``                | 0.3.0         |
 
-The signature algorithm which Gravitino supports is as below:
+The signature algorithms that Gravitino supports follows:
 
 | Name  | Description                                    |
 |-------|------------------------------------------------|
@@ -64,3 +72,44 @@ The signature algorithm which Gravitino supports is as below:
 | PS256 | RSASSA-PSS using SHA-256 and MGF1 with SHA-256 |
 | PS384 | RSASSA-PSS using SHA-384 and MGF1 with SHA-384 |
 | PS512 | RSASSA-PSS using SHA-512 and MGF1 with SHA-512 |
+
+## HTTPS configuration
+Users would better use HTTPS instead of HTTP if users choose OAuth 2.0 as the authenticator.
+Because HTTPS will protect the header of request from smuggling and HTTPS will be safer.
+If users choose to enable HTTPS, Gravitino won't provide the ability of HTTP service.
+Both Gravitino server and Iceberg REST service can configure HTTPS.
+
+### Gravitino server's configuration
+| Configuration item                                  | Description                                                | Default value | Since version |
+|-----------------------------------------------------|------------------------------------------------------------|---------------|---------------|
+| `gravitino.server.webserver.enableHttps`            | Enables https                                              | `false`       | 0.3.0         |
+| `gravitino.server.webserver.httpsPort`              | The https port number of the Jetty web server              | `8433`        | 0.3.0         |
+| `gravitino.server.webserver.keyStorePath`           | Path to the key store file                                 | ``            | 0.3.0         |
+| `gravitino.server.webserver.keyStorePassword`       | Password to the key store                                  | ``            | 0.3.0         |
+| `gravitino.server.webserver.keyStoreType`           | The type to the key store                                  | `JKS`         | 0.3.0         |
+| `gravitino.server.webserver.managerPassword`        | Manager password to the key store                          | ``            | 0.3.0         |
+| `gravitino.server.webserver.tlsProtocol`            | TLS protocol to use. The protocol must be supported by JVM | none          | 0.3.0         |
+| `gravitino.server.webserver.enableCipherAlgorithms` | The collection of the cipher algorithms which are enabled. | ``            | 0.3.0         |
+| `gravitino.server.webserver.enableClientAuth`       | Enables the authentication of the client                   | `false`       | 0.3.0         |
+| `gravitino.server.webserver.trustStorePath`         | Path to the trust store file                               | ``            | 0.3.0         |
+| `gravitino.server.webserver.trustStorePassword`     | Password to the trust store                                | ``            | 0.3.0         |
+| `gravitino.server.webserver.trustStoreType`         | The type to the trust store                                | `JKS`         | 0.3.0         |
+
+### Iceberg REST service's configuration
+| Configuration item                                         | Description                                                | Default value | Since version |
+|------------------------------------------------------------|------------------------------------------------------------|---------------|---------------|
+| `gravitino.auxService.iceberg-rest.enableHttps`            | Enables https                                              | `false`       | 0.3.0         |
+| `gravitino.auxService.iceberg-rest.httpsPort`              | The https port number of the Jetty web server              | `8433`        | 0.3.0         |
+| `gravitino.auxService.iceberg-rest.keyStorePath`           | Path to the key store file                                 | ``            | 0.3.0         |
+| `gravitino.auxService.iceberg-rest.keyStorePassword`       | Password to the key store                                  | ``            | 0.3.0         |
+| `gravitino.uxService.iceberg-rest.keyStoreType`            | The type to the key store                                  | `JKS`         | 0.3.0         |
+| `gravitino.auxService.iceberg-rest.managerPassword`        | Manager password to the key store                          | ``            | 0.3.0         |
+| `gravitino.auxService.iceberg-rest.tlsProtocol`            | TLS protocol to use. The protocol must be supported by JVM | none          | 0.3.0         |
+| `gravitino.auxService.iceberg-rest.enableCipherAlgorithms` | The collection of the cipher algorithms which are enabled  | ``            | 0.3.0         |
+| `gravitino.auxService.iceberg-rest.enableClientAuth`       | Enables the authentication of the client                   | `false`       | 0.3.0         |
+| `gravitino.auxService.iceberg-rest.trustStorePath`         | Path to the trust store file                               | ``            | 0.3.0         |
+| `gravitino.auxService.iceberg-rest.trustStorePassword`     | Password to the trust store                                | ``            | 0.3.0         |
+| `gravitino.auxService.iceberg-rest.trustStoreType`         | The type to the trust store                                | `JKS`         | 0.3.0         |
+
+About `tlsProtocol`, the reference list of protocols can be found in the "Additional JSSE Standard Names" section of the Java security guide. The list for Java 8 can be found at [this](https://docs.oracle.com/javase/8/docs/technotes/guides/security/StandardNames.html#jssenames).
+About `enableCipherAlgorithms`, the reference list of protocols can be found in the "JSSE Cipher Suite Names" section of the Java security guide. The list for Java 8 can be found at [this](https://docs.oracle.com/javase/8/docs/technotes/guides/security/StandardNames.html#ciphersuites)

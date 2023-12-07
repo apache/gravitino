@@ -4,7 +4,6 @@
  */
 package com.datastrato.gravitino.integration.test.web.rest;
 
-import com.datastrato.gravitino.auth.AuthConstants;
 import com.datastrato.gravitino.auth.AuthenticatorType;
 import com.datastrato.gravitino.client.GravitinoVersion;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
@@ -46,7 +45,9 @@ public class AuthenticationOperationsIT extends AbstractIT {
     configs.put(OAuthConfig.SERVICE_AUDIENCE.getKey(), "service1");
     configs.put(OAuthConfig.DEFAULT_SIGN_KEY.getKey(), publicKey);
     configs.put(OAuthConfig.ALLOW_SKEW_SECONDS.getKey(), "6");
-    configs.put(AuthConstants.HTTP_HEADER_AUTHORIZATION, token);
+    configs.put(OAuthConfig.DEFAULT_SERVER_URI.getKey(), "test");
+    configs.put(OAuthConfig.DEFAULT_TOKEN_PATH.getKey(), "test");
+
     registerCustomConfigs(configs);
     OAuthMockDataProvider mockDataProvider = OAuthMockDataProvider.getInstance();
     mockDataProvider.setTokenData(token.getBytes(StandardCharsets.UTF_8));
