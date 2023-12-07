@@ -66,6 +66,8 @@ public class IcebergCatalogPropertyConverter extends PropertyConverter {
     jdbcProperties.put("iceberg.jdbc-catalog.connection-user", properties.get("jdbc-user"));
     jdbcProperties.put("iceberg.jdbc-catalog.connection-password", properties.get("jdbc-password"));
     jdbcProperties.put("iceberg.jdbc-catalog.default-warehouse-dir", properties.get("warehouse"));
+
+    // TODO (FANG) make the catalog name equal to the catalog name in Gravitino
     jdbcProperties.put("iceberg.jdbc-catalog.catalog-name", "jdbc");
 
     return jdbcProperties;
