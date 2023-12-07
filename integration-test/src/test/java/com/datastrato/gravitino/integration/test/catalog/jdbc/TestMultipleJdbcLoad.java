@@ -197,10 +197,7 @@ public class TestMultipleJdbcLoad extends AbstractIT {
 
     Map<String, String> icebergMysqlConf = Maps.newHashMap();
 
-    icebergMysqlConf.put(
-        IcebergConfig.CATALOG_URI.getKey(),
-        StringUtils.substring(
-            mySQLContainer.getJdbcUrl(), 0, mySQLContainer.getJdbcUrl().lastIndexOf("/")));
+    icebergMysqlConf.put(IcebergConfig.CATALOG_URI.getKey(), mySQLContainer.getJdbcUrl());
     icebergMysqlConf.put(IcebergConfig.CATALOG_BACKEND.getKey(), "jdbc");
     icebergMysqlConf.put(IcebergConfig.CATALOG_WAREHOUSE.getKey(), "file:///tmp/iceberg-jdbc");
     icebergMysqlConf.put(IcebergConfig.JDBC_DRIVER.getKey(), mySQLContainer.getDriverClassName());
@@ -217,12 +214,12 @@ public class TestMultipleJdbcLoad extends AbstractIT {
 
     NameIdentifier[] nameIdentifiers =
         mysqlCatalog.asSchemas().listSchemas(Namespace.of(metalakeName, mysqlCatalogName));
-    Assertions.assertNotEquals(0, nameIdentifiers.length);
+    Assertions.assertEquals(0, nameIdentifiers.length);
     nameIdentifiers =
         postgreSqlCatalog
             .asSchemas()
             .listSchemas(Namespace.of(metalakeName, postgreSqlCatalogName));
-    Assertions.assertNotEquals(0, nameIdentifiers.length);
+    Assertions.assertEquals(0, nameIdentifiers.length);
 
     String schemaName = GravitinoITUtils.genRandomName("it_schema");
     mysqlCatalog
