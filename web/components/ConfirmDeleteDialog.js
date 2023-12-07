@@ -21,9 +21,9 @@ const ConfirmDeleteDialog = props => {
         >
           <Icon icon='tabler:alert-circle' fontSize='6rem' />
           <Typography variant='h4' className={'twc-mb-5 '} sx={{ color: 'text.secondary' }}>
-            Confirm Delete ?
+            Confirm Delete?
           </Typography>
-          <Typography>This action can not reserve!</Typography>
+          <Typography>This action can not be reversed!</Typography>
         </Box>
       </DialogContent>
       <DialogActions className={'twc-justify-center twc-px-5 twc-pb-8'}>
