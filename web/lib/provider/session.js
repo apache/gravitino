@@ -9,13 +9,17 @@ import { createContext, useEffect, useState, useContext } from 'react'
 
 import { useRouter } from 'next/navigation'
 
-import { useAppDispatch } from '@/lib/hooks/useStore'
-import { setVersion as setStoreVersion } from '@/lib/store/version'
+import { useAppDispatch, useAppSelector } from '@/lib/hooks/useStore'
+import { setVersion as setStoreVersion } from '@/lib/store/sys'
 
 import { useLocalStorage } from 'react-use'
 
 import { getVersionApi } from '@/lib/api/version'
 import { loginApi } from '@/lib/api/auth'
+
+import { isProdEnv } from '../utils'
+
+const devOauthUrl = process.env.NEXT_PUBLIC_OAUTH_PATH
 
 const authProvider = {
   version: null,
@@ -34,11 +38,18 @@ const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(authProvider.loading)
   const [token, setToken] = useLocalStorage('accessToken', null, { raw: true })
   const [version, setVersion] = useLocalStorage('version', authProvider.version, { raw: false })
+  const authStore = useAppSelector(state => state.auth)
   const dispatch = useAppDispatch()
 
   const handleLogin = async params => {
+    let oauthUrl = ''
+
+    if (typeof window !== 'undefined') {
+      oauthUrl = window.localStorage.getItem('oauthUrl')
+    }
+
     try {
-      const response = await loginApi(params)
+      const response = await loginApi(isProdEnv ? oauthUrl : devOauthUrl, params)
 
       const { access_token } = response.data
 

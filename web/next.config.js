@@ -6,23 +6,29 @@
 const isProdEnv = process.env.NODE_ENV === 'production'
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL
-const oauthUrl = process.env.NEXT_PUBLIC_OAUTH_URL
+const oauthUri = process.env.NEXT_PUBLIC_OAUTH_URI
+const oauthPath = process.env.NEXT_PUBLIC_OAUTH_PATH
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   ...(isProdEnv
     ? {}
     : {
+        // ** Just for development
         async rewrites() {
           return {
             fallback: [
               {
                 source: '/api/:path*',
-                destination: `${apiUrl}/:path*`
+                destination: `${apiUrl}/api/:path*`
               },
               {
-                source: '/oauth2/token',
-                destination: `${oauthUrl}`
+                source: '/configs',
+                destination: `${apiUrl}/configs`
+              },
+              {
+                source: `${oauthPath}`,
+                destination: `${oauthUri}${oauthPath}`
               }
             ]
           }
