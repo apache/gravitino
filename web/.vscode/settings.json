@@ -17,6 +17,8 @@
     "heroicons",
     "hookform",
     "iconify",
+    "jdbc",
+    "lakehouse",
     "metalake",
     "metalakes",
     "metastore",

@@ -34,18 +34,22 @@ import * as yup from 'yup'
 import { useForm, Controller } from 'react-hook-form'
 import { yupResolver } from '@hookform/resolvers/yup'
 
+import { providers } from '@/lib/utils/initial'
+
 const defaultValues = {
   name: '',
   type: 'relational',
   provider: 'hive',
   comment: '',
-  propItems: []
+  propItems: providers[0].defaultProps
 }
+
+const providerTypeValues = providers.map(i => i.value)
 
 const schema = yup.object().shape({
   name: yup.string().required(),
   type: yup.mixed().oneOf(['relational']).required(),
-  provider: yup.mixed().oneOf(['hive']).required(),
+  provider: yup.mixed().oneOf(providerTypeValues).required(),
   propItems: yup.array().of(
     yup.object().shape({
       required: yup.boolean(),
@@ -70,19 +74,14 @@ const CreateCatalogDialog = props => {
 
   const typeText = type === 'create' ? 'Create' : 'Update'
 
-  const [innerProps, setInnerProps] = useState([
-    {
-      key: 'metastore.uris',
-      value: '',
-      required: true
-    }
-  ])
+  const [innerProps, setInnerProps] = useState(providers[0].defaultProps)
 
   const [cacheData, setCacheData] = useState()
 
   const {
     control,
     reset,
+    watch,
     setValue,
     handleSubmit,
     formState: { errors }
@@ -91,6 +90,8 @@ const CreateCatalogDialog = props => {
     mode: 'onChange',
     resolver: yupResolver(schema)
   })
+
+  const providerSelect = watch('provider')
 
   const handleFormChange = (index, event) => {
     let data = [...innerProps]
@@ -115,20 +116,8 @@ const CreateCatalogDialog = props => {
 
   const handleClose = () => {
     reset()
-    setInnerProps([
-      {
-        key: 'metastore.uris',
-        value: '',
-        required: true
-      }
-    ])
-    setValue('propItems', [
-      {
-        key: 'metastore.uris',
-        value: '',
-        required: true
-      }
-    ])
+    setInnerProps(providers[0].defaultProps)
+    setValue('propItems', providers[0].defaultProps)
     setOpen(false)
   }
 
@@ -152,6 +141,11 @@ const CreateCatalogDialog = props => {
 
     handleClose()
   }
+
+  useEffect(() => {
+    const providerItemIndex = providers.findIndex(i => i.value === providerSelect)
+    setInnerProps(providers[providerItemIndex].defaultProps)
+  }, [providerSelect, setInnerProps])
 
   useEffect(() => {
     if (open && JSON.stringify(data) !== '{}') {
@@ -332,14 +326,15 @@ const CreateCatalogDialog = props => {
                             )}
                           </Box>
 
-                          <Box sx={{ minWidth: 40 }}>
-                            <IconButton
-                              sx={{ display: index === 0 ? 'none' : 'inherit' }}
-                              onClick={() => removeFields(index)}
-                            >
-                              <Icon icon='mdi:minus-circle-outline' />
-                            </IconButton>
-                          </Box>
+                          {!item.required ? (
+                            <Box sx={{ minWidth: 40 }}>
+                              <IconButton onClick={() => removeFields(index)}>
+                                <Icon icon='mdi:minus-circle-outline' />
+                              </IconButton>
+                            </Box>
+                          ) : (
+                            <Box sx={{ minWidth: 40 }}></Box>
+                          )}
                         </Box>
                       </Box>
                     </FormControl>
