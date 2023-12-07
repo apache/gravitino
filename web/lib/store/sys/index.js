@@ -15,7 +15,7 @@ export const initialVersion = createAsyncThunk('sys/fetchVersion', async (params
 
   if (!err && res) {
     version = res.data.version
-    sessionStorage.setItem('version', version.version)
+    typeof window !== 'undefined' && window.localStorage.setItem('version', JSON.stringify(version))
 
     console.log(
       `Gravitino Version: %c${version.version}`,
