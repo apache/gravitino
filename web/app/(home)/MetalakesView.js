@@ -16,7 +16,7 @@ const MetalakesView = () => {
         <Typography className={'twc-mb-4 twc-text-[1.375rem] twc-font-bold'}>Metalakes</Typography>
         <Typography sx={{ color: 'text.secondary' }}>
           A metalake is the top-level container for data in Gravitino. With a metalake, Gravitino provides a 3-level
-          namespace for organizing data: catalog, schemas(also called databases), and tables / view.
+          namespace for organizing data: catalog, schemas (also called databases), and tables / views.
         </Typography>
       </Grid>
       <Grid item xs={12}>
