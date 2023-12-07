@@ -712,7 +712,7 @@ public class TrinoConnectorIT extends AbstractIT {
   @Test
   @Order(11)
   void testMySQLCatalogCreatedByGravitino() throws InterruptedException {
-    String catalogName = GravitinoITUtils.genRandomName("iceberg_catalog").toLowerCase();
+    String catalogName = GravitinoITUtils.genRandomName("mysql_catalog").toLowerCase();
     GravitinoMetaLake createdMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
     String[] command = {
       "mysql",
