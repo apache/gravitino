@@ -69,7 +69,7 @@ jobs:
         uses: docker/setup-qemu-action@v2
 
       - name: Cache Docker images
-        id: cache
+        id: cache_docker_image
         uses: actions/cache@v2
         with:
           path: |
@@ -110,7 +110,7 @@ jobs:
           fi
 
       - name: Cache Maven dependencies
-        id: cache
+        id: cache_maven
         uses: actions/cache@v2
         with:
           path: ~/.m2/repository
