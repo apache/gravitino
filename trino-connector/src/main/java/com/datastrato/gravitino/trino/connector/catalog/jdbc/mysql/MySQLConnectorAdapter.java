@@ -2,20 +2,25 @@
  * Copyright 2023 Datastrato.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.gravitino.trino.connector.catalog.mysql;
+package com.datastrato.gravitino.trino.connector.catalog.jdbc.mysql;
 
 import static java.util.Collections.emptyList;
 
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorAdapter;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
+import com.datastrato.gravitino.trino.connector.catalog.PropertyConverter;
+import com.datastrato.gravitino.trino.connector.catalog.jdbc.JDBCCatalogPropertyConverter;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoCatalog;
 import java.util.HashMap;
 import java.util.Map;
 
 /** Transforming MySQL connector configuration and components into Gravitino connector. */
 public class MySQLConnectorAdapter implements CatalogConnectorAdapter {
+  private final PropertyConverter catalogConverter;
 
-  public MySQLConnectorAdapter() {}
+  public MySQLConnectorAdapter() {
+    this.catalogConverter = new JDBCCatalogPropertyConverter();
+  }
 
   public Map<String, Object> buildInternalConnectorConfig(GravitinoCatalog catalog)
       throws Exception {
@@ -23,11 +28,7 @@ public class MySQLConnectorAdapter implements CatalogConnectorAdapter {
     config.put("catalogHandle", catalog.getName() + ":normal:default");
     config.put("connectorName", "mysql");
 
-    Map<String, Object> properties = new HashMap<>();
-    properties.put("connection-url", catalog.getRequiredProperty("gravitino.bypass.jdbc-url"));
-    properties.put("connection-user", catalog.getRequiredProperty("gravitino.bypass.jdbc-user"));
-    properties.put(
-        "connection-password", catalog.getRequiredProperty("gravitino.bypass.jdbc-password"));
+    Map<String, String> properties = catalogConverter.toTrinoProperties(catalog.getProperties());
     config.put("properties", properties);
     return config;
   }

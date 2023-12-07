@@ -15,7 +15,7 @@ public class HiveTablePropertyConverter extends PropertyConverter {
   private static final Logger LOG = LoggerFactory.getLogger(HiveTablePropertyConverter.class);
   // Trino property key does not allow upper case character and '-', so we need to map it to
   // Gravitino
-  private static final TreeBidiMap<String, String> TRINO_HIVE_TO_GRAVITINO_HIVE =
+  private static final TreeBidiMap<String, String> TRINO_KEY_TO_GRAVITINO_KEY =
       new TreeBidiMap<>(
           new ImmutableMap.Builder<String, String>()
               .put("format", "format")
@@ -32,6 +32,6 @@ public class HiveTablePropertyConverter extends PropertyConverter {
 
   @Override
   public TreeBidiMap<String, String> trinoPropertyKeyToGravitino() {
-    return TRINO_HIVE_TO_GRAVITINO_HIVE;
+    return TRINO_KEY_TO_GRAVITINO_KEY;
   }
 }
