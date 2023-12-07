@@ -40,6 +40,8 @@ public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
       ImmutableMap.of(
           CATALOG_BACKEND_NAME,
           CATALOG_BACKEND_NAME,
+          GRAVITINO_JDBC_DRIVER,
+          GRAVITINO_JDBC_DRIVER,
           GRAVITINO_JDBC_USER,
           ICEBERG_JDBC_USER,
           GRAVITINO_JDBC_PASSWORD,

@@ -66,10 +66,6 @@ public class JdbcConfig extends Config {
     return get(JDBC_URL);
   }
 
-  public Optional<String> getJdbcDatabaseOptional() {
-    return get(JDBC_DATABASE);
-  }
-
   public String getJdbcDriver() {
     return get(JDBC_DRIVER);
   }
@@ -88,6 +84,14 @@ public class JdbcConfig extends Config {
 
   public int getPoolMaxSize() {
     return get(POOL_MAX_SIZE);
+  }
+
+  public String getJdbcDatabase() {
+    return get(JDBC_DATABASE)
+        .orElseThrow(
+            () ->
+                new IllegalArgumentException(
+                    "The `jdbc-database` configuration item is mandatory in PostgreSQL."));
   }
 
   public JdbcConfig(Map<String, String> properties) {

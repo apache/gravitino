@@ -58,7 +58,7 @@ public class IcebergTableOps implements AutoCloseable {
                 while (driverEnumeration.hasMoreElements()) {
                   drivers.add(driverEnumeration.nextElement());
                 }
-              } catch (ClassNotFoundException e) {
+              } catch (ClassNotFoundException | ClassCastException e) {
                 throw new IllegalArgumentException("Couldn't load jdbc driver " + driverClassName);
               }
             });
@@ -167,6 +167,7 @@ public class IcebergTableOps implements AutoCloseable {
 
         }
       }
+      drivers.clear();
     }
   }
 }

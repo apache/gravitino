@@ -31,13 +31,7 @@ public class PostgreSqlSchemaOperations extends JdbcDatabaseOperations {
   public void initialize(
       DataSource dataSource, JdbcExceptionConverter exceptionMapper, Map<String, String> conf) {
     super.initialize(dataSource, exceptionMapper, conf);
-    database =
-        new JdbcConfig(conf)
-            .getJdbcDatabaseOptional()
-            .orElseThrow(
-                () ->
-                    new IllegalArgumentException(
-                        "The `jdbc-database` configuration item is mandatory in PostgreSQL."));
+    database = new JdbcConfig(conf).getJdbcDatabase();
   }
 
   @Override

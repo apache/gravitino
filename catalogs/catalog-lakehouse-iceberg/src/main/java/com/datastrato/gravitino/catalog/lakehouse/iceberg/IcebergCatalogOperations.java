@@ -113,7 +113,15 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
 
   /** Closes the Iceberg catalog and releases the associated client pool. */
   @Override
-  public void close() {}
+  public void close() {
+    if (null != icebergTableOps) {
+      try {
+        icebergTableOps.close();
+      } catch (Exception ignore) {
+
+      }
+    }
+  }
 
   /**
    * Lists the schemas under the given namespace.

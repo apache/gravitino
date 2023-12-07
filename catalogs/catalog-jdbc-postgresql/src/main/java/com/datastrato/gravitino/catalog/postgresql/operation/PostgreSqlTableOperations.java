@@ -70,13 +70,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
       JdbcTypeConverter jdbcTypeConverter,
       Map<String, String> conf) {
     super.initialize(dataSource, exceptionMapper, jdbcTypeConverter, conf);
-    database =
-        new JdbcConfig(conf)
-            .getJdbcDatabaseOptional()
-            .orElseThrow(
-                () ->
-                    new IllegalArgumentException(
-                        "The `jdbc-database` configuration item is mandatory in PostgreSQL."));
+    database = new JdbcConfig(conf).getJdbcDatabase();
   }
 
   @Override
