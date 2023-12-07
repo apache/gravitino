@@ -3,12 +3,12 @@
 # Copyright 2023 Datastrato.
 # This software is licensed under the Apache License version 2.
 #
-set -ex
+#set -ex
 script_dir="$(dirname "${BASH_SOURCE-$0}")"
 script_dir="$(cd "${script_dir}">/dev/null; pwd)"
-
 # Build docker image for multi-arch
-USAGE="-e Usage: ./build-docker.sh --platform [all|linux/amd64|linux/arm64] --type [gravitino|hive|trino] --image {image_name} --tag {tag_name} --latest"
+# shellcheck disable=SC2089
+USAGE="Usage: ./build-docker.sh --platform [all|linux/amd64|linux/arm64] --type [gravitino|hive|trino] --image {image_name} --tag {tag_name} --latest\nNotice: You shouldn't use 'all' for the platform if you don't use the Github action to publish the Docker image."
 
 # Get platform type
 if [[ "$1" == "--platform" ]]; then
