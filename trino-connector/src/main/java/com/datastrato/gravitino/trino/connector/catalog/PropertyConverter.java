@@ -15,6 +15,7 @@ import org.slf4j.LoggerFactory;
 public abstract class PropertyConverter {
 
   private static final Logger LOG = LoggerFactory.getLogger(PropertyConverter.class);
+
   /**
    * Convert Trino properties to Gravitino properties. It will return a map that holds the mapping
    * between Trino and gravitino properties.
@@ -22,6 +23,7 @@ public abstract class PropertyConverter {
    * @return a map that holds the mapping from Trino to Gravitino properties.
    */
   public abstract TreeBidiMap<String, String> trinoPropertyKeyToGravitino();
+
   /** Convert Trino properties to Gravitino properties. */
   public Map<String, String> toTrinoProperties(Map<String, String> properties) {
     Map<String, String> trinoProperties = new HashMap<>();

@@ -32,6 +32,7 @@ import org.apache.thrift.TException;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Tag;
@@ -710,7 +711,56 @@ public class TrinoConnectorIT extends AbstractIT {
   }
 
   @Test
-  @Order(11)
+  @Order(15)
+  @Disabled("We need to add jdbc-connecotor-jar to trino container Iceberg connector")
+  void testIcebergCatalogCreatedByGravitino() throws InterruptedException {
+    String catalogName = GravitinoITUtils.genRandomName("iceberg_catalog").toLowerCase();
+    GravitinoMetaLake createdMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
+    String[] command = {
+      "mysql",
+      "-h127.0.0.1",
+      "-uroot",
+      "-pds123", // username and password are referred from Hive dockerfile
+      "-e",
+      "grant all privileges on *.* to root@'%' identified by 'ds123'"
+    };
+
+    // There exists a mysql instance in Hive the container.
+    containerSuite.getHiveContainer().executeInContainer(command);
+    String hiveHost = containerSuite.getHiveContainer().getContainerIpAddress();
+
+    createdMetalake.createCatalog(
+        NameIdentifier.of(metalakeName, catalogName),
+        Catalog.Type.RELATIONAL,
+        "lakehouse-iceberg",
+        "comment",
+        ImmutableMap.<String, String>builder()
+            .put(
+                "uri",
+                String.format(
+                    "jdbc:mysql://%s:3306/metastore_db?createDatabaseIfNotExist=true", hiveHost))
+            .put("warehouse", "file:///tmp/iceberg")
+            .put("catalog-backend", "jdbc")
+            .put("jdbc-user", "root")
+            .put("jdbc-password", "ds123")
+            .put("driverClassName", "com.mysql.cj.jdbc.Driver")
+            .build());
+    Catalog catalog = createdMetalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
+    Assertions.assertEquals("root", catalog.properties().get("jdbc-user"));
+
+    String sql = String.format("show catalogs like '%s.%s'", metalakeName, catalogName);
+    boolean success = checkTrinoHasLoaded(sql, 30);
+    if (!success) {
+      Assertions.fail("Trino fail to load catalogs created by gravitino: " + sql);
+    }
+
+    // Because we assign 'hive.target-max-file-size' a wrong value, trino can't load the catalog
+    String data = containerSuite.getTrinoContainer().executeQuerySQL(sql).get(0).get(0);
+    Assertions.assertEquals(metalakeName + "." + catalogName, data);
+  }
+
+  @Test
+  @Order(16)
   void testMySQLCatalogCreatedByGravitino() throws InterruptedException {
     String catalogName = GravitinoITUtils.genRandomName("mysql_catalog").toLowerCase();
     GravitinoMetaLake createdMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));

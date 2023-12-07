@@ -4,6 +4,9 @@ Copyright 2023 Datastrato
 This product includes software developed at
 Datastrato (https://datastrato.ai).
 
+This product includes software developed at
+The Apache Software Foundation (http://www.apache.org/).
+
 Apache Iceberg
 Copyright 2017-2022 The Apache Software Foundation
 
@@ -18,15 +21,6 @@ Copyright 2016-2023 The Apache Software Foundation
 
 Apache Hadoop
 Copyright 2006 and onwards The Apache Software Foundation.
-
-This product includes software developed at
-The Apache Software Foundation (http://www.apache.org/).
-
-   =========================================================================
-   ==  NOTICE file corresponding to the section 4 d of                    ==
-   ==  the Apache License, Version 2.0,                                   ==
-   ==  in this case for the Apache Ant distribution.                      ==
-   =========================================================================
 
    This product includes also software developed by :
      - the W3C consortium (http://www.w3c.org) ,
@@ -68,17 +62,11 @@ Copyright 2006-2023 Google, Inc.
 Google Guice - Extensions - Servlet
 Copyright 2006-2011 Google, Inc.
 
-   =========================================================================
-   ==  NOTICE file corresponding to the section 4 d of                    ==
-   ==  the Apache License, Version 2.0,                                   ==
-   ==  in this case for the BoneCP (Java connection pool).                ==
-   =========================================================================
+BoneCP
+Copyright 2010 Wallace Wadge
 
-   BoneCP
-   Copyright 2010 Wallace Wadge
-
-   This product includes software developed by
-   Wallace Wadge (http://jolbox.com/).
+This product includes software developed by
+Wallace Wadge (http://jolbox.com/).
 
 Android JSON library
 Copyright (C) 2010 The Android Open Source Project
@@ -87,20 +75,26 @@ This product includes software developed by
 The Android Open Source Project
 
 Apache Commons BeanUtils
-Copyright 2000-2008 The Apache Software Foundation
+Copyright 2000-2019 The Apache Software Foundation
 
 Apache Commons CLI
 Copyright 2001-2009 The Apache Software Foundation
 
 Apache Commons Codec
-Copyright 2002-2013 The Apache Software Foundation
+Copyright 2002-2017 The Apache Software Foundation
 
 src/test/org/apache/commons/codec/language/DoubleMetaphoneTest.java
 contains test data from http://aspell.net/test/orig/batch0.tab.
 Copyright (C) 2002 Kevin Atkinson (kevina@gnu.org)
 
+The content of package org.apache.commons.codec.language.bm has been translated
+from the original php source code available at http://stevemorse.org/phoneticinfo.htm
+with permission from the original authors.
+Original source copyright:
+Copyright (c) 2008 Alexander Beider & Stephen P. Morse.
+
 Apache Commons Collections
-Copyright 2001-2019 The Apache Software Foundation
+Copyright 2001-2015 The Apache Software Foundation
 
 Apache Commons Configuration
 Copyright 2001-2008 The Apache Software Foundation
@@ -118,10 +112,10 @@ Apache Jakarta HttpClient
 Copyright 1999-2007 The Apache Software Foundation
 
 Apache Commons IO
-Copyright 2002-2021 The Apache Software Foundation
+Copyright 2002-2023 The Apache Software Foundation
 
 Apache Commons Lang
-Copyright 2001-2021 The Apache Software Foundation
+Copyright 2001-2023 The Apache Software Foundation
 
 Apache Commons Logging
 Copyright 2003-2014 The Apache Software Foundation
@@ -243,14 +237,11 @@ WebSocket and HTTP server:
 Apache Java Data Objects (JDO)
 Copyright 2005-2006 The Apache Software Foundation
 
-=============================================================================
-= NOTICE file corresponding to section 4d of the Apache License Version 2.0 =
-=============================================================================
 This product includes software developed by
 Joda.org (https://www.joda.org/).
 
 Apache log4j
-Copyright 2007 The Apache Software Foundation
+Copyright 2010 The Apache Software Foundation
 
 Byte Buddy
 Copyright 2014 - Present Rafael Winterhalter
@@ -262,15 +253,6 @@ This product includes software from the Eigenbase project, licensed from
 DynamoBI Corporation.
 
 Copyright (C) 2005 Dynamo BI Corporation
-
-  =========================================================================
-  ==  NOTICE file corresponding to section 4(d) of the Apache License,   ==
-  ==  Version 2.0, in this case for the distribution of jets3t.          ==
-  =========================================================================
-
-  This product includes software developed by:
-
-  The Apache Software Foundation (http://www.apache.org/).
    
   The ExoLab Project (http://www.exolab.org/)
 
@@ -283,6 +265,10 @@ Copyright (C) 2005 Dynamo BI Corporation
 Apache Ant
 Copyright 1999-2013 The Apache Software Foundation
 
+The <sync> task is based on code Copyright (c) 2002, Landmark
+Graphics Corp that has been kindly donated to the Apache Software
+Foundation.
+
 Apache Avro
 Copyright 2009-2022 The Apache Software Foundation
 
@@ -293,18 +279,13 @@ Apache Commons Math
 Copyright 2001-2012 The Apache Software Foundation
 
 Curator Client
-Copyright 2011-2015 The Apache Software Foundation
+Copyright 2011-2018 The Apache Software Foundation
 
 Curator Framework
-Copyright 2011-2015 The Apache Software Foundation
+Copyright 2011-2018 The Apache Software Foundation
 
 Curator Recipes
-Copyright 2011-2015 The Apache Software Foundation
-
-=========================================================================
-==  NOTICE file corresponding to section 4(d) of the Apache License,
-==  Version 2.0, in this case for the Apache Derby distribution.
-=========================================================================
+Copyright 2011-2018 The Apache Software Foundation
 
 Apache Derby
 Copyright 2004-2014 The Apache Software Foundation
@@ -372,29 +353,11 @@ project. The following notice covers the Felix files:
   Copyright (c) 2002,2003, Stefan Haustein, Oberhausen, Rhld., Germany.
   Licensed under BSD License.
 
-  II. Used Software
-
-  This product uses software developed at
-  The OSGi Alliance (http://www.osgi.org/).
-  Copyright (c) OSGi Alliance (2000, 2007).
-  Licensed under the Apache License 2.0.
-
-
-  III. License Summary
-  - Apache License 2.0
-  - BSD License
-
-
 =========================================================================
 
 
 The Derby build relies on jar files supplied by the Apache Xalan
 project. The following notice covers the Xalan jar files:
-
-   =========================================================================
-   ==  NOTICE file corresponding to section 4(d) of the Apache License,   ==
-   ==  Version 2.0, in this case for the Apache Xalan Java distribution.  ==
-   =========================================================================
 
    Apache Xalan (Xalan XSLT processor)
    Copyright 1999-2006 The Apache Software Foundation
@@ -410,19 +373,6 @@ project. The following notice covers the Xalan jar files:
        http://www.sun.com.
      - software copyright (c) 2003, IBM Corporation.,
        http://www.ibm.com.
-       
-
-   =========================================================================
-   Apache Xerces Java
-   Copyright 1999-2006 The Apache Software Foundation
-
-   Portions of Apache Xerces Java in xercesImpl.jar and xml-apis.jar
-   were originally based on the following:
-     - software copyright (c) 1999, IBM Corporation., http://www.ibm.com.
-     - software copyright (c) 1999, Sun Microsystems., http://www.sun.com.
-     - voluntary contributions made by Paul Eng on behalf of the
-       Apache Software Foundation that were originally developed at iClick, Inc.,
-       software copyright (c) 1999.
 
    =========================================================================
    Apache xml-commons xml-apis (redistribution of xml-apis.jar)
@@ -465,6 +415,17 @@ which has the following notices:
   Progress Software Corporation and/or its  subsidiaries or affiliates.
 * This product includes software developed by IBM Corporation and others.
 
+Apache Hadoop HDFS Client
+
+The binary distribution of this product bundles binaries of
+AWS Java SDK 1.11.271,
+which has the following notices:
+ * This software includes third party software subject to the following copyrights:
+   - XML parsing and utility functions from JetS3t - Copyright 2006-2009 James Murty.
+   - PKCS#1 PEM encoded private key parsing and utility functions from oauth.googlecode.com - Copyright 1998-2010 AOL Inc.
+
+The binary distribution of this product bundles binaries of Gson 2.2.4.
+
 Hive Common
 Copyright 2021 The Apache Software Foundation
 
@@ -504,11 +465,11 @@ Copyright 2021 The Apache Software Foundation
 Hive Shims Scheduler
 Copyright 2021 The Apache Software Foundation
 
-htrace-core
-Copyright 2015 The Apache Software Foundation
+htrace-core4
+Copyright 2016 The Apache Software Foundation
 
 Apache HttpClient
-Copyright 1999-2015 The Apache Software Foundation
+Copyright 1999-2021 The Apache Software Foundation
 
 Apache HttpCore
 Copyright 2005-2015 The Apache Software Foundation
@@ -567,12 +528,6 @@ Copyright (C) 2000-2007 The Apache Software Foundation
 Apache ZooKeeper
 Copyright 2009-2012 The Apache Software Foundation
 
-=========================================================================
-==  NOTICE file corresponding to the section 4 d of                    ==
-==  the Apache License, Version 2.0,                                   ==
-==  in this case for the Groovy Language distribution.                 ==
-=========================================================================
-
 Apache Groovy
 Copyright 2003-2015 The Apache Software Foundation
 
@@ -581,11 +536,6 @@ This product currently only contains code developed by authors
 of specific components, as identified by the source code files;
 if such notes are missing files have been created by
 Tatu Saloranta.
-
-=========================================================================
-==  NOTICE file corresponding to section 4(d) of the Apache License,   ==
-==  Version 2.0, in this case for the DataNucleus distribution.        ==
-=========================================================================
 
 ===================================================================
 This product includes software developed by many individuals,
@@ -607,37 +557,237 @@ This product also includes software developed by the Apache Commons project
 Apache Tomcat
 Copyright 1999-2023 The Apache Software Foundation
 
-  ========================================================================
-  ==  NOTICE file corresponding to section 4(d) of the Apache License,   ==
-  ==  Version 2.0, in this case for the Apache Xerces Java distribution. ==
-  =========================================================================
+Apache Xerces Java
+Copyright 1999-2007 The Apache Software Foundation
 
-  Apache Xerces Java
-  Copyright 1999-2007 The Apache Software Foundation
+Portions of this software were originally based on the following:
+  - software copyright (c) 1999, IBM Corporation., http://www.ibm.com.
+  - software copyright (c) 1999, Sun Microsystems., http://www.sun.com.
+  - voluntary contributions made by Paul Eng on behalf of the
+    Apache Software Foundation that were originally developed at iClick, Inc.,
+    software copyright (c) 1999.
 
-  This product includes software developed at
-  The Apache Software Foundation (http://www.apache.org/).
+Apache XML Commons XML APIs
+Copyright 1999-2009 The Apache Software Foundation.
 
-  Portions of this software were originally based on the following:
-    - software copyright (c) 1999, IBM Corporation., http://www.ibm.com.
-    - software copyright (c) 1999, Sun Microsystems., http://www.sun.com.
-    - voluntary contributions made by Paul Eng on behalf of the 
-      Apache Software Foundation that were originally developed at iClick, Inc.,
-      software copyright (c) 1999.
+Portions of this software were originally based on the following:
+  - software copyright (c) 1999, IBM Corporation., http://www.ibm.com.
+  - software copyright (c) 1999, Sun Microsystems., http://www.sun.com.
+  - software copyright (c) 2000 World Wide Web Consortium, http://www.w3.org
 
-   =========================================================================
-   ==  NOTICE file corresponding to section 4(d) of the Apache License,   ==
-   ==  Version 2.0, in this case for the Apache xml-commons xml-apis      ==
-   ==  distribution.                                                      ==
-   =========================================================================
+Apache Yetus
+Copyright 2008-2022 The Apache Software Foundation
 
-   Apache XML Commons XML APIs
-   Copyright 2006 The Apache Software Foundation.
+Apache Yetus - Audience Annotations
+Copyright 2015-2017 The Apache Software Foundation
 
-   This product includes software developed at
-   The Apache Software Foundation (http://www.apache.org/).
+The binary distribution of this product bundles binaries of Gson 2.2.4.
+
+The binary distribution of this product bundles binaries of
+Commons Codec 1.4,
+which has the following notices:
+ * src/test/org/apache/commons/codec/language/DoubleMetaphoneTest.javacontains test data from http://aspell.net/test/orig/batch0.tab.Copyright (C) 2002 Kevin Atkinson (kevina@gnu.org)
+  ===============================================================================
+  The content of package org.apache.commons.codec.language.bm has been translated
+  from the original php source code available at http://stevemorse.org/phoneticinfo.htm
+  with permission from the original authors.
+  Original source copyright:Copyright (c) 2008 Alexander Beider & Stephen P. Morse.
+
+The binary distribution of this product bundles binaries of
+Commons Lang 2.6,
+which has the following notices:
+ * This product includes software from the Spring Framework,under the Apache License 2.0 (see: StringUtils.containsWhitespace())
+
+The binary distribution of this product bundles binaries of
+reload4j 1.2.18.3,
+which has the following notices:
+ * ResolverUtil.java
+    Copyright 2005-2006 Tim Fennell
+  Dumbster SMTP test server
+    Copyright 2004 Jason Paul Kitchen
+  TypeUtil.java
+    Copyright 2002-2012 Ramnivas Laddad, Juergen Hoeller, Chris Beams
+
+The binary distribution of this product bundles binaries of
+Java Concurrency in Practice book annotations 1.0,
+which has the following notices:
+ * Copyright (c) 2005 Brian Goetz and Tim Peierls Released under the Creative
+  Commons Attribution License (http://creativecommons.org/licenses/by/2.5)
+  Official home: http://www.jcip.net Any republication or derived work
+  distributed in source code form must include this copyright and license
+  notice.
+
+The binary distribution of this product bundles binaries of
+Jetty 6.1.26,
+which has the following notices:
+ * ==============================================================
+    Jetty Web Container
+    Copyright 1995-2016 Mort Bay Consulting Pty Ltd.
+   ==============================================================
+
+   The Jetty Web Container is Copyright Mort Bay Consulting Pty Ltd
+   unless otherwise noted.
+
+   Jetty is dual licensed under both
+
+     * The Apache 2.0 License
+       http://www.apache.org/licenses/LICENSE-2.0.html
+
+         and
+
+     * The Eclipse Public 1.0 License
+       http://www.eclipse.org/legal/epl-v10.html
+
+   Jetty may be distributed under either license.
+
+   ------
+   Eclipse
+
+   The following artifacts are EPL.
+    * org.eclipse.jetty.orbit:org.eclipse.jdt.core
+
+   The following artifacts are EPL and ASL2.
+    * org.eclipse.jetty.orbit:javax.security.auth.message
+
+
+   The following artifacts are EPL and CDDL 1.0.
+    * org.eclipse.jetty.orbit:javax.mail.glassfish
+
+
+   ------
+   Oracle
+
+   The following artifacts are CDDL + GPLv2 with classpath exception.
+   https://glassfish.dev.java.net/nonav/public/CDDL+GPL.html
+
+    * javax.servlet:javax.servlet-api
+    * javax.annotation:javax.annotation-api
+    * javax.transaction:javax.transaction-api
+    * javax.websocket:javax.websocket-api
+
+   ------
+   Oracle OpenJDK
+
+   If ALPN is used to negotiate HTTP/2 connections, then the following
+   artifacts may be included in the distribution or downloaded when ALPN
+   module is selected.
+
+    * java.sun.security.ssl
+
+   These artifacts replace/modify OpenJDK classes.  The modififications
+   are hosted at github and both modified and original are under GPL v2 with
+   classpath exceptions.
+   http://openjdk.java.net/legal/gplv2+ce.html
+
+
+   ------
+   OW2
+
+   The following artifacts are licensed by the OW2 Foundation according to the
+   terms of http://asm.ow2.org/license.html
+
+   org.ow2.asm:asm-commons
+   org.ow2.asm:asm
+
+
+   ------
+   Apache
+
+   The following artifacts are ASL2 licensed.
+
+   org.apache.taglibs:taglibs-standard-spec
+   org.apache.taglibs:taglibs-standard-impl
+
+
+   ------
+   MortBay
+
+   The following artifacts are ASL2 licensed.  Based on selected classes from
+   following Apache Tomcat jars, all ASL2 licensed.
+
+   org.mortbay.jasper:apache-jsp
+     org.apache.tomcat:tomcat-jasper
+     org.apache.tomcat:tomcat-juli
+     org.apache.tomcat:tomcat-jsp-api
+     org.apache.tomcat:tomcat-el-api
+     org.apache.tomcat:tomcat-jasper-el
+     org.apache.tomcat:tomcat-api
+     org.apache.tomcat:tomcat-util-scan
+     org.apache.tomcat:tomcat-util
+
+   org.mortbay.jasper:apache-el
+     org.apache.tomcat:tomcat-jasper-el
+     org.apache.tomcat:tomcat-el-api
+
+
+   ------
+   Mortbay
+
+   The following artifacts are CDDL + GPLv2 with classpath exception.
+
+   https://glassfish.dev.java.net/nonav/public/CDDL+GPL.html
+
+   org.eclipse.jetty.toolchain:jetty-schemas
+
+   ------
+   Assorted
+
+   The UnixCrypt.java code implements the one way cryptography used by
+   Unix systems for simple password protection.  Copyright 1996 Aki Yoshida,
+   modified April 2001  by Iris Van den Broeke, Daniel Deville.
+   Permission to use, copy, modify and distribute UnixCrypt
+   for non-commercial or commercial purposes and without fee is
+   granted provided that the copyright notice appears in all copies./
+
+The binary distribution of this product bundles binaries of
+Snappy for Java 1.0.4.1,
+which has the following notices:
+ * This product includes software developed by Google
+    Snappy: http://code.google.com/p/snappy/ (New BSD License)
+
+   This product includes software developed by Apache
+    PureJavaCrc32C from apache-hadoop-common http://hadoop.apache.org/
+    (Apache 2.0 license)
+
+   This library containd statically linked libstdc++. This inclusion is allowed by
+   "GCC RUntime Library Exception"
+   http://gcc.gnu.org/onlinedocs/libstdc++/manual/license.html
+
+   == Contributors ==
+     * Tatu Saloranta
+       * Providing benchmark suite
+     * Alec Wysoker
+       * Performance and memory usage improvement
+
+The binary distribution of this product bundles binaries of
+Xerces2 Java Parser 2.9.1,
+which has the following notices:
+
+   Apache Xerces Java
+   Copyright 1999-2018 The Apache Software Foundation
 
    Portions of this software were originally based on the following:
      - software copyright (c) 1999, IBM Corporation., http://www.ibm.com.
      - software copyright (c) 1999, Sun Microsystems., http://www.sun.com.
-     - software copyright (c) 2000 World Wide Web Consortium, http://www.w3.org
+     - voluntary contributions made by Paul Eng on behalf of the
+       Apache Software Foundation that were originally developed at iClick, Inc.,
+       software copyright (c) 1999.
+
+Prometheus instrumentation library for JVM applications
+Copyright 2012-2015 The Prometheus Authors
+
+This product includes software developed at
+Boxever Ltd. (http://www.boxever.com/).
+
+This product includes software developed at
+SoundCloud Ltd. (http://soundcloud.com/).
+
+This product includes software developed as part of the
+Ocelli project by Netflix Inc. (https://github.com/Netflix/ocelli/).
+
+Apache ZooKeeper
+Copyright 2009-2022 The Apache Software Foundation
+
+This product includes software components originally
+developed for Airlift (https://github.com/airlift/airlift),
+licensed under the Apache 2.0 license.

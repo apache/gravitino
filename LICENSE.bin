@@ -213,15 +213,11 @@
    Apache Spark
    Apache Submarine
    Apache Zeppelin
-
-   This product bundles various third-party components also under the
-   Apache Software License 2.0
-
+   Apache ZooKeeper  
    Java Classmate
    Jackson Annotations
    Jackson Core
    Jackson Databind
-   Jackson Dataformat Yaml
    Jackson Datatype Guava
    Jackson Datatype JDK8
    Jackson Datatype Joda
@@ -282,6 +278,8 @@
    ApacheDS I18n
    ApacheDS Protocol Kerberos Codec
    Apache Hadoop
+   Apache Hadoop HDFS Client
+   Apache Hadoop Yarn Client
    Apache Hive
    Apache HTrace
    Apache HttpClient
@@ -296,6 +294,8 @@
    Apache Thrift
    Apache Velocity
    Apache Groovy
+   Apache Yetus
+   Apache Yetus - Audience Annotations
    Jackson JSON processor
    DataNucleus
    Modernizer Maven Plugin
@@ -311,6 +311,22 @@
    Apache Xerces Java
    Apache XML Commons XML APIs
    Jettison
+   Woodstox Core
+   JSON Smart v2
+   JSON Small and Fast Parser
+   Prometheus instrumentation library for JVM applications
+   JSR-330: Dependency Injection for Java
+   Java JWT
+   JSqlParser
+   Nimbus JOSE + JWT
+   reload4j
+   JVM CPU Profiler
+   Slice
+   Jakarta Oro
+   OkHttp
+   Okio
+   J2ObjC
+   SQLite JDBC Driver
 
    This product bundles various third-party components also under the
    Apache Software Foundation License 1.1
@@ -330,11 +346,17 @@
    Jakarta XML Binding
    JLine
    XMLenc
+   Stax2 API
+   String Template 4
+   JSch
+   ASM
+   Protobuf
 
    This product bundles various third-party components also under the
    MIT license
 
    SLF4J
+   SLF4J-API
    Checker Framework
    Janino Common Compiler
    Protocol Buffers
@@ -345,6 +367,7 @@
 
    Activation
    Stax API
+   Java Servlet API
 
    This product bundles various third-party components also under the
    Common Development and Distribution License 1.1
@@ -358,7 +381,11 @@
 
    Logback
    Eclipse Jetty
+   Eclipse Jetty Webapp
+   Eclipse Jetty XML
    JTA
+   AOP Alliance Repackaged
+   OSGi Resource Locator
 
    This product bundles various third-party components also under the
    Eclipse Public License 2.0
@@ -366,13 +393,25 @@
    Eclipse Jetty
    Eclipse Jersey
    Eclipse GlassFish
+   Jakarta Annotations API
+   Jakarta Inject
+   Jakarta Transaction API
+   Jakarta Validation API
+   Jakarta RESTful WS API
+   Jakarta XML Binding API
+   JavaServer Pages(TM) API
+   HK2 API Module
+   HK2 Service Locator
+   HK2 Utils
 
    This product bundles various third-party components also under the
    Mozilla Public License
 
    Javassist
 
-   This product bundles various third-party components also under the
-   Unicode/ICU License
 
-   icu4j
+   This product bundles various third-party components also placed in
+   the public domain.
+
+   AOP Alliance
+
