@@ -117,8 +117,8 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
     if (null != icebergTableOps) {
       try {
         icebergTableOps.close();
-      } catch (Exception ignore) {
-
+      } catch (Exception e) {
+        LOG.warn("Failed to close Iceberg catalog", e);
       }
     }
   }
