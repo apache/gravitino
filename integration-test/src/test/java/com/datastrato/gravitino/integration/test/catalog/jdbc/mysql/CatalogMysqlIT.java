@@ -68,9 +68,9 @@ public class CatalogMysqlIT extends AbstractIT {
   public static String MYSQL_COL_NAME1 = "mysql_col_name1";
   public static String MYSQL_COL_NAME2 = "mysql_col_name2";
   public static String MYSQL_COL_NAME3 = "mysql_col_name3";
-  private static final String provider = "jdbc-mysql";
-  private static final String DOWNLOAD_JDBC_DRIVER_URL =
+  public static final String DOWNLOAD_JDBC_DRIVER_URL =
       "https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.27/mysql-connector-java-8.0.27.jar";
+  private static final String provider = "jdbc-mysql";
 
   private static GravitinoMetaLake metalake;
 

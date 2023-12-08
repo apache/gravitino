@@ -7,6 +7,7 @@ package com.datastrato.gravitino.catalog.lakehouse.iceberg.utils;
 import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogPropertiesMetadata.ICEBERG_JDBC_INITIALIZE;
 
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend;
+import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergConfig;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -41,6 +42,18 @@ public class IcebergCatalogUtil {
   }
 
   private static JdbcCatalog loadJdbcCatalog(Map<String, String> properties) {
+    IcebergConfig icebergConfig = new IcebergConfig(properties);
+    icebergConfig
+        .getJdbcDriverOptional()
+        .ifPresent(
+            driverClassName -> {
+              try {
+                // Load the jdbc driver
+                Class.forName(driverClassName);
+              } catch (ClassNotFoundException e) {
+                throw new IllegalArgumentException("Couldn't load jdbc driver " + driverClassName);
+              }
+            });
     JdbcCatalog jdbcCatalog =
         new JdbcCatalog(
             null,

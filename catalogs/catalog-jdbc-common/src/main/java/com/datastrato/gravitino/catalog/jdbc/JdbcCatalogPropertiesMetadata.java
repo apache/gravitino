@@ -22,6 +22,7 @@ public class JdbcCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
       ImmutableList.of(
           JdbcConfig.JDBC_URL.getKey(),
           JdbcConfig.JDBC_DATABASE.getKey(),
+          JdbcConfig.JDBC_DRIVER.getKey(),
           JdbcConfig.USERNAME.getKey(),
           JdbcConfig.PASSWORD.getKey(),
           JdbcConfig.POOL_MIN_SIZE.getKey(),
@@ -33,6 +34,20 @@ public class JdbcCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
             stringImmutablePropertyEntry(
                 JdbcConfig.JDBC_URL.getKey(),
                 JdbcConfig.JDBC_URL.getDoc(),
+                true,
+                null,
+                false,
+                false),
+            stringImmutablePropertyEntry(
+                JdbcConfig.JDBC_DATABASE.getKey(),
+                JdbcConfig.JDBC_DATABASE.getDoc(),
+                false,
+                null,
+                false,
+                false),
+            stringImmutablePropertyEntry(
+                JdbcConfig.JDBC_DRIVER.getKey(),
+                JdbcConfig.JDBC_DRIVER.getDoc(),
                 false,
                 null,
                 false,

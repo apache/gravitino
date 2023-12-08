@@ -25,6 +25,8 @@ public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
   public static final String GRAVITINO_JDBC_PASSWORD = "jdbc-password";
   public static final String ICEBERG_JDBC_PASSWORD = "jdbc.password";
   public static final String ICEBERG_JDBC_INITIALIZE = "jdbc-initialize";
+
+  public static final String GRAVITINO_JDBC_DRIVER = "jdbc-driver";
   public static final String WAREHOUSE = "warehouse";
   public static final String URI = "uri";
 
@@ -38,6 +40,8 @@ public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
       ImmutableMap.of(
           CATALOG_BACKEND_NAME,
           CATALOG_BACKEND_NAME,
+          GRAVITINO_JDBC_DRIVER,
+          GRAVITINO_JDBC_DRIVER,
           GRAVITINO_JDBC_USER,
           ICEBERG_JDBC_USER,
           GRAVITINO_JDBC_PASSWORD,

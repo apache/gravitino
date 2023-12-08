@@ -40,12 +40,9 @@ public class DataSourceUtils {
     BasicDataSource basicDataSource =
         BasicDataSourceFactory.createDataSource(getProperties(jdbcConfig));
     basicDataSource.setUrl(jdbcConfig.getJdbcUrl());
-    if (null != jdbcConfig.getUsername()) {
-      basicDataSource.setUsername(jdbcConfig.getUsername());
-    }
-    if (null != jdbcConfig.getPassword()) {
-      basicDataSource.setPassword(jdbcConfig.getPassword());
-    }
+    jdbcConfig.getJdbcDriverOptional().ifPresent(basicDataSource::setDriverClassName);
+    jdbcConfig.getUsernameOptional().ifPresent(basicDataSource::setUsername);
+    jdbcConfig.getPasswordOptional().ifPresent(basicDataSource::setPassword);
     basicDataSource.setMaxTotal(jdbcConfig.getPoolMaxSize());
     basicDataSource.setMinIdle(jdbcConfig.getPoolMinSize());
     // Set each time a connection is taken out from the connection pool, a test statement will be

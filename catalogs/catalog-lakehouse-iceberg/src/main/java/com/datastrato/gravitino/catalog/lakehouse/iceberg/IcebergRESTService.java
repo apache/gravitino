@@ -33,6 +33,8 @@ public class IcebergRESTService implements GravitinoAuxiliaryService {
 
   public static final String SERVICE_NAME = "iceberg-rest";
 
+  private IcebergTableOps icebergTableOps;
+
   private void initServer(IcebergConfig icebergConfig) {
     JettyServerConfig serverConfig = JettyServerConfig.fromConfig(icebergConfig);
     server = new JettyServer();
@@ -48,7 +50,7 @@ public class IcebergRESTService implements GravitinoAuxiliaryService {
         new HttpServerMetricsSource(MetricsSource.ICEBERG_REST_SERVER_METRIC_NAME, config, server);
     metricsSystem.register(httpServerMetricsSource);
 
-    IcebergTableOps icebergTableOps = new IcebergTableOps(icebergConfig);
+    icebergTableOps = new IcebergTableOps(icebergConfig);
     config.register(
         new AbstractBinder() {
           @Override
@@ -69,8 +71,7 @@ public class IcebergRESTService implements GravitinoAuxiliaryService {
 
   @Override
   public void serviceInit(Map<String, String> properties) {
-    IcebergConfig icebergConfig = new IcebergConfig();
-    icebergConfig.loadFromMap(properties, k -> true);
+    IcebergConfig icebergConfig = new IcebergConfig(properties);
     initServer(icebergConfig);
     LOG.info("Iceberg REST service inited");
   }
@@ -92,6 +93,9 @@ public class IcebergRESTService implements GravitinoAuxiliaryService {
     if (server != null) {
       server.stop();
       LOG.info("Iceberg REST service stopped");
+    }
+    if (icebergTableOps != null) {
+      icebergTableOps.close();
     }
   }
 }

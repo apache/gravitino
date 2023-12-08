@@ -65,9 +65,9 @@ public class CatalogPostgreSqlIT extends AbstractIT {
   public static String POSTGRESQL_COL_NAME1 = "postgresql_col_name1";
   public static String POSTGRESQL_COL_NAME2 = "postgresql_col_name2";
   public static String POSTGRESQL_COL_NAME3 = "postgresql_col_name3";
-  private static final String provider = "jdbc-postgresql";
-  private static final String DOWNLOAD_JDK_URL =
+  public static final String DOWNLOAD_JDBC_DRIVER_URL =
       "https://jdbc.postgresql.org/download/postgresql-42.7.0.jar";
+  private static final String provider = "jdbc-postgresql";
 
   private static GravitinoMetaLake metalake;
 
@@ -87,7 +87,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     if (!ITUtils.EMBEDDED_TEST_MODE.equals(testMode)) {
       String gravitinoHome = System.getenv("GRAVITINO_HOME");
       Path tmpPath = Paths.get(gravitinoHome, "/catalogs/jdbc-postgresql/libs");
-      JdbcDriverDownloader.downloadJdbcDriver(DOWNLOAD_JDK_URL, tmpPath.toString());
+      JdbcDriverDownloader.downloadJdbcDriver(DOWNLOAD_JDBC_DRIVER_URL, tmpPath.toString());
     }
 
     POSTGRESQL_CONTAINER =

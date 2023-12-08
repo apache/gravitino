@@ -6,6 +6,7 @@
 package com.datastrato.gravitino.catalog.lakehouse.iceberg;
 
 import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogPropertiesMetadata.CATALOG_BACKEND_NAME;
+import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogPropertiesMetadata.GRAVITINO_JDBC_DRIVER;
 import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogPropertiesMetadata.ICEBERG_JDBC_INITIALIZE;
 import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogPropertiesMetadata.ICEBERG_JDBC_PASSWORD;
 import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogPropertiesMetadata.ICEBERG_JDBC_USER;
@@ -15,6 +16,8 @@ import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogP
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.config.ConfigBuilder;
 import com.datastrato.gravitino.config.ConfigEntry;
+import java.util.Map;
+import java.util.Optional;
 
 public class IcebergConfig extends Config {
 
@@ -53,12 +56,28 @@ public class IcebergConfig extends Config {
           .stringConf()
           .createWithDefault(null);
 
+  public static final ConfigEntry<Optional<String>> JDBC_DRIVER =
+      new ConfigBuilder(GRAVITINO_JDBC_DRIVER)
+          .doc("The driver of the Jdbc connection")
+          .version("0.3.0")
+          .stringConf()
+          .createWithOptional();
+
   public static final ConfigEntry<Boolean> JDBC_INIT_TABLES =
       new ConfigBuilder(ICEBERG_JDBC_INITIALIZE)
           .doc("Whether to initialize meta tables when create Jdbc catalog")
           .version("0.2.0")
           .booleanConf()
           .createWithDefault(true);
+
+  public Optional<String> getJdbcDriverOptional() {
+    return get(JDBC_DRIVER);
+  }
+
+  public IcebergConfig(Map<String, String> properties) {
+    super(false);
+    loadFromMap(properties, k -> true);
+  }
 
   public IcebergConfig() {
     super(false);

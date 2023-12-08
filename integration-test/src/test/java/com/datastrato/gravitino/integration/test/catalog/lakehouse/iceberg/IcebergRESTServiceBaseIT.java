@@ -203,9 +203,7 @@ public class IcebergRESTServiceBaseIT extends AbstractIT {
     Map<String, String> m =
         config.getConfigsWithPrefix(AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX);
     m = MapUtils.getPrefixMap(m, IcebergRESTService.SERVICE_NAME + ".");
-    IcebergConfig icebergConfig = new IcebergConfig();
-    icebergConfig.loadFromMap(m, k -> true);
-    return icebergConfig;
+    return new IcebergConfig(m);
   }
 
   private void initSparkEnv() {
