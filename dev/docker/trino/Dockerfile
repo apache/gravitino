@@ -54,4 +54,6 @@ ARG GRAVITINO_HOST_IP
 ARG GRAVITINO_HOST_PORT
 ARG GRAVITINO_METALAKE_NAME
 ARG HIVE_HOST_IP
+
+USER root
 ENTRYPOINT ["/bin/bash", "-c", "/etc/trino/update-trino-conf.sh && /usr/lib/trino/bin/run-trino"]

@@ -59,7 +59,8 @@ public class TrinoContainer extends BaseContainer {
       String metalakeName,
       String hiveContainerIP) {
     super(image, hostName, ports, extraHosts, filesToMount, envVars, network);
-    updateTrinoConfigFile(trinoConfDir, gravitinoServerAddress, metalakeName, hiveContainerIP);
+    //    updateTrinoConfigFile(trinoConfDir, gravitinoServerAddress, metalakeName,
+    // hiveContainerIP);
   }
 
   @Override
