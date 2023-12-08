@@ -9,7 +9,7 @@ keywords:
 Gravitino Metrics is built upon the [Dropwizard Metrics](https://metrics.dropwizard.io/). These metrics are exported through both JMX and an HTTP server, supporting JSON and Prometheus formats. You can retrieve them via HTTP requests, as illustrated below:
 ```
 // Use Gravitino Server address or Iceberg REST server address to replace 127.0.0.1:8090
-// Get metrics in json format
+// Get metrics in JSON format
 curl http://127.0.0.1:8090/metrics
 // Get metrics in Promethus format
 curl http://127.0.0.1:8090/prometheus/metrics
