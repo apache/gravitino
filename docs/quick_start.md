@@ -11,7 +11,7 @@ Gravitino is a high-performance, geo-distributed, and federated metadata lake. I
 
 ## Where to get Gravitino?
 
-You can build from [Github](https://github.com/datastrato/gravitino), see [how to build](/docs/how-to-build) for instructions, or use our docker images at [datastrato](https://hub.docker.com/u/datastrato) DockerHub repository. You can also stop and start a local Gravitino server via ``bin/gravitino.sh start`` and ``bin/gravitino.sh stop`` in a Gravitino distribution, see [how to build](/docs/how-to-build) for more instructions.
+You can build from [GitHub](https://github.com/datastrato/gravitino), see [how to build](/docs/how-to-build) for instructions, or use our docker images at [Datastrato](https://hub.docker.com/u/datastrato) DockerHub repository. You can also stop and start a local Gravitino server via ``bin/gravitino.sh start`` and ``bin/gravitino.sh stop`` in a Gravitino distribution, see [how to build](/docs/how-to-build) for more instructions.
 
 ## Where is the documentation?
 

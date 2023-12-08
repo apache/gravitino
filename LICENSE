@@ -200,6 +200,8 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 
+   The Web UI also bundles various third-party components also under
+   different licenses, please see web/LICENSE for these.
 
    This product bundles various third-party components also under the
    Apache Software License 2.0.

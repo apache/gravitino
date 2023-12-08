@@ -16,10 +16,10 @@ public class HiveCatalogPropertyConverter extends PropertyConverter {
 
   public static final Logger LOG = LoggerFactory.getLogger(HiveCatalogPropertyConverter.class);
 
-  private static final TreeBidiMap<String, String> GRAVITINO_HIVE_TO_TRINO_HIVE =
+  private static final TreeBidiMap<String, String> TRINO_KEY_TO_GRAVITINO_KEY =
       new TreeBidiMap<>(
           new ImmutableMap.Builder<String, String>()
-              // Key is the trino property, value is the gravitino property
+              // Key is the Trino property, value is the Gravitino property
               .put("hive.storage-format", "hive.storage-format")
               .put("hive.compression-codec", "hive.compression-codec")
               .put("hive.config.resources", "hive.config.resources")
@@ -42,6 +42,6 @@ public class HiveCatalogPropertyConverter extends PropertyConverter {
 
   @Override
   public TreeBidiMap<String, String> trinoPropertyKeyToGravitino() {
-    return GRAVITINO_HIVE_TO_TRINO_HIVE;
+    return TRINO_KEY_TO_GRAVITINO_KEY;
   }
 }

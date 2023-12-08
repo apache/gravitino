@@ -305,7 +305,6 @@ tasks.test {
   }
 }
 
-
 fun downloadJDBCJavaConnector(url: String, catalog: String) {
   try {
     val connection = URL(url).openConnection()

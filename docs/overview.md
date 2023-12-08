@@ -26,7 +26,7 @@ Gravitino aims to provide several key features:
 
 * **Functionality Layer**: Gravitino provides a set of APIs for users to manage and govern the
   metadata, including standard metadata creation, update, and delete operations. In the meantime, it also provides the ability to govern the metadata in a unified way, including access control, discovery, and others.
-* **Interface Layer**: Gravitino provides standard REST APIs as the interface layer for users. It will also provide Thrift and JDBC interfaces in the future.
+* **Interface Layer**: Gravitino provides standard REST APIs as the interface layer for users. Future support includes Thrift and JDBC interfaces.
 * **Core Object Model**: Gravitino defines a generic metadata model to represent the metadata in different sources and types and manages them in a unified way.
 * **Connection Layer**: In the connection layer, Gravitino provides a set of connectors to connect to different metadata sources, including Apache Hive, MySQL, PostgreSQL, and others. It also allows connecting and managing heterogeneous metadata other than Tabular data.
 

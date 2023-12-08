@@ -1,0 +1,21 @@
+/*
+ * Copyright 2023 Datastrato.
+ * This software is licensed under the Apache License version 2.
+ */
+package com.datastrato.gravitino.trino.connector.catalog.jdbc.postgresql;
+
+import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
+import io.trino.spi.session.PropertyMetadata;
+import java.util.List;
+
+/** Transforming gravitino PostgreSQL metadata to trino. */
+public class PostgreSQLMetadataAdapter extends CatalogConnectorMetadataAdapter {
+
+  public PostgreSQLMetadataAdapter(
+      List<PropertyMetadata<?>> schemaProperties,
+      List<PropertyMetadata<?>> tableProperties,
+      List<PropertyMetadata<?>> columnProperties) {
+
+    super(schemaProperties, tableProperties, columnProperties, new PostgreSQLDataTypeTransformer());
+  }
+}

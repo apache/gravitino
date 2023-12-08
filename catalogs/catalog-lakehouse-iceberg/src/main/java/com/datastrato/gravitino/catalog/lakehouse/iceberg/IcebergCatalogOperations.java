@@ -102,8 +102,7 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
     Map<String, String> resultConf = Maps.newHashMap(prefixMap);
     resultConf.putAll(gravitinoConfig);
 
-    IcebergConfig icebergConfig = new IcebergConfig();
-    icebergConfig.loadFromMap(resultConf, k -> true);
+    IcebergConfig icebergConfig = new IcebergConfig(resultConf);
 
     this.icebergTableOps = new IcebergTableOps(icebergConfig);
     this.icebergTableOpsHelper = icebergTableOps.createIcebergTableOpsHelper();
@@ -113,7 +112,15 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
 
   /** Closes the Iceberg catalog and releases the associated client pool. */
   @Override
-  public void close() {}
+  public void close() {
+    if (null != icebergTableOps) {
+      try {
+        icebergTableOps.close();
+      } catch (Exception e) {
+        LOG.warn("Failed to close Iceberg catalog", e);
+      }
+    }
+  }
 
   /**
    * Lists the schemas under the given namespace.

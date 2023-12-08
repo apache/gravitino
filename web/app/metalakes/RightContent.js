@@ -5,6 +5,8 @@
 
 'use client'
 
+import { useState } from 'react'
+
 import Link from 'next/link'
 
 import { Box, Button, IconButton } from '@mui/material'
@@ -15,11 +17,18 @@ import { useAppSelector } from '@/lib/hooks/useStore'
 
 import TabsContent from './TabsContent'
 import MetalakePath from './MetalakePath'
+import CreateCatalogDialog from './CreateCatalogDialog'
 
 const RightContent = props => {
   const { tableTitle, routeParams, page } = props
 
   const store = useAppSelector(state => state.metalakes)
+
+  const [open, setOpen] = useState(false)
+
+  const handleCreateCatalog = () => {
+    setOpen(true)
+  }
 
   return (
     <Box className={`twc-w-0 twc-grow twc-h-full twc-bg-customs-white twc-overflow-hidden`}>
@@ -40,11 +49,12 @@ const RightContent = props => {
           </Box>
         </Box>
 
-        {page === 'metalake' && (
+        {page === 'metalakes' && (
           <Box className={`twc-flex twc-items-center`}>
-            <Button variant='contained' startIcon={<Icon icon='mdi:plus-box' />}>
+            <Button variant='contained' startIcon={<Icon icon='mdi:plus-box' />} onClick={handleCreateCatalog}>
               Create Catalog
             </Button>
+            <CreateCatalogDialog open={open} setOpen={setOpen} routeParams={routeParams} />
           </Box>
         )}
       </Box>

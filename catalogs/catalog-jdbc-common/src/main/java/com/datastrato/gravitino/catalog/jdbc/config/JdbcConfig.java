@@ -9,6 +9,7 @@ import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.config.ConfigBuilder;
 import com.datastrato.gravitino.config.ConfigEntry;
 import java.util.Map;
+import java.util.Optional;
 
 public class JdbcConfig extends Config {
 
@@ -19,26 +20,33 @@ public class JdbcConfig extends Config {
           .stringConf()
           .createWithDefault(null);
 
-  public static final ConfigEntry<String> JDBC_DATABASE =
+  public static final ConfigEntry<Optional<String>> JDBC_DATABASE =
       new ConfigBuilder("jdbc-database")
           .doc("The database of the jdbc connection")
           .version("0.3.0")
           .stringConf()
-          .createWithDefault(null);
+          .createWithOptional();
 
-  public static final ConfigEntry<String> USERNAME =
+  public static final ConfigEntry<Optional<String>> JDBC_DRIVER =
+      new ConfigBuilder("jdbc-driver")
+          .doc("The driver of the jdbc connection")
+          .version("0.3.0")
+          .stringConf()
+          .createWithOptional();
+
+  public static final ConfigEntry<Optional<String>> USERNAME =
       new ConfigBuilder("jdbc-user")
           .doc("The username of the Jdbc connection")
           .version("0.3.0")
           .stringConf()
-          .createWithDefault(null);
+          .createWithOptional();
 
-  public static final ConfigEntry<String> PASSWORD =
+  public static final ConfigEntry<Optional<String>> PASSWORD =
       new ConfigBuilder("jdbc-password")
           .doc("The password of the Jdbc connection")
           .version("0.3.0")
           .stringConf()
-          .createWithDefault(null);
+          .createWithOptional();
 
   public static final ConfigEntry<Integer> POOL_MIN_SIZE =
       new ConfigBuilder("jdbc.pool.min-size")
@@ -58,15 +66,15 @@ public class JdbcConfig extends Config {
     return get(JDBC_URL);
   }
 
-  public String getJdbcDatabase() {
-    return get(JDBC_DATABASE);
+  public Optional<String> getJdbcDriverOptional() {
+    return get(JDBC_DRIVER);
   }
 
-  public String getUsername() {
+  public Optional<String> getUsernameOptional() {
     return get(USERNAME);
   }
 
-  public String getPassword() {
+  public Optional<String> getPasswordOptional() {
     return get(PASSWORD);
   }
 
@@ -76,6 +84,10 @@ public class JdbcConfig extends Config {
 
   public int getPoolMaxSize() {
     return get(POOL_MAX_SIZE);
+  }
+
+  public String getJdbcDatabaseOrElseThrow(String errorMessage) {
+    return get(JDBC_DATABASE).orElseThrow(() -> new IllegalArgumentException(errorMessage));
   }
 
   public JdbcConfig(Map<String, String> properties) {

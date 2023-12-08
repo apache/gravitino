@@ -2,6 +2,8 @@
  * Copyright 2023 Datastrato.
  * This software is licensed under the Apache License version 2.
  */
+import com.github.gradle.node.NodeExtension
+import com.github.gradle.node.NodePlugin
 import com.github.jk1.license.filter.DependencyFilter
 import com.github.jk1.license.filter.LicenseBundleNormalizer
 import com.github.jk1.license.render.InventoryHtmlReportRenderer
@@ -19,6 +21,7 @@ plugins {
   id("idea")
   id("jacoco")
   alias(libs.plugins.gradle.extensions)
+  alias(libs.plugins.node) apply false
 
   // Spotless version < 6.19.0 (https://github.com/diffplug/spotless/issues/1819) has an issue
   // running against JDK21, but we cannot upgrade the spotless to 6.19.0 or later since it only
@@ -147,6 +150,17 @@ subprojects {
     from(tasks["javadoc"])
   }
 
+  if (project.name in listOf("web", "docs")) {
+    plugins.apply(NodePlugin::class)
+    configure<NodeExtension> {
+      version.set("20.9.0")
+      npmVersion.set("10.1.0")
+      yarnVersion.set("1.22.19")
+      nodeProjectDir.set(file("$rootDir/.node"))
+      download.set(true)
+    }
+  }
+
   apply(plugin = "signing")
   publishing {
     publications {
@@ -250,7 +264,8 @@ tasks.rat {
     "**/.github/**/*",
     "dev/docker/**/*.xml",
     "**/*.log",
-    "licenses/*txt",
+    "**/licenses/*.txt",
+    "**/licenses/*.md",
     "integration-test/**",
     "web/.**",
     "web/dist/**/*",
@@ -258,7 +273,8 @@ tasks.rat {
     "web/src/iconify-bundle/bundle-icons-react.js",
     "web/src/iconify-bundle/icons-bundle-react.js",
     "web/yarn.lock",
-    "integration-test/**"
+    "**/LICENSE.*",
+    "**/NOTICE.*"
   )
 
   // Add .gitignore excludes to the Apache Rat exclusion list.

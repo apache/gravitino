@@ -15,7 +15,7 @@ Gravitino offers the capability to utilize Apache Hive as a catalog for metadata
 * Support is available for Apache Hive 2.x.
 * Before you create a Hive catalog, make sure you have already created a Metalake. If you haven't done so, please follow the Metalake creation steps.
 
-## Creating an Apache Hive Catalog
+## Creating an Apache Hive catalog
 To create a Hive catalog, use the following steps:
 
 Submit a catalog JSON example to the Gravitino server using the URL format:
@@ -82,7 +82,7 @@ Example JSON:
 |---------------------|----------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------|---------------|
 | `location`          | The directory for Hive database storage. Not required, HMS uses the value of `hive.metastore.warehouse.dir` in the hive-site.xml by default. | `/user/hive/warehouse`                   | 0.1.0         |
 
-## Creating an Apache Hive Table
+## Creating an Apache Hive table
 
 After creating the schema, you can submit a table JSON example to the Gravitino server using the URL format:
 

@@ -1,0 +1,445 @@
+#
+# Copyright 2023 Datastrato.
+# This software is licensed under the Apache License version 2.
+#
+
+
+---
+
+paths:
+  /metalakes:
+
+    get:
+      tags:
+        - metalake
+      summary: List all metalakes
+      operationId: listMetalakes
+      description: Returns a list of all metalakes.
+      responses:
+        "200":
+          $ref: "#/components/responses/ListMetalakesResponse"
+        "400":
+          $ref: "#/components/responses/BadRequestErrorResponse"
+        "5xx":
+          $ref: "#/components/responses/ServerErrorResponse"
+
+    post:
+      tags:
+        - metalake
+      summary: Create a new metalake
+      operationId: createMetalake
+      description: Creates a new metalake
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MetalakeCreateRequest"
+            examples:
+              MetalakeCreate:
+                $ref: "#/components/examples/MetalakeCreate"
+
+      responses:
+        "200":
+          $ref: "#/components/responses/MetalakeResponse"
+        "409":
+          description: Conflict - The target metalake already exists
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                MetalakeAlreadyExistsException:
+                  $ref: "#/components/examples/MetalakeAlreadyExistsException"
+        "5xx":
+          $ref: "#/components/responses/ServerErrorResponse"
+
+  /metalakes/{name}:
+    parameters:
+      - name: name
+        in: path
+        description: The name of the metalake to retrieve
+        required: true
+        schema:
+          type: string
+    get:
+      tags:
+        - metalake
+      summary: Load a metalake from the Gravitino store
+      operationId: loadMetalake
+      description: Returns a metalake information by given metalake name
+      responses:
+        "200":
+          $ref: "#/components/responses/MetalakeResponse"
+        "404":
+          description: Not Found - The metalake does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetalakeException:
+                  $ref: "#/components/examples/NoSuchMetalakeException"
+        "5xx":
+          $ref: "#/components/responses/ServerErrorResponse"
+
+    put:
+      tags:
+        - metalake
+      summary: Alter a metalake by name
+      operationId: alterMetalake
+      description: Alters a specified metalake
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MetalakeUpdatesRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/MetalakeResponse"
+        "404":
+          description: Not Found - The metalake does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetalakeException:
+                  $ref: "#/components/examples/NoSuchMetalakeException"
+        "409":
+          description: Conflict - The target (metalake)name already exists
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                MetalakeAlreadyExistsException:
+                  $ref: "#/components/examples/MetalakeAlreadyExistsException"
+        "500":
+          description:
+            Internal server error. It is possible that the server
+            encountered a storage issue.
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+
+    delete:
+      tags:
+        - metalake
+      summary: Drop a metalake by name
+      operationId: dropMetalake
+      description: Drops a specified metalake
+      responses:
+        "200":
+          $ref: "#/components/responses/DropResponse"
+        "404":
+          description: Not Found - The metalake does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetalakeException:
+                  $ref: "#/components/examples/NoSuchMetalakeException"
+        "5xx":
+          description:
+            Internal server error. It is possible that the server
+            encountered a storage issue.
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+
+components:
+
+  schemas:
+
+    MetalakeCreateRequest:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          description: The name of the metalake
+        comment:
+          type: string
+          description: A comment about the metalake
+          nullable: true
+        properties:
+          type: object
+          description: Configured string to string map of properties for the metalake
+          nullable: true
+          default: { }
+          additionalProperties:
+            type: string
+
+    MetalakeUpdatesRequest:
+      type: object
+      required:
+        - updates
+      properties:
+        updates:
+          type: array
+          items:
+            $ref: "#/components/schemas/MetalakeUpdateRequest"
+
+    MetalakeUpdateRequest:
+      oneOf:
+        - $ref: "#/components/schemas/RenameMetalakeRequest"
+        - $ref: "#/components/schemas/UpdateMetalakeCommentRequest"
+        - $ref: "#/components/schemas/SetMetalakePropertyRequest"
+        - $ref: "#/components/schemas/RemoveMetalakePropertyRequest"
+      discriminator:
+        propertyName: "@type"
+        mapping:
+          rename: "#/components/schemas/RenameMetalakeRequest"
+          updateComment: "#/components/schemas/UpdateMetalakeCommentRequest"
+          setProperty: "#/components/schemas/SetMetalakePropertyRequest"
+          removeProperty: "#/components/schemas/RemoveMetalakePropertyRequest"
+
+    RenameMetalakeRequest:
+      type: object
+      required:
+        - "@type"
+        - newName
+      properties:
+        "@type":
+          type: string
+          enum:
+            - rename
+        newName:
+          type: string
+          description: The new name of the metalake
+      example: {
+        "@type": "rename",
+        "newName": "my_metalake_new"
+      }
+
+    UpdateMetalakeCommentRequest:
+      type: object
+      required:
+        - "@type"
+        - newComment
+      properties:
+        "@type":
+          type: string
+          enum:
+            - updateComment
+        newComment:
+          type: string
+          description: The new comment of the metalake
+      example: {
+        "@type": "updateComment",
+        "newComment": "This is my new metalake comment"
+      }
+
+    SetMetalakePropertyRequest:
+      type: object
+      required:
+        - "@type"
+        - property
+        - value
+      properties:
+        "@type":
+          type: string
+          enum:
+            - setProperty
+        property:
+          type: string
+          description: The property to set
+        value:
+          type: string
+          description: The value to set
+      example: {
+        "@type": "setProperty",
+        "property": "key1",
+        "value": "value1_new"
+      }
+
+    RemoveMetalakePropertyRequest:
+      type: object
+      required:
+        - "@type"
+        - property
+      properties:
+        type:
+          type: string
+          enum:
+            - removeProperty
+        property:
+          type: string
+          description: The property to remove
+      example: {
+        "@type": "removeProperty",
+        "property": "key2"
+      }
+
+    Metalake:
+      type: object
+      description:
+        Gravitino Metalake is the top-level metadata repository for users.
+        It contains a list of catalogs as sub-level metadata collections.
+        With GravitinoMetaLake, users can list, create, load, alter and
+        drop a catalog with specified identifier.
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          description: The name of the Metalake
+        comment:
+          type: string
+          description: A comment about the Metalake
+          nullable: true
+        audit:
+          $ref: "./openapi.yaml#/components/schemas/Audit"
+        properties:
+          type: object
+          description: Configured string to string map of properties for the Metalake
+          default: { }
+          additionalProperties:
+            type: string
+
+  responses:
+
+    ListMetalakesResponse:
+      description: Returns a list of all metalakes.
+      content:
+        application/vnd.gravitino.v1+json:
+          schema:
+            type: object
+            properties:
+              code:
+                type: integer
+                format: int32
+                description: Status code of the response
+                enum:
+                  - 0
+                example: 0
+              metalakes:
+                type: array
+                description: A list of metalake objects
+                items:
+                  $ref: "#/components/schemas/Metalake"
+
+    BadRequestErrorResponse:
+      description:
+        Indicates a bad request error. It could be caused by an unexpected request
+        body format or other forms of request validation failure, such as invalid json.
+        Usually serves application/vnd.gravitino.v1+json content, although in some cases simple text/plain content might
+        be returned by the server's middleware.
+      content:
+        application/vnd.gravitino.v1+json:
+          schema:
+            $ref: './openapi.yaml#/components/schemas/ErrorModel'
+          example: {
+            "code": 1003,
+            "type": "BadRequestException",
+            "message": "Malformed request"
+          }
+
+    MetalakeResponse:
+      description: Returns included metalake object.
+      content:
+        application/vnd.gravitino.v1+json:
+          schema:
+            type: object
+            properties:
+              code:
+                type: integer
+                format: int32
+                description: Status code of the response
+                enum:
+                  - 0
+              metalake:
+                $ref: "#/components/schemas/Metalake"
+          examples:
+            MetalakeResponse:
+              $ref: "#/components/examples/MetalakeResponse"
+
+    DropResponse:
+      description: Represents a response for a drop operation
+      content:
+        application/vnd.gravitino.v1+json:
+          schema:
+            type: object
+            properties:
+              code:
+                type: integer
+                format: int32
+                description: Status code of the response
+                enum:
+                  - 0
+              dropped:
+                type: boolean
+                description: Whether the drop operation was successful
+
+    ServerErrorResponse:
+      description:
+        A server-side problem that might not be addressable from the client
+        side. Used for server 5xx errors without more specific documentation in
+        individual routes.
+      content:
+        application/vnd.gravitino.v1+json:
+          schema:
+            $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+          example: {
+            "code": 1002,
+            "type": "RuntimeException",
+            "message": "Internal Server Error",
+            "stack": [
+              "java.lang.RuntimeException: Internal Server Error"
+            ]
+          }
+
+  examples:
+
+    MetalakeAlreadyExistsException:
+      value: {
+        "code": 1004,
+        "type": "MetalakeAlreadyExistsException",
+        "message": "Failed to operate metalake(s) [my_metalake] operation [CREATE], reason [MetalakeAlreadyExistsException]",
+        "stack": [
+          "com.datastrato.gravitino.exceptions.MetalakeAlreadyExistsException: Metalake my_metalake already exists",
+          "..."
+        ]
+      }
+
+    NoSuchMetalakeException:
+      value: {
+        "code": 1003,
+        "type": "NoSuchMetalakeException",
+        "message": "Failed to operate metalake(s) [test] operation [LOAD], reason [NoSuchMetalakeException]",
+        "stack": [
+          "com.datastrato.gravitino.exceptions.NoSuchMetalakeException: Metalake test does not exist",
+          "..." ]
+      }
+
+    MetalakeCreate:
+      value: {
+        "name": "my_metalake",
+        "comment": "This is my metalake",
+        "properties": {
+          "key1": "value1",
+          "key2": "value2"
+        }
+      }
+
+    MetalakeResponse:
+      value: {
+        "code": 0,
+        "metalake": {
+          "name": "my_metalake",
+          "comment": "This is my metalake",
+          "properties": {
+            "key1": "value1",
+            "key2": "value2",
+            "gravitino.identifier": "gravitino.v1.uid2062071866014250017"
+          },
+          "audit": {
+            "creator": "gravitino",
+            "createTime": "2023-12-06T14:21:24.982Z"
+          }
+        }
+      }
