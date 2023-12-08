@@ -8,6 +8,7 @@ import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergConfig;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.ops.IcebergTableOpsHelper.IcebergTableChange;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.utils.IcebergCatalogUtil;
 import com.google.common.base.Preconditions;
+import java.util.Collections;
 import java.util.Optional;
 import javax.ws.rs.NotSupportedException;
 import org.apache.iceberg.Transaction;
@@ -39,17 +40,6 @@ public class IcebergTableOps implements AutoCloseable {
 
   public IcebergTableOps(IcebergConfig icebergConfig) {
     String catalogType = icebergConfig.get(IcebergConfig.CATALOG_BACKEND);
-    icebergConfig
-        .getJdbcDriverOptional()
-        .ifPresent(
-            driverClassName -> {
-              try {
-                // Load the jdbc driver
-                Class.forName(driverClassName);
-              } catch (ClassNotFoundException e) {
-                throw new IllegalArgumentException("Couldn't load jdbc driver " + driverClassName);
-              }
-            });
     catalog =
         IcebergCatalogUtil.loadCatalogBackend(catalogType, icebergConfig.getConfigsWithPrefix(""));
     if (catalog instanceof SupportsNamespaces) {
@@ -58,7 +48,7 @@ public class IcebergTableOps implements AutoCloseable {
   }
 
   public IcebergTableOps() {
-    this(new IcebergConfig());
+    this(new IcebergConfig(Collections.emptyMap()));
   }
 
   public IcebergTableOpsHelper createIcebergTableOpsHelper() {

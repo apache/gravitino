@@ -29,11 +29,12 @@ import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.MySQLContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
 
-// @Tag("gravitino-docker-it")
+@Tag("gravitino-docker-it")
 public class TestMultipleJdbcLoad extends AbstractIT {
 
   private static String TEST_DB_NAME = GravitinoITUtils.genRandomName("ct_db");

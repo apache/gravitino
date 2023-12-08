@@ -16,6 +16,7 @@ import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogP
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.config.ConfigBuilder;
 import com.datastrato.gravitino.config.ConfigEntry;
+import java.util.Map;
 import java.util.Optional;
 
 public class IcebergConfig extends Config {
@@ -73,7 +74,8 @@ public class IcebergConfig extends Config {
     return get(JDBC_DRIVER);
   }
 
-  public IcebergConfig() {
+  public IcebergConfig(Map<String, String> properties) {
     super(false);
+    loadFromMap(properties, k -> true);
   }
 }

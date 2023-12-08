@@ -71,8 +71,7 @@ public class IcebergRESTService implements GravitinoAuxiliaryService {
 
   @Override
   public void serviceInit(Map<String, String> properties) {
-    IcebergConfig icebergConfig = new IcebergConfig();
-    icebergConfig.loadFromMap(properties, k -> true);
+    IcebergConfig icebergConfig = new IcebergConfig(properties);
     initServer(icebergConfig);
     LOG.info("Iceberg REST service inited");
   }
