@@ -3,6 +3,7 @@ title: Gravitino metrics
 slug: /metrics
 keywords:
   - metrics
+license: Copyright 2023 Datastrato.  This software is licensed under the Apache License version 2.
 ---
 
 ## Introduction
@@ -19,7 +20,7 @@ curl http://127.0.0.1:8090/prometheus/metrics
 #### HTTP server metrics
 HTTP server metrics encompass the histogram of HTTP request processing time and the number of HTTP response codes, categorized by different HTTP interfaces such as `create-table` and `load-table`.
 
-For instance, considering the `create-table` operation in the Gravitino server, Prometheus metrics are obtained as follows:
+For instance, you can get Prometheus metrics for `create-table` operation in the Gravitino server as follows:
 ```
 gravitino_server_1xx_responses_total{operation="create-table",} 0.0
 gravitino_server_4xx_responses_total{operation="create-table",} 0.0
@@ -39,4 +40,4 @@ Please note that metrics with the `gravitino-server` prefix pertain to the Gravi
 
 #### JVM metrics
 JVM metrics source using [JVM instrumentation](https://metrics.dropwizard.io/4.2.0/manual/jvm.html) with BufferPoolMetricSet, GarbageCollectorMetricSet and MemoryUsageGaugeSet.
-These metrics start with the `jvm` prefix, like `jvm.heap.used` in json format, `jvm_head_used` in Prometheus format.
+These metrics start with the `jvm` prefix, like `jvm.heap.used` in JSON format, `jvm_head_used` in Prometheus format.
