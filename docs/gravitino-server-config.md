@@ -29,8 +29,8 @@ The `gravitino.conf` file lists the configuration items in the following table. 
 | `gravitino.server.webserver.threadPoolWorkQueueSize` | The size of the queue in the thread pool used by Jetty webserver.                                                                                    | `100`         | 0.1.0         |
 | `gravitino.server.webserver.stopTimeout`             | Time in milliseconds to gracefully shutdown the Jetty webserver, for more, please see `org.eclipse.jetty.server.Server#setStopTimeout`.                      | `30000`       | 0.2.0         |
 | `gravitino.server.webserver.idleTimeout`             | The timeout in milliseconds of idle connections.                                                                                                            | `30000`       | 0.2.0         |
-| `gravitino.server.webserver.requestHeaderSize`       | Maximum size of HTTP.arequests.                                                                                                                             | `131072`      | 0.1.0         |
-| `gravitino.server.webserver.responseHeaderSize`      | Maximum size of HTTP. responses.                                                                                                                            | `131072`      | 0.1.0         |
+| `gravitino.server.webserver.requestHeaderSize`       | Maximum size of HTTP requests.                                                                                                                             | `131072`      | 0.1.0         |
+| `gravitino.server.webserver.responseHeaderSize`      | Maximum size of HTTP responses.                                                                                                                            | `131072`      | 0.1.0         |
 | `gravitino.server.shutdown.timeout`                  | Time in milliseconds to gracefully shutdown of the Gravitino webserver.                                                                                              | `3000`        | 0.2.0         |
 
 ### Storage configuration
