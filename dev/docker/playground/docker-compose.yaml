@@ -35,7 +35,6 @@ services:
     volumes:
       - ./healthcheck:/tmp/healthcheck
       - ./init/gravitino:/tmp/gravitino
-    command: sh /tmp/gravitino/download_jdbc.sh
     deploy:
       resources:
         limits:
