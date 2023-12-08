@@ -9,12 +9,7 @@ paths:
 
   /metalakes/{metalake}/catalogs:
     parameters:
-      - name: metalake
-        in: path
-        description: The name of the metalake to operate on
-        required: true
-        schema:
-          type: string
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
     get:
       tags:
         - catalog
@@ -22,7 +17,7 @@ paths:
       operationId: listCatalogs
       responses:
         "200":
-          $ref: "#/components/responses/EntityListResponse"
+          $ref: "./openapi.yaml#/components/responses/EntityListResponse"
         "400":
           $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
         "5xx":
@@ -59,18 +54,8 @@ paths:
 
   /metalakes/{metalake}/catalogs/{catalog}:
     parameters:
-      - name: metalake
-        in: path
-        description: The name of the metalake to operate on
-        required: true
-        schema:
-          type: string
-      - name: catalog
-        in: path
-        description: The name of the catalog to operate on
-        required: true
-        schema:
-          type: string
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - $ref: "./openapi.yaml#/components/parameters/catalog"
 
     get:
       tags:
@@ -140,6 +125,8 @@ paths:
       responses:
         "200":
           $ref: "./openapi.yaml#/components/responses/DropResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
@@ -148,21 +135,6 @@ paths:
 components:
 
   schemas:
-    NameIdentifier:
-      type: object
-      description: A identifier for an entity
-      required:
-        - namespace
-        - name
-      properties:
-        namespace:
-          type: array
-          description: The namespace of the entity may be with multiple levels
-          items:
-            type: string
-        name:
-          type: string
-          description: The name of the entity
 
     Catalog:
       type: object
@@ -344,36 +316,6 @@ components:
 
 
   responses:
-    EntityListResponse:
-      description: A list of entities
-      content:
-        application/vnd.gravitino.v1+json:
-          schema:
-            type: object
-            properties:
-              code:
-                type: integer
-                format: int32
-                description: Status code of the response
-                enum:
-                  - 0
-                example: 0
-              identifiers:
-                type: array
-                description: A list of NameIdentifier objects
-                items:
-                  $ref: "#/components/schemas/NameIdentifier"
-          example: {
-            "code": 0,
-            "identifiers": [
-              {
-                "namespace": [
-                  "my_metalake"
-                ],
-                "name": "my_hive_catalog"
-              }
-            ]
-          }
 
     CatalogResponse:
       description: Returns included catalog object
@@ -396,6 +338,19 @@ components:
 
 
   examples:
+    CatalogListResponse:
+      value: {
+        "code": 0,
+        "identifiers": [
+          {
+            "namespace": [
+              "my_metalake"
+            ],
+            "name": "my_hive_catalog"
+          }
+        ]
+      }
+
     CatalogCreate:
       value: {
         "name": "my_hive_catalog",

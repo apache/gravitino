@@ -49,6 +49,12 @@ paths:
   /metalakes/{metalake}/catalogs/{catalog}:
     $ref: "./catalogs.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D"
 
+  /metalakes/{metalake}/catalogs/{catalog}/schemas:
+    $ref: "./schemas.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1schemas"
+
+  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}:
+    $ref: "./schemas.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1schemas~1%7Bschema%7D"
+
 components:
 
   schemas:
@@ -97,7 +103,49 @@ components:
           items:
             type: string
 
+    NameIdentifier:
+      type: object
+      description: A identifier for an entity
+      required:
+        - namespace
+        - name
+      properties:
+        namespace:
+          type: array
+          description: The namespace of the entity may be with multiple levels
+          items:
+            type: string
+        name:
+          type: string
+          description: The name of the entity
+
   responses:
+
+    EntityListResponse:
+      description: A list of entities
+      content:
+        application/vnd.gravitino.v1+json:
+          schema:
+            type: object
+            properties:
+              code:
+                type: integer
+                format: int32
+                description: Status code of the response
+                enum:
+                  - 0
+                example: 0
+              identifiers:
+                type: array
+                description: A list of NameIdentifier objects
+                items:
+                  $ref: "#/components/schemas/NameIdentifier"
+          examples:
+            CatalogListResponse:
+              $ref: "./catalogs.yaml#/components/examples/CatalogListResponse"
+            SchemaListResponse:
+              $ref: "./schemas.yaml#/components/examples/SchemaListResponse"
+
 
     BadRequestErrorResponse:
       description:
@@ -149,6 +197,31 @@ components:
               dropped:
                 type: boolean
                 description: Whether the drop operation was successful
+
+  parameters:
+    metalake:
+      name: metalake
+      in: path
+      description: The name of the metalake
+      required: true
+      schema:
+        type: string
+
+    catalog:
+      name: catalog
+      in: path
+      description: The name of the catalog
+      required: true
+      schema:
+        type: string
+
+    schema:
+      name: schema
+      in: path
+      description: The name of the schema
+      required: true
+      schema:
+        type: string
 
   securitySchemes:
     # todo: add OAuth2 security schema

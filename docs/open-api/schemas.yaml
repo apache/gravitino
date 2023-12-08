@@ -1,0 +1,333 @@
+#
+# Copyright 2023 Datastrato.
+# This software is licensed under the Apache License version 2.
+#
+
+---
+
+paths:
+
+  /metalakes/{metalake}/catalogs/{catalog}/schemas:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - $ref: "./openapi.yaml#/components/parameters/catalog"
+
+    get:
+      tags:
+        - schema
+      summary: List all schemas in a catalog
+      operationId: listSchemas
+      responses:
+        "200":
+          $ref: "./openapi.yaml#/components/responses/EntityListResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+    post:
+      tags:
+        - schema
+      summary: Create a new schema in a catalog
+      operationId: createSchema
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SchemaCreateRequest"
+            examples:
+              SchemaCreate:
+                $ref: "#/components/examples/SchemaCreate"
+
+      responses:
+        "200":
+          $ref: "#/components/responses/SchemaResponse"
+        "409":
+          description: Conflict - The target schema already exists
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                SchemaAlreadyExistsErrorResponse:
+                  $ref: "#/components/examples/SchemaAlreadyExistsException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - $ref: "./openapi.yaml#/components/parameters/catalog"
+      - $ref: "./openapi.yaml#/components/parameters/schema"
+
+    get:
+      tags:
+        - schema
+      summary: Get the specified schema in the specified catalog and metalake
+      operationId: loadSchema
+      description: Returns the specified schema in the specified catalog and metalake
+      responses:
+        "200":
+          $ref: "#/components/responses/SchemaResponse"
+        "404":
+          description: Not Found - The target schema does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetalakeException:
+                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
+                NoSuchCatalogException:
+                  $ref: "./catalogs.yaml#/components/examples/NoSuchCatalogException"
+                NoSuchSchemaException:
+                  $ref: "#/components/examples/NoSuchSchemaException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+    put:
+      tags:
+        - schema
+      summary: Update the specified schema in the specified catalog and metalake
+      operationId: alterSchema
+      description: Updates the specified schema in the specified catalog and metalake
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SchemaUpdatesRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/SchemaResponse"
+        "404":
+          description: Not Found - The target schema does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetalakeException:
+                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
+                NoSuchCatalogException:
+                  $ref: "./catalogs.yaml#/components/examples/NoSuchCatalogException"
+                NoSuchSchemaException:
+                  $ref: "#/components/examples/NoSuchSchemaException"
+        "409":
+          description: Conflict - The target schema already exists
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                SchemaAlreadyExistsExistsException:
+                  $ref: "#/components/examples/SchemaAlreadyExistsException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+    delete:
+      tags:
+        - schema
+      summary: Drop the specified schema in the specified catalog and metalake
+      operationId: dropSchema
+      responses:
+        "200":
+          $ref: "./openapi.yaml#/components/responses/DropResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+components:
+
+  schemas:
+
+    SchemaCreateRequest:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          description: The name of the schema
+        comment:
+          type: string
+          description: A comment describing the schema
+          nullable: true
+        properties:
+          type: object
+          description: A map of properties for the schema
+          nullable: true
+          default: { }
+          additionalProperties:
+            type: string
+
+    Schema:
+      type: object
+      description: A schema
+      required:
+        - name
+        - audit
+      properties:
+        name:
+          type: string
+          description: The name of the schema
+        comment:
+          type: string
+          description: A comment describing the schema
+          nullable: true
+        audit:
+          $ref: "./openapi.yaml#/components/schemas/Audit"
+        properties:
+          type: object
+          description: A map of properties for the schema
+          nullable: true
+          default: { }
+          additionalProperties:
+            type: string
+
+    SchemaUpdatesRequest:
+      type: object
+      required:
+        - updates
+      properties:
+        updates:
+          type: array
+          items:
+            $ref: "#/components/schemas/SchemaUpdateRequest"
+
+    SchemaUpdateRequest:
+      oneOf:
+        - $ref: "#/components/schemas/SetSchemaPropertyRequest"
+        - $ref: "#/components/schemas/RemoveSchemaPropertyRequest"
+      discriminator:
+        propertyName: "@type"
+        mapping:
+          setProperty: "#/components/schemas/SetSchemaPropertyRequest"
+          removeProperty: "#/components/schemas/RemoveSchemaPropertyRequest"
+
+    SetSchemaPropertyRequest:
+      type: object
+      required:
+        - "@type"
+        - property
+        - value
+      properties:
+        "@type":
+          type: string
+          enum:
+            - setProperty
+        property:
+          type: string
+          description: The name of the property to set
+        value:
+          type: string
+          description: The value of the property to set
+      example:
+        "@type": "setProperty"
+        property: "key1"
+        value: "value1_new"
+
+    RemoveSchemaPropertyRequest:
+      type: object
+      required:
+        - "@type"
+        - property
+      properties:
+        "@type":
+          type: string
+          enum:
+            - removeProperty
+        property:
+          type: string
+          description: The name of the property to remove
+      example: {
+        "@type": "removeProperty",
+        "property": "key2"
+      }
+
+  responses:
+    SchemaResponse:
+      description: Returns include the schema object
+      content:
+        application/vnd.gravitino.v1+json:
+          schema:
+            type: object
+            properties:
+              code:
+                type: integer
+                format: int32
+                description: Status code of the response
+                enum:
+                  - 0
+              schema:
+                $ref: "#/components/schemas/Schema"
+          examples:
+            SchemaResponse:
+              $ref: "#/components/examples/SchemaResponse"
+
+
+  examples:
+    SchemaListResponse:
+      value: {
+        "code": 0,
+        "identifiers": [
+          {
+            "namespace": [
+              "my_metalake",
+              "my_hive_catalog"
+            ],
+            "name": "my_hive_schema"
+          }
+        ]
+      }
+
+    SchemaCreate:
+      value: {
+        "name": "my_hive_schema",
+        "comment": "This is my Hive schema",
+        "properties": {
+          "location": "/user/hive/warehouse",
+          "key1": "value1",
+          "key2": "value2"
+        }
+      }
+
+    SchemaResponse:
+      value: {
+        "code": 0,
+        "schema": {
+          "name": "my_hive_schema",
+          "comment": "This is my Hive schema",
+          "properties": {
+            "key1": "value1",
+            "key2": "value2",
+            "location": "hdfs://0.0.0.0:9000/user/hive/warehouse"
+          },
+          "audit": {
+            "creator": "gravitino",
+            "createTime": "2023-12-08T08:37:43.531Z"
+          }
+        }
+      }
+
+    SchemaAlreadyExistsException:
+      value: {
+        "code": 1004,
+        "type": "SchemaAlreadyExistsException",
+        "message": "Failed to operate schema(s) [my_hive_schema] operation [CREATE] under catalog [my_hive_catalog], reason [SchemaAlreadyExistsException]",
+        "stack": [
+          "com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException: Hive schema (database) 'my_hive_schema' already exists in Hive Metastore",
+          "..."
+        ]
+      }
+
+    NoSuchSchemaException:
+      value: {
+        "code": 1003,
+        "type": "NoSuchSchemaException",
+        "message": "Failed to operate schema(s) [my_hive_schema1] operation [LOAD] under catalog [my_hive_catalog], reason [NoSuchSchemaException]",
+        "stack": [
+          "com.datastrato.gravitino.exceptions.NoSuchSchemaException: Hive schema (database) does not exist: my_hive_schema1 in Hive Metastore",
+          "..."
+        ]
+      }
