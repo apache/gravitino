@@ -28,10 +28,10 @@ Gravitino provides the ability to manage Apache Iceberg metadata.
 | Configuration item | Description                                   | value                                                                                                                 |
 |--------------------|-----------------------------------------------|-----------------------------------------------------------------------------------------------------------------------|
 | `catalog-backend`  | Catalog backend of Gravitino Iceberg catalog. | `hive` or `jdbc`                                                                                                      |
-| `uri`              | The uri config of the Iceberg catalog.        | `thrift://127.0.0.1:9083` or `jdbc:postgresql://127.0.0.1:5432/db_name` or `jdbc:mysql://127.0.0.1:3306/metastore_db` |
+| `uri`              | The URI configuration of the Iceberg catalog. | `thrift://127.0.0.1:9083` or `jdbc:postgresql://127.0.0.1:5432/db_name` or `jdbc:mysql://127.0.0.1:3306/metastore_db` |
 | `warehouse`        | Warehouse directory of catalog.               | `file:///user/hive/warehouse-hive/` for localfs or `hdfs://namespace/hdfs/path` for HDFS                              |
 
-Any properties not defined by Gravitino with `gravitino.bypass` prefix will pass to Iceberg catalog properites and HDFS configuration. For example, if specify `gravitino.bypass.list-all-tables`, `list-all-tables` will pass to Iceberg catalog properites.
+Any properties not defined by Gravitino with `gravitino.bypass` prefix will pass to Iceberg catalog properties and HDFS configuration. For example, if specify `gravitino.bypass.list-all-tables`, `list-all-tables` will pass to Iceberg catalog properties.
 
 #### JDBC catalog
 
@@ -56,13 +56,13 @@ Your must download the corresponding JDBC driver to the `catalogs/lakehouse-iceb
 
 ### Schema properties
 
-You could put any properties except `comment`.
+You could put properties except `comment`.
 
 ## Table info
 
 ### Capabilities
 
-- Doesn't suppport `Distribution`, you should use `BucketPartition` instead.
+- Doesn't support `Distribution`, you should use `BucketPartition` instead.
 - Built with Apache Iceberg `1.3.1`. The Apache Iceberg table format version is `1` by default.
 
 ### Column type 
