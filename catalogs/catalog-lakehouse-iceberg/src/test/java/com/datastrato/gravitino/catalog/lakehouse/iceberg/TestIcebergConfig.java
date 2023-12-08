@@ -18,13 +18,11 @@ public class TestIcebergConfig {
         ImmutableMap.of(JettyServerConfig.WEBSERVER_HTTP_PORT.getKey(), "1000");
 
     IcebergConfig icebergConfig = new IcebergConfig(properties);
-    icebergConfig.loadFromMap(properties, k -> k.startsWith("gravitino."));
-    Assertions.assertEquals(
+    Assertions.assertNotEquals(
         JettyServerConfig.WEBSERVER_HTTP_PORT.getDefaultValue(),
         icebergConfig.get(JettyServerConfig.WEBSERVER_HTTP_PORT));
 
     IcebergConfig icebergRESTConfig2 = new IcebergConfig(properties);
-    icebergRESTConfig2.loadFromMap(properties, k -> true);
     Assertions.assertEquals(1000, icebergRESTConfig2.get(JettyServerConfig.WEBSERVER_HTTP_PORT));
   }
 }
