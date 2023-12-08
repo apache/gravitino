@@ -15,7 +15,7 @@ This software is licensed under the Apache License version 2."
 
 Note:
 
-+ Gravitino requires at least JDK8 and at most JDK17 to run Gradle, so you need to 
++ Gravitino requires at least JDK8 and at most JDK17 to run Gradle, so you need to
   install JDK8 to 17 version to launch the build environment.
 
 + Gravitino itself uses JDK8 to build, Gravitino Trino connector uses JDK17 to build. You don't
@@ -30,7 +30,7 @@ Note:
 + macOS uses "docker-connector" to make the Gravitino Trino connector work with Docker
   for macOS. For the details of "docker-connector", please see [docker-connector](https://github.com/wenjunxiao/mac-docker-connector) and [README](../dev/docker/tools/README.md).
   Alternatively, you can use OrbStack to replace Docker for macOS, please see
-  [OrbStack](https://orbstack.dev/), with OrbStack you can run Gravitino integration tests 
+  [OrbStack](https://orbstack.dev/), with OrbStack you can run Gravitino integration tests
   without needing to install "docker-connector".
 
 ## Quick start
@@ -86,14 +86,14 @@ Note:
 
    You can access the Gravitino Web UI by typing http://localhost:8090 in your browser
 
-   > Note: 
-   > 
-   > If you need to debug the Gravitino server, enable the `GRAVITINO_DEBUG_OPTS` environment 
-   > variable in the `conf/gravitino-env.sh` file. Then you can create a `Remote JVM Debug` 
+   > Note:
+   >
+   > If you need to debug the Gravitino server, enable the `GRAVITINO_DEBUG_OPTS` environment
+   > variable in the `conf/gravitino-env.sh` file. Then you can create a `Remote JVM Debug`
    > configuration in `IntelliJ IDEA` and debug `gravitino.server.main`.
    >
-   > Currently, Gravitino server can only run with JDK8 due to some dependencies. Please 
-   > make sure you have JDK8 installed and `JAVA_HOME` configured correctly. To check the Jave 
+   > Currently, Gravitino server can only run with JDK8 due to some dependencies. Please
+   > make sure you have JDK8 installed and `JAVA_HOME` configured correctly. To check the Java
    > version, you can simply run `${JAVA_HOME}/bin/java -version` command.
 
 5. Stop Gravitino Server.
