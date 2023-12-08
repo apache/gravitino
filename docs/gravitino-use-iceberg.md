@@ -5,7 +5,7 @@ license: "Copyright 2023 Datastrato.
 This software is licensed under the Apache License version 2."
 ---
 
-## Using Apache Iceberg as a Catalog in Gravitino
+## Using Apache Iceberg as a catalog in Gravitino
 
 Gravitino provides the ability to use Apache Iceberg as a catalog for managing your data. This guide walks you through the steps to create a catalog using Iceberg within Gravitino.
 
@@ -56,7 +56,7 @@ http://{GravitinoServerHost}:8090/api/metalakes/{Your_metalake_name}/catalogs
 | Configuration item | Description                                   | value                                                                                                  |
 |--------------------|-----------------------------------------------|--------------------------------------------------------------------------------------------------------|
 | `catalog-backend`  | Catalog backend of Gravitino Iceberg catalog. | `hive` or `jdbc`                                                                                       |
-| `uri`              | The uri config of the Iceberg catalog.        | `thrift://127.0.0.1:9083` or `jdbc:postgresql://127.0.0.1:5432/` or `jdbc:mysql://127.0.0.1:3306/test` |
+| `uri`              | The URI config of the Iceberg catalog.        | `thrift://127.0.0.1:9083` or `jdbc:postgresql://127.0.0.1:5432/` or `jdbc:mysql://127.0.0.1:3306/test` |
 | `warehouse`        | Warehouse directory of catalog.               | `/user/hive/warehouse-hive/`  or `hdfs://namespace/hdfs/path`                                          |
 
 ### HDFS configuration
@@ -146,7 +146,7 @@ Gravitino reserves the following fields, and you can't pass them in properties.
 | `current-snapshot-id`     | The snapshot represents the current state of the table. |
 | `cherry-pick-snapshot-id` | Selecting a specific snapshot in a merge operation.     |
 | `sort-order`              | Selecting a specific snapshot in a merge operation.     |
-| `identifier-fields`       | The identifier field(s) for defining the table.         |
+| `identifier-fields`       | The identifier fields for defining the table.           |
 
 Regarding Iceberg's properties, you can refer to [official documentation](https://iceberg.apache.org/docs/1.3.1/configuration/).
 

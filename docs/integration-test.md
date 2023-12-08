@@ -95,7 +95,7 @@ By default, using MiniGravitino runs the integration tests. Debugging with MiniG
 
 ### How to debug deploy mode Gravitino server and integration tests
 
-You have two modes to debug the Gravitino server and integration tests; the `embedded` and `deploy` modes.
+You have two modes to debug the Gravitino server and integration tests, the `embedded` and `deploy` modes.
 
 1. Embedded Mode is the default:
     - This mode is simpler to debug but not as close to the actual environment.
