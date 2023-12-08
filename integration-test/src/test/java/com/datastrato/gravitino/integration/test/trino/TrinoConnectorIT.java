@@ -711,8 +711,7 @@ public class TrinoConnectorIT extends AbstractIT {
   }
 
   @Test
-  @Order(11)
-  @Disabled("We need to add jdbc-connecotor-jar to trino container Iceberg connector")
+  @Order(15)
   void testIcebergCatalogCreatedByGravitino() throws InterruptedException {
     String catalogName = GravitinoITUtils.genRandomName("iceberg_catalog").toLowerCase();
     GravitinoMetaLake createdMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));

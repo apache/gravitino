@@ -93,7 +93,7 @@ docker run --rm -it -p 8080:8080 datastrato/gravitino-ci-trino
 - Expose ports:
   - `8080` Trino JDBC port
 
-### gravitino-ci-trino:0.1.1
+### gravitino-ci-trino:0.1.2
 - Copy JDBC driver 'mysql-connector-java' and 'postgres' to `/usr/lib/trino/iceberg/` folder
 
 ## Hive (For experience only)
