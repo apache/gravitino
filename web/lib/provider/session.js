@@ -93,6 +93,7 @@ const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     const initAuth = async () => {
+      // ** the expired time obtained from the backend is in seconds, default value is 299 seconds
       const expired = (authStore.expiredIn ?? Number(localExpiredIn)) * (2 / 3) * 1000
       const defaultExpired = 299 * (2 / 3) * 1000
 
