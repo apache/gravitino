@@ -11,10 +11,12 @@ import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.catalog.hive.HiveClientPool;
 import com.datastrato.gravitino.client.GravitinoMetaLake;
 import com.datastrato.gravitino.dto.rel.ColumnDTO;
+import com.datastrato.gravitino.integration.test.catalog.jdbc.utils.JdbcDriverDownloader;
 import com.datastrato.gravitino.integration.test.container.ContainerSuite;
 import com.datastrato.gravitino.integration.test.container.HiveContainer;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
+import com.datastrato.gravitino.integration.test.util.ITUtils;
 import com.datastrato.gravitino.rel.Schema;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.types.Types;
@@ -22,6 +24,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -90,6 +93,23 @@ public class TrinoConnectorIT extends AbstractIT {
     containerSuite.getTrinoContainer().checkSyncCatalogFromGravitino(5, metalakeName, catalogName);
 
     createSchema();
+
+    String testMode =
+        System.getProperty(ITUtils.TEST_MODE) == null
+            ? ITUtils.EMBEDDED_TEST_MODE
+            : System.getProperty(ITUtils.TEST_MODE);
+
+    // Deploy mode, you should download jars to the Gravitino server iceberg lib directory
+    if (!ITUtils.EMBEDDED_TEST_MODE.equals(testMode)) {
+      String gravitinoHome = System.getenv("GRAVITINO_HOME");
+      String destPath = Paths.get(gravitinoHome, "/catalogs/lakehouse-iceberg/libs").toString();
+
+      JdbcDriverDownloader.downloadJdbcDriver(
+          "https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.27/mysql-connector-java-8.0.27.jar",
+          destPath);
+      JdbcDriverDownloader.downloadJdbcDriver(
+          "https://jdbc.postgresql.org/download/postgresql-42.7.0.jar", destPath);
+    }
   }
 
   @AfterAll

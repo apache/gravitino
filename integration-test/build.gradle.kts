@@ -3,10 +3,7 @@
  * This software is licensed under the Apache License version 2.
  */
 import org.gradle.internal.os.OperatingSystem
-import java.io.BufferedInputStream
-import java.io.FileOutputStream
 import java.io.IOException
-import java.net.URL
 import java.util.*
 
 plugins {
@@ -284,10 +281,6 @@ tasks.test {
       if (testMode == "deploy") {
         environment("GRAVITINO_HOME", rootDir.path + "/distribution/package")
         systemProperty("testMode", "deploy")
-        val mysqlJDBConnector = "https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.27/mysql-connector-java-8.0.27.jar"
-        val postgresJDBCConnector = "https://jdbc.postgresql.org/download/postgresql-42.7.0.jar"
-        downloadJDBCJavaConnector(mysqlJDBConnector, "lakehouse-iceberg")
-        downloadJDBCJavaConnector(postgresJDBCConnector, "lakehouse-iceberg")
       } else if (testMode == "embedded") {
         environment("GRAVITINO_HOME", rootDir.path)
         environment("GRAVITINO_TEST", "true")
@@ -302,37 +295,5 @@ tasks.test {
         }
       }
     }
-  }
-}
-
-fun downloadJDBCJavaConnector(url: String, catalog: String) {
-  try {
-    val connection = URL(url).openConnection()
-    val inputStream = connection.getInputStream()
-    val outputFile = File(rootDir.path + "/distribution/package/catalogs/$catalog/libs/${getFileName(url)}")
-    val outputStream = FileOutputStream(outputFile)
-    val buffer = ByteArray(1024)
-    var bytesRead: Int
-    val bufferedInputStream = BufferedInputStream(inputStream)
-
-    while (bufferedInputStream.read(buffer).also { bytesRead = it } != -1) {
-      outputStream.write(buffer, 0, bytesRead)
-    }
-
-    bufferedInputStream.close()
-    outputStream.close()
-
-    println("Successfully downloaded connector-java: $url")
-  } catch (e: IOException) {
-    println("Failed to download connector-java: $url: ${e.message}")
-  }
-}
-
-fun getFileName(url: String): String {
-  val lastSlashIndex = url.lastIndexOf('/')
-  return if (lastSlashIndex >= 0 && lastSlashIndex < url.length - 1) {
-    url.substring(lastSlashIndex + 1)
-  } else {
-    throw IllegalArgumentException("Invalid URL: $url")
   }
 }
