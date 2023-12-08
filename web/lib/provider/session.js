@@ -17,13 +17,13 @@ import { useLocalStorage } from 'react-use'
 import { getVersionApi } from '@/lib/api/version'
 import { loginApi } from '@/lib/api/auth'
 
-import { isProdEnv, to } from '../utils'
-import { getAuthConfigs } from '../store/auth'
+import { isProdEnv, to, loggerVersion } from '../utils'
+import { getAuthConfigs, setAuthParams, setAuthToken, setExpiredIn, refreshToken } from '../store/auth'
 
 const devOauthUrl = process.env.NEXT_PUBLIC_OAUTH_PATH
 
 const authProvider = {
-  version: null,
+  version: '',
   loading: true,
   setLoading: () => Boolean,
   login: () => Promise.resolve(),
@@ -37,7 +37,9 @@ export const useAuth = () => useContext(AuthContext)
 const AuthProvider = ({ children }) => {
   const router = useRouter()
   const [loading, setLoading] = useState(authProvider.loading)
-  const [token, setToken] = useLocalStorage('accessToken', null, { raw: true })
+  const [authParams, setLocalAuthParams] = useLocalStorage('authParams', '', { raw: true })
+  const [localExpiredIn, setLocalExpiredIn] = useLocalStorage('expiredIn', '', { raw: true })
+  const [token, setToken] = useLocalStorage('accessToken', '', { raw: true })
   const [version, setVersion] = useLocalStorage('version', authProvider.version, { raw: false })
   const authStore = useAppSelector(state => state.auth)
   const dispatch = useAppDispatch()
@@ -45,71 +47,78 @@ const AuthProvider = ({ children }) => {
   const handleLogin = async params => {
     let oauthUrl = authStore.oauthUrl
 
-    try {
-      const response = await loginApi(isProdEnv ? oauthUrl : devOauthUrl, params)
+    dispatch(setAuthParams(params))
+    setLocalAuthParams(params)
 
-      const { access_token } = response.data
+    const getTokenAction = new Promise(async resolve => {
+      const url = isProdEnv ? oauthUrl : devOauthUrl
+      const [err, res] = await to(loginApi(url, params))
 
-      if (access_token) {
-        setToken(access_token)
-
-        getVersionApi()
-          .then(async res => {
-            const { version } = res.data
-            console.log(
-              `Gravitino Version: %c${version.version}`,
-              `color: white; background-color: #6062E0; padding: 2px; border-radius: 4px;`
-            )
-            setVersion(version)
-            dispatch(setStoreVersion(version.version))
-            router.replace('/')
-          })
-          .catch(error => {
-            console.error(error)
-          })
+      if (err || !res) {
+        throw new Error(err)
       }
-    } catch (e) {
-      throw new Error(e)
-    }
+
+      const { access_token, expires_in } = res.data
+
+      setToken(access_token)
+      dispatch(setAuthToken(access_token))
+      setLocalExpiredIn(expires_in)
+      dispatch(setExpiredIn(expires_in))
+      resolve(access_token)
+    })
+
+    getTokenAction.then(async token => {
+      if (!token) {
+        throw new Error('Token not found')
+      }
+      const [verErr, resVer] = await to(getVersionApi())
+
+      const { version } = resVer.data
+
+      loggerVersion(version.version)
+      setVersion(version)
+      dispatch(setStoreVersion(version.version))
+      dispatch(refreshToken())
+      router.replace('/')
+    })
   }
 
   const handleLogout = () => {
-    setVersion(null)
-    setToken(null)
+    setVersion('')
+    dispatch(setStoreVersion(''))
+    setToken('')
+    dispatch(setAuthToken(''))
     router.push('/login')
   }
 
   useEffect(() => {
     const initAuth = async () => {
+      const expired = (authStore.expiredIn ?? Number(localExpiredIn)) * (2 / 3) * 1000 * 60
+      const defaultExpired = 299 * (2 / 3) * 1000 * 60
+
+      let intervalId = null
+
       const [authConfigsErr, resAuthConfigs] = await to(dispatch(getAuthConfigs()))
       const { authType, oauthUrl } = resAuthConfigs.payload
 
-      if (authType !== 'simple') {
+      if (authType === 'simple') {
+        dispatch(initialVersion())
+        router.replace('/')
+      } else {
         if (token) {
-          getVersionApi()
-            .then(res => {
-              setLoading(false)
-              const { version } = res.data
-              console.log(
-                `Gravitino Version: %c${version.version}`,
-                `color: white; background-color: #6062E0; padding: 2px; border-radius: 4px;`
-              )
-              setVersion(version)
-              dispatch(setStoreVersion(version.version))
-            })
-            .catch(() => {
-              localStorage.removeItem('version')
-              localStorage.removeItem('accessToken')
-              setLoading(false)
+          intervalId = setInterval(() => {
+            dispatch(refreshToken())
+          }, expired || defaultExpired)
 
-              router.replace('/login')
-            })
+          dispatch(setAuthToken(token))
+          dispatch(initialVersion())
         } else {
-          setLoading(false)
           router.replace('/login')
         }
-      } else {
-        dispatch(initialVersion())
+      }
+
+      return () => {
+        clearInterval(intervalId)
       }
     }
 

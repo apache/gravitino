@@ -11,6 +11,7 @@ import Image from 'next/image'
 import { Box, AppBar as MuiAppBar, Toolbar, Stack, Typography } from '@mui/material'
 
 import VersionView from './VersionView'
+import LogoutButton from './Logout'
 
 const AppBar = props => {
   return (
@@ -38,6 +39,7 @@ const AppBar = props => {
             <Box className={'app-bar-content-right twc-flex twc-items-center'}>
               <Stack direction='row' spacing={2} alignItems='center'>
                 <VersionView />
+                <LogoutButton />
               </Stack>
             </Box>
           </Box>
