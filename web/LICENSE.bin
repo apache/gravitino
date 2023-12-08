@@ -200,65 +200,210 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 
-   The Web UI also bundles various third-party components also under
-   different licenses, please see web/LICENSE for these.
 
    This product bundles various third-party components also under the
    Apache Software License 2.0.
-
-   Gradle Wrapper
-   ./gradlew
-
-   Apache Spark
-   ./api/src/main/java/com/datastrato/gravitino/rel/SchemaChange.java
-   ./api/src/main/java/com/datastrato/gravitino/rel/SupportsSchemas.java
-   ./api/src/main/java/com/datastrato/gravitino/rel/TableCatalog.java
-   ./api/src/main/java/com/datastrato/gravitino/rel/TableChange.java
-   ./api/src/main/java/com/datastrato/gravitino/rel/expressions/Literal.java
-   ./api/src/main/java/com/datastrato/gravitino/rel/expressions/sorts/NullOrdering.java
-   ./api/src/main/java/com/datastrato/gravitino/rel/expressions/sorts/SortDirection.java
-   ./api/src/main/java/com/datastrato/gravitino/rel/expressions/sorts/SortOrder.java
-   ./api/src/main/java/com/datastrato/gravitino/rel/expressions/transforms/Transform.java
-   ./api/src/main/java/com/datastrato/gravitino/rel/expressions/Expression.java
-   ./api/src/main/java/com/datastrato/gravitino/rel/expressions/NamedReference.java
-
-   Apache Iceberg
-   ./api/src/main/java/com/datastrato/gravitino/exceptions/RESTException.java
-   ./catalogs/catalog-hive/src/main/java/com/datastrato/gravitino/catalog/hive/HiveClientPool.java
-   ./catalogs/catalog-hive/src/main/java/com/datastrato/gravitino/catalog/hive/dyn/DynConstructors.java
-   ./catalogs/catalog-hive/src/main/java/com/datastrato/gravitino/catalog/hive/dyn/DynFields.java
-   ./catalogs/catalog-hive/src/main/java/com/datastrato/gravitino/catalog/hive/dyn/DynMethods.java
-   ./catalogs/catalog-hive/src/test/java/com/datastrato/gravitino/catalog/hive/miniHMS/MiniHiveMetastore.java
-   ./catalogs/catalog-hive/src/test/java/com/datastrato/gravitino/catalog/hive/miniHMS/MiniHiveMetastoreService.java
-   ./catalogs/catalog-hive/src/test/java/com/datastrato/gravitino/catalog/hive/miniHMS/ScriptRunner.java
-   ./catalogs/catalog-lakehouse-iceberg/src/main/java/com/datastrato/gravitino/catalog/lakehouse/iceberg/web/IcebergExceptionMapper.java
-   ./clients/client-java/src/main/java/com/datastrato/gravitino/client/HTTPClient.java
-   ./clients/client-java/src/main/java/com/datastrato/gravitino/client/RESTClient.java
-   ./clients/client-java/src/test/java/com/datastrato/gravitino/client/TestHTTPClient.java
-   ./common/src/main/java/com/datastrato/gravitino/rest/RESTUtils.java
-   ./common/src/main/java/com/datastrato/gravitino/rest/RESTMessage.java
-   ./core/src/main/java/com/datastrato/gravitino/utils/ClientPool.java
-   ./core/src/main/java/com/datastrato/gravitino/utils/ClientPoolImpl.java
-   ./common/src/main/java/com/datastrato/gravitino/dto/responses/OAuth2TokenResponse.java
-   ./clients/client-java/src/main/java/com/datastrato/gravitino/client/OAuth2ClientUtil.java
-
-   Apache Hive
-   ./catalogs/catalog-hive/src/test/resources/hive-schema-3.1.0.derby.sql
-
+   
    Apache Zeppelin
-   ./integration-test/src/test/java/com/datastrato/gravitino/integration/test/util/CommandExecutor.java
-   ./integration-test/src/test/java/com/datastrato/gravitino/integration/test/util/ProcessData.java
    ./web/WEB-INF/web.xml
 
-   Apache Hadoop
-   ./dev/docker/hive/hadoop-env.sh
-   ./dev/docker/hive/yarn-env.sh
+   @swc/helpers
 
-   Apache Kafka
-   ./core/src/main/java/com/datastrato/gravitino/utils/Bytes.java
+   This product bundles various third-party components also under the
+   MIT license.
 
-   Apache Submarine
-   ./bin/common.sh
+   @babel/code-frame
+   @babel/helper-module-imports
+   @babel/helper-string-parser
+   @babel/helper-validator-identifier
+   @babel/highlight
+   @babel/runtime
+   @babel/types
+   @emotion/babel-plugin
+   @emotion/cache
+   @emotion/hash
+   @emotion/is-prop-valid
+   @emotion/memoize
+   @emotion/react
+   @emotion/serialize
+   @emotion/sheet
+   @emotion/styled
+   @emotion/unitless
+   @emotion/use-insertion-effect-with-fallbacks
+   @emotion/utils
+   @emotion/weak-memoize
+   @floating-ui/core
+   @floating-ui/dom
+   @floating-ui/react-dom
+   @floating-ui/utils
+   @hookform/resolvers
+   @jridgewell/sourcemap-codec
+   @mui/base@5.0.0-beta.26
+   @mui/core-downloads-tracker
+   @mui/lab@5.0.0-alpha.155
+   @mui/material
+   @mui/private-theming
+   @mui/styled-engine
+   @mui/system
+   @mui/types
+   @mui/utils
+   @mui/x-data-grid
+   @mui/x-tree-view
+   @next/env
+   @next/swc-darwin-arm64
+   @popperjs/core
+   @reduxjs/toolkit
+   @types/hoist-non-react-statics
+   @types/js-cookie
+   @types/parse-json
+   @types/prop-types
+   @types/react-transition-group
+   @types/react
+   @types/scheduler
+   @types/use-sync-external-store
+   @xobotyi/scrollbar-width
+   ansi-styles
+   asynckit
+   axios
+   babel-plugin-macros
+   busboy
+   callsites
+   chalk
+   client-only
+   clsx
+   color-convert
+   color-name
+   combined-stream
+   convert-source-map
+   copy-to-clipboard
+   cosmiconfig
+   css-in-js-utils
+   css-tree
+   csstype
+   dayjs
+   delayed-stream
+   dom-helpers
+   error-ex
+   error-stack-parser
+   escape-string-regexp
+   escape-string-regexp
+   fast-deep-equal
+   fast-loops
+   fastest-stable-stringify
+   find-root
+   follow-redirects
+   form-data
+   function-bind
+   goober
+   has-flag
+   hasown
+   immer
+   import-fresh
+   inline-style-prefixer
+   is-arrayish
+   is-core-module
+   js-cookie
+   js-tokens
+   json-parse-even-better-errors
+   lines-and-columns
+   loose-envify
+   mime-db
+   mime-types
+   nanoid
+   next
+   nprogress
+   object-assign
+   parent-module
+   parse-json
+   path-parse
+   path-type
+   postcss
+   prop-types
+   property-expr
+   proxy-from-env
+   react-dom
+   react-hook-form
+   react-hot-toast
+   react-is
+   react-is
+   react-redux
+   react
+   redux-thunk
+   redux
+   regenerator-runtime
+   reselect
+   resize-observer-polyfill
+   resolve-from
+   resolve
+   rtl-css-js
+   scheduler
+   screenfull
+   stack-generator
+   stackframe
+   stacktrace-gps
+   stacktrace-js
+   streamsearch
+   styled-jsx
+   stylis
+   stylis
+   supports-color
+   supports-preserve-symlinks-flag
+   throttle-debounce
+   tiny-case
+   to-fast-properties
+   toggle-selection
+   toposort
+   use-sync-external-store
+   watchpack
+   yup
 
-   Trino
-   ./integration-test/src/main/java/com/datastrato/gravitino/integration/test/util/CloseableGroup.java
+   This product bundles various third-party components also under the
+   CC BY 4.0 license.
+
+   caniuse-lite
+
+   This product bundles various third-party components placed in the
+   public domain.
+
+   fast-shallow-equal
+   react-universal-interface
+
+   This product bundles various third-party components also under the
+   BSD 2-Clause license.
+
+   glob-to-regexp
+
+   This product bundles various third-party components also under the
+   BSD 3-Clause license.
+
+   hoist-non-react-statics
+   hyphenate-style-name
+   react-transition-group
+   source-map-js
+   source-map
+   tslib
+
+   This product bundles various third-party components also under the
+   BSD-3-Clause and Apache-2.0 license.
+
+   chroma-js
+
+   This product bundles various third-party components also under the
+   ISC license.
+
+   graceful-fs
+   picocolors
+
+   This product bundles various third-party components also under the
+   CC0 1.0 license.
+
+   mdn-data
+   type-fest
+
+   This product bundles various third-party components also under the
+   Unlicense license.
+
+   nano-css
+   react-use
+   set-harmonic-interval
+   ts-easing

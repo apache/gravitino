@@ -200,65 +200,9 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 
-   The Web UI also bundles various third-party components also under
-   different licenses, please see web/LICENSE for these.
 
    This product bundles various third-party components also under the
    Apache Software License 2.0.
-
-   Gradle Wrapper
-   ./gradlew
-
-   Apache Spark
-   ./api/src/main/java/com/datastrato/gravitino/rel/SchemaChange.java
-   ./api/src/main/java/com/datastrato/gravitino/rel/SupportsSchemas.java
-   ./api/src/main/java/com/datastrato/gravitino/rel/TableCatalog.java
-   ./api/src/main/java/com/datastrato/gravitino/rel/TableChange.java
-   ./api/src/main/java/com/datastrato/gravitino/rel/expressions/Literal.java
-   ./api/src/main/java/com/datastrato/gravitino/rel/expressions/sorts/NullOrdering.java
-   ./api/src/main/java/com/datastrato/gravitino/rel/expressions/sorts/SortDirection.java
-   ./api/src/main/java/com/datastrato/gravitino/rel/expressions/sorts/SortOrder.java
-   ./api/src/main/java/com/datastrato/gravitino/rel/expressions/transforms/Transform.java
-   ./api/src/main/java/com/datastrato/gravitino/rel/expressions/Expression.java
-   ./api/src/main/java/com/datastrato/gravitino/rel/expressions/NamedReference.java
-
-   Apache Iceberg
-   ./api/src/main/java/com/datastrato/gravitino/exceptions/RESTException.java
-   ./catalogs/catalog-hive/src/main/java/com/datastrato/gravitino/catalog/hive/HiveClientPool.java
-   ./catalogs/catalog-hive/src/main/java/com/datastrato/gravitino/catalog/hive/dyn/DynConstructors.java
-   ./catalogs/catalog-hive/src/main/java/com/datastrato/gravitino/catalog/hive/dyn/DynFields.java
-   ./catalogs/catalog-hive/src/main/java/com/datastrato/gravitino/catalog/hive/dyn/DynMethods.java
-   ./catalogs/catalog-hive/src/test/java/com/datastrato/gravitino/catalog/hive/miniHMS/MiniHiveMetastore.java
-   ./catalogs/catalog-hive/src/test/java/com/datastrato/gravitino/catalog/hive/miniHMS/MiniHiveMetastoreService.java
-   ./catalogs/catalog-hive/src/test/java/com/datastrato/gravitino/catalog/hive/miniHMS/ScriptRunner.java
-   ./catalogs/catalog-lakehouse-iceberg/src/main/java/com/datastrato/gravitino/catalog/lakehouse/iceberg/web/IcebergExceptionMapper.java
-   ./clients/client-java/src/main/java/com/datastrato/gravitino/client/HTTPClient.java
-   ./clients/client-java/src/main/java/com/datastrato/gravitino/client/RESTClient.java
-   ./clients/client-java/src/test/java/com/datastrato/gravitino/client/TestHTTPClient.java
-   ./common/src/main/java/com/datastrato/gravitino/rest/RESTUtils.java
-   ./common/src/main/java/com/datastrato/gravitino/rest/RESTMessage.java
-   ./core/src/main/java/com/datastrato/gravitino/utils/ClientPool.java
-   ./core/src/main/java/com/datastrato/gravitino/utils/ClientPoolImpl.java
-   ./common/src/main/java/com/datastrato/gravitino/dto/responses/OAuth2TokenResponse.java
-   ./clients/client-java/src/main/java/com/datastrato/gravitino/client/OAuth2ClientUtil.java
-
-   Apache Hive
-   ./catalogs/catalog-hive/src/test/resources/hive-schema-3.1.0.derby.sql
-
+   
    Apache Zeppelin
-   ./integration-test/src/test/java/com/datastrato/gravitino/integration/test/util/CommandExecutor.java
-   ./integration-test/src/test/java/com/datastrato/gravitino/integration/test/util/ProcessData.java
    ./web/WEB-INF/web.xml
-
-   Apache Hadoop
-   ./dev/docker/hive/hadoop-env.sh
-   ./dev/docker/hive/yarn-env.sh
-
-   Apache Kafka
-   ./core/src/main/java/com/datastrato/gravitino/utils/Bytes.java
-
-   Apache Submarine
-   ./bin/common.sh
-
-   Trino
-   ./integration-test/src/main/java/com/datastrato/gravitino/integration/test/util/CloseableGroup.java
