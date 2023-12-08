@@ -7,6 +7,7 @@
 
 import { useEffect } from 'react'
 
+import Image from 'next/image'
 import { useRouter, usePathname } from 'next/navigation'
 
 import { Box, Card, Grid, Button, CardContent, Typography, TextField, FormControl, FormHelperText } from '@mui/material'
@@ -74,7 +75,8 @@ const LoginPage = () => {
         <Card sx={{ width: 480 }}>
           <CardContent className={`twc-p-12`}>
             <Box className={`twc-mb-8 twc-flex twc-items-center twc-justify-center`}>
-              <Typography variant='h6' className={`twc-font-bold twc-text-[1.5rem] logoText`}>
+              <Image src={'/icons/gravitino.svg'} width={24} height={24} alt='logo' />
+              <Typography variant='h6' className={`twc-ml-2 twc-font-semibold twc-text-[1.5rem] logoText`}>
                 Gravitino
               </Typography>
             </Box>
