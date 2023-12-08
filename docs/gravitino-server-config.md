@@ -48,7 +48,7 @@ The `gravitino.conf` file lists the configuration items in the following table. 
 
 | Configuration item                            | Description                                                                                                                                                                                             | Default value | Since version |
 |-----------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|---------------|
-| `gravitino.catalog.cache.evictionIntervalMs`  | The interval in milliseconds to evict the catalog cache, default 3600000msor 1h.                                                                                                                         | `3600000`     | 0.1.0         |
+| `gravitino.catalog.cache.evictionIntervalMs`  | The interval in milliseconds to evict the catalog cache, default 3600000 ms or 1 hour.                                                                                                                         | `3600000`     | 0.1.0         |
 | `gravitino.catalog.classloader.isolated`      | Whether to use an isolated classloader for catalog, if true, an isolated classloader loads all catalog-related libraries and configurations, not the AppClassLoader. The default value is `true`. | `true`        | 0.1.0         |
 
 ## How to set up runtime environment variables
