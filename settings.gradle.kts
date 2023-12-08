@@ -13,3 +13,4 @@ include("catalogs:catalog-hive", "catalogs:catalog-lakehouse-iceberg", "catalogs
 include("clients:client-java", "clients:client-java-runtime")
 include("trino-connector")
 include("web")
+include("docs")
