@@ -94,7 +94,7 @@ Apache Iceberg doesn't support Gravitino `Varchar` `Fixedchar` `Byte` `Short` `U
 
 ### Table properties
 
-You call pass [Iceberg table properties](https://iceberg.apache.org/docs/1.3.1/configuration/) to Gravitino when creating Iceberg table.
+You can pass [Iceberg table properties](https://iceberg.apache.org/docs/1.3.1/configuration/) to Gravitino when creating Iceberg table.
 
 Gravitino server reserves the following fields which can't be passed.
 
