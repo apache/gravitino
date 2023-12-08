@@ -1,7 +1,7 @@
 ---
 title: "How to use Gravitino to manage Apache Hive metadata"
 date: 2023-10-20
-license: "Copyright 2023 DATASTRATO Pvt Ltd.
+license: "Copyright 2023 Datastrato Pvt Ltd.
 This software is licensed under the Apache License version 2."
 ---
 ## Using Apache Hive as a catalog in Gravitino

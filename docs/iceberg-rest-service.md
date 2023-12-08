@@ -1,7 +1,7 @@
 ---
 title: "How to set up Gravitino and Apache Iceberg REST server"
 date: 2023-10-18T09:03:20-08:00
-license: "Copyright 2023 DATASTRATO Pvt Ltd.
+license: "Copyright 2023 Datastrato Pvt Ltd.
 This software is licensed under the Apache License version 2."
 ---
 

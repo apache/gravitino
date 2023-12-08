@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 DATASTRATO Pvt Ltd.
+ * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 
@@ -82,7 +82,7 @@ fun writeProjectPropertiesFile() {
   propertiesFile.writer().use { writer ->
     writer.write(
       "#\n" +
-        "# Copyright 2023 DATASTRATO Pvt Ltd.\n" +
+        "# Copyright 2023 Datastrato Pvt Ltd.\n" +
         "# This software is licensed under the Apache License version 2.\n" +
         "#\n"
     )

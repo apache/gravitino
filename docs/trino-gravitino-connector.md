@@ -1,7 +1,7 @@
 ---
 title: "Gravitino connector"
 date: 2023-10-17T11:05:00-08:00
-license: "Copyright 2023 DATASTRATO Pvt Ltd.
+license: "Copyright 2023 Datastrato Pvt Ltd.
 This software is licensed under the Apache License version 2."
 ---
 ## Gravitino connector
