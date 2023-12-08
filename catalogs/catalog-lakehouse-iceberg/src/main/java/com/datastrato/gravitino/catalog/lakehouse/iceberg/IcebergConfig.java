@@ -78,4 +78,8 @@ public class IcebergConfig extends Config {
     super(false);
     loadFromMap(properties, k -> true);
   }
+
+  public IcebergConfig() {
+    super(false);
+  }
 }
