@@ -89,7 +89,7 @@ Both Gravitino server and Iceberg REST service can configure HTTPS.
 | `gravitino.server.webserver.keyStoreType`           | The type to the key store.                                 | `JKS`         | 0.3.0         |
 | `gravitino.server.webserver.managerPassword`        | Manager password to the key store.                         | ``            | 0.3.0         |
 | `gravitino.server.webserver.tlsProtocol`            | TLS protocol to use. The JVM must support the TLS protocol to use. | none          | 0.3.0         |
-| `gravitino.server.webserver.enableCipherAlgorithms` | The collection of enabled the cipher algorithms.           | ``            | 0.3.0         |
+| `gravitino.server.webserver.enableCipherAlgorithms` | The collection of enabled cipher algorithms.               | ``            | 0.3.0         |
 | `gravitino.server.webserver.enableClientAuth`       | Enables the authentication of the client.                  | `false`       | 0.3.0         |
 | `gravitino.server.webserver.trustStorePath`         | Path to the trust store file.                              | ``            | 0.3.0         |
 | `gravitino.server.webserver.trustStorePassword`     | Password to the trust store.                               | ``            | 0.3.0         |
@@ -105,7 +105,7 @@ Both Gravitino server and Iceberg REST service can configure HTTPS.
 | `gravitino.uxService.iceberg-rest.keyStoreType`            | The type to the key store.                                 | `JKS`         | 0.3.0         |
 | `gravitino.auxService.iceberg-rest.managerPassword`        | Manager password to the key store.                         | ``            | 0.3.0         |
 | `gravitino.auxService.iceberg-rest.tlsProtocol`            | TLS protocol to use. The JVM must support the TLS protocol to use.| none          | 0.3.0         |
-| `gravitino.auxService.iceberg-rest.enableCipherAlgorithms` | The collection of enabled the cipher algorithms.           | ``            | 0.3.0         |
+| `gravitino.auxService.iceberg-rest.enableCipherAlgorithms` | The collection of enabled cipher algorithms.               | ``            | 0.3.0         |
 | `gravitino.auxService.iceberg-rest.enableClientAuth`       | Enables the authentication of the client.                  | `false`       | 0.3.0         |
 | `gravitino.auxService.iceberg-rest.trustStorePath`         | Path to the trust store file.                              | ``            | 0.3.0         |
 | `gravitino.auxService.iceberg-rest.trustStorePassword`     | Password to the trust store.                               | ``            | 0.3.0         |
