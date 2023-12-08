@@ -93,8 +93,8 @@ const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     const initAuth = async () => {
-      const expired = (authStore.expiredIn ?? Number(localExpiredIn)) * (2 / 3) * 1000 * 60
-      const defaultExpired = 299 * (2 / 3) * 1000 * 60
+      const expired = (authStore.expiredIn ?? Number(localExpiredIn)) * (2 / 3) * 1000
+      const defaultExpired = 299 * (2 / 3) * 1000
 
       let intervalId = null
 
