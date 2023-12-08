@@ -251,6 +251,7 @@ tasks.rat {
     "dev/docker/**/*.xml",
     "**/*.log",
     "**/licenses/*.txt",
+    "**/licenses/*.md",
     "integration-test/**",
     "web/.**",
     "web/dist/**/*",
