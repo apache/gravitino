@@ -6,7 +6,6 @@
 #set -ex
 playground_dir="$(dirname "${BASH_SOURCE-$0}")"
 playground_dir="$(cd "${playground_dir}">/dev/null; pwd)"
-
 isExist=`which docker-compose`
 if [ $isExist ]
 then
@@ -17,6 +16,7 @@ else
 fi
 
 cd ${playground_dir}
+export VERSION=`grep 'version =' ../../../gradle.properties | awk '{printf $3}'`
 docker-compose up
 
 # Clean Docker containers when you quit this script

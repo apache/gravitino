@@ -25,7 +25,8 @@ services:
           memory: 1G
 
   gravitino:
-    image: datastrato/gravitino:0.3.0-SNAPSHOT
+    image: datastrato/gravitino:${VERSION}
+    entrypoint: /bin/bash /tmp/gravitino/init.sh
     ports:
       - "8090:8090"
     container_name: playground-gravitino
