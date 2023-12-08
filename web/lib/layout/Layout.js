@@ -17,14 +17,6 @@ import MainContent from './MainContent'
 import ScrollToTop from './ScrollToTop'
 import { NavigationEvents } from './navigation-events'
 
-const Loading = () => {
-  return (
-    <Box className={`twc-h-[100vh] twc-flex twc-items-center twc-flex-col twc-justify-center`}>
-      <CircularProgress disableShrink sx={{ mt: 6 }} />
-    </Box>
-  )
-}
-
 const Layout = ({ children, scrollToTop }) => {
   return (
     <div className={'layout-wrapper twc-h-full twc-flex twc-overflow-clip'}>
@@ -35,10 +27,7 @@ const Layout = ({ children, scrollToTop }) => {
           }
         />
         <AppBar />
-        <Suspense fallback={<Loading />}>
-          <NavigationEvents />
-          <MainContent>{children}</MainContent>
-        </Suspense>
+        <MainContent>{children}</MainContent>
         <Footer />
         {scrollToTop ? (
           scrollToTop(props)

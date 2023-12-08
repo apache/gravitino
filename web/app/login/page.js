@@ -5,10 +5,7 @@
 
 'use client'
 
-import { useEffect } from 'react'
-
 import Image from 'next/image'
-import { useRouter, usePathname } from 'next/navigation'
 
 import { Box, Card, Grid, Button, CardContent, Typography, TextField, FormControl, FormHelperText } from '@mui/material'
 
@@ -16,9 +13,6 @@ import * as yup from 'yup'
 import { useForm, Controller } from 'react-hook-form'
 import { yupResolver } from '@hookform/resolvers/yup'
 import { useAuth } from '@/lib/provider/session'
-import { useLocalStorage } from 'react-use'
-
-import { useAppSelector } from '@/lib/hooks/useStore'
 
 const defaultValues = {
   grant_type: 'client_credentials',
@@ -36,12 +30,6 @@ const schema = yup.object().shape({
 
 const LoginPage = () => {
   const auth = useAuth()
-  const router = useRouter()
-  const pathname = usePathname()
-
-  const [version] = useLocalStorage('version')
-
-  const authStore = useAppSelector(state => state.auth)
 
   const {
     control,
@@ -56,18 +44,6 @@ const LoginPage = () => {
   const onSubmit = data => {
     auth.login(data)
   }
-
-  useEffect(() => {
-    if (authStore.authType === 'simple') {
-      router.push('/')
-    } else {
-      const check = version && pathname === '/login'
-      if (check) {
-        router.push('/')
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
 
   return (
     <Grid container spacing={2} sx={{ justifyContent: 'center', alignItems: 'center', height: '100%' }}>

@@ -15,6 +15,9 @@ const defHttp = axios.create({
 })
 
 defHttp.interceptors.request.use(config => {
+  if (config.url.includes('/oauth2/token')) {
+    return config
+  }
   const accessToken = typeof window !== 'undefined' ? window.localStorage.getItem('accessToken') : null
 
   if (accessToken) {

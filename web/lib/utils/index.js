@@ -21,6 +21,13 @@ export const to = (promise, errExt) => {
     })
 }
 
+export const loggerVersion = version => {
+  console.log(
+    `Gravitino Version: %c${version}`,
+    `color: white; background-color: #6062E0; padding: 2px; border-radius: 4px;`
+  )
+}
+
 export const genUpdates = (originalData, newData) => {
   const updates = []
 
