@@ -5,85 +5,98 @@ keywords:
   - lakehouse
   - iceberg
   - metadata
+license: Copyright 2023 Datastrato.  This software is licensed under the Apache License version 2.
 ---
 
 ## Introduction
 
-Gravitino provides the ability to manage Iceberg metadata.
+Gravitino provides the ability to manage Apache Iceberg metadata.
 
 ### Capabilities
 
-* Worked as a catalog proxy, supports `HiveCatalog` and `JdbcCatalog`.
-* Support DDL operation for schema and Iceberg table.
-* Not support snapshot or table management operations.
-* When writing to HDFS, the Gravitino Iceberg REST server can only operate as the specified HDFS user and
-  it doesn't support proxying to other HDFS users. See **How to access Apache Hadoop** in the **How to customize Gravitino server configurations** document for more details.
+- Works as a catalog proxy, supporting `HiveCatalog` and `JdbcCatalog`.
+- Supports DDL operation for Iceberg schemas and tables.
+- Doesn't support snapshot or table management operations.
+- When writing to HDFS, the Gravitino Iceberg REST server can only operate as the specified HDFS user and
+  doesn't support proxying to other HDFS users. See [How to access Apache Hadoop](gravitino-server-config.md) for more details.
 
 
 ## Catalog info
-### Catalog Properties
 
-| Configuration item | Description                                   | value                                                                                                  |
-|-----------------------|-----------------------------------------------|--------------------------------------------------------------------------------------------------------|
-| `catalog-backend`  | Catalog backend of Gravitino Iceberg catalog. | `hive` or `jdbc`                                                                                       |
+### Catalog properties
+
+| Configuration item | Description                                   | value                                                                                                                 |
+|--------------------|-----------------------------------------------|-----------------------------------------------------------------------------------------------------------------------|
+| `catalog-backend`  | Catalog backend of Gravitino Iceberg catalog. | `hive` or `jdbc`                                                                                                      |
 | `uri`              | The uri config of the Iceberg catalog.        | `thrift://127.0.0.1:9083` or `jdbc:postgresql://127.0.0.1:5432/db_name` or `jdbc:mysql://127.0.0.1:3306/metastore_db` |
-| `warehouse`        | Warehouse directory of catalog.               | `file:///user/hive/warehouse-hive/` for localfs or `hdfs://namespace/hdfs/path` for HDFS
+| `warehouse`        | Warehouse directory of catalog.               | `file:///user/hive/warehouse-hive/` for localfs or `hdfs://namespace/hdfs/path` for HDFS                              |
 
 Any properties not defined by Gravitino with `gravitino.bypass` prefix will pass to Iceberg catalog properites and HDFS configuration. For example, if specify `gravitino.bypass.list-all-tables`, `list-all-tables` will pass to Iceberg catalog properites.
 
 #### JDBC catalog
 
-If you are using JDBC catalog, you should provide `jdbc-user`, `jdbc-password` and `jdbc-driver` to catalog properties and download corresponding JDBC driver to the `catalogs/lakehouse-iceberg/libs` directory.
+If you are using JDBC catalog, you must provide `jdbc-user`, `jdbc-password` and `jdbc-driver` to catalog properties.
 
-| Configuration item | Description                                   | Default value                                                                                                  |
-|--------------------|-----------------------------------------------|--------------------------------------------------------------------------------------------------------|
-| `jdbc-user`  | JDBC user name  | ``|
-| `jdbc-password`  | JDBC password | ``|
-| `jdbc-driver`  | `com.mysql.jdbc.Driver` or `com.mysql.cj.jdbc.Driver` for MySQL, `org.postgresql.Driver` for PostgreSQL | ``|
-| `jdbc-initialize`  | Whether to initialize meta tables when create Jdbc catalog  | `true`|
+| Configuration item | Description                                                                                             | Default value |
+|--------------------|---------------------------------------------------------------------------------------------------------|---------------|
+| `jdbc-user`        | JDBC user name                                                                                          | ` `           |
+| `jdbc-password`    | JDBC password                                                                                           | ` `           |
+| `jdbc-driver`      | `com.mysql.jdbc.Driver` or `com.mysql.cj.jdbc.Driver` for MySQL, `org.postgresql.Driver` for PostgreSQL | ` `           |
+| `jdbc-initialize`  | Whether to initialize meta tables when create Jdbc catalog                                              | `true`        |
+
+:::caution
+Your must download the corresponding JDBC driver to the `catalogs/lakehouse-iceberg/libs` directory.
+:::
 
 ## Schema info
+
 ### Capabilities
-* Not support cascade drop schema.
+
+- Not support cascade drop schema.
 
 ### Schema properties
+
 You could put any properties except `comment`.
 
 ## Table info
 
 ### Capabilities
-* Not suppport `Distribution`, you should use `BucketPartition` instead.
-* Built with Iceberg `1.3.1`. The Iceberg table format version is `1` by default.
 
-### Type Info
+- Doesn't suppport `Distribution`, you should use `BucketPartition` instead.
+- Built with Apache Iceberg `1.3.1`. The Apache Iceberg table format version is `1` by default.
 
-| Gravitino Type | Iceberg Type |
-|----------------|-----------------|
-| `Struct`       |`Struct`         |
-| `Map`          |`Map` |
-| `Array`        |`Array` |
-| `Boolean`      |`Boolean` |
-| `Integer`             |`Integer` |
-| `Long`             |`Long` |
-| `Float`             |`Float` |
-| `Double`             |`Double` |
-| `String`             |`String` |
-| `Date`             |`Date` |
-| `Time`             |`Time` |
-| `TimestampType withZone`             |`TimestampType withZone` |
-| `TimestampType withoutZone`             |`TimestampType withoutZone` |
-| `Decimal`             |`Decimal` |
-| `Fixed`             |`Fixed` |
-| `BinaryType`             |`Binary` |
-| `UUID`             |`UUID` |
+### Column type 
 
-Iceberg does not support Gravitino `Varchar` `Fixedchar` `Byte` `Short` `Union` type.
+| Gravitino Type              | Apache Iceberg Type         |
+|-----------------------------|-----------------------------|
+| `Struct`                    | `Struct`                    |
+| `Map`                       | `Map`                       |
+| `Array`                     | `Array`                     |
+| `Boolean`                   | `Boolean`                   |
+| `Integer`                   | `Integer`                   |
+| `Long`                      | `Long`                      |
+| `Float`                     | `Float`                     |
+| `Double`                    | `Double`                    |
+| `String`                    | `String`                    |
+| `Date`                      | `Date`                      |
+| `Time`                      | `Time`                      |
+| `TimestampType withZone`    | `TimestampType withZone`    |
+| `TimestampType withoutZone` | `TimestampType withoutZone` |
+| `Decimal`                   | `Decimal`                   |
+| `Fixed`                     | `Fixed`                     |
+| `BinaryType`                | `Binary`                    |
+| `UUID`                      | `UUID`                      |
+
+:::info
+Apache Iceberg doesn't support Gravitino `Varchar` `Fixedchar` `Byte` `Short` `Union` type.
+:::
 
 
 ### Table properties
+
 You call pass [Iceberg table properties](https://iceberg.apache.org/docs/1.3.1/configuration/) to Gravitino when creating Iceberg table.
 
-Gravitino server reserves the following fields, you can't pass them.
+Gravitino server reserves the following fields which can't be passed.
 
 | Configuration item        | Description                                             |
 |---------------------------|---------------------------------------------------------|
@@ -93,7 +106,8 @@ Gravitino server reserves the following fields, you can't pass them.
 | `current-snapshot-id`     | The snapshot represents the current state of the table. |
 | `cherry-pick-snapshot-id` | Selecting a specific snapshot in a merge operation.     |
 | `sort-order`              | Selecting a specific snapshot in a merge operation.     |
-| `identifier-fields`       | The identifier field(s) for defining the table.         |
+| `identifier-fields`       | The identifier fields for defining the table.           |
 
 ### HDFS configuration
-You can place `core-site.xml` and `hdfs-site.xml` in the `catalogs/lakehouse-iceberg/conf` directory, and it will be automatically loaded as the default HDFS configuration. 
+
+You can place `core-site.xml` and `hdfs-site.xml` in the `catalogs/lakehouse-iceberg/conf` directory to automatically load as the default HDFS configuration.
