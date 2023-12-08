@@ -88,7 +88,12 @@ public class ContainerSuite implements Closeable {
     TrinoContainer.Builder trinoBuilder =
         TrinoContainer.builder()
             .withEnvVars(
-                ImmutableMap.<String, String>builder().put("HADOOP_USER_NAME", "root").build())
+                ImmutableMap.<String, String>builder()
+                    .put("HADOOP_USER_NAME", "root")
+                    .put("GRAVITINO_HOST_IP", gravitinoServerAddr.getAddress().getHostAddress())
+                    .put("GRAVITINO_HOST_PORT", String.valueOf(gravitinoServerAddr.getPort()))
+                    .put("GRAVITINO_METALAKE_NAME", metalakeName)
+                    .build())
             .withNetwork(getNetwork())
             .withExtraHosts(
                 ImmutableMap.<String, String>builder()
@@ -96,7 +101,6 @@ public class ContainerSuite implements Closeable {
                     .build())
             .withFilesToMount(
                 ImmutableMap.<String, String>builder()
-                    .put(TrinoContainer.TRINO_CONTAINER_CONF_DIR, trinoConfDir)
                     .put(TrinoContainer.TRINO_CONTAINER_PLUGIN_GRAVITINO_DIR, trinoConnectorLibDir)
                     .build())
             .withExposePorts(ImmutableSet.of(TrinoContainer.TRINO_PORT))

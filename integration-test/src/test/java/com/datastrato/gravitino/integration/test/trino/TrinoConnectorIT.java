@@ -11,10 +11,12 @@ import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.catalog.hive.HiveClientPool;
 import com.datastrato.gravitino.client.GravitinoMetaLake;
 import com.datastrato.gravitino.dto.rel.ColumnDTO;
+import com.datastrato.gravitino.integration.test.catalog.jdbc.utils.JdbcDriverDownloader;
 import com.datastrato.gravitino.integration.test.container.ContainerSuite;
 import com.datastrato.gravitino.integration.test.container.HiveContainer;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
+import com.datastrato.gravitino.integration.test.util.ITUtils;
 import com.datastrato.gravitino.rel.Schema;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.types.Types;
@@ -32,7 +34,6 @@ import org.apache.thrift.TException;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Tag;
@@ -91,6 +92,22 @@ public class TrinoConnectorIT extends AbstractIT {
     containerSuite.getTrinoContainer().checkSyncCatalogFromGravitino(5, metalakeName, catalogName);
 
     createSchema();
+
+    String testMode =
+        System.getProperty(ITUtils.TEST_MODE) == null
+            ? ITUtils.EMBEDDED_TEST_MODE
+            : System.getProperty(ITUtils.TEST_MODE);
+
+    // Deploy mode, you should download jars to the Gravitino server iceberg lib directory
+    if (!ITUtils.EMBEDDED_TEST_MODE.equals(testMode)) {
+      String gravitinoHome = System.getenv("GRAVITINO_HOME");
+      String destPath = ITUtils.joinDirPath(gravitinoHome, "catalogs", "lakehouse-iceberg", "libs");
+      JdbcDriverDownloader.downloadJdbcDriver(
+          "https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.27/mysql-connector-java-8.0.27.jar",
+          destPath);
+      JdbcDriverDownloader.downloadJdbcDriver(
+          "https://jdbc.postgresql.org/download/postgresql-42.7.0.jar", destPath);
+    }
   }
 
   @AfterAll
@@ -712,7 +729,6 @@ public class TrinoConnectorIT extends AbstractIT {
 
   @Test
   @Order(15)
-  @Disabled("We need to add jdbc-connecotor-jar to trino container Iceberg connector")
   void testIcebergCatalogCreatedByGravitino() throws InterruptedException {
     String catalogName = GravitinoITUtils.genRandomName("iceberg_catalog").toLowerCase();
     GravitinoMetaLake createdMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
@@ -754,7 +770,6 @@ public class TrinoConnectorIT extends AbstractIT {
       Assertions.fail("Trino fail to load catalogs created by gravitino: " + sql);
     }
 
-    // Because we assign 'hive.target-max-file-size' a wrong value, trino can't load the catalog
     String data = containerSuite.getTrinoContainer().executeQuerySQL(sql).get(0).get(0);
     Assertions.assertEquals(metalakeName + "." + catalogName, data);
   }
@@ -796,7 +811,6 @@ public class TrinoConnectorIT extends AbstractIT {
       Assertions.fail("Trino fail to load catalogs created by gravitino: " + sql);
     }
 
-    // Because we assign 'hive.target-max-file-size' a wrong value, trino can't load the catalog
     String data = containerSuite.getTrinoContainer().executeQuerySQL(sql).get(0).get(0);
     Assertions.assertEquals(metalakeName + "." + catalogName, data);
   }
