@@ -86,12 +86,8 @@ public class JdbcConfig extends Config {
     return get(POOL_MAX_SIZE);
   }
 
-  public String getJdbcDatabase() {
-    return get(JDBC_DATABASE)
-        .orElseThrow(
-            () ->
-                new IllegalArgumentException(
-                    "The `jdbc-database` configuration item is mandatory in PostgreSQL."));
+  public String getJdbcDatabaseOrElseThrow(String errorMessage) {
+    return get(JDBC_DATABASE).orElseThrow(() -> new IllegalArgumentException(errorMessage));
   }
 
   public JdbcConfig(Map<String, String> properties) {
