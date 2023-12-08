@@ -36,7 +36,9 @@ gravitino_server_http_request_duration_seconds{operation="create-table",quantile
 gravitino_server_http_request_duration_seconds{operation="create-table",quantile="0.999",} 0.0
 ```
 
-Please note that metrics with the `gravitino-server` prefix pertain to the Gravitino server, while those with the `iceberg-rest-server` prefix are for the Gravitino Iceberg REST server.
+:::info
+Metrics with the `gravitino-server` prefix pertain to the Gravitino server, while those with the `iceberg-rest-server` prefix are for the Gravitino Iceberg REST server.
+:::
 
 #### JVM metrics
 JVM metrics source using [JVM instrumentation](https://metrics.dropwizard.io/4.2.0/manual/jvm.html) with BufferPoolMetricSet, GarbageCollectorMetricSet and MemoryUsageGaugeSet.
