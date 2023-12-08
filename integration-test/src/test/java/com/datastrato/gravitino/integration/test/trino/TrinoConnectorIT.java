@@ -24,7 +24,6 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -102,8 +101,7 @@ public class TrinoConnectorIT extends AbstractIT {
     // Deploy mode, you should download jars to the Gravitino server iceberg lib directory
     if (!ITUtils.EMBEDDED_TEST_MODE.equals(testMode)) {
       String gravitinoHome = System.getenv("GRAVITINO_HOME");
-      String destPath = Paths.get(gravitinoHome, "/catalogs/lakehouse-iceberg/libs").toString();
-
+      String destPath = ITUtils.joinDirPath(gravitinoHome, "catalogs", "lakehouse-iceberg", "libs");
       JdbcDriverDownloader.downloadJdbcDriver(
           "https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.27/mysql-connector-java-8.0.27.jar",
           destPath);

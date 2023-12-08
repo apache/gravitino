@@ -101,7 +101,6 @@ public class ContainerSuite implements Closeable {
                     .build())
             .withFilesToMount(
                 ImmutableMap.<String, String>builder()
-                    .put(TrinoContainer.TRINO_CONTAINER_CONF_DIR, trinoConfDir)
                     .put(TrinoContainer.TRINO_CONTAINER_PLUGIN_GRAVITINO_DIR, trinoConnectorLibDir)
                     .build())
             .withExposePorts(ImmutableSet.of(TrinoContainer.TRINO_PORT))

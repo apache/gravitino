@@ -17,11 +17,18 @@ cd ${gravitino_home}
 ${gravitino_home}/gradlew clean assembleTrinoConnector -x test
 cp -r "${gravitino_home}/distribution/gravitino-trino-connector" "${trino_dir}/packages/gravitino-trino-connector"
 
-# Download MySQL jdbc driver
-cd "${trino_dir}/packages/gravitino-trino-connector/" && curl -O "https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.27/mysql-connector-java-8.0.27.jar" && cd -
+MYSQL_JAVA_CONNECTOR_URL="https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.27/mysql-connector-java-8.0.27.jar"
+PG_JAVA_CONNECTOR_URL="https://jdbc.postgresql.org/download/postgresql-42.7.0.jar"
 
-# Download PostgreSQL jdbc driver
-cd "${trino_dir}/packages/gravitino-trino-connector/" && curl -O "https://jdbc.postgresql.org/download/postgresql-42.7.0.jar" && cd -
+# Download MySQL jdbc driver if it does not exist.
+if [ ! -f "${trino_dir}/packages/gravitino-trino-connector/mysql-connector-java-8.0.27.jar" ]; then
+  cd "${trino_dir}/packages/gravitino-trino-connector/" && curl -O "${MYSQL_JAVA_CONNECTOR_URL}" && cd -
+fi
+
+# Download PostgreSQL jdbc driver if it does not exist.
+if [ ! -f "${trino_dir}/packages/gravitino-trino-connector/postgresql-42.7.0.jar" ]; then
+  cd "${trino_dir}/packages/gravitino-trino-connector/" && curl -O "$PG_JAVA_CONNECTOR_URL" && cd -
+fi
 
 mkdir -p "${trino_dir}/packages/trino"
 cp -r -p "${trino_dir}/conf" "${trino_dir}/packages/trino/conf"

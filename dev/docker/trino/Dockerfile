@@ -5,6 +5,8 @@
 FROM trinodb/trino:426
 LABEL maintainer="support@datastrato.com"
 
+USER root
+
 # Only mysql, hudi, iceberg, mariadb, jmx, memory, tpch, tpcds, postgresql, hive plugin are kept
 RUN rm -rf /usr/lib/trino/plugin/accumulo  \
     && rm -rf /usr/lib/trino/plugin/blackhole \
@@ -55,5 +57,4 @@ ARG GRAVITINO_HOST_PORT
 ARG GRAVITINO_METALAKE_NAME
 ARG HIVE_HOST_IP
 
-USER root
 ENTRYPOINT ["/bin/bash", "-c", "/etc/trino/update-trino-conf.sh && /usr/lib/trino/bin/run-trino"]
