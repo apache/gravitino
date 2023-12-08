@@ -24,7 +24,6 @@ public class TestIcebergConfig {
         icebergConfig.get(JettyServerConfig.WEBSERVER_HTTP_PORT));
 
     IcebergConfig icebergRESTConfig2 = new IcebergConfig(properties);
-    icebergRESTConfig2.loadFromMap(properties, k -> true);
     Assertions.assertEquals(1000, icebergRESTConfig2.get(JettyServerConfig.WEBSERVER_HTTP_PORT));
   }
 }
