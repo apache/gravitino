@@ -250,7 +250,8 @@ tasks.rat {
     "**/.github/**/*",
     "dev/docker/**/*.xml",
     "**/*.log",
-    "licenses/*txt",
+    "**/licenses/*.txt",
+    "**/licenses/*.md",
     "integration-test/**",
     "web/.**",
     "web/dist/**/*",
@@ -258,7 +259,8 @@ tasks.rat {
     "web/src/iconify-bundle/bundle-icons-react.js",
     "web/src/iconify-bundle/icons-bundle-react.js",
     "web/yarn.lock",
-    "integration-test/**"
+    "**/LICENSE.*",
+    "**/NOTICE.*"
   )
 
   // Add .gitignore excludes to the Apache Rat exclusion list.

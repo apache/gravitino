@@ -7,6 +7,9 @@ Datastrato (https://datastrato.ai).
 This product includes software developed at
 The Apache Software Foundation (http://www.apache.org/).
 
+The Web UI also has a NOTICE file please see web/NOTICE
+for it's contents.
+
 Apache Iceberg
 Copyright 2017-2022 The Apache Software Foundation
 
