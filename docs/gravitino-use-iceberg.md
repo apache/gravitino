@@ -1,7 +1,7 @@
 ---
 title: "How to use Gravitino to manage Apache Iceberg metadata"
 date: 2023-10-18
-license: "Copyright 2023 Datastrato.
+license: "Copyright 2023 Datastrato Pvt Ltd.
 This software is licensed under the Apache License version 2."
 ---
 
