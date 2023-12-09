@@ -20,4 +20,4 @@ else
 fi
 
 cd ${script_dir}/authorization-server/
-docker buildx build --no-cache --pull --platform=linux/amd64,linux/arm64 --push --progress plain -f Dockerfile -t sample-authorization-server:0.3.0
+docker buildx build --no-cache --pull --platform=linux/amd64,linux/arm64 --push --progress plain -f Dockerfile -t sample-authorization-server:0.3.0 .
