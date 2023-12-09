@@ -89,7 +89,7 @@ Its clientId is `test`. Its secret is `test`. Its scope is `test`.
 3. Open the url http://localhost:8177/oauth2/jwks in the browser and you can get the JKS.
    ![jks_image](assets/jks.png)
 
-4. Convert the JKS to PEM. You can use the online tool https://8gwifi.org/jwkconvertfunctions.jsp#google_vignette or other tools.
+4. Convert the JKS to PEM. You can use the [online tool](https://8gwifi.org/jwkconvertfunctions.jsp#google_vignette) or other tools.
    ![pem_image](assets/pem.png)
 
 5. Copy the public key and remove the character `\n` and you can get the default signing key of Gravitino server.
@@ -163,6 +163,7 @@ You can follow the steps to set up a HTTPS server.
 
 1. Prerequisite
 You need to install the JDK8, wget and set the environment JAVA_HOME.
+If you want to use the command `curl` to request the Gravitino server, you should install openssl.
 
 2. Generate the key store
 ```shell
@@ -190,13 +191,16 @@ Configuration doesn't support to resolve environment variable, so you should rep
 Then, You can start the Gravitino server.
 ```
 gravitino.server.webserver.host localhost
-gravitino.server.webserver.httpsEnable true
+gravitino.server.webserver.enableHttps true
 gravitino.server.webserver.keyStorePath ${JAVA_HOME}/localhost.jks
 gravitino.server.webserver.keyStorePassword localhost
 gravitino.server.webserver.managerPassword localhost
 ```
 
-6. Use GravitinoClient to call the version api
+6. Request the Gravitino server
+
+If you use Java, you can follow the steps
+
 Copy the code to a file named Main.java
 ```java
 import com.datastrato.gravitino.client.GravitinoClient;
@@ -204,9 +208,10 @@ import com.datastrato.gravitino.client.GravitinoVersion;
 
 public class Main {
     public static void main(String[] args) {
-        String uri = "https://localhost:8443";
+        String uri = "https://localhost:8433";
         GravitinoClient client = GravitinoClient.builder(uri).build();
         GravitinoVersion gravitinoVersion = client.getVersion();
+        System.out.println(gravitinoVersion);
     }
 }
 ```
@@ -214,4 +219,10 @@ Run the command
 ```shell
 version = <the release version>
 wget https://repo1.maven.org/maven2/com/datastrato/gravitino/client-java-runtime/${version}/client-java-runtime-${version}.jar -O client.jar && $JAVA_HOME/bin/javac -classpath ./client.jar Main.java && $JAVA_HOME/bin/java -classpath ./client.jar:. Main
+```
+
+If you want to use the command `curl`, you can follow the commands:
+```shell
+openssl x509 -inform der -in $JAVA_HOME/localhost.crt -out certificate.pem
+curl -v -X GET --cacert ./certificate.pem -H "Accept: application/vnd.gravitino.v1+json" -H "Content-Type: application/json" https://localhost:8433/api/version
 ```
