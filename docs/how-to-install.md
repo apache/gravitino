@@ -1,7 +1,7 @@
 ---
 title: How to install Gravitino
 slug: /how-to-install
-license: Copyright 2023 Datastrato. This software is licensed under the Apache License version 2.
+license: Copyright 2023 Datastrato Pvt. This software is licensed under the Apache License version 2.
 ---
 
 # How to install Gravitino
@@ -112,6 +112,14 @@ curl -v -X GET -H "Accept: application/vnd.gravitino.v1+json" -H "Content-Type: 
 ```
 
 to make sure Gravitino is running.
+
+:::info
+
+If you need to debug the Gravitino server, enable the `GRAVITINO_DEBUG_OPTS` environment
+variable in the `conf/gravitino-env.sh` file. Then you can create a `Remote JVM Debug`
+configuration in `IntelliJ IDEA` and debug `gravitino.server.main`.
+
+:::
 
 ## Install Gravitino using Docker
 

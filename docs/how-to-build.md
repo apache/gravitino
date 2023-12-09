@@ -1,10 +1,10 @@
 ---
-title: "How to Build Gravitino"
-date: 2023-10-03T09:03:20-08:00
-license: "Copyright 2023 Datastrato Pvt Ltd.
-This software is licensed under the Apache License version 2."
+title: How to build Gravitino
+slug: /how-to-build
+license: Copyright 2023 Datastrato Pvt. This software is licensed under the Apache License version 2.
 ---
-## How to build Gravitino
+
+# How to build Gravitino
 
 ## Prerequisites
 
@@ -13,7 +13,7 @@ This software is licensed under the Apache License version 2."
 + A Java Development Kit version 8 to 17 installed in your environment to launch Gradle
 + Optionally Docker to run integration tests
 
-Note:
+:::info Please read the following notes first
 
 + Gravitino requires at least JDK8 and at most JDK17 to run Gradle, so you need to
   install JDK8 to 17 version to launch the build environment.
@@ -33,6 +33,8 @@ Note:
   [OrbStack](https://orbstack.dev/), with OrbStack you can run Gravitino integration tests
   without needing to install "docker-connector".
 
+:::
+
 ## Quick start
 
 1. Clone the Gravitino project.
@@ -48,9 +50,13 @@ Note:
     ./gradlew build
     ```
 
-   > Note: The first time you build the project, downloading the dependencies may take a while. You can add `-x test` to skip the test, like `./gradlew build -x test`.
+:::note
 
-3. Deploy the Gravitino project in your local environment.
+The first time you build the project, downloading the dependencies may take a while. You can add `-x test` to skip the test, like `./gradlew build -x test`.
+
+:::
+
+3. Get the Gravitino binary package.
 
     ```shell
     ./gradlew compileDistribution
@@ -60,33 +66,13 @@ Note:
 
    The directory structure of the `distribution` directory is as follows:
 
-   > Note: The `./gradlew clean` command deletes the `distribution` directory.
+:::note 
 
-4. Run Gravitino Server.
+The `./gradlew clean` command deletes the `distribution` directory.
 
-    ```shell
-    distribution/package/bin/gravitino.sh start
-    ```
+:::
 
-   You can access the Gravitino Web UI by typing http://localhost:8090 in your browser
-
-   > Note:
-   >
-   > If you need to debug the Gravitino server, enable the `GRAVITINO_DEBUG_OPTS` environment
-   > variable in the `conf/gravitino-env.sh` file. Then you can create a `Remote JVM Debug`
-   > configuration in `IntelliJ IDEA` and debug `gravitino.server.main`.
-   >
-   > Currently, Gravitino server can only run with JDK8 due to some dependencies. Please
-   > make sure you have JDK8 installed and `JAVA_HOME` configured correctly. To check the Java
-   > version, you can simply run `${JAVA_HOME}/bin/java -version` command.
-
-5. Stop Gravitino Server.
-
-    ```shell
-    distribution/package/bin/gravitino.sh stop
-    ```
-
-6. Assemble the Gravitino distribution package.
+4. Assemble the Gravitino distribution package.
 
     ```shell
     ./gradlew assembleDistribution
@@ -96,9 +82,13 @@ Note:
 
    You can deploy them to your production environment.
 
-   > Note: The `gravitino-{version}-bin.tar.gz` file is the Gravitino Server distribution package, and the `gravitino-{version}-bin.tar.gz.sha256` file is the sha256 checksum file for the Gravitino Server distribution package.
+:::note
 
-7. Assemble Gravitino Trino connector package
+The `gravitino-{version}-bin.tar.gz` file is the Gravitino Server distribution package, and the `gravitino-{version}-bin.tar.gz.sha256` file is the sha256 checksum file for the Gravitino Server distribution package.
+
+:::
+
+5. Assemble Gravitino Trino connector package
 
    ```shell
     ./gradlew assembleTrinoConnector
