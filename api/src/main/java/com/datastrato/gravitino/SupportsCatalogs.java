@@ -9,6 +9,10 @@ import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
 import java.util.Map;
 
+/**
+ * Interface for supporting catalogs. It includes methods for listing, loading, creating, altering
+ * and dropping catalogs.
+ */
 public interface SupportsCatalogs {
 
   /**

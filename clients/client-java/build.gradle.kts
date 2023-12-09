@@ -37,3 +37,7 @@ dependencies {
   testImplementation(libs.mockserver.client.java)
   testImplementation(libs.bundles.jwt)
 }
+
+tasks.build {
+  dependsOn("javadoc")
+}

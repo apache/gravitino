@@ -4,6 +4,7 @@
  */
 package com.datastrato.gravitino.exceptions;
 
+/** An exception thrown when a namespace is invalid. */
 public class IllegalNamespaceException extends IllegalArgumentException {
 
   public IllegalNamespaceException(String message) {

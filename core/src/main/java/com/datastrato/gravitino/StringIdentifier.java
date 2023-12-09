@@ -80,7 +80,13 @@ public class StringIdentifier {
     return String.format(CURRENT_FORMAT, CURRENT_FORMAT_VERSION, id);
   }
 
-  /** ******Helper methods to set/get StringIdentifier to/from different places******* */
+  /**
+   * Helper methods to set/get StringIdentifier to/from different places
+   *
+   * @param stringId the string identifier to add to the properties
+   * @param properties the properties to add the string identifier to
+   * @return the properties with the string identifier added
+   */
   public static Map<String, String> addToProperties(
       StringIdentifier stringId, Map<String, String> properties) {
     if (properties == null) {

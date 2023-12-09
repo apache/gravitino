@@ -56,6 +56,9 @@ public class SortOrders {
     return new SortImpl(expression, direction, nullOrdering);
   }
 
+  /**
+   * Create a sort order by the given expression with the given sort direction and null ordering.
+   */
   public static final class SortImpl implements SortOrder {
     private final Expression expression;
     private final SortDirection direction;

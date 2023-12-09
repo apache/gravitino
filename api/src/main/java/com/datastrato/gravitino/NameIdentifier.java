@@ -9,6 +9,12 @@ import com.google.common.base.Splitter;
 import com.google.common.collect.Iterables;
 import java.util.Arrays;
 
+/**
+ * A name identifier is a sequence of names separated by dots. It's used to identify a metalake, a
+ * catalog, a schema or a table. For example, "metalake1" can represent a metalake,
+ * "metalake1.catalog1" can represent a catalog, "metalake1.catalog1.schema1" can represent a
+ * schema.
+ */
 public class NameIdentifier {
 
   private static final Splitter DOT = Splitter.on('.');
@@ -158,17 +164,29 @@ public class NameIdentifier {
     this.name = name;
   }
 
-  /** Check if the {@link NameIdentifier} has a namespace. */
+  /**
+   * Check if the {@link NameIdentifier} has a namespace.
+   *
+   * @return True if the {@link NameIdentifier} has a namespace, false otherwise.
+   */
   public boolean hasNamespace() {
     return !namespace.isEmpty();
   }
 
-  /** Get the namespace of the {@link NameIdentifier}. */
+  /**
+   * Get the namespace of the {@link NameIdentifier}.
+   *
+   * @return The namespace of the {@link NameIdentifier}.
+   */
   public Namespace namespace() {
     return namespace;
   }
 
-  /** Get the name of the {@link NameIdentifier}. */
+  /**
+   * Get the name of the {@link NameIdentifier}.
+   *
+   * @return The name of the {@link NameIdentifier}.
+   */
   public String name() {
     return name;
   }

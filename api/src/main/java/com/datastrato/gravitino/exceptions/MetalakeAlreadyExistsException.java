@@ -4,6 +4,7 @@
  */
 package com.datastrato.gravitino.exceptions;
 
+/** An exception thrown when the metalake already exists. */
 public class MetalakeAlreadyExistsException extends AlreadyExistsException {
 
   public MetalakeAlreadyExistsException(String message) {

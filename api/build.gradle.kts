@@ -21,3 +21,7 @@ dependencies {
   testImplementation(libs.junit.jupiter.params)
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
+
+tasks.build {
+  dependsOn("javadoc")
+}

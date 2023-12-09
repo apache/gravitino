@@ -254,6 +254,7 @@ public class KvEntityStore implements EntityStore {
    *
    * @param nameIdentifier name of a specific entity
    * @return key that maps to the id of a specific entity. See above, The key maybe like '4/5/c1'
+   * @throws IOException if error occurs
    */
   public String generateKeyForMapping(NameIdentifier nameIdentifier) throws IOException {
     if (nameIdentifier.namespace().isEmpty()) {

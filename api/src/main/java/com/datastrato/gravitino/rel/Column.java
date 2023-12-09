@@ -18,16 +18,16 @@ import java.util.Map;
  */
 public interface Column {
 
-  /** Returns the name of this column. */
+  /** @return The name of this column. */
   String name();
 
-  /** Returns the data type of this column. */
+  /** @return The data type of this column. */
   Type dataType();
 
-  /** Returns the comment of this column, null if not specified. */
+  /** @return The comment of this column, null if not specified. */
   String comment();
 
-  /** Returns true if this column may produce null values. Default is true. */
+  /** @return True if this column may produce null values. Default is true. */
   boolean nullable();
 
   // TODO. Support column default value. @Jerry

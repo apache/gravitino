@@ -4,6 +4,7 @@
  */
 package com.datastrato.gravitino.exceptions;
 
+/** An exception thrown when a resource already exists. */
 public class CatalogAlreadyExistsException extends AlreadyExistsException {
 
   public CatalogAlreadyExistsException(String message) {

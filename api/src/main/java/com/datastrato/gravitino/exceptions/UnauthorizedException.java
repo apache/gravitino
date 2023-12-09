@@ -5,6 +5,7 @@
 
 package com.datastrato.gravitino.exceptions;
 
+/** Exception thrown when a user is not authorized to perform an action. */
 public class UnauthorizedException extends GravitinoRuntimeException {
 
   public UnauthorizedException(String message) {

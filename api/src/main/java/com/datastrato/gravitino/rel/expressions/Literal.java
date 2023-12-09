@@ -30,10 +30,10 @@ import java.util.Objects;
  * @param <T> the JVM type of value held by the literal
  */
 public interface Literal<T> extends Expression {
-  /** Returns the literal value. */
+  /** @return The literal value. */
   T value();
 
-  /** Returns the data type of the literal. */
+  /** @return The data type of the literal. */
   Type dataType();
 
   @Override
@@ -73,6 +73,11 @@ public interface Literal<T> extends Expression {
     return of(value, Types.StringType.get());
   }
 
+  /**
+   * Creates a literal with the given type value.
+   *
+   * @param <T> The JVM type of value held by the literal.
+   */
   final class LiteralImpl<T> implements Literal<T> {
     private final T value;
     private final Type dataType;

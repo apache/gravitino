@@ -27,6 +27,8 @@ public interface EntityKeyEncoder<T> {
    * Construct the key for key-value store from the entity NameIdentifier and EntityType.
    *
    * @param nullIfMissing return null if the specific entity no found
+   * @param type type of the ident that represents
+   * @param ident entity identifier to encode
    * @return encoded key for key-value stored
    * @throws IOException Exception if error occurs
    */

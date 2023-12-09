@@ -4,8 +4,12 @@
  */
 package com.datastrato.gravitino;
 
+/**
+ * An auditable entity is an entity that has audit information associated with it. This audit
+ * information is used to track changes to the entity.
+ */
 public interface Auditable {
 
-  /** Returns the audit information of the entity. */
+  /** @return The audit information of the entity. */
   Audit auditInfo();
 }

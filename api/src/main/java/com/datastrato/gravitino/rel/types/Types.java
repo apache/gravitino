@@ -12,10 +12,11 @@ import java.util.StringJoiner;
 /** The helper class for {@link Type}. */
 public class Types {
 
+  /** The boolean type in Gravitino. */
   public static class BooleanType extends Type.PrimitiveType {
     private static final BooleanType INSTANCE = new BooleanType();
 
-    /** Returns the singleton instance of {@link BooleanType}. */
+    /** @return The singleton instance of {@link BooleanType}. */
     public static BooleanType get() {
       return INSTANCE;
     }
@@ -33,10 +34,11 @@ public class Types {
     }
   }
 
+  /** The byte type in Gravitino. */
   public static class ByteType extends Type.IntegralType {
     private static final ByteType INSTANCE = new ByteType();
 
-    /** Returns the singleton instance of {@link ByteType}. */
+    /** @return The singleton instance of {@link ByteType}. */
     public static ByteType get() {
       return INSTANCE;
     }
@@ -54,10 +56,11 @@ public class Types {
     }
   }
 
+  /** The short type in Gravitino. */
   public static class ShortType extends Type.IntegralType {
     private static final ShortType INSTANCE = new ShortType();
 
-    /** Returns the singleton instance of {@link ShortType}. */
+    /** @return The singleton instance of {@link ShortType}. */
     public static ShortType get() {
       return INSTANCE;
     }
@@ -75,10 +78,11 @@ public class Types {
     }
   }
 
+  /** The integer type in Gravitino. */
   public static class IntegerType extends Type.IntegralType {
     private static final IntegerType INSTANCE = new IntegerType();
 
-    /** Returns the singleton instance of {@link IntegerType}. */
+    /** @return The singleton instance of {@link IntegerType}. */
     public static IntegerType get() {
       return INSTANCE;
     }
@@ -96,10 +100,11 @@ public class Types {
     }
   }
 
+  /** The long type in Gravitino. */
   public static class LongType extends Type.IntegralType {
     private static final LongType INSTANCE = new LongType();
 
-    /** Returns the singleton instance of {@link LongType}. */
+    /** @return The singleton instance of {@link LongType}. */
     public static LongType get() {
       return INSTANCE;
     }
@@ -117,10 +122,11 @@ public class Types {
     }
   }
 
+  /** The float type in Gravitino. */
   public static class FloatType extends Type.FractionType {
     private static final FloatType INSTANCE = new FloatType();
 
-    /** Returns the singleton instance of {@link FloatType}. */
+    /** @return The singleton instance of {@link FloatType}. */
     public static FloatType get() {
       return INSTANCE;
     }
@@ -138,10 +144,11 @@ public class Types {
     }
   }
 
+  /** The double type in Gravitino. */
   public static class DoubleType extends Type.FractionType {
     private static final DoubleType INSTANCE = new DoubleType();
 
-    /** Returns the singleton instance of {@link DoubleType}. */
+    /** @return The singleton instance of {@link DoubleType}. */
     public static DoubleType get() {
       return INSTANCE;
     }
@@ -159,8 +166,13 @@ public class Types {
     }
   }
 
+  /** The decimal type in Gravitino. */
   public static class DecimalType extends Type.FractionType {
-    /** Returns a {@link DecimalType} with the given precision and scale. */
+    /**
+     * @param precision The precision of the decimal type.
+     * @param scale The scale of the decimal type.
+     * @return A {@link DecimalType} with the given precision and scale.
+     */
     public static DecimalType of(int precision, int scale) {
       return new DecimalType(precision, scale);
     }
@@ -215,10 +227,11 @@ public class Types {
     }
   }
 
+  /** The date time type in Gravitino. */
   public static class DateType extends Type.DateTimeType {
     private static final DateType INSTANCE = new DateType();
 
-    /** Returns the singleton instance of {@link DateType}. */
+    /** @return The singleton instance of {@link DateType}. */
     public static DateType get() {
       return INSTANCE;
     }
@@ -236,10 +249,11 @@ public class Types {
     }
   }
 
+  /** The time type in Gravitino. */
   public static class TimeType extends Type.DateTimeType {
     private static final TimeType INSTANCE = new TimeType();
 
-    /** Returns the singleton instance of {@link TimeType}. */
+    /** @return The singleton instance of {@link TimeType}. */
     public static TimeType get() {
       return INSTANCE;
     }
@@ -257,16 +271,17 @@ public class Types {
     }
   }
 
+  /** The timestamp type in Gravitino. */
   public static class TimestampType extends Type.DateTimeType {
     private static final TimestampType INSTANCE_WITHOUT_TIME_ZONE = new TimestampType(false);
     private static final TimestampType INSTANCE_WITH_TIME_ZONE = new TimestampType(true);
 
-    /** Returns a {@link TimestampType} with time zone. */
+    /** @return A {@link TimestampType} with time zone. */
     public static TimestampType withTimeZone() {
       return INSTANCE_WITH_TIME_ZONE;
     }
 
-    /** Returns a {@link TimestampType} without time zone. */
+    /** @return A {@link TimestampType} without time zone. */
     public static TimestampType withoutTimeZone() {
       return INSTANCE_WITHOUT_TIME_ZONE;
     }
@@ -292,10 +307,11 @@ public class Types {
     }
   }
 
+  /** The interval year type in Gravitino. */
   public static class IntervalYearType extends Type.IntervalType {
     private static final IntervalYearType INSTANCE = new IntervalYearType();
 
-    /** Returns the singleton instance of {@link IntervalYearType}. */
+    /** @return The singleton instance of {@link IntervalYearType}. */
     public static IntervalYearType get() {
       return INSTANCE;
     }
@@ -313,10 +329,11 @@ public class Types {
     }
   }
 
+  /** The interval day type in Gravitino. */
   public static class IntervalDayType extends Type.IntervalType {
     private static final IntervalDayType INSTANCE = new IntervalDayType();
 
-    /** Returns the singleton instance of {@link IntervalDayType}. */
+    /** @return The singleton instance of {@link IntervalDayType}. */
     public static IntervalDayType get() {
       return INSTANCE;
     }
@@ -334,10 +351,11 @@ public class Types {
     }
   }
 
+  /** The string type in Gravitino. */
   public static class StringType extends Type.PrimitiveType {
     private static final StringType INSTANCE = new StringType();
 
-    /** Returns the singleton instance of {@link StringType}. */
+    /** @return The singleton instance of {@link StringType}. */
     public static StringType get() {
       return INSTANCE;
     }
@@ -355,10 +373,11 @@ public class Types {
     }
   }
 
+  /** The uuid type in Gravitino. */
   public static class UUIDType extends Type.PrimitiveType {
     private static final UUIDType INSTANCE = new UUIDType();
 
-    /** Returns the singleton instance of {@link UUIDType}. */
+    /** @return The singleton instance of {@link UUIDType}. */
     public static UUIDType get() {
       return INSTANCE;
     }
@@ -376,9 +395,13 @@ public class Types {
     }
   }
 
+  /** The fixed string type in Gravitino. */
   public static class FixedType extends Type.PrimitiveType {
 
-    /** Returns a {@link FixedType} with the given length. */
+    /**
+     * @param length The length of the fixed type.
+     * @return An {@link FixedType} with the given length.
+     */
     public static FixedType of(int length) {
       return new FixedType(length);
     }
@@ -421,9 +444,13 @@ public class Types {
     }
   }
 
+  /** The varchar type in Gravitino. */
   public static class VarCharType extends Type.PrimitiveType {
 
-    /** Returns a {@link VarCharType} with the given length. */
+    /**
+     * @param length The length of the var char type.
+     * @return An {@link VarCharType} with the given length.
+     */
     public static VarCharType of(int length) {
       return new VarCharType(length);
     }
@@ -466,9 +493,13 @@ public class Types {
     }
   }
 
+  /** The fixed char type in Gravitino. */
   public static class FixedCharType extends Type.PrimitiveType {
 
-    /** Returns a {@link FixedCharType} with the given length. */
+    /**
+     * @param length The length of the fixed char type.
+     * @return An {@link FixedCharType} with the given length.
+     */
     public static FixedCharType of(int length) {
       return new FixedCharType(length);
     }
@@ -511,10 +542,14 @@ public class Types {
     }
   }
 
+  /**
+   * The binary type in Gravitino. Note, this type is not supported in the current version of
+   * Gravitino.
+   */
   public static class BinaryType extends Type.PrimitiveType {
     private static final BinaryType INSTANCE = new BinaryType();
 
-    /** Returns the singleton instance of {@link BinaryType}. */
+    /** @return The singleton instance of {@link BinaryType}. */
     public static BinaryType get() {
       return INSTANCE;
     }
@@ -532,9 +567,16 @@ public class Types {
     }
   }
 
+  /**
+   * The struct type in Gravitino. Note, this type is not supported in the current version of
+   * Gravitino.
+   */
   public static class StructType extends Type.ComplexType {
 
-    /** Returns a {@link StructType} with the given fields. */
+    /**
+     * @param fields The fields of the struct type.
+     * @return An {@link StructType} with the given fields.
+     */
     public static StructType of(Field... fields) {
       Preconditions.checkArgument(
           fields != null && fields.length > 0, "fields cannot be null or empty");
@@ -580,29 +622,54 @@ public class Types {
       return Arrays.hashCode(fields);
     }
 
+    /** A field of a struct type. */
     public static class Field {
 
-      /** Returns a NOT NULL {@link Field} with the given name, type and empty comment. */
+      /**
+       * @param name The name of the field.
+       * @param type The type of the field.
+       * @return A NOT NULL {@link Field} with the given name, type and empty comment.
+       */
       public static Field notNullField(String name, Type type) {
         return notNullField(name, type, null);
       }
 
-      /** Returns a NOT NULL {@link Field} with the given name, type and comment. */
+      /**
+       * @param name The name of the field.
+       * @param type The type of the field.
+       * @param comment The comment of the field.
+       * @return A NOT NULL {@link Field} with the given name, type and comment.
+       */
       public static Field notNullField(String name, Type type, String comment) {
         return of(name, type, false, comment);
       }
 
-      /** Returns a nullable {@link Field} with the given name, type and empty comment. */
+      /**
+       * @param name The name of the field.
+       * @param type The type of the field.
+       * @return A nullable {@link Field} with the given name, type and empty comment.
+       */
       public static Field nullableField(String name, Type type) {
         return nullableField(name, type, null);
       }
 
-      /** Returns a nullable {@link Field} with the given name, type and comment. */
+      /**
+       * @param name The name of the field.
+       * @param type The type of the field.
+       * @param comment The comment of the field.
+       * @return A nullable {@link Field} with the given name, type and comment.
+       */
       public static Field nullableField(String name, Type type, String comment) {
         return of(name, type, true, comment);
       }
 
-      /** Returns a nullable {@link Field} with the given name, type and comment. */
+      /**
+       * @param name The name of the field.
+       * @param type The type of the field.
+       * @param nullable Whether the field is nullable.
+       * @param comment The comment of the field.
+       * @return A nullable {@link Field} with the given name, type and comment.
+       */
       public static Field of(String name, Type type, boolean nullable, String comment) {
         return new Field(name, type, nullable, comment);
       }
@@ -621,22 +688,22 @@ public class Types {
         this.comment = comment;
       }
 
-      /** Returns the name of the field. */
+      /** @return The name of the field. */
       public String name() {
         return name;
       }
 
-      /** Returns the type of the field. */
+      /** @return The type of the field. */
       public Type type() {
         return type;
       }
 
-      /** Returns whether the field is nullable. */
+      /** @return Whether the field is nullable. */
       public boolean nullable() {
         return nullable;
       }
 
-      /** Returns the comment of the field. May be null if not set. */
+      /** @return The comment of the field. May be null if not set. */
       public String comment() {
         return comment;
       }
@@ -671,6 +738,7 @@ public class Types {
     }
   }
 
+  /** A list type. Note, this type is not supported in the current version of Gravitino. */
   public static class ListType extends Type.ComplexType {
 
     public static ListType nullable(Type elementType) {
@@ -733,6 +801,10 @@ public class Types {
     }
   }
 
+  /**
+   * The map type in Gravitino. Note, this type is not supported in the current version of
+   * Gravitino.
+   */
   public static class MapType extends Type.ComplexType {
 
     public static MapType valueNullable(Type keyType, Type valueType) {
@@ -799,6 +871,10 @@ public class Types {
     }
   }
 
+  /**
+   * The union type in Gravitino. Note, this type is not supported in the current version of
+   * Gravitino.
+   */
   public static class UnionType extends Type.ComplexType {
 
     public static UnionType of(Type... types) {

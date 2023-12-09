@@ -80,7 +80,7 @@ public abstract class BaseTable implements Table {
   /**
    * Returns the distribution strategy of the table.
    *
-   * @return
+   * @return The distribution strategy of the table.
    */
   @Override
   public Distribution distribution() {

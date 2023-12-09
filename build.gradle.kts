@@ -140,6 +140,11 @@ subprojects {
     }
   }
 
+  tasks.withType<Javadoc> {
+    options.encoding = "UTF-8"
+    options.locale = "en_US"
+  }
+
   val sourcesJar by tasks.registering(Jar::class) {
     from(sourceSets.named("main").get().allSource)
     archiveClassifier.set("sources")

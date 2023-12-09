@@ -16,6 +16,8 @@ public interface GravitinoAuxiliaryService {
   /**
    * The name of GravitinoAuxiliaryService implementation, GravitinoServer will automatically start
    * the aux service implementation if the name is added to `gravitino.auxService.AuxServiceNames`
+   *
+   * @return the name of GravitinoAuxiliaryService implementation
    */
   String shortName();
 
@@ -28,6 +30,10 @@ public interface GravitinoAuxiliaryService {
   /** Start aux service */
   void serviceStart();
 
-  /** Stop aux service */
+  /**
+   * Stop aux service
+   *
+   * @throws Exception if the stop operation fails
+   */
   void serviceStop() throws Exception;
 }

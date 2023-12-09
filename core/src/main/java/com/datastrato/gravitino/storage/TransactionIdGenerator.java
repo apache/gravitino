@@ -13,6 +13,8 @@ public interface TransactionIdGenerator extends Closeable {
   /**
    * Next transaction id. The transaction id is a monotonically increasing number, which is used as
    * MVCC version.
+   *
+   * @return next transaction id
    */
   long nextId();
 

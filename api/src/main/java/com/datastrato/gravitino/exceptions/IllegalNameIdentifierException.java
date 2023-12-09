@@ -4,6 +4,7 @@
  */
 package com.datastrato.gravitino.exceptions;
 
+/** An exception thrown when a name identifier is invalid. */
 public class IllegalNameIdentifierException extends IllegalArgumentException {
 
   public IllegalNameIdentifierException(String message) {

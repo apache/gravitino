@@ -52,6 +52,8 @@ public interface NamedReference extends Expression {
    * Returns the referenced field name as an array of String parts.
    *
    * <p>Each string in the returned array represents a field name.
+   *
+   * @return the referenced field name as an array of String parts.
    */
   String[] fieldName();
 
@@ -65,6 +67,7 @@ public interface NamedReference extends Expression {
     return new NamedReference[] {this};
   }
 
+  /** A {@link NamedReference} that references a field or column. */
   final class FieldReference implements NamedReference {
     private final String[] fieldName;
 
