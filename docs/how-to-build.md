@@ -60,22 +60,6 @@ Note:
 
    The directory structure of the `distribution` directory is as follows:
 
-    ```text
-    ├── ...
-    └── distribution/package
-        ├── bin/gravitino.sh            # Gravitino Server Launching scripts.
-        ├── catalogs
-        │   └── hive/                   # Hive catalog dependencies and configurations.
-        │   └── lakehouse-iceberg/      # Apache Iceberg catalog dependencies and configurations.
-        ├── conf/                       # All configuration for Gravitino.
-        |   ├── gravitino.conf          # Gravitino Server configuration.
-        |   ├── gravitino-env.sh        # Environment variables, etc., JAVA_HOME, GRAVITINO_HOME, and more.
-        |   └── log4j2.properties       # log4j configuration for Gravitino Server.
-        ├── libs/                       # Gravitino Server dependencies libraries.
-        └── logs/                       # Gravitino Server logs. Automatically created after the Gravitino server starts.
-        └── data/                       # Default directory for Gravitino Server to store data.
-    ```
-
    > Note: The `./gradlew clean` command deletes the `distribution` directory.
 
 4. Run Gravitino Server.
