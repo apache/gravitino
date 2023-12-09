@@ -80,6 +80,7 @@ You can follow the steps to set up an OAuth mode Gravitino server.
 You need to install the JDK8 and Docker.
 
 2. Set up an external OAuth 2.0 server
+We build a sample-authorization-server based on [spring-authorization-server](https://github.com/spring-projects/spring-authorization-server/tree/1.0.3).
 We have registered a client information in the external OAuth 2.0 server.
 Its clientId is `test`. Its secret is `test`. Its scope is `test`.
 ```shell
