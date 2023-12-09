@@ -2,8 +2,7 @@
 title: "Security"
 slug: /security
 keyword: security
-license: "Copyright 2023 Datastrato Pvt Ltd.
-This software is licensed under the Apache License version 2."
+license: "Copyright 2023 Datastrato Pvt Ltd. This software is licensed under the Apache License version 2."
 ---
 
 ## Authentication
@@ -81,6 +80,8 @@ You can follow the steps to set up an OAuth mode Gravitino server.
 You need to install the JDK8 and Docker.
 
 2. Set up an external OAuth 2.0 server
+We have registered a client information in the external OAuth 2.0 server.
+Its clientId is `test`. Its secret is `test`. Its scope is `test`.
 ```shell
  docker run -p 8177:8177 --name sample-auth-server -d datastrato/sample-authorization-server:0.3.0
 ```
@@ -93,16 +94,26 @@ You need to install the JDK8 and Docker.
 
 5. Copy the public key and remove the character `\n` and you can get the default signing key of Gravitino server.
 
-6. You can refer to the [document](getting-started) and append the configurations to the conf/gravitino.conf.
+6. You can refer to the [Configurations](gravitino-server-config) and append the configurations to the conf/gravitino.conf.
 ```
 gravitino.authenticator oauth
 gravitino.authenticator.oauth.serviceAudience test
 gravitino.authenticator.oauth.defaultSignKey <the default signing key>
 gravitino.authenticator.oauth.tokenPath /oauth2/token
-gravitino.authenticator.oauth.serverUri http://localhost:8078
+gravitino.authenticator.oauth.serverUri http://localhost:8177
 ```
-7.Open the url http://localhost:8090 and login in with clientId `test`, clientSecret `test` and scope `test`.
+7. Open the [url](http://localhost:8090) and login in with clientId `test`, clientSecret `test` and scope `test`.
    ![oauth_login_image](assets/oauth.png)
+
+8. You can also use curl command to access Gravitino.
+Get access token
+```shell
+curl --location --request POST 'http://127.0.0.1:8177/oauth2/token?grant_type=client_credentials&client_id=test&client_secret=test&scope=test'
+```
+Use the access token to request the Gravitino
+```shell
+curl -v -X GET -H "Accept: application/vnd.gravitino.v1+json" -H "Content-Type: application/json" -H "Authorization: Bearer <access_token>" http://localhost:8090/api/version
+```
 
 
 ## HTTPS
@@ -174,7 +185,7 @@ bin/keytool -export -alias localhost -keystore localhost.jks -file  localhost.cr
 bin/keytool -import -alias localhost -keystore jre/lib/security/cacerts -file localhost.crt -storepass changeit -noprompt
 ```
 
-5. You can refer to the [document](getting-started) and append the configurations to the conf/gravitino.conf.
+5. You can refer to the [Configurations](gravitino-server-config) and append the configurations to the conf/gravitino.conf.
 Configuration doesn't support to resolve environment variable, so you should replace ${JAVA_HOME} with the actual value.
 Then, You can start the Gravitino server.
 ```
