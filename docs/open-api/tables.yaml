@@ -1,0 +1,848 @@
+#
+# Copyright 2023 Datastrato.
+# This software is licensed under the Apache License version 2.
+#
+
+---
+
+paths:
+
+  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/tables:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - $ref: "./openapi.yaml#/components/parameters/catalog"
+      - $ref: "./openapi.yaml#/components/parameters/schema"
+
+    get:
+      tags:
+        - table
+      summary: List all tables in a schema
+      operationId: listTables
+      responses:
+        "200":
+          $ref: "./openapi.yaml#/components/responses/EntityListResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+    post:
+      tags:
+        - table
+      summary: Create a new table in a schema
+      operationId: createTable
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TableCreateRequest"
+            examples:
+              HiveTableCreate:
+                $ref: "#/components/examples/HiveTableCreate"
+      responses:
+        "200":
+          $ref: "#/components/responses/TableResponse"
+        "409":
+          description: Conflict - The target table already exists
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                TableAlreadyExistsErrorResponse:
+                  $ref: "#/components/examples/TableAlreadyExistsException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+
+  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/tables/{table}:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - $ref: "./openapi.yaml#/components/parameters/catalog"
+      - $ref: "./openapi.yaml#/components/parameters/schema"
+      - $ref: "./openapi.yaml#/components/parameters/table"
+
+    get:
+      tags:
+        - table
+      summary: Get the specified table in a schema
+      operationId: loadTable
+      description: Returns the specified table object
+      responses:
+        "200":
+          $ref: "#/components/responses/TableResponse"
+        "404":
+          description: Not Found - The target table does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetalakeException:
+                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
+                NoSuchCatalogException:
+                  $ref: "./catalogs.yaml#/components/examples/NoSuchCatalogException"
+                NoSuchSchemaException:
+                  $ref: "./schemas.yaml#/components/examples/NoSuchSchemaException"
+                NoSuchTableException:
+                  $ref: "#/components/examples/NoSuchTableException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+    put:
+      tags:
+        - table
+      summary: Update the specified table in a schema
+      operationId: alterTable
+      description: Updates the specified table in a schema
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TableUpdatesRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/TableResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "404":
+          description: Not Found - The target table does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetalakeException:
+                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
+                NoSuchCatalogException:
+                  $ref: "./catalogs.yaml#/components/examples/NoSuchCatalogException"
+                NoSuchSchemaException:
+                  $ref: "./schemas.yaml#/components/examples/NoSuchSchemaException"
+                NoSuchTableException:
+                  $ref: "#/components/examples/NoSuchTableException"
+        "409":
+          description: Conflict - The target table already exists
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                TableAlreadyExistsErrorResponse:
+                  $ref: "#/components/examples/TableAlreadyExistsException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+    delete:
+      tags:
+        - table
+      summary: Delete the specified table in a schema
+      operationId: dropTable
+      responses:
+        "200":
+          $ref: "./openapi.yaml#/components/responses/DropResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+
+components:
+
+  schemas:
+    TableCreateRequest:
+      type: object
+      required:
+        - name
+        - columns
+      properties:
+        name:
+          type: string
+          description: The name of the table
+        columns:
+          type: array
+          description: A list of columns
+          items:
+            $ref: "#/components/schemas/Column"
+        comment:
+          type: string
+          description: The comment of the table
+          nullable: true
+        properties:
+          type: object
+          description: A map of table properties
+          nullable: true
+          default: { }
+          additionalProperties:
+            type: string
+        sortOrders:
+          type: array
+          description: Describes the sort order of the table data
+          nullable: true
+          default: [ ]
+          items:
+            $ref: "#/components/schemas/SortOrder"
+        distribution:
+          $ref: "#/components/schemas/Distribution"
+        partitioning:
+          type: array
+          description: partitioning of the table data
+          nullable: true
+          default: [ ]
+          items:
+            $ref: "./partitioning.yaml#/components/schemas/PartitioningSpec"
+
+    Table:
+      type: object
+      description: A table object
+      required:
+        - name
+        - columns
+        - audit
+      properties:
+        name:
+          type: string
+          description: The name of the table
+        columns:
+          type: array
+          description: A list of columns
+          items:
+            $ref: "#/components/schemas/Column"
+        comment:
+          type: string
+          description: The comment of the table
+          nullable: true
+        audit:
+          $ref: "./openapi.yaml#/components/schemas/Audit"
+        properties:
+          type: object
+          description: A map of table properties
+          nullable: true
+          default: { }
+          additionalProperties:
+            type: string
+        distribution:
+          $ref: "#/components/schemas/Distribution"
+        sortOrders:
+          type: array
+          description: Describes the sort order of the table data
+          nullable: true
+          default: [ ]
+          items:
+            $ref: "#/components/schemas/SortOrder"
+        partitioning:
+          type: array
+          description: partitioning of the table data
+          nullable: true
+          default: [ ]
+          items:
+            $ref: "./partitioning.yaml#/components/schemas/PartitioningSpec"
+
+    Distribution:
+      type: object
+      description: Describes how data is distributed across partitions
+      nullable: true
+      required:
+        - number
+        - funcArgs
+      properties:
+        strategy:
+          type: string
+          description: The distribution strategy
+          nullable: true
+          default: "hash"
+          enum:
+            - "hash"
+            - "range"
+            - "even"
+        number:
+          type: integer
+          description: The number of buckets/distribution
+          format: int32
+        funcArgs:
+          type: array
+          description: The arguments of the distribution function
+          nullable: true
+          default: [ ]
+          items:
+            $ref: "./expression.yaml#/components/schemas/FunctionArg"
+
+    SortOrder:
+      type: object
+      required:
+        - sortTerm
+      properties:
+        sortTerm:
+          $ref: "./expression.yaml#/components/schemas/FunctionArg"
+        direction:
+          type: string
+          description: The direction of the sort order
+          enum:
+            - "asc"
+            - "desc"
+          nullable: true
+          default: "asc"
+        nullOrdering:
+          type: string
+          description: ｜
+            The sort order of null values.
+            The default value is "nulls_first" if the direction is "asc", otherwise "nulls_last".
+          enum:
+            - "nulls_first"
+            - "nulls_last"
+
+    FieldNames:
+      type: array
+      description: The names of the fields, each field may be with multiple levels
+      items:
+        $ref: "#/components/schemas/FieldName"
+
+    FieldName:
+      type: array
+      description: The name of the field, may be with multiple levels
+      items:
+        type: string
+
+    Column:
+      type: object
+      required:
+        - name
+        - type
+      properties:
+        name:
+          type: string
+          description: The name of the column
+        type:
+          $ref: "./datatype.yaml#/components/schemas/DataType"
+        comment:
+          type: string
+          description: The comment of the column
+          nullable: true
+        nullable:
+          type: boolean
+          description: Whether the column is nullable
+          nullable: true
+          default: true
+
+    TableUpdatesRequest:
+      type: object
+      required:
+        - updates
+      properties:
+        updates:
+          type: array
+          items:
+            $ref: "#/components/schemas/TableUpdateRequest"
+
+    TableUpdateRequest:
+      oneOf:
+        - $ref: "#/components/schemas/RenameTableRequest"
+        - $ref: "#/components/schemas/UpdateTableCommentRequest"
+        - $ref: "#/components/schemas/SetTablePropertyRequest"
+        - $ref: "#/components/schemas/RemoveTablePropertyRequest"
+        - $ref: "#/components/schemas/AddTableColumnRequest"
+        - $ref: "#/components/schemas/RenameTableColumnRequest"
+        - $ref: "#/components/schemas/UpdateTableColumnTypeRequest"
+        - $ref: "#/components/schemas/UpdateTableColumnCommentRequest"
+        - $ref: "#/components/schemas/UpdateTableColumnPositionRequest"
+        - $ref: "#/components/schemas/UpdateTableColumnNullabilityRequest"
+        - $ref: "#/components/schemas/DeleteTableColumnRequest"
+      discriminator:
+        propertyName: "@type"
+        mapping:
+          rename: "#/components/schemas/RenameTableRequest"
+          updateComment: "#/components/schemas/UpdateTableCommentRequest"
+          setProperty: "#/components/schemas/SetTablePropertyRequest"
+          removeProperty: "#/components/schemas/RemoveTablePropertyRequest"
+          addColumn: "#/components/schemas/AddTableColumnRequest"
+          renameColumn: "#/components/schemas/RenameTableColumnRequest"
+          updateColumnType: "#/components/schemas/UpdateTableColumnTypeRequest"
+          updateColumnComment: "#/components/schemas/UpdateTableColumnCommentRequest"
+          updateColumnPosition: "#/components/schemas/UpdateTableColumnPositionRequest"
+          updateColumnNullability: "#/components/schemas/UpdateTableColumnNullabilityRequest"
+          deleteColumn: "#/components/schemas/DeleteTableColumnRequest"
+
+    RenameTableRequest:
+      type: object
+      required:
+        - "@type"
+        - newName
+      properties:
+        "@type":
+          type: string
+          enum:
+            - "rename"
+        newName:
+          type: string
+          description: The new name of the table
+      example: {
+        "@type": "rename",
+        "newName": "my_hive_table_new"
+      }
+
+    UpdateTableCommentRequest:
+      type: object
+      required:
+        - "@type"
+        - newComment
+      properties:
+        "@type":
+          type: string
+          enum:
+            - "updateComment"
+        newComment:
+          type: string
+          description: The new comment of the table
+      example: {
+        "@type": "updateComment",
+        "newComment": "This is my Hive table new comment"
+      }
+
+    SetTablePropertyRequest:
+      type: object
+      required:
+        - "@type"
+        - property
+        - value
+      properties:
+        "@type":
+          type: string
+          enum:
+            - "setProperty"
+        property:
+          type: string
+          description: The name of the property to set
+        value:
+          type: string
+          description: The value of the property to set
+      example: {
+        "@type": "setProperty",
+        "property": "key1",
+        "value": "value1_new"
+      }
+
+    RemoveTablePropertyRequest:
+      type: object
+      required:
+        - "@type"
+        - property
+      properties:
+        "@type":
+          type: string
+          enum:
+            - "removeProperty"
+        property:
+          type: string
+          description: The name of the property to remove
+      example: {
+        "@type": "removeProperty",
+        "property": "key2"
+      }
+
+    AddTableColumnRequest:
+      type: object
+      required:
+        - "@type"
+        - fieldName
+        - type
+      properties:
+        "@type":
+          type: string
+          enum:
+            - "addColumn"
+        fieldName:
+          $ref: "#/components/schemas/FieldName"
+          description: The name of the column to add
+        type:
+          $ref: "./datatype.yaml#/components/schemas/DataType"
+          description: The type of the column to add
+        comment:
+          type: string
+          description: The comment of the column to add
+          nullable: true
+        position:
+          $ref: "#/components/schemas/ColumnPosition"
+          description: The position of the column to add
+          nullable: true
+          default: "default"
+        nullable:
+          type: boolean
+          description: Whether the column to add is nullable
+          nullable: true
+          default: true
+      example: {
+        "@type": "addColumn",
+        "fieldName": [ "new_column" ],
+        "type": "integer",
+        "comment": "new integer column comment",
+        "position": "first",
+        "nullable": true
+      }
+
+    RenameTableColumnRequest:
+      type: object
+      required:
+        - "@type"
+        - oldFieldName
+        - newFieldName
+      properties:
+        "@type":
+          type: string
+          enum:
+            - "renameColumn"
+        oldFieldName:
+          $ref: "#/components/schemas/FieldName"
+          description: The name of the column to rename
+        newFieldName:
+          type: string
+          description: The new name of the field
+      example: {
+        "@type": "renameColumn",
+        "oldFieldName": [ "existing_column" ],
+        "newFieldName": "existing_column_new"
+      }
+
+    UpdateTableColumnTypeRequest:
+      type: object
+      required:
+        - "@type"
+        - fieldName
+        - newType
+      properties:
+        "@type":
+          type: string
+          enum:
+            - "updateColumnType"
+        fieldName:
+          $ref: "#/components/schemas/FieldName"
+          description: The name of the column to update
+        newType:
+          $ref: "./datatype.yaml#/components/schemas/DataType"
+          description: The new type of the column
+      example: {
+        "@type": "updateColumnType",
+        "fieldName": [ "existing_column" ],
+        "newType": "string"
+      }
+
+    UpdateTableColumnCommentRequest:
+      type: object
+      required:
+        - "@type"
+        - fieldName
+        - newComment
+      properties:
+        "@type":
+          type: string
+          enum:
+            - "updateColumnComment"
+        fieldName:
+          $ref: "#/components/schemas/FieldName"
+          description: The name of the column to update
+        newComment:
+          type: string
+          description: The new comment of the column
+      example: {
+        "@type": "updateColumnComment",
+        "fieldName": [ "existing_column" ],
+        "newComment": "existing column new comment"
+      }
+
+    UpdateTableColumnPositionRequest:
+      type: object
+      required:
+        - "@type"
+        - fieldName
+        - newPosition
+      properties:
+        "@type":
+          type: string
+          enum:
+            - "updateColumnPosition"
+        fieldName:
+          $ref: "#/components/schemas/FieldName"
+          description: The name of the column to update
+        newPosition:
+          $ref: "#/components/schemas/ColumnPosition"
+          description: The new position of the column
+      example: {
+        "@type": "updateColumnPosition",
+        "fieldName": [ "existing_column" ],
+        "newPosition": {
+          "after": "existing_column"
+        }
+      }
+
+    UpdateTableColumnNullabilityRequest:
+      type: object
+      required:
+        - "@type"
+        - fieldName
+        - nullable
+      properties:
+        "@type":
+          type: string
+          enum:
+            - "updateColumnNullability"
+        fieldName:
+          $ref: "#/components/schemas/FieldName"
+          description: The name of the column to update
+        nullable:
+          type: boolean
+          description: Whether the column is nullable
+      example: {
+        "@type": "updateColumnNullability",
+        "fieldName": [ "existing_column" ],
+        "nullable": true
+      }
+
+    DeleteTableColumnRequest:
+      type: object
+      required:
+        - "@type"
+        - fieldName
+      properties:
+        "@type":
+          type: string
+          enum:
+            - "deleteColumn"
+        fieldName:
+          $ref: "#/components/schemas/FieldName"
+          description: The name of the column to delete
+        ifExists:
+          type: boolean
+          description: If true, the request will not fail if the column does not exist
+          nullable: true
+          default: false
+      example: {
+        "@type": "deleteColumn",
+        "fieldName": [ "no_existing_column" ],
+        "ifExists": true
+      }
+
+
+    ColumnPosition:
+      oneOf:
+        - $ref: "#/components/schemas/FirstColumnPosition"
+        - $ref: "#/components/schemas/AfterColumnPosition"
+        - $ref: "#/components/schemas/DefaultColumnPosition"
+
+    FirstColumnPosition:
+      type: string
+      enum:
+        - "first"
+
+    AfterColumnPosition:
+      type: object
+      required:
+        - after
+      properties:
+        after:
+          type: string
+          description: The name of the column which the new column will be added after
+
+    DefaultColumnPosition:
+      type: string
+      description: |
+        The default position of the column to add, the position is determined by the catalog implementation
+      enum:
+        - "default"
+
+
+  responses:
+    TableResponse:
+      description: Returns include the table object
+      content:
+        application/vnd.gravitino.v1+json:
+          schema:
+            type: object
+            properties:
+              code:
+                type: integer
+                format: int32
+                description: Status code of the response
+                enum:
+                  - 0
+              table:
+                $ref: "#/components/schemas/Table"
+          examples:
+            TableResponse:
+              $ref: "#/components/examples/TableResponse"
+
+  examples:
+    TableListResponse:
+      value: {
+        "code": 0,
+        "identifiers": [
+          {
+            "namespace": [
+              "my_metalake",
+              "my_hive_catalog",
+              "my_hive_schema"
+            ],
+            "name": "my_hive_table"
+          }
+        ]
+      }
+
+    HiveTableCreate:
+      value: {
+        "name": "my_hive_table",
+        "comment": "This is my Hive table",
+        "columns": [
+          {
+            "name": "id",
+            "type": "integer",
+            "comment": "id column comment",
+            "nullable": true
+          },
+          {
+            "name": "name",
+            "type": "string",
+            "comment": "name column comment",
+            "nullable": true
+          },
+          {
+            "name": "age",
+            "type": "integer",
+            "comment": "age column comment",
+            "nullable": true
+          },
+          {
+            "name": "dt",
+            "type": "date",
+            "comment": "dt column comment",
+            "nullable": true
+          }
+        ],
+        "partitioning": [
+          {
+            "strategy": "identity",
+            "fieldName": [ "dt" ]
+          }
+        ],
+        "distribution": {
+          "strategy": "hash",
+          "number": 32,
+          "funcArgs": [
+            {
+              "type": "field",
+              "fieldName": [ "id" ]
+            }
+          ]
+        },
+        "sortOrders": [
+          {
+            "sortTerm": {
+              "type": "field",
+              "fieldName": [ "age" ]
+            },
+            "direction": "asc",
+            "nullOrdering": "nulls_first"
+          }
+        ],
+        "properties": {
+          "format": "ORC"
+        }
+      }
+
+    TableResponse:
+      value: {
+        "code": 0,
+        "table": {
+          "name": "my_hive_table",
+          "comment": "This is my Hive table",
+          "columns": [
+            {
+              "name": "id",
+              "type": "integer",
+              "comment": "id column comment",
+              "nullable": true
+            },
+            {
+              "name": "name",
+              "type": "string",
+              "comment": "name column comment",
+              "nullable": true
+            },
+            {
+              "name": "age",
+              "type": "integer",
+              "comment": "age column comment",
+              "nullable": true
+            },
+            {
+              "name": "dt",
+              "type": "date",
+              "comment": "dt column comment",
+              "nullable": true
+            }
+          ],
+          "properties": {
+            "input-format": "org.apache.hadoop.hive.ql.io.orc.OrcInputFormat",
+            "transient_lastDdlTime": "1702033666",
+            "output-format": "org.apache.hadoop.hive.ql.io.orc.OrcOutputFormat",
+            "location": "hdfs://0.0.0.0:9000/user/hive/warehouse/my_hive_table",
+            "table-type": "MANAGED_TABLE",
+            "serde-lib": "org.apache.hadoop.hive.ql.io.orc.OrcSerde",
+            "serde-name": "my_hive_table"
+          },
+          "audit": {
+            "creator": "gravitino",
+            "createTime": "2023-12-08T11:07:46.938Z"
+          },
+          "distribution": {
+            "strategy": "hash",
+            "number": 32,
+            "funcArgs": [
+              {
+                "type": "field",
+                "fieldName": [
+                  "id"
+                ]
+              }
+            ]
+          },
+          "sortOrders": [
+            {
+              "sortTerm": {
+                "type": "field",
+                "fieldName": [
+                  "age"
+                ]
+              },
+              "direction": "asc",
+              "nullOrdering": "nulls_first"
+            }
+          ],
+          "partitioning": [
+            {
+              "strategy": "identity",
+              "fieldName": [
+                "dt"
+              ]
+            }
+          ]
+        }
+      }
+
+    TableAlreadyExistsException:
+      value: {
+        "code": 1004,
+        "type": "TableAlreadyExistsException",
+        "message": "Failed to operate table(s) [my_hive_table] operation [CREATE] under schema [my_hive_schema], reason [TableAlreadyExistsException]",
+        "stack": [
+          "com.datastrato.gravitino.exceptions.TableAlreadyExistsException: Table already exists: my_hive_table",
+          "..."
+        ]
+      }
+
+    NoSuchTableException:
+      value: {
+        "code": 1003,
+        "type": "NoSuchTableException",
+        "message": "Failed to operate table(s) [test_table] operation [LOAD] under schema [test_schema], reason [NoSuchTableException]",
+        "stack": [
+          "com.datastrato.gravitino.exceptions.NoSuchTableException: Hive table does not exist: test_table in Hive Metastore",
+          "..."
+        ]
+      }

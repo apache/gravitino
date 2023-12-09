@@ -1,0 +1,130 @@
+#
+# Copyright 2023 Datastrato.
+# This software is licensed under the Apache License version 2.
+#
+
+---
+
+components:
+  schemas:
+    DataType:
+      oneOf:
+        - $ref: "#/components/schemas/PrimitiveType"
+        - $ref: "#/components/schemas/StructType"
+        - $ref: "#/components/schemas/ListType"
+        - $ref: "#/components/schemas/MapType"
+        - $ref: "#/components/schemas/UnionType"
+
+    PrimitiveType:
+      type: string
+      example:
+        - "boolean"
+        - "byte"
+        - "short"
+        - "integer"
+        - "long"
+        - "float"
+        - "double"
+        - "decimal(10,2)"
+        - "date"
+        - "time"
+        - "timestamp"
+        - "timestamp_tz"
+        - "string"
+        - "char(10)"
+        - "varchar(10)"
+        - "interval_day"
+        - "interval_year"
+        - "uuid"
+        - "fixed(16)"
+        - "binary"
+
+    UnionType:
+      type: object
+      required:
+        - type
+        - types
+      properties:
+        type:
+          type: string
+          enum:
+            - "union"
+        types:
+          type: array
+          items:
+            $ref: "#/components/schemas/DataType"
+
+    MapType:
+      type: object
+      required:
+        - type
+        - keyType
+        - valueType
+      properties:
+        type:
+          type: string
+          enum:
+            - "map"
+        keyType:
+          $ref: "#/components/schemas/DataType"
+        valueType:
+          $ref: "#/components/schemas/DataType"
+        valueContainsNull:
+          type: boolean
+          description: Whether the value of the map contains null values
+          nullable: true
+          default: true
+
+    ListType:
+      type: object
+      required:
+        - type
+        - elementType
+      properties:
+        type:
+          type: string
+          enum:
+            - "list"
+        containsNull:
+          type: boolean
+          description: Whether the list contains null values
+          nullable: true
+          default: true
+        elementType:
+          $ref: "#/components/schemas/DataType"
+
+    StructType:
+      type: object
+      required:
+        - type
+        - fields
+      properties:
+        type:
+          type: string
+          enum:
+            - "struct"
+        fields:
+          type: array
+          items:
+            $ref: "#/components/schemas/StructField"
+
+    StructField:
+      type: object
+      required:
+        - name
+        - type
+      properties:
+        name:
+          type: string
+          description: The name of the struct field
+        type:
+          $ref: "#/components/schemas/DataType"
+        nullable:
+          type: boolean
+          description: Whether the struct field is nullable
+          nullable: true
+          default: true
+        comment:
+          type: string
+          description: The comment of the struct field
+          nullable: true
