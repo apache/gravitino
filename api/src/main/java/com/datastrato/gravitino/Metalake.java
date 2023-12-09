@@ -12,12 +12,26 @@ import java.util.Map;
  */
 public interface Metalake extends Auditable {
 
-  /** The name of the metalake. */
+  /**
+   * The name of the metalake.
+   *
+   * @return The name of the metalake.
+   */
   String name();
 
-  /** The comment of the metalake. */
+  /**
+   * The comment of the metalake. Note. this method will return null if the comment is not set for
+   * this metalake.
+   *
+   * @return The comment of the metalake.
+   */
   String comment();
 
-  /** The properties of the metalake. */
+  /**
+   * The properties of the metalake. Note, this method will return null if the properties are not
+   * set.
+   *
+   * @return The properties of the metalake.
+   */
   Map<String, String> properties();
 }

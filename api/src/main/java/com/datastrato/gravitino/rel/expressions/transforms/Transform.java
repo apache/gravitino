@@ -31,15 +31,15 @@ import java.util.Objects;
  * The transform name is "date" and its argument is a reference to the "ts" column.
  */
 public interface Transform extends Expression {
-  /** Returns the transform function name. */
+  /** @return The transform function name. */
   String name();
 
-  /** Returns the arguments passed to the transform function. */
+  /** @return The arguments passed to the transform function. */
   Expression[] arguments();
 
   /**
-   * Returns the preassigned partitions in the partitioning. Currently, only ListTransform and
-   * RangeTransform need to deal with assignments
+   * @return The preassigned partitions in the partitioning. Currently, only ListTransform and
+   *     RangeTransform need to deal with assignments
    */
   default Expression[] assignments() {
     return Expression.EMPTY_EXPRESSION;

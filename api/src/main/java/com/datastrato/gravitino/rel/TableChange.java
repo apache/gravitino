@@ -26,6 +26,10 @@ import java.util.Objects;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 
+/**
+ * The TableChange interface defines the public API for managing tables in a schema. If the catalog
+ * implementation supports tables, it must implement this interface.
+ */
 public interface TableChange {
 
   /**
@@ -336,6 +340,10 @@ public interface TableChange {
     }
   }
 
+  /**
+   * The interface for all column positions. Column positions are used to specify the position of a
+   * column when adding a new column to a table.
+   */
   interface ColumnPosition {
 
     static ColumnPosition first() {
@@ -403,6 +411,9 @@ public interface TableChange {
     }
   }
 
+  /**
+   * The interface for all column changes. Column changes are used to modify the schema of a table.
+   */
   interface ColumnChange extends TableChange {
     String[] fieldName();
   }

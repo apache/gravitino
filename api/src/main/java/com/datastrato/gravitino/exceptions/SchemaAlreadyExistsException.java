@@ -4,6 +4,7 @@
  */
 package com.datastrato.gravitino.exceptions;
 
+/** An exception thrown when the schema already exists. */
 public class SchemaAlreadyExistsException extends AlreadyExistsException {
 
   public SchemaAlreadyExistsException(String message) {

@@ -5,6 +5,7 @@
 
 package com.datastrato.gravitino.exceptions;
 
+/** An exception thrown when a resource is not empty. */
 public class NonEmptyEntityException extends GravitinoRuntimeException {
 
   public NonEmptyEntityException(String message) {

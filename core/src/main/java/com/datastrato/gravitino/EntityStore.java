@@ -42,9 +42,11 @@ public interface EntityStore extends Closeable {
    * may not be consistent.
    *
    * @param namespace the namespace of the entities
-   * @return the list of entities
-   * @param type the type of the entity
+   * @param <E> class of the entity
+   * @param type the detailed type of the entity
+   * @param entityType the general type of the entity
    * @throws IOException if the list operation fails
+   * @return the list of entities
    */
   <E extends Entity & HasIdentifier> List<E> list(
       Namespace namespace, Class<E> type, EntityType entityType) throws IOException;
@@ -53,6 +55,7 @@ public interface EntityStore extends Closeable {
    * Check if the entity with the specified {@link NameIdentifier} exists.
    *
    * @param ident the name identifier of the entity
+   * @param entityType the general type of the entity,
    * @return true if the entity exists, false otherwise
    * @throws IOException if the check operation fails
    */
@@ -100,9 +103,10 @@ public interface EntityStore extends Closeable {
    * <p>Note: the whole update operation should be in one transaction.
    *
    * @param ident the name identifier of the entity
-   * @param type the type of the entity
+   * @param type the detailed type of the entity
    * @param updater the updater function to update the entity
-   * @param <E> the type of the entity
+   * @param <E> the class of the entity
+   * @param entityType the general type of the entity
    * @return E the updated entity
    * @throws IOException if the store operation fails
    * @throws NoSuchEntityException if the entity does not exist
@@ -119,6 +123,9 @@ public interface EntityStore extends Closeable {
    * retrieve of entities.
    *
    * @param ident the unique identifier of the entity
+   * @param entityType the general type of the entity
+   * @param e the entity class instance
+   * @param <E> the class of entity
    * @return the entity retrieved from the underlying storage
    * @throws NoSuchEntityException if the entity does not exist
    * @throws IOException if the retrieve operation fails
@@ -154,8 +161,10 @@ public interface EntityStore extends Closeable {
    *
    * @param executable the executable to run
    * @param <R> the type of the return value
+   * @param <E> the type of the exception
    * @return the return value of the executable
    * @throws IOException if the execution fails
+   * @throws E if the execution fails
    */
   <R, E extends Exception> R executeInTransaction(Executable<R, E> executable)
       throws E, IOException;

@@ -4,6 +4,7 @@
  */
 package com.datastrato.gravitino.exceptions;
 
+/** Base class for all Gravitino runtime exceptions. */
 public class GravitinoRuntimeException extends RuntimeException {
 
   public GravitinoRuntimeException(String message) {

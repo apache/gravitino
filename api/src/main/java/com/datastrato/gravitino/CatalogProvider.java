@@ -13,6 +13,8 @@ public interface CatalogProvider {
   /**
    * The string that represents the catalog that this provider uses. This is overridden by children
    * to provide a nice alias for the catalog.
+   *
+   * @return The string that represents the catalog that this provider uses.
    */
   String shortName();
 }

@@ -38,7 +38,11 @@ public enum SortDirection {
     this.defaultNullOrdering = defaultNullOrdering;
   }
 
-  /** Returns the default null ordering to use if no null ordering is specified explicitly. */
+  /**
+   * Returns the default null ordering to use if no null ordering is specified explicitly.
+   *
+   * @return The default null ordering.
+   */
   public NullOrdering defaultNullOrdering() {
     return defaultNullOrdering;
   }

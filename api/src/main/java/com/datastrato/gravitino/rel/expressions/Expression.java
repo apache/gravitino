@@ -33,10 +33,10 @@ public interface Expression {
    */
   NamedReference[] EMPTY_NAMED_REFERENCE = new NamedReference[0];
 
-  /** Returns an array of the children of this node. Children should not change. */
+  /** @return An array of the children of this node. Children should not change. */
   Expression[] children();
 
-  /** List of fields or columns that are referenced by this expression. */
+  /** @return A list of fields or columns that are referenced by this expression. */
   default NamedReference[] references() {
     Set<NamedReference> set = new HashSet<>();
     for (Expression e : children()) {

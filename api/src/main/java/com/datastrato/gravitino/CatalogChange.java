@@ -7,6 +7,10 @@ package com.datastrato.gravitino;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 
+/**
+ * A catalog change is a change to a catalog. It can be used to rename a catalog, update the comment
+ * of a catalog, set a property and value pair for a catalog, or remove a property from a catalog.
+ */
 public interface CatalogChange {
 
   /**
@@ -50,6 +54,7 @@ public interface CatalogChange {
     return new RemoveProperty(property);
   }
 
+  /** A catalog change to rename the catalog. */
   @Getter
   @EqualsAndHashCode
   final class RenameCatalog implements CatalogChange {
@@ -60,6 +65,7 @@ public interface CatalogChange {
     }
   }
 
+  /** A catalog change to update the catalog comment. */
   @Getter
   @EqualsAndHashCode
   final class UpdateCatalogComment implements CatalogChange {
@@ -70,6 +76,7 @@ public interface CatalogChange {
     }
   }
 
+  /** A catalog change to set the property and value for the catalog. */
   @Getter
   @EqualsAndHashCode
   final class SetProperty implements CatalogChange {
@@ -82,6 +89,7 @@ public interface CatalogChange {
     }
   }
 
+  /** A catalog change to remove a property from the catalog. */
   @Getter
   @EqualsAndHashCode
   final class RemoveProperty implements CatalogChange {
