@@ -32,7 +32,8 @@ servers:
         default: "api"
 
 security:
-  - BearerAuth: []
+  - OAuth2WithJWT: [serviceAudience]
+  - BasicAuth: []
 
 paths:
   /metalakes:
@@ -240,7 +241,17 @@ components:
         type: string
 
   securitySchemes:
-    # todo: add OAuth2 security schema
-    BearerAuth:
+
+    OAuth2WithJWT:
+      type: oauth2
+      description: OAuth2 with JWT
+      flows:
+        clientCredentials:
+          tokenUrl: https://external-oauth-server.com/token
+          scopes:
+            serviceAudience: The audience name when Gravitino uses OAuth as the authenticator.
+
+    BasicAuth:
       type: http
-      scheme: bearer
+      scheme: basic
+
