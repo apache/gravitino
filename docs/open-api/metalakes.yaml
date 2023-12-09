@@ -132,6 +132,8 @@ paths:
       responses:
         "200":
           $ref: "./openapi.yaml#/components/responses/DropResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
