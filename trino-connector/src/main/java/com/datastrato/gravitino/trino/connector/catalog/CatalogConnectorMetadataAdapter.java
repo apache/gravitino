@@ -66,7 +66,10 @@ public class CatalogConnectorMetadataAdapter {
 
     Map<String, Object> properties = toTrinoTableProperties(gravitinoTable.getProperties());
     return new ConnectorTableMetadata(
-        schemaTableName, columnMetadataList, properties, Optional.of(gravitinoTable.getComment()));
+        schemaTableName,
+        columnMetadataList,
+        properties,
+        Optional.ofNullable(gravitinoTable.getComment()));
   }
 
   /** Transform trino ConnectorTableMetadata to gravitino table metadata */
