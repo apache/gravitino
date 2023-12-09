@@ -1,8 +1,8 @@
 ---
-title: "How to Publish Docker images"
-date: 2023-10-01T09:03:20-08:00
-license: "Copyright 2023 Datastrato Pvt Ltd.
-This software is licensed under the Apache License version 2."
+title: "Publish Docker images"
+slug: /publish-docker-images
+keyword: docker
+license: "Copyright 2023 Datastrato Pvt Ltd. This software is licensed under the Apache License version 2."
 ---
 
 ## How to publish Docker images
@@ -31,6 +31,6 @@ You can use GitHub actions to publish Docker images to the Docker Hub repository
 
 ![Publish Dockerimage](assets/publish-docker-image.png)
 
-## The version of Gravitino Docker images
+## More details of Gravitino Docker images
 
-+ [Gravitino Docker images](../dev/docker/README.md)
++ [Gravitino Docker images](docker-image-details)
