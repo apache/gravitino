@@ -1,6 +1,7 @@
 ---
-title: "How to customize Gravitino server configurations"
-date: 2023-11-20T09:03:20-08:00
+title: "Security"
+slug: /security
+keyword: security
 license: "Copyright 2023 Datastrato Pvt Ltd.
 This software is licensed under the Apache License version 2."
 ---
@@ -73,7 +74,38 @@ The signature algorithms that Gravitino supports follows:
 | PS384 | RSASSA-PSS using SHA-384 and MGF1 with SHA-384 |
 | PS512 | RSASSA-PSS using SHA-512 and MGF1 with SHA-512 |
 
-## HTTPS configuration
+### Example
+You can follow the steps to set up an OAuth mode Gravitino server.
+
+1. Prerequisite
+You need to install the JDK8 and Docker.
+
+2. Set up an external OAuth 2.0 server
+```shell
+ docker run -p 8177:8177 --name sample-auth-server -d datastrato/sample-authorization-server:0.3.0
+```
+
+3. Open the url http://localhost:8177/oauth2/jwks in the browser and you can get the JKS.
+   ![jks_image](assets/jks.png)
+
+4. Convert the JKS to PEM. You can use the online tool https://8gwifi.org/jwkconvertfunctions.jsp#google_vignette or other tools.
+   ![pem_image](assets/pem.png)
+
+5. Copy the public key and remove the character `\n` and you can get the default signing key of Gravitino server.
+
+6. You can refer to the [document](getting-started) and append the configurations to the conf/gravitino.conf.
+```
+gravitino.authenticator oauth
+gravitino.authenticator.oauth.serviceAudience test
+gravitino.authenticator.oauth.defaultSignKey <the default signing key>
+gravitino.authenticator.oauth.tokenPath /oauth2/token
+gravitino.authenticator.oauth.serverUri http://localhost:8078
+```
+7.Open the url http://localhost:8090 and login in with clientId `test`, clientSecret `test` and scope `test`.
+   ![oauth_login_image](assets/oauth.png)
+
+
+## HTTPS
 Users would better use HTTPS instead of HTTP if users choose OAuth 2.0 as the authenticator.
 HTTPS protects the header of the request from smuggling, making it safer.
 If users choose to enable HTTPS, Gravitino won't provide the ability of HTTP service.
@@ -114,3 +146,61 @@ Both Gravitino server and Iceberg REST service can configure HTTPS.
 Refer to the "Additional JSSE Standard Names" section of the [Java security guide](https://docs.oracle.com/javase/8/docs/technotes/guides/security/StandardNames.html#jssenames) for the list of protocols related to tlsProtocol. You can find the list of `tlsProtocol` values for Java 8 in this document.
 
 Refer to the "Additional JSSE Standard Names" section of the [Java security guide](https://docs.oracle.com/javase/8/docs/technotes/guides/security/StandardNames.html#ciphersuites) for the list of protocols related to tlsProtocol. You can find the list of `enableCipherAlgorithms` values for Java 8 in this document.
+
+### Example
+You can follow the steps to set up a HTTPS server.
+
+1. Prerequisite
+You need to install the JDK8, wget and set the environment JAVA_HOME.
+
+2. Generate the key store
+```shell
+cd $JAVA_HOME
+bin/keytool -genkeypair  -alias localhost \
+-keyalg RSA -keysize 4096 -keypass localhost \
+-sigalg SHA256withRSA \
+-keystore localhost.jks -storetype JKS -storepass localhost \
+-dname "cn=localhost,ou=localhost,o=localhost,l=beijing,st=beijing,c=cn" \
+-validity 36500
+```
+
+3. Generate the certificate
+```shell
+bin/keytool -export -alias localhost -keystore localhost.jks -file  localhost.crt -storepass localhost
+```
+
+4. Import the certificate
+```shell
+bin/keytool -import -alias localhost -keystore jre/lib/security/cacerts -file localhost.crt -storepass changeit -noprompt
+```
+
+5. You can refer to the [document](getting-started) and append the configurations to the conf/gravitino.conf.
+Configuration doesn't support to resolve environment variable, so you should replace ${JAVA_HOME} with the actual value.
+Then, You can start the Gravitino server.
+```
+gravitino.server.webserver.host localhost
+gravitino.server.webserver.httpsEnable true
+gravitino.server.webserver.keyStorePath ${JAVA_HOME}/localhost.jks
+gravitino.server.webserver.keyStorePassword localhost
+gravitino.server.webserver.managerPassword localhost
+```
+
+6. Use GravitinoClient to call the version api
+Copy the code to a file named Main.java
+```java
+import com.datastrato.gravitino.client.GravitinoClient;
+import com.datastrato.gravitino.client.GravitinoVersion;
+
+public class Main {
+    public static void main(String[] args) {
+        String uri = "https://localhost:8443";
+        GravitinoClient client = GravitinoClient.builder(uri).build();
+        GravitinoVersion gravitinoVersion = client.getVersion();
+    }
+}
+```
+Run the command
+```shell
+version = <the release version>
+wget https://repo1.maven.org/maven2/com/datastrato/gravitino/client-java-runtime/${version}/client-java-runtime-${version}.jar -O client.jar && $JAVA_HOME/bin/javac -classpath ./client.jar Main.java && $JAVA_HOME/bin/java -classpath ./client.jar:. Main
+```
