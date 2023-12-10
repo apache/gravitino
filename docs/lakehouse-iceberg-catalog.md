@@ -50,7 +50,7 @@ Your must download the corresponding JDBC driver to the `catalogs/lakehouse-iceb
 
 ## Schema info
 
-### Capabilities
+### Schema capabilities
 
 - Not support cascade drop schema.
 
@@ -60,12 +60,12 @@ You could put properties except `comment`.
 
 ## Table info
 
-### Capabilities
+### Table capabilities
 
 - Doesn't support `Distribution`, you should use `BucketPartition` instead.
 - Built with Apache Iceberg `1.3.1`. The Apache Iceberg table format version is `1` by default.
 
-### Column type 
+### Table column type 
 
 | Gravitino Type              | Apache Iceberg Type         |
 |-----------------------------|-----------------------------|
