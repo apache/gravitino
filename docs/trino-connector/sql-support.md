@@ -36,7 +36,6 @@ The connector provides read access and write access to data and metadata stored 
 - [ALTER TABLE](https://trino.io/docs/current/sql/alter-table.html)
 - [CREATE SCHEMA](https://trino.io/docs/current/sql/create-schema.html)
 - [DROP SCHEMA](https://trino.io/docs/current/sql/drop-schema.html)
-- [ALTER SCHEMA](https://trino.io/docs/current/sql/alter-schema.html)
 - [COMMENT](https://trino.io/docs/current/sql/comment.html)
 
 ### Transactions:
