@@ -74,15 +74,19 @@ The signature algorithms that Gravitino supports follows:
 | PS512 | RSASSA-PSS using SHA-512 and MGF1 with SHA-512 |
 
 ### Example
+
 You can follow the steps to set up an OAuth mode Gravitino server.
 
 1. Prerequisite
+
 You need to install the JDK8 and Docker.
 
 2. Set up an external OAuth 2.0 server
+
 There is a sample-authorization-server based on [spring-authorization-server](https://github.com/spring-projects/spring-authorization-server/tree/1.0.3).
 The image has registered a client information in the external OAuth 2.0 server.
 Its clientId is `test`. Its secret is `test`. Its scope is `test`.
+
 ```shell
  docker run -p 8177:8177 --name sample-auth-server -d datastrato/sample-authorization-server:0.3.0
 ```
@@ -96,6 +100,7 @@ Its clientId is `test`. Its secret is `test`. Its scope is `test`.
 5. Copy the public key and remove the character `\n` and you can get the default signing key of Gravitino server.
 
 6. You can refer to the [Configurations](gravitino-server-config) and append the configurations to the conf/gravitino.conf.
+
 ```text
 gravitino.authenticator oauth
 gravitino.authenticator.oauth.serviceAudience test
@@ -103,27 +108,34 @@ gravitino.authenticator.oauth.defaultSignKey <the default signing key>
 gravitino.authenticator.oauth.tokenPath /oauth2/token
 gravitino.authenticator.oauth.serverUri http://localhost:8177
 ```
+
 7. Open [the URL of Gravitino server](http://localhost:8090) and login in with clientId `test`, clientSecret `test` and scope `test`.
    ![oauth_login_image](assets/oauth.png)
 
 8. You can also use curl command to access Gravitino.
+
 Get access token
+
 ```shell
 curl --location --request POST 'http://127.0.0.1:8177/oauth2/token?grant_type=client_credentials&client_id=test&client_secret=test&scope=test'
 ```
+
 Use the access token to request the Gravitino
+
 ```shell
 curl -v -X GET -H "Accept: application/vnd.gravitino.v1+json" -H "Content-Type: application/json" -H "Authorization: Bearer <access_token>" http://localhost:8090/api/version
 ```
 
 
 ## HTTPS
+
 Users would better use HTTPS instead of HTTP if users choose OAuth 2.0 as the authenticator.
 HTTPS protects the header of the request from smuggling, making it safer.
 If users choose to enable HTTPS, Gravitino won't provide the ability of HTTP service.
 Both Gravitino server and Iceberg REST service can configure HTTPS.
 
 ### Gravitino server's configuration
+
 | Configuration item                                  | Description                                                | Default value | Since version |
 |-----------------------------------------------------|------------------------------------------------------------|---------------|---------------|
 | `gravitino.server.webserver.enableHttps`            | Enables HTTPS.                                             | `false`       | 0.3.0         |
@@ -140,6 +152,7 @@ Both Gravitino server and Iceberg REST service can configure HTTPS.
 | `gravitino.server.webserver.trustStoreType`         | The type to the trust store.                                | `JKS`         | 0.3.0         |
 
 ### Iceberg REST service's configuration
+
 | Configuration item                                         | Description                                                | Default value | Since version |
 |------------------------------------------------------------|------------------------------------------------------------|---------------|---------------|
 | `gravitino.auxService.iceberg-rest.enableHttps`            | Enables HTTPS.                                             | `false`       | 0.3.0         |
@@ -160,13 +173,16 @@ Refer to the "Additional JSSE Standard Names" section of the [Java security guid
 Refer to the "Additional JSSE Standard Names" section of the [Java security guide](https://docs.oracle.com/javase/8/docs/technotes/guides/security/StandardNames.html#ciphersuites) for the list of protocols related to tlsProtocol. You can find the list of `enableCipherAlgorithms` values for Java 8 in this document.
 
 ### Example
+
 You can follow the steps to set up a HTTPS server.
 
 1. Prerequisite
+
 You need to install the JDK8, wget and set the environment JAVA_HOME.
 If you want to use the command `curl` to request the Gravitino server, you should install openSSL.
 
 2. Generate the key store
+
 ```shell
 cd $JAVA_HOME
 bin/keytool -genkeypair  -alias localhost \
@@ -178,11 +194,13 @@ bin/keytool -genkeypair  -alias localhost \
 ```
 
 3. Generate the certificate
+
 ```shell
 bin/keytool -export -alias localhost -keystore localhost.jks -file  localhost.crt -storepass localhost
 ```
 
 4. Import the certificate
+
 ```shell
 bin/keytool -import -alias localhost -keystore jre/lib/security/cacerts -file localhost.crt -storepass changeit -noprompt
 ```
@@ -190,6 +208,7 @@ bin/keytool -import -alias localhost -keystore jre/lib/security/cacerts -file lo
 5. You can refer to the [Configurations](gravitino-server-config) and append the configurations to the conf/gravitino.conf.
 Configuration doesn't support to resolve environment variable, so you should replace ${JAVA_HOME} with the actual value.
 Then, You can start the Gravitino server.
+
 ```text
 gravitino.server.webserver.host localhost
 gravitino.server.webserver.enableHttps true
@@ -203,6 +222,7 @@ gravitino.server.webserver.managerPassword localhost
 If you use Java, you can follow the steps
 
 Copy the code to a file named Main.java
+
 ```java
 import com.datastrato.gravitino.client.GravitinoClient;
 import com.datastrato.gravitino.client.GravitinoVersion;
@@ -216,13 +236,16 @@ public class Main {
     }
 }
 ```
+
 Run the command
+
 ```shell
 version = <the release version>
 wget https://repo1.maven.org/maven2/com/datastrato/gravitino/client-java-runtime/${version}/client-java-runtime-${version}.jar -O client.jar && $JAVA_HOME/bin/javac -classpath ./client.jar Main.java && $JAVA_HOME/bin/java -classpath ./client.jar:. Main
 ```
 
 If you want to use the command `curl`, you can follow the commands:
+
 ```shell
 openssl x509 -inform der -in $JAVA_HOME/localhost.crt -out certificate.pem
 curl -v -X GET --cacert ./certificate.pem -H "Accept: application/vnd.gravitino.v1+json" -H "Content-Type: application/json" https://localhost:8433/api/version
