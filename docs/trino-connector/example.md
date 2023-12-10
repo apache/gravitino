@@ -29,7 +29,7 @@ The results like:
 Query 20231017_082503_00018_6nt3n, FINISHED, 1 node
 ```
 
-### Cretae Scema and Table
+### Create Schema and Table
 
 The `gravitino` catalog is a catalog defined Trino catalog configuration.
 Is is generally not used.

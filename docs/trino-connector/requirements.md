@@ -5,7 +5,7 @@ keyword: gravition connector trino
 license: Copyright 2023 Datastrato Pvt. This software is licensed under the Apache License version 2.
 ---
 
-# Rquirements
+# Requirements
 
 
 To install and deploy the Gravitino connector, the following environment setup is required:

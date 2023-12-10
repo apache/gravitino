@@ -28,7 +28,7 @@ Data Type Conversion between Trino and Gravitino
 | BooleanType       | BOOLEAN    |
 | ByteType          | TINYINT    |
 | ShortType         | SMALLINT   |
-| IntegerType       | INTERGE    |
+| IntegerType       | INTEGER    |
 | LongType          | BIGINT     |
 | FloatType         | REAL       |
 | DoubleType        | DOUBLE     |

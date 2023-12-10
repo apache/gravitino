@@ -25,7 +25,7 @@ Please refer to the [Gravitino Development documentation](how-to-build)
 ## Example
 Let me tell you how to install the Gravitino connector in Trino office docker images.
 
-### Running the contanier
+### Running the container
 Use the docker command to create a container from the `trinodb/trino` image. Assign it the trino-gravitino name. 
 Run it in the background, and map the default Trino port, which is 8080, from inside the container to port 8080 on your workstation.
 
