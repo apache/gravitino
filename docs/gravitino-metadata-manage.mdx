@@ -1,6 +1,7 @@
 ---
 title: "Gravitino metadata manage"
 slug: /gravitino-metadata-manage
+date: 2023-12-10
 keyword: metadata manage 
 license: Copyright 2023 Datastrato Pvt Ltd. This software is licensed under the Apache License version 2.
 ---
@@ -37,7 +38,8 @@ like metalakes, catalogs, schemas, and tables. The following contents are includ
   - [Drop a table](#drop-a-table)
   - [List all tables under a schema](#list-all-tables-under-a-schema)
 
-In this document, you would use Apache Hive catalog as an example to show how to manage Gravitino metadata. Other Catalogs are similar to Hive catalog.
+In this document, Gravitino would use Apache Hive catalog as an example to show how to manage Gravitino metadata. Other Catalogs are similar to Hive catalog.
+
 Assuming Gravitino has just started, and the host and post is `http://localhost:8090`.
 
 ## Metalake Operations
@@ -132,10 +134,16 @@ public class MetalakeExample {
 }
 ```
 
-Users can do several changes to a metalake, including:
+Currently, Gravitino supports the following changes to a metalake:
 
-- `MetalakeChange.setProperty`
-- `MetalakeChange.removeProperty`
+| Supported modification | Bash                                                         | Java                                            |
+|------------------------|--------------------------------------------------------------|-------------------------------------------------|
+| Rename metalake        | `{"@type":"rename","newName":"metalake_renamed"}`            | `MetalakeChange.rename("metalake_renamed")`     |
+| Update comment         | `{"@type":"updateComment","newComment":"new_comment"}`       | `MetalakeChange.updateComment("new_comment")`   |
+| Add a property         | `{"@type":"setProperty","property":"key1","value":"value1"}` | `MetalakeChange.setProperty("key1", "value1")`  |
+| Remove a property      | `{"@type":"removeProperty","property":"key1"}`               | `MetalakeChange.removeProperty("key1")`         |
+
+
 
 
 ### Drop a metalake
@@ -302,12 +310,15 @@ public class CatalogExample {
 }
 ```
 
-You can do several changes to a catalog, including:
+Currently, Gravitino supports the following changes to a catalog:
 
-- `CatalogChange.rename("hive_catalog_renamed")`;
-- `CatalogChange.updateComment("xxx")`;    
-- `CatalogChange.removeProperty("property_key")`;
-- `CatalogChange.setProperty("property_key", "property_value");`
+| Supported modification | Bash                                                         | Java                                           |
+|------------------------|--------------------------------------------------------------|------------------------------------------------|
+| Rename metalake        | `{"@type":"rename","newName":"metalake_renamed"}`            | `CatalogChange.rename("catalog_renamed")`      |
+| Update comment         | `{"@type":"updateComment","newComment":"new_comment"}`       | `CatalogChange.updateComment("new_comment")`   |
+| Add a property         | `{"@type":"setProperty","property":"key1","value":"value1"}` | `CatalogChange.setProperty("key1", "value1")`  |
+| Remove a property      | `{"@type":"removeProperty","property":"key1"}`               | `CatalogChange.removeProperty("key1")`         |
+
 
 ### Drop a catalog
 
@@ -481,6 +492,14 @@ public class SchemaExample {
 }
 ```
 
+Currently, Gravitino supports the following changes to a schema:
+
+| Supported modification | Bash                                                         | Java                                           |
+|------------------------|--------------------------------------------------------------|------------------------------------------------|
+| Add a property         | `{"@type":"setProperty","property":"key1","value":"value1"}` | `SchemaChange.setProperty("key1", "value1")`  |
+| Remove a property      | `{"@type":"removeProperty","property":"key1"}`               | `SchemaChange.removeProperty("key1")`         |
+
+
 ### Drop a schema
 Users can remove a schema by sending a `DELETE` request to the `/api/v1/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}` endpoint or just use the Gravitino Java client. The following is an example of droping a schema:
 
@@ -621,7 +640,18 @@ public class TableExample {
 
 In addition to the basic settings, you support the following features:
 
-#### Partitioned table
+:::note
+The following features are not supported by all catalogs. Please refer to the related doc for more details.
+:::
+
+| Feature             | Description                                                                                  |
+|---------------------|----------------------------------------------------------------------------------------------|
+| Partitioned table   | Equal to `PARTITION BY` in Apache Hive and other engine that support partitioning.           |
+| Bucketed table      | Equal to `CLUSTERED BY` in Apache Hive, some engine may use different words to describe it.  |
+| Sorted order table  | Equal to `SORTED BY` in Apache Hive, some engine may use different words to describe it.     |
+
+The following is an example of creating a partitioned, bucketed table and sorted order table:
+
 ```bash
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" -H "Content-Type: application/json" -d '{
   "name": "table",
@@ -660,87 +690,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" -H "Content-Type: ap
       "strategy": "identity",
       "fieldName": ["score"]
     }
-  ]
-}' http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema/tables
-```
-
-```java
-tableCatalog.createTable(
-        NameIdentifier.of("metalake", "catalog", "schema", "table"),
-        new ColumnDTO[] {
-            ColumnDTO.builder()
-                .withComment("Id of the user")
-                .withName("id")
-                .withDataType(Types.IntegerType.get())
-                .withNullable(true)
-                .build(),
-            ColumnDTO.builder()
-                .withComment("Name of the user")
-                .withName("name")
-                .withDataType(Types.VarCharType.of(1000))
-                .withNullable(true)
-                .build(),
-            ColumnDTO.builder()
-                .withComment("Age of the user")
-                .withName("age")
-                .withDataType(Types.ShortType.get())
-                .withNullable(true)
-                .build(),
-
-            ColumnDTO.builder()
-                .withComment("Score of the user")
-                .withName("score")
-                .withDataType(Types.DoubleType.get())
-                .withNullable(true)
-                .build(),
-        },
-        "Create a new Table",
-        tablePropertiesMap,
-        new Transform[] {
-            // partition by score
-            Transforms.identity("score")
-        },
-        DistributionDTO.NONE,
-        SortOrderDTO.EMPTY_SORT
-    );
-
-```
-
-#### Bucketed table
-
-```bash
-curl -X POST -H "Accept: application/vnd.gravitino.v1+json" -H "Content-Type: application/json" -d '{
-  "name": "table",
-  "columns": [
-    {
-      "name": "id",
-      "type": "integer",
-      "nullable": true,
-      "comment": "Id of the user"
-    },
-    {
-      "name": "name",
-      "type": "varchar(2000)",
-      "nullable": true,
-      "comment": "Name of the user"
-    },
-    {
-      "name": "age",
-      "type": "short",
-      "nullable": true,
-      "comment": "Age of the user"
-    },
-    {
-      "name": "score",
-      "type": "double",
-      "nullable": true,
-      "comment": "Score of the user"
-    }
   ],
-  "comment": "Create a new Table",
-  "properties": {
-    "format": "ORC"
-  },
   "distribution": {
     "strategy": "hash",
     "number": 4,
@@ -750,89 +700,6 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" -H "Content-Type: ap
         "fieldName": ["score"] 
       } 
     ]
-  }
-}' http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema/tables 
-
-```
-
-```java
-    tableCatalog.createTable(
-        NameIdentifier.of("metalake", "catalog", "schema", "table"),
-        new ColumnDTO[] {
-            ColumnDTO.builder()
-                .withComment("Id of the user")
-                .withName("id")
-                .withDataType(Types.IntegerType.get())
-                .withNullable(true)
-                .build(),
-            ColumnDTO.builder()
-                .withComment("Name of the user")
-                .withName("name")
-                .withDataType(Types.VarCharType.of(1000))
-                .withNullable(true)
-                .build(),
-            ColumnDTO.builder()
-                .withComment("Age of the user")
-                .withName("age")
-                .withDataType(Types.ShortType.get())
-                .withNullable(true)
-                .build(),
-
-            ColumnDTO.builder()
-                .withComment("Score of the user")
-                .withName("score")
-                .withDataType(Types.DoubleType.get())
-                .withNullable(true)
-                .build(),
-        },
-        "Create a new Table",
-        tablePropertiesMap,
-        new Transform[] {
-        },
-        // CLUSTERED BY id
-        new DistributionDTO.Builder()
-            .withStrategy(Strategy.HASH)
-            .withNumber(4)
-            .withArgs(FieldReferenceDTO.of("id"))
-            .build(),
-        SortOrderDTO.EMPTY_SORT
-    );
-```
-
-#### Sort Ordered table
-
-```bash
-curl -X POST -H "Accept: application/vnd.gravitino.v1+json" -H "Content-Type: application/json" -d '{
-  "name": "table",
-  "columns": [
-    {
-      "name": "id",
-      "type": "integer",
-      "nullable": true,
-      "comment": "Id of the user"
-    },
-    {
-      "name": "name",
-      "type": "varchar(2000)",
-      "nullable": true,
-      "comment": "Name of the user"
-    },
-    {
-      "name": "age",
-      "type": "short",
-      "nullable": true,
-      "comment": "Age of the user"
-    },
-    {
-      "name": "score",
-      "type": "double",
-      "nullable": true,
-      "comment": "Score of the user"
-    }
-  ],
-  "comment": "Create a new Table",
-  "properties": {
-    "format": "ORC"
   },
   "sortOrders": [
     {
@@ -843,54 +710,61 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" -H "Content-Type: ap
         "fieldName": ["name"] 
       } 
     }
-  ]
-}' http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema/tables 
+  ] 
+}' http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema/tables
 ```
 
 ```java
-    tableCatalog.createTable(
-        NameIdentifier.of("metalake", "catalog", "schema", "table"),
+  tableCatalog.createTable(
+        NameIdentifier.of("metalake", "hive_catalog", "schema", "table"),
         new ColumnDTO[] {
-            ColumnDTO.builder()
-                .withComment("Id of the user")
-                .withName("id")
-                .withDataType(Types.IntegerType.get())
-                .withNullable(true)
-                .build(),
-            ColumnDTO.builder()
-                .withComment("Name of the user")
-                .withName("name")
-                .withDataType(Types.VarCharType.of(1000))
-                .withNullable(true)
-                .build(),
-            ColumnDTO.builder()
-                .withComment("Age of the user")
-                .withName("age")
-                .withDataType(Types.ShortType.get())
-                .withNullable(true)
-                .build(),
+        ColumnDTO.builder()
+        .withComment("Id of the user")
+        .withName("id")
+        .withDataType(Types.IntegerType.get())
+        .withNullable(true)
+        .build(),
+        ColumnDTO.builder()
+        .withComment("Name of the user")
+        .withName("name")
+        .withDataType(Types.VarCharType.of(1000))
+        .withNullable(true)
+        .build(),
+        ColumnDTO.builder()
+        .withComment("Age of the user")
+        .withName("age")
+        .withDataType(Types.ShortType.get())
+        .withNullable(true)
+        .build(),
 
-            ColumnDTO.builder()
-                .withComment("Score of the user")
-                .withName("score")
-                .withDataType(Types.DoubleType.get())
-                .withNullable(true)
-                .build(),
+        ColumnDTO.builder()
+        .withComment("Score of the user")
+        .withName("score")
+        .withDataType(Types.DoubleType.get())
+        .withNullable(true)
+        .build(),
         },
         "Create a new Table",
         tablePropertiesMap,
         new Transform[] {
+        // Partition by id
+        Transforms.identity("score")
         },
-        DistributionDTO.NONE,
+        // CLUSTERED BY id
+        new DistributionDTO.Builder()
+        .withStrategy(Strategy.HASH)
+        .withNumber(4)
+        .withArgs(FieldReferenceDTO.of("id"))
+        .build(),
         // SORTED BY name asc
         new SortOrderDTO[] {
-            new SortOrderDTO.Builder()
-                .withDirection(SortDirection.ASCENDING)
-                .withNullOrder(NullOrdering.NULLS_LAST)
-                .withSortTerm(FieldReferenceDTO.of("name"))
-                .build()
+        new SortOrderDTO.Builder()
+        .withDirection(SortDirection.ASCENDING)
+        .withNullOrder(NullOrdering.NULLS_LAST)
+        .withSortTerm(FieldReferenceDTO.of("name"))
+        .build()
         }
-    );
+        );
 ```
 
 ### Load a table
@@ -935,7 +809,6 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" -H "Content-Type: app
       "property": "key3",
       "value": "value3"
     }
-  ]
 }' http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema/tables/table
 ```
 
@@ -958,22 +831,25 @@ public static void main(String[] args) {
 }
 ```
 
-You can do several changes to a table, including:
+Currently, Gravitino supports the following changes to a table:
 
-- `TableChange.setProperty`
-- `TableChange.removeProperty`
-- `TableChange.addColumn()`
-- `TableChange.deleteColumn()`
-- `TableChange.renameColumn()`
-- `TableChange.updateColumnComment()`
-- `TableChange.updateColumnType()`
-- `TableChange.updateColumnNullability()`
-- `TableChange.updateColumnPosition()`
-- `TableChange.updateComment()`
+| Supported modification             | Bash                                                                                                                  | Java                                        |
+|------------------------------------|-----------------------------------------------------------------------------------------------------------------------|---------------------------------------------|
+| Rename metalake                    | `{"@type":"rename","newName":"table_renamed"}`                                                                        | `TableChange.rename("table_renamed")`       |
+| Update comment                     | `{"@type":"updateComment","newComment":"new_comment"}`                                                                | `TableChange.updateComment("new_comment")`  |
+| Add a table property               | `{"@type":"setProperty","property":"key1","value":"value1"}`                                                          | `TableChange.setProperty("key1", "value1")` |
+| Remove a column                    | `{"@type":"removeProperty","property":"key1"}`                                                                        | `TableChange.removeProperty("key1")`        |
+| Add a column                       | `{"@type":"addColumn","fieldName":["position"],"type":"varchar(20)","comment":"Position of user","position":"FIRST"}` | `TableChange.addColumn(...)`                |
+| Delete a column                    | `{"@type":"deleteColumn","fieldName": ["name"], "ifExist": true}`                                                     | `TableChange.deleteColumn(...)`             |
+| Rename a column                    | `{"@type":"renameColumn","oldFieldName":["name_old"], "newFieldName":"name_new"}`                                     | `TableChange.renameColumn(...)`             |
+| Update the column comment          | `{"@type":"updateColumnComment", "fieldName": ["name"], "newComment": "new comment"}`                                 | `TableChange.updateColumnCommment(...)`     |
+| Update the type of a column        | `{"@type":"updateColumnType","fieldName": ["name"], "newType":"varchar(100)"}`                                        | `TableChange.updateColumnType(...)`         |
+| Update the nullability of a column | `{"@type":"updateColumnNullability","fieldName": ["name"],"nullable":true}`                                           | `TableChange.updateColumnNullability(...)`  |
+| Update the position of a column    | `{"@type":"updateColumnPosition","fieldName": ["name"], "newPosition":"default"}`                                     | `TableChange.updateColumnPosition(...)`     |
 
 ### Drop a table
 
-Users can removing a table by sending a `DELETE` request to the `/api/v1/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables/{table_name}` endpoint or just use the Gravitino Java client. The following is an example of droping a table:
+Users can remove a table by sending a `DELETE` request to the `/api/v1/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables/{table_name}` endpoint or just use the Gravitino Java client. The following is an example of droping a table:
 
 
 ```bash
