@@ -5,7 +5,6 @@ keyword: docker
 license: "Copyright 2023 Datastrato Pvt Ltd. This software is licensed under the Apache License version 2."
 ---
 
-## How to publish Docker images
 
 ## Introduction
 

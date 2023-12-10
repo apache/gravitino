@@ -25,7 +25,8 @@ gravitino:0.3.0
 - Docker image `datastrato/gravitino:0.3.0`
 - Gravitino Server
 - Expose ports:
-  - `8090` Gravitino Web UI
+  - `8090` Gravitino web UI
+  - `9001` Iceberg REST service
 
 ## Playground Docker image
 
@@ -43,31 +44,25 @@ Changelog
   - Docker image `datastrato/hive:2.7.3-no-yarn`
   - `hadoop-2.7.3`
   - `hive-2.3.9`
-  - Not start YARN when container startup
+  - Don't start YARN when container startup
 
 ### Trino image
 
 Changelog
 
-- trino:426-gravitino-0.3.0-SNAPSHOT
-  - Docker image `datastrato/trino:426-gravitino-0.3.0-SNAPSHOT`
+- trino:426-gravitino-0.3.0
+  - Docker image `datastrato/trino:426-gravitino-0.3.0`
   - Base on `trino:462`
-  - Added Gravitino trino-connector-0.3.0-SNAPSHOT libraries into the `/usr/lib/trino/plugin/gravitino`
+  - Added Gravitino trino-connector-0.3.0 libraries into the `/usr/lib/trino/plugin/gravitino`
 
 # Developer Docker images
 
-You can use this kind of the Docker images to facilitate Gravitino integration testing.
+You can use these kinds of the Docker images to facilitate Gravitino integration testing.
 You can use it to test all catalog and connector modules within Gravitino.
 
 ## Gravitino CI Apache Hive image
 
 You can use this kind of images to test the catalog of Apache Hive.
-
-Container startup commands
-
-```shell
-docker run --rm -d -p 9000:9000 -p 9083:9083 -p 10000:10000 -p 10002:10002 -p 50010:50010 -p 50070:50070 -p 50075:50075 datastrato/gravitino-ci-hive
-```
 
 Changelog
 
@@ -118,12 +113,6 @@ Changelog
 ## Gravitino CI Trino image
 
 You can use this kind of images to test Trino.
-
-Container startup commands
-
-```shell
-docker run --rm -it -p 8080:8080 datastrato/gravitino-ci-trino
-```
 
 Changelog
 
