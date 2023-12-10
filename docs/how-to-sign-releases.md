@@ -4,8 +4,6 @@ slug: /how-to-sign-release
 license: Copyright 2023 Datastrato Pvt. This software is licensed under the Apache License version 2.
 ---
 
-# How to sign and verify a Gravitino releases
-
 These instructions provide a guide on signing and verifying Gravitino releases, enhancing the security of releases. Having a signed release allows people to confirm the release's author and guarantees that the code has not been altered.
 
 ## Prerequisites
@@ -17,7 +15,7 @@ Before signing or verifying a Gravitino release, ensure you have the following p
 
 ## Platform support
 
- These instructions are for OSX, you may need to make adjustments for other platforms.
+ These instructions are for macOS, you may need to make adjustments for other platforms.
 
 1. **How to Install GPG or GnuPG:**
 
@@ -111,9 +109,7 @@ Before signing or verifying a Gravitino release, ensure you have the following p
     ```
 
 :::caution important
-    
 Ensure to keep your private key secure and saved somewhere other than just your computer. Don't forget your key password, and also securely record it somewhere. If you lose your keys or forget your password you won't be able to sign releases.
-
 :::
 
 2. **Sign a release:**
