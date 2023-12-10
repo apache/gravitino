@@ -4,13 +4,10 @@ slug: /overview
 license: Copyright 2023 Datastrato Pvt. This software is licensed under the Apache License version 2.
 ---
 
-# Overview
-
 ## Introduction
 
 Gravitino is a high-performance, geo-distributed, and federated metadata lake. It manages the 
 metadata directly in different sources, types, and regions. It also provides users with unified metadata access for data and AI assets.
-
 
 ![Gravitino Architecture](assets/gravitino-architecture.png)
 
@@ -53,7 +50,7 @@ the changes both in Gravitino will directly reflect in the underlying systems, a
 ### Geo-distribution support (WIP)
 
 Gravitino supports geo-distribution deployment , which means different instances of Gravitino 
-can be deployed in different regions or clouds, and they can be connected to each other to get 
+can deploy in different regions or clouds, and they can connect to each other to get 
 the metadata from each other. With this, users can get a global view of metadata across the 
 regions or clouds.
 
@@ -68,8 +65,8 @@ In the meaning time, other query engine support is in the roadmap, including
 
 ### AI asset management (WIP)
 
-The Gravitino is to unify the data management in both data and AI assets. The support AI assets 
-like models, features, and others is under development.
+The goal of Gravitino is to unify the data management in both data and AI assets. The support of AI 
+assets like models, features, and others is under development.
 
 ## Terminology
 
