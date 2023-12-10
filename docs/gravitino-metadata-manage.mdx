@@ -73,10 +73,10 @@ curl -X GET -H "Accept: application/vnd.gravitino.v1+json" -H "Content-Type: app
 ```
 
 ```java
-    // ...
-    GravitinoMetaLake loaded = gravitinoClient.loadMetalake(
-        NameIdentifier.of("metalake"));
-    // ...
+// ...
+GravitinoMetaLake loaded = gravitinoClient.loadMetalake(
+    NameIdentifier.of("metalake"));
+// ...
 ```
 
 ### Alter a metalake
@@ -100,12 +100,12 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" -H "Content-Type: app
 ```
 
 ```java
-    // ...
-    GravitinoMetaLake renamed = gravitinoClient.alterMetalake(
-        NameIdentifier.of("new_metalake"),
-        MetalakeChange.rename("new_metalake_renamed")
-    );
-   // ...
+// ...
+GravitinoMetaLake renamed = gravitinoClient.alterMetalake(
+    NameIdentifier.of("new_metalake"),
+    MetalakeChange.rename("new_metalake_renamed")
+);
+// ...
 ```
 
 Currently, Gravitino supports the following changes to a metalake:
@@ -127,12 +127,16 @@ curl -X DELETE -H "Accept: application/vnd.gravitino.v1+json" -H "Content-Type: 
 ````
 
 ```java
-    // ...
-    boolean success = gravitinoClient.dropMetalake(
-        NameIdentifier.of("metalake")
-    );
-    // ...
+// ...
+boolean success = gravitinoClient.dropMetalake(
+    NameIdentifier.of("metalake")
+);
+// ...
 ```
+
+:::note
+Drop a metalake will only remove metadata about the metalake and catalogs, schemas, tables under the metalake in Gravitino, It will not remove the real data(table and schema) in Apache Hive.
+::::
 
 ### List all metalakes
 
@@ -143,9 +147,9 @@ curl -X GET -H "Accept: application/vnd.gravitino.v1+json" -H "Content-Type: app
 ```
 
 ```java
-    // ...
-    GravitinoMetaLake[] allMetalakes = gravitinoClient.listMetalakes();
-    // ...
+// ...
+GravitinoMetaLake[] allMetalakes = gravitinoClient.listMetalakes();
+// ...
 ```
 ## Catalogs operations
 
@@ -170,26 +174,26 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" -H "Content-Type: ap
 ```
 
 ```java
-    GravitinoClient gravitinoClient = GravitinoClient
-        .builder("http://127.0.0.1:8090")
+GravitinoClient gravitinoClient = GravitinoClient
+    .builder("http://127.0.0.1:8090")
+    .build();
+
+// Assuming you have just created a metalake named `metalake`
+GravitinoMetaLake gravitinoMetaLake =
+    gravitinoClient.loadMetalake(NameIdentifier.of("metalake"));
+
+Map<String, String> hiveProperties = ImmutableMap.<String, String>builder()
+        // You should replace the following with your own hive metastore uris that Gravitino can access
+        .put("metastore.uris", "thrift://localhost:9083")
         .build();
 
-    // Assuming you have just created a metalake named `metalake`
-    GravitinoMetaLake gravitinoMetaLake =
-        gravitinoClient.loadMetalake(NameIdentifier.of("metalake"));
-
-    Map<String, String> hiveProperties = ImmutableMap.<String, String>builder()
-            // You should replace the following with your own hive metastore uris that Gravitino can access
-            .put("metastore.uris", "thrift://localhost:9083")
-            .build();
-
-    Catalog catalog = gravitinoMetaLake.createCatalog(
-        NameIdentifier.of("metalake", "catalog"),
-        Type.RELATIONAL,
-        "hive",
-        "This is a hive catalog",
-        hiveProperties);
-    // ...
+Catalog catalog = gravitinoMetaLake.createCatalog(
+    NameIdentifier.of("metalake", "catalog"),
+    Type.RELATIONAL,
+    "hive",
+    "This is a hive catalog",
+    hiveProperties);
+// ...
 ```
 
 ### Load a catalog
@@ -201,13 +205,13 @@ curl -X GET -H "Accept: application/vnd.gravitino.v1+json" -H "Content-Type: app
 ```
 
 ```java
-    // ...
-    // Assuming you have just created a metalake named `metalake`
-    GravitinoMetaLake gravitinoMetaLake =
-        gravitinoClient.loadMetalake(NameIdentifier.of("metalake"));
+// ...
+// Assuming you have just created a metalake named `metalake`
+GravitinoMetaLake gravitinoMetaLake =
+    gravitinoClient.loadMetalake(NameIdentifier.of("metalake"));
 
-    Catalog catalog = gravitinoMetaLake.loadCatalog(NameIdentifier.of("metalake", "catalog"));
-    // ...
+Catalog catalog = gravitinoMetaLake.loadCatalog(NameIdentifier.of("metalake", "catalog"));
+// ...
 ```    
 
 ### Alter a catalog
@@ -231,14 +235,14 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" -H "Content-Type: app
 ```
 
 ```java
-    // ...
-    // Assuming you have just created a metalake named `metalake`
-    GravitinoMetaLake gravitinoMetaLake =
-        gravitinoClient.loadMetalake(NameIdentifier.of("metalake"));
+// ...
+// Assuming you have just created a metalake named `metalake`
+GravitinoMetaLake gravitinoMetaLake =
+    gravitinoClient.loadMetalake(NameIdentifier.of("metalake"));
 
-    Catalog catalog = gravitinoMetaLake.alterCatalog(NameIdentifier.of("metalake", "catalog"),
-        CatalogChange.rename("alter_catalog"), CatalogChange.updateComment("new comment"));
-    // ...
+Catalog catalog = gravitinoMetaLake.alterCatalog(NameIdentifier.of("metalake", "catalog"),
+    CatalogChange.rename("alter_catalog"), CatalogChange.updateComment("new comment"));
+// ...
 ```
 
 Currently, Gravitino supports the following changes to a catalog:
@@ -260,13 +264,17 @@ curl -X DELETE -H "Accept: application/vnd.gravitino.v1+json" -H "Content-Type: 
 ```
 
 ```java
-    // ...
-    // Assuming you have just created a metalake named `metalake`
-    GravitinoMetaLake gravitinoMetaLake =
-        gravitinoClient.loadMetalake(NameIdentifier.of("metalake"));
-    gravitinoMetaLake.dropCatalog(NameIdentifier.of("metalake", "catalog"));
-    // ...
+// ...
+// Assuming you have just created a metalake named `metalake`
+GravitinoMetaLake gravitinoMetaLake =
+    gravitinoClient.loadMetalake(NameIdentifier.of("metalake"));
+gravitinoMetaLake.dropCatalog(NameIdentifier.of("metalake", "catalog"));
+// ...
 ```
+
+:::note
+Drop a catalog will only remove metadata about the catalog and schemas, tables under the catalog in Gravitino, It will not remove the real data(table and schema) in Apache Hive.
+:::
 
 ### List all catalogs in a metalake
 
@@ -278,13 +286,13 @@ curl -X GET -H "Accept: application/vnd.gravitino.v1+json" -H "Content-Type: app
     ```
 
 ```java
-  // ...
-  // Assuming you have just created a metalake named `metalake`
-  GravitinoMetaLake gravitinoMetaLake =
-      gravitinoClient.loadMetalake(NameIdentifier.of("metalake"));
+// ...
+// Assuming you have just created a metalake named `metalake`
+GravitinoMetaLake gravitinoMetaLake =
+    gravitinoClient.loadMetalake(NameIdentifier.of("metalake"));
 
-  NameIdentifier[] catalogsIdents = gravitinoMetaLake.listCatalogs(Namespace.ofCatalog("metalake"));
-  // ...
+NameIdentifier[] catalogsIdents = gravitinoMetaLake.listCatalogs(Namespace.ofCatalog("metalake"));
+// ...
 ```
 
 ## Schemas operations
@@ -309,27 +317,27 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" -H "Content-Type: ap
 ```
 
 ```java
-    GravitinoClient gravitinoClient = GravitinoClient
-        .builder("http://127.0.0.1:8090")
-        .build();
+GravitinoClient gravitinoClient = GravitinoClient
+    .builder("http://127.0.0.1:8090")
+    .build();
 
-    // Assuming you have just created a metalake named `metalake`
-    GravitinoMetaLake gravitinoMetaLake =
-        gravitinoClient.loadMetalake(NameIdentifier.of("metalake"));
+// Assuming you have just created a metalake named `metalake`
+GravitinoMetaLake gravitinoMetaLake =
+    gravitinoClient.loadMetalake(NameIdentifier.of("metalake"));
 
-    // Assuming you have just created a Hive catalog named `catalog`
-    Catalog catalog = gravitinoMetaLake.loadCatalog(NameIdentifier.of("metalake", "catalog"));
+// Assuming you have just created a Hive catalog named `catalog`
+Catalog catalog = gravitinoMetaLake.loadCatalog(NameIdentifier.of("metalake", "catalog"));
 
-    SupportsSchemas supportsSchemas = catalog.asSchemas();
+SupportsSchemas supportsSchemas = catalog.asSchemas();
 
-    Map<String, String> schemaProperties = ImmutableMap.<String, String>builder()
-        .build();
-    Schema schema = supportsSchemas.createSchema(
-        NameIdentifier.of("metalake", "catalog", "schema"),
-        "This is a schema",
-        schemaProperties
-    );
-    // ...
+Map<String, String> schemaProperties = ImmutableMap.<String, String>builder()
+    .build();
+Schema schema = supportsSchemas.createSchema(
+    NameIdentifier.of("metalake", "catalog", "schema"),
+    "This is a schema",
+    schemaProperties
+);
+// ...
 ```
 
 ### Load a schema
@@ -342,12 +350,12 @@ curl -X GET -H "Accept: application/vnd.gravitino.v1+json" -H "Content-Type: app
 ```
 
 ```java
-    // ...
-    // Assuming you have just created a Hive catalog named `hive_catalog`
-    Catalog catalog = gravitinoMetaLake.loadCatalog(NameIdentifier.of("metalake", "catalog"));
-    SupportsSchemas supportsSchemas = catalog.asSchemas();
-    Schema schema = supportsSchemas.loadSchema(NameIdentifier.of("metalake", "catalog", "schema"));
-    // ...
+// ...
+// Assuming you have just created a Hive catalog named `hive_catalog`
+Catalog catalog = gravitinoMetaLake.loadCatalog(NameIdentifier.of("metalake", "catalog"));
+SupportsSchemas supportsSchemas = catalog.asSchemas();
+Schema schema = supportsSchemas.loadSchema(NameIdentifier.of("metalake", "catalog", "schema"));
+// ...
 ```
 
 ### Alter a schema
@@ -369,16 +377,16 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" -H "Content-Type: app
 ```
 
 ```java
-    // ...
-    // Assuming you have just created a Hive catalog named `hive_catalog`
-    Catalog catalog = gravitinoMetaLake.loadCatalog(NameIdentifier.of("metalake", "hive_catalog"));
+// ...
+// Assuming you have just created a Hive catalog named `hive_catalog`
+Catalog catalog = gravitinoMetaLake.loadCatalog(NameIdentifier.of("metalake", "hive_catalog"));
 
-    SupportsSchemas supportsSchemas = catalog.asSchemas();
+SupportsSchemas supportsSchemas = catalog.asSchemas();
 
-    Schema schema = supportsSchemas.alterSchema(NameIdentifier.of("metalake", "hive_catalog", "schema"),
-        SchemaChange.removeProperty("key1"),
-        SchemaChange.setProperty("key2", "value2"));
-    // ...
+Schema schema = supportsSchemas.alterSchema(NameIdentifier.of("metalake", "hive_catalog", "schema"),
+    SchemaChange.removeProperty("key1"),
+    SchemaChange.setProperty("key2", "value2"));
+// ...
 ```
 
 Currently, Gravitino supports the following changes to a schema:
@@ -399,13 +407,13 @@ curl -X DELETE -H "Accept: application/vnd.gravitino.v1+json" -H "Content-Type: 
 ```
 
 ```java
-    // ...
-    // Assuming you have just created a Hive catalog named `hive_catalog`
-    Catalog catalog = gravitinoMetaLake.loadCatalog(NameIdentifier.of("metalake", "catalog"));
+// ...
+// Assuming you have just created a Hive catalog named `hive_catalog`
+Catalog catalog = gravitinoMetaLake.loadCatalog(NameIdentifier.of("metalake", "catalog"));
 
-    SupportsSchemas supportsSchemas = catalog.asSchemas();
-    // cascade can be true or false
-    supportsSchemas.dropSchema(NameIdentifier.of("metalake", "catalog", "schema"), true);
+SupportsSchemas supportsSchemas = catalog.asSchemas();
+// cascade can be true or false
+supportsSchemas.dropSchema(NameIdentifier.of("metalake", "catalog", "schema"), true);
 ```
 
 ### List all schemas under a catalog
@@ -417,12 +425,12 @@ curl -X GET -H "Accept: application/vnd.gravitino.v1+json" -H "Content-Type: app
 ```
 
 ```java
-    // ...
-    // Assuming you have just created a Hive catalog named `hive_catalog`
-    Catalog catalog = gravitinoMetaLake.loadCatalog(NameIdentifier.of("metalake", "catalog"));
+// ...
+// Assuming you have just created a Hive catalog named `hive_catalog`
+Catalog catalog = gravitinoMetaLake.loadCatalog(NameIdentifier.of("metalake", "catalog"));
 
-    SupportsSchemas supportsSchemas = catalog.asSchemas();
-    NameIdentifier[] schemas = supportsSchemas.listSchemas(Namespace.ofSchema("metalake", "catalog"));
+SupportsSchemas supportsSchemas = catalog.asSchemas();
+NameIdentifier[] schemas = supportsSchemas.listSchemas(Namespace.ofSchema("metalake", "catalog"));
 ```
 
 ## Tables operations
@@ -460,41 +468,41 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" -H "Content-Type: ap
 ```
 
 ```java
-    GravitinoClient gravitinoClient = GravitinoClient
-        .builder("http://127.0.0.1:8090")
+GravitinoClient gravitinoClient = GravitinoClient
+    .builder("http://127.0.0.1:8090")
+    .build();
+
+// Assuming you have just created a metalake named `metalake`
+GravitinoMetaLake gravitinoMetaLake =
+    gravitinoClient.loadMetalake(NameIdentifier.of("metalake"));
+
+// Assuming you have just created a Hive catalog named `hive_catalog`
+Catalog catalog = gravitinoMetaLake.loadCatalog(NameIdentifier.of("metalake", "catalog"));
+
+TableCatalog tableCatalog = catalog.asTableCatalog();
+Map<String, String> tablePropertiesMap = ImmutableMap.<String, String>builder()
+        .put("format", "ORC")
+        // For more table properties, please refer to the related doc.
         .build();
-
-    // Assuming you have just created a metalake named `metalake`
-    GravitinoMetaLake gravitinoMetaLake =
-        gravitinoClient.loadMetalake(NameIdentifier.of("metalake"));
-
-    // Assuming you have just created a Hive catalog named `hive_catalog`
-    Catalog catalog = gravitinoMetaLake.loadCatalog(NameIdentifier.of("metalake", "catalog"));
-
-    TableCatalog tableCatalog = catalog.asTableCatalog();
-    Map<String, String> tablePropertiesMap = ImmutableMap.<String, String>builder()
-            .put("format", "ORC")
-            // For more table properties, please refer to the related doc.
-            .build();
-    tableCatalog.createTable(
-        NameIdentifier.of("metalake", "catalog", "schema", "table"),
-        new ColumnDTO[] {
-            ColumnDTO.builder()
-                .withComment("Id of the user")
-                .withName("id")
-                .withDataType(Types.IntegerType.get())
-                .withNullable(true)
-                .build(),
-            ColumnDTO.builder()
-                .withComment("Name of the user")
-                .withName("name")
-                .withDataType(Types.VarCharType.of(1000))
-                .withNullable(true)
-                .build(),
-        },
-        "Create a new Table",
-        tablePropertiesMap
-    );
+tableCatalog.createTable(
+    NameIdentifier.of("metalake", "catalog", "schema", "table"),
+    new ColumnDTO[] {
+        ColumnDTO.builder()
+            .withComment("Id of the user")
+            .withName("id")
+            .withDataType(Types.IntegerType.get())
+            .withNullable(true)
+            .build(),
+        ColumnDTO.builder()
+            .withComment("Name of the user")
+            .withName("name")
+            .withDataType(Types.VarCharType.of(1000))
+            .withNullable(true)
+            .build(),
+    },
+    "Create a new Table",
+    tablePropertiesMap
+);
 ```
 
 In addition to the basic settings, you support the following features:
@@ -574,56 +582,56 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" -H "Content-Type: ap
 ```
 
 ```java
-  tableCatalog.createTable(
-        NameIdentifier.of("metalake", "hive_catalog", "schema", "table"),
-        new ColumnDTO[] {
-        ColumnDTO.builder()
-        .withComment("Id of the user")
-        .withName("id")
-        .withDataType(Types.IntegerType.get())
-        .withNullable(true)
-        .build(),
-        ColumnDTO.builder()
-        .withComment("Name of the user")
-        .withName("name")
-        .withDataType(Types.VarCharType.of(1000))
-        .withNullable(true)
-        .build(),
-        ColumnDTO.builder()
-        .withComment("Age of the user")
-        .withName("age")
-        .withDataType(Types.ShortType.get())
-        .withNullable(true)
-        .build(),
+tableCatalog.createTable(
+    NameIdentifier.of("metalake", "hive_catalog", "schema", "table"),
+    new ColumnDTO[] {
+    ColumnDTO.builder()
+    .withComment("Id of the user")
+    .withName("id")
+    .withDataType(Types.IntegerType.get())
+    .withNullable(true)
+    .build(),
+    ColumnDTO.builder()
+    .withComment("Name of the user")
+    .withName("name")
+    .withDataType(Types.VarCharType.of(1000))
+    .withNullable(true)
+    .build(),
+    ColumnDTO.builder()
+    .withComment("Age of the user")
+    .withName("age")
+    .withDataType(Types.ShortType.get())
+    .withNullable(true)
+    .build(),
 
-        ColumnDTO.builder()
-        .withComment("Score of the user")
-        .withName("score")
-        .withDataType(Types.DoubleType.get())
-        .withNullable(true)
-        .build(),
-        },
-        "Create a new Table",
-        tablePropertiesMap,
-        new Transform[] {
-        // Partition by id
-        Transforms.identity("score")
-        },
-        // CLUSTERED BY id
-        new DistributionDTO.Builder()
-        .withStrategy(Strategy.HASH)
-        .withNumber(4)
-        .withArgs(FieldReferenceDTO.of("id"))
-        .build(),
-        // SORTED BY name asc
-        new SortOrderDTO[] {
-        new SortOrderDTO.Builder()
-        .withDirection(SortDirection.ASCENDING)
-        .withNullOrder(NullOrdering.NULLS_LAST)
-        .withSortTerm(FieldReferenceDTO.of("name"))
-        .build()
-        }
-        );
+    ColumnDTO.builder()
+    .withComment("Score of the user")
+    .withName("score")
+    .withDataType(Types.DoubleType.get())
+    .withNullable(true)
+    .build(),
+    },
+    "Create a new Table",
+    tablePropertiesMap,
+    new Transform[] {
+    // Partition by id
+    Transforms.identity("score")
+    },
+    // CLUSTERED BY id
+    new DistributionDTO.Builder()
+    .withStrategy(Strategy.HASH)
+    .withNumber(4)
+    .withArgs(FieldReferenceDTO.of("id"))
+    .build(),
+    // SORTED BY name asc
+    new SortOrderDTO[] {
+    new SortOrderDTO.Builder()
+    .withDirection(SortDirection.ASCENDING)
+    .withNullOrder(NullOrdering.NULLS_LAST)
+    .withSortTerm(FieldReferenceDTO.of("name"))
+    .build()
+    }
+    );
 ```
 
 ### Load a table
@@ -636,13 +644,13 @@ curl -X GET -H "Accept: application/vnd.gravitino.v1+json" -H "Content-Type: app
 ```
 
 ```java
-    // ...
-    // Assuming you have just created a Hive catalog named `catalog`
-    Catalog catalog = gravitinoMetaLake.loadCatalog(NameIdentifier.of("metalake", "catalog"));
+// ...
+// Assuming you have just created a Hive catalog named `catalog`
+Catalog catalog = gravitinoMetaLake.loadCatalog(NameIdentifier.of("metalake", "catalog"));
 
-    TableCatalog tableCatalog = catalog.asTableCatalog();
-    tableCatalog.loadTable(NameIdentifier.of("metalake", "hive_catalog", "schema", "table")); 
-    // ...
+TableCatalog tableCatalog = catalog.asTableCatalog();
+tableCatalog.loadTable(NameIdentifier.of("metalake", "hive_catalog", "schema", "table"));
+// ...
 ```
 
 ### Alter a table
@@ -664,15 +672,15 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" -H "Content-Type: app
 ```
 
 ```java
-    // ...
-    // Assuming you have just created a Hive catalog named `catalog`
-    Catalog catalog = gravitinoMetaLake.loadCatalog(NameIdentifier.of("metalake", "catalog"));
+// ...
+// Assuming you have just created a Hive catalog named `catalog`
+Catalog catalog = gravitinoMetaLake.loadCatalog(NameIdentifier.of("metalake", "catalog"));
 
-    TableCatalog tableCatalog = catalog.asTableCatalog();
+TableCatalog tableCatalog = catalog.asTableCatalog();
 
-    Table t = tableCatalog.alterTable(NameIdentifier.of("metalake", "catalog", "schema", "table"),
-        TableChange.rename("table_renamed"), TableChange.updateComment("xxx"));
-    // ...
+Table t = tableCatalog.alterTable(NameIdentifier.of("metalake", "catalog", "schema", "table"),
+    TableChange.rename("table_renamed"), TableChange.updateComment("xxx"));
+// ...
 ```
 
 Currently, Gravitino supports the following changes to a table:
@@ -700,13 +708,13 @@ curl -X DELETE -H "Accept: application/vnd.gravitino.v1+json" -H "Content-Type: 
 ```
 
 ```java
-    // ...
-    // Assuming you have just created a Hive catalog named `hive_catalog`
-    Catalog catalog = gravitinoMetaLake.loadCatalog(NameIdentifier.of("metalake", "catalog"));
+// ...
+// Assuming you have just created a Hive catalog named `hive_catalog`
+Catalog catalog = gravitinoMetaLake.loadCatalog(NameIdentifier.of("metalake", "catalog"));
 
-    TableCatalog tableCatalog = catalog.asTableCatalog();
-    tableCatalog.dropTable(NameIdentifier.of("metalake", "catalog", "schema", "table"));
-    // ...
+TableCatalog tableCatalog = catalog.asTableCatalog();
+tableCatalog.dropTable(NameIdentifier.of("metalake", "catalog", "schema", "table"));
+// ...
 ```
 
 ### List all tables under a schema
@@ -718,12 +726,12 @@ curl -X GET -H "Accept: application/vnd.gravitino.v1+json" -H "Content-Type: app
 ```
 
 ```java
-    // ...
-    // Assuming you have just created a Hive catalog named `hive_catalog`
-    Catalog catalog = gravitinoMetaLake.loadCatalog(NameIdentifier.of("metalake", "catalog"));
+// ...
+// Assuming you have just created a Hive catalog named `hive_catalog`
+Catalog catalog = gravitinoMetaLake.loadCatalog(NameIdentifier.of("metalake", "catalog"));
 
-    TableCatalog tableCatalog = catalog.asTableCatalog();
-    NameIdentifier[] identifiers =
-        tableCatalog.listTables(Namespace.ofTable("metalake", "catalog", "schema"));
-    // ...
+TableCatalog tableCatalog = catalog.asTableCatalog();
+NameIdentifier[] identifiers =
+    tableCatalog.listTables(Namespace.ofTable("metalake", "catalog", "schema"));
+// ...
 ```
