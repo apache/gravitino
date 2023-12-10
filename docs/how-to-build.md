@@ -4,8 +4,6 @@ slug: /how-to-build
 license: Copyright 2023 Datastrato Pvt. This software is licensed under the Apache License version 2.
 ---
 
-# How to build Gravitino
-
 ## Prerequisites
 
 + Linux or macOS operating system
@@ -14,7 +12,6 @@ license: Copyright 2023 Datastrato Pvt. This software is licensed under the Apac
 + Optionally Docker to run integration tests
 
 :::info Please read the following notes first
-
 + Gravitino requires at least JDK8 and at most JDK17 to run Gradle, so you need to
   install JDK8 to 17 version to launch the build environment.
 
@@ -32,7 +29,6 @@ license: Copyright 2023 Datastrato Pvt. This software is licensed under the Apac
   Alternatively, you can use OrbStack to replace Docker for macOS, please see
   [OrbStack](https://orbstack.dev/), with OrbStack you can run Gravitino integration tests
   without needing to install "docker-connector".
-
 :::
 
 ## Quick start
@@ -51,9 +47,7 @@ license: Copyright 2023 Datastrato Pvt. This software is licensed under the Apac
     ```
 
 :::note
-
 The first time you build the project, downloading the dependencies may take a while. You can add `-x test` to skip the test, like `./gradlew build -x test`.
-
 :::
 
 3. Get the Gravitino binary package.
@@ -67,9 +61,7 @@ The first time you build the project, downloading the dependencies may take a wh
    The directory structure of the `distribution` directory is as follows:
 
 :::note 
-
 The `./gradlew clean` command deletes the `distribution` directory.
-
 :::
 
 4. Assemble the Gravitino distribution package.
@@ -83,9 +75,7 @@ The `./gradlew clean` command deletes the `distribution` directory.
    You can deploy them to your production environment.
 
 :::note
-
 The `gravitino-{version}-bin.tar.gz` file is the Gravitino Server distribution package, and the `gravitino-{version}-bin.tar.gz.sha256` file is the sha256 checksum file for the Gravitino Server distribution package.
-
 :::
 
 5. Assemble Gravitino Trino connector package
