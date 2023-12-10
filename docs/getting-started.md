@@ -6,17 +6,17 @@ license: "Copyright 2023 Datastrato Pvt Ltd. This software is licensed under the
 
 There are several options for getting started with Gravitino. Installing and configuring Hive and Trino can be a little complex, so if you are unfamiliar with the technologies it would be best to use Docker.
 
-If you want to download and install Gravitino, on AWS see [Getting started on Amazon Web Services](#getting-started-on-amazon-web-services) 
-or Google Cloud Platform see [Getting started on Google Cloud Platform](#getting-started-on-google-cloud-platform) 
+If you want to download and install Gravitino, on AWS see [Getting started on Amazon Web Services](#getting-started-on-amazon-web-services)
+or Google Cloud Platform see [Getting started on Google Cloud Platform](#getting-started-on-google-cloud-platform)
 or locally see [Getting started locally](#getting-started-locally).
 
-If you have your own Gravitino setup and want to use Apache Hive on AWS or Google 
-Cloud Platform see [Installing Apache Hive on AWS or Google Cloud Platform](#installing-apache-hive-on-aws-or-google-cloud-platform) or locally see 
+If you have your own Gravitino setup and want to use Apache Hive on AWS or Google
+Cloud Platform see [Installing Apache Hive on AWS or Google Cloud Platform](#installing-apache-hive-on-aws-or-google-cloud-platform) or locally see
 [Installing Apache Hive locally](#installing-apache-hive-locally).
 
-If you prefer to get started quickly and use Docker for Gravitino, Apache Hive, Trino and others on 
-AWS or Google Cloud Platform see [Installing Gravitino playground on AWS or Google Cloud Platform](#installing-gravitino-playground-on-aws-or-google-cloud-platform) or locally see 
-or locally see [Installing Gravitino playground locally](#installing-gravitino-playground-locally). 
+If you prefer to get started quickly and use Docker for Gravitino, Apache Hive, Trino and others on
+AWS or Google Cloud Platform see [Installing Gravitino playground on AWS or Google Cloud Platform](#installing-gravitino-playground-on-aws-or-google-cloud-platform) or locally see
+or locally see [Installing Gravitino playground locally](#installing-gravitino-playground-locally).
 
 If you are using AWS and want to access the instance remotely, be sure to read [Accessing Gravitino on AWS externally](#accessing-gravitino-on-aws-externally)
 
@@ -59,11 +59,11 @@ To begin using Gravitino on AWS, follow these steps:
    You should see information about OpenJDK 8.
 
 5. Install Gravitino on the instance:
-   
-   You can install Gravitino from our binary release package or Docker image, please follow the 
+
+   You can install Gravitino from our binary release package or Docker image, please follow the
    [how-to-install](./how-to-install) to install Gravitino.
 
-   Or, you can install Gravitino from scratch, please follow the documentation of 
+   Or, you can install Gravitino from scratch, please follow the documentation of
    [how-to-build](./how-to-build) and [how-to-install](./how-to-install) to install Gravitino.
 
 6. Start Gravitino using the gravitino.sh script:
@@ -145,11 +145,11 @@ To use Gravitino locally on macOS or Linux, follow similar steps:
 
 ## Installing Apache Hive on AWS or Google Cloud Platform
 
-If you already have Apache Hive, Apache Hadoop in your environment, you can ignore this section 
+If you already have Apache Hive, Apache Hadoop in your environment, you can ignore this section
 and use them with Gravitino.
 
-You can install Apache Hive and Hadoop on AWS or Google Cloud Platform on your own, just follow 
-the steps of how to install [Apache Hive](https://cwiki.apache.org/confluence/display/Hive/) and 
+You can install Apache Hive and Hadoop on AWS or Google Cloud Platform manually, please follow
+the steps of how to install [Apache Hive](https://cwiki.apache.org/confluence/display/Hive/) and
 [Hadoop](https://hadoop.apache.org/docs/stable/hadoop-project-dist/hadoop-common/SingleCluster.html) instructions on their websites.
 
 Installing and configuring Hive can be a little complex. If you don't already have Hive setup and running you can use the Docker container Datastrato provide to get Gravitino up and running.
@@ -168,13 +168,13 @@ sudo docker start gravitino-container
 
 ## Installing Apache Hive locally
 
-The same steps apply for installing Hive locally as on AWS or Google Cloud Platform. You can 
+The same steps apply for installing Hive locally as on AWS or Google Cloud Platform. You can
 follow the instructions for [Installing Apache Hive on AWS or Google Cloud Platform](#installing-apache-hive-on-aws-or-google-cloud-platform).
 
 ## Installing Gravitino playground on AWS or Google Cloud Platform
 
-Gravitino provides a bundle of Docker images to launch a Gravitino playground, which 
-includes Apache Hive, Apache Hadoop, Trino, MySQL, PostgresSQL, and Gravitino. You can use 
+Gravitino provides a bundle of Docker images to launch a Gravitino playground, which
+includes Apache Hive, Apache Hadoop, Trino, MySQL, PostgresSQL, and Gravitino. You can use
 Docker compose to start them all.
 
 Installing Docker and Docker Compose is a requirement to using the playground.
@@ -185,9 +185,9 @@ sudo gpasswd -a $USER docker
 newgrp docker
 ```
 
-You can install and run all the programs as Docker containers by using the 
-[playground](https://github.com/datastrato/gravitino-playground). For the details of how to run the 
-playground, please see [playground-doc](xxx)
+You can install and run all the programs as Docker containers by using the
+[gravitino-playground](https://github.com/datastrato/gravitino-playground). For the details of
+how to run the playground, please see [how-to-use-the-playground](./how-to-use-the-playground)
 
 ## Installing Gravitino playground locally
 
@@ -205,21 +205,21 @@ After starting the Gravitino distribution, issue REST commands to create and mod
    -H "Content-Type: application/json" \
    -d '{"name":"metalake","comment":"Test metalake"}' http://localhost:8090/api/metalakes
    ```
-   
+
    Verify the MetaLakes creation
-   
+
    ```shell
    curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
    -H "Content-Type: application/json" \
    http://localhost:8090/api/metalakes
-   
+
    curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
    -H "Content-Type: application/json" \
    http://localhost:8090/api/metalakes/metalake
    ```
-   
+
    Note that if you request a Metalake that doesn't exist you get an *NoSuchMetalakeException* error.
-   
+
    ```shell
    curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
    -H "Content-Type: application/json" \
@@ -229,30 +229,30 @@ After starting the Gravitino distribution, issue REST commands to create and mod
 2. Create a catalog in Hive
 
    First, list the current catalogs to show that no catalogs exist.
-   
+
    ```shell
    curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
    -H "Content-Type: application/json" \
    http://localhost:8090/api/metalakes/metalake/catalogs
    ```
-   
+
    Create a new Hive catalog.
-   
+
    ```shell
    curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
    -H "Content-Type: application/json" \
    -d '{"name":"test","comment":"Test catalog", "type":"RELATIONAL", "provider":"hive", "properties":{"metastore.uris":"thrift://localhost:9083"}}' \
    http://localhost:8090/api/metalakes/metalake/catalogs
    ```
-   
+
    Verify the creation of the catalog.
-   
+
    ```shell
    curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
    -H "Content-Type: application/json" \
    http://localhost:8090/api/metalakes/metalake/catalogs
    ```
-   
+
    Note that the metastore.uris used for the Hive catalog and would need updating if you change your configuration.
 
 ## Accessing Gravitino on AWS externally
@@ -265,7 +265,7 @@ AWS assigns your instance a public IP address, but Gravitino can't bind to that 
 ip a
 ```
 
-Once you have identified the internal address, edit the Gravitino configuration to bind to that 
+Once you have identified the internal address, edit the Gravitino configuration to bind to that
 address. Open the file `<path-to-gravitino>/conf/gravitino.conf` and modify the `gravitino.server.
 webserver.host` parameter from `127.0.0.1` to your AWS instance's private IP4 address, or you can use '0.0.0.0'. '0.0.0.0' in this context means the host's IP address. Restart the Gravitino server for the change to take effect.
 
