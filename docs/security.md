@@ -1,9 +1,9 @@
----
+-----------------
 title: "Security"
 slug: /security
 keyword: security
 license: "Copyright 2023 Datastrato Pvt Ltd. This software is licensed under the Apache License version 2."
----
+-----------------
 
 ## Authentication
 
@@ -80,30 +80,30 @@ You can follow the steps to set up an OAuth mode Gravitino server.
 You need to install the JDK8 and Docker.
 
 2. Set up an external OAuth 2.0 server
-We build a sample-authorization-server based on [spring-authorization-server](https://github.com/spring-projects/spring-authorization-server/tree/1.0.3).
-We have registered a client information in the external OAuth 2.0 server.
+There is a sample-authorization-server based on [spring-authorization-server](https://github.com/spring-projects/spring-authorization-server/tree/1.0.3).
+The image has registered a client information in the external OAuth 2.0 server.
 Its clientId is `test`. Its secret is `test`. Its scope is `test`.
 ```shell
  docker run -p 8177:8177 --name sample-auth-server -d datastrato/sample-authorization-server:0.3.0
 ```
 
-3. Open the url http://localhost:8177/oauth2/jwks in the browser and you can get the JKS.
-   ![jks_image](assets/jks.png)
+3. Open [the JWK URL of the Authorization server](http://localhost:8177/oauth2/jwks) in the browser and you can get the JWK.
+   ![jks_response_image](assets/jks.png)
 
-4. Convert the JKS to PEM. You can use the [online tool](https://8gwifi.org/jwkconvertfunctions.jsp#google_vignette) or other tools.
-   ![pem_image](assets/pem.png)
+4. Convert the JWK to PEM. You can use the [online tool](https://8gwifi.org/jwkconvertfunctions.jsp#google_vignette) or other tools.
+   ![pem_convert_result_image](assets/pem.png)
 
 5. Copy the public key and remove the character `\n` and you can get the default signing key of Gravitino server.
 
 6. You can refer to the [Configurations](gravitino-server-config) and append the configurations to the conf/gravitino.conf.
-```
+```text
 gravitino.authenticator oauth
 gravitino.authenticator.oauth.serviceAudience test
 gravitino.authenticator.oauth.defaultSignKey <the default signing key>
 gravitino.authenticator.oauth.tokenPath /oauth2/token
 gravitino.authenticator.oauth.serverUri http://localhost:8177
 ```
-7. Open the [url](http://localhost:8090) and login in with clientId `test`, clientSecret `test` and scope `test`.
+7. Open [the URL of Gravitino server](http://localhost:8090) and login in with clientId `test`, clientSecret `test` and scope `test`.
    ![oauth_login_image](assets/oauth.png)
 
 8. You can also use curl command to access Gravitino.
@@ -164,7 +164,7 @@ You can follow the steps to set up a HTTPS server.
 
 1. Prerequisite
 You need to install the JDK8, wget and set the environment JAVA_HOME.
-If you want to use the command `curl` to request the Gravitino server, you should install openssl.
+If you want to use the command `curl` to request the Gravitino server, you should install openSSL.
 
 2. Generate the key store
 ```shell
@@ -190,7 +190,7 @@ bin/keytool -import -alias localhost -keystore jre/lib/security/cacerts -file lo
 5. You can refer to the [Configurations](gravitino-server-config) and append the configurations to the conf/gravitino.conf.
 Configuration doesn't support to resolve environment variable, so you should replace ${JAVA_HOME} with the actual value.
 Then, You can start the Gravitino server.
-```
+```text
 gravitino.server.webserver.host localhost
 gravitino.server.webserver.enableHttps true
 gravitino.server.webserver.keyStorePath ${JAVA_HOME}/localhost.jks
