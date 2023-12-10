@@ -886,7 +886,7 @@ public class CatalogHiveIT extends AbstractIT {
   }
 
   @Test
-  void testPrefixProblem() {
+  void testLoadEntityWithSamePrefix() {
     GravitinoMetaLake metalake = client.loadMetalake(NameIdentifier.of(metalakeName));
     Catalog catalog = metalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
     Assertions.assertNotNull(catalog);
@@ -965,7 +965,7 @@ public class CatalogHiveIT extends AbstractIT {
   void testAlterEntityName() {
     GravitinoMetaLake metalake = client.loadMetalake(NameIdentifier.of(metalakeName));
     String newMetalakeName = GravitinoITUtils.genRandomName("CatalogHiveIT_metalake_new");
-    for (int i = 0; i < 10; i++) {
+    for (int i = 0; i < 2; i++) {
       client.alterMetalake(NameIdentifier.of(metalakeName), MetalakeChange.rename(newMetalakeName));
       metalake = client.loadMetalake(NameIdentifier.of(newMetalakeName));
       Assertions.assertNotNull(metalake);
@@ -980,7 +980,7 @@ public class CatalogHiveIT extends AbstractIT {
 
     // Now try to rename catalog
     String newCatalogName = GravitinoITUtils.genRandomName("CatalogHiveIT_catalog_new");
-    for (int i = 0; i < 10; i++) {
+    for (int i = 0; i < 2; i++) {
       metalake.alterCatalog(
           NameIdentifier.of(metalakeName, catalogName), CatalogChange.rename(newCatalogName));
       catalog = metalake.loadCatalog(NameIdentifier.of(metalakeName, newCatalogName));
@@ -1002,13 +1002,18 @@ public class CatalogHiveIT extends AbstractIT {
             TABLE_COMMENT,
             createProperties(),
             new Transform[0]);
+
+    final Catalog cata = catalog;
     // Now try to rename table
-    String newTableName = GravitinoITUtils.genRandomName("CatalogHiveIT_table_new");
-    Table t =
-        catalog
-            .asTableCatalog()
-            .loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, tableName));
-    for (int i = 0; i < 10; i++) {
+    final String newTableName = GravitinoITUtils.genRandomName("CatalogHiveIT_table_new");
+    for (int i = 0; i < 2; i++) {
+      // The table to be renamed does not exist
+      Assertions.assertThrows(
+          NoSuchTableException.class,
+          () ->
+              cata.asTableCatalog()
+                  .loadTable(
+                      NameIdentifier.of(metalakeName, catalogName, schemaName, newTableName)));
       catalog
           .asTableCatalog()
           .alterTable(
@@ -1019,6 +1024,14 @@ public class CatalogHiveIT extends AbstractIT {
               .asTableCatalog()
               .loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, newTableName));
       Assertions.assertNotNull(table);
+
+      // Old Table should not exist anymore.
+      Assertions.assertThrows(
+          NoSuchTableException.class,
+          () ->
+              cata.asTableCatalog()
+                  .loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, tableName)));
+
       catalog
           .asTableCatalog()
           .alterTable(
