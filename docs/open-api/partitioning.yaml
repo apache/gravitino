@@ -1,0 +1,179 @@
+#
+# Copyright 2023 Datastrato Pvt Ltd.
+# This software is licensed under the Apache License version 2.
+#
+
+---
+
+components:
+  schemas:
+    PartitioningSpec:
+      oneOf:
+        - $ref: "#/components/schemas/IdentityPartitioning"
+        - $ref: "#/components/schemas/YearPartitioning"
+        - $ref: "#/components/schemas/MonthPartitioning"
+        - $ref: "#/components/schemas/DayPartitioning"
+        - $ref: "#/components/schemas/HourPartitioning"
+        - $ref: "#/components/schemas/BucketPartitioning"
+        - $ref: "#/components/schemas/TruncatePartitioning"
+        - $ref: "#/components/schemas/ListPartitioning"
+        - $ref: "#/components/schemas/RangePartitioning"
+        - $ref: "#/components/schemas/FunctionPartitioning"
+      discriminator:
+        propertyName: strategy
+        mapping:
+          identity: "#/components/schemas/IdentityPartitioning"
+          year: "#/components/schemas/YearPartitioning"
+          month: "#/components/schemas/MonthPartitioning"
+          day: "#/components/schemas/DayPartitioning"
+          hour: "#/components/schemas/HourPartitioning"
+          bucket: "#/components/schemas/BucketPartitioning"
+          truncate: "#/components/schemas/TruncatePartitioning"
+          list: "#/components/schemas/ListPartitioning"
+          range: "#/components/schemas/RangePartitioning"
+          function: "#/components/schemas/FunctionPartitioning"
+
+    IdentityPartitioning:
+      type: object
+      required:
+        - strategy
+        - fieldName
+      properties:
+        strategy:
+          type: string
+          enum:
+            - "identity"
+        fieldName:
+          $ref: "./tables.yaml#/components/schemas/FieldName"
+
+    YearPartitioning:
+      type: object
+      required:
+        - strategy
+        - fieldName
+      properties:
+        strategy:
+          type: string
+          enum:
+            - "year"
+        fieldName:
+          $ref: "./tables.yaml#/components/schemas/FieldName"
+
+    MonthPartitioning:
+      type: object
+      required:
+        - strategy
+        - fieldName
+      properties:
+        strategy:
+          type: string
+          enum:
+            - "month"
+        fieldName:
+          $ref: "./tables.yaml#/components/schemas/FieldName"
+
+    DayPartitioning:
+      type: object
+      required:
+        - strategy
+        - fieldName
+      properties:
+        strategy:
+          type: string
+          enum:
+            - "day"
+        fieldName:
+          $ref: "./tables.yaml#/components/schemas/FieldName"
+
+    HourPartitioning:
+      type: object
+      required:
+        - strategy
+        - fieldName
+      properties:
+        strategy:
+          type: string
+          enum:
+            - "hour"
+        fieldName:
+          $ref: "./tables.yaml#/components/schemas/FieldName"
+
+    BucketPartitioning:
+      type: object
+      required:
+        - strategy
+        - numBuckets
+        - fieldNames
+      properties:
+        strategy:
+          type: string
+          enum:
+            - "bucket"
+        numBuckets:
+          type: integer
+          description: The number of buckets
+        fieldNames:
+          $ref: "./tables.yaml#/components/schemas/FieldNames"
+
+    TruncatePartitioning:
+      type: object
+      required:
+        - strategy
+        - width
+        - fieldName
+      properties:
+        strategy:
+          type: string
+          enum:
+            - "truncate"
+        width:
+          type: integer
+          description: The width of the truncate
+        fieldName:
+          $ref: "./tables.yaml#/components/schemas/FieldName"
+
+    ListPartitioning:
+      type: object
+      required:
+        - strategy
+        - fieldNames
+      properties:
+        strategy:
+          type: string
+          enum:
+            - "list"
+        fieldNames:
+          $ref: "./tables.yaml#/components/schemas/FieldNames"
+
+    RangePartitioning:
+      type: object
+      required:
+        - strategy
+        - fieldName
+      properties:
+        strategy:
+          type: string
+          enum:
+            - "range"
+        fieldName:
+          $ref: "./tables.yaml#/components/schemas/FieldName"
+
+    FunctionPartitioning:
+      type: object
+      required:
+        - strategy
+        - funcName
+        - funcArgs
+      properties:
+        strategy:
+          type: string
+          enum:
+            - "function"
+        funcName:
+          type: string
+          description: The name of the partitioning function
+        funcArgs:
+          type: array
+          description: The arguments of the partitioning function
+          items:
+            $ref: "./expression.yaml#/components/schemas/FunctionArg"
