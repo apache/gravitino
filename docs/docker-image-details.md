@@ -6,8 +6,11 @@ license: Copyright 2023 Datastrato Pvt Ltd. This software is licensed under the 
 ---
 
 # User Docker images
+
 There are 2 kinds of docker images for user Docker images: the Gravitino Docker image and playground Docker images.
+
 ## Gravitino Docker image
+
 You can deploy the service with Gravitino Docker image.
 
 Container startup commands
@@ -23,11 +26,13 @@ gravitino:0.3.0
   - `8090` Gravitino Web UI
 
 ## Playground Docker image
+
 You can use the [playground](https://github.com/datastrato/gravitino-playground) to experience the whole Gravitino system with other components. 
 The playground consists of multiple Docker images.
 The Docker images of playground have suitable configurations for users to experience.
 
 ### Hive image
+
 Changelog
 - hive:2.7.3-no-yarn
   - Docker image `datastrato/hive:2.7.3-no-yarn`
@@ -36,6 +41,7 @@ Changelog
   - Not start YARN when container startup
 
 ### Trino image
+
 Changelog
 - trino:426-gravitino-0.3.0-SNAPSHOT
   - Docker image `datastrato/trino:426-gravitino-0.3.0-SNAPSHOT`
@@ -43,9 +49,12 @@ Changelog
   - Added Gravitino trino-connector-0.3.0-SNAPSHOT libraries into the `/usr/lib/trino/plugin/gravitino`
 
 # Developer Docker images
+
 You can use this kind of the Docker images to facilitate Gravitino integration testing.
 You can use it to test all catalog and connector modules within Gravitino.
+
 ## Gravitino CI Apache Hive image
+
 You can use this kind of images to test the catalog of Apache Hive.
 
 Container startup commands
@@ -90,7 +99,9 @@ Changelog
     - `9083` Hive Metastore
     - `10000` HiveServer2
     - `10002` HiveServer2 HTTP
+
 ## Gravitino CI Trino image
+
 You can use this kind of images to test Trino.
 
 Container startup commands
