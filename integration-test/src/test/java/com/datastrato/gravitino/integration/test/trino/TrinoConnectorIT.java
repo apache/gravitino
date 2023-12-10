@@ -22,12 +22,14 @@ import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.types.Types;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Map;
+import java.util.Set;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.thrift.TException;
@@ -466,20 +468,31 @@ public class TrinoConnectorIT extends AbstractIT {
     return false;
   }
 
-  private ColumnDTO[] createMySQLFullTypeColumns() {
+  private ColumnDTO[] createHiveFullTypeColumns() {
     ColumnDTO[] columnDTO = createFullTypeColumns();
+    Set<String> ignoreType = Sets.newHashSet("FixedType", "StringType", "TimeType");
     // MySQL doesn't support timestamp time zone
     return Arrays.stream(columnDTO)
-        .map(
-            c -> {
-              if (c.name().equals("TimestampType")) {
-                return new ColumnDTO.Builder<>()
-                    .withDataType(Types.TimestampType.withoutTimeZone())
-                    .withName("TimestampType")
-                    .build();
-              }
-              return c;
-            })
+        .filter(c -> !ignoreType.contains(c.name()))
+        .toArray(ColumnDTO[]::new);
+  }
+
+  private ColumnDTO[] createMySQLFullTypeColumns() {
+    ColumnDTO[] columnDTO = createFullTypeColumns();
+    Set<String> ignoreType = Sets.newHashSet("FixedType", "StringType", "TimestampType");
+    // MySQL doesn't support timestamp time zone
+    return Arrays.stream(columnDTO)
+        .filter(c -> !ignoreType.contains(c.name()))
+        .toArray(ColumnDTO[]::new);
+  }
+
+  private ColumnDTO[] createIcebergFullTypeColumns() {
+    ColumnDTO[] columnDTO = createFullTypeColumns();
+
+    Set<String> ignoreType =
+        Sets.newHashSet("ByteType", "ShortType", "VarCharType", "FixedCharType");
+    return Arrays.stream(columnDTO)
+        .filter(c -> !ignoreType.contains(c.name()))
         .toArray(ColumnDTO[]::new);
   }
 
@@ -525,6 +538,12 @@ public class TrinoConnectorIT extends AbstractIT {
           .withName("FixedCharType")
           .withDataType(Types.FixedCharType.of(100))
           .build(),
+      new ColumnDTO.Builder<>().withName("StringType").withDataType(Types.StringType.get()).build(),
+      new ColumnDTO.Builder<>()
+          .withName("FixedType")
+          .withDataType(Types.FixedType.of(1000))
+          .build(),
+      // Binary Type
       new ColumnDTO.Builder<>().withName("BinaryType").withDataType(Types.BinaryType.get()).build()
       // No Interval Type and complex type like map, struct, and list
     };
@@ -567,7 +586,7 @@ public class TrinoConnectorIT extends AbstractIT {
         .asTableCatalog()
         .createTable(
             NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
-            createFullTypeColumns(),
+            createHiveFullTypeColumns(),
             "Created by gravitino client",
             ImmutableMap.<String, String>builder()
                 .put("format", "ORC")
@@ -717,7 +736,7 @@ public class TrinoConnectorIT extends AbstractIT {
         .asTableCatalog()
         .createTable(
             NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
-            createFullTypeColumns(),
+            createIcebergFullTypeColumns(),
             "Created by gravitino client",
             ImmutableMap.<String, String>builder()
                 .put("format-version", "1")
