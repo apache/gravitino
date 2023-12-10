@@ -963,32 +963,47 @@ public class CatalogHiveIT extends AbstractIT {
   // Make sure it will be executed at last.
   @Order(Integer.MAX_VALUE)
   void testAlterEntityName() {
-    GravitinoMetaLake metalake = client.loadMetalake(NameIdentifier.of(metalakeName));
+    final GravitinoMetaLake metalake = client.loadMetalake(NameIdentifier.of(metalakeName));
     String newMetalakeName = GravitinoITUtils.genRandomName("CatalogHiveIT_metalake_new");
+
+    // Test rename metalake
     for (int i = 0; i < 2; i++) {
+      Assertions.assertThrows(
+          NoSuchMetalakeException.class,
+          () -> client.loadMetalake(NameIdentifier.of(newMetalakeName)));
       client.alterMetalake(NameIdentifier.of(metalakeName), MetalakeChange.rename(newMetalakeName));
-      metalake = client.loadMetalake(NameIdentifier.of(newMetalakeName));
-      Assertions.assertNotNull(metalake);
+      client.loadMetalake(NameIdentifier.of(newMetalakeName));
+      Assertions.assertThrows(
+          NoSuchMetalakeException.class,
+          () -> client.loadMetalake(NameIdentifier.of(metalakeName)));
 
       client.alterMetalake(NameIdentifier.of(newMetalakeName), MetalakeChange.rename(metalakeName));
-      metalake = client.loadMetalake(NameIdentifier.of(metalakeName));
-      Assertions.assertNotNull(metalake);
+      client.loadMetalake(NameIdentifier.of(metalakeName));
+      Assertions.assertThrows(
+          NoSuchMetalakeException.class,
+          () -> client.loadMetalake(NameIdentifier.of(newMetalakeName)));
     }
 
     Catalog catalog = metalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
-    Assertions.assertNotNull(catalog);
-
-    // Now try to rename catalog
+    // Test rename catalog
     String newCatalogName = GravitinoITUtils.genRandomName("CatalogHiveIT_catalog_new");
     for (int i = 0; i < 2; i++) {
+      Assertions.assertThrows(
+          NoSuchCatalogException.class,
+          () -> metalake.loadCatalog(NameIdentifier.of(metalakeName, newMetalakeName)));
       metalake.alterCatalog(
           NameIdentifier.of(metalakeName, catalogName), CatalogChange.rename(newCatalogName));
-      catalog = metalake.loadCatalog(NameIdentifier.of(metalakeName, newCatalogName));
-      Assertions.assertNotNull(catalog);
+      metalake.loadCatalog(NameIdentifier.of(metalakeName, newCatalogName));
+      Assertions.assertThrows(
+          NoSuchCatalogException.class,
+          () -> metalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName)));
+
       metalake.alterCatalog(
           NameIdentifier.of(metalakeName, newCatalogName), CatalogChange.rename(catalogName));
       catalog = metalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
-      Assertions.assertNotNull(catalog);
+      Assertions.assertThrows(
+          NoSuchCatalogException.class,
+          () -> metalake.loadCatalog(NameIdentifier.of(metalakeName, newMetalakeName)));
     }
 
     // Schema does not have the rename operation.
