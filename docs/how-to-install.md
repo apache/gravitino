@@ -7,7 +7,7 @@ license: Copyright 2023 Datastrato Pvt. This software is licensed under the Apac
 ## Install Gravitino from scratch
 
 :::note
-Gravitino requires JDK8 to run, please make sure you have JDK8 installed and `JAVA_HOME` 
+Gravitino requires JDK8 to run, please make sure you have JDK8 installed and `JAVA_HOME`
 configured correctly. To confirm the Java version, you can simply run `${JAVA_HOME}/bin/java -version` command.
 :::
 
@@ -17,11 +17,11 @@ Before installing Gravitino, make sure you have Gravitino binary distribution pa
 download the latest Gravitino binary distribution Package from [GitHub](https://github.com/datastrato/gravitino/releases),
 or you can build it yourself by following the instructions in [How to Build Gravitino](./how-to-build).
 
-If you build Gravitino yourself by `./gradlew compileDistribution` command, you can find the 
+If you build Gravitino yourself by `./gradlew compileDistribution` command, you can find the
 Gravitino binary distribution package in `distribution/package` directory.
 
-If you build Gravitino yourself by `./gradlew assembleDistribution` command, you can get the 
-compressed Gravitino binary distribution package with name `gravitino-<version>-bin.tar.gz` in 
+If you build Gravitino yourself by `./gradlew assembleDistribution` command, you can get the
+compressed Gravitino binary distribution package with name `gravitino-<version>-bin.tar.gz` in
 `distribution` directory with sha256 checksum file `gravitino-<version>-bin.tar.gz.sha256`.
 
 The Gravitino binary distribution package contains the following files:
@@ -46,29 +46,29 @@ The Gravitino binary distribution package contains the following files:
 
 #### Configure Gravitino server
 
-The Gravitino server configuration file is `conf/gravitino.conf`. You can configure the Gravitino 
-server by modifying this file. Basic configurations are already added to this file, all the 
+The Gravitino server configuration file is `conf/gravitino.conf`. You can configure the Gravitino
+server by modifying this file. Basic configurations are already added to this file, all the
 configurations list in [Gravitino Server Configurations](./gravitino-server-config).
 
 #### Configure Gravitino server log
 
-The Gravitino server log configuration file is `conf/log4j2.properties`. Gravitino uses Log4j2 as 
-the Logging system. You can [Log4j2](https://logging.apache.org/log4j/2.x/) to 
+The Gravitino server log configuration file is `conf/log4j2.properties`. Gravitino uses Log4j2 as
+the Logging system. You can [Log4j2](https://logging.apache.org/log4j/2.x/) to
 do the log configuration.
 
 #### Configure Gravitino server environment
 
-The Gravitino server environment configuration file is `conf/gravitino-env.sh`. Gravitino exposes 
+The Gravitino server environment configuration file is `conf/gravitino-env.sh`. Gravitino exposes
 several environment variables, you can modify this file to reconfigure.
 
 #### Configure Gravitino catalogs
 
-Gravitino supports multiple catalogs, you can configure the catalog level configurations by 
-modifying the related configuration file in `catalogs/<catalog-provider>/conf` directory. The 
+Gravitino supports multiple catalogs, you can configure the catalog level configurations by
+modifying the related configuration file in `catalogs/<catalog-provider>/conf` directory. The
 configurations you set here apply to all the catalogs of the same type you create.
 
-For example, if you want to configure the Hive catalog, you can modify the file 
-`catalogs/hive/conf/hive.conf`. The detailed configurations list in the specific catalog 
+For example, if you want to configure the Hive catalog, you can modify the file
+`catalogs/hive/conf/hive.conf`. The detailed configurations list in the specific catalog
 documentation.
 
 :::note
@@ -77,17 +77,17 @@ Gravitino takes the catalog configurations in the following order:
 1. Catalog `properties` specified in catalog creation API or REST API.
 2. Catalog configurations specified in the catalog configuration file.
 
-The catalog `properties` can override the catalog configurations specified in the configuration 
+The catalog `properties` can override the catalog configurations specified in the configuration
 file.
 :::
 
-Gravitino supports pass in catalog specific configurations by adding `gravitino.bypass.`. For 
-example, if you want to pass in HMS specific configuration 
-`hive.metastore.client.capability.check` to the underlying Hive client in Hive catalog, you can 
+Gravitino supports pass in catalog specific configurations by adding `gravitino.bypass.`. For
+example, if you want to pass in HMS specific configuration
+`hive.metastore.client.capability.check` to the underlying Hive client in Hive catalog, you can
 simply add `gravitino.bypass.` prefix to it.
 
-Also, Gravitino supports loading catalog specific configurations from external files. For example, 
-you can put your own `hive-site.xml` file in `catalogs/hive/conf` directory, Gravitino loads 
+Also, Gravitino supports loading catalog specific configurations from external files. For example,
+you can put your own `hive-site.xml` file in `catalogs/hive/conf` directory, Gravitino loads
 it automatically.
 
 #### Start Gravitino server
@@ -98,7 +98,7 @@ After configuring the Gravitino server, you can start the Gravitino server by ru
 ./bin/gravitino.sh start
 ```
 
-You can access the Gravitino Web UI by typing `http://localhost:8090` in your browser. or you 
+You can access the Gravitino Web UI by typing `http://localhost:8090` in your browser. or you
 can run
 
 ```shell
@@ -117,7 +117,7 @@ configuration in `IntelliJ IDEA` and debug `gravitino.server.main`.
 
 ### Get the Gravitino Docker image
 
-Gravitino publishes the Docker image to [Docker Hub](https://hub.docker.com/r/datastrato/gravitino/tags). 
+Gravitino publishes the Docker image to [Docker Hub](https://hub.docker.com/r/datastrato/gravitino/tags).
 You can run the Gravitino Docker image by:
 
 ```shell
@@ -135,9 +135,10 @@ to make sure Gravitino is running.
 
 ## Install Gravitino using Docker compose
 
-The published Gravitino Docker image only contains Gravitino server with basic configurations. If 
-you want to experience the whole Gravitino system with other components, you can use the Docker 
+The published Gravitino Docker image only contains Gravitino server with basic configurations. If
+you want to experience the whole Gravitino system with other components, you can use the Docker
 compose file.
 
-For the details, you can check the 
-[Gravitino playground repo](https://github.com/datastrato/gravitino-playground) and [example](xxx).
+For the details, you can check the
+[Gravitino playground repo](https://github.com/datastrato/gravitino-playground) and
+[playground example](./how-to-use-the-playground).

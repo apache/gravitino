@@ -60,7 +60,7 @@ The first time you build the project, downloading the dependencies may take a wh
 
    The directory structure of the `distribution` directory is as follows:
 
-:::note 
+:::note
 The `./gradlew clean` command deletes the `distribution` directory.
 :::
 
