@@ -6,7 +6,7 @@ license: Copyright 2023 Datastrato Pvt. This software is licensed under the Apac
 
 ## Introduction
 
-Gravitino is a high-performance, geo-distributed, and federated metadata lake. It manages the 
+Gravitino is a high-performance, geo-distributed, and federated metadata lake. It manages the
 metadata directly in different sources, types, and regions. It also provides users with unified metadata access for data and AI assets.
 
 ![Gravitino Architecture](assets/gravitino-architecture.png)
@@ -32,41 +32,41 @@ Gravitino aims to provide several key features:
 
 ### Unified metadata management and governance
 
-Gravitino abstracts the unified metadata models and APIs for different kind of metadata sources. 
-For example, relational metadata model for all the tabular data, like Hive, MySQL, PostgresSQL, etc.
+Gravitino abstracts the unified metadata models and APIs for different kinds of metadata sources.
+For example, relational metadata models for tabular data, like Hive, MySQL, PostgresSQL, etc.
 File metadata model for all the unstructured data, like HDFS, S3, and others.
 
-Besides the unified metadata models, Gravitino also provides a unified metadata governance layer 
-(WIP) to manage the metadata in a unified way, including access control, auditing, discovery and 
+Besides the unified metadata models, Gravitino also provides a unified metadata governance layer
+(WIP) to manage the metadata in a unified way, including access control, auditing, discovery and
 others.
 
 ### Direct metadata management
 
-Unlike the traditional metadata management systems, which need to collect the metadata 
+Unlike the traditional metadata management systems, which need to collect the metadata
 actively or passively from underlying systems, Gravitino manages these systems directly
-the metadata directly. It provides a set of connectors to connect to different metadata sources, 
-the changes both in Gravitino will directly reflect in the underlying systems, and vice versa.
+the metadata directly. It provides a set of connectors to connect to different metadata sources,
+the changes in Gravitino will directly reflect in the underlying systems, and vice versa.
 
 ### Geo-distribution support (WIP)
 
-Gravitino supports geo-distribution deployment , which means different instances of Gravitino 
-can deploy in different regions or clouds, and they can connect to each other to get 
-the metadata from each other. With this, users can get a global view of metadata across the 
+Gravitino supports geo-distribution deployment, which means different instances of Gravitino
+can deploy in different regions or clouds, and they can connect to get
+the metadata from each other. With this, users can get a global view of metadata across the
 regions or clouds.
 
 ### Multi-engine support
 
-Gravitino supports different query engines to access the metadata. Currently, it supports 
-[Trino](https://trino.io/), user can use Trino to query the metadata and data without needing to 
+Gravitino supports different query engines to access the metadata. Currently, it supports
+[Trino](https://trino.io/), users can use Trino to query the metadata and data without needing to
 change the existing SQL dialects.
 
-In the meaning time, other query engine support is in the roadmap, including 
+In the meantime, other query engine support is on the roadmap, including
 [Apache Spark](https://spark.apache.org/), [Apache Flink](https://flink.apache.org/) and others.
 
 ### AI asset management (WIP)
 
-The goal of Gravitino is to unify the data management in both data and AI assets. The support of AI 
-assets like models, features, and others is under development.
+The goal of Gravitino is to unify the data management in both data and AI assets. The support of AI
+assets like models, features, and others are under development.
 
 ## Terminology
 
@@ -74,12 +74,12 @@ assets like models, features, and others is under development.
 
 ![Gravitino Model](assets/metadata-model.png)
 
-* **Metalake**: The top-level container for metadata. Typically, one group has one metalake 
+* **Metalake**: The top-level container for metadata. Typically, one group has one metalake
   to manage all the metadata in it. Each metalake exposes a three-level namespace(catalog.schema.
   table) to organize the data.
-* **Catalog**: catalog is a collection of metadata from a specific metadata source. 
+* **Catalog**: catalog is a collection of metadata from a specific metadata source.
   Each catalog has a related connector to connect to the specific metadata source.
-* **Schema**: Schema is equivalent to a database, Schemas only exist in the specific catalogs 
+* **Schema**: Schema is equivalent to a database, Schemas only exist in the specific catalogs
   that support relational metadata sources, such as Apache Hive, MySQL, PostgresSQL, and others.
 * **Table**: The lowest level in the object hierarchy for catalogs that support relational
   metadata sources. You can create Tables in specific schemas in the catalogs.
