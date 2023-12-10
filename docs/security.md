@@ -12,8 +12,11 @@ Gravitino supports two kinds of authentication mechanisms: simple and OAuth.
 ### Simple mode
 
 Simple mode is the default authentication option.
+
 Simple mode allows the client to use the environment variable `GRAVITINO_USER` as the user.
+
 If the environment variable `GRAVITINO_USER` isn't set, the client uses the user of the machine that sends requests.
+
 For the client side, users can enable `simple` mode by the following code:
 
 ```java
@@ -25,10 +28,13 @@ GravitinoClient client = GravitinoClient.builder(uri)
 ### OAuth mode
 
 Gravitino only supports external OAuth 2.0 servers.
+
 First, users need to guarantee that the external correctly configured OAuth 2.0 server supports Bearer JWT.
+
 Then, on the server side, users should set `gravitino.authenticator` as `oauth` and give 
 `gravitino.authenticator.oauth.defaultSignKey`, `gravitino.authenticator.oauth.serverUri` and 
 `gravitino.authenticator.oauth.tokenPath`  a proper value.
+
 Next, for the client side, users can enable `OAuth` mode by the following code:
 
 ```java
@@ -79,22 +85,26 @@ You can follow the steps to set up an OAuth mode Gravitino server.
 
 1. Prerequisite
 
-You need to install the JDK8 and Docker.
+   You need to install the JDK8 and Docker.
 
 2. Set up an external OAuth 2.0 server
 
-There is a sample-authorization-server based on [spring-authorization-server](https://github.com/spring-projects/spring-authorization-server/tree/1.0.3).
-The image has registered a client information in the external OAuth 2.0 server.
-Its clientId is `test`. Its secret is `test`. Its scope is `test`.
+   There is a sample-authorization-server based on [spring-authorization-server](https://github.com/spring-projects/spring-authorization-server/tree/1.0.3).
+
+   The image has registered a client information in the external OAuth 2.0 server.
+
+   Its clientId is `test`. Its secret is `test`. Its scope is `test`.
 
 ```shell
  docker run -p 8177:8177 --name sample-auth-server -d datastrato/sample-authorization-server:0.3.0
 ```
 
 3. Open [the JWK URL of the Authorization server](http://localhost:8177/oauth2/jwks) in the browser and you can get the JWK.
+   
    ![jks_response_image](assets/jks.png)
 
 4. Convert the JWK to PEM. You can use the [online tool](https://8gwifi.org/jwkconvertfunctions.jsp#google_vignette) or other tools.
+
    ![pem_convert_result_image](assets/pem.png)
 
 5. Copy the public key and remove the character `\n` and you can get the default signing key of Gravitino server.
@@ -110,6 +120,7 @@ gravitino.authenticator.oauth.serverUri http://localhost:8177
 ```
 
 7. Open [the URL of Gravitino server](http://localhost:8090) and login in with clientId `test`, clientSecret `test` and scope `test`.
+   
    ![oauth_login_image](assets/oauth.png)
 
 8. You can also use curl command to access Gravitino.
@@ -130,8 +141,11 @@ curl -v -X GET -H "Accept: application/vnd.gravitino.v1+json" -H "Content-Type: 
 ## HTTPS
 
 Users would better use HTTPS instead of HTTP if users choose OAuth 2.0 as the authenticator.
+
 HTTPS protects the header of the request from smuggling, making it safer.
+
 If users choose to enable HTTPS, Gravitino won't provide the ability of HTTP service.
+
 Both Gravitino server and Iceberg REST service can configure HTTPS.
 
 ### Gravitino server's configuration
@@ -178,8 +192,9 @@ You can follow the steps to set up a HTTPS server.
 
 1. Prerequisite
 
-You need to install the JDK8, wget and set the environment JAVA_HOME.
-If you want to use the command `curl` to request the Gravitino server, you should install openSSL.
+   You need to install the JDK8, wget and set the environment JAVA_HOME.
+
+   If you want to use the command `curl` to request the Gravitino server, you should install openSSL.
 
 2. Generate the key store
 
@@ -219,9 +234,9 @@ gravitino.server.webserver.managerPassword localhost
 
 6. Request the Gravitino server
 
-If you use Java, you can follow the steps
+   If you use Java, you can follow the steps
 
-Copy the code to a file named Main.java
+   Copy the code to a file named Main.java
 
 ```java
 import com.datastrato.gravitino.client.GravitinoClient;
@@ -235,13 +250,6 @@ public class Main {
         System.out.println(gravitinoVersion);
     }
 }
-```
-
-Run the command
-
-```shell
-version = <the release version>
-wget https://repo1.maven.org/maven2/com/datastrato/gravitino/client-java-runtime/${version}/client-java-runtime-${version}.jar -O client.jar && $JAVA_HOME/bin/javac -classpath ./client.jar Main.java && $JAVA_HOME/bin/java -classpath ./client.jar:. Main
 ```
 
 If you want to use the command `curl`, you can follow the commands:
