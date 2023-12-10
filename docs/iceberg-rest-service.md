@@ -2,7 +2,6 @@
 title: How to set up Gravitino and Apache Iceberg REST server
 slug: /iceberg-rest-service
 keywords:
-  - lakehouse
   - Iceberg REST catalog
 license: Copyright 2023 Datastrato.  This software is licensed under the Apache License version 2.
 ---
@@ -15,7 +14,7 @@ The Gravitino Iceberg REST Server follows the [Apache Iceberg REST API specifica
 
 - Supports the Apache Iceberg REST API defined in Iceberg 1.3.1, supports all namespace and table interfaces. `Token`, `ReportMetrics`, and `Config` interfaces aren't supported yet.
 - Works as a catalog proxy, supporting `HiveCatalog` and `JDBCCatalog`.
-- Builts with Iceberg `1.3.1`. The Iceberg table format version is `1` by default.
+- Builds with Iceberg `1.3.1`. The Iceberg table format version is `1` by default.
 - When writing to HDFS, the Gravitino Iceberg REST server can only operate as the specified HDFS user and
   doesn't support proxying to other HDFS users. See [How to access Apache Hadoop](gravitino-server-config) for more details.
 
