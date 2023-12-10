@@ -242,7 +242,7 @@ public class GravitinoClient implements SupportsMetalakes, Closeable {
     }
 
     /**
-     * Sets the simple mode authentication for the Gravitino
+     * Sets the simple mode authentication for Gravitino
      *
      * @return This Builder instance for method chaining.
      */
