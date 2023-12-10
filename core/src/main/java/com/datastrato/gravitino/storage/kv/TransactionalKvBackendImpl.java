@@ -358,7 +358,6 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
     return generateCommitKey(1L);
   }
 
-  // return key + (SEPARATOR + 1)
   static byte[] endOfKey(byte[] key) {
     return generateKey(key, 1L);
   }
