@@ -23,9 +23,9 @@ gravitino:0.3.0
   - `8090` Gravitino Web UI
 
 ## Playground Docker image
-The playground is used for users to experience Gravitino. 
+You can use the [playground](https://github.com/datastrato/gravitino-playground) to experience the whole Gravitino system with other components. 
 The playground consists of multiple Docker images.
-The Docker images of playground are configured for users to experience.
+The Docker images of playground have suitable configurations for users to experience.
 
 ### Hive image
 Changelog
@@ -40,13 +40,13 @@ Changelog
 - trino:426-gravitino-0.3.0-SNAPSHOT
   - Docker image `datastrato/trino:426-gravitino-0.3.0-SNAPSHOT`
   - Base on `trino:462`
-  - Added Gravitino trino-connector-0.3.0-SNAPSHOT libs into the `/usr/lib/trino/plugin/gravitino`
+  - Added Gravitino trino-connector-0.3.0-SNAPSHOT libraries into the `/usr/lib/trino/plugin/gravitino`
 
 # Developer Docker images
-This kind of the Docker images is designed to facilitate Gravitino integration testing.
-It can be utilized to test all catalog and connector modules within Gravitino.
-## Gravitino CI Apache Hive Image
-This kind of images is used for testing the catalog of Apache Hive.
+You can use this kind of the Docker images to facilitate Gravitino integration testing.
+You can use it to test all catalog and connector modules within Gravitino.
+## Gravitino CI Apache Hive image
+You can use this kind of images to test the catalog of Apache Hive.
 
 Container startup commands
 ```shell
@@ -65,9 +65,9 @@ Changelog
   - Map container hostname to `127.0.0.1` before starting Hadoop
   - Expose `50010` port for the HDFS DataNode
 - gravitino-ci-hive:0.1.3
-  - change mysql bind-address from `127.0.0.1` to `0.0.0.0`
-  - add `iceberg` to mysql users with password `iceberg`
-  - export `3306` port for mysql
+  - change Mysql bind-address from `127.0.0.1` to `0.0.0.0`
+  - add `iceberg` to Mysql users with password `iceberg`
+  - export `3306` port for Mysql
 - gravitino-ci-hive:0.1.2
   - base on `datastrato/gravitino-ci-hive:0.1.1`
   - Modify `fs.defaultFS` from `local` to `0.0.0.0` in the `core-site.xml` file.
@@ -84,14 +84,14 @@ Changelog
     - `22` SSH
     - `9000` HDFS defaultFS
     - `50070` HDFS NameNode
-    - `50075` HDFS DataNode http server
+    - `50075` HDFS DataNode HTTP server
     - `50010` HDFS DataNode data transfer
     - `8088` YARN Service
     - `9083` Hive Metastore
     - `10000` HiveServer2
     - `10002` HiveServer2 HTTP
 ## Gravitino CI Trino image
-This kind of images is used for testing Trino.
+You can use this kind of images to test Trino.
 
 Container startup commands
 ```shell
