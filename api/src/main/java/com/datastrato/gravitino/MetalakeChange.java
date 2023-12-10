@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Datastrato.
+ * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 package com.datastrato.gravitino;
@@ -7,6 +7,11 @@ package com.datastrato.gravitino;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 
+/**
+ * A metalake change is a change to a metalake. It can be used to rename a metalake, update the
+ * comment of a metalake, set a property and value pair for a metalake, or remove a property from a
+ * metalake.
+ */
 public interface MetalakeChange {
 
   /**
@@ -50,6 +55,7 @@ public interface MetalakeChange {
     return new RemoveProperty(property);
   }
 
+  /** A metalake change to rename the metalake. */
   @Getter
   @EqualsAndHashCode
   final class RenameMetalake implements MetalakeChange {
@@ -60,6 +66,7 @@ public interface MetalakeChange {
     }
   }
 
+  /** A metalake change to update the metalake comment. */
   @Getter
   @EqualsAndHashCode
   final class UpdateMetalakeComment implements MetalakeChange {
@@ -70,6 +77,7 @@ public interface MetalakeChange {
     }
   }
 
+  /** A metalake change to set a property and value pair for the metalake. */
   @Getter
   @EqualsAndHashCode
   final class SetProperty implements MetalakeChange {
@@ -82,6 +90,7 @@ public interface MetalakeChange {
     }
   }
 
+  /** A metalake change to remove a property from the metalake. */
   @Getter
   @EqualsAndHashCode
   final class RemoveProperty implements MetalakeChange {

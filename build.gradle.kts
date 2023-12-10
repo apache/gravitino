@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Datastrato.
+ * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 import com.github.gradle.node.NodeExtension
@@ -140,6 +140,11 @@ subprojects {
     }
   }
 
+  tasks.withType<Javadoc> {
+    options.encoding = "UTF-8"
+    options.locale = "en_US"
+  }
+
   val sourcesJar by tasks.registering(Jar::class) {
     from(sourceSets.named("main").get().allSource)
     archiveClassifier.set("sources")
@@ -251,7 +256,7 @@ subprojects {
 }
 
 tasks.rat {
-  substringMatcher("DS", "Datastrato", "Copyright 2023 Datastrato.")
+  substringMatcher("DS", "Datastrato", "Copyright 2023 Datastrato Pvt Ltd.")
   approvedLicense("Datastrato")
   approvedLicense("Apache License Version 2.0")
 

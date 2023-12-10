@@ -24,15 +24,16 @@ import com.datastrato.gravitino.rel.expressions.Expression;
 
 /** Represents a sort order in the public expression API. */
 public interface SortOrder extends Expression {
-  /** Returns the sort expression. */
+  /** @return The sort expression. */
   Expression expression();
 
-  /** Returns the sort direction. */
+  /** @return The sort direction. */
   SortDirection direction();
 
-  /** Returns the null ordering. */
+  /** @return The null ordering. */
   NullOrdering nullOrdering();
 
+  /** @return A {@link SortOrder} with the given sort direction. */
   @Override
   default Expression[] children() {
     return new Expression[] {expression()};

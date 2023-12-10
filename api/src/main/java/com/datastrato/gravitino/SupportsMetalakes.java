@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Datastrato.
+ * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 package com.datastrato.gravitino;
@@ -8,9 +8,17 @@ import com.datastrato.gravitino.exceptions.MetalakeAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
 import java.util.Map;
 
+/**
+ * Interface for supporting metalakes. It includes methods for listing, loading, creating, altering
+ * and dropping metalakes.
+ */
 public interface SupportsMetalakes {
 
-  /** List all metalakes. */
+  /**
+   * List all metalakes.
+   *
+   * @return The list of metalakes.
+   */
   Metalake[] listMetalakes();
 
   /**

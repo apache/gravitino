@@ -1,7 +1,7 @@
 ---
 title: "Getting Started with Gravitino"
 date: 2023-11-20
-license: "Copyright 2023 Datastrato.
+license: "Copyright 2023 Datastrato Pvt Ltd.
 This software is licensed under the Apache License version 2."
 ---
 

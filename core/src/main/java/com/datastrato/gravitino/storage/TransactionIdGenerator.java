@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Datastrato.
+ * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 
@@ -13,6 +13,8 @@ public interface TransactionIdGenerator extends Closeable {
   /**
    * Next transaction id. The transaction id is a monotonically increasing number, which is used as
    * MVCC version.
+   *
+   * @return next transaction id
    */
   long nextId();
 

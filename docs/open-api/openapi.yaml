@@ -32,7 +32,8 @@ servers:
         default: "api"
 
 security:
-  - BearerAuth: []
+  - OAuth2WithJWT: [serviceAudience]
+  - BasicAuth: []
 
 paths:
   /metalakes:
@@ -54,6 +55,12 @@ paths:
 
   /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}:
     $ref: "./schemas.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1schemas~1%7Bschema%7D"
+
+  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/tables:
+    $ref: "./tables.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1schemas~1%7Bschema%7D~1tables"
+
+  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/tables/{table}:
+    $ref: "./tables.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1schemas~1%7Bschema%7D~1tables~1%7Btable%7D"
 
 components:
 
@@ -145,6 +152,8 @@ components:
               $ref: "./catalogs.yaml#/components/examples/CatalogListResponse"
             SchemaListResponse:
               $ref: "./schemas.yaml#/components/examples/SchemaListResponse"
+            TableListResponse:
+              $ref: "./tables.yaml#/components/examples/TableListResponse"
 
 
     BadRequestErrorResponse:
@@ -223,8 +232,26 @@ components:
       schema:
         type: string
 
+    table:
+      name: table
+      in: path
+      description: The name of the table
+      required: true
+      schema:
+        type: string
+
   securitySchemes:
-    # todo: add OAuth2 security schema
-    BearerAuth:
+
+    OAuth2WithJWT:
+      type: oauth2
+      description: OAuth2 with JWT
+      flows:
+        clientCredentials:
+          tokenUrl: https://external-oauth-server.com/token
+          scopes:
+            serviceAudience: The audience name when Gravitino uses OAuth as the authenticator.
+
+    BasicAuth:
       type: http
-      scheme: bearer
+      scheme: basic
+

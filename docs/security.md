@@ -1,7 +1,7 @@
 ---
 title: "How to customize Gravitino server configurations"
 date: 2023-11-20T09:03:20-08:00
-license: "Copyright 2023 Datastrato.
+license: "Copyright 2023 Datastrato Pvt Ltd.
 This software is licensed under the Apache License version 2."
 ---
 

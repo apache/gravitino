@@ -1,9 +1,10 @@
 /*
- * Copyright 2023 Datastrato.
+ * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 package com.datastrato.gravitino.exceptions;
 
+/** An exception thrown when the schema already exists. */
 public class SchemaAlreadyExistsException extends AlreadyExistsException {
 
   public SchemaAlreadyExistsException(String message) {

@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Datastrato.
+ * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 
@@ -29,8 +29,8 @@ import org.apache.commons.lang3.tuple.Pair;
  *
  * <pre>
  *       KEY                         VALUE
- *   key1 + separator + 1 --> status_code  + v1
- *   tx + separator + 1 -->  binary that contains all keys involved in this tx
+ *   key1 + separator + 1 --  status_code  + v1
+ *   tx + separator + 1   --  binary that contains all keys involved in this tx
  * </pre>
  *
  * We use '0x1F' as the separator, '______tx' as the value of tx, key1 + separator + 1 as the key of

@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Datastrato.
+ * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 package com.datastrato.gravitino;
@@ -8,8 +8,13 @@ import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.datastrato.gravitino.rel.TableCatalog;
 import java.util.Map;
 
+/**
+ * The interface of a catalog. The catalog is the second level entity in the gravitino system,
+ * containing a set of tables.
+ */
 public interface Catalog extends Auditable {
 
+  /** The type of the catalog. */
   enum Type {
     RELATIONAL, // Catalog Type for Relational Data Structure, like db.table, catalog.db.table.
     FILE, // Catalog Type for File System (including HDFS, S3, etc.), like path/to/file
@@ -27,24 +32,28 @@ public interface Catalog extends Auditable {
    */
   String PROPERTY_PACKAGE = "package";
 
-  /** The name of the catalog. */
+  /** @return The name of the catalog. */
   String name();
 
-  /** The type of the catalog. */
+  /** @return The type of the catalog. */
   Type type();
 
-  /** The provider of the catalog. */
+  /** @return The provider of the catalog. */
   String provider();
 
   /**
    * The comment of the catalog. Note. this method will return null if the comment is not set for
    * this catalog.
+   *
+   * @return The comment of the catalog.
    */
   String comment();
 
   /**
    * The properties of the catalog. Note, this method will return null if the properties are not
    * set.
+   *
+   * @return The properties of the catalog.
    */
   Map<String, String> properties();
 
@@ -52,14 +61,14 @@ public interface Catalog extends Auditable {
    * Return the {@link SupportsSchemas} if the catalog supports schema operations.
    *
    * @throws UnsupportedOperationException if the catalog does not support schema operations.
+   * @return The {@link SupportsSchemas} if the catalog supports schema operations.
    */
   default SupportsSchemas asSchemas() throws UnsupportedOperationException {
     throw new UnsupportedOperationException("Catalog does not support schema operations");
   }
 
   /**
-   * return the {@link TableCatalog} if the catalog supports table operations.
-   *
+   * @return the {@link TableCatalog} if the catalog supports table operations.
    * @throws UnsupportedOperationException if the catalog does not support table operations.
    */
   default TableCatalog asTableCatalog() throws UnsupportedOperationException {

@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Datastrato.
+ * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 package com.datastrato.gravitino.rel;
@@ -19,16 +19,16 @@ import javax.annotation.Nullable;
  */
 public interface Schema extends Auditable {
 
-  /** Return the name of the Schema. */
+  /** @return The name of the Schema. */
   String name();
 
-  /** Return the comment of the Schema. Null is returned if the comment is not set. */
+  /** @return The comment of the Schema. Null is returned if the comment is not set. */
   @Nullable
   default String comment() {
     return null;
   }
 
-  /** Return the properties of the Schema. An empty map is returned if no properties are set. */
+  /** @return The properties of the Schema. An empty map is returned if no properties are set. */
   default Map<String, String> properties() {
     return Collections.emptyMap();
   }

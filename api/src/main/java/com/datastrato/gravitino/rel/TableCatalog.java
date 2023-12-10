@@ -144,6 +144,7 @@ public interface TableCatalog {
    * @param columns The columns of the new table.
    * @param comment The table comment.
    * @param properties The table properties.
+   * @param distribution The distribution of the table.
    * @return The created table metadata.
    * @throws NoSuchSchemaException If the schema does not exist.
    * @throws TableAlreadyExistsException If the table already exists.

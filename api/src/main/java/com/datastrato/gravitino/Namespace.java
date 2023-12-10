@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Datastrato.
+ * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 package com.datastrato.gravitino;
@@ -8,6 +8,11 @@ import com.datastrato.gravitino.exceptions.IllegalNamespaceException;
 import com.google.common.base.Joiner;
 import java.util.Arrays;
 
+/**
+ * A namespace is a sequence of levels separated by dots. It's used to identify a metalake, a
+ * catalog or a schema. For example, "metalake1", "metalake1.catalog1" and
+ * "metalake1.catalog1.schema1" are all valid namespaces.
+ */
 public class Namespace {
 
   private static final Namespace EMPTY = new Namespace(new String[0]);
@@ -15,7 +20,11 @@ public class Namespace {
 
   private final String[] levels;
 
-  /** Get an empty namespace. */
+  /**
+   * Get an empty namespace.
+   *
+   * @return An empty namespace
+   */
   public static Namespace empty() {
     return EMPTY;
   }
@@ -40,7 +49,11 @@ public class Namespace {
     return new Namespace(levels);
   }
 
-  /** Create a namespace for metalake. */
+  /**
+   * Create a namespace for metalake.
+   *
+   * @return A namespace for metalake
+   */
   public static Namespace ofMetalake() {
     return empty();
   }
@@ -137,7 +150,11 @@ public class Namespace {
     this.levels = levels;
   }
 
-  /** Get the levels of the namespace. */
+  /**
+   * Get the levels of the namespace.
+   *
+   * @return The levels of the namespace
+   */
   public String[] levels() {
     return levels;
   }
@@ -153,12 +170,20 @@ public class Namespace {
     return levels[pos];
   }
 
-  /** Get the length of the namespace. */
+  /**
+   * Get the length of the namespace.
+   *
+   * @return The length of the namespace.
+   */
   public int length() {
     return levels.length;
   }
 
-  /** Check if the namespace is empty. */
+  /**
+   * Check if the namespace is empty.
+   *
+   * @return True if the namespace is empty, false otherwise.
+   */
   public boolean isEmpty() {
     return levels.length == 0;
   }
