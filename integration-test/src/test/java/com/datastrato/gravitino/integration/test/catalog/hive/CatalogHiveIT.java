@@ -27,6 +27,8 @@ import static org.apache.hadoop.hive.serde.serdeConstants.TINYINT_TYPE_NAME;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.datastrato.gravitino.Catalog;
+import com.datastrato.gravitino.CatalogChange;
+import com.datastrato.gravitino.MetalakeChange;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.catalog.hive.HiveClientPool;
 import com.datastrato.gravitino.catalog.hive.HiveSchemaPropertiesMetadata;
@@ -38,6 +40,9 @@ import com.datastrato.gravitino.dto.rel.SortOrderDTO;
 import com.datastrato.gravitino.dto.rel.expressions.FieldReferenceDTO;
 import com.datastrato.gravitino.dto.rel.partitions.IdentityPartitioningDTO;
 import com.datastrato.gravitino.dto.rel.partitions.Partitioning;
+import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
+import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
+import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NoSuchTableException;
 import com.datastrato.gravitino.integration.test.container.ContainerSuite;
 import com.datastrato.gravitino.integration.test.container.HiveContainer;
@@ -75,6 +80,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.MethodOrderer;
+import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
@@ -877,5 +883,152 @@ public class CatalogHiveIT extends AbstractIT {
     Map<String, String> properties3 = database.getParameters();
     Assertions.assertFalse(properties3.containsKey("key1"));
     Assertions.assertEquals("val2-alter", properties3.get("key2"));
+  }
+
+  @Test
+  void testPrefixProblem() {
+    GravitinoMetaLake metalake = client.loadMetalake(NameIdentifier.of(metalakeName));
+    Catalog catalog = metalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
+    Assertions.assertNotNull(catalog);
+
+    for (int i = 1; i < metalakeName.length(); i++) {
+      // We can't get the metalake by prefix
+      final int length = i;
+      Assertions.assertThrows(
+          NoSuchMetalakeException.class,
+          () -> client.loadMetalake(NameIdentifier.of(metalakeName.substring(0, length))));
+    }
+    Assertions.assertThrows(
+        NoSuchMetalakeException.class,
+        () -> client.loadMetalake(NameIdentifier.of(metalakeName + "a")));
+
+    for (int i = 1; i < catalogName.length(); i++) {
+      // We can't get the catalog by prefix
+      final int length = i;
+      Assertions.assertThrows(
+          NoSuchCatalogException.class,
+          () ->
+              metalake.loadCatalog(
+                  NameIdentifier.of(metalakeName, catalogName.substring(0, length))));
+    }
+
+    // We can't load the catalog.
+    Assertions.assertThrows(
+        NoSuchCatalogException.class,
+        () -> metalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName + "a")));
+
+    for (int i = 1; i < schemaName.length(); i++) {
+      // We can't get the schema by prefix
+      final int length = i;
+      Assertions.assertThrows(
+          NoSuchSchemaException.class,
+          () ->
+              catalog
+                  .asSchemas()
+                  .loadSchema(
+                      NameIdentifier.of(
+                          metalakeName, catalogName, schemaName.substring(0, length))));
+    }
+
+    Assertions.assertThrows(
+        NoSuchSchemaException.class,
+        () ->
+            catalog
+                .asSchemas()
+                .loadSchema(NameIdentifier.of(metalakeName, catalogName, schemaName + "a")));
+
+    for (int i = 1; i < tableName.length(); i++) {
+      // We can't get the table by prefix
+      final int length = i;
+      Assertions.assertThrows(
+          NoSuchTableException.class,
+          () ->
+              catalog
+                  .asTableCatalog()
+                  .loadTable(
+                      NameIdentifier.of(
+                          metalakeName, catalogName, schemaName, tableName.substring(0, length))));
+    }
+
+    Assertions.assertThrows(
+        NoSuchTableException.class,
+        () ->
+            catalog
+                .asTableCatalog()
+                .loadTable(
+                    NameIdentifier.of(metalakeName, catalogName, schemaName, tableName + "a")));
+  }
+
+  @Test
+  // Make sure it will be executed at last.
+  @Order(Integer.MAX_VALUE)
+  void testAlterEntityName() {
+    GravitinoMetaLake metalake = client.loadMetalake(NameIdentifier.of(metalakeName));
+    String newMetalakeName = GravitinoITUtils.genRandomName("CatalogHiveIT_metalake_new");
+    for (int i = 0; i < 10; i++) {
+      client.alterMetalake(NameIdentifier.of(metalakeName), MetalakeChange.rename(newMetalakeName));
+      metalake = client.loadMetalake(NameIdentifier.of(newMetalakeName));
+      Assertions.assertNotNull(metalake);
+
+      client.alterMetalake(NameIdentifier.of(newMetalakeName), MetalakeChange.rename(metalakeName));
+      metalake = client.loadMetalake(NameIdentifier.of(metalakeName));
+      Assertions.assertNotNull(metalake);
+    }
+
+    Catalog catalog = metalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
+    Assertions.assertNotNull(catalog);
+
+    // Now try to rename catalog
+    String newCatalogName = GravitinoITUtils.genRandomName("CatalogHiveIT_catalog_new");
+    for (int i = 0; i < 10; i++) {
+      metalake.alterCatalog(
+          NameIdentifier.of(metalakeName, catalogName), CatalogChange.rename(newCatalogName));
+      catalog = metalake.loadCatalog(NameIdentifier.of(metalakeName, newCatalogName));
+      Assertions.assertNotNull(catalog);
+      metalake.alterCatalog(
+          NameIdentifier.of(metalakeName, newCatalogName), CatalogChange.rename(catalogName));
+      catalog = metalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
+      Assertions.assertNotNull(catalog);
+    }
+
+    // Schema does not have the rename operation.
+
+    ColumnDTO[] columns = createColumns();
+    catalog
+        .asTableCatalog()
+        .createTable(
+            NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
+            columns,
+            TABLE_COMMENT,
+            createProperties(),
+            new Transform[0]);
+    // Now try to rename table
+    String newTableName = GravitinoITUtils.genRandomName("CatalogHiveIT_table_new");
+    Table t =
+        catalog
+            .asTableCatalog()
+            .loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, tableName));
+    for (int i = 0; i < 10; i++) {
+      catalog
+          .asTableCatalog()
+          .alterTable(
+              NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
+              TableChange.rename(newTableName));
+      Table table =
+          catalog
+              .asTableCatalog()
+              .loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, newTableName));
+      Assertions.assertNotNull(table);
+      catalog
+          .asTableCatalog()
+          .alterTable(
+              NameIdentifier.of(metalakeName, catalogName, schemaName, newTableName),
+              TableChange.rename(tableName));
+      table =
+          catalog
+              .asTableCatalog()
+              .loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, tableName));
+      Assertions.assertNotNull(table);
+    }
   }
 }
