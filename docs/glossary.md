@@ -315,7 +315,7 @@ This software is licensed under the Apache License version 2."
 
 ## Iceberg Hive catalog
 
-- The **Iceberg Hive catalog** is a specialized metadata repository associated with the Apache Hive data warehousing system, leveraging the Iceberg table format. 
+- The **Iceberg Hive catalog** is a specialized metadata service designed for the Apache Iceberg table format, allowing external systems to interact with Iceberg metadata via a thrift client of Hive metastore.
 
 ## Iceberg REST catalog
 
