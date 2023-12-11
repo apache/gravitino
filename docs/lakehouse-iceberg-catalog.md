@@ -33,11 +33,11 @@ Builds with hadoop 2.10.x, there may compatibility issue when accessing hadoop 3
 
 ### Catalog properties
 
-| Configuration item | Description                                   | value                                                                                                                 | Since Version |
-|--------------------|-----------------------------------------------|-----------------------------------------------------------------------------------------------------------------------|---------------|
-| `catalog-backend`  | Catalog backend of Gravitino Iceberg catalog. | `hive` or `jdbc`                                                                                                      | 0.2.0         |
-| `uri`              | The URI configuration of the Iceberg catalog. | `thrift://127.0.0.1:9083` or `jdbc:postgresql://127.0.0.1:5432/db_name` or `jdbc:mysql://127.0.0.1:3306/metastore_db` | 0.2.0         |
-| `warehouse`        | Warehouse directory of catalog.               | `file:///user/hive/warehouse-hive/` for local fs or `hdfs://namespace/hdfs/path` for HDFS                             | 0.2.0         |
+| Property name     | Description                                                                                                                                                          | Default value | Required | Since Version |
+|-------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
+| `catalog-backend` | Catalog backend of Gravitino Iceberg catalog. Supports `hive` or `jdbc`.                                                                                             | (none)        | Yes      | 0.2.0         |
+| `uri`             | The URI configuration of the Iceberg catalog. `thrift://127.0.0.1:9083` or `jdbc:postgresql://127.0.0.1:5432/db_name` or `jdbc:mysql://127.0.0.1:3306/metastore_db`. | (none)        | Yes      | 0.2.0         |
+| `warehouse`       | Warehouse directory of catalog. `file:///user/hive/warehouse-hive/` for local fs or `hdfs://namespace/hdfs/path` for HDFS.                                           | (none)        | Yes      | 0.2.0         |
 
 Any properties not defined by Gravitino with `gravitino.bypass` prefix will pass to Iceberg catalog properties and HDFS configuration. For example, if specify `gravitino.bypass.list-all-tables`, `list-all-tables` will pass to Iceberg catalog properties.
 
@@ -45,12 +45,12 @@ Any properties not defined by Gravitino with `gravitino.bypass` prefix will pass
 
 If you are using JDBC catalog, you must provide `jdbc-user`, `jdbc-password` and `jdbc-driver` to catalog properties.
 
-| Configuration item | Description                                                                                             | Default value | Since Version |
-|--------------------|---------------------------------------------------------------------------------------------------------|---------------|---------------|
-| `jdbc-user`        | JDBC user name                                                                                          | ` `           | 0.2.0         |
-| `jdbc-password`    | JDBC password                                                                                           | ` `           | 0.2.0         |
-| `jdbc-driver`      | `com.mysql.jdbc.Driver` or `com.mysql.cj.jdbc.Driver` for MySQL, `org.postgresql.Driver` for PostgreSQL | ` `           | 0.3.0         |
-| `jdbc-initialize`  | Whether to initialize meta tables when create Jdbc catalog                                              | `true`        | 0.2.0         |
+| Property name     | Description                                                                                             | Default value | Required | Since Version |
+|-------------------|---------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
+| `jdbc-user`       | JDBC user name                                                                                          | (none)        | Yes      | 0.2.0         |
+| `jdbc-password`   | JDBC password                                                                                           | (none)        | Yes      | 0.2.0         |
+| `jdbc-driver`     | `com.mysql.jdbc.Driver` or `com.mysql.cj.jdbc.Driver` for MySQL, `org.postgresql.Driver` for PostgreSQL | (none)        | Yes      | 0.3.0         |
+| `jdbc-initialize` | Whether to initialize meta tables when create Jdbc catalog                                              | `true`        | No       | 0.2.0         |
 
 :::caution
 Your must download the corresponding JDBC driver to the `catalogs/lakehouse-iceberg/libs` directory.
