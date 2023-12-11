@@ -1,7 +1,8 @@
 ---
 title: How to test Gravitino
 slug: /how-to-test
-license: Copyright 2023 Datastrato Pvt. This software is licensed under the Apache License version 2.
+license: "Copyright 2023 Datastrato Pvt Ltd.
+This software is licensed under the Apache License version 2."
 ---
 
 Gravitino has two types of tests: unit tests and integration tests. Unit tests are mainly
