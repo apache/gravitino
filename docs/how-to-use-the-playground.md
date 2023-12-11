@@ -85,7 +85,7 @@ If you want to know which employee has the largest sales amount.
 You can run the SQL.
 
 ```SQL
-WITH salesscores AS (
+WITH totalsales AS (
   SELECT
     employee_id,
     SUM(total_amount) AS sales_amount
@@ -97,7 +97,7 @@ WITH salesscores AS (
     employee_id,
     sales_amount,
     RANK() OVER (ORDER BY sales_amount DESC) AS sales_rank
-  FROM salesscores
+  FROM totalsales
 )
 SELECT
   e.employee_id,
