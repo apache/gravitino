@@ -3,7 +3,7 @@ title: Gravitino metrics
 slug: /metrics
 keywords:
   - metrics
-license: Copyright 2023 Datastrato.  This software is licensed under the Apache License version 2.
+license: Copyright 2023 Datastrato Pvt Ltd. This software is licensed under the Apache License version 2.
 ---
 
 ## Introduction
