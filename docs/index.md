@@ -83,16 +83,13 @@ Gravitino provides several ways to configure and manage the Gravitino server. Pl
 
 Gravitino support different catalogs to manage the metadata in different sources. Please see:
 
-* [How to use Gravitino manage Apache Iceberg metadata](./lakehouse-iceberg-catalog): a complete
-  guide to use Gravitino manage Apache Iceberg data.
-* [How to set up Gravitino Apache Iceberg REST catalog service](./iceberg-rest-service.md): a
+* [Lakehouse Iceberg catalog](./lakehouse-iceberg-catalog): a complete guide to use Gravitino 
+  manage Apache Iceberg data.
+* [How to set up Gravitino Apache Iceberg REST catalog service](./iceberg-rest-service): a
   complete guide to use Gravitino as Apache Iceberg REST catalog service.
-* [How to use Gravitino manage Apache Hive metadata](./apache-hive-catalog): a complete guide to
-  use Gravitino manage Apache Hive data.
-* [How to use Gravitino manage MySQL metadata](./jdbc-mysql-catalog): a complete guide to use
-  Gravitino manage MySQL data.
-* [How to use Gravitino manage PostgreSQL metadata](./jdbc-postgresql-catalog): a complete guide
-  to use Gravitino manage PostgreSQL data.
+* [Apache Hive catalog](./apache-hive-catalog): a complete guide to use Gravitino manage Apache Hive data.
+* [JDBC MySQL catalog](./jdbc-mysql-catalog): a complete guide to use Gravitino manage MySQL data.
+* [JDBC PostgreSQL catalog](./jdbc-postgresql-catalog): a complete guide to use Gravitino manage PostgreSQL data.
 
 ### Trino connector
 
