@@ -112,7 +112,6 @@ WHERE
   sales_rank = 1;
 ```
 
-
 If you want to know top 10 customers who bought the most by state.
 
 You run the SQL.
