@@ -213,7 +213,7 @@ Drop a column `age` from the `table_01` table:
 alter table "test.hive_test".database_01.table_01 drop column age;
 ```
 
-rename the `table_01` table to `table_02`:
+Rename the `table_01` table to `table_02`:
 
 ```sql
 alter table "test.hive_test".database_01.table_01 rename to "test.hive_test".database_01.table_02;
