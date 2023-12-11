@@ -64,8 +64,9 @@ to learn how to use the playground.
 * [Manage metadata using Gravitino](./manage-metadata-using-gravitino): provides the complete
   functionalities of Gravitino metadata management. Including metalake, catalog, schema and
   table management.
-* [Gravitino Open API](xxx): provides the complete Open API definition of Gravitino.
-* [Gravitino Javadoc](./gravitino-rest-api): provides the Javadoc for Gravitino API.
+* [Gravitino Open API](/apis/java/index.html): provides the complete Open API definition of 
+  Gravitino.
+* [Gravitino Javadoc](./apis/rest/gravitino-rest-api): provides the Javadoc for Gravitino API.
 
 ### Server administration
 
@@ -98,7 +99,7 @@ Gravitino support different catalogs to manage the metadata in different sources
 Gravitino provides a Trino connector to connect to Gravitino to manage the metadata in a unified
 way. to use the Trino connector, please see:
 
-* [How to use Gravitino Trino connector](./trino-connector/): a complete guide to use Gravitino
+* [How to use Gravitino Trino connector](./trino-connector/index): a complete guide to use Gravitino
   Trino connector.
 
 ### Development guides
@@ -107,7 +108,7 @@ way. to use the Trino connector, please see:
   source.
 * [How to test Gravitino](./how-to-test): a complete guide to run Gravitino unit tests and
   integration tests.
-* [How to sign and verify a Gravitino release](./how-to-sign-releases): a guide to sign and verify
+* [How to sign and verify a Gravitino releases](./how-to-sign-releases): a guide to sign and verify
   a Gravitino release.
 * [Publish Docker images](./publish-docker-images): a guide to publish Gravitino Docker images,
   also list the change logs of Gravitino CI Docker images and release images.
