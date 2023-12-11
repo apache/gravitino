@@ -15,12 +15,13 @@ Advanced features like partitioning, sorting, and distribution are not supported
 `CREATE TABLE AS SELECT` is not supported.
 
 ## Alter table
+
 Support for the following alter table operations:
 - Rename table
 - Add a column
 - Drop a column
+- Rename a column
 - Change a column type
-- Change column comment
 - Set a table property
 
 ## Select
@@ -111,6 +112,14 @@ Create a new schema named `database_01` in `test.hive_test` catalog.
 
 ```sql
 create schema "test.hive_test".database_01;
+```
+
+Create a new schema using hdfs location:
+
+```sql
+create schema "test.hive_test".database_01 {
+  location = 'hdfs://hdfs-host:9000/user/hive/warehouse/database_01'
+};
 ```
 
 Create a new table named `table_01` in schema `"test.hive_test".database_01` and stored in a TEXTFILE format.

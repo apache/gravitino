@@ -8,6 +8,22 @@ license: "Copyright 2023 Datastrato Pvt Ltd. This software is licensed under the
 The PostgreSQL catalog allows querying and creating tables in an external PostgreSQL database. 
 This can be used to join data between different systems like PostgreSQL and Hive, or between different PostgreSQL instances.
 
+## Create table
+
+Currently, only basic mysql table creation statements are supported, including fields, null allowance, and comments.
+Advanced features like primary key, index, default value, auto increment are not supported.
+
+
+## Alter table
+
+Support for the following alter table operations:
+- Rename table
+- Add a column
+- Drop a column
+- Rename a column
+- Change a column type
+- Set a table property
+
 ## Table and Schema properties
 
 PostgreSQL's tables and schemas cannot support properties.

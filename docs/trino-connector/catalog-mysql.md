@@ -9,8 +9,18 @@ The MySQL catalog allows querying and creating tables in an external MySQL insta
 This can be used to join data between different systems like MySQL and Hive, or between two different MySQL instances.
 
 ## Create table
+
 Currently, only basic mysql table creation statements are supported, including fields, null allowance, and comments.
 Advanced features like primary key, index, default value, auto increment are not supported.
+
+## Alter table
+
+Support for the following alter table operations:
+- Rename table
+- Add a column
+- Drop a column
+- Change a column type
+- Set a table property
 
 ## Table and Schema properties
 

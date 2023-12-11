@@ -9,6 +9,21 @@ Apache Iceberg is an open table format for huge analytic datasets.
 The Iceberg catalog allows Trino querying data stored in files written in Iceberg format, 
 as defined in the Iceberg Table Spec. The catalog supports Apache Iceberg table spec versions 1 and 2.
 
+## Create table
+
+Currently, only basic table creation statements are supported, including fields, null allowance, and comments.
+Advanced features like partitioning, sorting, and distribution are not supported.
+
+## Alter table
+
+Support for the following alter table operations:
+- Rename table
+- Add a column
+- Drop a column
+- Rename a column
+- Change a column type
+- Set a table property
+
 ## Table and Schema properties
 
 Iceberg's tables and schemas cannot support properties.
@@ -64,6 +79,14 @@ Create a new schema named `database_01` in `test.iceberg_test` catalog.
 
 ```sql
 create schema "test.iceberg_test".database_01;
+```
+
+Create a new schema using hdfs location:
+
+```sql
+create schema "test.iceberg_test".database_01 {
+  location = 'hdfs://hdfs-host:9000/user/iceberg/warehouse/database_01'
+};
 ```
 
 Create a new table named `table_01` in schema `"test.iceberg_test".database_01` and stored in a TEXTFILE format.
