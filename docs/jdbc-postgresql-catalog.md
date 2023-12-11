@@ -64,7 +64,7 @@ see [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino#schemas-
 - Doesn't support index definition.
 - Doesn't support table property settings.
 
-### Table column type
+#### Table column types
 | Gravitino Type | PostgreSQL Type               |
 |----------------|-------------------------------|
 | `Boolean`      | `boolean`                     |
