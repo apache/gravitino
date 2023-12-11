@@ -687,7 +687,7 @@ Currently, Gravitino supports the following changes to a table:
 
 | Supported modification             | Bash                                                                                                                  | Java                                        |
 |------------------------------------|-----------------------------------------------------------------------------------------------------------------------|---------------------------------------------|
-| Rename metalake                    | `{"@type":"rename","newName":"table_renamed"}`                                                                        | `TableChange.rename("table_renamed")`       |
+| Rename table                       | `{"@type":"rename","newName":"table_renamed"}`                                                                        | `TableChange.rename("table_renamed")`       |
 | Update comment                     | `{"@type":"updateComment","newComment":"new_comment"}`                                                                | `TableChange.updateComment("new_comment")`  |
 | Add a table property               | `{"@type":"setProperty","property":"key1","value":"value1"}`                                                          | `TableChange.setProperty("key1", "value1")` |
 | Remove a column                    | `{"@type":"removeProperty","property":"key1"}`                                                                        | `TableChange.removeProperty("key1")`        |
