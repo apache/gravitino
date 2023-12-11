@@ -23,7 +23,7 @@ Gravitino provides the ability to manage MySQL metadata.
 Any properties not defined by Gravitino with `gravitino.bypass` prefix will pass to MySQL catalog data source properties. For example, if specify `gravitino.bypass.maxWaitMillis`, `maxWaitMillis` will pass to MySQL catalog data source properties.
 You can check the relevant data source configuration in [data source properties](https://commons.apache.org/proper/commons-dbcp/configuration.html)
 
-If you are using JDBC catalog, you must provide `jdbc-url`, `jdbc-driver`, `jdbc-user` and `jdbc-password` to catalog properties.
+If you use JDBC catalog, you must provide `jdbc-url`, `jdbc-driver`, `jdbc-user` and `jdbc-password` to catalog properties.
 
 | Configuration item      | Description                                                                                                | Default value | Required | Since Version |
 |-------------------------|------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
