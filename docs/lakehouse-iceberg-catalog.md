@@ -19,7 +19,7 @@ Gravitino provides the ability to manage Apache Iceberg metadata.
 Builds with Apache Iceberg `1.3.1`. The Apache Iceberg table format version is `1` by default.
 :::
 
-:::notice
+:::info
 Builds with hadoop 2.10.x, there may compatibility issue when accessing hadoop 3.x clusters.
 :::
 
@@ -181,7 +181,7 @@ The default column position is `LAST` when you add a column. If you add a non nu
 Iceberg just supports update primitive types.
 :::
 
-:::notice
+:::caution
 If you update a nullability column to non nullability, there may be compatibility issue.
 :::
 
@@ -189,6 +189,6 @@ If you update a nullability column to non nullability, there may be compatibilit
 
 You can place `core-site.xml` and `hdfs-site.xml` in the `catalogs/lakehouse-iceberg/conf` directory to automatically load as the default HDFS configuration.
 
-:::notice
+:::caution
 When writing to HDFS, the Gravitino Iceberg REST server can only operate as the specified HDFS user and doesn't support proxying to other HDFS users. See [How to access Apache Hadoop](gravitino-server-config) for more details.
 :::
