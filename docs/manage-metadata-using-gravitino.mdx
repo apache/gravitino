@@ -140,6 +140,8 @@ GravitinoMetaLake[] allMetalakes = gravitinoClient.listMetalakes();
 
 :::tip
 Users should create a metalake before creating a catalog.
+
+The code below is an example of creating a Hive catalog. For other catalogs, the code is similar, but the catalog type, provider and properties may be different. For more details, please refer to the related doc.
 :::
 
 You can create a catalog by sending a `POST` request to the `/api/metalakes/{metalake_name}/catalogs` endpoint or just use the Gravitino Java client. The following is an example of creating a catalog:
@@ -173,15 +175,11 @@ Map<String, String> hiveProperties = ImmutableMap.<String, String>builder()
 Catalog catalog = gravitinoMetaLake.createCatalog(
     NameIdentifier.of("metalake", "catalog"),
     Type.RELATIONAL,
-    "hive",
+    "hive", // provider, We support hive, jdbc-mysql, jdbc-postgresql, lakehouse-iceberg, etc.
     "This is a hive catalog",
-    hiveProperties);
+    hiveProperties); // Please change the properties according to the value of provider.
 // ...
 ```
-
-:::warning
-The code above is an example of creating a Hive catalog. For other catalogs, the code is similar, but the catalog type, provider and properties may be different. For more details, please refer to the related doc.
-:::
 
 ### Load a catalog
 
@@ -467,6 +465,9 @@ GravitinoMetaLake gravitinoMetaLake =
 Catalog catalog = gravitinoMetaLake.loadCatalog(NameIdentifier.of("metalake", "catalog"));
 
 TableCatalog tableCatalog = catalog.asTableCatalog();
+
+// This is an example of creating a Hive table, you should refer to the related doc to get the
+// table properties of other catalogs.
 Map<String, String> tablePropertiesMap = ImmutableMap.<String, String>builder()
         .put("format", "ORC")
         // For more table properties, please refer to the related doc.
@@ -494,15 +495,15 @@ tableCatalog.createTable(
 
 In addition to the basic settings, you support the following features:
 
-:::note
-The following features aren't supported by all catalogs. Please refer to the related doc for more details.
-:::
-
 | Feature             | Description                                                                                  |
 |---------------------|----------------------------------------------------------------------------------------------|
 | Partitioned table   | Equal to `PARTITION BY` in Apache Hive and other engine that support partitioning.           |
 | Bucketed table      | Equal to `CLUSTERED BY` in Apache Hive, some engine may use different words to describe it.  |
 | Sorted order table  | Equal to `SORTED BY` in Apache Hive, some engine may use different words to describe it.     |
+
+:::tip
+**Those features may not be supported by all catalogs**. Please refer to the related doc for more details.
+:::
 
 The following is an example of creating a partitioned, bucketed table and sorted order table:
 
