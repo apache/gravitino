@@ -1,7 +1,8 @@
 ---
 title: How to sign and verify a Gravitino releases
 slug: /how-to-sign-release
-license: Copyright 2023 Datastrato Pvt. This software is licensed under the Apache License version 2.
+license: "Copyright 2023 Datastrato Pvt Ltd.
+This software is licensed under the Apache License version 2."
 ---
 
 These instructions provide a guide on signing and verifying Gravitino releases, enhancing the security of releases. Having a signed release allows people to confirm the release's author and guarantees that the code has not been altered.

@@ -1,7 +1,8 @@
 ---
 title: How to install Gravitino
 slug: /how-to-install
-license: Copyright 2023 Datastrato Pvt. This software is licensed under the Apache License version 2.
+license: "Copyright 2023 Datastrato Pvt Ltd.
+This software is licensed under the Apache License version 2."
 ---
 
 ## Install Gravitino from scratch
@@ -29,19 +30,19 @@ The Gravitino binary distribution package contains the following files:
 ```text
 |── ...
 └── distribution/package
-    |── bin/gravitino.sh            # Gravitino Server Launching scripts.
+    |── bin/gravitino.sh            # Gravitino server Launching scripts.
     |── catalogs
     |   └── hive/                   # Hive catalog dependencies and configurations.
     |   └── lakehouse-iceberg/      # Apache Iceberg catalog dependencies and configurations.
     |   └── jdbc-mysql/             # JDBC MySQL catalog dependencies and configurations.
     |   └── jdbc-postgresql/        # JDBC PostgreSQL catalog dependencies and configurations.
     |── conf/                       # All configuration for Gravitino.
-    |   ├── gravitino.conf          # Gravitino Server configuration.
+    |   ├── gravitino.conf          # Gravitino server configuration.
     |   ├── gravitino-env.sh        # Environment variables, etc., JAVA_HOME, GRAVITINO_HOME, and more.
-    |   └── log4j2.properties       # log4j configuration for Gravitino Server.
-    |── libs/                       # Gravitino Server dependencies libraries.
-    |── logs/                       # Gravitino Server logs. Automatically created after the Gravitino server starts.
-    └── data/                       # Default directory for Gravitino Server to store data.
+    |   └── log4j2.properties       # log4j configuration for Gravitino server.
+    |── libs/                       # Gravitino server dependencies libraries.
+    |── logs/                       # Gravitino server logs. Automatically created after the Gravitino server starts.
+    └── data/                       # Default directory for Gravitino server to store data.
 ```
 
 #### Configure Gravitino server

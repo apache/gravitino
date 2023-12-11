@@ -1,7 +1,8 @@
 ---
 title: How to build Gravitino
 slug: /how-to-build
-license: Copyright 2023 Datastrato Pvt. This software is licensed under the Apache License version 2.
+license: "Copyright 2023 Datastrato Pvt Ltd.
+This software is licensed under the Apache License version 2."
 ---
 
 ## Prerequisites
@@ -47,7 +48,8 @@ license: Copyright 2023 Datastrato Pvt. This software is licensed under the Apac
     ```
 
 :::note
-The first time you build the project, downloading the dependencies may take a while. You can add `-x test` to skip the test, like `./gradlew build -x test`.
+The first time you build the project, downloading the dependencies may take a while. You can add
+`-x test` to skip the tests, like `./gradlew build -x test`.
 :::
 
 3. Get the Gravitino binary package.
@@ -75,7 +77,9 @@ The `./gradlew clean` command deletes the `distribution` directory.
    You can deploy them to your production environment.
 
 :::note
-The `gravitino-{version}-bin.tar.gz` file is the Gravitino Server distribution package, and the `gravitino-{version}-bin.tar.gz.sha256` file is the sha256 checksum file for the Gravitino Server distribution package.
+The `gravitino-{version}-bin.tar.gz` file is the Gravitino server distribution package, and the
+`gravitino-{version}-bin.tar.gz.sha256` file is the sha256 checksum file for the Gravitino
+server distribution package.
 :::
 
 5. Assemble Gravitino Trino connector package
