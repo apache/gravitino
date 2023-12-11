@@ -84,3 +84,4 @@ assets like models, features, and others are under development.
   that support relational metadata sources, such as Apache Hive, MySQL, PostgresSQL, and others.
 * **Table**: The lowest level in the object hierarchy for catalogs that support relational
   metadata sources. You can create Tables in specific schemas in the catalogs.
+* **Model**: Model represents the metadata in the specific catalogs that support model management.
