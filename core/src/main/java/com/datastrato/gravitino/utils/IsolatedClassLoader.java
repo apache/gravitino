@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Datastrato.
+ * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 package com.datastrato.gravitino.utils;
@@ -75,6 +75,12 @@ public class IsolatedClassLoader implements Closeable {
   /**
    * Executes the provided function within the isolated class loading context and wraps any
    * exception, for more, please refer to {@link #withClassLoader(ThrowableFunction)}.
+   *
+   * @param fn The function to be executed within the isolated class loading context.
+   * @param exceptionClass The exception class to be wrapped.
+   * @param <E> The exception type.
+   * @param <T> The type of value return by this method
+   * @return The return value of the fn that executed within the classloader.
    */
   public <T, E extends RuntimeException> T withClassLoader(
       ThrowableFunction<ClassLoader, T> fn, Class<E> exceptionClass) {

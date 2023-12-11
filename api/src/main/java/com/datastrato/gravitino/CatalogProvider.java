@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Datastrato.
+ * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 package com.datastrato.gravitino;
@@ -13,6 +13,8 @@ public interface CatalogProvider {
   /**
    * The string that represents the catalog that this provider uses. This is overridden by children
    * to provide a nice alias for the catalog.
+   *
+   * @return The string that represents the catalog that this provider uses.
    */
   String shortName();
 }

@@ -1,17 +1,18 @@
 /*
- * Copyright 2023 Datastrato.
+ * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 package com.datastrato.gravitino.rel.types;
 
 /** An interface representing all data types supported by Gravitino. */
 public interface Type {
-  /** Returns the generic name of the type. */
+  /** @return The generic name of the type. */
   Name name();
 
-  /** Readable string representation for the type. */
+  /** @return A readable string representation for the type. */
   String simpleString();
 
+  /** The root type name of this type. */
   enum Name {
     BOOLEAN,
     BYTE,

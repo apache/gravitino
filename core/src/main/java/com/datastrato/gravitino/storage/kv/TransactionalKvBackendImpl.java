@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Datastrato.
+ * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 
@@ -29,8 +29,8 @@ import org.apache.commons.lang3.tuple.Pair;
  *
  * <pre>
  *       KEY                         VALUE
- *   key1 + separator + 1 --> status_code  + v1
- *   tx + separator + 1 -->  binary that contains all keys involved in this tx
+ *   key1 + separator + 1 --  status_code  + v1
+ *   tx + separator + 1   --  binary that contains all keys involved in this tx
  * </pre>
  *
  * We use '0x1F' as the separator, '______tx' as the value of tx, key1 + separator + 1 as the key of
@@ -184,7 +184,7 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
     byte[] end = scanRange.getEnd();
     boolean endInclude = scanRange.isEndInclusive();
     if (endInclude) {
-      end = Bytes.increment(Bytes.wrap(end)).get();
+      end = endOfKey(end);
       endInclude = false;
     }
 
@@ -283,7 +283,7 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
             new KvRangeScan.KvRangeScanBuilder()
                 .start(key)
                 .startInclusive(false)
-                .end(Bytes.increment(Bytes.wrap(key)).get())
+                .end(endOfKey(key))
                 .endInclusive(false)
                 .predicate(
                     (k, v) -> {
@@ -353,7 +353,13 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
 
   /** Get the end of transaction id, we use this key to scan all commit marks. */
   static byte[] endOfTransactionId() {
-    return Bytes.increment(Bytes.wrap(Bytes.concat(TRANSACTION_PREFIX, SEPARATOR))).get();
+    // Why use 1? Because we use 1 to represent the smallest transaction id. The smaller id will
+    // be larger than the bigger id when converting it to a byte array.
+    return generateCommitKey(1L);
+  }
+
+  static byte[] endOfKey(byte[] key) {
+    return generateKey(key, 1L);
   }
 
   static byte[] getRealKey(byte[] rawKey) {

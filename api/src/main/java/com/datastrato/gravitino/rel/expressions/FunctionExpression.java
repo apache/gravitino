@@ -1,9 +1,13 @@
 /*
- * Copyright 2023 Datastrato.
+ * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 package com.datastrato.gravitino.rel.expressions;
 
+/**
+ * The interface of a function expression. A function expression is an expression that takes a
+ * function name and a list of arguments.
+ */
 public interface FunctionExpression extends Expression {
 
   /**
@@ -27,10 +31,10 @@ public interface FunctionExpression extends Expression {
     return of(functionName, Expression.EMPTY_EXPRESSION);
   }
 
-  /** Returns the transform function name. */
+  /** @return The transform function name. */
   String functionName();
 
-  /** Returns the arguments passed to the transform function. */
+  /** @return The arguments passed to the transform function. */
   Expression[] arguments();
 
   @Override
@@ -38,6 +42,7 @@ public interface FunctionExpression extends Expression {
     return arguments();
   }
 
+  /** A {@link FunctionExpression} implementation */
   final class FuncExpressionImpl implements FunctionExpression {
     private final String functionName;
     private final Expression[] arguments;

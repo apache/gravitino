@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Datastrato.
+ * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 package com.datastrato.gravitino.rel.expressions.distributions;
@@ -66,6 +66,11 @@ public class Distributions {
    *   SQL syntax: distribute by EVEN(a) buckets 128
    *   fields(Strategy.EVEN, 128, new String[]{"a"});
    * </pre>
+   *
+   * @param strategy The strategy to use.
+   * @param number The number of buckets.
+   * @param fieldNames The field names to distribute by.
+   * @return The created distribution.
    */
   public static Distribution fields(Strategy strategy, int number, String[]... fieldNames) {
     Expression[] expressions =
@@ -73,6 +78,10 @@ public class Distributions {
     return of(strategy, number, expressions);
   }
 
+  /**
+   * Create a distribution on columns. Like distribute by (a) or (a, b), for complex like
+   * distributing by (func(a), b) or (func(a), func(b)), please use {@link DistributionImpl.Builder}
+   */
   public static final class DistributionImpl implements Distribution {
     private final Strategy strategy;
     private final int number;
@@ -99,6 +108,7 @@ public class Distributions {
       return expressions;
     }
 
+    /** Builder to create a distribution. */
     public static class Builder {
       private Strategy strategy;
       private int number;

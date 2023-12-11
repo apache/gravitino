@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Datastrato.
+ * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 package com.datastrato.gravitino.rel.expressions.transforms;
@@ -211,6 +211,7 @@ public class Transforms {
     return new HourTransform(ref);
   }
 
+  /** A transform that returns the input value. */
   public static final class IdentityTransform extends Transform.SingleFieldTransform {
     private IdentityTransform(NamedReference ref) {
       this.ref = ref;
@@ -232,6 +233,7 @@ public class Transforms {
     }
   }
 
+  /** A transform that returns the year of the input value. */
   public static final class YearTransform extends Transform.SingleFieldTransform {
     private YearTransform(NamedReference ref) {
       this.ref = ref;
@@ -253,6 +255,7 @@ public class Transforms {
     }
   }
 
+  /** A transform that returns the month of the input value. */
   public static final class MonthTransform extends Transform.SingleFieldTransform {
     private MonthTransform(NamedReference ref) {
       this.ref = ref;
@@ -274,6 +277,7 @@ public class Transforms {
     }
   }
 
+  /** A transform that returns the day of the input value. */
   public static final class DayTransform extends Transform.SingleFieldTransform {
     private DayTransform(NamedReference ref) {
       this.ref = ref;
@@ -295,6 +299,7 @@ public class Transforms {
     }
   }
 
+  /** A transform that returns the hour of the input value. */
   public static final class HourTransform extends Transform.SingleFieldTransform {
     private HourTransform(NamedReference ref) {
       this.ref = ref;
@@ -316,6 +321,7 @@ public class Transforms {
     }
   }
 
+  /** A transform that returns the bucket of the input value. */
   public static final class BucketTransform implements Transform {
 
     private final Literal<Integer> numBuckets;
@@ -364,6 +370,7 @@ public class Transforms {
     }
   }
 
+  /** A transform that returns the truncated value of the input value with the given width. */
   public static final class TruncateTransform implements Transform {
 
     private final Literal<Integer> width;
@@ -410,6 +417,7 @@ public class Transforms {
     }
   }
 
+  /** A transform that includes multiple fields in a list. */
   public static final class ListTransform implements Transform {
 
     private final NamedReference[] fields;
@@ -456,6 +464,7 @@ public class Transforms {
     }
   }
 
+  /** A transform that returns the range of the input value. */
   public static final class RangeTransform implements Transform {
 
     private final NamedReference field;
@@ -498,6 +507,7 @@ public class Transforms {
     }
   }
 
+  /** A transform that applies a function to the input value. */
   public static final class ApplyTransform implements Transform {
 
     private final String name;

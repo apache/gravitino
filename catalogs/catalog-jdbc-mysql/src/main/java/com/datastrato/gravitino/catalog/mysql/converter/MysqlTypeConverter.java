@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Datastrato.
+ * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 package com.datastrato.gravitino.catalog.mysql.converter;
@@ -17,8 +17,6 @@ public class MysqlTypeConverter extends JdbcTypeConverter<ColDataType, String> {
   public Type toGravitinoType(ColDataType type) {
     List<String> arguments = type.getArgumentsStringList();
     switch (type.getDataType().toLowerCase()) {
-      case "boolean":
-        return Types.BooleanType.get();
       case "tinyint":
         return Types.ByteType.get();
       case "smallint":
@@ -55,9 +53,7 @@ public class MysqlTypeConverter extends JdbcTypeConverter<ColDataType, String> {
 
   @Override
   public String fromGravitinoType(Type type) {
-    if (type instanceof Types.BooleanType) {
-      return type.simpleString();
-    } else if (type instanceof Types.ByteType) {
+    if (type instanceof Types.ByteType) {
       return "tinyint";
     } else if (type instanceof Types.ShortType) {
       return "smallint";

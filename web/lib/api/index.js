@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Datastrato.
+ * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 
@@ -15,6 +15,9 @@ const defHttp = axios.create({
 })
 
 defHttp.interceptors.request.use(config => {
+  if (config.url.includes('/oauth2/token')) {
+    return config
+  }
   const accessToken = typeof window !== 'undefined' ? window.localStorage.getItem('accessToken') : null
 
   if (accessToken) {

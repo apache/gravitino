@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Datastrato.
+ * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 
@@ -19,6 +19,13 @@ export const to = (promise, errExt) => {
 
       return [err, undefined]
     })
+}
+
+export const loggerVersion = version => {
+  console.log(
+    `Gravitino Version: %c${version}`,
+    `color: white; background-color: #6062E0; padding: 2px; border-radius: 4px;`
+  )
 }
 
 export const genUpdates = (originalData, newData) => {

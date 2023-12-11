@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Datastrato.
+ * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 package com.datastrato.gravitino.json;
@@ -187,6 +187,11 @@ public class TestDTOJsonSerDe {
     Assertions.assertEquals(expectedJson, serJson);
     ColumnDTO deserColumn = JsonUtils.objectMapper().readValue(serJson, ColumnDTO.class);
     Assertions.assertEquals(column, deserColumn);
+
+    // test default nullable
+    String json = "{\"name\":\"column\",\"type\":\"byte\",\"comment\":\"comment\"}";
+    ColumnDTO deColumn = JsonUtils.objectMapper().readValue(json, ColumnDTO.class);
+    Assertions.assertTrue(deColumn.nullable());
   }
 
   @Test

@@ -1,0 +1,406 @@
+#
+# Copyright 2023 Datastrato Pvt Ltd.
+# This software is licensed under the Apache License version 2.
+#
+
+---
+
+paths:
+
+  /metalakes/{metalake}/catalogs:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+    get:
+      tags:
+        - catalog
+      summary: List all catalogs in the specified metalake
+      operationId: listCatalogs
+      responses:
+        "200":
+          $ref: "./openapi.yaml#/components/responses/EntityListResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+    post:
+      tags:
+        - catalog
+      summary: Create a new catalog in the specified metalake
+      operationId: createCatalog
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CatalogCreateRequest"
+            examples:
+              CatalogCreate:
+                $ref: "#/components/examples/CatalogCreate"
+
+      responses:
+        "200":
+          $ref: "#/components/responses/CatalogResponse"
+        "409":
+          description: Conflict - The target catalog already exists in the specified metalake
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                CatalogAlreadyExistsException:
+                  $ref: "#/components/examples/CatalogAlreadyExistsException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+  /metalakes/{metalake}/catalogs/{catalog}:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - $ref: "./openapi.yaml#/components/parameters/catalog"
+
+    get:
+      tags:
+        - catalog
+      summary: Get the specified catalog in the specified metalake
+      operationId: loadCatalog
+      description: Returns the specified catalog information in the specified metalake
+      responses:
+        "200":
+          $ref: "#/components/responses/CatalogResponse"
+        "404":
+          description: Not Found - The specified catalog does not exist in the specified metalake
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetalakeException:
+                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
+                NoSuchCatalogException:
+                  $ref: "#/components/examples/NoSuchCatalogException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+    put:
+      tags:
+        - catalog
+      summary: Update the specified catalog in the specified metalake
+      operationId: alterCatalog
+      description: Alters the specified catalog information in the specified metalake
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CatalogUpdatesRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/CatalogResponse"
+        "404":
+          description: Not Found - The specified catalog does not exist in the specified metalake
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetalakeException:
+                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
+                NoSuchCatalogException:
+                  $ref: "#/components/examples/NoSuchCatalogException"
+        "409":
+            description: Conflict - The target catalog already exists in the specified metalake
+            content:
+              application/vnd.gravitino.v1+json:
+                schema:
+                  $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+                examples:
+                  CatalogAlreadyExistsException:
+                    $ref: "#/components/examples/CatalogAlreadyExistsException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+    delete:
+      tags:
+        - catalog
+      summary: Drop the specified catalog in the specified metalake
+      operationId: dropCatalog
+      responses:
+        "200":
+          $ref: "./openapi.yaml#/components/responses/DropResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+
+
+components:
+
+  schemas:
+
+    Catalog:
+      type: object
+      description: A catalog
+      required:
+        - name
+        - type
+        - provider
+        - audit
+      properties:
+        name:
+          type: string
+          description: The name of the catalog
+        type:
+          type: string
+          description: The type of the catalog
+          enum:
+            - relational
+            - file
+            - stream
+        provider:
+          type: string
+          description: The provider of the catalog
+          enum:
+            - hive
+            - lakehouse-iceberg
+            - jdbc-mysql
+            - jdbc-postgresql
+        comment:
+          type: string
+          description: A comment about the catalog
+          nullable: true
+        audit:
+          $ref: "./openapi.yaml#/components/schemas/Audit"
+        properties:
+          type: object
+          description: Configured string to string map of properties for the catalog
+          default: { }
+          additionalProperties:
+            type: string
+
+    CatalogCreateRequest:
+      type: object
+      required:
+        - name
+        - type
+        - provider
+      properties:
+        name:
+          type: string
+          description: The name of the catalog
+        type:
+          type: string
+          description: The type of the catalog
+          enum:
+            - relational
+            - file
+            - stream
+        provider:
+          type: string
+          description: The provider of the catalog
+          enum:
+            - hive
+            - lakehouse-iceberg
+            - jdbc-mysql
+            - jdbc-postgresql
+        comment:
+          type: string
+          description: A comment for the catalog
+          nullable: true
+        properties:
+          type: object
+          description: A map of properties for the catalog
+          nullable: true
+          default: { }
+          additionalProperties:
+            type: string
+
+    CatalogUpdatesRequest:
+      type: object
+      required:
+        - updates
+      properties:
+        updates:
+          type: array
+          items:
+            $ref: "#/components/schemas/CatalogUpdateRequest"
+
+    CatalogUpdateRequest:
+      oneOf:
+        - $ref: "#/components/schemas/RenameCatalogRequest"
+        - $ref: "#/components/schemas/UpdateCatalogCommentRequest"
+        - $ref: "#/components/schemas/SetCatalogPropertyRequest"
+        - $ref: "#/components/schemas/RemoveCatalogPropertyRequest"
+      discriminator:
+        propertyName: "@type"
+        mapping:
+          rename: "#/components/schemas/RenameCatalogRequest"
+          updateComment: "#/components/schemas/UpdateCatalogCommentRequest"
+          setProperty: "#/components/schemas/SetCatalogPropertyRequest"
+          removeProperty: "#/components/schemas/RemoveCatalogPropertyRequest"
+
+    RenameCatalogRequest:
+      type: object
+      required:
+        - "@type"
+        - newName
+      properties:
+        "@type":
+          type: string
+          enum:
+            - rename
+        newName:
+          type: string
+          description: The new name of the catalog
+      example: {
+        "@type": "rename",
+        "newName": "my_catalog_new"
+      }
+
+    UpdateCatalogCommentRequest:
+      type: object
+      required:
+        - "@type"
+        - newComment
+      properties:
+        "@type":
+          type: string
+          enum:
+            - updateComment
+        newComment:
+          type: string
+          description: The new comment of the catalog
+      example: {
+        "@type": "updateComment",
+        "newComment": "This is my new catalog comment"
+      }
+
+    SetCatalogPropertyRequest:
+      type: object
+      required:
+        - "@type"
+        - property
+        - value
+      properties:
+        "@type":
+          type: string
+          enum:
+            - setProperty
+        property:
+          type: string
+          description: The property to set
+        value:
+          type: string
+          description: The value to set
+      example: {
+        "@type": "setProperty",
+        "property": "key1",
+        "value": "value1"
+      }
+
+    RemoveCatalogPropertyRequest:
+      type: object
+      required:
+        - "@type"
+        - property
+      properties:
+        "@type":
+          type: string
+          enum:
+            - removeProperty
+        property:
+          type: string
+          description: The property to remove
+      example: {
+        "@type": "removeProperty",
+        "property": "key2"
+      }
+
+
+  responses:
+
+    CatalogResponse:
+      description: Returns included catalog object
+      content:
+        application/vnd.gravitino.v1+json:
+          schema:
+            type: object
+            properties:
+              code:
+                type: integer
+                format: int32
+                description: Status code of the response
+                enum:
+                  - 0
+              catalog:
+                $ref: "#/components/schemas/Catalog"
+          examples:
+            CatalogResponse:
+              $ref: "#/components/examples/CatalogResponse"
+
+
+  examples:
+    CatalogListResponse:
+      value: {
+        "code": 0,
+        "identifiers": [
+          {
+            "namespace": [
+              "my_metalake"
+            ],
+            "name": "my_hive_catalog"
+          }
+        ]
+      }
+
+    CatalogCreate:
+      value: {
+        "name": "my_hive_catalog",
+        "type": "relational",
+        "provider": "hive",
+        "comment": "This is my hive catalog",
+        "properties": {
+          "metastore.uris": "thrift://127.0.0.1:9083",
+          "key1": "value1"
+        }
+      }
+
+    CatalogResponse:
+      value: {
+        "code": 0,
+        "catalog": {
+          "name": "my_hive_catalog",
+          "type": "relational",
+          "provider": "hive",
+          "comment": "This is my hive catalog",
+          "properties": {
+            "key1": "value1",
+            "gravitino.bypass.hive.metastore.client.capability.check": "false",
+            "metastore.uris": "thrift://127.0.0.1:9083"
+          },
+          "audit": {
+            "creator": "gravitino",
+            "createTime": "2023-12-08T03:41:25.595Z"
+          }
+        }
+      }
+
+    CatalogAlreadyExistsException:
+      value: {
+        "code": 1004,
+        "type": "CatalogAlreadyExistsException",
+        "message": "Failed to operate catalog(s) [my_catalog] operation [CREATE], reason [CatalogAlreadyExistsException]",
+        "stack": [
+          "com.datastrato.gravitino.exceptions.CatalogAlreadyExistsException: Catalog my_catalog already exists",
+          "..."
+        ]
+      }
+
+    NoSuchCatalogException:
+      value: {
+        "code": 1003,
+        "type": "NoSuchCatalogException",
+        "message": "Failed to operate catalog(s) [test] operation [LOAD] under metalake [my_test_metalake], reason [NoSuchCatalogException]",
+        "stack": [
+          "com.datastrato.gravitino.exceptions.NoSuchCatalogException: Catalog my_test_metalake.test does not exist",
+          "..."
+        ]
+      }

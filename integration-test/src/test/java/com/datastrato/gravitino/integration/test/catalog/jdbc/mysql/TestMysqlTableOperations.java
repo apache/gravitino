@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Datastrato.
+ * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 package com.datastrato.gravitino.integration.test.catalog.jdbc.mysql;
@@ -11,10 +11,13 @@ import com.datastrato.gravitino.catalog.jdbc.JdbcColumn;
 import com.datastrato.gravitino.catalog.jdbc.JdbcTable;
 import com.datastrato.gravitino.exceptions.GravitinoRuntimeException;
 import com.datastrato.gravitino.exceptions.NoSuchTableException;
+import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.types.Type;
 import com.datastrato.gravitino.rel.types.Types;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -385,6 +388,139 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
 
     JdbcTable loaded = TABLE_OPERATIONS.load(TEST_DB_NAME, tableName);
     assertionsTableInfo(tableName, tableComment, columns, properties, loaded);
+  }
+
+  @Test
+  public void testCreateAllTypeTable() {
+    String tableName = GravitinoITUtils.genRandomName("type_table_");
+    String tableComment = "test_comment";
+    List<JdbcColumn> columns = new ArrayList<>();
+    columns.add(
+        new JdbcColumn.Builder()
+            .withName("col_1")
+            .withType(Types.ByteType.get())
+            .withNullable(false)
+            .build());
+    columns.add(
+        new JdbcColumn.Builder()
+            .withName("col_2")
+            .withType(Types.ShortType.get())
+            .withNullable(true)
+            .build());
+    columns.add(
+        new JdbcColumn.Builder().withName("col_3").withType(INT).withNullable(false).build());
+    columns.add(
+        new JdbcColumn.Builder()
+            .withName("col_4")
+            .withType(Types.LongType.get())
+            .withNullable(false)
+            .build());
+    columns.add(
+        new JdbcColumn.Builder()
+            .withName("col_5")
+            .withType(Types.FloatType.get())
+            .withNullable(false)
+            .build());
+    columns.add(
+        new JdbcColumn.Builder()
+            .withName("col_6")
+            .withType(Types.DoubleType.get())
+            .withNullable(false)
+            .build());
+    columns.add(
+        new JdbcColumn.Builder()
+            .withName("col_7")
+            .withType(Types.DateType.get())
+            .withNullable(false)
+            .build());
+    columns.add(
+        new JdbcColumn.Builder()
+            .withName("col_8")
+            .withType(Types.TimeType.get())
+            .withNullable(false)
+            .build());
+    columns.add(
+        new JdbcColumn.Builder()
+            .withName("col_9")
+            .withType(Types.TimestampType.withoutTimeZone())
+            .withNullable(false)
+            .build());
+    columns.add(
+        new JdbcColumn.Builder().withName("col_10").withType(Types.DecimalType.of(10, 2)).build());
+    columns.add(
+        new JdbcColumn.Builder().withName("col_11").withType(VARCHAR).withNullable(false).build());
+    columns.add(
+        new JdbcColumn.Builder()
+            .withName("col_12")
+            .withType(Types.FixedCharType.of(10))
+            .withNullable(false)
+            .build());
+    columns.add(
+        new JdbcColumn.Builder()
+            .withName("col_13")
+            .withType(Types.StringType.get())
+            .withNullable(false)
+            .build());
+    columns.add(
+        new JdbcColumn.Builder()
+            .withName("col_14")
+            .withType(Types.BinaryType.get())
+            .withNullable(false)
+            .build());
+
+    // create table
+    TABLE_OPERATIONS.create(
+        TEST_DB_NAME,
+        tableName,
+        columns.toArray(new JdbcColumn[0]),
+        tableComment,
+        Collections.emptyMap(),
+        null);
+
+    JdbcTable load = TABLE_OPERATIONS.load(TEST_DB_NAME, tableName);
+    assertionsTableInfo(tableName, tableComment, columns, Collections.emptyMap(), load);
+  }
+
+  @Test
+  public void testCreateNotSupportTypeTable() {
+    String tableName = GravitinoITUtils.genRandomName("type_table_");
+    String tableComment = "test_comment";
+    List<JdbcColumn> columns = new ArrayList<>();
+    List<Type> notSupportType =
+        Arrays.asList(
+            Types.BooleanType.get(),
+            Types.FixedType.of(10),
+            Types.IntervalDayType.get(),
+            Types.IntervalYearType.get(),
+            Types.TimestampType.withTimeZone(),
+            Types.UUIDType.get(),
+            Types.ListType.of(Types.DateType.get(), true),
+            Types.MapType.of(Types.StringType.get(), Types.IntegerType.get(), true),
+            Types.UnionType.of(Types.IntegerType.get()),
+            Types.StructType.of(
+                Types.StructType.Field.notNullField("col_1", Types.IntegerType.get())));
+
+    for (Type type : notSupportType) {
+      columns.clear();
+      columns.add(
+          new JdbcColumn.Builder().withName("col_1").withType(type).withNullable(false).build());
+
+      IllegalArgumentException illegalArgumentException =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  TABLE_OPERATIONS.create(
+                      TEST_DB_NAME,
+                      tableName,
+                      columns.toArray(new JdbcColumn[0]),
+                      tableComment,
+                      Collections.emptyMap(),
+                      null));
+      Assertions.assertTrue(
+          illegalArgumentException
+              .getMessage()
+              .contains("Not a supported type: " + type.toString()));
+    }
   }
 
   @Test

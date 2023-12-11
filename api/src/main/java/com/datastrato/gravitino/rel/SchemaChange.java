@@ -23,6 +23,7 @@ package com.datastrato.gravitino.rel;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 
+/** NamespaceChange class to set the property and value pairs for the namespace. */
 public interface SchemaChange {
 
   /**

@@ -1,5 +1,5 @@
 #
-# Copyright 2023 Datastrato.
+# Copyright 2023 Datastrato Pvt Ltd.
 # This software is licensed under the Apache License version 2.
 #
 
@@ -19,9 +19,9 @@ paths:
         "200":
           $ref: "#/components/responses/ListMetalakesResponse"
         "400":
-          $ref: "#/components/responses/BadRequestErrorResponse"
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
         "5xx":
-          $ref: "#/components/responses/ServerErrorResponse"
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
     post:
       tags:
@@ -51,7 +51,7 @@ paths:
                 MetalakeAlreadyExistsException:
                   $ref: "#/components/examples/MetalakeAlreadyExistsException"
         "5xx":
-          $ref: "#/components/responses/ServerErrorResponse"
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
   /metalakes/{name}:
     parameters:
@@ -80,7 +80,7 @@ paths:
                 NoSuchMetalakeException:
                   $ref: "#/components/examples/NoSuchMetalakeException"
         "5xx":
-          $ref: "#/components/responses/ServerErrorResponse"
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
     put:
       tags:
@@ -131,24 +131,11 @@ paths:
       description: Drops a specified metalake
       responses:
         "200":
-          $ref: "#/components/responses/DropResponse"
-        "404":
-          description: Not Found - The metalake does not exist
-          content:
-            application/vnd.gravitino.v1+json:
-              schema:
-                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
-              examples:
-                NoSuchMetalakeException:
-                  $ref: "#/components/examples/NoSuchMetalakeException"
+          $ref: "./openapi.yaml#/components/responses/DropResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
         "5xx":
-          description:
-            Internal server error. It is possible that the server
-            encountered a storage issue.
-          content:
-            application/vnd.gravitino.v1+json:
-              schema:
-                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
 components:
 
@@ -170,7 +157,7 @@ components:
           type: object
           description: Configured string to string map of properties for the metalake
           nullable: true
-          default: { }
+          default: {}
           additionalProperties:
             type: string
 
@@ -263,7 +250,7 @@ components:
         - "@type"
         - property
       properties:
-        type:
+        "@type":
           type: string
           enum:
             - removeProperty
@@ -300,6 +287,19 @@ components:
           default: { }
           additionalProperties:
             type: string
+      example: {
+        "name": "my_metalake",
+        "comment": "This is my metalake",
+        "properties": {
+          "key1": "value1",
+          "key2": "value2",
+          "gravitino.identifier": "gravitino.v1.uid4516733622157792920"
+        },
+        "audit": {
+          "creator": "gravitino",
+          "createTime": "2023-12-07T14:04:17.349Z"
+        }
+      }
 
   responses:
 
@@ -323,22 +323,6 @@ components:
                 items:
                   $ref: "#/components/schemas/Metalake"
 
-    BadRequestErrorResponse:
-      description:
-        Indicates a bad request error. It could be caused by an unexpected request
-        body format or other forms of request validation failure, such as invalid json.
-        Usually serves application/vnd.gravitino.v1+json content, although in some cases simple text/plain content might
-        be returned by the server's middleware.
-      content:
-        application/vnd.gravitino.v1+json:
-          schema:
-            $ref: './openapi.yaml#/components/schemas/ErrorModel'
-          example: {
-            "code": 1003,
-            "type": "BadRequestException",
-            "message": "Malformed request"
-          }
-
     MetalakeResponse:
       description: Returns included metalake object.
       content:
@@ -357,41 +341,6 @@ components:
           examples:
             MetalakeResponse:
               $ref: "#/components/examples/MetalakeResponse"
-
-    DropResponse:
-      description: Represents a response for a drop operation
-      content:
-        application/vnd.gravitino.v1+json:
-          schema:
-            type: object
-            properties:
-              code:
-                type: integer
-                format: int32
-                description: Status code of the response
-                enum:
-                  - 0
-              dropped:
-                type: boolean
-                description: Whether the drop operation was successful
-
-    ServerErrorResponse:
-      description:
-        A server-side problem that might not be addressable from the client
-        side. Used for server 5xx errors without more specific documentation in
-        individual routes.
-      content:
-        application/vnd.gravitino.v1+json:
-          schema:
-            $ref: "./openapi.yaml#/components/schemas/ErrorModel"
-          example: {
-            "code": 1002,
-            "type": "RuntimeException",
-            "message": "Internal Server Error",
-            "stack": [
-              "java.lang.RuntimeException: Internal Server Error"
-            ]
-          }
 
   examples:
 

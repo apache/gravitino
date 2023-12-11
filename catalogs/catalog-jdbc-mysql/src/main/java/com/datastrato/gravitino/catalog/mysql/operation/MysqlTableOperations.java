@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Datastrato.
+ * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 package com.datastrato.gravitino.catalog.mysql.operation;
@@ -535,16 +535,14 @@ public class MysqlTableOperations extends JdbcTableOperations {
         .append(SPACE);
 
     // Add NOT NULL if the column is marked as such
-    if (!column.nullable()) {
+    if (column.nullable()) {
+      sqlBuilder.append("NULL ");
+    } else {
       sqlBuilder.append("NOT NULL ");
     }
     // Add DEFAULT value if specified
     if (StringUtils.isNotEmpty(column.getDefaultValue())) {
       sqlBuilder.append("DEFAULT '").append(column.getDefaultValue()).append("'").append(SPACE);
-    } else {
-      if (column.nullable()) {
-        sqlBuilder.append("DEFAULT NULL ");
-      }
     }
 
     // Add column properties if specified

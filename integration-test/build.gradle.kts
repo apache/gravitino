@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Datastrato.
+ * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 import org.gradle.internal.os.OperatingSystem
@@ -273,7 +273,7 @@ tasks.test {
 
       // Gravitino CI Docker image
       environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-hive:0.1.6")
-      environment("GRAVITINO_CI_TRINO_DOCKER_IMAGE", "datastrato/gravitino-ci-trino:0.1.0")
+      environment("GRAVITINO_CI_TRINO_DOCKER_IMAGE", "datastrato/gravitino-ci-trino:0.1.2")
 
       val testMode = project.properties["testMode"] as? String ?: "embedded"
       systemProperty("gravitino.log.path", buildDir.path + "/integration-test.log")

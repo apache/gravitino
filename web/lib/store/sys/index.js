@@ -1,11 +1,11 @@
 /*
- * Copyright 2023 Datastrato.
+ * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit'
 
-import { to } from '@/lib/utils'
+import { loggerVersion, to } from '@/lib/utils'
 
 import { getVersionApi } from '@/lib/api/version'
 
@@ -17,10 +17,7 @@ export const initialVersion = createAsyncThunk('sys/fetchVersion', async (params
     version = res.data.version
     typeof window !== 'undefined' && window.localStorage.setItem('version', JSON.stringify(version))
 
-    console.log(
-      `Gravitino Version: %c${version.version}`,
-      `color: white; background-color: #6062E0; padding: 2px; border-radius: 4px;`
-    )
+    loggerVersion(version.version)
   }
 
   return version
@@ -29,7 +26,7 @@ export const initialVersion = createAsyncThunk('sys/fetchVersion', async (params
 export const sysSlice = createSlice({
   name: 'sys',
   initialState: {
-    version: null
+    version: ''
   },
   reducers: {
     setVersion(state, action) {

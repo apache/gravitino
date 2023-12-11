@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Datastrato.
+ * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 
@@ -12,10 +12,18 @@ public interface TransactionalKvBackend extends KvBackend {
   /** Begin the transaction. */
   void begin();
 
-  /** Commit the transaction. */
+  /**
+   * Commit the transaction.
+   *
+   * @throws IOException if the commit operation fails
+   */
   void commit() throws IOException;
 
-  /** Rollback the transaction if something goes wrong. */
+  /**
+   * Rollback the transaction if something goes wrong.
+   *
+   * @throws IOException if the rollback operation fails
+   */
   void rollback() throws IOException;
 
   /** Close the current transaction. */
