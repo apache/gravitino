@@ -133,6 +133,10 @@ This software is licensed under the Apache License version 2."
 
 - Cryptographic hash values generated from the contents of a file, often used for integrity verification.
 
+## HDFS
+
+- **HDFS** (Hadoop Distributed File System) is an open-source distributed file system and a key component of the Apache Hadoop ecosystem. It is designed to store and process large-scale datasets, providing high reliability, fault tolerance, and performance for distributed storage solutions.
+
 ## Headless
 
 - A system without a graphical user interface.
@@ -140,6 +144,18 @@ This software is licensed under the Apache License version 2."
 ## HTTP port
 
 - The port number on which a server listens for incoming connections.
+
+## Iceberg Hive catalog
+
+- The **Iceberg Hive catalog** is a specialized metadata service designed for the Apache Iceberg table format, allowing external systems to interact with Iceberg metadata via a Hive metastore thrift client.
+
+## Iceberg REST catalog
+
+- The **Iceberg REST Catalog** is a specialized metadata service designed for the Apache Iceberg table format, allowing external systems to interact with Iceberg metadata via a RESTful API.
+
+## Iceberg JDBC catalog
+
+- The **Iceberg JDBC Catalog** is a specialized metadata service designed for the Apache Iceberg table format, allowing external systems to interact with Iceberg metadata using JDBC (Java Database Connectivity).
 
 ## Identity fields
 
@@ -180,6 +196,10 @@ This software is licensed under the Apache License version 2."
 ## KEYS file
 
 - A file containing public keys used to sign previous releases, necessary for verifying signatures.
+
+## Lakehouse
+
+- **Lakehouse** refers to a modern data management architecture that combines elements of data lakes and data warehouses. It aims to provide a unified platform for storing, managing, and analyzing both raw unstructured data (similar to data lakes) and curated structured data.
 
 ## Manifest
 
@@ -269,6 +289,10 @@ This software is licensed under the Apache License version 2."
 
 - A structured set of data elements stored in columns and rows.
 
+## Token
+
+- A **token** in the context of computing and security commonly refers to a small, indivisible unit of data. Tokens play a crucial role in various domains, including authentication, authorization, and cryptographic systems.
+
 ## Thrift protocol
 
 - The network protocol used for communication with Hive Metastore Service (HMS).
@@ -300,27 +324,3 @@ This software is licensed under the Apache License version 2."
 ## YAML
 
 - YAML Ain't Markup Language, a human-readable data serialization format often used for configuration files.
-
-## HDFS
-
-- **HDFS** (Hadoop Distributed File System) is an open-source distributed file system and a key component of the Apache Hadoop ecosystem. It is designed to store and process large-scale datasets, providing high reliability, fault tolerance, and performance for distributed storage solutions. 
-
-## Lakehouse
-
-- **Lakehouse** refers to a modern data management architecture that combines elements of data lakes and data warehouses. It aims to provide a unified platform for storing, managing, and analyzing both raw, unstructured data (similar to data lakes) and curated, structured data. 
-
-## Token
-
-- A **token** in the context of computing and security commonly refers to a small, indivisible unit of data. Tokens play a crucial role in various domains, including authentication, authorization, and cryptographic systems.
-
-## Iceberg Hive catalog
-
-- The **Iceberg Hive catalog** is a specialized metadata service designed for the Apache Iceberg table format, allowing external systems to interact with Iceberg metadata via a thrift client of Hive metastore.
-
-## Iceberg REST catalog
-
-- The **Iceberg REST Catalog** is a specialized metadata service designed for the Apache Iceberg table format, allowing external systems to interact with Iceberg metadata via a RESTful API. 
-
-## Iceberg JDBC catalog
-
-- The **Iceberg JDBC Catalog** is a specialized metadata service designed for the Apache Iceberg table format, allowing external systems to interact with Iceberg metadata using JDBC (Java Database Connectivity). 

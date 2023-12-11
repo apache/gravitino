@@ -1,11 +1,12 @@
 ---
-title: How to use Gravitino to manage Iceberg metadata
+title: "Lakehouse Apache Iceberg catalog"
 slug: /lakehouse-iceberg-catalog
 keywords:
   - lakehouse
   - iceberg
   - metadata
-license: Copyright 2023 Datastrato.  This software is licensed under the Apache License version 2.
+license: "Copyright 2023 Datastrato Pvt Ltd.
+This software is licensed under the Apache License version 2."
 ---
 
 ## Introduction
@@ -20,6 +21,9 @@ Gravitino provides the ability to manage Apache Iceberg metadata.
 - When writing to HDFS, the Gravitino Iceberg REST server can only operate as the specified HDFS user and
   doesn't support proxying to other HDFS users. See [How to access Apache Hadoop](gravitino-server-config) for more details.
 
+:::info
+Built with Apache Iceberg `1.3.1`. The Apache Iceberg table format version is `1` by default.
+:::
 
 ## Catalog info
 
@@ -60,10 +64,44 @@ You could put properties except `comment`.
 
 ## Table info
 
-### Table capabilities
+### Table partitions
+
+Supports transforms:
+  - `IdentityTransform`
+  - `BucketTransform`
+:::info
+Iceberg doesn't support multi fields in `BucketTransform`
+:::
+  - `TruncateTransform`
+  - `YearTransform`
+  - `MonthTransform`
+  - `DayTransform`
+  - `HourTransform`
+:::info
+Iceberg doesn't support `ApplyTransform`, `RangeTransform` and `ListTransform`
+:::
+
+### Table sort orders
+
+supports expressions:
+- `FieldReference`
+- `FunctionExpression`
+  - `bucket`
+:::info
+The first argument must be integer literal,the second argument must be field reference.
+:::
+  - `truncate`
+:::info
+The first argument must be integer literal,the second argument must be field reference.
+:::
+  - `year`
+  - `month`
+  - `day`
+  - `hour`
+
+### Table distribution
 
 - Doesn't support `Distribution`, you should use `BucketPartition` instead.
-- Built with Apache Iceberg `1.3.1`. The Apache Iceberg table format version is `1` by default.
 
 ### Table column type 
 
