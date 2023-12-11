@@ -4,7 +4,6 @@ slug: /trino-connector
 keyword: gravition connector trino
 license: Copyright 2023 Datastrato Pvt. This software is licensed under the Apache License version 2.
 ---
-# Trino connector for Gravitino
 
 Trino can manage and access data using the Trino connector provided by `Gravitino`, referred to as the `Gravitino connector`.
 After configuring the Gravitino connector in Trino, it can automatically load catalog metadata from Gravitino, allowing users to directly access these catalogs in Trino.

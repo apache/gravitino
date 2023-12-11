@@ -2,15 +2,37 @@
 title: "Gravtino connnector - Hive catalog"
 slug: /trino-connector/catalogs/hive
 keyword: gravition connector trino
-license: Copyright 2023 Datastrato Pvt. This software is licensed under the Apache License version 2.
+license: "Copyright 2023 Datastrato Pvt Ltd. This software is licensed under the Apache License version 2."
 ---
 
 The Hive catalog allows Trino querying data stored in an Apache Hive data warehouse. 
 
-## Table Properties
+## Create table
+
+Currently, only basic Hive table creation statements are supported, including fields, null allowance, and comments.
+Advanced features like partitioning, sorting, and distribution are not supported.
+
+`CREATE TABLE AS SELECT` is not supported.
+
+## Alter table
+Support for the following alter table operations:
+- Rename table
+- Add a column
+- Drop a column
+- Change a column type
+- Change column comment
+- Set a table property
+
+## Select
+
+Most `SELECT` statements are supported, the queries can be executed successfully.
+Some query optimizations such as pushdown and pruning functionalities are not yet supported.
+
+## Table properties
 
 In the Hive catalog, additional properties can be set for tables and schemas
 using the "WITH" keyword in the "CREATE TABLE/SCHEMA" statement.
+
 ```sql
 CREATE TABLE "metalake.catalog".dbname.tabname
 (
@@ -34,7 +56,8 @@ CREATE TABLE "metalake.catalog".dbname.tabname
 | serde_lib    | The serde library class for the table     | org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe         |
 | serde_name   | Name of the serde, table name by default  | null                                                       |
 
-## Schema Properties
+## Schema properties
+
 | Property | Description                        | Default |
 | -------- | ---------------------------------- | ------- |
 | location | HDFS location for table storage    | null    |
@@ -157,12 +180,16 @@ rename the `table_01` table to `table_02`:
 alter table "test.hive_test".database_01.table_01 rename to "test.hive_test".database_01.table_02;
 ```
 
-## HDFS username and permissions
+## HDFS config and permissions
+
+For basic setups, Gravitino connector configures the HDFS client automatically and does not require any configuration files.
+Gravitino connector is not support user to config the `hdfs-site.xml` and `core-site.xml` files to the HDFS client.
 
 Before running any `Insert` statements for Hive tables in Trino, 
 you must check that the user Trino is using to access HDFS has access to the Hive warehouse directory.
 You can override this username by setting the HADOOP_USER_NAME system property in the Trino JVM config, 
 replacing hdfs_user with the appropriate username:
+
 ```text
 -DHADOOP_USER_NAME=hdfs_user
 ```

@@ -2,13 +2,13 @@
 title: "Gravtino connnector - PostgreSQL catalog"
 slug: /trino-connector/catalogs/postgresql
 keyword: gravition connector trino
-license: Copyright 2023 Datastrato Pvt. This software is licensed under the Apache License version 2.
+license: "Copyright 2023 Datastrato Pvt Ltd. This software is licensed under the Apache License version 2."
 ---
 
 The PostgreSQL catalog allows querying and creating tables in an external PostgreSQL database. 
 This can be used to join data between different systems like PostgreSQL and Hive, or between different PostgreSQL instances.
 
-## Table and Schema Properties 
+## Table and Schema properties
 
 PostgreSQL's tables and schemas cannot support properties.
 
@@ -30,7 +30,7 @@ curl -X POST -H "Content-Type: application/json" \
     "jdbc-user": "root",
     "jdbc-password": "ds123",
     "jdbc-database": "mydb",
-    "gravitino.bypass.driverClassName": "org.postgresql.Driver"
+    "jdbc-driver": "org.postgresql.Driver"
   }
 }' http://gravition-host:8090/api/metalakes/test/catalogs
 

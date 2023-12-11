@@ -2,7 +2,7 @@
 title: "Gravitino connector installation"
 slug: /trino-connector/install
 keyword: gravition connector trino
-license: Copyright 2023 Datastrato Pvt. This software is licensed under the Apache License version 2.
+license: "Copyright 2023 Datastrato Pvt Ltd. This software is licensed under the Apache License version 2."
 ---
 
 To install the Gravitino connector, first deploy the Trino environment, and then install the Gravitino connector plugin into Trino.
@@ -33,6 +33,7 @@ Run it in the background, and map the default Trino port, which is 8080, from in
 ```shell
 docker run --name trino-gravitino -d -p 8080:8080 trinodb/trino:426
 ```
+
 Run `docker ps` to check whether the container is running.
 
 
@@ -45,14 +46,17 @@ cd /tmp
 wget https://github.com/datastrato/gravitino/releases/gravitino-trino-connector-0.3.0.tar.gz
 tar -zxvf gravitino-trino-connector-0.3.0.tar.gz
 ```
+
 You can see the connector directory `gravitino-trino-connector-0.3.0` after unpacking.
 
 Copy the connector directory to the Trino container's plugin directory.
+
 ```shell
 docker copy  /tmp/gravitino-trino-connector-0.3.0 trino-gravitino:/lib/trino/plugin
 ```
 
 Check the plugin directory in the container.
+
 ```shell
 docker exec -it trino-gravitino /bin/bash
 cd /lib/trino/plugin
@@ -65,11 +69,13 @@ Assuming you have now started the Gravitino server on the host `gravition-server
 If not, please refer to the [Gravitino documentation](getting-started)
 
 Add catalog configuration to the Trino configuration file `/etc/trino/catalog/gravitino.properties`.
+
 ```text
 connector.name=gravitino
 gravitino.url=http://gravition-server-host:8090
 gravitino.metalake=test
 ```
+
 The `gravitino.name` defines which Gravitino connector is used. It must be `gravitino`.
 The `gravitino.metalake` defines which metalake are used. It should exist in the Gravitino server.
 The `gravitino.uri` defines the connection information about Gravitino server. Make sure your container can access the Gravitino server.
@@ -78,6 +84,7 @@ If you don't have the `test` metalake. You can create a new metalake named `test
 You should start the gravitino server, see more "docs/gravitino/overview.md#running-the-server". 
 
 Create a new metalake named `test` by the following command.
+
 ```shell
 curl -X POST -H "Content-Type: application/json" -d '{"name":"test","comment":"comment","properties":{}}' http://gravition-server-host:8090/api/metalakes
 ```
@@ -92,6 +99,7 @@ docker restart trino-gravitino
 
 Assuming you have created a catalog named `test.jdbc-mysql` in the Gravitino server.
 Use the Trino CLI to connect to the Trino container and run a query.
+
 ```text
 docker exec -it trino trino
 trino> show catalogs;
@@ -104,11 +112,13 @@ tpcds
 tpch
 system
 ```
+
 You can see the `gravitino` catalog in the result. This signifies the successful installation of the Gravitino connector.
 
 Assuming you have created a catalog named `test.jdbc-mysql` in the Gravitino server. 
 
 Then you can use the Trino CLI to connect to the Trino container and run a query.
+
 ```text
 docker exec -it trino trino
 trino> show catalogs;
@@ -122,5 +132,6 @@ tpch
 system
 test.jdbc-mysql
 ```
+
 The catalog named 'test.jdbc-mysql' is your created catalog by gravitino server. 
 You can use it to access the mysql database like other Trino catalogs.

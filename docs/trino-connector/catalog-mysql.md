@@ -2,13 +2,17 @@
 title: "Gravtino connnector - MySQL catalog"
 slug: /trino-connector/catalogs/mysql
 keyword: gravition connector trino
-license: Copyright 2023 Datastrato Pvt. This software is licensed under the Apache License version 2.
+license: "Copyright 2023 Datastrato Pvt Ltd. This software is licensed under the Apache License version 2."
 ---
 
 The MySQL catalog allows querying and creating tables in an external MySQL instance. 
 This can be used to join data between different systems like MySQL and Hive, or between two different MySQL instances.
 
-## Table and Schema Properties 
+## Create table
+Currently, only basic mysql table creation statements are supported, including fields, null allowance, and comments.
+Advanced features like primary key, index, default value, auto increment are not supported.
+
+## Table and Schema properties
 
 MySQL's tables and schemas cannot support properties.
 
@@ -25,9 +29,10 @@ curl -X POST -H "Content-Type: application/json" \
   "comment": "comment",
   "provider": "jdbc-mysql",
   "properties": {
-    "gravitino.bypass.jdbc-url": "jdbc:mysql://mysql-host:3306?useSSL=false",
-    "gravitino.bypass.jdbc-user": "root",
-    "gravitino.bypass.jdbc-password": "ds123"
+    "jdbc-url": "jdbc:mysql://mysql-host:3306?useSSL=false",
+    "jdbc-user": "root",
+    "jdbc-password": "ds123"
+    "jdbc-driver": "com.mysql.cj.jdbc.Driver"
   }
 }' http://gravition-host:8090/api/metalakes/test/catalogs
 ```
