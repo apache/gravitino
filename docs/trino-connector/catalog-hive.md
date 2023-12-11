@@ -133,7 +133,7 @@ Query 20231017_082503_00018_6nt3n, FINISHED, 1 node
 ```
 
 The `gravitino` catalog is a catalog defined By Trino catalog configuration. 
-The test.hive_test catalog is the catalog created by you in Gravitino.
+The `test.hive_test` catalog is the catalog created by you in Gravitino.
 Other catalogs are regular user-configured Trino catalogs.
 
 ### Creating tables and schemas
@@ -144,7 +144,7 @@ Create a new schema named `database_01` in `test.hive_test` catalog.
 create schema "test.hive_test".database_01;
 ```
 
-Create a new schema using hdfs location:
+Create a new schema using HDFS location:
 
 ```sql
 create schema "test.hive_test".database_01 {
