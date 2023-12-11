@@ -1,7 +1,8 @@
 ---
 title: "Getting started with Gravitino"
 slug: /getting-started
-license: "Copyright 2023 Datastrato Pvt Ltd. This software is licensed under the Apache License version 2."
+license: "Copyright 2023 Datastrato Pvt Ltd.
+This software is licensed under the Apache License version 2."
 ---
 
 There are several options for getting started with Gravitino. Installing and configuring Hive and Trino can be a little complex, so if you are unfamiliar with the technologies it would be best to use Docker.
