@@ -22,12 +22,14 @@ import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.types.Types;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Map;
+import java.util.Set;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.thrift.TException;
@@ -466,6 +468,87 @@ public class TrinoConnectorIT extends AbstractIT {
     return false;
   }
 
+  private ColumnDTO[] createHiveFullTypeColumns() {
+    ColumnDTO[] columnDTO = createFullTypeColumns();
+    Set<String> unsupportedType = Sets.newHashSet("FixedType", "StringType", "TimeType");
+    // MySQL doesn't support timestamp time zone
+    return Arrays.stream(columnDTO)
+        .filter(c -> !unsupportedType.contains(c.name()))
+        .toArray(ColumnDTO[]::new);
+  }
+
+  private ColumnDTO[] createMySQLFullTypeColumns() {
+    ColumnDTO[] columnDTO = createFullTypeColumns();
+    Set<String> unsupportedType = Sets.newHashSet("FixedType", "StringType", "TimestampType");
+    // MySQL doesn't support timestamp time zone
+    return Arrays.stream(columnDTO)
+        .filter(c -> !unsupportedType.contains(c.name()))
+        .toArray(ColumnDTO[]::new);
+  }
+
+  private ColumnDTO[] createIcebergFullTypeColumns() {
+    ColumnDTO[] columnDTO = createFullTypeColumns();
+
+    Set<String> unsupportedType =
+        Sets.newHashSet("ByteType", "ShortType", "VarCharType", "FixedCharType", "FixedType");
+    return Arrays.stream(columnDTO)
+        .filter(c -> !unsupportedType.contains(c.name()))
+        .toArray(ColumnDTO[]::new);
+  }
+
+  private ColumnDTO[] createFullTypeColumns() {
+    // Generate all types of columns that in class Types
+    return new ColumnDTO[] {
+      new ColumnDTO.Builder<>()
+          .withName("BooleanType")
+          .withDataType(Types.BooleanType.get())
+          .build(),
+
+      // Int type
+      new ColumnDTO.Builder<>().withName("ByteType").withDataType(Types.ByteType.get()).build(),
+      new ColumnDTO.Builder<>().withName("ShortType").withDataType(Types.ShortType.get()).build(),
+      new ColumnDTO.Builder<>()
+          .withName("IntegerType")
+          .withDataType(Types.IntegerType.get())
+          .build(),
+      new ColumnDTO.Builder<>().withName("LongType").withDataType(Types.LongType.get()).build(),
+
+      // float type
+      new ColumnDTO.Builder<>().withName("FloatType").withDataType(Types.FloatType.get()).build(),
+      new ColumnDTO.Builder<>().withName("DoubleType").withDataType(Types.DoubleType.get()).build(),
+      new ColumnDTO.Builder<>()
+          .withName("DecimalType")
+          .withDataType(Types.DecimalType.of(10, 3))
+          .build(),
+
+      // Date Type
+      new ColumnDTO.Builder<>().withName("DateType").withDataType(Types.DateType.get()).build(),
+      new ColumnDTO.Builder<>().withName("TimeType").withDataType(Types.TimeType.get()).build(),
+      new ColumnDTO.Builder<>()
+          .withName("TimestampType")
+          .withDataType(Types.TimestampType.withTimeZone())
+          .build(),
+
+      // String Type
+      new ColumnDTO.Builder<>()
+          .withName("VarCharType")
+          .withDataType(Types.VarCharType.of(100))
+          .build(),
+      new ColumnDTO.Builder<>()
+          .withName("FixedCharType")
+          .withDataType(Types.FixedCharType.of(100))
+          .build(),
+      new ColumnDTO.Builder<>().withName("StringType").withDataType(Types.StringType.get()).build(),
+      new ColumnDTO.Builder<>()
+          .withName("FixedType")
+          .withDataType(Types.FixedType.of(1000))
+          .build(),
+      // Binary Type
+      new ColumnDTO.Builder<>().withName("BinaryType").withDataType(Types.BinaryType.get()).build()
+      // No Interval Type and complex type like map, struct, and list
+    };
+  }
+
   @Test
   @Order(10)
   void testHiveTableCreatedByGravitino() throws InterruptedException {
@@ -503,18 +586,7 @@ public class TrinoConnectorIT extends AbstractIT {
         .asTableCatalog()
         .createTable(
             NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
-            new ColumnDTO[] {
-              new ColumnDTO.Builder<>()
-                  .withComment("xx1")
-                  .withName("id")
-                  .withDataType(Types.IntegerType.get())
-                  .build(),
-              new ColumnDTO.Builder<>()
-                  .withComment("xx2")
-                  .withName("name")
-                  .withDataType(Types.IntegerType.get())
-                  .build()
-            },
+            createHiveFullTypeColumns(),
             "Created by gravitino client",
             ImmutableMap.<String, String>builder()
                 .put("format", "ORC")
@@ -664,18 +736,7 @@ public class TrinoConnectorIT extends AbstractIT {
         .asTableCatalog()
         .createTable(
             NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
-            new ColumnDTO[] {
-              new ColumnDTO.Builder<>()
-                  .withComment("xx1")
-                  .withName("id")
-                  .withDataType(Types.IntegerType.get())
-                  .build(),
-              new ColumnDTO.Builder<>()
-                  .withComment("xx2")
-                  .withName("name")
-                  .withDataType(Types.IntegerType.get())
-                  .build()
-            },
+            createIcebergFullTypeColumns(),
             "Created by gravitino client",
             ImmutableMap.<String, String>builder()
                 .put("format-version", "1")
@@ -813,6 +874,83 @@ public class TrinoConnectorIT extends AbstractIT {
 
     String data = containerSuite.getTrinoContainer().executeQuerySQL(sql).get(0).get(0);
     Assertions.assertEquals(metalakeName + "." + catalogName, data);
+  }
+
+  @Test
+  @Order(17)
+  void testMySQLTableCreatedByGravitino() throws InterruptedException {
+    String catalogName = GravitinoITUtils.genRandomName("mysql_catalog").toLowerCase();
+    String schemaName = GravitinoITUtils.genRandomName("mysql_schema").toLowerCase();
+    String tableName = GravitinoITUtils.genRandomName("mysql_table").toLowerCase();
+    GravitinoMetaLake createdMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
+    String[] command = {
+      "mysql",
+      "-h127.0.0.1",
+      "-uroot",
+      "-pds123", // username and password are referred from Hive dockerfile.
+      "-e",
+      "grant all privileges on *.* to root@'%' identified by 'ds123'"
+    };
+
+    // There exists a mysql instance in Hive the container.
+    containerSuite.getHiveContainer().executeInContainer(command);
+    String hiveHost = containerSuite.getHiveContainer().getContainerIpAddress();
+
+    createdMetalake.createCatalog(
+        NameIdentifier.of(metalakeName, catalogName),
+        Catalog.Type.RELATIONAL,
+        "jdbc-mysql",
+        "comment",
+        ImmutableMap.<String, String>builder()
+            .put("jdbc-user", "root")
+            .put("jdbc-password", "ds123")
+            .put("jdbc-url", String.format("jdbc:mysql://%s:3306?useSSL=false", hiveHost))
+            .build());
+    Catalog catalog = createdMetalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
+    Assertions.assertEquals("root", catalog.properties().get("jdbc-user"));
+
+    String sql = String.format("show catalogs like '%s.%s'", metalakeName, catalogName);
+    boolean success = checkTrinoHasLoaded(sql, 30);
+    if (!success) {
+      Assertions.fail("Trino fail to load catalogs created by gravitino: " + sql);
+    }
+
+    String data = containerSuite.getTrinoContainer().executeQuerySQL(sql).get(0).get(0);
+    Assertions.assertEquals(metalakeName + "." + catalogName, data);
+
+    Schema schema =
+        catalog
+            .asSchemas()
+            .createSchema(
+                NameIdentifier.of(metalakeName, catalogName, schemaName),
+                "Created by gravitino client",
+                ImmutableMap.<String, String>builder().build());
+
+    Assertions.assertNotNull(schema);
+
+    catalog
+        .asTableCatalog()
+        .createTable(
+            NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
+            createMySQLFullTypeColumns(),
+            "Created by gravitino client",
+            ImmutableMap.<String, String>builder().build());
+    LOG.info("create table \"{}.{}\".{}.{}", metalakeName, catalogName, schemaName, tableName);
+
+    Table table =
+        catalog
+            .asTableCatalog()
+            .loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, tableName));
+    Assertions.assertNotNull(table);
+
+    sql =
+        String.format(
+            "show create table \"%s.%s\".%s.%s", metalakeName, catalogName, schemaName, tableName);
+
+    success = checkTrinoHasLoaded(sql, 30);
+    if (!success) {
+      Assertions.fail("Trino fail to load table created by gravitino: " + sql);
+    }
   }
 
   private static void createMetalake() {
