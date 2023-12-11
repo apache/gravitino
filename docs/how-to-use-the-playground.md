@@ -78,7 +78,7 @@ Sales department uses PostgreSQL to store its data.
 
 This sample have generated some data for two departments.
 
-You can queries some interesting results use Gravitino.
+You can query some interesting results with Gravitino.
 
 If you want to know which employee has the largest sales amount.
 
