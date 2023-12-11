@@ -9,13 +9,13 @@ license: Copyright 2023 Datastrato Pvt. This software is licensed under the Apac
 First, you need to create a metalake and catalog in Gravitino.
 For example, create a new metalake named `test` and create a new catalog named `hive_test` using the hive provider.
 
-Listing all Gravitino manager catalogs
+Listing all Gravitino managed catalogs:
 
-```sql
+```sql 
 show catalogs
 ```
 
-The results like:
+The results are similar to:
 
 ```text
     Catalog
@@ -29,13 +29,11 @@ The results like:
 Query 20231017_082503_00018_6nt3n, FINISHED, 1 node
 ```
 
-### Create Schema and Table
-
-The `gravitino` catalog is a catalog defined Trino catalog configuration.
-Is is generally not used.
-The `test.hive_test` catalog is Gravitino Hive managed catalog,
-dynamically loaded from the `gravitino` catalog in Gravitino.
+The `gravitino` catalog is a catalog defined By Trino catalog configuration. 
+The test.hive_test catalog is the catalog created by you in Gravitino.
 Other catalogs are regular user-configured Trino catalogs.
+
+### Creating tables and schemas
 
 Create a new schema named `database_01` in `test.hive_test` catalog.
 
@@ -70,7 +68,8 @@ drop table "test.hive_test".database_01.table_01;
 
 
 
-### Writing Data
+### Writing data
+
 Insert data into the table `table_01`:
 
 ```sql
@@ -83,7 +82,7 @@ Insert data into the table `table_01` from select:
 insert into  "test.hive_test".database_01.table_01 (name, salary) select * from "test.hive_test".database_01.table_01;
 ```
 
-### Querying Data
+### Querying data
 
 Query the `table_01` table:
 
@@ -92,7 +91,7 @@ select * from "test.hive_test".database_01.table_01;
 ```
 
 
-### Modify Table
+### Modify a table
 
 Add a new column `age` to the `table_01` table:
 

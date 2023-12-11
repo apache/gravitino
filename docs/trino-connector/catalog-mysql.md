@@ -7,5 +7,3 @@ license: Copyright 2023 Datastrato Pvt. This software is licensed under the Apac
 
 The MySQL catalog allows querying and creating tables in an external MySQL instance. 
 This can be used to join data between different systems like MySQL and Hive, or between two different MySQL instances.
-
-

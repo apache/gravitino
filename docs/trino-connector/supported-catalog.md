@@ -13,13 +13,13 @@ The catalogs currently supported by the Gravitino connector are as follows:
 - [MySQL](/docs/trino-connector/catalogs/mysql)
 - [PostgreSQL](/docs/trino-connector/catalogs/postgresql)
 
-## Create Catalog
+## Create catalog
 Trino currently does not support creating Gravitino managed catalogs. 
 If you need to create a catalog, please refer to:
 - [Create Catalog](/docs)
 - [Gravition Catalog](/docs)
 
-## Data Type Mapping
+## Data type mapping
 All types of catalogs support the following data type conversions.
 Data Type Conversion between Trino and Gravitino
 

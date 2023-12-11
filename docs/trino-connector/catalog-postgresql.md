@@ -7,6 +7,3 @@ license: Copyright 2023 Datastrato Pvt. This software is licensed under the Apac
 
 The PostgreSQL catalog allows querying and creating tables in an external PostgreSQL database. 
 This can be used to join data between different systems like PostgreSQL and Hive, or between different PostgreSQL instances.
-
-
-
