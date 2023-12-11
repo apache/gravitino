@@ -23,7 +23,7 @@ Gravitino aims to provide several key features:
 
 ## Contributing to Gravitino
 
-Gravitino is open source software available under the Apache 2.0 license. For information of how to contribute to Gravitino please see the ![Contribution guidelines](CONTRIBUTING.md).
+Gravitino is open source software available under the Apache 2.0 license. For information of how to contribute to Gravitino please see the [Contribution guidelines](CONTRIBUTING.md).
 
 ## Online documentation
 
