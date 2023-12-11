@@ -38,7 +38,7 @@ The following table lists predefined schema properties for the Hive database. In
 
 ### Table properties
 
-Table properties supply or set metadata for underlying Hive tables.
+Table properties supply or set metadata for the underlying Hive tables.
 The following table lists predefined table properties for the Hive table. In addition, you can also define your own key-value pair properties, which can also be transmitted to the underlying Hive table.
 
 | Property name      | Description                                                                                                                                                                                | example value                                                                                | Since version |
