@@ -21,7 +21,7 @@ Gravitino provides the ability to manage PostgreSQL metadata.
 - Doesn't support setting certain column properties, such as default value and check constraints
 
 ### Catalog properties
-Any properties not defined by Gravitino with `gravitino.bypass` prefix will pass to PostgreSQL catalog data source properties. For example, if specify `gravitino.bypass.maxWaitMillis`, `maxWaitMillis` will pass to PostgreSQL catalog data source properties.
+Any property that isn't defined by Gravitino can pass to MySQL data source by adding `gravitino.bypass` prefix as a catalog property. For example, catalog property `gravitino.bypass.maxWaitMillis` will pass `maxWaitMillis` to the data source property.
 You can check the relevant data source configuration in [data source properties](https://commons.apache.org/proper/commons-dbcp/configuration.html)
 
 If you use JDBC catalog, you must provide `jdbc-url`, `jdbc-driver`, `jdbc-database`, `jdbc-user` and `jdbc-password` to catalog properties.
