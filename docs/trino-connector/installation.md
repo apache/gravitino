@@ -42,7 +42,7 @@ Download the Gravitino connector tarball and unpack it.
 
 ```shell
 cd /tmp
-wget xxx/gravitino-trino-connector-0.3.0.tar.gz
+wget https://github.com/datastrato/gravitino/releases/gravitino-trino-connector-0.3.0.tar.gz
 tar -zxvf gravitino-trino-connector-0.3.0.tar.gz
 ```
 You can see the connector directory `gravitino-trino-connector-0.3.0` after unpacking.
