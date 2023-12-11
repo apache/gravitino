@@ -168,20 +168,20 @@ Both Gravitino server and Iceberg REST service can configure HTTPS.
 
 ### Iceberg REST service's configuration
 
-| Configuration item                                         | Description                                                        | Default value | Required                                           | Since version |
-|------------------------------------------------------------|--------------------------------------------------------------------|---------------|----------------------------------------------------|---------------|
-| `gravitino.auxService.iceberg-rest.enableHttps`            | Enables HTTPS.                                                     | `false`       | Yes                                                | 0.3.0         |
-| `gravitino.auxService.iceberg-rest.httpsPort`              | The HTTPS port number of the Jetty web server.                     | `8433`        | Yes if use HTTPS                                   | 0.3.0         |
-| `gravitino.auxService.iceberg-rest.keyStorePath`           | Path to the key store file.                                        | (none)        | Yes if use HTTPS                                   | 0.3.0         |
-| `gravitino.auxService.iceberg-rest.keyStorePassword`       | Password to the key store.                                         | (none)        | Yes if use HTTPS                                   | 0.3.0         |
-| `gravitino.uxService.iceberg-rest.keyStoreType`            | The type to the key store.                                         | `JKS`         | Yes if use HTTPS                                   | 0.3.0         |
-| `gravitino.auxService.iceberg-rest.managerPassword`        | Manager password to the key store.                                 | (none)        | Yes if use HTTPS                                   | 0.3.0         |
-| `gravitino.auxService.iceberg-rest.tlsProtocol`            | TLS protocol to use. The JVM must support the TLS protocol to use. | (none)        | Yes if use HTTPS                                   | 0.3.0         |
-| `gravitino.auxService.iceberg-rest.enableCipherAlgorithms` | The collection of enabled cipher algorithms.                       | ``            | No                                                 | 0.3.0         |
-| `gravitino.auxService.iceberg-rest.enableClientAuth`       | Enables the authentication of the client.                          | `false`       | Yes if use HTTPS                                   | 0.3.0         |
-| `gravitino.auxService.iceberg-rest.trustStorePath`         | Path to the trust store file.                                      | (none)        | Yes if use HTTPS and the authentication of client  | 0.3.0         |
-| `gravitino.auxService.iceberg-rest.trustStorePassword`     | Password to the trust store.                                       | (none)        | Yes if use HTTPS and the authentication of client  | 0.3.0         |
-| `gravitino.auxService.iceberg-rest.trustStoreType`         | The type to the trust store.                                       | `JKS`         | Yes if use  HTTPS and the authentication of client | 0.3.0         |
+| Configuration item                                         | Description                                                        | Default value | Required                                          | Since version |
+|------------------------------------------------------------|--------------------------------------------------------------------|---------------|---------------------------------------------------|---------------|
+| `gravitino.auxService.iceberg-rest.enableHttps`            | Enables HTTPS.                                                     | `false`       | Yes                                               | 0.3.0         |
+| `gravitino.auxService.iceberg-rest.httpsPort`              | The HTTPS port number of the Jetty web server.                     | `8433`        | Yes if use HTTPS                                  | 0.3.0         |
+| `gravitino.auxService.iceberg-rest.keyStorePath`           | Path to the key store file.                                        | (none)        | Yes if use HTTPS                                  | 0.3.0         |
+| `gravitino.auxService.iceberg-rest.keyStorePassword`       | Password to the key store.                                         | (none)        | Yes if use HTTPS                                  | 0.3.0         |
+| `gravitino.uxService.iceberg-rest.keyStoreType`            | The type to the key store.                                         | `JKS`         | Yes if use HTTPS                                  | 0.3.0         |
+| `gravitino.auxService.iceberg-rest.managerPassword`        | Manager password to the key store.                                 | (none)        | Yes if use HTTPS                                  | 0.3.0         |
+| `gravitino.auxService.iceberg-rest.tlsProtocol`            | TLS protocol to use. The JVM must support the TLS protocol to use. | (none)        | Yes if use HTTPS                                  | 0.3.0         |
+| `gravitino.auxService.iceberg-rest.enableCipherAlgorithms` | The collection of enabled cipher algorithms.                       | ``            | No                                                | 0.3.0         |
+| `gravitino.auxService.iceberg-rest.enableClientAuth`       | Enables the authentication of the client.                          | `false`       | Yes if use HTTPS                                  | 0.3.0         |
+| `gravitino.auxService.iceberg-rest.trustStorePath`         | Path to the trust store file.                                      | (none)        | Yes if use HTTPS and the authentication of client | 0.3.0         |
+| `gravitino.auxService.iceberg-rest.trustStorePassword`     | Password to the trust store.                                       | (none)        | Yes if use HTTPS and the authentication of client | 0.3.0         |
+| `gravitino.auxService.iceberg-rest.trustStoreType`         | The type to the trust store.                                       | `JKS`         | Yes if use HTTPS and the authentication of client | 0.3.0         |
 
 Refer to the "Additional JSSE Standard Names" section of the [Java security guide](https://docs.oracle.com/javase/8/docs/technotes/guides/security/StandardNames.html#jssenames) for the list of protocols related to tlsProtocol. You can find the list of `tlsProtocol` values for Java 8 in this document.
 
