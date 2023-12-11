@@ -1,5 +1,5 @@
 ---
-title: "How to use Gravitino to manage JDBC PostgreSQL metadata"
+title: "How to use Gravitino to manage JDBC PostgreSQL catalog"
 slug: /jdbc-postgresql-catalog
 keywords:
 - jdbc
@@ -45,7 +45,7 @@ In PostgreSQL, the database corresponds to the Gravitino catalog, and the schema
 :::
 
 ### Catalog operations
-see [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino#catalogs-operations).
+see [Manage metadata using Gravitino](./manage-metadata-using-gravitino#catalogs-operations).
 
 ## Schema
 ### Schema capabilities
@@ -58,7 +58,7 @@ see [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino#catalogs
 - Doesn't are schema property settings.
 
 ### Schema operations
-see [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino#schemas-operations).
+see [Manage metadata using Gravitino](./manage-metadata-using-gravitino#schemas-operations).
 
 ## Table
 ### Table capabilities
@@ -96,4 +96,4 @@ PostgreSQL doesn't support Gravitino `Fixed` `Struct` `List` `Map` `IntervalDay`
 - Doesn't support table properties.
 
 ### Table operations
-see [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino#tables-operations).
+see [Manage metadata using Gravitino](./manage-metadata-using-gravitino#tables-operations).

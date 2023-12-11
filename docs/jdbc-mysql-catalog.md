@@ -1,5 +1,5 @@
 ---
-title: "How to use Gravitino to manage JDBC MySQL metadata"
+title: "How to use Gravitino to manage JDBC MySQL catalog"
 slug: /jdbc-mysql-catalog
 keywords:
 - jdbc
@@ -39,7 +39,7 @@ You must download the corresponding JDBC driver to the `catalogs/jdbc-mysql/libs
 :::
 
 ### Catalog operations
-see [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino#catalogs-operations).
+see [Manage metadata using Gravitino](./manage-metadata-using-gravitino#catalogs-operations).
 
 ## Schema
 ### Schema capabilities
@@ -52,7 +52,7 @@ see [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino#catalogs
 - Doesn't support are database property settings.
 
 ### Schema operations
-see [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino#schemas-operations).
+see [Manage metadata using Gravitino](./manage-metadata-using-gravitino#schemas-operations).
 
 ## Table
 ### Table capabilities
@@ -88,4 +88,4 @@ MySQL doesn't support Gravitino `Boolean` `Fixed` `Struct` `List` `Map` `Timesta
 - Doesn't support table properties.
 
 ### Table operations
-see [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino#tables-operations).
+see [Manage metadata using Gravitino](./manage-metadata-using-gravitino#tables-operations).
