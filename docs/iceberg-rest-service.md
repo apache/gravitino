@@ -1,5 +1,5 @@
 ---
-title: Lakehouse Apache Iceberg REST service"
+title: "Lakehouse Apache Iceberg REST service"
 slug: /iceberg-rest-service
 keywords:
   - Iceberg REST catalog

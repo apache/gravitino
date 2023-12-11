@@ -146,6 +146,35 @@ Gravitino server reserves the following fields which can't be passed.
 | `sort-order`              | Selecting a specific snapshot in a merge operation.     |
 | `identifier-fields`       | The identifier fields for defining the table.           |
 
+
+### Alter table operations
+
+supports operations:
+- `RenameTable`
+- `SetProperty`
+- `RemoveProperty`
+- `UpdateComment`
+- `AddColumn`
+:::info
+The default column position is `LAST` if not specifying column position.
+:::
+:::notice
+If you add a non nullability column, there may be compatibility issue.
+:::
+- `DeleteColumn`
+- `RenameColumn`
+- `UpdateColumnType`
+:::info
+Iceberg supports update primitive type. 
+:::
+- `UpdateColumnPosition`
+- `UpdateColumnNullability`
+:::notice
+If you update a nullability column to non nullability, there may be compatibility issue.
+:::
+- `UpdateColumnComment`
+
+
 ### HDFS configuration
 
 You can place `core-site.xml` and `hdfs-site.xml` in the `catalogs/lakehouse-iceberg/conf` directory to automatically load as the default HDFS configuration.
