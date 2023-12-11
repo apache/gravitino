@@ -73,11 +73,10 @@ SELECT * FROM "metalake_demo.catalog_demo".db1.table_001;
 In companies, there may be different departments using different data stacks.
 In this example, HR department uses Apache Hive to store its data.
 Sales department uses PostgreSQL to store its data.
-
 This example has generated some data for two departments.
 You can query some interesting results with Gravitino.
-If you want to know which employee has the largest sales amount.
 
+If you want to know which employee has the largest sales amount.
 You can run the SQL.
 
 ```SQL
@@ -109,7 +108,6 @@ WHERE
 ```
 
 If you want to know top 10 customers who bought the most by state.
-
 You run the SQL.
 
 ```SQL
@@ -154,8 +152,7 @@ ORDER BY
     customer_rank;
 ```
 
-If you want to know that employees average performance rating and total sales
-
+If you want to know that employees average performance rating and total sales.
 You run the SQL.
 
 ```SQL
