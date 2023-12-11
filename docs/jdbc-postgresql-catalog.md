@@ -14,6 +14,7 @@ Gravitino provides the ability to manage PostgreSQL metadata.
 
 ## Catalog
 ### Catalog capabilities
+- Gravitino catalog corresponds to the PostgreSQL database.
 - Supports metadata management of PostgreSQL(9.2, 12.0, 13.0).
 - Supports DDL operation for PostgreSQL schemas and tables.
 - Doesn't support table index operations.
@@ -48,6 +49,7 @@ see [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino#catalogs
 
 ## Schema
 ### Schema capabilities
+- Gravitino schema corresponds to the PostgreSQL schema.
 - Support create schema with comments.
 - Support drop schema.
 - Support cascade drop schema.
@@ -60,6 +62,7 @@ see [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino#schemas-
 
 ## Table
 ### Table capabilities
+- Gravitino table corresponds to the PostgreSQL table.
 - Supports DDL operation for PostgreSQL tables.
 - Doesn't support setting certain column properties, such as default value and check constraints.
 - Doesn't support index definition.

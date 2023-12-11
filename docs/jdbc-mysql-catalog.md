@@ -43,6 +43,9 @@ see [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino#catalogs
 
 ## Schema
 ### Schema capabilities
+- Gravitino schema corresponds to the MySQL database.
+- Support create schema with comments.
+- Support drop schema.
 - Doesn't support cascade drop database.
 
 ### Schema properties
@@ -53,6 +56,7 @@ see [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino#schemas-
 
 ## Table
 ### Table capabilities
+- Gravitino table corresponds to the MySQL table.
 - Supports DDL operation for MySQL tables.
 - Doesn't support setting certain column properties, such as default value and check constraints.
 - Doesn't support index definition.
