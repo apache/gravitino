@@ -30,8 +30,9 @@ Apache Hadoop HDFS 2.x and 3.x are supported.
 
 ## Create table
 
-Currently, only basic Hive table creation statements are supported, including fields, null allowance, and comments.
-Advanced features like partitioning, sorting, and distribution are not supported.
+The Gravitino connector currently supports basic Hive table creation statements, such as defining fields, 
+allowing null values, and adding comments. 
+However, it does not support advanced features like partitioning, sorting, and distribution.
 
 `CREATE TABLE AS SELECT` is not supported.
 
@@ -47,8 +48,8 @@ Support for the following alter table operations:
 
 ## Select
 
-Most `SELECT` statements are supported, the queries can be executed successfully.
-Some query optimizations such as pushdown and pruning functionalities are not yet supported.
+The Gravitino connector supports most SELECT statements, allowing the execution of queries successfully.
+It's not implements certain query optimizations, such as pushdown and pruning functionalities.
 
 ## Table properties
 

@@ -17,8 +17,8 @@ To connect to MySQL, you need:
 
 ## Create table
 
-Currently, only basic mysql table creation statements are supported, including fields, null allowance, and comments.
-Advanced features like primary key, index, default value, auto increment are not supported.
+At present, the Gravitino connector only supports basic MySQL table creation statements, which involve fields, null allowances, and comments. 
+However, it does not support advanced features like primary keys, indexes, default values, and auto-increment.
 
 ## Alter table
 
@@ -28,6 +28,11 @@ Support for the following alter table operations:
 - Drop a column
 - Change a column type
 - Set a table property
+
+## Select
+
+The Gravitino connector supports most SELECT statements, allowing the execution of queries successfully.
+It's not implements certain query optimizations, such as indexing and pushdowns.
 
 ## Table and Schema properties
 

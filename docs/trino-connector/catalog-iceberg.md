@@ -21,8 +21,9 @@ To use Iceberg, you need:
 
 ## Create table
 
-Currently, only basic table creation statements are supported, including fields, null allowance, and comments.
-Advanced features like partitioning, sorting, and distribution are not supported.
+The Gravitino connector currently supports basic Hive table creation statements, such as defining fields, 
+allowing null values, and adding comments. 
+However, it does not support advanced features like partitioning, sorting, and distribution.
 
 ## Alter table
 
@@ -33,6 +34,11 @@ Support for the following alter table operations:
 - Rename a column
 - Change a column type
 - Set a table property
+
+## Select
+
+The Gravitino connector supports most SELECT statements, allowing the execution of queries successfully.
+It's not implements certain query optimizations, such as pushdown and pruning functionalities.
 
 ## Table and Schema properties
 
