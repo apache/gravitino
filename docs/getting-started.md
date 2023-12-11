@@ -14,7 +14,7 @@ If you have your own Gravitino setup and want to use Apache Hive on AWS or Googl
 Cloud Platform see [Installing Apache Hive on AWS or Google Cloud Platform](#installing-apache-hive-on-aws-or-google-cloud-platform) or locally see
 [Installing Apache Hive locally](#installing-apache-hive-locally).
 
-If you prefer to get started quickly and use Docker for Gravitino, Apache Hive, Trino and others on
+If you prefer to get started quickly and use Docker for Gravitino, Apache Hive, Trino, and others on
 AWS or Google Cloud Platform see [Installing Gravitino playground on AWS or Google Cloud Platform](#installing-gravitino-playground-on-aws-or-google-cloud-platform) or locally see
 or locally see [Installing Gravitino playground locally](#installing-gravitino-playground-locally).
 
@@ -60,7 +60,7 @@ To begin using Gravitino on AWS, follow these steps:
 
 5. Install Gravitino on the instance:
 
-   You can install Gravitino from our binary release package or Docker image, please follow the
+   You can install Gravitino from the binary release package or Docker image, please follow the
    [how-to-install](./how-to-install) to install Gravitino.
 
    Or, you can install Gravitino from scratch, please follow the documentation of
@@ -107,7 +107,7 @@ To begin using Gravitino on GCP, follow these steps:
 
 5. Install Gravitino on the instance:
 
-   You can install Gravitino from our binary release package or Docker image, please follow the
+   You can install Gravitino from the binary release package or Docker image, please follow the
    [how-to-install](./how-to-install) to install Gravitino.
 
    Or, you can install Gravitino from scratch, please follow the documentation of
@@ -129,9 +129,12 @@ To use Gravitino locally on macOS or Linux, follow similar steps:
     sdk install java 8.0.392-amzn
     ```
 
+    You can also use different package managers to install JDK, for example,
+    [Homebrew](https://brew.sh/) on macOS, `apt` on Ubuntu/Debian, `yum` on CentOS/RedHat, etc.
+
 2. Install Gravitino:
 
-   You can install Gravitino from our binary release package or Docker image, please follow the
+   You can install Gravitino from the binary release package or Docker image, please follow the
    [how-to-install](./how-to-install) to install Gravitino.
 
    Or, you can install Gravitino from scratch, please follow the documentation of
