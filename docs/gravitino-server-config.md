@@ -74,7 +74,7 @@ Please refer to [security](security) for HTTPS and Authentication configurations
 
 There are three types of catalog properties:
 
-1. **Gravitino-defined properties**: These simplify the catalog creation process.
+1. **Gravitino-defined properties**: These properties simplify the catalog creation process.
 2. **Properties with the `gravitino.bypass.` prefix**: These properties are not managed by Gravitino; instead, they bypass the underlying system for advanced usage.
 3. **Other properties**: Stored in Gravitino storage, these properties do not bypass the underlying system.
 
