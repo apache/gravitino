@@ -88,4 +88,22 @@ MySQL doesn't support Gravitino `Boolean` `Fixed` `Struct` `List` `Map` `Timesta
 - Doesn't support table properties.
 
 ### Table operations
-see [Manage metadata using Gravitino](./manage-metadata-using-gravitino#tables-operations).
+#### Alter table operations
+Supports operations:
+- `RenameTable`
+- `UpdateComment`
+- `AddColumn`
+- `DeleteColumn`
+- `RenameColumn`
+- `UpdateColumnType`
+- `UpdateColumnPosition`
+- `UpdateColumnNullability`
+- `UpdateColumnComment`
+
+:::info
+The `RenameTable` operation cannot be submitted at the same time as other operations
+:::
+
+:::caution
+If you update a nullability column to non nullability, there may be compatibility issue.
+:::

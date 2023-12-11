@@ -96,4 +96,22 @@ PostgreSQL doesn't support Gravitino `Fixed` `Struct` `List` `Map` `IntervalDay`
 - Doesn't support table properties.
 
 ### Table operations
-see [Manage metadata using Gravitino](./manage-metadata-using-gravitino#tables-operations).
+#### Alter table operations
+Supports operations:
+- `RenameTable`
+- `UpdateComment`
+- `AddColumn`
+- `DeleteColumn`
+- `RenameColumn`
+- `UpdateColumnType`
+- `UpdateColumnNullability`
+- `UpdateColumnComment`
+
+:::info
+The `RenameTable` operation cannot be submitted at the same time as other operations
+:::
+
+:::caution
+PostgreSQL does not support the `UpdateColumnPosition` operation, so you can only use ColumnPosition.defaultPosition() when `AddColumn`.
+If you update a nullability column to non nullability, there may be compatibility issue.
+:::
