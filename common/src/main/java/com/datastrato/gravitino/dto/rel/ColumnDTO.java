@@ -31,7 +31,7 @@ public class ColumnDTO implements Column {
   private String comment;
 
   @JsonProperty("nullable")
-  private boolean nullable;
+  private boolean nullable = true;
 
   private ColumnDTO() {}
 

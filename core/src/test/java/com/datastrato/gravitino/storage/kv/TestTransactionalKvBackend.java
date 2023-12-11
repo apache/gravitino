@@ -21,6 +21,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -420,5 +421,402 @@ class TestTransactionalKvBackend {
     threadPoolExecutor.shutdown();
     threadPoolExecutor.awaitTermination(5, TimeUnit.SECONDS);
     LOGGER.info(String.format("%d thread write qps is: %d/s", threadNum, atomicLong.get() / 2));
+  }
+
+  @Test
+  void testPrefixError() throws IOException, InterruptedException {
+    Config config = getConfig();
+    KvBackend kvBackend = getKvBackEnd(config);
+    TransactionIdGenerator transactionIdGenerator =
+        new TransactionIdGeneratorImpl(kvBackend, config);
+    TransactionalKvBackend transactionalKvBackend =
+        new TransactionalKvBackendImpl(kvBackend, transactionIdGenerator);
+
+    transactionalKvBackend.begin();
+    transactionalKvBackend.put(
+        "abcefghi ".getBytes(StandardCharsets.UTF_8),
+        "value1".getBytes(StandardCharsets.UTF_8),
+        true);
+    transactionalKvBackend.commit();
+
+    // Start to read;
+    transactionalKvBackend.begin();
+    Assertions.assertEquals(
+        "value1", new String(transactionalKvBackend.get("abcefghi ".getBytes())));
+    Assertions.assertNull(transactionalKvBackend.get("abcefghi".getBytes(StandardCharsets.UTF_8)));
+    Assertions.assertNull(transactionalKvBackend.get("abcefgh".getBytes(StandardCharsets.UTF_8)));
+    Assertions.assertNull(transactionalKvBackend.get("abcefg".getBytes(StandardCharsets.UTF_8)));
+    Assertions.assertNull(transactionalKvBackend.get("abcef".getBytes(StandardCharsets.UTF_8)));
+    Assertions.assertNull(transactionalKvBackend.get("abce".getBytes(StandardCharsets.UTF_8)));
+    Assertions.assertNull(transactionalKvBackend.get("abc".getBytes(StandardCharsets.UTF_8)));
+    Assertions.assertNull(transactionalKvBackend.get("ab".getBytes(StandardCharsets.UTF_8)));
+    Assertions.assertNull(transactionalKvBackend.get("a".getBytes(StandardCharsets.UTF_8)));
+    Assertions.assertNull(transactionalKvBackend.get("_".getBytes(StandardCharsets.UTF_8)));
+
+    transactionalKvBackend.begin();
+    transactionalKvBackend.put(
+        "abc".getBytes(StandardCharsets.UTF_8), "value1".getBytes(StandardCharsets.UTF_8), true);
+    transactionalKvBackend.commit();
+
+    transactionalKvBackend.begin();
+    Assertions.assertEquals("value1", new String(transactionalKvBackend.get("abc".getBytes())));
+    Assertions.assertNull(transactionalKvBackend.get("ab".getBytes(StandardCharsets.UTF_8)));
+    Assertions.assertNull(transactionalKvBackend.get("a".getBytes(StandardCharsets.UTF_8)));
+    Assertions.assertNull(transactionalKvBackend.get("abce".getBytes(StandardCharsets.UTF_8)));
+    Assertions.assertNull(transactionalKvBackend.get("abcd".getBytes(StandardCharsets.UTF_8)));
+    Assertions.assertNull(transactionalKvBackend.get("abcef".getBytes(StandardCharsets.UTF_8)));
+    Assertions.assertNull(transactionalKvBackend.get("abcefg".getBytes(StandardCharsets.UTF_8)));
+    transactionalKvBackend.commit();
+
+    // Start to test scan
+    // We randomly repeated insert some data and test the result
+    int repeatedTimes = new Random().nextInt(10) + 1;
+    for (int i = 0; i < repeatedTimes; i++) {
+      transactionalKvBackend.begin();
+      transactionalKvBackend.put(
+          "m".getBytes(StandardCharsets.UTF_8), "value1".getBytes(StandardCharsets.UTF_8), true);
+      transactionalKvBackend.put(
+          "mb".getBytes(StandardCharsets.UTF_8), "value2".getBytes(StandardCharsets.UTF_8), true);
+      transactionalKvBackend.put(
+          "mbc".getBytes(StandardCharsets.UTF_8), "value3".getBytes(StandardCharsets.UTF_8), true);
+      transactionalKvBackend.put(
+          "mbcd".getBytes(StandardCharsets.UTF_8), "value4".getBytes(StandardCharsets.UTF_8), true);
+      transactionalKvBackend.put(
+          "mbcde".getBytes(StandardCharsets.UTF_8),
+          "value5".getBytes(StandardCharsets.UTF_8),
+          true);
+      transactionalKvBackend.put(
+          "mbcdf".getBytes(StandardCharsets.UTF_8),
+          "value6".getBytes(StandardCharsets.UTF_8),
+          true);
+      transactionalKvBackend.put(
+          "mbcdfg".getBytes(StandardCharsets.UTF_8),
+          "value7".getBytes(StandardCharsets.UTF_8),
+          true);
+      transactionalKvBackend.commit();
+      Thread.sleep(1);
+    }
+
+    transactionalKvBackend.begin();
+
+    // start is 'mb' and end is 'mc'
+    List<Pair<byte[], byte[]>> data =
+        transactionalKvBackend.scan(
+            KvRangeScan.builder()
+                .start("mb".getBytes(StandardCharsets.UTF_8))
+                .end("mc".getBytes(StandardCharsets.UTF_8))
+                .startInclusive(true)
+                .endInclusive(false)
+                .build());
+    Assertions.assertEquals(6, data.size());
+
+    data =
+        transactionalKvBackend.scan(
+            KvRangeScan.builder()
+                .start("mb".getBytes(StandardCharsets.UTF_8))
+                .end("mc".getBytes(StandardCharsets.UTF_8))
+                .startInclusive(false)
+                .endInclusive(false)
+                .build());
+    Assertions.assertEquals(5, data.size());
+    Assertions.assertEquals("mbc", new String(data.get(0).getKey()));
+
+    data =
+        transactionalKvBackend.scan(
+            KvRangeScan.builder()
+                .start("mb".getBytes(StandardCharsets.UTF_8))
+                .end("mc".getBytes(StandardCharsets.UTF_8))
+                .startInclusive(true)
+                .endInclusive(true)
+                .build());
+    Assertions.assertEquals(6, data.size());
+    Assertions.assertEquals("mb", new String(data.get(0).getKey()));
+
+    data =
+        transactionalKvBackend.scan(
+            KvRangeScan.builder()
+                .start("mb".getBytes(StandardCharsets.UTF_8))
+                .end("mc".getBytes(StandardCharsets.UTF_8))
+                .startInclusive(true)
+                .endInclusive(false)
+                .build());
+    Assertions.assertEquals(6, data.size());
+    Assertions.assertEquals("mb", new String(data.get(0).getKey()));
+
+    // Start is 'mb' and end is 'mbcde'
+    data =
+        transactionalKvBackend.scan(
+            KvRangeScan.builder()
+                .start("mb".getBytes(StandardCharsets.UTF_8))
+                .end("mbcde".getBytes(StandardCharsets.UTF_8))
+                .startInclusive(false)
+                .endInclusive(false)
+                .build());
+    Assertions.assertEquals(2, data.size());
+    Assertions.assertEquals("mbcd", new String(data.get(1).getKey()));
+
+    data =
+        transactionalKvBackend.scan(
+            KvRangeScan.builder()
+                .start("mb".getBytes(StandardCharsets.UTF_8))
+                .end("mbcde".getBytes(StandardCharsets.UTF_8))
+                .startInclusive(false)
+                .endInclusive(true)
+                .build());
+    Assertions.assertEquals(3, data.size());
+    Assertions.assertEquals("mbcde", new String(data.get(2).getKey()));
+
+    data =
+        transactionalKvBackend.scan(
+            KvRangeScan.builder()
+                .start("mb".getBytes(StandardCharsets.UTF_8))
+                .end("mbcde".getBytes(StandardCharsets.UTF_8))
+                .startInclusive(true)
+                .endInclusive(true)
+                .build());
+
+    Assertions.assertEquals(4, data.size());
+    Assertions.assertEquals("mbcde", new String(data.get(3).getKey()));
+
+    data =
+        transactionalKvBackend.scan(
+            KvRangeScan.builder()
+                .start("mb".getBytes(StandardCharsets.UTF_8))
+                .end("mbcde".getBytes(StandardCharsets.UTF_8))
+                .startInclusive(true)
+                .endInclusive(false)
+                .build());
+
+    Assertions.assertEquals(3, data.size());
+    Assertions.assertEquals("mbcd", new String(data.get(2).getKey()));
+
+    // Start is 'mb' and end is 'mbc'
+    data =
+        transactionalKvBackend.scan(
+            KvRangeScan.builder()
+                .start("mb".getBytes(StandardCharsets.UTF_8))
+                .end("mbc".getBytes(StandardCharsets.UTF_8))
+                .startInclusive(false)
+                .endInclusive(true)
+                .build());
+    Assertions.assertEquals(1, data.size());
+    Assertions.assertEquals("mbc", new String(data.get(0).getKey()));
+
+    data =
+        transactionalKvBackend.scan(
+            KvRangeScan.builder()
+                .start("mb".getBytes(StandardCharsets.UTF_8))
+                .end("mbc".getBytes(StandardCharsets.UTF_8))
+                .startInclusive(false)
+                .endInclusive(false)
+                .build());
+    Assertions.assertEquals(0, data.size());
+
+    data =
+        transactionalKvBackend.scan(
+            KvRangeScan.builder()
+                .start("mb".getBytes(StandardCharsets.UTF_8))
+                .end("mbc".getBytes(StandardCharsets.UTF_8))
+                .startInclusive(true)
+                .endInclusive(false)
+                .build());
+    Assertions.assertEquals(1, data.size());
+    Assertions.assertEquals("mb", new String(data.get(0).getKey()));
+
+    data =
+        transactionalKvBackend.scan(
+            KvRangeScan.builder()
+                .start("mb".getBytes(StandardCharsets.UTF_8))
+                .end("mbc".getBytes(StandardCharsets.UTF_8))
+                .startInclusive(true)
+                .endInclusive(true)
+                .build());
+    Assertions.assertEquals(2, data.size());
+    Assertions.assertEquals("mb", new String(data.get(0).getKey()));
+    Assertions.assertEquals("mbc", new String(data.get(1).getKey()));
+
+    data =
+        transactionalKvBackend.scan(
+            KvRangeScan.builder()
+                .start("mb".getBytes(StandardCharsets.UTF_8))
+                .end("mb".getBytes(StandardCharsets.UTF_8))
+                .startInclusive(true)
+                .endInclusive(true)
+                .build());
+
+    Assertions.assertEquals(1, data.size());
+    Assertions.assertEquals("mb", new String(data.get(0).getKey()));
+
+    transactionalKvBackend.scan(
+        KvRangeScan.builder()
+            .start("mb".getBytes(StandardCharsets.UTF_8))
+            .end("mc".getBytes(StandardCharsets.UTF_8))
+            .startInclusive(true)
+            .endInclusive(true)
+            .build());
+
+    Assertions.assertEquals(1, data.size());
+    Assertions.assertEquals("mb", new String(data.get(0).getKey()));
+
+    repeatedTimes = new Random().nextInt(10) + 1;
+    for (int i = 0; i < repeatedTimes; i++) {
+      transactionalKvBackend.begin();
+      transactionalKvBackend.put(
+          "bc".getBytes(StandardCharsets.UTF_8), "value1".getBytes(StandardCharsets.UTF_8), true);
+      transactionalKvBackend.put(
+          "bcd".getBytes(StandardCharsets.UTF_8), "value2".getBytes(StandardCharsets.UTF_8), true);
+      transactionalKvBackend.put(
+          "bcde".getBytes(StandardCharsets.UTF_8), "value3".getBytes(StandardCharsets.UTF_8), true);
+      transactionalKvBackend.put(
+          "bce".getBytes(StandardCharsets.UTF_8), "value4".getBytes(StandardCharsets.UTF_8), true);
+      transactionalKvBackend.put(
+          "bcef".getBytes(StandardCharsets.UTF_8), "value5".getBytes(StandardCharsets.UTF_8), true);
+      transactionalKvBackend.put(
+          "bef".getBytes(StandardCharsets.UTF_8), "value6".getBytes(StandardCharsets.UTF_8), true);
+      transactionalKvBackend.put(
+          "beg".getBytes(StandardCharsets.UTF_8), "value7".getBytes(StandardCharsets.UTF_8), true);
+      transactionalKvBackend.commit();
+      Thread.sleep(1);
+    }
+
+    transactionalKvBackend.begin();
+
+    // Start is "bc" and end is "bcef"
+    data =
+        transactionalKvBackend.scan(
+            KvRangeScan.builder()
+                .start("bc".getBytes(StandardCharsets.UTF_8))
+                .end("bcef".getBytes(StandardCharsets.UTF_8))
+                .startInclusive(false)
+                .endInclusive(false)
+                .build());
+    Assertions.assertEquals(3, data.size());
+    Assertions.assertEquals("bcd", new String(data.get(0).getKey()));
+    Assertions.assertEquals("bce", new String(data.get(2).getKey()));
+    data =
+        transactionalKvBackend.scan(
+            KvRangeScan.builder()
+                .start("bc".getBytes(StandardCharsets.UTF_8))
+                .end("bcef".getBytes(StandardCharsets.UTF_8))
+                .startInclusive(false)
+                .endInclusive(true)
+                .build());
+    Assertions.assertEquals(4, data.size());
+    Assertions.assertEquals("bcd", new String(data.get(0).getKey()));
+    Assertions.assertEquals("bcef", new String(data.get(3).getKey()));
+    data =
+        transactionalKvBackend.scan(
+            KvRangeScan.builder()
+                .start("bc".getBytes(StandardCharsets.UTF_8))
+                .end("bcef".getBytes(StandardCharsets.UTF_8))
+                .startInclusive(true)
+                .endInclusive(true)
+                .build());
+    Assertions.assertEquals(5, data.size());
+    Assertions.assertEquals("bc", new String(data.get(0).getKey()));
+    Assertions.assertEquals("bcef", new String(data.get(4).getKey()));
+    data =
+        transactionalKvBackend.scan(
+            KvRangeScan.builder()
+                .start("bc".getBytes(StandardCharsets.UTF_8))
+                .end("bcef".getBytes(StandardCharsets.UTF_8))
+                .startInclusive(true)
+                .endInclusive(false)
+                .build());
+    Assertions.assertEquals(4, data.size());
+    Assertions.assertEquals("bc", new String(data.get(0).getKey()));
+    Assertions.assertEquals("bce", new String(data.get(3).getKey()));
+
+    // Start is "bc" and end is "bef"
+    data =
+        transactionalKvBackend.scan(
+            KvRangeScan.builder()
+                .start("bc".getBytes(StandardCharsets.UTF_8))
+                .end("bef".getBytes(StandardCharsets.UTF_8))
+                .startInclusive(false)
+                .endInclusive(false)
+                .build());
+    Assertions.assertEquals(4, data.size());
+    Assertions.assertEquals("bcd", new String(data.get(0).getKey()));
+    Assertions.assertEquals("bcef", new String(data.get(3).getKey()));
+    data =
+        transactionalKvBackend.scan(
+            KvRangeScan.builder()
+                .start("bc".getBytes(StandardCharsets.UTF_8))
+                .end("bef".getBytes(StandardCharsets.UTF_8))
+                .startInclusive(false)
+                .endInclusive(true)
+                .build());
+    Assertions.assertEquals(5, data.size());
+    Assertions.assertEquals("bcd", new String(data.get(0).getKey()));
+    Assertions.assertEquals("bef", new String(data.get(4).getKey()));
+    data =
+        transactionalKvBackend.scan(
+            KvRangeScan.builder()
+                .start("bc".getBytes(StandardCharsets.UTF_8))
+                .end("bef".getBytes(StandardCharsets.UTF_8))
+                .startInclusive(true)
+                .endInclusive(true)
+                .build());
+    Assertions.assertEquals(6, data.size());
+    Assertions.assertEquals("bc", new String(data.get(0).getKey()));
+    Assertions.assertEquals("bef", new String(data.get(5).getKey()));
+    data =
+        transactionalKvBackend.scan(
+            KvRangeScan.builder()
+                .start("bc".getBytes(StandardCharsets.UTF_8))
+                .end("bef".getBytes(StandardCharsets.UTF_8))
+                .startInclusive(true)
+                .endInclusive(false)
+                .build());
+    Assertions.assertEquals(5, data.size());
+    Assertions.assertEquals("bc", new String(data.get(0).getKey()));
+    Assertions.assertEquals("bcef", new String(data.get(4).getKey()));
+
+    // Start is "bc" and end is "be"
+    data =
+        transactionalKvBackend.scan(
+            KvRangeScan.builder()
+                .start("bc".getBytes(StandardCharsets.UTF_8))
+                .end("be".getBytes(StandardCharsets.UTF_8))
+                .startInclusive(false)
+                .endInclusive(false)
+                .build());
+    Assertions.assertEquals(4, data.size());
+    Assertions.assertEquals("bcd", new String(data.get(0).getKey()));
+    Assertions.assertEquals("bcef", new String(data.get(3).getKey()));
+    data =
+        transactionalKvBackend.scan(
+            KvRangeScan.builder()
+                .start("bc".getBytes(StandardCharsets.UTF_8))
+                .end("be".getBytes(StandardCharsets.UTF_8))
+                .startInclusive(false)
+                .endInclusive(true)
+                .build());
+    Assertions.assertEquals(4, data.size());
+    Assertions.assertEquals("bcd", new String(data.get(0).getKey()));
+    Assertions.assertEquals("bcef", new String(data.get(3).getKey()));
+    data =
+        transactionalKvBackend.scan(
+            KvRangeScan.builder()
+                .start("bc".getBytes(StandardCharsets.UTF_8))
+                .end("be".getBytes(StandardCharsets.UTF_8))
+                .startInclusive(true)
+                .endInclusive(true)
+                .build());
+    Assertions.assertEquals(5, data.size());
+    Assertions.assertEquals("bc", new String(data.get(0).getKey()));
+    Assertions.assertEquals("bcef", new String(data.get(4).getKey()));
+    data =
+        transactionalKvBackend.scan(
+            KvRangeScan.builder()
+                .start("bc".getBytes(StandardCharsets.UTF_8))
+                .end("bef".getBytes(StandardCharsets.UTF_8))
+                .startInclusive(true)
+                .endInclusive(false)
+                .build());
+    Assertions.assertEquals(5, data.size());
+    Assertions.assertEquals("bc", new String(data.get(0).getKey()));
+    Assertions.assertEquals("bcef", new String(data.get(4).getKey()));
   }
 }

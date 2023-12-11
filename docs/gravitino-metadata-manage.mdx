@@ -135,7 +135,7 @@ boolean success = gravitinoClient.dropMetalake(
 ```
 
 :::note
-Drop a metalake will only remove metadata about the metalake and catalogs, schemas, tables under the metalake in Gravitino, It will not remove the real data(table and schema) in Apache Hive.
+Drop a metalake only removes metadata about the metalake and catalogs, schemas, tables under the metalake in Gravitino, It doesn't remove the real schema and table data in Apache Hive.
 ::::
 
 ### List all metalakes
@@ -151,6 +151,7 @@ curl -X GET -H "Accept: application/vnd.gravitino.v1+json" -H "Content-Type: app
 GravitinoMetaLake[] allMetalakes = gravitinoClient.listMetalakes();
 // ...
 ```
+
 ## Catalogs operations
 
 ### Create a catalog
@@ -254,7 +255,6 @@ Currently, Gravitino supports the following changes to a catalog:
 | Add a property         | `{"@type":"setProperty","property":"key1","value":"value1"}` | `CatalogChange.setProperty("key1", "value1")`  |
 | Remove a property      | `{"@type":"removeProperty","property":"key1"}`               | `CatalogChange.removeProperty("key1")`         |
 
-
 ### Drop a catalog
 
 Users can remove a catalog by sending a `DELETE` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}` endpoint or just use the Gravitino Java client. The following is an example of dropping a catalog:
@@ -273,7 +273,7 @@ gravitinoMetaLake.dropCatalog(NameIdentifier.of("metalake", "catalog"));
 ```
 
 :::note
-Drop a catalog will only remove metadata about the catalog and schemas, tables under the catalog in Gravitino, It will not remove the real data(table and schema) in Apache Hive.
+Drop a catalog only removes metadata about the catalog and schemas, tables under the catalog in Gravitino, It doesn't remove the real data(table and schema) in Apache Hive.
 :::
 
 ### List all catalogs in a metalake
@@ -304,7 +304,6 @@ Users should create a metalake and a catalog before creating a schema.
 ### Create a schema
 
 Users can create a schema by sending a `POST` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas` endpoint or just use the Gravitino Java client. The following is an example of creating a schema:
-
 
 ```bash
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" -H "Content-Type: application/json" -d '{
@@ -359,6 +358,7 @@ Schema schema = supportsSchemas.loadSchema(NameIdentifier.of("metalake", "catalo
 ```
 
 ### Alter a schema
+
 Users can change a schema by sending a `PUT` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}` endpoint or just use the Gravitino Java client. The following is an example of modifying a schema:
 
 ```bash
@@ -398,7 +398,7 @@ Currently, Gravitino supports the following changes to a schema:
 
 
 ### Drop a schema
-Users can remove a schema by sending a `DELETE` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}` endpoint or just use the Gravitino Java client. The following is an example of droping a schema:
+Users can remove a schema by sending a `DELETE` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}` endpoint or just use the Gravitino Java client. The following is an example of dropping a schema:
 
 
 ```bash
@@ -417,6 +417,7 @@ supportsSchemas.dropSchema(NameIdentifier.of("metalake", "catalog", "schema"), t
 ```
 
 ### List all schemas under a catalog
+
 Users can alter all schemas under a catalog by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas` endpoint or just use the Gravitino Java client. The following is an example of list all schema
     in a catalog:
 
@@ -701,7 +702,7 @@ Currently, Gravitino supports the following changes to a table:
 
 ### Drop a table
 
-Users can remove a table by sending a `DELETE` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables/{table_name}` endpoint or just use the Gravitino Java client. The following is an example of droping a table:
+Users can remove a table by sending a `DELETE` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables/{table_name}` endpoint or just use the Gravitino Java client. The following is an example of dropping a table:
 
 ```bash
 curl -X DELETE -H "Accept: application/vnd.gravitino.v1+json" -H "Content-Type: application/json" http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema/tables/table
