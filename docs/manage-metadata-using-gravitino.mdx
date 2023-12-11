@@ -39,7 +39,12 @@ like metalakes, catalogs, schemas, and tables. The following contents are includ
   - [List all tables under a schema](#list-all-tables-under-a-schema)
 
 In this document, Gravitino uses Apache Hive catalog as an example to show how to manage metadata by Gravitino. Other catalogs are similar to Hive catalog,
-but they may have some differences. For more details, please refer to the related doc.
+but they may have some differences, especially in catalog property, table property and column type. For more details, please refer to the related doc.
+
+- [**Apache Hive**](/apache-hive-catalog)
+- [**MySQL**](/jdbc-postgresql-catalog)
+- [**PostgreSQL**](/jdbc-mysql-catalog)
+- [**Apache Iceberg**](/lakehouse-iceberg-catalog)
 
 
 Assuming Gravitino has just started, and the host and port is `http://localhost:8090`.
@@ -198,6 +203,10 @@ Catalog catalog = gravitinoMetaLake.createCatalog(
     hiveProperties);
 // ...
 ```
+
+:::warning
+The code above is an example of creating a Hive catalog. For other catalogs, the code is similar, but the catalog type, provider and properties may be different. For more details, please refer to the related doc.
+:::
 
 ### Load a catalog
 
@@ -636,6 +645,10 @@ tableCatalog.createTable(
     }
     );
 ```
+
+:::warning
+The code above is an example of creating a Hive table. For other catalogs, the code is similar, but the supported column type, table properties may be different. For more details, please refer to the related doc.
+:::
 
 ### Load a table
 
