@@ -1,7 +1,8 @@
 ---
 title: Gravitino overview
 slug: /
-license: Copyright 2023 Datastrato Pvt Ltd. This software is licensed under the Apache License version 2.
+license: "Copyright 2023 Datastrato Pvt Ltd.
+This software is licensed under the Apache License version 2."
 ---
 
 ## What is Gravitino?
@@ -64,9 +65,9 @@ to learn how to use the playground.
 * [Manage metadata using Gravitino](./manage-metadata-using-gravitino): provides the complete
   functionalities of Gravitino metadata management. Including metalake, catalog, schema and
   table management.
-* [Gravitino Open API](/apis/java/index.html): provides the complete Open API definition of 
+* [Gravitino Open API](/api/java/index.html): provides the complete Open API definition of 
   Gravitino.
-* [Gravitino Javadoc](./apis/rest/gravitino-rest-api): provides the Javadoc for Gravitino API.
+* [Gravitino Javadoc](./api/rest/gravitino-rest-api): provides the Javadoc for Gravitino API.
 
 ### Server administration
 
