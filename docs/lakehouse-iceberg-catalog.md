@@ -13,22 +13,23 @@ This software is licensed under the Apache License version 2."
 
 Gravitino provides the ability to manage Apache Iceberg metadata.
 
-### Capabilities
-
-- Works as a catalog proxy, supporting `HiveCatalog` and `JdbcCatalog`.
-- Supports DDL operation for Iceberg schemas and tables.
-- Doesn't support snapshot or table management operations.
-- When writing to HDFS, the Gravitino Iceberg REST server can only operate as the specified HDFS user and
-  doesn't support proxying to other HDFS users. See [How to access Apache Hadoop](gravitino-server-config) for more details.
+### Requirements and limitations
 
 :::info
 Builds with Apache Iceberg `1.3.1`. The Apache Iceberg table format version is `1` by default.
 :::
+
 :::notice
 Builds with hadoop 2.10.x, there may compatibility issue when accessing hadoop 3.x clusters.
 :::
 
-## Catalog info
+## Catalog 
+
+### Catalog capabilities
+
+- Works as a catalog proxy, supporting `HiveCatalog` and `JdbcCatalog`.
+- Supports DDL operations for Iceberg schemas and tables.
+- Doesn't support snapshot or table management operations.
 
 ### Catalog properties
 
@@ -36,7 +37,7 @@ Builds with hadoop 2.10.x, there may compatibility issue when accessing hadoop 3
 |--------------------|-----------------------------------------------|-----------------------------------------------------------------------------------------------------------------------|---------------|
 | `catalog-backend`  | Catalog backend of Gravitino Iceberg catalog. | `hive` or `jdbc`                                                                                                      | 0.2.0         |
 | `uri`              | The URI configuration of the Iceberg catalog. | `thrift://127.0.0.1:9083` or `jdbc:postgresql://127.0.0.1:5432/db_name` or `jdbc:mysql://127.0.0.1:3306/metastore_db` | 0.2.0         |
-| `warehouse`        | Warehouse directory of catalog.               | `file:///user/hive/warehouse-hive/` for localfs or `hdfs://namespace/hdfs/path` for HDFS                              | 0.2.0         |
+| `warehouse`        | Warehouse directory of catalog.               | `file:///user/hive/warehouse-hive/` for local fs or `hdfs://namespace/hdfs/path` for HDFS                             | 0.2.0         |
 
 Any properties not defined by Gravitino with `gravitino.bypass` prefix will pass to Iceberg catalog properties and HDFS configuration. For example, if specify `gravitino.bypass.list-all-tables`, `list-all-tables` will pass to Iceberg catalog properties.
 
@@ -55,33 +56,41 @@ If you are using JDBC catalog, you must provide `jdbc-user`, `jdbc-password` and
 Your must download the corresponding JDBC driver to the `catalogs/lakehouse-iceberg/libs` directory.
 :::
 
-## Schema info
+### Catalog operations
+
+## Schema 
 
 ### Schema capabilities
 
-- Not support cascade drop schema.
+- doesn't support cascade drop schema.
 
 ### Schema properties
 
 You could put properties except `comment`.
 
-## Table info
+### Schema operations
 
-### Table partitions
+## Table 
+
+### Table capabilities
+
+#### Table partitions
 
 Supports transforms:
   - `IdentityTransform`
   - `BucketTransform`
-:::info
-Iceberg doesn't support multi fields in `BucketTransform`
-:::
   - `TruncateTransform`
   - `YearTransform`
   - `MonthTransform`
   - `DayTransform`
   - `HourTransform`
+
 :::info
-Iceberg doesn't support `ApplyTransform`, `RangeTransform` and `ListTransform`
+Iceberg doesn't support multi fields in `BucketTransform`.
+:::
+   
+:::info
+Iceberg doesn't support `ApplyTransform`, `RangeTransform` and `ListTransform`.
 :::
 
 ### Table sort orders
@@ -90,23 +99,21 @@ supports expressions:
 - `FieldReference`
 - `FunctionExpression`
   - `bucket`
-:::info
-The first argument must be integer literal,the second argument must be field reference.
-:::
   - `truncate`
-:::info
-The first argument must be integer literal,the second argument must be field reference.
-:::
   - `year`
   - `month`
   - `day`
   - `hour`
 
-### Table distribution
+:::info
+For `bucket` and `truncate`, the first argument must be integer literal, the second argument must be field reference.
+:::
+
+### Table distributions
 
 - Doesn't support `Distribution`, you should use `BucketPartition` instead.
 
-### Table column type 
+### Table column types 
 
 | Gravitino Type              | Apache Iceberg Type         |
 |-----------------------------|-----------------------------|
@@ -133,7 +140,7 @@ Apache Iceberg doesn't support Gravitino `Varchar` `Fixedchar` `Byte` `Short` `U
 :::
 
 
-### Table properties
+## Table properties
 
 You can pass [Iceberg table properties](https://iceberg.apache.org/docs/1.3.1/configuration/) to Gravitino when creating Iceberg table.
 
@@ -149,34 +156,39 @@ Gravitino server reserves the following fields which can't be passed.
 | `sort-order`              | Selecting a specific snapshot in a merge operation.     |
 | `identifier-fields`       | The identifier fields for defining the table.           |
 
+## Table operations
 
 ### Alter table operations
 
-supports operations:
+Supports operations:
 - `RenameTable`
 - `SetProperty`
 - `RemoveProperty`
 - `UpdateComment`
 - `AddColumn`
-:::info
-The default column position is `LAST` if not specifying column position.
-:::
-:::notice
-If you add a non nullability column, there may be compatibility issue.
-:::
 - `DeleteColumn`
 - `RenameColumn`
 - `UpdateColumnType`
-:::info
-Iceberg supports update primitive type. 
-:::
 - `UpdateColumnPosition`
 - `UpdateColumnNullability`
+- `UpdateColumnComment`
+
+:::info
+The default column position is `LAST` when you add a column. If you add a non nullability column, there may be compatibility issue.
+:::
+
+:::info
+Iceberg just supports update primitive types.
+:::
+
 :::notice
 If you update a nullability column to non nullability, there may be compatibility issue.
 :::
-- `UpdateColumnComment`
 
 ## HDFS configuration
 
 You can place `core-site.xml` and `hdfs-site.xml` in the `catalogs/lakehouse-iceberg/conf` directory to automatically load as the default HDFS configuration.
+
+:::notice
+When writing to HDFS, the Gravitino Iceberg REST server can only operate as the specified HDFS user and doesn't support proxying to other HDFS users. See [How to access Apache Hadoop](gravitino-server-config) for more details.
+:::
