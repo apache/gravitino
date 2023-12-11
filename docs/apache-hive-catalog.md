@@ -1,5 +1,5 @@
 ---
-title: "Apache Hive catalog of Gravitino"
+title: "Apache Hive catalog"
 slug: /apache-hive-catalog
 date: 2023-12-10
 keyword: hive catalog
@@ -15,33 +15,119 @@ Gravitino offers the capability to utilize [Apache Hive](https://hive.apache.org
 
 * The Hive catalog requires a Hive Metastore Service (HMS), or a compatible implementation of the HMS, such as AWS Glue.
 * The Gravitino must have network access to the Hive metastore service with the Thrift protocol.
-* Support is available for Apache Hive 2.x.
+
+:::note
+The Hive catalog is available for Apache Hive **2.x** only. Support for Apache Hive 3.x is under development.
+:::
+
+## Data types
+
+The Hive catalog supports all data types defined in the [Hive Language Manual](https://cwiki.apache.org/confluence/display/Hive/LanguageManual+Types).
+The following table lists the data types mapped from the Hive catalog to the Gravitino.
+
+| Hive Data Type              | Gravitino Data Type | Since Version |
+|-----------------------------|---------------------|---------------|
+| `boolean`                   | `boolean`           | 0.2.0         |
+| `tinyint`                   | `byte`              | 0.2.0         |
+| `smallint`                  | `short`             | 0.2.0         |
+| `int`/`integer`             | `integer`           | 0.2.0         |
+| `bigint`                    | `long`              | 0.2.0         |
+| `float`                     | `float`             | 0.2.0         |
+| `double`/`double precision` | `double`            | 0.2.0         |
+| `decimal`                   | `decimal`           | 0.2.0         |
+| `string`                    | `string`            | 0.2.0         |
+| `char`                      | `char`              | 0.2.0         |
+| `varchar`                   | `varchar`           | 0.2.0         |
+| `timestamp`                 | `timestamp`         | 0.2.0         |
+| `date`                      | `date`              | 0.2.0         |
+| `interval_year_month`       | `interval_year`     | 0.2.0         |
+| `interval_day_time`         | `interval_day`      | 0.2.0         |
+| `binary`                    | `binary`            | 0.2.0         |
+| `array`                     | `array`             | 0.2.0         |
+| `map`                       | `map`               | 0.2.0         |
+| `struct`                    | `struct`            | 0.2.0         |
+| `uniontype`                 | `uniontype`         | 0.2.0         |
+
+## Partitioned Tables
+
+The Hive catalog supports [partitioned tables](https://cwiki.apache.org/confluence/display/Hive/LanguageManual+DDL#LanguageManualDDL-PartitionedTables). Users can create partitioned tables in the Hive catalog with specific partitioning attribute.
+Although Gravitino supports several partitioning strategies, the Apache Hive inherently only supports a single partitioning strategy(partitioned by column), therefore the Hive catalog only support `Identity` partitioning.
+
+:::caution
+The `fieldName` specified in the partitioning attribute must be a column defined in the table.
+:::
+
+## Bucketed Sorted Tables
+
+The Hive catalog supports [bucketed sorted tables](https://cwiki.apache.org/confluence/display/Hive/LanguageManual+DDL#LanguageManualDDL-BucketedSortedTables). Users can create bucketed sorted tables in the Hive catalog with specific `distribution` and `sortOrders` attributes.
+Although Gravitino supports several distribution strategies, the Apache Hive inherently only supports a single distribution strategy(clustered by column), therefore the Hive catalog only support `Hash` distribution.
+
+:::caution
+The `fieldName` specified in the `distribution` and `sortOrders` attribute must be a column defined in the table.
+:::
+
+## Alter Operations
+
+Gravitino has already defined a unified set of [metadata operation interfaces](/docs/manage-metadata-using-gravitino#alter-a-table), and almost all [Hive Alter operations](https://cwiki.apache.org/confluence/display/Hive/LanguageManual+DDL#LanguageManualDDL-AlterTable/Partition/Column) have corresponding table update request which enable you to change the struct of an existing table.
+The following table lists the mapping relationship between Hive Alter operations and Gravitino table update request.
+
+### Alter Table
+
+| Hive Alter Operation                          | Gravitino Table Update Request | Since Version |
+|-----------------------------------------------|--------------------------------|---------------|
+| `Rename Table`                                | `Rename table`                 | 0.2.0         |
+| `Alter Table Properties`                      | `Set a table property`         | 0.2.0         |
+| `Alter Table Comment`                         | `Update comment`               | 0.2.0         |
+| `Alter SerDe Properties`                      | `Set a table property`         | 0.2.0         |
+| `Remove SerDe Properties`                     | `Remove a table property`      | 0.2.0         |
+| `Alter Table Storage Properties`              | Unsupported                    | -             |
+| `Alter Table Skewed or Stored as Directories` | Unsupported                    | -             |
+| `Alter Table Constraints`                     | Unsupported                    | -             |
+
+:::note
+As Gravitino has a separate interface for updating the comment of a table, the Hive catalog sets `comment` as a reserved property for the table, preventing users from setting the comment property, Although Apache Hive change the comment of a table by modifying the comment property of the table.
+:::
+
+### Alter Column
+
+| Hive Alter Operation     | Gravitino Table Update Request    | Since Version |
+|--------------------------|-----------------------------------|---------------|
+| `Change Column Name`     | `Rename a column`                 | 0.2.0         |
+| `Change Column Type`     | `Update the type of a column`     | 0.2.0         |
+| `Change Column Position` | `Update the position of a column` | 0.2.0         |
+| `Change Column Comment`  | `Update the column comment`       | 0.2.0         |
+
+### Alter Partition
+
+:::note
+Support for altering partitions is under development.
+:::
 
 ## Properties
 
-### Catalog properties
+### Catalog Properties
 
-| Property name       | Description                                                                                                                  | example value                                                                                                            | Since version |
+| Property name       | Description                                                                                                                  | Example Value                                                                                                            | Since Version |
 |---------------------|------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------|---------------|
 | `metastore.uris`    | This is a required configuration, and it should be the Hive metastore service URIs, separate multiple addresses with commas. | `thrift://127.0.0.1:9083`                                                                                                | 0.2.0         |
 | `client.pool-size`  | The maximum number of Hive metastore clients in the pool for Gravitino. 1 by default.                                        | 1                                                                                                                        | 0.2.0         |
 | `gravitino.bypass.` | Property name with this prefix passed down to the underlying HMS client for use. Empty by default.                           | `gravitino.bypass.hive.metastore.failure.retries = 3` indicate 3 times of retries upon failure of Thrift metastore calls | 0.2.0         |
 
-### Schema properties
+### Schema Properties
 
 Schema properties supply or set metadata for the underlying Hive database.
 The following table lists predefined schema properties for the Hive database. In addition, you can also define your own key-value pair properties, which can also be transmitted to the underlying Hive database.
 
-| Property name       | Description                                                                                                                                  | example value                            | Since version |
+| Property name       | Description                                                                                                                                  | example value                            | Since Version |
 |---------------------|----------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------|---------------|
 | `location`          | The directory for Hive database storage. Not required, HMS uses the value of `hive.metastore.warehouse.dir` in the hive-site.xml by default. | `/user/hive/warehouse`                   | 0.1.0         |
 
-### Table properties
+### Table Properties
 
 Table properties supply or set metadata for the underlying Hive tables.
 The following table lists predefined table properties for the Hive table. In addition, you can also define your own key-value pair properties, which can also be transmitted to the underlying Hive table.
 
-| Property name      | Description                                                                                                                                                                                | example value                                                                                | Since version |
+| Property Name      | Description                                                                                                                                                                                | Example Value                                                                                | Since version |
 |--------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------|---------------|
 | `location`         | The location for table storage. Not required, HMS will use the database location as the parent directory by default.                                                                       | `/user/hive/warehouse/test_table`                                                            | 0.2.0         |
 | `table-type`       | Type of the table. Valid values include `MANAGED_TABLE` and `EXTERNAL_TABLE`. `MANAGED_TABLE` by default.                                                                                  | `MANAGED_TABLE`                                                                              | 0.2.0         |
@@ -53,7 +139,7 @@ The following table lists predefined table properties for the Hive table. In add
 
 Some properties are reserved, which are automatically added and managed by Hive. Users are not allowed to set these properties.
 
-| Property name           | Description                                       | Since version |
+| Property Name           | Description                                       | Since Version |
 |-------------------------|---------------------------------------------------|---------------|
 | `comment`               | Used to store the table comment.                  | 0.2.0         |
 | `numFiles`              | Used to store the number of files in the table.   | 0.2.0         |
