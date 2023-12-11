@@ -1,5 +1,5 @@
 ---
-title: "How to use Gravitino to manage JDBC MySQL catalog"
+title: "JDBC MySQL catalog"
 slug: /jdbc-mysql-catalog
 keywords:
 - jdbc
