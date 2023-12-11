@@ -49,7 +49,7 @@ This software is licensed under the Apache License version 2."
 
 :::note
 The first time you build the project, downloading the dependencies may take a while. You can add
-`-x test` to skip the tests, like `./gradlew build -x test`.
+`-x test` to skip the tests, by using `./gradlew build -x test`.
 :::
 
 3. Get the Gravitino binary package.
