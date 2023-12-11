@@ -25,6 +25,8 @@ The Gravitino connector currently supports basic Hive table creation statements,
 allowing null values, and adding comments. 
 However, it does not support advanced features like partitioning, sorting, and distribution.
 
+The Gravitino connector does not support `CREATE TABLE AS SELECT`.
+
 ## Alter table
 
 Support for the following alter table operations:
