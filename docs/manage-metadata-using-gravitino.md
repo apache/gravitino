@@ -6,9 +6,9 @@ keyword: Gravitino metadata manage
 license: Copyright 2023 Datastrato Pvt Ltd. This software is licensed under the Apache License version 2.
 ---
 
-[//]: # (import Tabs from "@theme/Tabs";)
+[//]: # "import Tabs from "@theme/Tabs";"
 
-[//]: # (import TabItem from "@theme/TabItem";)
+[//]: # "import TabItem from "@theme/TabItem";"
 
 This page introduces how to manage metadata by Gravitino. Through Gravitino, you can create, edit, and delete metadata
 like metalakes, catalogs, schemas, and tables. The following contents are included in this page:
@@ -197,7 +197,7 @@ GravitinoMetaLake gravitinoMetaLake =
 
 Catalog catalog = gravitinoMetaLake.loadCatalog(NameIdentifier.of("metalake", "catalog"));
 // ...
-```    
+```
 
 ### Alter a catalog
 
@@ -267,7 +267,7 @@ a metalake:
 
 ```bash
 curl -X GET -H "Accept: application/vnd.gravitino.v1+json" -H "Content-Type: application/json" http://localhost:8090/api/metalakes/metalake/catalogs
-    ```
+```
 
 ```java
 // ...
@@ -621,6 +621,51 @@ tableCatalog.createTable(
     }
     );
 ```
+
+
+#### Partitioned table
+
+Currently, Gravitino supports the following partitioning strategies:
+
+| Partitioning strategy | Json                                            | Java                           | SQL syntax           | Description                       |
+|-----------------------|-------------------------------------------------| ------------------------------ | -------------------- |-----------------------------------|
+| Identity              | `{"strategy":"identity","fieldName":["score"]}` | `Transforms.identity("score")` | `PARTITION BY score` | Partition by a field or reference |
+
+
+
+#### Bucketed table
+
+- Strategy. It defines in which way we bucket the table.
+
+| Bucket strategy | Json    | Java             | Description              |
+|-----------------|---------|------------------|--------------------------|
+| HASH            | `HASH`  | `Strategy.HASH`  | Bucket table using hash  |
+| RANGE           | `RANGE` | `Strategy.RANGE` | Bucket table using range |
+| EVEN            | `EVEN`  | `Strategy.EVEN`  | Bucket table using       |
+
+- Number. It defines how many buckets we use to bucket the table.
+- Function arguments. It defines which field or function should be used to bucket the table.
+
+
+#### Sorted order table
+
+To define a sorted order table, you should use the following three components to construct a valid sorted order table.
+
+- Direction.  It defines in which direction we sort the table.
+
+| Direction  | Json   | Java                       | Description                               |
+| ---------- | ------ | -------------------------- |-------------------------------------------|
+| Ascending  | `asc`  | `SortDirection.ASCENDING`  | Sorted by a field or a function ascending |
+| Descending | `desc` | `SortDirection.DESCENDING` | Sorted by a field or a function ascending |
+
+- Null ordering. It describes how to handle null value when ordering
+
+| Null ordering                     | Json          | Java                       | Description                                 |
+| --------------------------------- | ------------- | -------------------------- |---------------------------------------------|
+| Put null value in the first place | `nulls_first` | `NullOrdering.NULLS_FIRST` | Gravitino put null value in the first place |  
+| Put null value int the last place | `nulls_last`  | `NullOrdering.NULLS_LAST`  | Gravitino put null value in the last place  |
+
+- Sort term.  It shows which field or function should be used to sort the table.
 
 :::warning
 The code above is an example of creating a Hive table. For other catalogs, the code is similar, but the supported column type, table properties may be different. For more details, please refer to the related doc.
