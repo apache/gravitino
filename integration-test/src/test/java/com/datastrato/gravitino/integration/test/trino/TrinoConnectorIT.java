@@ -470,29 +470,29 @@ public class TrinoConnectorIT extends AbstractIT {
 
   private ColumnDTO[] createHiveFullTypeColumns() {
     ColumnDTO[] columnDTO = createFullTypeColumns();
-    Set<String> ignoreType = Sets.newHashSet("FixedType", "StringType", "TimeType");
+    Set<String> unsupportedType = Sets.newHashSet("FixedType", "StringType", "TimeType");
     // MySQL doesn't support timestamp time zone
     return Arrays.stream(columnDTO)
-        .filter(c -> !ignoreType.contains(c.name()))
+        .filter(c -> !unsupportedType.contains(c.name()))
         .toArray(ColumnDTO[]::new);
   }
 
   private ColumnDTO[] createMySQLFullTypeColumns() {
     ColumnDTO[] columnDTO = createFullTypeColumns();
-    Set<String> ignoreType = Sets.newHashSet("FixedType", "StringType", "TimestampType");
+    Set<String> unsupportedType = Sets.newHashSet("FixedType", "StringType", "TimestampType");
     // MySQL doesn't support timestamp time zone
     return Arrays.stream(columnDTO)
-        .filter(c -> !ignoreType.contains(c.name()))
+        .filter(c -> !unsupportedType.contains(c.name()))
         .toArray(ColumnDTO[]::new);
   }
 
   private ColumnDTO[] createIcebergFullTypeColumns() {
     ColumnDTO[] columnDTO = createFullTypeColumns();
 
-    Set<String> ignoreType =
-        Sets.newHashSet("ByteType", "ShortType", "VarCharType", "FixedCharType");
+    Set<String> unsupportedType =
+        Sets.newHashSet("ByteType", "ShortType", "VarCharType", "FixedCharType", "FixedType");
     return Arrays.stream(columnDTO)
-        .filter(c -> !ignoreType.contains(c.name()))
+        .filter(c -> !unsupportedType.contains(c.name()))
         .toArray(ColumnDTO[]::new);
   }
 
