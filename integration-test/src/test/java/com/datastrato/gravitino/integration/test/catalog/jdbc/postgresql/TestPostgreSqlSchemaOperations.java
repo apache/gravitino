@@ -57,13 +57,7 @@ public class TestPostgreSqlSchemaOperations extends TestPostgreSqlAbstractIT {
     properties.put(JdbcConfig.PASSWORD.getKey(), CONTAINER.getPassword());
     DataSource dataSource = DataSourceUtils.createDataSource(properties);
     PostgreSqlSchemaOperations postgreSqlSchemaOperations = new PostgreSqlSchemaOperations();
-    Map<String, String> config =
-        new HashMap<String, String>() {
-          {
-            put(JdbcConfig.JDBC_DATABASE.getKey(), testDbName);
-          }
-        };
-    postgreSqlSchemaOperations.initialize(dataSource, JDBC_EXCEPTION_CONVERTER, config);
+    postgreSqlSchemaOperations.initialize(dataSource, JDBC_EXCEPTION_CONVERTER, properties);
 
     String schema_1 = "schema_multiple_1";
     DATABASE_OPERATIONS.create(schema_1, null, null);

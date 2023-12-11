@@ -8,8 +8,12 @@ package com.datastrato.gravitino.catalog.jdbc.config;
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.config.ConfigBuilder;
 import com.datastrato.gravitino.config.ConfigEntry;
+import com.datastrato.gravitino.exceptions.GravitinoRuntimeException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.Map;
 import java.util.Optional;
+import org.apache.commons.lang3.StringUtils;
 
 public class JdbcConfig extends Config {
 
@@ -19,13 +23,6 @@ public class JdbcConfig extends Config {
           .version("0.3.0")
           .stringConf()
           .createWithDefault(null);
-
-  public static final ConfigEntry<Optional<String>> JDBC_DATABASE =
-      new ConfigBuilder("jdbc-database")
-          .doc("The database of the jdbc connection")
-          .version("0.3.0")
-          .stringConf()
-          .createWithOptional();
 
   public static final ConfigEntry<Optional<String>> JDBC_DRIVER =
       new ConfigBuilder("jdbc-driver")
@@ -87,7 +84,21 @@ public class JdbcConfig extends Config {
   }
 
   public String getJdbcDatabaseOrElseThrow(String errorMessage) {
-    return get(JDBC_DATABASE).orElseThrow(() -> new IllegalArgumentException(errorMessage));
+    try {
+      String jdbcUrl = getJdbcUrl();
+      URI uri = new URI(jdbcUrl.replace("jdbc:", ""));
+      String database = uri.getPath();
+      if (StringUtils.startsWith(database, "/")) {
+        // Remove leading slash
+        database = database.substring(1);
+      }
+      if (StringUtils.isEmpty(database)) {
+        throw new IllegalArgumentException(errorMessage);
+      }
+      return database;
+    } catch (URISyntaxException e) {
+      throw new GravitinoRuntimeException(e.getMessage(), e);
+    }
   }
 
   public JdbcConfig(Map<String, String> properties) {

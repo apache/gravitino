@@ -10,8 +10,6 @@ import com.datastrato.gravitino.catalog.postgresql.converter.PostgreSqlTypeConve
 import com.datastrato.gravitino.catalog.postgresql.operation.PostgreSqlSchemaOperations;
 import com.datastrato.gravitino.catalog.postgresql.operation.PostgreSqlTableOperations;
 import com.datastrato.gravitino.integration.test.catalog.jdbc.TestJdbcAbstractIT;
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.util.HashMap;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeAll;
@@ -30,23 +28,16 @@ public class TestPostgreSqlAbstractIT extends TestJdbcAbstractIT {
     JDBC_EXCEPTION_CONVERTER = new PostgreSqlExceptionConverter();
     TestJdbcAbstractIT.startup();
     String jdbcUrl = CONTAINER.getJdbcUrl();
-    try {
-      String database =
-          new URI(CONTAINER.getJdbcUrl().substring(jdbcUrl.lastIndexOf("/") + 1, jdbcUrl.length()))
-              .getPath();
-      Map<String, String> config =
-          new HashMap<String, String>() {
-            {
-              put(JdbcConfig.JDBC_DATABASE.getKey(), database);
-            }
-          };
-      TABLE_OPERATIONS = new PostgreSqlTableOperations();
-      DATABASE_OPERATIONS.initialize(DATA_SOURCE, JDBC_EXCEPTION_CONVERTER, config);
-      TABLE_OPERATIONS.initialize(
-          DATA_SOURCE, JDBC_EXCEPTION_CONVERTER, new PostgreSqlTypeConverter(), config);
-      DATABASE_OPERATIONS.create(TEST_DB_NAME, null, null);
-    } catch (URISyntaxException e) {
-      throw new RuntimeException(e);
-    }
+    Map<String, String> config =
+        new HashMap<String, String>() {
+          {
+            put(JdbcConfig.JDBC_URL.getKey(), jdbcUrl);
+          }
+        };
+    TABLE_OPERATIONS = new PostgreSqlTableOperations();
+    DATABASE_OPERATIONS.initialize(DATA_SOURCE, JDBC_EXCEPTION_CONVERTER, config);
+    TABLE_OPERATIONS.initialize(
+        DATA_SOURCE, JDBC_EXCEPTION_CONVERTER, new PostgreSqlTypeConverter(), config);
+    DATABASE_OPERATIONS.create(TEST_DB_NAME, null, null);
   }
 }

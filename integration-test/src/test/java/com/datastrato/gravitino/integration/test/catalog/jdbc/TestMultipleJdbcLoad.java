@@ -23,7 +23,6 @@ import com.datastrato.gravitino.integration.test.util.ITUtils;
 import com.datastrato.gravitino.rel.types.Types;
 import com.google.common.collect.Maps;
 import java.io.IOException;
-import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -82,9 +81,7 @@ public class TestMultipleJdbcLoad extends AbstractIT {
 
     Map<String, String> pgConf = Maps.newHashMap();
     String jdbcUrl = postgreSQLContainer.getJdbcUrl();
-    String database = new URI(jdbcUrl.substring(jdbcUrl.lastIndexOf("/") + 1)).getPath();
     pgConf.put(JdbcConfig.JDBC_URL.getKey(), jdbcUrl);
-    pgConf.put(JdbcConfig.JDBC_DATABASE.getKey(), database);
     pgConf.put(JdbcConfig.JDBC_DRIVER.getKey(), postgreSQLContainer.getDriverClassName());
     pgConf.put(JdbcConfig.USERNAME.getKey(), postgreSQLContainer.getUsername());
     pgConf.put(JdbcConfig.PASSWORD.getKey(), postgreSQLContainer.getPassword());

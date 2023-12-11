@@ -73,7 +73,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
     database =
         new JdbcConfig(conf)
             .getJdbcDatabaseOrElseThrow(
-                "The `jdbc-database` configuration item is mandatory in PostgreSQL.");
+                "The `database` name must be configured in the PostgreSQL `jdbc-url`.");
   }
 
   @Override

@@ -31,8 +31,6 @@ import com.datastrato.gravitino.rel.types.Types;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.IOException;
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
@@ -140,16 +138,10 @@ public class CatalogPostgreSqlIT extends AbstractIT {
   private static void createCatalog() {
     Map<String, String> catalogProperties = Maps.newHashMap();
 
-    try {
-      String jdbcUrl = POSTGRESQL_CONTAINER.getJdbcUrl();
-      String database = new URI(jdbcUrl.substring(jdbcUrl.lastIndexOf("/") + 1)).getPath();
-      catalogProperties.put(JdbcConfig.JDBC_URL.getKey(), jdbcUrl);
-      catalogProperties.put(JdbcConfig.JDBC_DATABASE.getKey(), database);
-      catalogProperties.put(JdbcConfig.USERNAME.getKey(), POSTGRESQL_CONTAINER.getUsername());
-      catalogProperties.put(JdbcConfig.PASSWORD.getKey(), POSTGRESQL_CONTAINER.getPassword());
-    } catch (URISyntaxException e) {
-      throw new RuntimeException(e);
-    }
+    String jdbcUrl = POSTGRESQL_CONTAINER.getJdbcUrl();
+    catalogProperties.put(JdbcConfig.JDBC_URL.getKey(), jdbcUrl);
+    catalogProperties.put(JdbcConfig.USERNAME.getKey(), POSTGRESQL_CONTAINER.getUsername());
+    catalogProperties.put(JdbcConfig.PASSWORD.getKey(), POSTGRESQL_CONTAINER.getPassword());
 
     Catalog createdCatalog =
         metalake.createCatalog(

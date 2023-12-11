@@ -317,19 +317,13 @@ public class TestPostgreSqlTableOperations extends TestPostgreSqlAbstractIT {
     properties.put(JdbcConfig.PASSWORD.getKey(), CONTAINER.getPassword());
     DataSource dataSource = DataSourceUtils.createDataSource(properties);
     PostgreSqlSchemaOperations postgreSqlSchemaOperations = new PostgreSqlSchemaOperations();
-    Map<String, String> config =
-        new HashMap<String, String>() {
-          {
-            put(JdbcConfig.JDBC_DATABASE.getKey(), testDbName);
-          }
-        };
-    postgreSqlSchemaOperations.initialize(dataSource, JDBC_EXCEPTION_CONVERTER, config);
+    postgreSqlSchemaOperations.initialize(dataSource, JDBC_EXCEPTION_CONVERTER, properties);
     postgreSqlSchemaOperations.create(TEST_DB_NAME, null, null);
 
     PostgreSqlTableOperations postgreSqlTableOperations = new PostgreSqlTableOperations();
 
     postgreSqlTableOperations.initialize(
-        dataSource, JDBC_EXCEPTION_CONVERTER, new PostgreSqlTypeConverter(), config);
+        dataSource, JDBC_EXCEPTION_CONVERTER, new PostgreSqlTypeConverter(), properties);
 
     String table_1 = "table_multiple_1";
     postgreSqlTableOperations.create(

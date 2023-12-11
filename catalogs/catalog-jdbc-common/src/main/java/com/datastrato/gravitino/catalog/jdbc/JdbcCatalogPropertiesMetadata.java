@@ -21,7 +21,6 @@ public class JdbcCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
   private static final List<String> JDBC_PROPERTIES =
       ImmutableList.of(
           JdbcConfig.JDBC_URL.getKey(),
-          JdbcConfig.JDBC_DATABASE.getKey(),
           JdbcConfig.JDBC_DRIVER.getKey(),
           JdbcConfig.USERNAME.getKey(),
           JdbcConfig.PASSWORD.getKey(),
@@ -35,13 +34,6 @@ public class JdbcCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
                 JdbcConfig.JDBC_URL.getKey(),
                 JdbcConfig.JDBC_URL.getDoc(),
                 true,
-                null,
-                false,
-                false),
-            stringImmutablePropertyEntry(
-                JdbcConfig.JDBC_DATABASE.getKey(),
-                JdbcConfig.JDBC_DATABASE.getDoc(),
-                false,
                 null,
                 false,
                 false),
