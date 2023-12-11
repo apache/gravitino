@@ -166,6 +166,9 @@ public class Bytes implements Comparable<byte[]> {
    */
   public static Bytes increment(Bytes input) throws IndexOutOfBoundsException {
     byte[] inputArr = input.get();
+    if (inputArr.length == 0) {
+      throw new IndexOutOfBoundsException("The length of Key should be greater than 0");
+    }
     byte[] ret = new byte[inputArr.length];
     int carry = 1;
     for (int i = inputArr.length - 1; i >= 0; i--) {

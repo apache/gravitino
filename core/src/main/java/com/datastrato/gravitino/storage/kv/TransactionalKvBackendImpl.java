@@ -184,7 +184,7 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
     byte[] end = scanRange.getEnd();
     boolean endInclude = scanRange.isEndInclusive();
     if (endInclude) {
-      end = Bytes.increment(Bytes.wrap(end)).get();
+      end = endOfKey(end);
       endInclude = false;
     }
 
@@ -283,7 +283,7 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
             new KvRangeScan.KvRangeScanBuilder()
                 .start(key)
                 .startInclusive(false)
-                .end(Bytes.increment(Bytes.wrap(key)).get())
+                .end(endOfKey(key))
                 .endInclusive(false)
                 .predicate(
                     (k, v) -> {
@@ -353,7 +353,13 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
 
   /** Get the end of transaction id, we use this key to scan all commit marks. */
   static byte[] endOfTransactionId() {
-    return Bytes.increment(Bytes.wrap(Bytes.concat(TRANSACTION_PREFIX, SEPARATOR))).get();
+    // Why use 1? Because we use 1 to represent the smallest transaction id. The smaller id will
+    // be larger than the bigger id when converting it to a byte array.
+    return generateCommitKey(1L);
+  }
+
+  static byte[] endOfKey(byte[] key) {
+    return generateKey(key, 1L);
   }
 
   static byte[] getRealKey(byte[] rawKey) {
