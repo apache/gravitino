@@ -9,17 +9,21 @@ import com.datastrato.gravitino.shaded.org.apache.commons.collections4.bidimap.T
 import com.datastrato.gravitino.trino.connector.GravitinoErrorCode;
 import com.datastrato.gravitino.trino.connector.catalog.PropertyConverter;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Sets;
 import io.trino.spi.TrinoException;
-import java.sql.Driver;
-import java.sql.DriverManager;
-import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
 public class IcebergCatalogPropertyConverter extends PropertyConverter {
 
   private static final TreeBidiMap<String, String> TRINO_ICEBERG_TO_GRAVITINO_ICEBERG =
       new TreeBidiMap<>(new ImmutableMap.Builder<String, String>().build());
+
+  private static final Set<String> JDBC_BACKEND_REQUIRED_PROPERTIES =
+      Set.of("jdbc-driver", "uri", "jdbc-user", "jdbc-password");
+
+  private static final Set<String> HIVE_BACKEND_REQUIRED_PROPERTIES = Set.of("uri");
 
   @Override
   public TreeBidiMap<String, String> trinoPropertyKeyToGravitino() {
@@ -40,6 +44,14 @@ public class IcebergCatalogPropertyConverter extends PropertyConverter {
   }
 
   private Map<String, String> buildHiveBackendProperties(Map<String, String> properties) {
+    Set<String> missingProperty =
+        Sets.difference(HIVE_BACKEND_REQUIRED_PROPERTIES, properties.keySet());
+    if (!missingProperty.isEmpty()) {
+      throw new TrinoException(
+          GravitinoErrorCode.GRAVITINO_MISSING_REQUIRED_PROPERTY,
+          "Missing required property for Hive backend: " + missingProperty);
+    }
+
     Map<String, String> hiveProperties = new HashMap<>();
     hiveProperties.put("iceberg.catalog.type", "hive_metastore");
     hiveProperties.put("hive.metastore.uri", properties.get("uri"));
@@ -47,21 +59,17 @@ public class IcebergCatalogPropertyConverter extends PropertyConverter {
   }
 
   private Map<String, String> buildJDBCBackendProperties(Map<String, String> properties) {
-    Map<String, String> jdbcProperties = new HashMap<>();
-    Driver driver;
-    try {
-      driver = DriverManager.getDriver(properties.get("uri"));
-    } catch (SQLException e) {
+    Set<String> missingProperty =
+        Sets.difference(JDBC_BACKEND_REQUIRED_PROPERTIES, properties.keySet());
+    if (!missingProperty.isEmpty()) {
       throw new TrinoException(
-          GravitinoErrorCode.GRAVITINO_ICEBERG_UNSUPPORTED_JDBC_TYPE,
-          "Invalid JDBC URI: " + properties.get("uri"),
-          e);
+          GravitinoErrorCode.GRAVITINO_MISSING_REQUIRED_PROPERTY,
+          "Missing required property for JDBC backend: " + missingProperty);
     }
 
-    String driverClass = driver.getClass().getCanonicalName();
-
+    Map<String, String> jdbcProperties = new HashMap<>();
     jdbcProperties.put("iceberg.catalog.type", "jdbc");
-    jdbcProperties.put("iceberg.jdbc-catalog.driver-class", driverClass);
+    jdbcProperties.put("iceberg.jdbc-catalog.driver-class", properties.get("jdbc-driver"));
     jdbcProperties.put("iceberg.jdbc-catalog.connection-url", properties.get("uri"));
     jdbcProperties.put("iceberg.jdbc-catalog.connection-user", properties.get("jdbc-user"));
     jdbcProperties.put("iceberg.jdbc-catalog.connection-password", properties.get("jdbc-password"));

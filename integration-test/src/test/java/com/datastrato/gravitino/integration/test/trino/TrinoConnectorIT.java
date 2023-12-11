@@ -759,7 +759,7 @@ public class TrinoConnectorIT extends AbstractIT {
             .put("catalog-backend", "jdbc")
             .put("jdbc-user", "root")
             .put("jdbc-password", "ds123")
-            .put("driverClassName", "com.mysql.cj.jdbc.Driver")
+            .put("jdbc-driver", "com.mysql.cj.jdbc.Driver")
             .build());
     Catalog catalog = createdMetalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
     Assertions.assertEquals("root", catalog.properties().get("jdbc-user"));
