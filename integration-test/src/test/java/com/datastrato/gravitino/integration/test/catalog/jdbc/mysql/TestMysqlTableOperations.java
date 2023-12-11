@@ -16,6 +16,7 @@ import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.types.Type;
 import com.datastrato.gravitino.rel.types.Types;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -478,6 +479,48 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
 
     JdbcTable load = TABLE_OPERATIONS.load(TEST_DB_NAME, tableName);
     assertionsTableInfo(tableName, tableComment, columns, Collections.emptyMap(), load);
+  }
+
+  @Test
+  public void testCreateNotSupportTypeTable() {
+    String tableName = GravitinoITUtils.genRandomName("type_table_");
+    String tableComment = "test_comment";
+    List<JdbcColumn> columns = new ArrayList<>();
+    List<Type> notSupportType =
+        Arrays.asList(
+            Types.BooleanType.get(),
+            Types.FixedType.of(10),
+            Types.IntervalDayType.get(),
+            Types.IntervalYearType.get(),
+            Types.TimestampType.withTimeZone(),
+            Types.UUIDType.get(),
+            Types.ListType.of(Types.DateType.get(), true),
+            Types.MapType.of(Types.StringType.get(), Types.IntegerType.get(), true),
+            Types.UnionType.of(Types.IntegerType.get()),
+            Types.StructType.of(
+                Types.StructType.Field.notNullField("col_1", Types.IntegerType.get())));
+
+    for (Type type : notSupportType) {
+      columns.clear();
+      columns.add(
+          new JdbcColumn.Builder().withName("col_1").withType(type).withNullable(false).build());
+
+      IllegalArgumentException illegalArgumentException =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  TABLE_OPERATIONS.create(
+                      TEST_DB_NAME,
+                      tableName,
+                      columns.toArray(new JdbcColumn[0]),
+                      tableComment,
+                      Collections.emptyMap(),
+                      null));
+      Assertions.assertTrue(
+          illegalArgumentException
+              .getMessage()
+              .contains("Not a supported type: " + type.toString()));
+    }
   }
 
   @Test
