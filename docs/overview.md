@@ -34,7 +34,7 @@ Gravitino aims to provide several key features:
 ### Unified metadata management and governance
 
 Gravitino abstracts the unified metadata models and APIs for different kinds of metadata sources.
-For example, relational metadata models for tabular data, like Hive, MySQL, PostgresSQL, etc.
+For example, relational metadata models for tabular data, like Hive, MySQL, PostgreSQL, etc.
 File metadata model for all the unstructured data, like HDFS, S3, and others.
 
 Besides the unified metadata models, Gravitino also provides a unified metadata governance layer
@@ -44,8 +44,8 @@ others.
 ### Direct metadata management
 
 Unlike the traditional metadata management systems, which need to collect the metadata
-actively or passively from underlying systems, Gravitino manages these systems directly
-the metadata directly. It provides a set of connectors to connect to different metadata sources,
+actively or passively from underlying systems, Gravitino manages these systems directly.
+It provides a set of connectors to connect to different metadata sources,
 the changes in Gravitino will directly reflect in the underlying systems, and vice versa.
 
 ### Geo-distribution support (WIP)
