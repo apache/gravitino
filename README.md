@@ -80,7 +80,7 @@ Gravitino provides a Trino connector to access the metadata in Gravitino. To use
 ## Development guide
 
 1. [How to build Gravitino](docs/how-to-build.md)
-2. [How to Run Integration Test](docs/integration-test.md)
+2. [How to test Gravitino](docs/how-to-test.md)
 3. [How to publish Docker images](docs/publish-docker-images.md)
 
 ## License

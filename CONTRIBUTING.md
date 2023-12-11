@@ -88,7 +88,7 @@ To stop and start a local Gravitino server via ``bin/gravitino.sh start`` and ``
 
 The CI infrastructure runs unit and integration tests on each pull request, please make sure these tests pass before making a pull request.
 
-The unit tests run on every build and integration tests run as needed. See [integration tests](docs/integration-test.md) for more information.
+The unit tests run on every build and integration tests run as needed. See [how to test](docs/how-to-test) for more information.
 
 When adding new code or fixing a bug be sure to add unit tests to provide coverage.
 
