@@ -351,7 +351,10 @@ public class Types {
     }
   }
 
-  /** The string type in Gravitino. */
+  /**
+   * The string type in Gravitino, equivalent to varchar(MAX), which the MAX is determined by the
+   * underlying catalog.
+   */
   public static class StringType extends Type.PrimitiveType {
     private static final StringType INSTANCE = new StringType();
 
@@ -395,7 +398,10 @@ public class Types {
     }
   }
 
-  /** The fixed string type in Gravitino. */
+  /**
+   * Fixed-length byte array type, if you want to use variable-length byte array, use {@link
+   * BinaryType} instead.
+   */
   public static class FixedType extends Type.PrimitiveType {
 
     /**
@@ -542,10 +548,7 @@ public class Types {
     }
   }
 
-  /**
-   * The binary type in Gravitino. Note, this type is not supported in the current version of
-   * Gravitino.
-   */
+  /** The binary type in Gravitino. */
   public static class BinaryType extends Type.PrimitiveType {
     private static final BinaryType INSTANCE = new BinaryType();
 

@@ -1,6 +1,6 @@
 ---
-title: "How to Sign and Verify a Gravitino Releases"
-date: 2023-11-01T014:00:00+11:00
+title: How to sign and verify a Gravitino releases
+slug: /how-to-sign-release
 license: "Copyright 2023 Datastrato Pvt Ltd.
 This software is licensed under the Apache License version 2."
 ---
@@ -16,7 +16,7 @@ Before signing or verifying a Gravitino release, ensure you have the following p
 
 ## Platform support
 
- These instructions are for OSX, you may need to make adjustments for other platforms.
+ These instructions are for macOS, you may need to make adjustments for other platforms.
 
 1. **How to Install GPG or GnuPG:**
 
@@ -109,7 +109,9 @@ Before signing or verifying a Gravitino release, ensure you have the following p
     sub   cv25519 2023-11-15 [E] [expires: 2028-11-13]
     ```
 
-    **IMPORTANT!!!** Ensure to keep your private key secure and saved somewhere other than just your computer. Don't forget your key password, and also securely record it somewhere. If you lose your keys or forget your password you won't be able to sign releases.
+:::caution important
+Ensure to keep your private key secure and saved somewhere other than just your computer. Don't forget your key password, and also securely record it somewhere. If you lose your keys or forget your password you won't be able to sign releases.
+:::
 
 2. **Sign a release:**
 
@@ -119,7 +121,7 @@ Before signing or verifying a Gravitino release, ensure you have the following p
     gpg --detach-sign --armor <filename>.[zip|tar.gz]
     ```
 
-    For example to sign the Gravitino 2.0 release you would use this command.
+    For example to sign the Gravitino 0.2.0 release you would use this command.
 
     ```shell
     gpg --detach-sign --armor gravitino.0.2.0.zip
@@ -135,7 +137,7 @@ Before signing or verifying a Gravitino release, ensure you have the following p
     shasum -a 256 <filename>.[zip|tar.gz] > <filename>.[zip|tar.gz].sha256
     ```
 
-    For example, to generate a hash for the Gravitino 2.0 release you would use this command:
+    For example, to generate a hash for the Gravitino 0.2.0 release you would use this command:
 
     ```shell
     shasum -a 256 gravitino.0.2.0.zip > gravitino.0.2.0.zip.sha256
@@ -174,7 +176,7 @@ Before signing or verifying a Gravitino release, ensure you have the following p
 
     The output should contain the text "Good signature from ...".
 
-    For example to verify the Gravitino 2.0 zip file you would use this command:
+    For example to verify the Gravitino 0.2.0 zip file you would use this command:
 
     ```shell
      gpg --verify gravitino.0.2.0.zip.asc
