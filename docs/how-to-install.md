@@ -140,6 +140,6 @@ The published Gravitino Docker image only contains Gravitino server with basic c
 you want to experience the whole Gravitino system with other components, you can use the Docker
 compose file.
 
-For the details, you can check the
-[Gravitino playground repo](https://github.com/datastrato/gravitino-playground) and
+For the details, you can review the
+[Gravitino playground repository](https://github.com/datastrato/gravitino-playground) and
 [playground example](./how-to-use-the-playground).
