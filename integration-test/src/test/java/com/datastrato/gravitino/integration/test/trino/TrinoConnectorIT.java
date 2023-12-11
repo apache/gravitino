@@ -479,7 +479,7 @@ public class TrinoConnectorIT extends AbstractIT {
 
   private ColumnDTO[] createMySQLFullTypeColumns() {
     ColumnDTO[] columnDTO = createFullTypeColumns();
-    Set<String> unsupportedType = Sets.newHashSet("FixedType", "StringType", "TimestampType");
+    Set<String> unsupportedType = Sets.newHashSet("FixedType", "StringType", "TimestampType", "BooleanType");
     // MySQL doesn't support timestamp time zone
     return Arrays.stream(columnDTO)
         .filter(c -> !unsupportedType.contains(c.name()))
