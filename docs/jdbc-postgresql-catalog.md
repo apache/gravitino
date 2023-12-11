@@ -1,5 +1,5 @@
 ---
-title: "How to use Gravitino to manage JDBC PostgreSQL catalog"
+title: "JDBC PostgreSQL catalog"
 slug: /jdbc-postgresql-catalog
 keywords:
 - jdbc
