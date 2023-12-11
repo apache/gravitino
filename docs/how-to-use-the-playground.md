@@ -18,7 +18,7 @@ Once the playground environment has started, you can open http://localhost:8090 
 
 You should install git and docker-compose.
 
-## Startup playground
+## Start playground
 
 ```shell
 git clone git@github.com:datastrato/gravitino-playground.git
