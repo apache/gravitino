@@ -71,15 +71,11 @@ SELECT * FROM "metalake_demo.catalog_demo".db1.table_001;
 ### Cross-catalog queries
 
 In companies, there may be different departments using different data stacks.
-
-In this sample, HR department uses Apache Hive to store its data.
-
+In this example, HR department uses Apache Hive to store its data.
 Sales department uses PostgreSQL to store its data.
 
-This sample have generated some data for two departments.
-
+This example has generated some data for two departments.
 You can query some interesting results with Gravitino.
-
 If you want to know which employee has the largest sales amount.
 
 You can run the SQL.
