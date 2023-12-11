@@ -2,11 +2,18 @@
 title: "Gravtino connnector - MySQL catalog"
 slug: /trino-connector/catalogs/mysql
 keyword: gravition connector trino
-license: "Copyright 2023 Datastrato Pvt Ltd. This software is licensed under the Apache License version 2."
+license: "Copyright 2023 Datastrato Pvt Ltd.
+This software is licensed under the Apache License version 2."
 ---
 
 The MySQL catalog allows querying and creating tables in an external MySQL instance. 
 This can be used to join data between different systems like MySQL and Hive, or between two different MySQL instances.
+
+## Requirements
+
+To connect to MySQL, you need:
+- MySQL 5.7, 8.0 or higher.
+- Network access from the Trino coordinator and workers to MySQL. Port 3306 is the default port.
 
 ## Create table
 
@@ -30,8 +37,16 @@ MySQL's tables and schemas cannot support properties.
 
 First, you need to create a metalake and catalog in Gravitino.
 For example, create a new metalake named `test` and create a new catalog named `mysql_test` using the `mysql` provider.
+For More information about the MySQL catalog, please refer to [MySql catalog](../docs/jdbc-mysql-catalog).
 
 ```bash
+curl -X POST -H "Content-Type: application/json" \
+-d '{
+  "name": "test",
+  "comment": "comment",
+  "properties": {}
+}' http://gravition-host:8090/api/metalakes
+
 curl -X POST -H "Content-Type: application/json" \
 -d '{
   "name": "mysql_test",

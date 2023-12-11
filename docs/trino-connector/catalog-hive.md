@@ -2,10 +2,31 @@
 title: "Gravtino connnector - Hive catalog"
 slug: /trino-connector/catalogs/hive
 keyword: gravition connector trino
-license: "Copyright 2023 Datastrato Pvt Ltd. This software is licensed under the Apache License version 2."
+license: "Copyright 2023 Datastrato Pvt Ltd.
+This software is licensed under the Apache License version 2."
 ---
 
 The Hive catalog allows Trino querying data stored in an Apache Hive data warehouse. 
+
+## Requirements
+
+- The Hive connector requires a Hive metastore service (HMS), or a compatible implementation of the Hive metastore, such as AWS Glue.
+Apache Hadoop HDFS 2.x and 3.x are supported.
+- Many distributed storage systems including HDFS, Amazon S3 or S3-compatible systems, 
+  Google Cloud Storage, Azure Storage, and IBM Cloud Object Storage can be queried with the Hive connector.
+- The coordinator and all workers must have network access to the Hive metastore and the storage system. 
+  Hive metastore access with the Thrift protocol defaults to using port 9083.
+- Data files must be in a supported file format. Some file formats can be configured using file format configuration properties 
+  per catalog:
+  - ORC
+  - Parquet
+  - Avro
+  - RCText (RCFile using ColumnarSerDe)
+  - RCBinary (RCFile using LazyBinaryColumnarSerDe)
+  - SequenceFile
+  - JSON (using org.apache.hive.hcatalog.data.JsonSerDe)
+  - CSV (using org.apache.hadoop.hive.serde2.OpenCSVSerde)
+  - TextFile
 
 ## Create table
 
@@ -44,31 +65,39 @@ CREATE TABLE "metalake.catalog".dbname.tabname
 );
 ```
 
-| Property     | Description                               | Default                                                    |
-| ------------ |-------------------------------------------| ---------------------------------------------------------- |
-| format       | Hive storage format for the table         | TEXTFILE                                                   |
-| total_size   | total size of the table                   | null                                                       |
-| num_files    | number of files                           | 0                                                          |
-| external     | Indicate whether it's an external table   | null                                                       |
-| location     | HDFS location for table storage           | null                                                       |
-| table_type   | The type of Hive table                    | null                                                       |
-| input_format | The input format class for the table      | org.apache.hadoop.mapred.TextInputFormat                   |
-| output_format| The output format class for the table     | org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat |
-| serde_lib    | The serde library class for the table     | org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe         |
-| serde_name   | Name of the serde, table name by default  | null                                                       |
+| Property      | Description                              | Default                                                    | Required | Since Version |
+|---------------|------------------------------------------|------------------------------------------------------------|----------|---------------|
+| format        | Hive storage format for the table        | TEXTFILE                                                   | No       | 0.2.0         |
+| total_size    | total size of the table                  | (none)                                                     | No       | 0.2.0         |
+| num_files     | number of files                          | 0                                                          | No       | 0.2.0         |
+| external      | Indicate whether it's an external table  | (none)                                                     | No       | 0.2.0         |
+| location      | HDFS location for table storage          | (none)                                                     | No       | 0.2.0         |
+| table_type    | The type of Hive table                   | (none)                                                     | No       | 0.2.0         |
+| input_format  | The input format class for the table     | org.apache.hadoop.mapred.TextInputFormat                   | No       | 0.2.0         |
+| output_format | The output format class for the table    | org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat | No       | 0.2.0         |
+| serde_lib     | The serde library class for the table    | org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe         | No       | 0.2.0         |
+| serde_name    | Name of the serde, table name by default | (none)                                                     | No       | 0.2.0         |
 
 ## Schema properties
 
-| Property | Description                        | Default |
-| -------- | ---------------------------------- | ------- |
-| location | HDFS location for table storage    | null    |
+| Property | Description                     | Default | Required | Since Version |
+|----------|---------------------------------|---------|----------|---------------|
+| location | HDFS location for table storage | (none)  | No       | 0.2.0         |
 
 ## Basic usage examples
 
 First, you need to create a metalake and catalog in Gravitino.
 For example, create a new metalake named `test` and create a new catalog named `hive_test` using the `hive` provider.
+For More information about the Hive catalog, please refer to [Hive catalog](../apache-hive-catalog).
 
 ```bash
+curl -X POST -H "Content-Type: application/json" \
+-d '{
+  "name": "test",
+  "comment": "comment",
+  "properties": {}
+}' http://gravition-host:8090/api/metalakes
+
 curl -X POST \
 -H "Content-Type: application/json" \
 -d '{

@@ -2,14 +2,15 @@
 title: "Gravitino connector installation"
 slug: /trino-connector/install
 keyword: gravition connector trino
-license: "Copyright 2023 Datastrato Pvt Ltd. This software is licensed under the Apache License version 2."
+license: "Copyright 2023 Datastrato Pvt Ltd.
+This software is licensed under the Apache License version 2."
 ---
 
 To install the Gravitino connector, first deploy the Trino environment, and then install the Gravitino connector plugin into Trino.
 Please refer to the [Deploying Trino documentation](https://trino.io/docs/current/installation/deployment.html).
 
 1. Download the Gravitino connector tarball and unpack it.
-   The tarball contains a single top-level directory `gravitino-trino-connector-xxx`,
+   The tarball contains a single top-level directory `gravitino-trino-connector-`,
    which call the connector directory.
    [Download the gravitino-connector](https://github.com/datastrato/gravitino/releases).
 2. Copy the connector directory to the Trino's plugin directory.
@@ -18,7 +19,7 @@ Please refer to the [Deploying Trino documentation](https://trino.io/docs/curren
 
 Alternatively,
 you can build the Gravitino connector package from the sources
-and obtain the `gravitino-trino-connector-xxx.tar.gz` file in the `$PROJECT/distribution` directory.
+and obtain the `gravitino-trino-connector-.tar.gz` file in the `$PROJECT/distribution` directory.
 Please refer to the [Gravitino Development documentation](how-to-build)
 
 ## Example

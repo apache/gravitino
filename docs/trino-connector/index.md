@@ -1,7 +1,8 @@
 ---
 title: "Gravitino connector index"
 keyword: gravition connector trino
-license: "Copyright 2023 Datastrato Pvt Ltd. This software is licensed under the Apache License version 2."
+license: "Copyright 2023 Datastrato Pvt Ltd.
+This software is licensed under the Apache License version 2."
 ---
 
 Gravitino connector index:

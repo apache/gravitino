@@ -2,12 +2,22 @@
 title: "Gravtino connnector - Iceberg catalog"
 slug: /trino-connector/catalogs/iceberg
 keyword: gravition connector trino
-license: "Copyright 2023 Datastrato Pvt Ltd. This software is licensed under the Apache License version 2."
+license: "Copyright 2023 Datastrato Pvt Ltd.
+This software is licensed under the Apache License version 2."
 ---
 
 Apache Iceberg is an open table format for huge analytic datasets. 
 The Iceberg catalog allows Trino querying data stored in files written in Iceberg format, 
 as defined in the Iceberg Table Spec. The catalog supports Apache Iceberg table spec versions 1 and 2.
+
+## Requirements
+
+To use Iceberg, you need:
+- Network access from the Trino coordinator and workers to the distributed object storage.
+- Access to a Hive metastore service (HMS), an AWS Glue catalog, a JDBC catalog, a REST catalog, or a Nessie server.
+- Data files stored in a supported file format. These can be configured using file format configuration properties per catalog:
+- - ORC
+- - Parquet (default)
 
 ## Create table
 
@@ -32,8 +42,16 @@ Iceberg's tables and schemas cannot support properties.
 
 First, you need to create a metalake and catalog in Gravitino.
 For example, create a new metalake named `test` and create a new catalog named `iceberg_test` using the `iceberge` provider.
+For More information about the Iceberg catalog, please refer to [Iceberg catalog](../lakehouse-iceberg-catalog).
 
 ```bash
+curl -X POST -H "Content-Type: application/json" \
+-d '{
+  "name": "test",
+  "comment": "comment",
+  "properties": {}
+}' http://gravition-host:8090/api/metalakes
+
 curl -X POST -H "Content-Type: application/json" \
 -d '{
   "name": "iceberg_test",

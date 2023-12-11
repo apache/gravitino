@@ -2,11 +2,18 @@
 title: "Gravtino connnector - PostgreSQL catalog"
 slug: /trino-connector/catalogs/postgresql
 keyword: gravition connector trino
-license: "Copyright 2023 Datastrato Pvt Ltd. This software is licensed under the Apache License version 2."
+license: "Copyright 2023 Datastrato Pvt Ltd.
+This software is licensed under the Apache License version 2."
 ---
 
 The PostgreSQL catalog allows querying and creating tables in an external PostgreSQL database. 
 This can be used to join data between different systems like PostgreSQL and Hive, or between different PostgreSQL instances.
+
+## Requirements
+
+To connect to PostgreSQL, you need:
+- PostgreSQL 11.x or higher.
+- Network access from the Trino coordinator and workers to PostgreSQL. Port 5432 is the default port.
 
 ## Create table
 
@@ -33,8 +40,16 @@ PostgreSQL's tables and schemas cannot support properties.
 
 First, you need to create a metalake and catalog in Gravitino.
 For example, create a new metalake named `test` and create a new catalog named `postgresql_test` using the `postgresql` provider.
+For More information about the PostgreSQL catalog, please refer to [PostgreSQL catalog](../docs/jdbc-postgressql-catalog).
 
 ```bash
+curl -X POST -H "Content-Type: application/json" \
+-d '{
+  "name": "test",
+  "comment": "comment",
+  "properties": {}
+}' http://gravition-host:8090/api/metalakes
+
 curl -X POST -H "Content-Type: application/json" \
 -d '{
   "name": "jdbc-postgresql",
