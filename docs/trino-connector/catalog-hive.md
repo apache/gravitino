@@ -54,7 +54,7 @@ It's not implements certain query optimizations, such as pushdown and pruning fu
 ## Table properties
 
 In the Hive catalog, additional properties can be set for tables and schemas
-using the "WITH" keyword in the "CREATE TABLE/SCHEMA" statement.
+using the "WITH" keyword in the "CREATE TABLE" statement.
 
 ```sql
 CREATE TABLE "metalake.catalog".dbname.tabname
@@ -69,8 +69,8 @@ CREATE TABLE "metalake.catalog".dbname.tabname
 | Property      | Description                              | Default                                                    | Required | Since Version |
 |---------------|------------------------------------------|------------------------------------------------------------|----------|---------------|
 | format        | Hive storage format for the table        | TEXTFILE                                                   | No       | 0.2.0         |
-| total_size    | total size of the table                  | (none)                                                     | No       | 0.2.0         |
-| num_files     | number of files                          | 0                                                          | No       | 0.2.0         |
+| total_size    | Total size of the table                  | (none)                                                     | No       | 0.2.0         |
+| num_files     | Number of files                          | 0                                                          | No       | 0.2.0         |
 | external      | Indicate whether it's an external table  | (none)                                                     | No       | 0.2.0         |
 | location      | HDFS location for table storage          | (none)                                                     | No       | 0.2.0         |
 | table_type    | The type of Hive table                   | (none)                                                     | No       | 0.2.0         |
