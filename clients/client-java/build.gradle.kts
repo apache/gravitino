@@ -41,3 +41,15 @@ dependencies {
 tasks.build {
   dependsOn("javadoc")
 }
+
+tasks.javadoc {
+  dependsOn(":api:javadoc", ":common:javadoc")
+  source =
+          sourceSets["main"].allJava +
+                  project(":api").sourceSets["main"].allJava +
+                  project(":common").sourceSets["main"].allJava
+
+  classpath = configurations["compileClasspath"] +
+          project(":api").configurations["runtimeClasspath"] +
+          project(":common").configurations["runtimeClasspath"]
+}
