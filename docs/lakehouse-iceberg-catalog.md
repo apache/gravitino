@@ -22,7 +22,10 @@ Gravitino provides the ability to manage Apache Iceberg metadata.
   doesn't support proxying to other HDFS users. See [How to access Apache Hadoop](gravitino-server-config) for more details.
 
 :::info
-Builts with Apache Iceberg `1.3.1`. The Apache Iceberg table format version is `1` by default.
+Builds with Apache Iceberg `1.3.1`. The Apache Iceberg table format version is `1` by default.
+:::
+:::notice
+Builds with hadoop 2.10.x, there may compatibility issue when accessing hadoop 3.x clusters.
 :::
 
 ## Catalog info
@@ -173,7 +176,6 @@ Iceberg supports update primitive type.
 If you update a nullability column to non nullability, there may be compatibility issue.
 :::
 - `UpdateColumnComment`
-
 
 ## HDFS configuration
 
