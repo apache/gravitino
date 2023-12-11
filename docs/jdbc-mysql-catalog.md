@@ -1,5 +1,5 @@
 ---
-title: "How to use Gravitino to manage MySQL metadata"
+title: "How to use Gravitino to manage JDBC MySQL metadata"
 slug: /jdbc-mysql-catalog
 keywords:
 - jdbc
@@ -14,6 +14,7 @@ Gravitino provides the ability to manage MySQL metadata.
 
 ## Catalog
 ### Catalog capabilities
+- Supports metadata management of MySQL(5.6, 5.7, 8.0).
 - Supports DDL operation for MySQL databases and tables.
 - Doesn't support table index operations.
 - Doesn't support setting certain column properties, such as default value and check constraints.
@@ -24,22 +25,21 @@ You can check the relevant datasource configuration in [datasource properties](h
 
 If you are using JDBC catalog, you must provide `jdbc-url`, `jdbc-driver`, `jdbc-user` and `jdbc-password` to catalog properties.
 
-| Configuration item      | Description                                                      | Example value                 | Since Version |
-|-------------------------|------------------------------------------------------------------|-------------------------------|---------------|
-| `jdbc-url`              | JDBC URL for connecting to the database.                         | `jdbc:mysql://localhost:3306` | 0.3.0         |
-| `jdbc-driver`           | `com.mysql.jdbc.Driver` or `com.mysql.cj.jdbc.Driver` for MySQL. | `com.mysql.jdbc.Driver`       | 0.3.0         |
-| `jdbc-user`             | The JDBC user name.                                              | `root`                        | 0.3.0         |
-| `jdbc-password`         | The JDBC password.                                               | `root`                        | 0.3.0         |
-| `jdbc.pool.min-size`    | The minimum number of connections in the pool. `2` by default.   | `2`                           | 0.3.0         |
-| `jdbc.pool.max-size`    | The maximum number of connections in the pool. `10` by default.  | `10`                          | 0.3.0         |
+| Configuration item      | Description                                                                                                | Default value | Required | Since Version |
+|-------------------------|------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
+| `jdbc-url`              | JDBC URL for connecting to the database. For example `jdbc:mysql://localhost:3306`                         | (none)        | Yes      | 0.3.0         |
+| `jdbc-driver`           | The driver of the jdbc connection. For example `com.mysql.jdbc.Driver` or `com.mysql.cj.jdbc.Driver`.      | (none)        | Yes      | 0.3.0         |
+| `jdbc-user`             | The JDBC user name.                                                                                        | (none)        | Yes      | 0.3.0         |
+| `jdbc-password`         | The JDBC password.                                                                                         | (none)        | Yes      | 0.3.0         |
+| `jdbc.pool.min-size`    | The minimum number of connections in the pool. `2` by default.                                             | `2`           | No       | 0.3.0         |
+| `jdbc.pool.max-size`    | The maximum number of connections in the pool. `10` by default.                                            | `10`          | No       | 0.3.0         |
 
-### Catalog operations
-see [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino#catalogs-operations).
-
-### Catalog other
 :::caution
 You must download the corresponding JDBC driver to the `catalogs/jdbc-mysql/libs` directory.
 :::
+
+### Catalog operations
+see [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino#catalogs-operations).
 
 ## Schema
 ### Schema capabilities

@@ -1,5 +1,5 @@
 ---
-title: "How to use Gravitino to manage PostgreSQL metadata"
+title: "How to use Gravitino to manage JDBC PostgreSQL metadata"
 slug: /jdbc-postgresql-catalog
 keywords:
 - jdbc
@@ -14,6 +14,7 @@ Gravitino provides the ability to manage PostgreSQL metadata.
 
 ## Catalog
 ### Catalog capabilities
+- Supports metadata management of PostgreSQL(9.2, 12.0, 13.0).
 - Supports DDL operation for PostgreSQL schemas and tables.
 - Doesn't support table index operations.
 - Doesn't support setting certain column properties, such as default value and check constraints
@@ -24,15 +25,15 @@ You can check the relevant data source configuration in [data source properties]
 
 If you are using JDBC catalog, you must provide `jdbc-url`, `jdbc-driver`, `jdbc-database`, `jdbc-user` and `jdbc-password` to catalog properties.
 
-| Configuration item   | Description                                                                                               | Example value                                                  | Since Version |
-|----------------------|-----------------------------------------------------------------------------------------------------------|----------------------------------------------------------------|---------------|
-| `jdbc-url`           | JDBC URL for connecting to the database. You need to specify the database in the URL.                     | `jdbc:postgresql://localhost:3306/pg_database?sslmode=require` | 0.3.0         |
-| `jdbc-driver`        | `org.postgresql.Driver` for PostgreSQL.                                                                   | `org.postgresql.Driver`                                        | 0.3.0         |
-| `jdbc-database`      | The database of the JDBC connection. Needs to be configured with the same value as database in `jdbc-url` | `pg_database`                                                  | 0.3.0         |
-| `jdbc-user`          | The JDBC user name.                                                                                       | `root`                                                         | 0.3.0         |
-| `jdbc-password`      | The JDBC password.                                                                                        | `root`                                                         | 0.3.0         |
-| `jdbc.pool.min-size` | The minimum number of connections in the pool. `2` by default.                                            | `2`                                                            | 0.3.0         |
-| `jdbc.pool.max-size` | The maximum number of connections in the pool. `10` by default.                                           | `10`                                                           | 0.3.0         |
+| Configuration item   | Description                                                                                                                                                       | Default value | Required | Since Version |
+|----------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
+| `jdbc-url`           | JDBC URL for connecting to the database. You need to specify the database in the URL. For example `jdbc:postgresql://localhost:3306/pg_database?sslmode=require`. | (none)        | Yes      | 0.3.0         |
+| `jdbc-driver`        | The driver of the jdbc connection. For example `org.postgresql.Driver`.                                                                                           | (none)        | Yes      | 0.3.0         |
+| `jdbc-database`      | The database of the JDBC connection. Needs to be configured with the same value as database in `jdbc-url`. For example `pg_database`.                             | (none)        | Yes      | 0.3.0         |
+| `jdbc-user`          | The JDBC user name.                                                                                                                                               | (none)        | Yes      | 0.3.0         |
+| `jdbc-password`      | The JDBC password.                                                                                                                                                | (none)        | Yes      | 0.3.0         |
+| `jdbc.pool.min-size` | The minimum number of connections in the pool. `2` by default.                                                                                                    | `2`           | No       | 0.3.0         |
+| `jdbc.pool.max-size` | The maximum number of connections in the pool. `10` by default.                                                                                                   | `10`          | No       | 0.3.0         |
 
 :::caution
 You must download the corresponding JDBC driver to the `catalogs/jdbc-postgresql/libs` directory.
