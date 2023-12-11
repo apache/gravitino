@@ -21,6 +21,10 @@ Gravitino aims to provide several key features:
 * Security in one place, centralizing the security for different sources.
 * Built-in data management and data access management.
 
+## Contributing to Gravitino
+
+Gravitino is open source software available under the Apache 2.0 license. For information of how to contribute to Gravitino please see the ![Contribution guidelines](CONTRIBUTING.md).
+
 ## Online documentation
 
 You can find the latest Gravitino documentation here in the [doc folder](docs), The README file only contains basic setup instructions.
@@ -73,10 +77,10 @@ To stop the Gravitino server, please run:
 
 Gravitino provides a Trino connector to access the metadata in Gravitino. To use Trino with Gravitino, please follow the [trino-gravitino-connector doc](docs/trino-gravitino-connector.md).
 
-## Development Guide
+## Development guide
 
 1. [How to build Gravitino](docs/how-to-build.md)
-2. [How to Run Integration Test](docs/integration-test.md)
+2. [How to test Gravitino](docs/how-to-test.md)
 3. [How to publish Docker images](docs/publish-docker-images.md)
 
 ## License
