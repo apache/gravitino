@@ -48,7 +48,6 @@ public class GravitinoClient implements SupportsMetalakes, Closeable {
    * Constructs a new GravitinoClient with the given URI, authenticator and AuthDataProvider.
    *
    * @param uri The base URI for the Gravitino API.
-   * @param authenticator The type of authenticator.
    * @param authDataProvider The provider of the data which is used for authentication.
    */
   private GravitinoClient(String uri, AuthDataProvider authDataProvider) {
@@ -233,7 +232,7 @@ public class GravitinoClient implements SupportsMetalakes, Closeable {
     private AuthDataProvider authDataProvider;
 
     /**
-     * Private constructor for the Builder class.
+     * The private constructor for the Builder class.
      *
      * @param uri The base URI for the Gravitino API.
      */
@@ -242,7 +241,7 @@ public class GravitinoClient implements SupportsMetalakes, Closeable {
     }
 
     /**
-     * Sets the simple mode authentication for the Graivitno
+     * Sets the simple mode authentication for Gravitino
      *
      * @return This Builder instance for method chaining.
      */
