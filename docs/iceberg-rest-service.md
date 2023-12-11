@@ -1,6 +1,8 @@
 ---
-title: "How to set up Gravitino and Apache Iceberg REST server"
-date: 2023-10-18T09:03:20-08:00
+title: "Gravitino Iceberg REST catalog service"
+slug: /iceberg-rest-service
+keywords:
+  - Iceberg REST catalog
 license: "Copyright 2023 Datastrato Pvt Ltd.
 This software is licensed under the Apache License version 2."
 ---
@@ -11,96 +13,120 @@ The Gravitino Iceberg REST Server follows the [Apache Iceberg REST API specifica
 
 ### Capabilities
 
-* Supports the Apache Iceberg REST API defined in Iceberg 1.3.1, and supports the namespace and table interfaces. `Token`, `ReportMetrics`, and `Config` interfaces aren't supported yet.
-* Works as a catalog proxy, supporting HiveCatalog and JDBCCatalog.
-* Built with Iceberg `1.3.1`. The Iceberg table format version is `1` by default.
-* When writing to HDFS, the Gravitino Iceberg REST server can only operate as the specified HDFS user and
-  it doesn't support proxying to other HDFS users. See *How to access Apache Hadoop* in the *How to customize Gravitino server configurations* document for more details.
+- Supports the Apache Iceberg REST API defined in Iceberg 1.3.1, supports all namespace and table interfaces. `Token`, `ReportMetrics`, and `Config` interfaces aren't supported yet.
+- Works as a catalog proxy, supporting `HiveCatalog` and `JDBCCatalog`.
+- When writing to HDFS, the Gravitino Iceberg REST catalog service can only operate as the specified HDFS user and
+  doesn't support proxying to other HDFS users. See [How to access Apache Hadoop](gravitino-server-config) for more details.
 
-## How to start the Gravitino and Apache Iceberg REST server
+:::info
+Builds with Apache Iceberg `1.3.1`. The Apache Iceberg table format version is `1` by default.
+:::
 
-Deploy the Gravitino server to the `GRAVITINO_HOME` directory. You can find the configuration options in [`$GRAVITINO_HOME/conf/gravitino.conf`](gravitino-server-config.md).
+:::info
+Builds with hadoop 2.10.x, there may compatibility issue when accessing hadoop 3.x clusters.
+:::
 
-### Basic Gravitino and Apache Iceberg server configuration
+## How to start the Gravitino Iceberg REST catalog service
 
-| Configuration item                | Description                                                                                                                                                                                                          | Default value                                                                | Since Version |
-|-----------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------|---------------|
-| `gravitino.auxService.names ` | The auxiliary service name of the Gravitino Iceberg REST server, use **`iceberg-rest`** for the Gravitino Iceberg REST server.                                                                                      | null                                                                         | 0.2.0         |
-| `gravitino.auxService.iceberg-rest.classpath ` | The classpath of the Gravitino Iceberg REST server, includes the directory containing jars and configuration. It supports both absolute paths and relative paths, for example, `catalogs/lakehouse-iceberg/libs, catalogs/lakehouse-iceberg/conf` | null                                                                         | 0.2.0         |
-| `gravitino.auxService.iceberg-rest.host` | The host of the Gravitino Iceberg REST server.                                                                                                                                                                            | `0.0.0.0`                                                                    | 0.2.0         |
-| `gravitino.auxService.iceberg-rest.httpPort` | The port of the Gravitino Iceberg REST server. **If this port is already in use, set a different port, such as `9001`.**                                                          | `8090`                                                                       | 0.2.0         |
-| `gravitino.auxService.iceberg-rest.minThreads` | The minimum number of threads in the thread pool used by the Jetty web server. `minThreads` is 8 if the value is less than 8.                                                                       | `Math.max(Math.min(Runtime.getRuntime().availableProcessors() * 2, 100), 8)` | 0.2.0 |
-| `gravitino.auxService.iceberg-rest.maxThreads` | The maximum number of threads in the thread pool used by the Jetty web server. `maxThreads` is 8 if the value is less than 8, and `maxThreads` must be greater than or equal to `minThreads`.               | `Math.max(Runtime.getRuntime().availableProcessors() * 4, 400)`              | 0.2.0         |
-| `gravitino.auxService.iceberg-rest.threadPoolWorkQueueSize` | The size of the queue in the thread pool used by Gravitino Iceberg REST server.                                                                                                                                     | `100`                                                                        | 0.2.0         |
-| `gravitino.auxService.iceberg-rest.stopTimeout` | The amount of time in ms for the Gravitino Iceberg REST server to stop gracefully. For more information see `org.eclipse.jetty.server.Server#setStopTimeout`.                                                                            | `30000`                                                                      | 0.2.0         |
-| `gravitino.auxService.iceberg-rest.idleTimeout` | The timeout in ms of idle connections.                                                                                                                                                                           | `30000`                                                                      | 0.2.0         |
-| `gravitino.auxService.iceberg-rest.requestHeaderSize` | The maximum size of an HTTP request.                                                                                                                                                                                            | `131072`                                                                     | 0.2.0         |
-| `gravitino.auxService.iceberg-rest.responseHeaderSize` | The maximum size of an HTTP response.                                                                                                                                                                                           | `131072`                                                                     | 0.2.0         |
+Deploy the Gravitino server to the `GRAVITINO_HOME` directory. You can find the configuration options in [`$GRAVITINO_HOME/conf/gravitino.conf`](gravitino-server-config).
 
-### Apache Iceberg catalog configuration
+### Gravitino Iceberg REST catalog service configuration
 
-Not recommended for production environments the Gravitino Iceberg REST server defaults to using a memory catalog. You can instead specify an Apache Hive or JDBC catalog.
+| Configuration item                                          | Description                                                                                                                                                                                                                                                | Default value                                                                | Required | Since Version |
+|-------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------|----------|---------------|
+| `gravitino.auxService.names`                                | The auxiliary service name of the Gravitino Iceberg REST catalog service, use **`iceberg-rest`** for the Gravitino Iceberg REST catalog service.                                                                                                           | (none)                                                                       | Yes      | 0.2.0         |
+| `gravitino.auxService.iceberg-rest.classpath`               | The classpath of the Gravitino Iceberg REST catalog service, includes the directory containing jars and configuration. It supports both absolute paths and relative paths, for example, `catalogs/lakehouse-iceberg/libs, catalogs/lakehouse-iceberg/conf` | (none)                                                                       | Yes      | 0.2.0         |
+| `gravitino.auxService.iceberg-rest.host`                    | The host of the Gravitino Iceberg REST catalog service.                                                                                                                                                                                                    | `0.0.0.0`                                                                    | No       | 0.2.0         |
+| `gravitino.auxService.iceberg-rest.httpPort`                | The port of the Gravitino Iceberg REST catalog service.                                                                                                                                                                                                    | `8090`                                                                       | Yes      | 0.2.0         |
+| `gravitino.auxService.iceberg-rest.minThreads`              | The minimum number of threads in the thread pool used by the Jetty web server. `minThreads` is 8 if the value is less than 8.                                                                                                                              | `Math.max(Math.min(Runtime.getRuntime().availableProcessors() * 2, 100), 8)` | No       | 0.2.0         |
+| `gravitino.auxService.iceberg-rest.maxThreads`              | The maximum number of threads in the thread pool used by the Jetty web server. `maxThreads` is 8 if the value is less than 8, and `maxThreads` must be greater than or equal to `minThreads`.                                                              | `Math.max(Runtime.getRuntime().availableProcessors() * 4, 400)`              | No       | 0.2.0         |
+| `gravitino.auxService.iceberg-rest.threadPoolWorkQueueSize` | The size of the queue in the thread pool used by Gravitino Iceberg REST catalog service.                                                                                                                                                                   | `100`                                                                        | No       | 0.2.0         |
+| `gravitino.auxService.iceberg-rest.stopTimeout`             | The amount of time in ms for the Gravitino Iceberg REST catalog service to stop gracefully. For more information see `org.eclipse.jetty.server.Server#setStopTimeout`.                                                                                     | `30000`                                                                      | No       | 0.2.0         |
+| `gravitino.auxService.iceberg-rest.idleTimeout`             | The timeout in ms of idle connections.                                                                                                                                                                                                                     | `30000`                                                                      | No       | 0.2.0         |
+| `gravitino.auxService.iceberg-rest.requestHeaderSize`       | The maximum size of an HTTP request.                                                                                                                                                                                                                       | `131072`                                                                     | No       | 0.2.0         |
+| `gravitino.auxService.iceberg-rest.responseHeaderSize`      | The maximum size of an HTTP response.                                                                                                                                                                                                                      | `131072`                                                                     | No       | 0.2.0         |
 
-#### Apache Hive catalog configuration
+:::caution
+You must set `gravitino.auxService.iceberg-rest.httpPort` explicitly, like `9001`.
+:::
 
-| Configuration item                | Description                                                                                                                 | Default value |  Since Version |
-|-----------------------------------|-----------------------------------------------------------------------------------------------------------------------------|---------------|-----|
-| `gravitino.auxService.iceberg-rest.catalog-backend` | The Catalog backend of Gravitino Iceberg REST server, use the value **`hive`** for a Hive catalog. | `memory` | 0.2.0 |
-| `gravitino.auxService.iceberg-rest.uri` | The Hive metadata address, such as `thrift://127.0.0.1:9083`. | null | 0.2.0 |
-| `gravitino.auxService.iceberg-rest.warehouse ` | The warehouse directory of the Hive catalog, such as `/user/hive/warehouse-hive/`. | null | 0.2.0 |
+### Iceberg catalog configuration
+
+:::info
+The Gravitino Iceberg REST catalog service using memory catalog for default. You can specify Hive or JDBC catalog for production environments.
+:::
+
+#### Hive catalog configuration
+
+| Configuration item                                  | Description                                                                                                 | Default value | Required   | Since Version |
+|-----------------------------------------------------|-------------------------------------------------------------------------------------------------------------|---------------|------------|---------------|
+| `gravitino.auxService.iceberg-rest.catalog-backend` | The Catalog backend of Gravitino Iceberg REST catalog service, use the value **`hive`** for a Hive catalog. | `memory`      | Yes        | 0.2.0         |
+| `gravitino.auxService.iceberg-rest.uri`             | The Hive metadata address, such as `thrift://127.0.0.1:9083`.                                               | (none)        | Yes        | 0.2.0         |
+| `gravitino.auxService.iceberg-rest.warehouse `      | The warehouse directory of the Hive catalog, such as `/user/hive/warehouse-hive/`.                          | (none)        | Yes        | 0.2.0         |
 
 #### JDBC catalog configuration
 
-| Configuration item                | Description                                                                                                                 | Default value |  Since Version |
-|-----------------------------------|-----------------------------------------------------------------------------------------------------------------------------|---------------|-----|
-| `gravitino.auxService.iceberg-rest.catalog-backend` | The Catalog backend of Gravitino Iceberg REST server, use the value **`jdbc`** for a JDBC catalog | `memory`| 0.2.0 |
-| `gravitino.auxService.iceberg-rest.uri` | The JDBC connection address, such as `jdbc:postgresql://127.0.0.1:5432` for Postgres, or `jdbc:mysql://127.0.0.1:3306/` for mysql.  | null | 0.2.0 |
-| `gravitino.auxService.iceberg-rest.warehouse ` | The warehouse directory of JDBC catalog, set HDFS prefix if using HDFS, such as `hdfs://127.0.0.1:9000/user/hive/warehouse-jdbc` | null | 0.2.0 |
-| `gravitino.auxService.iceberg-rest.jdbc.user` | The username of the JDBC connection. | null | 0.2.0 |
-| `gravitino.auxService.iceberg-rest.jdbc.password` | The password of the JDBC connection.  | null | 0.2.0 |
-| `gravitino.auxService.iceberg-rest.jdbc-initialize` | Whether to initialize the meta tables when creating the JDBC catalog. | `true` | 0.2.0 |
+| Configuration item                                  | Description                                                                                                                        | Default value | Required | Since Version |
+|-----------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
+| `gravitino.auxService.iceberg-rest.catalog-backend` | The Catalog backend of Gravitino Iceberg REST catalog service, use the value **`jdbc`** for a JDBC catalog.                        | `memory`      | Yes      | 0.2.0         |
+| `gravitino.auxService.iceberg-rest.uri`             | The JDBC connection address, such as `jdbc:postgresql://127.0.0.1:5432` for Postgres, or `jdbc:mysql://127.0.0.1:3306/` for mysql. | (none)        | Yes      | 0.2.0         |
+| `gravitino.auxService.iceberg-rest.warehouse `      | The warehouse directory of JDBC catalog, set HDFS prefix if using HDFS, such as `hdfs://127.0.0.1:9000/user/hive/warehouse-jdbc`   | (none)        | Yes      | 0.2.0         |
+| `gravitino.auxService.iceberg-rest.jdbc.user`       | The username of the JDBC connection.                                                                                               | (none)        | Yes      | 0.2.0         |
+| `gravitino.auxService.iceberg-rest.jdbc.password`   | The password of the JDBC connection.                                                                                               | (none)        | Yes      | 0.2.0         |
+| `gravitino.auxService.iceberg-rest.jdbc-initialize` | Whether to initialize the meta tables when creating the JDBC catalog.                                                              | `true`        | No       | 0.2.0         |
+| `gravitino.auxService.iceberg-rest.jdbc-driver`     | `com.mysql.jdbc.Driver` or `com.mysql.cj.jdbc.Driver` for MySQL, `org.postgresql.Driver` for PostgreSQL.                           | (none)        | Yes      | 0.3.0         |
 
-If using a JDBC catalog, you must **download the corresponding JDBC driver jars, and place them in the Gravitino Iceberg REST server classpath**, such as `catalogs/lakehouse-iceberg/libs`.
+:::caution
+You must download the corresponding JDBC driver to the `catalogs/lakehouse-iceberg/libs` directory.
+:::
+
+:::info
+`gravitino.auxService.iceberg-rest.jdbc-driver` is not required unless Gravitino manages multi JDBC drivers.
+:::
 
 ### Other Apache Iceberg catalog properties
 
-You can add other properties defined in [CatalogProperties of Iceberg](https://github.com/apache/iceberg/blob/main/core/src/main/java/org/apache/iceberg/CatalogProperties.java), please note that `catalog-impl` has no effect.
+You can add other properties defined in [Iceberg table properties](https://iceberg.apache.org/docs/1.3.1/configuration/). 
 The `clients` property for example:
 
-| Configuration item                | Description                                                                                                                 | Default value |
-|-----------------------------------|-----------------------------------------------------------------------------------------------------------------------------|---------------|
-| `gravitino.auxService.iceberg-rest.clients` | The client pool size of the catalog. | `2` |
+| Configuration item                          | Description                          | Default value | Required |
+|---------------------------------------------|--------------------------------------|---------------|----------|
+| `gravitino.auxService.iceberg-rest.clients` | The client pool size of the catalog. | `2`           | No       |
+
+:::info
+`catalog-impl` has no effect.
+:::
 
 ### HDFS configuration
 
-The Gravitino Iceberg REST server adds the HDFS configuration files, `core-site.xml` and `hdfs-site.xml` from the directory defined by `gravitino.auxService.iceberg-rest.classpath`, for example, `catalogs/lakehouse-iceberg/conf`, to the classpath.
+The Gravitino Iceberg REST catalog service adds the HDFS configuration files, `core-site.xml` and `hdfs-site.xml` from the directory defined by `gravitino.auxService.iceberg-rest.classpath`, for example, `catalogs/lakehouse-iceberg/conf`, to the classpath.
 
-## Starting the Gravitino and Apache Iceberg REST server
+## Starting the Gravitino Iceberg REST catalog service
 
-Starting the Gravitino Iceberg REST server:
+Starting the Gravitino Iceberg REST catalog service:
 
 ```shell
 ./bin/gravitino.sh start
 ```
 
-How to find out whether the Gravitino Iceberg REST server has started:
+How to find out whether the Gravitino Iceberg REST catalog service has started:
 
 ```shell
 curl  http://127.0.0.1:9001/iceberg/application.wadl
 ```
 
-## Exploring the Gravitino and Apache Iceberg REST server with Apache Spark
+## Exploring the Gravitino and Apache Iceberg REST catalog service with Apache Spark
 
 ### Deploying Apache Spark with Apache Iceberg support
 
-Follow the [Spark Iceberg start guide](https://iceberg.apache.org/docs/latest/getting-started/) to setup Apache Spark's and Apache Iceberg's environment. Please keep the Spark version consistent with the `spark-iceberg-runtime` version.
+Follow the [Spark Iceberg start guide](https://iceberg.apache.org/docs/latest/getting-started/) to set up Apache Spark's and Apache Iceberg's environment. Please keep the Apache Spark version consistent with the `spark-iceberg-runtime` version.
 
 ### Starting the Apache Spark client with the Apache Iceberg REST catalog
 
-| Configuration item                | Description                                                                                                                 |
-|-----------------------------------|-----------------------------------------------------------------------------------------------------------------------------|
-| `spark.sql.catalog.${catalog-name}.type` | The Spark catalog type, should set to `rest`. |
-| `spark.sql.catalog.${catalog-name}.uri` | Spark Iceberg REST catalog URI, such as `http://127.0.0.1:9001/iceberg/`. |
+| Configuration item                       | Description                                                               |
+|------------------------------------------|---------------------------------------------------------------------------|
+| `spark.sql.catalog.${catalog-name}.type` | The Spark catalog type, should set to `rest`.                             |
+| `spark.sql.catalog.${catalog-name}.uri`  | Spark Iceberg REST catalog URI, such as `http://127.0.0.1:9001/iceberg/`. |
 
 For example:
 
