@@ -11,7 +11,7 @@ The Hive catalog allows Trino querying data stored in an Apache Hive data wareho
 ## Requirements
 
 - The Hive connector requires a Hive metastore service (HMS), or a compatible implementation of the Hive metastore, such as AWS Glue.
-Apache Hadoop HDFS 2.x and 3.x are supported.
+- Apache Hadoop HDFS 2.x and 3.x are supported.
 - Many distributed storage systems including HDFS, Amazon S3 or S3-compatible systems, 
   Google Cloud Storage, Azure Storage, and IBM Cloud Object Storage can be queried with the Hive connector.
 - The coordinator and all workers must have network access to the Hive metastore and the storage system. 
