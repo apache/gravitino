@@ -53,7 +53,7 @@ If you are using JDBC catalog, you must provide `jdbc-user`, `jdbc-password` and
 | `jdbc-initialize` | Whether to initialize meta tables when create Jdbc catalog                                              | `true`        | No       | 0.2.0         |
 
 :::caution
-Your must download the corresponding JDBC driver to the `catalogs/lakehouse-iceberg/libs` directory.
+You must download the corresponding JDBC driver to the `catalogs/lakehouse-iceberg/libs` directory.
 :::
 
 ### Catalog operations
@@ -140,7 +140,7 @@ Apache Iceberg doesn't support Gravitino `Varchar` `Fixedchar` `Byte` `Short` `U
 :::
 
 
-## Table properties
+### Table properties
 
 You can pass [Iceberg table properties](https://iceberg.apache.org/docs/1.3.1/configuration/) to Gravitino when creating Iceberg table.
 
@@ -156,9 +156,9 @@ Gravitino server reserves the following fields which can't be passed.
 | `sort-order`              | Selecting a specific snapshot in a merge operation.     |
 | `identifier-fields`       | The identifier fields for defining the table.           |
 
-## Table operations
+### Table operations
 
-### Alter table operations
+#### Alter table operations
 
 Supports operations:
 - `RenameTable`
