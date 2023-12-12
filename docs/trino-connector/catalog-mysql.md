@@ -1,5 +1,5 @@
 ---
-title: "Gravtino connnector - MySQL catalog"
+title: "Gravitino connector - MySQL catalog"
 slug: /trino-connector/catalog-mysql
 keyword: gravitino connector trino
 license: "Copyright 2023 Datastrato Pvt Ltd.

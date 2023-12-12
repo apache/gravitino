@@ -1,5 +1,5 @@
 ---
-title: "Gravtino connnector - Iceberg catalog"
+title: "Gravitino connector - Iceberg catalog"
 slug: /trino-connector/catalog-iceberg
 keyword: gravitino connector trino
 license: "Copyright 2023 Datastrato Pvt Ltd.

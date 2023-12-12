@@ -8,7 +8,7 @@ This software is licensed under the Apache License version 2."
 
 ## Playground introduction
 
-Playground is a complete Gravitino Docker runtime environment with `Hive`, `Hdfs`, `Trino`, `MySQL`, `PostgreSQL`, and `Gravitno` server.
+Playground is a complete Gravitino Docker runtime environment with `Hive`, `Hdfs`, `Trino`, `MySQL`, `PostgreSQL`, and `Gravitino` server.
 
 Depending on your network, the startup may take 3-5 minutes.
 

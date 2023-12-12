@@ -96,7 +96,7 @@ These rules only apply on the catalog properties, doesn't affect on the schema o
 | `jdbc-postgresql`   | [PostgresSQL catalog properties](jdbc-postgresql-catalog#catalog-properties)         | `catalogs/jdbc-postgresql/conf/jdbc-postgresql.conf`     | 
 
 :::info
-Gravition server automatically add catalog properties configuration dir to classpath.
+Gravitino server automatically add catalog properties configuration dir to classpath.
 :::
 
 ## Some other configurations

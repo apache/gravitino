@@ -1,5 +1,5 @@
 ---
-title: "Gravtino connnector - Hive catalog"
+title: "Gravitino connector - Hive catalog"
 slug: /trino-connector/catalog-hive
 keyword: gravitino connector trino
 license: "Copyright 2023 Datastrato Pvt Ltd.

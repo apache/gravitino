@@ -1,5 +1,5 @@
 ---
-title: "Gravtino connnector - PostgreSQL catalog"
+title: "Gravitino connector - PostgreSQL catalog"
 slug: /trino-connector/catalog-postgresql
 keyword: gravitino connector trino
 license: "Copyright 2023 Datastrato Pvt Ltd.
