@@ -92,7 +92,7 @@ GravitinoMetaLake renamed = gravitinoClient.alterMetalake(
 
 Currently, Gravitino supports the following changes to a metalake:
 
-| Supported modification | Bash                                                         | Java                                            |
+| Supported modification | Json                                                         | Java                                            |
 |------------------------|--------------------------------------------------------------|-------------------------------------------------|
 | Rename metalake        | `{"@type":"rename","newName":"metalake_renamed"}`            | `MetalakeChange.rename("metalake_renamed")`     |
 | Update comment         | `{"@type":"updateComment","newComment":"new_comment"}`       | `MetalakeChange.updateComment("new_comment")`   |
@@ -241,7 +241,7 @@ Catalog catalog = gravitinoMetaLake.alterCatalog(NameIdentifier.of("metalake", "
 
 Currently, Gravitino supports the following changes to a catalog:
 
-| Supported modification | Bash                                                         | Java                                           |
+| Supported modification | Json                                                         | Java                                           |
 |------------------------|--------------------------------------------------------------|------------------------------------------------|
 | Rename metalake        | `{"@type":"rename","newName":"metalake_renamed"}`            | `CatalogChange.rename("catalog_renamed")`      |
 | Update comment         | `{"@type":"updateComment","newComment":"new_comment"}`       | `CatalogChange.updateComment("new_comment")`   |
@@ -548,7 +548,7 @@ The following the types that Gravitino supports:
 | Union                     | `Types.UnionType.of([type1, type2, ...])`                                | `{"type": "union", "types": [type JSON, ...]}`                                                                                       | Union type, indicate a union of types     
 
 
-The related java doc is [here](./javadoc/com/datastrato/gravitino/rel/types/Type.html).
+The related java doc is [here](./api/java/javadoc/com/datastrato/gravitino/rel/types/Type.html).
 
 #### Table property and type mapping
 
@@ -564,11 +564,11 @@ The following is the table property that Gravitino supports:
 
 In addition to the basic settings, Gravitino supports the following features:
 
-| Feature             | Description                                                                                  | Java doc                                                                                       |
-|---------------------|----------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------|
-| Partitioned table   | Equal to `PARTITION BY` in Apache Hive and other engine that support partitioning.           | [Partition](./javadoc/com/datastrato/gravitino/dto/rel/partitions/Partitioning.html)           |
-| Bucketed table      | Equal to `CLUSTERED BY` in Apache Hive, some engine may use different words to describe it.  | [Distribution](./javadoc/datastrato/gravitino/rel/expressions/distributions/Distribution.html) |
-| Sorted order table  | Equal to `SORTED BY` in Apache Hive, some engine may use different words to describe it.     | [SortOrder](./javadoc/com/datastrato/gravitino/rel/expressions/sorts/SortOrder.html)           |
+| Feature             | Description                                                                                  | Java doc                                                                                                |
+|---------------------|----------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------|
+| Partitioned table   | Equal to `PARTITION BY` in Apache Hive and other engine that support partitioning.           | [Partition](./api/java/javadoc/com/datastrato/gravitino/dto/rel/partitions/Partitioning.html)           |
+| Bucketed table      | Equal to `CLUSTERED BY` in Apache Hive, some engine may use different words to describe it.  | [Distribution](./api/java/javadoc/datastrato/gravitino/rel/expressions/distributions/Distribution.html) |
+| Sorted order table  | Equal to `SORTED BY` in Apache Hive, some engine may use different words to describe it.     | [SortOrder](./api/java/javadoc/com/datastrato/gravitino/rel/expressions/sorts/SortOrder.html)           |
 
 :::tip
 **Those features may not be supported by all catalogs**. Please refer to the related doc for more details.
@@ -746,7 +746,7 @@ Table t = tableCatalog.alterTable(NameIdentifier.of("metalake", "catalog", "sche
 
 Currently, Gravitino supports the following changes to a table:
 
-| Supported modification             | Bash                                                                                                                  | Java                                        |
+| Supported modification             | Json                                                                                                                  | Java                                        |
 |------------------------------------|-----------------------------------------------------------------------------------------------------------------------|---------------------------------------------|
 | Rename table                       | `{"@type":"rename","newName":"table_renamed"}`                                                                        | `TableChange.rename("table_renamed")`       |
 | Update comment                     | `{"@type":"updateComment","newComment":"new_comment"}`                                                                | `TableChange.updateComment("new_comment")`  |
