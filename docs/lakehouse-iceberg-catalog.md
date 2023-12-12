@@ -113,6 +113,11 @@ For `bucket` and `truncate`, the first argument must be integer literal, the sec
 
 - Doesn't support `Distribution`, you should use `BucketPartition` instead.
 
+:::info
+If you load Iceberg table, the table distribution strategy maybe `hash` with num 0, which means no distribution.
+:::
+
+
 ### Table column types 
 
 | Gravitino Type              | Apache Iceberg Type         |
