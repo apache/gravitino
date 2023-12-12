@@ -32,8 +32,8 @@ Gravitino only supports external OAuth 2.0 servers.
 
 First, users need to guarantee that the external correctly configured OAuth 2.0 server supports Bearer JWT.
 
-Then, on the server side, users should set `gravitino.authenticator` as `oauth` and give 
-`gravitino.authenticator.oauth.defaultSignKey`, `gravitino.authenticator.oauth.serverUri` and 
+Then, on the server side, users should set `gravitino.authenticator` as `oauth` and give
+`gravitino.authenticator.oauth.defaultSignKey`, `gravitino.authenticator.oauth.serverUri` and
 `gravitino.authenticator.oauth.tokenPath`  a proper value.
 
 Next, for the client side, users can enable `OAuth` mode by the following code:
@@ -138,7 +138,6 @@ Use the access token to request the Gravitino
 curl -v -X GET -H "Accept: application/vnd.gravitino.v1+json" -H "Content-Type: application/json" -H "Authorization: Bearer <access_token>" http://localhost:8090/api/version
 ```
 
-
 ## HTTPS
 
 Users would better use HTTPS instead of HTTP if users choose OAuth 2.0 as the authenticator.
@@ -193,7 +192,7 @@ You can follow the steps to set up a HTTPS server.
 
 1. Prerequisite
 
-   You need to install the JDK8, wget and set the environment JAVA_HOME.
+   You need to install the JDK8, wget, and set the environment JAVA_HOME.
 
    If you want to use the command `curl` to request the Gravitino server, you should install openSSL.
 

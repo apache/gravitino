@@ -5,7 +5,7 @@ license: "Copyright 2023 Datastrato Pvt Ltd.
 This software is licensed under the Apache License version 2."
 ---
 
-These instructions provide a guide on signing and verifying Gravitino releases, enhancing the security of releases. Having a signed release allows people to confirm the release's author and guarantees that the code has not been altered.
+These instructions provide a guide on signing and verifying Gravitino releases, enhancing the security of releases. A signed release enables people to confirm the author of the release and guarantees that the code hasn't been altered.
 
 ## Prerequisites
 

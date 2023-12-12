@@ -20,10 +20,10 @@ Builds with Apache Iceberg `1.3.1`. The Apache Iceberg table format version is `
 :::
 
 :::info
-Builds with hadoop 2.10.x, there may compatibility issue when accessing hadoop 3.x clusters.
+Builds with Hadoop 2.10.x, there may compatibility issue when accessing Hadoop 3.x clusters.
 :::
 
-## Catalog 
+## Catalog
 
 ### Catalog capabilities
 
@@ -50,7 +50,7 @@ If you are using JDBC catalog, you must provide `jdbc-user`, `jdbc-password` and
 | `jdbc-user`       | JDBC user name                                                                                          | (none)        | Yes      | 0.2.0         |
 | `jdbc-password`   | JDBC password                                                                                           | (none)        | Yes      | 0.2.0         |
 | `jdbc-driver`     | `com.mysql.jdbc.Driver` or `com.mysql.cj.jdbc.Driver` for MySQL, `org.postgresql.Driver` for PostgreSQL | (none)        | Yes      | 0.3.0         |
-| `jdbc-initialize` | Whether to initialize meta tables when create Jdbc catalog                                              | `true`        | No       | 0.2.0         |
+| `jdbc-initialize` | Whether to initialize meta tables when create JDBC catalog                                              | `true`        | No       | 0.2.0         |
 
 :::caution
 You must download the corresponding JDBC driver to the `catalogs/lakehouse-iceberg/libs` directory.
@@ -58,7 +58,7 @@ You must download the corresponding JDBC driver to the `catalogs/lakehouse-icebe
 
 ### Catalog operations
 
-## Schema 
+## Schema
 
 ### Schema capabilities
 
@@ -70,13 +70,14 @@ You could put properties except `comment`.
 
 ### Schema operations
 
-## Table 
+## Table
 
 ### Table capabilities
 
 #### Table partitions
 
 Supports transforms:
+
   - `IdentityTransform`
   - `BucketTransform`
   - `TruncateTransform`
@@ -88,7 +89,7 @@ Supports transforms:
 :::info
 Iceberg doesn't support multi fields in `BucketTransform`.
 :::
-   
+
 :::info
 Iceberg doesn't support `ApplyTransform`, `RangeTransform` and `ListTransform`.
 :::
@@ -96,6 +97,7 @@ Iceberg doesn't support `ApplyTransform`, `RangeTransform` and `ListTransform`.
 ### Table sort orders
 
 supports expressions:
+
 - `FieldReference`
 - `FunctionExpression`
   - `bucket`
@@ -114,11 +116,10 @@ For `bucket` and `truncate`, the first argument must be integer literal, the sec
 - Doesn't support `Distribution`, you should use `BucketPartition` instead.
 
 :::info
-If you load Iceberg table, the table distribution strategy maybe `hash` with num 0, which means no distribution.
+If you load Iceberg tables, the table distribution strategy is `hash` with num 0, which means no distribution.
 :::
 
-
-### Table column types 
+### Table column types
 
 | Gravitino Type              | Apache Iceberg Type         |
 |-----------------------------|-----------------------------|
@@ -144,12 +145,11 @@ If you load Iceberg table, the table distribution strategy maybe `hash` with num
 Apache Iceberg doesn't support Gravitino `Varchar` `Fixedchar` `Byte` `Short` `Union` type.
 :::
 
-
 ### Table properties
 
 You can pass [Iceberg table properties](https://iceberg.apache.org/docs/1.3.1/configuration/) to Gravitino when creating Iceberg table.
 
-Gravitino server reserves the following fields which can't be passed.
+The Gravitino server doesn't allow passing the following reserved fields.
 
 | Configuration item        | Description                                             |
 |---------------------------|---------------------------------------------------------|
@@ -166,6 +166,7 @@ Gravitino server reserves the following fields which can't be passed.
 #### Alter table operations
 
 Supports operations:
+
 - `RenameTable`
 - `SetProperty`
 - `RemoveProperty`
@@ -179,15 +180,15 @@ Supports operations:
 - `UpdateColumnComment`
 
 :::info
-The default column position is `LAST` when you add a column. If you add a non nullability column, there may be compatibility issue.
+The default column position is `LAST` when you add a column. If you add a non nullability column, there may be compatibility issues.
 :::
 
 :::info
-Iceberg just supports update primitive types.
+Iceberg just supports updating primitive types.
 :::
 
 :::caution
-If you update a nullability column to non nullability, there may be compatibility issue.
+If you update a nullability column to non nullability, there may be compatibility issues.
 :::
 
 ## HDFS configuration

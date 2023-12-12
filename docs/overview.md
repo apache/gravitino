@@ -45,8 +45,8 @@ others.
 
 Unlike the traditional metadata management systems, which need to collect the metadata
 actively or passively from underlying systems, Gravitino manages these systems directly.
-It provides a set of connectors to connect to different metadata sources,
-the changes in Gravitino will directly reflect in the underlying systems, and vice versa.
+It provides a set of connectors to connect to different metadata sources.
+The changes in Gravitino directly reflect in the underlying systems, and vice versa.
 
 ### Geo-distribution support (WIP)
 
