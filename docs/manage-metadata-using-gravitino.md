@@ -183,9 +183,9 @@ Catalog catalog = gravitinoMetaLake.createCatalog(
 
 Currently, Gravitino supports the following catalog providers:
 
-| Catalog provider    | Catalog property                                                          | 
-|---------------------|---------------------------------------------------------------------------|
-| `hive`              | [Hive catalog property](./apache-hive-catalog#catalog-properties)         | 
+| Catalog provider    | Catalog property                                                            | 
+|---------------------|-----------------------------------------------------------------------------|
+| `hive`              | [Hive catalog property](./apache-hive-catalog#catalog-properties)           | 
 | `lakehouse-iceberg` | [Iceberg catalog property](./lakehouse-iceberg-catalog#catalog-properties)  |                                    
 | `jdbc-mysql`        | [MySQL catalog property](./jdbc-mysql-catalog#catalog-properties)           |                            
 | `jdbc-postgresql`   | [PostgreSQL catalog property](./jdbc-postgresql-catalog#catalog-properties) |          
@@ -332,7 +332,7 @@ Schema schema = supportsSchemas.createSchema(
 // ...
 ```
 
-Currently, Gravitino supports the following catalog providers:
+Currently, Gravitino supports the following schema property:
 
 | Catalog provider    | Schema property                                                           | 
 |---------------------|---------------------------------------------------------------------------|
@@ -517,7 +517,7 @@ In order to create a table, you need to provide the following information:
 - Table column name and type
 - Table property 
 
-#### Column type
+#### Gravitino table column type
 
 The following the types that Gravitino supports:
 
