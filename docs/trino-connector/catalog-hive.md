@@ -77,22 +77,22 @@ CREATE TABLE "metalake.catalog".dbname.tabname
 
 | Property      | Description                             | Default Value                                              | Required | Since Version |
 |---------------|-----------------------------------------|------------------------------------------------------------|----------|---------------|
-| format        | Hive storage format for the table       | TEXTFILE                                                   | No       | 0.2.0         |
-| total_size    | Total size of the table                 | (none)                                                     | No       | 0.2.0         |
-| num_files     | Number of files                         | 0                                                          | No       | 0.2.0         |
-| external      | Indicate whether it's an external table | (none)                                                     | No       | 0.2.0         |
-| location      | HDFS location for table storage         | (none)                                                     | No       | 0.2.0         |
-| table_type    | The type of Hive table                  | (none)                                                     | No       | 0.2.0         |
-| input_format  | The input format class for the table    | org.apache.hadoop.mapred.TextInputFormat                   | No       | 0.2.0         |
-| output_format | The output format class for the table   | org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat | No       | 0.2.0         |
-| serde_lib     | The serde library class for the table   | org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe         | No       | 0.2.0         |
-| serde_name    | Name of the serde                       | table name by default                                      | No       | 0.2.0         |
+| format        | Hive storage format for the table       | TEXTFILE                                                   | No       | 0.3.0         |
+| total_size    | Total size of the table                 | (none)                                                     | No       | 0.3.0         |
+| num_files     | Number of files                         | 0                                                          | No       | 0.3.0         |
+| external      | Indicate whether it's an external table | (none)                                                     | No       | 0.3.0         |
+| location      | HDFS location for table storage         | (none)                                                     | No       | 0.3.0         |
+| table_type    | The type of Hive table                  | (none)                                                     | No       | 0.3.0         |
+| input_format  | The input format class for the table    | org.apache.hadoop.mapred.TextInputFormat                   | No       | 0.3.0         |
+| output_format | The output format class for the table   | org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat | No       | 0.3.0         |
+| serde_lib     | The serde library class for the table   | org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe         | No       | 0.3.0         |
+| serde_name    | Name of the serde                       | table name by default                                      | No       | 0.3.0         |
 
 ## Schema properties
 
 | Property | Description                     | Default Value | Required | Since Version |
 |----------|---------------------------------|---------------|----------|---------------|
-| location | HDFS location for table storage | (none)        | No       | 0.2.0         |
+| location | HDFS location for table storage | (none)        | No       | 0.3.0         |
 
 ## Basic usage examples
 

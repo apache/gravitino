@@ -121,10 +121,10 @@ Ensure to keep your private key secure and saved somewhere other than just your 
     gpg --detach-sign --armor <filename>.[zip|tar.gz]
     ```
 
-    For example to sign the Gravitino 0.2.0 release you would use this command.
+    For example to sign the Gravitino 0.3.0 release you would use this command.
 
     ```shell
-    gpg --detach-sign --armor gravitino.0.2.0.zip
+    gpg --detach-sign --armor gravitino.0.3.0.zip
     ```
 
     To generate a .asc file containing a PGP signature. Anyone can use this file and your public signature to verify the release.
@@ -137,10 +137,10 @@ Ensure to keep your private key secure and saved somewhere other than just your 
     shasum -a 256 <filename>.[zip|tar.gz] > <filename>.[zip|tar.gz].sha256
     ```
 
-    For example, to generate a hash for the Gravitino 0.2.0 release you would use this command:
+    For example, to generate a hash for the Gravitino 0.3.0 release you would use this command:
 
     ```shell
-    shasum -a 256 gravitino.0.2.0.zip > gravitino.0.2.0.zip.sha256
+    shasum -a 256 gravitino.0.3.0.zip > gravitino.0.3.0.zip.sha256
     ```
 
 4. **Copy your public key to the KEYS file:**
@@ -176,10 +176,10 @@ Ensure to keep your private key secure and saved somewhere other than just your 
 
     The output should contain the text "Good signature from ...".
 
-    For example to verify the Gravitino 0.2.0 zip file you would use this command:
+    For example to verify the Gravitino 0.3.0 zip file you would use this command:
 
     ```shell
-     gpg --verify gravitino.0.2.0.zip.asc
+     gpg --verify gravitino.0.3.0.zip.asc
     ```
 
 3. **Verify the hashes:**
@@ -193,7 +193,7 @@ Ensure to keep your private key secure and saved somewhere other than just your 
     For example to verify the Gravitino 2.0 zip file you would use this command:
 
     ```shell
-    diff -u gravitino.0.2.0.zip.sha256 <(shasum -a 256 gravitino.0.2.0.zip)
+    diff -u gravitino.0.3.0.zip.sha256 <(shasum -a 256 gravitino.0.3.0.zip)
     ```
 
     This command ensures that the signatures match and that there are no differences between them.
