@@ -687,7 +687,7 @@ In order to create a table, you need to provide the following information:
 
 #### Gravitino table column type
 
-The following types which Gravitino supports:
+The following types that Gravitino supports:
 
 | Type                      | Java                                                                     | Json                                                                                                                                 | Description                                                                                      |
 |---------------------------|--------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------|
