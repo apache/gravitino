@@ -16,8 +16,8 @@ To use Iceberg, you need:
 - Network access from the Trino coordinator and workers to the distributed object storage.
 - Access to a Hive metastore service (HMS), an AWS Glue catalog, a JDBC catalog, a REST catalog, or a Nessie server.
 - Data files stored in a supported file format. These can be configured using file format configuration properties per catalog:
-- - ORC
-- - Parquet (default)
+  - ORC
+  - Parquet (default)
 
 ## Create table
 
