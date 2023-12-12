@@ -296,7 +296,6 @@ export const getSchemaDetails = createAsyncThunk(
 export const fetchTables = createAsyncThunk(
   'appMetalakes/fetchTables',
   async ({ init, page, metalake, catalog, schema }) => {
-    console.log(schema)
     try {
       const response = await getTablesApi({ metalake, catalog, schema })
 
@@ -322,7 +321,7 @@ export const fetchTables = createAsyncThunk(
 
 export const getTableDetails = createAsyncThunk(
   'appMetalakes/getTableDetails',
-  async ({ metalake, catalog, schema, table }) => {
+  async ({ metalake, catalog, schema, table }, { dispatch }) => {
     const response = await getTableDetailsApi({ metalake, catalog, schema, table })
 
     const { table: resTable } = response.data
@@ -360,6 +359,9 @@ export const appMetalakesSlice = createSlice({
     },
     setExpandedTreeNode(state, action) {
       state.expendedTreeNode = action.payload
+    },
+    resetTableData(state, action) {
+      state.tableData = []
     },
     resetMetalakeStore(state, action) {}
   },
@@ -426,11 +428,18 @@ export const appMetalakesSlice = createSlice({
     })
     builder.addCase(getTableDetails.fulfilled, (state, action) => {
       state.activatedDetails = action.payload
+      state.tableData = action.payload.columns || []
     })
   }
 })
 
-export const { setFilteredMetalakes, setIsLoadedTree, setSelectedTreeNode, setExpandedTreeNode, resetMetalakeStore } =
-  appMetalakesSlice.actions
+export const {
+  setFilteredMetalakes,
+  setIsLoadedTree,
+  setSelectedTreeNode,
+  setExpandedTreeNode,
+  resetMetalakeStore,
+  resetTableData
+} = appMetalakesSlice.actions
 
 export default appMetalakesSlice.reducer
