@@ -29,7 +29,7 @@ You can use GitHub actions to publish Docker images to the Docker Hub repository
 6. You must enter the correct `publish docker token` before you can execute run `Publish Docker Image` workflow.
 7. Wait for the workflow to complete. You can see a new Docker image shown in the [Datastrato Docker Hub](https://hub.docker.com/u/datastrato) repository.
 
-![Publish Docker_image](assets/publish-docker-image.png)
+![Publish Docker image](assets/publish-docker-image.png)
 
 ## More details of Gravitino Docker images
 
