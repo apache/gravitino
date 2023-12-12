@@ -11,7 +11,7 @@ Please refer to the [Deploying Trino documentation](https://trino.io/docs/curren
 
 1. Download the Gravitino connector tarball and unpack it.
    The tarball contains a single top-level directory `gravitino-trino-connector-<version>`,
-   which call the connector directory.
+   which called the connector directory.
    [Download the gravitino-connector](https://github.com/datastrato/gravitino/releases).
 2. Copy the connector directory to the Trino's plugin directory.
    Normally, the directory location is `Trino-server-<version>/plugin`, and the directory contains other catalogs used by Trino.

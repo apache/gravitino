@@ -43,7 +43,8 @@ MySQL's tables and schemas cannot support properties.
 ## Basic usage examples
 
 First, you need to create a metalake and catalog in Gravitino.
-For example, create a new metalake named `test` and create a new catalog named `mysql_test` using the `mysql` provider.
+For example, create a new metalake named `test` and create a new catalog named `mysql_test` using the `jdbc-mysql` provider.
+And configure the Metalake `test` into the `Graviton connector`.
 For More information about the MySQL catalog, please refer to [MySql catalog](../docs/jdbc-mysql-catalog).
 
 ```bash
@@ -72,7 +73,7 @@ curl -X POST -H "Content-Type: application/json" \
 Listing all Gravitino managed catalogs:
 
 ```sql 
-SHOW CATALOGS
+SHOW CATALOGS;
 ```
 
 The results are similar to:
@@ -101,7 +102,7 @@ Create a new schema named `database_01` in `test.mysql_test` catalog.
 CREATE SCHEMA "test.mysql_test".database_01;
 ```
 
-Create a new table named `table_01` in schema `"test.mysql_test".database_01` and stored in a TEXTFILE format.
+Create a new table named `table_01` in schema `"test.mysql_test".database_01`.
 
 ```sql
 CREATE TABLE  "test.mysql_test".database_01.table_01

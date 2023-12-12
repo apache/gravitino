@@ -12,7 +12,7 @@ This can be used to join data between different systems like PostgreSQL and Hive
 ## Requirements
 
 To connect to PostgreSQL, you need:
-- PostgreSQL 11.x or higher.
+- PostgreSQL 10.x or higher.
 - Network access from the Trino coordinator and workers to PostgreSQL. Port 5432 is the default port.
 
 ## Create table
@@ -44,7 +44,8 @@ PostgreSQL's tables and schemas cannot support properties.
 ## Basic usage examples
 
 First, you need to create a metalake and catalog in Gravitino.
-For example, create a new metalake named `test` and create a new catalog named `postgresql_test` using the `postgresql` provider.
+For example, create a new metalake named `test` and create a new catalog named `postgresql_test` using the `jdbc-postgresql` provider.
+And configure the Metalake `test` into the `Graviton connector`.
 For More information about the PostgreSQL catalog, please refer to [PostgreSQL catalog](../docs/jdbc-postgressql-catalog).
 
 ```bash
@@ -75,7 +76,7 @@ curl -X POST -H "Content-Type: application/json" \
 Listing all Gravitino managed catalogs:
 
 ```sql 
-SHOW CATALOGS
+SHOW CATALOGS;
 ```
 
 The results are similar to:
@@ -104,7 +105,7 @@ Create a new schema named `database_01` in `test.postgresql_test` catalog.
 CREATE SCHEMA "test.postgresql_test".database_01;
 ```
 
-Create a new table named `table_01` in schema `"test.postgresql_test".database_01` and stored in a TEXTFILE format.
+Create a new table named `table_01` in schema `"test.postgresql_test".database_01`.
 
 ```sql
 CREATE TABLE "test.postgresql_test".database_01.table_01

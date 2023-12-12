@@ -49,7 +49,8 @@ Iceberg's tables and schemas do not support properties.
 ## Basic usage examples
 
 First, you need to create a metalake and catalog in Gravitino.
-For example, create a new metalake named `test` and create a new catalog named `iceberg_test` using the `iceberge` provider.
+For example, create a new metalake named `test` and create a new catalog named `iceberg_test` using the `lakehouse-iceberge` provider.
+And configure the Metalake `test` into the `Graviton connector`.
 For More information about the Iceberg catalog, please refer to [Iceberg catalog](../lakehouse-iceberg-catalog).
 
 ```bash
@@ -77,7 +78,7 @@ curl -X POST -H "Content-Type: application/json" \
 Listing all Gravitino managed catalogs:
 
 ```sql 
-SHOW CATALOGS
+SHOW CATALOGS;
 ```
 
 The results are similar to:
@@ -109,12 +110,12 @@ CREATE SCHEMA "test.iceberg_test".database_01;
 Create a new schema using HDFS location:
 
 ```sql
-CREATE SCHEMA "test.iceberg_test".database_01 {
+CREATE SCHEMA "test.iceberg_test".database_01 WITH (
   location = 'hdfs://hdfs-host:9000/user/iceberg/warehouse/database_01'
-};
+);
 ```
 
-Create a new table named `table_01` in schema `"test.iceberg_test".database_01` and stored in a TEXTFILE format.
+Create a new table named `table_01` in schema `"test.iceberg_test".database_01`.
 
 ```sql
 CREATE TABLE  "test.iceberg_test".database_01.table_01

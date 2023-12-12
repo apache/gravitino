@@ -93,6 +93,7 @@ CREATE TABLE "metalake.catalog".dbname.tabname
 
 First, you need to create a metalake and catalog in Gravitino.
 For example, create a new metalake named `test` and create a new catalog named `hive_test` using the `hive` provider.
+And configure the Metalake `test` into the `Graviton connector`.
 For More information about the Hive catalog, please refer to [Hive catalog](../apache-hive-catalog).
 
 ```bash
@@ -119,7 +120,7 @@ curl -X POST \
 Listing all Gravitino managed catalogs:
 
 ```sql 
-SHOW CATALOGS
+SHOW CATALOGS;
 ```
 
 The results are similar to:
@@ -151,9 +152,9 @@ CREATE SCHEMA "test.hive_test".database_01;
 Create a new schema using HDFS location:
 
 ```sql
-CREATE SCHEMA "test.hive_test".database_01 {
+CREATE SCHEMA "test.hive_test".database_01 WITH (
   location = 'hdfs://hdfs-host:9000/user/hive/warehouse/database_01'
-};
+);
 ```
 
 Create a new table named `table_01` in schema `"test.hive_test".database_01` and stored in a TEXTFILE format.
