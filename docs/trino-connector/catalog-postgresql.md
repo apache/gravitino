@@ -58,7 +58,7 @@ curl -X POST -H "Content-Type: application/json" \
 
 curl -X POST -H "Content-Type: application/json" \
 -d '{
-  "name": "jdbc-postgresql",
+  "name": "postgresql_test",
   "type": "RELATIONAL",
   "comment": "comment",
   "provider": "jdbc-postgresql",
