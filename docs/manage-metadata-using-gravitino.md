@@ -394,8 +394,8 @@ Schema schema = supportsSchemas.alterSchema(NameIdentifier.of("metalake", "hive_
 
 Currently, Gravitino supports the following changes to a schema:
 
-| Supported modification | Bash                                                         | Java                                           |
-|------------------------|--------------------------------------------------------------|------------------------------------------------|
+| Supported modification | Json                                                         | Java                                          |
+|------------------------|--------------------------------------------------------------|-----------------------------------------------|
 | Set a property         | `{"@type":"setProperty","property":"key1","value":"value1"}` | `SchemaChange.setProperty("key1", "value1")`  |
 | Remove a property      | `{"@type":"removeProperty","property":"key1"}`               | `SchemaChange.removeProperty("key1")`         |
 
@@ -691,7 +691,7 @@ tableCatalog.createTable(
     );
 ```
 
-:::warning
+:::note
 The code above is an example of creating a Hive table. For other catalogs, the code is similar, but the supported column type, table properties may be different. For more details, please refer to the related doc.
 :::
 
