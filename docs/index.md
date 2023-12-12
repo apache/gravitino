@@ -47,7 +47,7 @@ To get started with Gravitino, please see [Getting started](./getting-started) f
 ## Gravitino playground
 
 To experience Gravitino with other components simply, Gravitino provides a playground to run. It
-integrates Apache Hadoop, Apache Hive, Trino, Mysql, PostgreSQL, and Gravitino together as a
+integrates Apache Hadoop, Apache Hive, Trino, MySQL, PostgreSQL, and Gravitino together as a
 complete environment. To experience the whole features, please also see
 [Getting started](./getting-started) and [How to use the Gravitino playground](./how-to-use-the-playground)
 to learn how to use the playground.
@@ -66,9 +66,9 @@ to learn how to use the playground.
 * [Manage metadata using Gravitino](./manage-metadata-using-gravitino): provides the complete
   functionalities of Gravitino metadata management. Including metalake, catalog, schema and
   table management.
-* [Gravitino Open API](./api/java/index.html): provides the complete Open API definition of
+* [Gravitino Open API](./api/rest/gravitino-rest-api): provides the complete Open API definition of
   Gravitino.
-* [Gravitino Javadoc](./api/rest/gravitino-rest-api): provides the Javadoc for Gravitino API.
+* [Gravitino Javadoc](./api/java/index.html): provides the Javadoc for Gravitino API.
 
 ### Server administration
 
