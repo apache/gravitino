@@ -18,13 +18,14 @@ import Icon from '@/components/Icon'
 import clsx from 'clsx'
 
 import { useAppDispatch, useAppSelector } from '@/lib/hooks/useStore'
-import { setExpandedTreeNode, setIntoTreeAction } from '@/lib/store/metalakes'
+import { setExpandedTreeNode, setIntoTreeAction, resetTableData } from '@/lib/store/metalakes'
 
 const StyledLink = styled(Link)(({ theme }) => ({
   textDecoration: 'none'
 }))
 
 const CustomContent = forwardRef(function CustomContent(props, ref) {
+  const dispatch = useAppDispatch()
   const { classes, className, label, nodeId, icon: iconProp, expansionIcon, displayIcon } = props
 
   const { disabled, expanded, selected, focused, handleExpansion, handleSelection, preventSelection } =
@@ -41,6 +42,7 @@ const CustomContent = forwardRef(function CustomContent(props, ref) {
   }
 
   const handleSelectionClick = event => {
+    dispatch(resetTableData())
     handleSelection(event)
   }
 
@@ -123,15 +125,15 @@ const CustomTreeItem = forwardRef(function CustomTreeItem(props, ref) {
 })
 
 const CatalogTreeItem = props => {
-  return <CustomTreeItem labelIcon='bx:book' level={0} {...props} />
+  return <CustomTreeItem labelIcon={'bx:book'} level={0} {...props} />
 }
 
 const SchemaTreeItem = props => {
-  return <CustomTreeItem labelIcon='bx:coin-stack' level={1} {...props} />
+  return <CustomTreeItem labelIcon={'bx:coin-stack'} level={1} {...props} />
 }
 
 const TableTreeItem = props => {
-  return <CustomTreeItem labelIcon='bx:table' level={2} {...props} />
+  return <CustomTreeItem labelIcon={'bx:table'} level={2} {...props} />
 }
 
 const MetalakeTree = props => {
