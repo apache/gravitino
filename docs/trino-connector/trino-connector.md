@@ -18,6 +18,7 @@ The loading of Gravitino's catalogs into Trino follows the naming convention:
 ```text
 {metalake}.{catalog}
 ```
+
 Regarding `metalake` and `catalog`, you can refer to [Gravitino Metalake](/metalake), [Gravitino Catalog](/catalog).
 
 Usage in queries is as follows:

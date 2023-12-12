@@ -72,7 +72,6 @@ curl -X POST -H "Content-Type: application/json" \
     "warehouse": "hdfs://hdfs-host:9000/user/iceberg/warehouse"
   }
 }' http://gravitino-host:8090/api/metalakes/test/catalogs
-
 ```
 
 Listing all Gravitino managed catalogs:
@@ -187,6 +186,7 @@ Before running any `Insert` statements for Iceberg tables in Trino,
 you must check that the user Trino is using to access HDFS has access to the warehouse directory.
 You can override this username by setting the HADOOP_USER_NAME system property in the Trino JVM config, 
 replacing hdfs_user with the appropriate username:
+
 ```text
 -DHADOOP_USER_NAME=hdfs_user
 ```

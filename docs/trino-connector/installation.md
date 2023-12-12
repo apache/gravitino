@@ -62,6 +62,7 @@ Check the plugin directory in the container.
 docker exec -it trino-gravitino /bin/bash
 cd /lib/trino/plugin
 ```
+
 Now you can see the Gravitino connector directory in the plugin directory.
 
 ### Configuring the Gravitino connector
