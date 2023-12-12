@@ -6,6 +6,9 @@ keyword: Gravitino metadata manage
 license: Copyright 2023 Datastrato Pvt Ltd. This software is licensed under the Apache License version 2.
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 This page introduces how to manage metadata by Gravitino. Through Gravitino, you can create, edit, and delete metadata
 like metalakes, catalogs, schemas, and tables. The following contents are included in this page:
 
@@ -27,11 +30,17 @@ Assuming Gravitino has just started, and the host and port is `http://localhost:
 You can create a metalake by sending a `POST` request to the `/api/metalakes` endpoint or just use the Gravitino Java client.
 The following is an example of creating a metalake:
 
+<Tabs>
+<TabItem value="bash" label="Bash">
+
 ```bash
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{"name":"metalake","comment":"comment","properties":{}}' \
 http://localhost:8090/api/metalakes
 ```
+
+</TabItem>
+<TabItem value="java" label="Java">
 
 ```java
 GravitinoClient gravitinoClient = GravitinoClient
@@ -44,14 +53,24 @@ GravitinoMetaLake newMetalake = gravitinoClient.createMetalake(
   // ...
 ```
 
+</TabItem>
+</Tabs>
+
 ### Load a metalake
 
 You can create a metalake by sending a `GET` request to the `/api/metalakes/{metalake_name}` endpoint or just use the Gravitino Java client. The following is an example of loading a metalake:
+
+
+<Tabs>
+<TabItem value="bash" label="Bash">
 
 ```bash
 curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json"  http://localhost:8090/api/metalakes/metalake
 ```
+
+</TabItem>
+<TabItem value="java" label="Java">
 
 ```java
 // ...
@@ -60,9 +79,15 @@ GravitinoMetaLake loaded = gravitinoClient.loadMetalake(
 // ...
 ```
 
+</TabItem>
+</Tabs>
+
 ### Alter a metalake
 
 You can modify a metalake by sending a `PUT` request to the `/api/metalakes/{metalake_name}` endpoint or just use the Gravitino Java client. The following is an example of altering a metalake:
+
+<Tabs>
+<TabItem value="bash" label="Bash">
 
 ```bash
 curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
@@ -81,6 +106,9 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 }' http://localhost:8090/api/metalakes/new_metalake
 ```
 
+</TabItem>
+<TabItem value="java" label="Java">
+
 ```java
 // ...
 GravitinoMetaLake renamed = gravitinoClient.alterMetalake(
@@ -89,6 +117,10 @@ GravitinoMetaLake renamed = gravitinoClient.alterMetalake(
 );
 // ...
 ```
+
+</TabItem>
+</Tabs>
+
 
 Currently, Gravitino supports the following changes to a metalake:
 
@@ -104,10 +136,16 @@ Currently, Gravitino supports the following changes to a metalake:
 
 You can remove a metalake by sending a `DELETE` request to the `/api/metalakes/{metalake_name}` endpoint or just use the Gravitino Java client. The following is an example of dropping a metalake:
 
+<Tabs>
+<TabItem value="bash" label="Bash">
+
 ```bash
 curl -X DELETE -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" http://localhost:8090/api/metalakes/metalake
-````
+```
+
+</TabItem>
+<TabItem value="java" label="Java">
 
 ```java
 // ...
@@ -117,6 +155,9 @@ boolean success = gravitinoClient.dropMetalake(
 // ...
 ```
 
+</TabItem>
+</Tabs>
+
 :::note
 Drop a metalake only removes metadata about the metalake and catalogs, schemas, tables under the metalake in Gravitino, It doesn't remove the real schema and table data in Apache Hive.
 :::
@@ -125,16 +166,25 @@ Drop a metalake only removes metadata about the metalake and catalogs, schemas, 
 
 You can list metalakes by sending a `GET` request to the `/api/metalakes` endpoint or just use the Gravitino Java client. The following is an example of listing all metalake name:
 
+<Tabs>
+<TabItem value="bash" label="Bash">
+
 ```bash
 curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json"  http://localhost:8090/api/metalakes
 ```
+
+</TabItem>
+<TabItem value="java" label="Java">
 
 ```java
 // ...
 GravitinoMetaLake[] allMetalakes = gravitinoClient.listMetalakes();
 // ...
 ```
+
+</TabItem>
+</Tabs>
 
 ## Catalogs operations
 
@@ -148,6 +198,10 @@ The code below is an example of creating a Hive catalog. For other catalogs, the
 
 You can create a catalog by sending a `POST` request to the `/api/metalakes/{metalake_name}/catalogs` endpoint or just use the Gravitino Java client. The following is an example of creating a catalog:
 
+
+<Tabs>
+<TabItem value="bash" label="Bash">
+
 ```bash
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
@@ -160,6 +214,9 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   }
 }' http://localhost:8090/api/metalakes/metalake/catalogs
 ```
+
+</TabItem>
+<TabItem value="java" label="Java">
 
 ```java
 GravitinoClient gravitinoClient = GravitinoClient
@@ -184,6 +241,9 @@ Catalog catalog = gravitinoMetaLake.createCatalog(
 // ...
 ```
 
+</TabItem>
+</Tabs>
+
 Currently, Gravitino supports the following catalog providers:
 
 | Catalog provider    | Catalog property                                                            | 
@@ -197,10 +257,16 @@ Currently, Gravitino supports the following catalog providers:
 
 You can load a catalog by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}` endpoint or just use the Gravitino Java client. The following is an example of loading a catalog:
 
+<Tabs>
+<TabItem value="bash" label="Bash">
+
 ```bash
 curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" http://localhost:8090/api/metalakes/metalake/catalogs/catalog
 ```
+
+</TabItem>
+<TabItem value="java" label="Java">
 
 ```java
 // ...
@@ -212,9 +278,15 @@ Catalog catalog = gravitinoMetaLake.loadCatalog(NameIdentifier.of("metalake", "c
 // ...
 ```
 
+</TabItem>
+</Tabs>
+
 ### Alter a catalog
 
 You can modify a catalog by sending a `PUT` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}` endpoint or just use the Gravitino Java client. The following is an example of altering a catalog:
+
+<Tabs>
+<TabItem value="bash" label="Bash">
 
 ```bash
 curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
@@ -233,6 +305,9 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 }' http://localhost:8090/api/metalakes/metalake/catalogs/catalog
 ```
 
+</TabItem>
+<TabItem value="java" label="Java">
+
 ```java
 // ...
 // Assuming you have just created a metalake named `metalake`
@@ -243,6 +318,9 @@ Catalog catalog = gravitinoMetaLake.alterCatalog(NameIdentifier.of("metalake", "
     CatalogChange.rename("alter_catalog"), CatalogChange.updateComment("new comment"));
 // ...
 ```
+
+</TabItem>
+</Tabs>
 
 Currently, Gravitino supports the following changes to a catalog:
 
@@ -257,11 +335,17 @@ Currently, Gravitino supports the following changes to a catalog:
 
 You can remove a catalog by sending a `DELETE` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}` endpoint or just use the Gravitino Java client. The following is an example of dropping a catalog:
 
+<Tabs>
+<TabItem value="bash" label="Bash">
+
 ```bash
 curl -X DELETE -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" \
 http://localhost:8090/api/metalakes/metalake/catalogs/catalog
 ```
+
+</TabItem>
+<TabItem value="java" label="Java">
 
 ```java
 // ...
@@ -270,7 +354,11 @@ GravitinoMetaLake gravitinoMetaLake =
     gravitinoClient.loadMetalake(NameIdentifier.of("metalake"));
 gravitinoMetaLake.dropCatalog(NameIdentifier.of("metalake", "catalog"));
 // ...
+  // ...
 ```
+
+</TabItem>
+</Tabs>
 
 :::note
 Drop a catalog only removes metadata about the catalog and schemas, tables under the catalog in Gravitino, It doesn't remove the real data(table and schema) in Apache Hive.
@@ -281,11 +369,17 @@ Drop a catalog only removes metadata about the catalog and schemas, tables under
 You can list all catalogs under a metalake by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs` endpoint or just use the Gravitino Java client. The following is an example of listing all catalogs in
 a metalake:
 
+<Tabs>
+<TabItem value="bash" label="Bash">
+
 ```bash
 curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" \
 http://localhost:8090/api/metalakes/metalake/catalogs
 ```
+
+</TabItem>
+<TabItem value="java" label="Java">
 
 ```java
 // ...
@@ -297,6 +391,9 @@ NameIdentifier[] catalogsIdents = gravitinoMetaLake.listCatalogs(Namespace.ofCat
 // ...
 ```
 
+</TabItem>
+</Tabs>
+
 ## Schemas operations
 
 :::tip
@@ -306,6 +403,9 @@ Users should create a metalake and a catalog before creating a schema.
 ### Create a schema
 
 You can create a schema by sending a `POST` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas` endpoint or just use the Gravitino Java client. The following is an example of creating a schema:
+
+<Tabs>
+<TabItem value="bash" label="Bash">
 
 ```bash
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
@@ -317,6 +417,9 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   }
 }' http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas
 ```
+
+</TabItem>
+<TabItem value="java" label="Java">
 
 ```java
 GravitinoClient gravitinoClient = GravitinoClient
@@ -342,6 +445,9 @@ Schema schema = supportsSchemas.createSchema(
 // ...
 ```
 
+</TabItem>
+</Tabs>
+
 Currently, Gravitino supports the following schema property:
 
 | Catalog provider    | Schema property                                                           | 
@@ -357,11 +463,17 @@ Currently, Gravitino supports the following schema property:
 You can create a schema by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}` endpoint or just use the Gravitino Java client. The following is an example of loading a schema:
 
 
+<Tabs>
+<TabItem value="bash" label="Bash">
+
 ```bash
 curl -X GET \-H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" \
 http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema
 ```
+
+</TabItem>
+<TabItem value="java" label="Java">
 
 ```java
 // ...
@@ -372,9 +484,15 @@ Schema schema = supportsSchemas.loadSchema(NameIdentifier.of("metalake", "catalo
 // ...
 ```
 
+</TabItem>
+</Tabs>
+
 ### Alter a schema
 
 You can change a schema by sending a `PUT` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}` endpoint or just use the Gravitino Java client. The following is an example of modifying a schema:
+
+<Tabs>
+<TabItem value="bash" label="Bash">
 
 ```bash
 curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
@@ -392,6 +510,9 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 }' http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema
 ```
 
+</TabItem>
+<TabItem value="java" label="Java">
+
 ```java
 // ...
 // Assuming you have just created a Hive catalog named `hive_catalog`
@@ -405,6 +526,9 @@ Schema schema = supportsSchemas.alterSchema(NameIdentifier.of("metalake", "hive_
 // ...
 ```
 
+</TabItem>
+</Tabs>
+
 Currently, Gravitino supports the following changes to a schema:
 
 | Supported modification | Json                                                         | Java                                          |
@@ -416,6 +540,8 @@ Currently, Gravitino supports the following changes to a schema:
 ### Drop a schema
 You can remove a schema by sending a `DELETE` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}` endpoint or just use the Gravitino Java client. The following is an example of dropping a schema:
 
+<Tabs>
+<TabItem value="bash" label="Bash">
 
 ```bash
 // cascade can be true or false
@@ -423,6 +549,9 @@ curl -X DELETE -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" \
 http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema?cascade=true
 ```
+
+</TabItem>
+<TabItem value="java" label="Java">
 
 ```java
 // ...
@@ -434,15 +563,25 @@ SupportsSchemas supportsSchemas = catalog.asSchemas();
 supportsSchemas.dropSchema(NameIdentifier.of("metalake", "catalog", "schema"), true);
 ```
 
+</TabItem>
+</Tabs>
+
 ### List all schemas under a catalog
 
 You can alter all schemas under a catalog by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas` endpoint or just use the Gravitino Java client. The following is an example of list all schema
     in a catalog:
 
+
+<Tabs>
+<TabItem value="bash" label="Bash">
+
 ```bash
 curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas
 ```
+
+</TabItem>
+<TabItem value="java" label="Java">
 
 ```java
 // ...
@@ -453,6 +592,9 @@ SupportsSchemas supportsSchemas = catalog.asSchemas();
 NameIdentifier[] schemas = supportsSchemas.listSchemas(Namespace.ofSchema("metalake", "catalog"));
 ```
 
+</TabItem>
+</Tabs>
+
 ## Tables operations
 
 :::tip
@@ -462,6 +604,9 @@ Users should create a metalake, a catalog and a schema before creating a table.
 ### Create a table
 
 You can create a table by sending a `POST` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables` endpoint or just use the Gravitino Java client. The following is an example of creating a table:
+
+<Tabs>
+<TabItem value="bash" label="Bash">
 
 ```bash
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
@@ -487,6 +632,9 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   }
 }' http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema/tables
 ```
+
+</TabItem>
+<TabItem value="java" label="Java">
 
 ```java
 GravitinoClient gravitinoClient = GravitinoClient
@@ -528,6 +676,9 @@ tableCatalog.createTable(
     tablePropertiesMap
 );
 ```
+
+</TabItem>
+</Tabs>
 
 In order to create a table, you need to provide the following information:
 
@@ -593,6 +744,9 @@ In addition to the basic settings, Gravitino supports the following features:
 
 The following is an example of creating a partitioned, bucketed table and sorted order table:
 
+<Tabs>
+<TabItem value="bash" label="Bash">
+
 ```bash
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
@@ -656,6 +810,9 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 }' http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema/tables
 ```
 
+</TabItem>
+<TabItem value="java" label="Java">
+
 ```java
 tableCatalog.createTable(
     NameIdentifier.of("metalake", "hive_catalog", "schema", "table"),
@@ -709,6 +866,9 @@ tableCatalog.createTable(
     );
 ```
 
+</TabItem>
+</Tabs>
+
 :::note
 The code above is an example of creating a Hive table. For other catalogs, the code is similar, but the supported column type, table properties may be different. For more details, please refer to the related doc.
 :::
@@ -717,12 +877,17 @@ The code above is an example of creating a Hive table. For other catalogs, the c
 
 You can load a table by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables/{table_name}` endpoint or just use the Gravitino Java client. The following is an example of loading a table:
 
+<Tabs>
+<TabItem value="bash" label="Bash">
+
 ```bash
 curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json"  \
 http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema/tables/table
-
 ```
+
+</TabItem>
+<TabItem value="java" label="Java">
 
 ```java
 // ...
@@ -734,9 +899,15 @@ tableCatalog.loadTable(NameIdentifier.of("metalake", "hive_catalog", "schema", "
 // ...
 ```
 
+</TabItem>
+</Tabs>
+
 ### Alter a table
 
 You can modify a table by sending a `PUT` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables/{table_name}` endpoint or just use the Gravitino Java client. The following is an example of modifying a table:
+
+<Tabs>
+<TabItem value="bash" label="Bash">
 
 ```bash
 curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
@@ -753,6 +924,9 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 }' http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema/tables/table
 ```
 
+</TabItem>
+<TabItem value="java" label="Java">
+
 ```java
 // ...
 // Assuming you have just created a Hive catalog named `catalog`
@@ -764,6 +938,9 @@ Table t = tableCatalog.alterTable(NameIdentifier.of("metalake", "catalog", "sche
     TableChange.rename("table_renamed"), TableChange.updateComment("xxx"));
 // ...
 ```
+
+</TabItem>
+</Tabs>
 
 Currently, Gravitino supports the following changes to a table:
 
@@ -785,10 +962,17 @@ Currently, Gravitino supports the following changes to a table:
 
 You can remove a table by sending a `DELETE` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables/{table_name}` endpoint or just use the Gravitino Java client. The following is an example of dropping a table:
 
+<Tabs>
+<TabItem value="bash" label="Bash">
+
 ```bash
 curl -X DELETE -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json" http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema/tables/table
+-H "Content-Type: application/json" \
+http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema/tables/table
 ```
+
+</TabItem>
+<TabItem value="java" label="Java">
 
 ```java
 // ...
@@ -800,15 +984,24 @@ tableCatalog.dropTable(NameIdentifier.of("metalake", "catalog", "schema", "table
 // ...
 ```
 
+</TabItem>
+</Tabs>
+
 ### List all tables under a schema
 
 You can list all tables in a schema by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables` endpoint or just use the Gravitino Java client. The following is an example of list all tables in a schema:
+
+<Tabs>
+<TabItem value="bash" label="Bash">
 
 ```bash
 curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" \
 http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema/tables 
 ```
+
+</TabItem>
+<TabItem value="java" label="Java">
 
 ```java
 // ...
@@ -820,3 +1013,6 @@ NameIdentifier[] identifiers =
     tableCatalog.listTables(Namespace.ofTable("metalake", "catalog", "schema"));
 // ...
 ```
+
+</TabItem>
+</Tabs>
