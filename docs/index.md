@@ -68,7 +68,7 @@ to learn how to use the playground.
   table management.
 * [Gravitino Open API](./api/rest/gravitino-rest-api): provides the complete Open API definition of
   Gravitino.
-* [Gravitino Javadoc](./api/java/index.html): provides the Javadoc for Gravitino API.
+* [Gravitino Javadoc](pathname:///docs/0.3.0/api/java/index.html): provides the Javadoc for Gravitino API.
 
 ### Server administration
 
