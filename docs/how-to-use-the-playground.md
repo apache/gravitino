@@ -66,6 +66,12 @@ WITH (
 INSERT INTO "metalake_demo.catalog_demo".db1.table_001 (name, salary) VALUES ('sam', '11');
 
 SELECT * FROM "metalake_demo.catalog_demo".db1.table_001;
+
+SHOW SCHEMAS from "metalake_demo.catalog_demo";
+
+DESCRIBE "metalake_demo.catalog_demo".db1.table_001;
+
+SHOW TABLES from "metalake_demo.catalog_demo".db1;
 ```
 
 ### Cross-catalog queries
