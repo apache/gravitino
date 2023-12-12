@@ -83,7 +83,7 @@ Gravitino provides several ways to configure and manage the Gravitino server. Pl
 
 ### Catalog details
 
-Gravitino support different catalogs to manage the metadata in different sources. Please see:
+Gravitino supports different catalogs to manage the metadata in different sources. Please see:
 
 * [Lakehouse Iceberg catalog](./lakehouse-iceberg-catalog): a complete guide to use Gravitino 
   manage Apache Iceberg data.
