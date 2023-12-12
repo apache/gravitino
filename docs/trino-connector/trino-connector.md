@@ -1,7 +1,7 @@
 ---
 title: "Gravitino connector"
 slug: /trino-connector
-keyword: gravition connector trino
+keyword: gravitino connector trino
 license: "Copyright 2023 Datastrato Pvt Ltd.
 This software is licensed under the Apache License version 2."
 ---
@@ -18,7 +18,7 @@ The loading of Gravitino's catalogs into Trino follows the naming convention:
 ```text
 {metalake}.{catalog}
 ```
-Regarding `metalake` and `catalog`, you can refer to [Gravition Metalake](/metalake), [Gravition Catalog](/catalog).
+Regarding `metalake` and `catalog`, you can refer to [Gravitino Metalake](/metalake), [Gravitino Catalog](/catalog).
 
 Usage in queries is as follows:
 

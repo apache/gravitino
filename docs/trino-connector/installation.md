@@ -1,7 +1,7 @@
 ---
 title: "Gravitino connector installation"
 slug: /trino-connector/install
-keyword: gravition connector trino
+keyword: gravitino connector trino
 license: "Copyright 2023 Datastrato Pvt Ltd.
 This software is licensed under the Apache License version 2."
 ---
@@ -66,14 +66,14 @@ Now you can see the Gravitino connector directory in the plugin directory.
 
 ### Configuring the Gravitino connector
 
-Assuming you have now started the Gravitino server on the host `gravition-server-host` and can access it properly. 
+Assuming you have now started the Gravitino server on the host `gravitino-server-host` and can access it properly. 
 And you have created a metalake named `test`. If not, please refer to the [Gravitino Getting-started](getting-started)
 
 Add catalog configuration to the Trino configuration file `/etc/trino/catalog/gravitino.properties`.
 
 ```text
 connector.name=gravitino
-gravitino.url=http://gravition-server-host:8090
+gravitino.url=http://gravitino-server-host:8090
 gravitino.metalake=test
 ```
 
@@ -86,7 +86,7 @@ If you don't have the `test` metalake. You can create a new metalake named `test
 Create a new metalake named `test` by the following command.
 
 ```shell
-curl -X POST -H "Content-Type: application/json" -d '{"name":"test","comment":"comment","properties":{}}' http://gravition-server-host:8090/api/metalakes
+curl -X POST -H "Content-Type: application/json" -d '{"name":"test","comment":"comment","properties":{}}' http://gravitino-server-host:8090/api/metalakes
 ```
 
 Restart the Trino container to load the Gravitino connector.

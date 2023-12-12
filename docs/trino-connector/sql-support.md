@@ -1,21 +1,21 @@
 ---
 title: "Gravitino connector SQL support"
 slug: /trino-connector/sql-support
-keyword: gravition connector trino
+keyword: gravitino connector trino
 license: "Copyright 2023 Datastrato Pvt Ltd.
 This software is licensed under the Apache License version 2."
 ---
 
 The connector provides read access and write access to data and metadata stored in Gravitino.
 
-### Globally available statements:
+### Globally available statements
 
 - [EXPLAIN](https://trino.io/docs/current/sql/explain.html)
 - [EXPLAIN ANALYZE](https://trino.io/docs/current/sql/explain-analyze.html)
 - [PREPARE](https://trino.io/docs/current/sql/prepare.html)
 - [USE](https://trino.io/docs/current/sql/use.html)
 
-### Read operations:
+### Read operations
 
 - [SELECT](https://trino.io/docs/current/sql/select.html)
 - [DESCRIBE](https://trino.io/docs/current/sql/describe.html)
@@ -26,12 +26,12 @@ The connector provides read access and write access to data and metadata stored 
 - [SHOW SCHEMAS](https://trino.io/docs/current/sql/show-schemas.html)
 - [SHOW TABLES](https://trino.io/docs/current/sql/show-tables.html)
 
-### Write operations:
+### Write operations
 
 - [INSERT](https://trino.io/docs/current/sql/insert.html)
 - [INSERT INTO SELECT](https://trino.io/docs/current/sql/insert.html)
 
-### Schema and table management:
+### Schema and table management
 
 - [CREATE TABLE](https://trino.io/docs/current/sql/create-table.html)
 - [DROP TABLE](https://trino.io/docs/current/sql/drop-table.html)
@@ -40,7 +40,7 @@ The connector provides read access and write access to data and metadata stored 
 - [DROP SCHEMA](https://trino.io/docs/current/sql/drop-schema.html)
 - [COMMENT](https://trino.io/docs/current/sql/comment.html)
 
-### Transactions:
+### Transactions
 
 - [START TRANSACTION](https://trino.io/docs/current/sql/start-transaction.html)
 - [COMMIT](https://trino.io/docs/current/sql/commit.html)

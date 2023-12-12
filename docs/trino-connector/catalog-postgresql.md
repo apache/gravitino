@@ -1,7 +1,7 @@
 ---
 title: "Gravtino connnector - PostgreSQL catalog"
 slug: /trino-connector/catalogs/postgresql
-keyword: gravition connector trino
+keyword: gravitino connector trino
 license: "Copyright 2023 Datastrato Pvt Ltd.
 This software is licensed under the Apache License version 2."
 ---
@@ -53,7 +53,7 @@ curl -X POST -H "Content-Type: application/json" \
   "name": "test",
   "comment": "comment",
   "properties": {}
-}' http://gravition-host:8090/api/metalakes
+}' http://gravitino-host:8090/api/metalakes
 
 curl -X POST -H "Content-Type: application/json" \
 -d '{
@@ -68,7 +68,7 @@ curl -X POST -H "Content-Type: application/json" \
     "jdbc-database": "mydb",
     "jdbc-driver": "org.postgresql.Driver"
   }
-}' http://gravition-host:8090/api/metalakes/test/catalogs
+}' http://gravitino-host:8090/api/metalakes/test/catalogs
 
 ```
 
