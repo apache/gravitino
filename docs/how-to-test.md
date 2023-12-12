@@ -81,6 +81,7 @@ For example, the `integration-test/src/test/.../CatalogHiveIT.java` test needs t
 the `datastrato/gravitino-ci-hive` Docker container for testing the Hive data source.
 Therefore, it should have the following `@tag` annotation:`@tag(gravitino-docker-it)`, This annotation
 helps identify the specific Docker container required for the integration test.
+
 For example:
 
 ```java
