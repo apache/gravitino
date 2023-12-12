@@ -16,7 +16,7 @@ The Gravitino project provides a set of Docker images to facilitate the publishi
 
 You can use GitHub actions to publish Docker images to the Docker Hub repository.
 
-1. Open the [docker publish link](https://github.com/datastrato/gravitino/actions/workflows/docker-image.yml)
+1. Open the [Docker publish link](https://github.com/datastrato/gravitino/actions/workflows/docker-image.yml)
 2. Click the `Run workflow` button.
 3. Select the branch you want to build
    + Selecting the main branch results in publishing the Docker image with the specified tag and the latest tag.
