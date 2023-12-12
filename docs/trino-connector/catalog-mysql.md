@@ -153,7 +153,7 @@ Rename the `table_01` table to `table_02`:
 ALTER TABLE "test.mysql_test".database_01.table_01 RENAME TO "test.mysql_test".database_01.table_02;
 ```
 
-# DROP
+### DROP
 
 Drop a schema:
 

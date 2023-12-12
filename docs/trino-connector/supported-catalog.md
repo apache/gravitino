@@ -23,7 +23,7 @@ If you need to create a catalog, please refer to:
 ## Data type mapping
 
 All types of catalogs support the following data type conversions.
-Data Type Conversion between Trino and Gravitino
+Data Type Conversion between Trino and Gravitino is as following:
 
 | Gravitino Type | Trino Type |
 |----------------|------------|

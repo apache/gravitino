@@ -167,7 +167,7 @@ Rename the `table_01` table to `table_02`:
 ALTER TABLE "test.iceberg_test".database_01.table_01 RENAME TO "test.iceberg_test".database_01.table_02;
 ```
 
-# Drop
+### Drop
 
 Drop a schema:
 
