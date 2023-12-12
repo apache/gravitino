@@ -10,14 +10,19 @@ The Hive catalog allows Trino querying data stored in an Apache Hive data wareho
 
 ## Requirements
 
-- The Hive connector requires a Hive metastore service (HMS), or a compatible implementation of the Hive metastore, such as AWS Glue.
-- Apache Hadoop HDFS 2.x and 3.x are supported.
-- Many distributed storage systems including HDFS, Amazon S3 or S3-compatible systems, 
-  Google Cloud Storage, Azure Storage, and IBM Cloud Object Storage can be queried with the Hive connector.
-- The coordinator and all workers must have network access to the Hive metastore and the storage system. 
-  Hive metastore access with the Thrift protocol defaults to using port 9083.
-- Data files must be in a supported file format. Some file formats can be configured using file format configuration properties 
-  per catalog:
+The Hive connector requires a Hive metastore service (HMS), or a compatible implementation of the Hive metastore, such as AWS Glue.
+
+Apache Hadoop HDFS 2.x and 3.x are supported.
+
+Many distributed storage systems including HDFS, Amazon S3 or S3-compatible systems,
+Google Cloud Storage, Azure Storage, and IBM Cloud Object Storage can be queried with the Hive connector.
+
+The coordinator and all workers must have network access to the Hive metastore and the storage system. 
+
+Hive metastore access with the Thrift protocol defaults to using port 9083.
+
+Data files must be in a supported file format. Some file formats can be configured using file format configuration properties 
+per catalog:
   - ORC
   - Parquet
   - Avro
@@ -49,12 +54,11 @@ Support for the following alter table operations:
 ## Select
 
 The Gravitino connector supports most SELECT statements, allowing the execution of queries successfully.
-It's not implements certain query optimizations, such as pushdown and pruning functionalities.
+Currently, it doesn't support certain query optimizations, such as pushdown and pruning functionalities.
 
 ## Table properties
 
-In the Hive catalog, additional properties can be set for tables and schemas
-using the "WITH" keyword in the "CREATE TABLE" statement.
+You can set additional properties for tables and schemas in the Hive catalog using "WITH" keyword in the "CREATE TABLE" statement.
 
 ```sql
 CREATE TABLE "metalake.catalog".dbname.tabname
@@ -115,7 +119,7 @@ curl -X POST \
 Listing all Gravitino managed catalogs:
 
 ```sql 
-show catalogs
+SHOW CATALOGS
 ```
 
 The results are similar to:
@@ -141,13 +145,13 @@ Other catalogs are regular user-configured Trino catalogs.
 Create a new schema named `database_01` in `test.hive_test` catalog.
 
 ```sql
-create schema "test.hive_test".database_01;
+CREATE SCHEMA "test.hive_test".database_01;
 ```
 
 Create a new schema using HDFS location:
 
 ```sql
-create schema "test.hive_test".database_01 {
+CREATE SCHEMA "test.hive_test".database_01 {
   location = 'hdfs://hdfs-host:9000/user/hive/warehouse/database_01'
 };
 ```
@@ -155,7 +159,7 @@ create schema "test.hive_test".database_01 {
 Create a new table named `table_01` in schema `"test.hive_test".database_01` and stored in a TEXTFILE format.
 
 ```sql
-create table  "test.hive_test".database_01.table_01
+CREATE TABLE  "test.hive_test".database_01.table_01
 (
 name varchar,
 salary int
@@ -165,30 +169,18 @@ WITH (
 );
 ```
 
-Drop a schema:
-
-```sql
-drop schema "test.hive_test".database_01;
-```
-
-Drop a table:
-
-```sql
-drop table "test.hive_test".database_01.table_01;
-```
-
 ### Writing data
 
 Insert data into the table `table_01`:
 
 ```sql
-insert into  "test.hive_test".database_01.table_01 (name, salary) values ('ice', 12);
+INSERT INTO "test.hive_test".database_01.table_01 (name, salary) VALUES ('ice', 12);
 ```
 
 Insert data into the table `table_01` from select:
 
 ```sql
-insert into  "test.hive_test".database_01.table_01 (name, salary) select * from "test.hive_test".database_01.table_01;
+INSERT INTO "test.hive_test".database_01.table_01 (name, salary) SELECT * FROM "test.hive_test".database_01.table_01;
 ```
 
 ### Querying data
@@ -196,7 +188,7 @@ insert into  "test.hive_test".database_01.table_01 (name, salary) select * from 
 Query the `table_01` table:
 
 ```sql
-select * from "test.hive_test".database_01.table_01;
+SELECT * FROM "test.hive_test".database_01.table_01;
 ```
 
 ### Modify a table
@@ -204,19 +196,33 @@ select * from "test.hive_test".database_01.table_01;
 Add a new column `age` to the `table_01` table:
 
 ```sql
-alter table "test.hive_test".database_01.table_01 add column age int;
+ALTER TABLE "test.hive_test".database_01.table_01 ADD COLUMN age int;
 ```
 
 Drop a column `age` from the `table_01` table:
 
 ```sql
-alter table "test.hive_test".database_01.table_01 drop column age;
+ALTER TABLE "test.hive_test".database_01.table_01 DROP COLUMN age;
 ```
 
 Rename the `table_01` table to `table_02`:
 
 ```sql
-alter table "test.hive_test".database_01.table_01 rename to "test.hive_test".database_01.table_02;
+ALTER TABLE "test.hive_test".database_01.table_01 RENAME TO "test.hive_test".database_01.table_02;
+```
+
+# DROP 
+
+Drop a schema:
+
+```sql
+DROP SCHEMA "test.hive_test".database_01;
+```
+
+Drop a table:
+
+```sql
+DROP TABLE "test.hive_test".database_01.table_01;
 ```
 
 ## HDFS config and permissions

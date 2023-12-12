@@ -14,30 +14,32 @@ The catalogs currently supported by the Gravitino connector are as follows:
 - [PostgreSQL](/docs/trino-connector/catalogs/postgresql)
 
 ## Create catalog
+
 Trino currently does not support creating Gravitino managed catalogs. 
 If you need to create a catalog, please refer to:
 - [Create Catalog](/docs)
 - [Gravition Catalog](/docs)
 
 ## Data type mapping
+
 All types of catalogs support the following data type conversions.
 Data Type Conversion between Trino and Gravitino
 
-| Gravitino Type    | Trino Type |
-| ----------------- |------------|
-| BooleanType       | BOOLEAN    |
-| ByteType          | TINYINT    |
-| ShortType         | SMALLINT   |
-| IntegerType       | INTEGER    |
-| LongType          | BIGINT     |
-| FloatType         | REAL       |
-| DoubleType        | DOUBLE     |
-| DecimalType       | DECIMAL    |
-| StringType        | VARCHAR    |
-| VarcharType       | VARCHAR    |
-| VarbinaryType     | VARBINARY  |
-| TimestampType     | TIMESTAMP  |
-| DateType          | DATE       |
-| ArrayType         | ARRAY      |
-| MapType           | MAP        |
-| RowType           | ROW        |
+| Gravitino Type | Trino Type |
+|----------------|------------|
+| BooleanType    | BOOLEAN    |
+| ByteType       | TINYINT    |
+| ShortType      | SMALLINT   |
+| IntegerType    | INTEGER    |
+| LongType       | BIGINT     |
+| FloatType      | REAL       |
+| DoubleType     | DOUBLE     |
+| DecimalType    | DECIMAL    |
+| StringType     | VARCHAR    |
+| VarcharType    | VARCHAR    |
+| BinaryType     | VARBINARY  |
+| TimestampType  | TIMESTAMP  |
+| DateType       | DATE       |
+| ArrayType      | ARRAY      |
+| MapType        | MAP        |
+| UnionType      | ROW        |

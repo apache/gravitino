@@ -35,12 +35,11 @@ Support for the following alter table operations:
 ## Select
 
 The Gravitino connector supports most SELECT statements, allowing the execution of queries successfully.
-It's not implements certain query optimizations, such as indexing and pushdowns.
+Currently, it doesn't support certain query optimizations, such as indexing and pushdowns.
 
 ## Table and Schema properties
 
 PostgreSQL's tables and schemas cannot support properties.
-
 
 ## Basic usage examples
 
@@ -64,8 +63,8 @@ curl -X POST -H "Content-Type: application/json" \
   "provider": "jdbc-postgresql",
   "properties": {
     "jdbc-url": "jdbc:postgresql://postgresql-host/mydb",
-    "jdbc-user": "root",
-    "jdbc-password": "ds123",
+    "jdbc-user": "<user>",
+    "jdbc-password": "<password>",
     "jdbc-database": "mydb",
     "jdbc-driver": "org.postgresql.Driver"
   }
@@ -76,7 +75,7 @@ curl -X POST -H "Content-Type: application/json" \
 Listing all Gravitino managed catalogs:
 
 ```sql 
-show catalogs
+SHOW CATALOGS
 ```
 
 The results are similar to:
@@ -102,29 +101,17 @@ Other catalogs are regular user-configured Trino catalogs.
 Create a new schema named `database_01` in `test.postgresql_test` catalog.
 
 ```sql
-create schema "test.postgresql_test".database_01;
+CREATE SCHEMA "test.postgresql_test".database_01;
 ```
 
 Create a new table named `table_01` in schema `"test.postgresql_test".database_01` and stored in a TEXTFILE format.
 
 ```sql
-create table  "test.postgresql_test".database_01.table_01
+CREATE TABLE "test.postgresql_test".database_01.table_01
 (
 name varchar,
 salary int
 );
-```
-
-Drop a schema:
-
-```sql
-drop schema "test.postgresql_test".database_01;
-```
-
-Drop a table:
-
-```sql
-drop table "test.postgresql_test".database_01.table_01;
 ```
 
 ### Writing data
@@ -132,13 +119,13 @@ drop table "test.postgresql_test".database_01.table_01;
 Insert data into the table `table_01`:
 
 ```sql
-insert into  "test.postgresql_test".database_01.table_01 (name, salary) values ('ice', 12);
+INSERT INTO "test.postgresql_test".database_01.table_01 (name, salary) VALUES ('ice', 12);
 ```
 
 Insert data into the table `table_01` from select:
 
 ```sql
-insert into  "test.postgresql_test".database_01.table_01 (name, salary) select * from "test.postgresql_test".database_01.table_01;
+INSERT INTO "test.postgresql_test".database_01.table_01 (name, salary) SELECT * FROM "test.postgresql_test".database_01.table_01;
 ```
 
 ### Querying data
@@ -146,7 +133,7 @@ insert into  "test.postgresql_test".database_01.table_01 (name, salary) select *
 Query the `table_01` table:
 
 ```sql
-select * from "test.postgresql_test".database_01.table_01;
+SELECT * FROM "test.postgresql_test".database_01.table_01;
 ```
 
 ### Modify a table
@@ -154,17 +141,31 @@ select * from "test.postgresql_test".database_01.table_01;
 Add a new column `age` to the `table_01` table:
 
 ```sql
-alter table "test.postgresql_test".database_01.table_01 add column age int;
+ALTER TABLE "test.postgresql_test".database_01.table_01 ADD COLUMN age int;
 ```
 
 Drop a column `age` from the `table_01` table:
 
 ```sql
-alter table "test.postgresql_test".database_01.table_01 drop column age;
+ALTER TABLE "test.postgresql_test".database_01.table_01 DROP COLUMN age;
 ```
 
 Rename the `table_01` table to `table_02`:
 
 ```sql
-alter table "test.postgresql_test".database_01.table_01 rename to "test.postgresql_test".database_01.table_02;
+ALTER TABLE "test.postgresql_test".database_01.table_01 RENAME TO "test.postgresql_test".database_01.table_02;
+```
+
+# Drop
+
+Drop a schema:
+
+```sql
+DROP SCHEMA "test.postgresql_test".database_01;
+```
+
+Drop a table:
+
+```sql
+DROP TABLE "test.postgresql_test".database_01.table_01;
 ```

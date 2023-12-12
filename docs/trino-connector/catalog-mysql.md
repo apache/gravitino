@@ -7,7 +7,7 @@ This software is licensed under the Apache License version 2."
 ---
 
 The MySQL catalog allows querying and creating tables in an external MySQL instance. 
-This can be used to join data between different systems like MySQL and Hive, or between two different MySQL instances.
+You can join data between different systems like MySQL and Hive, or between two different MySQL instances by this.
 
 ## Requirements
 
@@ -34,7 +34,7 @@ Support for the following alter table operations:
 ## Select
 
 The Gravitino connector supports most SELECT statements, allowing the execution of queries successfully.
-It's not implements certain query optimizations, such as indexing and pushdowns.
+Currently, it doesn't support certain query optimizations, such as indexing and pushdowns.
 
 ## Table and Schema properties
 
@@ -62,8 +62,8 @@ curl -X POST -H "Content-Type: application/json" \
   "provider": "jdbc-mysql",
   "properties": {
     "jdbc-url": "jdbc:mysql://mysql-host:3306?useSSL=false",
-    "jdbc-user": "root",
-    "jdbc-password": "ds123"
+    "jdbc-user": "<username>",
+    "jdbc-password": "<password>"
     "jdbc-driver": "com.mysql.cj.jdbc.Driver"
   }
 }' http://gravition-host:8090/api/metalakes/test/catalogs
@@ -72,7 +72,7 @@ curl -X POST -H "Content-Type: application/json" \
 Listing all Gravitino managed catalogs:
 
 ```sql 
-show catalogs
+SHOW CATALOGS
 ```
 
 The results are similar to:
@@ -90,7 +90,7 @@ Query 20231017_082503_00018_6nt3n, FINISHED, 1 node
 ```
 
 The `gravitino` catalog is a catalog defined By Trino catalog configuration. 
-The `1test.mysql_test` catalog is the catalog created by you in Gravitino.
+The `test.mysql_test` catalog is the catalog created by you in Gravitino.
 Other catalogs are regular user-configured Trino catalogs.
 
 ### Creating tables and schemas
@@ -98,29 +98,17 @@ Other catalogs are regular user-configured Trino catalogs.
 Create a new schema named `database_01` in `test.mysql_test` catalog.
 
 ```sql
-create schema "test.mysql_test".database_01;
+CREATE SCHEMA "test.mysql_test".database_01;
 ```
 
 Create a new table named `table_01` in schema `"test.mysql_test".database_01` and stored in a TEXTFILE format.
 
 ```sql
-create table  "test.mysql_test".database_01.table_01
+CREATE TABLE  "test.mysql_test".database_01.table_01
 (
 name varchar,
 salary int
 );
-```
-
-Drop a schema:
-
-```sql
-drop schema "test.mysql_test".database_01;
-```
-
-Drop a table:
-
-```sql
-drop table "test.mysql_test".database_01.table_01;
 ```
 
 ### Writing data
@@ -128,13 +116,13 @@ drop table "test.mysql_test".database_01.table_01;
 Insert data into the table `table_01`:
 
 ```sql
-insert into  "test.mysql_test".database_01.table_01 (name, salary) values ('ice', 12);
+INSERT INTO "test.mysql_test".database_01.table_01 (name, salary) VALUES ('ice', 12);
 ```
 
 Insert data into the table `table_01` from select:
 
 ```sql
-insert into  "test.mysql_test".database_01.table_01 (name, salary) select * from "test.mysql_test".database_01.table_01;
+INSERT INTO "test.mysql_test".database_01.table_01 (name, salary) SELECT * FROM "test.mysql_test".database_01.table_01;
 ```
 
 ### Querying data
@@ -142,7 +130,7 @@ insert into  "test.mysql_test".database_01.table_01 (name, salary) select * from
 Query the `table_01` table:
 
 ```sql
-select * from "test.mysql_test".database_01.table_01;
+SELECT * FROM "test.mysql_test".database_01.table_01;
 ```
 
 ### Modify a table
@@ -150,17 +138,31 @@ select * from "test.mysql_test".database_01.table_01;
 Add a new column `age` to the `table_01` table:
 
 ```sql
-alter table "test.mysql_test".database_01.table_01 add column age int;
+ALTER TABLE "test.mysql_test".database_01.table_01 ADD COLUMN age int;
 ```
 
 Drop a column `age` from the `table_01` table:
 
 ```sql
-alter table "test.mysql_test".database_01.table_01 drop column age;
+ALTER TABLE "test.mysql_test".database_01.table_01 DROP COLUMN age;
 ```
 
 Rename the `table_01` table to `table_02`:
 
 ```sql
-alter table "test.mysql_test".database_01.table_01 rename to "test.mysql_test".database_01.table_02;
+ALTER TABLE "test.mysql_test".database_01.table_01 RENAME TO "test.mysql_test".database_01.table_02;
+```
+
+# DROP
+
+Drop a schema:
+
+```sql
+DROP SCHEMA "test.mysql_test".database_01;
+```
+
+Drop a table:
+
+```sql
+DROP TABLE "test.mysql_test".database_01.table_01;
 ```

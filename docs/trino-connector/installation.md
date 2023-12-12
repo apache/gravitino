@@ -44,16 +44,16 @@ Download the Gravitino connector tarball and unpack it.
 
 ```shell
 cd /tmp
-wget https://github.com/datastrato/gravitino/releases/gravitino-trino-connector-0.3.0.tar.gz
-tar -zxvf gravitino-trino-connector-0.3.0.tar.gz
+wget https://github.com/datastrato/gravitino/releases/gravitino-trino-connector-<version>.tar.gz
+tar -zxvf gravitino-trino-connector-<version>.tar.gz
 ```
 
-You can see the connector directory `gravitino-trino-connector-0.3.0` after unpacking.
+You can see the connector directory `gravitino-trino-connector-<version>` after unpacking.
 
 Copy the connector directory to the Trino container's plugin directory.
 
 ```shell
-docker copy  /tmp/gravitino-trino-connector-0.3.0 trino-gravitino:/lib/trino/plugin
+docker copy  /tmp/gravitino-trino-connector-<version> trino-gravitino:/lib/trino/plugin
 ```
 
 Check the plugin directory in the container.
@@ -101,7 +101,7 @@ Use the Trino CLI to connect to the Trino container and run a query.
 
 ```text
 docker exec -it trino trino
-trino> show catalogs;
+trino> SHOW CATALOGS;
 Catalog
 ------------------------
 gravitino
@@ -121,7 +121,7 @@ Then you can use the Trino CLI to connect to the Trino container and run a query
 
 ```text
 docker exec -it trino trino
-trino> show catalogs;
+trino> SHOW CATALOGS;
 Catalog
 ------------------------
 gravitino
