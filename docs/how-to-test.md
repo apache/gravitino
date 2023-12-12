@@ -81,6 +81,7 @@ For example, the `integration-test/src/test/.../CatalogHiveIT.java` test needs t
 the `datastrato/gravitino-ci-hive` Docker container for testing the Hive data source.
 Therefore, it should have the following `@tag` annotation:`@tag(gravitino-docker-it)`, This annotation
 helps identify the specific Docker container required for the integration test.
+
 For example:
 
 ```java
@@ -95,7 +96,7 @@ public class CatalogHiveIT extends AbstractIT {
 :::note
 * You should make sure that the `Docker server` is running before running all the
   integration tests. Otherwise, it only runs the integration tests without the `gravitino-docker-it` tag.
-* on macOS, please be sure to run the `${GRAVITION_HOME}/dev/docker/tools/mac-docker-connector.sh`
+* on macOS, please be sure to run the `${GRAVITINO_HOME}/dev/docker/tools/mac-docker-connector.sh`
   script before running the integration tests. Or, you should make sure that
   [OrbStack](https://orbstack.dev/) is running.
 :::
