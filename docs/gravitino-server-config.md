@@ -10,7 +10,7 @@ This software is licensed under the Apache License version 2."
 ## Introduction
 
 Gravitino supports several configurations: 
-1. **Gravitino server configuration**: Used to start up Gravition server.
+1. **Gravitino server configuration**: Used to start up Gravitino server.
 2. **Gravitino catalog properties configuration**: Used to make default values for different catalogs. 
 3. **Some other configurations**: Includes configurations such as HDFS configuration.
 
@@ -93,10 +93,10 @@ These rules only apply on the catalog properties, doesn't affect on the schema o
 | `hive`              | [Hive catalog properties](apache-hive-catalog#catalog-properties)                    | `catalogs/hive/conf/hive.conf`                           |
 | `lakehouse-iceberg` | [Lakehouse Iceberg catalog properties](lakehouse-iceberg-catalog#catalog-properties) | `catalogs/lakehouse-iceberg/conf/lakehouse-iceberg.conf` | 
 | `jdbc-mysql`        | [MySQL catalog properties](jdbc-mysql-catalog#catalog-properties)                    | `catalogs/jdbc-mysql/conf/jdbc-mysql.conf`               | 
-| `jdbc-postgresql`   | [PostgresSQL catalog properties](jdbc-postgresql-catalog#catalog-properties)         | `catalogs/jdbc-postgresql/conf/jdbc-postgresql.conf`     | 
+| `jdbc-postgresql`   | [PostgreSQL catalog properties](jdbc-postgresql-catalog#catalog-properties)          | `catalogs/jdbc-postgresql/conf/jdbc-postgresql.conf`     |
 
 :::info
-Gravition server automatically add catalog properties configuration dir to classpath.
+Gravitino server automatically add catalog properties configuration dir to classpath.
 :::
 
 ## Some other configurations
