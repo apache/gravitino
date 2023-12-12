@@ -93,7 +93,7 @@ These rules only apply on the catalog properties, doesn't affect on the schema o
 | `hive`              | [Hive catalog properties](apache-hive-catalog#catalog-properties)                    | `catalogs/hive/conf/hive.conf`                           |
 | `lakehouse-iceberg` | [Lakehouse Iceberg catalog properties](lakehouse-iceberg-catalog#catalog-properties) | `catalogs/lakehouse-iceberg/conf/lakehouse-iceberg.conf` | 
 | `jdbc-mysql`        | [MySQL catalog properties](jdbc-mysql-catalog#catalog-properties)                    | `catalogs/jdbc-mysql/conf/jdbc-mysql.conf`               | 
-| `jdbc-postgresql`   | [PostgresSQL catalog properties](jdbc-postgresql-catalog#catalog-properties)         | `catalogs/jdbc-postgresql/conf/jdbc-postgresql.conf`     | 
+| `jdbc-postgresql`   | [PostgreSQL catalog properties](jdbc-postgresql-catalog#catalog-properties)          | `catalogs/jdbc-postgresql/conf/jdbc-postgresql.conf`     |
 
 :::info
 Gravitino server automatically add catalog properties configuration dir to classpath.

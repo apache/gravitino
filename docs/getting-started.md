@@ -178,7 +178,7 @@ follow the instructions for [Installing Apache Hive on AWS or Google Cloud Platf
 ## Installing Gravitino playground on AWS or Google Cloud Platform
 
 Gravitino provides a bundle of Docker images to launch a Gravitino playground, which
-includes Apache Hive, Apache Hadoop, Trino, MySQL, PostgresSQL, and Gravitino. You can use
+includes Apache Hive, Apache Hadoop, Trino, MySQL, PostgreSQL, and Gravitino. You can use
 Docker compose to start them all.
 
 Installing Docker and Docker Compose is a requirement to using the playground.

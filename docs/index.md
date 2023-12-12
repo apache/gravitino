@@ -65,7 +65,7 @@ to learn how to use the playground.
 * [Manage metadata using Gravitino](./manage-metadata-using-gravitino): provides the complete
   functionalities of Gravitino metadata management. Including metalake, catalog, schema and
   table management.
-* [Gravitino Open API](/api/java/index.html): provides the complete Open API definition of 
+* [Gravitino Open API](./api/java/index.html): provides the complete Open API definition of
   Gravitino.
 * [Gravitino Javadoc](./api/rest/gravitino-rest-api): provides the Javadoc for Gravitino API.
 
