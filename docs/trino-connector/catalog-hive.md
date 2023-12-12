@@ -90,9 +90,9 @@ CREATE TABLE "metalake.catalog".dbname.tabname
 
 ## Schema properties
 
-| Property | Description                     | Default | Required | Since Version |
-|----------|---------------------------------|---------|----------|---------------|
-| location | HDFS location for table storage | (none)  | No       | 0.2.0         |
+| Property | Description                     | Default Value | Required | Since Version |
+|----------|---------------------------------|---------------|----------|---------------|
+| location | HDFS location for table storage | (none)        | No       | 0.2.0         |
 
 ## Basic usage examples
 
