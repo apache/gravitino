@@ -106,7 +106,7 @@ For any bugs or new code please add unit tests to provide coverage of the code. 
 
 ## Community and communication
 
-Join the [community chat](https://datastrato-community.slack.com) to discuss ideas and seek help. You are also encouraged to use GitHub discussions and follow Datastrato on social media to stay updated on project news.
+Join the [community discourse group](https://gravitino.discourse.group) to discuss ideas and seek help. You are also encouraged to use GitHub discussions and follow Datastrato on social media to stay updated on project news.
 
 ## License
 
