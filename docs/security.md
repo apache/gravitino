@@ -222,7 +222,7 @@ bin/keytool -import -alias localhost -keystore jre/lib/security/cacerts -file lo
 ```
 
 5. You can refer to the [Configurations](gravitino-server-config) and append the configurations to the conf/gravitino.conf.
-Configuration doesn't support to resolve environment variable, so you should replace JAVA_HOME with the actual value.
+Configuration doesn't support to resolve environment variable, so you should replace `${JAVA_HOME}` with the actual value.
 Then, You can start the Gravitino server.
 
 ```text
