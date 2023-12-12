@@ -562,7 +562,7 @@ The following is the table property that Gravitino supports:
 | `jdbc-postgresql`   | [PostgreSQL table property](./jdbc-postgresql-catalog#table-properties) | [PostgreSQL type mapping](./jdbc-postgresql-catalog#table-column-types) |                                 |
 
 
-In addition to the basic settings, you support the following features:
+In addition to the basic settings, Gravitino supports the following features:
 
 | Feature             | Description                                                                                  | Java doc                                                                                       |
 |---------------------|----------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------|
