@@ -26,8 +26,11 @@ This software is licensed under the Apache License version 2."
 + Make sure you have installed Docker in your environment as Gravitino uses it to run integration tests; without it, some Docker-related tests may not run.
 
 + macOS uses "docker-connector" to make the Gravitino Trino connector work with Docker
-  for macOS. For the details of "docker-connector", please see [docker-connector](https://github.com/wenjunxiao/mac-docker-connector) and [README](../dev/docker/tools/README).
-  Alternatively, you can use OrbStack to replace Docker for macOS, please see
+  for macOS. For the details of "docker-connector", please see [docker-connector](https://github.com/wenjunxiao/mac-docker-connector)
+  , `$GRAVITINO_HOME/dev/docker/tools/mac-docker-connector.sh`, and
+  `$GRAVITINO_HOME/dev/docker/tools/README.md` for more details.
+
++ Alternatively, you can use OrbStack to replace Docker for macOS, please see
   [OrbStack](https://orbstack.dev/), with OrbStack you can run Gravitino integration tests
   without needing to install "docker-connector".
 :::

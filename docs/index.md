@@ -15,7 +15,7 @@ metadata access for data and AI assets.
 
 ## Downloading
 
-You can get Graviton from the[GitHub release page](https://github.com/datastrato/gravitino/releases),
+You can get Graviton from the [GitHub release page](https://github.com/datastrato/gravitino/releases),
 or you can build Gravitino from source, please see [How to build Gravitino](./how-to-build).
 
 Gravitino runs on both Linux and macOS, and requires Java 8. This should include JVMs on x86_64 and
