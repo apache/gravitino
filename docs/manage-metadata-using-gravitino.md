@@ -181,6 +181,15 @@ Catalog catalog = gravitinoMetaLake.createCatalog(
 // ...
 ```
 
+Currently, Gravitino supports the following catalog providers:
+
+| Catalog provider    | Catalog property                                                          | 
+|---------------------|---------------------------------------------------------------------------|
+| `hive`              | [Hive catalog property](./apache-hive-catalog#catalog-properties)         | 
+| `lakehouse-iceberg` | [Iceberg catalog property](./lakehouse-iceberg-catalog#catalog-properties)  |                                    
+| `jdbc-mysql`        | [MySQL catalog property](./jdbc-mysql-catalog#catalog-properties)           |                            
+| `jdbc-postgresql`   | [PostgreSQL catalog property](./jdbc-postgresql-catalog#catalog-properties) |          
+
 ### Load a catalog
 
 You can load a catalog by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}` endpoint or just use the Gravitino Java client. The following is an example of loading a catalog:
@@ -322,6 +331,16 @@ Schema schema = supportsSchemas.createSchema(
 );
 // ...
 ```
+
+Currently, Gravitino supports the following catalog providers:
+
+| Catalog provider    | Schema property                                                           | 
+|---------------------|---------------------------------------------------------------------------|
+| `hive`              | [Hive schema property](./apache-hive-catalog#schema-properties)           | 
+| `lakehouse-iceberg` | [Iceberg scheme property](./lakehouse-iceberg-catalog#schema-properties)  |                                    
+| `jdbc-mysql`        | [MySQL schema property](./jdbc-mysql-catalog#schema-properties)           |                            
+| `jdbc-postgresql`   | [PostgreSQL schema property](./jdbc-postgresql-catalog#schema-properties) |        
+
 
 ### Load a schema
 
@@ -493,13 +512,63 @@ tableCatalog.createTable(
 );
 ```
 
+In order to create a table, you need to provide the following information:
+
+- Table column name and type
+- Table property 
+
+#### Column type
+
+The following the types that Gravitino supports:
+
+| Type                      | Java                                                                     | Json                                                                                                                                 | Description                                                                                      |
+|---------------------------|--------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------|
+| Boolean                   | `Types.BooleanType.get()`                                                | `boolean`                                                                                                                            | Boolean type                                                                                     |
+| Byte                      | `Types.ByteType.get()`                                                   | `byte`                                                                                                                               | Byte type, indicates a numerical value of 1 byte                                                 |
+| Short                     | `Types.ShortType.get()`                                                  | `short`                                                                                                                              | Short type, indicates a numerical value of 2 bytes                                               |
+| Integer                   | `Types.IntegerType.get()`                                                | `integer`                                                                                                                            | Integer type, indicates a numerical value of 4 bytes                                             |
+| Long                      | `Types.LongType.get()`                                                   | `long`                                                                                                                               | Long type, indicates a numerical value of 8 bytes                                                |
+| Float                     | `Types.FloatType.get()`                                                  | `float`                                                                                                                              | Float type, indicates a single-precision floating point number                                   |
+| Double                    | `Types.DoubleType.get()`                                                 | `double`                                                                                                                             | Double type, indicates a double-precision floating point number                                  |
+| Decimal(precision, scale) | `Types.DecimalType.of(precision, scale)`                                 | `decimal(p, s)`                                                                                                                      | Decimal type, indicates a fixed-precision decimal number                                         |
+| String                    | `Types.StringType.get()`                                                 | `string`                                                                                                                             | String type                                                                                      |
+| FixedChar(length)         | `Types.FixedCharType.of(length)`                                         | `char(l)`                                                                                                                            | Char type, indicates a fixed-length string                                                       |
+| VarChar(length)           | `Types.VarCharType.of(length)`                                           | `varchar(l)`                                                                                                                         | Varchar type, indicates a variable-length string, the length is the maximum length of the string |
+| Timestamp                 | `Types.TimestampType.withoutTimeZone()`                                  | `timestamp`                                                                                                                          | Timestamp type, indicates a timestamp without timezone                                           |
+| TimestampWithTimezone     | `Types.TimestampType.withTimeZone()`                                     | `timestamp_tz`                                                                                                                       | Timestamp with timezone type, indicates a timestamp with timezone                                |
+| Date                      | `Types.DateType.get()`                                                   | `date`                                                                                                                               | Date type                                                                                        |
+| Time                      | `Types.TimeType.withoutTimeZone()`                                       | `time`                                                                                                                               | Time type                                                                                        |
+| IntervalToYearMonth       | `Types.IntervalYearType.get()`                                           | `interval_year`                                                                                                                      | Interval type, indicates an interval of year and month                                           |
+| IntervalToDayTime         | `Types.IntervalDayType.get()`                                            | `interval_day`                                                                                                                       | Interval type, indicates an interval of day and time                                             |
+| Fixed(length)             | `Types.FixedType.of(length)`                                             | `fixed(l)`                                                                                                                           | Fixed type, indicates a fixed-length binary array                                                |
+| Binary                    | `Types.BinaryType.get()`                                                 | `binary`                                                                                                                             | Binary type, indicates a arbitrary-length binary array                                           |
+| List                      | `Types.ListType.of(elementType, elementNullable)`                        | `{"type": "list", "containsNull": JSON Boolean, "elementType": type JSON}`                                                           | List type, indicate a list of elements with the same type                                        |
+| Map                       | `Types.MapType.of(keyType, valueType)`                                   | `{"type": "map", "keyType": type JSON, "valueType": type JSON, "valueContainsNull": JSON Boolean}`                                   | Map type, indicate a map of key-value pairs                                                      |
+| Struct                    | `Types.StructType.of([Types.StructType.Field.of(name, type, nullable)])` | `{"type": "struct", "fields": [JSON StructField, {"name": string, "type": type JSON, "nullable": JSON Boolean, "comment": string}]}` | Struct type, indicate a struct of fields                                                         |
+| Union                     | `Types.UnionType.of([type1, type2, ...])`                                | `{"type": "union", "types": [type JSON, ...]}`                                                                                       | Union type, indicate a union of types     
+
+
+The related java doc is [here](./javadoc/com/datastrato/gravitino/rel/types/Type.html).
+
+#### Table property and type mapping
+
+The following is the table property that Gravitino supports:
+
+| Catalog provider    | Table property                                                          | Type mapping                                                            |
+|---------------------|-------------------------------------------------------------------------|-------------------------------------------------------------------------|
+| `hive`              | [Hive table property](./apache-hive-catalog#table-properties)           | [Hive type mapping](./apache-hive-catalog#table-column-types)           | 
+| `lakehouse-iceberg` | [Iceberg table property](./lakehouse-iceberg-catalog#table-properties)  | [Iceberg type mapping](./lakehouse-iceberg-catalog#table-column-types)  |                                    |
+| `jdbc-mysql`        | [MySQL table property](./jdbc-mysql-catalog#table-properties)           | [MySQL type mapping](./jdbc-mysql-catalog#table-column-types)           |                            |
+| `jdbc-postgresql`   | [PostgreSQL table property](./jdbc-postgresql-catalog#table-properties) | [PostgreSQL type mapping](./jdbc-postgresql-catalog#table-column-types) |                                 |
+
+
 In addition to the basic settings, you support the following features:
 
-| Feature             | Description                                                                                  |
-|---------------------|----------------------------------------------------------------------------------------------|
-| Partitioned table   | Equal to `PARTITION BY` in Apache Hive and other engine that support partitioning.           |
-| Bucketed table      | Equal to `CLUSTERED BY` in Apache Hive, some engine may use different words to describe it.  |
-| Sorted order table  | Equal to `SORTED BY` in Apache Hive, some engine may use different words to describe it.     |
+| Feature             | Description                                                                                  | Java doc                                                                                       |
+|---------------------|----------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------|
+| Partitioned table   | Equal to `PARTITION BY` in Apache Hive and other engine that support partitioning.           | [Partition](./javadoc/com/datastrato/gravitino/dto/rel/partitions/Partitioning.html)           |
+| Bucketed table      | Equal to `CLUSTERED BY` in Apache Hive, some engine may use different words to describe it.  | [Distribution](./javadoc/datastrato/gravitino/rel/expressions/distributions/Distribution.html) |
+| Sorted order table  | Equal to `SORTED BY` in Apache Hive, some engine may use different words to describe it.     | [SortOrder](./javadoc/com/datastrato/gravitino/rel/expressions/sorts/SortOrder.html)           |
 
 :::tip
 **Those features may not be supported by all catalogs**. Please refer to the related doc for more details.
@@ -621,51 +690,6 @@ tableCatalog.createTable(
     }
     );
 ```
-
-
-#### Partitioned table
-
-Currently, Gravitino supports the following partitioning strategies:
-
-| Partitioning strategy | Json                                            | Java                           | SQL syntax           | Description                       |
-|-----------------------|-------------------------------------------------| ------------------------------ | -------------------- |-----------------------------------|
-| Identity              | `{"strategy":"identity","fieldName":["score"]}` | `Transforms.identity("score")` | `PARTITION BY score` | Partition by a field or reference |
-
-
-
-#### Bucketed table
-
-- Strategy. It defines in which way we bucket the table.
-
-| Bucket strategy | Json    | Java             | Description              |
-|-----------------|---------|------------------|--------------------------|
-| HASH            | `HASH`  | `Strategy.HASH`  | Bucket table using hash  |
-| RANGE           | `RANGE` | `Strategy.RANGE` | Bucket table using range |
-| EVEN            | `EVEN`  | `Strategy.EVEN`  | Bucket table using       |
-
-- Number. It defines how many buckets we use to bucket the table.
-- Function arguments. It defines which field or function should be used to bucket the table.
-
-
-#### Sorted order table
-
-To define a sorted order table, you should use the following three components to construct a valid sorted order table.
-
-- Direction.  It defines in which direction we sort the table.
-
-| Direction  | Json   | Java                       | Description                               |
-| ---------- | ------ | -------------------------- |-------------------------------------------|
-| Ascending  | `asc`  | `SortDirection.ASCENDING`  | Sorted by a field or a function ascending |
-| Descending | `desc` | `SortDirection.DESCENDING` | Sorted by a field or a function ascending |
-
-- Null ordering. It describes how to handle null value when ordering
-
-| Null ordering                     | Json          | Java                       | Description                                 |
-| --------------------------------- | ------------- | -------------------------- |---------------------------------------------|
-| Put null value in the first place | `nulls_first` | `NullOrdering.NULLS_FIRST` | Gravitino put null value in the first place |  
-| Put null value int the last place | `nulls_last`  | `NullOrdering.NULLS_LAST`  | Gravitino put null value in the last place  |
-
-- Sort term.  It shows which field or function should be used to sort the table.
 
 :::warning
 The code above is an example of creating a Hive table. For other catalogs, the code is similar, but the supported column type, table properties may be different. For more details, please refer to the related doc.
