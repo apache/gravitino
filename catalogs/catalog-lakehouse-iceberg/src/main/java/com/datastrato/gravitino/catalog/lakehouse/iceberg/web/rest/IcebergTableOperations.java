@@ -86,15 +86,11 @@ public class IcebergTableOperations {
       @PathParam("namespace") String namespace,
       @PathParam("table") String table,
       UpdateTableRequest updateTableRequest) {
-    try {
-      LOG.info(
-          "Update Iceberg table, namespace: {}, table: {}, updateTableRequest: {}",
-          namespace,
-          table,
-          icebergObjectMapper.writeValueAsString(updateTableRequest));
-    } catch (JsonProcessingException e) {
-      LOG.info("Update Iceberg table, namespace: {}, table: {}", namespace, table);
-    }
+    LOG.info(
+        "Update Iceberg table, namespace: {}, table: {}, updateTableRequest: {}",
+        namespace,
+        table,
+        SerializeUpdateTableRequest(updateTableRequest));
     TableIdentifier tableIdentifier =
         TableIdentifier.of(RESTUtil.decodeNamespace(namespace), table);
     return IcebergRestUtils.ok(icebergTableOps.updateTable(tableIdentifier, updateTableRequest));
@@ -165,5 +161,14 @@ public class IcebergTableOperations {
       @PathParam("table") String table,
       ReportMetricsRequest request) {
     return IcebergRestUtils.noContent();
+  }
+
+  private String SerializeUpdateTableRequest(UpdateTableRequest updateTableRequest) {
+    try {
+      return icebergObjectMapper.writeValueAsString(updateTableRequest);
+    } catch (JsonProcessingException e) {
+      LOG.warn("Serialize update table request failed", e);
+      return updateTableRequest.toString();
+    }
   }
 }
