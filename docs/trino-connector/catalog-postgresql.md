@@ -17,7 +17,7 @@ To connect to PostgreSQL, you need:
 
 ## Create table
 
-At present, the Gravitino connector only supports basic ProgreSQL table creation statements, which involve fields, null allowances, and comments. 
+At present, the Gravitino connector only supports basic PostgreSQL table creation statements, which involve fields, null allowances, and comments. 
 However, it does not support advanced features like primary keys, indexes, default values, and auto-increment.
 
 The Gravitino connector does not support `CREATE TABLE AS SELECT`.

@@ -8,17 +8,16 @@ This software is licensed under the Apache License version 2."
 
 The catalogs currently supported by the Gravitino connector are as follows:
 
-- [Hive](/docs/trino-connector/catalogs/hive)
-- [Iceberg](/docs/trino-connector/catalogs/iceberg)
-- [MySQL](/docs/trino-connector/catalogs/mysql)
-- [PostgreSQL](/docs/trino-connector/catalogs/postgresql)
+- [Hive](catalogs/hive)
+- [Iceberg](catalogs/iceberg)
+- [MySQL](catalogs/mysql)
+- [PostgreSQL](catalogs/postgresql)
 
 ## Create catalog
 
 Trino currently does not support creating Gravitino managed catalogs. 
 If you need to create a catalog, please refer to:
-- [Create Catalog](/docs)
-- [Gravitino Catalog](/docs)
+- [[Create a Catalog](../manage-metadata-using-gravitino#create-a-catalog)
 
 ## Data type mapping
 
@@ -42,4 +41,4 @@ Data Type Conversion between Trino and Gravitino is as following:
 | DateType       | DATE       |
 | ArrayType      | ARRAY      |
 | MapType        | MAP        |
-| UnionType      | ROW        |
+| StructType     | ROW        |
