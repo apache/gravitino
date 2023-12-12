@@ -1,6 +1,6 @@
 ---
 title: "Gravitino connector installation"
-slug: /trino-connector/install
+slug: /trino-connector/installation
 keyword: gravitino connector trino
 license: "Copyright 2023 Datastrato Pvt Ltd.
 This software is licensed under the Apache License version 2."
@@ -20,7 +20,7 @@ Please refer to the [Deploying Trino documentation](https://trino.io/docs/curren
 Alternatively,
 you can build the Gravitino connector package from the sources
 and obtain the `gravitino-trino-connector-<version>.tar.gz` file in the `$PROJECT/distribution` directory.
-Please refer to the [Gravitino Development documentation](how-to-build)
+Please refer to the [Gravitino Development documentation](../how-to-build)
 
 ## Example
 
@@ -68,7 +68,7 @@ Now you can see the Gravitino connector directory in the plugin directory.
 ### Configuring the Gravitino connector
 
 Assuming you have now started the Gravitino server on the host `gravitino-server-host` and can access it properly. 
-And you have created a metalake named `test`. If not, please refer to the [Gravitino Getting-started](getting-started)
+And you have created a metalake named `test`. If not, please refer to the [Gravitino Getting-started](../getting-started)
 
 Add catalog configuration to the Trino configuration file `/etc/trino/catalog/gravitino.properties`.
 

@@ -1,6 +1,6 @@
 ---
 title: "Gravtino connnector - Iceberg catalog"
-slug: /trino-connector/catalogs/iceberg
+slug: /trino-connector/catalog-iceberg
 keyword: gravitino connector trino
 license: "Copyright 2023 Datastrato Pvt Ltd.
 This software is licensed under the Apache License version 2."
@@ -49,7 +49,7 @@ Iceberg's tables and schemas do not support properties.
 ## Basic usage examples
 
 First, you need to create a metalake and catalog in Gravitino.
-For example, create a new metalake named `test` and create a new catalog named `iceberg_test` using the `lakehouse-iceberge` provider.
+For example, create a new metalake named `test` and create a new catalog named `iceberg_test` using the `lakehouse-iceberg` provider.
 And configure the Metalake `test` into the `Graviton connector`.
 For More information about the Iceberg catalog, please refer to [Iceberg catalog](../lakehouse-iceberg-catalog).
 
@@ -105,14 +105,6 @@ Create a new schema named `database_01` in `test.iceberg_test` catalog.
 
 ```sql
 CREATE SCHEMA "test.iceberg_test".database_01;
-```
-
-Create a new schema using HDFS location:
-
-```sql
-CREATE SCHEMA "test.iceberg_test".database_01 WITH (
-  location = 'hdfs://hdfs-host:9000/user/iceberg/warehouse/database_01'
-);
 ```
 
 Create a new table named `table_01` in schema `"test.iceberg_test".database_01`.

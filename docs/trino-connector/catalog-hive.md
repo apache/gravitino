@@ -1,42 +1,45 @@
 ---
 title: "Gravtino connnector - Hive catalog"
-slug: /trino-connector/catalogs/hive
+slug: /trino-connector/catalog-hive
 keyword: gravitino connector trino
 license: "Copyright 2023 Datastrato Pvt Ltd.
 This software is licensed under the Apache License version 2."
 ---
 
-The Hive catalog allows Trino querying data stored in an Apache Hive data warehouse. 
+The Hive catalog allows Trino querying data stored in an Apache Hive data warehouse.
 
 ## Requirements
 
-The Hive connector requires a Hive metastore service (HMS), or a compatible implementation of the Hive metastore, such as AWS Glue.
+The Hive connector requires a Hive metastore service (HMS), or a compatible implementation of the Hive metastore, such
+as AWS Glue.
 
 Apache Hadoop HDFS 2.x supported.
 
 Many distributed storage systems including HDFS, Amazon S3 or S3-compatible systems,
 Google Cloud Storage, Azure Storage, and IBM Cloud Object Storage can be queried with the Hive connector.
 
-The coordinator and all workers must have network access to the Hive metastore and the storage system. 
+The coordinator and all workers must have network access to the Hive metastore and the storage system.
 
 Hive metastore access with the Thrift protocol defaults to using port 9083.
 
-Data files must be in a supported file format. Some file formats can be configured using file format configuration properties 
+Data files must be in a supported file format. Some file formats can be configured using file format configuration
+properties
 per catalog:
-  - ORC
-  - Parquet
-  - Avro
-  - RCText (RCFile using ColumnarSerDe)
-  - RCBinary (RCFile using LazyBinaryColumnarSerDe)
-  - SequenceFile
-  - JSON (using org.apache.hive.hcatalog.data.JsonSerDe)
-  - CSV (using org.apache.hadoop.hive.serde2.OpenCSVSerde)
-  - TextFile
+
+- ORC
+- Parquet
+- Avro
+- RCText (RCFile using ColumnarSerDe)
+- RCBinary (RCFile using LazyBinaryColumnarSerDe)
+- SequenceFile
+- JSON (using org.apache.hive.hcatalog.data.JsonSerDe)
+- CSV (using org.apache.hadoop.hive.serde2.OpenCSVSerde)
+- TextFile
 
 ## Create table
 
-The Gravitino connector currently supports basic Hive table creation statements, such as defining fields, 
-allowing null values, and adding comments. 
+The Gravitino connector currently supports basic Hive table creation statements, such as defining fields,
+allowing null values, and adding comments.
 However, it does not support advanced features like partitioning, sorting, and distribution.
 
 The Gravitino connector does not support `CREATE TABLE AS SELECT`.
@@ -44,6 +47,7 @@ The Gravitino connector does not support `CREATE TABLE AS SELECT`.
 ## Alter table
 
 Support for the following alter table operations:
+
 - Rename table
 - Add a column
 - Drop a column
@@ -58,7 +62,8 @@ Currently, it doesn't support certain query optimizations, such as pushdown and 
 
 ## Table properties
 
-You can set additional properties for tables and schemas in the Hive catalog using "WITH" keyword in the "CREATE TABLE" statement.
+You can set additional properties for tables and schemas in the Hive catalog using "WITH" keyword in the "CREATE TABLE"
+statement.
 
 ```sql
 CREATE TABLE "metalake.catalog".dbname.tabname
@@ -70,18 +75,18 @@ CREATE TABLE "metalake.catalog".dbname.tabname
 );
 ```
 
-| Property      | Description                              | Default                                                    | Required | Since Version |
-|---------------|------------------------------------------|------------------------------------------------------------|----------|---------------|
-| format        | Hive storage format for the table        | TEXTFILE                                                   | No       | 0.2.0         |
-| total_size    | Total size of the table                  | (none)                                                     | No       | 0.2.0         |
-| num_files     | Number of files                          | 0                                                          | No       | 0.2.0         |
-| external      | Indicate whether it's an external table  | (none)                                                     | No       | 0.2.0         |
-| location      | HDFS location for table storage          | (none)                                                     | No       | 0.2.0         |
-| table_type    | The type of Hive table                   | (none)                                                     | No       | 0.2.0         |
-| input_format  | The input format class for the table     | org.apache.hadoop.mapred.TextInputFormat                   | No       | 0.2.0         |
-| output_format | The output format class for the table    | org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat | No       | 0.2.0         |
-| serde_lib     | The serde library class for the table    | org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe         | No       | 0.2.0         |
-| serde_name    | Name of the serde, table name by default | (none)                                                     | No       | 0.2.0         |
+| Property      | Description                             | Default Value                                              | Required | Since Version |
+|---------------|-----------------------------------------|------------------------------------------------------------|----------|---------------|
+| format        | Hive storage format for the table       | TEXTFILE                                                   | No       | 0.2.0         |
+| total_size    | Total size of the table                 | (none)                                                     | No       | 0.2.0         |
+| num_files     | Number of files                         | 0                                                          | No       | 0.2.0         |
+| external      | Indicate whether it's an external table | (none)                                                     | No       | 0.2.0         |
+| location      | HDFS location for table storage         | (none)                                                     | No       | 0.2.0         |
+| table_type    | The type of Hive table                  | (none)                                                     | No       | 0.2.0         |
+| input_format  | The input format class for the table    | org.apache.hadoop.mapred.TextInputFormat                   | No       | 0.2.0         |
+| output_format | The output format class for the table   | org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat | No       | 0.2.0         |
+| serde_lib     | The serde library class for the table   | org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe         | No       | 0.2.0         |
+| serde_name    | Name of the serde                       | table name by default                                      | No       | 0.2.0         |
 
 ## Schema properties
 
@@ -137,7 +142,7 @@ The results are similar to:
 Query 20231017_082503_00018_6nt3n, FINISHED, 1 node
 ```
 
-The `gravitino` catalog is a catalog defined By Trino catalog configuration. 
+The `gravitino` catalog is a catalog defined By Trino catalog configuration.
 The `test.hive_test` catalog is the catalog created by you in Gravitino.
 Other catalogs are regular user-configured Trino catalogs.
 
@@ -212,7 +217,7 @@ Rename the `table_01` table to `table_02`:
 ALTER TABLE "test.hive_test".database_01.table_01 RENAME TO "test.hive_test".database_01.table_02;
 ```
 
-### DROP 
+### DROP
 
 Drop a schema:
 
@@ -228,12 +233,13 @@ DROP TABLE "test.hive_test".database_01.table_01;
 
 ## HDFS config and permissions
 
-For basic setups, Gravitino connector configures the HDFS client automatically and does not require any configuration files.
+For basic setups, Gravitino connector configures the HDFS client automatically and does not require any configuration
+files.
 Gravitino connector is not support user to config the `hdfs-site.xml` and `core-site.xml` files to the HDFS client.
 
-Before running any `Insert` statements for Hive tables in Trino, 
+Before running any `Insert` statements for Hive tables in Trino,
 you must check that the user Trino is using to access HDFS has access to the Hive warehouse directory.
-You can override this username by setting the HADOOP_USER_NAME system property in the Trino JVM config, 
+You can override this username by setting the HADOOP_USER_NAME system property in the Trino JVM config,
 replacing hdfs_user with the appropriate username:
 
 ```text

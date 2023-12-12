@@ -1,6 +1,6 @@
 ---
 title: "Gravitino supported Catalogs"
-slug: /trino-connector/catalogs
+slug: /trino-connector/supported-catalog
 keyword: gravitino connector trino
 license: "Copyright 2023 Datastrato Pvt Ltd.
 This software is licensed under the Apache License version 2."
@@ -8,10 +8,10 @@ This software is licensed under the Apache License version 2."
 
 The catalogs currently supported by the Gravitino connector are as follows:
 
-- [Hive](catalogs/hive)
-- [Iceberg](catalogs/iceberg)
-- [MySQL](catalogs/mysql)
-- [PostgreSQL](catalogs/postgresql)
+- [Hive](catalog-hive)
+- [Iceberg](catalog-iceberg)
+- [MySQL](catalog-mysql)
+- [PostgreSQL](catalog-postgresql)
 
 ## Create catalog
 

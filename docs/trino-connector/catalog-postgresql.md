@@ -1,6 +1,6 @@
 ---
 title: "Gravtino connnector - PostgreSQL catalog"
-slug: /trino-connector/catalogs/postgresql
+slug: /trino-connector/catalog-postgresql
 keyword: gravitino connector trino
 license: "Copyright 2023 Datastrato Pvt Ltd.
 This software is licensed under the Apache License version 2."
@@ -24,7 +24,7 @@ The Gravitino connector does not support `CREATE TABLE AS SELECT`.
 
 ## Alter table
 
-Support for the following alter table operations:
+Gravitino connector supports the following alter table operations:
 - Rename table
 - Add a column
 - Drop a column

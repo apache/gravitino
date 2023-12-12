@@ -16,5 +16,5 @@ Gravitino connector index:
     - [Hive](catalog-hive)
     - [Iceberg](catalog-iceberg)
     - [MySQL](catalog-mysql)
-    - [PostreSQL](catalog-postgresql)
+    - [PostgreSQL](catalog-postgresql)
   - [Supported SQL](sql-support)

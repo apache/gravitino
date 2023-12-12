@@ -10,7 +10,7 @@ This software is licensed under the Apache License version 2."
 ## Introduction
 
 Gravitino supports several configurations: 
-1. **Gravitino server configuration**: Used to start up Gravition server.
+1. **Gravitino server configuration**: Used to start up Gravitino server.
 2. **Gravitino catalog properties configuration**: Used to make default values for different catalogs. 
 3. **Some other configurations**: Includes configurations such as HDFS configuration.
 
