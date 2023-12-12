@@ -574,9 +574,9 @@ The following is the table property that Gravitino supports:
 | Catalog provider    | Table property                                                          | Type mapping                                                            |
 |---------------------|-------------------------------------------------------------------------|-------------------------------------------------------------------------|
 | `hive`              | [Hive table property](./apache-hive-catalog#table-properties)           | [Hive type mapping](./apache-hive-catalog#table-column-types)           | 
-| `lakehouse-iceberg` | [Iceberg table property](./lakehouse-iceberg-catalog#table-properties)  | [Iceberg type mapping](./lakehouse-iceberg-catalog#table-column-types)  |                                    |
-| `jdbc-mysql`        | [MySQL table property](./jdbc-mysql-catalog#table-properties)           | [MySQL type mapping](./jdbc-mysql-catalog#table-column-types)           |                            |
-| `jdbc-postgresql`   | [PostgreSQL table property](./jdbc-postgresql-catalog#table-properties) | [PostgreSQL type mapping](./jdbc-postgresql-catalog#table-column-types) |                                 |
+| `lakehouse-iceberg` | [Iceberg table property](./lakehouse-iceberg-catalog#table-properties)  | [Iceberg type mapping](./lakehouse-iceberg-catalog#table-column-types)  |                                    
+| `jdbc-mysql`        | [MySQL table property](./jdbc-mysql-catalog#table-properties)           | [MySQL type mapping](./jdbc-mysql-catalog#table-column-types)           |                            
+| `jdbc-postgresql`   | [PostgreSQL table property](./jdbc-postgresql-catalog#table-properties) | [PostgreSQL type mapping](./jdbc-postgresql-catalog#table-column-types) |  
 
 
 In addition to the basic settings, Gravitino supports the following features:
