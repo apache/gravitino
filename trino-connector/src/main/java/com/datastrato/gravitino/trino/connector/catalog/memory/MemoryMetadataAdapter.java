@@ -1,14 +1,15 @@
 /*
- * Copyright 2023 Datastrato.
+ * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 package com.datastrato.gravitino.trino.connector.catalog.memory;
 
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
+import com.datastrato.gravitino.trino.connector.util.GeneralDataTypeTransformer;
 import io.trino.spi.session.PropertyMetadata;
 import java.util.List;
 
-/** Support trino memory connector for testing. */
+/** Support Trino memory connector for testing. */
 public class MemoryMetadataAdapter extends CatalogConnectorMetadataAdapter {
 
   public MemoryMetadataAdapter(
@@ -16,6 +17,6 @@ public class MemoryMetadataAdapter extends CatalogConnectorMetadataAdapter {
       List<PropertyMetadata<?>> tableProperties,
       List<PropertyMetadata<?>> columnProperties) {
 
-    super(schemaProperties, tableProperties, columnProperties);
+    super(schemaProperties, tableProperties, columnProperties, new GeneralDataTypeTransformer());
   }
 }

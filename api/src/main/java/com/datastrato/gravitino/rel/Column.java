@@ -1,11 +1,11 @@
 /*
- * Copyright 2023 Datastrato.
+ * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 package com.datastrato.gravitino.rel;
 
 import com.datastrato.gravitino.NameIdentifier;
-import io.substrait.type.Type;
+import com.datastrato.gravitino.rel.types.Type;
 import java.util.Map;
 
 /**
@@ -18,16 +18,16 @@ import java.util.Map;
  */
 public interface Column {
 
-  /** Returns the name of this column. */
+  /** @return The name of this column. */
   String name();
 
-  /** Returns the data type of this column. */
+  /** @return The data type of this column. */
   Type dataType();
 
-  /** Returns the comment of this column, null if not specified. */
+  /** @return The comment of this column, null if not specified. */
   String comment();
 
-  /** Returns true if this column may produce null values. Default is true. */
+  /** @return True if this column may produce null values. Default is true. */
   boolean nullable();
 
   // TODO. Support column default value. @Jerry

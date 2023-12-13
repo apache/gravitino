@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Datastrato.
+ * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 package com.datastrato.gravitino.storage.kv;
@@ -183,6 +183,7 @@ public class BinaryEntityKeyEncoder implements EntityKeyEncoder<byte[]> {
 
     return bytes;
   }
+
   /**
    * Encodes an entity object into a byte array for use as a key in a key-value store.
    *

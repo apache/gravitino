@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Datastrato.
+ * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 package com.datastrato.gravitino.catalog.lakehouse.iceberg.ops;
@@ -8,6 +8,7 @@ import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergConfig;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.ops.IcebergTableOpsHelper.IcebergTableChange;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.utils.IcebergCatalogUtil;
 import com.google.common.base.Preconditions;
+import java.util.Collections;
 import java.util.Optional;
 import javax.ws.rs.NotSupportedException;
 import org.apache.iceberg.Transaction;
@@ -30,7 +31,7 @@ import org.apache.iceberg.rest.responses.UpdateNamespacePropertiesResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class IcebergTableOps {
+public class IcebergTableOps implements AutoCloseable {
 
   private static final Logger LOG = LoggerFactory.getLogger(IcebergTableOps.class);
 
@@ -47,7 +48,7 @@ public class IcebergTableOps {
   }
 
   public IcebergTableOps() {
-    this(new IcebergConfig());
+    this(new IcebergConfig(Collections.emptyMap()));
   }
 
   public IcebergTableOpsHelper createIcebergTableOpsHelper() {
@@ -132,5 +133,13 @@ public class IcebergTableOps {
     Transaction transaction = icebergTableChange.getTransaction();
     transaction.commitTransaction();
     return loadTable(icebergTableChange.getTableIdentifier());
+  }
+
+  @Override
+  public void close() throws Exception {
+    if (catalog instanceof AutoCloseable) {
+      // JdbcCatalog need close.
+      ((AutoCloseable) catalog).close();
+    }
   }
 }

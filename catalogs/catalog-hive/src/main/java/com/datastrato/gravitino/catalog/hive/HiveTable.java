@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Datastrato.
+ * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 package com.datastrato.gravitino.catalog.hive;
@@ -213,7 +213,7 @@ public class HiveTable extends BaseTable {
             .collect(Collectors.toList());
     return new FieldSchema(
         partitionColumns.get(0).name(),
-        partitionColumns.get(0).dataType().accept(ToHiveType.INSTANCE).getQualifiedName(),
+        ToHiveType.convert(partitionColumns.get(0).dataType()).getQualifiedName(),
         partitionColumns.get(0).comment());
   }
 
@@ -228,9 +228,7 @@ public class HiveTable extends BaseTable {
             .map(
                 c ->
                     new FieldSchema(
-                        c.name(),
-                        c.dataType().accept(ToHiveType.INSTANCE).getQualifiedName(),
-                        c.comment()))
+                        c.name(), ToHiveType.convert(c.dataType()).getQualifiedName(), c.comment()))
             .collect(Collectors.toList()));
 
     // `location` must not be null, otherwise it will result in an NPE when calling HMS `alterTable`

@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Datastrato.
+ * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 package com.datastrato.gravitino.server.web;
@@ -38,7 +38,7 @@ public class TestJettyServer {
     Config config = new Config(false) {};
     config.set(JettyServerConfig.WEBSERVER_HTTP_PORT, RESTUtils.findAvailablePort(5000, 6000));
     JettyServerConfig serverConfig = JettyServerConfig.fromConfig(config);
-    jettyServer.initialize(serverConfig, "test");
+    jettyServer.initialize(serverConfig, "test", false);
 
     // TODO might be nice to have an isInitalised method or similar?
   }
@@ -48,7 +48,7 @@ public class TestJettyServer {
     Config config = new Config(false) {};
     config.set(JettyServerConfig.WEBSERVER_HTTP_PORT, RESTUtils.findAvailablePort(5000, 6000));
     JettyServerConfig serverConfig = JettyServerConfig.fromConfig(config);
-    jettyServer.initialize(serverConfig, "test");
+    jettyServer.initialize(serverConfig, "test", false);
     jettyServer.start();
     // TODO might be nice to have an IsRunning method or similar?
     jettyServer.stop();
@@ -59,7 +59,7 @@ public class TestJettyServer {
     Config config = new Config(false) {};
     config.set(JettyServerConfig.WEBSERVER_HTTP_PORT, RESTUtils.findAvailablePort(5000, 6000));
     JettyServerConfig serverConfig = JettyServerConfig.fromConfig(config);
-    jettyServer.initialize(serverConfig, "test");
+    jettyServer.initialize(serverConfig, "test", false);
     jettyServer.start();
 
     Servlet mockServlet = mock(Servlet.class);

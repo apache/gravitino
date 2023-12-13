@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Datastrato.
+ * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 package com.datastrato.gravitino.catalog;
@@ -23,6 +23,7 @@ import com.datastrato.gravitino.meta.BaseMetalake;
 import com.datastrato.gravitino.meta.SchemaVersion;
 import com.datastrato.gravitino.storage.RandomIdGenerator;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.time.Instant;
@@ -285,7 +286,7 @@ public class TestCatalogManager {
   @Test
   public void testCreateCatalog() {
     NameIdentifier ident = NameIdentifier.of("metalake", "test1");
-    Map<String, String> props = ImmutableMap.of();
+    Map<String, String> props = Maps.newHashMap();
 
     Catalog testCatalog =
         catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, "comment", props);
@@ -320,6 +321,27 @@ public class TestCatalogManager {
     // Test if the catalog is already cached
     CatalogManager.CatalogWrapper cached = catalogManager.catalogCache.getIfPresent(ident);
     Assertions.assertNotNull(cached);
+
+    // Test failed creation
+    NameIdentifier failedIdent = NameIdentifier.of("metalake", "test2");
+    props.put("fail-create", "true");
+    Throwable exception3 =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () ->
+                catalogManager.createCatalog(
+                    failedIdent, Catalog.Type.RELATIONAL, provider, "comment", props));
+    Assertions.assertTrue(exception3.getMessage().contains("Failed to create Test catalog"));
+    Assertions.assertNull(catalogManager.catalogCache.getIfPresent(failedIdent));
+    // Test failed for the second time
+    Throwable exception4 =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () ->
+                catalogManager.createCatalog(
+                    failedIdent, Catalog.Type.RELATIONAL, provider, "comment", props));
+    Assertions.assertTrue(exception4.getMessage().contains("Failed to create Test catalog"));
+    Assertions.assertNull(catalogManager.catalogCache.getIfPresent(failedIdent));
   }
 
   @Test

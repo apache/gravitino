@@ -8,17 +8,48 @@ on:
   pull_request:
     branches: [ "main", "branch-*" ]
 
-env:
-  HIVE_IMAGE_NAME: datastrato/gravitino-ci-hive
-  HIVE_IMAGE_TAG_NAME: 0.1.4
-
 concurrency:
   group: ${{ github.worklfow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_requests' }}
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dorny/paths-filter@v2
+        id: filter
+        with:
+          filters: |
+            source_changes:
+              - .github/**
+              - api/**
+              - bin/**
+              - catalogs/**
+              - clients/**
+              - common/**
+              - conf/**
+              - core/**
+              - dev/**
+              - gradle/**
+              - integration-test/**
+              - meta/**
+              - server/**
+              - server-common/**
+              - trino-connector/**
+              - web/**
+              - docs/open-api/**
+              - build.gradle.kts
+              - gradle.properties
+              - gradlew
+              - setting.gradle.kts
+    outputs:
+      source_changes: ${{ steps.filter.outputs.source_changes }}
+
   # Integration test for AMD64 architecture
   test-amd64-arch:
+    needs: changes
+    if: needs.changes.outputs.source_changes == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
@@ -38,46 +69,10 @@ jobs:
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-
-      - name: Build the hive Docker image for AMD64
-        if: ${{ contains(github.event.pull_request.labels.*.name, 'build docker image') }}
-        run: ./dev/docker/hive/build-docker.sh --platform ${PLATFORM} --image ${HIVE_IMAGE_NAME}:${HIVE_IMAGE_TAG_NAME}
-
-      - name: Run AMD64 container
-        run: |
-          docker run --rm --name ${DOCKER_RUN_NAME} --platform ${PLATFORM} -d -p 8022:22 -p 8088:8088 -p 9000:9000 -p 9083:9083 -p 10000:10000 -p 10002:10002 -p 50010:50010 -p 50070:50070 -p 50075:50075 ${HIVE_IMAGE_NAME}:${HIVE_IMAGE_TAG_NAME}
-          docker ps -a
-
-      - name: Setup Gradle
-        uses: gradle/gradle-build-action@v2
-        with:
-          gradle-version: '8.2'
-
-      - name: Show gradle version
-        run: gradle --version
-
       - name: Package Gravitino
         run: |
-          gradle build -x test
-          gradle compileDistribution
-
-      - name: Check docker container status
-        uses: nick-fields/retry@v2
-        with:
-          max_attempts: 3
-          timeout_seconds: 200
-          continue_on_error: false
-          command: |
-            docker exec -i ${DOCKER_RUN_NAME} bash /tmp/check-status.sh
-          on_retry_command: |
-            docker ps -a
-            docker stop ${DOCKER_RUN_NAME}
-            sleep 3
-            docker ps -a
-            docker run --rm --name ${DOCKER_RUN_NAME} --platform ${PLATFORM} -d -p 8022:22 -p 8088:8088 -p 9000:9000 -p 9083:9083 -p 10000:10000 -p 10002:10002 -p 50010:50010 -p 50070:50070 -p 50075:50075 ${HIVE_IMAGE_NAME}:${HIVE_IMAGE_TAG_NAME}
-            sleep 60
+          ./gradlew build -x test
+          ./gradlew compileDistribution -x test
 
       - name: Setup debug Github Action
         if: ${{ contains(github.event.pull_request.labels.*.name, 'debug action') }}
@@ -86,25 +81,16 @@ jobs:
       - name: Integration Test
         id: integrationTest
         run: |
-          gradle test --rerun-tasks -PskipTests -PtestMode=embedded
-          gradle test --rerun-tasks -PskipTests -PtestMode=deploy
+          ./gradlew test --rerun-tasks -PskipTests -PtestMode=embedded
+          ./gradlew test --rerun-tasks -PskipTests -PtestMode=deploy
 
-      - name: Print logs when Gravitino integration tests failure
+      - name: Upload integrate tests reports
+        uses: actions/upload-artifact@v3
         if: ${{ failure() && steps.integrationTest.outcome == 'failure' }}
-        run: |
-          if [ -f "integration-test/build/integration-test.log" ]; then
-            cat integration-test/build/integration-test.log
-          fi
-          if [ -f "distribution/package/logs/gravitino-server.out" ]; then
-            cat distribution/package/logs/gravitino-server.out
-          fi
-          if [ -f "distribution/package/logs/gravitino-server.log" ]; then
-            cat distribution/package/logs/gravitino-server.log
-          fi
-
-      - name: Stop and remove container
-        run: |
-          docker stop ${DOCKER_RUN_NAME}
-          sleep 3
-          docker ps -a
-          docker rmi ${HIVE_IMAGE_NAME}:${HIVE_IMAGE_TAG_NAME}
+        with:
+          name: integrate test reports 
+          path: |
+            build/reports
+            integration-test/build/integration-test.log
+            distribution/package/logs/gravitino-server.out
+            distribution/package/logs/gravitino-server.log

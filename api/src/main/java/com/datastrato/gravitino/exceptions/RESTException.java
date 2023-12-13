@@ -22,6 +22,8 @@ import com.google.errorprone.annotations.FormatMethod;
 
 // Referred from Apache Iceberg's RESTException implementation
 // api/src/main/java/org/apache/iceberg/exceptions/RESTException.java
+
+/** An exception thrown when a REST request fails. */
 public class RESTException extends RuntimeException {
   @FormatMethod
   public RESTException(String message, Object... args) {

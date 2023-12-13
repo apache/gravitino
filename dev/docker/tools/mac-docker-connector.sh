@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Copyright 2023 Datastrato.
+# Copyright 2023 Datastrato Pvt Ltd.
 # This software is licensed under the Apache License version 2.
 #
 #set -ex
@@ -31,7 +31,7 @@ fi
 # Start the Docker image on which the docker-connector server depends.
 docker stop desktop-connector 2>/dev/null
 docker rm desktop-connector 2>/dev/null
-docker run -it -d --rm --net host --cap-add NET_ADMIN --name desktop-connector wenjunxiao/desktop-docker-connector
+docker run -it -d --restart always --net host --cap-add NET_ADMIN --name desktop-connector wenjunxiao/desktop-docker-connector
 
 # Start docker-connector server
 echo "Start docker-connector requires root privileges, Please enter the root password."

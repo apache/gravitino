@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Datastrato.
+ * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 package com.datastrato.gravitino.json;
@@ -25,11 +25,11 @@ import com.datastrato.gravitino.dto.rel.partitions.Partitioning;
 import com.datastrato.gravitino.dto.rel.partitions.RangePartitioningDTO;
 import com.datastrato.gravitino.dto.rel.partitions.TruncatePartitioningDTO;
 import com.datastrato.gravitino.dto.rel.partitions.YearPartitioningDTO;
+import com.datastrato.gravitino.rel.types.Type;
+import com.datastrato.gravitino.rel.types.Types;
 import com.fasterxml.jackson.databind.cfg.EnumFeature;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.google.common.collect.ImmutableMap;
-import io.substrait.type.StringTypeVisitor;
-import io.substrait.type.TypeCreator;
 import java.time.Instant;
 import java.util.Map;
 import org.junit.jupiter.api.Assertions;
@@ -170,7 +170,7 @@ public class TestDTOJsonSerDe {
   @Test
   public void testColumnDTOSerDe() throws Exception {
     String name = "column";
-    io.substrait.type.Type type = TypeCreator.NULLABLE.I8;
+    Type type = Types.ByteType.get();
     String comment = "comment";
 
     // Test required fields
@@ -181,18 +181,23 @@ public class TestDTOJsonSerDe {
         String.format(
             columnJson,
             withQuotes(name),
-            withQuotes(type.accept(new StringTypeVisitor())),
+            withQuotes(type.simpleString()),
             withQuotes(comment),
             column.nullable());
     Assertions.assertEquals(expectedJson, serJson);
     ColumnDTO deserColumn = JsonUtils.objectMapper().readValue(serJson, ColumnDTO.class);
     Assertions.assertEquals(column, deserColumn);
+
+    // test default nullable
+    String json = "{\"name\":\"column\",\"type\":\"byte\",\"comment\":\"comment\"}";
+    ColumnDTO deColumn = JsonUtils.objectMapper().readValue(json, ColumnDTO.class);
+    Assertions.assertTrue(deColumn.nullable());
   }
 
   @Test
   public void testTableDTOSerDe() throws Exception {
     String name = "column";
-    io.substrait.type.Type type = TypeCreator.NULLABLE.I8;
+    Type type = Types.ByteType.get();
     String comment = "comment";
     String creator = "creator";
     Instant now = Instant.now();
@@ -227,7 +232,7 @@ public class TestDTOJsonSerDe {
             String.format(
                 columnJson,
                 withQuotes(name),
-                withQuotes(type.accept(new StringTypeVisitor())),
+                withQuotes(type.simpleString()),
                 withQuotes(comment),
                 column.nullable()),
             JsonUtils.objectMapper().writeValueAsString(properties),
@@ -275,7 +280,7 @@ public class TestDTOJsonSerDe {
     FunctionArg arg1 = FieldReferenceDTO.of(field1);
     FunctionArg arg2 =
         new LiteralDTO.Builder()
-            .withDataType(TypeCreator.REQUIRED.STRING)
+            .withDataType(Types.StringType.get())
             .withValue("Asia/Shanghai")
             .build();
     FunctionArg toDateFunc =

@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Datastrato.
+ * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 package com.datastrato.gravitino.server.auth;
@@ -31,8 +31,12 @@ public class TestOAuth2TokenAuthenticator {
     String publicKey = new String(Base64.getEncoder().encode(keyPair.getPublic().getEncoded()));
     Config config = new Config(false) {};
     config.set(OAuthConfig.SERVICE_AUDIENCE, "service1");
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> auth2TokenAuthenticator.initialize(config));
     config.set(OAuthConfig.DEFAULT_SIGN_KEY, publicKey);
     config.set(OAuthConfig.ALLOW_SKEW_SECONDS, 6L);
+    config.set(OAuthConfig.DEFAULT_TOKEN_PATH, "test");
+    config.set(OAuthConfig.DEFAULT_SERVER_URI, "test");
     auth2TokenAuthenticator.initialize(config);
     Assertions.assertTrue(auth2TokenAuthenticator.isDataFromToken());
     Exception e =

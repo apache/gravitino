@@ -1,11 +1,17 @@
 /*
- * Copyright 2023 Datastrato.
+ * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 package com.datastrato.gravitino.catalog.lakehouse.iceberg.web.rest;
 
+import com.codahale.metrics.annotation.ResponseMetered;
+import com.codahale.metrics.annotation.Timed;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.ops.IcebergTableOps;
+import com.datastrato.gravitino.catalog.lakehouse.iceberg.web.IcebergObjectMapperProvider;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.web.IcebergRestUtils;
+import com.datastrato.gravitino.metrics.MetricNames;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.Consumes;
@@ -38,21 +44,29 @@ public class IcebergTableOperations {
 
   private IcebergTableOps icebergTableOps;
 
+  private ObjectMapper icebergObjectMapper;
+
   @Context private HttpServletRequest httpRequest;
 
   @Inject
   public IcebergTableOperations(IcebergTableOps icebergTableOps) {
     this.icebergTableOps = icebergTableOps;
+    this.icebergObjectMapper =
+        new IcebergObjectMapperProvider().getContext(IcebergTableOperations.class);
   }
 
   @GET
   @Produces(MediaType.APPLICATION_JSON)
+  @Timed(name = "list-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "list-table", absolute = true)
   public Response listTable(@PathParam("namespace") String namespace) {
     return IcebergRestUtils.ok(icebergTableOps.listTable(RESTUtil.decodeNamespace(namespace)));
   }
 
   @POST
   @Produces(MediaType.APPLICATION_JSON)
+  @Timed(name = "create-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "create-table", absolute = true)
   public Response createTable(
       @PathParam("namespace") String namespace, CreateTableRequest createTableRequest) {
     LOG.info(
@@ -66,15 +80,17 @@ public class IcebergTableOperations {
   @POST
   @Path("{table}")
   @Produces(MediaType.APPLICATION_JSON)
+  @Timed(name = "update-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "update-table", absolute = true)
   public Response updateTable(
       @PathParam("namespace") String namespace,
       @PathParam("table") String table,
       UpdateTableRequest updateTableRequest) {
     LOG.info(
-        "Update Iceberg table, namespace: {}, table: {}, snapshots: {}, updateTableRequest: {}",
+        "Update Iceberg table, namespace: {}, table: {}, updateTableRequest: {}",
         namespace,
         table,
-        updateTableRequest);
+        SerializeUpdateTableRequest(updateTableRequest));
     TableIdentifier tableIdentifier =
         TableIdentifier.of(RESTUtil.decodeNamespace(namespace), table);
     return IcebergRestUtils.ok(icebergTableOps.updateTable(tableIdentifier, updateTableRequest));
@@ -83,6 +99,8 @@ public class IcebergTableOperations {
   @DELETE
   @Path("{table}")
   @Produces(MediaType.APPLICATION_JSON)
+  @Timed(name = "drop-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "drop-table", absolute = true)
   public Response dropTable(
       @PathParam("namespace") String namespace,
       @PathParam("table") String table,
@@ -105,6 +123,8 @@ public class IcebergTableOperations {
   @GET
   @Path("{table}")
   @Produces(MediaType.APPLICATION_JSON)
+  @Timed(name = "load-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "load-table", absolute = true)
   public Response loadTable(
       @PathParam("namespace") String namespace,
       @PathParam("table") String table,
@@ -118,6 +138,8 @@ public class IcebergTableOperations {
   @HEAD
   @Path("{table}")
   @Produces(MediaType.APPLICATION_JSON)
+  @Timed(name = "table-exists." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "table-exits", absolute = true)
   public Response tableExists(
       @PathParam("namespace") String namespace, @PathParam("table") String table) {
     TableIdentifier tableIdentifier =
@@ -132,10 +154,21 @@ public class IcebergTableOperations {
   @POST
   @Path("{table}/metrics")
   @Produces(MediaType.APPLICATION_JSON)
+  @Timed(name = "report-table-metrics." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "report-table-metrics", absolute = true)
   public Response reportTableMetrics(
       @PathParam("namespace") String namespace,
       @PathParam("table") String table,
       ReportMetricsRequest request) {
     return IcebergRestUtils.noContent();
+  }
+
+  private String SerializeUpdateTableRequest(UpdateTableRequest updateTableRequest) {
+    try {
+      return icebergObjectMapper.writeValueAsString(updateTableRequest);
+    } catch (JsonProcessingException e) {
+      LOG.warn("Serialize update table request failed", e);
+      return updateTableRequest.toString();
+    }
   }
 }

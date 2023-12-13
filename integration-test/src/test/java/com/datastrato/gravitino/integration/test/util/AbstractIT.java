@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Datastrato.
+ * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 package com.datastrato.gravitino.integration.test.util;
@@ -8,12 +8,15 @@ import static com.datastrato.gravitino.Configs.ENTRY_KV_ROCKSDB_BACKEND_PATH;
 import static com.datastrato.gravitino.server.GravitinoServer.WEBSERVER_CONF_PREFIX;
 
 import com.datastrato.gravitino.Config;
+import com.datastrato.gravitino.auth.AuthenticatorType;
 import com.datastrato.gravitino.client.GravitinoClient;
 import com.datastrato.gravitino.integration.test.MiniGravitino;
 import com.datastrato.gravitino.integration.test.MiniGravitinoContext;
 import com.datastrato.gravitino.server.GravitinoServer;
 import com.datastrato.gravitino.server.ServerConfig;
+import com.datastrato.gravitino.server.auth.OAuthConfig;
 import com.datastrato.gravitino.server.web.JettyServerConfig;
+import java.io.File;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
@@ -34,14 +37,18 @@ import org.slf4j.LoggerFactory;
 
 @ExtendWith(PrintFuncNameExtension.class)
 public class AbstractIT {
-  public static final Logger LOG = LoggerFactory.getLogger(AbstractIT.class);
+  private static final Logger LOG = LoggerFactory.getLogger(AbstractIT.class);
   protected static GravitinoClient client;
+
+  private static final OAuthMockDataProvider mockDataProvider = OAuthMockDataProvider.getInstance();
+
+  protected static final CloseableGroup closer = CloseableGroup.create();
 
   private static MiniGravitino miniGravitino;
 
   protected static Config serverConfig;
 
-  static String testMode = "";
+  public static String testMode = "";
 
   protected static Map<String, String> customConfigs = new HashMap<>();
 
@@ -113,7 +120,14 @@ public class AbstractIT {
         JettyServerConfig.fromConfig(serverConfig, WEBSERVER_CONF_PREFIX);
 
     String uri = "http://" + jettyServerConfig.getHost() + ":" + jettyServerConfig.getHttpPort();
-    client = GravitinoClient.builder(uri).build();
+    if (AuthenticatorType.OAUTH
+        .name()
+        .toLowerCase()
+        .equals(customConfigs.get(OAuthConfig.AUTHENTICATOR.getKey()))) {
+      client = GravitinoClient.builder(uri).withOAuth(mockDataProvider).build();
+    } else {
+      client = GravitinoClient.builder(uri).build();
+    }
   }
 
   @AfterAll
@@ -156,5 +170,22 @@ public class AbstractIT {
       LOG.error(e.getMessage(), e);
     }
     return hostIP;
+  }
+
+  protected String readGitCommitIdFromGitFile() {
+    try {
+      String gravitinoHome = System.getenv("GRAVITINO_HOME");
+      String gitFolder = gravitinoHome + File.separator + ".git" + File.separator;
+      String headFileContent = FileUtils.readFileToString(new File(gitFolder + "HEAD"), "UTF-8");
+      String[] refAndBranch = headFileContent.split(":");
+      if (refAndBranch.length == 1) {
+        return refAndBranch[0].trim();
+      }
+      return FileUtils.readFileToString(new File(gitFolder + refAndBranch[1].trim()), "UTF-8")
+          .trim();
+    } catch (IOException e) {
+      LOG.warn("Can't get git commit id for:", e);
+      return "";
+    }
   }
 }

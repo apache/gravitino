@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Datastrato.
+ * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 package com.datastrato.gravitino.client;
@@ -53,11 +53,11 @@ import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.distributions.Strategy;
 import com.datastrato.gravitino.rel.expressions.sorts.SortDirection;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
+import com.datastrato.gravitino.rel.types.Type;
+import com.datastrato.gravitino.rel.types.Types;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import io.substrait.type.Type;
-import io.substrait.type.TypeCreator;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
@@ -335,8 +335,8 @@ public class TestRelationalCatalog extends TestBase {
 
     ColumnDTO[] columns =
         new ColumnDTO[] {
-          createMockColumn("col1", TypeCreator.NULLABLE.I8, "comment1"),
-          createMockColumn("col2", TypeCreator.NULLABLE.STRING, "comment2")
+          createMockColumn("col1", Types.ByteType.get(), "comment1"),
+          createMockColumn("col2", Types.StringType.get(), "comment2")
         };
 
     SortOrderDTO[] sortOrderDTOs = createMockSortOrderDTO("col2", DESCENDING);
@@ -431,8 +431,8 @@ public class TestRelationalCatalog extends TestBase {
 
     ColumnDTO[] columns =
         new ColumnDTO[] {
-          createMockColumn("city", TypeCreator.NULLABLE.I32, "comment1"),
-          createMockColumn("dt", TypeCreator.NULLABLE.DATE, "comment2")
+          createMockColumn("city", Types.IntegerType.get(), "comment1"),
+          createMockColumn("dt", Types.DateType.get(), "comment2")
         };
 
     // Test empty partitioning
@@ -559,8 +559,8 @@ public class TestRelationalCatalog extends TestBase {
             RelationalCatalog.formatTableRequestPath(tableId.namespace()) + "/" + tableId.name());
     ColumnDTO[] columns =
         new ColumnDTO[] {
-          createMockColumn("col1", TypeCreator.NULLABLE.I8, "comment1"),
-          createMockColumn("col2", TypeCreator.NULLABLE.STRING, "comment2")
+          createMockColumn("col1", Types.ByteType.get(), "comment1"),
+          createMockColumn("col2", Types.StringType.get(), "comment2")
         };
 
     DistributionDTO distributionDTO = createMockDistributionDTO("col1", 10);
@@ -597,7 +597,7 @@ public class TestRelationalCatalog extends TestBase {
   public void testRenameTable() throws JsonProcessingException {
     NameIdentifier tableId = NameIdentifier.of(metalakeName, catalogName, "schema1", "table1");
     ColumnDTO[] columns =
-        new ColumnDTO[] {createMockColumn("col1", TypeCreator.NULLABLE.I8, "comment1")};
+        new ColumnDTO[] {createMockColumn("col1", Types.ByteType.get(), "comment1")};
 
     DistributionDTO distributionDTO = createMockDistributionDTO("col1", 10);
     SortOrderDTO[] sortOrderDTOs = createMockSortOrderDTO("col1", DESCENDING);
@@ -621,7 +621,7 @@ public class TestRelationalCatalog extends TestBase {
   public void testUpdateTableComment() throws JsonProcessingException {
     NameIdentifier tableId = NameIdentifier.of(metalakeName, catalogName, "schema1", "table1");
     ColumnDTO[] columns =
-        new ColumnDTO[] {createMockColumn("col1", TypeCreator.NULLABLE.I8, "comment1")};
+        new ColumnDTO[] {createMockColumn("col1", Types.ByteType.get(), "comment1")};
 
     DistributionDTO distributionDTO = createMockDistributionDTO("col1", 10);
     SortOrderDTO[] sortOrderDTOs = createMockSortOrderDTO("col1", DESCENDING);
@@ -645,7 +645,7 @@ public class TestRelationalCatalog extends TestBase {
   public void testSetTableProperty() throws JsonProcessingException {
     NameIdentifier tableId = NameIdentifier.of(metalakeName, catalogName, "schema1", "table1");
     ColumnDTO[] columns =
-        new ColumnDTO[] {createMockColumn("col1", TypeCreator.NULLABLE.I8, "comment1")};
+        new ColumnDTO[] {createMockColumn("col1", Types.ByteType.get(), "comment1")};
     Map<String, String> properties = ImmutableMap.of("k1", "v1");
 
     DistributionDTO distributionDTO = createMockDistributionDTO("col1", 10);
@@ -670,7 +670,7 @@ public class TestRelationalCatalog extends TestBase {
   public void testRemoveTableProperty() throws JsonProcessingException {
     NameIdentifier tableId = NameIdentifier.of(metalakeName, catalogName, "schema1", "table1");
     ColumnDTO[] columns =
-        new ColumnDTO[] {createMockColumn("col1", TypeCreator.NULLABLE.I8, "comment1")};
+        new ColumnDTO[] {createMockColumn("col1", Types.ByteType.get(), "comment1")};
 
     DistributionDTO distributionDTO = createMockDistributionDTO("col1", 10);
     SortOrderDTO[] sortOrderDTOs = createMockSortOrderDTO("col1", DESCENDING);
@@ -694,8 +694,8 @@ public class TestRelationalCatalog extends TestBase {
     NameIdentifier tableId = NameIdentifier.of(metalakeName, catalogName, "schema1", "table1");
     ColumnDTO[] columns =
         new ColumnDTO[] {
-          createMockColumn("col1", TypeCreator.NULLABLE.I8, "comment1"),
-          createMockColumn("col2", TypeCreator.NULLABLE.STRING, "comment2")
+          createMockColumn("col1", Types.ByteType.get(), "comment1"),
+          createMockColumn("col2", Types.StringType.get(), "comment2", false)
         };
 
     DistributionDTO distributionDTO = createMockDistributionDTO("col2", 10);
@@ -714,9 +714,10 @@ public class TestRelationalCatalog extends TestBase {
     TableUpdateRequest.AddTableColumnRequest req =
         new TableUpdateRequest.AddTableColumnRequest(
             new String[] {"col2"},
-            TypeCreator.NULLABLE.STRING,
+            Types.StringType.get(),
             "comment2",
-            TableChange.ColumnPosition.after("col1"));
+            TableChange.ColumnPosition.after("col1"),
+            false);
 
     testAlterTable(tableId, req, expectedTable);
   }
@@ -726,9 +727,9 @@ public class TestRelationalCatalog extends TestBase {
     NameIdentifier tableId = NameIdentifier.of(metalakeName, catalogName, "schema1", "table1");
     ColumnDTO[] columns =
         new ColumnDTO[] {
-          createMockColumn("col1", TypeCreator.NULLABLE.I8, "comment1"),
-          createMockColumn("col2", TypeCreator.NULLABLE.STRING, "comment2"),
-          createMockColumn("col3", TypeCreator.NULLABLE.STRING, "comment3")
+          createMockColumn("col1", Types.ByteType.get(), "comment1"),
+          createMockColumn("col2", Types.StringType.get(), "comment2"),
+          createMockColumn("col3", Types.StringType.get(), "comment3")
         };
 
     DistributionDTO distributionDTO = createMockDistributionDTO("col1", 10);
@@ -753,7 +754,7 @@ public class TestRelationalCatalog extends TestBase {
   public void testUpdateTableColumnComment() throws JsonProcessingException {
     NameIdentifier tableId = NameIdentifier.of(metalakeName, catalogName, "schema1", "table1");
     ColumnDTO[] columns =
-        new ColumnDTO[] {createMockColumn("col1", TypeCreator.NULLABLE.I8, "comment2")};
+        new ColumnDTO[] {createMockColumn("col1", Types.ByteType.get(), "comment2")};
 
     DistributionDTO distributionDTO = createMockDistributionDTO("col1", 10);
     SortOrderDTO[] sortOrderDTOs = createMockSortOrderDTO("col1", DESCENDING);
@@ -777,7 +778,7 @@ public class TestRelationalCatalog extends TestBase {
   public void testUpdateTableColumnDataType() throws JsonProcessingException {
     NameIdentifier tableId = NameIdentifier.of(metalakeName, catalogName, "schema1", "table1");
     ColumnDTO[] columns =
-        new ColumnDTO[] {createMockColumn("col1", TypeCreator.NULLABLE.STRING, "comment1")};
+        new ColumnDTO[] {createMockColumn("col1", Types.StringType.get(), "comment1")};
 
     DistributionDTO distributionDTO = createMockDistributionDTO("col1", 10);
     SortOrderDTO[] sortOrderDTOs = createMockSortOrderDTO("col1", DESCENDING);
@@ -792,7 +793,30 @@ public class TestRelationalCatalog extends TestBase {
             sortOrderDTOs);
     TableUpdateRequest.UpdateTableColumnTypeRequest req =
         new TableUpdateRequest.UpdateTableColumnTypeRequest(
-            new String[] {"col1"}, TypeCreator.NULLABLE.STRING);
+            new String[] {"col1"}, Types.StringType.get());
+
+    testAlterTable(tableId, req, expectedTable);
+  }
+
+  @Test
+  public void testUpdateTableColumnNullability() throws JsonProcessingException {
+    NameIdentifier tableId = NameIdentifier.of(metalakeName, catalogName, "schema1", "table1");
+    ColumnDTO[] columns =
+        new ColumnDTO[] {createMockColumn("col1", Types.StringType.get(), "comment1")};
+
+    DistributionDTO distributionDTO = createMockDistributionDTO("col1", 10);
+    SortOrderDTO[] sortOrderDTOs = createMockSortOrderDTO("col1", DESCENDING);
+    TableDTO expectedTable =
+        createMockTable(
+            "table1",
+            columns,
+            "comment",
+            Collections.emptyMap(),
+            EMPTY_PARTITIONING,
+            distributionDTO,
+            sortOrderDTOs);
+    TableUpdateRequest.UpdateTableColumnNullabilityRequest req =
+        new TableUpdateRequest.UpdateTableColumnNullabilityRequest(new String[] {"col1"}, true);
 
     testAlterTable(tableId, req, expectedTable);
   }
@@ -802,8 +826,8 @@ public class TestRelationalCatalog extends TestBase {
     NameIdentifier tableId = NameIdentifier.of(metalakeName, catalogName, "schema1", "table1");
     ColumnDTO[] columns =
         new ColumnDTO[] {
-          createMockColumn("col1", TypeCreator.NULLABLE.I8, "comment1"),
-          createMockColumn("col2", TypeCreator.NULLABLE.STRING, "comment2")
+          createMockColumn("col1", Types.ByteType.get(), "comment1"),
+          createMockColumn("col2", Types.StringType.get(), "comment2")
         };
 
     DistributionDTO distributionDTO = createMockDistributionDTO("col1", 10);
@@ -848,7 +872,7 @@ public class TestRelationalCatalog extends TestBase {
   public void testDeleteTableColumn() throws JsonProcessingException {
     NameIdentifier tableId = NameIdentifier.of(metalakeName, catalogName, "schema1", "table1");
     ColumnDTO[] columns =
-        new ColumnDTO[] {createMockColumn("col2", TypeCreator.NULLABLE.STRING, "comment2")};
+        new ColumnDTO[] {createMockColumn("col2", Types.StringType.get(), "comment2")};
 
     DistributionDTO distributionDTO = createMockDistributionDTO("col2", 10);
     SortOrderDTO[] sortOrderDTOs = createMockSortOrderDTO("col2", DESCENDING);
@@ -890,6 +914,29 @@ public class TestRelationalCatalog extends TestBase {
     Assertions.assertFalse(catalog.asTableCatalog().dropTable(tableId));
   }
 
+  @Test
+  public void testPurgeTable() throws JsonProcessingException {
+    NameIdentifier tableId = NameIdentifier.of(metalakeName, catalogName, "schema1", "table1");
+    String tablePath =
+        withSlash(
+            RelationalCatalog.formatTableRequestPath(tableId.namespace()) + "/" + tableId.name());
+    DropResponse resp = new DropResponse(true);
+    buildMockResource(Method.DELETE, tablePath, null, resp, SC_OK);
+
+    Assertions.assertTrue(catalog.asTableCatalog().purgeTable(tableId));
+
+    // return false
+    resp = new DropResponse(false);
+    buildMockResource(Method.DELETE, tablePath, null, resp, SC_OK);
+    Assertions.assertFalse(catalog.asTableCatalog().purgeTable(tableId));
+
+    // Test with exception
+    ErrorResponse errorResp = ErrorResponse.internalError("internal error");
+    buildMockResource(Method.DELETE, tablePath, null, errorResp, SC_INTERNAL_SERVER_ERROR);
+
+    Assertions.assertFalse(catalog.asTableCatalog().purgeTable(tableId));
+  }
+
   private void testAlterTable(NameIdentifier ident, TableUpdateRequest req, TableDTO updatedTable)
       throws JsonProcessingException {
     String tablePath =
@@ -910,6 +957,8 @@ public class TestRelationalCatalog extends TestBase {
           updatedTable.columns()[i].dataType(), alteredTable.columns()[i].dataType());
       Assertions.assertEquals(
           updatedTable.columns()[i].comment(), alteredTable.columns()[i].comment());
+      Assertions.assertEquals(
+          updatedTable.columns()[i].nullable(), alteredTable.columns()[i].nullable());
     }
 
     Assertions.assertArrayEquals(updatedTable.partitioning(), alteredTable.partitioning());
@@ -947,12 +996,17 @@ public class TestRelationalCatalog extends TestBase {
   }
 
   private static ColumnDTO createMockColumn(String name, Type type, String comment) {
-    return new ColumnDTO.Builder<>().withName(name).withDataType(type).withComment(comment).build();
+    return createMockColumn(name, type, comment, true);
   }
 
-  private static TableDTO createMockTable(
-      String name, ColumnDTO[] columns, String comment, Map<String, String> properties) {
-    return createMockTable(name, columns, comment, properties, EMPTY_PARTITIONING, null, null);
+  private static ColumnDTO createMockColumn(
+      String name, Type type, String comment, boolean nullable) {
+    return new ColumnDTO.Builder<>()
+        .withName(name)
+        .withDataType(type)
+        .withComment(comment)
+        .withNullable(nullable)
+        .build();
   }
 
   private static TableDTO createMockTable(

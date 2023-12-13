@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Datastrato.
+ * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 package com.datastrato.gravitino.catalog.hive;
@@ -21,7 +21,12 @@ public class HiveSchemaPropertiesMetadata extends BasePropertiesMetadata {
     List<PropertyEntry<?>> propertyEntries =
         ImmutableList.of(
             stringOptionalPropertyEntry(
-                LOCATION, "The location for Hive database storage", false, null, false));
+                LOCATION,
+                "The directory for Hive database storage. Not required, HMS uses the value of "
+                    + "`hive.metastore.warehouse.dir` in the hive-site.xml by default",
+                false,
+                null,
+                false));
 
     propertiesMetadata = Maps.uniqueIndex(propertyEntries, PropertyEntry::getName);
   }

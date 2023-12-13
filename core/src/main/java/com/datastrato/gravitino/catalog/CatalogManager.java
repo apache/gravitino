@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Datastrato.
+ * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 package com.datastrato.gravitino.catalog;
@@ -272,18 +272,15 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
             .build();
 
     try {
-      store.executeInTransaction(
-          () -> {
-            NameIdentifier metalakeIdent = NameIdentifier.of(ident.namespace().levels());
-            if (!store.exists(metalakeIdent, EntityType.METALAKE)) {
-              LOG.warn("Metalake {} does not exist", metalakeIdent);
-              throw new NoSuchMetalakeException("Metalake " + metalakeIdent + " does not exist");
-            }
+      NameIdentifier metalakeIdent = NameIdentifier.of(ident.namespace().levels());
+      if (!store.exists(metalakeIdent, EntityType.METALAKE)) {
+        LOG.warn("Metalake {} does not exist", metalakeIdent);
+        throw new NoSuchMetalakeException("Metalake " + metalakeIdent + " does not exist");
+      }
 
-            store.put(e, false /* overwrite */);
-            return null;
-          });
+      // TODO: should avoid a race condition here
       CatalogWrapper wrapper = catalogCache.get(ident, id -> createCatalogWrapper(e));
+      store.put(e, false /* overwrite */);
       return wrapper.catalog;
     } catch (EntityAlreadyExistsException e1) {
       LOG.warn("Catalog {} already exists", ident, e1);
@@ -291,6 +288,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
     } catch (IllegalArgumentException | NoSuchMetalakeException e2) {
       throw e2;
     } catch (Exception e3) {
+      catalogCache.invalidate(ident);
       LOG.error("Failed to create catalog {}", ident, e3);
       throw new RuntimeException(e3);
     }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Datastrato.
+ * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 package com.datastrato.gravitino.catalog.lakehouse.iceberg;
@@ -27,19 +27,19 @@ public class IcebergTablePropertiesMetadata extends BasePropertiesMetadata {
   static {
     List<PropertyEntry<?>> propertyEntries =
         ImmutableList.of(
-            stringReservedPropertyEntry(COMMENT, "Table comment", true),
-            stringReservedPropertyEntry(CREATOR, "Table creator info", false),
+            stringReservedPropertyEntry(COMMENT, "The table comment", true),
+            stringReservedPropertyEntry(CREATOR, "The table creator", false),
             stringReservedPropertyEntry(LOCATION, "Iceberg location for table storage", false),
             stringReservedPropertyEntry(
                 CURRENT_SNAPSHOT_ID,
-                "The snapshot representing the current state of the table",
+                "The snapshot represents the current state of the table",
                 false),
             stringReservedPropertyEntry(
                 CHERRY_PICK_SNAPSHOT_ID,
-                "Selecting a specific snapshots in a merge operation",
+                "Selecting a specific snapshot in a merge operation",
                 false),
             stringReservedPropertyEntry(
-                SORT_ORDER, "Selecting a specific snapshots in a merge operation", false),
+                SORT_ORDER, "Selecting a specific snapshot in a merge operation", false),
             stringReservedPropertyEntry(
                 IDENTIFIER_FIELDS, "The identifier field(s) for defining the table", false));
     PROPERTIES_METADATA = Maps.uniqueIndex(propertyEntries, PropertyEntry::getName);

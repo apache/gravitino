@@ -1,0 +1,15 @@
+{
+  "recommendations": [
+    "esbenp.prettier-vscode",
+    "dbaeumer.vscode-eslint",
+    "jasonnutter.search-node-modules",
+    "kisstkondoros.vscode-codemetrics",
+    "streetsidesoftware.code-spell-checker",
+    "editorconfig.editorconfig",
+    "usernamehw.errorlens",
+    "aaron-bond.better-comments",
+    "yzhang.markdown-all-in-one",
+    "davidanson.vscode-markdownlint",
+    "chakrounanas.turbo-console-log"
+  ]
+}

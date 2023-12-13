@@ -1,36 +1,36 @@
 ---
-title: "How to Publish Docker images"
-date: 2023-10-01T09:03:20-08:00
-license: "Copyright 2023 Datastrato.
+title: "Publish Docker images"
+slug: /publish-docker-images
+keyword: docker
+license: "Copyright 2023 Datastrato Pvt Ltd.
 This software is licensed under the Apache License version 2."
 ---
 
-## How to Publish Docker Images
 
 ## Introduction
 
-The Gravitino project provides a set of docker images to facilitate the publishing, development and testing of the Gravitino project.
-The Gravitino official docker images are published to the [datastrato](https://hub.docker.com/u/datastrato) DockerHub repository.
+The Gravitino project provides a set of Docker images to facilitate the publishing, development, and testing of the Gravitino project.
+[Datastrato Docker Hub](https://hub.docker.com/u/datastrato) repository publishes the official Gravitino Docker images.
 
-## Publish Docker Images to Docker Hub
+## Publish Docker images to Docker Hub
 
-We use Github Actions to publish the docker images to the DockerHub repository.
+You can use GitHub actions to publish Docker images to the Docker Hub repository.
 
-1. Open the <https://github.com/datastrato/gravitino/actions/workflows/docker-image.yml>
+1. Open the [Docker publish link](https://github.com/datastrato/gravitino/actions/workflows/docker-image.yml)
 2. Click the `Run workflow` button.
 3. Select the branch you want to build
-   + If you select `main` branch, the docker image will be published with the specified tag and the `latest` tag.
-   + If you select another branch, the docker image will only publish the specified tag.
+   + Selecting the main branch results in publishing the Docker image with the specified tag and the latest tag.
+   + Selecting another branch, results are publishing the Docker image with the specified tag.
 4. Choose the image you want to build
    + `datastrato/gravitino-ci-hive`.
    + `datastrato/gravitino-ci-trino`.
-   + Other data sources will be supported in the future.
-4. Input the `tag name`, for example: `0.1.0`, Then build and push the docker image name is `datastrato/{image-name}:0.1.0`.
-5. You must enter the correct `publish docker token` before you can execute run `Publish Docker Image` workflow.
-6. Wait for the workflow to complete. You can see a new docker image shown in the [datastrato](https://hub.docker.com/u/datastrato) DockerHub repository.
+   + Future plans include support for other data sources.
+5. Input the `tag name`, for example: `0.1.0`, Then build and push the Docker image name is `datastrato/{image-name}:0.1.0`.
+6. You must enter the correct `publish docker token` before you can execute run `Publish Docker Image` workflow.
+7. Wait for the workflow to complete. You can see a new Docker image shown in the [Datastrato Docker Hub](https://hub.docker.com/u/datastrato) repository.
 
-![Publish Docker Image](assets/publish-docker-image.png)
+![Publish Docker image](assets/publish-docker-image.png)
 
-## The Version of Gravitino Docker images
+## More details of Gravitino Docker images
 
-+ [Gravitino Docker images](../dev/docker/README.md)
++ [Gravitino Docker images](docker-image-details)

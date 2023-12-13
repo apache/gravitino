@@ -20,8 +20,8 @@
 
 package com.datastrato.gravitino.rel.expressions;
 
-import io.substrait.type.Type;
-import io.substrait.type.TypeCreator;
+import com.datastrato.gravitino.rel.types.Type;
+import com.datastrato.gravitino.rel.types.Types;
 import java.util.Objects;
 
 /**
@@ -30,10 +30,10 @@ import java.util.Objects;
  * @param <T> the JVM type of value held by the literal
  */
 public interface Literal<T> extends Expression {
-  /** Returns the literal value. */
+  /** @return The literal value. */
   T value();
 
-  /** Returns the data type of the literal. */
+  /** @return The data type of the literal. */
   Type dataType();
 
   @Override
@@ -60,7 +60,7 @@ public interface Literal<T> extends Expression {
    * @return a new {@link Literal} instance
    */
   static LiteralImpl<Integer> integer(Integer value) {
-    return of(value, TypeCreator.REQUIRED.I32);
+    return of(value, Types.IntegerType.get());
   }
 
   /**
@@ -70,9 +70,14 @@ public interface Literal<T> extends Expression {
    * @return a new {@link Literal} instance
    */
   static LiteralImpl<String> string(String value) {
-    return of(value, TypeCreator.REQUIRED.STRING);
+    return of(value, Types.StringType.get());
   }
 
+  /**
+   * Creates a literal with the given type value.
+   *
+   * @param <T> The JVM type of value held by the literal.
+   */
   final class LiteralImpl<T> implements Literal<T> {
     private final T value;
     private final Type dataType;

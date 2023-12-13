@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Datastrato.
+ * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 
@@ -7,7 +7,6 @@ package com.datastrato.gravitino.storage.kv;
 
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.EntityAlreadyExistsException;
-import com.datastrato.gravitino.utils.Executable;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.List;
@@ -70,22 +69,4 @@ public interface KvBackend extends Closeable {
    * @throws IOException If an I/O exception occurs during scanning.
    */
   List<Pair<byte[], byte[]>> scan(KvRangeScan scanRange) throws IOException;
-
-  /**
-   * Executes a transactional operation on the KV backend.
-   *
-   * <p>NOTE: Some backends may not support transactions, in which case this method should throw an
-   * UnsupportedOperationException.
-   *
-   * @param executable The executable operation to perform transactionally.
-   * @param <R> The type of the result.
-   * @param <E> The type of exception that the executable may throw.
-   * @return The result of the transactional operation.
-   * @throws E If the executable throws an exception.
-   * @throws IOException If an I/O exception occurs during the transaction.
-   */
-  default <R, E extends Exception> R executeInTransaction(Executable<R, E> executable)
-      throws E, IOException {
-    throw new UnsupportedOperationException("Transaction not supported");
-  }
 }

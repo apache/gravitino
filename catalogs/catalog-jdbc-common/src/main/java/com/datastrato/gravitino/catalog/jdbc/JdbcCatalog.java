@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Datastrato.
+ * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 package com.datastrato.gravitino.catalog.jdbc;
@@ -9,6 +9,7 @@ import com.datastrato.gravitino.catalog.CatalogOperations;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import com.datastrato.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
+import com.datastrato.gravitino.catalog.jdbc.operation.JdbcTableOperations;
 import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.datastrato.gravitino.rel.TableCatalog;
 import java.util.Map;
@@ -29,7 +30,8 @@ public abstract class JdbcCatalog extends BaseCatalog<JdbcCatalog> {
             entity(),
             createExceptionConverter(),
             createJdbcTypeConverter(),
-            createJdbcDatabaseOperations());
+            createJdbcDatabaseOperations(),
+            createJdbcTableOperations());
     ops.initialize(config);
     return ops;
   }
@@ -58,4 +60,7 @@ public abstract class JdbcCatalog extends BaseCatalog<JdbcCatalog> {
    * @return The {@link JdbcDatabaseOperations} to be used by the catalog to manage databases in the
    */
   protected abstract JdbcDatabaseOperations createJdbcDatabaseOperations();
+
+  /** @return The {@link JdbcTableOperations} to be used by the catalog to manage tables in the */
+  protected abstract JdbcTableOperations createJdbcTableOperations();
 }

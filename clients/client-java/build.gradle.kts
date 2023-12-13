@@ -1,12 +1,11 @@
 /*
- * Copyright 2023 Datastrato.
+ * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 plugins {
   `maven-publish`
   id("java")
   id("idea")
-  id("com.diffplug.spotless")
 }
 
 dependencies {
@@ -15,14 +14,6 @@ dependencies {
   implementation(libs.protobuf.java.util) {
     exclude("com.google.guava", "guava")
       .because("Brings in Guava for Andriod, which we don't want (and breaks multimaps).")
-  }
-  implementation(libs.substrait.java.core) {
-    exclude("org.slf4j")
-    exclude("com.fasterxml.jackson.core")
-    exclude("com.fasterxml.jackson.datatype")
-    exclude("com.fasterxml.jackson.dataformat")
-    exclude("com.google.code.findbugs")
-    exclude("com.google.protobuf")
   }
   implementation(libs.jackson.databind)
   implementation(libs.jackson.annotations)
@@ -44,4 +35,21 @@ dependencies {
   testImplementation(libs.mockito.core)
   testImplementation(libs.mockserver.netty)
   testImplementation(libs.mockserver.client.java)
+  testImplementation(libs.bundles.jwt)
+}
+
+tasks.build {
+  dependsOn("javadoc")
+}
+
+tasks.javadoc {
+  dependsOn(":api:javadoc", ":common:javadoc")
+  source =
+    sourceSets["main"].allJava +
+    project(":api").sourceSets["main"].allJava +
+    project(":common").sourceSets["main"].allJava
+
+  classpath = configurations["compileClasspath"] +
+    project(":api").configurations["runtimeClasspath"] +
+    project(":common").configurations["runtimeClasspath"]
 }

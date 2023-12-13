@@ -1,9 +1,11 @@
 /*
- * Copyright 2023 Datastrato.
+ * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 package com.datastrato.gravitino.server.web.rest;
 
+import com.codahale.metrics.annotation.ResponseMetered;
+import com.codahale.metrics.annotation.Timed;
 import com.datastrato.gravitino.MetalakeChange;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
@@ -17,6 +19,7 @@ import com.datastrato.gravitino.dto.responses.MetalakeResponse;
 import com.datastrato.gravitino.dto.util.DTOConverters;
 import com.datastrato.gravitino.meta.BaseMetalake;
 import com.datastrato.gravitino.meta.MetalakeManager;
+import com.datastrato.gravitino.metrics.MetricNames;
 import com.datastrato.gravitino.server.web.Utils;
 import java.util.Arrays;
 import javax.inject.Inject;
@@ -53,6 +56,8 @@ public class MetalakeOperations {
 
   @GET
   @Produces("application/vnd.gravitino.v1+json")
+  @Timed(name = "list-metalake." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "list-metalake", absolute = true)
   public Response listMetalakes() {
     try {
       BaseMetalake[] metalakes = manager.listMetalakes();
@@ -68,6 +73,8 @@ public class MetalakeOperations {
 
   @POST
   @Produces("application/vnd.gravitino.v1+json")
+  @Timed(name = "create-metalake." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "create-metalake", absolute = true)
   public Response createMetalake(MetalakeCreateRequest request) {
     try {
       request.validate();
@@ -84,6 +91,8 @@ public class MetalakeOperations {
   @GET
   @Path("{name}")
   @Produces("application/vnd.gravitino.v1+json")
+  @Timed(name = "load-metalake." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "load-metalake", absolute = true)
   public Response loadMetalake(@PathParam("name") String metalakeName) {
     try {
       NameIdentifier identifier = NameIdentifier.ofMetalake(metalakeName);
@@ -98,6 +107,8 @@ public class MetalakeOperations {
   @PUT
   @Path("{name}")
   @Produces("application/vnd.gravitino.v1+json")
+  @Timed(name = "alter-metalake." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "alter-metalake", absolute = true)
   public Response alterMetalake(
       @PathParam("name") String metalakeName, MetalakeUpdatesRequest updatesRequest) {
     try {
@@ -119,6 +130,8 @@ public class MetalakeOperations {
   @DELETE
   @Path("{name}")
   @Produces("application/vnd.gravitino.v1+json")
+  @Timed(name = "drop-metalake." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "drop-metalake", absolute = true)
   public Response dropMetalake(@PathParam("name") String metalakeName) {
     try {
       NameIdentifier identifier = NameIdentifier.ofMetalake(metalakeName);

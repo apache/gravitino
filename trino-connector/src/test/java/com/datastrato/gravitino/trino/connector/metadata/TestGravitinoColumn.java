@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Datastrato.
+ * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 package com.datastrato.gravitino.trino.connector.metadata;
@@ -7,7 +7,7 @@ package com.datastrato.gravitino.trino.connector.metadata;
 import static org.testng.Assert.assertEquals;
 
 import com.datastrato.gravitino.dto.rel.ColumnDTO;
-import com.datastrato.gravitino.shaded.io.substrait.type.TypeCreator;
+import com.datastrato.gravitino.rel.types.Types;
 import org.testng.annotations.Test;
 
 public class TestGravitinoColumn {
@@ -18,7 +18,7 @@ public class TestGravitinoColumn {
         new ColumnDTO.Builder()
             .withName("f1")
             .withComment("test column")
-            .withDataType(TypeCreator.NULLABLE.STRING)
+            .withDataType(Types.StringType.get())
             .build();
 
     GravitinoColumn column = new GravitinoColumn(columnDTO, 0);

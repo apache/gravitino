@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Datastrato.
+ * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 
@@ -7,8 +7,14 @@ package com.datastrato.gravitino.catalog.jdbc.operation;
 
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import com.datastrato.gravitino.catalog.jdbc.utils.JdbcConnectorUtils;
+import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
+import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
 import java.sql.Connection;
+import java.sql.DatabaseMetaData;
+import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import javax.sql.DataSource;
 import org.slf4j.Logger;
@@ -23,16 +29,17 @@ public abstract class JdbcDatabaseOperations implements DatabaseOperation {
   protected JdbcExceptionConverter exceptionMapper;
 
   @Override
-  public void initialize(final DataSource dataSource, final JdbcExceptionConverter exceptionMapper)
-      throws RuntimeException {
+  public void initialize(
+      DataSource dataSource, JdbcExceptionConverter exceptionMapper, Map<String, String> conf) {
     this.dataSource = dataSource;
     this.exceptionMapper = exceptionMapper;
   }
 
   @Override
-  public void create(String databaseName, String comment, Map<String, String> properties) {
+  public void create(String databaseName, String comment, Map<String, String> properties)
+      throws SchemaAlreadyExistsException {
     LOG.info("Beginning to create database {}", databaseName);
-    try (final Connection connection = this.dataSource.getConnection()) {
+    try (final Connection connection = getConnection()) {
       JdbcConnectorUtils.executeUpdate(
           connection, generateCreateDatabaseSql(databaseName, comment, properties));
       LOG.info("Finished creating database {}", databaseName);
@@ -42,9 +49,9 @@ public abstract class JdbcDatabaseOperations implements DatabaseOperation {
   }
 
   @Override
-  public void delete(String databaseName, boolean cascade) {
+  public void delete(String databaseName, boolean cascade) throws NoSuchSchemaException {
     LOG.info("Beginning to drop database {}", databaseName);
-    try (final Connection connection = this.dataSource.getConnection()) {
+    try (final Connection connection = getConnection()) {
       JdbcConnectorUtils.executeUpdate(connection, generateDropDatabaseSql(databaseName, cascade));
       LOG.info("Finished dropping database {}", databaseName);
     } catch (final SQLException se) {
@@ -52,12 +59,29 @@ public abstract class JdbcDatabaseOperations implements DatabaseOperation {
     }
   }
 
+  @Override
+  public List<String> listDatabases() {
+    List<String> databaseNames = new ArrayList<>();
+    try (final Connection connection = this.dataSource.getConnection()) {
+      DatabaseMetaData metaData = connection.getMetaData();
+      ResultSet resultSet = metaData.getCatalogs();
+      while (resultSet.next()) {
+        String databaseName = resultSet.getString("TABLE_CAT");
+        databaseNames.add(databaseName);
+      }
+      return databaseNames;
+    } catch (final SQLException se) {
+      throw this.exceptionMapper.toGravitinoException(se);
+    }
+  }
+
   /**
-   * @param databaseName The name of the database to create.
-   * @param comment The comment of the database to create.
+   * @param databaseName The name of the database.
+   * @param comment The comment of the database.
+   * @param properties The properties of the database.
    * @return the SQL statement to create a database with the given name and comment.
    */
-  abstract String generateCreateDatabaseSql(
+  protected abstract String generateCreateDatabaseSql(
       String databaseName, String comment, Map<String, String> properties);
 
   /**
@@ -65,5 +89,9 @@ public abstract class JdbcDatabaseOperations implements DatabaseOperation {
    * @param cascade cascade If set to true, drops all the tables in the schema as well.
    * @return the SQL statement to drop a database with the given name.
    */
-  abstract String generateDropDatabaseSql(String databaseName, boolean cascade);
+  protected abstract String generateDropDatabaseSql(String databaseName, boolean cascade);
+
+  protected Connection getConnection() throws SQLException {
+    return dataSource.getConnection();
+  }
 }

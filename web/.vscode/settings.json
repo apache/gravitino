@@ -1,0 +1,36 @@
+{
+  "prettier.requireConfig": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.formatOnSave": true,
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": true,
+    "source.organizeImports": false
+  },
+  "eslint.validate": ["javascript", "javascriptreact"],
+  "eslint.format.enable": true,
+  "npm.packageManager": "yarn",
+  "cSpell.words": [
+    "clsx",
+    "Datastrato",
+    "Gravitino",
+    "headlessui",
+    "heroicons",
+    "hookform",
+    "iconify",
+    "jdbc",
+    "lakehouse",
+    "metalake",
+    "metalakes",
+    "metastore",
+    "Neue",
+    "nextui",
+    "nprogress",
+    "reduxjs",
+    "Roboto",
+    "Segoe",
+    "tabler",
+    "tailwindcss"
+  ],
+  "search-node-modules.path": "node_modules",
+  "tailwindCSS.experimental.classRegex": [["clsx\\(([^)]*)\\)", "(?:'|\"|`)([^']*)(?:'|\"|`)"]]
+}

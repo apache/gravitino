@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Datastrato.
+ * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 package com.datastrato.gravitino.catalog.lakehouse.iceberg;
@@ -102,8 +102,7 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
     Map<String, String> resultConf = Maps.newHashMap(prefixMap);
     resultConf.putAll(gravitinoConfig);
 
-    IcebergConfig icebergConfig = new IcebergConfig();
-    icebergConfig.loadFromMap(resultConf, k -> true);
+    IcebergConfig icebergConfig = new IcebergConfig(resultConf);
 
     this.icebergTableOps = new IcebergTableOps(icebergConfig);
     this.icebergTableOpsHelper = icebergTableOps.createIcebergTableOpsHelper();
@@ -113,7 +112,15 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
 
   /** Closes the Iceberg catalog and releases the associated client pool. */
   @Override
-  public void close() {}
+  public void close() {
+    if (null != icebergTableOps) {
+      try {
+        icebergTableOps.close();
+      } catch (Exception e) {
+        LOG.warn("Failed to close Iceberg catalog", e);
+      }
+    }
+  }
 
   /**
    * Lists the schemas under the given namespace.
@@ -125,9 +132,10 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
   @Override
   public NameIdentifier[] listSchemas(Namespace namespace) throws NoSuchCatalogException {
     try {
+      List<org.apache.iceberg.catalog.Namespace> namespaces =
+          icebergTableOps.listNamespace(IcebergTableOpsHelper.getIcebergNamespace()).namespaces();
 
-      return icebergTableOps.listNamespace(IcebergTableOpsHelper.getIcebergNamespace()).namespaces()
-          .stream()
+      return namespaces.stream()
           .map(icebergNamespace -> NameIdentifier.of(icebergNamespace.levels()))
           .toArray(NameIdentifier[]::new);
     } catch (NoSuchNamespaceException e) {
@@ -535,8 +543,8 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
   @Override
   public boolean purgeTable(NameIdentifier tableIdent) throws UnsupportedOperationException {
     try {
-      icebergTableOps.purgeTable(
-          TableIdentifier.of(ArrayUtils.add(tableIdent.namespace().levels(), tableIdent.name())));
+      String schema = NameIdentifier.of(tableIdent.namespace().levels()).name();
+      icebergTableOps.purgeTable(TableIdentifier.of(schema, tableIdent.name()));
       LOG.info("Purge Iceberg table {}", tableIdent.name());
       return true;
     } catch (org.apache.iceberg.exceptions.NoSuchTableException e) {

@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Datastrato.
+ * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
@@ -20,14 +20,6 @@ tasks.withType<ShadowJar>(ShadowJar::class.java) {
   archiveClassifier.set("")
 
   // Relocate dependencies to avoid conflicts
-  relocate("io.substrait", "com.datastrato.gravitino.shaded.io.substrait") {
-    exclude("org.slf4j")
-    exclude("com.fasterxml.jackson.core")
-    exclude("com.fasterxml.jackson.datatype")
-    exclude("com.fasterxml.jackson.dataformat")
-    exclude("com.google.code.findbugs")
-    exclude("com.google.protobuf")
-  }
   relocate("com.google", "com.datastrato.gravitino.shaded.com.google")
   relocate("com.fasterxml", "com.datastrato.gravitino.shaded.com.fasterxml")
   relocate("org.apache.httpcomponents", "com.datastrato.gravitino.shaded.org.apache.httpcomponents")

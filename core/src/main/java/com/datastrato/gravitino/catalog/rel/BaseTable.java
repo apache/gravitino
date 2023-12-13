@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Datastrato.
+ * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 package com.datastrato.gravitino.catalog.rel;
@@ -80,7 +80,7 @@ public abstract class BaseTable implements Table {
   /**
    * Returns the distribution strategy of the table.
    *
-   * @return
+   * @return The distribution strategy of the table.
    */
   @Override
   public Distribution distribution() {

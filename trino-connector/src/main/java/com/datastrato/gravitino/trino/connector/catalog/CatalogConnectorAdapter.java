@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Datastrato.
+ * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 package com.datastrato.gravitino.trino.connector.catalog;
@@ -21,13 +21,13 @@ public interface CatalogConnectorAdapter {
     return emptyList();
   }
 
-  /** @return Return internal connector config with trino. */
-  Map<String, Object> buildInternalConnectorConfig(GravitinoCatalog catalog);
+  /** @return Return internal connector config with Trino. */
+  Map<String, Object> buildInternalConnectorConfig(GravitinoCatalog catalog) throws Exception;
 
   /** @return SchemaProperties list that used to validate schema properties. */
   default List<PropertyMetadata<?>> getSchemaProperties() {
     return emptyList();
-  };
+  }
 
   /** @return Return MetadataAdapter for special catalog connector. */
   CatalogConnectorMetadataAdapter getMetadataAdapter();

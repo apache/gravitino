@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Datastrato.
+ * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 package com.datastrato.gravitino.dto.responses;
@@ -40,7 +40,7 @@ public class CatalogResponse extends BaseResponse {
   /**
    * Validates the response data.
    *
-   * @throws IllegalArgumentException if teh catalog name, type or audit is not set.
+   * @throws IllegalArgumentException if the catalog name, type or audit is not set.
    */
   @Override
   public void validate() throws IllegalArgumentException {

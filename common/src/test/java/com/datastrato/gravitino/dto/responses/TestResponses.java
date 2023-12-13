@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Datastrato.
+ * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 package com.datastrato.gravitino.dto.responses;
@@ -18,7 +18,7 @@ import com.datastrato.gravitino.dto.rel.ColumnDTO;
 import com.datastrato.gravitino.dto.rel.SchemaDTO;
 import com.datastrato.gravitino.dto.rel.TableDTO;
 import com.datastrato.gravitino.dto.rel.partitions.Partitioning;
-import io.substrait.type.TypeCreator;
+import com.datastrato.gravitino.rel.types.Types;
 import java.time.Instant;
 import org.junit.jupiter.api.Test;
 
@@ -82,8 +82,8 @@ public class TestResponses {
 
   @Test
   void testMetalakeResponseException() throws IllegalArgumentException {
-    MetalakeResponse reponse = new MetalakeResponse();
-    assertThrows(IllegalArgumentException.class, () -> reponse.validate());
+    MetalakeResponse response = new MetalakeResponse();
+    assertThrows(IllegalArgumentException.class, () -> response.validate());
   }
 
   @Test
@@ -97,8 +97,8 @@ public class TestResponses {
 
   @Test
   void testMetalakeListResponseException() throws IllegalArgumentException {
-    MetalakeListResponse reponse = new MetalakeListResponse();
-    assertThrows(IllegalArgumentException.class, () -> reponse.validate());
+    MetalakeListResponse response = new MetalakeListResponse();
+    assertThrows(IllegalArgumentException.class, () -> response.validate());
   }
 
   @Test
@@ -144,7 +144,7 @@ public class TestResponses {
     AuditDTO audit =
         new AuditDTO.Builder().withCreator("creator").withCreateTime(Instant.now()).build();
     ColumnDTO column =
-        new ColumnDTO.Builder().withName("ColumnA").withDataType(TypeCreator.NULLABLE.I8).build();
+        new ColumnDTO.Builder().withName("ColumnA").withDataType(Types.ByteType.get()).build();
     TableDTO table =
         new TableDTO.Builder()
             .withName("TableA")
@@ -197,5 +197,30 @@ public class TestResponses {
   void testUnknownErrorResponse() throws IllegalArgumentException {
     ErrorResponse error = ErrorResponse.unknownError("unknown error");
     error.validate(); // No exception thrown
+  }
+
+  @Test
+  void testOAuthTokenResponse() throws IllegalArgumentException {
+    OAuth2TokenResponse response =
+        new OAuth2TokenResponse("Bearer xx", null, "Bearer", null, null, null);
+    response.validate();
+  }
+
+  @Test
+  void testOAuthTokenException() throws IllegalArgumentException {
+    OAuth2TokenResponse response = new OAuth2TokenResponse();
+    assertThrows(IllegalArgumentException.class, () -> response.validate());
+  }
+
+  @Test
+  void testOAuthErrorResponse() throws IllegalArgumentException {
+    OAuth2ErrorResponse response = new OAuth2ErrorResponse("invalid_grant", "error");
+    response.validate(); // No exception thrown
+  }
+
+  @Test
+  void testOAuthErrorException() throws IllegalArgumentException {
+    OAuth2ErrorResponse response = new OAuth2ErrorResponse();
+    assertThrows(IllegalArgumentException.class, () -> response.validate());
   }
 }

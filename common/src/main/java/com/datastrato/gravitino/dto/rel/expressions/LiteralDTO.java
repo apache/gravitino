@@ -1,11 +1,11 @@
 /*
- * Copyright 2023 Datastrato.
+ * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 package com.datastrato.gravitino.dto.rel.expressions;
 
 import com.datastrato.gravitino.rel.expressions.Literal;
-import io.substrait.type.Type;
+import com.datastrato.gravitino.rel.types.Type;
 import lombok.EqualsAndHashCode;
 
 @EqualsAndHashCode

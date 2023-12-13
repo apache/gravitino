@@ -1,8 +1,10 @@
 /*
- * Copyright 2023 Datastrato.
+ * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 package com.datastrato.gravitino.trino.connector;
+
+import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_TABLE_NOT_EXISTS;
 
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorMetadata;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
@@ -13,6 +15,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import io.airlift.slice.Slice;
+import io.trino.spi.TrinoException;
 import io.trino.spi.connector.ColumnHandle;
 import io.trino.spi.connector.ColumnMetadata;
 import io.trino.spi.connector.ConnectorInsertTableHandle;
@@ -82,6 +85,12 @@ public class GravitinoMetadata implements ConnectorMetadata {
 
     ConnectorTableHandle internalTableHandle =
         internalMetadata.getTableHandle(session, tableName, startVersion, endVersion);
+
+    if (internalTableHandle == null) {
+      throw new TrinoException(
+          GRAVITINO_TABLE_NOT_EXISTS,
+          String.format("Table %s does not exist in the internal connector", tableName));
+    }
     return new GravitinoTableHandle(
         tableName.getSchemaName(), tableName.getTableName(), internalTableHandle);
   }
@@ -254,7 +263,7 @@ public class GravitinoMetadata implements ConnectorMetadata {
         properties.entrySet().stream()
             .filter(e -> e.getValue().isPresent())
             .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().get()));
-    Map<String, String> allProps = metadataAdapter.toGravitonTableProperties(resultMap);
+    Map<String, String> allProps = metadataAdapter.toGravitinoTableProperties(resultMap);
     catalogConnectorMetadata.setTableProperties(gravitinoTableHandle.toSchemaTableName(), allProps);
   }
 
@@ -293,7 +302,9 @@ public class GravitinoMetadata implements ConnectorMetadata {
     GravitinoTableHandle gravitinoTableHandle = (GravitinoTableHandle) tableHandle;
     GravitinoColumnHandle gravitinoColumnHandle = (GravitinoColumnHandle) column;
     catalogConnectorMetadata.setColumnType(
-        gravitinoTableHandle.toSchemaTableName(), gravitinoColumnHandle.getColumnName(), type);
+        gravitinoTableHandle.toSchemaTableName(),
+        gravitinoColumnHandle.getColumnName(),
+        metadataAdapter.getDataTypeTransformer().getGravitinoType(type));
   }
 
   @Override

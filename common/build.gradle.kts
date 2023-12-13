@@ -1,24 +1,15 @@
 /*
- * Copyright 2023 Datastrato.
+ * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 plugins {
   `maven-publish`
   id("java")
   id("idea")
-  id("com.diffplug.spotless")
 }
 
 dependencies {
   implementation(project(":api"))
-  implementation(libs.substrait.java.core) {
-    exclude("org.slf4j")
-    exclude("com.fasterxml.jackson.core")
-    exclude("com.fasterxml.jackson.datatype")
-    exclude("com.fasterxml.jackson.dataformat")
-    exclude("com.google.protobuf")
-    exclude("com.google.code.findbugs")
-  }
 
   implementation(libs.jackson.databind)
   implementation(libs.jackson.annotations)

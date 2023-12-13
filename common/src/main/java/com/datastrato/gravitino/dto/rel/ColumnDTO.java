@@ -1,16 +1,16 @@
 /*
- * Copyright 2023 Datastrato.
+ * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 package com.datastrato.gravitino.dto.rel;
 
 import com.datastrato.gravitino.json.JsonUtils;
 import com.datastrato.gravitino.rel.Column;
+import com.datastrato.gravitino.rel.types.Type;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.google.common.base.Preconditions;
-import io.substrait.type.Type;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
 
@@ -31,7 +31,7 @@ public class ColumnDTO implements Column {
   private String comment;
 
   @JsonProperty("nullable")
-  private boolean nullable;
+  private boolean nullable = true;
 
   private ColumnDTO() {}
 

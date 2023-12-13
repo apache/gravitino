@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Datastrato.
+ * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 package com.datastrato.gravitino;
@@ -80,7 +80,13 @@ public class StringIdentifier {
     return String.format(CURRENT_FORMAT, CURRENT_FORMAT_VERSION, id);
   }
 
-  /** ******Helper methods to set/get StringIdentifier to/from different places******* */
+  /**
+   * Helper methods to set/get StringIdentifier to/from different places
+   *
+   * @param stringId the string identifier to add to the properties
+   * @param properties the properties to add the string identifier to
+   * @return the properties with the string identifier added
+   */
   public static Map<String, String> addToProperties(
       StringIdentifier stringId, Map<String, String> properties) {
     if (properties == null) {
@@ -135,5 +141,27 @@ public class StringIdentifier {
 
     String idString = comment.substring(index + STRING_COMMENT.length() + 1, comment.length() - 1);
     return fromString(idString);
+  }
+
+  public static String removeIdFromComment(String comment) {
+    if (StringUtils.isBlank(comment)) {
+      return comment;
+    }
+
+    StringIdentifier identifier = fromComment(comment);
+    if (identifier != null) {
+      String format = String.format(STRING_COMMENT_FORMAT, " ", STRING_COMMENT, identifier);
+      int indexOf = comment.indexOf(format);
+
+      if (indexOf == -1) {
+        format = String.format(STRING_COMMENT_FORMAT, "", STRING_COMMENT, identifier);
+        indexOf = comment.indexOf(format);
+      }
+
+      if (indexOf != -1) {
+        return comment.substring(0, indexOf);
+      }
+    }
+    return comment;
   }
 }

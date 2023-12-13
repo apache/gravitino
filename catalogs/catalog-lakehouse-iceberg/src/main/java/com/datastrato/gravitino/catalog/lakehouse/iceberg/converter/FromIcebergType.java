@@ -1,11 +1,10 @@
 /*
- * Copyright 2023 Datastrato.
+ * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 package com.datastrato.gravitino.catalog.lakehouse.iceberg.converter;
 
-import io.substrait.type.Type;
-import io.substrait.type.TypeCreator;
+import com.datastrato.gravitino.rel.types.Type;
 import java.util.List;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.types.TypeUtil;
@@ -37,58 +36,53 @@ public class FromIcebergType extends TypeUtil.SchemaVisitor<Type> {
 
   @Override
   public Type list(Types.ListType list, Type elementResult) {
-    if (list.isElementOptional()) {
-      return TypeCreator.NULLABLE.list(elementResult);
-    } else {
-      return TypeCreator.REQUIRED.list(elementResult);
-    }
+    return com.datastrato.gravitino.rel.types.Types.ListType.of(
+        elementResult, list.isElementOptional());
   }
 
   @Override
   public Type map(Types.MapType map, Type keyResult, Type valueResult) {
-    if (map.isValueOptional()) {
-      return TypeCreator.NULLABLE.map(keyResult, valueResult);
-    } else {
-      return TypeCreator.REQUIRED.map(keyResult, valueResult);
-    }
+    return com.datastrato.gravitino.rel.types.Types.MapType.of(
+        keyResult, valueResult, map.isValueOptional());
   }
 
   @Override
   public Type primitive(org.apache.iceberg.types.Type.PrimitiveType primitive) {
     switch (primitive.typeId()) {
       case BOOLEAN:
-        return TypeCreator.NULLABLE.BOOLEAN;
+        return com.datastrato.gravitino.rel.types.Types.BooleanType.get();
       case INTEGER:
-        return TypeCreator.NULLABLE.I32;
+        return com.datastrato.gravitino.rel.types.Types.IntegerType.get();
       case LONG:
-        return TypeCreator.NULLABLE.I64;
+        return com.datastrato.gravitino.rel.types.Types.LongType.get();
       case FLOAT:
-        return TypeCreator.NULLABLE.FP32;
+        return com.datastrato.gravitino.rel.types.Types.FloatType.get();
       case DOUBLE:
-        return TypeCreator.NULLABLE.FP64;
+        return com.datastrato.gravitino.rel.types.Types.DoubleType.get();
       case DATE:
-        return TypeCreator.NULLABLE.DATE;
+        return com.datastrato.gravitino.rel.types.Types.DateType.get();
       case TIME:
-        return TypeCreator.NULLABLE.TIME;
+        return com.datastrato.gravitino.rel.types.Types.TimeType.get();
       case TIMESTAMP:
         Types.TimestampType ts = (Types.TimestampType) primitive;
         if (ts.shouldAdjustToUTC()) {
-          return TypeCreator.NULLABLE.TIMESTAMP_TZ;
+          return com.datastrato.gravitino.rel.types.Types.TimestampType.withoutTimeZone();
         } else {
-          return TypeCreator.NULLABLE.TIMESTAMP;
+          return com.datastrato.gravitino.rel.types.Types.TimestampType.withTimeZone();
         }
       case STRING:
-        return TypeCreator.NULLABLE.STRING;
+        return com.datastrato.gravitino.rel.types.Types.StringType.get();
       case UUID:
-        return TypeCreator.NULLABLE.UUID;
+        return com.datastrato.gravitino.rel.types.Types.UUIDType.get();
       case FIXED:
         Types.FixedType fixedType = (Types.FixedType) primitive;
-        return TypeCreator.NULLABLE.fixedChar(fixedType.length());
+        return com.datastrato.gravitino.rel.types.Types.FixedType.of(fixedType.length());
       case BINARY:
-        return TypeCreator.NULLABLE.BINARY;
+        return com.datastrato.gravitino.rel.types.Types.BinaryType.get();
       case DECIMAL:
         Types.DecimalType decimal = (Types.DecimalType) primitive;
-        return TypeCreator.NULLABLE.decimal(decimal.precision(), decimal.scale());
+        return com.datastrato.gravitino.rel.types.Types.DecimalType.of(
+            decimal.precision(), decimal.scale());
       default:
         throw new UnsupportedOperationException(
             "Cannot convert unknown type to Gravitino: " + primitive);

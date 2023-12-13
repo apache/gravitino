@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Datastrato.
+ * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 package com.datastrato.gravitino.trino.connector;
@@ -29,6 +29,8 @@ public enum GravitinoErrorCode implements ErrorCodeSupplier {
   GRAVITINO_SCHEMA_NOT_EMPTY(15, EXTERNAL),
   GRAVITINO_ILLEGAL_ARGUMENT(16, EXTERNAL),
   GRAVITINO_INNER_CONNECTOR_EXCEPTION(17, EXTERNAL),
+  GRAVITINO_ICEBERG_UNSUPPORTED_JDBC_TYPE(18, EXTERNAL),
+  GRAVITINO_MISSING_REQUIRED_PROPERTY(19, EXTERNAL),
   ;
 
   private final ErrorCode errorCode;

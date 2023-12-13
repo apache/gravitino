@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Datastrato.
+ * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 package com.datastrato.gravitino.catalog.hive.converter;
@@ -23,126 +23,76 @@ import static org.apache.hadoop.hive.serde2.typeinfo.TypeInfoFactory.getListType
 import static org.apache.hadoop.hive.serde2.typeinfo.TypeInfoFactory.getMapTypeInfo;
 import static org.apache.hadoop.hive.serde2.typeinfo.TypeInfoFactory.getPrimitiveTypeInfo;
 import static org.apache.hadoop.hive.serde2.typeinfo.TypeInfoFactory.getStructTypeInfo;
+import static org.apache.hadoop.hive.serde2.typeinfo.TypeInfoFactory.getUnionTypeInfo;
 import static org.apache.hadoop.hive.serde2.typeinfo.TypeInfoFactory.getVarcharTypeInfo;
 
-import io.substrait.function.ParameterizedTypeVisitor;
-import io.substrait.type.Type;
+import com.datastrato.gravitino.rel.types.Type;
+import com.datastrato.gravitino.rel.types.Types;
+import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
 
-/** Converts Substrait data types to corresponding Hive data types. */
-public class ToHiveType
-    extends ParameterizedTypeVisitor.ParameterizedTypeThrowsVisitor<TypeInfo, RuntimeException> {
-
-  public static ToHiveType INSTANCE = new ToHiveType();
-
-  private ToHiveType() {
-    super("Only support type literals and parameterized types.");
-  }
-
-  // Visit methods for each Substrait data type
-  @Override
-  public TypeInfo visit(Type.Bool type) throws RuntimeException {
-    return getPrimitiveTypeInfo(BOOLEAN_TYPE_NAME);
-  }
-
-  @Override
-  public TypeInfo visit(Type.I8 type) throws RuntimeException {
-    return getPrimitiveTypeInfo(TINYINT_TYPE_NAME);
-  }
-
-  @Override
-  public TypeInfo visit(Type.I16 type) throws RuntimeException {
-    return getPrimitiveTypeInfo(SMALLINT_TYPE_NAME);
-  }
-
-  @Override
-  public TypeInfo visit(Type.I32 type) throws RuntimeException {
-    return getPrimitiveTypeInfo(INT_TYPE_NAME);
-  }
-
-  @Override
-  public TypeInfo visit(Type.I64 type) throws RuntimeException {
-    return getPrimitiveTypeInfo(BIGINT_TYPE_NAME);
-  }
-
-  @Override
-  public TypeInfo visit(Type.FP32 type) throws RuntimeException {
-    return getPrimitiveTypeInfo(FLOAT_TYPE_NAME);
-  }
-
-  @Override
-  public TypeInfo visit(Type.FP64 type) throws RuntimeException {
-    return getPrimitiveTypeInfo(DOUBLE_TYPE_NAME);
-  }
-
-  @Override
-  public TypeInfo visit(Type.Str type) throws RuntimeException {
-    return getPrimitiveTypeInfo(STRING_TYPE_NAME);
-  }
-
-  @Override
-  public TypeInfo visit(Type.VarChar type) throws RuntimeException {
-    return getVarcharTypeInfo(type.length());
-  }
-
-  @Override
-  public TypeInfo visit(Type.FixedChar type) throws RuntimeException {
-    return getCharTypeInfo(type.length());
-  }
-
-  @Override
-  public TypeInfo visit(Type.Date type) throws RuntimeException {
-    return getPrimitiveTypeInfo(DATE_TYPE_NAME);
-  }
-
-  @Override
-  public TypeInfo visit(Type.Timestamp type) throws RuntimeException {
-    return getPrimitiveTypeInfo(TIMESTAMP_TYPE_NAME);
-  }
-
-  @Override
-  public TypeInfo visit(Type.Decimal type) throws RuntimeException {
-    return getDecimalTypeInfo(type.precision(), type.scale());
-  }
-
-  @Override
-  public TypeInfo visit(Type.Binary type) throws RuntimeException {
-    return getPrimitiveTypeInfo(BINARY_TYPE_NAME);
-  }
-
-  @Override
-  public TypeInfo visit(Type.IntervalYear type) throws RuntimeException {
-    return getPrimitiveTypeInfo(INTERVAL_YEAR_MONTH_TYPE_NAME);
-  }
-
-  @Override
-  public TypeInfo visit(Type.IntervalDay type) throws RuntimeException {
-    return getPrimitiveTypeInfo(INTERVAL_DAY_TIME_TYPE_NAME);
-  }
-
-  @Override
-  public TypeInfo visit(Type.ListType type) throws RuntimeException {
-    return getListTypeInfo(type.elementType().accept(INSTANCE));
-  }
-
-  @Override
-  public TypeInfo visit(Type.Map type) throws RuntimeException {
-    return getMapTypeInfo(type.key().accept(INSTANCE), type.value().accept(INSTANCE));
-  }
-
-  @Override
-  public TypeInfo visit(Type.Struct type) throws RuntimeException {
-    List<TypeInfo> typeInfos =
-        type.fields().stream().map(t -> t.accept(INSTANCE)).collect(Collectors.toList());
-    List<String> names =
-        IntStream.range(0, typeInfos.size()).mapToObj(String::valueOf).collect(Collectors.toList());
-    // TODO: Actually, Hive's Struct type should correspond to Substrait's NamedStruct type.
-    //  However, NamedStruct is a Pseudo-type, not an implementation of io.substrait.type.Type.
-    //  I haven't figured out a good way to resolve this yet. For now, I'm using an index instead of
-    //  name as a temporary workaround.
-    return getStructTypeInfo(names, typeInfos);
+/** Converts Gravitino data types to corresponding Hive data types. */
+public class ToHiveType {
+  public static TypeInfo convert(Type type) {
+    switch (type.name()) {
+      case BOOLEAN:
+        return getPrimitiveTypeInfo(BOOLEAN_TYPE_NAME);
+      case BYTE:
+        return getPrimitiveTypeInfo(TINYINT_TYPE_NAME);
+      case SHORT:
+        return getPrimitiveTypeInfo(SMALLINT_TYPE_NAME);
+      case INTEGER:
+        return getPrimitiveTypeInfo(INT_TYPE_NAME);
+      case LONG:
+        return getPrimitiveTypeInfo(BIGINT_TYPE_NAME);
+      case FLOAT:
+        return getPrimitiveTypeInfo(FLOAT_TYPE_NAME);
+      case DOUBLE:
+        return getPrimitiveTypeInfo(DOUBLE_TYPE_NAME);
+      case STRING:
+        return getPrimitiveTypeInfo(STRING_TYPE_NAME);
+      case VARCHAR:
+        return getVarcharTypeInfo(((Types.VarCharType) type).length());
+      case FIXEDCHAR:
+        return getCharTypeInfo(((Types.FixedCharType) type).length());
+      case DATE:
+        return getPrimitiveTypeInfo(DATE_TYPE_NAME);
+      case TIMESTAMP:
+        return getPrimitiveTypeInfo(TIMESTAMP_TYPE_NAME);
+      case DECIMAL:
+        Types.DecimalType decimalType = (Types.DecimalType) type;
+        return getDecimalTypeInfo(decimalType.precision(), decimalType.scale());
+      case BINARY:
+        return getPrimitiveTypeInfo(BINARY_TYPE_NAME);
+      case INTERVAL_YEAR:
+        return getPrimitiveTypeInfo(INTERVAL_YEAR_MONTH_TYPE_NAME);
+      case INTERVAL_DAY:
+        return getPrimitiveTypeInfo(INTERVAL_DAY_TIME_TYPE_NAME);
+      case LIST:
+        return getListTypeInfo(convert(((Types.ListType) type).elementType()));
+      case MAP:
+        Types.MapType mapType = (Types.MapType) type;
+        return getMapTypeInfo(convert(mapType.keyType()), convert(mapType.valueType()));
+      case STRUCT:
+        Types.StructType structType = (Types.StructType) type;
+        List<TypeInfo> typeInfos =
+            Arrays.stream(structType.fields())
+                .map(t -> convert(t.type()))
+                .collect(Collectors.toList());
+        List<String> names =
+            Arrays.stream(structType.fields())
+                .map(Types.StructType.Field::name)
+                .collect(Collectors.toList());
+        return getStructTypeInfo(names, typeInfos);
+      case UNION:
+        return getUnionTypeInfo(
+            Arrays.stream(((Types.UnionType) type).types())
+                .map(ToHiveType::convert)
+                .collect(Collectors.toList()));
+      default:
+        throw new UnsupportedOperationException("Unsupported conversion to Hive type: " + type);
+    }
   }
 }

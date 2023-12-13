@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Datastrato.
+ * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 package com.datastrato.gravitino.catalog.jdbc.operation;
@@ -9,6 +9,8 @@ import static com.datastrato.gravitino.catalog.jdbc.converter.SqliteExceptionCon
 import com.datastrato.gravitino.catalog.jdbc.JdbcSchema;
 import com.datastrato.gravitino.catalog.jdbc.utils.JdbcConnectorUtils;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
+import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
+import com.datastrato.gravitino.meta.AuditInfo;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.sql.Connection;
@@ -29,7 +31,8 @@ public class SqliteDatabaseOperations extends JdbcDatabaseOperations {
   }
 
   @Override
-  public void create(String databaseName, String comment, Map<String, String> properties) {
+  public void create(String databaseName, String comment, Map<String, String> properties)
+      throws SchemaAlreadyExistsException {
     try {
       if (exist(databaseName)) {
         throw new SQLException(
@@ -53,7 +56,7 @@ public class SqliteDatabaseOperations extends JdbcDatabaseOperations {
   }
 
   @Override
-  public List<String> list() {
+  public List<String> listDatabases() {
     File file = new File(dbPath);
     Preconditions.checkArgument(file.exists(), "Database path %s does not exist", dbPath);
     return Arrays.stream(Objects.requireNonNull(file.listFiles()))
@@ -64,13 +67,13 @@ public class SqliteDatabaseOperations extends JdbcDatabaseOperations {
   @Override
   public JdbcSchema load(String databaseName) throws NoSuchSchemaException {
     if (exist(databaseName)) {
-      return new JdbcSchema.Builder().withName(databaseName).build();
+      return new JdbcSchema.Builder().withName(databaseName).withAuditInfo(AuditInfo.EMPTY).build();
     }
     return null;
   }
 
   @Override
-  public void delete(String databaseName, boolean cascade) {
+  public void delete(String databaseName, boolean cascade) throws NoSuchSchemaException {
     delete(databaseName);
   }
 
@@ -79,13 +82,13 @@ public class SqliteDatabaseOperations extends JdbcDatabaseOperations {
   }
 
   @Override
-  String generateCreateDatabaseSql(
+  public String generateCreateDatabaseSql(
       String databaseName, String comment, Map<String, String> properties) {
     return null;
   }
 
   @Override
-  String generateDropDatabaseSql(String databaseName, boolean cascade) {
+  public String generateDropDatabaseSql(String databaseName, boolean cascade) {
     return null;
   }
 }

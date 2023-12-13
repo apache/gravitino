@@ -1,15 +1,19 @@
 /*
- * Copyright 2023 Datastrato.
+ * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 
 package com.datastrato.gravitino.catalog.lakehouse.iceberg;
 
+import com.datastrato.gravitino.GravitinoEnv;
 import com.datastrato.gravitino.aux.GravitinoAuxiliaryService;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.ops.IcebergTableOps;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.web.IcebergExceptionMapper;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.web.IcebergObjectMapperProvider;
+import com.datastrato.gravitino.metrics.MetricsSystem;
+import com.datastrato.gravitino.metrics.source.MetricsSource;
 import com.datastrato.gravitino.server.auth.AuthenticationFilter;
+import com.datastrato.gravitino.server.web.HttpServerMetricsSource;
 import com.datastrato.gravitino.server.web.JettyServer;
 import com.datastrato.gravitino.server.web.JettyServerConfig;
 import java.util.Map;
@@ -29,18 +33,24 @@ public class IcebergRESTService implements GravitinoAuxiliaryService {
 
   public static final String SERVICE_NAME = "iceberg-rest";
 
+  private IcebergTableOps icebergTableOps;
+
   private void initServer(IcebergConfig icebergConfig) {
     JettyServerConfig serverConfig = JettyServerConfig.fromConfig(icebergConfig);
     server = new JettyServer();
-    server.initialize(serverConfig, SERVICE_NAME);
+    MetricsSystem metricsSystem = GravitinoEnv.getInstance().metricsSystem();
+    server.initialize(serverConfig, SERVICE_NAME, false /* shouldEnableUI */);
 
     ResourceConfig config = new ResourceConfig();
     config.packages("com.datastrato.gravitino.catalog.lakehouse.iceberg.web.rest");
 
     config.register(IcebergObjectMapperProvider.class).register(JacksonFeature.class);
     config.register(IcebergExceptionMapper.class);
+    HttpServerMetricsSource httpServerMetricsSource =
+        new HttpServerMetricsSource(MetricsSource.ICEBERG_REST_SERVER_METRIC_NAME, config, server);
+    metricsSystem.register(httpServerMetricsSource);
 
-    IcebergTableOps icebergTableOps = new IcebergTableOps(icebergConfig);
+    icebergTableOps = new IcebergTableOps(icebergConfig);
     config.register(
         new AbstractBinder() {
           @Override
@@ -61,8 +71,7 @@ public class IcebergRESTService implements GravitinoAuxiliaryService {
 
   @Override
   public void serviceInit(Map<String, String> properties) {
-    IcebergConfig icebergConfig = new IcebergConfig();
-    icebergConfig.loadFromMap(properties, k -> true);
+    IcebergConfig icebergConfig = new IcebergConfig(properties);
     initServer(icebergConfig);
     LOG.info("Iceberg REST service inited");
   }
@@ -84,6 +93,9 @@ public class IcebergRESTService implements GravitinoAuxiliaryService {
     if (server != null) {
       server.stop();
       LOG.info("Iceberg REST service stopped");
+    }
+    if (icebergTableOps != null) {
+      icebergTableOps.close();
     }
   }
 }

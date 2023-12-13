@@ -1,9 +1,11 @@
 /*
- * Copyright 2023 Datastrato.
+ * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 package com.datastrato.gravitino.server.web.rest;
 
+import com.codahale.metrics.annotation.ResponseMetered;
+import com.codahale.metrics.annotation.Timed;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.catalog.CatalogOperationDispatcher;
@@ -14,6 +16,7 @@ import com.datastrato.gravitino.dto.responses.DropResponse;
 import com.datastrato.gravitino.dto.responses.EntityListResponse;
 import com.datastrato.gravitino.dto.responses.SchemaResponse;
 import com.datastrato.gravitino.dto.util.DTOConverters;
+import com.datastrato.gravitino.metrics.MetricNames;
 import com.datastrato.gravitino.rel.Schema;
 import com.datastrato.gravitino.rel.SchemaChange;
 import com.datastrato.gravitino.server.web.Utils;
@@ -53,6 +56,8 @@ public class SchemaOperations {
 
   @GET
   @Produces("application/vnd.gravitino.v1+json")
+  @Timed(name = "list-schema." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "list-schema", absolute = true)
   public Response listSchemas(
       @PathParam("metalake") String metalake, @PathParam("catalog") String catalog) {
     try {
@@ -67,6 +72,8 @@ public class SchemaOperations {
 
   @POST
   @Produces("application/vnd.gravitino.v1+json")
+  @Timed(name = "create-schema." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "create-schema", absolute = true)
   public Response createSchema(
       @PathParam("metalake") String metalake,
       @PathParam("catalog") String catalog,
@@ -86,6 +93,8 @@ public class SchemaOperations {
   @GET
   @Path("/{schema}")
   @Produces("application/vnd.gravitino.v1+json")
+  @Timed(name = "load-schema." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "load-schema", absolute = true)
   public Response loadSchema(
       @PathParam("metalake") String metalake,
       @PathParam("catalog") String catalog,
@@ -103,6 +112,8 @@ public class SchemaOperations {
   @PUT
   @Path("/{schema}")
   @Produces("application/vnd.gravitino.v1+json")
+  @Timed(name = "alter-schema." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "alter-schema", absolute = true)
   public Response alterSchema(
       @PathParam("metalake") String metalake,
       @PathParam("catalog") String catalog,
@@ -126,6 +137,8 @@ public class SchemaOperations {
   @DELETE
   @Path("/{schema}")
   @Produces("application/vnd.gravitino.v1+json")
+  @Timed(name = "drop-schema." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "drop-schema", absolute = true)
   public Response dropSchema(
       @PathParam("metalake") String metalake,
       @PathParam("catalog") String catalog,

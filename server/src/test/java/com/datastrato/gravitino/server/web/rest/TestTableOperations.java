@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Datastrato.
+ * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 package com.datastrato.gravitino.server.web.rest;
@@ -41,11 +41,11 @@ import com.datastrato.gravitino.rel.expressions.sorts.NullOrdering;
 import com.datastrato.gravitino.rel.expressions.sorts.SortDirection;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
+import com.datastrato.gravitino.rel.types.Type;
+import com.datastrato.gravitino.rel.types.Types;
 import com.datastrato.gravitino.rest.RESTUtils;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import io.substrait.type.Type;
-import io.substrait.type.TypeCreator;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
@@ -183,8 +183,7 @@ public class TestTableOperations extends JerseyTest {
   public void testCreateTable() {
     Column[] columns =
         new Column[] {
-          mockColumn("col1", TypeCreator.NULLABLE.STRING),
-          mockColumn("col2", TypeCreator.NULLABLE.I8)
+          mockColumn("col1", Types.StringType.get()), mockColumn("col2", Types.ByteType.get())
         };
     Table table = mockTable("table1", columns, "mock comment", ImmutableMap.of("k1", "v1"));
     when(dispatcher.createTable(any(), any(), any(), any(), any(), any(), any())).thenReturn(table);
@@ -311,8 +310,7 @@ public class TestTableOperations extends JerseyTest {
   public void testCreatePartitionedTable() {
     Column[] columns =
         new Column[] {
-          mockColumn("col1", TypeCreator.NULLABLE.STRING),
-          mockColumn("col2", TypeCreator.NULLABLE.I8)
+          mockColumn("col1", Types.StringType.get()), mockColumn("col2", Types.ByteType.get())
         };
     Partitioning[] partitioning =
         new Partitioning[] {IdentityPartitioningDTO.of(columns[0].name())};
@@ -387,8 +385,7 @@ public class TestTableOperations extends JerseyTest {
   public void testLoadTable() {
     Column[] columns =
         new Column[] {
-          mockColumn("col1", TypeCreator.NULLABLE.STRING),
-          mockColumn("col2", TypeCreator.NULLABLE.I8)
+          mockColumn("col1", Types.StringType.get()), mockColumn("col2", Types.ByteType.get())
         };
     Table table =
         mockTable("table1", columns, "mock comment", ImmutableMap.of("k1", "v1"), new Transform[0]);
@@ -459,8 +456,7 @@ public class TestTableOperations extends JerseyTest {
     TableUpdateRequest.RenameTableRequest req = new TableUpdateRequest.RenameTableRequest("table2");
     Column[] columns =
         new Column[] {
-          mockColumn("col1", TypeCreator.NULLABLE.STRING),
-          mockColumn("col2", TypeCreator.NULLABLE.I8)
+          mockColumn("col1", Types.StringType.get()), mockColumn("col2", Types.ByteType.get())
         };
     Table table =
         mockTable("table2", columns, "mock comment", ImmutableMap.of("k1", "v1"), new Transform[0]);
@@ -473,8 +469,7 @@ public class TestTableOperations extends JerseyTest {
         new TableUpdateRequest.UpdateTableCommentRequest("new comment");
     Column[] columns =
         new Column[] {
-          mockColumn("col1", TypeCreator.NULLABLE.STRING),
-          mockColumn("col2", TypeCreator.NULLABLE.I8)
+          mockColumn("col1", Types.StringType.get()), mockColumn("col2", Types.ByteType.get())
         };
     Table table =
         mockTable("table1", columns, "new comment", ImmutableMap.of("k1", "v1"), new Transform[0]);
@@ -487,8 +482,7 @@ public class TestTableOperations extends JerseyTest {
         new TableUpdateRequest.SetTablePropertyRequest("k2", "v2");
     Column[] columns =
         new Column[] {
-          mockColumn("col1", TypeCreator.NULLABLE.STRING),
-          mockColumn("col2", TypeCreator.NULLABLE.I8)
+          mockColumn("col1", Types.StringType.get()), mockColumn("col2", Types.ByteType.get())
         };
     Table table =
         mockTable(
@@ -506,8 +500,7 @@ public class TestTableOperations extends JerseyTest {
         new TableUpdateRequest.RemoveTablePropertyRequest("k1");
     Column[] columns =
         new Column[] {
-          mockColumn("col1", TypeCreator.NULLABLE.STRING),
-          mockColumn("col2", TypeCreator.NULLABLE.I8)
+          mockColumn("col1", Types.StringType.get()), mockColumn("col2", Types.ByteType.get())
         };
     Table table = mockTable("table1", columns, "mock comment", ImmutableMap.of(), new Transform[0]);
     testAlterTableRequest(req, table);
@@ -518,14 +511,15 @@ public class TestTableOperations extends JerseyTest {
     TableUpdateRequest.AddTableColumnRequest req =
         new TableUpdateRequest.AddTableColumnRequest(
             new String[] {"col3"},
-            TypeCreator.NULLABLE.STRING,
+            Types.StringType.get(),
             "mock comment",
-            TableChange.ColumnPosition.first());
+            TableChange.ColumnPosition.first(),
+            false);
     Column[] columns =
         new Column[] {
-          mockColumn("col3", TypeCreator.NULLABLE.STRING),
-          mockColumn("col1", TypeCreator.NULLABLE.STRING),
-          mockColumn("col2", TypeCreator.NULLABLE.I8)
+          mockColumn("col3", Types.StringType.get(), false),
+          mockColumn("col1", Types.StringType.get()),
+          mockColumn("col2", Types.ByteType.get())
         };
     Table table =
         mockTable("table1", columns, "mock comment", ImmutableMap.of("k1", "v1"), new Transform[0]);
@@ -537,14 +531,15 @@ public class TestTableOperations extends JerseyTest {
     TableUpdateRequest.AddTableColumnRequest req =
         new TableUpdateRequest.AddTableColumnRequest(
             new String[] {"col1"},
-            TypeCreator.NULLABLE.STRING,
+            Types.StringType.get(),
             "mock comment",
-            TableChange.ColumnPosition.after("col2"));
+            TableChange.ColumnPosition.after("col2"),
+            true);
     Column[] columns =
         new Column[] {
-          mockColumn("col1", TypeCreator.NULLABLE.STRING),
-          mockColumn("col2", TypeCreator.NULLABLE.I8),
-          mockColumn("col3", TypeCreator.NULLABLE.STRING)
+          mockColumn("col1", Types.StringType.get()),
+          mockColumn("col2", Types.ByteType.get()),
+          mockColumn("col3", Types.StringType.get())
         };
     Table table =
         mockTable("table1", columns, "mock comment", ImmutableMap.of("k1", "v1"), new Transform[0]);
@@ -557,8 +552,7 @@ public class TestTableOperations extends JerseyTest {
         new TableUpdateRequest.RenameTableColumnRequest(new String[] {"col1"}, "col3");
     Column[] columns =
         new Column[] {
-          mockColumn("col3", TypeCreator.NULLABLE.STRING),
-          mockColumn("col2", TypeCreator.NULLABLE.I8)
+          mockColumn("col3", Types.StringType.get()), mockColumn("col2", Types.ByteType.get())
         };
     Table table =
         mockTable("table1", columns, "mock comment", ImmutableMap.of("k1", "v1"), new Transform[0]);
@@ -569,10 +563,10 @@ public class TestTableOperations extends JerseyTest {
   public void testUpdateTableColumnType() {
     TableUpdateRequest.UpdateTableColumnTypeRequest req =
         new TableUpdateRequest.UpdateTableColumnTypeRequest(
-            new String[] {"col1"}, TypeCreator.NULLABLE.I8);
+            new String[] {"col1"}, Types.ByteType.get());
     Column[] columns =
         new Column[] {
-          mockColumn("col1", TypeCreator.NULLABLE.I8), mockColumn("col2", TypeCreator.NULLABLE.I8)
+          mockColumn("col1", Types.ByteType.get()), mockColumn("col2", Types.ByteType.get())
         };
     Table table =
         mockTable("table1", columns, "mock comment", ImmutableMap.of("k1", "v1"), new Transform[0]);
@@ -586,8 +580,7 @@ public class TestTableOperations extends JerseyTest {
             new String[] {"col1"}, "new comment");
     Column[] columns =
         new Column[] {
-          mockColumn("col1", TypeCreator.NULLABLE.STRING, "new comment"),
-          mockColumn("col2", TypeCreator.NULLABLE.I8)
+          mockColumn("col1", Types.StringType.get()), mockColumn("col2", Types.ByteType.get())
         };
     Table table =
         mockTable("table1", columns, "mock comment", ImmutableMap.of("k1", "v1"), new Transform[0]);
@@ -601,8 +594,7 @@ public class TestTableOperations extends JerseyTest {
             new String[] {"col1"}, TableChange.ColumnPosition.after("col2"));
     Column[] columns =
         new Column[] {
-          mockColumn("col2", TypeCreator.NULLABLE.I8),
-          mockColumn("col1", TypeCreator.NULLABLE.STRING)
+          mockColumn("col2", Types.ByteType.get()), mockColumn("col1", Types.StringType.get())
         };
     Table table =
         mockTable("table1", columns, "mock comment", ImmutableMap.of("k1", "v1"), new Transform[0]);
@@ -769,14 +761,19 @@ public class TestTableOperations extends JerseyTest {
   }
 
   private static Column mockColumn(String name, Type type) {
-    return mockColumn(name, type, "mock comment");
+    return mockColumn(name, type, true);
   }
 
-  private static Column mockColumn(String name, Type type, String comment) {
+  private static Column mockColumn(String name, Type type, boolean nullable) {
+    return mockColumn(name, type, "mock comment", nullable);
+  }
+
+  private static Column mockColumn(String name, Type type, String comment, boolean nullable) {
     Column column = mock(Column.class);
     when(column.name()).thenReturn(name);
     when(column.dataType()).thenReturn(type);
     when(column.comment()).thenReturn(comment);
+    when(column.nullable()).thenReturn(nullable);
     return column;
   }
 

@@ -1,5 +1,5 @@
 <!--
-  Copyright 2023 Datastrato.
+  Copyright 2023 Datastrato Pvt Ltd.
   This software is licensed under the Apache License version 2.
 -->
 
@@ -16,27 +16,31 @@ Gravitino is a high-performance, geo-distributed, and federated metadata lake. I
 
 Gravitino aims to provide several key features:
 
-* SSOT (Single Source of Truth) for multi-regional data with geo-distributed architecture support.
+* Single Source of Truth for multi-regional data with geo-distributed architecture support.
 * Unified Data and AI asset management for both users and engines.
 * Security in one place, centralizing the security for different sources.
 * Built-in data management and data access management.
 
-## Online Documentation
+## Contributing to Gravitino
+
+Gravitino is open source software available under the Apache 2.0 license. For information of how to contribute to Gravitino please see the [Contribution guidelines](CONTRIBUTING.md).
+
+## Online documentation
 
 You can find the latest Gravitino documentation here in the [doc folder](docs), The README file only contains basic setup instructions.
 
 ## Building Gravitino
 
-Gravitino is built using Gradle. To build Gravitino, please run:
+Gravitino builds Gradle. To build Gravitino, please run:
 
 ```shell
-./gradlew clean build
+./gradlew clean build -x test
 ```
 
 If you want to build a distribution package, please run:
 
 ```shell
-./gradlew compileDistribution
+./gradlew compileDistribution -x test
 ```
 
 to build a distribution package.
@@ -44,23 +48,24 @@ to build a distribution package.
 Or:
 
 ```shell
-./gradlew assembleDistribution
+./gradlew assembleDistribution -x test
 ```
 
 to build a compressed distribution package.
 
-Note:
-
-1. Gravitino is built against JDK8, please make sure JDK8 is installed in your environment.
-2. Gravitino trino-connector is built against JDK17. Please also make sure JDK17 is installed in your environment.
+The generated binary distribution package locates in `distribution` directory.
 
 For the details of building and testing Gravitino, please see [How to build Gravitino](docs/how-to-build.md).
 
-## Quick Start
+## Quick start
 
 ### Configure and start the Gravitino server
 
-Gravitino server configuration file `gravitino.conf` is located under `conf` and follows the typical property file format. You can change the configuration in this file.
+If you already have a binary distribution package, please decompress the package (if required)
+and go to the directory where the package locates.
+
+Before starting the Gravitino server, please configure the Gravitino server configuration file. The
+configuration file, `gravitino.conf`, located in the `conf` directory and follows the standard property file format. You can modify the configuration within this file.
 
 To start the Gravitino server, please run:
 
@@ -76,14 +81,16 @@ To stop the Gravitino server, please run:
 
 ### Using Trino with Gravitino
 
-Gravitino provides a Trino connector to access the metadata in Gravitino. To use Trino with Gravitino, please follow the [trino-gravitino-connector doc](docs/trino-gravitino-connector.md).
+Gravitino provides a Trino connector to access the metadata in Gravitino. To use Trino with Gravitino, please follow the [trino-gravitino-connector doc](docs/trino-connector/index.md).
 
-## Development Guide
+## Development guide
 
 1. [How to build Gravitino](docs/how-to-build.md)
-2. [How to Run Integration Test](docs/integration-test.md)
+2. [How to test Gravitino](docs/how-to-test.md)
 3. [How to publish Docker images](docs/publish-docker-images.md)
 
 ## License
 
 Gravitino is under the Apache License Version 2.0, See the [LICENSE](LICENSE) for the details.
+
+<sub>Apache®, Apache Hadoop&reg;, Apache Hive&trade;, Apache Iceberg&trade;, Apache Kafka&reg;, Apache Spark&trade;, Apache Submarine&trade;, Apache Thrift&trade; and Apache Zeppelin&trade; are either registered trademarks or trademarks of the Apache Software Foundation in the United States and/or other countries.</sub>

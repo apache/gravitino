@@ -1,0 +1,257 @@
+#
+# Copyright 2023 Datastrato Pvt Ltd.
+# This software is licensed under the Apache License version 2.
+#
+
+---
+openapi: 3.0.3
+info:
+  title: Gravitino REST API
+  license:
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0.html
+  version: 0.3.0
+  description: |
+    Defines the specification for the first version of the Gravitino REST API.
+
+servers:
+  - url: "{scheme}://{host}:{port}/{basePath}"
+    description: Generic base server URL, with all parts configurable.
+    variables:
+      scheme:
+        description: The scheme of the URI, either http or https.
+        default: http
+      host:
+        description: The host address for the specified server
+        default: localhost
+      port:
+        description: The port used when addressing the host
+        default: "8090"
+      basePath:
+        description: Optional prefix to be appended to all routes
+        default: "api"
+
+security:
+  - OAuth2WithJWT: [serviceAudience]
+  - BasicAuth: []
+
+paths:
+  /metalakes:
+    # escape the path name by replacing `/` with `~1`
+    $ref: "./metalakes.yaml#/paths/~1metalakes"
+
+  /metalakes/{name}:
+    # escape the path name by replacing `{ }` with `%7B %7D`
+    $ref: "./metalakes.yaml#/paths/~1metalakes~1%7Bname%7D"
+
+  /metalakes/{metalake}/catalogs:
+    $ref: "./catalogs.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs"
+
+  /metalakes/{metalake}/catalogs/{catalog}:
+    $ref: "./catalogs.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D"
+
+  /metalakes/{metalake}/catalogs/{catalog}/schemas:
+    $ref: "./schemas.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1schemas"
+
+  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}:
+    $ref: "./schemas.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1schemas~1%7Bschema%7D"
+
+  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/tables:
+    $ref: "./tables.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1schemas~1%7Bschema%7D~1tables"
+
+  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/tables/{table}:
+    $ref: "./tables.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1schemas~1%7Bschema%7D~1tables~1%7Btable%7D"
+
+components:
+
+  schemas:
+
+    Audit:
+      type: object
+      description: Audit information for a Gravitino resource.
+      properties:
+        creator:
+          type: string
+          description: The user who created the resource
+        createTime:
+          type: string
+          format: date-time
+          description: The time the resource was created
+        lastModifier:
+          type: string
+          description: The user who last modified the resource
+        lastModifiedTime:
+          type: string
+          format: date-time
+          description: The time the resource was last modified
+
+    ErrorModel:
+      type: object
+      description: JSON error payload returned in a response with further details on the error
+      required:
+        - message
+        - type
+        - code
+      properties:
+        code:
+          type: integer
+          minimum: 1000
+          maximum: 1100
+          description: HTTP response code
+          example: 1002
+        type:
+          type: string
+          description: Internal type definition of the error
+        message:
+          type: string
+          description: A human-readable message
+        stack:
+          type: array
+          items:
+            type: string
+
+    NameIdentifier:
+      type: object
+      description: A identifier for an entity
+      required:
+        - namespace
+        - name
+      properties:
+        namespace:
+          type: array
+          description: The namespace of the entity may be with multiple levels
+          items:
+            type: string
+        name:
+          type: string
+          description: The name of the entity
+
+  responses:
+
+    EntityListResponse:
+      description: A list of entities
+      content:
+        application/vnd.gravitino.v1+json:
+          schema:
+            type: object
+            properties:
+              code:
+                type: integer
+                format: int32
+                description: Status code of the response
+                enum:
+                  - 0
+                example: 0
+              identifiers:
+                type: array
+                description: A list of NameIdentifier objects
+                items:
+                  $ref: "#/components/schemas/NameIdentifier"
+          examples:
+            CatalogListResponse:
+              $ref: "./catalogs.yaml#/components/examples/CatalogListResponse"
+            SchemaListResponse:
+              $ref: "./schemas.yaml#/components/examples/SchemaListResponse"
+            TableListResponse:
+              $ref: "./tables.yaml#/components/examples/TableListResponse"
+
+
+    BadRequestErrorResponse:
+      description:
+        Indicates a bad request error. It could be caused by an unexpected request
+        body format or other forms of request validation failure, such as invalid json.
+        Usually serves application/json content, although in some cases simple text/plain content might
+        be returned by the server's middleware.
+      content:
+        application/vnd.gravitino.v1+json:
+          schema:
+            $ref: '#/components/schemas/ErrorModel'
+          example: {
+            "code": 1003,
+            "type": "BadRequestException",
+            "message": "Malformed request"
+          }
+
+    ServerErrorResponse:
+      description:
+        A server-side problem that might not be addressable from the client
+        side. Used for server 5xx errors without more specific documentation in
+        individual routes.
+      content:
+        application/vnd.gravitino.v1+json:
+          schema:
+            $ref: "#/components/schemas/ErrorModel"
+          example: {
+            "code": 1002,
+            "type": "RuntimeException",
+            "message": "Internal Server Error",
+            "stack": [
+              "java.lang.RuntimeException: Internal Server Error"
+            ]
+          }
+
+    DropResponse:
+      description: Represents a response for a drop operation
+      content:
+        application/vnd.gravitino.v1+json:
+          schema:
+            type: object
+            properties:
+              code:
+                type: integer
+                format: int32
+                description: Status code of the response
+                enum:
+                  - 0
+              dropped:
+                type: boolean
+                description: Whether the drop operation was successful
+
+  parameters:
+    metalake:
+      name: metalake
+      in: path
+      description: The name of the metalake
+      required: true
+      schema:
+        type: string
+
+    catalog:
+      name: catalog
+      in: path
+      description: The name of the catalog
+      required: true
+      schema:
+        type: string
+
+    schema:
+      name: schema
+      in: path
+      description: The name of the schema
+      required: true
+      schema:
+        type: string
+
+    table:
+      name: table
+      in: path
+      description: The name of the table
+      required: true
+      schema:
+        type: string
+
+  securitySchemes:
+
+    OAuth2WithJWT:
+      type: oauth2
+      description: OAuth2 with JWT
+      flows:
+        clientCredentials:
+          tokenUrl: https://external-oauth-server.com/token
+          scopes:
+            serviceAudience: The audience name when Gravitino uses OAuth as the authenticator.
+
+    BasicAuth:
+      type: http
+      scheme: basic
+

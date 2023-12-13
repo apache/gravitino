@@ -36,7 +36,12 @@ out/**
 distribution
 server/src/main/resources/project.properties
 
-dev/docker/hive/packages
+dev/docker/*/packages
 docs/build
 
 dev/docker/tools/docker-connector
+
+include web/.gitignore
+
+# node env
+.node

@@ -1,14 +1,14 @@
 #!/bin/bash
 #
-# Copyright 2023 Datastrato.
+# Copyright 2023 Datastrato Pvt Ltd.
 # This software is licensed under the Apache License version 2.
 #
-set -ex
+#set -ex
 script_dir="$(dirname "${BASH_SOURCE-$0}")"
 script_dir="$(cd "${script_dir}">/dev/null; pwd)"
-
 # Build docker image for multi-arch
-USAGE="-e Usage: ./build-docker.sh --platform [all|linux/amd64|linux/arm64] --type [hive|trino] --image {image_name} --tag {tag_name} --latest"
+# shellcheck disable=SC2089
+USAGE="Usage: ./build-docker.sh --platform [all|linux/amd64|linux/arm64] --type [gravitino|hive|trino] --image {image_name} --tag {tag_name} --latest\nNotice: You shouldn't use 'all' for the platform if you don't use the Github action to publish the Docker image."
 
 # Get platform type
 if [[ "$1" == "--platform" ]]; then
@@ -66,7 +66,9 @@ if [[ "${component_type}" == "hive" ]]; then
   . ${script_dir}/hive/hive-dependency.sh
   build_args="--build-arg HADOOP_PACKAGE_NAME=${HADOOP_PACKAGE_NAME} --build-arg HIVE_PACKAGE_NAME=${HIVE_PACKAGE_NAME}"
 elif [ "${component_type}" == "trino" ]; then
-  true # Placeholder, do nothing
+  . ${script_dir}/trino/trino-dependency.sh
+elif [ "${component_type}" == "gravitino" ]; then
+  . ${script_dir}/gravitino/gravitino-dependency.sh
 else
   echo "ERROR : ${component_type} is not a valid component type"
   echo ${USAGE}
@@ -86,14 +88,14 @@ fi
 cd ${script_dir}/${component_type}
 if [[ "${platform_type}" == "all" ]]; then
   if [ ${build_latest} -eq 1 ]; then
-    docker buildx build --platform=linux/amd64,linux/arm64 ${build_args} --push --progress plain -f Dockerfile -t ${image_name}:latest -t ${image_name}:${tag_name} .
+    docker buildx build --no-cache --pull --platform=linux/amd64,linux/arm64 ${build_args} --push --progress plain -f Dockerfile -t ${image_name}:latest -t ${image_name}:${tag_name} .
   else
-    docker buildx build --platform=linux/amd64,linux/arm64 ${build_args} --push --progress plain -f Dockerfile -t ${image_name}:${tag_name} .
+    docker buildx build --no-cache --pull --platform=linux/amd64,linux/arm64 ${build_args} --push --progress plain -f Dockerfile -t ${image_name}:${tag_name} .
   fi
 else
   if [ ${build_latest} -eq 1 ]; then
-    docker buildx build --platform=${platform_type} ${build_args} --output type=docker --progress plain -f Dockerfile -t ${image_name}:latest -t ${image_name}:${tag_name} .
+    docker buildx build --no-cache --pull --platform=${platform_type} ${build_args} --output type=docker --progress plain -f Dockerfile -t ${image_name}:latest -t ${image_name}:${tag_name} .
   else
-    docker buildx build --platform=${platform_type} ${build_args} --output type=docker --progress plain -f Dockerfile -t ${image_name}:${tag_name} .
+    docker buildx build --no-cache --pull --platform=${platform_type} ${build_args} --output type=docker --progress plain -f Dockerfile -t ${image_name}:${tag_name} .
   fi
 fi

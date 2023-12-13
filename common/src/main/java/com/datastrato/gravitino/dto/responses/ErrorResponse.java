@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Datastrato.
+ * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 package com.datastrato.gravitino.dto.responses;
@@ -132,6 +132,10 @@ public class ErrorResponse extends BaseResponse {
   public static ErrorResponse unknownError(String message) {
     return new ErrorResponse(
         ErrorConstants.UNKNOWN_ERROR_CODE, RuntimeException.class.getSimpleName(), message, null);
+  }
+
+  public static ErrorResponse oauthError(int code, String type, String message) {
+    return new ErrorResponse(code, type, message, null);
   }
 
   private static List<String> getStackTrace(Throwable throwable) {

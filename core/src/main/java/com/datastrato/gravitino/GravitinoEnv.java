@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Datastrato.
+ * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 package com.datastrato.gravitino;
@@ -8,6 +8,8 @@ import com.datastrato.gravitino.aux.AuxiliaryServiceManager;
 import com.datastrato.gravitino.catalog.CatalogManager;
 import com.datastrato.gravitino.catalog.CatalogOperationDispatcher;
 import com.datastrato.gravitino.meta.MetalakeManager;
+import com.datastrato.gravitino.metrics.MetricsSystem;
+import com.datastrato.gravitino.metrics.source.JVMMetricsSource;
 import com.datastrato.gravitino.storage.IdGenerator;
 import com.datastrato.gravitino.storage.RandomIdGenerator;
 import com.google.common.base.Preconditions;
@@ -37,6 +39,8 @@ public class GravitinoEnv {
 
   private AuxiliaryServiceManager auxServiceManager;
 
+  private MetricsSystem metricsSystem;
+
   private GravitinoEnv() {}
 
   private static class InstanceHolder {
@@ -61,6 +65,8 @@ public class GravitinoEnv {
     LOG.info("Initializing Gravitino Environment...");
 
     this.config = config;
+    this.metricsSystem = new MetricsSystem();
+    metricsSystem.register(new JVMMetricsSource());
 
     // Initialize EntitySerDe
     this.entitySerDe = EntitySerDeFactory.createEntitySerDe(config);
@@ -152,8 +158,18 @@ public class GravitinoEnv {
     return idGenerator;
   }
 
+  /**
+   * Get the MetricsSystem associated with the Gravitino environment.
+   *
+   * @return The MetricsSystem instance.
+   */
+  public MetricsSystem metricsSystem() {
+    return metricsSystem;
+  }
+
   public void start() {
     auxServiceManager.serviceStart();
+    metricsSystem.start();
   }
 
   /** Shutdown the Gravitino environment. */
@@ -178,6 +194,10 @@ public class GravitinoEnv {
       } catch (Exception e) {
         LOG.warn("Failed to stop AuxServiceManager", e);
       }
+    }
+
+    if (metricsSystem != null) {
+      metricsSystem.close();
     }
 
     LOG.info("Gravitino Environment is shut down.");

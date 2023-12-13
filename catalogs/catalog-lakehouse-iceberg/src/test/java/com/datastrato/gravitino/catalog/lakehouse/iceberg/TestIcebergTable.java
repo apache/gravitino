@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Datastrato.
+ * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 package com.datastrato.gravitino.catalog.lakehouse.iceberg;
@@ -27,8 +27,8 @@ import com.datastrato.gravitino.rel.expressions.sorts.SortDirection;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrders;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
+import com.datastrato.gravitino.rel.types.Types;
 import com.google.common.collect.Maps;
-import io.substrait.type.TypeCreator;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
@@ -128,14 +128,14 @@ public class TestIcebergTable {
     IcebergColumn col1 =
         new IcebergColumn.Builder()
             .withName("col_1")
-            .withType(TypeCreator.NULLABLE.I8)
+            .withType(Types.IntegerType.get())
             .withComment(ICEBERG_COMMENT)
             .withNullable(true)
             .build();
     IcebergColumn col2 =
         new IcebergColumn.Builder()
             .withName("col_2")
-            .withType(TypeCreator.NULLABLE.DATE)
+            .withType(Types.DateType.get())
             .withComment(ICEBERG_COMMENT)
             .withNullable(false)
             .build();
@@ -208,13 +208,13 @@ public class TestIcebergTable {
     IcebergColumn col1 =
         new IcebergColumn.Builder()
             .withName("city")
-            .withType(TypeCreator.NULLABLE.I8)
+            .withType(Types.IntegerType.get())
             .withComment(ICEBERG_COMMENT)
             .build();
     IcebergColumn col2 =
         new IcebergColumn.Builder()
             .withName("date")
-            .withType(TypeCreator.NULLABLE.DATE)
+            .withType(Types.DateType.get())
             .withComment(ICEBERG_COMMENT)
             .build();
     Column[] columns = new Column[] {col1, col2};
@@ -310,13 +310,13 @@ public class TestIcebergTable {
     IcebergColumn col1 =
         new IcebergColumn.Builder()
             .withName("col_1")
-            .withType(TypeCreator.NULLABLE.I8)
+            .withType(Types.IntegerType.get())
             .withComment(ICEBERG_COMMENT)
             .build();
     IcebergColumn col2 =
         new IcebergColumn.Builder()
             .withName("col_2")
-            .withType(TypeCreator.NULLABLE.DATE)
+            .withType(Types.DateType.get())
             .withComment(ICEBERG_COMMENT)
             .build();
     Column[] columns = new Column[] {col1, col2};
@@ -359,13 +359,13 @@ public class TestIcebergTable {
     IcebergColumn col1 =
         new IcebergColumn.Builder()
             .withName("col_1")
-            .withType(TypeCreator.NULLABLE.I8)
+            .withType(Types.IntegerType.get())
             .withComment(ICEBERG_COMMENT)
             .build();
     IcebergColumn col2 =
         new IcebergColumn.Builder()
             .withName("col_2")
-            .withType(TypeCreator.NULLABLE.DATE)
+            .withType(Types.DateType.get())
             .withComment(ICEBERG_COMMENT)
             .build();
     Column[] columns = new Column[] {col1, col2};
@@ -408,14 +408,14 @@ public class TestIcebergTable {
             TableChange.removeProperty("key1"),
             TableChange.setProperty("key2", "val2_new"),
             // columns current format: [col_1:I8:comment, col_2:DATE:comment]
-            TableChange.addColumn(new String[] {"col_3"}, TypeCreator.NULLABLE.STRING),
+            TableChange.addColumn(new String[] {"col_3"}, Types.StringType.get()),
             // columns current format: [col_1:I8:comment, col_2:DATE:comment, col_3:STRING:null]
             TableChange.renameColumn(new String[] {"col_2"}, "col_2_new"),
             // columns current format: [col_1:I8:comment, col_2_new:DATE:comment, col_3:STRING:null]
             TableChange.updateColumnComment(new String[] {"col_1"}, ICEBERG_COMMENT + "_new"),
             // columns current format: [col_1:I8:comment_new, col_2_new:DATE:comment,
             // col_3:STRING:null]
-            TableChange.updateColumnType(new String[] {"col_1"}, TypeCreator.NULLABLE.I32),
+            TableChange.updateColumnType(new String[] {"col_1"}, Types.IntegerType.get()),
             // columns current format: [col_1:I32:comment_new, col_2_new:DATE:comment,
             // col_3:STRING:null]
             TableChange.updateColumnPosition(
@@ -442,17 +442,17 @@ public class TestIcebergTable {
         new Column[] {
           new IcebergColumn.Builder()
               .withName("col_2_new")
-              .withType(TypeCreator.NULLABLE.DATE)
+              .withType(Types.DateType.get())
               .withComment(ICEBERG_COMMENT)
               .build(),
           new IcebergColumn.Builder()
               .withName("col_1")
-              .withType(TypeCreator.NULLABLE.I32)
+              .withType(Types.IntegerType.get())
               .withComment(ICEBERG_COMMENT + "_new")
               .build(),
           new IcebergColumn.Builder()
               .withName("col_3")
-              .withType(TypeCreator.NULLABLE.STRING)
+              .withType(Types.StringType.get())
               .withComment(null)
               .build()
         };

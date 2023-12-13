@@ -1,20 +1,19 @@
 /*
- * Copyright 2023 Datastrato.
+ * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 plugins {
   `maven-publish`
   id("java")
   id("idea")
-  id("com.diffplug.spotless")
 }
 
 repositories {
-    mavenCentral()
+  mavenCentral()
 }
 
 dependencies {
-  implementation(project(":clients:client-java-runtime", configuration="shadow"))
+  implementation(project(":clients:client-java-runtime", configuration = "shadow"))
   implementation(libs.jackson.databind)
   implementation(libs.jackson.annotations)
   implementation(libs.guava)
@@ -26,6 +25,7 @@ dependencies {
   implementation(libs.trino.toolkit) {
     exclude("org.apache.logging.log4j")
   }
+  testImplementation(libs.mysql.driver)
   testImplementation(libs.mockito.core)
   testImplementation(libs.trino.testing) {
     exclude("org.apache.logging.log4j")
@@ -36,28 +36,22 @@ dependencies {
   }
 }
 
-java {
-  toolchain {
-    languageVersion.set(JavaLanguageVersion.of(17))
-  }
-}
-
 tasks.named("generateMetadataFileForMavenJavaPublication") {
-    dependsOn(":trino-connector:copyDepends")
+  dependsOn(":trino-connector:copyDepends")
 }
 
 tasks {
-    val copyDepends by registering(Copy::class) {
-        from(configurations.runtimeClasspath)
-        into("build/libs")
-    }
-    jar {
-     finalizedBy(copyDepends)
-    }
+  val copyDepends by registering(Copy::class) {
+    from(configurations.runtimeClasspath)
+    into("build/libs")
+  }
+  jar {
+    finalizedBy(copyDepends)
+  }
 
-    val copyLibs by registering(Copy::class) {
-        dependsOn(copyDepends, "build")
-        from("build/libs")
-        into("${rootDir}/distribution/${rootProject.name}-trino-connector")
-    }
+  register("copyLibs", Copy::class) {
+    dependsOn(copyDepends, "build")
+    from("build/libs")
+    into("$rootDir/distribution/${rootProject.name}-trino-connector")
+  }
 }

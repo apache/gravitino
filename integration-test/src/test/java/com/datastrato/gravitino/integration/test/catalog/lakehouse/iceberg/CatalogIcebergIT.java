@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Datastrato.
+ * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 package com.datastrato.gravitino.integration.test.catalog.lakehouse.iceberg;
@@ -24,6 +24,8 @@ import com.datastrato.gravitino.dto.rel.partitions.Partitioning;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.TableAlreadyExistsException;
+import com.datastrato.gravitino.integration.test.container.ContainerSuite;
+import com.datastrato.gravitino.integration.test.container.HiveContainer;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
 import com.datastrato.gravitino.rel.Column;
@@ -38,9 +40,9 @@ import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
 import com.datastrato.gravitino.rel.expressions.sorts.NullOrdering;
 import com.datastrato.gravitino.rel.expressions.sorts.SortDirection;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
+import com.datastrato.gravitino.rel.types.Types;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
-import io.substrait.type.TypeCreator;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -85,9 +87,10 @@ public class CatalogIcebergIT extends AbstractIT {
   public static String ICEBERG_COL_NAME2 = "iceberg_col_name2";
   public static String ICEBERG_COL_NAME3 = "iceberg_col_name3";
   private static final String provider = "lakehouse-iceberg";
-  private static final String WAREHOUSE =
-      "hdfs://127.0.0.1:9000/user/hive/warehouse-catalog-iceberg/";
-  private static final String URI = "thrift://127.0.0.1:9083";
+
+  private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
+  private static String WAREHOUSE;
+  private static String HIVE_METASTORE_URIS;
 
   private static String SELECT_ALL_TEMPLATE = "SELECT * FROM iceberg.%s";
   private static String INSERT_BATCH_WITHOUT_PARTITION_TEMPLATE =
@@ -102,6 +105,19 @@ public class CatalogIcebergIT extends AbstractIT {
 
   @BeforeAll
   public static void startup() {
+    containerSuite.startHiveContainer();
+    HIVE_METASTORE_URIS =
+        String.format(
+            "thrift://%s:%d",
+            containerSuite.getHiveContainer().getContainerIpAddress(),
+            HiveContainer.HIVE_METASTORE_PORT);
+
+    WAREHOUSE =
+        String.format(
+            "hdfs://%s:%d/user/hive/warehouse-catalog-iceberg/",
+            containerSuite.getHiveContainer().getContainerIpAddress(),
+            HiveContainer.HDFS_DEFAULTFS_PORT);
+
     createMetalake();
     createCatalog();
     createSchema();
@@ -111,7 +127,7 @@ public class CatalogIcebergIT extends AbstractIT {
             .appName("Iceberg Catalog integration test")
             .config("spark.sql.warehouse.dir", WAREHOUSE)
             .config("spark.sql.catalog.iceberg", "org.apache.iceberg.spark.SparkCatalog")
-            .config("spark.sql.catalog.iceberg.uri", URI)
+            .config("spark.sql.catalog.iceberg.uri", HIVE_METASTORE_URIS)
             .config("spark.sql.catalog.iceberg.type", "hive")
             .config(
                 "spark.sql.extensions",
@@ -161,11 +177,11 @@ public class CatalogIcebergIT extends AbstractIT {
 
     catalogProperties.put(
         IcebergConfig.CATALOG_BACKEND.getKey(), IcebergCatalogBackend.HIVE.name());
-    catalogProperties.put(IcebergConfig.CATALOG_URI.getKey(), URI);
+    catalogProperties.put(IcebergConfig.CATALOG_URI.getKey(), HIVE_METASTORE_URIS);
     catalogProperties.put(IcebergConfig.CATALOG_WAREHOUSE.getKey(), WAREHOUSE);
 
     Map<String, String> hiveProperties = Maps.newHashMap();
-    hiveProperties.put(IcebergConfig.CATALOG_URI.getKey(), URI);
+    hiveProperties.put(IcebergConfig.CATALOG_URI.getKey(), HIVE_METASTORE_URIS);
     hiveProperties.put(IcebergConfig.CATALOG_WAREHOUSE.getKey(), WAREHOUSE);
 
     hiveCatalog = new HiveCatalog();
@@ -201,19 +217,19 @@ public class CatalogIcebergIT extends AbstractIT {
     ColumnDTO col1 =
         new ColumnDTO.Builder()
             .withName(ICEBERG_COL_NAME1)
-            .withDataType(TypeCreator.NULLABLE.I32)
+            .withDataType(Types.IntegerType.get())
             .withComment("col_1_comment")
             .build();
     ColumnDTO col2 =
         new ColumnDTO.Builder()
             .withName(ICEBERG_COL_NAME2)
-            .withDataType(TypeCreator.NULLABLE.DATE)
+            .withDataType(Types.DateType.get())
             .withComment("col_2_comment")
             .build();
     ColumnDTO col3 =
         new ColumnDTO.Builder()
             .withName(ICEBERG_COL_NAME3)
-            .withDataType(TypeCreator.NULLABLE.STRING)
+            .withDataType(Types.StringType.get())
             .withComment("col_3_comment")
             .build();
     return new ColumnDTO[] {col1, col2, col3};
@@ -506,11 +522,11 @@ public class CatalogIcebergIT extends AbstractIT {
             TableChange.updateComment(table_comment + "_new"),
             TableChange.removeProperty("key1"),
             TableChange.setProperty("key2", "val2_new"),
-            TableChange.addColumn(new String[] {"col_4"}, TypeCreator.NULLABLE.STRING),
+            TableChange.addColumn(new String[] {"col_4"}, Types.StringType.get()),
             TableChange.renameColumn(new String[] {ICEBERG_COL_NAME2}, "col_2_new"),
             TableChange.updateColumnComment(new String[] {ICEBERG_COL_NAME1}, "comment_new"),
             TableChange.updateColumnType(
-                new String[] {ICEBERG_COL_NAME1}, TypeCreator.NULLABLE.I32));
+                new String[] {ICEBERG_COL_NAME1}, Types.IntegerType.get()));
 
     Table table =
         catalog
@@ -520,19 +536,19 @@ public class CatalogIcebergIT extends AbstractIT {
     Assertions.assertEquals("val2_new", table.properties().get("key2"));
 
     Assertions.assertEquals(ICEBERG_COL_NAME1, table.columns()[0].name());
-    Assertions.assertEquals(TypeCreator.NULLABLE.I32, table.columns()[0].dataType());
+    Assertions.assertEquals(Types.IntegerType.get(), table.columns()[0].dataType());
     Assertions.assertEquals("comment_new", table.columns()[0].comment());
 
     Assertions.assertEquals("col_2_new", table.columns()[1].name());
-    Assertions.assertEquals(TypeCreator.NULLABLE.DATE, table.columns()[1].dataType());
+    Assertions.assertEquals(Types.DateType.get(), table.columns()[1].dataType());
     Assertions.assertEquals("col_2_comment", table.columns()[1].comment());
 
     Assertions.assertEquals(ICEBERG_COL_NAME3, table.columns()[2].name());
-    Assertions.assertEquals(TypeCreator.NULLABLE.STRING, table.columns()[2].dataType());
+    Assertions.assertEquals(Types.StringType.get(), table.columns()[2].dataType());
     Assertions.assertEquals("col_3_comment", table.columns()[2].comment());
 
     Assertions.assertEquals("col_4", table.columns()[3].name());
-    Assertions.assertEquals(TypeCreator.NULLABLE.STRING, table.columns()[3].dataType());
+    Assertions.assertEquals(Types.StringType.get(), table.columns()[3].dataType());
     Assertions.assertNull(table.columns()[3].comment());
 
     Assertions.assertEquals(1, table.partitioning().length);
@@ -543,19 +559,19 @@ public class CatalogIcebergIT extends AbstractIT {
     ColumnDTO col1 =
         new ColumnDTO.Builder()
             .withName("name")
-            .withDataType(TypeCreator.NULLABLE.STRING)
+            .withDataType(Types.StringType.get())
             .withComment("comment")
             .build();
     ColumnDTO col2 =
         new ColumnDTO.Builder()
             .withName("address")
-            .withDataType(TypeCreator.NULLABLE.STRING)
+            .withDataType(Types.StringType.get())
             .withComment("comment")
             .build();
     ColumnDTO col3 =
         new ColumnDTO.Builder()
             .withName("date_of_birth")
-            .withDataType(TypeCreator.NULLABLE.DATE)
+            .withDataType(Types.DateType.get())
             .withComment("comment")
             .build();
     ColumnDTO[] newColumns = new ColumnDTO[] {col1, col2, col3};

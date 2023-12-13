@@ -1,10 +1,9 @@
 /*
- * Copyright 2023 Datastrato.
+ * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 package com.datastrato.gravitino.integration.test.catalog.hive;
 
-import static com.datastrato.gravitino.catalog.BaseCatalog.CATALOG_BYPASS_PREFIX;
 import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.METASTORE_URIS;
 import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.COMMENT;
 import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.EXTERNAL;
@@ -28,6 +27,8 @@ import static org.apache.hadoop.hive.serde.serdeConstants.TINYINT_TYPE_NAME;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.datastrato.gravitino.Catalog;
+import com.datastrato.gravitino.CatalogChange;
+import com.datastrato.gravitino.MetalakeChange;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.catalog.hive.HiveClientPool;
 import com.datastrato.gravitino.catalog.hive.HiveSchemaPropertiesMetadata;
@@ -39,7 +40,12 @@ import com.datastrato.gravitino.dto.rel.SortOrderDTO;
 import com.datastrato.gravitino.dto.rel.expressions.FieldReferenceDTO;
 import com.datastrato.gravitino.dto.rel.partitions.IdentityPartitioningDTO;
 import com.datastrato.gravitino.dto.rel.partitions.Partitioning;
+import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
+import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
+import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NoSuchTableException;
+import com.datastrato.gravitino.integration.test.container.ContainerSuite;
+import com.datastrato.gravitino.integration.test.container.HiveContainer;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
 import com.datastrato.gravitino.rel.Schema;
@@ -53,9 +59,9 @@ import com.datastrato.gravitino.rel.expressions.sorts.NullOrdering;
 import com.datastrato.gravitino.rel.expressions.sorts.SortDirection;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
+import com.datastrato.gravitino.rel.types.Types;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
-import io.substrait.type.TypeCreator;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -74,27 +80,32 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.MethodOrderer;
+import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Tag("gravitino-docker-it")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class CatalogHiveIT extends AbstractIT {
-  public static String metalakeName = GravitinoITUtils.genRandomName("CatalogHiveIT_metalake");
-  public static String catalogName = GravitinoITUtils.genRandomName("CatalogHiveIT_catalog");
-  public static String SCHEMA_PREFIX = "CatalogHiveIT_schema";
-  public static String schemaName = GravitinoITUtils.genRandomName(SCHEMA_PREFIX);
-  public static String TABLE_PREFIX = "CatalogHiveIT_table";
-  public static String tableName = GravitinoITUtils.genRandomName(TABLE_PREFIX);
-  public static String ALTER_TABLE_NAME = "alert_table_name";
-  public static String TABLE_COMMENT = "table_comment";
-  public static String HIVE_COL_NAME1 = "hive_col_name1";
-  public static String HIVE_COL_NAME2 = "hive_col_name2";
-  public static String HIVE_COL_NAME3 = "hive_col_name3";
-
-  private static final String HIVE_METASTORE_URIS = "thrift://localhost:9083";
+  private static final Logger LOG = LoggerFactory.getLogger(CatalogHiveIT.class);
+  public static final String metalakeName =
+      GravitinoITUtils.genRandomName("CatalogHiveIT_metalake");
+  public static final String catalogName = GravitinoITUtils.genRandomName("CatalogHiveIT_catalog");
+  public static final String SCHEMA_PREFIX = "CatalogHiveIT_schema";
+  public static final String schemaName = GravitinoITUtils.genRandomName(SCHEMA_PREFIX);
+  public static final String TABLE_PREFIX = "CatalogHiveIT_table";
+  public static final String tableName = GravitinoITUtils.genRandomName(TABLE_PREFIX);
+  public static final String ALTER_TABLE_NAME = "alert_table_name";
+  public static final String TABLE_COMMENT = "table_comment";
+  public static final String HIVE_COL_NAME1 = "hive_col_name1";
+  public static final String HIVE_COL_NAME2 = "hive_col_name2";
+  public static final String HIVE_COL_NAME3 = "hive_col_name3";
+  private static String HIVE_METASTORE_URIS;
   private static final String provider = "hive";
+  private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
   private static HiveClientPool hiveClientPool;
   private static GravitinoMetaLake metalake;
   private static Catalog catalog;
@@ -117,13 +128,33 @@ public class CatalogHiveIT extends AbstractIT {
 
   @BeforeAll
   public static void startup() throws Exception {
-    HiveConf hiveConf = GravitinoITUtils.hiveConfig();
+    containerSuite.startHiveContainer();
+
+    HIVE_METASTORE_URIS =
+        String.format(
+            "thrift://%s:%d",
+            containerSuite.getHiveContainer().getContainerIpAddress(),
+            HiveContainer.HIVE_METASTORE_PORT);
+
+    HiveConf hiveConf = new HiveConf();
+    hiveConf.set(HiveConf.ConfVars.METASTOREURIS.varname, HIVE_METASTORE_URIS);
+
+    // Check if hive client can connect to hive metastore
     hiveClientPool = new HiveClientPool(1, hiveConf);
+    List<String> dbs = hiveClientPool.run(client -> client.getAllDatabases());
+    Assertions.assertTrue(dbs.size() > 0);
+
     sparkSession =
         SparkSession.builder()
             .master("local[1]")
             .appName("Hive Catalog integration test")
             .config("hive.metastore.uris", HIVE_METASTORE_URIS)
+            .config(
+                "spark.sql.warehouse.dir",
+                String.format(
+                    "hdfs://%s:%d/user/hive/warehouse",
+                    containerSuite.getHiveContainer().getContainerIpAddress(),
+                    HiveContainer.HDFS_DEFAULTFS_PORT))
             .config("spark.sql.storeAssignmentPolicy", "LEGACY")
             .config("mapreduce.input.fileinputformat.input.dir.recursive", "true")
             .enableHiveSupport()
@@ -142,6 +173,11 @@ public class CatalogHiveIT extends AbstractIT {
 
     if (sparkSession != null) {
       sparkSession.close();
+    }
+    try {
+      closer.close();
+    } catch (Exception e) {
+      LOG.error("Failed to close CloseableGroup", e);
     }
   }
 
@@ -169,13 +205,6 @@ public class CatalogHiveIT extends AbstractIT {
   private static void createCatalog() {
     Map<String, String> properties = Maps.newHashMap();
     properties.put(METASTORE_URIS, HIVE_METASTORE_URIS);
-    properties.put(
-        CATALOG_BYPASS_PREFIX + HiveConf.ConfVars.METASTORETHRIFTCONNECTIONRETRIES.varname, "30");
-    properties.put(
-        CATALOG_BYPASS_PREFIX + HiveConf.ConfVars.METASTORETHRIFTFAILURERETRIES.varname, "30");
-    properties.put(
-        CATALOG_BYPASS_PREFIX + HiveConf.ConfVars.METASTORE_CLIENT_CONNECT_RETRY_DELAY.varname,
-        "5");
 
     metalake.createCatalog(
         NameIdentifier.of(metalakeName, catalogName),
@@ -192,6 +221,13 @@ public class CatalogHiveIT extends AbstractIT {
     Map<String, String> properties = Maps.newHashMap();
     properties.put("key1", "val1");
     properties.put("key2", "val2");
+    properties.put(
+        "location",
+        String.format(
+            "hdfs://%s:%d/user/hive/warehouse/%s.db",
+            containerSuite.getHiveContainer().getContainerIpAddress(),
+            HiveContainer.HDFS_DEFAULTFS_PORT,
+            schemaName.toLowerCase()));
     String comment = "comment";
 
     catalog.asSchemas().createSchema(ident, comment, properties);
@@ -214,19 +250,19 @@ public class CatalogHiveIT extends AbstractIT {
     ColumnDTO col1 =
         new ColumnDTO.Builder<>()
             .withName(HIVE_COL_NAME1)
-            .withDataType(TypeCreator.NULLABLE.I8)
+            .withDataType(Types.ByteType.get())
             .withComment("col_1_comment")
             .build();
     ColumnDTO col2 =
         new ColumnDTO.Builder<>()
             .withName(HIVE_COL_NAME2)
-            .withDataType(TypeCreator.NULLABLE.DATE)
+            .withDataType(Types.DateType.get())
             .withComment("col_2_comment")
             .build();
     ColumnDTO col3 =
         new ColumnDTO.Builder<>()
             .withName(HIVE_COL_NAME3)
-            .withDataType(TypeCreator.NULLABLE.STRING)
+            .withDataType(Types.StringType.get())
             .withComment("col_3_comment")
             .build();
     return new ColumnDTO[] {col1, col2, col3};
@@ -457,7 +493,10 @@ public class CatalogHiveIT extends AbstractIT {
                     TABLE_TYPE,
                     "external_table",
                     LOCATION,
-                    "/tmp",
+                    String.format(
+                        "hdfs://%s:%d/tmp",
+                        containerSuite.getHiveContainer().getContainerIpAddress(),
+                        HiveContainer.HDFS_DEFAULTFS_PORT),
                     FORMAT,
                     "textfile",
                     SERDE_LIB,
@@ -502,7 +541,12 @@ public class CatalogHiveIT extends AbstractIT {
     NameIdentifier schemaIdent =
         NameIdentifier.of(metalakeName, catalogName, GravitinoITUtils.genRandomName(SCHEMA_PREFIX));
     Map<String, String> properties = Maps.newHashMap();
-    String expectedSchemaLocation = "/tmp";
+    String expectedSchemaLocation =
+        String.format(
+            "hdfs://%s:%d/tmp",
+            containerSuite.getHiveContainer().getContainerIpAddress(),
+            HiveContainer.HDFS_DEFAULTFS_PORT);
+
     properties.put(HiveSchemaPropertiesMetadata.LOCATION, expectedSchemaLocation);
     catalog.asSchemas().createSchema(schemaIdent, "comment", properties);
 
@@ -674,13 +718,13 @@ public class CatalogHiveIT extends AbstractIT {
                 TableChange.setProperty("key2", "val2_new"),
                 TableChange.addColumn(
                     new String[] {"col_4"},
-                    TypeCreator.NULLABLE.STRING,
+                    Types.StringType.get(),
                     null,
                     TableChange.ColumnPosition.after(columns[1].name())),
                 TableChange.renameColumn(new String[] {HIVE_COL_NAME2}, "col_2_new"),
                 TableChange.updateColumnComment(new String[] {HIVE_COL_NAME1}, "comment_new"),
                 TableChange.updateColumnType(
-                    new String[] {HIVE_COL_NAME1}, TypeCreator.NULLABLE.I32));
+                    new String[] {HIVE_COL_NAME1}, Types.IntegerType.get()));
 
     // Direct get table from hive metastore to check if the table is altered successfully.
     org.apache.hadoop.hive.metastore.api.Table hiveTab =
@@ -716,7 +760,7 @@ public class CatalogHiveIT extends AbstractIT {
                   .alterTable(
                       NameIdentifier.of(metalakeName, catalogName, schemaName, ALTER_TABLE_NAME),
                       TableChange.updateColumnType(
-                          new String[] {HIVE_COL_NAME3}, TypeCreator.NULLABLE.I32));
+                          new String[] {HIVE_COL_NAME3}, Types.IntegerType.get()));
             });
     Assertions.assertTrue(exception.getMessage().contains("Cannot alter partition column"));
 
@@ -724,19 +768,19 @@ public class CatalogHiveIT extends AbstractIT {
     ColumnDTO col1 =
         new ColumnDTO.Builder()
             .withName("name")
-            .withDataType(TypeCreator.NULLABLE.STRING)
+            .withDataType(Types.StringType.get())
             .withComment("comment")
             .build();
     ColumnDTO col2 =
         new ColumnDTO.Builder()
             .withName("address")
-            .withDataType(TypeCreator.NULLABLE.STRING)
+            .withDataType(Types.StringType.get())
             .withComment("comment")
             .build();
     ColumnDTO col3 =
         new ColumnDTO.Builder()
             .withName("date_of_birth")
-            .withDataType(TypeCreator.NULLABLE.DATE)
+            .withDataType(Types.DateType.get())
             .withComment("comment")
             .build();
     ColumnDTO[] newColumns = new ColumnDTO[] {col1, col2, col3};
@@ -839,5 +883,180 @@ public class CatalogHiveIT extends AbstractIT {
     Map<String, String> properties3 = database.getParameters();
     Assertions.assertFalse(properties3.containsKey("key1"));
     Assertions.assertEquals("val2-alter", properties3.get("key2"));
+  }
+
+  @Test
+  void testLoadEntityWithSamePrefix() {
+    GravitinoMetaLake metalake = client.loadMetalake(NameIdentifier.of(metalakeName));
+    Catalog catalog = metalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
+    Assertions.assertNotNull(catalog);
+
+    for (int i = 1; i < metalakeName.length(); i++) {
+      // We can't get the metalake by prefix
+      final int length = i;
+      Assertions.assertThrows(
+          NoSuchMetalakeException.class,
+          () -> client.loadMetalake(NameIdentifier.of(metalakeName.substring(0, length))));
+    }
+    Assertions.assertThrows(
+        NoSuchMetalakeException.class,
+        () -> client.loadMetalake(NameIdentifier.of(metalakeName + "a")));
+
+    for (int i = 1; i < catalogName.length(); i++) {
+      // We can't get the catalog by prefix
+      final int length = i;
+      Assertions.assertThrows(
+          NoSuchCatalogException.class,
+          () ->
+              metalake.loadCatalog(
+                  NameIdentifier.of(metalakeName, catalogName.substring(0, length))));
+    }
+
+    // We can't load the catalog.
+    Assertions.assertThrows(
+        NoSuchCatalogException.class,
+        () -> metalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName + "a")));
+
+    for (int i = 1; i < schemaName.length(); i++) {
+      // We can't get the schema by prefix
+      final int length = i;
+      Assertions.assertThrows(
+          NoSuchSchemaException.class,
+          () ->
+              catalog
+                  .asSchemas()
+                  .loadSchema(
+                      NameIdentifier.of(
+                          metalakeName, catalogName, schemaName.substring(0, length))));
+    }
+
+    Assertions.assertThrows(
+        NoSuchSchemaException.class,
+        () ->
+            catalog
+                .asSchemas()
+                .loadSchema(NameIdentifier.of(metalakeName, catalogName, schemaName + "a")));
+
+    for (int i = 1; i < tableName.length(); i++) {
+      // We can't get the table by prefix
+      final int length = i;
+      Assertions.assertThrows(
+          NoSuchTableException.class,
+          () ->
+              catalog
+                  .asTableCatalog()
+                  .loadTable(
+                      NameIdentifier.of(
+                          metalakeName, catalogName, schemaName, tableName.substring(0, length))));
+    }
+
+    Assertions.assertThrows(
+        NoSuchTableException.class,
+        () ->
+            catalog
+                .asTableCatalog()
+                .loadTable(
+                    NameIdentifier.of(metalakeName, catalogName, schemaName, tableName + "a")));
+  }
+
+  @Test
+  // Make sure it will be executed at last.
+  @Order(Integer.MAX_VALUE)
+  void testAlterEntityName() {
+    final GravitinoMetaLake metalake = client.loadMetalake(NameIdentifier.of(metalakeName));
+    String newMetalakeName = GravitinoITUtils.genRandomName("CatalogHiveIT_metalake_new");
+
+    // Test rename metalake
+    for (int i = 0; i < 2; i++) {
+      Assertions.assertThrows(
+          NoSuchMetalakeException.class,
+          () -> client.loadMetalake(NameIdentifier.of(newMetalakeName)));
+      client.alterMetalake(NameIdentifier.of(metalakeName), MetalakeChange.rename(newMetalakeName));
+      client.loadMetalake(NameIdentifier.of(newMetalakeName));
+      Assertions.assertThrows(
+          NoSuchMetalakeException.class,
+          () -> client.loadMetalake(NameIdentifier.of(metalakeName)));
+
+      client.alterMetalake(NameIdentifier.of(newMetalakeName), MetalakeChange.rename(metalakeName));
+      client.loadMetalake(NameIdentifier.of(metalakeName));
+      Assertions.assertThrows(
+          NoSuchMetalakeException.class,
+          () -> client.loadMetalake(NameIdentifier.of(newMetalakeName)));
+    }
+
+    Catalog catalog = metalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
+    // Test rename catalog
+    String newCatalogName = GravitinoITUtils.genRandomName("CatalogHiveIT_catalog_new");
+    for (int i = 0; i < 2; i++) {
+      Assertions.assertThrows(
+          NoSuchCatalogException.class,
+          () -> metalake.loadCatalog(NameIdentifier.of(metalakeName, newMetalakeName)));
+      metalake.alterCatalog(
+          NameIdentifier.of(metalakeName, catalogName), CatalogChange.rename(newCatalogName));
+      metalake.loadCatalog(NameIdentifier.of(metalakeName, newCatalogName));
+      Assertions.assertThrows(
+          NoSuchCatalogException.class,
+          () -> metalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName)));
+
+      metalake.alterCatalog(
+          NameIdentifier.of(metalakeName, newCatalogName), CatalogChange.rename(catalogName));
+      catalog = metalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
+      Assertions.assertThrows(
+          NoSuchCatalogException.class,
+          () -> metalake.loadCatalog(NameIdentifier.of(metalakeName, newMetalakeName)));
+    }
+
+    // Schema does not have the rename operation.
+
+    ColumnDTO[] columns = createColumns();
+    catalog
+        .asTableCatalog()
+        .createTable(
+            NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
+            columns,
+            TABLE_COMMENT,
+            createProperties(),
+            new Transform[0]);
+
+    final Catalog cata = catalog;
+    // Now try to rename table
+    final String newTableName = GravitinoITUtils.genRandomName("CatalogHiveIT_table_new");
+    for (int i = 0; i < 2; i++) {
+      // The table to be renamed does not exist
+      Assertions.assertThrows(
+          NoSuchTableException.class,
+          () ->
+              cata.asTableCatalog()
+                  .loadTable(
+                      NameIdentifier.of(metalakeName, catalogName, schemaName, newTableName)));
+      catalog
+          .asTableCatalog()
+          .alterTable(
+              NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
+              TableChange.rename(newTableName));
+      Table table =
+          catalog
+              .asTableCatalog()
+              .loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, newTableName));
+      Assertions.assertNotNull(table);
+
+      // Old Table should not exist anymore.
+      Assertions.assertThrows(
+          NoSuchTableException.class,
+          () ->
+              cata.asTableCatalog()
+                  .loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, tableName)));
+
+      catalog
+          .asTableCatalog()
+          .alterTable(
+              NameIdentifier.of(metalakeName, catalogName, schemaName, newTableName),
+              TableChange.rename(tableName));
+      table =
+          catalog
+              .asTableCatalog()
+              .loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, tableName));
+      Assertions.assertNotNull(table);
+    }
   }
 }

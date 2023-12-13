@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Datastrato.
+ * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 package com.datastrato.gravitino.trino.connector;
@@ -15,6 +15,7 @@ import io.trino.spi.connector.ConnectorAccessControl;
 import io.trino.spi.connector.ConnectorMetadata;
 import io.trino.spi.connector.ConnectorPageSinkProvider;
 import io.trino.spi.connector.ConnectorPageSourceProvider;
+import io.trino.spi.connector.ConnectorRecordSetProvider;
 import io.trino.spi.connector.ConnectorSession;
 import io.trino.spi.connector.ConnectorSplitManager;
 import io.trino.spi.connector.ConnectorTransactionHandle;
@@ -105,6 +106,13 @@ public class GravitinoConnector implements Connector {
     ConnectorPageSourceProvider internalPageSourceProvider =
         internalConnector.getPageSourceProvider();
     return new GravitinoDataSourceProvider(internalPageSourceProvider);
+  }
+
+  @Override
+  public ConnectorRecordSetProvider getRecordSetProvider() {
+    Connector internalConnector = catalogConnectorContext.getInternalConnector();
+    ConnectorRecordSetProvider internalRecordSetProvider = internalConnector.getRecordSetProvider();
+    return new GravitinoRecordSetProvider(internalRecordSetProvider);
   }
 
   @Override

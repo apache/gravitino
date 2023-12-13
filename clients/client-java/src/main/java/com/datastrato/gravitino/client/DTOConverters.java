@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Datastrato.
+ * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 package com.datastrato.gravitino.client;
@@ -145,32 +145,36 @@ class DTOConverters {
     if (change instanceof TableChange.AddColumn) {
       TableChange.AddColumn addColumn = (TableChange.AddColumn) change;
       return new TableUpdateRequest.AddTableColumnRequest(
-          addColumn.fieldNames(),
+          addColumn.fieldName(),
           addColumn.getDataType(),
           addColumn.getComment(),
-          addColumn.getPosition());
+          addColumn.getPosition(),
+          addColumn.isNullable());
 
     } else if (change instanceof TableChange.RenameColumn) {
       TableChange.RenameColumn renameColumn = (TableChange.RenameColumn) change;
       return new TableUpdateRequest.RenameTableColumnRequest(
-          renameColumn.fieldNames(), renameColumn.getNewName());
+          renameColumn.fieldName(), renameColumn.getNewName());
 
     } else if (change instanceof TableChange.UpdateColumnType) {
       return new TableUpdateRequest.UpdateTableColumnTypeRequest(
-          change.fieldNames(), ((TableChange.UpdateColumnType) change).getNewDataType());
+          change.fieldName(), ((TableChange.UpdateColumnType) change).getNewDataType());
 
     } else if (change instanceof TableChange.UpdateColumnComment) {
       return new TableUpdateRequest.UpdateTableColumnCommentRequest(
-          change.fieldNames(), ((TableChange.UpdateColumnComment) change).getNewComment());
+          change.fieldName(), ((TableChange.UpdateColumnComment) change).getNewComment());
 
     } else if (change instanceof TableChange.UpdateColumnPosition) {
       return new TableUpdateRequest.UpdateTableColumnPositionRequest(
-          change.fieldNames(), ((TableChange.UpdateColumnPosition) change).getPosition());
+          change.fieldName(), ((TableChange.UpdateColumnPosition) change).getPosition());
 
     } else if (change instanceof TableChange.DeleteColumn) {
       return new TableUpdateRequest.DeleteTableColumnRequest(
-          change.fieldNames(), ((TableChange.DeleteColumn) change).getIfExists());
+          change.fieldName(), ((TableChange.DeleteColumn) change).getIfExists());
 
+    } else if (change instanceof TableChange.UpdateColumnNullability) {
+      return new TableUpdateRequest.UpdateTableColumnNullabilityRequest(
+          change.fieldName(), ((TableChange.UpdateColumnNullability) change).nullable());
     } else {
       throw new IllegalArgumentException(
           "Unknown column change type: " + change.getClass().getSimpleName());

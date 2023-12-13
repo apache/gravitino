@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Datastrato.
+ * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 package com.datastrato.gravitino.rel;
@@ -22,38 +22,39 @@ import javax.annotation.Nullable;
  */
 public interface Table extends Auditable {
 
-  /** return the name of the table. */
+  /** @return Name of the table. */
   String name();
 
-  /** Return the columns of the table. */
+  /** @return The columns of the table. */
   Column[] columns();
 
-  /** Returns the physical partitioning of the table. */
+  /** @return The physical partitioning of the table. */
   default Transform[] partitioning() {
     return EMPTY_TRANSFORM;
   }
 
   /**
-   * Return the sort order of the table. If no sort order is specified, an empty array is returned.
+   * @return The sort order of the table. If no sort order is specified, an empty array is returned.
    */
   default SortOrder[] sortOrder() {
     return new SortOrder[0];
   }
 
   /**
-   * Return the bucketing of the table. If no bucketing is specified, Distribution.NONE is returned.
+   * @return The bucketing of the table. If no bucketing is specified, Distribution.NONE is
+   *     returned.
    */
   default Distribution distribution() {
     return Distributions.NONE;
   }
 
-  /** Return the comment of the table. Null is returned if no comment is set. */
+  /** @return The comment of the table. Null is returned if no comment is set. */
   @Nullable
   default String comment() {
     return null;
   }
 
-  /** Return the properties of the table. Empty map is returned if no properties are set. */
+  /** @return The properties of the table. Empty map is returned if no properties are set. */
   default Map<String, String> properties() {
     return Collections.emptyMap();
   }

@@ -1,10 +1,15 @@
 /*
- * Copyright 2023 Datastrato.
+ * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 package com.datastrato.gravitino.trino.connector.metadata;
 
+import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_MISSING_CONFIG;
+
 import com.datastrato.gravitino.Catalog;
+import io.trino.spi.TrinoException;
+import java.util.Map;
+import org.apache.logging.log4j.util.Strings;
 
 /** Help Gravitino connector access CatalogMetadata from gravitino client. */
 public class GravitinoCatalog {
@@ -23,7 +28,19 @@ public class GravitinoCatalog {
     return catalog.name();
   }
 
-  public String getProperties(String name, String defaultValue) {
+  public String getProperty(String name, String defaultValue) {
     return catalog.properties().getOrDefault(name, defaultValue);
+  }
+
+  public String getRequiredProperty(String name) throws Exception {
+    String value = catalog.properties().getOrDefault(name, "");
+    if (Strings.isBlank(value)) {
+      throw new TrinoException(GRAVITINO_MISSING_CONFIG, "Missing required config: " + name);
+    }
+    return value;
+  }
+
+  public Map<String, String> getProperties() {
+    return catalog.properties();
   }
 }
