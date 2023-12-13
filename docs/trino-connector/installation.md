@@ -68,7 +68,7 @@ Now you can see the Gravitino connector directory in the plugin directory.
 
 Assuming you have now started the Gravitino server on the host `gravitino-server-host` and already created a metalake named `test`, if those have not been prepared, please refer to the [Gravitino Getting-started](../getting-started).
 
-To configure Gravitino connector correctly, you need to put the following configurations to the Trino configuration file at `/etc/trino/catalog/gravitino.properties`.
+To configure Gravitino connector correctly, you need to put the following configurations to the Trino configuration file `/etc/trino/catalog/gravitino.properties`.
 
 ```text
 connector.name=gravitino
