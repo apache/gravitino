@@ -23,7 +23,7 @@ Builds with Apache Iceberg `1.3.1`. The Apache Iceberg table format version is `
 :::
 
 :::info
-Builds with hadoop 2.10.x, there may compatibility issue when accessing hadoop 3.x clusters.
+Builds with Hadoop 2.10.x, there may compatibility issue when accessing Hadoop 3.x clusters.
 :::
 
 ## How to start the Gravitino Iceberg REST catalog service
@@ -81,12 +81,12 @@ You must download the corresponding JDBC driver to the `catalogs/lakehouse-icebe
 :::
 
 :::info
-`gravitino.auxService.iceberg-rest.jdbc-driver` is not required unless Gravitino manages multi JDBC drivers.
+`gravitino.auxService.iceberg-rest.jdbc-driver` isn't required unless Gravitino manages multi JDBC drivers.
 :::
 
 ### Other Apache Iceberg catalog properties
 
-You can add other properties defined in [Iceberg table properties](https://iceberg.apache.org/docs/1.3.1/configuration/). 
+You can add other properties defined in [Iceberg table properties](https://iceberg.apache.org/docs/1.3.1/configuration/).
 The `clients` property for example:
 
 | Configuration item                          | Description                          | Default value | Required |

@@ -9,9 +9,9 @@ This software is licensed under the Apache License version 2."
 
 ## Introduction
 
-Gravitino supports several configurations: 
+Gravitino supports several configurations:
 1. **Gravitino server configuration**: Used to start up Gravitino server.
-2. **Gravitino catalog properties configuration**: Used to make default values for different catalogs. 
+2. **Gravitino catalog properties configuration**: Used to make default values for different catalogs.
 3. **Some other configurations**: Includes configurations such as HDFS configuration.
 
 ## Gravitino server configurations
@@ -55,7 +55,7 @@ It's highly recommend that you change the default value of `gravitino.entity.sto
 
 | Configuration item                           | Description                                                                                                                                                                                       | Default value | Required | Since version |
 |----------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
-| `gravitino.catalog.cache.evictionIntervalMs` | The interval in milliseconds to evict the catalog cache, default 3600000ms(1h)                                                                                                                    | `3600000`     | No       | 0.1.0         |
+| `gravitino.catalog.cache.evictionIntervalMs` | The interval in milliseconds to evict the catalog cache, default 3600000ms(1h).                                                                                                                    | `3600000`     | No       | 0.1.0         |
 | `gravitino.catalog.classloader.isolated`     | Whether to use an isolated classloader for catalog, if true, an isolated classloader loads all catalog-related libraries and configurations, not the AppClassLoader. The default value is `true`. | `true`        | No       | 0.1.0         |
 
 ### Auxiliary service configuration
@@ -64,7 +64,7 @@ It's highly recommend that you change the default value of `gravitino.entity.sto
 |-------------------------------|--------------------------------------------------------------------------------------------------------------------------------|---------------|---------------|
 | `gravitino.auxService.names ` | The auxiliary service name of the Gravitino Iceberg REST server, use **`iceberg-rest`** for the Gravitino Iceberg REST server. | (none)        | 0.2.0         |
 
-Please refer to [Iceberg REST catalog service](iceberg-rest-service) for Iceberg rest catalog service configurations.
+Please refer to [Iceberg REST catalog service](iceberg-rest-service) for Iceberg REST catalog service configurations.
 
 ### Security configuration
 
@@ -75,12 +75,12 @@ Please refer to [security](security) for HTTPS and Authentication configurations
 There are three types of catalog properties:
 
 1. **Gravitino-defined properties**: These properties simplify the catalog creation process.
-2. **Properties with the `gravitino.bypass.` prefix**: These properties are not managed by Gravitino; instead, they bypass the underlying system for advanced usage.
-3. **Other properties**: Stored in Gravitino storage, these properties do not bypass the underlying system.
+2. **Properties with the `gravitino.bypass.` prefix**: These properties aren't managed by Gravitino; instead, they bypass the underlying system for advanced usage.
+3. **Other properties**: Stored in Gravitino storage, these properties don't bypass the underlying system.
 
-Catalog properties are either defined in catalog configuration files as default values or specified explicitly when creating a catalog. 
+Catalog properties are either defined in catalog configuration files as default values or specified explicitly when creating a catalog.
 
-:::info 
+:::info
 Explicit specifications take precedence over the formal configurations.
 :::
 
@@ -88,11 +88,11 @@ Explicit specifications take precedence over the formal configurations.
 These rules only apply on the catalog properties, doesn't affect on the schema or table properties.
 :::
 
-| catalog provider    | catalog properties                                                                   | catalog properties configuration file path               | 
+| catalog provider    | catalog properties                                                                   | catalog properties configuration file path               |
 |---------------------|--------------------------------------------------------------------------------------|----------------------------------------------------------|
 | `hive`              | [Hive catalog properties](apache-hive-catalog#catalog-properties)                    | `catalogs/hive/conf/hive.conf`                           |
-| `lakehouse-iceberg` | [Lakehouse Iceberg catalog properties](lakehouse-iceberg-catalog#catalog-properties) | `catalogs/lakehouse-iceberg/conf/lakehouse-iceberg.conf` | 
-| `jdbc-mysql`        | [MySQL catalog properties](jdbc-mysql-catalog#catalog-properties)                    | `catalogs/jdbc-mysql/conf/jdbc-mysql.conf`               | 
+| `lakehouse-iceberg` | [Lakehouse Iceberg catalog properties](lakehouse-iceberg-catalog#catalog-properties) | `catalogs/lakehouse-iceberg/conf/lakehouse-iceberg.conf` |
+| `jdbc-mysql`        | [MySQL catalog properties](jdbc-mysql-catalog#catalog-properties)                    | `catalogs/jdbc-mysql/conf/jdbc-mysql.conf`               |
 | `jdbc-postgresql`   | [PostgreSQL catalog properties](jdbc-postgresql-catalog#catalog-properties)          | `catalogs/jdbc-postgresql/conf/jdbc-postgresql.conf`     |
 
 :::info

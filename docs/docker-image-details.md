@@ -23,6 +23,7 @@ docker run --rm -d -p 8090:8090 datastrato/gravitino
 Changelog
 
 gravitino:0.3.0
+
 - Docker image `datastrato/gravitino:0.3.0`
 - Gravitino Server
 - Expose ports:
@@ -31,7 +32,7 @@ gravitino:0.3.0
 
 ## Playground Docker image
 
-You can use the [playground](https://github.com/datastrato/gravitino-playground) to experience the whole Gravitino system with other components. 
+You can use the [playground](https://github.com/datastrato/gravitino-playground) to experience the whole Gravitino system with other components.
 
 The playground consists of multiple Docker images.
 
@@ -77,22 +78,22 @@ Changelog
   - Rollback `Map container hostname to 127.0.0.1 before starting Hadoop` of `datastrato/gravitino-ci-hive:0.1.4`
 
 - gravitino-ci-hive:0.1.4
-  - Config HDFS DataNode data transfer address to `0.0.0.0:50010` explicitly
-  - Map container hostname to `127.0.0.1` before starting Hadoop
+  - Configure HDFS DataNode data transfer address to be `0.0.0.0:50010`
+  - Map the container hostname to `127.0.0.1` before starting Hadoop
   - Expose `50010` port for the HDFS DataNode
 
 - gravitino-ci-hive:0.1.3
-  - change Mysql bind-address from `127.0.0.1` to `0.0.0.0`
-  - add `iceberg` to Mysql users with password `iceberg`
-  - export `3306` port for Mysql
+  - Change MySQL bind-address from `127.0.0.1` to `0.0.0.0`
+  - Add `iceberg` to MySQL users with password `iceberg`
+  - Export `3306` port for MySQL
 
 - gravitino-ci-hive:0.1.2
-  - base on `datastrato/gravitino-ci-hive:0.1.1`
+  - Based on `datastrato/gravitino-ci-hive:0.1.1`
   - Modify `fs.defaultFS` from `local` to `0.0.0.0` in the `core-site.xml` file.
-  - Expose `9000` port int the `Dockerfile` file.
+  - Expose `9000` port in the `Dockerfile` file.
 
 - gravitino-ci-hive:0.1.1
-  - base on `datastrato/gravitino-ci-hive:0.1.0`
+  - Based on `datastrato/gravitino-ci-hive:0.1.0`
   - Modify HDFS/YARN/HIVE `MaxPermSize` from `8GB` to `128MB`
   - Modify `HADOOP_HEAPSIZE` from `8192` to `128`
 
@@ -107,13 +108,13 @@ Changelog
     - `50075` HDFS DataNode HTTP server
     - `50010` HDFS DataNode data transfer
     - `8088` YARN Service
-    - `9083` Hive Metastore
+    - `9083` Hive metastore
     - `10000` HiveServer2
     - `10002` HiveServer2 HTTP
 
 ## Gravitino CI Trino image
 
-You can use this kind of images to test Trino.
+You can use this image to test Trino.
 
 Changelog
 
@@ -122,6 +123,6 @@ Changelog
 
 - gravitino-ci-trino:0.1.0
   - Docker image `datastrato/gravitino-ci-trino:0.1.0`
-  - Base on `trinodb/trino:426` and removed some unused plugins from it.
+  - Based on `trinodb/trino:426` and removed some unused plugins from it.
   - Expose ports:
     - `8080` Trino JDBC port
