@@ -180,7 +180,7 @@ Supports operations:
 - `UpdateColumnComment`
 
 :::info
-The default column position is `LAST` when you add a column. If you add a non nullability column, there may be compatibility issue.
+The default column position is `LAST` when you add a column. If you add a non nullability column, there may be compatibility issues.
 Iceberg just supports updating primitive types.
 :::
 
