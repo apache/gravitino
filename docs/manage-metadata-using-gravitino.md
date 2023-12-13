@@ -10,7 +10,7 @@ import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 This page introduces how to manage metadata by Gravitino. Through Gravitino, you can create, edit, and delete metadata
-like metalakes, catalogs, schemas, and tables. The following contents are included in this page:
+like metalakes, catalogs, schemas, and tables. This page includes the following contents:
 
 In this document, Gravitino uses Apache Hive catalog as an example to show how to manage metadata by Gravitino. Other catalogs are similar to Hive catalog,
 but they may have some differences, especially in catalog property, table property and column type. For more details, please refer to the related doc.
@@ -59,7 +59,6 @@ GravitinoMetaLake newMetalake = gravitinoClient.createMetalake(
 ### Load a metalake
 
 You can create a metalake by sending a `GET` request to the `/api/metalakes/{metalake_name}` endpoint or just use the Gravitino Java client. The following is an example of loading a metalake:
-
 
 <Tabs>
 <TabItem value="bash" label="Bash">
@@ -124,7 +123,7 @@ GravitinoMetaLake renamed = gravitinoClient.alterMetalake(
 
 Currently, Gravitino supports the following changes to a metalake:
 
-| Supported modification | Json                                                         | Java                                            |
+| Supported modification | JSON                                                         | Java                                            |
 |------------------------|--------------------------------------------------------------|-------------------------------------------------|
 | Rename metalake        | `{"@type":"rename","newName":"metalake_renamed"}`            | `MetalakeChange.rename("metalake_renamed")`     |
 | Update comment         | `{"@type":"updateComment","newComment":"new_comment"}`       | `MetalakeChange.updateComment("new_comment")`   |
@@ -193,11 +192,10 @@ GravitinoMetaLake[] allMetalakes = gravitinoClient.listMetalakes();
 :::tip
 Users should create a metalake before creating a catalog.
 
-The code below is an example of creating a Hive catalog. For other catalogs, the code is similar, but the catalog type, provider and properties may be different. For more details, please refer to the related doc.
+The code below is an example of creating a Hive catalog. For other catalogs, the code is similar, but the catalog type, provider, and properties may be different. For more details, please refer to the related doc.
 :::
 
 You can create a catalog by sending a `POST` request to the `/api/metalakes/{metalake_name}/catalogs` endpoint or just use the Gravitino Java client. The following is an example of creating a catalog:
-
 
 <Tabs>
 <TabItem value="bash" label="Bash">
@@ -246,12 +244,12 @@ Catalog catalog = gravitinoMetaLake.createCatalog(
 
 Currently, Gravitino supports the following catalog providers:
 
-| Catalog provider    | Catalog property                                                            | 
+| Catalog provider    | Catalog property                                                            |
 |---------------------|-----------------------------------------------------------------------------|
-| `hive`              | [Hive catalog property](./apache-hive-catalog#catalog-properties)           | 
-| `lakehouse-iceberg` | [Iceberg catalog property](./lakehouse-iceberg-catalog#catalog-properties)  |                                    
-| `jdbc-mysql`        | [MySQL catalog property](./jdbc-mysql-catalog#catalog-properties)           |                            
-| `jdbc-postgresql`   | [PostgreSQL catalog property](./jdbc-postgresql-catalog#catalog-properties) |          
+| `hive`              | [Hive catalog property](./apache-hive-catalog#catalog-properties)           |
+| `lakehouse-iceberg` | [Iceberg catalog property](./lakehouse-iceberg-catalog#catalog-properties)  |
+| `jdbc-mysql`        | [MySQL catalog property](./jdbc-mysql-catalog#catalog-properties)           |
+| `jdbc-postgresql`   | [PostgreSQL catalog property](./jdbc-postgresql-catalog#catalog-properties) |
 
 ### Load a catalog
 
@@ -324,7 +322,7 @@ Catalog catalog = gravitinoMetaLake.alterCatalog(NameIdentifier.of("metalake", "
 
 Currently, Gravitino supports the following changes to a catalog:
 
-| Supported modification | Json                                                         | Java                                           |
+| Supported modification | JSON                                                         | Java                                           |
 |------------------------|--------------------------------------------------------------|------------------------------------------------|
 | Rename metalake        | `{"@type":"rename","newName":"metalake_renamed"}`            | `CatalogChange.rename("catalog_renamed")`      |
 | Update comment         | `{"@type":"updateComment","newComment":"new_comment"}`       | `CatalogChange.updateComment("new_comment")`   |
@@ -361,7 +359,7 @@ gravitinoMetaLake.dropCatalog(NameIdentifier.of("metalake", "catalog"));
 </Tabs>
 
 :::note
-Drop a catalog only removes metadata about the catalog and schemas, tables under the catalog in Gravitino, It doesn't remove the real data(table and schema) in Apache Hive.
+Drop a catalog only removes metadata about the catalog and schemas, tables under the catalog in Gravitino, It doesn't remove the real data (table and schema) in Apache Hive.
 :::
 
 ### List all catalogs in a metalake
@@ -450,18 +448,16 @@ Schema schema = supportsSchemas.createSchema(
 
 Currently, Gravitino supports the following schema property:
 
-| Catalog provider    | Schema property                                                           | 
+| Catalog provider    | Schema property                                                           |
 |---------------------|---------------------------------------------------------------------------|
-| `hive`              | [Hive schema property](./apache-hive-catalog#schema-properties)           | 
-| `lakehouse-iceberg` | [Iceberg scheme property](./lakehouse-iceberg-catalog#schema-properties)  |                                    
-| `jdbc-mysql`        | [MySQL schema property](./jdbc-mysql-catalog#schema-properties)           |                            
-| `jdbc-postgresql`   | [PostgreSQL schema property](./jdbc-postgresql-catalog#schema-properties) |        
-
+| `hive`              | [Hive schema property](./apache-hive-catalog#schema-properties)           |
+| `lakehouse-iceberg` | [Iceberg scheme property](./lakehouse-iceberg-catalog#schema-properties)  |
+| `jdbc-mysql`        | [MySQL schema property](./jdbc-mysql-catalog#schema-properties)           |
+| `jdbc-postgresql`   | [PostgreSQL schema property](./jdbc-postgresql-catalog#schema-properties) |
 
 ### Load a schema
 
 You can create a schema by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}` endpoint or just use the Gravitino Java client. The following is an example of loading a schema:
-
 
 <Tabs>
 <TabItem value="bash" label="Bash">
@@ -531,11 +527,10 @@ Schema schema = supportsSchemas.alterSchema(NameIdentifier.of("metalake", "hive_
 
 Currently, Gravitino supports the following changes to a schema:
 
-| Supported modification | Json                                                         | Java                                          |
+| Supported modification | JSON                                                         | Java                                          |
 |------------------------|--------------------------------------------------------------|-----------------------------------------------|
 | Set a property         | `{"@type":"setProperty","property":"key1","value":"value1"}` | `SchemaChange.setProperty("key1", "value1")`  |
 | Remove a property      | `{"@type":"removeProperty","property":"key1"}`               | `SchemaChange.removeProperty("key1")`         |
-
 
 ### Drop a schema
 You can remove a schema by sending a `DELETE` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}` endpoint or just use the Gravitino Java client. The following is an example of dropping a schema:
@@ -683,13 +678,13 @@ tableCatalog.createTable(
 In order to create a table, you need to provide the following information:
 
 - Table column name and type
-- Table property 
+- Table property
 
 #### Gravitino table column type
 
 The following types that Gravitino supports:
 
-| Type                      | Java                                                                     | Json                                                                                                                                 | Description                                                                                      |
+| Type                      | Java                                                                     | JSON                                                                                                                                 | Description                                                                                      |
 |---------------------------|--------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------|
 | Boolean                   | `Types.BooleanType.get()`                                                | `boolean`                                                                                                                            | Boolean type                                                                                     |
 | Byte                      | `Types.ByteType.get()`                                                   | `byte`                                                                                                                               | Byte type, indicates a numerical value of 1 byte                                                 |
@@ -713,7 +708,7 @@ The following types that Gravitino supports:
 | List                      | `Types.ListType.of(elementType, elementNullable)`                        | `{"type": "list", "containsNull": JSON Boolean, "elementType": type JSON}`                                                           | List type, indicate a list of elements with the same type                                        |
 | Map                       | `Types.MapType.of(keyType, valueType)`                                   | `{"type": "map", "keyType": type JSON, "valueType": type JSON, "valueContainsNull": JSON Boolean}`                                   | Map type, indicate a map of key-value pairs                                                      |
 | Struct                    | `Types.StructType.of([Types.StructType.Field.of(name, type, nullable)])` | `{"type": "struct", "fields": [JSON StructField, {"name": string, "type": type JSON, "nullable": JSON Boolean, "comment": string}]}` | Struct type, indicate a struct of fields                                                         |
-| Union                     | `Types.UnionType.of([type1, type2, ...])`                                | `{"type": "union", "types": [type JSON, ...]}`                                                                                       | Union type, indicate a union of types     
+| Union                     | `Types.UnionType.of([type1, type2, ...])`                                | `{"type": "union", "types": [type JSON, ...]}`                                                                                       | Union type, indicate a union of types
 
 
 The related java doc is [here](pathname:///docs/0.3.0/api/java/com/datastrato/gravitino/rel/types/Type.html).
@@ -724,10 +719,10 @@ The following is the table property that Gravitino supports:
 
 | Catalog provider    | Table property                                                          | Type mapping                                                            |
 |---------------------|-------------------------------------------------------------------------|-------------------------------------------------------------------------|
-| `hive`              | [Hive table property](./apache-hive-catalog#table-properties)           | [Hive type mapping](./apache-hive-catalog#table-column-types)           | 
-| `lakehouse-iceberg` | [Iceberg table property](./lakehouse-iceberg-catalog#table-properties)  | [Iceberg type mapping](./lakehouse-iceberg-catalog#table-column-types)  |                                    
-| `jdbc-mysql`        | [MySQL table property](./jdbc-mysql-catalog#table-properties)           | [MySQL type mapping](./jdbc-mysql-catalog#table-column-types)           |                            
-| `jdbc-postgresql`   | [PostgreSQL table property](./jdbc-postgresql-catalog#table-properties) | [PostgreSQL type mapping](./jdbc-postgresql-catalog#table-column-types) |  
+| `hive`              | [Hive table property](./apache-hive-catalog#table-properties)           | [Hive type mapping](./apache-hive-catalog#table-column-types)           |
+| `lakehouse-iceberg` | [Iceberg table property](./lakehouse-iceberg-catalog#table-properties)  | [Iceberg type mapping](./lakehouse-iceberg-catalog#table-column-types)  |
+| `jdbc-mysql`        | [MySQL table property](./jdbc-mysql-catalog#table-properties)           | [MySQL type mapping](./jdbc-mysql-catalog#table-column-types)           |
+| `jdbc-postgresql`   | [PostgreSQL table property](./jdbc-postgresql-catalog#table-properties) | [PostgreSQL type mapping](./jdbc-postgresql-catalog#table-column-types) |
 
 
 In addition to the basic settings, Gravitino supports the following features:
@@ -739,7 +734,7 @@ In addition to the basic settings, Gravitino supports the following features:
 | Sorted order table  | Equal to `SORTED BY` in Apache Hive, some engine may use different words to describe it.     | [SortOrder](pathname:///docs/0.3.0/api/java/com/datastrato/gravitino/rel/expressions/sorts/SortOrder.html)               |
 
 :::tip
-**Those features may not be supported by all catalogs**. Please refer to the related doc for more details.
+**Not all catalogs may support those features.**. Please refer to the related document for more details.
 :::
 
 The following is an example of creating a partitioned, bucketed table and sorted order table:
@@ -793,8 +788,8 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
     "funcArgs": [
       {
         "type": "field",
-        "fieldName": ["score"] 
-      } 
+        "fieldName": ["score"]
+      }
     ]
   },
   "sortOrders": [
@@ -803,10 +798,10 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
       "nullOrder": "NULLS_LAST",
       "sortTerm":  {
         "type": "field",
-        "fieldName": ["name"] 
-      } 
+        "fieldName": ["name"]
+      }
     }
-  ] 
+  ]
 }' http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema/tables
 ```
 
@@ -944,7 +939,7 @@ Table t = tableCatalog.alterTable(NameIdentifier.of("metalake", "catalog", "sche
 
 Currently, Gravitino supports the following changes to a table:
 
-| Supported modification             | Json                                                                                                                  | Java                                        |
+| Supported modification             | JSON                                                                                                                  | Java                                        |
 |------------------------------------|-----------------------------------------------------------------------------------------------------------------------|---------------------------------------------|
 | Rename table                       | `{"@type":"rename","newName":"table_renamed"}`                                                                        | `TableChange.rename("table_renamed")`       |
 | Update comment                     | `{"@type":"updateComment","newComment":"new_comment"}`                                                                | `TableChange.updateComment("new_comment")`  |
@@ -997,7 +992,7 @@ You can list all tables in a schema by sending a `GET` request to the `/api/meta
 ```bash
 curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" \
-http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema/tables 
+http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema/tables
 ```
 
 </TabItem>

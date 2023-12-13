@@ -47,7 +47,7 @@ The Hive catalog supports to create, update, and delete databases in the HMS.
 ### Schema properties
 
 Schema properties supply or set metadata for the underlying Hive database.
-The following table lists predefined schema properties for the Hive database. In addition, you can also define your own key-value pair properties, which can also be transmitted to the underlying Hive database.
+The following table lists predefined schema properties for the Hive database. Additionally, you can define your own key-value pair properties and transmit them to the underlying Hive database.
 
 | Property name | Description                                                              | Default value                                                                           | Required | Since Version |
 |---------------|--------------------------------------------------------------------------|-----------------------------------------------------------------------------------------|----------|---------------|
@@ -56,7 +56,6 @@ The following table lists predefined schema properties for the Hive database. In
 ### Schema operations
 
 see [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino#schemas-operations).
-
 
 ## Table
 
@@ -67,7 +66,7 @@ The Hive catalog supports to create, update, and delete tables in the HMS.
 #### Table partitions
 
 The Hive catalog supports [partitioned tables](https://cwiki.apache.org/confluence/display/Hive/LanguageManual+DDL#LanguageManualDDL-PartitionedTables). Users can create partitioned tables in the Hive catalog with specific partitioning attribute.
-Although Gravitino supports several partitioning strategies, the Apache Hive inherently only supports a single partitioning strategy(partitioned by column), therefore the Hive catalog only support `Identity` partitioning.
+Although Gravitino supports several partitioning strategies, the Apache Hive inherently only supports a single partitioning strategy (partitioned by column), therefore the Hive catalog only support `Identity` partitioning.
 
 :::caution
 The `fieldName` specified in the partitioning attribute must be a column defined in the table.
@@ -76,7 +75,7 @@ The `fieldName` specified in the partitioning attribute must be a column defined
 #### Table sort orders and distributions
 
 The Hive catalog supports [bucketed sorted tables](https://cwiki.apache.org/confluence/display/Hive/LanguageManual+DDL#LanguageManualDDL-BucketedSortedTables). Users can create bucketed sorted tables in the Hive catalog with specific `distribution` and `sortOrders` attributes.
-Although Gravitino supports several distribution strategies, the Apache Hive inherently only supports a single distribution strategy(clustered by column), therefore the Hive catalog only support `Hash` distribution.
+Although Gravitino supports several distribution strategies, the Apache Hive inherently only supports a single distribution strategy (clustered by column), therefore the Hive catalog only support `Hash` distribution.
 
 :::caution
 The `fieldName` specified in the `distribution` and `sortOrders` attribute must be a column defined in the table.
@@ -113,7 +112,7 @@ The following table lists the data types mapped from the Hive catalog to the Gra
 ### Table properties
 
 Table properties supply or set metadata for the underlying Hive tables.
-The following table lists predefined table properties for the Hive table. In addition, you can also define your own key-value pair properties, which can also be transmitted to the underlying Hive table.
+The following table lists predefined table properties for the Hive table. Additionally, you can define your own key-value pair properties and transmit them to the underlying Hive database.
 
 | Property Name      | Description                                                                                                                             | Default Value                                                                                                                                       | Required | Since version |
 |--------------------|-----------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------|----------|---------------|
@@ -125,7 +124,7 @@ The following table lists predefined table properties for the Hive table. In add
 | `serde-lib`        | The serde library class for the table. Such as `org.apache.hadoop.hive.ql.io.orc.OrcSerde`.                                             | The property `format` sets the default value `org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe` and can change it to a different default.         | No       | 0.2.0         |
 | `serde.parameter.` | The prefix of the serde parameter. Such as `"serde.parameter.orc.create.index" = "true"` indicate `ORC` serde lib to create row indexes | (none)                                                                                                                                              | No       | 0.2.0         |
 
-Some properties are reserved, which are automatically added and managed by Hive. Users are not allowed to set these properties.
+Hive automatically adds and manages some reserved properties. Users aren't allowed to set these properties.
 
 | Property Name           | Description                                       | Since Version |
 |-------------------------|---------------------------------------------------|---------------|
