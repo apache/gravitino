@@ -8,16 +8,16 @@ This software is licensed under the Apache License version 2."
 
 The catalogs currently supported by the Gravitino connector are as follows:
 
-- [Hive](catalog-hive)
-- [Iceberg](catalog-iceberg)
-- [MySQL](catalog-mysql)
-- [PostgreSQL](catalog-postgresql)
+- [Hive](catalog-hive.md)
+- [Iceberg](catalog-iceberg.md)
+- [MySQL](catalog-mysql.md)
+- [PostgreSQL](catalog-postgresql.md)
 
 ## Create catalog
 
 Trino currently does not support creating Gravitino managed catalogs. 
 If you need to create a catalog, please refer to:
-- [Create a Catalog](../manage-metadata-using-gravitino#create-a-catalog)
+- [Create a Catalog](../manage-metadata-using-gravitino.md#create-a-catalog)
 
 ## Data type mapping
 

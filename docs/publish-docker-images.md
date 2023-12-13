@@ -33,4 +33,4 @@ You can use GitHub actions to publish Docker images to the Docker Hub repository
 
 ## More details of Gravitino Docker images
 
-+ [Gravitino Docker images](docker-image-details)
++ [Gravitino Docker images](docker-image-details.md)
