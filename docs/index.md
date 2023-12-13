@@ -5,7 +5,7 @@ license: "Copyright 2023 Datastrato Pvt Ltd.
 This software is licensed under the Apache License version 2."
 ---
 
-## What is Gravitino?
+## What's Gravitino?
 
 Gravitino is a high-performance, geo-distributed, and federated metadata lake. It manages the
 metadata directly in different sources, types, and regions. It also provides users with unified
@@ -85,7 +85,7 @@ Gravitino provides several ways to configure and manage the Gravitino server. Pl
 
 Gravitino supports different catalogs to manage the metadata in different sources. Please see:
 
-* [Lakehouse Iceberg catalog](./lakehouse-iceberg-catalog): a complete guide to use Gravitino 
+* [Lakehouse Iceberg catalog](./lakehouse-iceberg-catalog): a complete guide to use Gravitino
   manage Apache Iceberg data.
 * [How to set up Gravitino Apache Iceberg REST catalog service](./iceberg-rest-service): a
   complete guide to use Gravitino as Apache Iceberg REST catalog service.

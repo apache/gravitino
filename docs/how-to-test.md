@@ -67,9 +67,9 @@ Deploy the Gravitino server locally to run the integration tests. Follow these s
 
 ## Skip tests
 
-- You can skip unit tests by using the `./gradlew build -PskipTests` command.
-- You can skip integration tests by using the `./gradlew build -PskipITs` command.
-- You can skip both unit tests and integration tests by using the `./gradlew build -x test` or `./gradlew build -PskipTests -PskipITs` commands.
+* You can skip unit tests by using the `./gradlew build -PskipTests` command.
+* You can skip integration tests by using the `./gradlew build -PskipITs` command.
+* You can skip both unit tests and integration tests by using the `./gradlew build -x test` or `./gradlew build -PskipTests -PskipITs` commands.
 
 ## Docker test environment
 
@@ -127,27 +127,27 @@ Gravitino project and set breakpoints anywhere.
 This mode is closer to the actual environment but more complex to debug. To debug the Gravitino
 server code, follow these steps:
 
-- Run the `./gradlew build -x test` command to build the Gravitino project.
-- Use the `./gradlew compileDistribution` command to republish the packaged project in the `distribution` directory.
-- If you only debug integration test codes, You don't have to do any setup to debug directly.
-- If you need to debug Gravitino server codes, follow these steps:
- - Enable the `GRAVITINO_DEBUG_OPTS` environment variable in the
-   `distribution/package/conf/gravitino-env.sh` file to enable remote JVM debugging.
- - Manually start the Gravitino server using the `./distribution/package/bin/gravitino.sh
-   start` command.
- - Select `gravitino.server.main` module classpath in the `Remote JVM Debug` to attach the
-   Gravitino server process and debug it.
+* Run the `./gradlew build -x test` command to build the Gravitino project.
+* Use the `./gradlew compileDistribution` command to republish the packaged project in the `distribution` directory.
+* If you only debug integration test codes, You don't have to do any setup to debug directly.
+* If you need to debug Gravitino server codes, follow these steps:
+  * Enable the `GRAVITINO_DEBUG_OPTS` environment variable in the
+  `distribution/package/conf/gravitino-env.sh` file to enable remote JVM debugging.
+  * Manually start the Gravitino server using the `./distribution/package/bin/gravitino.sh
+  start` command.
+  * Select `gravitino.server.main` module classpath in the `Remote JVM Debug` to attach the
+  Gravitino server process and debug it.
 
 ## Running on GitHub actions
 
-- GitHub Actions automatically run integration tests in the embedded and deploy mode when you
+* GitHub Actions automatically run integration tests in the embedded and deploy mode when you
   submit a pull request.
-- View the test results in the `Actions` tab of the pull request page.
-- Run the integration tests in several steps:
-  - The Gravitino integration tests pull the CI Docker image from the Docker Hub repository. This step typically takes around 15 seconds.
-  - If you set the `debug action` label in the pull request, GitHub actions runs an SSH server with `csexton/debugger-action@master`, allowing you to log in to the actions environment for remote debugging.
-  - The Gravitino project compiles and packages in the `distribution` directory using the `./gradlew compileDistribution` command.
-  - Run the `./gradlew test -PtestMode=[embedded|deploy]` command.
+* View the test results in the `Actions` tab of the pull request page.
+* Run the integration tests in several steps:
+  * The Gravitino integration tests pull the CI Docker image from the Docker Hub repository. This step typically takes around 15 seconds.
+  * If you set the `debug action` label in the pull request, GitHub actions runs an SSH server with `csexton/debugger-action@master`, allowing you to log in to the actions environment for remote debugging.
+  * The Gravitino project compiles and packages in the `distribution` directory using the `./gradlew compileDistribution` command.
+  * Run the `./gradlew test -PtestMode=[embedded|deploy]` command.
 
 ## Test failure
 
