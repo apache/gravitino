@@ -55,7 +55,7 @@ You must download the corresponding JDBC driver to the `catalogs/lakehouse-icebe
 
 ### Catalog operations
 
-Please refer [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino#catalogs-operations) for more details.
+Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino#catalogs-operations) for more details.
 
 ## Schema 
 
@@ -69,7 +69,7 @@ You could put properties except `comment`.
 
 ### Schema operations
 
-Please refer [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino#schemas-operations) for more details.
+Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino#schemas-operations) for more details.
 
 ## Table 
 
@@ -161,7 +161,7 @@ The Gravitino server doesn't allow passing the following reserved fields.
 
 ### Table operations
 
-Please refer [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino#tables-operations) for more details.
+Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino#tables-operations) for more details.
 
 #### Alter table operations
 
