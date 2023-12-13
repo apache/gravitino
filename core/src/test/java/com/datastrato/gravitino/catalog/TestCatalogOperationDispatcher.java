@@ -146,8 +146,8 @@ public class TestCatalogOperationDispatcher {
     NameIdentifier tableIdentifier = NameIdentifier.of(tableNamespace, "Table1");
     Column[] columns =
         new Column[] {
-          new TestColumn.Builder().withName("col1").withType(TypeCreator.NULLABLE.STRING).build(),
-          new TestColumn.Builder().withName("col2").withType(TypeCreator.NULLABLE.STRING).build()
+          new TestColumn.Builder().withName("col1").withType(Types.VarCharType.of(1000)).build(),
+          new TestColumn.Builder().withName("col2").withType(Types.VarCharType.of(1000)).build()
         };
     dispatcher.createTable(tableIdentifier, columns, "comment", props, new Transform[0]);
 
