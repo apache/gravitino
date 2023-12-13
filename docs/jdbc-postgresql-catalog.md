@@ -50,7 +50,7 @@ In PostgreSQL, the database corresponds to the Gravitino catalog, and the schema
 
 ### Catalog operations
 
-see [Manage metadata using Gravitino](./manage-metadata-using-gravitino#catalogs-operations).
+Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino#catalogs-operations) for more details.
 
 ## Schema
 
@@ -62,13 +62,17 @@ see [Manage metadata using Gravitino](./manage-metadata-using-gravitino#catalogs
 - Supports cascade drop schema.
 
 ### Schema properties
+
 - Doesn't are schema property settings.
 
 ### Schema operations
-see [Manage metadata using Gravitino](./manage-metadata-using-gravitino#schemas-operations).
+
+Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino#schemas-operations) for more details.
 
 ## Table
+
 ### Table capabilities
+
 - Gravitino table corresponds to the PostgreSQL table.
 - Supports DDL operation for PostgreSQL tables.
 - Doesn't support setting certain column properties, such as default value and check constraints.
@@ -76,6 +80,7 @@ see [Manage metadata using Gravitino](./manage-metadata-using-gravitino#schemas-
 - Doesn't support table property settings.
 
 #### Table column types
+
 | Gravitino Type | PostgreSQL Type               |
 |----------------|-------------------------------|
 | `Boolean`      | `boolean`                     |
@@ -104,6 +109,8 @@ PostgreSQL doesn't support Gravitino `Fixed` `Struct` `List` `Map` `IntervalDay`
 - Doesn't support table properties.
 
 ### Table operations
+
+Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino#tables-operations) for more details.
 
 #### Alter table operations
 

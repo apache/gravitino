@@ -44,7 +44,7 @@ You must download the corresponding JDBC driver to the `catalogs/jdbc-mysql/libs
 
 ### Catalog operations
 
-see [Manage metadata using Gravitino](./manage-metadata-using-gravitino#catalogs-operations).
+Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino#catalogs-operations) for more details.
 
 ## Schema
 
@@ -61,7 +61,7 @@ see [Manage metadata using Gravitino](./manage-metadata-using-gravitino#catalogs
 
 ### Schema operations
 
-see [Manage metadata using Gravitino](./manage-metadata-using-gravitino#schemas-operations).
+Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino#schemas-operations) for more details.
 
 ## Table
 
@@ -101,6 +101,8 @@ MySQL doesn't support Gravitino `Boolean` `Fixed` `Struct` `List` `Map` `Timesta
 - Doesn't support table properties.
 
 ### Table operations
+
+Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino#tables-operations) for more details.
 
 #### Alter table operations
 

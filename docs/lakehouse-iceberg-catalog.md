@@ -17,9 +17,6 @@ Gravitino provides the ability to manage Apache Iceberg metadata.
 
 :::info
 Builds with Apache Iceberg `1.3.1`. The Apache Iceberg table format version is `1` by default.
-:::
-
-:::info
 Builds with Hadoop 2.10.x, there may compatibility issue when accessing Hadoop 3.x clusters.
 :::
 
@@ -58,7 +55,9 @@ You must download the corresponding JDBC driver to the `catalogs/lakehouse-icebe
 
 ### Catalog operations
 
-## Schema
+Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino#catalogs-operations) for more details.
+
+## Schema 
 
 ### Schema capabilities
 
@@ -70,7 +69,9 @@ You could put properties except `comment`.
 
 ### Schema operations
 
-## Table
+Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino#schemas-operations) for more details.
+
+## Table 
 
 ### Table capabilities
 
@@ -88,9 +89,6 @@ Supports transforms:
 
 :::info
 Iceberg doesn't support multi fields in `BucketTransform`.
-:::
-
-:::info
 Iceberg doesn't support `ApplyTransform`, `RangeTransform` and `ListTransform`.
 :::
 
@@ -163,6 +161,8 @@ The Gravitino server doesn't allow passing the following reserved fields.
 
 ### Table operations
 
+Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino#tables-operations) for more details.
+
 #### Alter table operations
 
 Supports operations:
@@ -181,9 +181,6 @@ Supports operations:
 
 :::info
 The default column position is `LAST` when you add a column. If you add a non nullability column, there may be compatibility issues.
-:::
-
-:::info
 Iceberg just supports updating primitive types.
 :::
 
