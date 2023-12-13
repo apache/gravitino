@@ -48,10 +48,10 @@ Iceberg's tables and schemas do not support properties.
 
 ## Basic usage examples
 
-First, you need to create a metalake and catalog in Gravitino.
-For example, create a new metalake named `test` and create a new catalog named `iceberg_test` using the `lakehouse-iceberg` provider.
-And configure the Metalake `test` into the `Graviton connector`.
-For More information about the Iceberg catalog, please refer to [Iceberg catalog](../lakehouse-iceberg-catalog).
+You need to do the following steps before you can use the Iceberg catalog in Trino through Gravitino.
+
+- Create a metalake and catalog in Gravitino. Assuming that the metalake name is `test` and the catalog name is `iceberg_test`,
+- then you can use the following code to create them in Gravitino:
 
 ```bash
 curl -X POST -H "Content-Type: application/json" \
@@ -74,6 +74,10 @@ curl -X POST -H "Content-Type: application/json" \
   }
 }' http://gravitino-host:8090/api/metalakes/test/catalogs
 ```
+
+For More information about the Iceberg catalog, please refer to [Iceberg catalog](../lakehouse-iceberg-catalog).
+
+- Set the value of configuration `gravitino.metalake` to the metalake you have created, named 'test', and start the Trino container.
 
 Listing all Gravitino managed catalogs:
 
