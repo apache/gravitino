@@ -82,7 +82,7 @@ gravitino.metalake=test
 
 Full configurations for Gravitino connector can be seen [here](configuration.md)
 
-If you haven't created the metalake named `test`, you can use the following command to create it. 
+If you haven't created the metalake named `test`, you can use the following command to create it.
 
 ```shell
 curl -X POST -H "Content-Type: application/json" -d '{"name":"test","comment":"comment","properties":{}}' http://gravitino-server-host:8090/api/metalakes
@@ -129,5 +129,4 @@ system
 test.jdbc-mysql
 ```
 
-The catalog named 'test.jdbc-mysql' is the catalog that you created by gravitino server, and  
-you can use it to access the mysql database like other Trino catalogs.
+The catalog named 'test.jdbc-mysql' is the catalog that you created by gravitino server, and you can use it to access the mysql database like other Trino catalogs.

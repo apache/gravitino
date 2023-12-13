@@ -11,8 +11,8 @@ After configuring the Gravitino connector in Trino, Trino can automatically load
 Once integrated with Gravitino, Trino can operate on all Gravitino data without requiring additional configuration.
 
 :::node
-Once metadata such as catalogs, schemas, or tables are changed in Gravitino, Trino can update itself through Gravitino immediately, this process usually takes 
-about 3~10 seconds.
+Once metadata such as catalogs, schemas, or tables are changed in Gravitino, Trino can update itself through Gravitino, this process usually takes 
+about 3~10 seconds. 
 :::
 
 The loading of Gravitino's catalogs into Trino follows the naming convention:
