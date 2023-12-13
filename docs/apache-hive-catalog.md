@@ -36,7 +36,7 @@ The Hive catalog supports to create, update, and delete databases and tables in 
 
 ### Catalog operations
 
-see [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino.md#catalogs-operations).
+Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino.md#catalogs-operations) for more details.
 
 ## Schema
 
@@ -135,6 +135,8 @@ Hive automatically adds and manages some reserved properties. Users aren't allow
 | `transient_lastDdlTime` | Used to store the last DDL time of the table.     | 0.2.0         |
 
 ### Table operations
+
+Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino#tables-operations) for more details.
 
 #### Alter operations
 
