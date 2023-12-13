@@ -44,7 +44,7 @@ You must download the corresponding JDBC driver to the `catalogs/jdbc-mysql/libs
 
 ### Catalog operations
 
-see [Manage metadata using Gravitino](./manage-metadata-using-gravitino#catalogs-operations).
+see [Manage metadata using Gravitino](./manage-metadata-using-gravitino.md#catalogs-operations).
 
 ## Schema
 
@@ -61,7 +61,7 @@ see [Manage metadata using Gravitino](./manage-metadata-using-gravitino#catalogs
 
 ### Schema operations
 
-see [Manage metadata using Gravitino](./manage-metadata-using-gravitino#schemas-operations).
+see [Manage metadata using Gravitino](./manage-metadata-using-gravitino.md#schemas-operations).
 
 ## Table
 

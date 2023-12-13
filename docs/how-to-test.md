@@ -12,7 +12,7 @@ are end-to-end tests that covers the whole system.
 :::note before test
 * If you want to run the complete integration test suites, you need to install Docker in your
   environment.
-* Please refer to [How to build Gravitino](./how-to-build) for more details to make sure you have
+* Please refer to [How to build Gravitino](./how-to-build.md) for more details to make sure you have
   a build environment ready.
 * [OrbStack](https://orbstack.dev/) is highly recommended to replace Docker Desktop for
   macOS. OrbStack automatically configures the network between Docker containers.

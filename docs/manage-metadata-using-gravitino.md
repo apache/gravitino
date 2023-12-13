@@ -15,10 +15,10 @@ like metalakes, catalogs, schemas, and tables. This page includes the following 
 In this document, Gravitino uses Apache Hive catalog as an example to show how to manage metadata by Gravitino. Other catalogs are similar to Hive catalog,
 but they may have some differences, especially in catalog property, table property and column type. For more details, please refer to the related doc.
 
-- [**Apache Hive**](./apache-hive-catalog)
-- [**MySQL**](./jdbc-postgresql-catalog)
-- [**PostgreSQL**](./jdbc-mysql-catalog)
-- [**Apache Iceberg**](./lakehouse-iceberg-catalog)
+- [**Apache Hive**](./apache-hive-catalog.md)
+- [**MySQL**](./jdbc-postgresql-catalog.md)
+- [**PostgreSQL**](./jdbc-mysql-catalog.md)
+- [**Apache Iceberg**](./lakehouse-iceberg-catalog.md)
 
 
 Assuming Gravitino has just started, and the host and port is `http://localhost:8090`.
@@ -244,12 +244,12 @@ Catalog catalog = gravitinoMetaLake.createCatalog(
 
 Currently, Gravitino supports the following catalog providers:
 
-| Catalog provider    | Catalog property                                                            |
-|---------------------|-----------------------------------------------------------------------------|
-| `hive`              | [Hive catalog property](./apache-hive-catalog#catalog-properties)           |
-| `lakehouse-iceberg` | [Iceberg catalog property](./lakehouse-iceberg-catalog#catalog-properties)  |
-| `jdbc-mysql`        | [MySQL catalog property](./jdbc-mysql-catalog#catalog-properties)           |
-| `jdbc-postgresql`   | [PostgreSQL catalog property](./jdbc-postgresql-catalog#catalog-properties) |
+| Catalog provider    | Catalog property                                                               |
+|---------------------|--------------------------------------------------------------------------------|
+| `hive`              | [Hive catalog property](./apache-hive-catalog.md#catalog-properties)           |
+| `lakehouse-iceberg` | [Iceberg catalog property](./lakehouse-iceberg-catalog.md#catalog-properties)  |
+| `jdbc-mysql`        | [MySQL catalog property](./jdbc-mysql-catalog.md#catalog-properties)           |
+| `jdbc-postgresql`   | [PostgreSQL catalog property](./jdbc-postgresql-catalog.md#catalog-properties) |
 
 ### Load a catalog
 
@@ -448,12 +448,12 @@ Schema schema = supportsSchemas.createSchema(
 
 Currently, Gravitino supports the following schema property:
 
-| Catalog provider    | Schema property                                                           |
-|---------------------|---------------------------------------------------------------------------|
-| `hive`              | [Hive schema property](./apache-hive-catalog#schema-properties)           |
-| `lakehouse-iceberg` | [Iceberg scheme property](./lakehouse-iceberg-catalog#schema-properties)  |
-| `jdbc-mysql`        | [MySQL schema property](./jdbc-mysql-catalog#schema-properties)           |
-| `jdbc-postgresql`   | [PostgreSQL schema property](./jdbc-postgresql-catalog#schema-properties) |
+| Catalog provider    | Schema property                                                              |
+|---------------------|------------------------------------------------------------------------------|
+| `hive`              | [Hive schema property](./apache-hive-catalog.md#schema-properties)           |
+| `lakehouse-iceberg` | [Iceberg scheme property](./lakehouse-iceberg-catalog.md#schema-properties)  |
+| `jdbc-mysql`        | [MySQL schema property](./jdbc-mysql-catalog.md#schema-properties)           |
+| `jdbc-postgresql`   | [PostgreSQL schema property](./jdbc-postgresql-catalog.md#schema-properties) |
 
 ### Load a schema
 
@@ -717,12 +717,12 @@ The related java doc is [here](pathname:///docs/0.3.0/api/java/com/datastrato/gr
 
 The following is the table property that Gravitino supports:
 
-| Catalog provider    | Table property                                                          | Type mapping                                                            |
-|---------------------|-------------------------------------------------------------------------|-------------------------------------------------------------------------|
-| `hive`              | [Hive table property](./apache-hive-catalog#table-properties)           | [Hive type mapping](./apache-hive-catalog#table-column-types)           |
-| `lakehouse-iceberg` | [Iceberg table property](./lakehouse-iceberg-catalog#table-properties)  | [Iceberg type mapping](./lakehouse-iceberg-catalog#table-column-types)  |
-| `jdbc-mysql`        | [MySQL table property](./jdbc-mysql-catalog#table-properties)           | [MySQL type mapping](./jdbc-mysql-catalog#table-column-types)           |
-| `jdbc-postgresql`   | [PostgreSQL table property](./jdbc-postgresql-catalog#table-properties) | [PostgreSQL type mapping](./jdbc-postgresql-catalog#table-column-types) |
+| Catalog provider    | Table property                                                             | Type mapping                                                               |
+|---------------------|----------------------------------------------------------------------------|----------------------------------------------------------------------------|
+| `hive`              | [Hive table property](./apache-hive-catalog.md#table-properties)           | [Hive type mapping](./apache-hive-catalog.md#table-column-types)           |
+| `lakehouse-iceberg` | [Iceberg table property](./lakehouse-iceberg-catalog.md#table-properties)  | [Iceberg type mapping](./lakehouse-iceberg-catalog.md#table-column-types)  |
+| `jdbc-mysql`        | [MySQL table property](./jdbc-mysql-catalog.md#table-properties)           | [MySQL type mapping](./jdbc-mysql-catalog.md#table-column-types)           |
+| `jdbc-postgresql`   | [PostgreSQL table property](./jdbc-postgresql-catalog.md#table-properties) | [PostgreSQL type mapping](./jdbc-postgresql-catalog.md#table-column-types) |
 
 
 In addition to the basic settings, Gravitino supports the following features:

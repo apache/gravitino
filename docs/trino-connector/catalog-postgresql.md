@@ -46,7 +46,7 @@ PostgreSQL's tables and schemas cannot support properties.
 First, you need to create a metalake and catalog in Gravitino.
 For example, create a new metalake named `test` and create a new catalog named `postgresql_test` using the `jdbc-postgresql` provider.
 And configure the Metalake `test` into the `Graviton connector`.
-For More information about the PostgreSQL catalog, please refer to [PostgreSQL catalog](../docs/jdbc-postgressql-catalog).
+For More information about the PostgreSQL catalog, please refer to [PostgreSQL catalog](../jdbc-postgresql-catalog.md).
 
 ```bash
 curl -X POST -H "Content-Type: application/json" \

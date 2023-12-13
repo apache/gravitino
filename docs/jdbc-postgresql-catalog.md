@@ -50,7 +50,7 @@ In PostgreSQL, the database corresponds to the Gravitino catalog, and the schema
 
 ### Catalog operations
 
-see [Manage metadata using Gravitino](./manage-metadata-using-gravitino#catalogs-operations).
+see [Manage metadata using Gravitino](./manage-metadata-using-gravitino.md#catalogs-operations).
 
 ## Schema
 
@@ -65,7 +65,7 @@ see [Manage metadata using Gravitino](./manage-metadata-using-gravitino#catalogs
 - Doesn't are schema property settings.
 
 ### Schema operations
-see [Manage metadata using Gravitino](./manage-metadata-using-gravitino#schemas-operations).
+see [Manage metadata using Gravitino](./manage-metadata-using-gravitino.md#schemas-operations).
 
 ## Table
 ### Table capabilities
