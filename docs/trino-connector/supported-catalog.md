@@ -19,10 +19,9 @@ Trino currently does not support creating Gravitino managed catalogs.
 If you need to create a catalog, please refer to:
 - [Create a Catalog](../manage-metadata-using-gravitino#create-a-catalog)
 
-## Data type mapping
+## Data type mapping between Trino and Gravitino
 
-All types of catalogs support the following data type conversions.
-Data Type Conversion between Trino and Gravitino is as following:
+All types of catalogs support the following data type conversions between Trino and Gravitino:
 
 | Gravitino Type | Trino Type |
 |----------------|------------|
