@@ -20,9 +20,6 @@ The Gravitino Iceberg REST Server follows the [Apache Iceberg REST API specifica
 
 :::info
 Builds with Apache Iceberg `1.3.1`. The Apache Iceberg table format version is `1` by default.
-:::
-
-:::info
 Builds with Hadoop 2.10.x, there may compatibility issue when accessing Hadoop 3.x clusters.
 :::
 
