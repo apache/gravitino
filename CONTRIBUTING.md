@@ -97,7 +97,7 @@ When adding new code or fixing a bug be sure to add unit tests to provide covera
 Spotless checks code formatting. If your code isn't correctly formatted, the build fails. To correctly format your code please use Spotless.
 
 ```bash
-./grawdlew spotlessApply
+./gradlew spotlessApply
 ```
 
 All files must have a license header and the build fails if any files are missing license headers. If you are adding third-party code be sure to understand how to add the third-party license to Gravitino LICENSE and NOTICE files.
