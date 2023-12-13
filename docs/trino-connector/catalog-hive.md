@@ -122,7 +122,7 @@ curl -X POST \
 }' http://gravitino-host:8090/api/metalakes/test/catalogs
 ```
 
-For More information about the Hive catalog, please refer to [Hive catalog](../apache-hive-catalog).
+For More information about the Hive catalog, please refer to [Hive catalog](../apache-hive-catalog.md).
 
 - Set the value of configuration `gravitino.metalake` to the metalake you have created, named 'test', and start the Trino container.
 

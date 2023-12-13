@@ -75,7 +75,7 @@ curl -X POST -H "Content-Type: application/json" \
 }' http://gravitino-host:8090/api/metalakes/test/catalogs
 ```
 
-For More information about the Iceberg catalog, please refer to [Iceberg catalog](../lakehouse-iceberg-catalog).
+For More information about the Iceberg catalog, please refer to [Iceberg catalog](../lakehouse-iceberg-catalog.md).
 
 - Set the value of configuration `gravitino.metalake` to the metalake you have created, named 'test', and start the Trino container.
 

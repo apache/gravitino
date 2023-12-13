@@ -19,7 +19,7 @@ Please refer to the [Deploying Trino documentation](https://trino.io/docs/curren
 Alternatively,
 you can build the Gravitino connector package from the sources
 and obtain the `gravitino-trino-connector-<version>.tar.gz` file in the `$PROJECT/distribution` directory.
-Please refer to the [Gravitino Development documentation](../how-to-build)
+Please refer to the [Gravitino Development documentation](../how-to-build.md)
 
 ## Example
 
@@ -66,7 +66,12 @@ Now you can see the Gravitino connector directory in the plugin directory.
 
 ### Configuring the Gravitino connector
 
+<<<<<<< HEAD
 Assuming you have now started the Gravitino server on the host `gravitino-server-host` and already created a metalake named `test`, if those have not been prepared, please refer to the [Gravitino Getting-started](../getting-started).
+=======
+Assuming you have now started the Gravitino server on the host `gravitino-server-host` and can access it properly. 
+And you have created a metalake named `test`. If not, please refer to the [Gravitino Getting-started](../getting-started.md)
+>>>>>>> aab86ed7347b876fcdb369dd88be8cb66b6cd9d3
 
 To configure Gravitino connector correctly, you need to put the following configurations to the Trino configuration file `/etc/trino/catalog/gravitino.properties`.
 

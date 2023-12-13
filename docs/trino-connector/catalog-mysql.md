@@ -70,7 +70,7 @@ curl -X POST -H "Content-Type: application/json" \
 }' http://gravitino-host:8090/api/metalakes/test/catalogs
 ```
 
-For More information about the MySQL catalog, please refer to [MySql catalog](../docs/jdbc-mysql-catalog).
+For More information about the MySQL catalog, please refer to [MySQL catalog](../jdbc-mysql-catalog.md).
 
 - Set the value of configuration `gravitino.metalake` to the metalake you have created, named 'test', and start the Trino container.
 

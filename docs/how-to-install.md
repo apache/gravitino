@@ -16,7 +16,7 @@ configured correctly. To confirm the Java version, you can simply run `${JAVA_HO
 
 Before installing Gravitino, make sure you have Gravitino binary distribution package. You can
 download the latest Gravitino binary distribution Package from [GitHub](https://github.com/datastrato/gravitino/releases),
-or you can build it yourself by following the instructions in [How to Build Gravitino](./how-to-build).
+or you can build it yourself by following the instructions in [How to Build Gravitino](./how-to-build.md).
 
 If you build Gravitino yourself by `./gradlew compileDistribution` command, you can find the
 Gravitino binary distribution package in `distribution/package` directory.
@@ -49,7 +49,7 @@ The Gravitino binary distribution package contains the following files:
 
 The Gravitino server configuration file is `conf/gravitino.conf`. You can configure the Gravitino
 server by modifying this file. Basic configurations are already added to this file, all the
-configurations list in [Gravitino Server Configurations](./gravitino-server-config).
+configurations list in [Gravitino Server Configurations](./gravitino-server-config.md).
 
 #### Configure Gravitino server log
 
@@ -142,4 +142,4 @@ compose file.
 
 For the details, you can review the
 [Gravitino playground repository](https://github.com/datastrato/gravitino-playground) and
-[playground example](./how-to-use-the-playground).
+[playground example](./how-to-use-the-playground.md).
