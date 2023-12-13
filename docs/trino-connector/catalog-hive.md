@@ -99,7 +99,7 @@ CREATE TABLE "metalake.catalog".dbname.tabname
 First, you need to create a metalake and catalog in Gravitino.
 For example, create a new metalake named `test` and create a new catalog named `hive_test` using the `hive` provider.
 And configure the Metalake `test` into the `Graviton connector`.
-For More information about the Hive catalog, please refer to [Hive catalog](../apache-hive-catalog).
+For More information about the Hive catalog, please refer to [Hive catalog](../apache-hive-catalog.md).
 
 ```bash
 curl -X POST -H "Content-Type: application/json" \

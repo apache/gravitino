@@ -20,7 +20,7 @@ Please refer to the [Deploying Trino documentation](https://trino.io/docs/curren
 Alternatively,
 you can build the Gravitino connector package from the sources
 and obtain the `gravitino-trino-connector-<version>.tar.gz` file in the `$PROJECT/distribution` directory.
-Please refer to the [Gravitino Development documentation](../how-to-build)
+Please refer to the [Gravitino Development documentation](../how-to-build.md)
 
 ## Example
 
@@ -68,7 +68,7 @@ Now you can see the Gravitino connector directory in the plugin directory.
 ### Configuring the Gravitino connector
 
 Assuming you have now started the Gravitino server on the host `gravitino-server-host` and can access it properly. 
-And you have created a metalake named `test`. If not, please refer to the [Gravitino Getting-started](../getting-started)
+And you have created a metalake named `test`. If not, please refer to the [Gravitino Getting-started](../getting-started.md)
 
 Add catalog configuration to the Trino configuration file `/etc/trino/catalog/gravitino.properties`.
 
@@ -116,7 +116,7 @@ system
 You can see the `gravitino` catalog in the result. This signifies the successful installation of the Gravitino connector.
 
 Assuming you have created a catalog named `test.jdbc-mysql` in the Gravitino server.
-If you don't have it, please refer to [Create a Catalog](../manage-metadata-using-gravitino#create-a-catalog)
+If you don't have it, please refer to [Create a Catalog](../manage-metadata-using-gravitino.md#create-a-catalog)
 
 Then you can use the Trino CLI to connect to the Trino container and run a query.
 

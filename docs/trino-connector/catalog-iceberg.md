@@ -51,7 +51,7 @@ Iceberg's tables and schemas do not support properties.
 First, you need to create a metalake and catalog in Gravitino.
 For example, create a new metalake named `test` and create a new catalog named `iceberg_test` using the `lakehouse-iceberg` provider.
 And configure the Metalake `test` into the `Graviton connector`.
-For More information about the Iceberg catalog, please refer to [Iceberg catalog](../lakehouse-iceberg-catalog).
+For More information about the Iceberg catalog, please refer to [Iceberg catalog](../lakehouse-iceberg-catalog.md).
 
 ```bash
 curl -X POST -H "Content-Type: application/json" \

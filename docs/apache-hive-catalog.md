@@ -36,7 +36,7 @@ The Hive catalog supports to create, update, and delete databases and tables in 
 
 ### Catalog operations
 
-Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino#catalogs-operations) for more details.
+Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino.md#catalogs-operations) for more details.
 
 ## Schema
 
@@ -55,7 +55,7 @@ The following table lists predefined schema properties for the Hive database. Ad
 
 ### Schema operations
 
-see [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino#schemas-operations).
+see [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino.md#schemas-operations).
 
 ## Table
 
@@ -140,7 +140,7 @@ Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravit
 
 #### Alter operations
 
-Gravitino has already defined a unified set of [metadata operation interfaces](./manage-metadata-using-gravitino#alter-a-table), and almost all [Hive Alter operations](https://cwiki.apache.org/confluence/display/Hive/LanguageManual+DDL#LanguageManualDDL-AlterTable/Partition/Column) have corresponding table update request which enable you to change the struct of an existing table.
+Gravitino has already defined a unified set of [metadata operation interfaces](./manage-metadata-using-gravitino.md#alter-a-table), and almost all [Hive Alter operations](https://cwiki.apache.org/confluence/display/Hive/LanguageManual+DDL#LanguageManualDDL-AlterTable/Partition/Column) have corresponding table update request which enable you to change the struct of an existing table.
 The following table lists the mapping relationship between Hive Alter operations and Gravitino table update request.
 
 ##### Alter table
