@@ -64,11 +64,11 @@ It's highly recommend that you change the default value of `gravitino.entity.sto
 |-------------------------------|--------------------------------------------------------------------------------------------------------------------------------|---------------|---------------|
 | `gravitino.auxService.names ` | The auxiliary service name of the Gravitino Iceberg REST server, use **`iceberg-rest`** for the Gravitino Iceberg REST server. | (none)        | 0.2.0         |
 
-Please refer to [Iceberg REST catalog service](iceberg-rest-service) for Iceberg REST catalog service configurations.
+Please refer to [Iceberg REST catalog service](iceberg-rest-service.md) for Iceberg REST catalog service configurations.
 
 ### Security configuration
 
-Please refer to [security](security) for HTTPS and Authentication configurations.
+Please refer to [security](security.md) for HTTPS and Authentication configurations.
 
 ## Gravitino catalog properties configuration
 
@@ -88,12 +88,12 @@ Explicit specifications take precedence over the formal configurations.
 These rules only apply on the catalog properties, doesn't affect on the schema or table properties.
 :::
 
-| catalog provider    | catalog properties                                                                   | catalog properties configuration file path               |
-|---------------------|--------------------------------------------------------------------------------------|----------------------------------------------------------|
-| `hive`              | [Hive catalog properties](apache-hive-catalog#catalog-properties)                    | `catalogs/hive/conf/hive.conf`                           |
-| `lakehouse-iceberg` | [Lakehouse Iceberg catalog properties](lakehouse-iceberg-catalog#catalog-properties) | `catalogs/lakehouse-iceberg/conf/lakehouse-iceberg.conf` |
-| `jdbc-mysql`        | [MySQL catalog properties](jdbc-mysql-catalog#catalog-properties)                    | `catalogs/jdbc-mysql/conf/jdbc-mysql.conf`               |
-| `jdbc-postgresql`   | [PostgreSQL catalog properties](jdbc-postgresql-catalog#catalog-properties)          | `catalogs/jdbc-postgresql/conf/jdbc-postgresql.conf`     |
+| catalog provider    | catalog properties                                                                      | catalog properties configuration file path               |
+|---------------------|-----------------------------------------------------------------------------------------|----------------------------------------------------------|
+| `hive`              | [Hive catalog properties](apache-hive-catalog.md#catalog-properties)                    | `catalogs/hive/conf/hive.conf`                           |
+| `lakehouse-iceberg` | [Lakehouse Iceberg catalog properties](lakehouse-iceberg-catalog.md#catalog-properties) | `catalogs/lakehouse-iceberg/conf/lakehouse-iceberg.conf` |
+| `jdbc-mysql`        | [MySQL catalog properties](jdbc-mysql-catalog.md#catalog-properties)                    | `catalogs/jdbc-mysql/conf/jdbc-mysql.conf`               |
+| `jdbc-postgresql`   | [PostgreSQL catalog properties](jdbc-postgresql-catalog.md#catalog-properties)          | `catalogs/jdbc-postgresql/conf/jdbc-postgresql.conf`     |
 
 :::info
 Gravitino server automatically add catalog properties configuration dir to classpath.

@@ -62,10 +62,10 @@ To begin using Gravitino on AWS, follow these steps:
 5. Install Gravitino on the instance:
 
    You can install Gravitino from the binary release package or Docker image, please follow the
-   [how-to-install](./how-to-install) to install Gravitino.
+   [how-to-install](./how-to-install.md) to install Gravitino.
 
    Or, you can install Gravitino from scratch, please follow the documentation of
-   [how-to-build](./how-to-build) and [how-to-install](./how-to-install) to install Gravitino.
+   [how-to-build](./how-to-build.md) and [how-to-install](./how-to-install.md) to install Gravitino.
 
 6. Start Gravitino using the gravitino.sh script:
 
@@ -109,10 +109,10 @@ To begin using Gravitino on GCP, follow these steps:
 5. Install Gravitino on the instance:
 
    You can install Gravitino from the binary release package or Docker image, please follow the
-   [how-to-install](./how-to-install) to install Gravitino.
+   [how-to-install](./how-to-install.md) to install Gravitino.
 
    Or, you can install Gravitino from scratch, please follow the documentation of
-   [how-to-build](./how-to-build) and [how-to-install](./how-to-install) to install Gravitino.
+   [how-to-build](./how-to-build.md) and [how-to-install](./how-to-install.md) to install Gravitino.
 
 6. Start Gravitino using the gravitino.sh script:
 
@@ -136,10 +136,10 @@ To use Gravitino locally on macOS or Linux, follow similar steps:
 2. Install Gravitino:
 
    You can install Gravitino from the binary release package or Docker image, please follow the
-   [how-to-install](./how-to-install) to install Gravitino.
+   [how-to-install](./how-to-install.md) to install Gravitino.
 
    Or, you can install Gravitino from scratch, please follow the documentation of
-   [how-to-build](./how-to-build) and [how-to-install](./how-to-install) to install Gravitino.
+   [how-to-build](./how-to-build.md) and [how-to-install](./how-to-install.md) to install Gravitino.
 
 3. Start Gravitino using the gravitino.sh script:
 
@@ -191,7 +191,7 @@ newgrp docker
 
 You can install and run all the programs as Docker containers by using the
 [gravitino-playground](https://github.com/datastrato/gravitino-playground). For the details of
-how to run the playground, please see [how-to-use-the-playground](./how-to-use-the-playground)
+how to run the playground, please see [how-to-use-the-playground](./how-to-use-the-playground.md)
 
 ## Installing Gravitino playground locally
 
