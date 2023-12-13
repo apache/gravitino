@@ -45,7 +45,7 @@ MySQL's tables and schemas cannot support properties.
 You need to do the following steps before you can use the MySQL catalog in Trino through Gravitino.
 
 - Create a metalake and catalog in Gravitino. Assuming that the metalake name is `test` and the catalog name is `mysql_test`,
-- then you can use the following code to create them in Gravitino:
+then you can use the following code to create them in Gravitino:
 
 ```bash
 curl -X POST -H "Content-Type: application/json" \
@@ -73,6 +73,8 @@ curl -X POST -H "Content-Type: application/json" \
 For More information about the MySQL catalog, please refer to [MySQL catalog](../jdbc-mysql-catalog.md).
 
 - Set the value of configuration `gravitino.metalake` to the metalake you have created, named 'test', and start the Trino container.
+
+Use the Trino CLI to connect to the Trino container and run a query.
 
 Listing all Gravitino managed catalogs:
 

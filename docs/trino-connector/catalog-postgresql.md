@@ -75,6 +75,7 @@ For more information about the PostgreSQL catalog, please refer to [PostgreSQL c
 
 - Set the value of configuration `gravitino.metalake` to the metalake you have created, named 'test', and start the Trino container.
 
+Use the Trino CLI to connect to the Trino container and run a query.
 
 Listing all Gravitino managed catalogs:
 
