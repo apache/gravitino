@@ -44,7 +44,7 @@ public final class KvGarbageCollector implements Closeable {
       new ScheduledThreadPoolExecutor(
           2,
           r -> {
-            Thread t = new Thread(r, "KvEntityStore-Garbage-Collector-%d");
+            Thread t = new Thread(r, "KvEntityStore-Garbage-Collector");
             t.setDaemon(true);
             return t;
           },
@@ -188,6 +188,7 @@ public final class KvGarbageCollector implements Closeable {
 
       // All keys in this transaction have been deleted, we can remove the commit mark.
       if (keysDeletedCount == keysInTheTransaction.size()) {
+        LOG.info("Physically delete commit mark: {}", Bytes.wrap(kv.getKey()));
         kvBackend.delete(kv.getKey());
       }
     }

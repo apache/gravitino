@@ -7,6 +7,7 @@ package com.datastrato.gravitino;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Maps;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -106,6 +107,27 @@ public class StringIdentifier {
         .putAll(properties)
         .put(ID_KEY, stringId.toString())
         .build();
+  }
+
+  /**
+   * Remove StringIdentifier from properties.
+   *
+   * @param properties the properties to remove the string identifier from.
+   * @return the properties with the string identifier removed.
+   */
+  public static Map<String, String> removeFromProperties(Map<String, String> properties) {
+    if (properties == null) {
+      return null;
+    }
+
+    if (!properties.containsKey(ID_KEY)) {
+      return properties;
+    }
+
+    Map<String, String> copy = Maps.newHashMap(properties);
+    copy.remove(ID_KEY);
+
+    return ImmutableMap.copyOf(copy);
   }
 
   public static StringIdentifier fromProperties(Map<String, String> properties) {

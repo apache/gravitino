@@ -52,9 +52,9 @@ public class MetalakeManager implements SupportsMetalakes {
   @Override
   public BaseMetalake[] listMetalakes() {
     try {
-      return store
-          .list(Namespace.empty(), BaseMetalake.class, EntityType.METALAKE)
-          .toArray(new BaseMetalake[0]);
+      return store.list(Namespace.empty(), BaseMetalake.class, EntityType.METALAKE).stream()
+          .map(this::removeIdFromProperties)
+          .toArray(BaseMetalake[]::new);
     } catch (IOException ioe) {
       LOG.error("Listing Metalakes failed due to storage issues.", ioe);
       throw new RuntimeException(ioe);
@@ -72,7 +72,8 @@ public class MetalakeManager implements SupportsMetalakes {
   @Override
   public BaseMetalake loadMetalake(NameIdentifier ident) throws NoSuchMetalakeException {
     try {
-      return store.get(ident, EntityType.METALAKE, BaseMetalake.class);
+      BaseMetalake baseMetalake = store.get(ident, EntityType.METALAKE, BaseMetalake.class);
+      return removeIdFromProperties(baseMetalake);
     } catch (NoSuchEntityException e) {
       LOG.warn("Metalake {} does not exist", ident, e);
       throw new NoSuchMetalakeException("Metalake " + ident + " does not exist");
@@ -115,7 +116,7 @@ public class MetalakeManager implements SupportsMetalakes {
 
     try {
       store.put(metalake, false /* overwritten */);
-      return metalake;
+      return removeIdFromProperties(metalake);
     } catch (EntityAlreadyExistsException e) {
       LOG.warn("Metalake {} already exists", ident, e);
       throw new MetalakeAlreadyExistsException("Metalake " + ident + " already exists");
@@ -139,37 +140,40 @@ public class MetalakeManager implements SupportsMetalakes {
   public BaseMetalake alterMetalake(NameIdentifier ident, MetalakeChange... changes)
       throws NoSuchMetalakeException, IllegalArgumentException {
     try {
-      return store.update(
-          ident,
-          BaseMetalake.class,
-          EntityType.METALAKE,
-          metalake -> {
-            BaseMetalake.Builder builder =
-                new BaseMetalake.Builder()
-                    .withId(metalake.id())
-                    .withName(metalake.name())
-                    .withComment(metalake.comment())
-                    .withProperties(metalake.properties())
-                    .withVersion(metalake.getVersion());
+      BaseMetalake baseMetalake =
+          store.update(
+              ident,
+              BaseMetalake.class,
+              EntityType.METALAKE,
+              metalake -> {
+                BaseMetalake.Builder builder =
+                    new BaseMetalake.Builder()
+                        .withId(metalake.id())
+                        .withName(metalake.name())
+                        .withComment(metalake.comment())
+                        .withProperties(metalake.properties())
+                        .withVersion(metalake.getVersion());
 
-            AuditInfo newInfo =
-                new AuditInfo.Builder()
-                    .withCreator(metalake.auditInfo().creator())
-                    .withCreateTime(metalake.auditInfo().createTime())
-                    .withLastModifier(
-                        metalake.auditInfo().creator()) /*TODO: Use real user later on.  */
-                    .withLastModifiedTime(Instant.now())
-                    .build();
-            builder.withAuditInfo(newInfo);
+                AuditInfo newInfo =
+                    new AuditInfo.Builder()
+                        .withCreator(metalake.auditInfo().creator())
+                        .withCreateTime(metalake.auditInfo().createTime())
+                        .withLastModifier(
+                            metalake.auditInfo().creator()) /*TODO: Use real user later on.  */
+                        .withLastModifiedTime(Instant.now())
+                        .build();
+                builder.withAuditInfo(newInfo);
 
-            Map<String, String> newProps =
-                metalake.properties() == null
-                    ? Maps.newHashMap()
-                    : Maps.newHashMap(metalake.properties());
-            builder = updateEntity(builder, newProps, changes);
+                Map<String, String> newProps =
+                    metalake.properties() == null
+                        ? Maps.newHashMap()
+                        : Maps.newHashMap(metalake.properties());
+                builder = updateEntity(builder, newProps, changes);
 
-            return builder.build();
-          });
+                return builder.build();
+              });
+
+      return removeIdFromProperties(baseMetalake);
 
     } catch (NoSuchEntityException ne) {
       LOG.warn("Metalake {} does not exist", ident, ne);
@@ -237,5 +241,16 @@ public class MetalakeManager implements SupportsMetalakes {
     }
 
     return builder.withProperties(newProps);
+  }
+
+  private BaseMetalake removeIdFromProperties(BaseMetalake metalake) {
+    return new BaseMetalake.Builder()
+        .withId(metalake.id())
+        .withName(metalake.name())
+        .withComment(metalake.comment())
+        .withProperties(StringIdentifier.removeFromProperties(metalake.properties()))
+        .withVersion(metalake.version)
+        .withAuditInfo((AuditInfo) metalake.auditInfo())
+        .build();
   }
 }
