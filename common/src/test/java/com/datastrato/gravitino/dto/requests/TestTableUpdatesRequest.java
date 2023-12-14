@@ -151,6 +151,13 @@ public class TestTableUpdatesRequest {
             + "}";
     Assertions.assertEquals(
         JsonUtils.objectMapper().readTree(expected), JsonUtils.objectMapper().readTree(jsonString));
+    Assertions.assertTrue(
+        JsonUtils.objectMapper()
+                .readValue(
+                    jsonString.replace("first", "FIRST"),
+                    TableUpdateRequest.AddTableColumnRequest.class)
+                .getPosition()
+            instanceof TableChange.First);
 
     // test default position
     addTableColumnRequest =
@@ -170,5 +177,12 @@ public class TestTableUpdatesRequest {
             + "}";
     Assertions.assertEquals(
         JsonUtils.objectMapper().readTree(expected), JsonUtils.objectMapper().readTree(jsonString));
+    Assertions.assertTrue(
+        JsonUtils.objectMapper()
+                .readValue(
+                    jsonString.replace("default", "DEFAULT"),
+                    TableUpdateRequest.AddTableColumnRequest.class)
+                .getPosition()
+            instanceof TableChange.Default);
   }
 }

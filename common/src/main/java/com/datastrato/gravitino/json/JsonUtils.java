@@ -704,9 +704,13 @@ public class JsonUtils {
           node != null && !node.isNull(),
           "Cannot parse column position from invalid JSON: %s",
           node);
-      if (node.isTextual() && node.asText().equals(POSITION_FIRST)) {
+      if (node.isTextual()
+          && (node.asText().equals(POSITION_FIRST)
+              || node.asText().equals(POSITION_FIRST.toUpperCase()))) {
         return TableChange.ColumnPosition.first();
-      } else if (node.isTextual() && node.asText().equals(POSITION_DEFAULT)) {
+      } else if (node.isTextual()
+          && (node.asText().equalsIgnoreCase(POSITION_DEFAULT)
+              || node.asText().equalsIgnoreCase(POSITION_DEFAULT.toUpperCase()))) {
         return TableChange.ColumnPosition.defaultPos();
       } else if (node.isObject()) {
         String afterColumn = getString(POSITION_AFTER, node);
