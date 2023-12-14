@@ -15,7 +15,7 @@ The catalogs currently supported by the Gravitino connector are as follows:
 
 ## Create catalog
 
-Trino currently does not support creating Gravitino managed catalogs, if you need to create a catalog, please refer to: [Create a Catalog](../manage-metadata-using-gravitino.md#create-a-catalog)
+Trino currently does not support creating Gravitino managed catalogs, if you need to create a catalog, please refer to: [Create a Catalog](../manage-metadata-using-gravitino.md#create-a-catalog).
 
 ## Data type mapping between Trino and Gravitino
 
@@ -42,4 +42,4 @@ Hive does not support `TIME` data type.
 | MapType        | MAP        |
 | StructType     | ROW        |
 
-For more about Trino data types, please refer to [Trino data types](https://trino.io/docs/current/language/types.html) and Gravity data types, please refer to [Gravity data types](../manage-metadata-using-gravitino.md#gravitino-table-column-type)
+For more about Trino data types, please refer to [Trino data types](https://trino.io/docs/current/language/types.html) and Gravity data types, please refer to [Gravitino data types](../manage-metadata-using-gravitino.md#gravitino-table-column-type).
