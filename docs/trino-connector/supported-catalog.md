@@ -19,7 +19,7 @@ Trino currently does not support creating Gravitino managed catalogs, if you nee
 
 ## Data type mapping between Trino and Gravitino
 
-Gravitino connector supports the following data type conversions between Trino and Gravitino currently. Depending on the detailed catalog, some data types conversion may not be supported for this specific catalog, for example
+Gravitino connector supports the following data type conversions between Trino and Gravitino currently. Depending on the detailed catalog, some data types conversion may not be supported for this specific catalog, for example,
 Hive does not support `TIME` data type.
 
 | Gravitino Type | Trino Type |
