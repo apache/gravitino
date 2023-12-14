@@ -36,6 +36,8 @@ public class CatalogInjector {
 
   // It is used to inject catalogs to trino
   private InjectCatalogHandle injectHandle;
+  // It's used to remove catalogs from trino
+  private RemoveCatalogHandle removeHandle;
 
   // It is used to create internal catalogs.
   private CreateCatalogHandle createHandle;
@@ -171,6 +173,7 @@ public class CatalogInjector {
       createInjectHandler(
           catalogManager, catalogFactory, createCatalogMethod, catalogPropertiesClass);
 
+      removeInjectHandle(catalogManager);
       LOG.info("Bind Trino catalog manager successfully.");
     } catch (Exception e) {
       String message =
@@ -178,6 +181,30 @@ public class CatalogInjector {
               "Bind Trino catalog manager failed, unsupported trino-%s version", trinoVersion);
       LOG.error(message, e);
       throw new TrinoException(GRAVITINO_UNSUPPORTED_TRINO_VERSION, message, e);
+    }
+  }
+
+  private void removeInjectHandle(Object catalogManager)
+      throws NoSuchFieldException, IllegalAccessException {
+    if (isClassObject(catalogManager, "CoordinatorDynamicCatalogManager")) {
+      ConcurrentHashMap activeCatalogs =
+          (ConcurrentHashMap) getFiledObject(catalogManager, "activeCatalogs");
+      Preconditions.checkNotNull(activeCatalogs, "activeCatalogs should not be null");
+
+      ConcurrentHashMap allCatalogs =
+          (ConcurrentHashMap) getFiledObject(catalogManager, "allCatalogs");
+      Preconditions.checkNotNull(allCatalogs, "allCatalogs should not be null");
+
+      removeHandle =
+          (catalogName) -> {
+            activeCatalogs.remove(catalogName);
+            allCatalogs.remove(catalogName);
+          };
+    } else {
+      // The catalogManager is an instance of StaticCatalogManager
+      ConcurrentHashMap catalogs = (ConcurrentHashMap) getFiledObject(catalogManager, "catalogs");
+      Preconditions.checkNotNull(catalogs, "catalogs should not be null");
+      removeHandle = (catalogName) -> catalogs.remove(catalogName);
     }
   }
 
@@ -237,6 +264,16 @@ public class CatalogInjector {
     }
   }
 
+  void removeCatalogConnector(String catalogName) {
+    try {
+      removeHandle.invoke(catalogName);
+      LOG.info("Remove trino catalog {} successfully.", catalogName);
+    } catch (Exception e) {
+      LOG.error("Remove trino catalog {} failed.", catalogName, e);
+      throw new TrinoException(GRAVITINO_CREATE_INNER_CONNECTOR_FAILED, e);
+    }
+  }
+
   void injectCatalogConnector(String catalogName) {
     try {
       String catalogProperties = createCatalogProperties(catalogName);
@@ -287,5 +324,9 @@ public class CatalogInjector {
 
   interface CreateCatalogHandle {
     Object invoke(String name, String properties) throws Exception;
+  }
+
+  interface RemoveCatalogHandle {
+    void invoke(String catalogName) throws Exception;
   }
 }

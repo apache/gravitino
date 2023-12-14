@@ -135,6 +135,17 @@ public class CatalogConnectorManager {
         metalake.name(),
         Arrays.toString(catalogNames));
 
+    // Delete those catalogs that have been deleted in Gravitino server
+    catalogConnectors.keySet().stream()
+        .filter((String catalogName) -> !Arrays.asList(catalogNames).contains(catalogName))
+        .forEach(
+            (String catalogName) -> {
+              catalogConnectors.remove(catalogName);
+              catalogInjector.removeCatalogConnector(catalogName);
+              LOG.info(
+                  "Remove catalog '{}' in metalake {} successfully.", catalogName, metalake.name());
+            });
+
     Arrays.stream(catalogNames)
         .forEach(
             (NameIdentifier nameIdentifier) -> {
