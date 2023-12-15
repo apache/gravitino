@@ -5,10 +5,14 @@
 
 package com.datastrato.gravitino.integration.test.catalog.lakehouse.iceberg;
 
+import com.datastrato.gravitino.aux.AuxiliaryServiceManager;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend;
+import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergConfig;
+import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergRESTService;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -23,14 +27,12 @@ import org.apache.spark.sql.catalyst.analysis.TableAlreadyExistsException;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
 import org.junit.jupiter.api.condition.EnabledIf;
 
 @TestInstance(Lifecycle.PER_CLASS)
-@Tag("gravitino-docker-it")
 public class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
 
   private static final String ICEBERG_REST_NS_PREFIX = "iceberg_rest_";
@@ -46,6 +48,28 @@ public class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
   @AfterAll
   void cleanup() {
     purgeAllIcebergTestNamespaces();
+  }
+
+  @Override
+  void initEnv() {}
+
+  @Override
+  Map<String, String> getCatalogConfig() {
+    Map<String, String> configMap = new HashMap<>();
+    configMap.put(
+        AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
+            + IcebergRESTService.SERVICE_NAME
+            + "."
+            + IcebergConfig.CATALOG_BACKEND.getKey(),
+        IcebergCatalogBackend.MEMORY.toString().toLowerCase());
+
+    configMap.put(
+        AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
+            + IcebergRESTService.SERVICE_NAME
+            + "."
+            + IcebergConfig.CATALOG_WAREHOUSE.getKey(),
+        "/tmp/");
+    return configMap;
   }
 
   private void purgeTable(String namespace, String table) {
