@@ -222,6 +222,12 @@ public class TestGravitinoConnector extends AbstractTestQueryFramework {
     dropTestTable(fullTableName1);
   }
 
+  @Test
+  public void testCreateCatalog() throws Exception {
+    assertUpdate("call gravitino.system.createMetalake('m1', false);");
+    assertUpdate("call gravitino.system.createMetalake('m1', false);");
+  }
+
   private TableName createTestTable(String fullTableName) throws Exception {
     TableName tableName = new TableName(fullTableName);
 

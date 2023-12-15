@@ -44,6 +44,10 @@ public class GravitinoConfig {
     return config.getOrDefault(GRAVITINO_METALAKE.key, GRAVITINO_METALAKE.defaultValue);
   }
 
+  boolean isDummy() {
+    return config.getOrDefault("gravitino.internal", "false").equals("true");
+  }
+
   static class ConfigEntry {
     final String key;
     final String description;
