@@ -7,7 +7,7 @@ This software is licensed under the Apache License version 2."
 
 Gravitino has two types of tests: unit tests and integration tests. Unit tests are mainly
 focused on the functionalities of the specific class, module, or component. Integration tests
-are end-to-end tests that covers the whole system.
+are end-to-end tests that cover the whole system.
 
 :::note before test
 * If you want to run the complete integration test suites, you need to install Docker in your
@@ -31,15 +31,15 @@ To run the unit test, you can simply run the following command:
 ./gradlew test -PskipITs
 ```
 
-This command runs all the unit tests and skip the integration tests.
+This command runs all the unit tests and skips the integration tests.
 
 ## Run the integration tests
 
-Gravitino has two modes to run the integration tests, the `embedded` and `deploy` modes.
+Gravitino has two modes to run the integration tests, the `embedded`(default) and `deploy` modes.
 
 * With the `embedded` mode, the integration test starts an embedded `MiniGravitino` server
   within the same process of the integration test to run the integration tests.
-* With the `deploy` mode, the user has to deploy a Gravitino binary package beforehand, the
+* With the `deploy` mode, the user has to build(`./gradlew compileDistribution`) a Gravitino binary package beforehand, the
   integration test launches and connects to the local Gravitino server to run the integration
   tests.
 
@@ -153,7 +153,7 @@ server code, follow these steps:
 
 If a test fails, you can retrieve valuable information from the logs and test report. Test reports are in the `./build/reports` directory. The integration test logs are in the `./integrate-test/build` directory. In deploy mode, Gravitino server logs are in the `./distribution/package/logs/` directory. In the event of a test failure within the GitHub workflow, the system generates archived logs and test reports. To obtain the archive, follow these steps:
 
-1. Click the `detail` link associated with the failed integrate test in the pull request. This redirects you to the job page.
+1. Click the `detail` link associated with the failed integrated test in the pull request. This redirects you to the job page.
 
    ![pr page Image](assets/test-fail-pr.png)
 
