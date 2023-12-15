@@ -18,8 +18,8 @@ metadata access for data and AI assets.
 You can get Gravitino from the [GitHub release page](https://github.com/datastrato/gravitino/releases),
 or you can build Gravitino from source code, please see [How to build Gravitino](./how-to-build.md).
 
-Gravitino runs on both Linux and macOS, and requires at least Java 8. Gravitino trino-connector runs with
-Trino, and requires at least Java 17. This should include JVMs on x86_64 and
+Gravitino runs on both Linux and macOS, and requires Java 8. Gravitino trino-connector runs with
+Trino, and requires Java 17. This should include JVMs on x86_64 and
 ARM64. It's easy to run locally on one machine --- all you need is to have `java` installed on
 your system `PATH`, or the `JAVA_HOME` environment variable pointing to a Java installation.
 
