@@ -446,6 +446,31 @@ public class TrinoConnectorIT extends AbstractIT {
             "location = 'hdfs://localhost:9000/user/hive/warehouse/hive_schema_1223445.db'"));
   }
 
+  private static boolean checkTrinoHasRemoved(String sql, long maxWaitTimeSec) {
+    long current = System.currentTimeMillis();
+    while (System.currentTimeMillis() - current <= maxWaitTimeSec * 1000) {
+      try {
+        ArrayList<ArrayList<String>> lists =
+            containerSuite.getTrinoContainer().executeQuerySQL(sql);
+        if (lists.isEmpty()) {
+          return true;
+        }
+
+        LOG.info("Catalog has not synchronized yet, wait 200ms and retry. The SQL is '{}'", sql);
+      } catch (Exception e) {
+        LOG.warn("Failed to execute sql: {}", sql, e);
+      }
+
+      try {
+        Thread.sleep(200);
+      } catch (InterruptedException e) {
+        LOG.warn("Failed to sleep 200ms", e);
+      }
+    }
+
+    return false;
+  }
+
   private static boolean checkTrinoHasLoaded(String sql, long maxWaitTimeSec)
       throws InterruptedException {
     long current = System.currentTimeMillis();
@@ -987,11 +1012,12 @@ public class TrinoConnectorIT extends AbstractIT {
 
       String sql = String.format("show catalogs like '%s.%s'", metalakeName, catalogName);
       boolean success = checkTrinoHasLoaded(sql, 30);
-      if (!success) {
-        Assertions.fail("Trino fail to load catalogs created by gravitino: " + sql);
-      }
+      Assertions.assertTrue(success, "Trino should load the catalog: " + sql);
 
       createdMetalake.dropCatalog(NameIdentifier.of(metalakeName, catalogName));
+      // We need to test we can't load this catalog any more by Trino.
+      success = checkTrinoHasRemoved(sql, 30);
+      Assertions.assertFalse(success, "Trino should not load the catalog any more: " + sql);
     }
   }
 
