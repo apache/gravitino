@@ -140,8 +140,8 @@ public class CatalogConnectorManager {
         .filter((String catalogName) -> !Arrays.asList(catalogNames).contains(catalogName))
         .forEach(
             (String catalogName) -> {
-              catalogConnectors.remove(catalogName);
               catalogInjector.removeCatalogConnector(catalogName);
+              catalogConnectors.remove(catalogName);
               LOG.info(
                   "Remove catalog '{}' in metalake {} successfully.", catalogName, metalake.name());
             });
