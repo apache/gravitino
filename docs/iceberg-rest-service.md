@@ -61,7 +61,7 @@ The Gravitino Iceberg REST catalog service using memory catalog for default. You
 | `gravitino.auxService.iceberg-rest.uri`             | The Hive metadata address, such as `thrift://127.0.0.1:9083`.                                               | (none)        | Yes        | 0.2.0         |
 | `gravitino.auxService.iceberg-rest.warehouse `      | The warehouse directory of the Hive catalog, such as `/user/hive/warehouse-hive/`.                          | (none)        | Yes        | 0.2.0         |
 
-#### JDBC catalog configuration
+#### Iceberg JDBC backend configuration
 
 | Configuration item                                  | Description                                                                                                                        | Default value | Required | Since Version |
 |-----------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
