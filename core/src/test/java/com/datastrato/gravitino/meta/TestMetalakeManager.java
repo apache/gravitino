@@ -173,8 +173,6 @@ public class TestMetalakeManager {
           Assertions.assertEquals(v, testProps.get(k));
         });
 
-    Assertions.assertTrue(testProps.containsKey(StringIdentifier.ID_KEY));
-    StringIdentifier StringId = StringIdentifier.fromString(testProps.get(StringIdentifier.ID_KEY));
-    Assertions.assertEquals(StringId.toString(), testProps.get(StringIdentifier.ID_KEY));
+    Assertions.assertFalse(testProps.containsKey(StringIdentifier.ID_KEY));
   }
 }

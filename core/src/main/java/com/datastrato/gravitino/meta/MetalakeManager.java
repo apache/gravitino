@@ -52,9 +52,8 @@ public class MetalakeManager implements SupportsMetalakes {
   @Override
   public BaseMetalake[] listMetalakes() {
     try {
-      return store
-          .list(Namespace.empty(), BaseMetalake.class, EntityType.METALAKE)
-          .toArray(new BaseMetalake[0]);
+      return store.list(Namespace.empty(), BaseMetalake.class, EntityType.METALAKE).stream()
+          .toArray(BaseMetalake[]::new);
     } catch (IOException ioe) {
       LOG.error("Listing Metalakes failed due to storage issues.", ioe);
       throw new RuntimeException(ioe);

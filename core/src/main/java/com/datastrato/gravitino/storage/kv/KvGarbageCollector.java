@@ -44,7 +44,7 @@ public final class KvGarbageCollector implements Closeable {
       new ScheduledThreadPoolExecutor(
           2,
           r -> {
-            Thread t = new Thread(r, "KvEntityStore-Garbage-Collector-%d");
+            Thread t = new Thread(r, "KvEntityStore-Garbage-Collector");
             t.setDaemon(true);
             return t;
           },

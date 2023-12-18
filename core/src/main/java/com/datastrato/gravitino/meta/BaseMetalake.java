@@ -10,6 +10,7 @@ import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.Field;
 import com.datastrato.gravitino.HasIdentifier;
 import com.datastrato.gravitino.Metalake;
+import com.datastrato.gravitino.StringIdentifier;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -126,7 +127,7 @@ public class BaseMetalake implements Metalake, Entity, Auditable, HasIdentifier 
    */
   @Override
   public Map<String, String> properties() {
-    return properties;
+    return StringIdentifier.removeIdFromProperties(properties);
   }
 
   /** Builder class for creating instances of {@link BaseMetalake}. */
