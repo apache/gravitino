@@ -259,7 +259,7 @@ openssl x509 -inform der -in $JAVA_HOME/localhost.crt -out certificate.pem
 curl -v -X GET --cacert ./certificate.pem -H "Accept: application/vnd.gravitino.v1+json" -H "Content-Type: application/json" https://localhost:8433/api/version
 ```
 
-## Custom filter
+## Custom filters
 
 Gravitino supports custom filters to implement the user specified logic to satisfy different safety needs.
 
