@@ -26,6 +26,9 @@ public class GravitinoConfig {
   public GravitinoConfig(Map<String, String> requiredConfig) {
     config = requiredConfig;
 
+    if (!isDummy()) {
+      return;
+    }
     for (Map.Entry<String, ConfigEntry> entry : CONFIG_DEFINITIONS.entrySet()) {
       ConfigEntry configDefinition = entry.getValue();
       if (configDefinition.isRequired && !config.containsKey(configDefinition.key)) {
@@ -45,7 +48,7 @@ public class GravitinoConfig {
   }
 
   boolean isDummy() {
-    return config.getOrDefault("gravitino.internal", "false").equals("true");
+    return config.getOrDefault("gravitino.internal", "false").equals("false");
   }
 
   static class ConfigEntry {
