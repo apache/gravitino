@@ -53,7 +53,6 @@ public class MetalakeManager implements SupportsMetalakes {
   public BaseMetalake[] listMetalakes() {
     try {
       return store.list(Namespace.empty(), BaseMetalake.class, EntityType.METALAKE).stream()
-          .map(this::removeIdFromProperties)
           .toArray(BaseMetalake[]::new);
     } catch (IOException ioe) {
       LOG.error("Listing Metalakes failed due to storage issues.", ioe);
@@ -72,8 +71,7 @@ public class MetalakeManager implements SupportsMetalakes {
   @Override
   public BaseMetalake loadMetalake(NameIdentifier ident) throws NoSuchMetalakeException {
     try {
-      BaseMetalake baseMetalake = store.get(ident, EntityType.METALAKE, BaseMetalake.class);
-      return removeIdFromProperties(baseMetalake);
+      return store.get(ident, EntityType.METALAKE, BaseMetalake.class);
     } catch (NoSuchEntityException e) {
       LOG.warn("Metalake {} does not exist", ident, e);
       throw new NoSuchMetalakeException("Metalake " + ident + " does not exist");
@@ -116,7 +114,8 @@ public class MetalakeManager implements SupportsMetalakes {
 
     try {
       store.put(metalake, false /* overwritten */);
-      return removeIdFromProperties(metalake);
+      return metalake;
+      //      return removeIdFromProperties(metalake);
     } catch (EntityAlreadyExistsException e) {
       LOG.warn("Metalake {} already exists", ident, e);
       throw new MetalakeAlreadyExistsException("Metalake " + ident + " already exists");
@@ -173,7 +172,7 @@ public class MetalakeManager implements SupportsMetalakes {
                 return builder.build();
               });
 
-      return removeIdFromProperties(baseMetalake);
+      return baseMetalake;
 
     } catch (NoSuchEntityException ne) {
       LOG.warn("Metalake {} does not exist", ident, ne);
@@ -241,16 +240,5 @@ public class MetalakeManager implements SupportsMetalakes {
     }
 
     return builder.withProperties(newProps);
-  }
-
-  private BaseMetalake removeIdFromProperties(BaseMetalake metalake) {
-    return new BaseMetalake.Builder()
-        .withId(metalake.id())
-        .withName(metalake.name())
-        .withComment(metalake.comment())
-        .withProperties(StringIdentifier.removeFromProperties(metalake.properties()))
-        .withVersion(metalake.version)
-        .withAuditInfo((AuditInfo) metalake.auditInfo())
-        .build();
   }
 }

@@ -127,7 +127,7 @@ public class StringIdentifier {
     Map<String, String> copy = Maps.newHashMap(properties);
     copy.remove(ID_KEY);
 
-    return ImmutableMap.copyOf(copy);
+    return ImmutableMap.<String, String>builder().putAll(copy).build();
   }
 
   public static StringIdentifier fromProperties(Map<String, String> properties) {
