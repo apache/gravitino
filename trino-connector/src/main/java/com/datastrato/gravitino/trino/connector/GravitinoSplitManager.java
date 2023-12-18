@@ -30,11 +30,12 @@ public class GravitinoSplitManager implements ConnectorSplitManager {
     GravitinoTransactionHandle gravitinoTransactionHandle =
         (GravitinoTransactionHandle) transaction;
 
+    // TODO(yuhui) add dynamic filter
     return internalSplitManager.getSplits(
         gravitinoTransactionHandle.getInternalTransactionHandle(),
         session,
         gravitinoTableHandle.getInternalTableHandle(),
-        dynamicFilter,
+        DynamicFilter.EMPTY,
         constraint);
   }
 }
