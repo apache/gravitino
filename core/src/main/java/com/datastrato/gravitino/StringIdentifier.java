@@ -115,7 +115,7 @@ public class StringIdentifier {
    * @param properties the properties to remove the string identifier from.
    * @return the properties with the string identifier removed.
    */
-  public static Map<String, String> removeFromProperties(Map<String, String> properties) {
+  public static Map<String, String> removeIdFromProperties(Map<String, String> properties) {
     if (properties == null) {
       return null;
     }

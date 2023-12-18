@@ -127,7 +127,7 @@ public class BaseMetalake implements Metalake, Entity, Auditable, HasIdentifier 
    */
   @Override
   public Map<String, String> properties() {
-    return StringIdentifier.removeFromProperties(properties);
+    return StringIdentifier.removeIdFromProperties(properties);
   }
 
   /** Builder class for creating instances of {@link BaseMetalake}. */
