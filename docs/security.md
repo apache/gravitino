@@ -173,7 +173,7 @@ Both Gravitino server and Iceberg REST service can configure HTTPS.
 | `gravitino.auxService.iceberg-rest.httpsPort`              | The HTTPS port number of the Jetty web server.                     | `8433`        | Yes if use HTTPS                                  | 0.3.0         |
 | `gravitino.auxService.iceberg-rest.keyStorePath`           | Path to the key store file.                                        | (none)        | Yes if use HTTPS                                  | 0.3.0         |
 | `gravitino.auxService.iceberg-rest.keyStorePassword`       | Password to the key store.                                         | (none)        | Yes if use HTTPS                                  | 0.3.0         |
-| `gravitino.uxService.iceberg-rest.keyStoreType`            | The type to the key store.                                         | `JKS`         | Yes if use HTTPS                                  | 0.3.0         |
+| `gravitino.auxService.iceberg-rest.keyStoreType`           | The type to the key store.                                         | `JKS`         | Yes if use HTTPS                                  | 0.3.0         |
 | `gravitino.auxService.iceberg-rest.managerPassword`        | Manager password to the key store.                                 | (none)        | Yes if use HTTPS                                  | 0.3.0         |
 | `gravitino.auxService.iceberg-rest.tlsProtocol`            | TLS protocol to use. The JVM must support the TLS protocol to use. | (none)        | Yes if use HTTPS                                  | 0.3.0         |
 | `gravitino.auxService.iceberg-rest.enableCipherAlgorithms` | The collection of enabled cipher algorithms.                       | ``            | No                                                | 0.3.0         |
@@ -257,4 +257,52 @@ If you want to use the command `curl`, you can follow the commands:
 ```shell
 openssl x509 -inform der -in $JAVA_HOME/localhost.crt -out certificate.pem
 curl -v -X GET --cacert ./certificate.pem -H "Accept: application/vnd.gravitino.v1+json" -H "Content-Type: application/json" https://localhost:8433/api/version
+```
+
+## Custom filter
+
+Gravitino supports custom filters to implement the user specified logic to satisfy different safety needs.
+
+### Gravitino server's configuration
+| Configuration item                          | Description                                                      | Default value | Required  | Since version |
+|---------------------------------------------|------------------------------------------------------------------|---------------|-----------|---------------|
+| `gravitino.server.webserver.customFilters`  | Comma separated list of filter class names to apply to the APIs. | ``            | Yes       | 0.4.0         |
+The filter should be a standard javax servlet Filter.
+Filter parameters can also be specified in the configuration, by setting config entries of the form `gravitino.server.webserver.<class name of filter>.param.<param name>=<value>`
+
+For example:
+```text
+gravitino.server.webserver.customFilters=com.test.filter1
+gravitino.server.webserver.com.test.filter1.param.name1=foo
+gravitino.server.webserver.com.test.filter1.param.name2=ba
+```
+
+### Iceberg REST service's configuration
+| Configuration item                                  | Description                                                        | Default value | Required  | Since version |
+|-----------------------------------------------------|--------------------------------------------------------------------|---------------|-----------|---------------|
+| `gravitino.auxService.iceberg-rest.customFilters`   | Comma separated list of filter class names to apply to the APIs.   | ``            | Yes       | 0.4.0         |
+The filter should be a standard javax servlet Filter.
+Filter parameters can also be specified in the configuration, by setting config entries of the form `gravitino.auxService.iceberg-rest.<class name of filter>.param.<param name>=<value>`
+
+For example:
+```text
+gravitino.auxService.iceberg-rest.customFilters=com.test.filter1
+gravitino.auxService.iceberg-rest.com.test.filter1.param.name1=foo
+gravitino.auxService.iceberg-rest.com.test.filter1.param.name2=ba
+```
+
+### Example
+
+If you want to use a cross-origin filter for the Gravitino server, you can follow the steps.
+
+```shell
+wget https://repo1.maven.org/maven2/org/eclipse/jetty/jetty-servlets/9.4.51.v20230217/jetty-servlets-9.4.51.v20230217.jar 
+cp jetty-servlets-9.4.51.v20230217.jar <gravitno home>/lib
+```
+
+You can refer to the [Configurations](gravitino-server-config.md) and append the configurations to the conf/gravitino.conf.
+
+```text
+gravitino.server.webserver.customFilter=org.eclipse.jetty.servlets.CrossOriginFilter
+gravitino.server.webserver.org.eclipse.jetty.servlets.CrossOriginFilter.param.allowedOrigins=*
 ```

@@ -171,6 +171,13 @@ public final class JettyServerConfig {
           .stringConf()
           .createWithDefault("JKS");
 
+  public static final ConfigEntry<String> CUSTOM_FILTERS =
+      new ConfigBuilder("customFilters")
+          .doc("Comma separated list of filter class names to apply to the APIs")
+          .version("0.4.0")
+          .stringConf()
+          .createWithDefault("");
+
   private final String host;
 
   private final int httpPort;
@@ -199,7 +206,9 @@ public final class JettyServerConfig {
   private final Set<String> enableCipherAlgorithms;
   private final boolean enableClientAuth;
   private final String trustStorePath;
-  private final String trustStorePasword;
+  private final String trustStorePassword;
+
+  private final Set<String> customFilters;
   private final String trustStoreType;
   private final Config internalConfig;
 
@@ -245,8 +254,11 @@ public final class JettyServerConfig {
             Sets.newHashSet(internalConfig.get(ENABLE_CIPHER_ALGORITHMS).split(SPLITTER)));
     this.enableClientAuth = internalConfig.get(ENABLE_CLIENT_AUTH);
     this.trustStorePath = internalConfig.get(SSL_TRUST_STORE_PATH);
-    this.trustStorePasword = internalConfig.get(SSL_TRUST_STORE_PASSWORD);
+    this.trustStorePassword = internalConfig.get(SSL_TRUST_STORE_PASSWORD);
     this.trustStoreType = internalConfig.get(SSL_TRUST_STORE_TYPE);
+    this.customFilters =
+        Collections.unmodifiableSet(
+            Sets.newHashSet(internalConfig.get(CUSTOM_FILTERS).split(SPLITTER)));
   }
 
   public static JettyServerConfig fromConfig(Config config, String prefix) {
@@ -330,12 +342,16 @@ public final class JettyServerConfig {
     return trustStorePath;
   }
 
-  public String getTrustStorePasword() {
-    return trustStorePasword;
+  public String getTrustStorePassword() {
+    return trustStorePassword;
   }
 
   public String getTrustStoreType() {
     return trustStoreType;
+  }
+
+  public Map<String, String> getAllWithPrefix(String prefix) {
+    return internalConfig.getConfigsWithPrefix(prefix);
   }
 
   private SSLContext getDefaultSSLContext() {
@@ -364,6 +380,10 @@ public final class JettyServerConfig {
     Set<String> supportedAlgorithms = Sets.newHashSet(enableCipherAlgorithms);
     supportedAlgorithms.retainAll(getSupportedCipherSuites());
     return supportedAlgorithms;
+  }
+
+  public Set<String> getCustomFilters() {
+    return customFilters;
   }
 
   @VisibleForTesting
