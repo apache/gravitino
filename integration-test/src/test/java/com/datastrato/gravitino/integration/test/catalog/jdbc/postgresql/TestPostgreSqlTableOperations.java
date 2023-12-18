@@ -350,6 +350,14 @@ public class TestPostgreSqlTableOperations extends TestPostgreSqlAbstractIT {
     List<String> tableNames = TABLE_OPERATIONS.listTables(TEST_DB_NAME);
     Assertions.assertFalse(tableNames.contains(table_1));
 
+    Assertions.assertThrows(
+        NoSuchTableException.class, () -> TABLE_OPERATIONS.load(TEST_DB_NAME, table_1));
+
+    Assertions.assertThrows(
+        NoSuchTableException.class, () -> TABLE_OPERATIONS.load("other_schema", table_1));
+    Assertions.assertThrows(
+        NoSuchTableException.class, () -> postgreSqlTableOperations.load("other_schema", table_1));
+
     String table_2 = "table_multiple_2";
     TABLE_OPERATIONS.create(
         TEST_DB_NAME,
@@ -369,10 +377,11 @@ public class TestPostgreSqlTableOperations extends TestPostgreSqlAbstractIT {
     Assertions.assertFalse(tableNames.contains(table_2));
 
     Assertions.assertThrows(
-        NoSuchTableException.class,
-        () -> {
-          postgreSqlTableOperations.load(TEST_DB_NAME, table_2);
-        });
+        NoSuchTableException.class, () -> postgreSqlTableOperations.load(TEST_DB_NAME, table_2));
+    Assertions.assertThrows(
+        NoSuchTableException.class, () -> postgreSqlTableOperations.load("other_schema", table_2));
+    Assertions.assertThrows(
+        NoSuchTableException.class, () -> TABLE_OPERATIONS.load("other_schema", table_2));
     postgreSqlTableOperations.purge(TEST_DB_NAME, table_1);
 
     Assertions.assertThrows(
