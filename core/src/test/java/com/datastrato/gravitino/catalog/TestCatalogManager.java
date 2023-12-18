@@ -34,13 +34,9 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.MethodOrderer;
-import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestMethodOrder;
 import org.mockito.Mockito;
 
-@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class TestCatalogManager {
 
   private static CatalogManager catalogManager;
@@ -136,7 +132,6 @@ public class TestCatalogManager {
   }
 
   @Test
-  @Order(1)
   void testLoadTable() throws IOException {
     NameIdentifier ident = NameIdentifier.of("metalake", "test444");
     // key1 is required;
@@ -161,7 +156,6 @@ public class TestCatalogManager {
   }
 
   @Test
-  @Order(2)
   void testPropertyValidationInAlter() throws IOException {
     // key1 is required and immutable and do not have default value, is not hidden and not reserved
     // key2 is required and mutable and do not have default value, is not hidden and not reserved
@@ -228,7 +222,6 @@ public class TestCatalogManager {
   }
 
   @Test
-  @Order(3)
   void testPropertyValidationInCreate() throws IOException {
     // key1 is required and immutable and do not have default value, is not hidden and not reserved
     // key2 is required and mutable and do not have default value, is not hidden and not reserved

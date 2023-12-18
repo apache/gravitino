@@ -79,16 +79,12 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.MethodOrderer;
-import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestMethodOrder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @Tag("gravitino-docker-it")
-@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class CatalogHiveIT extends AbstractIT {
   private static final Logger LOG = LoggerFactory.getLogger(CatalogHiveIT.class);
   public static final String metalakeName =
@@ -960,9 +956,9 @@ public class CatalogHiveIT extends AbstractIT {
   }
 
   @Test
-  // Make sure it will be executed at last.
-  @Order(Integer.MAX_VALUE)
   void testAlterEntityName() {
+    String metalakeName = GravitinoITUtils.genRandomName("CatalogHiveIT_metalake");
+    client.createMetalake(NameIdentifier.of(metalakeName), "", ImmutableMap.of());
     final GravitinoMetaLake metalake = client.loadMetalake(NameIdentifier.of(metalakeName));
     String newMetalakeName = GravitinoITUtils.genRandomName("CatalogHiveIT_metalake_new");
 
@@ -983,6 +979,14 @@ public class CatalogHiveIT extends AbstractIT {
           NoSuchMetalakeException.class,
           () -> client.loadMetalake(NameIdentifier.of(newMetalakeName)));
     }
+
+    String catalogName = GravitinoITUtils.genRandomName("CatalogHiveIT_catalog");
+    metalake.createCatalog(
+        NameIdentifier.of(metalakeName, catalogName),
+        Catalog.Type.RELATIONAL,
+        provider,
+        "comment",
+        ImmutableMap.of(METASTORE_URIS, HIVE_METASTORE_URIS));
 
     Catalog catalog = metalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
     // Test rename catalog
@@ -1007,7 +1011,16 @@ public class CatalogHiveIT extends AbstractIT {
     }
 
     // Schema does not have the rename operation.
+    final String schemaName = GravitinoITUtils.genRandomName("CatalogHiveIT_schema");
+    catalog
+        .asSchemas()
+        .createSchema(
+            NameIdentifier.of(metalakeName, catalogName, schemaName), "", ImmutableMap.of());
 
+    final Catalog cata = catalog;
+    // Now try to rename table
+    final String tableName = GravitinoITUtils.genRandomName("CatalogHiveIT_table");
+    final String newTableName = GravitinoITUtils.genRandomName("CatalogHiveIT_table_new");
     ColumnDTO[] columns = createColumns();
     catalog
         .asTableCatalog()
@@ -1018,9 +1031,6 @@ public class CatalogHiveIT extends AbstractIT {
             createProperties(),
             new Transform[0]);
 
-    final Catalog cata = catalog;
-    // Now try to rename table
-    final String newTableName = GravitinoITUtils.genRandomName("CatalogHiveIT_table_new");
     for (int i = 0; i < 2; i++) {
       // The table to be renamed does not exist
       Assertions.assertThrows(

@@ -44,14 +44,11 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestMethodOrder;
 import org.testcontainers.containers.PostgreSQLContainer;
 
 @Tag("gravitino-docker-it")
-@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class CatalogPostgreSqlIT extends AbstractIT {
   public static String metalakeName = GravitinoITUtils.genRandomName("postgresql_it_metalake");
   public static String catalogName = GravitinoITUtils.genRandomName("postgresql_it_catalog");
