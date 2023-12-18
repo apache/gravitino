@@ -15,8 +15,8 @@ metadata access for data and AI assets.
 
 ## Downloading
 
-You can get Graviton from the [GitHub release page](https://github.com/datastrato/gravitino/releases),
-or you can build Gravitino from source, please see [How to build Gravitino](./how-to-build.md).
+You can get Gravitino from the [GitHub release page](https://github.com/datastrato/gravitino/releases),
+or you can build Gravitino from source code, please see [How to build Gravitino](./how-to-build.md).
 
 Gravitino runs on both Linux and macOS, and requires Java 8. Gravitino trino-connector runs with
 Trino, and requires Java 17. This should include JVMs on x86_64 and
@@ -46,7 +46,7 @@ To get started with Gravitino, please see [Getting started](./getting-started.md
 
 ## Gravitino playground
 
-To experience Gravitino with other components simply, Gravitino provides a playground to run. It
+To experience Gravitino with other components easily, Gravitino provides a playground to run. It
 integrates Apache Hadoop, Apache Hive, Trino, MySQL, PostgreSQL, and Gravitino together as a
 complete environment. To experience the whole features, please also see
 [Getting started](./getting-started.md) and [How to use the Gravitino playground](./how-to-use-the-playground.md)
@@ -98,7 +98,7 @@ Gravitino supports different catalogs to manage the metadata in different source
 Gravitino provides a Trino connector to connect to Gravitino to manage the metadata in a unified
 way. to use the Trino connector, please see:
 
-* [How to use Gravitino Trino connector](./trino-connector/index): a complete guide to use Gravitino
+* [How to use Gravitino Trino connector](./trino-connector/index.md): a complete guide to use Gravitino
   Trino connector.
 
 ### Development guides
