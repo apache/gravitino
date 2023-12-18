@@ -137,7 +137,10 @@ public class CatalogConnectorManager {
 
     // Delete those catalogs that have been deleted in Gravitino server
     catalogConnectors.keySet().stream()
-        .filter((String catalogName) -> !Arrays.asList(catalogNames).contains(catalogName))
+        .filter(
+            (String catalogName) ->
+                !Arrays.asList(catalogNames).contains(catalogName)
+                    && !catalogName.equals("test.memory"))
         .forEach(
             (String catalogName) -> {
               catalogInjector.removeCatalogConnector(catalogName);
