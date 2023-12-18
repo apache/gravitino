@@ -8,21 +8,19 @@ This software is licensed under the Apache License version 2."
 
 The catalogs currently supported by the Gravitino connector are as follows:
 
-- [Hive](catalog-hive)
-- [Iceberg](catalog-iceberg)
-- [MySQL](catalog-mysql)
-- [PostgreSQL](catalog-postgresql)
+- [Hive](catalog-hive.md)
+- [Iceberg](catalog-iceberg.md)
+- [MySQL](catalog-mysql.md)
+- [PostgreSQL](catalog-postgresql.md)
 
 ## Create catalog
 
-Trino currently does not support creating Gravitino managed catalogs. 
-If you need to create a catalog, please refer to:
-- [Create a Catalog](../manage-metadata-using-gravitino#create-a-catalog)
+Trino currently does not support creating Gravitino managed catalogs, if you need to create a catalog, please refer to: [Create a Catalog](../manage-metadata-using-gravitino.md#create-a-catalog).
 
-## Data type mapping
+## Data type mapping between Trino and Gravitino
 
-All types of catalogs support the following data type conversions.
-Data Type Conversion between Trino and Gravitino is as following:
+Gravitino connector supports the following data type conversions between Trino and Gravitino currently. Depending on the detailed catalog, Gravitino may not support some data types conversion for this specific catalog, for example,
+Hive does not support `TIME` data type.
 
 | Gravitino Type | Trino Type |
 |----------------|------------|
@@ -37,8 +35,11 @@ Data Type Conversion between Trino and Gravitino is as following:
 | StringType     | VARCHAR    |
 | VarcharType    | VARCHAR    |
 | BinaryType     | VARBINARY  |
-| TimestampType  | TIMESTAMP  |
 | DateType       | DATE       |
+| TimeType       | TIME       |
+| TimestampType  | TIMESTAMP  |
 | ArrayType      | ARRAY      |
 | MapType        | MAP        |
 | StructType     | ROW        |
+
+For more about Trino data types, please refer to [Trino data types](https://trino.io/docs/current/language/types.html) and Gravitino data types, please refer to [Gravitino data types](../manage-metadata-using-gravitino.md#gravitino-table-column-type).

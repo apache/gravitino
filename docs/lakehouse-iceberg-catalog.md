@@ -1,5 +1,5 @@
 ---
-title: "Lakehouse Apache Iceberg catalog"
+title: "Lakehouse Iceberg catalog"
 slug: /lakehouse-iceberg-catalog
 keywords:
   - lakehouse
@@ -17,13 +17,10 @@ Gravitino provides the ability to manage Apache Iceberg metadata.
 
 :::info
 Builds with Apache Iceberg `1.3.1`. The Apache Iceberg table format version is `1` by default.
+Builds with Hadoop 2.10.x, there may compatibility issue when accessing Hadoop 3.x clusters.
 :::
 
-:::info
-Builds with hadoop 2.10.x, there may compatibility issue when accessing hadoop 3.x clusters.
-:::
-
-## Catalog 
+## Catalog
 
 ### Catalog capabilities
 
@@ -50,13 +47,15 @@ If you are using JDBC catalog, you must provide `jdbc-user`, `jdbc-password` and
 | `jdbc-user`       | JDBC user name                                                                                          | (none)        | Yes      | 0.2.0         |
 | `jdbc-password`   | JDBC password                                                                                           | (none)        | Yes      | 0.2.0         |
 | `jdbc-driver`     | `com.mysql.jdbc.Driver` or `com.mysql.cj.jdbc.Driver` for MySQL, `org.postgresql.Driver` for PostgreSQL | (none)        | Yes      | 0.3.0         |
-| `jdbc-initialize` | Whether to initialize meta tables when create Jdbc catalog                                              | `true`        | No       | 0.2.0         |
+| `jdbc-initialize` | Whether to initialize meta tables when create JDBC catalog                                              | `true`        | No       | 0.2.0         |
 
 :::caution
 You must download the corresponding JDBC driver to the `catalogs/lakehouse-iceberg/libs` directory.
 :::
 
 ### Catalog operations
+
+Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino.md#catalogs-operations) for more details.
 
 ## Schema 
 
@@ -70,6 +69,8 @@ You could put properties except `comment`.
 
 ### Schema operations
 
+Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino.md#schemas-operations) for more details.
+
 ## Table 
 
 ### Table capabilities
@@ -77,6 +78,7 @@ You could put properties except `comment`.
 #### Table partitions
 
 Supports transforms:
+
   - `IdentityTransform`
   - `BucketTransform`
   - `TruncateTransform`
@@ -87,15 +89,13 @@ Supports transforms:
 
 :::info
 Iceberg doesn't support multi fields in `BucketTransform`.
-:::
-   
-:::info
 Iceberg doesn't support `ApplyTransform`, `RangeTransform` and `ListTransform`.
 :::
 
 ### Table sort orders
 
 supports expressions:
+
 - `FieldReference`
 - `FunctionExpression`
   - `bucket`
@@ -113,7 +113,11 @@ For `bucket` and `truncate`, the first argument must be integer literal, the sec
 
 - Doesn't support `Distribution`, you should use `BucketPartition` instead.
 
-### Table column types 
+:::info
+If you load Iceberg tables, the table distribution strategy is `hash` with num 0, which means no distribution.
+:::
+
+### Table column types
 
 | Gravitino Type              | Apache Iceberg Type         |
 |-----------------------------|-----------------------------|
@@ -139,12 +143,11 @@ For `bucket` and `truncate`, the first argument must be integer literal, the sec
 Apache Iceberg doesn't support Gravitino `Varchar` `Fixedchar` `Byte` `Short` `Union` type.
 :::
 
-
 ### Table properties
 
 You can pass [Iceberg table properties](https://iceberg.apache.org/docs/1.3.1/configuration/) to Gravitino when creating Iceberg table.
 
-Gravitino server reserves the following fields which can't be passed.
+The Gravitino server doesn't allow passing the following reserved fields.
 
 | Configuration item        | Description                                             |
 |---------------------------|---------------------------------------------------------|
@@ -158,9 +161,12 @@ Gravitino server reserves the following fields which can't be passed.
 
 ### Table operations
 
+Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino.md#tables-operations) for more details.
+
 #### Alter table operations
 
 Supports operations:
+
 - `RenameTable`
 - `SetProperty`
 - `RemoveProperty`
@@ -174,15 +180,12 @@ Supports operations:
 - `UpdateColumnComment`
 
 :::info
-The default column position is `LAST` when you add a column. If you add a non nullability column, there may be compatibility issue.
-:::
-
-:::info
-Iceberg just supports update primitive types.
+The default column position is `LAST` when you add a column. If you add a non nullability column, there may be compatibility issues.
+Iceberg just supports updating primitive types.
 :::
 
 :::caution
-If you update a nullability column to non nullability, there may be compatibility issue.
+If you update a nullability column to non nullability, there may be compatibility issues.
 :::
 
 ## HDFS configuration
@@ -190,5 +193,5 @@ If you update a nullability column to non nullability, there may be compatibilit
 You can place `core-site.xml` and `hdfs-site.xml` in the `catalogs/lakehouse-iceberg/conf` directory to automatically load as the default HDFS configuration.
 
 :::caution
-When writing to HDFS, the Gravitino Iceberg REST server can only operate as the specified HDFS user and doesn't support proxying to other HDFS users. See [How to access Apache Hadoop](gravitino-server-config) for more details.
+When writing to HDFS, the Gravitino Iceberg REST server can only operate as the specified HDFS user and doesn't support proxying to other HDFS users. See [How to access Apache Hadoop](gravitino-server-config.md) for more details.
 :::

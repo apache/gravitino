@@ -32,8 +32,8 @@ Gravitino only supports external OAuth 2.0 servers.
 
 First, users need to guarantee that the external correctly configured OAuth 2.0 server supports Bearer JWT.
 
-Then, on the server side, users should set `gravitino.authenticator` as `oauth` and give 
-`gravitino.authenticator.oauth.defaultSignKey`, `gravitino.authenticator.oauth.serverUri` and 
+Then, on the server side, users should set `gravitino.authenticator` as `oauth` and give
+`gravitino.authenticator.oauth.defaultSignKey`, `gravitino.authenticator.oauth.serverUri` and
 `gravitino.authenticator.oauth.tokenPath`  a proper value.
 
 Next, for the client side, users can enable `OAuth` mode by the following code:
@@ -110,7 +110,7 @@ You can follow the steps to set up an OAuth mode Gravitino server.
 
 5. Copy the public key and remove the character `\n` and you can get the default signing key of Gravitino server.
 
-6. You can refer to the [Configurations](gravitino-server-config) and append the configurations to the conf/gravitino.conf.
+6. You can refer to the [Configurations](gravitino-server-config.md) and append the configurations to the conf/gravitino.conf.
 
 ```text
 gravitino.authenticator oauth
@@ -137,7 +137,6 @@ Use the access token to request the Gravitino
 ```shell
 curl -v -X GET -H "Accept: application/vnd.gravitino.v1+json" -H "Content-Type: application/json" -H "Authorization: Bearer <access_token>" http://localhost:8090/api/version
 ```
-
 
 ## HTTPS
 
@@ -193,7 +192,7 @@ You can follow the steps to set up a HTTPS server.
 
 1. Prerequisite
 
-   You need to install the JDK8, wget and set the environment JAVA_HOME.
+   You need to install the JDK8, wget, and set the environment JAVA_HOME.
 
    If you want to use the command `curl` to request the Gravitino server, you should install openSSL.
 
@@ -221,8 +220,8 @@ bin/keytool -export -alias localhost -keystore localhost.jks -file  localhost.cr
 bin/keytool -import -alias localhost -keystore jre/lib/security/cacerts -file localhost.crt -storepass changeit -noprompt
 ```
 
-5. You can refer to the [Configurations](gravitino-server-config) and append the configurations to the conf/gravitino.conf.
-Configuration doesn't support to resolve environment variable, so you should replace ${JAVA_HOME} with the actual value.
+5. You can refer to the [Configurations](gravitino-server-config.md) and append the configurations to the conf/gravitino.conf.
+Configuration doesn't support to resolve environment variable, so you should replace `${JAVA_HOME}` with the actual value.
 Then, You can start the Gravitino server.
 
 ```text

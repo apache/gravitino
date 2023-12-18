@@ -6,16 +6,19 @@ keyword: Gravitino metadata manage
 license: Copyright 2023 Datastrato Pvt Ltd. This software is licensed under the Apache License version 2.
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 This page introduces how to manage metadata by Gravitino. Through Gravitino, you can create, edit, and delete metadata
-like metalakes, catalogs, schemas, and tables. The following contents are included in this page:
+like metalakes, catalogs, schemas, and tables. This page includes the following contents:
 
 In this document, Gravitino uses Apache Hive catalog as an example to show how to manage metadata by Gravitino. Other catalogs are similar to Hive catalog,
 but they may have some differences, especially in catalog property, table property and column type. For more details, please refer to the related doc.
 
-- [**Apache Hive**](./apache-hive-catalog)
-- [**MySQL**](./jdbc-postgresql-catalog)
-- [**PostgreSQL**](./jdbc-mysql-catalog)
-- [**Apache Iceberg**](./lakehouse-iceberg-catalog)
+- [**Apache Hive**](./apache-hive-catalog.md)
+- [**MySQL**](./jdbc-postgresql-catalog.md)
+- [**PostgreSQL**](./jdbc-mysql-catalog.md)
+- [**Apache Iceberg**](./lakehouse-iceberg-catalog.md)
 
 
 Assuming Gravitino has just started, and the host and port is `http://localhost:8090`.
@@ -27,11 +30,17 @@ Assuming Gravitino has just started, and the host and port is `http://localhost:
 You can create a metalake by sending a `POST` request to the `/api/metalakes` endpoint or just use the Gravitino Java client.
 The following is an example of creating a metalake:
 
+<Tabs>
+<TabItem value="bash" label="Bash">
+
 ```bash
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{"name":"metalake","comment":"comment","properties":{}}' \
 http://localhost:8090/api/metalakes
 ```
+
+</TabItem>
+<TabItem value="java" label="Java">
 
 ```java
 GravitinoClient gravitinoClient = GravitinoClient
@@ -44,14 +53,23 @@ GravitinoMetaLake newMetalake = gravitinoClient.createMetalake(
   // ...
 ```
 
+</TabItem>
+</Tabs>
+
 ### Load a metalake
 
 You can create a metalake by sending a `GET` request to the `/api/metalakes/{metalake_name}` endpoint or just use the Gravitino Java client. The following is an example of loading a metalake:
+
+<Tabs>
+<TabItem value="bash" label="Bash">
 
 ```bash
 curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json"  http://localhost:8090/api/metalakes/metalake
 ```
+
+</TabItem>
+<TabItem value="java" label="Java">
 
 ```java
 // ...
@@ -60,9 +78,15 @@ GravitinoMetaLake loaded = gravitinoClient.loadMetalake(
 // ...
 ```
 
+</TabItem>
+</Tabs>
+
 ### Alter a metalake
 
 You can modify a metalake by sending a `PUT` request to the `/api/metalakes/{metalake_name}` endpoint or just use the Gravitino Java client. The following is an example of altering a metalake:
+
+<Tabs>
+<TabItem value="bash" label="Bash">
 
 ```bash
 curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
@@ -81,6 +105,9 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 }' http://localhost:8090/api/metalakes/new_metalake
 ```
 
+</TabItem>
+<TabItem value="java" label="Java">
+
 ```java
 // ...
 GravitinoMetaLake renamed = gravitinoClient.alterMetalake(
@@ -90,9 +117,13 @@ GravitinoMetaLake renamed = gravitinoClient.alterMetalake(
 // ...
 ```
 
+</TabItem>
+</Tabs>
+
+
 Currently, Gravitino supports the following changes to a metalake:
 
-| Supported modification | Json                                                         | Java                                            |
+| Supported modification | JSON                                                         | Java                                            |
 |------------------------|--------------------------------------------------------------|-------------------------------------------------|
 | Rename metalake        | `{"@type":"rename","newName":"metalake_renamed"}`            | `MetalakeChange.rename("metalake_renamed")`     |
 | Update comment         | `{"@type":"updateComment","newComment":"new_comment"}`       | `MetalakeChange.updateComment("new_comment")`   |
@@ -104,10 +135,16 @@ Currently, Gravitino supports the following changes to a metalake:
 
 You can remove a metalake by sending a `DELETE` request to the `/api/metalakes/{metalake_name}` endpoint or just use the Gravitino Java client. The following is an example of dropping a metalake:
 
+<Tabs>
+<TabItem value="bash" label="Bash">
+
 ```bash
 curl -X DELETE -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" http://localhost:8090/api/metalakes/metalake
-````
+```
+
+</TabItem>
+<TabItem value="java" label="Java">
 
 ```java
 // ...
@@ -117,6 +154,9 @@ boolean success = gravitinoClient.dropMetalake(
 // ...
 ```
 
+</TabItem>
+</Tabs>
+
 :::note
 Drop a metalake only removes metadata about the metalake and catalogs, schemas, tables under the metalake in Gravitino, It doesn't remove the real schema and table data in Apache Hive.
 :::
@@ -125,16 +165,25 @@ Drop a metalake only removes metadata about the metalake and catalogs, schemas, 
 
 You can list metalakes by sending a `GET` request to the `/api/metalakes` endpoint or just use the Gravitino Java client. The following is an example of listing all metalake name:
 
+<Tabs>
+<TabItem value="bash" label="Bash">
+
 ```bash
 curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json"  http://localhost:8090/api/metalakes
 ```
+
+</TabItem>
+<TabItem value="java" label="Java">
 
 ```java
 // ...
 GravitinoMetaLake[] allMetalakes = gravitinoClient.listMetalakes();
 // ...
 ```
+
+</TabItem>
+</Tabs>
 
 ## Catalogs operations
 
@@ -143,10 +192,13 @@ GravitinoMetaLake[] allMetalakes = gravitinoClient.listMetalakes();
 :::tip
 Users should create a metalake before creating a catalog.
 
-The code below is an example of creating a Hive catalog. For other catalogs, the code is similar, but the catalog type, provider and properties may be different. For more details, please refer to the related doc.
+The code below is an example of creating a Hive catalog. For other catalogs, the code is similar, but the catalog type, provider, and properties may be different. For more details, please refer to the related doc.
 :::
 
 You can create a catalog by sending a `POST` request to the `/api/metalakes/{metalake_name}/catalogs` endpoint or just use the Gravitino Java client. The following is an example of creating a catalog:
+
+<Tabs>
+<TabItem value="bash" label="Bash">
 
 ```bash
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
@@ -160,6 +212,9 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   }
 }' http://localhost:8090/api/metalakes/metalake/catalogs
 ```
+
+</TabItem>
+<TabItem value="java" label="Java">
 
 ```java
 GravitinoClient gravitinoClient = GravitinoClient
@@ -184,23 +239,32 @@ Catalog catalog = gravitinoMetaLake.createCatalog(
 // ...
 ```
 
+</TabItem>
+</Tabs>
+
 Currently, Gravitino supports the following catalog providers:
 
-| Catalog provider    | Catalog property                                                            | 
-|---------------------|-----------------------------------------------------------------------------|
-| `hive`              | [Hive catalog property](./apache-hive-catalog#catalog-properties)           | 
-| `lakehouse-iceberg` | [Iceberg catalog property](./lakehouse-iceberg-catalog#catalog-properties)  |                                    
-| `jdbc-mysql`        | [MySQL catalog property](./jdbc-mysql-catalog#catalog-properties)           |                            
-| `jdbc-postgresql`   | [PostgreSQL catalog property](./jdbc-postgresql-catalog#catalog-properties) |          
+| Catalog provider    | Catalog property                                                               |
+|---------------------|--------------------------------------------------------------------------------|
+| `hive`              | [Hive catalog property](./apache-hive-catalog.md#catalog-properties)           |
+| `lakehouse-iceberg` | [Iceberg catalog property](./lakehouse-iceberg-catalog.md#catalog-properties)  |
+| `jdbc-mysql`        | [MySQL catalog property](./jdbc-mysql-catalog.md#catalog-properties)           |
+| `jdbc-postgresql`   | [PostgreSQL catalog property](./jdbc-postgresql-catalog.md#catalog-properties) |
 
 ### Load a catalog
 
 You can load a catalog by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}` endpoint or just use the Gravitino Java client. The following is an example of loading a catalog:
 
+<Tabs>
+<TabItem value="bash" label="Bash">
+
 ```bash
 curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" http://localhost:8090/api/metalakes/metalake/catalogs/catalog
 ```
+
+</TabItem>
+<TabItem value="java" label="Java">
 
 ```java
 // ...
@@ -212,9 +276,15 @@ Catalog catalog = gravitinoMetaLake.loadCatalog(NameIdentifier.of("metalake", "c
 // ...
 ```
 
+</TabItem>
+</Tabs>
+
 ### Alter a catalog
 
 You can modify a catalog by sending a `PUT` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}` endpoint or just use the Gravitino Java client. The following is an example of altering a catalog:
+
+<Tabs>
+<TabItem value="bash" label="Bash">
 
 ```bash
 curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
@@ -233,6 +303,9 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 }' http://localhost:8090/api/metalakes/metalake/catalogs/catalog
 ```
 
+</TabItem>
+<TabItem value="java" label="Java">
+
 ```java
 // ...
 // Assuming you have just created a metalake named `metalake`
@@ -244,9 +317,12 @@ Catalog catalog = gravitinoMetaLake.alterCatalog(NameIdentifier.of("metalake", "
 // ...
 ```
 
+</TabItem>
+</Tabs>
+
 Currently, Gravitino supports the following changes to a catalog:
 
-| Supported modification | Json                                                         | Java                                           |
+| Supported modification | JSON                                                         | Java                                           |
 |------------------------|--------------------------------------------------------------|------------------------------------------------|
 | Rename metalake        | `{"@type":"rename","newName":"metalake_renamed"}`            | `CatalogChange.rename("catalog_renamed")`      |
 | Update comment         | `{"@type":"updateComment","newComment":"new_comment"}`       | `CatalogChange.updateComment("new_comment")`   |
@@ -257,11 +333,17 @@ Currently, Gravitino supports the following changes to a catalog:
 
 You can remove a catalog by sending a `DELETE` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}` endpoint or just use the Gravitino Java client. The following is an example of dropping a catalog:
 
+<Tabs>
+<TabItem value="bash" label="Bash">
+
 ```bash
 curl -X DELETE -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" \
 http://localhost:8090/api/metalakes/metalake/catalogs/catalog
 ```
+
+</TabItem>
+<TabItem value="java" label="Java">
 
 ```java
 // ...
@@ -270,10 +352,14 @@ GravitinoMetaLake gravitinoMetaLake =
     gravitinoClient.loadMetalake(NameIdentifier.of("metalake"));
 gravitinoMetaLake.dropCatalog(NameIdentifier.of("metalake", "catalog"));
 // ...
+  // ...
 ```
 
+</TabItem>
+</Tabs>
+
 :::note
-Drop a catalog only removes metadata about the catalog and schemas, tables under the catalog in Gravitino, It doesn't remove the real data(table and schema) in Apache Hive.
+Drop a catalog only removes metadata about the catalog and schemas, tables under the catalog in Gravitino, It doesn't remove the real data (table and schema) in Apache Hive.
 :::
 
 ### List all catalogs in a metalake
@@ -281,11 +367,17 @@ Drop a catalog only removes metadata about the catalog and schemas, tables under
 You can list all catalogs under a metalake by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs` endpoint or just use the Gravitino Java client. The following is an example of listing all catalogs in
 a metalake:
 
+<Tabs>
+<TabItem value="bash" label="Bash">
+
 ```bash
 curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" \
 http://localhost:8090/api/metalakes/metalake/catalogs
 ```
+
+</TabItem>
+<TabItem value="java" label="Java">
 
 ```java
 // ...
@@ -297,6 +389,9 @@ NameIdentifier[] catalogsIdents = gravitinoMetaLake.listCatalogs(Namespace.ofCat
 // ...
 ```
 
+</TabItem>
+</Tabs>
+
 ## Schemas operations
 
 :::tip
@@ -306,6 +401,9 @@ Users should create a metalake and a catalog before creating a schema.
 ### Create a schema
 
 You can create a schema by sending a `POST` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas` endpoint or just use the Gravitino Java client. The following is an example of creating a schema:
+
+<Tabs>
+<TabItem value="bash" label="Bash">
 
 ```bash
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
@@ -317,6 +415,9 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   }
 }' http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas
 ```
+
+</TabItem>
+<TabItem value="java" label="Java">
 
 ```java
 GravitinoClient gravitinoClient = GravitinoClient
@@ -342,26 +443,33 @@ Schema schema = supportsSchemas.createSchema(
 // ...
 ```
 
+</TabItem>
+</Tabs>
+
 Currently, Gravitino supports the following schema property:
 
-| Catalog provider    | Schema property                                                           | 
-|---------------------|---------------------------------------------------------------------------|
-| `hive`              | [Hive schema property](./apache-hive-catalog#schema-properties)           | 
-| `lakehouse-iceberg` | [Iceberg scheme property](./lakehouse-iceberg-catalog#schema-properties)  |                                    
-| `jdbc-mysql`        | [MySQL schema property](./jdbc-mysql-catalog#schema-properties)           |                            
-| `jdbc-postgresql`   | [PostgreSQL schema property](./jdbc-postgresql-catalog#schema-properties) |        
-
+| Catalog provider    | Schema property                                                              |
+|---------------------|------------------------------------------------------------------------------|
+| `hive`              | [Hive schema property](./apache-hive-catalog.md#schema-properties)           |
+| `lakehouse-iceberg` | [Iceberg scheme property](./lakehouse-iceberg-catalog.md#schema-properties)  |
+| `jdbc-mysql`        | [MySQL schema property](./jdbc-mysql-catalog.md#schema-properties)           |
+| `jdbc-postgresql`   | [PostgreSQL schema property](./jdbc-postgresql-catalog.md#schema-properties) |
 
 ### Load a schema
 
 You can create a schema by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}` endpoint or just use the Gravitino Java client. The following is an example of loading a schema:
 
+<Tabs>
+<TabItem value="bash" label="Bash">
 
 ```bash
 curl -X GET \-H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" \
 http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema
 ```
+
+</TabItem>
+<TabItem value="java" label="Java">
 
 ```java
 // ...
@@ -372,9 +480,15 @@ Schema schema = supportsSchemas.loadSchema(NameIdentifier.of("metalake", "catalo
 // ...
 ```
 
+</TabItem>
+</Tabs>
+
 ### Alter a schema
 
 You can change a schema by sending a `PUT` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}` endpoint or just use the Gravitino Java client. The following is an example of modifying a schema:
+
+<Tabs>
+<TabItem value="bash" label="Bash">
 
 ```bash
 curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
@@ -392,6 +506,9 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 }' http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema
 ```
 
+</TabItem>
+<TabItem value="java" label="Java">
+
 ```java
 // ...
 // Assuming you have just created a Hive catalog named `hive_catalog`
@@ -405,17 +522,21 @@ Schema schema = supportsSchemas.alterSchema(NameIdentifier.of("metalake", "hive_
 // ...
 ```
 
+</TabItem>
+</Tabs>
+
 Currently, Gravitino supports the following changes to a schema:
 
-| Supported modification | Json                                                         | Java                                          |
+| Supported modification | JSON                                                         | Java                                          |
 |------------------------|--------------------------------------------------------------|-----------------------------------------------|
 | Set a property         | `{"@type":"setProperty","property":"key1","value":"value1"}` | `SchemaChange.setProperty("key1", "value1")`  |
 | Remove a property      | `{"@type":"removeProperty","property":"key1"}`               | `SchemaChange.removeProperty("key1")`         |
 
-
 ### Drop a schema
 You can remove a schema by sending a `DELETE` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}` endpoint or just use the Gravitino Java client. The following is an example of dropping a schema:
 
+<Tabs>
+<TabItem value="bash" label="Bash">
 
 ```bash
 // cascade can be true or false
@@ -423,6 +544,9 @@ curl -X DELETE -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" \
 http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema?cascade=true
 ```
+
+</TabItem>
+<TabItem value="java" label="Java">
 
 ```java
 // ...
@@ -434,15 +558,25 @@ SupportsSchemas supportsSchemas = catalog.asSchemas();
 supportsSchemas.dropSchema(NameIdentifier.of("metalake", "catalog", "schema"), true);
 ```
 
+</TabItem>
+</Tabs>
+
 ### List all schemas under a catalog
 
 You can alter all schemas under a catalog by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas` endpoint or just use the Gravitino Java client. The following is an example of list all schema
     in a catalog:
 
+
+<Tabs>
+<TabItem value="bash" label="Bash">
+
 ```bash
 curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas
 ```
+
+</TabItem>
+<TabItem value="java" label="Java">
 
 ```java
 // ...
@@ -453,6 +587,9 @@ SupportsSchemas supportsSchemas = catalog.asSchemas();
 NameIdentifier[] schemas = supportsSchemas.listSchemas(Namespace.ofSchema("metalake", "catalog"));
 ```
 
+</TabItem>
+</Tabs>
+
 ## Tables operations
 
 :::tip
@@ -462,6 +599,9 @@ Users should create a metalake, a catalog and a schema before creating a table.
 ### Create a table
 
 You can create a table by sending a `POST` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables` endpoint or just use the Gravitino Java client. The following is an example of creating a table:
+
+<Tabs>
+<TabItem value="bash" label="Bash">
 
 ```bash
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
@@ -487,6 +627,9 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   }
 }' http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema/tables
 ```
+
+</TabItem>
+<TabItem value="java" label="Java">
 
 ```java
 GravitinoClient gravitinoClient = GravitinoClient
@@ -529,16 +672,19 @@ tableCatalog.createTable(
 );
 ```
 
+</TabItem>
+</Tabs>
+
 In order to create a table, you need to provide the following information:
 
 - Table column name and type
-- Table property 
+- Table property
 
 #### Gravitino table column type
 
-The following the types that Gravitino supports:
+The following types that Gravitino supports:
 
-| Type                      | Java                                                                     | Json                                                                                                                                 | Description                                                                                      |
+| Type                      | Java                                                                     | JSON                                                                                                                                 | Description                                                                                      |
 |---------------------------|--------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------|
 | Boolean                   | `Types.BooleanType.get()`                                                | `boolean`                                                                                                                            | Boolean type                                                                                     |
 | Byte                      | `Types.ByteType.get()`                                                   | `byte`                                                                                                                               | Byte type, indicates a numerical value of 1 byte                                                 |
@@ -562,36 +708,39 @@ The following the types that Gravitino supports:
 | List                      | `Types.ListType.of(elementType, elementNullable)`                        | `{"type": "list", "containsNull": JSON Boolean, "elementType": type JSON}`                                                           | List type, indicate a list of elements with the same type                                        |
 | Map                       | `Types.MapType.of(keyType, valueType)`                                   | `{"type": "map", "keyType": type JSON, "valueType": type JSON, "valueContainsNull": JSON Boolean}`                                   | Map type, indicate a map of key-value pairs                                                      |
 | Struct                    | `Types.StructType.of([Types.StructType.Field.of(name, type, nullable)])` | `{"type": "struct", "fields": [JSON StructField, {"name": string, "type": type JSON, "nullable": JSON Boolean, "comment": string}]}` | Struct type, indicate a struct of fields                                                         |
-| Union                     | `Types.UnionType.of([type1, type2, ...])`                                | `{"type": "union", "types": [type JSON, ...]}`                                                                                       | Union type, indicate a union of types     
+| Union                     | `Types.UnionType.of([type1, type2, ...])`                                | `{"type": "union", "types": [type JSON, ...]}`                                                                                       | Union type, indicate a union of types
 
 
-The related java doc is [here](./api/java/com/datastrato/gravitino/rel/types/Type.html).
+The related java doc is [here](pathname:///docs/0.3.0/api/java/com/datastrato/gravitino/rel/types/Type.html).
 
 #### Table property and type mapping
 
 The following is the table property that Gravitino supports:
 
-| Catalog provider    | Table property                                                          | Type mapping                                                            |
-|---------------------|-------------------------------------------------------------------------|-------------------------------------------------------------------------|
-| `hive`              | [Hive table property](./apache-hive-catalog#table-properties)           | [Hive type mapping](./apache-hive-catalog#table-column-types)           | 
-| `lakehouse-iceberg` | [Iceberg table property](./lakehouse-iceberg-catalog#table-properties)  | [Iceberg type mapping](./lakehouse-iceberg-catalog#table-column-types)  |                                    
-| `jdbc-mysql`        | [MySQL table property](./jdbc-mysql-catalog#table-properties)           | [MySQL type mapping](./jdbc-mysql-catalog#table-column-types)           |                            
-| `jdbc-postgresql`   | [PostgreSQL table property](./jdbc-postgresql-catalog#table-properties) | [PostgreSQL type mapping](./jdbc-postgresql-catalog#table-column-types) |  
+| Catalog provider    | Table property                                                             | Type mapping                                                               |
+|---------------------|----------------------------------------------------------------------------|----------------------------------------------------------------------------|
+| `hive`              | [Hive table property](./apache-hive-catalog.md#table-properties)           | [Hive type mapping](./apache-hive-catalog.md#table-column-types)           |
+| `lakehouse-iceberg` | [Iceberg table property](./lakehouse-iceberg-catalog.md#table-properties)  | [Iceberg type mapping](./lakehouse-iceberg-catalog.md#table-column-types)  |
+| `jdbc-mysql`        | [MySQL table property](./jdbc-mysql-catalog.md#table-properties)           | [MySQL type mapping](./jdbc-mysql-catalog.md#table-column-types)           |
+| `jdbc-postgresql`   | [PostgreSQL table property](./jdbc-postgresql-catalog.md#table-properties) | [PostgreSQL type mapping](./jdbc-postgresql-catalog.md#table-column-types) |
 
 
 In addition to the basic settings, Gravitino supports the following features:
 
-| Feature             | Description                                                                                  | Java doc                                                                                        |
-|---------------------|----------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------|
-| Partitioned table   | Equal to `PARTITION BY` in Apache Hive and other engine that support partitioning.           | [Partition](./api/java/com/datastrato/gravitino/dto/rel/partitions/Partitioning.html)           |
-| Bucketed table      | Equal to `CLUSTERED BY` in Apache Hive, some engine may use different words to describe it.  | [Distribution](./api/java/datastrato/gravitino/rel/expressions/distributions/Distribution.html) |
-| Sorted order table  | Equal to `SORTED BY` in Apache Hive, some engine may use different words to describe it.     | [SortOrder](./api/java/com/datastrato/gravitino/rel/expressions/sorts/SortOrder.html)           |
+| Feature             | Description                                                                                  | Java doc                                                                                                                 |
+|---------------------|----------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------|
+| Partitioned table   | Equal to `PARTITION BY` in Apache Hive and other engine that support partitioning.           | [Partition](pathname:///docs/0.3.0/api/java/com/datastrato/gravitino/dto/rel/partitions/Partitioning.html)               |
+| Bucketed table      | Equal to `CLUSTERED BY` in Apache Hive, some engine may use different words to describe it.  | [Distribution](pathname:///docs/0.3.0/api/java/com/datastrato/gravitino/rel/expressions/distributions/Distribution.html) |
+| Sorted order table  | Equal to `SORTED BY` in Apache Hive, some engine may use different words to describe it.     | [SortOrder](pathname:///docs/0.3.0/api/java/com/datastrato/gravitino/rel/expressions/sorts/SortOrder.html)               |
 
 :::tip
-**Those features may not be supported by all catalogs**. Please refer to the related doc for more details.
+**Not all catalogs may support those features.**. Please refer to the related document for more details.
 :::
 
 The following is an example of creating a partitioned, bucketed table and sorted order table:
+
+<Tabs>
+<TabItem value="bash" label="Bash">
 
 ```bash
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
@@ -639,8 +788,8 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
     "funcArgs": [
       {
         "type": "field",
-        "fieldName": ["score"] 
-      } 
+        "fieldName": ["score"]
+      }
     ]
   },
   "sortOrders": [
@@ -649,12 +798,15 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
       "nullOrder": "NULLS_LAST",
       "sortTerm":  {
         "type": "field",
-        "fieldName": ["name"] 
-      } 
+        "fieldName": ["name"]
+      }
     }
-  ] 
+  ]
 }' http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema/tables
 ```
+
+</TabItem>
+<TabItem value="java" label="Java">
 
 ```java
 tableCatalog.createTable(
@@ -709,6 +861,9 @@ tableCatalog.createTable(
     );
 ```
 
+</TabItem>
+</Tabs>
+
 :::note
 The code above is an example of creating a Hive table. For other catalogs, the code is similar, but the supported column type, table properties may be different. For more details, please refer to the related doc.
 :::
@@ -717,12 +872,17 @@ The code above is an example of creating a Hive table. For other catalogs, the c
 
 You can load a table by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables/{table_name}` endpoint or just use the Gravitino Java client. The following is an example of loading a table:
 
+<Tabs>
+<TabItem value="bash" label="Bash">
+
 ```bash
 curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json"  \
 http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema/tables/table
-
 ```
+
+</TabItem>
+<TabItem value="java" label="Java">
 
 ```java
 // ...
@@ -734,9 +894,15 @@ tableCatalog.loadTable(NameIdentifier.of("metalake", "hive_catalog", "schema", "
 // ...
 ```
 
+</TabItem>
+</Tabs>
+
 ### Alter a table
 
 You can modify a table by sending a `PUT` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables/{table_name}` endpoint or just use the Gravitino Java client. The following is an example of modifying a table:
+
+<Tabs>
+<TabItem value="bash" label="Bash">
 
 ```bash
 curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
@@ -753,6 +919,9 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 }' http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema/tables/table
 ```
 
+</TabItem>
+<TabItem value="java" label="Java">
+
 ```java
 // ...
 // Assuming you have just created a Hive catalog named `catalog`
@@ -765,16 +934,19 @@ Table t = tableCatalog.alterTable(NameIdentifier.of("metalake", "catalog", "sche
 // ...
 ```
 
+</TabItem>
+</Tabs>
+
 Currently, Gravitino supports the following changes to a table:
 
-| Supported modification             | Json                                                                                                                  | Java                                        |
+| Supported modification             | JSON                                                                                                                  | Java                                        |
 |------------------------------------|-----------------------------------------------------------------------------------------------------------------------|---------------------------------------------|
 | Rename table                       | `{"@type":"rename","newName":"table_renamed"}`                                                                        | `TableChange.rename("table_renamed")`       |
 | Update comment                     | `{"@type":"updateComment","newComment":"new_comment"}`                                                                | `TableChange.updateComment("new_comment")`  |
 | Set a table property               | `{"@type":"setProperty","property":"key1","value":"value1"}`                                                          | `TableChange.setProperty("key1", "value1")` |
 | Remove a table property            | `{"@type":"removeProperty","property":"key1"}`                                                                        | `TableChange.removeProperty("key1")`        |
 | Add a column                       | `{"@type":"addColumn","fieldName":["position"],"type":"varchar(20)","comment":"Position of user","position":"FIRST"}` | `TableChange.addColumn(...)`                |
-| Delete a column                    | `{"@type":"deleteColumn","fieldName": ["name"], "ifExist": true}`                                                     | `TableChange.deleteColumn(...)`             |
+| Delete a column                    | `{"@type":"deleteColumn","fieldName": ["name"], "ifExists": true}`                                                     | `TableChange.deleteColumn(...)`             |
 | Rename a column                    | `{"@type":"renameColumn","oldFieldName":["name_old"], "newFieldName":"name_new"}`                                     | `TableChange.renameColumn(...)`             |
 | Update the column comment          | `{"@type":"updateColumnComment", "fieldName": ["name"], "newComment": "new comment"}`                                 | `TableChange.updateColumnCommment(...)`     |
 | Update the type of a column        | `{"@type":"updateColumnType","fieldName": ["name"], "newType":"varchar(100)"}`                                        | `TableChange.updateColumnType(...)`         |
@@ -785,10 +957,17 @@ Currently, Gravitino supports the following changes to a table:
 
 You can remove a table by sending a `DELETE` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables/{table_name}` endpoint or just use the Gravitino Java client. The following is an example of dropping a table:
 
+<Tabs>
+<TabItem value="bash" label="Bash">
+
 ```bash
 curl -X DELETE -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json" http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema/tables/table
+-H "Content-Type: application/json" \
+http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema/tables/table
 ```
+
+</TabItem>
+<TabItem value="java" label="Java">
 
 ```java
 // ...
@@ -800,15 +979,24 @@ tableCatalog.dropTable(NameIdentifier.of("metalake", "catalog", "schema", "table
 // ...
 ```
 
+</TabItem>
+</Tabs>
+
 ### List all tables under a schema
 
 You can list all tables in a schema by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables` endpoint or just use the Gravitino Java client. The following is an example of list all tables in a schema:
 
+<Tabs>
+<TabItem value="bash" label="Bash">
+
 ```bash
 curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" \
-http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema/tables 
+http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema/tables
 ```
+
+</TabItem>
+<TabItem value="java" label="Java">
 
 ```java
 // ...
@@ -820,3 +1008,6 @@ NameIdentifier[] identifiers =
     tableCatalog.listTables(Namespace.ofTable("metalake", "catalog", "schema"));
 // ...
 ```
+
+</TabItem>
+</Tabs>

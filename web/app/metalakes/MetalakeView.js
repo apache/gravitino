@@ -56,7 +56,6 @@ const MetalakeView = props => {
 
         break
       case 'tables':
-        dispatch(fetchColumns({ init: true, page, metalake, catalog, schema, table }))
         dispatch(getTableDetails({ metalake, catalog, schema, table }))
         break
       default:
