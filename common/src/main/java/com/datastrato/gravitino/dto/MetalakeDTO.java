@@ -7,14 +7,13 @@ package com.datastrato.gravitino.dto;
 import com.datastrato.gravitino.Audit;
 import com.datastrato.gravitino.Metalake;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import java.util.Map;
 import javax.annotation.Nullable;
-import lombok.EqualsAndHashCode;
 import lombok.ToString;
 
 /** Represents a Metalake Data Transfer Object (DTO) that implements the Metalake interface. */
-@EqualsAndHashCode
 @ToString
 public class MetalakeDTO implements Metalake {
 
@@ -131,5 +130,41 @@ public class MetalakeDTO implements Metalake {
       Preconditions.checkArgument(audit != null, "audit cannot be null");
       return new MetalakeDTO(name, comment, properties, audit);
     }
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+    MetalakeDTO that = (MetalakeDTO) o;
+    return Objects.equal(name, that.name)
+        && Objects.equal(comment, that.comment)
+        && propertyEqual(properties, that.properties)
+        && Objects.equal(audit, that.audit);
+  }
+
+  private boolean propertyEqual(Map<String, String> p1, Map<String, String> p2) {
+    if (p1 == null && p2 == null) {
+      return true;
+    }
+
+    if (p1 != null && p1.isEmpty() && p2 == null) {
+      return true;
+    }
+
+    if (p2 != null && p2.isEmpty() && p1 == null) {
+      return true;
+    }
+
+    return java.util.Objects.equals(p1, p2);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hashCode(name, comment, audit);
   }
 }
