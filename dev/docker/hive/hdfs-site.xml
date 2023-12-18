@@ -13,4 +13,9 @@
     <name>dfs.datanode.address</name>
     <value>0.0.0.0:50010</value>
   </property>
+
+  <property>
+    <name>dfs.permissions.superusergroup</name>
+    <value>hdfs</value>
+  </property>
 </configuration>

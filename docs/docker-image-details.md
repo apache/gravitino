@@ -68,6 +68,10 @@ You can use this kind of images to test the catalog of Apache Hive.
 
 Changelog
 
+- gravitino-ci-hive:0.1.7
+  - Download Mysql JDBC driver before building the Docker image
+  - Set `hdfs` as HDFS superuser group
+
 - gravitino-ci-hive:0.1.6
   - No start YARN when container startup
   - Removed expose ports:
