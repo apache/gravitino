@@ -123,7 +123,8 @@ public class CatalogConnectorManager {
     }
   }
 
-  void loadCatalogs(GravitinoMetaLake metalake) {
+  @VisibleForTesting
+  public void loadCatalogs(GravitinoMetaLake metalake) {
     NameIdentifier[] catalogNames;
     try {
       catalogNames = metalake.listCatalogs(Namespace.ofCatalog(metalake.name()));
