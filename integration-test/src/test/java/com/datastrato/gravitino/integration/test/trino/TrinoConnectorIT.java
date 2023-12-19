@@ -435,6 +435,31 @@ public class TrinoConnectorIT extends AbstractIT {
             "location = 'hdfs://localhost:9000/user/hive/warehouse/hive_schema_1223445.db'"));
   }
 
+  private static boolean checkTrinoHasRemoved(String sql, long maxWaitTimeSec) {
+    long current = System.currentTimeMillis();
+    while (System.currentTimeMillis() - current <= maxWaitTimeSec * 1000) {
+      try {
+        ArrayList<ArrayList<String>> lists =
+            containerSuite.getTrinoContainer().executeQuerySQL(sql);
+        if (lists.isEmpty()) {
+          return true;
+        }
+
+        LOG.info("Catalog has not synchronized yet, wait 200ms and retry. The SQL is '{}'", sql);
+      } catch (Exception e) {
+        LOG.warn("Failed to execute sql: {}", sql, e);
+      }
+
+      try {
+        Thread.sleep(200);
+      } catch (InterruptedException e) {
+        LOG.warn("Failed to sleep 200ms", e);
+      }
+    }
+
+    return false;
+  }
+
   private static boolean checkTrinoHasLoaded(String sql, long maxWaitTimeSec)
       throws InterruptedException {
     long current = System.currentTimeMillis();
@@ -932,6 +957,48 @@ public class TrinoConnectorIT extends AbstractIT {
     success = checkTrinoHasLoaded(sql, 30);
     if (!success) {
       Assertions.fail("Trino fail to load table created by gravitino: " + sql);
+    }
+  }
+
+  @Test
+  void testDropCatalogAndCreateAgain() throws InterruptedException {
+    String catalogName = GravitinoITUtils.genRandomName("mysql_catalog").toLowerCase();
+    GravitinoMetaLake createdMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
+    String[] command = {
+      "mysql",
+      "-h127.0.0.1",
+      "-uroot",
+      "-pds123", // username and password are referred from Hive dockerfile.
+      "-e",
+      "grant all privileges on *.* to root@'%' identified by 'ds123'"
+    };
+
+    // There exists a mysql instance in Hive the container.
+    containerSuite.getHiveContainer().executeInContainer(command);
+    String hiveHost = containerSuite.getHiveContainer().getContainerIpAddress();
+
+    // Create the catalog and drop it for 3 times to test the create/drop catalog function work
+    // well.
+    for (int i = 0; i < 3; i++) {
+      createdMetalake.createCatalog(
+          NameIdentifier.of(metalakeName, catalogName),
+          Catalog.Type.RELATIONAL,
+          "jdbc-mysql",
+          "comment",
+          ImmutableMap.<String, String>builder()
+              .put("jdbc-user", "root")
+              .put("jdbc-password", "ds123")
+              .put("jdbc-url", String.format("jdbc:mysql://%s:3306?useSSL=false", hiveHost))
+              .build());
+
+      String sql = String.format("show catalogs like '%s.%s'", metalakeName, catalogName);
+      boolean success = checkTrinoHasLoaded(sql, 30);
+      Assertions.assertTrue(success, "Trino should load the catalog: " + sql);
+
+      createdMetalake.dropCatalog(NameIdentifier.of(metalakeName, catalogName));
+      // We need to test we can't load this catalog any more by Trino.
+      success = checkTrinoHasRemoved(sql, 30);
+      Assertions.assertFalse(success, "Trino should not load the catalog any more: " + sql);
     }
   }
 
