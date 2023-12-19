@@ -17,13 +17,12 @@ The `score`, `dt` and `city` are the field names in the table.
 | Partitioning strategy | Json                                                | Java                           | SQL syntax                 | Description                                                                                                                 |
 |-----------------------|-----------------------------------------------------|--------------------------------|----------------------------|-----------------------------------------------------------------------------------------------------------------------------|
 | Identity              | `{"strategy":"identity","fieldName":["score"]}`     | `Transforms.identity("score")` | `PARTITION BY score`       | Partition by a field or reference                                                                                           |
-| function              | `{"strategy":"functionName","fieldName":["score"]}` | `Transforms.hour("score")`     | `PARTITION BY hour(score)` | Partition by a function, currently, we support currently function, hour, year, day, bucket, month, truncate, list and range |
+| Function              | `{"strategy":"functionName","fieldName":["score"]}` | `Transforms.hour("score")`     | `PARTITION BY hour(score)` | Partition by a function, currently, we support currently function, hour, year, day, bucket, month, truncate, list and range |
 
 The detail of function strategies is as follows:
 
 | Function strategy | Json                                                             | Java                                           | SQL syntax                         | Description                                            |
 |-------------------|------------------------------------------------------------------|------------------------------------------------|------------------------------------|--------------------------------------------------------|
-| Identity          | `{"strategy":"identity","fieldName":["score"]}`                  | `Transforms.identity("score")`                 | `PARTITION BY score`               | Partition by field `score`                             |
 | Hour              | `{"strategy":"hour","fieldName":["score"]}`                      | `Transforms.hour("score")`                     | `PARTITION BY hour(score)`         | Partition by `hour` function in field `score`          |
 | Day               | `{"strategy":"day","fieldName":["score"]}`                       | `Transforms.day("score")`                      | `PARTITION BY day(score)`          | Partition by `day` function in field `score`           |
 | Month             | `{"strategy":"month","fieldName":["score"]}`                     | `Transforms.month("score")`                    | `PARTITION BY month(score)`        | Partition by `month` function in field `score`         |
@@ -42,12 +41,12 @@ For complex function, please refer to `FunctionPartitioningDTO`.
 
 | Bucket strategy | Json    | Java             | Description                                                                                 |
 |-----------------|---------|------------------|---------------------------------------------------------------------------------------------|
-| HASH            | `HASH`  | `Strategy.HASH`  | Bucket table using hash                                                                     |
-| RANGE           | `RANGE` | `Strategy.RANGE` | Bucket table using range                                                                    |
-| EVEN            | `EVEN`  | `Strategy.EVEN`  | Bucket table using even, The data will be bucketed equally according to the amount of data. |
+| HASH            | `hash`  | `Strategy.HASH`  | Bucket table using hash                                                                     |
+| RANGE           | `range` | `Strategy.RANGE` | Bucket table using range                                                                    |
+| EVEN            | `even`  | `Strategy.EVEN`  | Bucket table using even, The data will be bucketed equally according to the amount of data. |
 
 - Number. It defines how many buckets we use to bucket the table.
-- Function arguments. It defines which field or function should be used to bucket the table. Please refer to Java class `FunctionArg` and `DistributionDTO`.
+- Function arguments. It defines which field or function should be used to bucket the table. Gravitino supports the following three kinds of arguments, for more, you can refer to Java class `FunctionArg` and `DistributionDTO` to use more complex function arguments.
 
 | Expression type | Json                                                              | Java                                                                                                      | SQL syntax      | Description                    | 
 |-----------------|-------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------|-----------------|--------------------------------|
@@ -74,4 +73,4 @@ To define a sorted order table, you should use the following three components to
 | Put null value in the first place | `nulls_first` | `NullOrdering.NULLS_FIRST` | Put null value in the first place |  
 | Put null value int the last place | `nulls_last`  | `NullOrdering.NULLS_LAST`  | Put null value in the last place  |
 
-- Sort term.  It shows which field or function should be used to sort the table, please see the `Argument type` in the bucketed table.
+- Sort term.  It shows which field or function should be used to sort the table, please refer to the `Expression type` in the bucketed table chapter.
