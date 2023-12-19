@@ -55,6 +55,7 @@ jobs:
     strategy:
       matrix:
         architecture: [linux/amd64]
+        java-version: [ 8, 11, 17 ]
     env:
       DOCKER_RUN_NAME: hive-amd64
       PLATFORM: ${{ matrix.architecture }}
@@ -63,7 +64,7 @@ jobs:
 
       - uses: actions/setup-java@v3
         with:
-          java-version: '8'
+          java-version: ${{ matrix.java-version }}
           distribution: 'temurin'
 
       - name: Set up QEMU
@@ -71,8 +72,8 @@ jobs:
 
       - name: Package Gravitino
         run: |
-          ./gradlew build -x test
-          ./gradlew compileDistribution -x test
+          ./gradlew build -x test -PjdkVersion=${{ matrix.java-version }}
+          ./gradlew compileDistribution -x test -PjdkVersion=${{ matrix.java-version }}
 
       - name: Setup debug Github Action
         if: ${{ contains(github.event.pull_request.labels.*.name, 'debug action') }}
@@ -81,14 +82,14 @@ jobs:
       - name: Integration Test
         id: integrationTest
         run: |
-          ./gradlew test --rerun-tasks -PskipTests -PtestMode=embedded
-          ./gradlew test --rerun-tasks -PskipTests -PtestMode=deploy
+          ./gradlew test --rerun-tasks -PskipTests -PtestMode=embedded -PjdkVersion=${{ matrix.java-version }}
+          ./gradlew test --rerun-tasks -PskipTests -PtestMode=deploy -PjdkVersion=${{ matrix.java-version }}
 
       - name: Upload integrate tests reports
         uses: actions/upload-artifact@v3
         if: ${{ failure() && steps.integrationTest.outcome == 'failure' }}
         with:
-          name: integrate test reports 
+          name: integrate test reports
           path: |
             build/reports
             integration-test/build/integration-test.log
