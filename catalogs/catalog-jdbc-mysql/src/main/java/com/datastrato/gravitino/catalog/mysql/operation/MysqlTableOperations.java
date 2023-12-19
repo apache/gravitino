@@ -37,6 +37,7 @@ import net.sf.jsqlparser.statement.create.table.Index;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.BooleanUtils;
 import org.apache.commons.lang3.StringUtils;
 
 /** Table operations for MySQL. */
@@ -322,7 +323,8 @@ public class MysqlTableOperations extends JdbcTableOperations {
             updateColumnPositionFieldDefinition(updateColumnPosition, lazyLoadCreateTable));
       } else if (change instanceof TableChange.DeleteColumn) {
         TableChange.DeleteColumn deleteColumn = (TableChange.DeleteColumn) change;
-        alterSql.add(deleteColumnFieldDefinition(deleteColumn));
+        lazyLoadCreateTable = getOrCreateTable(databaseName, tableName, lazyLoadCreateTable);
+        alterSql.add(deleteColumnFieldDefinition(deleteColumn, lazyLoadCreateTable));
       } else if (change instanceof TableChange.UpdateColumnNullability) {
         lazyLoadCreateTable = getOrCreateTable(databaseName, tableName, lazyLoadCreateTable);
         alterSql.add(
@@ -496,11 +498,23 @@ public class MysqlTableOperations extends JdbcTableOperations {
     return columnDefinition.toString();
   }
 
-  private String deleteColumnFieldDefinition(TableChange.DeleteColumn deleteColumn) {
+  private String deleteColumnFieldDefinition(
+      TableChange.DeleteColumn deleteColumn, CreateTable lazyLoadCreateTable) {
     if (deleteColumn.fieldName().length > 1) {
       throw new UnsupportedOperationException("Mysql does not support nested column names.");
     }
     String col = deleteColumn.fieldName()[0];
+    boolean colExists =
+        lazyLoadCreateTable.getColumnDefinitions().stream()
+            .map(MysqlTableOperations::getColumnName)
+            .anyMatch(s -> StringUtils.equals(col, s));
+    if (!colExists) {
+      if (BooleanUtils.isTrue(deleteColumn.getIfExists())) {
+        return "";
+      } else {
+        throw new IllegalArgumentException("delete column not exists: " + col);
+      }
+    }
     return "DROP COLUMN " + col;
   }
 

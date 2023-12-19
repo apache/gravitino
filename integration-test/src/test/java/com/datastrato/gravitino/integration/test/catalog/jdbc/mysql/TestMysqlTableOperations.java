@@ -9,7 +9,6 @@ import static com.datastrato.gravitino.catalog.mysql.operation.MysqlTableOperati
 
 import com.datastrato.gravitino.catalog.jdbc.JdbcColumn;
 import com.datastrato.gravitino.catalog.jdbc.JdbcTable;
-import com.datastrato.gravitino.exceptions.GravitinoRuntimeException;
 import com.datastrato.gravitino.exceptions.NoSuchTableException;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
 import com.datastrato.gravitino.rel.TableChange;
@@ -138,19 +137,16 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
     load = TABLE_OPERATIONS.load(TEST_DB_NAME, newName);
     assertionsTableInfo(newName, tableComment, columns, properties, load);
 
-    GravitinoRuntimeException gravitinoRuntimeException =
+    IllegalArgumentException illegalArgumentException =
         Assertions.assertThrows(
-            GravitinoRuntimeException.class,
+            IllegalArgumentException.class,
             () ->
                 TABLE_OPERATIONS.alterTable(
                     TEST_DB_NAME,
                     newName,
-                    TableChange.deleteColumn(new String[] {newColumn.name()}, true)));
-
-    Assertions.assertTrue(
-        gravitinoRuntimeException
-            .getMessage()
-            .contains("Can't DROP 'col_5'; check that column/key exists"));
+                    TableChange.deleteColumn(new String[] {newColumn.name()}, false)));
+    Assertions.assertEquals(
+        "delete column not exists: " + newColumn.name(), illegalArgumentException.getMessage());
     Assertions.assertDoesNotThrow(() -> TABLE_OPERATIONS.purge(TEST_DB_NAME, newName));
     Assertions.assertThrows(
         NoSuchTableException.class, () -> TABLE_OPERATIONS.purge(TEST_DB_NAME, newName));
