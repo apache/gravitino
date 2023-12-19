@@ -48,7 +48,7 @@ public class EntitySerDeFactory {
     String className = ENTITY_SERDES.getOrDefault(name, name);
 
     try {
-      return (EntitySerDe) Class.forName(className).newInstance();
+      return (EntitySerDe) Class.forName(className).getDeclaredConstructor().newInstance();
     } catch (Exception e) {
       LOG.error("Failed to create EntitySerDe by name {}.", name, e);
       throw new RuntimeException("Failed to create EntitySerDe: " + name, e);

@@ -71,7 +71,7 @@ public class AuxiliaryServiceManager {
           try {
             Class<? extends GravitinoAuxiliaryService> providerClz =
                 lookupAuxService(auxServiceName, cl);
-            return providerClz.newInstance();
+            return providerClz.getDeclaredConstructor().newInstance();
           } catch (Exception e) {
             throw new RuntimeException(e);
           }

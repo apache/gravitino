@@ -16,7 +16,6 @@ import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.security.AccessController;
 import java.security.PrivilegedAction;
 import java.util.EnumSet;
 import java.util.Optional;
@@ -393,6 +392,7 @@ public final class JettyServer {
     return new ServerConnector(server, null, serverExecutor, null, -1, -1, connectionFactories);
   }
 
+  @SuppressWarnings("removal")
   private ThreadPool createThreadPool(int minThreads, int maxThreads, int threadPoolWorkQueueSize) {
 
     ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
@@ -404,7 +404,7 @@ public final class JettyServer {
 
           @Override
           public Thread newThread(Runnable runnable) {
-            return AccessController.doPrivileged(
+            return java.security.AccessController.doPrivileged(
                 new PrivilegedAction<Thread>() {
                   @Override
                   public Thread run() {

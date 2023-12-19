@@ -32,7 +32,7 @@ plugins {
     alias(libs.plugins.spotless)
   } else {
     throw GradleException(
-      "Gravitino Gradle current doesn't support " +
+      "Gravitino Gradle toolchain current doesn't support " +
         "Java version: ${JavaVersion.current()}. Please use JDK8 to 17."
     )
   }
@@ -42,6 +42,42 @@ plugins {
   alias(libs.plugins.rat)
   id("com.github.jk1.dependency-license-report") version "2.5"
   id("org.cyclonedx.bom") version "1.5.0" // Newer version fail due to our setup
+}
+
+if (extra["jdkVersion"] !in listOf("8", "11", "17")) {
+  throw GradleException(
+    "Gravitino current doesn't support building with " +
+      "Java version: ${extra["jdkVersion"]}. Please use JDK8, 11 or 17."
+  )
+}
+
+project.extra["extraJvmArgs"] = if (extra["jdkVersion"] in listOf("8", "11")) {
+  listOf()
+} else {
+  listOf(
+    "-XX:+IgnoreUnrecognizedVMOptions",
+    "--add-opens", "java.base/java.io=ALL-UNNAMED",
+    "--add-opens", "java.base/java.lang.invoke=ALL-UNNAMED",
+    "--add-opens", "java.base/java.lang.reflect=ALL-UNNAMED",
+    "--add-opens", "java.base/java.lang=ALL-UNNAMED",
+    "--add-opens", "java.base/java.math=ALL-UNNAMED",
+    "--add-opens", "java.base/java.net=ALL-UNNAMED",
+    "--add-opens", "java.base/java.nio=ALL-UNNAMED",
+    "--add-opens", "java.base/java.text=ALL-UNNAMED",
+    "--add-opens", "java.base/java.time=ALL-UNNAMED",
+    "--add-opens", "java.base/java.util.concurrent.atomic=ALL-UNNAMED",
+    "--add-opens", "java.base/java.util.concurrent=ALL-UNNAMED",
+    "--add-opens", "java.base/java.util.regex=ALL-UNNAMED",
+    "--add-opens", "java.base/java.util=ALL-UNNAMED",
+    "--add-opens", "java.base/jdk.internal.ref=ALL-UNNAMED",
+    "--add-opens", "java.base/jdk.internal.reflect=ALL-UNNAMED",
+    "--add-opens", "java.sql/java.sql=ALL-UNNAMED",
+    "--add-opens", "java.base/sun.util.calendar=ALL-UNNAMED",
+    "--add-opens", "java.base/sun.nio.ch=ALL-UNNAMED",
+    "--add-opens", "java.base/sun.nio.cs=ALL-UNNAMED",
+    "--add-opens", "java.base/sun.security.action=ALL-UNNAMED",
+    "--add-opens", "java.base/sun.util.calendar=ALL-UNNAMED"
+  )
 }
 
 licenseReport {
@@ -129,7 +165,9 @@ subprojects {
       if (project.name == "trino-connector") {
         languageVersion.set(JavaLanguageVersion.of(17))
       } else {
-        languageVersion.set(JavaLanguageVersion.of(8))
+        languageVersion.set(JavaLanguageVersion.of(extra["jdkVersion"].toString().toInt()))
+        sourceCompatibility = JavaVersion.VERSION_1_8
+        targetCompatibility = JavaVersion.VERSION_1_8
       }
     }
   }
@@ -208,7 +246,7 @@ subprojects {
     sign(publishing.publications)
   }
 
-  tasks.configureEach<Test> {
+  tasks.withType<Test> {
     testLogging {
       exceptionFormat = TestExceptionFormat.FULL
       showExceptions = true
@@ -224,6 +262,8 @@ subprojects {
       } else {
         useJUnitPlatform()
       }
+
+      jvmArgs(project.property("extraJvmArgs") as List<*>)
       finalizedBy(tasks.getByName("jacocoTestReport"))
     }
   }
