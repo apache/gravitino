@@ -733,6 +733,8 @@ In addition to the basic settings, Gravitino supports the following features:
 | Bucketed table      | Equal to `CLUSTERED BY` in Apache Hive, some engine may use different words to describe it.  | [Distribution](pathname:///docs/0.3.0/api/java/com/datastrato/gravitino/rel/expressions/distributions/Distribution.html) |
 | Sorted order table  | Equal to `SORTED BY` in Apache Hive, some engine may use different words to describe it.     | [SortOrder](pathname:///docs/0.3.0/api/java/com/datastrato/gravitino/rel/expressions/sorts/SortOrder.html)               |
 
+The detail doc about these three features is [here](advanced-table-feature.md).
+
 :::tip
 **Not all catalogs may support those features.**. Please refer to the related document for more details.
 :::
