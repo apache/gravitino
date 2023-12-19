@@ -246,7 +246,7 @@ subprojects {
     sign(publishing.publications)
   }
 
-  tasks.withType<Test> {
+  tasks.configureEach<Test> {
     testLogging {
       exceptionFormat = TestExceptionFormat.FULL
       showExceptions = true
