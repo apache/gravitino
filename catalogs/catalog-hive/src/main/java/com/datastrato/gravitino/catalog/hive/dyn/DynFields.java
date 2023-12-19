@@ -25,7 +25,6 @@ import com.google.common.base.Throwables;
 import com.google.common.collect.Sets;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
-import java.security.AccessController;
 import java.security.PrivilegedAction;
 import java.util.Set;
 
@@ -302,6 +301,7 @@ public class DynFields {
      * @see Class#forName(String)
      * @see Class#getField(String)
      */
+    @SuppressWarnings("removal")
     public Builder hiddenImpl(Class<?> targetClass, String fieldName) {
       // don't do any work if an implementation has been found
       if (field != null || targetClass == null) {
@@ -310,7 +310,7 @@ public class DynFields {
 
       try {
         Field hidden = targetClass.getDeclaredField(fieldName);
-        AccessController.doPrivileged(new MakeFieldAccessible(hidden));
+        java.security.AccessController.doPrivileged(new MakeFieldAccessible(hidden));
         this.field = new UnboundField(hidden, fieldName);
       } catch (SecurityException | NoSuchFieldException e) {
         // unusable

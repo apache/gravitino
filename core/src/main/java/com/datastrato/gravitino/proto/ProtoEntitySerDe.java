@@ -93,7 +93,7 @@ public class ProtoEntitySerDe implements EntitySerDe {
                 Class<? extends ProtoSerDe<? extends Entity, ? extends Message>> serdeClazz =
                     (Class<? extends ProtoSerDe<? extends Entity, ? extends Message>>)
                         loadClass(ENTITY_TO_SERDE.get(k.getCanonicalName()), classLoader);
-                return serdeClazz.newInstance();
+                return serdeClazz.getDeclaredConstructor().newInstance();
               } catch (Exception e) {
                 throw new RuntimeException(
                     "Failed to instantiate serde class " + k.getCanonicalName(), e);

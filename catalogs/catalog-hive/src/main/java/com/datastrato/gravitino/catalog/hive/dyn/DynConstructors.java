@@ -23,7 +23,6 @@ import com.google.common.base.Throwables;
 import com.google.common.collect.Maps;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
-import java.security.AccessController;
 import java.security.PrivilegedAction;
 import java.util.Arrays;
 import java.util.Map;
@@ -245,6 +244,7 @@ public class DynConstructors {
       return this;
     }
 
+    @SuppressWarnings("removal")
     public <T> Builder hiddenImpl(Class<T> targetClass, Class<?>... types) {
       // don't do any work if an implementation has been found
       if (ctor != null) {
@@ -253,7 +253,7 @@ public class DynConstructors {
 
       try {
         Constructor<T> hidden = targetClass.getDeclaredConstructor(types);
-        AccessController.doPrivileged(new MakeAccessible(hidden));
+        java.security.AccessController.doPrivileged(new MakeAccessible(hidden));
         ctor = new Ctor<T>(hidden, targetClass);
       } catch (SecurityException e) {
         // unusable
