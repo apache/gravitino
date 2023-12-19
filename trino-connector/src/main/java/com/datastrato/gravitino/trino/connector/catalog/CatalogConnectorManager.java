@@ -67,7 +67,7 @@ public class CatalogConnectorManager {
 
   private GravitinoClient gravitinoClient;
   private GravitinoConfig config;
-  private Set<String> usedMetalakes = new HashSet<>();
+  private final Set<String> usedMetalakes = new HashSet<>();
 
   public CatalogConnectorManager(
       CatalogInjector catalogInjector, CatalogConnectorFactory catalogFactory) {
@@ -116,10 +116,10 @@ public class CatalogConnectorManager {
           metalake = gravitinoClient.loadMetalake(NameIdentifier.ofMetalake(usedMetalake));
         } catch (NoSuchMetalakeException noSuchMetalakeException) {
           LOG.warn("Metalake {} does not exist.", usedMetalake);
-          return;
+          continue;
         } catch (Exception e) {
           LOG.error("Load Metalake {} failed.", usedMetalake, e);
-          return;
+          continue;
         }
 
         LOG.debug("Load metalake: " + usedMetalake);

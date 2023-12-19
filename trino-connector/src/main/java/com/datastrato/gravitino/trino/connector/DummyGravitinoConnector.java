@@ -30,7 +30,7 @@ public class DummyGravitinoConnector implements Connector {
 
   private final CatalogConnectorManager catalogConnectorManager;
 
-  private static Set<Procedure> procedures = new HashSet<>();
+  private Set<Procedure> procedures = new HashSet<>();
 
   public DummyGravitinoConnector(CatalogConnectorManager catalogConnectorManager) {
     super();
@@ -54,7 +54,7 @@ public class DummyGravitinoConnector implements Connector {
               new Procedure.Argument("METALAKE", VARCHAR),
               new Procedure.Argument("CATALOG", VARCHAR),
               new Procedure.Argument("PROVIDER", VARCHAR),
-              new Procedure.Argument("PROPERTIES", VARCHAR),
+              new Procedure.Argument("PROPERTIES", VARCHAR, false, "{}"),
               new Procedure.Argument("IGNORE EXIST", BOOLEAN, false, true));
       Procedure procedure = new Procedure("system", "createCatalog", arguments, createCatalog);
       procedures.add(procedure);

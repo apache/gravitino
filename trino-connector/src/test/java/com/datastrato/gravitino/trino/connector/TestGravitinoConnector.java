@@ -53,11 +53,19 @@ public class TestGravitinoConnector extends AbstractTestQueryFramework {
       queryRunner.installPlugin(new GravitinoPlugin());
       queryRunner.installPlugin(new MemoryPlugin());
 
-      HashMap<String, String> properties = new HashMap<>();
-      properties.put("gravitino.metalake", "test");
-      properties.put("gravitino.uri", "http://127.0.0.1:8090");
+      {
+        HashMap<String, String> properties = new HashMap<>();
+        properties.put("gravitino.metalake", "test");
+        properties.put("gravitino.uri", "http://127.0.0.1:8090");
+        queryRunner.createCatalog("gravitino", "gravitino", properties);
+      }
 
-      queryRunner.createCatalog("gravitino", "gravitino", properties);
+      {
+        HashMap<String, String> properties = new HashMap<>();
+        properties.put("gravitino.metalake", "test1");
+        properties.put("gravitino.uri", "http://127.0.0.1:8090");
+        queryRunner.createCatalog("gravitino1", "gravitino", properties);
+      }
       server.setCatalogConnectorManager(GravitinoPlugin.catalogConnectorManager);
       // Wait for the catalog to be created. Wait for at least 30 seconds.
       int max_tries = 35;
@@ -224,8 +232,12 @@ public class TestGravitinoConnector extends AbstractTestQueryFramework {
 
   @Test
   public void testCreateCatalog() throws Exception {
-    assertUpdate("call gravitino.system.createMetalake('m1', false);");
-    assertUpdate("call gravitino.system.createMetalake('m1', false);");
+    assertUpdate("call gravitino.system.createMetalake('test1')");
+    assertUpdate("call gravitino.system.createCatalog('test1', 'memory1', 'memory')");
+    assertThat(computeActual("show catalogs").getOnlyColumnAsSet()).contains("test1.memory1");
+
+    // assertUpdate("call gravitino.system.dropCatalog('test1', 'memory1')");
+    // assertUpdate("call gravitino.system.dropMetalake('test1')");
   }
 
   private TableName createTestTable(String fullTableName) throws Exception {
