@@ -297,12 +297,12 @@ If you want to use a cross-origin filter for the Gravitino server, you can follo
 
 ```shell
 wget https://repo1.maven.org/maven2/org/eclipse/jetty/jetty-servlets/9.4.51.v20230217/jetty-servlets-9.4.51.v20230217.jar 
-cp jetty-servlets-9.4.51.v20230217.jar <gravitno home>/lib
+cp jetty-servlets-9.4.51.v20230217.jar <gravitno home>/libs
 ```
 
 You can refer to the [Configurations](gravitino-server-config.md) and append the configurations to the conf/gravitino.conf.
 
 ```text
-gravitino.server.webserver.customFilter=org.eclipse.jetty.servlets.CrossOriginFilter
+gravitino.server.webserver.customFilters=org.eclipse.jetty.servlets.CrossOriginFilter
 gravitino.server.webserver.org.eclipse.jetty.servlets.CrossOriginFilter.param.allowedOrigins=*
 ```

@@ -437,6 +437,9 @@ public final class JettyServer {
 
   public void addCustomFilters(String pathSpec) {
     for (String filterName : serverConfig.getCustomFilters()) {
+      if (StringUtils.isBlank(filterName)) {
+        continue;
+      }
       FilterHolder filterHolder = new FilterHolder();
       filterHolder.setClassName(filterName);
       for (Map.Entry<String, String> entry :
