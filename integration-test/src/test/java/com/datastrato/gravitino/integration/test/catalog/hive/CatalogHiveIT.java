@@ -62,12 +62,17 @@ import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.types.Types;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.Database;
@@ -106,6 +111,7 @@ public class CatalogHiveIT extends AbstractIT {
   private static GravitinoMetaLake metalake;
   private static Catalog catalog;
   private static SparkSession sparkSession;
+  private static FileSystem hdfs;
   private static final String SELECT_ALL_TEMPLATE = "SELECT * FROM %s.%s";
   private static final String INSERT_WITHOUT_PARTITION_TEMPLATE = "INSERT INTO %s.%s VALUES (%s)";
   private static final String INSERT_WITH_PARTITION_TEMPLATE =
@@ -155,13 +161,23 @@ public class CatalogHiveIT extends AbstractIT {
             .config("mapreduce.input.fileinputformat.input.dir.recursive", "true")
             .enableHiveSupport()
             .getOrCreate();
+
+    Configuration conf = new Configuration();
+    conf.set(
+        "fs.defaultFS",
+        String.format(
+            "hdfs://%s:%d",
+            containerSuite.getHiveContainer().getContainerIpAddress(),
+            HiveContainer.HDFS_DEFAULTFS_PORT));
+    hdfs = FileSystem.get(conf);
+
     createMetalake();
     createCatalog();
     createSchema();
   }
 
   @AfterAll
-  public static void stop() {
+  public static void stop() throws IOException {
     client.dropMetalake(NameIdentifier.of(metalakeName));
     if (hiveClientPool != null) {
       hiveClientPool.close();
@@ -169,6 +185,10 @@ public class CatalogHiveIT extends AbstractIT {
 
     if (sparkSession != null) {
       sparkSession.close();
+    }
+
+    if (hdfs != null) {
+      hdfs.close();
     }
     try {
       closer.close();
@@ -286,6 +306,19 @@ public class CatalogHiveIT extends AbstractIT {
     }
     Assertions.assertEquals(
         count + 1, sparkSession.sql(String.format(SELECT_ALL_TEMPLATE, dbName, tableName)).count());
+    // Assert HDFS owner
+    Path tableDirectory = new Path(table.getSd().getLocation());
+    FileStatus[] fileStatuses;
+    try {
+      fileStatuses = hdfs.listStatus(tableDirectory);
+    } catch (IOException e) {
+      LOG.warn("Failed to list status of table directory", e);
+      throw new RuntimeException(e);
+    }
+    Assertions.assertTrue(fileStatuses.length > 0);
+    for (FileStatus fileStatus : fileStatuses) {
+      Assertions.assertEquals("datastrato", fileStatus.getOwner());
+    }
   }
 
   private Map<String, String> createProperties() {
