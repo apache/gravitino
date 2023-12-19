@@ -1,6 +1,18 @@
+---
+title: "Advanced table feature"
+slug: /advanced-table-feature
+date: 2023-12-19
+keyword: partitioning bucket distribution sort order
+license: Copyright 2023 Datastrato Pvt Ltd. This software is licensed under the Apache License version 2.
+---
+
 #### Partitioned table
 
 Currently, Gravitino supports the following partitioning strategies:
+
+:::note
+The `score`, `dt` and `city` are the field names in the table.
+:::
 
 | Partitioning strategy | Json                                                | Java                           | SQL syntax                 | Description                                                                                                                 |
 |-----------------------|-----------------------------------------------------|--------------------------------|----------------------------|-----------------------------------------------------------------------------------------------------------------------------|
@@ -28,11 +40,11 @@ For complex function, please refer to `FunctionPartitioningDTO`.
 
 - Strategy. It defines in which way we bucket the table.
 
-| Bucket strategy | Json    | Java             | Description              |
-|-----------------|---------|------------------|--------------------------|
-| HASH            | `HASH`  | `Strategy.HASH`  | Bucket table using hash  |
-| RANGE           | `RANGE` | `Strategy.RANGE` | Bucket table using range |
-| EVEN            | `EVEN`  | `Strategy.EVEN`  | Bucket table using       |
+| Bucket strategy | Json    | Java             | Description                                                                                 |
+|-----------------|---------|------------------|---------------------------------------------------------------------------------------------|
+| HASH            | `HASH`  | `Strategy.HASH`  | Bucket table using hash                                                                     |
+| RANGE           | `RANGE` | `Strategy.RANGE` | Bucket table using range                                                                    |
+| EVEN            | `EVEN`  | `Strategy.EVEN`  | Bucket table using even, The data will be bucketed equally according to the amount of data. |
 
 - Number. It defines how many buckets we use to bucket the table.
 - Function arguments. It defines which field or function should be used to bucket the table. Please refer to Java class `FunctionArg` and `DistributionDTO`.
