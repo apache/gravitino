@@ -14,14 +14,14 @@ Currently, Gravitino supports the following partitioning strategies:
 The `score`, `dt` and `city` are the field names in the table.
 :::
 
-| Partitioning strategy | Json                                                | Java                           | SQL syntax                 | Description                                                                                                                 |
+| Partitioning strategy | Json                                                | Java                           | Equivalent SQL semantics   | Description                                                                                                                 |
 |-----------------------|-----------------------------------------------------|--------------------------------|----------------------------|-----------------------------------------------------------------------------------------------------------------------------|
 | Identity              | `{"strategy":"identity","fieldName":["score"]}`     | `Transforms.identity("score")` | `PARTITION BY score`       | Partition by a field or reference                                                                                           |
 | Function              | `{"strategy":"functionName","fieldName":["score"]}` | `Transforms.hour("score")`     | `PARTITION BY hour(score)` | Partition by a function, currently, we support currently function, hour, year, day, bucket, month, truncate, list and range |
 
 The detail of function strategies is as follows:
 
-| Function strategy | Json                                                             | Java                                           | SQL syntax                         | Description                                            |
+| Function strategy | Json example                                                     | Java example                                   | Equivalent SQL semantics           | Description                                            |
 |-------------------|------------------------------------------------------------------|------------------------------------------------|------------------------------------|--------------------------------------------------------|
 | Hour              | `{"strategy":"hour","fieldName":["score"]}`                      | `Transforms.hour("score")`                     | `PARTITION BY hour(score)`         | Partition by `hour` function in field `score`          |
 | Day               | `{"strategy":"day","fieldName":["score"]}`                       | `Transforms.day("score")`                      | `PARTITION BY day(score)`          | Partition by `day` function in field `score`           |
@@ -48,11 +48,11 @@ For complex function, please refer to `FunctionPartitioningDTO`.
 - Number. It defines how many buckets we use to bucket the table.
 - Function arguments. It defines which field or function should be used to bucket the table. Gravitino supports the following three kinds of arguments, for more, you can refer to Java class `FunctionArg` and `DistributionDTO` to use more complex function arguments.
 
-| Expression type | Json                                                              | Java                                                                                                      | SQL syntax      | Description                    | 
-|-----------------|-------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------|-----------------|--------------------------------|
-| Field           | `{"type":"field","fieldName":["score"]}`                          | `FieldReferenceDTO.of("score")`                                                                           | `score`         | field reference value `score`  |
-| Function        | `{"type":"function","functionName":"hour","fieldName":["score"]}` | `new FuncExpressionDTO.Builder()<br/>.withFunctionName("hour")<br/>.withFunctionArgs("score").build()`    | `hour(score)`   | function value `hour(score)`   |
-| Constant        | `{"type":"constant","value":10, "dataType": "integer"}`           | `new LiteralDTO.Builder()<br/>.withValue("10")<br/>.withDataType(Types.IntegerType.get())<br/>.build()`   | `10`            | Integer constant `10`          |
+| Expression type | Json example                                                      | Java example                                                                                            | Equivalent SQL semantics | Description                    | 
+|-----------------|-------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------|--------------------------|--------------------------------|
+| Field           | `{"type":"field","fieldName":["score"]}`                          | `FieldReferenceDTO.of("score")`                                                                         | `score`                  | field reference value `score`  |
+| Function        | `{"type":"function","functionName":"hour","fieldName":["score"]}` | `new FuncExpressionDTO.Builder()<br/>.withFunctionName("hour")<br/>.withFunctionArgs("score").build()`  | `hour(score)`            | function value `hour(score)`   |
+| Constant        | `{"type":"constant","value":10, "dataType": "integer"}`           | `new LiteralDTO.Builder()<br/>.withValue("10")<br/>.withDataType(Types.IntegerType.get())<br/>.build()` | `10`                     | Integer constant `10`          |
 
 
 #### Sorted order table
