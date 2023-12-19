@@ -73,7 +73,7 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
       }
     }
 
-    if (config.isDummy()) {
+    if (config.isStatic()) {
       // Default GravitinoConnector named "gravitino" is just using to load
       // CatalogConnectorManager,
       // that's dynamically loading catalogs from gravitino server.

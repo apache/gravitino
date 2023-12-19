@@ -26,7 +26,7 @@ public class GravitinoConfig {
   public GravitinoConfig(Map<String, String> requiredConfig) {
     config = requiredConfig;
 
-    if (!isDummy()) {
+    if (!isStatic()) {
       return;
     }
     for (Map.Entry<String, ConfigEntry> entry : CONFIG_DEFINITIONS.entrySet()) {
@@ -47,7 +47,9 @@ public class GravitinoConfig {
     return config.getOrDefault(GRAVITINO_METALAKE.key, GRAVITINO_METALAKE.defaultValue);
   }
 
-  boolean isDummy() {
+  boolean isStatic() {
+    // The 'isStatic' is indicated whether the connector
+    // is user-configured within Trino or loaded from the Graviton server
     return config.getOrDefault("gravitino.internal", "false").equals("false");
   }
 

@@ -4,10 +4,12 @@
  */
 package com.datastrato.gravitino.trino.connector;
 
+import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_UNSUPPORTED_OPERATION;
 import static io.trino.spi.type.BooleanType.BOOLEAN;
 import static io.trino.spi.type.VarcharType.VARCHAR;
 
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorManager;
+import io.trino.spi.TrinoException;
 import io.trino.spi.connector.Connector;
 import io.trino.spi.connector.ConnectorMetadata;
 import io.trino.spi.connector.ConnectorSession;
@@ -30,13 +32,14 @@ public class DummyGravitinoConnector implements Connector {
 
   private final CatalogConnectorManager catalogConnectorManager;
 
-  private Set<Procedure> procedures = new HashSet<>();
+  private final Set<Procedure> procedures = new HashSet<>();
 
   public DummyGravitinoConnector(CatalogConnectorManager catalogConnectorManager) {
     super();
     this.catalogConnectorManager = catalogConnectorManager;
 
     try {
+      // call gravitino.system.createCatalog(metalake, catalog, provider, properties, ignoreExist)
       MethodHandle createCatalog =
           MethodHandles.lookup()
               .unreflect(
@@ -59,6 +62,7 @@ public class DummyGravitinoConnector implements Connector {
       Procedure procedure = new Procedure("system", "createCatalog", arguments, createCatalog);
       procedures.add(procedure);
 
+      // call gravitino.system.createMetalake(name, ignoreExist)
       MethodHandle createMetalake =
           MethodHandles.lookup()
               .unreflect(
@@ -72,6 +76,7 @@ public class DummyGravitinoConnector implements Connector {
       procedure = new Procedure("system", "createMetalake", arguments, createMetalake);
       procedures.add(procedure);
 
+      // call gravitino.system.dropCatalog(metalake, catalog, ignoreNotExist)
       MethodHandle dropCatalog =
           MethodHandles.lookup()
               .unreflect(
@@ -86,6 +91,7 @@ public class DummyGravitinoConnector implements Connector {
       procedure = new Procedure("system", "dropCatalog", arguments, dropCatalog);
       procedures.add(procedure);
 
+      // call gravitino.system.dropMetalake(name, ignoreNotExist)
       MethodHandle dropMetalake =
           MethodHandles.lookup()
               .unreflect(
@@ -99,10 +105,9 @@ public class DummyGravitinoConnector implements Connector {
       procedure = new Procedure("system", "dropMetalake", arguments, dropMetalake);
       procedures.add(procedure);
 
-    } catch (NoSuchMethodException e) {
-      throw new RuntimeException(e);
-    } catch (IllegalAccessException e) {
-      throw new RuntimeException(e);
+    } catch (Exception e) {
+      throw new TrinoException(
+          GRAVITINO_UNSUPPORTED_OPERATION, "Failed to initialize gravitino system procedures", e);
     }
   }
 
