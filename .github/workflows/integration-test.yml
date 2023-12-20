@@ -2,11 +2,15 @@ name: Integration Test
 
 # Controls when the workflow will run
 on:
-  # Triggers the workflow on push or pull request events but only for the "main" branch
   push:
     branches: [ "main", "branch-*" ]
   pull_request:
     branches: [ "main", "branch-*" ]
+  workflow_run:
+    workflows:
+      - build
+    types:
+      - completed
 
 concurrency:
   group: ${{ github.worklfow }}-${{ github.event.pull_request.number || github.ref }}
@@ -15,6 +19,7 @@ concurrency:
 jobs:
   changes:
     runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     steps:
       - uses: actions/checkout@v3
       - uses: dorny/paths-filter@v2
