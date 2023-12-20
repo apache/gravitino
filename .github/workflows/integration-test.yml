@@ -72,6 +72,7 @@ jobs:
 
       - name: Package Gravitino
         run: |
+          ./gradlew build -x test -PjdkVersion=${{ matrix.java-version }}
           ./gradlew compileDistribution -x test -PjdkVersion=${{ matrix.java-version }}
 
       - name: Setup debug Github Action
