@@ -50,6 +50,8 @@ import org.mockito.stubbing.Answer;
 public class GravitinoMockServer implements AutoCloseable {
 
   private final String testCatalogProvider = "memory";
+  String testMetalake = "test";
+  String testCatalog = "memory";
 
   private final Map<String, Metalake> metalakes = new HashMap<>();
 
@@ -58,8 +60,6 @@ public class GravitinoMockServer implements AutoCloseable {
   private GeneralDataTypeTransformer dataTypeTransformer = new HiveDataTypeTransformer();
 
   public GravitinoMockServer() {
-    String testMetalake = "test";
-    String testCatalog = "memory";
     createGravitinoMetalake(NameIdentifier.ofMetalake(testMetalake));
     createGravitinoCatalog(NameIdentifier.ofCatalog(testMetalake, testCatalog));
   }

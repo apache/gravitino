@@ -236,8 +236,8 @@ public class TestGravitinoConnector extends AbstractTestQueryFramework {
     assertUpdate("call gravitino.system.createCatalog('test1', 'memory1', 'memory')");
     assertThat(computeActual("show catalogs").getOnlyColumnAsSet()).contains("test1.memory1");
 
-    // assertUpdate("call gravitino.system.dropCatalog('test1', 'memory1')");
-    // assertUpdate("call gravitino.system.dropMetalake('test1')");
+    assertUpdate("call gravitino.system.dropCatalog('test1', 'memory1')");
+    assertUpdate("call gravitino.system.dropMetalake('test1')");
   }
 
   private TableName createTestTable(String fullTableName) throws Exception {
