@@ -43,6 +43,13 @@ public class IcebergRESTJdbcCatalogIT extends IcebergRESTServiceIT {
         IcebergCatalogBackend.JDBC.toString().toLowerCase());
 
     configMap.put(
+            AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
+                    + IcebergRESTService.SERVICE_NAME
+                    + "."
+                    + IcebergConfig.JDBC_DRIVER.getKey(),
+            "org.sqlite.JDBC");
+
+    configMap.put(
         AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
             + IcebergRESTService.SERVICE_NAME
             + "."
