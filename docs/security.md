@@ -264,9 +264,9 @@ curl -v -X GET --cacert ./certificate.pem -H "Accept: application/vnd.gravitino.
 Gravitino supports custom filters to implement the user specified logic to satisfy different safety needs.
 
 ### Gravitino server's configuration
-| Configuration item                          | Description                                                      | Default value | Required  | Since version |
-|---------------------------------------------|------------------------------------------------------------------|---------------|-----------|---------------|
-| `gravitino.server.webserver.customFilters`  | Comma separated list of filter class names to apply to the APIs. | ``            | Yes       | 0.4.0         |
+| Configuration item                          | Description                                                      | Default value | Required | Since version |
+|---------------------------------------------|------------------------------------------------------------------|---------------|----------|---------------|
+| `gravitino.server.webserver.customFilters`  | Comma separated list of filter class names to apply to the APIs. | ``            | No       | 0.4.0         |
 The filter should be a standard javax servlet Filter.
 Filter parameters can also be specified in the configuration, by setting config entries of the form `gravitino.server.webserver.<class name of filter>.param.<param name>=<value>`
 
@@ -278,9 +278,9 @@ gravitino.server.webserver.com.test.filter1.param.name2=ba
 ```
 
 ### Iceberg REST service's configuration
-| Configuration item                                  | Description                                                        | Default value | Required  | Since version |
-|-----------------------------------------------------|--------------------------------------------------------------------|---------------|-----------|---------------|
-| `gravitino.auxService.iceberg-rest.customFilters`   | Comma separated list of filter class names to apply to the APIs.   | ``            | Yes       | 0.4.0         |
+| Configuration item                                  | Description                                                        | Default value | Required | Since version |
+|-----------------------------------------------------|--------------------------------------------------------------------|---------------|----------|---------------|
+| `gravitino.auxService.iceberg-rest.customFilters`   | Comma separated list of filter class names to apply to the APIs.   | ``            | No       | 0.4.0         |
 The filter should be a standard javax servlet Filter.
 Filter parameters can also be specified in the configuration, by setting config entries of the form `gravitino.auxService.iceberg-rest.<class name of filter>.param.<param name>=<value>`
 
