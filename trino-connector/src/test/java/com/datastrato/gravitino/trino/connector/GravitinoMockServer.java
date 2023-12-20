@@ -49,9 +49,9 @@ import org.mockito.stubbing.Answer;
 
 public class GravitinoMockServer implements AutoCloseable {
 
+  private final String testMetalake = "test";
+  private final String testCatalog = "memory";
   private final String testCatalogProvider = "memory";
-  String testMetalake = "test";
-  String testCatalog = "memory";
 
   private final Map<String, Metalake> metalakes = new HashMap<>();
 
