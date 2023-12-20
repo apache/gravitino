@@ -39,6 +39,7 @@ public abstract class TestJdbcAbstractIT {
   public static void startup() {
     CONTAINER.start();
     HashMap<String, String> properties = Maps.newHashMap();
+    properties.put(JdbcConfig.JDBC_DRIVER.getKey(), CONTAINER.getDriverClassName());
     properties.put(JdbcConfig.JDBC_URL.getKey(), CONTAINER.getJdbcUrl());
     properties.put(JdbcConfig.USERNAME.getKey(), CONTAINER.getUsername());
     properties.put(JdbcConfig.PASSWORD.getKey(), CONTAINER.getPassword());

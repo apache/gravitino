@@ -37,7 +37,7 @@ public class ConfigEntry<T> {
   @Getter private boolean isDeprecated;
 
   private boolean isOptional;
-  private boolean isNoDefault;
+  private boolean hasNoDefault;
 
   /**
    * Creates a new ConfigEntry instance.
@@ -103,8 +103,8 @@ public class ConfigEntry<T> {
   }
 
   /** Marks this configuration as no default value. */
-  void setNoDefault() {
-    this.isNoDefault = true;
+  void setHasNoDefault() {
+    this.hasNoDefault = true;
   }
 
   /**
@@ -145,12 +145,12 @@ public class ConfigEntry<T> {
    *
    * @return A new ConfigEntry instance with no default value.
    */
-  public ConfigEntry<T> createWithNoDefault() {
+  public ConfigEntry<T> create() {
     ConfigEntry<T> conf =
         new ConfigEntry<>(key, version, doc, alternatives, isPublic, isDeprecated);
     conf.setValueConverter(valueConverter);
     conf.setStringConverter(stringConverter);
-    conf.setNoDefault();
+    conf.setHasNoDefault();
     return conf;
   }
 
@@ -175,7 +175,7 @@ public class ConfigEntry<T> {
     if (value == null) {
       if (defaultValue != null) {
         return defaultValue;
-      } else if (isNoDefault) {
+      } else if (hasNoDefault) {
         return null;
       } else if (!isOptional) {
         throw new NoSuchElementException("No configuration found for key " + key);

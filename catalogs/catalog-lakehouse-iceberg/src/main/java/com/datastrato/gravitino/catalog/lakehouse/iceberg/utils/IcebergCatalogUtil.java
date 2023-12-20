@@ -8,9 +8,11 @@ import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogP
 
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergConfig;
+import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.iceberg.CatalogProperties;
 import org.apache.iceberg.catalog.Catalog;
@@ -43,17 +45,21 @@ public class IcebergCatalogUtil {
 
   private static JdbcCatalog loadJdbcCatalog(Map<String, String> properties) {
     IcebergConfig icebergConfig = new IcebergConfig(properties);
-    icebergConfig
-        .getJdbcDriverOptional()
-        .ifPresent(
-            driverClassName -> {
-              try {
-                // Load the jdbc driver
-                Class.forName(driverClassName);
-              } catch (ClassNotFoundException e) {
-                throw new IllegalArgumentException("Couldn't load jdbc driver " + driverClassName);
-              }
-            });
+    String driverClassName = icebergConfig.getJdbcDriver();
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(driverClassName), "Jdbc driver can't be blank");
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(icebergConfig.get(IcebergConfig.JDBC_USER)),
+        "Jdbc user can't be blank");
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(icebergConfig.get(IcebergConfig.JDBC_PASSWORD)),
+        "Jdbc password can't be blank");
+    try {
+      // Load the jdbc driver
+      Class.forName(driverClassName);
+    } catch (ClassNotFoundException e) {
+      throw new IllegalArgumentException("Couldn't load jdbc driver " + driverClassName);
+    }
     JdbcCatalog jdbcCatalog =
         new JdbcCatalog(
             null,

@@ -40,7 +40,7 @@ public class TestIcebergCatalogUtil {
     Assertions.assertTrue(catalog instanceof HiveCatalog);
 
     Assertions.assertThrowsExactly(
-        NullPointerException.class,
+        IllegalArgumentException.class,
         () -> {
           IcebergCatalogUtil.loadCatalogBackend("jdbc");
         });
@@ -48,6 +48,9 @@ public class TestIcebergCatalogUtil {
     Map<String, String> properties = new HashMap<>();
     properties.put(CatalogProperties.URI, "jdbc://0.0.0.0:3306");
     properties.put(CatalogProperties.WAREHOUSE_LOCATION, "test");
+    properties.put(IcebergCatalogPropertiesMetadata.GRAVITINO_JDBC_DRIVER, "org.sqlite.JDBC");
+    properties.put(IcebergCatalogPropertiesMetadata.ICEBERG_JDBC_USER, "test");
+    properties.put(IcebergCatalogPropertiesMetadata.ICEBERG_JDBC_PASSWORD, "test");
     properties.put(IcebergCatalogPropertiesMetadata.ICEBERG_JDBC_INITIALIZE, "false");
     catalog = IcebergCatalogUtil.loadCatalogBackend("jdbc", properties);
     Assertions.assertTrue(catalog instanceof JdbcCatalog);

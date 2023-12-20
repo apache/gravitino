@@ -16,6 +16,7 @@ import com.datastrato.gravitino.exceptions.NoSuchTableException;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
+import com.google.common.base.Preconditions;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -70,10 +71,10 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
       JdbcTypeConverter jdbcTypeConverter,
       Map<String, String> conf) {
     super.initialize(dataSource, exceptionMapper, jdbcTypeConverter, conf);
-    database =
-        new JdbcConfig(conf)
-            .getJdbcDatabaseOrElseThrow(
-                "The `jdbc-database` configuration item is mandatory in PostgreSQL.");
+    database = new JdbcConfig(conf).getJdbcDatabase();
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(database),
+        "The `jdbc-database` configuration item is mandatory in PostgreSQL.");
   }
 
   @Override

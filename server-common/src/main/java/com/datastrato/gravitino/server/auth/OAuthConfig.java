@@ -33,7 +33,7 @@ public interface OAuthConfig extends Configs {
           .doc("The signing key of JWT when Gravitino uses OAuth as the authenticator")
           .version("0.3.0")
           .stringConf()
-          .createWithNoDefault();
+          .create();
 
   ConfigEntry<String> SIGNATURE_ALGORITHM_TYPE =
       new ConfigBuilder(OAUTH_CONFIG_PREFIX + "signAlgorithmType")
@@ -47,12 +47,12 @@ public interface OAuthConfig extends Configs {
           .doc("The uri of the default OAuth server")
           .version("0.3.0")
           .stringConf()
-          .createWithNoDefault();
+          .create();
 
   ConfigEntry<String> DEFAULT_TOKEN_PATH =
       new ConfigBuilder(OAUTH_CONFIG_PREFIX + "tokenPath")
           .doc("The path for token of the default OAuth server")
           .version("0.3.0")
           .stringConf()
-          .createWithNoDefault();
+          .create();
 }

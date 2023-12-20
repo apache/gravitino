@@ -129,6 +129,13 @@ public class IcebergRESTServiceBaseIT extends AbstractIT {
         AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
             + IcebergRESTService.SERVICE_NAME
             + "."
+            + IcebergConfig.JDBC_DRIVER.getKey(),
+        "org.sqlite.JDBC");
+
+    configMap.put(
+        AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
+            + IcebergRESTService.SERVICE_NAME
+            + "."
             + IcebergConfig.CATALOG_URI.getKey(),
         "jdbc:sqlite::memory:");
 
