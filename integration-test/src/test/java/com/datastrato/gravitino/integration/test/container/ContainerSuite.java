@@ -17,6 +17,7 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.List;
+import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.DockerClientFactory;
@@ -27,9 +28,9 @@ public class ContainerSuite implements Closeable {
   private static volatile ContainerSuite instance = null;
 
   // The subnet must match the configuration in `dev/docker/tools/mac-docker-connector.conf`
-  public static final String CONTAINER_NETWORK_SUBNET = "10.20.30.0/26";
+  public static final String CONTAINER_NETWORK_SUBNET = "10.20.30.0/28";
   private static final String CONTAINER_NETWORK_GATEWAY = "10.20.30.1";
-  private static final String CONTAINER_NETWORK_IPRANGE = "10.20.30.62/26";
+  private static final String CONTAINER_NETWORK_IPRANGE = "10.20.30.14/28";
   private static final String NETWORK_NAME = "gravitino-ci-network";
 
   private static Network network = null;
@@ -45,7 +46,10 @@ public class ContainerSuite implements Closeable {
       Info info = dockerClient.infoCmd().exec();
       LOG.info("Docker info: {}", info);
 
-      network = createDockerNetwork();
+      if (System.getenv("NEED_CREATE_DOCKER_NETWORK") != null
+          && Objects.equals(System.getenv("NEED_CREATE_DOCKER_NETWORK"), "true")) {
+        network = createDockerNetwork();
+      }
     } catch (Exception e) {
       throw new RuntimeException("Failed to initialize ContainerSuite", e);
     }
@@ -150,6 +154,13 @@ public class ContainerSuite implements Closeable {
       for (Config ipamConfig : ipamConfigs) {
         try {
           if (ipRangesOverlap(ipamConfig.getSubnet(), CONTAINER_NETWORK_SUBNET)) {
+            LOG.error(
+                "The Docker of the network {} subnet {} conflicts with the `gravitino-ci-network` {}, "
+                    + "You can either remove {} network from Docker, or modify the `ContainerSuite.CONTAINER_NETWORK_SUBNET` variable",
+                network.getName(),
+                ipamConfig.getSubnet(),
+                CONTAINER_NETWORK_SUBNET,
+                network.getName());
             throw new RuntimeException(
                 "The Docker of the network "
                     + network.getName()
@@ -185,21 +196,18 @@ public class ContainerSuite implements Closeable {
     long[] net1 = cidrToRange(cidr1);
     long[] net2 = cidrToRange(cidr2);
 
-    LOG.info("Subnet1: {} allocate IP ranger [{}~{}]", cidr1, long2Ip(net1[0]), long2Ip(net1[1]));
-    LOG.info("Subnet2: {} allocate IP ranger [{}~{}]", cidr2, long2Ip(net2[0]), long2Ip(net2[1]));
+    long startIp1 = net1[0];
+    long endIp1 = net1[1];
+    long startIp2 = net2[0];
+    long endIp2 = net2[1];
 
-    if (net1[0] == net2[0] || net1[0] == net2[1] || net1[1] == net2[0] || net1[1] == net2[1]) {
-      return true;
-    } else if (net1[0] > net2[0] && net1[0] < net2[1]) {
-      return true;
-    } else if (net1[1] > net2[0] && net1[1] < net2[1]) {
-      return true;
-    } else if (net2[0] > net1[0] && net2[0] < net1[1]) {
-      return true;
-    } else if (net2[1] > net1[0] && net2[1] < net1[1]) {
-      return true;
-    } else {
+    LOG.info("Subnet1: {} allocate IP ranger [{} ~ {}]", cidr1, long2Ip(startIp1), long2Ip(endIp1));
+    LOG.info("Subnet2: {} allocate IP ranger [{} ~ {}]", cidr2, long2Ip(startIp2), long2Ip(endIp2));
+
+    if (startIp1 > endIp2 || endIp1 < startIp2) {
       return false;
+    } else {
+      return true;
     }
   }
 
