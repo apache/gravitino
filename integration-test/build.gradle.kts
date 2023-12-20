@@ -263,6 +263,8 @@ tasks.test {
         fileMode = 0b111101101
       }
 
+      jvmArgs(project.property("extraJvmArgs") as List<*>)
+
       // Default use MiniGravitino to run integration tests
       environment("GRAVITINO_ROOT_DIR", rootDir.path)
       environment("HADOOP_USER_NAME", "datastrato")
