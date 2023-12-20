@@ -123,7 +123,6 @@ public class CatalogConnectorManager {
 
         LOG.debug("Load metalake: " + usedMetalake);
         loadCatalogs(metalake);
-        // TODO (yuhui) need to handle metalake dropped.
       }
     } finally {
       // Load metalake for handling catalog in the metalake updates.
@@ -231,7 +230,7 @@ public class CatalogConnectorManager {
           gravitinoClient.loadMetalake(NameIdentifier.ofMetalake(catalog.namespace().toString()));
       metalake.createCatalog(catalog, Catalog.Type.RELATIONAL, provider, "Trino created", props);
 
-      LOG.info("Create catalog {} successfully.", catalog);
+      LOG.info("Create catalog {} in metalake {} successfully.", catalog, metalake);
 
       Future future = executorService.schedule(this::loadMetalake, 0, TimeUnit.SECONDS);
       future.get(30, TimeUnit.SECONDS);
@@ -280,6 +279,8 @@ public class CatalogConnectorManager {
         throw new TrinoException(
             GRAVITINO_UNSUPPORTED_OPERATION, "Drop catalog " + catalog + " does not support.");
       }
+      LOG.info("Drop catalog {} in metalake {} successfully.", catalog, metalake);
+
       Future future = executorService.schedule(this::loadMetalake, 0, TimeUnit.SECONDS);
       future.get(30, TimeUnit.SECONDS);
 
