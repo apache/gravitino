@@ -5,6 +5,7 @@
 
 package com.datastrato.gravitino.trino.connector.catalog.jdbc;
 
+import com.datastrato.gravitino.catalogs.jdbc.JdbcCatalogPropertyKeys;
 import com.datastrato.gravitino.shaded.org.apache.commons.collections4.bidimap.TreeBidiMap;
 import com.datastrato.gravitino.trino.connector.catalog.PropertyConverter;
 import com.google.common.collect.ImmutableMap;
@@ -22,9 +23,11 @@ public class JDBCCatalogPropertyConverter extends PropertyConverter {
       new TreeBidiMap<>(
           new ImmutableMap.Builder<String, String>()
               // Key is the Trino property, value is the Gravitino property
-              .put(JDBC_CONNECTION_URL_KEY, "jdbc-url")
-              .put(JDBC_CONNECTION_USER_KEY, "jdbc-user")
-              .put(JDBC_CONNECTION_PASSWORD_KEY, "jdbc-password")
+              .put(JDBC_CONNECTION_URL_KEY, JdbcCatalogPropertyKeys.JDBC_CONNECTION_URL_KEY)
+              .put(JDBC_CONNECTION_USER_KEY, JdbcCatalogPropertyKeys.JDBC_CONNECTION_USER_KEY)
+              .put(
+                  JDBC_CONNECTION_PASSWORD_KEY,
+                  JdbcCatalogPropertyKeys.JDBC_CONNECTION_PASSWORD_KEY)
               .build());
 
   public static final Set<String> REQUIRED_PROPERTIES =

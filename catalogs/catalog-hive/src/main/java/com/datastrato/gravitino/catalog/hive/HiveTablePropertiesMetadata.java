@@ -9,6 +9,17 @@ import static com.datastrato.gravitino.catalog.PropertyEntry.enumImmutableProper
 import static com.datastrato.gravitino.catalog.PropertyEntry.stringImmutablePropertyEntry;
 import static com.datastrato.gravitino.catalog.PropertyEntry.stringReservedPropertyEntry;
 import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.StorageFormat.TEXTFILE;
+import static com.datastrato.gravitino.catalogs.hive.HiveTablePropertyKeys.EXTERNAL;
+import static com.datastrato.gravitino.catalogs.hive.HiveTablePropertyKeys.FORMAT;
+import static com.datastrato.gravitino.catalogs.hive.HiveTablePropertyKeys.INPUT_FORMAT;
+import static com.datastrato.gravitino.catalogs.hive.HiveTablePropertyKeys.LOCATION;
+import static com.datastrato.gravitino.catalogs.hive.HiveTablePropertyKeys.NUM_FILES;
+import static com.datastrato.gravitino.catalogs.hive.HiveTablePropertyKeys.OUTPUT_FORMAT;
+import static com.datastrato.gravitino.catalogs.hive.HiveTablePropertyKeys.SERDE_LIB;
+import static com.datastrato.gravitino.catalogs.hive.HiveTablePropertyKeys.SERDE_NAME;
+import static com.datastrato.gravitino.catalogs.hive.HiveTablePropertyKeys.TABLE_TYPE;
+import static com.datastrato.gravitino.catalogs.hive.HiveTablePropertyKeys.TOTAL_SIZE;
+import static com.datastrato.gravitino.catalogs.hive.HiveTablePropertyKeys.TRANSIENT_LAST_DDL_TIME;
 import static org.apache.hadoop.hive.metastore.TableType.MANAGED_TABLE;
 
 import com.datastrato.gravitino.catalog.BasePropertiesMetadata;
@@ -23,18 +34,8 @@ import org.apache.hadoop.hive.metastore.TableType;
 
 public class HiveTablePropertiesMetadata extends BasePropertiesMetadata {
   public static final String COMMENT = "comment";
-  public static final String NUM_FILES = "numFiles";
-  public static final String TOTAL_SIZE = "totalSize";
-  public static final String EXTERNAL = "EXTERNAL";
-  public static final String LOCATION = "location";
-  public static final String FORMAT = "format";
-  public static final String TABLE_TYPE = "table-type";
-  public static final String INPUT_FORMAT = "input-format";
-  public static final String OUTPUT_FORMAT = "output-format";
-  public static final String SERDE_NAME = "serde-name";
-  public static final String SERDE_LIB = "serde-lib";
+
   public static final String SERDE_PARAMETER_PREFIX = "serde.parameter.";
-  public static final String TRANSIENT_LAST_DDL_TIME = "transient_lastDdlTime";
 
   public static final String TEXT_INPUT_FORMAT_CLASS = "org.apache.hadoop.mapred.TextInputFormat";
   public static final String IGNORE_KEY_OUTPUT_FORMAT_CLASS =

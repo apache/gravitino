@@ -7,6 +7,7 @@ package com.datastrato.gravitino.catalog.lakehouse.iceberg;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.catalog.CatalogOperations;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.ops.IcebergTableOps;
+import com.datastrato.gravitino.catalogs.Iceberg.IcebergCatalogPropertyKeys;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.CatalogEntity;
 import com.google.common.collect.Maps;
@@ -68,16 +69,16 @@ public class TestIcebergCatalog {
           IllegalArgumentException.class,
           () -> {
             Map<String, String> map = Maps.newHashMap();
-            map.put(IcebergCatalogPropertiesMetadata.CATALOG_BACKEND_NAME, "test");
+            map.put(IcebergCatalogPropertyKeys.CATALOG_BACKEND_NAME, "test");
             ops.catalogPropertiesMetadata().validatePropertyForCreate(map);
           });
 
       Assertions.assertDoesNotThrow(
           () -> {
             Map<String, String> map = Maps.newHashMap();
-            map.put(IcebergCatalogPropertiesMetadata.CATALOG_BACKEND_NAME, "hive");
-            map.put(IcebergCatalogPropertiesMetadata.URI, "127.0.0.1");
-            map.put(IcebergCatalogPropertiesMetadata.WAREHOUSE, "test");
+            map.put(IcebergCatalogPropertyKeys.CATALOG_BACKEND_NAME, "hive");
+            map.put(IcebergCatalogPropertyKeys.URI, "127.0.0.1");
+            map.put(IcebergCatalogPropertyKeys.WAREHOUSE, "test");
             ops.catalogPropertiesMetadata().validatePropertyForCreate(map);
           });
 
@@ -87,7 +88,7 @@ public class TestIcebergCatalog {
               () -> ops.catalogPropertiesMetadata().validatePropertyForCreate(Maps.newHashMap()));
 
       Assertions.assertTrue(
-          throwable.getMessage().contains(IcebergCatalogPropertiesMetadata.CATALOG_BACKEND_NAME));
+          throwable.getMessage().contains(IcebergCatalogPropertyKeys.CATALOG_BACKEND_NAME));
     }
   }
 }

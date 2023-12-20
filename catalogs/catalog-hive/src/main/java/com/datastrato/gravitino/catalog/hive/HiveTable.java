@@ -4,16 +4,16 @@
  */
 package com.datastrato.gravitino.catalog.hive;
 
+import static com.datastrato.gravitino.catalog.hive.HiveSchemaPropertiesMetadata.LOCATION;
 import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.COMMENT;
-import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.EXTERNAL;
-import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.FORMAT;
-import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.INPUT_FORMAT;
-import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.LOCATION;
-import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.OUTPUT_FORMAT;
-import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.SERDE_LIB;
-import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.SERDE_NAME;
 import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.SERDE_PARAMETER_PREFIX;
-import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.TABLE_TYPE;
+import static com.datastrato.gravitino.catalogs.hive.HiveTablePropertyKeys.EXTERNAL;
+import static com.datastrato.gravitino.catalogs.hive.HiveTablePropertyKeys.FORMAT;
+import static com.datastrato.gravitino.catalogs.hive.HiveTablePropertyKeys.INPUT_FORMAT;
+import static com.datastrato.gravitino.catalogs.hive.HiveTablePropertyKeys.OUTPUT_FORMAT;
+import static com.datastrato.gravitino.catalogs.hive.HiveTablePropertyKeys.SERDE_LIB;
+import static com.datastrato.gravitino.catalogs.hive.HiveTablePropertyKeys.SERDE_NAME;
+import static com.datastrato.gravitino.catalogs.hive.HiveTablePropertyKeys.TABLE_TYPE;
 import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.identity;
 import static org.apache.hadoop.hive.metastore.TableType.EXTERNAL_TABLE;
 import static org.apache.hadoop.hive.metastore.TableType.MANAGED_TABLE;

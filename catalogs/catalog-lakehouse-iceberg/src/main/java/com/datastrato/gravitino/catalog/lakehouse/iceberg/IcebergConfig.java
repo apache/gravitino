@@ -5,13 +5,13 @@
 
 package com.datastrato.gravitino.catalog.lakehouse.iceberg;
 
-import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogPropertiesMetadata.CATALOG_BACKEND_NAME;
-import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogPropertiesMetadata.GRAVITINO_JDBC_DRIVER;
 import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogPropertiesMetadata.ICEBERG_JDBC_INITIALIZE;
 import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogPropertiesMetadata.ICEBERG_JDBC_PASSWORD;
 import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogPropertiesMetadata.ICEBERG_JDBC_USER;
-import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogPropertiesMetadata.URI;
-import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogPropertiesMetadata.WAREHOUSE;
+import static com.datastrato.gravitino.catalogs.Iceberg.IcebergCatalogPropertyKeys.CATALOG_BACKEND_NAME;
+import static com.datastrato.gravitino.catalogs.Iceberg.IcebergCatalogPropertyKeys.JDBC_BACKEND_CONNECTION_DRIVER_KEY;
+import static com.datastrato.gravitino.catalogs.Iceberg.IcebergCatalogPropertyKeys.URI;
+import static com.datastrato.gravitino.catalogs.Iceberg.IcebergCatalogPropertyKeys.WAREHOUSE;
 
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.config.ConfigBuilder;
@@ -57,7 +57,7 @@ public class IcebergConfig extends Config {
           .createWithDefault(null);
 
   public static final ConfigEntry<Optional<String>> JDBC_DRIVER =
-      new ConfigBuilder(GRAVITINO_JDBC_DRIVER)
+      new ConfigBuilder(JDBC_BACKEND_CONNECTION_DRIVER_KEY)
           .doc("The driver of the Jdbc connection")
           .version("0.3.0")
           .stringConf()

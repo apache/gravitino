@@ -5,6 +5,7 @@
 
 package com.datastrato.gravitino.trino.connector.catalog.hive;
 
+import static com.datastrato.gravitino.trino.connector.catalog.hive.HiveSchemaPropertyConverter.TRINO_HIVE_SCHEMA_LOCATION;
 import static io.trino.spi.session.PropertyMetadata.booleanProperty;
 import static io.trino.spi.session.PropertyMetadata.enumProperty;
 import static io.trino.spi.session.PropertyMetadata.stringProperty;
@@ -19,32 +20,61 @@ public class HivePropertyMeta implements HasPropertyMeta {
 
   private static final List<PropertyMetadata<?>> SCHEMA_PROPERTY_META =
       ImmutableList.of(
-          stringProperty("location", "Hive storage location for the schema", null, false));
+          stringProperty(
+              TRINO_HIVE_SCHEMA_LOCATION, "Hive storage location for the schema", null, false));
 
   private static final List<PropertyMetadata<?>> TABLE_PROPERTY_META =
       ImmutableList.of(
-          stringProperty("format", "Hive storage format for the table", "TEXTFILE", false),
-          stringProperty("total_size", "total size of the table", null, false),
-          stringProperty("num_files", "number of files", null, false),
-          stringProperty("external", "Indicate whether it is an external table", null, true),
-          stringProperty("location", "HDFS location for table storage", null, false),
-          stringProperty("table_type", "The type of Hive table", null, false),
           stringProperty(
-              "input_format",
+              HiveTablePropertyConverter.TRINO_HIVE_TABLE_FORMAT,
+              "Hive storage format for the table",
+              "TEXTFILE",
+              false),
+          stringProperty(
+              HiveTablePropertyConverter.TRINO_HIVE_TABLE_TOTAL_SIZE,
+              "total size of the table",
+              null,
+              false),
+          stringProperty(
+              HiveTablePropertyConverter.TRINO_HIVE_TABLE_NUM_FILES,
+              "number of files",
+              null,
+              false),
+          stringProperty(
+              HiveTablePropertyConverter.TRINO_HIVE_TABLE_EXTERNAL,
+              "Indicate whether it is an external table",
+              null,
+              true),
+          stringProperty(
+              HiveTablePropertyConverter.TRINO_HIVE_TABLE_LOCATION,
+              "HDFS location for table storage",
+              null,
+              false),
+          stringProperty(
+              HiveTablePropertyConverter.TRINO_HIVE_TABLE_TABLE_TYPE,
+              "The type of Hive table",
+              null,
+              false),
+          stringProperty(
+              HiveTablePropertyConverter.TRINO_HIVE_TABLE_INPUT_FORMAT,
               "The input format class for the table",
               "org.apache.hadoop.mapred.TextInputFormat",
               false),
           stringProperty(
-              "output_format",
+              HiveTablePropertyConverter.TRINO_HIVE_TABLE_OUTPUT_FORMAT,
               "The output format class for the table",
               "org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat",
               false),
           stringProperty(
-              "serde_lib",
+              HiveTablePropertyConverter.TRINO_HIVE_TABLE_SERDE_LIB,
               "The serde library class for the table",
               "org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe",
               false),
-          stringProperty("serde_name", "Name of the serde, table name by default", null, false));
+          stringProperty(
+              HiveTablePropertyConverter.TRINO_HIVE_TABLE_SERDE_NAME,
+              "Name of the serde, table name by default",
+              null,
+              false));
 
   enum CatalogStorageFormat {
     AVRO,

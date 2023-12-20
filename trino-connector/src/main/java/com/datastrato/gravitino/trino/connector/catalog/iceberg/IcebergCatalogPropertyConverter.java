@@ -5,6 +5,7 @@
 
 package com.datastrato.gravitino.trino.connector.catalog.iceberg;
 
+import com.datastrato.gravitino.catalogs.Iceberg.IcebergCatalogPropertyKeys;
 import com.datastrato.gravitino.shaded.org.apache.commons.collections4.bidimap.TreeBidiMap;
 import com.datastrato.gravitino.trino.connector.GravitinoErrorCode;
 import com.datastrato.gravitino.trino.connector.catalog.PropertyConverter;
@@ -69,11 +70,20 @@ public class IcebergCatalogPropertyConverter extends PropertyConverter {
 
     Map<String, String> jdbcProperties = new HashMap<>();
     jdbcProperties.put("iceberg.catalog.type", "jdbc");
-    jdbcProperties.put("iceberg.jdbc-catalog.driver-class", properties.get("jdbc-driver"));
-    jdbcProperties.put("iceberg.jdbc-catalog.connection-url", properties.get("uri"));
-    jdbcProperties.put("iceberg.jdbc-catalog.connection-user", properties.get("jdbc-user"));
-    jdbcProperties.put("iceberg.jdbc-catalog.connection-password", properties.get("jdbc-password"));
-    jdbcProperties.put("iceberg.jdbc-catalog.default-warehouse-dir", properties.get("warehouse"));
+    jdbcProperties.put(
+        "iceberg.jdbc-catalog.driver-class",
+        properties.get(IcebergCatalogPropertyKeys.JDBC_BACKEND_CONNECTION_DRIVER_KEY));
+    jdbcProperties.put(
+        "iceberg.jdbc-catalog.connection-url", properties.get(IcebergCatalogPropertyKeys.URI));
+    jdbcProperties.put(
+        "iceberg.jdbc-catalog.connection-user",
+        properties.get(IcebergCatalogPropertyKeys.JDBC_BACKEND_CONNECTION_USER_KEY));
+    jdbcProperties.put(
+        "iceberg.jdbc-catalog.connection-password",
+        properties.get(IcebergCatalogPropertyKeys.JDBC_BACKEND_CONNECTION_PASSWORD_KEY));
+    jdbcProperties.put(
+        "iceberg.jdbc-catalog.default-warehouse-dir",
+        properties.get(IcebergCatalogPropertyKeys.WAREHOUSE));
 
     // TODO (FANG) make the catalog name equal to the catalog name in Gravitino
     jdbcProperties.put("iceberg.jdbc-catalog.catalog-name", "jdbc");

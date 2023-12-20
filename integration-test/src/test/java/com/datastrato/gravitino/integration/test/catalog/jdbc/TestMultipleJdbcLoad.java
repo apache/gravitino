@@ -4,14 +4,12 @@
  */
 package com.datastrato.gravitino.integration.test.catalog.jdbc;
 
-import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogPropertiesMetadata.GRAVITINO_JDBC_PASSWORD;
-import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogPropertiesMetadata.GRAVITINO_JDBC_USER;
-
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.catalog.jdbc.config.JdbcConfig;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergConfig;
+import com.datastrato.gravitino.catalogs.jdbc.JdbcCatalogPropertyKeys;
 import com.datastrato.gravitino.client.GravitinoMetaLake;
 import com.datastrato.gravitino.dto.rel.ColumnDTO;
 import com.datastrato.gravitino.integration.test.catalog.jdbc.mysql.CatalogMysqlIT;
@@ -188,8 +186,10 @@ public class TestMultipleJdbcLoad extends AbstractIT {
     icebergPgConf.put(IcebergConfig.CATALOG_BACKEND.getKey(), "jdbc");
     icebergPgConf.put(IcebergConfig.CATALOG_WAREHOUSE.getKey(), "file:///tmp/iceberg-jdbc");
     icebergPgConf.put(IcebergConfig.JDBC_DRIVER.getKey(), postgreSQLContainer.getDriverClassName());
-    icebergPgConf.put(GRAVITINO_JDBC_USER, postgreSQLContainer.getUsername());
-    icebergPgConf.put(GRAVITINO_JDBC_PASSWORD, postgreSQLContainer.getPassword());
+    icebergPgConf.put(
+        JdbcCatalogPropertyKeys.JDBC_CONNECTION_USER_KEY, postgreSQLContainer.getUsername());
+    icebergPgConf.put(
+        JdbcCatalogPropertyKeys.JDBC_CONNECTION_PASSWORD_KEY, postgreSQLContainer.getPassword());
 
     Catalog postgreSqlCatalog =
         metalake.createCatalog(
@@ -205,8 +205,10 @@ public class TestMultipleJdbcLoad extends AbstractIT {
     icebergMysqlConf.put(IcebergConfig.CATALOG_BACKEND.getKey(), "jdbc");
     icebergMysqlConf.put(IcebergConfig.CATALOG_WAREHOUSE.getKey(), "file:///tmp/iceberg-jdbc");
     icebergMysqlConf.put(IcebergConfig.JDBC_DRIVER.getKey(), mySQLContainer.getDriverClassName());
-    icebergMysqlConf.put(GRAVITINO_JDBC_USER, mySQLContainer.getUsername());
-    icebergMysqlConf.put(GRAVITINO_JDBC_PASSWORD, mySQLContainer.getPassword());
+    icebergMysqlConf.put(
+        JdbcCatalogPropertyKeys.JDBC_CONNECTION_USER_KEY, mySQLContainer.getUsername());
+    icebergMysqlConf.put(
+        JdbcCatalogPropertyKeys.JDBC_CONNECTION_PASSWORD_KEY, mySQLContainer.getPassword());
     String mysqlCatalogName = GravitinoITUtils.genRandomName("it_iceberg_mysql");
     Catalog mysqlCatalog =
         metalake.createCatalog(

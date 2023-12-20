@@ -13,6 +13,7 @@ plugins {
 dependencies {
   implementation(project(":api"))
   implementation(project(":core"))
+  implementation(project(":common"))
 
   compileOnly(libs.lombok)
   annotationProcessor(libs.lombok)
