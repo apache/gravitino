@@ -310,6 +310,7 @@ public class TestPostgreSqlTableOperations extends TestPostgreSqlAbstractIT {
       JdbcConnectorUtils.executeUpdate(connection, "CREATE DATABASE " + testDbName);
     }
     HashMap<String, String> properties = Maps.newHashMap();
+    properties.put(JdbcConfig.JDBC_DRIVER.getKey(), CONTAINER.getDriverClassName());
     String jdbcUrl =
         StringUtils.substring(CONTAINER.getJdbcUrl(), 0, CONTAINER.getJdbcUrl().lastIndexOf("/"));
     properties.put(JdbcConfig.JDBC_URL.getKey(), jdbcUrl + "/" + testDbName);

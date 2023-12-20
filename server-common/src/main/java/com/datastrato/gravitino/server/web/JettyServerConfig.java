@@ -107,21 +107,21 @@ public final class JettyServerConfig {
           .doc("Path to the key store file")
           .version("0.3.0")
           .stringConf()
-          .createWithDefault("");
+          .create();
 
   public static final ConfigEntry<String> SSL_KEYSTORE_PASSWORD =
       new ConfigBuilder("keyStorePassword")
           .doc("Password to the key store")
           .version("0.3.0")
           .stringConf()
-          .createWithDefault("");
+          .create();
 
   public static final ConfigEntry<String> SSL_MANAGER_PASSWORD =
       new ConfigBuilder("managerPassword")
           .doc("Manager password to the key store")
           .version("0.3.0")
           .stringConf()
-          .createWithDefault("");
+          .create();
 
   public static final ConfigEntry<String> SSL_KEYSTORE_TYPE =
       new ConfigBuilder("keyStoreType")
@@ -155,14 +155,14 @@ public final class JettyServerConfig {
           .doc("Path to the trust store file")
           .version("0.3.0")
           .stringConf()
-          .createWithDefault("");
+          .create();
 
   public static final ConfigEntry<String> SSL_TRUST_STORE_PASSWORD =
       new ConfigBuilder("trustStorePassword")
           .doc("Password to the trust store")
           .version("0.3.0")
           .stringConf()
-          .createWithDefault("");
+          .create();
 
   public static final ConfigEntry<String> SSL_TRUST_STORE_TYPE =
       new ConfigBuilder("trustStoreType")

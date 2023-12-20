@@ -17,7 +17,6 @@ import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.config.ConfigBuilder;
 import com.datastrato.gravitino.config.ConfigEntry;
 import java.util.Map;
-import java.util.Optional;
 
 public class IcebergConfig extends Config {
 
@@ -33,35 +32,35 @@ public class IcebergConfig extends Config {
           .doc("Warehouse directory of catalog")
           .version("0.2.0")
           .stringConf()
-          .createWithDefault(null);
+          .create();
 
   public static final ConfigEntry<String> CATALOG_URI =
       new ConfigBuilder(URI)
           .doc("The uri config of the Iceberg catalog")
           .version("0.2.0")
           .stringConf()
-          .createWithDefault(null);
+          .create();
 
   public static final ConfigEntry<String> JDBC_USER =
       new ConfigBuilder(ICEBERG_JDBC_USER)
           .doc("The username of the Jdbc connection")
           .version("0.2.0")
           .stringConf()
-          .createWithDefault(null);
+          .create();
 
   public static final ConfigEntry<String> JDBC_PASSWORD =
       new ConfigBuilder(ICEBERG_JDBC_PASSWORD)
           .doc("The password of the Jdbc connection")
           .version("0.2.0")
           .stringConf()
-          .createWithDefault(null);
+          .create();
 
-  public static final ConfigEntry<Optional<String>> JDBC_DRIVER =
+  public static final ConfigEntry<String> JDBC_DRIVER =
       new ConfigBuilder(GRAVITINO_JDBC_DRIVER)
           .doc("The driver of the Jdbc connection")
           .version("0.3.0")
           .stringConf()
-          .createWithOptional();
+          .create();
 
   public static final ConfigEntry<Boolean> JDBC_INIT_TABLES =
       new ConfigBuilder(ICEBERG_JDBC_INITIALIZE)
@@ -70,7 +69,7 @@ public class IcebergConfig extends Config {
           .booleanConf()
           .createWithDefault(true);
 
-  public Optional<String> getJdbcDriverOptional() {
+  public String getJdbcDriver() {
     return get(JDBC_DRIVER);
   }
 

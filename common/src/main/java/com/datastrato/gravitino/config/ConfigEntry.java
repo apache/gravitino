@@ -37,6 +37,7 @@ public class ConfigEntry<T> {
   @Getter private boolean isDeprecated;
 
   private boolean isOptional;
+  private boolean hasNoDefault;
 
   /**
    * Creates a new ConfigEntry instance.
@@ -101,6 +102,11 @@ public class ConfigEntry<T> {
     this.isOptional = true;
   }
 
+  /** Marks this configuration as no default value. */
+  void setHasNoDefault() {
+    this.hasNoDefault = true;
+  }
+
   /**
    * Creates a new ConfigEntry instance based on this configuration entry with a default value.
    *
@@ -135,6 +141,20 @@ public class ConfigEntry<T> {
   }
 
   /**
+   * Creates a new ConfigEntry instance based on this configuration entry with no default value.
+   *
+   * @return A new ConfigEntry instance with no default value.
+   */
+  public ConfigEntry<T> create() {
+    ConfigEntry<T> conf =
+        new ConfigEntry<>(key, version, doc, alternatives, isPublic, isDeprecated);
+    conf.setValueConverter(valueConverter);
+    conf.setStringConverter(stringConverter);
+    conf.setHasNoDefault();
+    return conf;
+  }
+
+  /**
    * Reads the configuration value.
    *
    * @param properties The map containing the configuration properties.
@@ -155,6 +175,8 @@ public class ConfigEntry<T> {
     if (value == null) {
       if (defaultValue != null) {
         return defaultValue;
+      } else if (hasNoDefault) {
+        return null;
       } else if (!isOptional) {
         throw new NoSuchElementException("No configuration found for key " + key);
       }
