@@ -264,9 +264,11 @@ curl -v -X GET --cacert ./certificate.pem -H "Accept: application/vnd.gravitino.
 Gravitino supports custom filters to implement the user specified logic to satisfy different safety needs.
 
 ### Gravitino server's configuration
+
 | Configuration item                          | Description                                                      | Default value | Required | Since version |
 |---------------------------------------------|------------------------------------------------------------------|---------------|----------|---------------|
 | `gravitino.server.webserver.customFilters`  | Comma separated list of filter class names to apply to the APIs. | ``            | No       | 0.4.0         |
+
 The filter should be a standard javax servlet Filter.
 Filter parameters can also be specified in the configuration, by setting config entries of the form `gravitino.server.webserver.<class name of filter>.param.<param name>=<value>`
 
@@ -278,9 +280,11 @@ gravitino.server.webserver.com.test.filter1.param.name2=ba
 ```
 
 ### Iceberg REST service's configuration
+
 | Configuration item                                  | Description                                                        | Default value | Required | Since version |
 |-----------------------------------------------------|--------------------------------------------------------------------|---------------|----------|---------------|
 | `gravitino.auxService.iceberg-rest.customFilters`   | Comma separated list of filter class names to apply to the APIs.   | ``            | No       | 0.4.0         |
+
 The filter should be a standard javax servlet Filter.
 Filter parameters can also be specified in the configuration, by setting config entries of the form `gravitino.auxService.iceberg-rest.<class name of filter>.param.<param name>=<value>`
 
@@ -297,7 +301,7 @@ If you want to use a cross-origin filter for the Gravitino server, you can follo
 
 ```shell
 wget https://repo1.maven.org/maven2/org/eclipse/jetty/jetty-servlets/9.4.51.v20230217/jetty-servlets-9.4.51.v20230217.jar 
-cp jetty-servlets-9.4.51.v20230217.jar <gravitno home>/libs
+cp jetty-servlets-9.4.51.v20230217.jar <gravitino home>/libs
 ```
 
 You can refer to the [Configurations](gravitino-server-config.md) and append the configurations to the conf/gravitino.conf.
