@@ -10,16 +10,12 @@ import com.datastrato.gravitino.aux.AuxiliaryServiceManager;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergConfig;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergRESTService;
-import com.datastrato.gravitino.integration.test.container.ContainerSuite;
-import com.datastrato.gravitino.integration.test.container.HiveContainer;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
-import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
 import com.datastrato.gravitino.server.web.JettyServerConfig;
 import com.datastrato.gravitino.utils.MapUtils;
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -31,8 +27,6 @@ import org.apache.spark.sql.SparkSession;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.TestInstance;
-import org.junit.jupiter.api.TestInstance.Lifecycle;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -40,31 +34,33 @@ import org.slf4j.LoggerFactory;
  * <p>Referred from spark/v3.4/spark/src/test/java/org/apache/iceberg/spark/SparkTestBase.java
  */
 
-@TestInstance(Lifecycle.PER_CLASS)
-public class IcebergRESTServiceBaseIT extends AbstractIT {
+public abstract class IcebergRESTServiceBaseIT extends AbstractIT {
   public static final Logger LOG = LoggerFactory.getLogger(IcebergRESTServiceBaseIT.class);
-  private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
   private SparkSession sparkSession;
   protected IcebergCatalogBackend catalogType = IcebergCatalogBackend.MEMORY;
 
   @BeforeAll
   void initIcebergTestEnv() throws Exception {
-    containerSuite.startHiveContainer();
+    // Start Gravitino docker container
+    initEnv();
+    // Inject Iceberg REST service config to gravitino.conf
     registerIcebergCatalogConfig();
+    // Start Gravitino server
     AbstractIT.startIntegrationTest();
+    // Start Spark session
     initSparkEnv();
-    LOG.info("gravitino and spark env started,{}", catalogType);
+    LOG.info("Gravitino and Spark env started,{}", catalogType);
   }
 
   @AfterAll
   void stopIcebergTestEnv() throws Exception {
     stopSparkEnv();
     AbstractIT.stopIntegrationTest();
-    LOG.info("gravitino and spark env stopped,{}", catalogType);
+    LOG.info("Gravitino and Spark env stopped,{}", catalogType);
   }
 
   // AbstractIT#startIntegrationTest() is static, so we couldn't inject catalog info
-  // if startIntegrationTest() is auto invoked by Junit. so here we override
+  // if startIntegrationTest() is auto invoked by Junit. So here we override
   // startIntegrationTest() to disable the auto invoke by junit.
   @BeforeAll
   public static void startIntegrationTest() {}
@@ -76,134 +72,14 @@ public class IcebergRESTServiceBaseIT extends AbstractIT {
     return !catalogType.equals(IcebergCatalogBackend.MEMORY);
   }
 
+  abstract void initEnv();
+
+  abstract Map<String, String> getCatalogConfig();
+
   private void registerIcebergCatalogConfig() {
-    Map<String, String> icebergConfigs;
-
-    switch (catalogType) {
-      case HIVE:
-        icebergConfigs = getIcebergHiveCatalogConfigs();
-        break;
-      case JDBC:
-        icebergConfigs = getIcebergJdbcCatalogConfigs();
-        break;
-      case MEMORY:
-        icebergConfigs = getIcebergMemoryCatalogConfigs();
-        break;
-      default:
-        throw new RuntimeException("Not support Iceberg catalog type:" + catalogType);
-    }
-
+    Map<String, String> icebergConfigs = getCatalogConfig();
     AbstractIT.registerCustomConfigs(icebergConfigs);
     LOG.info("Iceberg REST service config registered," + StringUtils.join(icebergConfigs));
-  }
-
-  private static Map<String, String> getIcebergMemoryCatalogConfigs() {
-    Map<String, String> configMap = new HashMap<>();
-    configMap.put(
-        AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
-            + IcebergRESTService.SERVICE_NAME
-            + "."
-            + IcebergConfig.CATALOG_BACKEND.getKey(),
-        IcebergCatalogBackend.MEMORY.toString().toLowerCase());
-
-    configMap.put(
-        AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
-            + IcebergRESTService.SERVICE_NAME
-            + "."
-            + IcebergConfig.CATALOG_WAREHOUSE.getKey(),
-        "/tmp/");
-    return configMap;
-  }
-
-  private static Map<String, String> getIcebergJdbcCatalogConfigs() {
-    Map<String, String> configMap = new HashMap<>();
-
-    configMap.put(
-        AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
-            + IcebergRESTService.SERVICE_NAME
-            + "."
-            + IcebergConfig.CATALOG_BACKEND.getKey(),
-        IcebergCatalogBackend.JDBC.toString().toLowerCase());
-
-    configMap.put(
-        AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
-            + IcebergRESTService.SERVICE_NAME
-            + "."
-            + IcebergConfig.JDBC_DRIVER.getKey(),
-        "org.sqlite.JDBC");
-
-    configMap.put(
-        AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
-            + IcebergRESTService.SERVICE_NAME
-            + "."
-            + IcebergConfig.CATALOG_URI.getKey(),
-        "jdbc:sqlite::memory:");
-
-    configMap.put(
-        AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
-            + IcebergRESTService.SERVICE_NAME
-            + "."
-            + IcebergConfig.JDBC_USER.getKey(),
-        "iceberg");
-
-    configMap.put(
-        AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
-            + IcebergRESTService.SERVICE_NAME
-            + "."
-            + IcebergConfig.JDBC_PASSWORD.getKey(),
-        "iceberg");
-
-    configMap.put(
-        AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
-            + IcebergRESTService.SERVICE_NAME
-            + "."
-            + IcebergConfig.JDBC_INIT_TABLES.getKey(),
-        "true");
-
-    configMap.put(
-        AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
-            + IcebergRESTService.SERVICE_NAME
-            + "."
-            + IcebergConfig.CATALOG_WAREHOUSE.getKey(),
-        GravitinoITUtils.genRandomName(
-            String.format(
-                "hdfs://%s:%d/user/hive/warehouse-jdbc-sqlite",
-                containerSuite.getHiveContainer().getContainerIpAddress(),
-                HiveContainer.HDFS_DEFAULTFS_PORT)));
-
-    return configMap;
-  }
-
-  private static Map<String, String> getIcebergHiveCatalogConfigs() {
-    Map<String, String> customConfigs = new HashMap<>();
-    customConfigs.put(
-        AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
-            + IcebergRESTService.SERVICE_NAME
-            + "."
-            + IcebergConfig.CATALOG_BACKEND.getKey(),
-        IcebergCatalogBackend.HIVE.toString().toLowerCase());
-
-    customConfigs.put(
-        AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
-            + IcebergRESTService.SERVICE_NAME
-            + "."
-            + IcebergConfig.CATALOG_URI.getKey(),
-        String.format(
-            "thrift://%s:%d",
-            containerSuite.getHiveContainer().getContainerIpAddress(),
-            HiveContainer.HIVE_METASTORE_PORT));
-
-    customConfigs.put(
-        AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
-            + IcebergRESTService.SERVICE_NAME
-            + "."
-            + IcebergConfig.CATALOG_WAREHOUSE.getKey(),
-        GravitinoITUtils.genRandomName(
-            String.format(
-                "hdfs://%s:%d/user/hive/warehouse-hive",
-                containerSuite.getHiveContainer().getContainerIpAddress(),
-                HiveContainer.HDFS_DEFAULTFS_PORT)));
-    return customConfigs;
   }
 
   private static IcebergConfig buildIcebergConfig(Config config) {

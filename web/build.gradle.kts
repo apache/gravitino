@@ -52,7 +52,10 @@ tasks {
   }
 
   clean {
+    delete(".node")
     delete("build")
     delete("dist")
+    delete("node_modules")
+    delete("yarn-error.log")
   }
 }

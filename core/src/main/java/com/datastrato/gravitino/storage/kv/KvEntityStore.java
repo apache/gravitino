@@ -421,7 +421,8 @@ public class KvEntityStore implements EntityStore {
     }
 
     try {
-      KvBackend kvBackend = (KvBackend) Class.forName(className).newInstance();
+      KvBackend kvBackend =
+          (KvBackend) Class.forName(className).getDeclaredConstructor().newInstance();
       kvBackend.initialize(config);
       return kvBackend;
     } catch (Exception e) {

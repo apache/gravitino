@@ -62,12 +62,17 @@ import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.types.Types;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.Database;
@@ -79,16 +84,12 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.MethodOrderer;
-import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestMethodOrder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @Tag("gravitino-docker-it")
-@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class CatalogHiveIT extends AbstractIT {
   private static final Logger LOG = LoggerFactory.getLogger(CatalogHiveIT.class);
   public static final String metalakeName =
@@ -110,6 +111,7 @@ public class CatalogHiveIT extends AbstractIT {
   private static GravitinoMetaLake metalake;
   private static Catalog catalog;
   private static SparkSession sparkSession;
+  private static FileSystem hdfs;
   private static final String SELECT_ALL_TEMPLATE = "SELECT * FROM %s.%s";
   private static final String INSERT_WITHOUT_PARTITION_TEMPLATE = "INSERT INTO %s.%s VALUES (%s)";
   private static final String INSERT_WITH_PARTITION_TEMPLATE =
@@ -159,13 +161,23 @@ public class CatalogHiveIT extends AbstractIT {
             .config("mapreduce.input.fileinputformat.input.dir.recursive", "true")
             .enableHiveSupport()
             .getOrCreate();
+
+    Configuration conf = new Configuration();
+    conf.set(
+        "fs.defaultFS",
+        String.format(
+            "hdfs://%s:%d",
+            containerSuite.getHiveContainer().getContainerIpAddress(),
+            HiveContainer.HDFS_DEFAULTFS_PORT));
+    hdfs = FileSystem.get(conf);
+
     createMetalake();
     createCatalog();
     createSchema();
   }
 
   @AfterAll
-  public static void stop() {
+  public static void stop() throws IOException {
     client.dropMetalake(NameIdentifier.of(metalakeName));
     if (hiveClientPool != null) {
       hiveClientPool.close();
@@ -173,6 +185,10 @@ public class CatalogHiveIT extends AbstractIT {
 
     if (sparkSession != null) {
       sparkSession.close();
+    }
+
+    if (hdfs != null) {
+      hdfs.close();
     }
     try {
       closer.close();
@@ -290,6 +306,19 @@ public class CatalogHiveIT extends AbstractIT {
     }
     Assertions.assertEquals(
         count + 1, sparkSession.sql(String.format(SELECT_ALL_TEMPLATE, dbName, tableName)).count());
+    // Assert HDFS owner
+    Path tableDirectory = new Path(table.getSd().getLocation());
+    FileStatus[] fileStatuses;
+    try {
+      fileStatuses = hdfs.listStatus(tableDirectory);
+    } catch (IOException e) {
+      LOG.warn("Failed to list status of table directory", e);
+      throw new RuntimeException(e);
+    }
+    Assertions.assertTrue(fileStatuses.length > 0);
+    for (FileStatus fileStatus : fileStatuses) {
+      Assertions.assertEquals("datastrato", fileStatus.getOwner());
+    }
   }
 
   private Map<String, String> createProperties() {
@@ -960,9 +989,9 @@ public class CatalogHiveIT extends AbstractIT {
   }
 
   @Test
-  // Make sure it will be executed at last.
-  @Order(Integer.MAX_VALUE)
   void testAlterEntityName() {
+    String metalakeName = GravitinoITUtils.genRandomName("CatalogHiveIT_metalake");
+    client.createMetalake(NameIdentifier.of(metalakeName), "", ImmutableMap.of());
     final GravitinoMetaLake metalake = client.loadMetalake(NameIdentifier.of(metalakeName));
     String newMetalakeName = GravitinoITUtils.genRandomName("CatalogHiveIT_metalake_new");
 
@@ -983,6 +1012,14 @@ public class CatalogHiveIT extends AbstractIT {
           NoSuchMetalakeException.class,
           () -> client.loadMetalake(NameIdentifier.of(newMetalakeName)));
     }
+
+    String catalogName = GravitinoITUtils.genRandomName("CatalogHiveIT_catalog");
+    metalake.createCatalog(
+        NameIdentifier.of(metalakeName, catalogName),
+        Catalog.Type.RELATIONAL,
+        provider,
+        "comment",
+        ImmutableMap.of(METASTORE_URIS, HIVE_METASTORE_URIS));
 
     Catalog catalog = metalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
     // Test rename catalog
@@ -1007,7 +1044,16 @@ public class CatalogHiveIT extends AbstractIT {
     }
 
     // Schema does not have the rename operation.
+    final String schemaName = GravitinoITUtils.genRandomName("CatalogHiveIT_schema");
+    catalog
+        .asSchemas()
+        .createSchema(
+            NameIdentifier.of(metalakeName, catalogName, schemaName), "", ImmutableMap.of());
 
+    final Catalog cata = catalog;
+    // Now try to rename table
+    final String tableName = GravitinoITUtils.genRandomName("CatalogHiveIT_table");
+    final String newTableName = GravitinoITUtils.genRandomName("CatalogHiveIT_table_new");
     ColumnDTO[] columns = createColumns();
     catalog
         .asTableCatalog()
@@ -1018,9 +1064,6 @@ public class CatalogHiveIT extends AbstractIT {
             createProperties(),
             new Transform[0]);
 
-    final Catalog cata = catalog;
-    // Now try to rename table
-    final String newTableName = GravitinoITUtils.genRandomName("CatalogHiveIT_table_new");
     for (int i = 0; i < 2; i++) {
       // The table to be renamed does not exist
       Assertions.assertThrows(

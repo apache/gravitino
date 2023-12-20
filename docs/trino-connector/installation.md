@@ -6,13 +6,12 @@ license: "Copyright 2023 Datastrato Pvt Ltd.
 This software is licensed under the Apache License version 2."
 ---
 
-To install the Gravitino connector, first deploy the Trino environment, and then install the Gravitino connector plugin into Trino.
-Please refer to the [Deploying Trino documentation](https://trino.io/docs/current/installation/deployment.html).
+To install the Gravitino connector, you should first deploy the Trino environment, and then install the Gravitino connector plugin into Trino.
+Please refer to the [Deploying Trino documentation](https://trino.io/docs/current/installation/deployment.html) and do the following steps:
 
-1. Download the Gravitino connector tarball and unpack it.
+1. [Download](https://github.com/datastrato/gravitino/releases) the Gravitino connector tarball and unpack it.
    The tarball contains a single top-level directory `gravitino-trino-connector-<version>`,
    which called the connector directory.
-   [Download the gravitino-connector](https://github.com/datastrato/gravitino/releases).
 2. Copy the connector directory to the Trino's plugin directory.
    Normally, the directory location is `Trino-server-<version>/plugin`, and the directory contains other catalogs used by Trino.
 3. Add Trino JVM arguments `-Dlog4j.configurationFile=file:////etc/trino/log4j2.properties` to enable logging for the Gravitino connector.
@@ -20,7 +19,7 @@ Please refer to the [Deploying Trino documentation](https://trino.io/docs/curren
 Alternatively,
 you can build the Gravitino connector package from the sources
 and obtain the `gravitino-trino-connector-<version>.tar.gz` file in the `$PROJECT/distribution` directory.
-Please refer to the [Gravitino Development documentation](../how-to-build)
+Please refer to the [Gravitino Development documentation](../how-to-build.md)
 
 ## Example
 
@@ -67,10 +66,9 @@ Now you can see the Gravitino connector directory in the plugin directory.
 
 ### Configuring the Gravitino connector
 
-Assuming you have now started the Gravitino server on the host `gravitino-server-host` and can access it properly. 
-And you have created a metalake named `test`. If not, please refer to the [Gravitino Getting-started](../getting-started)
+Assuming you have now started the Gravitino server on the host `gravitino-server-host` and already created a metalake named `test`, if those have not been prepared, please refer to the [Gravitino Getting-started](../getting-started.md).
 
-Add catalog configuration to the Trino configuration file `/etc/trino/catalog/gravitino.properties`.
+To configure Gravitino connector correctly, you need to put the following configurations to the Trino configuration file `/etc/trino/catalog/gravitino.properties`.
 
 ```text
 connector.name=gravitino
@@ -78,19 +76,19 @@ gravitino.url=http://gravitino-server-host:8090
 gravitino.metalake=test
 ```
 
-The `gravitino.name` defines which Gravitino connector is used. It must be `gravitino`.
-The `gravitino.metalake` defines which metalake are used. It should exist in the Gravitino server.
-The `gravitino.uri` defines the connection information about Gravitino server. Make sure your container can access the Gravitino server.
+- The `gravitino.name` defines which Gravitino connector is used. It must be `gravitino`.
+- The `gravitino.metalake` defines which metalake are used. It should exist in the Gravitino server.
+- The `gravitino.uri` defines the connection information about Gravitino server. Make sure your container can access the Gravitino server.
 
-If you don't have the `test` metalake. You can create a new metalake named `test`. 
+Full configurations for Gravitino connector can be seen [here](configuration.md)
 
-Create a new metalake named `test` by the following command.
+If you haven't created the metalake named `test`, you can use the following command to create it.
 
 ```shell
 curl -X POST -H "Content-Type: application/json" -d '{"name":"test","comment":"comment","properties":{}}' http://gravitino-server-host:8090/api/metalakes
 ```
 
-Restart the Trino container to load the Gravitino connector.
+And then restart the Trino container to load the Gravitino connector.
 
 ```shell
 docker restart trino-gravitino
@@ -113,12 +111,9 @@ tpch
 system
 ```
 
-You can see the `gravitino` catalog in the result. This signifies the successful installation of the Gravitino connector.
+You can see the `gravitino` catalog in the result set. This signifies the successful installation of the Gravitino connector.
 
-Assuming you have created a catalog named `test.jdbc-mysql` in the Gravitino server.
-If you don't have it, please refer to [Create a Catalog](../manage-metadata-using-gravitino#create-a-catalog)
-
-Then you can use the Trino CLI to connect to the Trino container and run a query.
+Assuming you have created a catalog named `test.jdbc-mysql` in the Gravitino server, or please refer to [Create a Catalog](../manage-metadata-using-gravitino#create-a-catalog). Then you can use the Trino CLI to connect to the Trino container and run a query like this.
 
 ```text
 docker exec -it trino trino
@@ -134,5 +129,4 @@ system
 test.jdbc-mysql
 ```
 
-The catalog named 'test.jdbc-mysql' is your created catalog by gravitino server. 
-You can use it to access the mysql database like other Trino catalogs.
+The catalog named 'test.jdbc-mysql' is the catalog that you created by gravitino server, and you can use it to access the mysql database like other Trino catalogs.

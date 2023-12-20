@@ -110,7 +110,7 @@ You can follow the steps to set up an OAuth mode Gravitino server.
 
 5. Copy the public key and remove the character `\n` and you can get the default signing key of Gravitino server.
 
-6. You can refer to the [Configurations](gravitino-server-config) and append the configurations to the conf/gravitino.conf.
+6. You can refer to the [Configurations](gravitino-server-config.md) and append the configurations to the conf/gravitino.conf.
 
 ```text
 gravitino.authenticator oauth
@@ -173,7 +173,7 @@ Both Gravitino server and Iceberg REST service can configure HTTPS.
 | `gravitino.auxService.iceberg-rest.httpsPort`              | The HTTPS port number of the Jetty web server.                     | `8433`        | Yes if use HTTPS                                  | 0.3.0         |
 | `gravitino.auxService.iceberg-rest.keyStorePath`           | Path to the key store file.                                        | (none)        | Yes if use HTTPS                                  | 0.3.0         |
 | `gravitino.auxService.iceberg-rest.keyStorePassword`       | Password to the key store.                                         | (none)        | Yes if use HTTPS                                  | 0.3.0         |
-| `gravitino.uxService.iceberg-rest.keyStoreType`            | The type to the key store.                                         | `JKS`         | Yes if use HTTPS                                  | 0.3.0         |
+| `gravitino.auxService.iceberg-rest.keyStoreType`           | The type to the key store.                                         | `JKS`         | Yes if use HTTPS                                  | 0.3.0         |
 | `gravitino.auxService.iceberg-rest.managerPassword`        | Manager password to the key store.                                 | (none)        | Yes if use HTTPS                                  | 0.3.0         |
 | `gravitino.auxService.iceberg-rest.tlsProtocol`            | TLS protocol to use. The JVM must support the TLS protocol to use. | (none)        | Yes if use HTTPS                                  | 0.3.0         |
 | `gravitino.auxService.iceberg-rest.enableCipherAlgorithms` | The collection of enabled cipher algorithms.                       | ``            | No                                                | 0.3.0         |
@@ -220,7 +220,7 @@ bin/keytool -export -alias localhost -keystore localhost.jks -file  localhost.cr
 bin/keytool -import -alias localhost -keystore jre/lib/security/cacerts -file localhost.crt -storepass changeit -noprompt
 ```
 
-5. You can refer to the [Configurations](gravitino-server-config) and append the configurations to the conf/gravitino.conf.
+5. You can refer to the [Configurations](gravitino-server-config.md) and append the configurations to the conf/gravitino.conf.
 Configuration doesn't support to resolve environment variable, so you should replace `${JAVA_HOME}` with the actual value.
 Then, You can start the Gravitino server.
 

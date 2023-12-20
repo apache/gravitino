@@ -23,13 +23,9 @@ import java.io.IOException;
 import java.lang.reflect.Field;
 import java.nio.file.Files;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.ClassOrderer.OrderAnnotation;
-import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestClassOrder;
 import org.mockito.Mockito;
 
-@TestClassOrder(OrderAnnotation.class)
 public class TestKvNameMappingService {
   private Config getConfig() throws IOException {
     File baseDir = new File(System.getProperty("java.io.tmpdir"));
@@ -63,7 +59,6 @@ public class TestKvNameMappingService {
   }
 
   @Test
-  @Order(1)
   public void testGetIdByName() throws Exception {
     try (KvEntityStore kvEntityStore = getKvEntityStore(getConfig())) {
       NameMappingService nameMappingService = kvEntityStore.nameMappingService;
@@ -85,7 +80,6 @@ public class TestKvNameMappingService {
   }
 
   @Test
-  @Order(2)
   public void testUpdateName() throws Exception {
     try (KvEntityStore kvEntityStore = getKvEntityStore(getConfig())) {
       NameMappingService nameMappingService = kvEntityStore.nameMappingService;
@@ -111,7 +105,6 @@ public class TestKvNameMappingService {
   }
 
   @Test
-  @Order(3)
   public void testBindAndUnBind() throws Exception {
     try (KvEntityStore kvEntityStore = getKvEntityStore(getConfig())) {
       KvNameMappingService nameMappingService =

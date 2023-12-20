@@ -50,17 +50,17 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
           + "    pg_namespace AS n ON n.oid = c.relnamespace\n"
           + "WHERE \n"
           + "    a.attnum > 0 \n"
-          + "    AND c.relname = ?";
+          + "    AND c.relname = ? AND n.nspname = ?";
 
   private static final String SHOW_COLUMN_INFO_SQL =
-      "select * FROM information_schema.columns WHERE table_name = ? order by ordinal_position";
+      "select * FROM information_schema.columns WHERE table_name = ? AND table_schema = ? order by ordinal_position";
 
   private static final String SHOW_TABLE_COMMENT_SQL =
       "SELECT tb.table_name, d.description\n"
           + "FROM information_schema.tables tb\n"
           + "         JOIN pg_class c ON c.relname = tb.table_name\n"
           + "         LEFT JOIN pg_description d ON d.objoid = c.oid AND d.objsubid = '0'\n"
-          + "WHERE tb.table_name = ?;";
+          + "WHERE tb.table_name = ? AND table_schema = ?;";
 
   private String database;
 
@@ -81,15 +81,18 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
   public JdbcTable load(String schema, String tableName) throws NoSuchTableException {
     try (Connection connection = getConnection(schema)) {
       // The first step is to obtain the comment information of the column.
-      Map<String, String> columnCommentMap = selectColumnComment(tableName, connection);
+      Map<String, String> columnCommentMap = selectColumnComment(schema, tableName, connection);
 
       // The second step is to obtain the column information of the table.
       List<JdbcColumn> jdbcColumns =
           selectColumnInfoAndExecute(
-              tableName, connection, (builder, s) -> builder.withComment(columnCommentMap.get(s)));
+              schema,
+              tableName,
+              connection,
+              (builder, s) -> builder.withComment(columnCommentMap.get(s)));
 
       // The third step is to obtain the comment information of the table.
-      String comment = selectTableComment(tableName, connection);
+      String comment = selectTableComment(schema, tableName, connection);
       return new JdbcTable.Builder()
           .withName(tableName)
           .withColumns(jdbcColumns.toArray(new JdbcColumn[0]))
@@ -103,6 +106,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
   }
 
   private List<JdbcColumn> selectColumnInfoAndExecute(
+      String schemaName,
       String tableName,
       Connection connection,
       BiConsumer<JdbcColumn.Builder, String> builderConsumer)
@@ -110,6 +114,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
     List<JdbcColumn> jdbcColumns = new ArrayList<>();
     try (PreparedStatement preparedStatement = connection.prepareStatement(SHOW_COLUMN_INFO_SQL)) {
       preparedStatement.setString(1, tableName);
+      preparedStatement.setString(2, schemaName);
       try (ResultSet resultSet = preparedStatement.executeQuery()) {
         while (resultSet.next()) {
           ColDataType colDataType = new ColDataType();
@@ -154,10 +159,12 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
     return result;
   }
 
-  private String selectTableComment(String tableName, Connection connection) throws SQLException {
+  private String selectTableComment(String schema, String tableName, Connection connection)
+      throws SQLException {
     try (PreparedStatement preparedStatement =
         connection.prepareStatement(SHOW_TABLE_COMMENT_SQL)) {
       preparedStatement.setString(1, tableName);
+      preparedStatement.setString(2, schema);
       try (ResultSet resultSet = preparedStatement.executeQuery()) {
         if (resultSet.next()) {
           return resultSet.getString("description");
@@ -171,13 +178,14 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
    * @return Returns the column names and comments of the table
    * @throws SQLException
    */
-  private Map<String, String> selectColumnComment(String tableName, Connection connection)
-      throws SQLException {
+  private Map<String, String> selectColumnComment(
+      String schema, String tableName, Connection connection) throws SQLException {
     Map<String, String> columnCommentMap = new HashMap<>();
 
     try (PreparedStatement preparedStatement =
         connection.prepareStatement(SHOW_COLUMN_COMMENT_SQL)) {
       preparedStatement.setString(1, tableName);
+      preparedStatement.setString(2, schema);
       try (ResultSet resultSet = preparedStatement.executeQuery()) {
         while (resultSet.next()) {
           String comment = resultSet.getString("comment");

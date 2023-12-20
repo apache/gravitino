@@ -36,16 +36,12 @@ import org.apache.thrift.TException;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.MethodOrderer;
-import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestMethodOrder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @Tag("gravitino-docker-it")
-@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class TrinoConnectorIT extends AbstractIT {
   public static final Logger LOG = LoggerFactory.getLogger(TrinoConnectorIT.class);
 
@@ -142,7 +138,6 @@ public class TrinoConnectorIT extends AbstractIT {
   }
 
   @Test
-  @Order(1)
   public void testShowSchemas() {
     String sql =
         String.format(
@@ -153,7 +148,6 @@ public class TrinoConnectorIT extends AbstractIT {
   }
 
   @Test
-  @Order(2)
   public void testCreateTable() throws TException, InterruptedException {
     String sql3 =
         String.format(
@@ -178,11 +172,11 @@ public class TrinoConnectorIT extends AbstractIT {
         hiveClientPool.run(client -> client.getTable(databaseName, tab1Name));
     Assertions.assertEquals(databaseName, hiveTab1.getDbName());
     Assertions.assertEquals(tab1Name, hiveTab1.getTableName());
+
+    testShowTable();
   }
 
-  @Order(3)
-  @Test
-  public void testShowTable() {
+  void testShowTable() {
     String sql =
         String.format(
             "SHOW TABLES FROM \"%s.%s\".%s LIKE '%s'",
@@ -192,8 +186,6 @@ public class TrinoConnectorIT extends AbstractIT {
     Assertions.assertEquals(queryData.get(0).get(0), tab1Name);
   }
 
-  @Test
-  @Order(4)
   public void testScenarioTable1() throws TException, InterruptedException {
     String sql3 =
         String.format(
@@ -260,8 +252,6 @@ public class TrinoConnectorIT extends AbstractIT {
     Assertions.assertEquals(table1Data, table1QueryData);
   }
 
-  @Test
-  @Order(5)
   public void testScenarioTable2() throws TException, InterruptedException {
     String sql4 =
         String.format(
@@ -326,8 +316,10 @@ public class TrinoConnectorIT extends AbstractIT {
   }
 
   @Test
-  @Order(6)
-  public void testScenarioJoinTwoTable() {
+  public void testScenarioJoinTwoTable() throws TException, InterruptedException {
+    testScenarioTable1();
+    testScenarioTable2();
+
     String sql9 =
         String.format(
             "SELECT * FROM (SELECT t1.user_name as user_name, gender, age, phone, consumer, recharge, event_time FROM \"%1$s.%2$s\".%3$s.%4$s AS t1\n"
@@ -355,7 +347,6 @@ public class TrinoConnectorIT extends AbstractIT {
   }
 
   @Test
-  @Order(7)
   void testHiveSchemaCreatedByTrino() {
     String schemaName = GravitinoITUtils.genRandomName("schema").toLowerCase();
 
@@ -373,7 +364,6 @@ public class TrinoConnectorIT extends AbstractIT {
   }
 
   @Test
-  @Order(8)
   void testHiveTableCreatedByTrino() {
     String schemaName = GravitinoITUtils.genRandomName("schema").toLowerCase();
     String tableName = GravitinoITUtils.genRandomName("table").toLowerCase();
@@ -400,7 +390,6 @@ public class TrinoConnectorIT extends AbstractIT {
   }
 
   @Test
-  @Order(9)
   void testHiveSchemaCreatedByGravitino() throws InterruptedException {
     String catalogName = GravitinoITUtils.genRandomName("catalog").toLowerCase();
     String schemaName = GravitinoITUtils.genRandomName("schema").toLowerCase();
@@ -444,6 +433,31 @@ public class TrinoConnectorIT extends AbstractIT {
     Assertions.assertTrue(
         data.contains(
             "location = 'hdfs://localhost:9000/user/hive/warehouse/hive_schema_1223445.db'"));
+  }
+
+  private static boolean checkTrinoHasRemoved(String sql, long maxWaitTimeSec) {
+    long current = System.currentTimeMillis();
+    while (System.currentTimeMillis() - current <= maxWaitTimeSec * 1000) {
+      try {
+        ArrayList<ArrayList<String>> lists =
+            containerSuite.getTrinoContainer().executeQuerySQL(sql);
+        if (lists.isEmpty()) {
+          return true;
+        }
+
+        LOG.info("Catalog has not synchronized yet, wait 200ms and retry. The SQL is '{}'", sql);
+      } catch (Exception e) {
+        LOG.warn("Failed to execute sql: {}", sql, e);
+      }
+
+      try {
+        Thread.sleep(200);
+      } catch (InterruptedException e) {
+        LOG.warn("Failed to sleep 200ms", e);
+      }
+    }
+
+    return false;
   }
 
   private static boolean checkTrinoHasLoaded(String sql, long maxWaitTimeSec)
@@ -551,7 +565,6 @@ public class TrinoConnectorIT extends AbstractIT {
   }
 
   @Test
-  @Order(10)
   void testHiveTableCreatedByGravitino() throws InterruptedException {
     String catalogName = GravitinoITUtils.genRandomName("catalog").toLowerCase();
     String schemaName = GravitinoITUtils.genRandomName("schema").toLowerCase();
@@ -624,7 +637,6 @@ public class TrinoConnectorIT extends AbstractIT {
   }
 
   @Test
-  @Order(11)
   void testHiveCatalogCreatedByGravitino() throws InterruptedException {
     String catalogName = GravitinoITUtils.genRandomName("catalog").toLowerCase();
     GravitinoMetaLake createdMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
@@ -663,7 +675,6 @@ public class TrinoConnectorIT extends AbstractIT {
   }
 
   @Test
-  @Order(12)
   void testWrongHiveCatalogProperty() throws InterruptedException {
     String catalogName = GravitinoITUtils.genRandomName("catalog").toLowerCase();
     GravitinoMetaLake createdMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
@@ -697,7 +708,6 @@ public class TrinoConnectorIT extends AbstractIT {
     Assertions.assertTrue(containerSuite.getTrinoContainer().executeQuerySQL(sql).isEmpty());
   }
 
-  @Order(13)
   @Test
   void testIcebergTableAndSchemaCreatedByGravitino() throws InterruptedException {
     String catalogName = GravitinoITUtils.genRandomName("catalog").toLowerCase();
@@ -767,7 +777,6 @@ public class TrinoConnectorIT extends AbstractIT {
   }
 
   @Test
-  @Order(14)
   void testIcebergTableAndSchemaCreatedByTrino() {
     String schemaName = GravitinoITUtils.genRandomName("schema").toLowerCase();
     String tableName = GravitinoITUtils.genRandomName("table").toLowerCase();
@@ -790,7 +799,6 @@ public class TrinoConnectorIT extends AbstractIT {
   }
 
   @Test
-  @Order(15)
   void testIcebergCatalogCreatedByGravitino() throws InterruptedException {
     String catalogName = GravitinoITUtils.genRandomName("iceberg_catalog").toLowerCase();
     GravitinoMetaLake createdMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
@@ -837,7 +845,6 @@ public class TrinoConnectorIT extends AbstractIT {
   }
 
   @Test
-  @Order(16)
   void testMySQLCatalogCreatedByGravitino() throws InterruptedException {
     String catalogName = GravitinoITUtils.genRandomName("mysql_catalog").toLowerCase();
     GravitinoMetaLake createdMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
@@ -879,7 +886,6 @@ public class TrinoConnectorIT extends AbstractIT {
   }
 
   @Test
-  @Order(17)
   void testMySQLTableCreatedByGravitino() throws InterruptedException {
     String catalogName = GravitinoITUtils.genRandomName("mysql_catalog").toLowerCase();
     String schemaName = GravitinoITUtils.genRandomName("mysql_schema").toLowerCase();
@@ -953,6 +959,48 @@ public class TrinoConnectorIT extends AbstractIT {
     success = checkTrinoHasLoaded(sql, 30);
     if (!success) {
       Assertions.fail("Trino fail to load table created by gravitino: " + sql);
+    }
+  }
+
+  @Test
+  void testDropCatalogAndCreateAgain() throws InterruptedException {
+    String catalogName = GravitinoITUtils.genRandomName("mysql_catalog").toLowerCase();
+    GravitinoMetaLake createdMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
+    String[] command = {
+      "mysql",
+      "-h127.0.0.1",
+      "-uroot",
+      "-pds123", // username and password are referred from Hive dockerfile.
+      "-e",
+      "grant all privileges on *.* to root@'%' identified by 'ds123'"
+    };
+
+    // There exists a mysql instance in Hive the container.
+    containerSuite.getHiveContainer().executeInContainer(command);
+    String hiveHost = containerSuite.getHiveContainer().getContainerIpAddress();
+
+    // Create the catalog and drop it for 3 times to test the create/drop catalog function work
+    // well.
+    for (int i = 0; i < 3; i++) {
+      createdMetalake.createCatalog(
+          NameIdentifier.of(metalakeName, catalogName),
+          Catalog.Type.RELATIONAL,
+          "jdbc-mysql",
+          "comment",
+          ImmutableMap.<String, String>builder()
+              .put("jdbc-user", "root")
+              .put("jdbc-password", "ds123")
+              .put("jdbc-url", String.format("jdbc:mysql://%s:3306?useSSL=false", hiveHost))
+              .build());
+
+      String sql = String.format("show catalogs like '%s.%s'", metalakeName, catalogName);
+      boolean success = checkTrinoHasLoaded(sql, 30);
+      Assertions.assertTrue(success, "Trino should load the catalog: " + sql);
+
+      createdMetalake.dropCatalog(NameIdentifier.of(metalakeName, catalogName));
+      // We need to test we can't load this catalog any more by Trino.
+      success = checkTrinoHasRemoved(sql, 30);
+      Assertions.assertFalse(success, "Trino should not load the catalog any more: " + sql);
     }
   }
 

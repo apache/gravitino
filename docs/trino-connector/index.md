@@ -8,13 +8,13 @@ This software is licensed under the Apache License version 2."
 
 Gravitino connector index:
 
-- [Trino Support](trino-connector)
-  - [Requirements](requirements)
-  - [Installation](installation)
-  - [Configuration](configuration)
-  - [Supported catalogs](supported-catalog)
-    - [Hive](catalog-hive)
-    - [Iceberg](catalog-iceberg)
-    - [MySQL](catalog-mysql)
-    - [PostgreSQL](catalog-postgresql)
-  - [Supported SQL](sql-support)
+- [Trino Support](trino-connector.md)
+  - [Requirements](requirements.md)
+  - [Installation](installation.md)
+  - [Configuration](configuration.md)
+  - [Supported catalogs](supported-catalog.md)
+    - [Hive](catalog-hive.md)
+    - [Iceberg](catalog-iceberg.md)
+    - [MySQL](catalog-mysql.md)
+    - [PostgreSQL](catalog-postgresql.md)
+  - [Supported SQL](sql-support.md)

@@ -494,7 +494,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
                 try {
                   Class<? extends CatalogProvider> providerClz =
                       lookupCatalogProvider(provider, cl);
-                  return (BaseCatalog) providerClz.newInstance();
+                  return (BaseCatalog) providerClz.getDeclaredConstructor().newInstance();
                 } catch (Exception e) {
                   LOG.error("Failed to load catalog with provider: {}", provider, e);
                   throw new RuntimeException(e);
