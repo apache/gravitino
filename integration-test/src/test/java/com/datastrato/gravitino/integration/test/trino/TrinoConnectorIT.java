@@ -988,6 +988,7 @@ public class TrinoConnectorIT extends AbstractIT {
           "jdbc-mysql",
           "comment",
           ImmutableMap.<String, String>builder()
+              .put("jdbc-driver", "com.mysql.cj.jdbc.Driver")
               .put("jdbc-user", "root")
               .put("jdbc-password", "ds123")
               .put("jdbc-url", String.format("jdbc:mysql://%s:3306?useSSL=false", hiveHost))
