@@ -232,7 +232,7 @@ public class CatalogConnectorManager {
 
       LOG.info("Create catalog {} in metalake {} successfully.", catalog, metalake);
 
-      Future future = executorService.schedule(this::loadMetalake, 0, TimeUnit.SECONDS);
+      Future<?> future = executorService.submit(this::loadMetalake);
       future.get(30, TimeUnit.SECONDS);
 
     } catch (NoSuchMetalakeException e) {
@@ -281,7 +281,7 @@ public class CatalogConnectorManager {
       }
       LOG.info("Drop catalog {} in metalake {} successfully.", catalog, metalake);
 
-      Future future = executorService.schedule(this::loadMetalake, 0, TimeUnit.SECONDS);
+      Future<?> future = executorService.submit(this::loadMetalake);
       future.get(30, TimeUnit.SECONDS);
 
     } catch (NoSuchMetalakeException e) {
