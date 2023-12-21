@@ -203,12 +203,12 @@ public final class JettyServerConfig {
 
   private final int threadPoolWorkQueueSize;
 
-  private final int httpsPort;
-  private final String keyStorePath;
-  private final String keyStorePassword;
-  private final String managerPassword;
-  private final boolean enableHttps;
-  private final String keyStoreType;
+  private int httpsPort;
+  private String keyStorePath;
+  private String keyStorePassword;
+  private String managerPassword;
+  private boolean enableHttps;
+  private String keyStoreType;
   private final Optional<String> tlsProtocol;
   private final Set<String> enableCipherAlgorithms;
   private final boolean enableClientAuth;
@@ -251,23 +251,41 @@ public final class JettyServerConfig {
 
     this.enableHttps = internalConfig.get(ENABLE_HTTPS);
     this.httpsPort = internalConfig.get(WEBSERVER_HTTPS_PORT);
-    this.keyStorePath = internalConfig.get(SSL_KEYSTORE_PATH);
-    this.keyStorePassword = internalConfig.get(SSL_KEYSTORE_PASSWORD);
-    this.managerPassword = internalConfig.get(SSL_MANAGER_PASSWORD);
-    this.keyStoreType = internalConfig.get(SSL_KEYSTORE_TYPE);
     this.tlsProtocol = internalConfig.get(SSL_PROTOCOL);
     this.enableCipherAlgorithms =
         Collections.unmodifiableSet(
             Sets.newHashSet(internalConfig.get(ENABLE_CIPHER_ALGORITHMS).split(SPLITTER)));
     this.enableClientAuth = internalConfig.get(ENABLE_CLIENT_AUTH);
-    this.trustStorePath = internalConfig.get(SSL_TRUST_STORE_PATH);
-    this.trustStorePassword = internalConfig.get(SSL_TRUST_STORE_PASSWORD);
-    this.trustStoreType = internalConfig.get(SSL_TRUST_STORE_TYPE);
+
     this.customFilters =
         internalConfig
             .get(CUSTOM_FILTERS)
             .map(filters -> Collections.unmodifiableSet(Sets.newHashSet(filters.split(SPLITTER))))
             .orElse(Collections.emptySet());
+
+    this.keyStoreType = internalConfig.get(SSL_KEYSTORE_TYPE);
+    this.trustStoreType = internalConfig.get(SSL_TRUST_STORE_TYPE);
+    String keyStorePath = null;
+    String keyStorePassword = null;
+    String managerPassword = null;
+    String trustStorePath = null;
+    String trustStorePassword = null;
+
+    if (this.enableHttps) {
+      keyStorePath = internalConfig.get(SSL_KEYSTORE_PATH);
+      keyStorePassword = internalConfig.get(SSL_KEYSTORE_PASSWORD);
+      managerPassword = internalConfig.get(SSL_MANAGER_PASSWORD);
+      if (this.enableClientAuth) {
+        trustStorePath = internalConfig.get(SSL_TRUST_STORE_PATH);
+        trustStorePassword = internalConfig.get(SSL_TRUST_STORE_PASSWORD);
+      }
+    }
+
+    this.keyStorePath = keyStorePath;
+    this.keyStorePassword = keyStorePassword;
+    this.managerPassword = managerPassword;
+    this.trustStorePasword = trustStorePassword;
+    this.trustStorePath = trustStorePath;
   }
 
   public static JettyServerConfig fromConfig(Config config, String prefix) {

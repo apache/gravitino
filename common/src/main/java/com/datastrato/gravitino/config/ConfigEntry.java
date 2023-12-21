@@ -211,6 +211,9 @@ public class ConfigEntry<T> {
       if (defaultValue != null) {
         return defaultValue;
       } else if (hasNoDefault) {
+        if (validator != null) {
+          validator.accept(null);
+        }
         return null;
       } else if (!isOptional) {
         throw new NoSuchElementException("No configuration found for key " + key);
