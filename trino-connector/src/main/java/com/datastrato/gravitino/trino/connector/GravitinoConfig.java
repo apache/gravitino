@@ -49,7 +49,7 @@ public class GravitinoConfig {
 
   boolean isStatic() {
     // The 'isStatic' is indicated whether the connector
-    // is user-configured within Trino or loaded from the Graviton server
+    // is user-configured within Trino or loaded from the Gravitino server
     return config.getOrDefault("gravitino.internal", "false").equals("false");
   }
 

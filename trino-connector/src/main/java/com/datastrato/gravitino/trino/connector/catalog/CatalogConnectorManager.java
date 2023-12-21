@@ -121,7 +121,7 @@ public class CatalogConnectorManager {
           continue;
         }
 
-        LOG.debug("Load metalake: " + usedMetalake);
+        LOG.info("Load metalake: " + usedMetalake);
         loadCatalogs(metalake);
       }
     } finally {
