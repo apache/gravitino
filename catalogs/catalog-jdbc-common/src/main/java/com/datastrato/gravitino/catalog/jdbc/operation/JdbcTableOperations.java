@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import javax.sql.DataSource;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -157,8 +158,12 @@ public abstract class JdbcTableOperations implements TableOperation {
       throws NoSuchTableException {
     LOG.info("Attempting to alter table {} from database {}", tableName, databaseName);
     try (Connection connection = getConnection(databaseName)) {
-      JdbcConnectorUtils.executeUpdate(
-          connection, generateAlterTableSql(databaseName, tableName, changes));
+      String sql = generateAlterTableSql(databaseName, tableName, changes);
+      if (StringUtils.isEmpty(sql)) {
+        LOG.info("No changes to alter table {} from database {}", tableName, databaseName);
+        return;
+      }
+      JdbcConnectorUtils.executeUpdate(connection, sql);
       LOG.info("Alter table {} from database {}", tableName, databaseName);
     } catch (final SQLException se) {
       throw this.exceptionMapper.toGravitinoException(se);
