@@ -738,7 +738,7 @@ In addition to the basic settings, Gravitino supports the following features:
 Currently, Gravitino supports the following partitioning strategies:
 
 :::note
-The `score`, `dt` and `city` are the field names in the table.
+The `score`, `dt`, and `city` appearing in the table below refer to the field names in a table.
 :::
 
 | Function strategy | Description                                                  | Source types                                                                        | Result type | Json example                                                     | Java example                                    | Equivalent SQL semantics           |
