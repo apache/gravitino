@@ -364,6 +364,11 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
       }
     }
 
+    // If there is no change, return directly
+    if (alterSql.isEmpty()) {
+      return "";
+    }
+
     // Return the generated SQL statement
     String result = String.join("\n", alterSql);
     LOG.info("Generated alter table:{}.{} sql: {}", schemaName, tableName, result);

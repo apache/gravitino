@@ -153,6 +153,9 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
                 TEST_DB_NAME,
                 newName,
                 TableChange.deleteColumn(new String[] {newColumn.name()}, true)));
+
+    TABLE_OPERATIONS.alterTable(
+        TEST_DB_NAME, newName, TableChange.deleteColumn(new String[] {newColumn.name()}, true));
     Assertions.assertDoesNotThrow(() -> TABLE_OPERATIONS.purge(TEST_DB_NAME, newName));
     Assertions.assertThrows(
         NoSuchTableException.class, () -> TABLE_OPERATIONS.purge(TEST_DB_NAME, newName));

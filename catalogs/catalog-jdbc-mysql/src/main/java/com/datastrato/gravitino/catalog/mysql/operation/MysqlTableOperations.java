@@ -355,6 +355,9 @@ public class MysqlTableOperations extends JdbcTableOperations {
       alterSql.add("COMMENT '" + newComment + "'");
     }
 
+    if (CollectionUtils.isEmpty(alterSql)) {
+      return "";
+    }
     // Return the generated SQL statement
     String result = "ALTER TABLE " + tableName + "\n" + String.join(",\n", alterSql) + ";";
     LOG.info("Generated alter table:{} sql: {}", databaseName + "." + tableName, result);
