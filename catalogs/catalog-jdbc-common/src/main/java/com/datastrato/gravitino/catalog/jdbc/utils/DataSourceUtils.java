@@ -6,14 +6,12 @@ package com.datastrato.gravitino.catalog.jdbc.utils;
 
 import com.datastrato.gravitino.catalog.jdbc.config.JdbcConfig;
 import com.datastrato.gravitino.exceptions.GravitinoRuntimeException;
-import com.google.common.base.Preconditions;
 import java.sql.SQLException;
 import java.util.Map;
 import java.util.Properties;
 import javax.sql.DataSource;
 import org.apache.commons.dbcp2.BasicDataSource;
 import org.apache.commons.dbcp2.BasicDataSourceFactory;
-import org.apache.commons.lang3.StringUtils;
 
 /**
  * Utility class for creating a {@link DataSource} from a {@link JdbcConfig}. It is mainly
@@ -42,19 +40,12 @@ public class DataSourceUtils {
     BasicDataSource basicDataSource =
         BasicDataSourceFactory.createDataSource(getProperties(jdbcConfig));
     String jdbcUrl = jdbcConfig.getJdbcUrl();
-    Preconditions.checkArgument(StringUtils.isNotBlank(jdbcUrl), "The jdbc url can't be blank.");
     basicDataSource.setUrl(jdbcUrl);
     String driverClassName = jdbcConfig.getJdbcDriver();
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(driverClassName), "The jdbc driver can't be blank.");
     basicDataSource.setDriverClassName(driverClassName);
     String userName = jdbcConfig.getUsername();
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(userName), "The jdbc user name can't be blank.");
     basicDataSource.setUsername(userName);
     String password = jdbcConfig.getPassword();
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(password), "The jdbc password can't be blank.");
     basicDataSource.setPassword(password);
     basicDataSource.setMaxTotal(jdbcConfig.getPoolMaxSize());
     basicDataSource.setMinIdle(jdbcConfig.getPoolMinSize());

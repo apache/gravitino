@@ -6,6 +6,7 @@ package com.datastrato.gravitino.server.web;
 
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.config.ConfigBuilder;
+import com.datastrato.gravitino.config.ConfigConstants;
 import com.datastrato.gravitino.config.ConfigEntry;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -17,6 +18,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import javax.net.ssl.SSLContext;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -107,6 +109,7 @@ public final class JettyServerConfig {
           .doc("Path to the key store file")
           .version("0.3.0")
           .stringConf()
+          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .create();
 
   public static final ConfigEntry<String> SSL_KEYSTORE_PASSWORD =
@@ -114,6 +117,7 @@ public final class JettyServerConfig {
           .doc("Password to the key store")
           .version("0.3.0")
           .stringConf()
+          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .create();
 
   public static final ConfigEntry<String> SSL_MANAGER_PASSWORD =
@@ -121,6 +125,7 @@ public final class JettyServerConfig {
           .doc("Manager password to the key store")
           .version("0.3.0")
           .stringConf()
+          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .create();
 
   public static final ConfigEntry<String> SSL_KEYSTORE_TYPE =
@@ -155,6 +160,7 @@ public final class JettyServerConfig {
           .doc("Path to the trust store file")
           .version("0.3.0")
           .stringConf()
+          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .create();
 
   public static final ConfigEntry<String> SSL_TRUST_STORE_PASSWORD =
@@ -162,6 +168,7 @@ public final class JettyServerConfig {
           .doc("Password to the trust store")
           .version("0.3.0")
           .stringConf()
+          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .create();
 
   public static final ConfigEntry<String> SSL_TRUST_STORE_TYPE =

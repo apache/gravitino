@@ -15,8 +15,10 @@ import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogP
 
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.config.ConfigBuilder;
+import com.datastrato.gravitino.config.ConfigConstants;
 import com.datastrato.gravitino.config.ConfigEntry;
 import java.util.Map;
+import org.apache.commons.lang3.StringUtils;
 
 public class IcebergConfig extends Config {
 
@@ -32,6 +34,7 @@ public class IcebergConfig extends Config {
           .doc("Warehouse directory of catalog")
           .version("0.2.0")
           .stringConf()
+          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .create();
 
   public static final ConfigEntry<String> CATALOG_URI =
@@ -39,6 +42,7 @@ public class IcebergConfig extends Config {
           .doc("The uri config of the Iceberg catalog")
           .version("0.2.0")
           .stringConf()
+          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .create();
 
   public static final ConfigEntry<String> JDBC_USER =
@@ -46,6 +50,7 @@ public class IcebergConfig extends Config {
           .doc("The username of the Jdbc connection")
           .version("0.2.0")
           .stringConf()
+          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .create();
 
   public static final ConfigEntry<String> JDBC_PASSWORD =
@@ -53,6 +58,7 @@ public class IcebergConfig extends Config {
           .doc("The password of the Jdbc connection")
           .version("0.2.0")
           .stringConf()
+          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .create();
 
   public static final ConfigEntry<String> JDBC_DRIVER =
@@ -60,6 +66,7 @@ public class IcebergConfig extends Config {
           .doc("The driver of the Jdbc connection")
           .version("0.3.0")
           .stringConf()
+          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .create();
 
   public static final ConfigEntry<Boolean> JDBC_INIT_TABLES =
