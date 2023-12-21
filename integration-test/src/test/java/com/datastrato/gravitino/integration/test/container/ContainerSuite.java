@@ -45,8 +45,7 @@ public class ContainerSuite implements Closeable {
       Info info = dockerClient.infoCmd().exec();
       LOG.info("Docker info: {}", info);
 
-      String needCreateDockerNetwork = System.getenv("NEED_CREATE_DOCKER_NETWORK");
-      if (needCreateDockerNetwork != null && needCreateDockerNetwork.equalsIgnoreCase("true")) {
+      if ("true".equalsIgnoreCase(System.getenv("NEED_CREATE_DOCKER_NETWORK"))) {
         network = createDockerNetwork();
       }
     } catch (Exception e) {
