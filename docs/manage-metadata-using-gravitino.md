@@ -561,6 +561,9 @@ supportsSchemas.dropSchema(NameIdentifier.of("metalake", "catalog", "schema"), t
 </TabItem>
 </Tabs>
 
+If `cascade` is true, Gravitino will drop all tables under the schema. Otherwise, Gravitino will throw an exception if there are tables under the schema. 
+Some catalogs may not support dropping a schema cascading, please refer to the related doc for more details.
+
 ### List all schemas under a catalog
 
 You can alter all schemas under a catalog by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas` endpoint or just use the Gravitino Java client. The following is an example of list all schema
@@ -961,9 +964,11 @@ You can remove a table by sending a `DELETE` request to the `/api/metalakes/{met
 <TabItem value="bash" label="Bash">
 
 ```bash
+## purge can be true or false, if purge is true, Gravitino will remove the real data of the table.
+
 curl -X DELETE -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" \
-http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema/tables/table
+http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema/tables/table?purge=true
 ```
 
 </TabItem>
@@ -975,9 +980,16 @@ http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema/tab
 Catalog catalog = gravitinoMetaLake.loadCatalog(NameIdentifier.of("metalake", "catalog"));
 
 TableCatalog tableCatalog = catalog.asTableCatalog();
+
+// Drop a table
 tableCatalog.dropTable(NameIdentifier.of("metalake", "catalog", "schema", "table"));
+
+// Purge a table
+tableCatalog.purgeTable(NameIdentifier.of("metalake", "catalog", "schema", "table"));
 // ...
 ```
+
+There are two ways to drop a table: `dropTable` and `purgeTable`, the difference between them is that `purgeTable` will remove the real data of the table, while `dropTable` only removes the metadata of the table.
 
 </TabItem>
 </Tabs>
