@@ -120,7 +120,7 @@ public class CatalogMysqlIT extends AbstractIT {
     NameIdentifier[] nameIdentifiers =
         catalog.asTableCatalog().listTables(Namespace.of(metalakeName, catalogName, schemaName));
     for (NameIdentifier nameIdentifier : nameIdentifiers) {
-      catalog.asTableCatalog().dropTable(nameIdentifier);
+      catalog.asTableCatalog().purgeTable(nameIdentifier);
     }
     catalog.asSchemas().dropSchema(NameIdentifier.of(metalakeName, catalogName, schemaName), false);
   }
@@ -455,5 +455,41 @@ public class CatalogMysqlIT extends AbstractIT {
         () -> {
           catalog.asTableCatalog().dropTable(tableIdentifier);
         });
+  }
+
+  @Test
+  void testDropMySQLDatabase() {
+    String schemaName = GravitinoITUtils.genRandomName("mysql_schema").toLowerCase();
+    String tableName = GravitinoITUtils.genRandomName("mysql_table").toLowerCase();
+
+    catalog
+        .asSchemas()
+        .createSchema(
+            NameIdentifier.of(metalakeName, catalogName, schemaName),
+            "Created by gravitino client",
+            ImmutableMap.<String, String>builder().build());
+
+    catalog
+        .asTableCatalog()
+        .createTable(
+            NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
+            createColumns(),
+            "Created by gravitino client",
+            ImmutableMap.<String, String>builder().build());
+
+    // Try to drop MySQL database without cascade equals to false, it should not be allowed.
+    catalog.asSchemas().dropSchema(NameIdentifier.of(metalakeName, catalogName, schemaName), false);
+    // Check database still exists
+    catalog.asSchemas().loadSchema(NameIdentifier.of(metalakeName, catalogName, schemaName));
+
+    // Try to drop MySQL database with cascade equals to true, it should be allowed.
+    catalog.asSchemas().dropSchema(NameIdentifier.of(metalakeName, catalogName, schemaName), true);
+    // Check database has been dropped
+    Assertions.assertThrows(
+        NoSuchSchemaException.class,
+        () ->
+            catalog
+                .asSchemas()
+                .loadSchema(NameIdentifier.of(metalakeName, catalogName, schemaName)));
   }
 }

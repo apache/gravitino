@@ -47,11 +47,30 @@ public class MysqlDatabaseOperations extends JdbcDatabaseOperations {
 
   @Override
   public String generateDropDatabaseSql(String databaseName, boolean cascade) {
+    final String dropDatabaseSql = "DROP DATABASE `" + databaseName + "`";
     if (cascade) {
-      throw new UnsupportedOperationException(
-          "MySQL does not support CASCADE option for DROP DATABASE.");
+      return dropDatabaseSql;
     }
-    return "DROP DATABASE `" + databaseName + "`";
+
+    try (final Connection connection = this.dataSource.getConnection()) {
+      String query = "SELECT * FROM information_schema.TABLES WHERE TABLE_SCHEMA = ?";
+      try (PreparedStatement preparedStatement = connection.prepareStatement(query)) {
+        preparedStatement.setString(1, databaseName);
+
+        // Execute the query and check if there exists any tables in the database
+        try (ResultSet resultSet = preparedStatement.executeQuery()) {
+          if (resultSet.next()) {
+            throw new IllegalStateException(
+                String.format(
+                    "Database %s is not empty. the value of cascade should be true.",
+                    databaseName));
+          }
+        }
+      }
+    } catch (SQLException sqlException) {
+      throw this.exceptionMapper.toGravitinoException(sqlException);
+    }
+    return dropDatabaseSql;
   }
 
   @Override
