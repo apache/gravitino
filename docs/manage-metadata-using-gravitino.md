@@ -916,6 +916,7 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
       "property": "key3",
       "value": "value3"
     }
+  ]  
 }' http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema/tables/table
 ```
 
