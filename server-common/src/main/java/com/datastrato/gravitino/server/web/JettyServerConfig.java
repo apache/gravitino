@@ -203,12 +203,12 @@ public final class JettyServerConfig {
 
   private final int threadPoolWorkQueueSize;
 
-  private int httpsPort;
-  private String keyStorePath;
-  private String keyStorePassword;
-  private String managerPassword;
-  private boolean enableHttps;
-  private String keyStoreType;
+  private final int httpsPort;
+  private final String keyStorePath;
+  private final String keyStorePassword;
+  private final String managerPassword;
+  private final boolean enableHttps;
+  private final String keyStoreType;
   private final Optional<String> tlsProtocol;
   private final Set<String> enableCipherAlgorithms;
   private final boolean enableClientAuth;
