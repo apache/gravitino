@@ -18,6 +18,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.PrivilegedAction;
 import java.util.EnumSet;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -103,7 +104,7 @@ public final class JettyServer {
             StringUtils.isNotBlank(serverConfig.getTrustStorePath()),
             "If enables the authentication of the client, must set trustStorePath");
         Preconditions.checkArgument(
-            StringUtils.isNotBlank(serverConfig.getTrustStorePasword()),
+            StringUtils.isNotBlank(serverConfig.getTrustStorePassword()),
             "If enables the authentication of the client, must set trustStorePassword");
       }
       ServerConnector httpsConnector =
@@ -122,7 +123,7 @@ public final class JettyServer {
               serverConfig.getSupportedAlgorithms(),
               serverConfig.isEnableClientAuth(),
               serverConfig.getTrustStorePath(),
-              serverConfig.getTrustStorePasword(),
+              serverConfig.getTrustStorePassword(),
               serverConfig.getTrustStoreType());
       server.addConnector(httpsConnector);
     } else {
@@ -432,5 +433,20 @@ public final class JettyServer {
 
   public ThreadPool getThreadPool() {
     return server.getThreadPool();
+  }
+
+  public void addCustomFilters(String pathSpec) {
+    for (String filterName : serverConfig.getCustomFilters()) {
+      if (StringUtils.isBlank(filterName)) {
+        continue;
+      }
+      FilterHolder filterHolder = new FilterHolder();
+      filterHolder.setClassName(filterName);
+      for (Map.Entry<String, String> entry :
+          serverConfig.getAllWithPrefix(String.format("%s.param.", filterName)).entrySet()) {
+        filterHolder.setInitParameter(entry.getKey(), entry.getValue());
+      }
+      servletContextHandler.addFilter(filterHolder, pathSpec, EnumSet.allOf(DispatcherType.class));
+    }
   }
 }

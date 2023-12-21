@@ -61,6 +61,7 @@ public class IcebergRESTService implements GravitinoAuxiliaryService {
 
     Servlet servlet = new ServletContainer(config);
     server.addServlet(servlet, "/iceberg/*");
+    server.addCustomFilters("/iceberg/*");
     server.addFilter(new AuthenticationFilter(), "/iceberg/*");
   }
 

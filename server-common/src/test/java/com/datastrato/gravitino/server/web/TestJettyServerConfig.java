@@ -5,6 +5,7 @@
 package com.datastrato.gravitino.server.web;
 
 import com.datastrato.gravitino.Config;
+import com.datastrato.gravitino.config.ConfigBuilder;
 import com.google.common.collect.Sets;
 import java.util.Collections;
 import java.util.Optional;
@@ -43,5 +44,22 @@ public class TestJettyServerConfig {
     jettyServerConfig = JettyServerConfig.fromConfig(protocolConfig, "");
     Assertions.assertIterableEquals(
         Sets.newHashSet(algorithm), jettyServerConfig.getSupportedAlgorithms());
+  }
+
+  @Test
+  public void testCustomFilters() {
+    Config emptyconfig = new Config() {};
+    JettyServerConfig jettyServerConfig = JettyServerConfig.fromConfig(emptyconfig, "");
+    Assertions.assertTrue(jettyServerConfig.getCustomFilters().isEmpty());
+
+    Config somethingConfig = new Config() {};
+    somethingConfig.set(JettyServerConfig.CUSTOM_FILTERS, Optional.of("1,2"));
+    somethingConfig.set(new ConfigBuilder("1.1").stringConf(), "test");
+    somethingConfig.set(new ConfigBuilder("1.2").stringConf(), "test");
+    jettyServerConfig = JettyServerConfig.fromConfig(somethingConfig, "");
+    Assertions.assertIterableEquals(
+        Sets.newHashSet("1", "2"), jettyServerConfig.getCustomFilters());
+    Assertions.assertTrue(jettyServerConfig.getAllWithPrefix("2.").isEmpty());
+    Assertions.assertEquals(2, jettyServerConfig.getAllWithPrefix("1.").size());
   }
 }

@@ -87,6 +87,7 @@ public class GravitinoServer extends ResourceConfig {
     server.addServlet(servlet, "/api/*");
     Servlet configServlet = new ConfigServlet(serverConfig);
     server.addServlet(configServlet, "/configs");
+    server.addCustomFilters("/api/*");
     server.addFilter(new VersioningFilter(), "/api/*");
     server.addFilter(new AuthenticationFilter(), "/api/*");
   }
