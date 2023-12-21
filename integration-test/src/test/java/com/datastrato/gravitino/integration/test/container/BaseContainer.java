@@ -189,7 +189,7 @@ public abstract class BaseContainer implements AutoCloseable {
     }
 
     public SELF withNetwork(Network network) {
-      this.network = Optional.of(network);
+      this.network = Optional.ofNullable(network);
       return self;
     }
 
