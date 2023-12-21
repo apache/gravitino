@@ -324,7 +324,10 @@ public class MysqlTableOperations extends JdbcTableOperations {
       } else if (change instanceof TableChange.DeleteColumn) {
         TableChange.DeleteColumn deleteColumn = (TableChange.DeleteColumn) change;
         lazyLoadCreateTable = getOrCreateTable(databaseName, tableName, lazyLoadCreateTable);
-        alterSql.add(deleteColumnFieldDefinition(deleteColumn, lazyLoadCreateTable));
+        String deleteColSql = deleteColumnFieldDefinition(deleteColumn, lazyLoadCreateTable);
+        if (StringUtils.isNotEmpty(deleteColSql)) {
+          alterSql.add(deleteColSql);
+        }
       } else if (change instanceof TableChange.UpdateColumnNullability) {
         lazyLoadCreateTable = getOrCreateTable(databaseName, tableName, lazyLoadCreateTable);
         alterSql.add(
