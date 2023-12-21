@@ -17,7 +17,6 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.List;
-import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.DockerClientFactory;
@@ -46,8 +45,8 @@ public class ContainerSuite implements Closeable {
       Info info = dockerClient.infoCmd().exec();
       LOG.info("Docker info: {}", info);
 
-      if (System.getenv("NEED_CREATE_DOCKER_NETWORK") != null
-          && Objects.equals(System.getenv("NEED_CREATE_DOCKER_NETWORK"), "true")) {
+      String needCreateDockerNetwork = System.getenv("NEED_CREATE_DOCKER_NETWORK");
+      if (needCreateDockerNetwork != null && needCreateDockerNetwork.equalsIgnoreCase("true")) {
         network = createDockerNetwork();
       }
     } catch (Exception e) {
