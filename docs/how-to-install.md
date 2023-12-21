@@ -10,7 +10,7 @@ This software is licensed under the Apache License version 2."
 :::note
 Gravitino supports running on Java 8, 11, and 17, please make sure you have Java installed and
 `JAVA_HOME` configured correctly. To confirm the Java version, you can simply run
-`${JAVA_HOME} /bin/java -version` command.
+`${JAVA_HOME}/bin/java -version` command.
 :::
 
 ### Get the Gravitino binary distribution package
