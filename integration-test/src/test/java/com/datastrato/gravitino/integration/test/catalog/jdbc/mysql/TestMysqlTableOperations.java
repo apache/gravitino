@@ -146,7 +146,7 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
                     newName,
                     TableChange.deleteColumn(new String[] {newColumn.name()}, false)));
     Assertions.assertEquals(
-        "delete column not exists: " + newColumn.name(), illegalArgumentException.getMessage());
+        "Delete column does not exist: " + newColumn.name(), illegalArgumentException.getMessage());
     Assertions.assertDoesNotThrow(
         () ->
             TABLE_OPERATIONS.alterTable(

@@ -518,7 +518,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
       if (BooleanUtils.isTrue(deleteColumn.getIfExists())) {
         return "";
       } else {
-        throw new IllegalArgumentException("delete column not exists: " + col);
+        throw new IllegalArgumentException("Delete column does not exist: " + col);
       }
     }
     return "DROP COLUMN " + col;

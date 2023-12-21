@@ -353,7 +353,10 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
       } else if (change instanceof TableChange.DeleteColumn) {
         lazyLoadTable = getOrCreateTable(schemaName, tableName, lazyLoadTable);
         TableChange.DeleteColumn deleteColumn = (TableChange.DeleteColumn) change;
-        alterSql.add(deleteColumnFieldDefinition(deleteColumn, lazyLoadTable));
+        String deleteColSql = deleteColumnFieldDefinition(deleteColumn, lazyLoadTable);
+        if (StringUtils.isNotEmpty(deleteColSql)) {
+          alterSql.add(deleteColSql);
+        }
       } else if (change instanceof TableChange.UpdateColumnNullability) {
         alterSql.add(
             updateColumnNullabilityDefinition(
@@ -415,7 +418,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
       if (BooleanUtils.isTrue(deleteColumn.getIfExists())) {
         return "";
       } else {
-        throw new IllegalArgumentException("delete column not exists: " + col);
+        throw new IllegalArgumentException("Delete column does not exist: " + col);
       }
     }
     return "ALTER TABLE " + table.name() + " DROP COLUMN " + deleteColumn.fieldName()[0] + ";";
