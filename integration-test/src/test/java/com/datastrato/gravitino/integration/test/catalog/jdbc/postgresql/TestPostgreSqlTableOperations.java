@@ -12,7 +12,6 @@ import com.datastrato.gravitino.catalog.jdbc.utils.JdbcConnectorUtils;
 import com.datastrato.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter;
 import com.datastrato.gravitino.catalog.postgresql.operation.PostgreSqlSchemaOperations;
 import com.datastrato.gravitino.catalog.postgresql.operation.PostgreSqlTableOperations;
-import com.datastrato.gravitino.exceptions.GravitinoRuntimeException;
 import com.datastrato.gravitino.exceptions.NoSuchTableException;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
 import com.datastrato.gravitino.rel.TableChange;
@@ -180,23 +179,28 @@ public class TestPostgreSqlTableOperations extends TestPostgreSqlAbstractIT {
     // delete column
     TABLE_OPERATIONS.alterTable(
         TEST_DB_NAME, newName, TableChange.deleteColumn(new String[] {newColumn.name()}, true));
+
     load = TABLE_OPERATIONS.load(TEST_DB_NAME, newName);
     alterColumns.remove(newColumn);
     assertionsTableInfo(newName, tableComment, alterColumns, properties, load);
 
-    GravitinoRuntimeException gravitinoRuntimeException =
+    IllegalArgumentException illegalArgumentException =
         Assertions.assertThrows(
-            GravitinoRuntimeException.class,
+            IllegalArgumentException.class,
             () ->
                 TABLE_OPERATIONS.alterTable(
                     TEST_DB_NAME,
                     newName,
-                    TableChange.deleteColumn(new String[] {newColumn.name()}, true)));
+                    TableChange.deleteColumn(new String[] {newColumn.name()}, false)));
+    Assertions.assertEquals(
+        "Delete column does not exist: " + newColumn.name(), illegalArgumentException.getMessage());
 
-    Assertions.assertTrue(
-        gravitinoRuntimeException
-            .getMessage()
-            .contains("ERROR: column \"col_5\" of relation \"new_table\" does not exist"));
+    Assertions.assertDoesNotThrow(
+        () ->
+            TABLE_OPERATIONS.alterTable(
+                TEST_DB_NAME,
+                newName,
+                TableChange.deleteColumn(new String[] {newColumn.name()}, true)));
     Assertions.assertDoesNotThrow(() -> TABLE_OPERATIONS.purge(TEST_DB_NAME, newName));
     Assertions.assertThrows(
         NoSuchTableException.class, () -> TABLE_OPERATIONS.purge(TEST_DB_NAME, newName));
