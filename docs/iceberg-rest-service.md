@@ -42,6 +42,11 @@ Deploy the Gravitino server to the `GRAVITINO_HOME` directory. You can find the 
 | `gravitino.auxService.iceberg-rest.idleTimeout`             | The timeout in ms of idle connections.                                                                                                                                                                                                                     | `30000`                                                                      | No       | 0.2.0         |
 | `gravitino.auxService.iceberg-rest.requestHeaderSize`       | The maximum size of an HTTP request.                                                                                                                                                                                                                       | `131072`                                                                     | No       | 0.2.0         |
 | `gravitino.auxService.iceberg-rest.responseHeaderSize`      | The maximum size of an HTTP response.                                                                                                                                                                                                                      | `131072`                                                                     | No       | 0.2.0         |
+| `gravitino.auxService.iceberg-rest.customFilters`           | Comma separated list of filter class names to apply to the APIs.                                                                                                                                                                                           | (none)                                                                       | No       | 0.4.0         |
+
+
+The filter in the customFilters should be a standard javax servlet Filter.
+Filter parameters can also be specified in the configuration, by setting config entries of the form `gravitino.auxService.iceberg-rest.<class name of filter>.param.<param name>=<value>`
 
 :::caution
 You must set `gravitino.auxService.iceberg-rest.httpPort` explicitly, like `9001`.

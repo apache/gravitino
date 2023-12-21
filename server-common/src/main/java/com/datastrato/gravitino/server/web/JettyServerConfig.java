@@ -171,12 +171,12 @@ public final class JettyServerConfig {
           .stringConf()
           .createWithDefault("JKS");
 
-  public static final ConfigEntry<String> CUSTOM_FILTERS =
+  public static final ConfigEntry<Optional<String>> CUSTOM_FILTERS =
       new ConfigBuilder("customFilters")
           .doc("Comma separated list of filter class names to apply to the APIs")
           .version("0.4.0")
           .stringConf()
-          .createWithDefault("");
+          .createWithOptional();
 
   private final String host;
 
@@ -257,8 +257,10 @@ public final class JettyServerConfig {
     this.trustStorePassword = internalConfig.get(SSL_TRUST_STORE_PASSWORD);
     this.trustStoreType = internalConfig.get(SSL_TRUST_STORE_TYPE);
     this.customFilters =
-        Collections.unmodifiableSet(
-            Sets.newHashSet(internalConfig.get(CUSTOM_FILTERS).split(SPLITTER)));
+        internalConfig
+            .get(CUSTOM_FILTERS)
+            .map(filters -> Collections.unmodifiableSet(Sets.newHashSet(filters.split(SPLITTER))))
+            .orElse(Collections.emptySet());
   }
 
   public static JettyServerConfig fromConfig(Config config, String prefix) {
