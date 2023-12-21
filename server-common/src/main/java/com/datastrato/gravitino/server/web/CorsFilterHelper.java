@@ -1,0 +1,36 @@
+/*
+ * Copyright 2023 Datastrato Pvt Ltd.
+ * This software is licensed under the Apache License version 2.
+ */
+
+package com.datastrato.gravitino.server.web;
+
+import org.eclipse.jetty.servlet.FilterHolder;
+import org.eclipse.jetty.servlets.CrossOriginFilter;
+
+class CorsFilterHelper {
+
+  private CorsFilterHelper() {}
+
+  public static FilterHolder createCorsFilterHolder(JettyServerConfig config) {
+    FilterHolder filterHolder = new FilterHolder();
+    filterHolder.setClassName(CrossOriginFilter.class.getName());
+    filterHolder.setInitParameter(
+        JettyServerConfig.ALLOWED_ORIGINS.getKey(), config.getAllowedOrigins());
+    filterHolder.setInitParameter(
+        JettyServerConfig.ALLOWED_TIMING_ORIGINS.getKey(), config.getAllowedTimingOrigins());
+    filterHolder.setInitParameter(
+        JettyServerConfig.CHAIN_PREFLIGHT.getKey(), String.valueOf(config.isChainPreflight()));
+    filterHolder.setInitParameter(
+        JettyServerConfig.PREFLIGHT_MAX_AGE.getKey(), String.valueOf(config.getPreflightMaxAge()));
+    filterHolder.setInitParameter(
+        JettyServerConfig.ALLOW_CREDENTIALS.getKey(), String.valueOf(config.isAllowCredentials()));
+    filterHolder.setInitParameter(
+        JettyServerConfig.ALLOWED_METHODS.getKey(), config.getAllowedMethods());
+    filterHolder.setInitParameter(
+        JettyServerConfig.ALLOWED_HEADERS.getKey(), config.getAllowedHeaders());
+    filterHolder.setInitParameter(
+        JettyServerConfig.EXPOSED_HEADERS.getKey(), config.getExposedHeaders());
+    return filterHolder;
+  }
+}
