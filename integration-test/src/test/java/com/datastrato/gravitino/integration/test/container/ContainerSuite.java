@@ -221,6 +221,8 @@ public class ContainerSuite implements Closeable {
     return result.toString();
   }
 
+  // Classless Inter-Domain Routing (CIDR)
+  // https://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing
   private static long[] cidrToRange(String cidr) throws Exception {
     String[] parts = cidr.split("/");
     InetAddress inetAddress = InetAddress.getByName(parts[0]);
