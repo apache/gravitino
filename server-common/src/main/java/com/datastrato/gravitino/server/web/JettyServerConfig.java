@@ -204,7 +204,7 @@ public final class JettyServerConfig {
   public static final ConfigEntry<String> ALLOWED_ORIGINS =
       new ConfigBuilder("allowedOrigins")
           .doc(
-              "A comma separated list of origins that are allowed to access the resources. Default value is *, meaning all origins")
+              "A comma separated list of origins that are allowed to access the resources. Default value is *, means all origins")
           .version("0.4.0")
           .stringConf()
           .createWithDefault("*");
@@ -212,7 +212,7 @@ public final class JettyServerConfig {
   public static final ConfigEntry<String> ALLOWED_TIMING_ORIGINS =
       new ConfigBuilder("allowedTimingOrigins")
           .doc(
-              "A comma separated list of origins that are allowed to time the resource. Default value is the empty string, meaning no origins.")
+              "A comma separated list of origins that are allowed to time the resource. Default value is the empty string, means no origins.")
           .version("0.4.0")
           .stringConf()
           .createWithDefault("");
@@ -233,8 +233,8 @@ public final class JettyServerConfig {
           .stringConf()
           .createWithDefault("X-Requested-With,Content-Type,Accept,Origin");
 
-  public static final ConfigEntry<Integer> PREFLIGHT_MAX_AGE_SEC =
-      new ConfigBuilder("preflightMaxAge")
+  public static final ConfigEntry<Integer> PREFLIGHT_MAX_AGE_IN_SECS =
+      new ConfigBuilder("preflightMaxAgeInSecs")
           .doc(
               "The number of seconds that preflight requests can be cached by the client. Default value is 1800 seconds, or 30 minutes")
           .version("0.4.0")
@@ -299,7 +299,7 @@ public final class JettyServerConfig {
   private final boolean enableCorsFilter;
   private final String allowedOrigins;
   private final String allowedTimingOrigins;
-  private final int preflightMaxAge;
+  private final int preflightMaxAgeInSecs;
   private final String allowedMethods;
   private final String allowedHeaders;
   private final boolean allowCredentials;
@@ -379,7 +379,7 @@ public final class JettyServerConfig {
     this.enableCorsFilter = internalConfig.get(ENABLE_CORS_FILTER);
     this.allowedOrigins = internalConfig.get(ALLOWED_ORIGINS);
     this.allowedTimingOrigins = internalConfig.get(ALLOWED_TIMING_ORIGINS);
-    this.preflightMaxAge = internalConfig.get(PREFLIGHT_MAX_AGE_SEC);
+    this.preflightMaxAgeInSecs = internalConfig.get(PREFLIGHT_MAX_AGE_IN_SECS);
     this.allowedMethods = internalConfig.get(ALLOWED_METHODS);
     this.allowedHeaders = internalConfig.get(ALLOWED_HEADERS);
     this.allowCredentials = internalConfig.get(ALLOW_CREDENTIALS);
@@ -506,8 +506,8 @@ public final class JettyServerConfig {
     return allowedTimingOrigins;
   }
 
-  public int getPreflightMaxAge() {
-    return preflightMaxAge;
+  public int getPreflightMaxAgeInSecs() {
+    return preflightMaxAgeInSecs;
   }
 
   public String getAllowedMethods() {
