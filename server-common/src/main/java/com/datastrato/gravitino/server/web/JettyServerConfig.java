@@ -38,6 +38,7 @@ public final class JettyServerConfig {
           .doc("The http port number of the Jetty web server")
           .version("0.1.0")
           .intConf()
+          .checkValue(value -> value >= 0, ConfigConstants.NON_NEGATIVE_NUMBER_ERROR_MSG)
           .createWithDefault(8090);
 
   public static final ConfigEntry<Integer> WEBSERVER_MIN_THREADS =
@@ -45,6 +46,7 @@ public final class JettyServerConfig {
           .doc("The minimum number of threads in the thread pool used by Jetty webserver")
           .version("0.2.0")
           .intConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(
               Math.max(Math.min(Runtime.getRuntime().availableProcessors() * 2, 100), 4));
 
@@ -53,6 +55,7 @@ public final class JettyServerConfig {
           .doc("The maximum number of threads in the thread pool used by Jetty webserver")
           .version("0.1.0")
           .intConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(Math.max(Runtime.getRuntime().availableProcessors() * 4, 400));
 
   public static final ConfigEntry<Long> WEBSERVER_STOP_TIMEOUT =
@@ -60,6 +63,7 @@ public final class JettyServerConfig {
           .doc("Time in milliseconds to gracefully shutdown the Jetty webserver")
           .version("0.2.0")
           .longConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(30 * 1000L);
 
   public static final ConfigEntry<Integer> WEBSERVER_IDLE_TIMEOUT =
@@ -67,6 +71,7 @@ public final class JettyServerConfig {
           .doc("The timeout in milliseconds of idle connections")
           .version("0.2.0")
           .intConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(30 * 1000);
 
   public static final ConfigEntry<Integer> WEBSERVER_REQUEST_HEADER_SIZE =
@@ -74,6 +79,7 @@ public final class JettyServerConfig {
           .doc("Maximum size of HTTP requests")
           .version("0.1.0")
           .intConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(128 * 1024);
 
   public static final ConfigEntry<Integer> WEBSERVER_RESPONSE_HEADER_SIZE =
@@ -81,6 +87,7 @@ public final class JettyServerConfig {
           .doc("Maximum size of HTTP responses")
           .version("0.1.0")
           .intConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(128 * 1024);
 
   public static final ConfigEntry<Integer> WEBSERVER_THREAD_POOL_WORK_QUEUE_SIZE =
@@ -88,6 +95,7 @@ public final class JettyServerConfig {
           .doc("The size of the queue in the thread pool used by Jetty webserver")
           .version("0.1.0")
           .intConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(100);
 
   public static final ConfigEntry<Boolean> ENABLE_HTTPS =
@@ -102,6 +110,7 @@ public final class JettyServerConfig {
           .doc("The https port number of the Jetty web server")
           .version("0.3.0")
           .intConf()
+          .checkValue(value -> value >= 0, ConfigConstants.NON_NEGATIVE_NUMBER_ERROR_MSG)
           .createWithDefault(8433);
 
   public static final ConfigEntry<String> SSL_KEYSTORE_PATH =
@@ -141,6 +150,7 @@ public final class JettyServerConfig {
           .version("0.3.0")
           .stringConf()
           .createWithOptional();
+
   public static final ConfigEntry<String> ENABLE_CIPHER_ALGORITHMS =
       new ConfigBuilder("enableCipherAlgorithms")
           .doc("The collection of the cipher algorithms are enabled ")
@@ -284,7 +294,7 @@ public final class JettyServerConfig {
     this.keyStorePath = keyStorePath;
     this.keyStorePassword = keyStorePassword;
     this.managerPassword = managerPassword;
-    this.trustStorePasword = trustStorePassword;
+    this.trustStorePassword = trustStorePassword;
     this.trustStorePath = trustStorePath;
   }
 

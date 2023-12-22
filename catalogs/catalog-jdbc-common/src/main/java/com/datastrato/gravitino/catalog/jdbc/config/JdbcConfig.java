@@ -59,6 +59,7 @@ public class JdbcConfig extends Config {
           .doc("The minimum number of connections in the pool")
           .version("0.3.0")
           .intConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(2);
 
   public static final ConfigEntry<Integer> POOL_MAX_SIZE =
@@ -66,6 +67,7 @@ public class JdbcConfig extends Config {
           .doc("The maximum number of connections in the pool")
           .version("0.3.0")
           .intConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(10);
 
   public String getJdbcUrl() {
