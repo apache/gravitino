@@ -205,7 +205,7 @@ public final class JettyServerConfig {
       new ConfigBuilder("allowedOrigins")
           .doc(
               "A comma separated list of origins that are allowed to access the resources."
-                  + "Default value is *, means all origins")
+                  + " Default value is *, means all origins")
           .version("0.4.0")
           .stringConf()
           .createWithDefault("*");
@@ -214,7 +214,7 @@ public final class JettyServerConfig {
       new ConfigBuilder("allowedTimingOrigins")
           .doc(
               "A comma separated list of origins that are allowed to time the resource."
-                  + "Default value is the empty string, means no origins.")
+                  + " Default value is the empty string, means no origins.")
           .version("0.4.0")
           .stringConf()
           .createWithDefault("");
@@ -223,7 +223,7 @@ public final class JettyServerConfig {
       new ConfigBuilder("allowedMethods")
           .doc(
               "A comma separated list of HTTP methods that are allowed to be used when accessing the resources."
-                  + "Default value is GET,POST,HEAD,DELETE")
+                  + " Default value is GET,POST,HEAD,DELETE")
           .version("0.4.0")
           .stringConf()
           .createWithDefault("GET,POST,HEAD,DELETE");
@@ -232,8 +232,8 @@ public final class JettyServerConfig {
       new ConfigBuilder("allowedHeaders")
           .doc(
               "A comma separated list of HTTP headers that are allowed to be specified when accessing the resources."
-                  + "Default value is X-Requested-With,Content-Type,Accept,Origin. If the value is a single *,"
-                  + "this means that any headers will be accepted.")
+                  + " Default value is X-Requested-With,Content-Type,Accept,Origin. If the value is a single *,"
+                  + " this means that any headers will be accepted.")
           .version("0.4.0")
           .stringConf()
           .createWithDefault("X-Requested-With,Content-Type,Accept,Origin");
@@ -242,7 +242,7 @@ public final class JettyServerConfig {
       new ConfigBuilder("preflightMaxAgeInSecs")
           .doc(
               "The number of seconds that preflight requests can be cached by the client."
-                  + "Default value is 1800 seconds, or 30 minutes")
+                  + " Default value is 1800 seconds, or 30 minutes")
           .version("0.4.0")
           .intConf()
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
