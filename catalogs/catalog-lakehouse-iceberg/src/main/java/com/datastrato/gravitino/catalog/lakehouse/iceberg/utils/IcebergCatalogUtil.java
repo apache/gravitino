@@ -45,7 +45,6 @@ public class IcebergCatalogUtil {
     IcebergConfig icebergConfig = new IcebergConfig(properties);
     String driverClassName = icebergConfig.getJdbcDriver();
 
-    // The method `get` will check the values of config options.
     icebergConfig.get(IcebergConfig.JDBC_USER);
     icebergConfig.get(IcebergConfig.JDBC_PASSWORD);
 

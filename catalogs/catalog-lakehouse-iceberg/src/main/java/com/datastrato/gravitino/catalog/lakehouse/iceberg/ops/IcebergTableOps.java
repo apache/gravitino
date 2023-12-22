@@ -42,7 +42,6 @@ public class IcebergTableOps implements AutoCloseable {
   public IcebergTableOps(IcebergConfig icebergConfig) {
     String catalogType = icebergConfig.get(IcebergConfig.CATALOG_BACKEND);
     if (!IcebergCatalogBackend.MEMORY.name().equalsIgnoreCase(catalogType)) {
-      // The method `get` will check the values of config options.
       icebergConfig.get(IcebergConfig.CATALOG_WAREHOUSE);
       icebergConfig.get(IcebergConfig.CATALOG_URI);
     }
