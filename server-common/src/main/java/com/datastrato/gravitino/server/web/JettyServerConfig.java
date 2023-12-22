@@ -220,7 +220,7 @@ public final class JettyServerConfig {
   public static final ConfigEntry<String> ALLOWED_METHODS =
       new ConfigBuilder("allowedMethods")
           .doc(
-              "a comma separated list of HTTP methods that are allowed to be used when accessing the resources. Default value is GET,POST,HEAD,DELETE")
+              "A comma separated list of HTTP methods that are allowed to be used when accessing the resources. Default value is GET,POST,HEAD,DELETE")
           .version("0.4.0")
           .stringConf()
           .createWithDefault("GET,POST,HEAD,DELETE");

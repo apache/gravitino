@@ -42,7 +42,7 @@ public class TestCorsFilterHelper {
         parameters.get(JettyServerConfig.ALLOWED_METHODS.getKey()));
     Assertions.assertEquals(
         String.valueOf(JettyServerConfig.PREFLIGHT_MAX_AGE_IN_SECS.getDefaultValue()),
-        parameters.get(JettyServerConfig.PREFLIGHT_MAX_AGE_IN_SECS.getKey()));
+        parameters.get(CorsFilterHelper.PREFLIGHT_MAX_AGE));
     Assertions.assertEquals(
         "org.eclipse.jetty.servlets.CrossOriginFilter", filterHolder.getClassName());
     config.set(JettyServerConfig.ALLOWED_ORIGINS, "a");
@@ -63,7 +63,9 @@ public class TestCorsFilterHelper {
     Assertions.assertEquals("false", parameters.get(JettyServerConfig.CHAIN_PREFLIGHT.getKey()));
     Assertions.assertEquals("e", parameters.get(JettyServerConfig.EXPOSED_HEADERS.getKey()));
     Assertions.assertEquals("d", parameters.get(JettyServerConfig.ALLOWED_METHODS.getKey()));
+    Assertions.assertNull(parameters.get(JettyServerConfig.PREFLIGHT_MAX_AGE_IN_SECS.getKey()));
+
     Assertions.assertEquals(
-        "10", parameters.get(JettyServerConfig.PREFLIGHT_MAX_AGE_IN_SECS.getKey()));
+            "10", parameters.get(CorsFilterHelper.PREFLIGHT_MAX_AGE));
   }
 }

@@ -10,7 +10,7 @@ import org.eclipse.jetty.servlets.CrossOriginFilter;
 
 class CorsFilterHelper {
 
-  private static final String PREFLIGHT_MAX_AGE = "preflightMaxAge";
+  static final String PREFLIGHT_MAX_AGE = "preflightMaxAge";
   private CorsFilterHelper() {}
 
   public static FilterHolder createCorsFilterHolder(JettyServerConfig config) {
