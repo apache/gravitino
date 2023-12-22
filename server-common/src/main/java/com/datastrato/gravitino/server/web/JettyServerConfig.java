@@ -239,6 +239,7 @@ public final class JettyServerConfig {
               "The number of seconds that preflight requests can be cached by the client. Default value is 1800 seconds, or 30 minutes")
           .version("0.4.0")
           .intConf()
+          .checkValue(value -> value, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(1800);
 
   public static final ConfigEntry<Boolean> ALLOW_CREDENTIALS =

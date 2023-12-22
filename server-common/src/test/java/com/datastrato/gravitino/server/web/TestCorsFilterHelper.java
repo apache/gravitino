@@ -65,7 +65,6 @@ public class TestCorsFilterHelper {
     Assertions.assertEquals("d", parameters.get(JettyServerConfig.ALLOWED_METHODS.getKey()));
     Assertions.assertNull(parameters.get(JettyServerConfig.PREFLIGHT_MAX_AGE_IN_SECS.getKey()));
 
-    Assertions.assertEquals(
-            "10", parameters.get(CorsFilterHelper.PREFLIGHT_MAX_AGE));
+    Assertions.assertEquals("10", parameters.get(CorsFilterHelper.PREFLIGHT_MAX_AGE));
   }
 }
