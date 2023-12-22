@@ -6,7 +6,7 @@
 package com.datastrato.gravitino.config;
 
 public interface ConfigConstants {
-  String NOT_BLANK_ERROR_MSG = "The value can't be the blank";
+  String NOT_BLANK_ERROR_MSG = "The value can't be blank";
 
   String POSITIVE_NUMBER_ERROR_MSG = "The value must be a positive number";
 

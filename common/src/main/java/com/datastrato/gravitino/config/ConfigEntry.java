@@ -168,6 +168,7 @@ public class ConfigEntry<T> {
           if (validator == null) {
             return;
           }
+          // If optionValue is empty, the config entry will skip the check.
           optionValue.ifPresent(value -> validator.accept(value));
         });
 
