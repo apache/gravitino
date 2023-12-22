@@ -243,7 +243,8 @@ public class CatalogConnectorManager {
           GRAVITINO_CATALOG_ALREADY_EXISTS,
           "Catalog " + catalog + " already exists in the server.");
     } catch (Exception e) {
-      throw new TrinoException(GRAVITINO_UNSUPPORTED_OPERATION, "Create catalog failed, ", e);
+      throw new TrinoException(
+          GRAVITINO_UNSUPPORTED_OPERATION, "Create catalog failed. " + e.getMessage(), e);
     }
   }
 
@@ -288,7 +289,8 @@ public class CatalogConnectorManager {
       throw new TrinoException(
           GRAVITINO_METALAKE_NOT_EXISTS, "Metalake " + metalakeName + " not exists.");
     } catch (Exception e) {
-      throw new TrinoException(GRAVITINO_UNSUPPORTED_OPERATION, "Drop catalog failed, ", e);
+      throw new TrinoException(
+          GRAVITINO_UNSUPPORTED_OPERATION, "Drop catalog failed. " + e.getMessage(), e);
     }
   }
 
