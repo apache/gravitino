@@ -144,7 +144,7 @@ public class CatalogHiveIT extends AbstractIT {
     // Check if hive client can connect to hive metastore
     hiveClientPool = new HiveClientPool(1, hiveConf);
     List<String> dbs = hiveClientPool.run(client -> client.getAllDatabases());
-    Assertions.assertTrue(dbs.size() > 0);
+    Assertions.assertFalse(dbs.isEmpty());
 
     sparkSession =
         SparkSession.builder()
