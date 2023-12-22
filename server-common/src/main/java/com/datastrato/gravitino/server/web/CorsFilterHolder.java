@@ -8,13 +8,13 @@ package com.datastrato.gravitino.server.web;
 import org.eclipse.jetty.servlet.FilterHolder;
 import org.eclipse.jetty.servlets.CrossOriginFilter;
 
-class CorsFilterHelper {
+class CorsFilterHolder {
 
   static final String PREFLIGHT_MAX_AGE = "preflightMaxAge";
 
-  private CorsFilterHelper() {}
+  private CorsFilterHolder() {}
 
-  public static FilterHolder createCorsFilterHolder(JettyServerConfig config) {
+  public static FilterHolder create(JettyServerConfig config) {
     FilterHolder filterHolder = new FilterHolder();
     filterHolder.setClassName(CrossOriginFilter.class.getName());
     filterHolder.setInitParameter(

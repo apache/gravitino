@@ -454,9 +454,7 @@ public final class JettyServer {
   public void addSystemFilters(String pathSpec) {
     if (serverConfig.isEnableCorsFilter()) {
       servletContextHandler.addFilter(
-          CorsFilterHelper.createCorsFilterHolder(serverConfig),
-          pathSpec,
-          EnumSet.allOf(DispatcherType.class));
+          CorsFilterHolder.create(serverConfig), pathSpec, EnumSet.allOf(DispatcherType.class));
     }
     addFilter(new AuthenticationFilter(), pathSpec);
   }

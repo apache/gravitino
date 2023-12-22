@@ -204,7 +204,8 @@ public final class JettyServerConfig {
   public static final ConfigEntry<String> ALLOWED_ORIGINS =
       new ConfigBuilder("allowedOrigins")
           .doc(
-              "A comma separated list of origins that are allowed to access the resources. Default value is *, means all origins")
+              "A comma separated list of origins that are allowed to access the resources."
+                  + "Default value is *, means all origins")
           .version("0.4.0")
           .stringConf()
           .createWithDefault("*");
@@ -212,7 +213,8 @@ public final class JettyServerConfig {
   public static final ConfigEntry<String> ALLOWED_TIMING_ORIGINS =
       new ConfigBuilder("allowedTimingOrigins")
           .doc(
-              "A comma separated list of origins that are allowed to time the resource. Default value is the empty string, means no origins.")
+              "A comma separated list of origins that are allowed to time the resource."
+                  + "Default value is the empty string, means no origins.")
           .version("0.4.0")
           .stringConf()
           .createWithDefault("");
@@ -220,7 +222,8 @@ public final class JettyServerConfig {
   public static final ConfigEntry<String> ALLOWED_METHODS =
       new ConfigBuilder("allowedMethods")
           .doc(
-              "A comma separated list of HTTP methods that are allowed to be used when accessing the resources. Default value is GET,POST,HEAD,DELETE")
+              "A comma separated list of HTTP methods that are allowed to be used when accessing the resources."
+                  + "Default value is GET,POST,HEAD,DELETE")
           .version("0.4.0")
           .stringConf()
           .createWithDefault("GET,POST,HEAD,DELETE");
@@ -228,7 +231,9 @@ public final class JettyServerConfig {
   public static final ConfigEntry<String> ALLOWED_HEADERS =
       new ConfigBuilder("allowedHeaders")
           .doc(
-              "A comma separated list of HTTP headers that are allowed to be specified when accessing the resources. Default value is X-Requested-With,Content-Type,Accept,Origin. If the value is a single *, this means that any headers will be accepted.")
+              "A comma separated list of HTTP headers that are allowed to be specified when accessing the resources."
+                  + "Default value is X-Requested-With,Content-Type,Accept,Origin. If the value is a single *,"
+                  + "this means that any headers will be accepted.")
           .version("0.4.0")
           .stringConf()
           .createWithDefault("X-Requested-With,Content-Type,Accept,Origin");
@@ -236,7 +241,8 @@ public final class JettyServerConfig {
   public static final ConfigEntry<Integer> PREFLIGHT_MAX_AGE_IN_SECS =
       new ConfigBuilder("preflightMaxAgeInSecs")
           .doc(
-              "The number of seconds that preflight requests can be cached by the client. Default value is 1800 seconds, or 30 minutes")
+              "The number of seconds that preflight requests can be cached by the client."
+                  + "Default value is 1800 seconds, or 30 minutes")
           .version("0.4.0")
           .intConf()
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
@@ -253,7 +259,8 @@ public final class JettyServerConfig {
   public static final ConfigEntry<String> EXPOSED_HEADERS =
       new ConfigBuilder("exposedHeaders")
           .doc(
-              "A comma separated list of HTTP headers that are allowed to be exposed on the client. Default value is the empty list")
+              "A comma separated list of HTTP headers that are allowed to be exposed on the client."
+                  + "Default value is the empty list")
           .version("0.4.0")
           .stringConf()
           .createWithDefault("");
@@ -261,7 +268,8 @@ public final class JettyServerConfig {
   public static final ConfigEntry<Boolean> CHAIN_PREFLIGHT =
       new ConfigBuilder("chainPreflight")
           .doc(
-              "If true preflight requests are chained to their target resource for normal handling (as an OPTION request). Otherwise the filter will response to the preflight. Default is true.")
+              "If true preflight requests are chained to their target resource for normal handling "
+                  + "(as an OPTION request). Otherwise the filter will response to the preflight. Default is true.")
           .version("0.4.0")
           .booleanConf()
           .createWithDefault(true);

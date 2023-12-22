@@ -11,13 +11,13 @@ import org.eclipse.jetty.servlet.FilterHolder;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-public class TestCorsFilterHelper {
+public class TestCorsFilterHolder {
 
   @Test
   public void testCreateCorsFilterHolder() {
     Config config = new Config() {};
     JettyServerConfig jettyServerConfig = JettyServerConfig.fromConfig(config, "");
-    FilterHolder filterHolder = CorsFilterHelper.createCorsFilterHolder(jettyServerConfig);
+    FilterHolder filterHolder = CorsFilterHolder.create(jettyServerConfig);
     Map<String, String> parameters = filterHolder.getInitParameters();
     Assertions.assertEquals(
         JettyServerConfig.ALLOWED_ORIGINS.getDefaultValue(),
@@ -42,7 +42,7 @@ public class TestCorsFilterHelper {
         parameters.get(JettyServerConfig.ALLOWED_METHODS.getKey()));
     Assertions.assertEquals(
         String.valueOf(JettyServerConfig.PREFLIGHT_MAX_AGE_IN_SECS.getDefaultValue()),
-        parameters.get(CorsFilterHelper.PREFLIGHT_MAX_AGE));
+        parameters.get(CorsFilterHolder.PREFLIGHT_MAX_AGE));
     Assertions.assertEquals(
         "org.eclipse.jetty.servlets.CrossOriginFilter", filterHolder.getClassName());
     config.set(JettyServerConfig.ALLOWED_ORIGINS, "a");
@@ -54,7 +54,7 @@ public class TestCorsFilterHelper {
     config.set(JettyServerConfig.CHAIN_PREFLIGHT, false);
     config.set(JettyServerConfig.PREFLIGHT_MAX_AGE_IN_SECS, 10);
     jettyServerConfig = JettyServerConfig.fromConfig(config, "");
-    filterHolder = CorsFilterHelper.createCorsFilterHolder(jettyServerConfig);
+    filterHolder = CorsFilterHolder.create(jettyServerConfig);
     parameters = filterHolder.getInitParameters();
     Assertions.assertEquals("a", parameters.get(JettyServerConfig.ALLOWED_ORIGINS.getKey()));
     Assertions.assertEquals("b", parameters.get(JettyServerConfig.ALLOWED_TIMING_ORIGINS.getKey()));
@@ -65,6 +65,6 @@ public class TestCorsFilterHelper {
     Assertions.assertEquals("d", parameters.get(JettyServerConfig.ALLOWED_METHODS.getKey()));
     Assertions.assertNull(parameters.get(JettyServerConfig.PREFLIGHT_MAX_AGE_IN_SECS.getKey()));
 
-    Assertions.assertEquals("10", parameters.get(CorsFilterHelper.PREFLIGHT_MAX_AGE));
+    Assertions.assertEquals("10", parameters.get(CorsFilterHolder.PREFLIGHT_MAX_AGE));
   }
 }
