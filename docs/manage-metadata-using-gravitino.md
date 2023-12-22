@@ -562,7 +562,7 @@ supportsSchemas.dropSchema(NameIdentifier.of("metalake", "catalog", "schema"), t
 </Tabs>
 
 If `cascade` is true, Gravitino will drop all tables under the schema. Otherwise, Gravitino will throw an exception if there are tables under the schema. 
-Some catalogs may not support dropping a schema cascading, please refer to the related doc for more details.
+Some catalogs may not support cascading deletion of a schema, please refer to the related doc for more details.
 
 ### List all schemas under a catalog
 
