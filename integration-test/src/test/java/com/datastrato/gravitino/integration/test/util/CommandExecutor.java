@@ -19,7 +19,9 @@ package com.datastrato.gravitino.integration.test.util;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,13 +43,15 @@ public class CommandExecutor {
       String[] command,
       boolean printToConsole,
       ProcessData.TypesOfData type,
-      IGNORE_ERRORS ignore_errors) {
+      IGNORE_ERRORS ignore_errors,
+      Map<String, String> env) {
     List<String> subCommandsAsList = new ArrayList<>(Arrays.asList(command));
     String mergedCommand = StringUtils.join(subCommandsAsList, " ");
 
     LOG.info("Sending command \"" + mergedCommand + "\" to localhost");
 
     ProcessBuilder processBuilder = new ProcessBuilder(command);
+    processBuilder.environment().putAll(env);
     Process process = null;
     try {
       process = processBuilder.start();
@@ -70,6 +74,23 @@ public class CommandExecutor {
   public static Object executeCommandLocalHost(
       String command, boolean printToConsole, ProcessData.TypesOfData type) {
     return executeCommandLocalHost(
-        new String[] {"bash", "-c", command}, printToConsole, type, DEFAULT_BEHAVIOUR_ON_ERRORS);
+        new String[] {"bash", "-c", command},
+        printToConsole,
+        type,
+        DEFAULT_BEHAVIOUR_ON_ERRORS,
+        new HashMap<String, String>());
+  }
+
+  public static Object executeCommandLocalHost(
+      String command,
+      boolean printToConsole,
+      ProcessData.TypesOfData type,
+      Map<String, String> env) {
+    return executeCommandLocalHost(
+        new String[] {"bash", "-c", command},
+        printToConsole,
+        type,
+        DEFAULT_BEHAVIOUR_ON_ERRORS,
+        env);
   }
 }

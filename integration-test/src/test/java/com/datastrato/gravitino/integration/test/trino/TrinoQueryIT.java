@@ -12,6 +12,9 @@ import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.client.GravitinoClient;
 import com.datastrato.gravitino.client.GravitinoMetaLake;
+import com.datastrato.gravitino.integration.test.util.AbstractIT;
+import com.datastrato.gravitino.integration.test.util.CommandExecutor;
+import com.datastrato.gravitino.integration.test.util.ProcessData;
 import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.datastrato.gravitino.rel.TableCatalog;
 import io.trino.cli.Query;
@@ -61,7 +64,7 @@ import org.slf4j.LoggerFactory;
 public class TrinoQueryIT {
   private static final Logger LOG = LoggerFactory.getLogger(TrinoQueryIT.class);
 
-  private static boolean isDockerRunning = false;
+  private static boolean autoStartEnv = true;
 
   // TODO(yuhui) redo get the configs after we have the Docker image ready for testing.
   private static String gravitinoUri = "http://127.0.0.1:8090";
@@ -73,17 +76,70 @@ public class TrinoQueryIT {
   private static final String metalakeName = "test";
   private static final Set<String> testCatalogs = new HashSet<>();
 
-  private static GravitinoClient client;
-  private static GravitinoMetaLake metalake;
+  private static GravitinoClient gravitinoClient;
+
   private static String testQueriesDir = "";
   private static AtomicInteger testCount = new AtomicInteger(0);
   private static AtomicInteger totalCount = new AtomicInteger(0);
   static TrinoQueryRunner trinoQueryRunner;
 
+  private static GravitinoMetaLake metalake;
+
+  static void startDocker() throws Exception {
+    AbstractIT.startIntegrationTest();
+    gravitinoUri = String.format("http://%s:%d", "127.0.0.1", AbstractIT.getGravitinoServerPort());
+    gravitinoClient = AbstractIT.client;
+
+    CommandExecutor.executeCommandLocalHost(
+        System.getenv("GRAVITINO_HOME") + "/dev/docker/trino-it/shutdown.sh",
+        false,
+        ProcessData.TypesOfData.OUTPUT);
+
+    Map<String, String> env = new HashMap<>();
+    env.put("GRAVITINO_SERVER_PORT", String.valueOf(AbstractIT.getGravitinoServerPort()));
+    CommandExecutor.executeCommandLocalHost(
+        System.getenv("GRAVITINO_HOME") + "/dev/docker/trino-it/launch.sh",
+        false,
+        ProcessData.TypesOfData.OUTPUT,
+        env);
+
+    Object output =
+        CommandExecutor.executeCommandLocalHost(
+            System.getenv("GRAVITINO_HOME") + "/dev/docker/trino-it/inspect_ip.sh",
+            false,
+            ProcessData.TypesOfData.OUTPUT);
+    String containerIpMapping = output.toString();
+    LOG.info("Container IP mapping: {}", containerIpMapping);
+    String[] containerInfos = containerIpMapping.split("\n");
+    for (String container : containerInfos) {
+      String[] info = container.split(":");
+      String containerName = info[0];
+      String address = info[1];
+      if (containerName.equals("trino")) {
+        trinoUri = String.format("http://%s:8080", address);
+      } else if (containerName.equals("hive")) {
+        hiveMetastoreUri = String.format("thrift://%s:9083", address);
+      } else if (containerName.equals("mysql")) {
+        mysqlUri = String.format("jdbc:mysql://%s:3306", address);
+      } else if (containerName.equals("postgresql")) {
+        postgresqlUri = String.format("jdbc:postgresql://%s", address);
+      }
+    }
+  }
+
+  private static void setEnv() throws Exception {
+    if (autoStartEnv) {
+      startDocker();
+    } else {
+      gravitinoClient = GravitinoClient.builder(gravitinoUri).build();
+    }
+  }
+
   @BeforeAll
   public static void setup() throws Exception {
     try {
-      client = GravitinoClient.builder(gravitinoUri).build();
+      setEnv();
+
       trinoQueryRunner = new TrinoQueryRunner();
 
       createMetalake();
@@ -111,10 +167,10 @@ public class TrinoQueryIT {
       if (catalogs.isEmpty() || catalogs.contains("jdbc-mysql")) {
         dropCatalog("jdbc-mysql");
         HashMap<String, String> properties = new HashMap<>();
-        properties.put("gravitino.bypass.jdbc-url", mysqlUri);
-        properties.put("gravitino.bypass.jdbc-user", "root");
-        properties.put("gravitino.bypass.jdbc-password", "ds123");
-        properties.put("gravitino.bypass.driverClassName", "com.mysql.cj.jdbc.Driver");
+        properties.put("jdbc-url", mysqlUri);
+        properties.put("jdbc-user", "mysql");
+        properties.put("jdbc-password", "mysql");
+        properties.put("jdbc-driver", "com.mysql.cj.jdbc.Driver");
 
         createCatalog("jdbc-mysql", "jdbc-mysql", properties);
       }
@@ -131,7 +187,7 @@ public class TrinoQueryIT {
         createCatalog("jdbc-postgresql", "jdbc-postgresql", properties);
       }
 
-      isDockerRunning = true;
+      //Thread.sleep(10000000);
     } catch (Exception e) {
       LOG.error("Services are not connected", e);
       return;
@@ -145,27 +201,41 @@ public class TrinoQueryIT {
   @AfterAll
   public static void cleanup() {
     trinoQueryRunner.stop();
+
+    try {
+      if (autoStartEnv) {
+        CommandExecutor.executeCommandLocalHost(
+            System.getenv("GRAVITINO_HOME") + "/dev/docker/trino-it/shutdown.sh",
+            false,
+            ProcessData.TypesOfData.OUTPUT);
+
+        AbstractIT.stopIntegrationTest();
+      }
+    } catch (Exception e) {
+      LOG.error("Error in cleanup", e);
+    }
   }
 
   private static void createMetalake() {
-    boolean exists = client.metalakeExists(NameIdentifier.of(metalakeName));
+    boolean exists = gravitinoClient.metalakeExists(NameIdentifier.of(metalakeName));
     if (exists) {
-      metalake = client.loadMetalake(NameIdentifier.of(metalakeName));
+      metalake = gravitinoClient.loadMetalake(NameIdentifier.of(metalakeName));
       return;
     }
 
     GravitinoMetaLake createdMetalake =
-        client.createMetalake(NameIdentifier.of(metalakeName), "comment", Collections.emptyMap());
+        gravitinoClient.createMetalake(
+            NameIdentifier.of(metalakeName), "comment", Collections.emptyMap());
     Assertions.assertNotNull(createdMetalake);
     metalake = createdMetalake;
   }
 
   private static void dropMetalake() {
-    boolean exists = client.metalakeExists(NameIdentifier.of(metalakeName));
+    boolean exists = gravitinoClient.metalakeExists(NameIdentifier.of(metalakeName));
     if (!exists) {
       return;
     }
-    client.dropMetalake(NameIdentifier.of(metalakeName));
+    gravitinoClient.dropMetalake(NameIdentifier.of(metalakeName));
   }
 
   private static void createCatalog(
@@ -187,10 +257,14 @@ public class TrinoQueryIT {
     boolean catalogCreated = false;
     int tries = 30;
     while (!catalogCreated && tries-- >= 0) {
-      String result = trinoQueryRunner.runQuery("show catalogs");
-      if (result.contains(metalakeName + "." + catalogName)) {
-        catalogCreated = true;
-        break;
+      try {
+        String result = trinoQueryRunner.runQuery("show catalogs");
+        if (result.contains(metalakeName + "." + catalogName)) {
+          catalogCreated = true;
+          break;
+        }
+        // connection exception need retry.
+      } catch (Exception ConnectionException) {
       }
       sleep(1000);
       LOG.info("Waiting for catalog {} to be created", catalogName);
@@ -263,10 +337,6 @@ public class TrinoQueryIT {
 
   @Test
   public void testSql() throws Exception {
-    if (!isDockerRunning) {
-      return;
-    }
-
     String[] catalogNames = readCatalogNames();
 
     ExecutorService executor = Executors.newFixedThreadPool(catalogNames.length);
@@ -426,6 +496,16 @@ public class TrinoQueryIT {
           CSV,
           Optional.of(""),
           false);
+      ClientSession session = queryRunner.getSession();
+
+      // update catalog and schema if present
+      if (queryResult.getSetCatalog().isPresent() || queryResult.getSetSchema().isPresent()) {
+        ClientSession.Builder builder = ClientSession.builder(session);
+        queryResult.getSetCatalog().ifPresent(builder::catalog);
+        queryResult.getSetSchema().ifPresent(builder::schema);
+        session = builder.build();
+        queryRunner.setSession(session);
+      }
       return outputStream.toString();
     }
 
@@ -442,6 +522,9 @@ public class TrinoQueryIT {
   }
 
   public static void main(String[] args) {
+    AbstractIT.testMode = "manual";
+    autoStartEnv = true;
+
     String targetTestId = null;
     try {
       if (args.length == 1) {
