@@ -964,7 +964,7 @@ You can remove a table by sending a `DELETE` request to the `/api/metalakes/{met
 <TabItem value="bash" label="Bash">
 
 ```bash
-## purge can be true or false, if purge is true, Gravitino will remove the real data of the table.
+## purge can be true or false, if purge is true, Gravitino will remove the data of the table.
 
 curl -X DELETE -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" \
@@ -989,10 +989,11 @@ tableCatalog.purgeTable(NameIdentifier.of("metalake", "catalog", "schema", "tabl
 // ...
 ```
 
-There are two ways to drop a table: `dropTable` and `purgeTable`, the difference between them is that `purgeTable` will remove real data of the table, while `dropTable` only removes the metadata of the table.
-
 </TabItem>
 </Tabs>
+
+There are two ways to drop a table: `dropTable` and `purgeTable`, the difference between them is that `purgeTable` will remove data of the table, while `dropTable` only removes the metadata of the table. Some engine such as 
+Apache Hive support both, `dropTable` will only remove the metadata of a table and the data in HDFS can be reused later through the format of external table.
 
 ### List all tables under a schema
 
