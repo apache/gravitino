@@ -989,7 +989,7 @@ tableCatalog.purgeTable(NameIdentifier.of("metalake", "catalog", "schema", "tabl
 // ...
 ```
 
-There are two ways to drop a table: `dropTable` and `purgeTable`, the difference between them is that `purgeTable` will remove the real data of the table, while `dropTable` only removes the metadata of the table.
+There are two ways to drop a table: `dropTable` and `purgeTable`, the difference between them is that `purgeTable` will remove real data of the table, while `dropTable` only removes the metadata of the table.
 
 </TabItem>
 </Tabs>
