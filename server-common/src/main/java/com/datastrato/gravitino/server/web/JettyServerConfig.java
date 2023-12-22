@@ -233,7 +233,7 @@ public final class JettyServerConfig {
           .stringConf()
           .createWithDefault("X-Requested-With,Content-Type,Accept,Origin");
 
-  public static final ConfigEntry<Integer> PREFLIGHT_MAX_AGE =
+  public static final ConfigEntry<Integer> PREFLIGHT_MAX_AGE_SEC =
       new ConfigBuilder("preflightMaxAge")
           .doc(
               "The number of seconds that preflight requests can be cached by the client. Default value is 1800 seconds, or 30 minutes")
@@ -379,7 +379,7 @@ public final class JettyServerConfig {
     this.enableCorsFilter = internalConfig.get(ENABLE_CORS_FILTER);
     this.allowedOrigins = internalConfig.get(ALLOWED_ORIGINS);
     this.allowedTimingOrigins = internalConfig.get(ALLOWED_TIMING_ORIGINS);
-    this.preflightMaxAge = internalConfig.get(PREFLIGHT_MAX_AGE);
+    this.preflightMaxAge = internalConfig.get(PREFLIGHT_MAX_AGE_SEC);
     this.allowedMethods = internalConfig.get(ALLOWED_METHODS);
     this.allowedHeaders = internalConfig.get(ALLOWED_HEADERS);
     this.allowCredentials = internalConfig.get(ALLOW_CREDENTIALS);

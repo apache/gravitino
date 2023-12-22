@@ -22,7 +22,7 @@ class CorsFilterHelper {
     filterHolder.setInitParameter(
         JettyServerConfig.CHAIN_PREFLIGHT.getKey(), String.valueOf(config.isChainPreflight()));
     filterHolder.setInitParameter(
-        JettyServerConfig.PREFLIGHT_MAX_AGE.getKey(), String.valueOf(config.getPreflightMaxAge()));
+        JettyServerConfig.PREFLIGHT_MAX_AGE_SEC.getKey(), String.valueOf(config.getPreflightMaxAge()));
     filterHolder.setInitParameter(
         JettyServerConfig.ALLOW_CREDENTIALS.getKey(), String.valueOf(config.isAllowCredentials()));
     filterHolder.setInitParameter(
