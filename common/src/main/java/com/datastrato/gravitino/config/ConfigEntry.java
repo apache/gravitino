@@ -10,6 +10,8 @@ import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.stream.Stream;
+
 import lombok.Getter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -165,11 +167,9 @@ public class ConfigEntry<T> {
     conf.setOptional();
     conf.setValidator(
         optionValue -> {
-          if (validator == null) {
-            return;
+          if (Stream.of(Optional.ofNullable(validator), optionValue).allMatch(Optional::isPresent)) {
+            validator.accept(optionValue.get());
           }
-          // If optionValue is empty, the config entry will skip the check.
-          optionValue.ifPresent(value -> validator.accept(value));
         });
 
     return conf;
