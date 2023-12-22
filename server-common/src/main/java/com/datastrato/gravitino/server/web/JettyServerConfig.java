@@ -260,7 +260,7 @@ public final class JettyServerConfig {
       new ConfigBuilder("exposedHeaders")
           .doc(
               "A comma separated list of HTTP headers that are allowed to be exposed on the client."
-                  + "Default value is the empty list")
+                  + " Default value is the empty list")
           .version("0.4.0")
           .stringConf()
           .createWithDefault("");
