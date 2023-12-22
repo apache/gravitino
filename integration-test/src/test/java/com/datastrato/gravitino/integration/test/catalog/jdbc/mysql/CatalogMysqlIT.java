@@ -477,12 +477,12 @@ public class CatalogMysqlIT extends AbstractIT {
             "Created by gravitino client",
             ImmutableMap.<String, String>builder().build());
 
-    // Try to drop MySQL database without cascade equals to false, it should not be allowed.
+    // Try to drop a database, and cascade equals to false, it should not be allowed.
     catalog.asSchemas().dropSchema(NameIdentifier.of(metalakeName, catalogName, schemaName), false);
-    // Check database still exists
+    // Check the database still exists
     catalog.asSchemas().loadSchema(NameIdentifier.of(metalakeName, catalogName, schemaName));
 
-    // Try to drop MySQL database with cascade equals to true, it should be allowed.
+    // Try to drop a database, and cascade equals to true, it should be allowed.
     catalog.asSchemas().dropSchema(NameIdentifier.of(metalakeName, catalogName, schemaName), true);
     // Check database has been dropped
     Assertions.assertThrows(

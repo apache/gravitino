@@ -12,6 +12,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.collections4.MapUtils;
@@ -53,16 +54,14 @@ public class MysqlDatabaseOperations extends JdbcDatabaseOperations {
     }
 
     try (final Connection connection = this.dataSource.getConnection()) {
-      String query = "SELECT * FROM information_schema.TABLES WHERE TABLE_SCHEMA = ?";
-      try (PreparedStatement preparedStatement = connection.prepareStatement(query)) {
-        preparedStatement.setString(1, databaseName);
-
+      String query = "SHOW TABLES IN " + databaseName;
+      try (Statement statement = connection.createStatement()) {
         // Execute the query and check if there exists any tables in the database
-        try (ResultSet resultSet = preparedStatement.executeQuery()) {
+        try (ResultSet resultSet = statement.executeQuery(query)) {
           if (resultSet.next()) {
             throw new IllegalStateException(
                 String.format(
-                    "Database %s is not empty. the value of cascade should be true.",
+                    "Database %s is not empty, the value of cascade should be true.",
                     databaseName));
           }
         }
