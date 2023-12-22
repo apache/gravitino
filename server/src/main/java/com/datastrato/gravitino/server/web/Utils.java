@@ -4,7 +4,10 @@
  */
 package com.datastrato.gravitino.server.web;
 
+import com.datastrato.gravitino.PrincipalContext;
+import com.datastrato.gravitino.auth.AuthConstants;
 import com.datastrato.gravitino.dto.responses.ErrorResponse;
+import com.datastrato.gravitino.server.auth.UserPrincipal;
 import java.util.Optional;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.core.MediaType;
@@ -93,5 +96,12 @@ public class Utils {
         .entity(ErrorResponse.nonEmpty(type, message, throwable))
         .type(MediaType.APPLICATION_JSON)
         .build();
+  }
+
+  public static PrincipalContext createUserPrincipalContext(HttpServletRequest httpRequest) {
+    return PrincipalContext.createPrincipalContext(
+        ((UserPrincipal)
+                httpRequest.getAttribute(AuthConstants.AuthenticatedPrincipalAttributeName))
+            .getName());
   }
 }

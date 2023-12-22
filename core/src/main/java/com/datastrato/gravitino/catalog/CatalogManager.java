@@ -18,6 +18,7 @@ import com.datastrato.gravitino.EntityAlreadyExistsException;
 import com.datastrato.gravitino.EntityStore;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
+import com.datastrato.gravitino.PrincipalContext;
 import com.datastrato.gravitino.StringIdentifier;
 import com.datastrato.gravitino.SupportsCatalogs;
 import com.datastrato.gravitino.exceptions.CatalogAlreadyExistsException;
@@ -261,7 +262,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
             .withProperties(StringIdentifier.addToProperties(stringId, mergedConfig))
             .withAuditInfo(
                 new AuditInfo.Builder()
-                    .withCreator("gravitino") /* TODO. Should change to real user */
+                    .withCreator(PrincipalContext.get().getCurrentUser())
                     .withCreateTime(Instant.now())
                     .build())
             .build();
@@ -366,8 +367,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
                     new AuditInfo.Builder()
                         .withCreator(catalog.auditInfo().creator())
                         .withCreateTime(catalog.auditInfo().createTime())
-                        .withLastModifier(
-                            catalog.auditInfo().creator()) /* TODO. We should use real user */
+                        .withLastModifier(PrincipalContext.get().getCurrentUser())
                         .withLastModifiedTime(Instant.now())
                         .build();
                 newCatalogBuilder.withAuditInfo(newInfo);

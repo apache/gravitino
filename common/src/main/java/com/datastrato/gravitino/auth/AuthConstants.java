@@ -13,4 +13,6 @@ public interface AuthConstants {
   String AUTHORIZATION_BASIC_HEADER = "Basic ";
 
   String ANONYMOUS_USER = "anonymous";
+
+  String AuthenticatedPrincipalAttributeName = AuthConstants.class.getName() + "-principal";
 }

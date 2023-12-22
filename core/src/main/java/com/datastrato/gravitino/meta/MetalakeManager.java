@@ -10,6 +10,7 @@ import com.datastrato.gravitino.EntityStore;
 import com.datastrato.gravitino.MetalakeChange;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
+import com.datastrato.gravitino.PrincipalContext;
 import com.datastrato.gravitino.StringIdentifier;
 import com.datastrato.gravitino.SupportsMetalakes;
 import com.datastrato.gravitino.exceptions.MetalakeAlreadyExistsException;
@@ -107,7 +108,7 @@ public class MetalakeManager implements SupportsMetalakes {
             .withVersion(SchemaVersion.V_0_1)
             .withAuditInfo(
                 new AuditInfo.Builder()
-                    .withCreator("gravitino") /*TODO: Use real user later on.  */
+                    .withCreator(PrincipalContext.get().getCurrentUser())
                     .withCreateTime(Instant.now())
                     .build())
             .build();

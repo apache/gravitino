@@ -11,6 +11,7 @@ import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
+import com.datastrato.gravitino.PrincipalContext;
 import com.datastrato.gravitino.catalog.CatalogOperationDispatcher;
 import com.datastrato.gravitino.dto.requests.TableCreateRequest;
 import com.datastrato.gravitino.dto.requests.TableUpdateRequest;
@@ -80,7 +81,7 @@ public class TableOperations {
       @PathParam("catalog") String catalog,
       @PathParam("schema") String schema,
       TableCreateRequest request) {
-    try {
+    try (PrincipalContext context = Utils.createUserPrincipalContext(httpRequest)) {
       request.validate();
       NameIdentifier ident = NameIdentifier.ofTable(metalake, catalog, schema, request.getName());
 
@@ -132,7 +133,7 @@ public class TableOperations {
       @PathParam("schema") String schema,
       @PathParam("table") String table,
       TableUpdatesRequest request) {
-    try {
+    try (PrincipalContext context = Utils.createUserPrincipalContext(httpRequest)) {
       request.validate();
       NameIdentifier ident = NameIdentifier.ofTable(metalake, catalog, schema, table);
       TableChange[] changes =

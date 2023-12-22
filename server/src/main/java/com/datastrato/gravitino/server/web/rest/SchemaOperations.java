@@ -8,6 +8,7 @@ import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
+import com.datastrato.gravitino.PrincipalContext;
 import com.datastrato.gravitino.catalog.CatalogOperationDispatcher;
 import com.datastrato.gravitino.dto.requests.SchemaCreateRequest;
 import com.datastrato.gravitino.dto.requests.SchemaUpdateRequest;
@@ -78,7 +79,7 @@ public class SchemaOperations {
       @PathParam("metalake") String metalake,
       @PathParam("catalog") String catalog,
       SchemaCreateRequest request) {
-    try {
+    try (PrincipalContext context = Utils.createUserPrincipalContext(httpRequest)) {
       request.validate();
       NameIdentifier ident = NameIdentifier.ofSchema(metalake, catalog, request.getName());
       Schema schema = dispatcher.createSchema(ident, request.getComment(), request.getProperties());
@@ -119,7 +120,7 @@ public class SchemaOperations {
       @PathParam("catalog") String catalog,
       @PathParam("schema") String schema,
       SchemaUpdatesRequest request) {
-    try {
+    try (PrincipalContext context = Utils.createUserPrincipalContext(httpRequest)) {
       request.validate();
       NameIdentifier ident = NameIdentifier.ofSchema(metalake, catalog, schema);
       SchemaChange[] changes =

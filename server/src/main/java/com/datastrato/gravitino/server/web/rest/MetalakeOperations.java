@@ -9,6 +9,7 @@ import com.codahale.metrics.annotation.Timed;
 import com.datastrato.gravitino.MetalakeChange;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
+import com.datastrato.gravitino.PrincipalContext;
 import com.datastrato.gravitino.dto.MetalakeDTO;
 import com.datastrato.gravitino.dto.requests.MetalakeCreateRequest;
 import com.datastrato.gravitino.dto.requests.MetalakeUpdateRequest;
@@ -76,7 +77,7 @@ public class MetalakeOperations {
   @Timed(name = "create-metalake." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "create-metalake", absolute = true)
   public Response createMetalake(MetalakeCreateRequest request) {
-    try {
+    try (PrincipalContext context = Utils.createUserPrincipalContext(httpRequest)) {
       request.validate();
       NameIdentifier ident = NameIdentifier.ofMetalake(request.getName());
       BaseMetalake metalake =
@@ -111,7 +112,7 @@ public class MetalakeOperations {
   @ResponseMetered(name = "alter-metalake", absolute = true)
   public Response alterMetalake(
       @PathParam("name") String metalakeName, MetalakeUpdatesRequest updatesRequest) {
-    try {
+    try (PrincipalContext context = Utils.createUserPrincipalContext(httpRequest)) {
       updatesRequest.validate();
       NameIdentifier identifier = NameIdentifier.ofMetalake(metalakeName);
       MetalakeChange[] changes =

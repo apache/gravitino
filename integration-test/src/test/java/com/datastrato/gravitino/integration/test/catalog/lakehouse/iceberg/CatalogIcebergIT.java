@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
+import com.datastrato.gravitino.auth.AuthConstants;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergConfig;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergSchemaPropertiesMetadata;
@@ -487,14 +488,17 @@ public class CatalogIcebergIT extends AbstractIT {
   @Test
   public void testAlterIcebergTable() {
     ColumnDTO[] columns = createColumns();
-    catalog
-        .asTableCatalog()
-        .createTable(
-            NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
-            columns,
-            table_comment,
-            createProperties(),
-            new Partitioning[] {IdentityPartitioningDTO.of(columns[0].name())});
+    Table table =
+        catalog
+            .asTableCatalog()
+            .createTable(
+                NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
+                columns,
+                table_comment,
+                createProperties(),
+                new Partitioning[] {IdentityPartitioningDTO.of(columns[0].name())});
+    Assertions.assertNull(table.auditInfo().lastModifier());
+    Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, table.auditInfo().creator());
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () -> {
@@ -506,11 +510,14 @@ public class CatalogIcebergIT extends AbstractIT {
                   TableChange.updateComment(table_comment + "_new"));
         });
 
-    catalog
-        .asTableCatalog()
-        .alterTable(
-            NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
-            TableChange.rename(alertTableName));
+    table =
+        catalog
+            .asTableCatalog()
+            .alterTable(
+                NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
+                TableChange.rename(alertTableName));
+    Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, table.auditInfo().lastModifier());
+    Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, table.auditInfo().creator());
 
     catalog
         .asTableCatalog()
@@ -525,7 +532,7 @@ public class CatalogIcebergIT extends AbstractIT {
             TableChange.updateColumnType(
                 new String[] {ICEBERG_COL_NAME1}, Types.IntegerType.get()));
 
-    Table table =
+    table =
         catalog
             .asTableCatalog()
             .loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, alertTableName));
@@ -787,6 +794,8 @@ public class CatalogIcebergIT extends AbstractIT {
     prop.remove(IcebergSchemaPropertiesMetadata.COMMENT);
     catalog.asSchemas().createSchema(ident, schema_comment, prop);
     Schema loadSchema = catalog.asSchemas().loadSchema(ident);
+    Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, loadSchema.auditInfo().creator());
+    Assertions.assertNull(loadSchema.auditInfo().lastModifier());
     Assertions.assertFalse(
         loadSchema.properties().containsKey(IcebergSchemaPropertiesMetadata.COMMENT));
     prop.forEach((key, value) -> Assertions.assertEquals(loadSchema.properties().get(key), value));
@@ -800,6 +809,8 @@ public class CatalogIcebergIT extends AbstractIT {
         () ->
             catalog.asSchemas().alterSchema(ident, SchemaChange.setProperty("comment-test", "v1")));
     Schema schema = catalog.asSchemas().loadSchema(ident);
+    Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, schema.auditInfo().creator());
+    Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, schema.auditInfo().lastModifier());
     Assertions.assertEquals("v1", schema.properties().get("comment-test"));
 
     // drop
