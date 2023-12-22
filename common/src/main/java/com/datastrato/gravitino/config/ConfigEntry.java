@@ -11,7 +11,6 @@ import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Stream;
-
 import lombok.Getter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -167,7 +166,8 @@ public class ConfigEntry<T> {
     conf.setOptional();
     conf.setValidator(
         optionValue -> {
-          if (Stream.of(Optional.ofNullable(validator), optionValue).allMatch(Optional::isPresent)) {
+          if (Stream.of(Optional.ofNullable(validator), optionValue)
+              .allMatch(Optional::isPresent)) {
             validator.accept(optionValue.get());
           }
         });
