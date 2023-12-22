@@ -6,6 +6,7 @@ package com.datastrato.gravitino.server.web;
 
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.config.ConfigBuilder;
+import com.datastrato.gravitino.config.ConfigConstants;
 import com.datastrato.gravitino.config.ConfigEntry;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -17,6 +18,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import javax.net.ssl.SSLContext;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,6 +38,7 @@ public final class JettyServerConfig {
           .doc("The http port number of the Jetty web server")
           .version("0.1.0")
           .intConf()
+          .checkValue(value -> value >= 0, ConfigConstants.NON_NEGATIVE_NUMBER_ERROR_MSG)
           .createWithDefault(8090);
 
   public static final ConfigEntry<Integer> WEBSERVER_MIN_THREADS =
@@ -43,6 +46,7 @@ public final class JettyServerConfig {
           .doc("The minimum number of threads in the thread pool used by Jetty webserver")
           .version("0.2.0")
           .intConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(
               Math.max(Math.min(Runtime.getRuntime().availableProcessors() * 2, 100), 4));
 
@@ -51,6 +55,7 @@ public final class JettyServerConfig {
           .doc("The maximum number of threads in the thread pool used by Jetty webserver")
           .version("0.1.0")
           .intConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(Math.max(Runtime.getRuntime().availableProcessors() * 4, 400));
 
   public static final ConfigEntry<Long> WEBSERVER_STOP_TIMEOUT =
@@ -58,6 +63,7 @@ public final class JettyServerConfig {
           .doc("Time in milliseconds to gracefully shutdown the Jetty webserver")
           .version("0.2.0")
           .longConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(30 * 1000L);
 
   public static final ConfigEntry<Integer> WEBSERVER_IDLE_TIMEOUT =
@@ -65,6 +71,7 @@ public final class JettyServerConfig {
           .doc("The timeout in milliseconds of idle connections")
           .version("0.2.0")
           .intConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(30 * 1000);
 
   public static final ConfigEntry<Integer> WEBSERVER_REQUEST_HEADER_SIZE =
@@ -72,6 +79,7 @@ public final class JettyServerConfig {
           .doc("Maximum size of HTTP requests")
           .version("0.1.0")
           .intConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(128 * 1024);
 
   public static final ConfigEntry<Integer> WEBSERVER_RESPONSE_HEADER_SIZE =
@@ -79,6 +87,7 @@ public final class JettyServerConfig {
           .doc("Maximum size of HTTP responses")
           .version("0.1.0")
           .intConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(128 * 1024);
 
   public static final ConfigEntry<Integer> WEBSERVER_THREAD_POOL_WORK_QUEUE_SIZE =
@@ -86,6 +95,7 @@ public final class JettyServerConfig {
           .doc("The size of the queue in the thread pool used by Jetty webserver")
           .version("0.1.0")
           .intConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(100);
 
   public static final ConfigEntry<Boolean> ENABLE_HTTPS =
@@ -100,6 +110,7 @@ public final class JettyServerConfig {
           .doc("The https port number of the Jetty web server")
           .version("0.3.0")
           .intConf()
+          .checkValue(value -> value >= 0, ConfigConstants.NON_NEGATIVE_NUMBER_ERROR_MSG)
           .createWithDefault(8433);
 
   public static final ConfigEntry<String> SSL_KEYSTORE_PATH =
@@ -107,6 +118,7 @@ public final class JettyServerConfig {
           .doc("Path to the key store file")
           .version("0.3.0")
           .stringConf()
+          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .create();
 
   public static final ConfigEntry<String> SSL_KEYSTORE_PASSWORD =
@@ -114,6 +126,7 @@ public final class JettyServerConfig {
           .doc("Password to the key store")
           .version("0.3.0")
           .stringConf()
+          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .create();
 
   public static final ConfigEntry<String> SSL_MANAGER_PASSWORD =
@@ -121,6 +134,7 @@ public final class JettyServerConfig {
           .doc("Manager password to the key store")
           .version("0.3.0")
           .stringConf()
+          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .create();
 
   public static final ConfigEntry<String> SSL_KEYSTORE_TYPE =
@@ -136,6 +150,7 @@ public final class JettyServerConfig {
           .version("0.3.0")
           .stringConf()
           .createWithOptional();
+
   public static final ConfigEntry<String> ENABLE_CIPHER_ALGORITHMS =
       new ConfigBuilder("enableCipherAlgorithms")
           .doc("The collection of the cipher algorithms are enabled ")
@@ -155,6 +170,7 @@ public final class JettyServerConfig {
           .doc("Path to the trust store file")
           .version("0.3.0")
           .stringConf()
+          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .create();
 
   public static final ConfigEntry<String> SSL_TRUST_STORE_PASSWORD =
@@ -162,6 +178,7 @@ public final class JettyServerConfig {
           .doc("Password to the trust store")
           .version("0.3.0")
           .stringConf()
+          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .create();
 
   public static final ConfigEntry<String> SSL_TRUST_STORE_TYPE =
@@ -244,23 +261,41 @@ public final class JettyServerConfig {
 
     this.enableHttps = internalConfig.get(ENABLE_HTTPS);
     this.httpsPort = internalConfig.get(WEBSERVER_HTTPS_PORT);
-    this.keyStorePath = internalConfig.get(SSL_KEYSTORE_PATH);
-    this.keyStorePassword = internalConfig.get(SSL_KEYSTORE_PASSWORD);
-    this.managerPassword = internalConfig.get(SSL_MANAGER_PASSWORD);
-    this.keyStoreType = internalConfig.get(SSL_KEYSTORE_TYPE);
     this.tlsProtocol = internalConfig.get(SSL_PROTOCOL);
     this.enableCipherAlgorithms =
         Collections.unmodifiableSet(
             Sets.newHashSet(internalConfig.get(ENABLE_CIPHER_ALGORITHMS).split(SPLITTER)));
     this.enableClientAuth = internalConfig.get(ENABLE_CLIENT_AUTH);
-    this.trustStorePath = internalConfig.get(SSL_TRUST_STORE_PATH);
-    this.trustStorePassword = internalConfig.get(SSL_TRUST_STORE_PASSWORD);
-    this.trustStoreType = internalConfig.get(SSL_TRUST_STORE_TYPE);
+
     this.customFilters =
         internalConfig
             .get(CUSTOM_FILTERS)
             .map(filters -> Collections.unmodifiableSet(Sets.newHashSet(filters.split(SPLITTER))))
             .orElse(Collections.emptySet());
+
+    this.keyStoreType = internalConfig.get(SSL_KEYSTORE_TYPE);
+    this.trustStoreType = internalConfig.get(SSL_TRUST_STORE_TYPE);
+    String keyStorePath = null;
+    String keyStorePassword = null;
+    String managerPassword = null;
+    String trustStorePath = null;
+    String trustStorePassword = null;
+
+    if (this.enableHttps) {
+      keyStorePath = internalConfig.get(SSL_KEYSTORE_PATH);
+      keyStorePassword = internalConfig.get(SSL_KEYSTORE_PASSWORD);
+      managerPassword = internalConfig.get(SSL_MANAGER_PASSWORD);
+      if (this.enableClientAuth) {
+        trustStorePath = internalConfig.get(SSL_TRUST_STORE_PATH);
+        trustStorePassword = internalConfig.get(SSL_TRUST_STORE_PASSWORD);
+      }
+    }
+
+    this.keyStorePath = keyStorePath;
+    this.keyStorePassword = keyStorePassword;
+    this.managerPassword = managerPassword;
+    this.trustStorePassword = trustStorePassword;
+    this.trustStorePath = trustStorePath;
   }
 
   public static JettyServerConfig fromConfig(Config config, String prefix) {

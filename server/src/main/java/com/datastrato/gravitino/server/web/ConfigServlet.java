@@ -5,6 +5,7 @@
 package com.datastrato.gravitino.server.web;
 
 import com.datastrato.gravitino.Configs;
+import com.datastrato.gravitino.auth.AuthenticatorType;
 import com.datastrato.gravitino.config.ConfigEntry;
 import com.datastrato.gravitino.json.JsonUtils;
 import com.datastrato.gravitino.server.ServerConfig;
@@ -22,16 +23,24 @@ import javax.servlet.http.HttpServletResponse;
 
 public class ConfigServlet extends HttpServlet {
 
-  private static final ImmutableSet<ConfigEntry<?>> configEntries =
-      ImmutableSet.of(
-          Configs.AUTHENTICATOR, OAuthConfig.DEFAULT_SERVER_URI, OAuthConfig.DEFAULT_TOKEN_PATH);
+  private static final ImmutableSet<ConfigEntry<?>> oauthConfigEntries =
+      ImmutableSet.of(OAuthConfig.DEFAULT_SERVER_URI, OAuthConfig.DEFAULT_TOKEN_PATH);
+
+  private static final ImmutableSet<ConfigEntry<?>> basicConfigEntries =
+      ImmutableSet.of(Configs.AUTHENTICATOR);
 
   private final Map<String, String> configs = Maps.newHashMap();
 
   public ConfigServlet(ServerConfig serverConfig) {
-    for (ConfigEntry<?> key : configEntries) {
+    for (ConfigEntry<?> key : basicConfigEntries) {
       String config = String.valueOf(serverConfig.get(key));
       configs.put(key.getKey(), config);
+    }
+    if (serverConfig.get(Configs.AUTHENTICATOR).equalsIgnoreCase(AuthenticatorType.OAUTH.name())) {
+      for (ConfigEntry<?> key : oauthConfigEntries) {
+        String config = String.valueOf(serverConfig.get(key));
+        configs.put(key.getKey(), config);
+      }
     }
   }
 

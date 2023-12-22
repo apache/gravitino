@@ -7,8 +7,10 @@ package com.datastrato.gravitino.catalog.jdbc.config;
 
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.config.ConfigBuilder;
+import com.datastrato.gravitino.config.ConfigConstants;
 import com.datastrato.gravitino.config.ConfigEntry;
 import java.util.Map;
+import org.apache.commons.lang3.StringUtils;
 
 public class JdbcConfig extends Config {
 
@@ -17,6 +19,7 @@ public class JdbcConfig extends Config {
           .doc("The url of the Jdbc connection")
           .version("0.3.0")
           .stringConf()
+          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .create();
 
   public static final ConfigEntry<String> JDBC_DATABASE =
@@ -24,6 +27,7 @@ public class JdbcConfig extends Config {
           .doc("The database of the jdbc connection")
           .version("0.3.0")
           .stringConf()
+          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .create();
 
   public static final ConfigEntry<String> JDBC_DRIVER =
@@ -31,6 +35,7 @@ public class JdbcConfig extends Config {
           .doc("The driver of the jdbc connection")
           .version("0.3.0")
           .stringConf()
+          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .create();
 
   public static final ConfigEntry<String> USERNAME =
@@ -38,6 +43,7 @@ public class JdbcConfig extends Config {
           .doc("The username of the Jdbc connection")
           .version("0.3.0")
           .stringConf()
+          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .create();
 
   public static final ConfigEntry<String> PASSWORD =
@@ -45,6 +51,7 @@ public class JdbcConfig extends Config {
           .doc("The password of the Jdbc connection")
           .version("0.3.0")
           .stringConf()
+          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .create();
 
   public static final ConfigEntry<Integer> POOL_MIN_SIZE =
@@ -52,6 +59,7 @@ public class JdbcConfig extends Config {
           .doc("The minimum number of connections in the pool")
           .version("0.3.0")
           .intConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(2);
 
   public static final ConfigEntry<Integer> POOL_MAX_SIZE =
@@ -59,6 +67,7 @@ public class JdbcConfig extends Config {
           .doc("The maximum number of connections in the pool")
           .version("0.3.0")
           .intConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(10);
 
   public String getJdbcUrl() {
