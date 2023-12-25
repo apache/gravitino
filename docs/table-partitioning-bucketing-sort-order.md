@@ -117,7 +117,7 @@ new Transform[] {
 
 To define a sorted order table, you should use the following three components to construct a valid sorted order table.
 
-- Direction.  It defines in which direction we sort the table.
+- Direction. It defines in which direction we sort the table. The default value is `ascending`.
 
 | Direction  | Description                               | Json   | Java                       |
 |------------|-------------------------------------------| ------ | -------------------------- |
