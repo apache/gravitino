@@ -1,4 +1,13 @@
+---
+title: "Table partitioning, bucketing and sorting order"
+slug: /table-partitioning-bucketing-sort-order
+date: 2023-12-25
+keyword: Table Partition Bucket Distribute Sort By 
+license: Copyright 2023 Datastrato Pvt Ltd. This software is licensed under the Apache License version 2.
+---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 ## Partitioned table
 
