@@ -13,8 +13,9 @@ The Gravitino Iceberg REST Server follows the [Apache Iceberg REST API specifica
 
 ### Capabilities
 
-- Supports the Apache Iceberg REST API defined in Iceberg 1.3.1, and supports all namespace and table interfaces. `Token`, `ReportMetrics`, and `Config` interfaces aren't supported yet.
+- Supports the Apache Iceberg REST API defined in Iceberg 1.3.1, and supports all namespace and table interfaces. `Token`, and `Config` interfaces aren't supported yet.
 - Works as a catalog proxy, supporting `HiveCatalog` and `JDBCCatalog`.
+- Provides a pluggable metrics store interface to store and delete Iceberg metrics.
 - When writing to HDFS, the Gravitino Iceberg REST catalog service can only operate as the specified HDFS user and
   doesn't support proxying to other HDFS users. See [How to access Apache Hadoop](gravitino-server-config.md#how-to-access-apache-hadoop) for more details.
 
@@ -23,9 +24,25 @@ Builds with Apache Iceberg `1.3.1`. The Apache Iceberg table format version is `
 Builds with Hadoop 2.10.x, there may be compatibility issues when accessing Hadoop 3.x clusters.
 :::
 
-## How to start the Gravitino Iceberg REST catalog service
+## Gravitino Iceberg REST catalog service Configurations
 
-Deploy the Gravitino server to the `GRAVITINO_HOME` directory. You can find the configuration options in [`$GRAVITINO_HOME/conf/gravitino.conf`](gravitino-server-config.md).
+Assuming the Gravitino server is deployed in the `GRAVITINO_HOME` directory, you can locate the configuration options in [`$GRAVITINO_HOME/conf/gravitino.conf`](gravitino-server-config.md). There are three types of configurations for the Iceberg REST catalog service:
+
+1. **Gravitino Iceberg REST Catalog Service Configuration:**
+
+In this section, you can specify the http server properties like host and port.
+
+2. **Gravitino Iceberg metrics store Configuration:**
+
+You could implement a custom Iceberg metrics store and set corresponding Iceberg metrics store configuration.
+
+3. **Gravitino Iceberg Catalog backend Configuration:**
+
+Here, you have the option to set the specified catalog-backend to either jdbc or hive.
+
+4. **Other Iceberg Catalog Properties Defined by Apache Iceberg:**
+
+This section allows you to configure additional properties defined by Apache Iceberg.
 
 ### Gravitino Iceberg REST catalog service configuration
 
@@ -60,13 +77,13 @@ Gravitino provides a pluggable metrics store interface to store and delete Icebe
 | `gravitino.auxService.iceberg-rest.metricsQueueCapacity`   | The size of queue to store metrics temporally before storing to the persistent storage. Metrics will be dropped when queue is full. | 1000          | No       | 0.4.0         |
 
 
-### Iceberg catalog configuration
+### Gravitino Iceberg catalog backend configuration
 
 :::info
-The Gravitino Iceberg REST catalog service uses the memory catalog by default. You can specify Hive or JDBC catalog for production environments.
+The Gravitino Iceberg REST catalog service using memory catalog for default. You can specify Hive or JDBC catalog in production environments.
 :::
 
-#### Hive catalog configuration
+#### Hive catalog backend configuration
 
 | Configuration item                                  | Description                                                                                                 | Default value | Required   | Since Version |
 |-----------------------------------------------------|-------------------------------------------------------------------------------------------------------------|---------------|------------|---------------|
@@ -74,7 +91,7 @@ The Gravitino Iceberg REST catalog service uses the memory catalog by default. Y
 | `gravitino.auxService.iceberg-rest.uri`             | The Hive metadata address, such as `thrift://127.0.0.1:9083`.                                               | (none)        | Yes        | 0.2.0         |
 | `gravitino.auxService.iceberg-rest.warehouse `      | The warehouse directory of the Hive catalog, such as `/user/hive/warehouse-hive/`.                          | (none)        | Yes        | 0.2.0         |
 
-#### Iceberg JDBC backend configuration
+#### JDBC catalog backend configuration
 
 | Configuration item                                  | Description                                                                                                                        | Default value | Required | Since Version |
 |-----------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
@@ -96,7 +113,7 @@ You must download the corresponding JDBC driver to the `catalogs/lakehouse-icebe
 
 ### Other Apache Iceberg catalog properties
 
-You can add other properties defined in [Iceberg table properties](https://iceberg.apache.org/docs/1.3.1/configuration/).
+You can add other properties defined in [Iceberg catalog properties](https://iceberg.apache.org/docs/1.3.1/configuration/#catalog-properties).
 The `clients` property for example:
 
 | Configuration item                          | Description                          | Default value | Required |
