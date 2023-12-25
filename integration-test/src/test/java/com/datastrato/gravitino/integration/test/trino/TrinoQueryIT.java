@@ -70,6 +70,7 @@ public class TrinoQueryIT {
   private static String gravitinoUri = "http://127.0.0.1:8090";
   private static String trinoUri = "http://127.0.0.1:8080";
   private static String hiveMetastoreUri = "thrift://127.0.0.1:9083";
+  private static String hdfsUri = "hdfs://localhost:9000";
   private static String mysqlUri = "jdbc:mysql://127.0.0.1?useSSL=false";
   private static String postgresqlUri = "jdbc:postgresql://127.0.0.1/mydb";
 
@@ -119,6 +120,7 @@ public class TrinoQueryIT {
         trinoUri = String.format("http://%s:8080", address);
       } else if (containerName.equals("hive")) {
         hiveMetastoreUri = String.format("thrift://%s:9083", address);
+        hdfsUri = String.format("hdfs://%s:9000", address);
       } else if (containerName.equals("mysql")) {
         mysqlUri = String.format("jdbc:mysql://%s:3306", address);
       } else if (containerName.equals("postgresql")) {
@@ -159,7 +161,7 @@ public class TrinoQueryIT {
         HashMap<String, String> properties = new HashMap<>();
         properties.put("uri", hiveMetastoreUri);
         properties.put("catalog-backend", "hive");
-        properties.put("warehouse", "hdfs://localhost:9000/user/iceberg/warehouse/TrinoQueryIT");
+        properties.put("warehouse", hdfsUri + "/user/iceberg/warehouse/TrinoQueryIT");
 
         createCatalog("lakehouse-iceberg", "lakehouse-iceberg", properties);
       }
@@ -168,8 +170,8 @@ public class TrinoQueryIT {
         dropCatalog("jdbc-mysql");
         HashMap<String, String> properties = new HashMap<>();
         properties.put("jdbc-url", mysqlUri);
-        properties.put("jdbc-user", "mysql");
-        properties.put("jdbc-password", "mysql");
+        properties.put("jdbc-user", "trino");
+        properties.put("jdbc-password", "ds123");
         properties.put("jdbc-driver", "com.mysql.cj.jdbc.Driver");
 
         createCatalog("jdbc-mysql", "jdbc-mysql", properties);
@@ -178,11 +180,11 @@ public class TrinoQueryIT {
       if (catalogs.isEmpty() || catalogs.contains("jdbc-postgresql")) {
         dropCatalog("jdbc-postgresql");
         HashMap<String, String> properties = new HashMap<>();
-        properties.put("jdbc-url", postgresqlUri);
-        properties.put("jdbc-user", "root");
+        properties.put("jdbc-url", postgresqlUri + "/gt_db");
+        properties.put("jdbc-user", "trino");
         properties.put("jdbc-password", "ds123");
-        properties.put("jdbc-database", "mydb");
-        properties.put("gravitino.bypass.driverClassName", "org.postgresql.Driver");
+        properties.put("jdbc-database", "gt_db");
+        properties.put("jdbc-driver", "org.postgresql.Driver");
 
         createCatalog("jdbc-postgresql", "jdbc-postgresql", properties);
       }
@@ -461,6 +463,26 @@ public class TrinoQueryIT {
     }
     queryRunner.stop();
   }
+
+  boolean match(String expectResult, String result) {
+    boolean match;
+    if (expectResult.isEmpty()) {
+      return  false;
+    }
+    // match query failed result.
+    if (Pattern.compile("^Query \\w+ failed:").matcher(result).find()) {
+      match = Pattern.compile("^Query \\w+ failed.*: " + expectResult).matcher(result).find();
+    }
+
+    if (Pattern.compile("^\"SHOW CREATE\\w+ failed:").matcher(result).find()) {
+      match = Pattern.compile("^Query \\w+ failed.*: " + expectResult).matcher(result).find();
+    }
+
+    //match normal text.
+    match = expectResult.equals(result);
+    return match;
+  }
+
 
   static class TrinoQueryRunner {
     private QueryRunner queryRunner;
