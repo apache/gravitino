@@ -3,7 +3,7 @@
   This software is licensed under the Apache License version 2.
 -->
 
-# Gravitino
+![Gravitino Logo](docs/assets/gravitino-logo.png)
 
 [![GitHub Actions Build](https://github.com/datastrato/gravitino/actions/workflows/build.yml/badge.svg)](https://github.com/datastrato/gravitino/actions/workflows/build.yml)
 [![GitHub Actions Integration Test](https://github.com/datastrato/gravitino/actions/workflows/integration-test.yml/badge.svg)](https://github.com/datastrato/gravitino/actions/workflows/integration-test.yml)
