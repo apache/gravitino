@@ -858,6 +858,8 @@ To define a sorted order table, you should use the following three components to
 | null_first         | Put null value in the first place | `nulls_first` | `NullOrdering.NULLS_FIRST` |
 | null_last          | Put null value in the last place  | `nulls_last`  | `NullOrdering.NULLS_LAST`  |
 
+Note: If the direction value is `ascending`, the default ordering value is `nulls_first` and if the direction value is `descending`, the default ordering value is `nulls_last`.
+
 - Sort term. It shows which field or function should be used to sort the table, please refer to the `Expression type` in the bucketed table chapter.
 
 <Tabs>
