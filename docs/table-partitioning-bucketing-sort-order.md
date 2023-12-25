@@ -17,19 +17,19 @@ Currently, Gravitino supports the following partitioning strategies:
 The `score`, `dt`, and `city` appearing in the table below refer to the field names in a table.
 :::
 
-| Partitioning strategy | Description                                                  | Json example                                                     | Java example                                    | Equivalent SQL semantics           |
-|-----------------------|--------------------------------------------------------------| ---------------------------------------------------------------- | ----------------------------------------------- |-----------------------------------|
-| `identity`            | Source value, unmodified                                     | `{"strategy":"identity","fieldName":["score"]}`                  | `Transforms.identity("score")`                  | `PARTITION BY score`               |
-| `hour`                | Extract a timestamp hour, as hours from 1970-01-01 00:00:00  | `{"strategy":"hour","fieldName":["score"]}`                      | `Transforms.hour("score")`                      | `PARTITION BY hour(score)`         |
-| `day`                 | Extract a date or timestamp day, as days from 1970-01-01     | `{"strategy":"day","fieldName":["score"]}`                       | `Transforms.day("score")`                       | `PARTITION BY day(score)`          |
-| `month`               | Extract a date or timestamp month, as months from 1970-01-01 | `{"strategy":"month","fieldName":["score"]}`                     | `Transforms.month("score")`                     | `PARTITION BY month(score)`        |
-| `year`                | Extract a date or timestamp year, as years from 1970         | `{"strategy":"year","fieldName":["score"]}`                      | `Transforms.year("score")`                      | `PARTITION BY year(score)`         |
-| `bucket[N]`           | Hash of value, mod N                                         | `{"strategy":"bucket","numBuckets":10,"fieldNames":[["score"]]}` | `Transforms.bucket(10, "score")`                | `PARTITION BY bucket(10, score)`   |
-| `truncate[W]`         | Value truncated to width W                                   | `{"strategy":"truncate","width":20,"fieldName":["score"]}`       | `Transforms.truncate(20, "score")`              | `PARTITION BY truncate(20, score)` |
-| `list`                | Partition the table by a list value                          | `{"strategy":"list","fieldNames":[["dt"],["city"]]}`             | `Transforms.list(new String[] {"dt", "city"})`  | `PARTITION BY list(dt, city)`      |
-| `range`               | Partition the table by a range value                         | `{"strategy":"range","fieldName":["dt"]}`                        | `Transforms.range(20, "score")`                 | `PARTITION BY range(score)`        |
+| Partitioning strategy | Description                                                  | Json example                                                     | Java example                                   | Equivalent SQL semantics           |
+|-----------------------|--------------------------------------------------------------|------------------------------------------------------------------|------------------------------------------------|------------------------------------|
+| `identity`            | Source value, unmodified                                     | `{"strategy":"identity","fieldName":["score"]}`                  | `Transforms.identity("score")`                 | `PARTITION BY score`               |
+| `hour`                | Extract a timestamp hour, as hours from 1970-01-01 00:00:00  | `{"strategy":"hour","fieldName":["dt"]}`                         | `Transforms.hour("dt")`                        | `PARTITION BY hour(dt)`            |
+| `day`                 | Extract a date or timestamp day, as days from 1970-01-01     | `{"strategy":"day","fieldName":["dt"]}`                          | `Transforms.day("dt")`                         | `PARTITION BY day(dt)`             |
+| `month`               | Extract a date or timestamp month, as months from 1970-01-01 | `{"strategy":"month","fieldName":["dt"]}`                        | `Transforms.month("dt")`                       | `PARTITION BY month(dt)`           |
+| `year`                | Extract a date or timestamp year, as years from 1970         | `{"strategy":"year","fieldName":["dt"]}`                         | `Transforms.year("dt")`                        | `PARTITION BY year(dt)`            |
+| `bucket[N]`           | Hash of value, mod N                                         | `{"strategy":"bucket","numBuckets":10,"fieldNames":[["score"]]}` | `Transforms.bucket(10, "score")`               | `PARTITION BY bucket(10, score)`   |
+| `truncate[W]`         | Value truncated to width W                                   | `{"strategy":"truncate","width":20,"fieldName":["score"]}`       | `Transforms.truncate(20, "score")`             | `PARTITION BY truncate(20, score)` |
+| `list`                | Partition the table by a list value                          | `{"strategy":"list","fieldNames":[["dt"],["city"]]}`             | `Transforms.list(new String[] {"dt", "city"})` | `PARTITION BY list(dt, city)`      |
+| `range`               | Partition the table by a range value                         | `{"strategy":"range","fieldName":["dt"]}`                        | `Transforms.range(20, "score")`                | `PARTITION BY range(score)`        |
 
-Except the strategies above, you can use other functions strategies to partition the table, for example, the strategy can be `{"strategy":"functionName","fieldName":["score"]}`. The `functionName` can be any function name that you can use in SQL, for example, `{"strategy":"toDate","fieldName":["score"]}` is equivalent to `PARTITION BY toDate(score)` in SQL.
+Except the strategies above, you can use other functions strategies to partition the table, for example, the strategy can be `{"strategy":"functionName","fieldName":["score"]}`. The `functionName` can be any function name that you can use in SQL, for example, `{"strategy":"toDate","fieldName":["dt"]}` is equivalent to `PARTITION BY toDate(dt)` in SQL.
 For complex function, please refer to [FunctionPartitioningDTO](https://github.com/datastrato/gravitino/blob/main/common/src/main/java/com/datastrato/gravitino/dto/rel/partitions/FunctionPartitioningDTO.java).
 
 The following is an example of creating a partitioned table:
@@ -75,11 +75,11 @@ new Transform[] {
 - Number. It defines how many buckets you use to bucket the table.
 - Function arguments. It defines the arguments of the strategy above, Gravitino supports the following three kinds of arguments, for more, you can refer to Java class [FunctionArg](https://github.com/datastrato/gravitino/blob/main/common/src/main/java/com/datastrato/gravitino/dto/rel/expressions/FunctionArg.java) and [DistributionDTO](https://github.com/datastrato/gravitino/blob/main/common/src/main/java/com/datastrato/gravitino/dto/rel/DistributionDTO.java) to use more complex function arguments.
 
-| Expression type | Json example                                                      | Java example                                                                                            | Equivalent SQL semantics | Description                    | 
-|-----------------|-------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------|--------------------------|--------------------------------|
-| field           | `{"type":"field","fieldName":["score"]}`                          | `FieldReferenceDTO.of("score")`                                                                         | `score`                  | field reference value `score`  |
-| function        | `{"type":"function","functionName":"hour","fieldName":["score"]}` | `new FuncExpressionDTO.Builder()<br/>.withFunctionName("hour")<br/>.withFunctionArgs("score").build()`  | `hour(score)`            | function value `hour(score)`   |
-| constant        | `{"type":"literal","value":10, "dataType": "integer"}`            | `new LiteralDTO.Builder()<br/>.withValue("10")<br/>.withDataType(Types.IntegerType.get())<br/>.build()` | `10`                     | Integer constant `10`          |
+| Expression type | Json example                                                   | Java example                                                                              | Equivalent SQL semantics | Description                       | 
+|-----------------|----------------------------------------------------------------|-------------------------------------------------------------------------------------------|--------------------------|-----------------------------------|
+| field           | `{"type":"field","fieldName":["score"]}`                       | `FieldReferenceDTO.of("score")`                                                           | `score`                  | The field reference value `score` |
+| function        | `{"type":"function","functionName":"hour","fieldName":["dt"]}` | `new FuncExpressionDTO.Builder().withFunctionName("hour").withFunctionArgs("dt").build()` | `hour(dt)`               | The function value `hour(dt)`     |
+| constant        | `{"type":"literal","value":10, "dataType": "integer"}`         | `new LiteralDTO.Builder().withValue("10").withDataType(Types.IntegerType.get()).build()`  | `10`                     | The integer literal `10`          |
 
 
 <Tabs>
@@ -153,11 +153,7 @@ Note: If the direction value is `ascending`, the default ordering value is `null
 <TabItem value="java" label="Java">
 
 ```java
- new SortOrderDTO.Builder()
-    .withDirection(SortDirection.ASCENDING)
-    .withNullOrder(NullOrdering.NULLS_LAST)
-    .withSortTerm(FieldReferenceDTO.of("score"))
-    .build()
+SortOrders.of(FieldReferenceDTO.of("score"), SortDirection.ASCENDING, NullOrdering.NULLS_LAST);
 ```
 
 </TabItem>
@@ -283,11 +279,7 @@ tableCatalog.createTable(
     .build(),
     // SORTED BY name asc
     new SortOrderDTO[] {
-    new SortOrderDTO.Builder()
-    .withDirection(SortDirection.ASCENDING)
-    .withNullOrder(NullOrdering.NULLS_LAST)
-    .withSortTerm(FieldReferenceDTO.of("name"))
-    .build()
+        SortOrders.of(FieldReferenceDTO.of("score"), SortDirection.ASCENDING, NullOrdering.NULLS_LAST)
     }
     );
 ```
