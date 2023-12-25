@@ -30,7 +30,7 @@ Assuming the Gravitino server is deployed in the `GRAVITINO_HOME` directory, you
 
 1. **Gravitino Iceberg REST Catalog Service Configuration:**
 
-In this section, you can specify the http server properties like host and port.
+In this section, you can specify the HTTP server properties like host and port.
 
 2. **Gravitino Iceberg metrics store Configuration:**
 
