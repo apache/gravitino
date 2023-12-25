@@ -238,18 +238,27 @@ public class TestGravitinoConnector extends AbstractTestQueryFramework {
     assertThat(computeActual("select * from system.jdbc.tables"));
 
     // test metalake named test. the connector name is gravitino
-    assertUpdate("call gravitino.system.createCatalog('memory1', 'memory')");
+    assertUpdate("call gravitino.system.create_catalog('memory1', 'memory', Map())");
     assertThat(computeActual("show catalogs").getOnlyColumnAsSet()).contains("test.memory1");
-    assertUpdate("call gravitino.system.dropCatalog('memory1')");
+    assertUpdate("call gravitino.system.drop_catalog('memory1')");
+    assertThat(computeActual("show catalogs").getOnlyColumnAsSet()).doesNotContain("test.memory1");
+
+    assertUpdate(
+        "call gravitino.system.create_catalog("
+            + "catalog=>'memory1', provider=>'memory', properties => Map(array['max_ttl'], array['10']), ignore_exist => true)");
+    assertThat(computeActual("show catalogs").getOnlyColumnAsSet()).contains("test.memory1");
+
+    assertUpdate(
+        "call gravitino.system.drop_catalog(catalog => 'memory1', ignore_not_exist => true)");
     assertThat(computeActual("show catalogs").getOnlyColumnAsSet()).doesNotContain("test.memory1");
 
     // test metalake named test1. the connnector name is test1
     GravitinoPlugin.gravitinoClient.createMetalake(
         NameIdentifier.ofMetalake("test1"), "", Collections.emptyMap());
 
-    assertUpdate("call test1.system.createCatalog('memory1', 'memory')");
+    assertUpdate("call test1.system.create_catalog('memory1', 'memory', Map())");
     assertThat(computeActual("show catalogs").getOnlyColumnAsSet()).contains("test1.memory1");
-    assertUpdate("call test1.system.dropCatalog('memory1')");
+    assertUpdate("call test1.system.drop_catalog('memory1')");
     assertThat(computeActual("show catalogs").getOnlyColumnAsSet()).doesNotContain("test1.memory1");
   }
 

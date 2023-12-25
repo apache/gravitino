@@ -22,22 +22,29 @@ The Gravitino connector provides the following stored procedures to create and d
 Create catalog:
 
 ```text
-createCatalog(CATALOG varchar, PROVIDER varchar, PROPERTIES varchar, IGNORE EXIST boolean);
+create_catalog(CATALOG varchar, PROVIDER varchar, PROPERTIES MAP(VARCHAR, VARCHAR), IGNORE_EXIST boolean);
 ```
 
 - CATALOG: The catalog name to be created.
 - PROVIDER: The catalog provider, currently only supports `hive`, `lakehouse-iceberg`, `jdbc-mysql`, `jdbc-postgresql`.
-- PROPERTIES: The properties of the catalog, the format is a json string. like `{"key1":"value1","key2":"value2"}`.
-- IGNORE EXIST: The flag to ignore the error if the catalog already exists. It's optional, the default value is `false`.
+- PROPERTIES: The properties of the catalog.
+- IGNORE_EXIST: The flag to ignore the error if the catalog already exists. It's optional, the default value is `false`.
+
+The type of catalog properties reference:
+- [Hive catalog](../apache-hive-catalog.md#catalog-properties)
+- [Iceberg catalog](../lakehouse-iceberg-catalog.md#catalog-properties)
+- [MySQL catalog](../jdbc-mysql-catalog.md#catalog-properties)
+- [PostgreSQL catalog](../jdbc-postgresql-catalog.md#catalog-properties)
+
 
 Drop catalog:
 
 ```text
-dropCatalog(CATALOG varchar, IGNORE NOT EXIST boolean);
+drop_catalog(CATALOG varchar, IGNORE_NOT_EXIST boolean);
 ```
 
 - CATALOG: The catalog name to be created.
-- IGNORE NOT EXIST: The flag to ignore the error if the catalog does not exist. It's optional, the default value is `false`.
+- IGNORE_NOT_EXIST: The flag to ignore the error if the catalog does not exist. It's optional, the default value is `false`.
 
 The two stored procedures are under the `gravitino` connector, and the `system` schema.
 So you need to use the following SQL to call them in the `trino-cli`:
@@ -46,8 +53,32 @@ Example:
 You can run the following SQL to create a catalog named `mysql` with `jdbc-mysql` provider.
 
 ```text
-call gravitino.system.createCatalog('mysql', 'jdbc-mysql', '{"jdbc-url":"jdbc:mysql://192.168.164.4:3306?useSSL=false","jdbc-user":"trino","jdbc-password":"ds123", "jdbc-driver":"com.mysql.cj.jdbc.Driver"}');
-call gravitino.system.dropCatalog('mysql');
+-- Call stored procedures with position.
+call gravitino.system.create_catalog(
+    'mysql',
+    'jdbc-mysql',
+    Map(
+        Array('jdbc-url', 'jdbc-user', 'jdbc-password', 'jdbc-driver'),
+        Array('jdbc:mysql:192.168.164.4:3306?useSSL=false', 'trino', 'ds123', 'com.mysql.cj.jdbc.Driver')
+    )
+)
+call gravitino.system.drop_datalog('mysql');
+
+-- Call stored procedures with name.
+call gravitino.system.create_catalog(
+    catalog =>'mysql',
+    provider => 'jdbc-mysql',
+    properties => Map(
+        Array('jdbc-url', 'jdbc-user', 'jdbc-password', 'jdbc-driver'),
+        Array('jdbc:mysql:192.168.164.4:3306?useSSL=false', 'trino', 'ds123', 'com.mysql.cj.jdbc.Driver')
+    ),
+    ignore_exist => true
+)
+
+call gravitino.system.drop_datalog(
+    catalog => 'mysql'
+    ignore_not_exist => true
+);
 ```
 
 if you need more information about catalog, please refer to:

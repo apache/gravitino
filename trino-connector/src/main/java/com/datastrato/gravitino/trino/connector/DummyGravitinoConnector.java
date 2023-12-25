@@ -16,10 +16,13 @@ import io.trino.spi.connector.ConnectorSession;
 import io.trino.spi.connector.ConnectorTransactionHandle;
 import io.trino.spi.procedure.Procedure;
 import io.trino.spi.transaction.IsolationLevel;
+import io.trino.spi.type.MapType;
+import io.trino.spi.type.TypeOperators;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -46,16 +49,17 @@ public class DummyGravitinoConnector implements Connector {
           MethodHandles.lookup()
               .unreflect(
                   DummyGravitinoConnector.class.getMethod(
-                      "createCatalog", String.class, String.class, String.class, boolean.class))
+                      "createCatalog", String.class, String.class, Map.class, boolean.class))
               .bindTo(this);
 
       List<Procedure.Argument> arguments =
           List.of(
               new Procedure.Argument("CATALOG", VARCHAR),
               new Procedure.Argument("PROVIDER", VARCHAR),
-              new Procedure.Argument("PROPERTIES", VARCHAR, false, "{}"),
-              new Procedure.Argument("IGNORE EXIST", BOOLEAN, false, true));
-      Procedure procedure = new Procedure("system", "createCatalog", arguments, createCatalog);
+              new Procedure.Argument(
+                  "PROPERTIES", new MapType(VARCHAR, VARCHAR, new TypeOperators())),
+              new Procedure.Argument("IGNORE_EXIST", BOOLEAN, false, true));
+      Procedure procedure = new Procedure("system", "create_catalog", arguments, createCatalog);
       procedures.add(procedure);
 
       // call gravitino.system.dropCatalog(metalake, catalog, ignoreNotExist)
@@ -68,8 +72,8 @@ public class DummyGravitinoConnector implements Connector {
       arguments =
           List.of(
               new Procedure.Argument("CATALOG", VARCHAR),
-              new Procedure.Argument("IGNORE NOT EXIST", BOOLEAN, false, true));
-      procedure = new Procedure("system", "dropCatalog", arguments, dropCatalog);
+              new Procedure.Argument("IGNORE_NOT_EXIST", BOOLEAN, false, true));
+      procedure = new Procedure("system", "drop_catalog", arguments, dropCatalog);
       procedures.add(procedure);
 
     } catch (Exception e) {
@@ -85,7 +89,7 @@ public class DummyGravitinoConnector implements Connector {
   }
 
   public void createCatalog(
-      String catalogName, String provider, String properties, boolean ignoreExist) {
+      String catalogName, String provider, Map<String, String> properties, boolean ignoreExist) {
     catalogConnectorManager.createCatalog(metalake, catalogName, provider, properties, ignoreExist);
   }
 
