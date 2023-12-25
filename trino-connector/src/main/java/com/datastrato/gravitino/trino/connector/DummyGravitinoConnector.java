@@ -30,12 +30,14 @@ import java.util.Set;
  */
 public class DummyGravitinoConnector implements Connector {
 
+  private final String metalake;
   private final CatalogConnectorManager catalogConnectorManager;
 
   private final Set<Procedure> procedures = new HashSet<>();
 
-  public DummyGravitinoConnector(CatalogConnectorManager catalogConnectorManager) {
+  public DummyGravitinoConnector(String metalake, CatalogConnectorManager catalogConnectorManager) {
     super();
+    this.metalake = metalake;
     this.catalogConnectorManager = catalogConnectorManager;
 
     try {
@@ -44,17 +46,11 @@ public class DummyGravitinoConnector implements Connector {
           MethodHandles.lookup()
               .unreflect(
                   DummyGravitinoConnector.class.getMethod(
-                      "createCatalog",
-                      String.class,
-                      String.class,
-                      String.class,
-                      String.class,
-                      boolean.class))
+                      "createCatalog", String.class, String.class, String.class, boolean.class))
               .bindTo(this);
 
       List<Procedure.Argument> arguments =
           List.of(
-              new Procedure.Argument("METALAKE", VARCHAR),
               new Procedure.Argument("CATALOG", VARCHAR),
               new Procedure.Argument("PROVIDER", VARCHAR),
               new Procedure.Argument("PROPERTIES", VARCHAR, false, "{}"),
@@ -62,47 +58,18 @@ public class DummyGravitinoConnector implements Connector {
       Procedure procedure = new Procedure("system", "createCatalog", arguments, createCatalog);
       procedures.add(procedure);
 
-      // call gravitino.system.createMetalake(name, ignoreExist)
-      MethodHandle createMetalake =
-          MethodHandles.lookup()
-              .unreflect(
-                  DummyGravitinoConnector.class.getMethod(
-                      "createMetalake", String.class, boolean.class))
-              .bindTo(this);
-      arguments =
-          List.of(
-              new Procedure.Argument("METALAKE", VARCHAR),
-              new Procedure.Argument("IGNORE EXIST", BOOLEAN, false, true));
-      procedure = new Procedure("system", "createMetalake", arguments, createMetalake);
-      procedures.add(procedure);
-
       // call gravitino.system.dropCatalog(metalake, catalog, ignoreNotExist)
       MethodHandle dropCatalog =
           MethodHandles.lookup()
               .unreflect(
                   DummyGravitinoConnector.class.getMethod(
-                      "dropCatalog", String.class, String.class, boolean.class))
+                      "dropCatalog", String.class, boolean.class))
               .bindTo(this);
       arguments =
           List.of(
-              new Procedure.Argument("METALAKE", VARCHAR),
               new Procedure.Argument("CATALOG", VARCHAR),
               new Procedure.Argument("IGNORE NOT EXIST", BOOLEAN, false, true));
       procedure = new Procedure("system", "dropCatalog", arguments, dropCatalog);
-      procedures.add(procedure);
-
-      // call gravitino.system.dropMetalake(name, ignoreNotExist)
-      MethodHandle dropMetalake =
-          MethodHandles.lookup()
-              .unreflect(
-                  DummyGravitinoConnector.class.getMethod(
-                      "dropMetalake", String.class, boolean.class))
-              .bindTo(this);
-      arguments =
-          List.of(
-              new Procedure.Argument("METALAKE", VARCHAR),
-              new Procedure.Argument("IGNORE NOT EXIST", BOOLEAN, false, true));
-      procedure = new Procedure("system", "dropMetalake", arguments, dropMetalake);
       procedures.add(procedure);
 
     } catch (Exception e) {
@@ -118,25 +85,12 @@ public class DummyGravitinoConnector implements Connector {
   }
 
   public void createCatalog(
-      String metalakeName,
-      String catalogName,
-      String provider,
-      String properties,
-      boolean ignoreExist) {
-    catalogConnectorManager.createCatalog(
-        metalakeName, catalogName, provider, properties, ignoreExist);
+      String catalogName, String provider, String properties, boolean ignoreExist) {
+    catalogConnectorManager.createCatalog(metalake, catalogName, provider, properties, ignoreExist);
   }
 
-  public void createMetalake(String name, boolean ignoreExist) {
-    catalogConnectorManager.createMetalake(name, ignoreExist);
-  }
-
-  public void dropCatalog(String metalakeName, String catalogName, boolean ignoreNotExist) {
-    catalogConnectorManager.dropCatalog(metalakeName, catalogName, ignoreNotExist);
-  }
-
-  public void dropMetalake(String name, boolean ignoreNotExist) {
-    catalogConnectorManager.dropMetalake(name, ignoreNotExist);
+  public void dropCatalog(String catalogName, boolean ignoreNotExist) {
+    catalogConnectorManager.dropCatalog(metalake, catalogName, ignoreNotExist);
   }
 
   @Override

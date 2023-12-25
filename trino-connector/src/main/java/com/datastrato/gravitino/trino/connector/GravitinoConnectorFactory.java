@@ -84,7 +84,7 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
       }
       catalogConnectorManager.addMetalake(metalake);
 
-      return new DummyGravitinoConnector(catalogConnectorManager);
+      return new DummyGravitinoConnector(metalake, catalogConnectorManager);
     } else {
       CatalogConnectorContext catalogConnectorContext =
           catalogConnectorManager.getCatalogConnector(catalogName);
