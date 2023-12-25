@@ -10,7 +10,20 @@
 
 ## Introduction
 
-Gravitino is a high-performance, geo-distributed, and federated metadata lake. It manages the metadata directly in different sources, types, and regions. It also provides users with unified metadata access for data and AI assets.
+Gravitino is a high-performance, geo-distributed, and federated metadata lake. It creates and manages metadata 
+from multiple different database sources and cloud providers directly, regardless of type and region. Users can then 
+access the unified metadata using supported engines for data management and advanced analytics.
+
+For a detailed overview of features, please see the [official documentation](https://datastrato.ai/docs).
+
+<details>
+<summary> Table of Contents </summary>   
+
+- [Core Features](#Core Features)
+- 
+</details>
+
+# Core Features
 
 ![Gravitino Architecture](docs/assets/gravitino-architecture.png)
 
@@ -21,17 +34,14 @@ Gravitino aims to provide several key features:
 * Security in one place, centralizing the security for different sources.
 * Built-in data management and data access management.
 
-## Contributing to Gravitino
+## Documentation
 
-Gravitino is open source software available under the Apache 2.0 license. For information of how to contribute to Gravitino please see the [Contribution guidelines](CONTRIBUTING.md).
+You can find the latest Gravitino documentation in the [docs folder](docs). The official [website]
+(https://datastrato.ai/docs) has docs for each official release.
 
-## Online documentation
+## Installation
 
-You can find the latest Gravitino documentation here in the [doc folder](docs), The README file only contains basic setup instructions.
-
-## Building Gravitino
-
-Gravitino builds Gradle. To build Gravitino, please run:
+Gradle is used to build Gravitino . To build Gravitino, please run:
 
 ```shell
 ./gradlew clean build -x test
@@ -83,11 +93,18 @@ To stop the Gravitino server, please run:
 
 Gravitino provides a Trino connector to access the metadata in Gravitino. To use Trino with Gravitino, please follow the [trino-gravitino-connector doc](docs/trino-connector/index.md).
 
+## Contributing to Gravitino
+
+Gravitino is open source software available under the Apache 2.0 license. For information of how to contribute to Gravitino please see the [Contribution guidelines](CONTRIBUTING.md).
+
 ## Development guide
 
 1. [How to build Gravitino](docs/how-to-build.md)
 2. [How to test Gravitino](docs/how-to-test.md)
 3. [How to publish Docker images](docs/publish-docker-images.md)
+
+## Community
+<>
 
 ## License
 
