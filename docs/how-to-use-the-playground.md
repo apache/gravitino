@@ -49,12 +49,12 @@ Use simple queries to test in the Trino CLI.
 ```SQL
 SHOW CATALOGS;
 
-CREATE SCHEMA "metalake_demo.catalog_demo".db1
+CREATE SCHEMA "metalake_demo.catalog_hive".db1
   WITH (location = 'hdfs://hive:9000/user/hive/warehouse/db1.db');
 
-SHOW CREATE SCHEMA "metalake_demo.catalog_demo".db1;
+SHOW CREATE SCHEMA "metalake_demo.catalog_hive".db1;
 
-CREATE TABLE "metalake_demo.catalog_demo".db1.table_001
+CREATE TABLE "metalake_demo.catalog_hive".db1.table_001
 (
   name varchar,
   salary varchar
@@ -63,15 +63,15 @@ WITH (
   format = 'TEXTFILE'
 );
 
-INSERT INTO "metalake_demo.catalog_demo".db1.table_001 (name, salary) VALUES ('sam', '11');
+INSERT INTO "metalake_demo.catalog_hive".db1.table_001 (name, salary) VALUES ('sam', '11');
 
-SELECT * FROM "metalake_demo.catalog_demo".db1.table_001;
+SELECT * FROM "metalake_demo.catalog_hive".db1.table_001;
 
-SHOW SCHEMAS from "metalake_demo.catalog_demo";
+SHOW SCHEMAS from "metalake_demo.catalog_hive";
 
-DESCRIBE "metalake_demo.catalog_demo".db1.table_001;
+DESCRIBE "metalake_demo.catalog_hive".db1.table_001;
 
-SHOW TABLES from "metalake_demo.catalog_demo".db1;
+SHOW TABLES from "metalake_demo.catalog_hive".db1;
 ```
 
 ### Cross-catalog queries
@@ -90,7 +90,7 @@ WITH totalsales AS (
   SELECT
     employee_id,
     SUM(total_amount) AS sales_amount
-  FROM "metalake_demo.catalog_demo".sales.sales
+  FROM "metalake_demo.catalog_hive".sales.sales
   GROUP BY
     employee_id
 ), rankedemployees AS (
@@ -107,7 +107,7 @@ SELECT
   job_title,
   sales_amount
 FROM rankedemployees AS r
-JOIN "metalake_demo.catalog_pg1".hr.employees AS e
+JOIN "metalake_demo.catalog_postgres".hr.employees AS e
   ON r.employee_id = e.employee_id
 WHERE
   sales_rank = 1;
@@ -119,18 +119,18 @@ You run the SQL.
 ```SQL
 WITH customersales AS (
     SELECT
-        "metalake_demo.catalog_demo".sales.customers.customer_id,
+        "metalake_demo.catalog_hive".sales.customers.customer_id,
         customer_name,
         customer_email,
         location AS state,
         SUM(total_amount) AS total_spent
-    FROM "metalake_demo.catalog_demo".sales.sales
-             JOIN "metalake_demo.catalog_demo".sales.customers
-                  ON "metalake_demo.catalog_demo".sales.sales.customer_id = "metalake_demo.catalog_demo".sales.customers.customer_id
-             JOIN "metalake_demo.catalog_demo".sales.stores
-                  ON "metalake_demo.catalog_demo".sales.sales.store_id = "metalake_demo.catalog_demo".sales.stores.store_id
+    FROM "metalake_demo.catalog_hive".sales.sales
+             JOIN "metalake_demo.catalog_hive".sales.customers
+                  ON "metalake_demo.catalog_hive".sales.sales.customer_id = "metalake_demo.catalog_hive".sales.customers.customer_id
+             JOIN "metalake_demo.catalog_hive".sales.stores
+                  ON "metalake_demo.catalog_hive".sales.sales.store_id = "metalake_demo.catalog_hive".sales.stores.store_id
     GROUP BY
-        "metalake_demo.catalog_demo".sales.customers.customer_id,
+        "metalake_demo.catalog_hive".sales.customers.customer_id,
         customer_name,
         customer_email,
         location
@@ -167,14 +167,14 @@ WITH employeeperformance AS (
   SELECT
     employee_id,
     AVG(rating) AS average_rating
-  FROM "metalake_demo.catalog_pg1".hr.employee_performance
+  FROM "metalake_demo.catalog_postgres".hr.employee_performance
   GROUP BY
     employee_id
 ), employeesales AS (
   SELECT
     employee_id,
     SUM(total_amount) AS total_sales
-  FROM "metalake_demo.catalog_demo".sales.sales
+  FROM "metalake_demo.catalog_hive".sales.sales
   GROUP BY
     employee_id
 )
