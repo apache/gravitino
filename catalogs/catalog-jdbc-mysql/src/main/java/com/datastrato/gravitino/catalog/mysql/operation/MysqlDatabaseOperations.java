@@ -12,6 +12,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.collections4.MapUtils;
@@ -47,11 +48,28 @@ public class MysqlDatabaseOperations extends JdbcDatabaseOperations {
 
   @Override
   public String generateDropDatabaseSql(String databaseName, boolean cascade) {
+    final String dropDatabaseSql = "DROP DATABASE `" + databaseName + "`";
     if (cascade) {
-      throw new UnsupportedOperationException(
-          "MySQL does not support CASCADE option for DROP DATABASE.");
+      return dropDatabaseSql;
     }
-    return "DROP DATABASE `" + databaseName + "`";
+
+    try (final Connection connection = this.dataSource.getConnection()) {
+      String query = "SHOW TABLES IN " + databaseName;
+      try (Statement statement = connection.createStatement()) {
+        // Execute the query and check if there exists any tables in the database
+        try (ResultSet resultSet = statement.executeQuery(query)) {
+          if (resultSet.next()) {
+            throw new IllegalStateException(
+                String.format(
+                    "Database %s is not empty, the value of cascade should be true.",
+                    databaseName));
+          }
+        }
+      }
+    } catch (SQLException sqlException) {
+      throw this.exceptionMapper.toGravitinoException(sqlException);
+    }
+    return dropDatabaseSql;
   }
 
   @Override
