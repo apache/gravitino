@@ -494,7 +494,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
                 try {
                   Class<? extends CatalogProvider> providerClz =
                       lookupCatalogProvider(provider, cl);
-                  return (BaseCatalog) providerClz.newInstance();
+                  return (BaseCatalog) providerClz.getDeclaredConstructor().newInstance();
                 } catch (Exception e) {
                   LOG.error("Failed to load catalog with provider: {}", provider, e);
                   throw new RuntimeException(e);
@@ -593,7 +593,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
             .map(CatalogProvider::getClass)
             .collect(Collectors.toList());
 
-    if (providers.size() == 0) {
+    if (providers.isEmpty()) {
       throw new IllegalArgumentException("No catalog provider found for: " + provider);
     } else if (providers.size() > 1) {
       throw new IllegalArgumentException("Multiple catalog providers found for: " + provider);

@@ -70,6 +70,7 @@ log4j-core = { group = "org.apache.logging.log4j", name = "log4j-core", version.
 log4j-12-api = { group = "org.apache.logging.log4j", name = "log4j-1.2-api", version.ref = "log4j" }
 jetty-server = { group = "org.eclipse.jetty", name = "jetty-server", version.ref = "jetty" }
 jetty-servlet = { group = "org.eclipse.jetty", name = "jetty-servlet", version.ref = "jetty" }
+jetty-servlets = { group = "org.eclipse.jetty", name = "jetty-servlets", version.ref = "jetty" }
 jetty-webapp = { group = "org.eclipse.jetty", name = "jetty-webapp", version.ref = "jetty" }
 jersey-server = { group = "org.glassfish.jersey.core", name = "jersey-server", version.ref = "jersey" }
 jersey-container-servlet-core = { group = "org.glassfish.jersey.containers", name = "jersey-container-servlet-core", version.ref = "jersey" }
@@ -135,7 +136,7 @@ postgresql-driver = { group = "org.postgresql", name = "postgresql", version.ref
 
 [bundles]
 log4j = ["slf4j-api", "log4j-slf4j2-impl", "log4j-api", "log4j-core", "log4j-12-api"]
-jetty = ["jetty-server", "jetty-servlet", "jetty-webapp"]
+jetty = ["jetty-server", "jetty-servlet", "jetty-webapp", "jetty-servlets"]
 jersey = ["jersey-server", "jersey-container-servlet-core", "jersey-container-jetty-http", "jersey-media-json-jackson", "jersey-hk2"]
 iceberg = ["iceberg-core", "iceberg-api"]
 jwt = ["jwt-api", "jwt-impl", "jwt-gson"]

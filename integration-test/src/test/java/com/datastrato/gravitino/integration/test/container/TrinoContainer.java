@@ -32,10 +32,6 @@ public class TrinoContainer extends BaseContainer {
 
   static Connection trinoJdbcConnection = null;
 
-  public static final String TRINO_CONF_GRAVITINO_URI = "gravitino.uri";
-  public static final String TRINO_CONF_GRAVITINO_METALAKE = "gravitino.metalake";
-  public static final String TRINO_CONF_HIVE_METASTORE_URI = "hive.metastore.uri";
-  public static final String TRINO_CONTAINER_CONF_DIR = "/etc/trino";
   public static final String TRINO_CONTAINER_PLUGIN_GRAVITINO_DIR =
       "/usr/lib/trino/plugin/gravitino";
 
@@ -50,11 +46,7 @@ public class TrinoContainer extends BaseContainer {
       Map<String, String> extraHosts,
       Map<String, String> filesToMount,
       Map<String, String> envVars,
-      Optional<Network> network,
-      String trinoConfDir,
-      InetSocketAddress gravitinoServerAddress,
-      String metalakeName,
-      String hiveContainerIP) {
+      Optional<Network> network) {
     super(image, hostName, ports, extraHosts, filesToMount, envVars, network);
   }
 
@@ -229,17 +221,7 @@ public class TrinoContainer extends BaseContainer {
     @Override
     public TrinoContainer build() {
       return new TrinoContainer(
-          image,
-          hostName,
-          exposePorts,
-          extraHosts,
-          filesToMount,
-          envVars,
-          network,
-          trinoConfDir,
-          gravitinoServerAddress,
-          metalakeName,
-          hiveContainerIP);
+          image, hostName, exposePorts, extraHosts, filesToMount, envVars, network);
     }
   }
 }

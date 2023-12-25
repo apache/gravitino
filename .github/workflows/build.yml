@@ -51,6 +51,9 @@ jobs:
   build:
     # The type of runner that the job will run on
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        java-version: [ 8, 11, 17 ]
     timeout-minutes: 30
     needs: changes
     if: needs.changes.outputs.source_changes == 'true'
@@ -61,11 +64,11 @@ jobs:
 
       - uses: actions/setup-java@v3
         with:
-          java-version: '8'
+          java-version: ${{ matrix.java-version }}
           distribution: 'temurin'
 
       - name: Build with Gradle
-        run: ./gradlew build -PskipITs
+        run: ./gradlew build -PskipITs -PjdkVersion=${{ matrix.java-version }}
 
       - name: Upload unit tests report
         uses: actions/upload-artifact@v3

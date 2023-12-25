@@ -8,6 +8,7 @@ import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.servlets.MetricsServlet;
 import com.datastrato.gravitino.GravitinoEnv;
 import com.datastrato.gravitino.metrics.MetricsSystem;
+import com.datastrato.gravitino.server.auth.AuthenticationFilter;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
@@ -16,9 +17,9 @@ import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.security.AccessController;
 import java.security.PrivilegedAction;
 import java.util.EnumSet;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -104,7 +105,7 @@ public final class JettyServer {
             StringUtils.isNotBlank(serverConfig.getTrustStorePath()),
             "If enables the authentication of the client, must set trustStorePath");
         Preconditions.checkArgument(
-            StringUtils.isNotBlank(serverConfig.getTrustStorePasword()),
+            StringUtils.isNotBlank(serverConfig.getTrustStorePassword()),
             "If enables the authentication of the client, must set trustStorePassword");
       }
       ServerConnector httpsConnector =
@@ -123,7 +124,7 @@ public final class JettyServer {
               serverConfig.getSupportedAlgorithms(),
               serverConfig.isEnableClientAuth(),
               serverConfig.getTrustStorePath(),
-              serverConfig.getTrustStorePasword(),
+              serverConfig.getTrustStorePassword(),
               serverConfig.getTrustStoreType());
       server.addConnector(httpsConnector);
     } else {
@@ -393,6 +394,7 @@ public final class JettyServer {
     return new ServerConnector(server, null, serverExecutor, null, -1, -1, connectionFactories);
   }
 
+  @SuppressWarnings("removal")
   private ThreadPool createThreadPool(int minThreads, int maxThreads, int threadPoolWorkQueueSize) {
 
     ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
@@ -404,7 +406,7 @@ public final class JettyServer {
 
           @Override
           public Thread newThread(Runnable runnable) {
-            return AccessController.doPrivileged(
+            return java.security.AccessController.doPrivileged(
                 new PrivilegedAction<Thread>() {
                   @Override
                   public Thread run() {
@@ -432,5 +434,28 @@ public final class JettyServer {
 
   public ThreadPool getThreadPool() {
     return server.getThreadPool();
+  }
+
+  public void addCustomFilters(String pathSpec) {
+    for (String filterName : serverConfig.getCustomFilters()) {
+      if (StringUtils.isBlank(filterName)) {
+        continue;
+      }
+      FilterHolder filterHolder = new FilterHolder();
+      filterHolder.setClassName(filterName);
+      for (Map.Entry<String, String> entry :
+          serverConfig.getAllWithPrefix(String.format("%s.param.", filterName)).entrySet()) {
+        filterHolder.setInitParameter(entry.getKey(), entry.getValue());
+      }
+      servletContextHandler.addFilter(filterHolder, pathSpec, EnumSet.allOf(DispatcherType.class));
+    }
+  }
+
+  public void addSystemFilters(String pathSpec) {
+    if (serverConfig.isEnableCorsFilter()) {
+      servletContextHandler.addFilter(
+          CorsFilterHolder.create(serverConfig), pathSpec, EnumSet.allOf(DispatcherType.class));
+    }
+    addFilter(new AuthenticationFilter(), pathSpec);
   }
 }

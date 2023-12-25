@@ -7,9 +7,10 @@ package com.datastrato.gravitino.catalog.jdbc.config;
 
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.config.ConfigBuilder;
+import com.datastrato.gravitino.config.ConfigConstants;
 import com.datastrato.gravitino.config.ConfigEntry;
 import java.util.Map;
-import java.util.Optional;
+import org.apache.commons.lang3.StringUtils;
 
 public class JdbcConfig extends Config {
 
@@ -18,41 +19,47 @@ public class JdbcConfig extends Config {
           .doc("The url of the Jdbc connection")
           .version("0.3.0")
           .stringConf()
-          .createWithDefault(null);
+          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
+          .create();
 
-  public static final ConfigEntry<Optional<String>> JDBC_DATABASE =
+  public static final ConfigEntry<String> JDBC_DATABASE =
       new ConfigBuilder("jdbc-database")
           .doc("The database of the jdbc connection")
           .version("0.3.0")
           .stringConf()
-          .createWithOptional();
+          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
+          .create();
 
-  public static final ConfigEntry<Optional<String>> JDBC_DRIVER =
+  public static final ConfigEntry<String> JDBC_DRIVER =
       new ConfigBuilder("jdbc-driver")
           .doc("The driver of the jdbc connection")
           .version("0.3.0")
           .stringConf()
-          .createWithOptional();
+          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
+          .create();
 
-  public static final ConfigEntry<Optional<String>> USERNAME =
+  public static final ConfigEntry<String> USERNAME =
       new ConfigBuilder("jdbc-user")
           .doc("The username of the Jdbc connection")
           .version("0.3.0")
           .stringConf()
-          .createWithOptional();
+          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
+          .create();
 
-  public static final ConfigEntry<Optional<String>> PASSWORD =
+  public static final ConfigEntry<String> PASSWORD =
       new ConfigBuilder("jdbc-password")
           .doc("The password of the Jdbc connection")
           .version("0.3.0")
           .stringConf()
-          .createWithOptional();
+          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
+          .create();
 
   public static final ConfigEntry<Integer> POOL_MIN_SIZE =
       new ConfigBuilder("jdbc.pool.min-size")
           .doc("The minimum number of connections in the pool")
           .version("0.3.0")
           .intConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(2);
 
   public static final ConfigEntry<Integer> POOL_MAX_SIZE =
@@ -60,21 +67,22 @@ public class JdbcConfig extends Config {
           .doc("The maximum number of connections in the pool")
           .version("0.3.0")
           .intConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(10);
 
   public String getJdbcUrl() {
     return get(JDBC_URL);
   }
 
-  public Optional<String> getJdbcDriverOptional() {
+  public String getJdbcDriver() {
     return get(JDBC_DRIVER);
   }
 
-  public Optional<String> getUsernameOptional() {
+  public String getUsername() {
     return get(USERNAME);
   }
 
-  public Optional<String> getPasswordOptional() {
+  public String getPassword() {
     return get(PASSWORD);
   }
 
@@ -86,8 +94,8 @@ public class JdbcConfig extends Config {
     return get(POOL_MAX_SIZE);
   }
 
-  public String getJdbcDatabaseOrElseThrow(String errorMessage) {
-    return get(JDBC_DATABASE).orElseThrow(() -> new IllegalArgumentException(errorMessage));
+  public String getJdbcDatabase() {
+    return get(JDBC_DATABASE);
   }
 
   public JdbcConfig(Map<String, String> properties) {

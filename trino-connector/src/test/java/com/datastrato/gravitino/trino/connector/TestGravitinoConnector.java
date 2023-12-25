@@ -23,6 +23,7 @@ import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.shaded.com.google.common.base.Preconditions;
+import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Parameters;
 import org.testng.annotations.Test;
 
@@ -32,6 +33,11 @@ public class TestGravitinoConnector extends AbstractTestQueryFramework {
   private static final Logger LOG = LoggerFactory.getLogger(TestGravitinoConnector.class);
 
   GravitinoMockServer server;
+
+  @BeforeMethod
+  public void reloadCatalog() {
+    server.reloadCatalogs();
+  }
 
   @Override
   protected QueryRunner createQueryRunner() throws Exception {
@@ -57,9 +63,11 @@ public class TestGravitinoConnector extends AbstractTestQueryFramework {
       int max_tries = 35;
       while (GravitinoPlugin.catalogConnectorManager.getCatalogs().isEmpty() && max_tries > 0) {
         Thread.sleep(1000);
-        if (max_tries-- == 0) {
-          throw new Exception("Catalog memory load failed");
-        }
+        max_tries--;
+      }
+
+      if (max_tries == 0) {
+        throw new RuntimeException("Failed to create catalog in about 35 seconds...");
       }
 
     } catch (Exception e) {

@@ -12,7 +12,6 @@ import com.datastrato.gravitino.catalog.lakehouse.iceberg.web.IcebergExceptionMa
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.web.IcebergObjectMapperProvider;
 import com.datastrato.gravitino.metrics.MetricsSystem;
 import com.datastrato.gravitino.metrics.source.MetricsSource;
-import com.datastrato.gravitino.server.auth.AuthenticationFilter;
 import com.datastrato.gravitino.server.web.HttpServerMetricsSource;
 import com.datastrato.gravitino.server.web.JettyServer;
 import com.datastrato.gravitino.server.web.JettyServerConfig;
@@ -61,7 +60,8 @@ public class IcebergRESTService implements GravitinoAuxiliaryService {
 
     Servlet servlet = new ServletContainer(config);
     server.addServlet(servlet, "/iceberg/*");
-    server.addFilter(new AuthenticationFilter(), "/iceberg/*");
+    server.addCustomFilters("/iceberg/*");
+    server.addSystemFilters("/iceberg/*");
   }
 
   @Override

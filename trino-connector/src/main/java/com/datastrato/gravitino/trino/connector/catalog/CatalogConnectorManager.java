@@ -21,10 +21,12 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.trino.spi.TrinoException;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.NotImplementedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -121,7 +123,8 @@ public class CatalogConnectorManager {
     }
   }
 
-  void loadCatalogs(GravitinoMetaLake metalake) {
+  @VisibleForTesting
+  public void loadCatalogs(GravitinoMetaLake metalake) {
     NameIdentifier[] catalogNames;
     try {
       catalogNames = metalake.listCatalogs(Namespace.ofCatalog(metalake.name()));
@@ -134,6 +137,20 @@ public class CatalogConnectorManager {
         "Load metalake {}'s catalogs. catalogs: {}.",
         metalake.name(),
         Arrays.toString(catalogNames));
+
+    // Delete those catalogs that have been deleted in Gravitino server
+    Set<String> catalogNameStrings =
+        Arrays.stream(catalogNames).map(NameIdentifier::toString).collect(Collectors.toSet());
+
+    catalogConnectors.keySet().stream()
+        .filter(catalogName -> !catalogNameStrings.contains(catalogName))
+        .forEach(
+            (String catalogName) -> {
+              catalogInjector.removeCatalogConnector(catalogName);
+              catalogConnectors.remove(catalogName);
+              LOG.info(
+                  "Remove catalog '{}' in metalake {} successfully.", catalogName, metalake.name());
+            });
 
     Arrays.stream(catalogNames)
         .forEach(

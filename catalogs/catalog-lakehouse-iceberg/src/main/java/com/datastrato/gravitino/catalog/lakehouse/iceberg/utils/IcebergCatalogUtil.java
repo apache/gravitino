@@ -43,17 +43,17 @@ public class IcebergCatalogUtil {
 
   private static JdbcCatalog loadJdbcCatalog(Map<String, String> properties) {
     IcebergConfig icebergConfig = new IcebergConfig(properties);
-    icebergConfig
-        .getJdbcDriverOptional()
-        .ifPresent(
-            driverClassName -> {
-              try {
-                // Load the jdbc driver
-                Class.forName(driverClassName);
-              } catch (ClassNotFoundException e) {
-                throw new IllegalArgumentException("Couldn't load jdbc driver " + driverClassName);
-              }
-            });
+    String driverClassName = icebergConfig.getJdbcDriver();
+
+    icebergConfig.get(IcebergConfig.JDBC_USER);
+    icebergConfig.get(IcebergConfig.JDBC_PASSWORD);
+
+    try {
+      // Load the jdbc driver
+      Class.forName(driverClassName);
+    } catch (ClassNotFoundException e) {
+      throw new IllegalArgumentException("Couldn't load jdbc driver " + driverClassName);
+    }
     JdbcCatalog jdbcCatalog =
         new JdbcCatalog(
             null,

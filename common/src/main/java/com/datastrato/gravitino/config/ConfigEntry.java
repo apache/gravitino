@@ -8,7 +8,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Optional;
+import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.stream.Stream;
 import lombok.Getter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,6 +39,8 @@ public class ConfigEntry<T> {
   @Getter private boolean isDeprecated;
 
   private boolean isOptional;
+  private boolean hasNoDefault;
+  private Consumer<T> validator;
 
   /**
    * Creates a new ConfigEntry instance.
@@ -101,6 +105,35 @@ public class ConfigEntry<T> {
     this.isOptional = true;
   }
 
+  /** Marks this configuration as no default value. */
+  void setHasNoDefault() {
+    this.hasNoDefault = true;
+  }
+
+  /** Set the validator value. */
+  void setValidator(Consumer<T> validator) {
+    this.validator = validator;
+  }
+
+  /**
+   * Checks if the user-provided value for the config matches the validator.
+   *
+   * @param checkValueFunc The validator of the configuration option
+   * @param errorMsg The thrown error message if the value is invalid
+   * @return The current ConfigEntry instance
+   */
+  public ConfigEntry<T> checkValue(Function<T, Boolean> checkValueFunc, String errorMsg) {
+    setValidator(
+        value -> {
+          if (!checkValueFunc.apply(value)) {
+            throw new IllegalArgumentException(
+                String.format(
+                    "%s in %s is invalid. %s", stringConverter.apply(value), key, errorMsg));
+          }
+        });
+    return this;
+  }
+
   /**
    * Creates a new ConfigEntry instance based on this configuration entry with a default value.
    *
@@ -113,6 +146,7 @@ public class ConfigEntry<T> {
     conf.setValueConverter(valueConverter);
     conf.setStringConverter(stringConverter);
     conf.setDefaultValue(t);
+    conf.setValidator(validator);
 
     return conf;
   }
@@ -130,7 +164,29 @@ public class ConfigEntry<T> {
     // Unless explicitly set by the user, null values are not expected to occur.
     conf.setStringConverter(t -> t.map(stringConverter).orElse(null));
     conf.setOptional();
+    conf.setValidator(
+        optionValue -> {
+          if (Stream.of(Optional.ofNullable(validator), optionValue)
+              .allMatch(Optional::isPresent)) {
+            validator.accept(optionValue.get());
+          }
+        });
 
+    return conf;
+  }
+
+  /**
+   * Creates a new ConfigEntry instance based on this configuration entry with no default value.
+   *
+   * @return A new ConfigEntry instance with no default value.
+   */
+  public ConfigEntry<T> create() {
+    ConfigEntry<T> conf =
+        new ConfigEntry<>(key, version, doc, alternatives, isPublic, isDeprecated);
+    conf.setValueConverter(valueConverter);
+    conf.setStringConverter(stringConverter);
+    conf.setHasNoDefault();
+    conf.setValidator(validator);
     return conf;
   }
 
@@ -155,12 +211,21 @@ public class ConfigEntry<T> {
     if (value == null) {
       if (defaultValue != null) {
         return defaultValue;
+      } else if (hasNoDefault) {
+        if (validator != null) {
+          validator.accept(null);
+        }
+        return null;
       } else if (!isOptional) {
         throw new NoSuchElementException("No configuration found for key " + key);
       }
     }
 
-    return valueConverter.apply(value);
+    T convertedValue = valueConverter.apply(value);
+    if (validator != null) {
+      validator.accept(convertedValue);
+    }
+    return convertedValue;
   }
 
   /**

@@ -29,16 +29,12 @@ import java.io.IOException;
 import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.ClassOrderer.OrderAnnotation;
-import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestClassOrder;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
 import org.mockito.Mockito;
 
 @TestInstance(Lifecycle.PER_CLASS)
-@TestClassOrder(OrderAnnotation.class)
 public class TestEntityKeyEncoding {
   private Config getConfig() throws IOException {
     File baseDir = new File(System.getProperty("java.io.tmpdir"));
@@ -75,7 +71,6 @@ public class TestEntityKeyEncoding {
   }
 
   @Test
-  @Order(1)
   public void testIdentifierEncoding()
       throws IOException, IllegalAccessException, NoSuchFieldException {
     Config config = getConfig();
@@ -192,7 +187,6 @@ public class TestEntityKeyEncoding {
   }
 
   @Test
-  @Order(10)
   public void testNamespaceEncoding()
       throws IOException, IllegalAccessException, NoSuchFieldException {
     Config config = getConfig();

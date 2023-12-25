@@ -53,7 +53,7 @@ public class AuxiliaryServiceManager {
             .map(GravitinoAuxiliaryService::getClass)
             .collect(Collectors.toList());
 
-    if (providers.size() == 0) {
+    if (providers.isEmpty()) {
       throw new IllegalArgumentException("No GravitinoAuxiliaryService found for: " + provider);
     } else if (providers.size() > 1) {
       throw new IllegalArgumentException(
@@ -71,7 +71,7 @@ public class AuxiliaryServiceManager {
           try {
             Class<? extends GravitinoAuxiliaryService> providerClz =
                 lookupAuxService(auxServiceName, cl);
-            return providerClz.newInstance();
+            return providerClz.getDeclaredConstructor().newInstance();
           } catch (Exception e) {
             throw new RuntimeException(e);
           }

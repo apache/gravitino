@@ -8,8 +8,9 @@ This software is licensed under the Apache License version 2."
 ## Install Gravitino from scratch
 
 :::note
-Gravitino requires JDK8 to run, please make sure you have JDK8 installed and `JAVA_HOME`
-configured correctly. To confirm the Java version, you can simply run `${JAVA_HOME}/bin/java -version` command.
+Gravitino supports running on Java 8, 11, and 17, please make sure you have Java installed and
+`JAVA_HOME` configured correctly. To confirm the Java version, you can simply run
+`${JAVA_HOME}/bin/java -version` command.
 :::
 
 ### Get the Gravitino binary distribution package

@@ -52,7 +52,7 @@ public class GravitinoMockServer implements AutoCloseable {
   private final String testCatalogProvider = "memory";
 
   private boolean start = true;
-  private CatalogConnectorManager catalogConnectorManager;
+  CatalogConnectorManager catalogConnectorManager;
   private GeneralDataTypeTransformer dataTypeTransformer = new HiveDataTypeTransformer();
 
   public void setCatalogConnectorManager(CatalogConnectorManager catalogConnectorManager) {
@@ -98,6 +98,14 @@ public class GravitinoMockServer implements AutoCloseable {
               }
             });
     return metaLake;
+  }
+
+  void reloadCatalogs() {
+    GravitinoMetaLake metaLake = mock(GravitinoMetaLake.class);
+    when(metaLake.name()).thenReturn(testMetalake);
+    when(metaLake.listCatalogs(any()))
+        .thenReturn(new NameIdentifier[] {NameIdentifier.ofCatalog(testMetalake, testCatalog)});
+    catalogConnectorManager.loadCatalogs(metaLake);
   }
 
   private Catalog createGravitinoCatalog(NameIdentifier catalogName) {

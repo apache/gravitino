@@ -44,6 +44,7 @@ fi
 
 GRAVITINO_CLASSPATH+=":${GRAVITINO_CONF_DIR}"
 
+JVM_VERSION=8
 function check_java_version() {
   if [[ -n "${JAVA_HOME+x}" ]]; then
     JAVA="$JAVA_HOME/bin/java"

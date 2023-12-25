@@ -6,6 +6,7 @@ package com.datastrato.gravitino.config;
 
 import com.google.common.collect.Lists;
 import java.util.NoSuchElementException;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -124,5 +125,33 @@ public class TestConfigEntry {
 
     testConf1.writeTo(configMap, Optional.empty());
     Assertions.assertEquals("11", configMap.get("gravitino.test.int1"));
+  }
+
+  @Test
+  public void testCheckValue() {
+    ConfigEntry<Integer> testConfDefault =
+        new ConfigBuilder("gravitino.test.default")
+            .intConf()
+            .checkValue(value -> value > 2, "error")
+            .createWithDefault(1);
+    testConfDefault.writeTo(configMap, -10);
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> testConfDefault.readFrom(configMap));
+    ConfigEntry<String> testConfNoDefault =
+        new ConfigBuilder("gravitino.test.no.default")
+            .stringConf()
+            .checkValue(Objects::nonNull, "error")
+            .create();
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> testConfNoDefault.readFrom(configMap));
+    ConfigEntry<Optional<String>> testConfOptional =
+        new ConfigBuilder("gravitino.test.optional")
+            .stringConf()
+            .checkValue(value -> !Objects.equals(value, "test"), "error")
+            .createWithOptional();
+    Assertions.assertDoesNotThrow(() -> testConfOptional.readFrom(configMap));
+    testConfOptional.writeTo(configMap, Optional.of("test"));
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> testConfOptional.readFrom(configMap));
   }
 }

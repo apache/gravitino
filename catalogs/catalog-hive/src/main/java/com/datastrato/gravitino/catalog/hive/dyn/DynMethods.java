@@ -23,7 +23,6 @@ import com.google.common.base.Throwables;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
-import java.security.AccessController;
 import java.security.PrivilegedAction;
 import java.util.Arrays;
 
@@ -393,6 +392,7 @@ public class DynMethods {
      * @see Class#forName(String)
      * @see Class#getMethod(String, Class[])
      */
+    @SuppressWarnings("removal")
     public Builder hiddenImpl(Class<?> targetClass, String methodName, Class<?>... argClasses) {
       // don't do any work if an implementation has been found
       if (method != null) {
@@ -401,7 +401,7 @@ public class DynMethods {
 
       try {
         Method hidden = targetClass.getDeclaredMethod(methodName, argClasses);
-        AccessController.doPrivileged(new MakeAccessible(hidden));
+        java.security.AccessController.doPrivileged(new MakeAccessible(hidden));
         this.method = new UnboundMethod(hidden, name);
       } catch (SecurityException | NoSuchMethodException e) {
         // unusable or not the right implementation

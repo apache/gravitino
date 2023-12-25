@@ -10,7 +10,6 @@ import com.datastrato.gravitino.catalog.CatalogOperationDispatcher;
 import com.datastrato.gravitino.meta.MetalakeManager;
 import com.datastrato.gravitino.metrics.MetricsSystem;
 import com.datastrato.gravitino.metrics.source.MetricsSource;
-import com.datastrato.gravitino.server.auth.AuthenticationFilter;
 import com.datastrato.gravitino.server.auth.ServerAuthenticator;
 import com.datastrato.gravitino.server.web.ConfigServlet;
 import com.datastrato.gravitino.server.web.HttpServerMetricsSource;
@@ -87,8 +86,9 @@ public class GravitinoServer extends ResourceConfig {
     server.addServlet(servlet, "/api/*");
     Servlet configServlet = new ConfigServlet(serverConfig);
     server.addServlet(configServlet, "/configs");
+    server.addCustomFilters("/api/*");
     server.addFilter(new VersioningFilter(), "/api/*");
-    server.addFilter(new AuthenticationFilter(), "/api/*");
+    server.addSystemFilters("/api/*");
   }
 
   public void start() throws Exception {

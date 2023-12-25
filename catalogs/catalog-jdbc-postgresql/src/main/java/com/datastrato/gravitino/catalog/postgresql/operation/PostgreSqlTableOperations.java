@@ -16,6 +16,7 @@ import com.datastrato.gravitino.exceptions.NoSuchTableException;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
+import com.google.common.base.Preconditions;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -32,6 +33,7 @@ import net.sf.jsqlparser.statement.create.table.ColDataType;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.BooleanUtils;
 import org.apache.commons.lang3.StringUtils;
 
 /** Table operations for PostgreSQL. */
@@ -70,10 +72,10 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
       JdbcTypeConverter jdbcTypeConverter,
       Map<String, String> conf) {
     super.initialize(dataSource, exceptionMapper, jdbcTypeConverter, conf);
-    database =
-        new JdbcConfig(conf)
-            .getJdbcDatabaseOrElseThrow(
-                "The `jdbc-database` configuration item is mandatory in PostgreSQL.");
+    database = new JdbcConfig(conf).getJdbcDatabase();
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(database),
+        "The `jdbc-database` configuration item is mandatory in PostgreSQL.");
   }
 
   @Override
@@ -350,8 +352,12 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
       } else if (change instanceof TableChange.UpdateColumnPosition) {
         throw new IllegalArgumentException("PostgreSQL does not support column position.");
       } else if (change instanceof TableChange.DeleteColumn) {
+        lazyLoadTable = getOrCreateTable(schemaName, tableName, lazyLoadTable);
         TableChange.DeleteColumn deleteColumn = (TableChange.DeleteColumn) change;
-        alterSql.add(deleteColumnFieldDefinition(deleteColumn, tableName));
+        String deleteColSql = deleteColumnFieldDefinition(deleteColumn, lazyLoadTable);
+        if (StringUtils.isNotEmpty(deleteColSql)) {
+          alterSql.add(deleteColSql);
+        }
       } else if (change instanceof TableChange.UpdateColumnNullability) {
         alterSql.add(
             updateColumnNullabilityDefinition(
@@ -360,6 +366,11 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
         throw new IllegalArgumentException(
             "Unsupported table change type: " + change.getClass().getName());
       }
+    }
+
+    // If there is no change, return directly
+    if (alterSql.isEmpty()) {
+      return "";
     }
 
     // Return the generated SQL statement
@@ -397,11 +408,21 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
   }
 
   private String deleteColumnFieldDefinition(
-      TableChange.DeleteColumn deleteColumn, String tableName) {
+      TableChange.DeleteColumn deleteColumn, JdbcTable table) {
     if (deleteColumn.fieldName().length > 1) {
       throw new UnsupportedOperationException("PostgreSQL does not support nested column names.");
     }
-    return "ALTER TABLE " + tableName + " DROP COLUMN " + deleteColumn.fieldName()[0] + ";";
+    String col = deleteColumn.fieldName()[0];
+    boolean colExists =
+        Arrays.stream(table.columns()).anyMatch(s -> StringUtils.equals(col, s.name()));
+    if (!colExists) {
+      if (BooleanUtils.isTrue(deleteColumn.getIfExists())) {
+        return "";
+      } else {
+        throw new IllegalArgumentException("Delete column does not exist: " + col);
+      }
+    }
+    return "ALTER TABLE " + table.name() + " DROP COLUMN " + deleteColumn.fieldName()[0] + ";";
   }
 
   private String updateColumnTypeFieldDefinition(

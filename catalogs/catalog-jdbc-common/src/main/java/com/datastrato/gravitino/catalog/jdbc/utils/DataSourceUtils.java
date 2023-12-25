@@ -39,10 +39,14 @@ public class DataSourceUtils {
   private static DataSource createDBCPDataSource(JdbcConfig jdbcConfig) throws Exception {
     BasicDataSource basicDataSource =
         BasicDataSourceFactory.createDataSource(getProperties(jdbcConfig));
-    basicDataSource.setUrl(jdbcConfig.getJdbcUrl());
-    jdbcConfig.getJdbcDriverOptional().ifPresent(basicDataSource::setDriverClassName);
-    jdbcConfig.getUsernameOptional().ifPresent(basicDataSource::setUsername);
-    jdbcConfig.getPasswordOptional().ifPresent(basicDataSource::setPassword);
+    String jdbcUrl = jdbcConfig.getJdbcUrl();
+    basicDataSource.setUrl(jdbcUrl);
+    String driverClassName = jdbcConfig.getJdbcDriver();
+    basicDataSource.setDriverClassName(driverClassName);
+    String userName = jdbcConfig.getUsername();
+    basicDataSource.setUsername(userName);
+    String password = jdbcConfig.getPassword();
+    basicDataSource.setPassword(password);
     basicDataSource.setMaxTotal(jdbcConfig.getPoolMaxSize());
     basicDataSource.setMinIdle(jdbcConfig.getPoolMinSize());
     // Set each time a connection is taken out from the connection pool, a test statement will be

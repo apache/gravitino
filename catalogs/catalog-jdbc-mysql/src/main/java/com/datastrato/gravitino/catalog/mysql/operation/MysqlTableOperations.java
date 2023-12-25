@@ -37,6 +37,7 @@ import net.sf.jsqlparser.statement.create.table.Index;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.BooleanUtils;
 import org.apache.commons.lang3.StringUtils;
 
 /** Table operations for MySQL. */
@@ -322,7 +323,11 @@ public class MysqlTableOperations extends JdbcTableOperations {
             updateColumnPositionFieldDefinition(updateColumnPosition, lazyLoadCreateTable));
       } else if (change instanceof TableChange.DeleteColumn) {
         TableChange.DeleteColumn deleteColumn = (TableChange.DeleteColumn) change;
-        alterSql.add(deleteColumnFieldDefinition(deleteColumn));
+        lazyLoadCreateTable = getOrCreateTable(databaseName, tableName, lazyLoadCreateTable);
+        String deleteColSql = deleteColumnFieldDefinition(deleteColumn, lazyLoadCreateTable);
+        if (StringUtils.isNotEmpty(deleteColSql)) {
+          alterSql.add(deleteColSql);
+        }
       } else if (change instanceof TableChange.UpdateColumnNullability) {
         lazyLoadCreateTable = getOrCreateTable(databaseName, tableName, lazyLoadCreateTable);
         alterSql.add(
@@ -353,6 +358,9 @@ public class MysqlTableOperations extends JdbcTableOperations {
       alterSql.add("COMMENT '" + newComment + "'");
     }
 
+    if (CollectionUtils.isEmpty(alterSql)) {
+      return "";
+    }
     // Return the generated SQL statement
     String result = "ALTER TABLE " + tableName + "\n" + String.join(",\n", alterSql) + ";";
     LOG.info("Generated alter table:{} sql: {}", databaseName + "." + tableName, result);
@@ -496,11 +504,23 @@ public class MysqlTableOperations extends JdbcTableOperations {
     return columnDefinition.toString();
   }
 
-  private String deleteColumnFieldDefinition(TableChange.DeleteColumn deleteColumn) {
+  private String deleteColumnFieldDefinition(
+      TableChange.DeleteColumn deleteColumn, CreateTable lazyLoadCreateTable) {
     if (deleteColumn.fieldName().length > 1) {
       throw new UnsupportedOperationException("Mysql does not support nested column names.");
     }
     String col = deleteColumn.fieldName()[0];
+    boolean colExists =
+        lazyLoadCreateTable.getColumnDefinitions().stream()
+            .map(MysqlTableOperations::getColumnName)
+            .anyMatch(s -> StringUtils.equals(col, s));
+    if (!colExists) {
+      if (BooleanUtils.isTrue(deleteColumn.getIfExists())) {
+        return "";
+      } else {
+        throw new IllegalArgumentException("Delete column does not exist: " + col);
+      }
+    }
     return "DROP COLUMN " + col;
   }
 
