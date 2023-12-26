@@ -21,7 +21,7 @@ The Gravitino connector provides the following stored procedures to create and d
 
 Create catalog:
 
-```text
+```sql
 create_catalog(CATALOG varchar, PROVIDER varchar, PROPERTIES MAP(VARCHAR, VARCHAR), IGNORE_EXIST boolean);
 ```
 
@@ -39,7 +39,7 @@ The type of catalog properties reference:
 
 Drop catalog:
 
-```text
+```sql
 drop_catalog(CATALOG varchar, IGNORE_NOT_EXIST boolean);
 ```
 
