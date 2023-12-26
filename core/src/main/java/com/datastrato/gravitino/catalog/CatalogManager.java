@@ -258,7 +258,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
             .withType(type)
             .withProvider(provider)
             .withComment(comment)
-            .withProperties(StringIdentifier.addToProperties(stringId, mergedConfig))
+            .withProperties(StringIdentifier.newPropertiesWithId(stringId, mergedConfig))
             .withAuditInfo(
                 new AuditInfo.Builder()
                     .withCreator("gravitino") /* TODO. Should change to real user */
@@ -593,7 +593,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
             .map(CatalogProvider::getClass)
             .collect(Collectors.toList());
 
-    if (providers.size() == 0) {
+    if (providers.isEmpty()) {
       throw new IllegalArgumentException("No catalog provider found for: " + provider);
     } else if (providers.size() > 1) {
       throw new IllegalArgumentException("Multiple catalog providers found for: " + provider);

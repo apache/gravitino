@@ -140,6 +140,8 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     try {
       String jdbcUrl = POSTGRESQL_CONTAINER.getJdbcUrl();
       String database = new URI(jdbcUrl.substring(jdbcUrl.lastIndexOf("/") + 1)).getPath();
+      catalogProperties.put(
+          JdbcConfig.JDBC_DRIVER.getKey(), POSTGRESQL_CONTAINER.getDriverClassName());
       catalogProperties.put(JdbcConfig.JDBC_URL.getKey(), jdbcUrl);
       catalogProperties.put(JdbcConfig.JDBC_DATABASE.getKey(), database);
       catalogProperties.put(JdbcConfig.USERNAME.getKey(), POSTGRESQL_CONTAINER.getUsername());
@@ -382,6 +384,11 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     Assertions.assertEquals(Types.StringType.get(), table.columns()[3].dataType());
     Assertions.assertNull(table.columns()[3].comment());
     Assertions.assertTrue(table.columns()[3].nullable());
+    Assertions.assertNotNull(table.auditInfo());
+    Assertions.assertNotNull(table.auditInfo().createTime());
+    Assertions.assertNotNull(table.auditInfo().creator());
+    Assertions.assertNotNull(table.auditInfo().lastModifiedTime());
+    Assertions.assertNotNull(table.auditInfo().lastModifier());
 
     ColumnDTO col1 =
         new ColumnDTO.Builder()

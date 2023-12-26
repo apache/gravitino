@@ -120,7 +120,7 @@ public class CatalogMysqlIT extends AbstractIT {
     NameIdentifier[] nameIdentifiers =
         catalog.asTableCatalog().listTables(Namespace.of(metalakeName, catalogName, schemaName));
     for (NameIdentifier nameIdentifier : nameIdentifiers) {
-      catalog.asTableCatalog().dropTable(nameIdentifier);
+      catalog.asTableCatalog().purgeTable(nameIdentifier);
     }
     catalog.asSchemas().dropSchema(NameIdentifier.of(metalakeName, catalogName, schemaName), false);
   }
@@ -144,6 +144,7 @@ public class CatalogMysqlIT extends AbstractIT {
         JdbcConfig.JDBC_URL.getKey(),
         StringUtils.substring(
             MYSQL_CONTAINER.getJdbcUrl(), 0, MYSQL_CONTAINER.getJdbcUrl().lastIndexOf("/")));
+    catalogProperties.put(JdbcConfig.JDBC_DRIVER.getKey(), MYSQL_CONTAINER.getDriverClassName());
     catalogProperties.put(JdbcConfig.USERNAME.getKey(), MYSQL_CONTAINER.getUsername());
     catalogProperties.put(JdbcConfig.PASSWORD.getKey(), MYSQL_CONTAINER.getPassword());
 
@@ -374,6 +375,11 @@ public class CatalogMysqlIT extends AbstractIT {
     Assertions.assertEquals("col_4", table.columns()[3].name());
     Assertions.assertEquals(Types.StringType.get(), table.columns()[3].dataType());
     Assertions.assertNull(table.columns()[3].comment());
+    Assertions.assertNotNull(table.auditInfo());
+    Assertions.assertNotNull(table.auditInfo().createTime());
+    Assertions.assertNotNull(table.auditInfo().creator());
+    Assertions.assertNotNull(table.auditInfo().lastModifiedTime());
+    Assertions.assertNotNull(table.auditInfo().lastModifier());
 
     ColumnDTO col1 =
         new ColumnDTO.Builder()
@@ -454,5 +460,41 @@ public class CatalogMysqlIT extends AbstractIT {
         () -> {
           catalog.asTableCatalog().dropTable(tableIdentifier);
         });
+  }
+
+  @Test
+  void testDropMySQLDatabase() {
+    String schemaName = GravitinoITUtils.genRandomName("mysql_schema").toLowerCase();
+    String tableName = GravitinoITUtils.genRandomName("mysql_table").toLowerCase();
+
+    catalog
+        .asSchemas()
+        .createSchema(
+            NameIdentifier.of(metalakeName, catalogName, schemaName),
+            "Created by gravitino client",
+            ImmutableMap.<String, String>builder().build());
+
+    catalog
+        .asTableCatalog()
+        .createTable(
+            NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
+            createColumns(),
+            "Created by gravitino client",
+            ImmutableMap.<String, String>builder().build());
+
+    // Try to drop a database, and cascade equals to false, it should not be allowed.
+    catalog.asSchemas().dropSchema(NameIdentifier.of(metalakeName, catalogName, schemaName), false);
+    // Check the database still exists
+    catalog.asSchemas().loadSchema(NameIdentifier.of(metalakeName, catalogName, schemaName));
+
+    // Try to drop a database, and cascade equals to true, it should be allowed.
+    catalog.asSchemas().dropSchema(NameIdentifier.of(metalakeName, catalogName, schemaName), true);
+    // Check database has been dropped
+    Assertions.assertThrows(
+        NoSuchSchemaException.class,
+        () ->
+            catalog
+                .asSchemas()
+                .loadSchema(NameIdentifier.of(metalakeName, catalogName, schemaName)));
   }
 }

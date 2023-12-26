@@ -263,12 +263,23 @@ tasks.test {
         fileMode = 0b111101101
       }
 
+      jvmArgs(project.property("extraJvmArgs") as List<*>)
+
       // Default use MiniGravitino to run integration tests
       environment("GRAVITINO_ROOT_DIR", rootDir.path)
       environment("HADOOP_USER_NAME", "datastrato")
       environment("HADOOP_HOME", "/tmp")
       environment("PROJECT_VERSION", version)
       environment("TRINO_CONF_DIR", buildDir.path + "/trino-conf")
+
+      val dockerRunning = project.extra["dockerRunning"] as? Boolean ?: false
+      val macDockerConnector = project.extra["macDockerConnector"] as? Boolean ?: false
+      if (OperatingSystem.current().isMacOsX() &&
+        dockerRunning &&
+        macDockerConnector
+      ) {
+        environment("NEED_CREATE_DOCKER_NETWORK", "true")
+      }
 
       // Gravitino CI Docker image
       environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-hive:0.1.7")

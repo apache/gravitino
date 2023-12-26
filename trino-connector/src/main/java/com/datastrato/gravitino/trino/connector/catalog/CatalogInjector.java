@@ -7,6 +7,7 @@ package com.datastrato.gravitino.trino.connector.catalog;
 import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_CREATE_INNER_CONNECTOR_FAILED;
 import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_UNSUPPORTED_TRINO_VERSION;
 
+import com.datastrato.gravitino.trino.connector.GravitinoConfig;
 import com.datastrato.gravitino.trino.connector.GravitinoErrorCode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Preconditions;
@@ -289,7 +290,9 @@ public class CatalogInjector {
   String createCatalogProperties(String catalogName) {
     String catalogPropertiesTemplate =
         "{\"catalogHandle\": \"%s:normal:default\",\"connectorName\":\"gravitino\", \"properties\": "
-            + "{\"gravitino.internal\": \"true\"}"
+            + "{\""
+            + GravitinoConfig.GRAVITINO_DYNAMIC_CONNECTOR
+            + "\": \"true\"}"
             + "}";
     return String.format(catalogPropertiesTemplate, catalogName);
   }

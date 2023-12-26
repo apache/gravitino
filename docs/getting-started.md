@@ -45,10 +45,11 @@ To begin using Gravitino on AWS, follow these steps:
 
     You may need to reboot the instance for all changes to take effect.
 
-4. Install the required Java Development Kit for Gravitino:
+4. Install the required Java Development Kit for Gravitino, Gravitino supports running on Java 8,
+   11 and 17, you can install any of them:
 
     ```shell
-    sudo apt install openjdk-8-jdk-headless
+    sudo apt install openjdk-<version>-jdk-headless
     ```
 
    Verify the Java version with:
@@ -57,7 +58,7 @@ To begin using Gravitino on AWS, follow these steps:
     java -version
     ```
 
-   You should see information about OpenJDK 8.
+   You should see information about OpenJDK version.
 
 5. Install Gravitino on the instance:
 
@@ -90,12 +91,13 @@ To begin using Gravitino on GCP, follow these steps:
 
     You may need to reboot the instance for all changes to take effect.
 
-4. Install the required Java Development Kit for Gravitino:
+4. Install the required Java Development Kit for Gravitino, Gravitino supports running on Java 8,
+   11 and 17, you can install any of them:
 
     ```shell
     wget -O - https://apt.corretto.aws/corretto.key | sudo gpg --dearmor -o /usr/share/keyrings/corretto-keyring.gpg && echo "deb [signed-by=/usr/share/keyrings/corretto-keyring.gpg] https://apt.corretto.aws stable main" | sudo tee /etc/apt/sources.list.d/corretto.list
     sudo apt-get update
-    sudo apt-get install -y java-1.8.0-amazon-corretto-jdk
+    sudo apt-get install -y java-<version>-amazon-corretto-jdk
     ```
 
    Verify the Java version with:
@@ -104,7 +106,7 @@ To begin using Gravitino on GCP, follow these steps:
     java -version
     ```
 
-   You should see information about OpenJDK 8.
+   You should see information about OpenJDK version.
 
 5. Install Gravitino on the instance:
 
@@ -124,10 +126,11 @@ To begin using Gravitino on GCP, follow these steps:
 
 To use Gravitino locally on macOS or Linux, follow similar steps:
 
-1. Install the required Java Development Kit using [sdkman](https://sdkman.io/) for example:
+1. Install the required Java Development Kit, Gravitino supports running on Java 8,
+   11 and 17, you can install any of them. Using [sdkman](https://sdkman.io/) for example:
 
     ```shell
-    sdk install java 8.0.392-amzn
+    sdk install java <version>
     ```
 
     You can also use different package managers to install JDK, for example,

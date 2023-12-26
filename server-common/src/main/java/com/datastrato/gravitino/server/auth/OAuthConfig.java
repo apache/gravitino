@@ -7,8 +7,10 @@ package com.datastrato.gravitino.server.auth;
 
 import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.config.ConfigBuilder;
+import com.datastrato.gravitino.config.ConfigConstants;
 import com.datastrato.gravitino.config.ConfigEntry;
 import io.jsonwebtoken.SignatureAlgorithm;
+import org.apache.commons.lang3.StringUtils;
 
 public interface OAuthConfig extends Configs {
 
@@ -33,7 +35,8 @@ public interface OAuthConfig extends Configs {
           .doc("The signing key of JWT when Gravitino uses OAuth as the authenticator")
           .version("0.3.0")
           .stringConf()
-          .createWithDefault("");
+          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
+          .create();
 
   ConfigEntry<String> SIGNATURE_ALGORITHM_TYPE =
       new ConfigBuilder(OAUTH_CONFIG_PREFIX + "signAlgorithmType")
@@ -47,12 +50,14 @@ public interface OAuthConfig extends Configs {
           .doc("The uri of the default OAuth server")
           .version("0.3.0")
           .stringConf()
-          .createWithDefault("");
+          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
+          .create();
 
   ConfigEntry<String> DEFAULT_TOKEN_PATH =
       new ConfigBuilder(OAUTH_CONFIG_PREFIX + "tokenPath")
           .doc("The path for token of the default OAuth server")
           .version("0.3.0")
           .stringConf()
-          .createWithDefault("");
+          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
+          .create();
 }

@@ -16,8 +16,9 @@ This software is licensed under the Apache License version 2."
 + Gravitino requires at least JDK8 and at most JDK17 to run Gradle, so you need to
   install JDK8 to 17 version to launch the build environment.
 
-+ Gravitino itself uses JDK8 to build, Gravitino Trino connector uses JDK17 to build. You don't
-  have to preinstall JDK8 or JDK17, Gradle detects the JDK version needed and downloads it automatically.
++ Gravitino itself supports using JDK8, 11, and 17 to build, Gravitino Trino connector uses
+  JDK17 to build. You don't have to preinstall the specified JDK environment,
++ Gradle detects the JDK version needed and downloads it automatically.
 
 + Gravitino uses Gradle Java Toolchain to detect and manage JDK versions, it checks the
   installed JDK by running `./gradlew javaToolchains` command. For the details of Gradle Java
@@ -50,9 +51,27 @@ This software is licensed under the Apache License version 2."
     ./gradlew build
     ```
 
+    The default specified JDK version is 8, if you want to use JDK 11 or 17 to build, you can
+    modify the property `jdkVersion` to 11 or 17 in `gradle.properties` file, or you can specify
+    with `-P`, like:
+
+    ```shell
+    ./gradlew build -PjdkVersion=11
+    ```
+
+    Or:
+
+    ```shell
+    ./gradlew build -PjdkVersion=17
+    ```
+
 :::note
 The first time you build the project, downloading the dependencies may take a while. You can add
 `-x test` to skip the tests, by using `./gradlew build -x test`.
+
+The built Gravitino libraries are Java 8 compatible, and verified under Java 8, 11, and 17
+environment. You can use Java 8, 11, 17 runtime to run the Gravitino server, no matter which
+JDK version you use to build the project.
 :::
 
 3. Get the Gravitino binary package.
