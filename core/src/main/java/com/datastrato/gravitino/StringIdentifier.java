@@ -8,6 +8,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
+import java.util.Collections;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -100,7 +101,7 @@ public class StringIdentifier {
               + "ignore adding the identifier to the properties",
           ID_KEY,
           properties.get(ID_KEY));
-      return properties;
+      return Collections.unmodifiableMap(properties);
     }
 
     return ImmutableMap.<String, String>builder()
@@ -121,7 +122,7 @@ public class StringIdentifier {
     }
 
     if (!properties.containsKey(ID_KEY)) {
-      return ImmutableMap.<String, String>builder().putAll(properties).build();
+      return Collections.unmodifiableMap(properties);
     }
 
     Map<String, String> copy = Maps.newHashMap(properties);
