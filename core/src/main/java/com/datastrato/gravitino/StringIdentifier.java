@@ -8,6 +8,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
+import java.util.Collections;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -88,7 +89,7 @@ public class StringIdentifier {
    * @param properties the properties to add the string identifier to
    * @return the properties with the string identifier added
    */
-  public static Map<String, String> addToProperties(
+  public static Map<String, String> newPropertiesWithId(
       StringIdentifier stringId, Map<String, String> properties) {
     if (properties == null) {
       return ImmutableMap.of(ID_KEY, stringId.toString());
@@ -100,7 +101,7 @@ public class StringIdentifier {
               + "ignore adding the identifier to the properties",
           ID_KEY,
           properties.get(ID_KEY));
-      return properties;
+      return Collections.unmodifiableMap(properties);
     }
 
     return ImmutableMap.<String, String>builder()
@@ -115,13 +116,13 @@ public class StringIdentifier {
    * @param properties the properties to remove the string identifier from.
    * @return the properties with the string identifier removed.
    */
-  public static Map<String, String> removeIdFromProperties(Map<String, String> properties) {
+  public static Map<String, String> newPropertiesWithoutId(Map<String, String> properties) {
     if (properties == null) {
       return null;
     }
 
     if (!properties.containsKey(ID_KEY)) {
-      return properties;
+      return Collections.unmodifiableMap(properties);
     }
 
     Map<String, String> copy = Maps.newHashMap(properties);

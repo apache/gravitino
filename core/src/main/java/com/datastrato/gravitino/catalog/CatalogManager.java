@@ -258,7 +258,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
             .withType(type)
             .withProvider(provider)
             .withComment(comment)
-            .withProperties(StringIdentifier.addToProperties(stringId, mergedConfig))
+            .withProperties(StringIdentifier.newPropertiesWithId(stringId, mergedConfig))
             .withAuditInfo(
                 new AuditInfo.Builder()
                     .withCreator("gravitino") /* TODO. Should change to real user */
