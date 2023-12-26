@@ -103,7 +103,7 @@ public class HiveContainer extends BaseContainer {
     while (nRetry++ < retryLimit) {
       try {
         List<String> databases = hiveClientPool.run(IMetaStoreClient::getAllDatabases);
-        if (databases.size() > 0) {
+        if (!databases.isEmpty()) {
           isHiveConnectSuccess = true;
           break;
         }

@@ -10,7 +10,6 @@ import com.datastrato.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import com.datastrato.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.meta.AuditInfo;
-import com.google.common.base.Preconditions;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -33,9 +32,6 @@ public class PostgreSqlSchemaOperations extends JdbcDatabaseOperations {
       DataSource dataSource, JdbcExceptionConverter exceptionMapper, Map<String, String> conf) {
     super.initialize(dataSource, exceptionMapper, conf);
     database = new JdbcConfig(conf).getJdbcDatabase();
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(database),
-        "The `jdbc-database` configuration item is mandatory in PostgreSQL.");
   }
 
   @Override
