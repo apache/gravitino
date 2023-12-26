@@ -99,9 +99,11 @@ public class Utils {
   }
 
   public static PrincipalContext createUserPrincipalContext(HttpServletRequest httpRequest) {
-    return PrincipalContext.createPrincipalContext(
-        ((UserPrincipal)
-                httpRequest.getAttribute(AuthConstants.AuthenticatedPrincipalAttributeName))
-            .getName());
+    UserPrincipal principal =
+        (UserPrincipal) httpRequest.getAttribute(AuthConstants.AuthenticatedPrincipalAttributeName);
+    if (principal == null) {
+      principal = new UserPrincipal(AuthConstants.ANONYMOUS_USER);
+    }
+    return PrincipalContext.createPrincipalContext(principal.getName());
   }
 }

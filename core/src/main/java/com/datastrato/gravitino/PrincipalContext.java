@@ -5,6 +5,7 @@
 
 package com.datastrato.gravitino;
 
+import com.datastrato.gravitino.auth.AuthConstants;
 import org.apache.commons.lang3.StringUtils;
 
 public class PrincipalContext implements AutoCloseable {
@@ -19,7 +20,7 @@ public class PrincipalContext implements AutoCloseable {
 
   public String getCurrentUser() {
     if (StringUtils.isBlank(currentUser)) {
-      return "gravitino";
+      return AuthConstants.ANONYMOUS_USER;
     }
     return currentUser;
   }
