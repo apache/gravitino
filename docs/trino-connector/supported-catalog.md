@@ -52,7 +52,7 @@ So you need to use the following SQL to call them in the `trino-cli`:
 Example:
 You can run the following SQL to create a catalog named `mysql` with `jdbc-mysql` provider.
 
-```text
+```sql
 -- Call stored procedures with position.
 call gravitino.system.create_catalog(
     'mysql',

@@ -44,7 +44,7 @@ public class DummyGravitinoConnector implements Connector {
     this.catalogConnectorManager = catalogConnectorManager;
 
     try {
-      // call gravitino.system.createCatalog(metalake, catalog, provider, properties, ignoreExist)
+      // call gravitino.system.create_catalog(catalog, provider, properties, ignore_exist)
       MethodHandle createCatalog =
           MethodHandles.lookup()
               .unreflect(
@@ -62,7 +62,7 @@ public class DummyGravitinoConnector implements Connector {
       Procedure procedure = new Procedure("system", "create_catalog", arguments, createCatalog);
       procedures.add(procedure);
 
-      // call gravitino.system.dropCatalog(metalake, catalog, ignoreNotExist)
+      // call gravitino.system.drop_catalog(catalog, ignore_not_exist)
       MethodHandle dropCatalog =
           MethodHandles.lookup()
               .unreflect(
