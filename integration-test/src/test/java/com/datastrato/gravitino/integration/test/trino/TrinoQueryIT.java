@@ -12,6 +12,7 @@ import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.client.GravitinoClient;
 import com.datastrato.gravitino.client.GravitinoMetaLake;
+import com.datastrato.gravitino.exceptions.RESTException;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.CommandExecutor;
 import com.datastrato.gravitino.integration.test.util.ProcessData;
@@ -139,61 +140,56 @@ public class TrinoQueryIT {
 
   @BeforeAll
   public static void setup() throws Exception {
-    try {
-      setEnv();
+    setEnv();
 
-      trinoQueryRunner = new TrinoQueryRunner();
+    trinoQueryRunner = new TrinoQueryRunner();
 
-      createMetalake();
+    createMetalake();
 
-      Set<String> catalogs = new HashSet<>(testCatalogs);
+    Set<String> catalogs = new HashSet<>(testCatalogs);
 
-      if (catalogs.isEmpty() || catalogs.contains("hive")) {
-        dropCatalog("hive");
-        HashMap<String, String> properties = new HashMap<>();
-        properties.put("metastore.uris", hiveMetastoreUri);
+    if (catalogs.isEmpty() || catalogs.contains("hive")) {
+      dropCatalog("hive");
+      HashMap<String, String> properties = new HashMap<>();
+      properties.put("metastore.uris", hiveMetastoreUri);
 
-        createCatalog("hive", "hive", properties);
-      }
-
-      if (catalogs.isEmpty() || catalogs.contains("lakehouse-iceberg")) {
-        dropCatalog("lakehouse-iceberg");
-        HashMap<String, String> properties = new HashMap<>();
-        properties.put("uri", hiveMetastoreUri);
-        properties.put("catalog-backend", "hive");
-        properties.put("warehouse", hdfsUri + "/user/iceberg/warehouse/TrinoQueryIT");
-
-        createCatalog("lakehouse-iceberg", "lakehouse-iceberg", properties);
-      }
-
-      if (catalogs.isEmpty() || catalogs.contains("jdbc-mysql")) {
-        dropCatalog("jdbc-mysql");
-        HashMap<String, String> properties = new HashMap<>();
-        properties.put("jdbc-url", mysqlUri);
-        properties.put("jdbc-user", "trino");
-        properties.put("jdbc-password", "ds123");
-        properties.put("jdbc-driver", "com.mysql.cj.jdbc.Driver");
-
-        createCatalog("jdbc-mysql", "jdbc-mysql", properties);
-      }
-
-      if (catalogs.isEmpty() || catalogs.contains("jdbc-postgresql")) {
-        dropCatalog("jdbc-postgresql");
-        HashMap<String, String> properties = new HashMap<>();
-        properties.put("jdbc-url", postgresqlUri + "/gt_db");
-        properties.put("jdbc-user", "trino");
-        properties.put("jdbc-password", "ds123");
-        properties.put("jdbc-database", "gt_db");
-        properties.put("jdbc-driver", "org.postgresql.Driver");
-
-        createCatalog("jdbc-postgresql", "jdbc-postgresql", properties);
-      }
-
-      //Thread.sleep(10000000);
-    } catch (Exception e) {
-      LOG.error("Services are not connected", e);
-      return;
+      createCatalog("hive", "hive", properties);
     }
+
+    if (catalogs.isEmpty() || catalogs.contains("lakehouse-iceberg")) {
+      dropCatalog("lakehouse-iceberg");
+      HashMap<String, String> properties = new HashMap<>();
+      properties.put("uri", hiveMetastoreUri);
+      properties.put("catalog-backend", "hive");
+      properties.put("warehouse", hdfsUri + "/user/iceberg/warehouse/TrinoQueryIT");
+
+      createCatalog("lakehouse-iceberg", "lakehouse-iceberg", properties);
+    }
+
+    if (catalogs.isEmpty() || catalogs.contains("jdbc-mysql")) {
+      dropCatalog("jdbc-mysql");
+      HashMap<String, String> properties = new HashMap<>();
+      properties.put("jdbc-url", mysqlUri);
+      properties.put("jdbc-user", "trino");
+      properties.put("jdbc-password", "ds123");
+      properties.put("jdbc-driver", "com.mysql.cj.jdbc.Driver");
+
+      createCatalog("jdbc-mysql", "jdbc-mysql", properties);
+    }
+
+    if (catalogs.isEmpty() || catalogs.contains("jdbc-postgresql")) {
+      dropCatalog("jdbc-postgresql");
+      HashMap<String, String> properties = new HashMap<>();
+      properties.put("jdbc-url", postgresqlUri + "/gt_db");
+      properties.put("jdbc-user", "trino");
+      properties.put("jdbc-password", "ds123");
+      properties.put("jdbc-database", "gt_db");
+      properties.put("jdbc-driver", "org.postgresql.Driver");
+
+      createCatalog("jdbc-postgresql", "jdbc-postgresql", properties);
+    }
+
+    // Thread.sleep(10000000);
 
     testQueriesDir =
         TrinoQueryIT.class.getClassLoader().getResource("trino-queries/catalogs").getPath();
@@ -218,18 +214,34 @@ public class TrinoQueryIT {
     }
   }
 
-  private static void createMetalake() {
-    boolean exists = gravitinoClient.metalakeExists(NameIdentifier.of(metalakeName));
-    if (exists) {
-      metalake = gravitinoClient.loadMetalake(NameIdentifier.of(metalakeName));
-      return;
+  private static void createMetalake() throws Exception {
+
+    boolean created = false;
+    int tries = 30;
+    while (!created && tries-- >= 0) {
+      try {
+        boolean exists = gravitinoClient.metalakeExists(NameIdentifier.of(metalakeName));
+
+        if (exists) {
+          metalake = gravitinoClient.loadMetalake(NameIdentifier.of(metalakeName));
+          return;
+        }
+
+        GravitinoMetaLake createdMetalake =
+            gravitinoClient.createMetalake(
+                NameIdentifier.of(metalakeName), "comment", Collections.emptyMap());
+        Assertions.assertNotNull(createdMetalake);
+        metalake = createdMetalake;
+        created = true;
+      } catch (RESTException exception) {
+        LOG.info("Waiting for connecting to gravitino server");
+        sleep(1000);
+      }
     }
 
-    GravitinoMetaLake createdMetalake =
-        gravitinoClient.createMetalake(
-            NameIdentifier.of(metalakeName), "comment", Collections.emptyMap());
-    Assertions.assertNotNull(createdMetalake);
-    metalake = createdMetalake;
+    if (!created) {
+      throw new Exception("Failed to create metalake " + metalakeName);
+    }
   }
 
   private static void dropMetalake() {
@@ -241,8 +253,7 @@ public class TrinoQueryIT {
   }
 
   private static void createCatalog(
-      String catalogName, String provider, Map<String, String> properties)
-      throws InterruptedException {
+      String catalogName, String provider, Map<String, String> properties) throws Exception {
     boolean exists = metalake.catalogExists(NameIdentifier.of(metalakeName, catalogName));
     if (!exists) {
       Catalog createdCatalog =
@@ -265,15 +276,16 @@ public class TrinoQueryIT {
           catalogCreated = true;
           break;
         }
+        LOG.info("Waiting for catalog {} to be created", catalogName);
         // connection exception need retry.
       } catch (Exception ConnectionException) {
+        LOG.info("Waiting for connecting to Trino");
       }
       sleep(1000);
-      LOG.info("Waiting for catalog {} to be created", catalogName);
     }
 
     if (!catalogCreated) {
-      Assertions.fail("Catalog " + catalogName + " not created");
+      throw new Exception("Catalog " + catalogName + " create timeout");
     }
   }
 
@@ -420,19 +432,11 @@ public class TrinoQueryIT {
         String sql = sqlMatcher.group(1);
         String expectResult = "";
         if (resultMatcher.find()) {
-          expectResult = resultMatcher.group(1).trim();
+          expectResult = resultMatcher.group(1);
         }
 
-        String result = queryRunner.runQuery(sql).trim();
-
-        boolean match;
-
-        if (!expectResult.isEmpty()
-            && Pattern.compile("^Query \\w+ failed:").matcher(result).find()) {
-          match = Pattern.compile("^Query \\w+ failed.*: " + expectResult).matcher(result).find();
-        } else {
-          match = expectResult.equals(result);
-        }
+        String result = queryRunner.runQuery(sql);
+        boolean match = match(expectResult, result);
 
         if (match) {
           LOG.info(
@@ -465,24 +469,32 @@ public class TrinoQueryIT {
   }
 
   boolean match(String expectResult, String result) {
-    boolean match;
     if (expectResult.isEmpty()) {
-      return  false;
+      return false;
     }
+
+    expectResult = expectResult.trim();
+    result = result.trim();
+
+    // match text
+    boolean match = expectResult.equals(result);
+    if (match) {
+      return true;
+    }
+
     // match query failed result.
-    if (Pattern.compile("^Query \\w+ failed:").matcher(result).find()) {
-      match = Pattern.compile("^Query \\w+ failed.*: " + expectResult).matcher(result).find();
+    match = Pattern.compile("^Query \\w+ failed.*: " + expectResult).matcher(result).find();
+    if (match) {
+      return true;
     }
 
-    if (Pattern.compile("^\"SHOW CREATE\\w+ failed:").matcher(result).find()) {
-      match = Pattern.compile("^Query \\w+ failed.*: " + expectResult).matcher(result).find();
-    }
-
-    //match normal text.
-    match = expectResult.equals(result);
+    // match reg
+    expectResult = expectResult.replace("\n", "");
+    expectResult = "\\Q" + expectResult.replace("%", "\\E.*?\\Q") + "\\E";
+    result = result.replace("\n", "");
+    match = Pattern.compile(expectResult).matcher(result).find();
     return match;
   }
-
 
   static class TrinoQueryRunner {
     private QueryRunner queryRunner;
@@ -545,7 +557,7 @@ public class TrinoQueryIT {
 
   public static void main(String[] args) {
     AbstractIT.testMode = "manual";
-    autoStartEnv = true;
+    autoStartEnv = false;
 
     String targetTestId = null;
     try {
