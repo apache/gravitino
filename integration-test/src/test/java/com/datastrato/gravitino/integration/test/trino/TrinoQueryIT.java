@@ -72,8 +72,8 @@ public class TrinoQueryIT {
   private static String trinoUri = "http://127.0.0.1:8080";
   private static String hiveMetastoreUri = "thrift://127.0.0.1:9083";
   private static String hdfsUri = "hdfs://127.0.0.1:9000";
-  private static String mysqlUri = "jdbc:mysql://127.0.0.1?useSSL=false";
-  private static String postgresqlUri = "jdbc:postgresql://127.0.0.1/mydb";
+  private static String mysqlUri = "jdbc:mysql://127.0.0.1";
+  private static String postgresqlUri = "jdbc:postgresql://127.0.0.1";
 
   private static final String metalakeName = "test";
   private static final Set<String> testCatalogs = new HashSet<>();
@@ -111,7 +111,7 @@ public class TrinoQueryIT {
             false,
             ProcessData.TypesOfData.OUTPUT);
     String containerIpMapping = output.toString();
-    LOG.info("Container IP mapping: {}", containerIpMapping);
+    LOG.info("Container IP mapping:\n{}", containerIpMapping);
     String[] containerInfos = containerIpMapping.split("\n");
     for (String container : containerInfos) {
       String[] info = container.split(":");
@@ -169,7 +169,7 @@ public class TrinoQueryIT {
     if (catalogs.isEmpty() || catalogs.contains("jdbc-mysql")) {
       dropCatalog("jdbc-mysql");
       HashMap<String, String> properties = new HashMap<>();
-      properties.put("jdbc-url", mysqlUri);
+      properties.put("jdbc-url", mysqlUri + "?useSSL=false");
       properties.put("jdbc-user", "trino");
       properties.put("jdbc-password", "ds123");
       properties.put("jdbc-driver", "com.mysql.cj.jdbc.Driver");
@@ -198,7 +198,9 @@ public class TrinoQueryIT {
 
   @AfterAll
   public static void cleanup() {
-    trinoQueryRunner.stop();
+    if (trinoQueryRunner != null) {
+      trinoQueryRunner.stop();
+    }
 
     try {
       if (autoStartEnv) {
@@ -337,7 +339,7 @@ public class TrinoQueryIT {
               LOG.info("Drop schema \"{}.{}\".{}", metalakeName, catalogName, schema.name());
             });
 
-    //metalake.dropCatalog(NameIdentifier.of(metalakeName, catalogName));
+    // metalake.dropCatalog(NameIdentifier.of(metalakeName, catalogName));
     LOG.info("Drop catalog \"{}.{}\"", metalakeName, catalogName);
   }
 
@@ -557,7 +559,7 @@ public class TrinoQueryIT {
 
   public static void main(String[] args) {
     AbstractIT.testMode = "manual";
-    autoStartEnv = false;
+    autoStartEnv = true;
 
     String targetTestId = null;
     try {
