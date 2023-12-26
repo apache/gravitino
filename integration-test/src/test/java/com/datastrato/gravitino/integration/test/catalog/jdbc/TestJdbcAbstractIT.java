@@ -62,17 +62,7 @@ public abstract class TestJdbcAbstractIT {
 
   protected static void testDropDatabase(String databaseName) {
     List<String> databases;
-    // delete database.
-    UnsupportedOperationException unsupportedOperationException =
-        Assertions.assertThrows(
-            UnsupportedOperationException.class,
-            () -> DATABASE_OPERATIONS.delete(databaseName, true));
-    Assertions.assertTrue(
-        unsupportedOperationException
-            .getMessage()
-            .contains("does not support CASCADE option for DROP DATABASE."));
-
-    Assertions.assertDoesNotThrow(() -> DATABASE_OPERATIONS.delete(databaseName, false));
+    DATABASE_OPERATIONS.delete(databaseName, true);
 
     Assertions.assertThrows(
         NoSuchSchemaException.class, () -> DATABASE_OPERATIONS.load(databaseName));
