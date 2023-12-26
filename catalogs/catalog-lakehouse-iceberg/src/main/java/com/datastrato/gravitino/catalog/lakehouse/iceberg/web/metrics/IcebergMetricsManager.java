@@ -54,6 +54,7 @@ public class IcebergMetricsManager {
       icebergMetricsStore.init(icebergConfig.getAllConfig());
     } catch (IOException e) {
       LOG.warn("Iceberg metrics store init failed.", e);
+      throw new RuntimeException(e);
     }
 
     retainDays = icebergConfig.get(IcebergConfig.ICEBERG_METRICS_STORE_RETAIN_DAYS);
@@ -157,16 +158,17 @@ public class IcebergMetricsManager {
 
   public void close() {
     isClosed = true;
+    metricsCleanerExecutor.ifPresent(executorService -> executorService.shutdownNow());
+
     if (metricsWriterThread != null) {
       metricsWriterThread.interrupt();
       try {
         metricsWriterThread.join();
       } catch (InterruptedException e) {
-        LOG.warn("Iceberg metrics manager is interrupted while join metrics writer thread.", e);
+        LOG.warn("Iceberg metrics manager is interrupted while join metrics writer thread.");
+        return;
       }
     }
-
-    metricsCleanerExecutor.ifPresent(executorService -> executorService.shutdownNow());
 
     if (icebergMetricsStore != null) {
       try {
