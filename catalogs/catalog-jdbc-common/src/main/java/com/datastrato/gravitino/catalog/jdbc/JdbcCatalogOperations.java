@@ -276,7 +276,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
     }
     Map<String, String> properties =
         load.properties() == null ? Maps.newHashMap() : Maps.newHashMap(load.properties());
-    StringIdentifier.addToProperties(id, properties);
+    properties = StringIdentifier.addToProperties(id, properties);
     return new JdbcTable.Builder()
         .withAuditInfo(load.auditInfo())
         .withName(tableName)
