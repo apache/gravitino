@@ -88,7 +88,7 @@ public class StringIdentifier {
    * @param properties the properties to add the string identifier to
    * @return the properties with the string identifier added
    */
-  public static Map<String, String> addToProperties(
+  public static Map<String, String> newPropertiesWithId(
       StringIdentifier stringId, Map<String, String> properties) {
     if (properties == null) {
       return ImmutableMap.of(ID_KEY, stringId.toString());
@@ -115,13 +115,13 @@ public class StringIdentifier {
    * @param properties the properties to remove the string identifier from.
    * @return the properties with the string identifier removed.
    */
-  public static Map<String, String> removeIdFromProperties(Map<String, String> properties) {
+  public static Map<String, String> newPropertiesWithoutId(Map<String, String> properties) {
     if (properties == null) {
       return null;
     }
 
     if (!properties.containsKey(ID_KEY)) {
-      return properties;
+      return ImmutableMap.<String, String>builder().putAll(properties).build();
     }
 
     Map<String, String> copy = Maps.newHashMap(properties);
