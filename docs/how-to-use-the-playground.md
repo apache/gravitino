@@ -49,29 +49,29 @@ Use simple queries to test in the Trino CLI.
 ```SQL
 SHOW CATALOGS;
 
-CREATE SCHEMA "metalake_demo.catalog_hive".db1
-  WITH (location = 'hdfs://hive:9000/user/hive/warehouse/db1.db');
+CREATE SCHEMA "metalake_demo.catalog_hive".company
+  WITH (location = 'hdfs://hive:9000/user/hive/warehouse/company.db');
 
-SHOW CREATE SCHEMA "metalake_demo.catalog_hive".db1;
+SHOW CREATE SCHEMA "metalake_demo.catalog_hive".company;
 
-CREATE TABLE "metalake_demo.catalog_hive".db1.table_001
+CREATE TABLE "metalake_demo.catalog_hive".company.employees
 (
   name varchar,
-  salary varchar
+  salary decimal(10,2)
 )
 WITH (
   format = 'TEXTFILE'
 );
 
-INSERT INTO "metalake_demo.catalog_hive".db1.table_001 (name, salary) VALUES ('sam', '11');
+INSERT INTO "metalake_demo.catalog_hive".company.employees (name, salary) VALUES ('Sam Evans', 55000);
 
-SELECT * FROM "metalake_demo.catalog_hive".db1.table_001;
+SELECT * FROM "metalake_demo.catalog_hive".company.employees;
 
 SHOW SCHEMAS from "metalake_demo.catalog_hive";
 
-DESCRIBE "metalake_demo.catalog_hive".db1.table_001;
+DESCRIBE "metalake_demo.catalog_hive".company.employees;
 
-SHOW TABLES from "metalake_demo.catalog_hive".db1;
+SHOW TABLES from "metalake_demo.catalog_hive".company;
 ```
 
 ### Cross-catalog queries
