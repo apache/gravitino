@@ -104,7 +104,7 @@ public class MetalakeManager implements SupportsMetalakes {
             .withId(uid)
             .withName(ident.name())
             .withComment(comment)
-            .withProperties(StringIdentifier.addToProperties(stringId, properties))
+            .withProperties(StringIdentifier.newPropertiesWithId(stringId, properties))
             .withVersion(SchemaVersion.V_0_1)
             .withAuditInfo(
                 new AuditInfo.Builder()

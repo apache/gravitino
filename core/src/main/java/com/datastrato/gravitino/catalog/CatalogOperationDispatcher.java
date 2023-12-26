@@ -128,7 +128,8 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
     // StringIdentifier to make sure only when the operation is successful, the related
     // SchemaEntity will be visible.
     StringIdentifier stringId = StringIdentifier.fromId(uid);
-    Map<String, String> updatedProperties = StringIdentifier.addToProperties(stringId, properties);
+    Map<String, String> updatedProperties =
+        StringIdentifier.newPropertiesWithId(stringId, properties);
 
     doWithCatalog(
         catalogIdent,
@@ -420,7 +421,8 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
     // StringIdentifier to make sure only when the operation is successful, the related
     // TableEntity will be visible.
     StringIdentifier stringId = StringIdentifier.fromId(uid);
-    Map<String, String> updatedProperties = StringIdentifier.addToProperties(stringId, properties);
+    Map<String, String> updatedProperties =
+        StringIdentifier.newPropertiesWithId(stringId, properties);
 
     doWithCatalog(
         catalogIdent,
