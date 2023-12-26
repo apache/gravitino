@@ -1,5 +1,5 @@
 ---
-title: "JDBC MySQL catalog"
+title: "MySQL catalog"
 slug: /jdbc-mysql-catalog
 keywords:
 - jdbc

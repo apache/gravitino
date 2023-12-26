@@ -123,7 +123,7 @@ Gravitino publishes the Docker image to [Docker Hub](https://hub.docker.com/r/da
 You can run the Gravitino Docker image by:
 
 ```shell
-docker run -d -i -p 8090:8090 datastrato/gravitino:0.3.0-SNAPSHOT
+docker run -d -i -p 8090:8090 datastrato/gravitino:<version>
 ```
 
 You can access the Gravitino Web UI by typing `http://localhost:8090` in your browser. or you
