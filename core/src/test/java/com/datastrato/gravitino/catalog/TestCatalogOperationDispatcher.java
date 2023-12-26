@@ -23,6 +23,7 @@ import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.EntityStore;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
+import com.datastrato.gravitino.PrincipalContext;
 import com.datastrato.gravitino.StringIdentifier;
 import com.datastrato.gravitino.TestColumn;
 import com.datastrato.gravitino.TestEntityStore;
@@ -72,6 +73,8 @@ public class TestCatalogOperationDispatcher {
 
   private static CatalogOperationDispatcher dispatcher;
 
+  private static PrincipalContext context;
+
   @BeforeAll
   public static void setUp() throws IOException {
     config = new Config(false) {};
@@ -96,11 +99,12 @@ public class TestCatalogOperationDispatcher {
 
     NameIdentifier ident = NameIdentifier.of(metalake, catalog);
     Map<String, String> props = ImmutableMap.of();
+    context = PrincipalContext.createPrincipalContext("gravitino");
     catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, "test", "comment", props);
   }
 
   @AfterAll
-  public static void tearDown() throws IOException {
+  public static void tearDown() throws Exception {
     if (entityStore != null) {
       entityStore.close();
       entityStore = null;
@@ -109,6 +113,9 @@ public class TestCatalogOperationDispatcher {
     if (catalogManager != null) {
       catalogManager.close();
       catalogManager = null;
+    }
+    if (context != null) {
+      context.close();
     }
   }
 

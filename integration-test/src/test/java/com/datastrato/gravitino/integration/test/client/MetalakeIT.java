@@ -11,6 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.datastrato.gravitino.MetalakeChange;
 import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.auth.AuthConstants;
 import com.datastrato.gravitino.client.GravitinoMetaLake;
 import com.datastrato.gravitino.exceptions.IllegalNameIdentifierException;
 import com.datastrato.gravitino.exceptions.IllegalNamespaceException;
@@ -104,7 +105,7 @@ public class MetalakeIT extends AbstractIT {
     GravitinoMetaLake metaLake = client.alterMetalake(NameIdentifier.of(metalakeNameA), changes);
     assertEquals(newName, metaLake.name());
     assertEquals("new metalake comment", metaLake.comment());
-    assertEquals("gravitino", metaLake.auditInfo().creator());
+    assertEquals(AuthConstants.ANONYMOUS_USER, metaLake.auditInfo().creator());
 
     // Reload metadata via new name to check if the changes are applied
     GravitinoMetaLake newMetalake = client.loadMetalake(NameIdentifier.of(newName));
@@ -142,7 +143,7 @@ public class MetalakeIT extends AbstractIT {
     GravitinoMetaLake metalake = client.loadMetalake(NameIdentifier.of(metalakeNameA));
     assertEquals(metalakeNameA, metalake.name());
     assertEquals("metalake A comment", metalake.comment());
-    assertEquals("gravitino", metalake.auditInfo().creator());
+    assertEquals(AuthConstants.ANONYMOUS_USER, metalake.auditInfo().creator());
 
     // Test metalake name already exists
     assertThrows(

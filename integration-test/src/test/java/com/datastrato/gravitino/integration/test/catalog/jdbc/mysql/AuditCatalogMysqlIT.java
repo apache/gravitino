@@ -141,12 +141,9 @@ public class AuditCatalogMysqlIT extends AbstractIT {
     table =
         catalog
             .asTableCatalog()
-            .loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, tableName));
-    catalog
-        .asTableCatalog()
-        .alterTable(
-            NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
-            TableChange.addColumn(new String[] {"col_4"}, Types.StringType.get()));
+            .alterTable(
+                NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
+                TableChange.addColumn(new String[] {"col_4"}, Types.StringType.get()));
     Assertions.assertEquals(expectUser, table.auditInfo().creator());
     Assertions.assertEquals(expectUser, table.auditInfo().lastModifier());
   }

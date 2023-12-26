@@ -12,6 +12,7 @@ import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.EntityStore;
 import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.PrincipalContext;
 import com.datastrato.gravitino.StringIdentifier;
 import com.datastrato.gravitino.TestEntityStore;
 import com.datastrato.gravitino.TestEntityStore.InMemoryEntityStore;
@@ -49,6 +50,8 @@ public class TestCatalogManager {
 
   private static String provider = "test";
 
+  private static PrincipalContext context;
+
   private static BaseMetalake metalakeEntity =
       new BaseMetalake.Builder()
           .withId(1L)
@@ -71,6 +74,7 @@ public class TestCatalogManager {
 
     catalogManager = new CatalogManager(config, entityStore, new RandomIdGenerator());
     catalogManager = Mockito.spy(catalogManager);
+    context = PrincipalContext.createPrincipalContext("test");
   }
 
   @BeforeEach
@@ -90,6 +94,9 @@ public class TestCatalogManager {
     if (catalogManager != null) {
       catalogManager.close();
       catalogManager = null;
+    }
+    if (context != null) {
+      context.close();
     }
   }
 

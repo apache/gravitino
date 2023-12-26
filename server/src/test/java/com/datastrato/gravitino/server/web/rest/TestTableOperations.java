@@ -12,6 +12,7 @@ import static org.mockito.Mockito.when;
 
 import com.datastrato.gravitino.Audit;
 import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.PrincipalContext;
 import com.datastrato.gravitino.catalog.CatalogOperationDispatcher;
 import com.datastrato.gravitino.dto.rel.ColumnDTO;
 import com.datastrato.gravitino.dto.rel.DistributionDTO;
@@ -62,8 +63,7 @@ import org.glassfish.jersey.internal.inject.AbstractBinder;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.glassfish.jersey.test.JerseyTest;
 import org.glassfish.jersey.test.TestProperties;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.*;
 
 public class TestTableOperations extends JerseyTest {
 
@@ -83,6 +83,8 @@ public class TestTableOperations extends JerseyTest {
   private final String catalog = "catalog1";
 
   private final String schema = "schema1";
+
+
 
   @Override
   protected Application configure() {

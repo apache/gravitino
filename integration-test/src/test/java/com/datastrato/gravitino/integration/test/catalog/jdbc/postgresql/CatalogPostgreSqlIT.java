@@ -347,11 +347,12 @@ public class CatalogPostgreSqlIT extends AbstractIT {
         });
 
     // rename table
-    catalog
-        .asTableCatalog()
-        .alterTable(
-            NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
-            TableChange.rename(alertTableName));
+    table =
+        catalog
+            .asTableCatalog()
+            .alterTable(
+                NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
+                TableChange.rename(alertTableName));
     Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, table.auditInfo().creator());
     Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, table.auditInfo().lastModifier());
 

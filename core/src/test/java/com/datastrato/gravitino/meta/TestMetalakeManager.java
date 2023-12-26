@@ -8,6 +8,7 @@ import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.EntityStore;
 import com.datastrato.gravitino.MetalakeChange;
 import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.PrincipalContext;
 import com.datastrato.gravitino.StringIdentifier;
 import com.datastrato.gravitino.TestEntityStore;
 import com.datastrato.gravitino.exceptions.MetalakeAlreadyExistsException;
@@ -15,7 +16,6 @@ import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
 import com.datastrato.gravitino.storage.RandomIdGenerator;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Sets;
-import java.io.IOException;
 import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.AfterAll;
@@ -31,6 +31,8 @@ public class TestMetalakeManager {
 
   private static Config config;
 
+  private static PrincipalContext context;
+
   @BeforeAll
   public static void setUp() {
     config = new Config(false) {};
@@ -40,13 +42,17 @@ public class TestMetalakeManager {
     entityStore.setSerDe(null);
 
     metalakeManager = new MetalakeManager(entityStore, new RandomIdGenerator());
+    context = PrincipalContext.createPrincipalContext("test");
   }
 
   @AfterAll
-  public static void tearDown() throws IOException {
+  public static void tearDown() throws Exception {
     if (entityStore != null) {
       entityStore.close();
       entityStore = null;
+    }
+    if (context != null) {
+      context.close();
     }
   }
 
