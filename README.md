@@ -29,7 +29,7 @@ For a detailed overview of features, please see the [official documentation](htt
 - [License](#license)
 </details>
 
-# Core Features
+## Core Features
 <b>Gravitino aims to provide several key features:</b>
 
 * Single Source of Truth for multi-regional data with geo-distributed architecture support.
