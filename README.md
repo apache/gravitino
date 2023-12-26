@@ -16,18 +16,21 @@ access the unified metadata using supported engines for data management and adva
 
 For a detailed overview of features, please see the [official documentation](https://datastrato.ai/docs).
 
+![Gravitino Architecture](docs/assets/gravitino-architecture.png)
+
 <details>
 <summary> Table of Contents </summary>   
 
-- [Core Features](#Core Features)
-- 
+- [Core Features](#core-features)
+- [Documentation](#documentation)
+- [Installation](#installation)
+- [Quick Start](#quick-start)
+- [Contributing](#contributing-to-gravitino)
+- [License](#license)
 </details>
 
 # Core Features
-
-![Gravitino Architecture](docs/assets/gravitino-architecture.png)
-
-Gravitino aims to provide several key features:
+<b>Gravitino aims to provide several key features:</b>
 
 * Single Source of Truth for multi-regional data with geo-distributed architecture support.
 * Unified Data and AI asset management for both users and engines.
@@ -36,12 +39,21 @@ Gravitino aims to provide several key features:
 
 ## Documentation
 
-You can find the latest Gravitino documentation in the [docs folder](docs). The official [website]
-(https://datastrato.ai/docs) has docs for each official release.
+You can find the latest Gravitino documentation in the [docs folder](docs). The official [website](https://datastrato.ai/docs) has docs for each official release.
 
 ## Installation
 
-Gradle is used to build Gravitino . To build Gravitino, please run:
+You can install Gravitino from the binary release package or Docker image, please follow the
+[how-to-install](docs/how-to-install.md) to install Gravitino. Or, you can install Gravitino from scratch, please 
+follow the documentation of
+[how-to-build](docs/how-to-build.md) and [how-to-install](docs/how-to-install.md) to install Gravitino.
+
+
+Gravitino requires **Java 8** to run. The optional trino-connector runs with Trino, and requires Java 17.
+
+### Building from Source 
+
+Gradle makes it easy to build Gravitino. To build Gravitino, please run:
 
 ```shell
 ./gradlew clean build -x test
@@ -50,24 +62,18 @@ Gradle is used to build Gravitino . To build Gravitino, please run:
 If you want to build a distribution package, please run:
 
 ```shell
-./gradlew compileDistribution -x test
+./gradlew compileDistribution -x test # build distribution package
 ```
-
-to build a distribution package.
-
-Or:
-
 ```shell
-./gradlew assembleDistribution -x test
+./gradlew assembleDistribution -x test # build a compressed distribution package
 ```
 
-to build a compressed distribution package.
 
 The generated binary distribution package locates in `distribution` directory.
 
 For the details of building and testing Gravitino, please see [How to build Gravitino](docs/how-to-build.md).
 
-## Quick start
+## Quick Start
 
 ### Configure and start the Gravitino server
 
@@ -89,6 +95,8 @@ To stop the Gravitino server, please run:
 ./bin/gravitino.sh stop
 ```
 
+For a more detailed step-by-step guide, see our [Getting Started](docs/getting-started.md) guide.
+
 ### Using Trino with Gravitino
 
 Gravitino provides a Trino connector to access the metadata in Gravitino. To use Trino with Gravitino, please follow the [trino-gravitino-connector doc](docs/trino-connector/index.md).
@@ -97,14 +105,16 @@ Gravitino provides a Trino connector to access the metadata in Gravitino. To use
 
 Gravitino is open source software available under the Apache 2.0 license. For information of how to contribute to Gravitino please see the [Contribution guidelines](CONTRIBUTING.md).
 
-## Development guide
+### Development guide
+
+If you are interested in developing with Gravitino, check out the following guides:
 
 1. [How to build Gravitino](docs/how-to-build.md)
 2. [How to test Gravitino](docs/how-to-test.md)
 3. [How to publish Docker images](docs/publish-docker-images.md)
 
 ## Community
-<>
+We have a [Discourse](http://gravitino.discourse.group) group that anyone can join and where we actively take feedback and feature requests.
 
 ## License
 
