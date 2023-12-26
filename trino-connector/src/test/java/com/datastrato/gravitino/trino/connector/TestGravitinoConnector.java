@@ -9,6 +9,7 @@ import static java.lang.String.format;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.testng.Assert.assertEquals;
 
+import com.datastrato.gravitino.NameIdentifier;
 import io.trino.Session;
 import io.trino.plugin.memory.MemoryPlugin;
 import io.trino.testing.AbstractTestQueryFramework;
@@ -16,6 +17,7 @@ import io.trino.testing.DistributedQueryRunner;
 import io.trino.testing.MaterializedResult;
 import io.trino.testing.MaterializedRow;
 import io.trino.testing.QueryRunner;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.regex.Matcher;
@@ -53,11 +55,21 @@ public class TestGravitinoConnector extends AbstractTestQueryFramework {
       queryRunner.installPlugin(new GravitinoPlugin());
       queryRunner.installPlugin(new MemoryPlugin());
 
-      HashMap<String, String> properties = new HashMap<>();
-      properties.put("gravitino.metalake", "test");
-      properties.put("gravitino.uri", "http://127.0.0.1:8090");
+      {
+        // create a gravitino connector named gravitino using metalake test
+        HashMap<String, String> properties = new HashMap<>();
+        properties.put("gravitino.metalake", "test");
+        properties.put("gravitino.uri", "http://127.0.0.1:8090");
+        queryRunner.createCatalog("gravitino", "gravitino", properties);
+      }
 
-      queryRunner.createCatalog("gravitino", "gravitino", properties);
+      {
+        // create a gravitino connector named test1 using metalake test1
+        HashMap<String, String> properties = new HashMap<>();
+        properties.put("gravitino.metalake", "test1");
+        properties.put("gravitino.uri", "http://127.0.0.1:8090");
+        queryRunner.createCatalog("test1", "gravitino", properties);
+      }
       server.setCatalogConnectorManager(GravitinoPlugin.catalogConnectorManager);
       // Wait for the catalog to be created. Wait for at least 30 seconds.
       int max_tries = 35;
@@ -79,12 +91,6 @@ public class TestGravitinoConnector extends AbstractTestQueryFramework {
   @Test
   public void testCreateSchema() {
     String catalogName = "test.memory";
-    // testing the catalogs
-    assertThat(computeActual("show catalogs").getOnlyColumnAsSet()).contains("gravitino");
-    assertThat(computeActual("show catalogs").getOnlyColumnAsSet()).contains(catalogName);
-
-    assertThat(computeActual("select * from system.jdbc.tables"));
-
     String schemaName = "db_01";
     String fullSchemaName = String.format("\"%s\".%s", catalogName, schemaName);
     assertThat(computeActual("show schemas from \"test.memory\"").getOnlyColumnAsSet())
@@ -110,7 +116,6 @@ public class TestGravitinoConnector extends AbstractTestQueryFramework {
 
   @Test
   public void testCreateTable() {
-    String schemaName = "db_01";
     String fullSchemaName = "\"test.memory\".db_01";
     String tableName = "tb_01";
     String fullTableName = fullSchemaName + "." + tableName;
@@ -220,6 +225,41 @@ public class TestGravitinoConnector extends AbstractTestQueryFramework {
         format("This connector does not support setting table properties"));
 
     dropTestTable(fullTableName1);
+  }
+
+  @Test
+  public void testCreateCatalog() throws Exception {
+    // testing the catalogs
+    assertThat(computeActual("show catalogs").getOnlyColumnAsSet()).contains("gravitino");
+    assertThat(computeActual("show catalogs").getOnlyColumnAsSet()).contains("test1");
+    assertThat(computeActual("show catalogs").getOnlyColumnAsSet()).contains("test.memory");
+
+    // testing the gravitino connector framework works.
+    assertThat(computeActual("select * from system.jdbc.tables"));
+
+    // test metalake named test. the connector name is gravitino
+    assertUpdate("call gravitino.system.create_catalog('memory1', 'memory', Map())");
+    assertThat(computeActual("show catalogs").getOnlyColumnAsSet()).contains("test.memory1");
+    assertUpdate("call gravitino.system.drop_catalog('memory1')");
+    assertThat(computeActual("show catalogs").getOnlyColumnAsSet()).doesNotContain("test.memory1");
+
+    assertUpdate(
+        "call gravitino.system.create_catalog("
+            + "catalog=>'memory1', provider=>'memory', properties => Map(array['max_ttl'], array['10']), ignore_exist => true)");
+    assertThat(computeActual("show catalogs").getOnlyColumnAsSet()).contains("test.memory1");
+
+    assertUpdate(
+        "call gravitino.system.drop_catalog(catalog => 'memory1', ignore_not_exist => true)");
+    assertThat(computeActual("show catalogs").getOnlyColumnAsSet()).doesNotContain("test.memory1");
+
+    // test metalake named test1. the connnector name is test1
+    GravitinoPlugin.gravitinoClient.createMetalake(
+        NameIdentifier.ofMetalake("test1"), "", Collections.emptyMap());
+
+    assertUpdate("call test1.system.create_catalog('memory1', 'memory', Map())");
+    assertThat(computeActual("show catalogs").getOnlyColumnAsSet()).contains("test1.memory1");
+    assertUpdate("call test1.system.drop_catalog('memory1')");
+    assertThat(computeActual("show catalogs").getOnlyColumnAsSet()).doesNotContain("test1.memory1");
   }
 
   private TableName createTestTable(String fullTableName) throws Exception {
