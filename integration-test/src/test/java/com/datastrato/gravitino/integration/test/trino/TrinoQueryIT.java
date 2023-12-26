@@ -71,7 +71,7 @@ public class TrinoQueryIT {
   private static String gravitinoUri = "http://127.0.0.1:8090";
   private static String trinoUri = "http://127.0.0.1:8080";
   private static String hiveMetastoreUri = "thrift://127.0.0.1:9083";
-  private static String hdfsUri = "hdfs://localhost:9000";
+  private static String hdfsUri = "hdfs://127.0.0.1:9000";
   private static String mysqlUri = "jdbc:mysql://127.0.0.1?useSSL=false";
   private static String postgresqlUri = "jdbc:postgresql://127.0.0.1/mydb";
 
@@ -337,7 +337,7 @@ public class TrinoQueryIT {
               LOG.info("Drop schema \"{}.{}\".{}", metalakeName, catalogName, schema.name());
             });
 
-    metalake.dropCatalog(NameIdentifier.of(metalakeName, catalogName));
+    //metalake.dropCatalog(NameIdentifier.of(metalakeName, catalogName));
     LOG.info("Drop catalog \"{}.{}\"", metalakeName, catalogName);
   }
 
@@ -483,9 +483,9 @@ public class TrinoQueryIT {
     }
 
     // match query failed result.
-    match = Pattern.compile("^Query \\w+ failed.*: " + expectResult).matcher(result).find();
-    if (match) {
-      return true;
+    if (Pattern.compile("^Query \\w+ failed:").matcher(result).find()) {
+      match = Pattern.compile("^Query \\w+ failed.*: " + expectResult).matcher(result).find();
+      return match;
     }
 
     // match reg
