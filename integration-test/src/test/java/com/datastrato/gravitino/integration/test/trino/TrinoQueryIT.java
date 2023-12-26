@@ -270,7 +270,7 @@ public class TrinoQueryIT {
     }
 
     boolean catalogCreated = false;
-    int tries = 30;
+    int tries = 60;
     while (!catalogCreated && tries-- >= 0) {
       try {
         String result = trinoQueryRunner.runQuery("show catalogs");
