@@ -28,23 +28,20 @@ Builds with Hadoop 2.10.x, there may be compatibility issues when accessing Hado
 
 Assuming the Gravitino server is deployed in the `GRAVITINO_HOME` directory, you can locate the configuration options in [`$GRAVITINO_HOME/conf/gravitino.conf`](gravitino-server-config.md). There are three types of configurations for the Iceberg REST catalog service:
 
-1. **Gravitino Iceberg REST Catalog Service Configuration:**
-
-In this section, you can specify the HTTP server properties like host and port.
+1. [**REST Catalog Server Configuration**](#rest-catalog-server-configuration): you can specify the HTTP server properties like host and port.
 
 2. **Gravitino Iceberg metrics store Configuration:**
 
 You could implement a custom Iceberg metrics store and set corresponding Iceberg metrics store configuration.
 
-3. **Gravitino Iceberg Catalog backend Configuration:**
+2. [**Iceberg Catalog Configuration**](#iceberg-catalog-configuration): you have the option to set the specified catalog-backend to either jdbc or hive.
 
-Here, you have the option to set the specified catalog-backend to either jdbc or hive.
+4. [**Other Iceberg Catalog Properties Defined by Apache Iceberg**](#other-apache-iceberg-catalog-properties): allows you to configure additional properties defined by Apache Iceberg.
 
-4. **Other Iceberg Catalog Properties Defined by Apache Iceberg:**
 
-This section allows you to configure additional properties defined by Apache Iceberg.
+Please refer to the following sections for details.
 
-### Gravitino Iceberg REST catalog service configuration
+### REST catalog server configuration
 
 | Configuration item                                          | Description                                                                                                                                                                                                                                                | Default value                                                                | Required | Since Version |
 |-------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------|----------|---------------|
