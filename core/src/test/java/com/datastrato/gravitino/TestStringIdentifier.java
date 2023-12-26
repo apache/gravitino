@@ -74,14 +74,14 @@ public class TestStringIdentifier {
     StringIdentifier stringId = StringIdentifier.fromId(uid);
 
     Map<String, String> prop = ImmutableMap.of("key1", "value1", "key2", "value2");
-    Map<String, String> propWithId = StringIdentifier.addToProperties(stringId, prop);
+    Map<String, String> propWithId = StringIdentifier.newPropertiesWithId(stringId, prop);
     Assertions.assertTrue(propWithId.containsKey(StringIdentifier.ID_KEY));
     Assertions.assertEquals(stringId.toString(), propWithId.get(StringIdentifier.ID_KEY));
     Assertions.assertEquals("value1", propWithId.get("key1"));
     Assertions.assertEquals("value2", propWithId.get("key2"));
 
     // Test if the input properties is null
-    Map<String, String> propWithId1 = StringIdentifier.addToProperties(stringId, null);
+    Map<String, String> propWithId1 = StringIdentifier.newPropertiesWithId(stringId, null);
     Assertions.assertTrue(propWithId1.containsKey(StringIdentifier.ID_KEY));
     Assertions.assertEquals(stringId.toString(), propWithId1.get(StringIdentifier.ID_KEY));
     Assertions.assertEquals(1, propWithId1.size());
@@ -90,7 +90,7 @@ public class TestStringIdentifier {
     Map<String, String> prop1 =
         ImmutableMap.of("k1", "v1", StringIdentifier.ID_KEY, stringId.toString());
     StringIdentifier newStringId = StringIdentifier.fromId(12341234L);
-    Map<String, String> propWithId2 = StringIdentifier.addToProperties(newStringId, prop1);
+    Map<String, String> propWithId2 = StringIdentifier.newPropertiesWithId(newStringId, prop1);
     Assertions.assertEquals(stringId.toString(), propWithId2.get(StringIdentifier.ID_KEY));
   }
 
@@ -100,7 +100,7 @@ public class TestStringIdentifier {
     StringIdentifier stringId = StringIdentifier.fromId(uid);
 
     Map<String, String> prop = ImmutableMap.of("key1", "value1", "key2", "value2");
-    Map<String, String> propWithId = StringIdentifier.addToProperties(stringId, prop);
+    Map<String, String> propWithId = StringIdentifier.newPropertiesWithId(stringId, prop);
     StringIdentifier stringIdFromProp = StringIdentifier.fromProperties(propWithId);
     Assertions.assertEquals(stringId.id(), stringIdFromProp.id());
 

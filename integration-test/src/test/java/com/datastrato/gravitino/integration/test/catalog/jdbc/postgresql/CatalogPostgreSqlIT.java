@@ -385,6 +385,11 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     Assertions.assertEquals(Types.StringType.get(), table.columns()[3].dataType());
     Assertions.assertNull(table.columns()[3].comment());
     Assertions.assertTrue(table.columns()[3].nullable());
+    Assertions.assertNotNull(table.auditInfo());
+    Assertions.assertNotNull(table.auditInfo().createTime());
+    Assertions.assertNotNull(table.auditInfo().creator());
+    Assertions.assertNotNull(table.auditInfo().lastModifiedTime());
+    Assertions.assertNotNull(table.auditInfo().lastModifier());
 
     ColumnDTO col1 =
         new ColumnDTO.Builder()
