@@ -27,9 +27,12 @@ services:
       timeout: 60s
       retries: 5
     depends_on:
-      - hive
-      - postgresql
-      - mysql
+      hive:
+        condition: service_healthy
+      postgresql:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
 
   hive:
     image: datastrato/gravitino-ci-hive:0.1.7

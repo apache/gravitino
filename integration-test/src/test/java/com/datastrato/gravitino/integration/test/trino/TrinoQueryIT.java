@@ -219,7 +219,7 @@ public class TrinoQueryIT {
   private static void createMetalake() throws Exception {
 
     boolean created = false;
-    int tries = 30;
+    int tries = 180;
     while (!created && tries-- >= 0) {
       try {
         boolean exists = gravitinoClient.metalakeExists(NameIdentifier.of(metalakeName));
@@ -270,7 +270,7 @@ public class TrinoQueryIT {
     }
 
     boolean catalogCreated = false;
-    int tries = 60;
+    int tries = 180;
     while (!catalogCreated && tries-- >= 0) {
       try {
         String result = trinoQueryRunner.runQuery("show catalogs");
