@@ -163,7 +163,7 @@ public class IcebergTableOperations {
       @PathParam("namespace") String namespace,
       @PathParam("table") String table,
       ReportMetricsRequest request) {
-    icebergMetricsManager.save(request.report());
+    icebergMetricsManager.recordMetric(request.report());
     return IcebergRestUtils.noContent();
   }
 

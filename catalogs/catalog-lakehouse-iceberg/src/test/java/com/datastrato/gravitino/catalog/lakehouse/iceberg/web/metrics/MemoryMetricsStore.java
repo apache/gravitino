@@ -21,7 +21,7 @@ public class MemoryMetricsStore implements IcebergMetricsStore {
   }
 
   @Override
-  public void save(MetricsReport metricsReport) {
+  public void recordMetric(MetricsReport metricsReport) {
     this.metricsReport = metricsReport;
     this.recordTime = Instant.now();
   }

@@ -9,14 +9,14 @@ import java.time.Instant;
 import java.util.Map;
 import org.apache.iceberg.metrics.MetricsReport;
 
-public class BlackHoleMetricsStore implements IcebergMetricsStore {
-  public static final String ICEBERG_METRICS_STORE_BLACK_HOLE_NAME = "blackHole";
+public class DummyMetricsStore implements IcebergMetricsStore {
+  public static final String ICEBERG_METRICS_STORE_DUMMY_NAME = "dummy";
 
   @Override
   public void init(Map<String, String> properties) {}
 
   @Override
-  public void save(MetricsReport metricsReport) {}
+  public void recordMetric(MetricsReport metricsReport) {}
 
   @Override
   public void close() {}

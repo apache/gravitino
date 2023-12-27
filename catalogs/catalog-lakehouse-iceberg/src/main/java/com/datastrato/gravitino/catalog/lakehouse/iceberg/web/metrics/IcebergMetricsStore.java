@@ -22,12 +22,12 @@ public interface IcebergMetricsStore {
   void init(Map<String, String> properties) throws IOException;
 
   /**
-   * Save metrics report.
+   * Record metrics report.
    *
    * @param metricsReport the metrics to be saved
    * @throws IOException if IO error happens
    */
-  void save(MetricsReport metricsReport) throws IOException;
+  void recordMetric(MetricsReport metricsReport) throws IOException;
 
   /**
    * Clean the expired Iceberg metrics

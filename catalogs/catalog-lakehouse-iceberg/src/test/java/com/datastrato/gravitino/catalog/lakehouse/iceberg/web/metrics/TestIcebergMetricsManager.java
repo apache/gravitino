@@ -48,9 +48,9 @@ public class TestIcebergMetricsManager {
     icebergMetricsManager.start();
 
     MetricsReport metricsReport = createMetricsReport();
-    icebergMetricsManager.save(metricsReport);
+    icebergMetricsManager.recordMetric(metricsReport);
     Assertions.assertDoesNotThrow(
-        () -> (BlackHoleMetricsStore) icebergMetricsManager.getIcebergMetricsStore());
+        () -> (DummyMetricsStore) icebergMetricsManager.getIcebergMetricsStore());
     icebergMetricsManager.close();
   }
 
@@ -78,7 +78,7 @@ public class TestIcebergMetricsManager {
     icebergMetricsManager.start();
 
     MetricsReport metricsReport = createMetricsReport();
-    icebergMetricsManager.save(metricsReport);
+    icebergMetricsManager.recordMetric(metricsReport);
     MemoryMetricsStore memoryMetricsStore =
         (MemoryMetricsStore) icebergMetricsManager.getIcebergMetricsStore();
     Assertions.assertEquals(metricsReport, tryGetIcebergMetrics(memoryMetricsStore));

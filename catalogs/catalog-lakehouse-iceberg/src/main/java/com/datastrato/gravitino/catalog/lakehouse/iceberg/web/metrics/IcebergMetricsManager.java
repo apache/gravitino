@@ -34,8 +34,8 @@ public class IcebergMetricsManager {
   // IcebergMetricsStore.
   private static final ImmutableMap<String, String> ICEBERG_METRICS_STORE_NAMES =
       ImmutableMap.of(
-          BlackHoleMetricsStore.ICEBERG_METRICS_STORE_BLACK_HOLE_NAME,
-          BlackHoleMetricsStore.class.getCanonicalName());
+          DummyMetricsStore.ICEBERG_METRICS_STORE_DUMMY_NAME,
+          DummyMetricsStore.class.getCanonicalName());
 
   private final IcebergMetricsFormatter icebergMetricsFormatter;
   private final IcebergMetricsStore icebergMetricsStore;
@@ -78,45 +78,6 @@ public class IcebergMetricsManager {
     metricsWriterThread.setDaemon(true);
   }
 
-  private void writeMetrics() {
-    while (Thread.currentThread().isInterrupted() == false) {
-      MetricsReport metricsReport;
-      try {
-        metricsReport = queue.take();
-      } catch (InterruptedException e) {
-        LOG.warn("Iceberg Metrics writer thread is interrupted.");
-        break;
-      }
-      if (metricsReport != null) {
-        doSave(metricsReport);
-      }
-    }
-
-    MetricsReport metricsReport = queue.poll();
-    while (metricsReport != null) {
-      logMetrics("Drop Iceberg metrics because it's time to close metrics store.", metricsReport);
-      metricsReport = queue.poll();
-    }
-  }
-
-  private IcebergMetricsStore loadIcebergMetricsStore(String metricsStoreName) {
-    String metricsStoreClass =
-        ICEBERG_METRICS_STORE_NAMES.getOrDefault(metricsStoreName, metricsStoreName);
-    LOG.info("Load Iceberg metrics store: {}.", metricsStoreClass);
-    try {
-      return (IcebergMetricsStore)
-          Class.forName(metricsStoreClass).getDeclaredConstructor().newInstance();
-    } catch (Exception e) {
-      LOG.error(
-          "Failed to create and initialize Iceberg metrics store by name {}.", metricsStoreName, e);
-      throw new RuntimeException(e);
-    }
-  }
-
-  private void logMetrics(String message, MetricsReport metricsReport) {
-    LOG.info("{} {}.", message, icebergMetricsFormatter.toPrintableString(metricsReport));
-  }
-
   public void start() {
     metricsWriterThread.start();
     metricsCleanerExecutor.ifPresent(
@@ -138,15 +99,7 @@ public class IcebergMetricsManager {
                 TimeUnit.HOURS));
   }
 
-  private void doSave(MetricsReport metricsReport) {
-    try {
-      icebergMetricsStore.save(metricsReport);
-    } catch (Exception e) {
-      LOG.warn("Write Iceberg metrics failed.", e);
-    }
-  }
-
-  public void save(MetricsReport metricsReport) {
+  public void recordMetric(MetricsReport metricsReport) {
     if (isClosed) {
       logMetrics("Drop Iceberg metrics because Iceberg Metrics Manager is closed.", metricsReport);
       return;
@@ -182,5 +135,52 @@ public class IcebergMetricsManager {
   @VisibleForTesting
   IcebergMetricsStore getIcebergMetricsStore() {
     return icebergMetricsStore;
+  }
+
+  private void writeMetrics() {
+    while (Thread.currentThread().isInterrupted() == false) {
+      MetricsReport metricsReport;
+      try {
+        metricsReport = queue.take();
+      } catch (InterruptedException e) {
+        LOG.warn("Iceberg Metrics writer thread is interrupted.");
+        break;
+      }
+      if (metricsReport != null) {
+        doRecordMetric(metricsReport);
+      }
+    }
+
+    MetricsReport metricsReport = queue.poll();
+    while (metricsReport != null) {
+      logMetrics("Drop Iceberg metrics because it's time to close metrics store.", metricsReport);
+      metricsReport = queue.poll();
+    }
+  }
+
+  private IcebergMetricsStore loadIcebergMetricsStore(String metricsStoreName) {
+    String metricsStoreClass =
+        ICEBERG_METRICS_STORE_NAMES.getOrDefault(metricsStoreName, metricsStoreName);
+    LOG.info("Load Iceberg metrics store: {}.", metricsStoreClass);
+    try {
+      return (IcebergMetricsStore)
+          Class.forName(metricsStoreClass).getDeclaredConstructor().newInstance();
+    } catch (Exception e) {
+      LOG.error(
+          "Failed to create and initialize Iceberg metrics store by name {}.", metricsStoreName, e);
+      throw new RuntimeException(e);
+    }
+  }
+
+  private void logMetrics(String message, MetricsReport metricsReport) {
+    LOG.info("{} {}.", message, icebergMetricsFormatter.toPrintableString(metricsReport));
+  }
+
+  private void doRecordMetric(MetricsReport metricsReport) {
+    try {
+      icebergMetricsStore.recordMetric(metricsReport);
+    } catch (Exception e) {
+      LOG.warn("Write Iceberg metrics failed.", e);
+    }
   }
 }
