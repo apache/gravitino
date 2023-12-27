@@ -14,7 +14,7 @@ import lombok.Getter;
 import org.apache.logging.log4j.util.Strings;
 
 @Getter
-public final class PropertyEntry<T> {
+public final class PropertyEntry<T> implements Comparable<PropertyEntry<?>> {
   private final String name;
   private final String description;
   private final boolean required;
@@ -303,5 +303,10 @@ public final class PropertyEntry<T> {
       boolean reserved) {
     return enumPropertyEntry(
         name, description, required, true, javaType, defaultValue, hidden, reserved);
+  }
+
+  @Override
+  public int compareTo(PropertyEntry<?> o) {
+    return this.name.compareTo(o.name);
   }
 }
