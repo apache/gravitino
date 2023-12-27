@@ -24,7 +24,7 @@ Builds with Apache Iceberg `1.3.1`. The Apache Iceberg table format version is `
 Builds with Hadoop 2.10.x, there may be compatibility issues when accessing Hadoop 3.x clusters.
 :::
 
-## Gravitino Iceberg REST catalog service Configurations
+## Gravitino Iceberg REST catalog service configurations
 
 Assuming the Gravitino server is deployed in the `GRAVITINO_HOME` directory, you can locate the configuration options in [`$GRAVITINO_HOME/conf/gravitino.conf`](gravitino-server-config.md). There are three types of configurations for the Iceberg REST catalog service:
 
@@ -34,7 +34,7 @@ Assuming the Gravitino server is deployed in the `GRAVITINO_HOME` directory, you
 
 You could implement a custom Iceberg metrics store and set corresponding Iceberg metrics store configuration.
 
-2. [**Iceberg Catalog Configuration**](#iceberg-catalog-configuration): you have the option to set the specified catalog-backend to either jdbc or hive.
+2. [**Iceberg Catalog Configuration**](#iceberg-catalog-configuration): you have the option to set the specified catalog-backend to either `jdbc` or `hive`.
 
 4. [**Other Iceberg Catalog Properties Defined by Apache Iceberg**](#other-apache-iceberg-catalog-properties): allows you to configure additional properties defined by Apache Iceberg.
 
@@ -77,7 +77,7 @@ Gravitino provides a pluggable metrics store interface to store and delete Icebe
 ### Gravitino Iceberg catalog backend configuration
 
 :::info
-The Gravitino Iceberg REST catalog service using memory catalog for default. You can specify Hive or JDBC catalog in production environments.
+The Gravitino Iceberg REST catalog service uses the memory catalog by default. You can specify using a Hive or JDBC catalog in a production environment.
 :::
 
 #### Hive catalog backend configuration
