@@ -2,7 +2,7 @@
 title: "Table partitioning, bucketing and sorting order"
 slug: /table-partitioning-bucketing-sort-order
 date: 2023-12-25
-keyword: Table Partition Bucket Distribute Sort By 
+keyword: Table Partition Bucket Distribute Sort By
 license: Copyright 2023 Datastrato Pvt Ltd. This software is licensed under the Apache License version 2.
 ---
 
@@ -10,27 +10,27 @@ import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 ## Partitioned table
-
+As well as
 Currently, Gravitino supports the following partitioning strategies:
 
 :::note
-The `score`, `dt`, and `city` appearing in the table below refer to the field names in a table.
+The `score`, `createTime`, and `city` appearing in the table below refer to the field names in a table.
 :::
 
-| Partitioning strategy | Description                                                  | Json example                                                     | Java example                                   | Equivalent SQL semantics           |
-|-----------------------|--------------------------------------------------------------|------------------------------------------------------------------|------------------------------------------------|------------------------------------|
-| `identity`            | Source value, unmodified                                     | `{"strategy":"identity","fieldName":["score"]}`                  | `Transforms.identity("score")`                 | `PARTITION BY score`               |
-| `hour`                | Extract a timestamp hour, as hours from 1970-01-01 00:00:00  | `{"strategy":"hour","fieldName":["dt"]}`                         | `Transforms.hour("dt")`                        | `PARTITION BY hour(dt)`            |
-| `day`                 | Extract a date or timestamp day, as days from 1970-01-01     | `{"strategy":"day","fieldName":["dt"]}`                          | `Transforms.day("dt")`                         | `PARTITION BY day(dt)`             |
-| `month`               | Extract a date or timestamp month, as months from 1970-01-01 | `{"strategy":"month","fieldName":["dt"]}`                        | `Transforms.month("dt")`                       | `PARTITION BY month(dt)`           |
-| `year`                | Extract a date or timestamp year, as years from 1970         | `{"strategy":"year","fieldName":["dt"]}`                         | `Transforms.year("dt")`                        | `PARTITION BY year(dt)`            |
-| `bucket[N]`           | Hash of value, mod N                                         | `{"strategy":"bucket","numBuckets":10,"fieldNames":[["score"]]}` | `Transforms.bucket(10, "score")`               | `PARTITION BY bucket(10, score)`   |
-| `truncate[W]`         | Value truncated to width W                                   | `{"strategy":"truncate","width":20,"fieldName":["score"]}`       | `Transforms.truncate(20, "score")`             | `PARTITION BY truncate(20, score)` |
-| `list`                | Partition the table by a list value                          | `{"strategy":"list","fieldNames":[["dt"],["city"]]}`             | `Transforms.list(new String[] {"dt", "city"})` | `PARTITION BY list(dt, city)`      |
-| `range`               | Partition the table by a range value                         | `{"strategy":"range","fieldName":["dt"]}`                        | `Transforms.range("dt")`                       | `PARTITION BY range(dt)`           |
+| Partitioning strategy | Description                                                    | JSON example                                                     | Java example                                           | Equivalent SQL semantics              |
+|-----------------------|----------------------------------------------------------------|------------------------------------------------------------------|--------------------------------------------------------|---------------------------------------|
+| `identity`            | Source value, unmodified.                                      | `{"strategy":"identity","fieldName":["score"]}`                  | `Transforms.identity("score")`                         | `PARTITION BY score`                  |
+| `hour`                | Extract a timestamp hour, as hours from '1970-01-01 00:00:00'. | `{"strategy":"hour","fieldName":["createTime"]}`                 | `Transforms.hour("createTime")`                        | `PARTITION BY hour(createTime)`       |
+| `day`                 | Extract a date or timestamp day, as days from '1970-01-01'.    | `{"strategy":"day","fieldName":["createTime"]}`                  | `Transforms.day("createTime")`                         | `PARTITION BY day(createTime)`        |
+| `month`               | Extract a date or timestamp month, as months from '1970-01-01' | `{"strategy":"month","fieldName":["createTime"]}`                | `Transforms.month("createTime")`                       | `PARTITION BY month(createTime)`      |
+| `year`                | Extract a date or timestamp year, as years from 1970.          | `{"strategy":"year","fieldName":["createTime"]}`                 | `Transforms.year("createTime")`                        | `PARTITION BY year(createTime)`       |
+| `bucket[N]`           | Hash of value, mod N.                                          | `{"strategy":"bucket","numBuckets":10,"fieldNames":[["score"]]}` | `Transforms.bucket(10, "score")`                       | `PARTITION BY bucket(10, score)`      |
+| `truncate[W]`         | Value truncated to width W.                                    | `{"strategy":"truncate","width":20,"fieldName":["score"]}`       | `Transforms.truncate(20, "score")`                     | `PARTITION BY truncate(20, score)`    |
+| `list`                | Partition the table by a list value.                           | `{"strategy":"list","fieldNames":[["createTime"],["city"]]}`     | `Transforms.list(new String[] {"createTime", "city"})` | `PARTITION BY list(createTime, city)` |
+| `range`               | Partition the table by a range value.                          | `{"strategy":"range","fieldName":["createTime"]}`                | `Transforms.range("createTime")`                       | `PARTITION BY range(createTime)`      |
 
-Except the strategies above, you can use other functions strategies to partition the table, for example, the strategy can be `{"strategy":"functionName","fieldName":["score"]}`. The `functionName` can be any function name that you can use in SQL, for example, `{"strategy":"toDate","fieldName":["dt"]}` is equivalent to `PARTITION BY toDate(dt)` in SQL.
-For complex function, please refer to [FunctionPartitioningDTO](https://github.com/datastrato/gravitino/blob/main/common/src/main/java/com/datastrato/gravitino/dto/rel/partitions/FunctionPartitioningDTO.java).
+As well as the strategies mentioned before, you can use other functions strategies to partition the table, for example, the strategy can be `{"strategy":"functionName","fieldName":["score"]}`. The `functionName` can be any function name that you can use in SQL, for example, `{"strategy":"toDate","fieldName":["createTime"]}` is equivalent to `PARTITION BY toDate(createTime)` in SQL.
+For complex functions, please refer to [FunctionPartitioningDTO](https://github.com/datastrato/gravitino/blob/main/common/src/main/java/com/datastrato/gravitino/dto/rel/partitions/FunctionPartitioningDTO.java).
 
 The following is an example of creating a partitioned table:
 
@@ -64,18 +64,18 @@ new Transform[] {
 
 ## Bucketed table
 
-- Strategy. It defines how your table data is distributed across partitions.
+- Strategy. It defines how Gravitino will distribute table data across partitions.
 
-| Bucket strategy | Description                                                                                                          | Json     | Java             |
-|-----------------|----------------------------------------------------------------------------------------------------------------------|----------|------------------|
-| hash            | Bucket table using hash. The data will be distributed into buckets based on the hash value of the key.               | `hash`   | `Strategy.HASH`  |
-| range           | Bucket table using range. The data will be divided into buckets based on a specified range or interval of values.    | `range`  | `Strategy.RANGE` |
-| even            | Bucket table using even. The data will be evenly distributed into buckets, ensuring an equal distribution of data.   | `even`   | `Strategy.EVEN`  |
+| Bucket strategy | Description                                                                                                                   | JSON     | Java             |
+|-----------------|-------------------------------------------------------------------------------------------------------------------------------|----------|------------------|
+| hash            | Bucket table using hash. Gravitino will distribute table data into buckets based on the hash value of the key.                | `hash`   | `Strategy.HASH`  |
+| range           | Bucket table using range. Gravitino will distribute table data into buckets based on a specified range or interval of values. | `range`  | `Strategy.RANGE` |
+| even            | Bucket table using even.  Gravitino will distribute table data, ensuring an equal distribution of data.                       | `even`   | `Strategy.EVEN`  |
 
 - Number. It defines how many buckets you use to bucket the table.
 - Function arguments. It defines the arguments of the strategy above, Gravitino supports the following three kinds of arguments, for more, you can refer to Java class [FunctionArg](https://github.com/datastrato/gravitino/blob/main/common/src/main/java/com/datastrato/gravitino/dto/rel/expressions/FunctionArg.java) and [DistributionDTO](https://github.com/datastrato/gravitino/blob/main/common/src/main/java/com/datastrato/gravitino/dto/rel/DistributionDTO.java) to use more complex function arguments.
 
-| Expression type | Json example                                                   | Java example                                                                              | Equivalent SQL semantics | Description                       | 
+| Expression type | JSON example                                                   | Java example                                                                              | Equivalent SQL semantics | Description                       | 
 |-----------------|----------------------------------------------------------------|-------------------------------------------------------------------------------------------|--------------------------|-----------------------------------|
 | field           | `{"type":"field","fieldName":["score"]}`                       | `FieldReferenceDTO.of("score")`                                                           | `score`                  | The field reference value `score` |
 | function        | `{"type":"function","functionName":"hour","fieldName":["dt"]}` | `new FuncExpressionDTO.Builder().withFunctionName("hour").withFunctionArgs("dt").build()` | `hour(dt)`               | The function value `hour(dt)`     |
@@ -117,23 +117,23 @@ new Transform[] {
 
 To define a sorted order table, you should use the following three components to construct a valid sorted order table.
 
-- Direction. It defines in which direction we sort the table. The default value is `ascending`.
+- Direction. It defines in which direction Gravitino sorts the table. The default value is `ascending`.
 
-| Direction  | Description                               | Json   | Java                       |
-|------------|-------------------------------------------| ------ | -------------------------- |
-| ascending  | Sorted by a field or a function ascending | `asc`  | `SortDirection.ASCENDING`  |
-| descending | Sorted by a field or a function descending| `desc` | `SortDirection.DESCENDING` |
+| Direction  | Description                                 | JSON   | Java                       |
+|------------|---------------------------------------------| ------ | -------------------------- |
+| ascending  | Sorted by a field or a function ascending.  | `asc`  | `SortDirection.ASCENDING`  |
+| descending | Sorted by a field or a function descending. | `desc` | `SortDirection.DESCENDING` |
 
-- Null ordering. It describes how to handle null value when ordering
+- Null ordering. It describes how to handle null values when ordering
 
-| Null ordering Type | Description                       | Json          | Java                       |
-|--------------------|-----------------------------------| ------------- | -------------------------- |
-| null_first         | Put null value in the first place | `nulls_first` | `NullOrdering.NULLS_FIRST` |
-| null_last          | Put null value in the last place  | `nulls_last`  | `NullOrdering.NULLS_LAST`  |
+| Null ordering Type | Description                             | JSON          | Java                       |
+|--------------------|-----------------------------------------| ------------- | -------------------------- |
+| null_first         | Puts the null value in the first place. | `nulls_first` | `NullOrdering.NULLS_FIRST` |
+| null_last          | Puts the null value in the last place.  | `nulls_last`  | `NullOrdering.NULLS_LAST`  |
 
 Note: If the direction value is `ascending`, the default ordering value is `nulls_first` and if the direction value is `descending`, the default ordering value is `nulls_last`.
 
-- Sort term. It shows which field or function should be used to sort the table, please refer to the `Expression type` in the bucketed table chapter.
+- Sort term. It shows which field or function Gravitino uses to sort the table, please refer to the `Expression type` in the bucketed table section.
 
 <Tabs>
 <TabItem value="Json" label="Json">
@@ -164,7 +164,7 @@ SortOrders.of(FieldReferenceDTO.of("score"), SortDirection.ASCENDING, NullOrderi
 **Not all catalogs may support those features.**. Please refer to the related document for more details.
 :::
 
-The following is an example of creating a partitioned, bucketed table and sorted order table:
+The following is an example of creating a partitioned, bucketed table, and sorted order table:
 
 <Tabs>
 <TabItem value="bash" label="Bash">
