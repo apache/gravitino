@@ -4,22 +4,6 @@
 #
 version: '3.0'
 services:
-  hive:
-    image: datastrato/gravitino-ci-hive:0.1.7
-    networks:
-      - trino-net
-    container_name: trino-ci-hive
-    environment:
-      - HADOOP_USER_NAME=root
-    entrypoint:  /bin/bash /tmp/hive/init.sh
-    volumes:
-      - ./init/hive:/tmp/hive
-    healthcheck:
-      test: ["CMD", "/tmp/check-status.sh"]
-      interval: 10s
-      timeout: 60s
-      retries: 5
-
   trino:
     image: datastrato/gravitino-ci-trino:0.1.2
     networks:
@@ -37,6 +21,26 @@ services:
       - ../../../trino-connector/build/libs:/usr/lib/trino/plugin/gravitino
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    depends_on:
+      - hive
+      - postgresql
+      - mysql
+
+  hive:
+    image: datastrato/gravitino-ci-hive:0.1.7
+    networks:
+      - trino-net
+    container_name: trino-ci-hive
+    environment:
+      - HADOOP_USER_NAME=root
+    entrypoint:  /bin/bash /tmp/hive/init.sh
+    volumes:
+      - ./init/hive:/tmp/hive
+    healthcheck:
+      test: ["CMD", "/tmp/check-status.sh"]
+      interval: 10s
+      timeout: 60s
+      retries: 5
 
   postgresql:
     image: postgres:13
