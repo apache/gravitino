@@ -99,7 +99,7 @@ public class TrinoQueryIT {
 
     Map<String, String> env = new HashMap<>();
     env.put("GRAVITINO_SERVER_PORT", String.valueOf(AbstractIT.getGravitinoServerPort()));
-    CommandExecutor.executeCommandLocalHost(
+    Object start_docker_output = CommandExecutor.executeCommandLocalHost(
         System.getenv("GRAVITINO_HOME") + "/dev/docker/trino-it/launch.sh",
         false,
         ProcessData.TypesOfData.OUTPUT,
@@ -112,21 +112,27 @@ public class TrinoQueryIT {
             ProcessData.TypesOfData.OUTPUT);
     String containerIpMapping = output.toString();
     LOG.info("Container IP mapping:\n{}", containerIpMapping);
-    String[] containerInfos = containerIpMapping.split("\n");
-    for (String container : containerInfos) {
-      String[] info = container.split(":");
-      String containerName = info[0];
-      String address = info[1];
-      if (containerName.equals("trino")) {
-        trinoUri = String.format("http://%s:8080", address);
-      } else if (containerName.equals("hive")) {
-        hiveMetastoreUri = String.format("thrift://%s:9083", address);
-        hdfsUri = String.format("hdfs://%s:9000", address);
-      } else if (containerName.equals("mysql")) {
-        mysqlUri = String.format("jdbc:mysql://%s:3306", address);
-      } else if (containerName.equals("postgresql")) {
-        postgresqlUri = String.format("jdbc:postgresql://%s", address);
+    try {
+      String[] containerInfos = containerIpMapping.split("\n");
+      for (String container : containerInfos) {
+        String[] info = container.split(":");
+        String containerName = info[0];
+        String address = info[1];
+        if (containerName.equals("trino")) {
+          trinoUri = String.format("http://%s:8080", address);
+        } else if (containerName.equals("hive")) {
+          hiveMetastoreUri = String.format("thrift://%s:9083", address);
+          hdfsUri = String.format("hdfs://%s:9000", address);
+        } else if (containerName.equals("mysql")) {
+          mysqlUri = String.format("jdbc:mysql://%s:3306", address);
+        } else if (containerName.equals("postgresql")) {
+          postgresqlUri = String.format("jdbc:postgresql://%s", address);
+        }
       }
+    } catch (Exception e) {
+      LOG.error("Failed to parse container ip mapping", e);
+      throw new Exception("Failed to parse container ip mapping:\n" +
+              containerIpMapping + "\nStartdocker output:\n" + start_docker_output.toString(), e);
     }
   }
 

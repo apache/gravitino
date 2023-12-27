@@ -18,6 +18,11 @@ else
 fi
 
 cd ${playground_dir}
-docker-compose up -d
+
+if [ "$1" = "-s" ]; then
+  docker-compose up -d > ../../../integration-test/build/trino-it-docker.log 2>&1
+else
+  docker-compose up -d
+
 
 nohup docker-compose logs -f  -t > ../../../integration-test/build/trino-it-docker.log &
