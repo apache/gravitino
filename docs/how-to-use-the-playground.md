@@ -79,6 +79,7 @@ In a company, there may be different departments using different data stacks. In
 If you want to know which employee has the largest sales amount, you can run this SQL.
 
 ```SQL
+SET SESSION allow_pushdown_into_connectors=false;
 SELECT given_name, family_name, job_title, sum(total_amount) AS total_sales
 FROM "metalake_demo.catalog_hive".sales.sales as s,
   "metalake_demo.catalog_postgres".hr.employees AS e
@@ -103,6 +104,7 @@ ORDER BY location, SUM(total_amount) DESC;
 If you want to know the employee's average performance rating and total sales, you can run this SQL.
 
 ```SQL
+SET SESSION allow_pushdown_into_connectors=false;
 SELECT e.employee_id, given_name, family_name, AVG(rating) AS average_rating,  SUM(total_amount) AS total_sales
 FROM "metalake_demo.catalog_postgres".hr.employees AS e,
   "metalake_demo.catalog_postgres".hr.employee_performance AS p,
