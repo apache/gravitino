@@ -94,6 +94,9 @@ public class LockManager {
 
   public void unlockResourcePath(LockType lockType) {
     Stack<LockObject> stack = currentLocked.get();
+    if (stack.isEmpty()) {
+      return;
+    }
     stack.pop().lockNode.release(lockType);
 
     while (!stack.isEmpty()) {
