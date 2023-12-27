@@ -99,7 +99,7 @@ public class TrinoQueryIT {
 
     Map<String, String> env = new HashMap<>();
     env.put("GRAVITINO_SERVER_PORT", String.valueOf(AbstractIT.getGravitinoServerPort()));
-    Object start_docker_output = CommandExecutor.executeCommandLocalHost(
+    CommandExecutor.executeCommandLocalHost(
         System.getenv("GRAVITINO_HOME") + "/dev/docker/trino-it/launch.sh",
         false,
         ProcessData.TypesOfData.OUTPUT,
@@ -131,8 +131,7 @@ public class TrinoQueryIT {
       }
     } catch (Exception e) {
       LOG.error("Failed to parse container ip mapping", e);
-      throw new Exception("Failed to parse container ip mapping:\n" +
-              containerIpMapping + "\nStartdocker output:\n" + start_docker_output.toString(), e);
+      throw new Exception("Failed to parse container ip mapping:\n" + containerIpMapping, e);
     }
   }
 
