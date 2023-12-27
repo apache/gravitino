@@ -113,21 +113,20 @@ public class IcebergMetricsManager {
     isClosed = true;
     metricsCleanerExecutor.ifPresent(executorService -> executorService.shutdownNow());
 
+    if (icebergMetricsStore != null) {
+      try {
+        icebergMetricsStore.close();
+      } catch (IOException e) {
+        LOG.warn("Close Iceberg metrics store failed.", e);
+      }
+    }
+
     if (metricsWriterThread != null) {
       metricsWriterThread.interrupt();
       try {
         metricsWriterThread.join();
       } catch (InterruptedException e) {
         LOG.warn("Iceberg metrics manager is interrupted while join metrics writer thread.");
-        return;
-      }
-    }
-
-    if (icebergMetricsStore != null) {
-      try {
-        icebergMetricsStore.close();
-      } catch (IOException e) {
-        LOG.warn("Close Iceberg metrics store failed.", e);
       }
     }
   }
