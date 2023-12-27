@@ -8,10 +8,6 @@ services:
     image: datastrato/gravitino-ci-hive:0.1.7
     networks:
       - trino-net
-    ports:
-      - "3307:3306"
-      - "9000:9000"
-      - "9083:9083"
     container_name: trino-ci-hive
     environment:
       - HADOOP_USER_NAME=root
@@ -28,12 +24,10 @@ services:
     image: datastrato/gravitino-ci-trino:0.1.2
     networks:
       - trino-net
-    ports:
-      - "8080:8080"
     container_name: trino-ci-trino
     environment:
       - HADOOP_USER_NAME=root
-      - GRAVITINO_HOST_IP=192.168.50.45
+      - GRAVITINO_HOST_IP=host.docker.internal
       - GRAVITINO_HOST_PORT=${GRAVITINO_SERVER_PORT:-8090}
       - GRAVITINO_METALAKE_NAME=test
       - HIVE_HOST_IP=hive
@@ -41,6 +35,8 @@ services:
     volumes:
       - ./init/trino:/tmp/trino
       - ../../../trino-connector/build/libs:/usr/lib/trino/plugin/gravitino
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   postgresql:
     image: postgres:13
@@ -52,8 +48,6 @@ services:
       ALLOW_IP_RANGE: 0.0.0.0/0
     networks:
       - trino-net
-    ports:
-      - "5432:5432"
     volumes:
       - ./init/postgres:/docker-entrypoint-initdb.d/
 
@@ -62,8 +56,6 @@ services:
     container_name: trino-ci-mysql
     networks:
       - trino-net
-    ports:
-      - "3306:3307"
     volumes:
       - ./init/mysql:/docker-entrypoint-initdb.d/
     environment:

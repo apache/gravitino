@@ -19,3 +19,5 @@ fi
 
 cd ${playground_dir}
 docker-compose up -d
+
+nohup docker-compose logs -f  -t > ../../../integration-test/build/trino-it-docker.log &
