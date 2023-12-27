@@ -41,7 +41,7 @@ public class TestIcebergMetricsManager {
   }
 
   @Test
-  void testIcebergMetricsManagerWithBlackHoldStore() {
+  void testIcebergMetricsManager() {
     IcebergConfig icebergConfig = new IcebergConfig();
 
     IcebergMetricsManager icebergMetricsManager = new IcebergMetricsManager(icebergConfig);
@@ -55,7 +55,7 @@ public class TestIcebergMetricsManager {
   }
 
   @Test
-  void testIcebergMetricsManagerWithNotExistsStorageType() {
+  void testIcebergMetricsManagerWithNotExistsStoreType() {
     IcebergConfig icebergConfig =
         new IcebergConfig(
             ImmutableMap.of(IcebergMetricsManager.ICEBERG_METRICS_STORE, "not-exists"));
