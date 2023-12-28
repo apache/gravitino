@@ -10,9 +10,7 @@
 
 ## Introduction
 
-Gravitino is a high-performance, geo-distributed, and federated metadata lake. It creates and manages metadata 
-from multiple different database sources and cloud providers directly, regardless of type and region. Users can then 
-access the unified metadata using supported engines for data management and advanced analytics.
+Gravitino is a high-performance, geo-distributed, and federated metadata lake. It creates and manages metadata from multiple different database sources and cloud providers directly, regardless of type and region. Users can then access the unified metadata using supported engines for data management and advanced analytics.
 
 For a detailed overview of features, please see the [official documentation](https://datastrato.ai/docs).
 
@@ -21,12 +19,12 @@ For a detailed overview of features, please see the [official documentation](htt
 <details>
 <summary> Table of Contents </summary>   
 
-- [Core Features](#core-features)
-- [Documentation](#documentation)
-- [Installation](#installation)
-- [Quick Start](#quick-start)
-- [Contributing](#contributing-to-gravitino)
-- [License](#license)
+- [Core Features](#Core-Features)
+- [Documentation](#Documentation)
+- [Installation](#Installation)
+- [Quick Start](#Quick-Start)
+- [Contributing](#Contributing-to-Gravitino)
+- [License](#License)
 </details>
 
 ## Core Features
@@ -62,10 +60,11 @@ Gradle makes it easy to build Gravitino. To build Gravitino, please run:
 If you want to build a distribution package, please run:
 
 ```shell
-./gradlew compileDistribution -x test # build distribution package
+./gradlew compileDistribution -x test 
 ```
+Or, you can also build a compressed distribution package with the following:
 ```shell
-./gradlew assembleDistribution -x test # build a compressed distribution package
+./gradlew assembleDistribution -x test 
 ```
 
 
