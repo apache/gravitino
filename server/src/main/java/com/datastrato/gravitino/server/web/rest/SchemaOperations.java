@@ -61,10 +61,13 @@ public class SchemaOperations {
   public Response listSchemas(
       @PathParam("metalake") String metalake, @PathParam("catalog") String catalog) {
     try {
-      Namespace schemaNS = Namespace.ofSchema(metalake, catalog);
-      NameIdentifier[] idents = dispatcher.listSchemas(schemaNS);
-      return Utils.ok(new EntityListResponse(idents));
-
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            Namespace schemaNS = Namespace.ofSchema(metalake, catalog);
+            NameIdentifier[] idents = dispatcher.listSchemas(schemaNS);
+            return Utils.ok(new EntityListResponse(idents));
+          });
     } catch (Exception e) {
       return ExceptionHandlers.handleSchemaException(OperationType.LIST, "", catalog, e);
     }
@@ -79,10 +82,15 @@ public class SchemaOperations {
       @PathParam("catalog") String catalog,
       SchemaCreateRequest request) {
     try {
-      request.validate();
-      NameIdentifier ident = NameIdentifier.ofSchema(metalake, catalog, request.getName());
-      Schema schema = dispatcher.createSchema(ident, request.getComment(), request.getProperties());
-      return Utils.ok(new SchemaResponse(DTOConverters.toDTO(schema)));
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            request.validate();
+            NameIdentifier ident = NameIdentifier.ofSchema(metalake, catalog, request.getName());
+            Schema schema =
+                dispatcher.createSchema(ident, request.getComment(), request.getProperties());
+            return Utils.ok(new SchemaResponse(DTOConverters.toDTO(schema)));
+          });
 
     } catch (Exception e) {
       return ExceptionHandlers.handleSchemaException(
@@ -100,9 +108,13 @@ public class SchemaOperations {
       @PathParam("catalog") String catalog,
       @PathParam("schema") String schema) {
     try {
-      NameIdentifier ident = NameIdentifier.ofSchema(metalake, catalog, schema);
-      Schema s = dispatcher.loadSchema(ident);
-      return Utils.ok(new SchemaResponse(DTOConverters.toDTO(s)));
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            NameIdentifier ident = NameIdentifier.ofSchema(metalake, catalog, schema);
+            Schema s = dispatcher.loadSchema(ident);
+            return Utils.ok(new SchemaResponse(DTOConverters.toDTO(s)));
+          });
 
     } catch (Exception e) {
       return ExceptionHandlers.handleSchemaException(OperationType.LOAD, schema, catalog, e);
@@ -120,14 +132,18 @@ public class SchemaOperations {
       @PathParam("schema") String schema,
       SchemaUpdatesRequest request) {
     try {
-      request.validate();
-      NameIdentifier ident = NameIdentifier.ofSchema(metalake, catalog, schema);
-      SchemaChange[] changes =
-          request.getUpdates().stream()
-              .map(SchemaUpdateRequest::schemaChange)
-              .toArray(SchemaChange[]::new);
-      Schema s = dispatcher.alterSchema(ident, changes);
-      return Utils.ok(new SchemaResponse(DTOConverters.toDTO(s)));
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            request.validate();
+            NameIdentifier ident = NameIdentifier.ofSchema(metalake, catalog, schema);
+            SchemaChange[] changes =
+                request.getUpdates().stream()
+                    .map(SchemaUpdateRequest::schemaChange)
+                    .toArray(SchemaChange[]::new);
+            Schema s = dispatcher.alterSchema(ident, changes);
+            return Utils.ok(new SchemaResponse(DTOConverters.toDTO(s)));
+          });
 
     } catch (Exception e) {
       return ExceptionHandlers.handleSchemaException(OperationType.ALTER, schema, catalog, e);
@@ -145,14 +161,17 @@ public class SchemaOperations {
       @PathParam("schema") String schema,
       @DefaultValue("false") @QueryParam("cascade") boolean cascade) {
     try {
-      NameIdentifier ident = NameIdentifier.ofSchema(metalake, catalog, schema);
-      boolean dropped = dispatcher.dropSchema(ident, cascade);
-      if (!dropped) {
-        LOG.warn("Fail to drop schema {} under namespace {}", schema, ident.namespace());
-      }
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            NameIdentifier ident = NameIdentifier.ofSchema(metalake, catalog, schema);
+            boolean dropped = dispatcher.dropSchema(ident, cascade);
+            if (!dropped) {
+              LOG.warn("Fail to drop schema {} under namespace {}", schema, ident.namespace());
+            }
 
-      return Utils.ok(new DropResponse(dropped));
-
+            return Utils.ok(new DropResponse(dropped));
+          });
     } catch (Exception e) {
       return ExceptionHandlers.handleSchemaException(OperationType.DROP, schema, catalog, e);
     }

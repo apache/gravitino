@@ -30,6 +30,7 @@ import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.datastrato.gravitino.rel.TableCatalog;
 import com.datastrato.gravitino.storage.IdGenerator;
 import com.datastrato.gravitino.utils.IsolatedClassLoader;
+import com.datastrato.gravitino.utils.PrincipalUtils;
 import com.datastrato.gravitino.utils.ThrowableFunction;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
@@ -261,7 +262,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
             .withProperties(StringIdentifier.newPropertiesWithId(stringId, mergedConfig))
             .withAuditInfo(
                 new AuditInfo.Builder()
-                    .withCreator("gravitino") /* TODO. Should change to real user */
+                    .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
                     .withCreateTime(Instant.now())
                     .build())
             .build();
@@ -366,8 +367,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
                     new AuditInfo.Builder()
                         .withCreator(catalog.auditInfo().creator())
                         .withCreateTime(catalog.auditInfo().createTime())
-                        .withLastModifier(
-                            catalog.auditInfo().creator()) /* TODO. We should use real user */
+                        .withLastModifier(PrincipalUtils.getCurrentPrincipal().getName())
                         .withLastModifiedTime(Instant.now())
                         .build();
                 newCatalogBuilder.withAuditInfo(newInfo);

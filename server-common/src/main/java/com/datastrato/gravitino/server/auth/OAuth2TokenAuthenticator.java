@@ -5,6 +5,7 @@
 package com.datastrato.gravitino.server.auth;
 
 import com.datastrato.gravitino.Config;
+import com.datastrato.gravitino.UserPrincipal;
 import com.datastrato.gravitino.auth.AuthConstants;
 import com.datastrato.gravitino.auth.SignatureAlgorithmFamilyType;
 import com.datastrato.gravitino.exceptions.UnauthorizedException;

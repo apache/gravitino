@@ -30,6 +30,7 @@ import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.CatalogChange;
 import com.datastrato.gravitino.MetalakeChange;
 import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.auth.AuthConstants;
 import com.datastrato.gravitino.catalog.hive.HiveClientPool;
 import com.datastrato.gravitino.catalog.hive.HiveSchemaPropertiesMetadata;
 import com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata;
@@ -728,14 +729,17 @@ public class CatalogHiveIT extends AbstractIT {
   @Test
   public void testAlterHiveTable() throws TException, InterruptedException {
     ColumnDTO[] columns = createColumns();
-    catalog
-        .asTableCatalog()
-        .createTable(
-            NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
-            columns,
-            TABLE_COMMENT,
-            createProperties(),
-            new Partitioning[] {IdentityPartitioningDTO.of(columns[2].name())});
+    Table createdTable =
+        catalog
+            .asTableCatalog()
+            .createTable(
+                NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
+                columns,
+                TABLE_COMMENT,
+                createProperties(),
+                new Partitioning[] {IdentityPartitioningDTO.of(columns[2].name())});
+    Assertions.assertNull(createdTable.auditInfo().lastModifier());
+    Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, createdTable.auditInfo().creator());
     Table alteredTable =
         catalog
             .asTableCatalog()
@@ -754,7 +758,8 @@ public class CatalogHiveIT extends AbstractIT {
                 TableChange.updateColumnComment(new String[] {HIVE_COL_NAME1}, "comment_new"),
                 TableChange.updateColumnType(
                     new String[] {HIVE_COL_NAME1}, Types.IntegerType.get()));
-
+    Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, alteredTable.auditInfo().creator());
+    Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, alteredTable.auditInfo().lastModifier());
     // Direct get table from hive metastore to check if the table is altered successfully.
     org.apache.hadoop.hive.metastore.api.Table hiveTab =
         hiveClientPool.run(client -> client.getTable(schemaName, ALTER_TABLE_NAME));
@@ -897,12 +902,19 @@ public class CatalogHiveIT extends AbstractIT {
 
     GravitinoMetaLake metalake = client.loadMetalake(NameIdentifier.of(metalakeName));
     Catalog catalog = metalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
-    catalog
-        .asSchemas()
-        .alterSchema(
-            ident,
-            SchemaChange.removeProperty("key1"),
-            SchemaChange.setProperty("key2", "val2-alter"));
+    Schema schema = catalog.asSchemas().loadSchema(ident);
+    Assertions.assertNull(schema.auditInfo().lastModifier());
+    Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, schema.auditInfo().creator());
+    schema =
+        catalog
+            .asSchemas()
+            .alterSchema(
+                ident,
+                SchemaChange.removeProperty("key1"),
+                SchemaChange.setProperty("key2", "val2-alter"));
+
+    Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, schema.auditInfo().lastModifier());
+    Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, schema.auditInfo().creator());
 
     Map<String, String> properties2 = catalog.asSchemas().loadSchema(ident).properties();
     Assertions.assertFalse(properties2.containsKey("key1"));
