@@ -101,11 +101,12 @@ public class TrinoQueryIT {
 
     Map<String, String> env = new HashMap<>();
     env.put("GRAVITINO_SERVER_PORT", String.valueOf(AbstractIT.getGravitinoServerPort()));
-    CommandExecutor.executeCommandLocalHost(
-        System.getenv("GRAVITINO_HOME") + "/dev/docker/trino-it/launch.sh",
-        false,
-        ProcessData.TypesOfData.STREAMS_MERGED,
-        env);
+    output =
+        CommandExecutor.executeCommandLocalHost(
+            System.getenv("GRAVITINO_HOME") + "/dev/docker/trino-it/launch.sh",
+            false,
+            ProcessData.TypesOfData.STREAMS_MERGED,
+            env);
     Log.info("Execute output: {}", output);
 
     output =
