@@ -14,7 +14,7 @@ import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
 import javax.security.auth.Subject;
 
-@SuppressWarnings("deprecation")
+@SuppressWarnings("removal")
 public class PrincipalUtils {
   private PrincipalUtils() {}
 
