@@ -5,9 +5,5 @@
 #
 cd "$(dirname "$0")"
 
-if [ "$1" = "-s" ]; then
-  docker-compose down >> ../../../integration-test/build/integration-test.log 2>&1
-else
-  docker-compose down
-fi
+docker-compose down >> ../../../integration-test/build/integration-test.log 2>&1
 

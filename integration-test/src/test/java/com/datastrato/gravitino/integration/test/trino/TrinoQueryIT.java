@@ -92,24 +92,27 @@ public class TrinoQueryIT {
     gravitinoUri = String.format("http://%s:%d", "127.0.0.1", AbstractIT.getGravitinoServerPort());
     gravitinoClient = AbstractIT.client;
 
-    CommandExecutor.executeCommandLocalHost(
-        System.getenv("GRAVITINO_HOME") + "/dev/docker/trino-it/shutdown.sh",
-        false,
-        ProcessData.TypesOfData.OUTPUT);
+    Object output =
+        CommandExecutor.executeCommandLocalHost(
+            System.getenv("GRAVITINO_HOME") + "/dev/docker/trino-it/shutdown.sh",
+            false,
+            ProcessData.TypesOfData.STREAMS_MERGED);
+    Log.info("Execute output: {}", output);
 
     Map<String, String> env = new HashMap<>();
     env.put("GRAVITINO_SERVER_PORT", String.valueOf(AbstractIT.getGravitinoServerPort()));
     CommandExecutor.executeCommandLocalHost(
-        System.getenv("GRAVITINO_HOME") + "/dev/docker/trino-it/launch.sh -s",
+        System.getenv("GRAVITINO_HOME") + "/dev/docker/trino-it/launch.sh",
         false,
-        ProcessData.TypesOfData.OUTPUT,
+        ProcessData.TypesOfData.STREAMS_MERGED,
         env);
+    Log.info("Execute output: {}", output);
 
-    Object output =
+    output =
         CommandExecutor.executeCommandLocalHost(
             System.getenv("GRAVITINO_HOME") + "/dev/docker/trino-it/inspect_ip.sh",
             false,
-            ProcessData.TypesOfData.OUTPUT);
+            ProcessData.TypesOfData.STREAMS_MERGED);
     String containerIpMapping = output.toString();
     LOG.info("Container IP mapping:\n{}", containerIpMapping);
     try {
@@ -208,10 +211,12 @@ public class TrinoQueryIT {
 
     try {
       if (autoStartEnv) {
-        CommandExecutor.executeCommandLocalHost(
-            System.getenv("GRAVITINO_HOME") + "/dev/docker/trino-it/shutdown.sh",
-            false,
-            ProcessData.TypesOfData.OUTPUT);
+        Object output =
+            CommandExecutor.executeCommandLocalHost(
+                System.getenv("GRAVITINO_HOME") + "/dev/docker/trino-it/shutdown.sh",
+                false,
+                ProcessData.TypesOfData.STREAMS_MERGED);
+        Log.info("Execute output: {}", output);
 
         AbstractIT.stopIntegrationTest();
       }

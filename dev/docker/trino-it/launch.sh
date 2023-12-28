@@ -19,10 +19,6 @@ fi
 
 cd ${playground_dir}
 
-if [ "$1" = "-s" ]; then
-  docker-compose up -d >> ../../../integration-test/build/integration-test.log 2>&1
-else
-  docker-compose up -d
-fi
+docker-compose up -d >> ../../../integration-test/build/integration-test.log 2>&1
 
 nohup docker-compose logs -f  -t >> ../../../integration-test/build/integration-test.log &
