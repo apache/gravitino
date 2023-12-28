@@ -14,5 +14,6 @@ public interface AuthConstants {
 
   String ANONYMOUS_USER = "anonymous";
 
+  // Refer to the style of `AuthenticationFilter#AuthenticatedRoleAttributeName` of Apache Pulsar
   String AUTHENTICATED_PRINCIPAL_ATTRIBUTE_NAME = AuthConstants.class.getName() + "-principal";
 }
