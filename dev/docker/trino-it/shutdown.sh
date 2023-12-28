@@ -5,5 +5,5 @@
 #
 cd "$(dirname "$0")"
 
-docker-compose down >> ../../../integration-test/build/integration-test.log 2>&1
+docker-compose down
 

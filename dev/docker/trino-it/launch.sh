@@ -19,6 +19,6 @@ fi
 
 cd ${playground_dir}
 
-docker-compose up -d >> ../../../integration-test/build/integration-test.log 2>&1
+docker-compose up -d
 
 nohup docker-compose logs -f  -t >> ../../../integration-test/build/integration-test.log &
