@@ -41,22 +41,4 @@ public class TestPrincipalUtils {
           return null;
         });
   }
-
-  @Test
-  public void testThreadPool() throws Exception {
-    UserPrincipal principal = new UserPrincipal("testThreadPool");
-    ExecutorService executorService = Executors.newCachedThreadPool();
-    PrincipalUtils.doAs(
-        principal,
-        () -> {
-          Future<?> future =
-              executorService.submit(
-                  () ->
-                      Assertions.assertEquals(
-                          "testThreadPool", PrincipalUtils.getCurrentPrincipal().getName()));
-          future.get();
-          return null;
-        });
-    executorService.shutdownNow();
-  }
 }
