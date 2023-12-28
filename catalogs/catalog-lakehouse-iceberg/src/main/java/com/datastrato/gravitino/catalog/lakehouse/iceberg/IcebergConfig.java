@@ -14,7 +14,6 @@ import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogP
 import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogPropertiesMetadata.WAREHOUSE;
 
 import com.datastrato.gravitino.Config;
-import com.datastrato.gravitino.catalog.lakehouse.iceberg.web.metrics.DummyMetricsStore;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.web.metrics.IcebergMetricsManager;
 import com.datastrato.gravitino.config.ConfigBuilder;
 import com.datastrato.gravitino.config.ConfigConstants;
@@ -83,7 +82,7 @@ public class IcebergConfig extends Config {
           .doc("The store to save Iceberg metrics")
           .version("0.4.0")
           .stringConf()
-          .createWithDefault(DummyMetricsStore.ICEBERG_METRICS_STORE_DUMMY_NAME);
+          .create();
 
   public static final ConfigEntry<Integer> ICEBERG_METRICS_STORE_RETAIN_DAYS =
       new ConfigBuilder(IcebergMetricsManager.ICEBERG_METRICS_STORE_RETAIN_DAYS)

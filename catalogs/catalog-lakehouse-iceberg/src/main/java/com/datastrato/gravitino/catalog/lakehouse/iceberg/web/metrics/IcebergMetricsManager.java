@@ -158,6 +158,9 @@ public class IcebergMetricsManager {
   }
 
   private IcebergMetricsStore loadIcebergMetricsStore(String metricsStoreName) {
+    if (metricsStoreName == null) {
+      metricsStoreName = DummyMetricsStore.ICEBERG_METRICS_STORE_DUMMY_NAME;
+    }
     String metricsStoreClass =
         ICEBERG_METRICS_STORE_NAMES.getOrDefault(metricsStoreName, metricsStoreName);
     LOG.info("Load Iceberg metrics store: {}.", metricsStoreClass);
