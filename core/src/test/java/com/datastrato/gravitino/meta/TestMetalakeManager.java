@@ -15,6 +15,8 @@ import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
 import com.datastrato.gravitino.storage.RandomIdGenerator;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Sets;
+
+import java.io.IOException;
 import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.AfterAll;
@@ -42,7 +44,7 @@ public class TestMetalakeManager {
   }
 
   @AfterAll
-  public static void tearDown() throws Exception {
+  public static void tearDown() throws IOException {
     if (entityStore != null) {
       entityStore.close();
       entityStore = null;

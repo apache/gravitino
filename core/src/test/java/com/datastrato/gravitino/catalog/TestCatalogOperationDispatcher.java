@@ -101,7 +101,7 @@ public class TestCatalogOperationDispatcher {
   }
 
   @AfterAll
-  public static void tearDown() throws Exception {
+  public static void tearDown() throws IOException {
     if (entityStore != null) {
       entityStore.close();
       entityStore = null;
