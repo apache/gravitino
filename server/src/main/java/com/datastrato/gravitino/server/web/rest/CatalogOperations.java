@@ -8,7 +8,6 @@ import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.CatalogChange;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
-import com.datastrato.gravitino.PrincipalContext;
 import com.datastrato.gravitino.catalog.CatalogManager;
 import com.datastrato.gravitino.dto.requests.CatalogCreateRequest;
 import com.datastrato.gravitino.dto.requests.CatalogUpdateRequest;
@@ -67,17 +66,21 @@ public class CatalogOperations {
   @Produces("application/vnd.gravitino.v1+json")
   public Response createCatalog(
       @PathParam("metalake") String metalake, CatalogCreateRequest request) {
-    try (PrincipalContext context = Utils.createUserPrincipalContext(httpRequest)) {
-      request.validate();
-      NameIdentifier ident = NameIdentifier.ofCatalog(metalake, request.getName());
-      Catalog catalog =
-          manager.createCatalog(
-              ident,
-              request.getType(),
-              request.getProvider(),
-              request.getComment(),
-              request.getProperties());
-      return Utils.ok(new CatalogResponse(DTOConverters.toDTO(catalog)));
+    try {
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            request.validate();
+            NameIdentifier ident = NameIdentifier.ofCatalog(metalake, request.getName());
+            Catalog catalog =
+                manager.createCatalog(
+                    ident,
+                    request.getType(),
+                    request.getProvider(),
+                    request.getComment(),
+                    request.getProperties());
+            return Utils.ok(new CatalogResponse(DTOConverters.toDTO(catalog)));
+          });
 
     } catch (Exception e) {
       return ExceptionHandlers.handleCatalogException(
@@ -108,16 +111,20 @@ public class CatalogOperations {
       @PathParam("metalake") String metalakeName,
       @PathParam("catalog") String catalogName,
       CatalogUpdatesRequest request) {
-    try (PrincipalContext context = Utils.createUserPrincipalContext(httpRequest)) {
-      request.validate();
-      NameIdentifier ident = NameIdentifier.ofCatalog(metalakeName, catalogName);
-      CatalogChange[] changes =
-          request.getUpdates().stream()
-              .map(CatalogUpdateRequest::catalogChange)
-              .toArray(CatalogChange[]::new);
+    try {
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            request.validate();
+            NameIdentifier ident = NameIdentifier.ofCatalog(metalakeName, catalogName);
+            CatalogChange[] changes =
+                request.getUpdates().stream()
+                    .map(CatalogUpdateRequest::catalogChange)
+                    .toArray(CatalogChange[]::new);
 
-      Catalog catalog = manager.alterCatalog(ident, changes);
-      return Utils.ok(new CatalogResponse(DTOConverters.toDTO(catalog)));
+            Catalog catalog = manager.alterCatalog(ident, changes);
+            return Utils.ok(new CatalogResponse(DTOConverters.toDTO(catalog)));
+          });
 
     } catch (Exception e) {
       return ExceptionHandlers.handleCatalogException(

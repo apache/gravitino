@@ -99,7 +99,6 @@ public class TestCatalogOperationDispatcher {
 
     NameIdentifier ident = NameIdentifier.of(metalake, catalog);
     Map<String, String> props = ImmutableMap.of();
-    context = PrincipalContext.createPrincipalContext("gravitino");
     catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, "test", "comment", props);
   }
 

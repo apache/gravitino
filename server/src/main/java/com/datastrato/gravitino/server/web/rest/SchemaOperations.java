@@ -8,7 +8,6 @@ import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
-import com.datastrato.gravitino.PrincipalContext;
 import com.datastrato.gravitino.catalog.CatalogOperationDispatcher;
 import com.datastrato.gravitino.dto.requests.SchemaCreateRequest;
 import com.datastrato.gravitino.dto.requests.SchemaUpdateRequest;
@@ -79,11 +78,16 @@ public class SchemaOperations {
       @PathParam("metalake") String metalake,
       @PathParam("catalog") String catalog,
       SchemaCreateRequest request) {
-    try (PrincipalContext context = Utils.createUserPrincipalContext(httpRequest)) {
-      request.validate();
-      NameIdentifier ident = NameIdentifier.ofSchema(metalake, catalog, request.getName());
-      Schema schema = dispatcher.createSchema(ident, request.getComment(), request.getProperties());
-      return Utils.ok(new SchemaResponse(DTOConverters.toDTO(schema)));
+    try {
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            request.validate();
+            NameIdentifier ident = NameIdentifier.ofSchema(metalake, catalog, request.getName());
+            Schema schema =
+                dispatcher.createSchema(ident, request.getComment(), request.getProperties());
+            return Utils.ok(new SchemaResponse(DTOConverters.toDTO(schema)));
+          });
 
     } catch (Exception e) {
       return ExceptionHandlers.handleSchemaException(
@@ -120,15 +124,19 @@ public class SchemaOperations {
       @PathParam("catalog") String catalog,
       @PathParam("schema") String schema,
       SchemaUpdatesRequest request) {
-    try (PrincipalContext context = Utils.createUserPrincipalContext(httpRequest)) {
-      request.validate();
-      NameIdentifier ident = NameIdentifier.ofSchema(metalake, catalog, schema);
-      SchemaChange[] changes =
-          request.getUpdates().stream()
-              .map(SchemaUpdateRequest::schemaChange)
-              .toArray(SchemaChange[]::new);
-      Schema s = dispatcher.alterSchema(ident, changes);
-      return Utils.ok(new SchemaResponse(DTOConverters.toDTO(s)));
+    try {
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            request.validate();
+            NameIdentifier ident = NameIdentifier.ofSchema(metalake, catalog, schema);
+            SchemaChange[] changes =
+                request.getUpdates().stream()
+                    .map(SchemaUpdateRequest::schemaChange)
+                    .toArray(SchemaChange[]::new);
+            Schema s = dispatcher.alterSchema(ident, changes);
+            return Utils.ok(new SchemaResponse(DTOConverters.toDTO(s)));
+          });
 
     } catch (Exception e) {
       return ExceptionHandlers.handleSchemaException(OperationType.ALTER, schema, catalog, e);

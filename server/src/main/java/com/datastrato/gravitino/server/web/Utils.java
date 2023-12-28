@@ -4,10 +4,11 @@
  */
 package com.datastrato.gravitino.server.web;
 
-import com.datastrato.gravitino.PrincipalContext;
+import com.datastrato.gravitino.UserPrincipal;
 import com.datastrato.gravitino.auth.AuthConstants;
 import com.datastrato.gravitino.dto.responses.ErrorResponse;
-import com.datastrato.gravitino.server.auth.UserPrincipal;
+import com.datastrato.gravitino.utils.PrincipalUtils;
+import java.security.PrivilegedExceptionAction;
 import java.util.Optional;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.core.MediaType;
@@ -98,12 +99,13 @@ public class Utils {
         .build();
   }
 
-  public static PrincipalContext createUserPrincipalContext(HttpServletRequest httpRequest) {
+  public static Response doAs(
+      HttpServletRequest httpRequest, PrivilegedExceptionAction<Response> action) throws Exception {
     UserPrincipal principal =
         (UserPrincipal) httpRequest.getAttribute(AuthConstants.AuthenticatedPrincipalAttributeName);
     if (principal == null) {
       principal = new UserPrincipal(AuthConstants.ANONYMOUS_USER);
     }
-    return PrincipalContext.createPrincipalContext(principal.getName());
+    return PrincipalUtils.doAs(principal, action);
   }
 }

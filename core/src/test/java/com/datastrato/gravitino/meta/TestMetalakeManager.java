@@ -8,7 +8,6 @@ import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.EntityStore;
 import com.datastrato.gravitino.MetalakeChange;
 import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.PrincipalContext;
 import com.datastrato.gravitino.StringIdentifier;
 import com.datastrato.gravitino.TestEntityStore;
 import com.datastrato.gravitino.exceptions.MetalakeAlreadyExistsException;
@@ -31,8 +30,6 @@ public class TestMetalakeManager {
 
   private static Config config;
 
-  private static PrincipalContext context;
-
   @BeforeAll
   public static void setUp() {
     config = new Config(false) {};
@@ -42,7 +39,6 @@ public class TestMetalakeManager {
     entityStore.setSerDe(null);
 
     metalakeManager = new MetalakeManager(entityStore, new RandomIdGenerator());
-    context = PrincipalContext.createPrincipalContext("test");
   }
 
   @AfterAll

@@ -9,7 +9,6 @@ import com.codahale.metrics.annotation.Timed;
 import com.datastrato.gravitino.MetalakeChange;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
-import com.datastrato.gravitino.PrincipalContext;
 import com.datastrato.gravitino.dto.MetalakeDTO;
 import com.datastrato.gravitino.dto.requests.MetalakeCreateRequest;
 import com.datastrato.gravitino.dto.requests.MetalakeUpdateRequest;
@@ -77,12 +76,16 @@ public class MetalakeOperations {
   @Timed(name = "create-metalake." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "create-metalake", absolute = true)
   public Response createMetalake(MetalakeCreateRequest request) {
-    try (PrincipalContext context = Utils.createUserPrincipalContext(httpRequest)) {
-      request.validate();
-      NameIdentifier ident = NameIdentifier.ofMetalake(request.getName());
-      BaseMetalake metalake =
-          manager.createMetalake(ident, request.getComment(), request.getProperties());
-      return Utils.ok(new MetalakeResponse(DTOConverters.toDTO(metalake)));
+    try {
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            request.validate();
+            NameIdentifier ident = NameIdentifier.ofMetalake(request.getName());
+            BaseMetalake metalake =
+                manager.createMetalake(ident, request.getComment(), request.getProperties());
+            return Utils.ok(new MetalakeResponse(DTOConverters.toDTO(metalake)));
+          });
 
     } catch (Exception e) {
       return ExceptionHandlers.handleMetalakeException(OperationType.CREATE, request.getName(), e);
@@ -112,16 +115,20 @@ public class MetalakeOperations {
   @ResponseMetered(name = "alter-metalake", absolute = true)
   public Response alterMetalake(
       @PathParam("name") String metalakeName, MetalakeUpdatesRequest updatesRequest) {
-    try (PrincipalContext context = Utils.createUserPrincipalContext(httpRequest)) {
-      updatesRequest.validate();
-      NameIdentifier identifier = NameIdentifier.ofMetalake(metalakeName);
-      MetalakeChange[] changes =
-          updatesRequest.getUpdates().stream()
-              .map(MetalakeUpdateRequest::metalakeChange)
-              .toArray(MetalakeChange[]::new);
+    try {
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            updatesRequest.validate();
+            NameIdentifier identifier = NameIdentifier.ofMetalake(metalakeName);
+            MetalakeChange[] changes =
+                updatesRequest.getUpdates().stream()
+                    .map(MetalakeUpdateRequest::metalakeChange)
+                    .toArray(MetalakeChange[]::new);
 
-      BaseMetalake updatedMetalake = manager.alterMetalake(identifier, changes);
-      return Utils.ok(new MetalakeResponse(DTOConverters.toDTO(updatedMetalake)));
+            BaseMetalake updatedMetalake = manager.alterMetalake(identifier, changes);
+            return Utils.ok(new MetalakeResponse(DTOConverters.toDTO(updatedMetalake)));
+          });
 
     } catch (Exception e) {
       return ExceptionHandlers.handleMetalakeException(OperationType.ALTER, metalakeName, e);
