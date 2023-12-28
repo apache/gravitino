@@ -7,6 +7,7 @@ package com.datastrato.gravitino.utils;
 
 import com.datastrato.gravitino.UserPrincipal;
 import com.datastrato.gravitino.auth.AuthConstants;
+import com.google.common.base.Throwables;
 import java.security.Principal;
 import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
@@ -24,16 +25,8 @@ public class PrincipalUtils {
       return Subject.doAs(subject, action);
     } catch (PrivilegedActionException pae) {
       Throwable cause = pae.getCause();
-      if (!(cause instanceof Exception)) {
-        throw new RuntimeException(
-            "PrivilegedActionException with no "
-                + "underlying cause. Principal "
-                + principal.getName()
-                + " : "
-                + pae,
-            pae);
-      }
-      throw (Exception) cause;
+      Throwables.propagateIfPossible(cause, Exception.class);
+      throw new RuntimeException("doAs method occurs an unexpected exception", pae);
     }
   }
 
