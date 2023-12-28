@@ -111,10 +111,10 @@ public class TrinoQueryIT {
       if (catalogs.isEmpty() || catalogs.contains("jdbc-mysql")) {
         dropCatalog("jdbc-mysql");
         HashMap<String, String> properties = new HashMap<>();
-        properties.put("gravitino.bypass.jdbc-url", mysqlUri);
-        properties.put("gravitino.bypass.jdbc-user", "root");
-        properties.put("gravitino.bypass.jdbc-password", "ds123");
-        properties.put("gravitino.bypass.driverClassName", "com.mysql.cj.jdbc.Driver");
+        properties.put("jdbc-url", mysqlUri);
+        properties.put("jdbc-user", "root");
+        properties.put("jdbc-password", "ds123");
+        properties.put("jdbc-driver", "com.mysql.cj.jdbc.Driver");
 
         createCatalog("jdbc-mysql", "jdbc-mysql", properties);
       }
@@ -126,7 +126,7 @@ public class TrinoQueryIT {
         properties.put("jdbc-user", "root");
         properties.put("jdbc-password", "ds123");
         properties.put("jdbc-database", "mydb");
-        properties.put("gravitino.bypass.driverClassName", "org.postgresql.Driver");
+        properties.put("jdbc-driver", "org.postgresql.Driver");
 
         createCatalog("jdbc-postgresql", "jdbc-postgresql", properties);
       }

@@ -4,11 +4,15 @@
  */
 package com.datastrato.gravitino.trino.connector;
 
+import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_METALAKE_NOT_EXISTS;
+
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorContext;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorFactory;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorManager;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogInjector;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
+import io.trino.spi.TrinoException;
 import io.trino.spi.connector.Connector;
 import io.trino.spi.connector.ConnectorContext;
 import io.trino.spi.connector.ConnectorFactory;
@@ -41,6 +45,7 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
   public Connector create(
       String catalogName, Map<String, String> requiredConfig, ConnectorContext context) {
     Preconditions.checkArgument(requiredConfig != null, "requiredConfig is not null");
+    GravitinoConfig config = new GravitinoConfig(requiredConfig);
 
     synchronized (this) {
       if (catalogConnectorManager == null) {
@@ -50,7 +55,6 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
           CatalogConnectorFactory catalogConnectorFactory =
               new CatalogConnectorFactory(catalogInjector);
 
-          GravitinoConfig config = new GravitinoConfig(requiredConfig);
           catalogConnectorManager =
               new CatalogConnectorManager(catalogInjector, catalogConnectorFactory);
           catalogConnectorManager.config(config);
@@ -66,17 +70,26 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
           LOG.error("Initialization of the GravitinoConnector failed.", e);
           throw e;
         }
-
-        // Default GravitinoConnector named "gravitino" is just using to load
-        // CatalogConnectorManager,
-        // that's dynamically loading catalogs from gravitino server.
-        return new DummyGravitinoConnector();
       }
     }
 
-    CatalogConnectorContext catalogConnectorContext =
-        catalogConnectorManager.getCatalogConnector(catalogName);
-    Preconditions.checkNotNull(catalogConnectorContext, "catalogConnector is not null");
-    return catalogConnectorContext.getConnector();
+    if (config.isDynamicConnector()) {
+      // The dynamic connector is an instance of GravitinoConnector. It is loaded from Gravitino
+      // server.
+      CatalogConnectorContext catalogConnectorContext =
+          catalogConnectorManager.getCatalogConnector(catalogName);
+      Preconditions.checkNotNull(catalogConnectorContext, "catalogConnector is not null");
+      return catalogConnectorContext.getConnector();
+    } else {
+      // The static connector is an instance of DummyGravitinoConnector. It is loaded by Trino using
+      // the connector configuration.
+      String metalake = config.getMetalake();
+      if (Strings.isNullOrEmpty(metalake)) {
+        throw new TrinoException(GRAVITINO_METALAKE_NOT_EXISTS, "No gravitino metalake selected");
+      }
+      catalogConnectorManager.addMetalake(metalake);
+
+      return new DummyGravitinoConnector(metalake, catalogConnectorManager);
+    }
   }
 }

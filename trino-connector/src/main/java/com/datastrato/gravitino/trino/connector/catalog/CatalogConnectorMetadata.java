@@ -65,7 +65,7 @@ public class CatalogConnectorMetadata {
     } catch (UnsupportedOperationException e) {
       throw new TrinoException(
           GRAVITINO_UNSUPPORTED_OPERATION,
-          "Catalog does not support schema or table operations",
+          "Catalog does not support schema or table operations." + e.getMessage(),
           e);
     }
   }
