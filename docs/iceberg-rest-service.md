@@ -24,9 +24,9 @@ Builds with Apache Iceberg `1.3.1`. The Apache Iceberg table format version is `
 Builds with Hadoop 2.10.x, there may be compatibility issues when accessing Hadoop 3.x clusters.
 :::
 
-## Gravitino Iceberg REST catalog service configurations
+## Gravitino Iceberg REST catalog service configuration
 
-Assuming the Gravitino server is deployed in the `GRAVITINO_HOME` directory, you can locate the configuration options in [`$GRAVITINO_HOME/conf/gravitino.conf`](gravitino-server-config.md). There are three types of configurations for the Iceberg REST catalog service:
+Assuming the Gravitino server is deployed in the `GRAVITINO_HOME` directory, you can locate the configuration options in [`$GRAVITINO_HOME/conf/gravitino.conf`](gravitino-server-config.md). There are three configuration properties for the Iceberg REST catalog service:
 
 1. [**REST Catalog Server Configuration**](#rest-catalog-server-configuration): you can specify the HTTP server properties like host and port.
 
