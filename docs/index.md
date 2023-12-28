@@ -88,7 +88,7 @@ to learn how to use the playground.
 
 Gravitino supports different catalogs to manage the metadata in different sources. Please see:
 
-* [Iceberg catalog](./lakehouse-iceberg-catalog.md): a complete guide to use Gravitino to
+* [Iceberg catalog](./lakehouse-iceberg-catalog.md): a complete guide to using Gravitino to
   manage Apache Iceberg data.
 * [Iceberg REST catalog service](./iceberg-rest-service.md): a
   complete guide to use Gravitino as an Apache Iceberg REST catalog service.
