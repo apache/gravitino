@@ -130,7 +130,6 @@ public class TrinoQueryIT {
         }
       }
     } catch (Exception e) {
-      LOG.error("Failed to parse container ip mapping", e);
       throw new Exception("Failed to parse container ip mapping:\n" + containerIpMapping, e);
     }
   }
