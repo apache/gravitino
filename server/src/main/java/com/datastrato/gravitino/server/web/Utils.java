@@ -102,7 +102,8 @@ public class Utils {
   public static Response doAs(
       HttpServletRequest httpRequest, PrivilegedExceptionAction<Response> action) throws Exception {
     UserPrincipal principal =
-        (UserPrincipal) httpRequest.getAttribute(AuthConstants.AuthenticatedPrincipalAttributeName);
+        (UserPrincipal)
+            httpRequest.getAttribute(AuthConstants.AUTHENTICATED_PRINCIPAL_ATTRIBUTE_NAME);
     if (principal == null) {
       principal = new UserPrincipal(AuthConstants.ANONYMOUS_USER);
     }

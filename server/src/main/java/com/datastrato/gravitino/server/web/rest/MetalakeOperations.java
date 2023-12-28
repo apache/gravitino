@@ -60,10 +60,14 @@ public class MetalakeOperations {
   @ResponseMetered(name = "list-metalake", absolute = true)
   public Response listMetalakes() {
     try {
-      BaseMetalake[] metalakes = manager.listMetalakes();
-      MetalakeDTO[] metalakeDTOS =
-          Arrays.stream(metalakes).map(DTOConverters::toDTO).toArray(MetalakeDTO[]::new);
-      return Utils.ok(new MetalakeListResponse(metalakeDTOS));
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            BaseMetalake[] metalakes = manager.listMetalakes();
+            MetalakeDTO[] metalakeDTOS =
+                Arrays.stream(metalakes).map(DTOConverters::toDTO).toArray(MetalakeDTO[]::new);
+            return Utils.ok(new MetalakeListResponse(metalakeDTOS));
+          });
 
     } catch (Exception e) {
       return ExceptionHandlers.handleMetalakeException(
@@ -99,9 +103,13 @@ public class MetalakeOperations {
   @ResponseMetered(name = "load-metalake", absolute = true)
   public Response loadMetalake(@PathParam("name") String metalakeName) {
     try {
-      NameIdentifier identifier = NameIdentifier.ofMetalake(metalakeName);
-      BaseMetalake metalake = manager.loadMetalake(identifier);
-      return Utils.ok(new MetalakeResponse(DTOConverters.toDTO(metalake)));
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            NameIdentifier identifier = NameIdentifier.ofMetalake(metalakeName);
+            BaseMetalake metalake = manager.loadMetalake(identifier);
+            return Utils.ok(new MetalakeResponse(DTOConverters.toDTO(metalake)));
+          });
 
     } catch (Exception e) {
       return ExceptionHandlers.handleMetalakeException(OperationType.LOAD, metalakeName, e);
@@ -142,13 +150,17 @@ public class MetalakeOperations {
   @ResponseMetered(name = "drop-metalake", absolute = true)
   public Response dropMetalake(@PathParam("name") String metalakeName) {
     try {
-      NameIdentifier identifier = NameIdentifier.ofMetalake(metalakeName);
-      boolean dropped = manager.dropMetalake(identifier);
-      if (!dropped) {
-        LOG.warn("Failed to drop metalake by name {}", metalakeName);
-      }
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            NameIdentifier identifier = NameIdentifier.ofMetalake(metalakeName);
+            boolean dropped = manager.dropMetalake(identifier);
+            if (!dropped) {
+              LOG.warn("Failed to drop metalake by name {}", metalakeName);
+            }
 
-      return Utils.ok(new DropResponse(dropped));
+            return Utils.ok(new DropResponse(dropped));
+          });
 
     } catch (Exception e) {
       return ExceptionHandlers.handleMetalakeException(OperationType.DROP, metalakeName, e);

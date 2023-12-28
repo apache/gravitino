@@ -14,5 +14,5 @@ public interface AuthConstants {
 
   String ANONYMOUS_USER = "anonymous";
 
-  String AuthenticatedPrincipalAttributeName = AuthConstants.class.getName() + "-principal";
+  String AUTHENTICATED_PRINCIPAL_ATTRIBUTE_NAME = AuthConstants.class.getName() + "-principal";
 }

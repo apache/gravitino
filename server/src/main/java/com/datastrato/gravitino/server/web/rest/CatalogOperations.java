@@ -53,10 +53,13 @@ public class CatalogOperations {
   @Produces("application/vnd.gravitino.v1+json")
   public Response listCatalogs(@PathParam("metalake") String metalake) {
     try {
-      Namespace catalogNS = Namespace.ofCatalog(metalake);
-      NameIdentifier[] idents = manager.listCatalogs(catalogNS);
-      return Utils.ok(new EntityListResponse(idents));
-
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            Namespace catalogNS = Namespace.ofCatalog(metalake);
+            NameIdentifier[] idents = manager.listCatalogs(catalogNS);
+            return Utils.ok(new EntityListResponse(idents));
+          });
     } catch (Exception e) {
       return ExceptionHandlers.handleCatalogException(OperationType.LIST, "", metalake, e);
     }
@@ -138,14 +141,17 @@ public class CatalogOperations {
   public Response dropCatalog(
       @PathParam("metalake") String metalakeName, @PathParam("catalog") String catalogName) {
     try {
-      NameIdentifier ident = NameIdentifier.ofCatalog(metalakeName, catalogName);
-      boolean dropped = manager.dropCatalog(ident);
-      if (!dropped) {
-        LOG.warn("Failed to drop catalog {} under metalake {}", catalogName, metalakeName);
-      }
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            NameIdentifier ident = NameIdentifier.ofCatalog(metalakeName, catalogName);
+            boolean dropped = manager.dropCatalog(ident);
+            if (!dropped) {
+              LOG.warn("Failed to drop catalog {} under metalake {}", catalogName, metalakeName);
+            }
 
-      return Utils.ok(new DropResponse(dropped));
-
+            return Utils.ok(new DropResponse(dropped));
+          });
     } catch (Exception e) {
       return ExceptionHandlers.handleCatalogException(
           OperationType.DROP, catalogName, metalakeName, e);

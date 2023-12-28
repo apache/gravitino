@@ -62,9 +62,13 @@ public class TableOperations {
       @PathParam("catalog") String catalog,
       @PathParam("schema") String schema) {
     try {
-      Namespace tableNS = Namespace.ofTable(metalake, catalog, schema);
-      NameIdentifier[] idents = dispatcher.listTables(tableNS);
-      return Utils.ok(new EntityListResponse(idents));
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            Namespace tableNS = Namespace.ofTable(metalake, catalog, schema);
+            NameIdentifier[] idents = dispatcher.listTables(tableNS);
+            return Utils.ok(new EntityListResponse(idents));
+          });
 
     } catch (Exception e) {
       return ExceptionHandlers.handleTableException(OperationType.LIST, "", schema, e);
@@ -117,10 +121,13 @@ public class TableOperations {
       @PathParam("schema") String schema,
       @PathParam("table") String table) {
     try {
-      NameIdentifier ident = NameIdentifier.ofTable(metalake, catalog, schema, table);
-      Table t = dispatcher.loadTable(ident);
-      return Utils.ok(new TableResponse(DTOConverters.toDTO(t)));
-
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            NameIdentifier ident = NameIdentifier.ofTable(metalake, catalog, schema, table);
+            Table t = dispatcher.loadTable(ident);
+            return Utils.ok(new TableResponse(DTOConverters.toDTO(t)));
+          });
     } catch (Exception e) {
       return ExceptionHandlers.handleTableException(OperationType.LOAD, table, schema, e);
     }
@@ -168,13 +175,17 @@ public class TableOperations {
       @PathParam("table") String table,
       @QueryParam("purge") @DefaultValue("false") boolean purge) {
     try {
-      NameIdentifier ident = NameIdentifier.ofTable(metalake, catalog, schema, table);
-      boolean dropped = purge ? dispatcher.purgeTable(ident) : dispatcher.dropTable(ident);
-      if (!dropped) {
-        LOG.warn("Failed to drop table {} under schema {}", table, schema);
-      }
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            NameIdentifier ident = NameIdentifier.ofTable(metalake, catalog, schema, table);
+            boolean dropped = purge ? dispatcher.purgeTable(ident) : dispatcher.dropTable(ident);
+            if (!dropped) {
+              LOG.warn("Failed to drop table {} under schema {}", table, schema);
+            }
 
-      return Utils.ok(new DropResponse(dropped));
+            return Utils.ok(new DropResponse(dropped));
+          });
 
     } catch (Exception e) {
       return ExceptionHandlers.handleTableException(OperationType.DROP, table, schema, e);

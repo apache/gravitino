@@ -54,7 +54,7 @@ public class AuthenticationFilter implements Filter {
       }
       if (authenticator.isDataFromToken()) {
         Principal principal = authenticator.authenticateToken(authData);
-        request.setAttribute(AuthConstants.AuthenticatedPrincipalAttributeName, principal);
+        request.setAttribute(AuthConstants.AUTHENTICATED_PRINCIPAL_ATTRIBUTE_NAME, principal);
       }
       chain.doFilter(request, response);
     } catch (UnauthorizedException ue) {
