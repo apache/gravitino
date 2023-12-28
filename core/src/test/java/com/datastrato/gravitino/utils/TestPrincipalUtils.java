@@ -1,6 +1,14 @@
+/*
+ * Copyright 2023 Datastrato Pvt Ltd.
+ * This software is licensed under the Apache License version 2.
+ */
+
 package com.datastrato.gravitino.utils;
 
 import com.datastrato.gravitino.UserPrincipal;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -35,5 +43,20 @@ public class TestPrincipalUtils {
   }
 
   @Test
-  public void testThreadPool() {}
+  public void testThreadPool() throws Exception {
+    UserPrincipal principal = new UserPrincipal("testThreadPool");
+    ExecutorService executorService = Executors.newCachedThreadPool();
+    PrincipalUtils.doAs(
+        principal,
+        () -> {
+          Future<?> future =
+              executorService.submit(
+                  () ->
+                      Assertions.assertEquals(
+                          "testThreadPool", PrincipalUtils.getCurrentPrincipal().getName()));
+          future.get();
+          return null;
+        });
+    executorService.shutdownNow();
+  }
 }
