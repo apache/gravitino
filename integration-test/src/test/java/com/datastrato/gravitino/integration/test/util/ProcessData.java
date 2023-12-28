@@ -98,6 +98,12 @@ public class ProcessData {
         }
       case STREAMS_MERGED:
         {
+          if (this.getOutPutStream().isEmpty()) {
+            return this.getErrorStream();
+          }
+          if (this.getOutPutStream().isEmpty()) {
+            return this.getErrorStream();
+          }
           return this.getOutPutStream() + "\n" + this.getErrorStream();
         }
       case PROCESS_DATA_OBJECT:
