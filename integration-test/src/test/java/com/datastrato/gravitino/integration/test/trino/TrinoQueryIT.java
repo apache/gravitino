@@ -94,7 +94,7 @@ public class TrinoQueryIT {
 
     Object output =
         CommandExecutor.executeCommandLocalHost(
-            System.getenv("GRAVITINO_HOME") + "/dev/docker/trino-it/shutdown.sh",
+            System.getenv("GRAVITINO_ROOT_DIR") + "/dev/docker/trino-it/shutdown.sh",
             false,
             ProcessData.TypesOfData.STREAMS_MERGED);
     Log.info("Execute output: {}", output);
@@ -103,7 +103,7 @@ public class TrinoQueryIT {
     env.put("GRAVITINO_SERVER_PORT", String.valueOf(AbstractIT.getGravitinoServerPort()));
     output =
         CommandExecutor.executeCommandLocalHost(
-            System.getenv("GRAVITINO_HOME") + "/dev/docker/trino-it/launch.sh",
+            System.getenv("GRAVITINO_ROOT_DIR") + "/dev/docker/trino-it/launch.sh",
             false,
             ProcessData.TypesOfData.STREAMS_MERGED,
             env);
@@ -111,7 +111,7 @@ public class TrinoQueryIT {
 
     output =
         CommandExecutor.executeCommandLocalHost(
-            System.getenv("GRAVITINO_HOME") + "/dev/docker/trino-it/inspect_ip.sh",
+            System.getenv("GRAVITINO_ROOT_DIR") + "/dev/docker/trino-it/inspect_ip.sh",
             false,
             ProcessData.TypesOfData.STREAMS_MERGED);
     String containerIpMapping = output.toString();
@@ -214,7 +214,7 @@ public class TrinoQueryIT {
       if (autoStartEnv) {
         Object output =
             CommandExecutor.executeCommandLocalHost(
-                System.getenv("GRAVITINO_HOME") + "/dev/docker/trino-it/shutdown.sh",
+                System.getenv("GRAVITINO_ROOT_DIR") + "/dev/docker/trino-it/shutdown.sh",
                 false,
                 ProcessData.TypesOfData.STREAMS_MERGED);
         Log.info("Execute output: {}", output);
