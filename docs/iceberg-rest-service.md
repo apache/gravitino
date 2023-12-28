@@ -52,7 +52,7 @@ The filter in the customFilters should be a standard javax servlet Filter.
 Filter parameters can also be specified in the configuration, by setting config entries of the form `gravitino.auxService.iceberg-rest.<class name of filter>.param.<param name>=<value>`
 
 :::caution 
-You must set `gravitino.auxService.iceberg-rest.httpPort` explicitly, like `9001`. 
+You must set `gravitino.auxService.iceberg-rest.httpPort` explicitly, for example `9001`. 
 :::
 
 ### Iceberg catalog configuration
