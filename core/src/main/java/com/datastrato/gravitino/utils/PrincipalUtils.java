@@ -7,8 +7,6 @@ package com.datastrato.gravitino.utils;
 
 import com.datastrato.gravitino.UserPrincipal;
 import com.datastrato.gravitino.auth.AuthConstants;
-import java.security.AccessControlContext;
-import java.security.AccessController;
 import java.security.Principal;
 import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
@@ -40,7 +38,7 @@ public class PrincipalUtils {
   }
 
   public static Principal getCurrentPrincipal() {
-    AccessControlContext context = AccessController.getContext();
+    java.security.AccessControlContext context = java.security.AccessController.getContext();
     Subject subject = Subject.getSubject(context);
     if (subject == null || subject.getPrincipals(UserPrincipal.class).isEmpty()) {
       return new UserPrincipal(AuthConstants.ANONYMOUS_USER);
