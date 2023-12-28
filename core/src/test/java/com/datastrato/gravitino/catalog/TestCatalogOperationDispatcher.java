@@ -23,10 +23,10 @@ import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.EntityStore;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
-import com.datastrato.gravitino.PrincipalContext;
 import com.datastrato.gravitino.StringIdentifier;
 import com.datastrato.gravitino.TestColumn;
 import com.datastrato.gravitino.TestEntityStore;
+import com.datastrato.gravitino.auth.AuthConstants;
 import com.datastrato.gravitino.exceptions.IllegalNamespaceException;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.meta.AuditInfo;
@@ -73,8 +73,6 @@ public class TestCatalogOperationDispatcher {
 
   private static CatalogOperationDispatcher dispatcher;
 
-  private static PrincipalContext context;
-
   @BeforeAll
   public static void setUp() throws IOException {
     config = new Config(false) {};
@@ -112,9 +110,6 @@ public class TestCatalogOperationDispatcher {
     if (catalogManager != null) {
       catalogManager.close();
       catalogManager = null;
-    }
-    if (context != null) {
-      context.close();
     }
   }
 
@@ -200,7 +195,7 @@ public class TestCatalogOperationDispatcher {
     Assertions.assertEquals(schema.comment(), loadedSchema.comment());
     testProperties(schema.properties(), loadedSchema.properties());
     // Audit info is gotten from entity store
-    Assertions.assertEquals("gravitino", loadedSchema.auditInfo().creator());
+    Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, loadedSchema.auditInfo().creator());
 
     // Case 2: Test if the schema is not found in entity store
     doThrow(new NoSuchEntityException("mock error")).when(entityStore).get(any(), any(), any());
@@ -224,7 +219,7 @@ public class TestCatalogOperationDispatcher {
             .withNamespace(Namespace.of(metalake, catalog))
             .withAuditInfo(
                 new AuditInfo.Builder()
-                    .withCreator("gravitino")
+                    .withCreator(AuthConstants.ANONYMOUS_USER)
                     .withCreateTime(Instant.now())
                     .build())
             .build();
@@ -258,8 +253,8 @@ public class TestCatalogOperationDispatcher {
     Map<String, String> expectedProps = ImmutableMap.of("k2", "v2", "k3", "v3");
     testProperties(expectedProps, alteredSchema.properties());
     // Audit info is gotten from gravitino entity store.
-    Assertions.assertEquals("gravitino", alteredSchema.auditInfo().creator());
-    Assertions.assertEquals("gravitino", alteredSchema.auditInfo().lastModifier());
+    Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, alteredSchema.auditInfo().creator());
+    Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, alteredSchema.auditInfo().lastModifier());
 
     // Case 2: Test if the schema is not found in entity store
     doThrow(new NoSuchEntityException("mock error"))
@@ -293,7 +288,7 @@ public class TestCatalogOperationDispatcher {
             .withNamespace(Namespace.of(metalake, catalog))
             .withAuditInfo(
                 new AuditInfo.Builder()
-                    .withCreator("gravitino")
+                    .withCreator(AuthConstants.ANONYMOUS_USER)
                     .withCreateTime(Instant.now())
                     .build())
             .build();
@@ -420,7 +415,7 @@ public class TestCatalogOperationDispatcher {
     Assertions.assertEquals(0, loadedTable1.partitioning().length);
     Assertions.assertArrayEquals(table1.columns(), loadedTable1.columns());
     // Audit info is gotten from the entity store
-    Assertions.assertEquals("gravitino", loadedTable1.auditInfo().creator());
+    Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, loadedTable1.auditInfo().creator());
 
     // Case 2: Test if the table entity is not found in the entity store
     reset(entityStore);
@@ -486,8 +481,8 @@ public class TestCatalogOperationDispatcher {
     Map<String, String> expectedProps = ImmutableMap.of("k2", "v2", "k3", "v3");
     testProperties(expectedProps, alteredTable.properties());
     // Audit info is gotten from gravitino entity store
-    Assertions.assertEquals("gravitino", alteredTable.auditInfo().creator());
-    Assertions.assertEquals("gravitino", alteredTable.auditInfo().lastModifier());
+    Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, alteredTable.auditInfo().creator());
+    Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, alteredTable.auditInfo().lastModifier());
 
     // Case 2: Test if the table entity is not found in the entity store
     reset(entityStore);

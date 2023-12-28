@@ -47,9 +47,6 @@ public class TestMetalakeManager {
       entityStore.close();
       entityStore = null;
     }
-    if (context != null) {
-      context.close();
-    }
   }
 
   @Test

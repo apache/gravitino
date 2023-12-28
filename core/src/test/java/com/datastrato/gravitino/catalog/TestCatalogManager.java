@@ -91,9 +91,6 @@ public class TestCatalogManager {
       catalogManager.close();
       catalogManager = null;
     }
-    if (context != null) {
-      context.close();
-    }
   }
 
   @Test
