@@ -15,7 +15,6 @@ import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
 import com.datastrato.gravitino.storage.RandomIdGenerator;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Sets;
-
 import java.io.IOException;
 import java.util.Map;
 import java.util.Set;
