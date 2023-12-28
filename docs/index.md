@@ -54,6 +54,9 @@ Also, you can find the complete REST API definition in
 [Gravitino Open API](./api/rest/gravitino-rest-api),
 Java SDK definition in [Gravitino Javadoc](pathname:///docs/0.3.0/api/java/index.html).
 
+Gravitino provides a web UI to manage the metadata, you can visit the web UI in the browser via
+the URL address `http://<ip-address>:8090`. Please see [Gravitino web UI](./webui.md) for the details.
+
 Gravitino currently supports the following catalogs:
 
 * [**Iceberg catalog**](./lakehouse-iceberg-catalog.md)
@@ -88,10 +91,10 @@ Gravitino supports different catalogs to manage the metadata in different source
 * [Iceberg catalog](./lakehouse-iceberg-catalog.md): a complete guide to use Gravitino to
   manage Apache Iceberg data.
 * [Iceberg REST catalog service](./iceberg-rest-service.md): a
-  complete guide to use Gravitino as Apache Iceberg REST catalog service.
-* [Hive catalog](./apache-hive-catalog.md): a complete guide to use Gravitino manage Apache Hive data.
-* [MySQL catalog](./jdbc-mysql-catalog.md): a complete guide to use Gravitino manage MySQL data.
-* [PostgreSQL catalog](./jdbc-postgresql-catalog.md): a complete guide to use Gravitino manage PostgreSQL data.
+  complete guide to use Gravitino as an Apache Iceberg REST catalog service.
+* [Hive catalog](./apache-hive-catalog.md): a complete guide to using Gravitino manage Apache Hive data.
+* [MySQL catalog](./jdbc-mysql-catalog.md): a complete guide to using Gravitino manage MySQL data.
+* [PostgreSQL catalog](./jdbc-postgresql-catalog.md): a complete guide to using Gravitino manage PostgreSQL data.
 
 ### Trino connector
 
@@ -105,16 +108,16 @@ way. to use the Trino connector, please see:
 
 Gravitino provides several ways to configure and manage the Gravitino server. Please see:
 
-* [Security](./security.md): provides the security configurations for Gravitino, including HTTPS
+* [Security](./security.md): provides security configurations for Gravitino, including HTTPS
   and OAuth2 configurations.
-* [Gravitino metrics](./metrics.md): provides the metrics configurations and detailed metrics list
-  of Gravitino server.
+* [Gravitino metrics](./metrics.md): provides metrics configurations and detailed metrics list
+  of the Gravitino server.
 
 ### Programming guides
 
 * [Gravitino Open API](./api/rest/gravitino-rest-api): provides the complete Open API definition of
   Gravitino.
-* [Gravitino Javadoc](pathname:///docs/0.3.0/api/java/index.html): provides the Javadoc for Gravitino API.
+* [Gravitino Javadoc](pathname:///docs/0.3.0/api/java/index.html): provides the Javadoc for the Gravitino API.
 
 ### Development guides
 
