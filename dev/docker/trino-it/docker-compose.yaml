@@ -4,35 +4,6 @@
 #
 version: '3.0'
 services:
-  trino:
-    image: datastrato/gravitino-ci-trino:0.1.2
-    networks:
-      - trino-net
-    container_name: trino-ci-trino
-    environment:
-      - HADOOP_USER_NAME=root
-      - GRAVITINO_HOST_IP=host.docker.internal
-      - GRAVITINO_HOST_PORT=${GRAVITINO_SERVER_PORT:-8090}
-      - GRAVITINO_METALAKE_NAME=test
-      - HIVE_HOST_IP=hive
-    entrypoint:  /bin/bash /tmp/trino/init.sh
-    volumes:
-      - ./init/trino:/tmp/trino
-      - ../../../trino-connector/build/libs:/usr/lib/trino/plugin/gravitino
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    healthcheck:
-      test: ["CMD", "trino", "--execute", "SELECT 1"]
-      interval: 10s
-      timeout: 60s
-      retries: 5
-    depends_on:
-      hive:
-        condition: service_healthy
-      postgresql:
-        condition: service_healthy
-      mysql:
-        condition: service_healthy
 
   hive:
     image: datastrato/gravitino-ci-hive:0.1.7
@@ -92,7 +63,41 @@ services:
       timeout: 60s
       retries: 5
 
+  trino:
+    image: datastrato/gravitino-ci-trino:0.1.2
+    networks:
+      - trino-net
+    container_name: trino-ci-trino
+    environment:
+      - HADOOP_USER_NAME=root
+      - GRAVITINO_HOST_IP=host.docker.internal
+      - GRAVITINO_HOST_PORT=${GRAVITINO_SERVER_PORT:-8090}
+      - GRAVITINO_METALAKE_NAME=test
+      - HIVE_HOST_IP=hive
+    entrypoint:  /bin/bash /tmp/trino/init.sh
+    volumes:
+      - ./init/trino:/tmp/trino
+      - ../../../trino-connector/build/libs:/usr/lib/trino/plugin/gravitino
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "trino", "--execute", "SELECT 1"]
+      interval: 10s
+      timeout: 60s
+      retries: 5
+    depends_on:
+      hive:
+        condition: service_healthy
+      postgresql:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+
+
 networks:
   trino-net:
     driver: bridge
     name: trino-net
+    ipam:
+      config:
+        - subnet: 10.20.30.16/28

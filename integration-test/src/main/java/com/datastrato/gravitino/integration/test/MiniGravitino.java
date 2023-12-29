@@ -220,7 +220,7 @@ public class MiniGravitino {
               Collections.emptyMap(),
               ErrorHandlers.restErrorHandler());
     } catch (RESTException e) {
-      LOG.warn("checkIfServerIsRunning() fails, GravitinoServer is not running" +  e.getMessage());
+      LOG.warn("checkIfServerIsRunning() fails, GravitinoServer is not running" + e.getMessage());
       return false;
     }
     if (response != null && response.getCode() == 0) {

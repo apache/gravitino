@@ -97,7 +97,7 @@ public class TrinoQueryIT {
             System.getenv("GRAVITINO_ROOT_DIR") + "/dev/docker/trino-it/shutdown.sh",
             false,
             ProcessData.TypesOfData.STREAMS_MERGED);
-    Log.info("Execute output:\n{}", output);
+    Log.info("Command execute output:\n{}", output);
 
     Map<String, String> env = new HashMap<>();
     env.put("GRAVITINO_SERVER_PORT", String.valueOf(AbstractIT.getGravitinoServerPort()));
@@ -107,7 +107,7 @@ public class TrinoQueryIT {
             false,
             ProcessData.TypesOfData.STREAMS_MERGED,
             env);
-    Log.info("Execute output:\n{}", output);
+    Log.info("Command execute output:\n{}", output);
 
     output =
         CommandExecutor.executeCommandLocalHost(
@@ -217,7 +217,7 @@ public class TrinoQueryIT {
                 System.getenv("GRAVITINO_ROOT_DIR") + "/dev/docker/trino-it/shutdown.sh",
                 false,
                 ProcessData.TypesOfData.STREAMS_MERGED);
-        Log.info("Execute output:\n{}", output);
+        Log.info("Command execute output:\n{}", output);
 
         AbstractIT.stopIntegrationTest();
       }

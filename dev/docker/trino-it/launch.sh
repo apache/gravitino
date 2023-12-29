@@ -22,3 +22,16 @@ cd ${playground_dir}
 docker-compose up -d
 
 nohup docker-compose logs -f  -t >> ../../../integration-test/build/integration-test.log &
+
+max_attempts=180
+
+for ((i = 0; i < max_attempts; i++)); do
+    docker-compose exec -T trino trino --execute "SELECT 1" >/dev/null 2>&1 && {
+        echo "All docker-compse service is now available."
+        exit 0
+    }
+    sleep 1
+done
+
+echo "Trino service did not start within the specified time."
+exit 1
