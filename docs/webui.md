@@ -129,7 +129,7 @@ Creating a catalog requires these fields:
 2. **Type**(**_required_**): the default value is `relational`
 3. **Provider**(**_required_**): `hive`/`iceberg`/`mysql`/`postgresql`
 4. **Comment**(_optional_): the comment of this catalog
-5. **Properties**(**specific provider included required fields**)
+5. **Properties**(**each `provider` must fill in the required property fields specifically**)
 
 ##### Providers
 
