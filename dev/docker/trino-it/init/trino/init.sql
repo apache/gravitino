@@ -3,3 +3,4 @@
  * This software is licensed under the Apache License version 2.
  */
 
+select 1;
