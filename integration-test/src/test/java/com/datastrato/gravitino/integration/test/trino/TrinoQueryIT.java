@@ -112,7 +112,6 @@ public class TrinoQueryIT {
 
   @BeforeAll
   public static void setup() throws Exception {
-    checkEnv();
     setEnv();
 
     trinoQueryRunner = new TrinoQueryRunner();
@@ -534,6 +533,7 @@ public class TrinoQueryIT {
   }
 
   public static void main(String[] args) {
+    checkEnv();
     String targetTestId = null;
     try {
       if (args.length == 1) {
