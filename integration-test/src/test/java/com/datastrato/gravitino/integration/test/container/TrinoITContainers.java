@@ -8,6 +8,8 @@ import com.datastrato.gravitino.integration.test.util.CommandExecutor;
 import com.datastrato.gravitino.integration.test.util.ProcessData;
 import java.util.HashMap;
 import java.util.Map;
+
+import org.apache.logging.log4j.util.Strings;
 import org.mortbay.log.Log;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,7 +26,12 @@ public class TrinoITContainers implements AutoCloseable {
   Map<String, String> servicesUri = new HashMap<>();
 
   TrinoITContainers() {
-    dockerComposeDir = System.getenv("GRAVITINO_ROOT_DIR") + "/dev/docker/trino-it/";
+    String dir = System.getenv("GRAVITINO_ROOT_DIR");
+    if (Strings.isEmpty(dir)) {
+      throw new RuntimeException("GRAVITINO_ROOT_DIR is not set");
+    }
+
+    dockerComposeDir = dir + "/integration-test/trino-it/";
   }
 
   public void launch(int gravitinoServerPort) throws Exception {

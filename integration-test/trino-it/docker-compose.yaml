@@ -77,7 +77,7 @@ services:
     entrypoint:  /bin/bash /tmp/trino/init.sh
     volumes:
       - ./init/trino:/tmp/trino
-      - ../../../trino-connector/build/libs:/usr/lib/trino/plugin/gravitino
+      - ../../trino-connector/build/libs:/usr/lib/trino/plugin/gravitino
     extra_hosts:
       - "host.docker.internal:host-gateway"
     healthcheck:

@@ -24,7 +24,7 @@ docker-compose up -d
 if [ -n "$GRAVITINO_LOG_PATH" ]; then
     LOG_PATH=$GRAVITINO_LOG_PATH
 else
-    LOG_PATH=../../../integration-test/build/integration-test.log
+    LOG_PATH=../build/integration-test.log
 fi
 
 echo The docker-compose log is: $LOG_PATH
