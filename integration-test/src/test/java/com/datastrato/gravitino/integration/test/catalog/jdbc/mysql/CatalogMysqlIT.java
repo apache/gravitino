@@ -12,7 +12,6 @@ import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.catalog.jdbc.config.JdbcConfig;
 import com.datastrato.gravitino.client.GravitinoMetaLake;
 import com.datastrato.gravitino.dto.rel.ColumnDTO;
-import com.datastrato.gravitino.dto.rel.SortOrderDTO;
 import com.datastrato.gravitino.dto.rel.partitions.Partitioning;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NotFoundException;
@@ -278,7 +277,7 @@ public class CatalogMysqlIT extends AbstractIT {
         NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
     Distribution distribution = Distributions.NONE;
 
-    final SortOrderDTO[] sortOrders = SortOrderDTO.EMPTY_SORT;
+    final SortOrder[] sortOrders = new SortOrder[0];
 
     Partitioning[] partitioning = Partitioning.EMPTY_PARTITIONING;
 
