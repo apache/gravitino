@@ -1,5 +1,5 @@
 ---
-title: "Table partitioning, bucketing and sorting order"
+title: "Table partitioning, bucketing and sort ordering"
 slug: /table-partitioning-bucketing-sort-order
 date: 2023-12-25
 keyword: Table Partition Bucket Distribute Sort By
