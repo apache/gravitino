@@ -518,9 +518,6 @@ public class TrinoQueryIT {
   }
 
   public static void main(String[] args) {
-    AbstractIT.testMode = "manual";
-    autoStartEnv = true;
-
     String targetTestId = null;
     try {
       if (args.length == 1) {
