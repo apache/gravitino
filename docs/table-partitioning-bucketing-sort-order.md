@@ -10,7 +10,10 @@ import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 ## Table partitioning
-Currently, Gravitino supports the following partitioning strategies:
+
+To create a partitioned table, you should provide the following two components to construct a valid partitioned table.
+
+- Partitioning strategy. It defines how Gravitino will distribute table data across partitions. currently Gravitino supports the following partitioning strategies.
 
 :::note
 The `score`, `createTime`, and `city` appearing in the table below refer to the field names in a table.
@@ -30,6 +33,10 @@ The `score`, `createTime`, and `city` appearing in the table below refer to the 
 
 As well as the strategies mentioned before, you can use other functions strategies to partition the table, for example, the strategy can be `{"strategy":"functionName","fieldName":["score"]}`. The `functionName` can be any function name that you can use in SQL, for example, `{"strategy":"toDate","fieldName":["createTime"]}` is equivalent to `PARTITION BY toDate(createTime)` in SQL.
 For complex functions, please refer to [FunctionPartitioningDTO](https://github.com/datastrato/gravitino/blob/main/common/src/main/java/com/datastrato/gravitino/dto/rel/partitions/FunctionPartitioningDTO.java).
+
+- Field names: It defines which fields Gravitino uses to partition the table.
+
+- Other messages may also be needed. For example, if the partitioning strategy is `bucket`, you should provide the number of buckets; if the partitioning strategy is `truncate`, you should provide the width of the truncate.
 
 The following is an example of creating a partitioned table:
 
@@ -62,6 +69,8 @@ new Transform[] {
 
 
 ## Table bucketing
+
+To create a bucketed table, you should use the following three components to construct a valid bucketed table.
 
 - Strategy. It defines how Gravitino will distribute table data across partitions.
 
@@ -132,7 +141,7 @@ To define a sorted order table, you should use the following three components to
 
 Note: If the direction value is `ascending`, the default ordering value is `nulls_first` and if the direction value is `descending`, the default ordering value is `nulls_last`.
 
-- Sort term. It shows which field or function Gravitino uses to sort the table, please refer to the `Expression type` in the bucketed table section.
+- Sort term. It shows which field or function Gravitino uses to sort the table, please refer to the `Function arguments` in the table bucketing section.
 
 <Tabs>
 <TabItem value="Json" label="Json">
