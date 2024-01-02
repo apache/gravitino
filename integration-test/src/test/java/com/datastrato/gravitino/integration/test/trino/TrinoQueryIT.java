@@ -13,9 +13,9 @@ import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.client.GravitinoClient;
 import com.datastrato.gravitino.client.GravitinoMetaLake;
 import com.datastrato.gravitino.exceptions.RESTException;
+import com.datastrato.gravitino.integration.test.container.ContainerSuite;
+import com.datastrato.gravitino.integration.test.container.TrinoITContainers;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
-import com.datastrato.gravitino.integration.test.util.CommandExecutor;
-import com.datastrato.gravitino.integration.test.util.ProcessData;
 import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.datastrato.gravitino.rel.TableCatalog;
 import io.trino.cli.Query;
@@ -75,72 +75,35 @@ public class TrinoQueryIT {
   private static String mysqlUri = "jdbc:mysql://127.0.0.1";
   private static String postgresqlUri = "jdbc:postgresql://127.0.0.1";
 
-  private static final String metalakeName = "test";
-  private static final Set<String> testCatalogs = new HashSet<>();
-
   private static GravitinoClient gravitinoClient;
+  private static TrinoITContainers trinoITContainers;
+  private static TrinoQueryRunner trinoQueryRunner;
+
+  private static final String metalakeName = "test";
+  private static GravitinoMetaLake metalake;
+  private static final Set<String> testCatalogs = new HashSet<>();
 
   private static String testQueriesDir = "";
   private static AtomicInteger testCount = new AtomicInteger(0);
   private static AtomicInteger totalCount = new AtomicInteger(0);
-  static TrinoQueryRunner trinoQueryRunner;
-
-  private static GravitinoMetaLake metalake;
-
-  static void startDocker() throws Exception {
-    AbstractIT.startIntegrationTest();
-    gravitinoUri = String.format("http://%s:%d", "127.0.0.1", AbstractIT.getGravitinoServerPort());
-    gravitinoClient = AbstractIT.client;
-
-    Object output =
-        CommandExecutor.executeCommandLocalHost(
-            System.getenv("GRAVITINO_ROOT_DIR") + "/dev/docker/trino-it/shutdown.sh",
-            false,
-            ProcessData.TypesOfData.STREAMS_MERGED);
-    Log.info("Command execute output:\n{}", output);
-
-    Map<String, String> env = new HashMap<>();
-    env.put("GRAVITINO_SERVER_PORT", String.valueOf(AbstractIT.getGravitinoServerPort()));
-    output =
-        CommandExecutor.executeCommandLocalHost(
-            System.getenv("GRAVITINO_ROOT_DIR") + "/dev/docker/trino-it/launch.sh",
-            false,
-            ProcessData.TypesOfData.STREAMS_MERGED,
-            env);
-    Log.info("Command execute output:\n{}", output);
-
-    output =
-        CommandExecutor.executeCommandLocalHost(
-            System.getenv("GRAVITINO_ROOT_DIR") + "/dev/docker/trino-it/inspect_ip.sh",
-            false,
-            ProcessData.TypesOfData.STREAMS_MERGED);
-    String containerIpMapping = output.toString();
-    LOG.info("Container IP mapping:\n{}", containerIpMapping);
-    try {
-      String[] containerInfos = containerIpMapping.split("\n");
-      for (String container : containerInfos) {
-        String[] info = container.split(":");
-        String containerName = info[0];
-        String address = info[1];
-        if (containerName.equals("trino")) {
-          trinoUri = String.format("http://%s:8080", address);
-        } else if (containerName.equals("hive")) {
-          hiveMetastoreUri = String.format("thrift://%s:9083", address);
-          hdfsUri = String.format("hdfs://%s:9000", address);
-        } else if (containerName.equals("mysql")) {
-          mysqlUri = String.format("jdbc:mysql://%s:3306", address);
-        } else if (containerName.equals("postgresql")) {
-          postgresqlUri = String.format("jdbc:postgresql://%s", address);
-        }
-      }
-    } catch (Exception e) {
-      throw new Exception("Failed to parse container ip mapping:\n" + containerIpMapping, e);
-    }
-  }
 
   private static void setEnv() throws Exception {
     if (autoStartEnv) {
-      startDocker();
+      AbstractIT.startIntegrationTest();
+      AbstractIT.getGravitinoServerPort();
+      ContainerSuite.getInstance();
+      trinoITContainers = ContainerSuite.getTrinoITContainers();
+      trinoITContainers.launch(AbstractIT.getGravitinoServerPort());
+      gravitinoClient = AbstractIT.client;
+
+      gravitinoUri =
+          String.format("http://%s:%d", "127.0.0.1", AbstractIT.getGravitinoServerPort());
+      trinoUri = trinoITContainers.getTrinoUri();
+      hiveMetastoreUri = trinoITContainers.getHiveMetastoreUri();
+      hdfsUri = trinoITContainers.getHdfsUri();
+      mysqlUri = trinoITContainers.getMysqlUri();
+      postgresqlUri = trinoITContainers.getPostgresqlUri();
+
     } else {
       gravitinoClient = GravitinoClient.builder(gravitinoUri).build();
     }
@@ -197,8 +160,6 @@ public class TrinoQueryIT {
       createCatalog("jdbc-postgresql", "jdbc-postgresql", properties);
     }
 
-    // Thread.sleep(10000000);
-
     testQueriesDir =
         TrinoQueryIT.class.getClassLoader().getResource("trino-queries/catalogs").getPath();
     LOG.info("Test Queries directory is {}", testQueriesDir);
@@ -212,13 +173,7 @@ public class TrinoQueryIT {
 
     try {
       if (autoStartEnv) {
-        Object output =
-            CommandExecutor.executeCommandLocalHost(
-                System.getenv("GRAVITINO_ROOT_DIR") + "/dev/docker/trino-it/shutdown.sh",
-                false,
-                ProcessData.TypesOfData.STREAMS_MERGED);
-        Log.info("Command execute output:\n{}", output);
-
+        trinoITContainers.shutdown();
         AbstractIT.stopIntegrationTest();
       }
     } catch (Exception e) {
@@ -227,7 +182,6 @@ public class TrinoQueryIT {
   }
 
   private static void createMetalake() throws Exception {
-
     boolean created = false;
     int tries = 180;
     while (!created && tries-- >= 0) {
@@ -511,7 +465,7 @@ public class TrinoQueryIT {
   static class TrinoQueryRunner {
     private QueryRunner queryRunner;
     private Terminal terminal;
-    private URI uri = new URI("http://192.168.215.2:8080");
+    private URI uri;
 
     TrinoQueryRunner() throws Exception {
       this.uri = new URI(trinoUri);

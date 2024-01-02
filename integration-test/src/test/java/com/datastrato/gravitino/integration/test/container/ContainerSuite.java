@@ -35,6 +35,7 @@ public class ContainerSuite implements Closeable {
   private static Network network = null;
   private static HiveContainer hiveContainer;
   private static TrinoContainer trinoContainer;
+  private static TrinoITContainers trinoITContainers;
 
   protected static final CloseableGroup closer = CloseableGroup.create();
 
@@ -126,6 +127,14 @@ public class ContainerSuite implements Closeable {
 
   public TrinoContainer getTrinoContainer() {
     return trinoContainer;
+  }
+
+  public static TrinoITContainers getTrinoITContainers() {
+    if (trinoITContainers == null) {
+      trinoITContainers = new TrinoITContainers();
+    }
+    closer.register(trinoITContainers);
+    return trinoITContainers;
   }
 
   public HiveContainer getHiveContainer() {
