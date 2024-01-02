@@ -517,6 +517,7 @@ Catalog catalog = gravitinoMetaLake.loadCatalog(NameIdentifier.of("metalake", "h
 SupportsSchemas supportsSchemas = catalog.asSchemas();
 
 Schema schema = supportsSchemas.alterSchema(NameIdentifier.of("metalake", "hive_catalog", "schema"),
+    SchemaChange.updateComment("new comment"),
     SchemaChange.removeProperty("key1"),
     SchemaChange.setProperty("key2", "value2"));
 // ...
@@ -527,10 +528,11 @@ Schema schema = supportsSchemas.alterSchema(NameIdentifier.of("metalake", "hive_
 
 Currently, Gravitino supports the following changes to a schema:
 
-| Supported modification | JSON                                                         | Java                                          |
-|------------------------|--------------------------------------------------------------|-----------------------------------------------|
-| Set a property         | `{"@type":"setProperty","property":"key1","value":"value1"}` | `SchemaChange.setProperty("key1", "value1")`  |
-| Remove a property      | `{"@type":"removeProperty","property":"key1"}`               | `SchemaChange.removeProperty("key1")`         |
+| Supported modification | JSON                                                         | Java                                         |
+|------------------------|--------------------------------------------------------------|----------------------------------------------|
+| Update comment         | `{"@type":"updateComment","newComment":"new_comment"}`       | `SchemaChange.updateComment("new_comment")`  |
+| Set a property         | `{"@type":"setProperty","property":"key1","value":"value1"}` | `SchemaChange.setProperty("key1", "value1")` |
+| Remove a property      | `{"@type":"removeProperty","property":"key1"}`               | `SchemaChange.removeProperty("key1")`        |
 
 ### Drop a schema
 You can remove a schema by sending a `DELETE` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}` endpoint or just use the Gravitino Java client. The following is an example of dropping a schema:
