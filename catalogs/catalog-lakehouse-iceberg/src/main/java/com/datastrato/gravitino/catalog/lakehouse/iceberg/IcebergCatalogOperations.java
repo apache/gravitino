@@ -246,11 +246,11 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
       List<String> removals = new ArrayList<>();
       Map<String, String> updates = new HashMap<>();
       Map<String, String> resultProperties = new HashMap<>(metadata);
-      String comment = null;
       for (SchemaChange change : changes) {
         if (change instanceof SchemaChange.UpdateComment) {
-          comment = ((SchemaChange.UpdateComment) change).getNewComment();
+          String comment = ((SchemaChange.UpdateComment) change).getNewComment();
           updates.put(IcebergSchemaPropertiesMetadata.COMMENT, comment);
+          resultProperties.put(IcebergSchemaPropertiesMetadata.COMMENT, comment);
         } else if (change instanceof SchemaChange.SetProperty) {
           String key = ((SchemaChange.SetProperty) change).getProperty();
           String val = ((SchemaChange.SetProperty) change).getValue();
@@ -268,12 +268,7 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
       IcebergSchema icebergSchema =
           new IcebergSchema.Builder()
               .withName(ident.name())
-              .withComment(
-                  comment == null
-                      ? Optional.of(response.properties())
-                          .map(map -> map.get(IcebergSchemaPropertiesMetadata.COMMENT))
-                          .orElse(null)
-                      : comment)
+              .withComment(resultProperties.get(IcebergSchemaPropertiesMetadata.COMMENT))
               .withAuditInfo(AuditInfo.EMPTY)
               .withProperties(resultProperties)
               .build();

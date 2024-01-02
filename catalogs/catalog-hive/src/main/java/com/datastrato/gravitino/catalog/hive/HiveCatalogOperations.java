@@ -283,10 +283,9 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
           ident.name(),
           properties.keySet());
 
-      String comment = null;
       for (SchemaChange change : changes) {
         if (change instanceof SchemaChange.UpdateComment) {
-          comment = ((SchemaChange.UpdateComment) change).getNewComment();
+          database.setDescription(((SchemaChange.UpdateComment) change).getNewComment());
         } else if (change instanceof SchemaChange.SetProperty) {
           properties.put(
               ((SchemaChange.SetProperty) change).getProperty(),
@@ -302,7 +301,6 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       // alter the hive database parameters
       Database alteredDatabase = database.deepCopy();
       alteredDatabase.setParameters(properties);
-      alteredDatabase.setDescription(comment == null ? alteredDatabase.getDescription() : comment);
 
       clientPool.run(
           client -> {
