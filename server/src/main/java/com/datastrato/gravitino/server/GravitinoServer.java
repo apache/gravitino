@@ -54,7 +54,7 @@ public class GravitinoServer extends ResourceConfig {
 
     JettyServerConfig jettyServerConfig =
         JettyServerConfig.fromConfig(serverConfig, WEBSERVER_CONF_PREFIX);
-    server.initialize(jettyServerConfig, SERVER_NAME, false /* shouldEnableUI */);
+    server.initialize(jettyServerConfig, SERVER_NAME, true /* shouldEnableUI */);
 
     ServerAuthenticator.getInstance().initialize(serverConfig);
 

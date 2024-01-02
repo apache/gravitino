@@ -132,8 +132,8 @@ public class ContainerSuite implements Closeable {
   public static TrinoITContainers getTrinoITContainers() {
     if (trinoITContainers == null) {
       trinoITContainers = new TrinoITContainers();
+      closer.register(trinoITContainers);
     }
-    closer.register(trinoITContainers);
     return trinoITContainers;
   }
 

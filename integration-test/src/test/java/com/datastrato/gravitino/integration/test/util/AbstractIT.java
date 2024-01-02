@@ -38,7 +38,7 @@ import org.slf4j.LoggerFactory;
 @ExtendWith(PrintFuncNameExtension.class)
 public class AbstractIT {
   private static final Logger LOG = LoggerFactory.getLogger(AbstractIT.class);
-  public static GravitinoClient client;
+  protected static GravitinoClient client;
 
   private static final OAuthMockDataProvider mockDataProvider = OAuthMockDataProvider.getInstance();
 
@@ -146,7 +146,7 @@ public class AbstractIT {
   }
 
   // Get host IP from primary NIC
-  public static String getPrimaryNICIp() {
+  protected static String getPrimaryNICIp() {
     String hostIP = "127.0.0.1";
     try {
       NetworkInterface networkInterface = NetworkInterface.getByName("en0"); // macOS
@@ -170,6 +170,10 @@ public class AbstractIT {
       LOG.error(e.getMessage(), e);
     }
     return hostIP;
+  }
+
+  public static GravitinoClient getGravitinoClient() {
+    return client;
   }
 
   protected String readGitCommitIdFromGitFile() {

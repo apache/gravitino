@@ -94,7 +94,7 @@ public class TrinoQueryIT {
       ContainerSuite.getInstance();
       trinoITContainers = ContainerSuite.getTrinoITContainers();
       trinoITContainers.launch(AbstractIT.getGravitinoServerPort());
-      gravitinoClient = AbstractIT.client;
+      gravitinoClient = AbstractIT.getGravitinoClient();
 
       gravitinoUri =
           String.format("http://%s:%d", "127.0.0.1", AbstractIT.getGravitinoServerPort());
@@ -240,7 +240,6 @@ public class TrinoQueryIT {
         String result = trinoQueryRunner.runQuery("show catalogs");
         if (result.contains(metalakeName + "." + catalogName)) {
           catalogCreated = true;
-          break;
         }
         LOG.info("Waiting for catalog {} to be created", catalogName);
         // connection exception need retry.
@@ -303,7 +302,7 @@ public class TrinoQueryIT {
               LOG.info("Drop schema \"{}.{}\".{}", metalakeName, catalogName, schema.name());
             });
 
-    // metalake.dropCatalog(NameIdentifier.of(metalakeName, catalogName));
+    metalake.dropCatalog(NameIdentifier.of(metalakeName, catalogName));
     LOG.info("Drop catalog \"{}.{}\"", metalakeName, catalogName);
   }
 
@@ -398,10 +397,10 @@ public class TrinoQueryIT {
         String sql = sqlMatcher.group(1);
         String expectResult = "";
         if (resultMatcher.find()) {
-          expectResult = resultMatcher.group(1);
+          expectResult = resultMatcher.group(1).trim();
         }
 
-        String result = queryRunner.runQuery(sql);
+        String result = queryRunner.runQuery(sql).trim();
         boolean match = match(expectResult, result);
 
         if (match) {
@@ -438,9 +437,6 @@ public class TrinoQueryIT {
     if (expectResult.isEmpty()) {
       return false;
     }
-
-    expectResult = expectResult.trim();
-    result = result.trim();
 
     // match text
     boolean match = expectResult.equals(result);
