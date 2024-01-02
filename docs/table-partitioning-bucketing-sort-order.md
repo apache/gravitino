@@ -9,8 +9,7 @@ license: Copyright 2023 Datastrato Pvt Ltd. This software is licensed under the 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-## Partitioned table
-As well as
+## Table partitioning
 Currently, Gravitino supports the following partitioning strategies:
 
 :::note
@@ -62,7 +61,7 @@ new Transform[] {
 </Tabs>
 
 
-## Bucketed table
+## Table bucketing
 
 - Strategy. It defines how Gravitino will distribute table data across partitions.
 
@@ -113,7 +112,7 @@ new Transform[] {
 </Tabs>
 
 
-## Sorted order table
+## Sort ordering
 
 To define a sorted order table, you should use the following three components to construct a valid sorted order table.
 
@@ -167,9 +166,9 @@ SortOrders.of(FieldReferenceDTO.of("score"), SortDirection.ASCENDING, NullOrderi
 The following is an example of creating a partitioned, bucketed table, and sorted order table:
 
 <Tabs>
-<TabItem value="bash" label="Bash">
+<TabItem value="shell" label="Shell">
 
-```bash
+```shell
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
   "name": "table",
@@ -239,49 +238,47 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 tableCatalog.createTable(
     NameIdentifier.of("metalake", "hive_catalog", "schema", "table"),
     new ColumnDTO[] {
-    ColumnDTO.builder()
-    .withComment("Id of the user")
-    .withName("id")
-    .withDataType(Types.IntegerType.get())
-    .withNullable(true)
-    .build(),
-    ColumnDTO.builder()
-    .withComment("Name of the user")
-    .withName("name")
-    .withDataType(Types.VarCharType.of(1000))
-    .withNullable(true)
-    .build(),
-    ColumnDTO.builder()
-    .withComment("Age of the user")
-    .withName("age")
-    .withDataType(Types.ShortType.get())
-    .withNullable(true)
-    .build(),
-
-    ColumnDTO.builder()
-    .withComment("Score of the user")
-    .withName("score")
-    .withDataType(Types.DoubleType.get())
-    .withNullable(true)
-    .build(),
+      ColumnDTO.builder()
+        .withComment("Id of the user")
+        .withName("id")
+        .withDataType(Types.IntegerType.get())
+        .withNullable(true)
+      .build(),
+      ColumnDTO.builder()
+        .withComment("Name of the user")
+        .withName("name")
+        .withDataType(Types.VarCharType.of(1000))
+        .withNullable(true)
+        .build(),
+      ColumnDTO.builder()
+        .withComment("Age of the user")
+        .withName("age")
+        .withDataType(Types.ShortType.get())
+        .withNullable(true)
+        .build(),
+      ColumnDTO.builder()
+        .withComment("Score of the user")
+        .withName("score")
+        .withDataType(Types.DoubleType.get())
+        .withNullable(true)
+        .build(),
     },
     "Create a new Table",
     tablePropertiesMap,
     new Transform[] {
     // Partition by id
-    Transforms.identity("score")
+      Transforms.identity("score")
     },
     // CLUSTERED BY id
     new DistributionDTO.Builder()
-    .withStrategy(Strategy.HASH)
-    .withNumber(4)
-    .withArgs(FieldReferenceDTO.of("id"))
-    .build(),
+      .withStrategy(Strategy.HASH)
+      .withNumber(4)
+      .withArgs(FieldReferenceDTO.of("id"))
+      .build(),
     // SORTED BY name asc
     new SortOrderDTO[] {
-        SortOrders.of(FieldReferenceDTO.of("score"), SortDirection.ASCENDING, NullOrdering.NULLS_LAST)
-    }
-    );
+      SortOrders.of(FieldReferenceDTO.of("score"), SortDirection.ASCENDING, NullOrdering.NULLS_LAST)
+    });
 ```
 
 </TabItem>
