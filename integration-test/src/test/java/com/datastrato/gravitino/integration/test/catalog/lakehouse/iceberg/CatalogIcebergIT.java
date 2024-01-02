@@ -645,12 +645,12 @@ public class CatalogIcebergIT extends AbstractIT {
     ColumnDTO[] columns = createColumns();
     String testTableName = GravitinoITUtils.genRandomName("test_table");
     SortOrder[] sortOrders = {
-      SortOrders.ascending(NamedReference.field(columns[0].name())),
-      SortOrders.descending(NamedReference.field(columns[2].name()))
+      SortOrders.ascending(NamedReference.field(columns[0].name())), SortOrders.descending(
+          NamedReference.field(columns[2].name()))
     };
 
     Transform[] partitioning = {
-      Transforms.day(columns[1].name()), Transforms.identity(columns[2].name())
+        Transforms.day(columns[1].name()), Transforms.identity(columns[2].name())
     };
     catalog
         .asTableCatalog()
