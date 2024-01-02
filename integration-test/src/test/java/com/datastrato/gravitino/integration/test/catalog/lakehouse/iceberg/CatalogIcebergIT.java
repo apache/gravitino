@@ -17,8 +17,6 @@ import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergTable;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.ops.IcebergTableOpsHelper;
 import com.datastrato.gravitino.client.GravitinoMetaLake;
 import com.datastrato.gravitino.dto.rel.ColumnDTO;
-import com.datastrato.gravitino.dto.rel.SortOrderDTO;
-import com.datastrato.gravitino.dto.rel.expressions.FieldReferenceDTO;
 import com.datastrato.gravitino.dto.rel.partitions.DayPartitioningDTO;
 import com.datastrato.gravitino.dto.rel.partitions.IdentityPartitioningDTO;
 import com.datastrato.gravitino.dto.rel.partitions.Partitioning;
@@ -36,11 +34,13 @@ import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.TableCatalog;
 import com.datastrato.gravitino.rel.TableChange;
+import com.datastrato.gravitino.rel.expressions.NamedReference;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
 import com.datastrato.gravitino.rel.expressions.sorts.NullOrdering;
 import com.datastrato.gravitino.rel.expressions.sorts.SortDirection;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
+import com.datastrato.gravitino.rel.expressions.sorts.SortOrders;
 import com.datastrato.gravitino.rel.types.Types;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
@@ -335,13 +335,12 @@ public class CatalogIcebergIT extends AbstractIT {
         NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
     Distribution distribution = Distributions.NONE;
 
-    final SortOrderDTO[] sortOrders =
-        new SortOrderDTO[] {
-          new SortOrderDTO.Builder()
-              .withNullOrder(NullOrdering.NULLS_FIRST)
-              .withDirection(SortDirection.DESCENDING)
-              .withSortTerm(FieldReferenceDTO.of(ICEBERG_COL_NAME2))
-              .build()
+    final SortOrder[] sortOrders =
+        new SortOrder[] {
+          SortOrders.of(
+              NamedReference.field(ICEBERG_COL_NAME2),
+              SortDirection.DESCENDING,
+              NullOrdering.NULLS_FIRST)
         };
 
     Partitioning[] partitioning = new Partitioning[] {DayPartitioningDTO.of(columns[1].name())};
@@ -640,17 +639,15 @@ public class CatalogIcebergIT extends AbstractIT {
   void testPartitionAndSortOrderIcebergTable() {
     ColumnDTO[] columns = createColumns();
     String testTableName = GravitinoITUtils.genRandomName("test_table");
-    SortOrderDTO[] sortOrders = {
-      new SortOrderDTO.Builder()
-          .withSortTerm(FieldReferenceDTO.of(columns[0].name()))
-          .withDirection(SortDirection.ASCENDING)
-          .withNullOrder(NullOrdering.NULLS_FIRST)
-          .build(),
-      new SortOrderDTO.Builder()
-          .withSortTerm(FieldReferenceDTO.of(columns[2].name()))
-          .withDirection(SortDirection.DESCENDING)
-          .withNullOrder(NullOrdering.NULLS_LAST)
-          .build()
+    SortOrder[] sortOrders = {
+      SortOrders.of(
+          NamedReference.field(columns[0].name()),
+          SortDirection.DESCENDING,
+          NullOrdering.NULLS_FIRST),
+      SortOrders.of(
+          NamedReference.field(columns[2].name()),
+          SortDirection.DESCENDING,
+          NullOrdering.NULLS_FIRST)
     };
     Partitioning[] partitioning = {
       DayPartitioningDTO.of(columns[1].name()), IdentityPartitioningDTO.of(columns[2].name())
@@ -692,16 +689,14 @@ public class CatalogIcebergIT extends AbstractIT {
     ColumnDTO[] columns = createColumns();
     String testTableName = GravitinoITUtils.genRandomName("test_table");
     SortOrder[] sortOrders = {
-      new SortOrderDTO.Builder()
-          .withSortTerm(FieldReferenceDTO.of(columns[0].name()))
-          .withDirection(SortDirection.ASCENDING)
-          .withNullOrder(NullOrdering.NULLS_FIRST)
-          .build(),
-      new SortOrderDTO.Builder()
-          .withSortTerm(FieldReferenceDTO.of(columns[2].name()))
-          .withDirection(SortDirection.DESCENDING)
-          .withNullOrder(NullOrdering.NULLS_LAST)
-          .build()
+      SortOrders.of(
+          NamedReference.field(columns[0].name()),
+          SortDirection.DESCENDING,
+          NullOrdering.NULLS_FIRST),
+      SortOrders.of(
+          NamedReference.field(columns[2].name()),
+          SortDirection.DESCENDING,
+          NullOrdering.NULLS_FIRST),
     };
     Partitioning[] transforms = {
       DayPartitioningDTO.of(columns[1].name()), IdentityPartitioningDTO.of(columns[2].name())
