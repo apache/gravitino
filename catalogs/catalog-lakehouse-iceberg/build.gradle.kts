@@ -15,7 +15,6 @@ dependencies {
   implementation(project(":core"))
   implementation(project(":api"))
   implementation(project(":server-common"))
-  implementation(project(":misc:iceberg-combined-catalog"))
   implementation(libs.jackson.databind)
   implementation(libs.jackson.annotations)
   implementation(libs.jackson.datatype.jdk8)
