@@ -236,6 +236,16 @@ public class TestRelationalCatalog extends TestBase {
   }
 
   @Test
+  public void testUpdateSchemaComment() throws JsonProcessingException {
+    NameIdentifier ident = NameIdentifier.of(metalakeName, catalogName, "schema1");
+    SchemaUpdateRequest.UpdateSchemaCommentRequest req =
+        new SchemaUpdateRequest.UpdateSchemaCommentRequest("comment");
+    SchemaDTO expectedSchema = createMockSchema("schema1", "comment", ImmutableMap.of("k1", "v1"));
+
+    testAlterSchema(ident, req, expectedSchema);
+  }
+
+  @Test
   public void testSetSchemaProperty() throws JsonProcessingException {
     NameIdentifier ident = NameIdentifier.of(metalakeName, catalogName, "schema1");
     SchemaUpdateRequest.SetSchemaPropertyRequest req =

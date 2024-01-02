@@ -20,6 +20,9 @@ import org.apache.commons.lang3.StringUtils;
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY)
 @JsonSubTypes({
   @JsonSubTypes.Type(
+      value = SchemaUpdateRequest.UpdateSchemaCommentRequest.class,
+      name = "updateComment"),
+  @JsonSubTypes.Type(
       value = SchemaUpdateRequest.SetSchemaPropertyRequest.class,
       name = "setProperty"),
   @JsonSubTypes.Type(
@@ -29,6 +32,35 @@ import org.apache.commons.lang3.StringUtils;
 public interface SchemaUpdateRequest extends RESTRequest {
 
   SchemaChange schemaChange();
+
+  @EqualsAndHashCode
+  @ToString
+  class UpdateSchemaCommentRequest implements SchemaUpdateRequest {
+
+    @Getter
+    @JsonProperty("newComment")
+    private final String newComment;
+
+    public UpdateSchemaCommentRequest(String newComment) {
+      this.newComment = newComment;
+    }
+
+    public UpdateSchemaCommentRequest() {
+      this(null);
+    }
+
+    @Override
+    public void validate() throws IllegalArgumentException {
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(newComment),
+          "\"newComment\" field is required and cannot be empty");
+    }
+
+    @Override
+    public SchemaChange schemaChange() {
+      return SchemaChange.updateComment(newComment);
+    }
+  }
 
   @EqualsAndHashCode
   @ToString

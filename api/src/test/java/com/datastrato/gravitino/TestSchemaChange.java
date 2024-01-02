@@ -12,9 +12,18 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.datastrato.gravitino.rel.SchemaChange;
 import com.datastrato.gravitino.rel.SchemaChange.RemoveProperty;
 import com.datastrato.gravitino.rel.SchemaChange.SetProperty;
+import com.datastrato.gravitino.rel.SchemaChange.UpdateComment;
 import org.junit.jupiter.api.Test;
 
 public class TestSchemaChange {
+
+  @Test
+  public void testUpdateComment() {
+    String comment = "New comment";
+    UpdateComment change = (UpdateComment) SchemaChange.updateComment(comment);
+
+    assertEquals(comment, change.getNewComment());
+  }
 
   @Test
   void testSetProperty() {
@@ -81,6 +90,31 @@ public class TestSchemaChange {
     String propertyB = "property B";
     String valueB = "B";
     SetProperty changeB = (SetProperty) SchemaChange.setProperty(propertyB, valueB);
+
+    assertFalse(changeA.equals(null));
+    assertFalse(changeA.equals(changeB));
+    assertFalse(changeB.equals(changeA));
+    assertNotEquals(changeA.hashCode(), changeB.hashCode());
+  }
+
+  @Test
+  void testUpdateCommentEqualsAndHashCode() {
+    String commentA = "a comment";
+    UpdateComment changeA = (UpdateComment) SchemaChange.updateComment(commentA);
+    String commentB = "a comment";
+    UpdateComment changeB = (UpdateComment) SchemaChange.updateComment(commentB);
+
+    assertTrue(changeA.equals(changeB));
+    assertTrue(changeB.equals(changeA));
+    assertEquals(changeA.hashCode(), changeB.hashCode());
+  }
+
+  @Test
+  void testUpdateCommentNotEqualsAndHashCode() {
+    String commentA = "a comment";
+    UpdateComment changeA = (UpdateComment) SchemaChange.updateComment(commentA);
+    String commentB = "a new comment";
+    UpdateComment changeB = (UpdateComment) SchemaChange.updateComment(commentB);
 
     assertFalse(changeA.equals(null));
     assertFalse(changeA.equals(changeB));

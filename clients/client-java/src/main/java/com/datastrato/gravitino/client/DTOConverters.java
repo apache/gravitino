@@ -99,7 +99,11 @@ class DTOConverters {
   }
 
   static SchemaUpdateRequest toSchemaUpdateRequest(SchemaChange change) {
-    if (change instanceof SchemaChange.SetProperty) {
+    if (change instanceof SchemaChange.UpdateComment) {
+      return new SchemaUpdateRequest.UpdateSchemaCommentRequest(
+          ((SchemaChange.UpdateComment) change).getNewComment());
+
+    } else if (change instanceof SchemaChange.SetProperty) {
       return new SchemaUpdateRequest.SetSchemaPropertyRequest(
           ((SchemaChange.SetProperty) change).getProperty(),
           ((SchemaChange.SetProperty) change).getValue());
