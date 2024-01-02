@@ -51,6 +51,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import jodd.io.StringOutputStream;
 import okhttp3.logging.HttpLoggingInterceptor;
+import org.apache.logging.log4j.util.Strings;
 import org.jline.terminal.Terminal;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
@@ -111,6 +112,7 @@ public class TrinoQueryIT {
 
   @BeforeAll
   public static void setup() throws Exception {
+    checkEnv();
     setEnv();
 
     trinoQueryRunner = new TrinoQueryRunner();
@@ -514,6 +516,20 @@ public class TrinoQueryIT {
         LOG.error("Failed to stop query runner", e);
         return false;
       }
+    }
+  }
+
+  private static void checkEnv() {
+    if (Strings.isEmpty(System.getenv("GRAVITINO_ROOT_DIR"))) {
+      throw new RuntimeException("GRAVITINO_ROOT_DIR is not set");
+    }
+
+    if (Strings.isEmpty(System.getenv("GRAVITINO_HOME"))) {
+      throw new RuntimeException("GRAVITINO_HOME is not set");
+    }
+
+    if (Strings.isEmpty(System.getenv("GRAVITINO_TEST"))) {
+      throw new RuntimeException("GRAVITINO_TEST is not set");
     }
   }
 

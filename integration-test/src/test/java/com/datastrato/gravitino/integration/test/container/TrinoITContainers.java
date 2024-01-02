@@ -8,7 +8,6 @@ import com.datastrato.gravitino.integration.test.util.CommandExecutor;
 import com.datastrato.gravitino.integration.test.util.ProcessData;
 import java.util.HashMap;
 import java.util.Map;
-
 import org.apache.logging.log4j.util.Strings;
 import org.mortbay.log.Log;
 import org.slf4j.Logger;
