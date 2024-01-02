@@ -36,11 +36,15 @@ import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.TableCatalog;
 import com.datastrato.gravitino.rel.TableChange;
+import com.datastrato.gravitino.rel.expressions.NamedReference;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
 import com.datastrato.gravitino.rel.expressions.sorts.NullOrdering;
 import com.datastrato.gravitino.rel.expressions.sorts.SortDirection;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
+import com.datastrato.gravitino.rel.expressions.sorts.SortOrders;
+import com.datastrato.gravitino.rel.expressions.transforms.Transform;
+import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
 import com.datastrato.gravitino.rel.types.Types;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
@@ -640,20 +644,13 @@ public class CatalogIcebergIT extends AbstractIT {
   void testPartitionAndSortOrderIcebergTable() {
     ColumnDTO[] columns = createColumns();
     String testTableName = GravitinoITUtils.genRandomName("test_table");
-    SortOrderDTO[] sortOrders = {
-      new SortOrderDTO.Builder()
-          .withSortTerm(FieldReferenceDTO.of(columns[0].name()))
-          .withDirection(SortDirection.ASCENDING)
-          .withNullOrder(NullOrdering.NULLS_FIRST)
-          .build(),
-      new SortOrderDTO.Builder()
-          .withSortTerm(FieldReferenceDTO.of(columns[2].name()))
-          .withDirection(SortDirection.DESCENDING)
-          .withNullOrder(NullOrdering.NULLS_LAST)
-          .build()
+    SortOrder[] sortOrders = {
+      SortOrders.ascending(NamedReference.field(columns[0].name())), SortOrders.descending(
+          NamedReference.field(columns[2].name()))
     };
-    Partitioning[] partitioning = {
-      DayPartitioningDTO.of(columns[1].name()), IdentityPartitioningDTO.of(columns[2].name())
+
+    Transform[] partitioning = {
+        Transforms.day(columns[1].name()), Transforms.identity(columns[2].name())
     };
     catalog
         .asTableCatalog()
