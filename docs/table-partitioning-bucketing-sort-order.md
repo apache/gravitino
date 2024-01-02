@@ -110,11 +110,7 @@ To create a bucketed table, you should use the following three components to con
 <TabItem value="java" label="Java">
 
 ```java
- new DistributionDTO.Builder()
-    .withStrategy(Strategy.HASH)
-    .withNumber(4)
-    .withArgs(FieldReferenceDTO.of("score"))
-    .build()
+Distributions.of(Strategy.HASH, 4, NamedReference.field("score"));
 ```
 
 </TabItem>
@@ -279,14 +275,11 @@ tableCatalog.createTable(
       Transforms.identity("score")
     },
     // CLUSTERED BY id
-    new DistributionDTO.Builder()
-      .withStrategy(Strategy.HASH)
-      .withNumber(4)
-      .withArgs(FieldReferenceDTO.of("id"))
-      .build(),
+    Distributions.of(Strategy.HASH, 4, NamedReference.field("id")),,
     // SORTED BY name asc
-    new SortOrderDTO[] {
-      SortOrders.of(FieldReferenceDTO.of("score"), SortDirection.ASCENDING, NullOrdering.NULLS_LAST)
+    new SortOrder[] {
+      SortOrders.of(
+        NamedReference.field("age"), SortDirection.ASCENDING, NullOrdering.NULLS_LAST),
     });
 ```
 
