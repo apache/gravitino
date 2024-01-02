@@ -1,5 +1,5 @@
 ---
-title: "Gravitino Iceberg REST catalog service"
+title: "Iceberg REST catalog service"
 slug: /iceberg-rest-service
 keywords:
   - Iceberg REST catalog
