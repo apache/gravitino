@@ -41,6 +41,8 @@ import com.datastrato.gravitino.rel.expressions.sorts.NullOrdering;
 import com.datastrato.gravitino.rel.expressions.sorts.SortDirection;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrders;
+import com.datastrato.gravitino.rel.expressions.transforms.Transform;
+import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
 import com.datastrato.gravitino.rel.types.Types;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
@@ -640,18 +642,14 @@ public class CatalogIcebergIT extends AbstractIT {
     ColumnDTO[] columns = createColumns();
     String testTableName = GravitinoITUtils.genRandomName("test_table");
     SortOrder[] sortOrders = {
-      SortOrders.of(
-          NamedReference.field(columns[0].name()),
-          SortDirection.DESCENDING,
-          NullOrdering.NULLS_FIRST),
-      SortOrders.of(
-          NamedReference.field(columns[2].name()),
-          SortDirection.DESCENDING,
-          NullOrdering.NULLS_FIRST)
+      SortOrders.ascending(NamedReference.field(columns[0].name())),
+      SortOrders.descending(NamedReference.field(columns[2].name()))
     };
-    Partitioning[] partitioning = {
-      DayPartitioningDTO.of(columns[1].name()), IdentityPartitioningDTO.of(columns[2].name())
+
+    Transform[] partitioning = {
+      Transforms.day(columns[1].name()), Transforms.identity(columns[2].name())
     };
+
     catalog
         .asTableCatalog()
         .createTable(
