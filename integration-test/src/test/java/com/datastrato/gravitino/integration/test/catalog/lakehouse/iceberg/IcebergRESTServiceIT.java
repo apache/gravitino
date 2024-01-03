@@ -13,6 +13,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -71,6 +72,9 @@ public class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
         "/tmp/");
     return configMap;
   }
+
+  void doubleCheckTableInfo(
+      String tableIdentifier, Map<String, String> contains, Set<String> notContains) {}
 
   private void purgeTable(String namespace, String table) {
     sql(String.format("DROP TABLE %s.%s PURGE", namespace, table));
@@ -221,6 +225,7 @@ public class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
             "Part 1", "days(ts)");
 
     checkMapContains(m, tableInfo);
+    doubleCheckTableInfo("iceberg_rest_table_test.create_foo1", m, new HashSet<>());
 
     Assertions.assertThrowsExactly(
         TableAlreadyExistsException.class,
@@ -232,9 +237,18 @@ public class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
     sql(
         "CREATE TABLE iceberg_rest_table_test.drop_foo1"
             + "(id bigint COMMENT 'unique id',data string) using iceberg");
+
     sql("DROP TABLE iceberg_rest_table_test.drop_foo1");
     Assertions.assertThrowsExactly(
         AnalysisException.class, () -> sql("DESC TABLE iceberg_rest_table_test.drop_foo1"));
+
+    if (catalogType.equals(IcebergCatalogBackend.COMBINE)) {
+      Assertions.assertThrowsExactly(
+          AnalysisException.class,
+          () ->
+              doubleCheckTableInfo(
+                  "iceberg_rest_table_test.drop_foo1", ImmutableMap.of(), new HashSet<>()));
+    }
 
     Assertions.assertThrowsExactly(
         NoSuchTableException.class, () -> sql("DROP TABLE iceberg_rest_table_test.drop_foo1"));
@@ -268,6 +282,14 @@ public class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
     sql("desc table iceberg_rest_table_test.rename_foo2");
     Assertions.assertThrowsExactly(
         AnalysisException.class, () -> sql("desc table iceberg_rest_table_test.rename_foo1"));
+
+    if (catalogType.equals(IcebergCatalogBackend.COMBINE)) {
+      Assertions.assertThrowsExactly(
+          AnalysisException.class,
+          () ->
+              doubleCheckTableInfo(
+                  "iceberg_rest_table_test.rename_foo1", ImmutableMap.of(), new HashSet<>()));
+    }
 
     sql(
         "CREATE TABLE iceberg_rest_table_test.rename_foo1"
@@ -369,7 +391,9 @@ public class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
     Map<String, String> tableInfo = getTableInfo("iceberg_rest_table_test.dropC_foo1");
     Map<String, String> m = ImmutableMap.of("id", "bigint");
     checkMapContains(m, tableInfo);
-    Assertions.assertFalse(m.containsKey("data"));
+    Assertions.assertFalse(tableInfo.containsKey("data"));
+
+    doubleCheckTableInfo("iceberg_rest_table_test.dropC_foo1", m, ImmutableSet.of("data"));
   }
 
   @Test

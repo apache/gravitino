@@ -11,24 +11,10 @@ plugins {
 }
 
 dependencies {
-  implementation(project(":common"))
-  implementation(project(":core"))
-  implementation(project(":api"))
-  implementation(project(":server-common"))
-  implementation(project(":misc:iceberg-combined-catalog"))
-  implementation(libs.jackson.databind)
-  implementation(libs.jackson.annotations)
-  implementation(libs.jackson.datatype.jdk8)
-  implementation(libs.jackson.datatype.jsr310)
-  implementation(libs.guava)
-  implementation(libs.commons.lang3)
   implementation(libs.bundles.log4j)
-  implementation(libs.bundles.jetty)
-  implementation(libs.bundles.jersey)
   implementation(libs.bundles.iceberg)
   implementation(libs.commons.lang3)
   implementation(libs.commons.io)
-  implementation(libs.commons.collections4)
   implementation(libs.iceberg.hive.metastore)
   implementation(libs.sqlite.jdbc)
 
@@ -60,7 +46,6 @@ dependencies {
     exclude("com.github.spotbugs")
   }
   implementation(libs.hadoop2.mapreduce.client.core)
-  implementation(libs.metrics.jersey2)
 
   compileOnly(libs.lombok)
   annotationProcessor(libs.lombok)
@@ -78,38 +63,4 @@ dependencies {
 }
 
 tasks {
-  val copyDepends by registering(Copy::class) {
-    from(configurations.runtimeClasspath)
-    into("build/libs")
-  }
-  val copyCatalogLibs by registering(Copy::class) {
-    dependsOn(copyDepends, "build")
-    from("build/libs")
-    into("$rootDir/distribution/package/catalogs/lakehouse-iceberg/libs")
-  }
-
-  val copyCatalogConfig by registering(Copy::class) {
-    from("src/main/resources")
-    into("$rootDir/distribution/package/catalogs/lakehouse-iceberg/conf")
-
-    include("lakehouse-iceberg.conf")
-    include("hive-site.xml.template")
-    include("hdfs-site.xml.template")
-
-    rename { original ->
-      if (original.endsWith(".template")) {
-        original.replace(".template", "")
-      } else {
-        original
-      }
-    }
-
-    exclude { details ->
-      details.file.isDirectory()
-    }
-  }
-
-  register("copyLibAndConfig", Copy::class) {
-    dependsOn(copyCatalogLibs, copyCatalogConfig)
-  }
 }

@@ -12,6 +12,7 @@ import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.Optional;
 import javax.ws.rs.NotSupportedException;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.iceberg.Transaction;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.Namespace;
@@ -41,9 +42,14 @@ public class IcebergTableOps implements AutoCloseable {
 
   public IcebergTableOps(IcebergConfig icebergConfig) {
     String catalogType = icebergConfig.get(IcebergConfig.CATALOG_BACKEND);
-    if (!IcebergCatalogBackend.MEMORY.name().equalsIgnoreCase(catalogType)) {
-      icebergConfig.get(IcebergConfig.CATALOG_WAREHOUSE);
-      icebergConfig.get(IcebergConfig.CATALOG_URI);
+    if ((!IcebergCatalogBackend.MEMORY.name().equalsIgnoreCase(catalogType))
+        && (!IcebergCatalogBackend.COMBINE.name().equalsIgnoreCase(catalogType))) {
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(icebergConfig.get(IcebergConfig.CATALOG_WAREHOUSE)),
+          "Catalog warehouse can't be blank");
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(icebergConfig.get(IcebergConfig.CATALOG_URI)),
+          "Catalog uri can't be blank");
     }
     catalog = IcebergCatalogUtil.loadCatalogBackend(catalogType, icebergConfig.getAllConfig());
     if (catalog instanceof SupportsNamespaces) {

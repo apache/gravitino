@@ -8,10 +8,15 @@ import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogP
 
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergConfig;
+import com.datastrato.gravitino.catalog.lakehouse.iceberg.combine.CombineCatalog;
+import com.datastrato.gravitino.catalog.lakehouse.iceberg.combine.hive.CombineHiveCatalog;
+import com.datastrato.gravitino.utils.MapUtils;
+import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
+import org.apache.iceberg.BaseMetastoreCatalog;
 import org.apache.iceberg.CatalogProperties;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.hive.HiveCatalog;
@@ -39,6 +44,37 @@ public class IcebergCatalogUtil {
     hiveCatalog.setConf(hdfsConfiguration);
     hiveCatalog.initialize("hive", properties);
     return hiveCatalog;
+  }
+
+  private static HiveCatalog loadCombineHiveCatalog(Map<String, String> properties) {
+    HiveCatalog hiveCatalog = new CombineHiveCatalog();
+    HdfsConfiguration hdfsConfiguration = new HdfsConfiguration();
+    properties.forEach(hdfsConfiguration::set);
+    hiveCatalog.setConf(hdfsConfiguration);
+    hiveCatalog.initialize("hive", properties);
+    return hiveCatalog;
+  }
+
+  private static CombineCatalog loadCombineCatalog(Map<String, String> properties) {
+
+    Map<String, String> primaryProperties = MapUtils.getPrefixMap(properties, "primary.");
+    String primaryCatalogType = primaryProperties.get(IcebergConfig.CATALOG_BACKEND.getKey());
+    Catalog primaryCatalog = loadCatalogBackend(primaryCatalogType, primaryProperties);
+
+    Map<String, String> secondaryProperties = MapUtils.getPrefixMap(properties, "secondary.");
+    String secondaryCatalogType = secondaryProperties.get(IcebergConfig.CATALOG_BACKEND.getKey());
+    Preconditions.checkArgument(
+        "hive".equalsIgnoreCase(secondaryCatalogType),
+        "Only support Hive as secondary catalog backend");
+    // todo support JDBC ?
+    // Catalog secondaryCatalog = loadCatalogBackend(secondaryCatalogType, secondaryProperties);
+    Catalog secondaryCatalog = loadCombineHiveCatalog(secondaryProperties);
+
+    CombineCatalog combineCatalog =
+        new CombineCatalog(
+            (BaseMetastoreCatalog) primaryCatalog, (BaseMetastoreCatalog) secondaryCatalog);
+    combineCatalog.initialize("combine", properties);
+    return combineCatalog;
   }
 
   private static JdbcCatalog loadJdbcCatalog(Map<String, String> properties) {
@@ -79,6 +115,8 @@ public class IcebergCatalogUtil {
         return loadHiveCatalog(properties);
       case JDBC:
         return loadJdbcCatalog(properties);
+      case COMBINE:
+        return loadCombineCatalog(properties);
       default:
         throw new RuntimeException(
             catalogType

@@ -10,6 +10,7 @@ import com.datastrato.gravitino.aux.AuxiliaryServiceManager;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergConfig;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergRESTService;
+import com.datastrato.gravitino.catalog.lakehouse.iceberg.combine.CombineCatalog;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.server.web.JettyServerConfig;
 import com.datastrato.gravitino.utils.MapUtils;
@@ -24,6 +25,7 @@ import java.util.stream.IntStream;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
+import org.apache.spark.sql.SparkSession.Builder;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -94,7 +96,8 @@ public abstract class IcebergRESTServiceBaseIT extends AbstractIT {
     int port = icebergConfig.get(JettyServerConfig.WEBSERVER_HTTP_PORT);
     LOG.info("Iceberg REST server port:{}", port);
     String IcebergRESTUri = String.format("http://127.0.0.1:%d/iceberg/", port);
-    sparkSession =
+
+    Builder builder =
         SparkSession.builder()
             .master("local[1]")
             .config(
@@ -104,8 +107,25 @@ public abstract class IcebergRESTServiceBaseIT extends AbstractIT {
             .config("spark.sql.catalog.rest.type", "rest")
             .config("spark.sql.catalog.rest.uri", IcebergRESTUri)
             // drop Iceberg table purge may hang in spark local mode
-            .config("spark.locality.wait.node", "0")
-            .getOrCreate();
+            .config("spark.locality.wait.node", "0");
+
+    if (catalogType.equals(IcebergCatalogBackend.COMBINE)) {
+      Map<String, String> catalogConfig = getCatalogConfig();
+      String hiveUri =
+          catalogConfig.get(
+              AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
+                  + IcebergRESTService.SERVICE_NAME
+                  + "."
+                  + CombineCatalog.SECONDARY
+                  + "."
+                  + IcebergConfig.CATALOG_URI.getKey());
+
+      builder
+          .config("spark.sql.catalog.secondary", "org.apache.iceberg.spark.SparkCatalog")
+          .config("spark.sql.catalog.secondary.type", "hive")
+          .config("spark.sql.catalog.secondary.uri", hiveUri);
+    }
+    sparkSession = builder.getOrCreate();
   }
 
   private void stopSparkEnv() {

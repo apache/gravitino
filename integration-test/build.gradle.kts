@@ -24,6 +24,7 @@ dependencies {
   implementation(project(":catalogs:catalog-jdbc-common"))
   implementation(project(":catalogs:catalog-jdbc-mysql"))
   implementation(project(":catalogs:catalog-jdbc-postgresql"))
+  implementation(project(":misc:iceberg-combined-catalog"))
   implementation(libs.guava)
   implementation(libs.bundles.log4j)
   implementation(libs.bundles.jersey)
