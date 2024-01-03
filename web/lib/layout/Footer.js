@@ -13,7 +13,7 @@ const Footer = props => {
       <Box className='footer-content-wrapper twc-px-6 twc-w-full twc-py-[0.75rem] [@media(min-width:1440px)]:twc-max-w-[1440px]'>
         <Box className={'twc-flex twc-flex-wrap twc-items-center twc-justify-between'}>
           <Typography className='twc-mr-2'>
-            {`© ${new Date().getFullYear()} `}
+            {`© 2023 `}
             <Link className={'twc-no-underline twc-text-primary-main'} target='_blank' href='https://datastrato.ai/'>
               Datastrato
             </Link>
