@@ -7,13 +7,13 @@
 nohup /usr/lib/trino/bin/run-trino &
 
 counter=0
-while [ $counter -le 240 ]; do
+while [ $counter -le 180]; do
   counter=$((counter + 1))
   trino_ready=$(trino --execute  "SHOW CATALOGS LIKE 'gravitino'" | wc -l)
   if [ "$trino_ready" -eq 0 ];
   then
     echo "Wait for the initialization of services"
-    sleep 5;
+    sleep 1;
   else
     # persist the container
     tail -f /dev/null
