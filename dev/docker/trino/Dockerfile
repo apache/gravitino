@@ -45,11 +45,17 @@ RUN rm -rf /usr/lib/trino/plugin/accumulo  \
     && rm -rf /usr/lib/trino/plugin/redis \
     && rm -rf /usr/lib/trino/plugin/session-property-managers \
     && rm -rf /usr/lib/trino/plugin/teradata-functions
-
 COPY --chown=trino:trino packages/trino/conf /etc/trino
-COPY --chown=trino:trino packages/gravitino-trino-connector/mysql-connector-java-8.0.27.jar /usr/lib/trino/plugin/iceberg/
-COPY --chown=trino:trino packages/gravitino-trino-connector/postgresql-42.7.0.jar /usr/lib/trino/plugin/iceberg/
-COPY --chown=trino:trino packages/gravitino-trino-connector /usr/lib/trino/plugin/gravitino
+
+ARG IMAGE_NAME
+RUN if [ "$IMAGE_NAME" = "datastrato/trino" ] ; then echo "Copying files for ${IMAGE_NAME} image" \
+  && COPY --chown=trino:trino packages/gravitino-trino-connector/mysql-connector-java-8.0.27.jar /usr/lib/trino/plugin/iceberg/ \
+  && COPY --chown=trino:trino packages/gravitino-trino-connector/postgresql-42.7.0.jar /usr/lib/trino/plugin/iceberg/ \
+  && COPY --chown=trino:trino packages/gravitino-trino-connector /usr/lib/trino/plugin/gravitino/; \
+  else echo "Copying files for other images"; \
+  fi
+
+
 
 # Use ARGs to update trino conf and start Trino server
 ARG GRAVITINO_HOST_IP
