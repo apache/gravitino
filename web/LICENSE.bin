@@ -213,6 +213,10 @@
    This product bundles various third-party components also under the
    MIT license.
 
+   MIT License Copyright (c) 2020-present, Vben
+  ./web/lib/utils/axios
+  ./web/types/axios.d.ts
+
    @babel/code-frame
    @babel/helper-module-imports
    @babel/helper-string-parser
@@ -359,7 +363,6 @@
    toposort
    undici-types
    use-sync-external-store
-   vben
    watchpack
    yup
 
