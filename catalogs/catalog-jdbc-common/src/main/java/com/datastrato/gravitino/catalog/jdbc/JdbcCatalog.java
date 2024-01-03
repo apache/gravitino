@@ -6,12 +6,14 @@ package com.datastrato.gravitino.catalog.jdbc;
 
 import com.datastrato.gravitino.catalog.BaseCatalog;
 import com.datastrato.gravitino.catalog.CatalogOperations;
+import com.datastrato.gravitino.catalog.PropertyEntry;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import com.datastrato.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
 import com.datastrato.gravitino.catalog.jdbc.operation.JdbcTableOperations;
 import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.datastrato.gravitino.rel.TableCatalog;
+import java.util.Collections;
 import java.util.Map;
 
 /** Implementation of an Jdbc catalog in Gravitino. */
@@ -31,7 +33,8 @@ public abstract class JdbcCatalog extends BaseCatalog<JdbcCatalog> {
             createExceptionConverter(),
             createJdbcTypeConverter(),
             createJdbcDatabaseOperations(),
-            createJdbcTableOperations());
+            createJdbcTableOperations(),
+            createJdbcTablePropertiesMetadata());
     ops.initialize(config);
     return ops;
   }
@@ -63,4 +66,15 @@ public abstract class JdbcCatalog extends BaseCatalog<JdbcCatalog> {
 
   /** @return The {@link JdbcTableOperations} to be used by the catalog to manage tables in the */
   protected abstract JdbcTableOperations createJdbcTableOperations();
+
+  /** @return The {@link JdbcTablePropertiesMetadata} to be used by the catalog to manage table */
+  protected JdbcTablePropertiesMetadata createJdbcTablePropertiesMetadata() {
+    return new JdbcTablePropertiesMetadata() {
+
+      @Override
+      protected Map<String, PropertyEntry<?>> specificPropertyEntries() {
+        return Collections.emptyMap();
+      }
+    };
+  }
 }

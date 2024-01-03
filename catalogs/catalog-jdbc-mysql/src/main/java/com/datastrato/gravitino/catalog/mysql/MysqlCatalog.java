@@ -5,6 +5,7 @@
 package com.datastrato.gravitino.catalog.mysql;
 
 import com.datastrato.gravitino.catalog.jdbc.JdbcCatalog;
+import com.datastrato.gravitino.catalog.jdbc.JdbcTablePropertiesMetadata;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import com.datastrato.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
@@ -40,5 +41,10 @@ public class MysqlCatalog extends JdbcCatalog {
   @Override
   protected JdbcTableOperations createJdbcTableOperations() {
     return new MysqlTableOperations();
+  }
+
+  @Override
+  protected JdbcTablePropertiesMetadata createJdbcTablePropertiesMetadata() {
+    return new MysqlTablePropertiesMetadata();
   }
 }
