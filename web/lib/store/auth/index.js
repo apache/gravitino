@@ -77,7 +77,7 @@ export const loginAction = createAsyncThunk('auth/loginAction', async ({ params,
     const { version } = resVer
 
     loggerVersion(version.version)
-    localStorage.setItem(version, JSON.stringify(version))
+    localStorage.setItem('version', JSON.stringify(version))
     dispatch(setStoreVersion(version.version))
 
     router.replace('/')
