@@ -7,7 +7,7 @@
 nohup /usr/lib/trino/bin/run-trino &
 
 counter=0
-while [ $counter -le 180]; do
+while [ $counter -le 300 ]; do
   counter=$((counter + 1))
   trino_ready=$(trino --execute  "SHOW CATALOGS LIKE 'gravitino'" | wc -l)
   if [ "$trino_ready" -eq 0 ];
