@@ -203,11 +203,12 @@
 
    This product bundles various third-party components also under the
    Apache Software License 2.0.
-   
+
    Apache Zeppelin
    ./web/WEB-INF/web.xml
 
    @swc/helpers
+   typescript
 
    This product bundles various third-party components also under the
    MIT license.
@@ -321,6 +322,7 @@
    prop-types
    property-expr
    proxy-from-env
+   qs
    react-dom
    react-hook-form
    react-hot-toast
@@ -338,6 +340,7 @@
    rtl-css-js
    scheduler
    screenfull
+   side-channel
    stack-generator
    stackframe
    stacktrace-gps
@@ -348,12 +351,15 @@
    stylis
    supports-color
    supports-preserve-symlinks-flag
+   sweetalert2
    throttle-debounce
    tiny-case
    to-fast-properties
    toggle-selection
    toposort
+   undici-types
    use-sync-external-store
+   vben
    watchpack
    yup
 
