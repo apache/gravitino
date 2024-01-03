@@ -23,7 +23,7 @@ Gravitino aims to provide several key features:
 
 ## Contributing to Gravitino
 
-Gravitino is open source software available under the Apache 2.0 license. For information of how to contribute to Gravitino please see the [Contribution guidelines](CONTRIBUTING.md).
+Gravitino is open source software available under the Apache 2.0 license. For information on how to contribute to Gravitino please see the [Contribution guidelines](CONTRIBUTING.md).
 
 ## Online documentation
 
@@ -53,7 +53,7 @@ Or:
 
 to build a compressed distribution package.
 
-The generated binary distribution package locates in `distribution` directory.
+The directory `distribution`` contains the generated binary distribution package.
 
 For the details of building and testing Gravitino, please see [How to build Gravitino](docs/how-to-build.md).
 
@@ -61,11 +61,10 @@ For the details of building and testing Gravitino, please see [How to build Grav
 
 ### Configure and start the Gravitino server
 
-If you already have a binary distribution package, please decompress the package (if required)
-and go to the directory where the package locates.
+If you already have a binary distribution package, go to the directory of the decompressed package.
 
 Before starting the Gravitino server, please configure the Gravitino server configuration file. The
-configuration file, `gravitino.conf`, located in the `conf` directory and follows the standard property file format. You can modify the configuration within this file.
+configuration file, `gravitino.conf`, is in the `conf` directory and follows the standard property file format. You can modify the configuration within this file.
 
 To start the Gravitino server, please run:
 
