@@ -26,7 +26,6 @@
 >
 > You should use the Yarn package manager.
 >
->
 > **Requirements**
 >
 > Please make sure you use the node’s LTS version
@@ -56,7 +55,7 @@ The Gravitino Web UI only works in the latest version of the Chrome browser. You
 
 ### Development scripts
 
-This command runs ESLint to help you inspect the code. If errors are printed, please make modifications based on the provided prompts.
+This command runs ESLint to help you inspect the code. If errors occur, please make modifications based on the provided prompts.
 
 ```bash
 yarn lint
@@ -72,7 +71,6 @@ This command automatically formats the code.
 
 ```bash
 yarn format
-
 ```
 
 ## Self-hosting deployment
