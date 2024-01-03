@@ -27,7 +27,7 @@ gravitino:0.3.0
 - Docker image `datastrato/gravitino:0.3.0`
 - Gravitino Server
 - Expose ports:
-  - `8090` Gravitino web UI
+  - `8090` Gravitino Web UI
   - `9001` Iceberg REST service
 
 ## Playground Docker image
