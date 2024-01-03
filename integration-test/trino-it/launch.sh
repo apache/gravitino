@@ -25,7 +25,7 @@ else
     LOG_PATH=../build/integration-test.log
 fi
 
-echo The docker-compose log is: $LOG_PATH
+echo "The docker-compose log is: $LOG_PATH"
 
 nohup docker-compose logs -f  -t >> $LOG_PATH &
 
@@ -33,7 +33,7 @@ max_attempts=180
 
 for ((i = 0; i < max_attempts; i++)); do
     docker-compose exec -T trino trino --execute "SELECT 1" >/dev/null 2>&1 && {
-        echo "All docker-compse service is now available."
+        echo "All docker-compose service is now available."
         exit 0
     }
     sleep 1

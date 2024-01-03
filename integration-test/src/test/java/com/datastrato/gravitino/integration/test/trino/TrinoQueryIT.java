@@ -91,9 +91,7 @@ public class TrinoQueryIT {
   private static void setEnv() throws Exception {
     if (autoStartEnv) {
       AbstractIT.startIntegrationTest();
-      AbstractIT.getGravitinoServerPort();
-      ContainerSuite.getInstance();
-      trinoITContainers = ContainerSuite.getTrinoITContainers();
+      trinoITContainers = ContainerSuite.getInstance().getTrinoITContainers();
       trinoITContainers.launch(AbstractIT.getGravitinoServerPort());
       gravitinoClient = AbstractIT.getGravitinoClient();
 
@@ -435,24 +433,49 @@ public class TrinoQueryIT {
     queryRunner.stop();
   }
 
+  /**
+   * * This method is used to match the result of the query. There are three cases: 1. The expected
+   * result is equal to the actual result. 2. The expected result is a query failed result, and the
+   * actual result matches the query failed result. 3. The expected result is a regular expression,
+   * and the actual result matches the regular expression.
+   *
+   * @param expectResult
+   * @param result
+   * @return
+   */
   boolean match(String expectResult, String result) {
     if (expectResult.isEmpty()) {
       return false;
     }
 
-    // match text
     boolean match = expectResult.equals(result);
     if (match) {
       return true;
     }
 
-    // match query failed result.
+    // Match query failed result.
+    // E.g., the expected result can be matched with the following actual result:
+    // query result:
+    // Query 20240103_132722_00006_pijfx failed: line 8:6: Schema must be specified when session
+    // schema is not set
+    // expectResult:
+    // Schema must be specified when session schema is not set
     if (Pattern.compile("^Query \\w+ failed:").matcher(result).find()) {
       match = Pattern.compile("^Query \\w+ failed.*: " + expectResult).matcher(result).find();
       return match;
     }
 
-    // match reg
+    // Match Wildcard.
+    // The valid wildcard is '%'. It can match any character.
+    // E.g., the expected result can be matched with the following actual result:
+    // query result:
+    //    ...
+    //    location = 'hdfs://10.l.30.1:9000/user/hive/warehouse/gt_db1.db/tb01',
+    //    ...
+    // expectResult:
+    //
+    //    location = 'hdfs://%:9000/user/hive/warehouse/gt_db1.db/tb01',
+    //    ...
     expectResult = expectResult.replace("\n", "");
     expectResult = "\\Q" + expectResult.replace("%", "\\E.*?\\Q") + "\\E";
     result = result.replace("\n", "");
