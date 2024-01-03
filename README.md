@@ -53,7 +53,7 @@ Or:
 
 to build a compressed distribution package.
 
-The directory `distribution`` contains the generated binary distribution package.
+The directory `distribution` contains the generated binary distribution package.
 
 For the details of building and testing Gravitino, please see [How to build Gravitino](docs/how-to-build.md).
 
