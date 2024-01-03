@@ -18,10 +18,13 @@ The Gravitino Iceberg REST Server follows the [Apache Iceberg REST API specifica
 - When writing to HDFS, the Gravitino Iceberg REST catalog service can only operate as the specified HDFS user and
   doesn't support proxying to other HDFS users. See [How to access Apache Hadoop](gravitino-server-config.md) for more details.
 
-:::info
-Builds with Apache Iceberg `1.3.1`. The Apache Iceberg table format version is `1` by default.
-Builds with Hadoop 2.10.x, there may compatibility issue when accessing Hadoop 3.x clusters.
+
+:::info 
+The REST server builds with Apache Iceberg `1.3.1`. The Apache Iceberg table format version is `1` by default.
+The server also builds with Hadoop `2.10.x`. Note there may be untested compatibility issues when accessing the service 
+with Hadoop `3.x` clusters.
 :::
+
 
 ## How to start the Gravitino Iceberg REST catalog service
 
@@ -48,14 +51,13 @@ Deploy the Gravitino server to the `GRAVITINO_HOME` directory. You can find the 
 The filter in the customFilters should be a standard javax servlet Filter.
 Filter parameters can also be specified in the configuration, by setting config entries of the form `gravitino.auxService.iceberg-rest.<class name of filter>.param.<param name>=<value>`
 
-:::caution
-You must set `gravitino.auxService.iceberg-rest.httpPort` explicitly, like `9001`.
+:::caution 
+You must set `gravitino.auxService.iceberg-rest.httpPort` explicitly, for example `9001`. 
 :::
 
 ### Iceberg catalog configuration
-
 :::info
-The Gravitino Iceberg REST catalog service using memory catalog for default. You can specify Hive or JDBC catalog for production environments.
+The Gravitino Iceberg REST catalog service uses the memory catalog by default. You can specify either a Hive or JDBC catalog if you are using a production environments.
 :::
 
 #### Hive catalog configuration
