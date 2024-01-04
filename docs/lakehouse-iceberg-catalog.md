@@ -17,7 +17,7 @@ Gravitino provides the ability to manage Apache Iceberg metadata.
 
 :::info
 Builds with Apache Iceberg `1.3.1`. The Apache Iceberg table format version is `1` by default.
-Builds with Hadoop 2.10.x, there may compatibility issue when accessing Hadoop 3.x clusters.
+Builds with Hadoop 2.10.x, there may be compatibility issues when accessing Hadoop 3.x clusters.
 :::
 
 ## Catalog
@@ -89,7 +89,7 @@ Supports transforms:
 
 :::info
 Iceberg doesn't support multi fields in `BucketTransform`.
-Iceberg doesn't support `ApplyTransform`, `RangeTransform` and `ListTransform`.
+Iceberg doesn't support `ApplyTransform`, `RangeTransform`, and `ListTransform`.
 :::
 
 ### Table sort orders
@@ -106,7 +106,7 @@ supports expressions:
   - `hour`
 
 :::info
-For `bucket` and `truncate`, the first argument must be integer literal, the second argument must be field reference.
+For `bucket` and `truncate`, the first argument must be integer literal, and the second argument must be field reference.
 :::
 
 ### Table distributions
@@ -145,7 +145,7 @@ Apache Iceberg doesn't support Gravitino `Varchar` `Fixedchar` `Byte` `Short` `U
 
 ### Table properties
 
-You can pass [Iceberg table properties](https://iceberg.apache.org/docs/1.3.1/configuration/) to Gravitino when creating Iceberg table.
+You can pass [Iceberg table properties](https://iceberg.apache.org/docs/1.3.1/configuration/) to Gravitino when creating an Iceberg table.
 
 The Gravitino server doesn't allow passing the following reserved fields.
 

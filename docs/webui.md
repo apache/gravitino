@@ -11,7 +11,7 @@ import Image from '@theme/IdealImage'
 import Tabs from '@theme/Tabs'
 import TabItem from '@theme/TabItem'
 
-This document primarily outlines how users can manage metadata within Gravitino using the web UI, the graphical interface is accessible through a web browser as an alterative to writing code or using the REST interface.
+This document primarily outlines how users can manage metadata within Gravitino using the web UI, the graphical interface is accessible through a web browser as an alternative to writing code or using the REST interface.
 
 Currently, you can integrate [OAuth settings](security.md) to view, add, modify, and delete metalakes, create catalogs, and view catalogs, schemas, and tables, among other functions.
 
@@ -35,11 +35,11 @@ After changing the configuration, make sure to restart the Gravitino server.
 
 ### Simple mode
 
-```
+```text
 gravitino.authenticator = simple
 ```
 
-Set the configuration parameter `gravitino.authenticator` to `simple`, the web UI displays the homepage (Metalakes).
+Set the configuration parameter `gravitino.authenticator` to `simple`, and the web UI displays the homepage (Metalakes).
 
 ![webui-metalakes-simple](assets/webui/metalakes-simple.png)
 
@@ -49,11 +49,11 @@ The main content displays the existing metalake list.
 
 ### Oauth mode
 
-```
+```text
 gravitino.authenticator = oauth
 ```
 
-Set the configuration parameter `gravitino.authenticator` to `oauth`, the web UI displays the login page.
+Set the configuration parameter `gravitino.authenticator` to `oauth`, and the web UI displays the login page.
 
 ![webui-login-with-oauth](assets/webui/login-with-oauth.png)
 
@@ -81,7 +81,7 @@ Creating a metalake needs these fields:
 
 1. **Name**(**_required_**): the name of the metalake.
 2. **Comment**(_optional_): the comment of the metalake.
-3. **Properties**(_optional_): clicking on the `ADD PROPERTY` button to add custom properties.
+3. **Properties**(_optional_): Click on the `ADD PROPERTY` button to add custom properties.
 
 ![metalake-list](assets/webui/metalake-list.png)
 
@@ -95,7 +95,7 @@ There are 3 actions you can perform on a metalake.
 
 #### Edit metalake
 
-Displays a dialog for for modifying a metalakes fields.
+Displays a dialog for modifying metalakes fields.
 
 ![create-metalake-dialog](assets/webui/create-metalake-dialog.png)
 
@@ -113,7 +113,7 @@ If this is the first time, it shows no data until after creating a catalog.
 
 ![metalake-catalogs](assets/webui/metalake-catalogs.png)
 
-Clicking on the Tab - `DETAILS` views the details of the catalog in the metalake catalogs page.
+Clicking on the Tab - `DETAILS` views the details of the catalog on the metalake catalogs page.
 
 ![metalake-catalogs-details](assets/webui/metalake-catalogs-details.png)
 
