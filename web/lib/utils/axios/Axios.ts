@@ -22,6 +22,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
+/**
+ * Referred from src/utils/http/axios/Axios.ts
+ */
+
 import type { AxiosRequestConfig, AxiosInstance, AxiosResponse, AxiosError, InternalAxiosRequestConfig } from 'axios'
 import type { RequestOptions, Result, UploadFileParams } from '@/types/axios'
 import type { CreateAxiosOptions } from './axiosTransform'

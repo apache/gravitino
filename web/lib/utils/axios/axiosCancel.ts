@@ -22,6 +22,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
+/**
+ * Referred from src/utils/http/axios/axiosCancel.ts
+ */
+
 import type { AxiosRequestConfig } from 'axios'
 
 const pendingMap = new Map<string, AbortController>()

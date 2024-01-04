@@ -22,6 +22,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
+/**
+ * Referred from src/utils/http/axios/checkStatus.ts
+ */
+
 import type { ErrorMessageMode } from '@/types/axios'
 import toast from 'react-hot-toast'
 import Swal from 'sweetalert2'

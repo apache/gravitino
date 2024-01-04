@@ -22,6 +22,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
+/**
+ * Referred from src/utils/http/axios/axiosTransform.ts
+ */
+
 // ** Data processing class, can be configured according to the project
 import type { AxiosInstance, AxiosRequestConfig, AxiosResponse, InternalAxiosRequestConfig } from 'axios'
 import type { RequestOptions, Result } from '@/types/axios'

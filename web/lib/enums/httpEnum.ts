@@ -22,6 +22,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
+/**
+ * Referred from src/enums/httpEnum.ts
+ */
+
 export enum ContentTypeEnum {
   JSON = 'application/json;charset=UTF-8',
   FORM_URLENCODED = 'application/x-www-form-urlencoded;charset=UTF-8',

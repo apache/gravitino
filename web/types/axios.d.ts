@@ -22,6 +22,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
+/**
+ * Referred from types/axios.d.ts
+ */
+
 export type ErrorMessageMode = 'none' | 'modal' | 'message' | undefined
 
 export type SuccessMessageMode = ErrorMessageMode

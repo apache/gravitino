@@ -22,6 +22,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
+/**
+ * Referred from src/utils/http/axios/helper.ts
+ */
+
 import { isObject, isString } from '@/lib/utils/is'
 
 const DATE_TIME_FORMAT = 'YYYY-MM-DD HH:mm:ss'
