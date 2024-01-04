@@ -31,7 +31,9 @@ You can find the latest Gravitino documentation here in the [doc folder](docs), 
 
 ## Building Gravitino
 
-Gravitino builds Gradle. To build Gravitino, please run:
+You can build Gravitino using Gradle. Currently you can build Gravitino on Linux and macOS, Windows isn't supported.
+
+To build Gravitino, please run:
 
 ```shell
 ./gradlew clean build -x test
