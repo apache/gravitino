@@ -182,6 +182,7 @@ const MetalakeList = () => {
             handleFilter={handleFilter}
             setOpenDialog={setOpenDialog}
             setDialogData={setDialogData}
+            setDialogType={setDialogType}
           />
           <DataGrid
             autoHeight
