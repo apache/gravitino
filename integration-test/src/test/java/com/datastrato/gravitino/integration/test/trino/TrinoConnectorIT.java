@@ -868,12 +868,11 @@ public class TrinoConnectorIT extends AbstractIT {
     }
 
     // Do not support the cascade drop
-    Assertions.assertThrows(
-        RuntimeException.class,
-        () ->
-            catalog
-                .asSchemas()
-                .dropSchema(NameIdentifier.of(metalakeName, catalogName, schemaName), true));
+    success =
+        catalog
+            .asSchemas()
+            .dropSchema(NameIdentifier.of(metalakeName, catalogName, schemaName), true);
+    Assertions.assertFalse(success);
     final String sql3 =
         String.format("show schemas in \"%s.%s\" like '%s'", metalakeName, catalogName, schemaName);
     success = checkTrinoHasLoaded(sql3, 30);

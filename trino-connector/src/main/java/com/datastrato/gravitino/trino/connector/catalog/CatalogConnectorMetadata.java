@@ -149,15 +149,16 @@ public class CatalogConnectorMetadata {
 
   public void dropSchema(String schemaName, boolean cascade) {
     try {
-      schemaCatalog.dropSchema(
-          NameIdentifier.ofSchema(metalake.name(), catalogName, schemaName), cascade);
+      boolean success =
+          schemaCatalog.dropSchema(
+              NameIdentifier.ofSchema(metalake.name(), catalogName, schemaName), cascade);
+
+      if (!success) {
+        throw new TrinoException(GRAVITINO_SCHEMA_NOT_EXISTS, "Drop schema failed");
+      }
+
     } catch (NonEmptySchemaException e) {
       throw new TrinoException(GRAVITINO_SCHEMA_NOT_EMPTY, "Schema does not empty", e);
-    } catch (Exception e1) {
-      String errorMessage =
-          e1.getMessage().lines().toList().get(0) + e1.getMessage().lines().toList().get(1);
-      throw new TrinoException(
-          GRAVITINO_SCHEMA_NOT_EMPTY, "Drop schema failed: " + errorMessage, e1);
     }
   }
 

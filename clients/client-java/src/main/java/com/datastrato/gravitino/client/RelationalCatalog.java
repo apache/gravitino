@@ -379,15 +379,24 @@ public class RelationalCatalog extends CatalogDTO implements TableCatalog, Suppo
   @Override
   public boolean dropSchema(NameIdentifier ident, boolean cascade) throws NonEmptySchemaException {
     NameIdentifier.checkSchema(ident);
-    DropResponse resp =
-        restClient.delete(
-            formatSchemaRequestPath(ident.namespace()) + "/" + ident.name(),
-            Collections.singletonMap("cascade", String.valueOf(cascade)),
-            DropResponse.class,
-            Collections.emptyMap(),
-            ErrorHandlers.schemaErrorHandler());
-    resp.validate();
-    return resp.dropped();
+
+    try {
+      DropResponse resp =
+          restClient.delete(
+              formatSchemaRequestPath(ident.namespace()) + "/" + ident.name(),
+              Collections.singletonMap("cascade", String.valueOf(cascade)),
+              DropResponse.class,
+              Collections.emptyMap(),
+              ErrorHandlers.schemaErrorHandler());
+      resp.validate();
+      return resp.dropped();
+
+    } catch (NonEmptySchemaException e) {
+      throw e;
+    } catch (Exception e) {
+      LOG.warn("Failed to drop schema {}", ident, e);
+      return false;
+    }
   }
 
   @VisibleForTesting
