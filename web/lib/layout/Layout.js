@@ -5,9 +5,9 @@
 
 'use client'
 
-import { Suspense } from 'react'
+import dynamic from 'next/dynamic'
 
-import { Box, Fab, CircularProgress } from '@mui/material'
+import { Box, Fab } from '@mui/material'
 
 import Icon from '@/components/Icon'
 
@@ -15,7 +15,6 @@ import AppBar from './AppBar'
 import Footer from './Footer'
 import MainContent from './MainContent'
 import ScrollToTop from './ScrollToTop'
-import { NavigationEvents } from './navigation-events'
 
 const Layout = ({ children, scrollToTop }) => {
   return (
@@ -43,4 +42,5 @@ const Layout = ({ children, scrollToTop }) => {
   )
 }
 
-export default Layout
+// ** use dynamic export instead of export default Layout
+export default dynamic(() => Promise.resolve(Layout), { ssr: false })

@@ -52,7 +52,7 @@ const DetailsView = props => {
           <Typography variant='body2' sx={{ mb: 2 }}>
             Comment
           </Typography>
-          <Typography sx={{ fontWeight: 500 }}>{activatedItem.comment}</Typography>
+          <Typography sx={{ fontWeight: 500 }}>{activatedItem?.comment || ''}</Typography>
         </Grid>
 
         <Grid item xs={12} md={6} sx={{ mb: [0, 5] }}>
