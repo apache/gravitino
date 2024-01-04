@@ -1038,7 +1038,7 @@ public class TrinoConnectorIT extends AbstractIT {
       createdMetalake.dropCatalog(NameIdentifier.of(metalakeName, catalogName));
       // We need to test we can't load this catalog any more by Trino.
       success = checkTrinoHasRemoved(sql, 30);
-      Assertions.assertFalse(success, "Trino should not load the catalog any more: " + sql);
+      Assertions.assertTrue(success, "Trino should not load the catalog any more: " + sql);
     }
   }
 
