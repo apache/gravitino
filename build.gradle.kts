@@ -315,8 +315,9 @@ tasks.rat {
     "web/.**",
     "web/dist/**/*",
     "web/node_modules/**/*",
-    "web/src/iconify-bundle/bundle-icons-react.js",
-    "web/src/iconify-bundle/icons-bundle-react.js",
+    "web/lib/utils/axios/**/*",
+    "web/lib/enums/httpEnum.ts",
+    "web/types/axios.d.ts",
     "web/yarn.lock",
     "**/LICENSE.*",
     "**/NOTICE.*"
