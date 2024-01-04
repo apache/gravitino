@@ -227,7 +227,12 @@ public class MysqlTableOperations extends JdbcTableOperations {
     // Add columns
     for (int i = 0; i < columns.length; i++) {
       JdbcColumn column = columns[i];
-      sqlBuilder.append(SPACE).append(SPACE).append(BACK_QUOTE).append(column.name()).append(BACK_QUOTE);
+      sqlBuilder
+          .append(SPACE)
+          .append(SPACE)
+          .append(BACK_QUOTE)
+          .append(column.name())
+          .append(BACK_QUOTE);
 
       appendColumnDefinition(column, sqlBuilder);
       // Add a comma for the next column, unless it's the last one
