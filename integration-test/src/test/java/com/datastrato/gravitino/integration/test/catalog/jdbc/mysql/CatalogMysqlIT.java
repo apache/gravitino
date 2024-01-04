@@ -319,6 +319,70 @@ public class CatalogMysqlIT extends AbstractIT {
   }
 
   @Test
+  void testColumnNameWithKeyWords() {
+    // Create table from Gravitino API
+    ColumnDTO[] columns = new ColumnDTO[] {
+        new ColumnDTO.Builder()
+            .withName("integer")
+            .withDataType(Types.IntegerType.get())
+            .withComment("integer")
+            .build(),
+        new ColumnDTO.Builder()
+            .withName("long")
+            .withDataType(Types.LongType.get())
+            .withComment("long")
+            .build(),
+        new ColumnDTO.Builder()
+            .withName("float")
+            .withDataType(Types.FloatType.get())
+            .withComment("float")
+            .build(),
+        new ColumnDTO.Builder()
+            .withName("double")
+            .withDataType(Types.DoubleType.get())
+            .withComment("double")
+            .build(),
+        new ColumnDTO.Builder()
+            .withName("decimal")
+            .withDataType(Types.DecimalType.of(10, 3))
+            .withComment("decimal")
+            .build(),
+        new ColumnDTO.Builder()
+            .withName("date")
+            .withDataType(Types.DateType.get())
+            .withComment("date")
+            .build(),
+        new ColumnDTO.Builder()
+            .withName("time")
+            .withDataType(Types.TimeType.get())
+            .withComment("time")
+            .build()
+    };
+
+    String name = GravitinoITUtils.genRandomName("table") + "_keyword";
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(metalakeName, catalogName, schemaName, name);
+    Distribution distribution = Distributions.NONE;
+
+    final SortOrder[] sortOrders = new SortOrder[0];
+
+    Partitioning[] partitioning = Partitioning.EMPTY_PARTITIONING;
+
+    Map<String, String> properties = createProperties();
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    Table createdTable =
+        tableCatalog.createTable(
+            tableIdentifier,
+            columns,
+            table_comment,
+            properties,
+            partitioning,
+            distribution,
+            sortOrders);
+    Assertions.assertEquals(createdTable.name(), name);
+  }
+
+  @Test
   void testAlterAndDropMysqlTable() {
     ColumnDTO[] columns = createColumns();
     catalog
