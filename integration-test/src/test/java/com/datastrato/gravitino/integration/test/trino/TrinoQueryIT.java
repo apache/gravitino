@@ -239,7 +239,7 @@ public class TrinoQueryIT {
         String result = trinoQueryRunner.runQuery("show catalogs");
         if (result.contains(metalakeName + "." + catalogName)) {
           catalogCreated = true;
-          continue;
+          break;
         }
         LOG.info("Waiting for catalog {} to be created", catalogName);
         // connection exception need retry.
