@@ -3,7 +3,7 @@
  * This software is licensed under the Apache License version 2.
  */
 
-import defHttp from '@/lib/api'
+import { defHttp } from '@/lib/utils/axios'
 
 const Apis = {
   GET: ({ metalake, catalog }) => `/api/metalakes/${metalake}/catalogs/${catalog}/schemas`,
@@ -11,15 +11,13 @@ const Apis = {
 }
 
 export const getSchemasApi = params => {
-  return defHttp.request({
-    url: `${Apis.GET(params)}`,
-    method: 'get'
+  return defHttp.get({
+    url: `${Apis.GET(params)}`
   })
 }
 
 export const getSchemaDetailsApi = ({ metalake, catalog, schema }) => {
-  return defHttp.request({
-    url: `${Apis.GET_DETAIL({ metalake, catalog, schema })}`,
-    method: 'get'
+  return defHttp.get({
+    url: `${Apis.GET_DETAIL({ metalake, catalog, schema })}`
   })
 }
