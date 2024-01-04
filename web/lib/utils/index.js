@@ -3,6 +3,9 @@
  * This software is licensed under the Apache License version 2.
  */
 
+import { intersectionWith, isEqual, mergeWith, unionWith } from 'lodash-es'
+import { isArray, isObject } from './is'
+
 export const isDevEnv = process.env.NODE_ENV === 'development'
 
 export const isProdEnv = process.env.NODE_ENV === 'production'
@@ -63,4 +66,45 @@ export const genUpdates = (originalData, newData) => {
 
 export const hasNull = obj => {
   return Object.keys(obj).some(key => obj[key] === null)
+}
+
+export const deepMerge = (source, target, mergeArrays = 'replace') => {
+  if (!target) {
+    return source
+  }
+  if (!source) {
+    return target
+  }
+
+  return mergeWith({}, source, target, (sourceValue, targetValue) => {
+    if (isArray(targetValue) && isArray(sourceValue)) {
+      switch (mergeArrays) {
+        case 'union':
+          return unionWith(sourceValue, targetValue, isEqual)
+        case 'intersection':
+          return intersectionWith(sourceValue, targetValue, isEqual)
+        case 'concat':
+          return sourceValue.concat(targetValue)
+        case 'replace':
+          return targetValue
+        default:
+          throw new Error(`Unknown merge array strategy: ${mergeArrays}`)
+      }
+    }
+    if (isObject(targetValue) && isObject(sourceValue)) {
+      return deepMerge(sourceValue, targetValue, mergeArrays)
+    }
+
+    return undefined
+  })
+}
+
+export function setObjToUrlParams(baseUrl, obj) {
+  let parameters = ''
+  for (const key in obj) {
+    parameters += key + '=' + encodeURIComponent(obj[key]) + '&'
+  }
+  parameters = parameters.replace(/&$/, '')
+
+  return /\?$/.test(baseUrl) ? baseUrl + parameters : baseUrl.replace(/\/?$/, '?') + parameters
 }

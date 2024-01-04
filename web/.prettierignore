@@ -5,3 +5,4 @@
 
 .next
 node_modules
+tsconfig.json
