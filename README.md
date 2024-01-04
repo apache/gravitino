@@ -27,7 +27,7 @@ Gravitino is open source software available under the Apache 2.0 license. For in
 
 ## Online documentation
 
-You can find the latest Gravitino documentation here in the [doc folder](docs), The README file only contains basic setup instructions.
+You can find the latest Gravitino documentation in the [doc folder](docs). This README file only contains basic setup instructions.
 
 ## Building Gravitino
 
