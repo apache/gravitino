@@ -69,6 +69,8 @@ public class GeneralDataTypeTransformer {
         return VarcharType.createVarcharType(((Types.VarCharType) type).length());
       case BINARY:
         return VARBINARY;
+      case FIXED:
+        return VARBINARY;
       case DATE:
         return DATE;
       case TIME:
