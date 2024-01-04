@@ -65,7 +65,7 @@ export function checkStatus(status: number, msg: string, errorMessageMode: Error
       break
 
     case 500:
-      errMessage = msg || 'Server error, please contact the administrator!'
+      errMessage = msg || 'Server error, unable to connect Gravitino!'
       break
 
     case 501:
