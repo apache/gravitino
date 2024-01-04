@@ -313,6 +313,7 @@ tasks.rat {
     "**/licenses/*.md",
     "integration-test/**",
     "web/.**",
+    "web/next-env.d.ts",
     "web/dist/**/*",
     "web/node_modules/**/*",
     "web/lib/utils/axios/**/*",
