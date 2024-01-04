@@ -35,9 +35,7 @@ const MetalakeView = props => {
   useEffect(() => {
     const { metalake, catalog, schema, table } = routeParams
 
-    if (store.metalakeTree.length === 0) {
-      dispatch(initMetalakeTree({ metalake, catalog, schema, table }))
-    }
+    dispatch(initMetalakeTree({ metalake, catalog, schema, table }))
 
     switch (page) {
       case 'metalakes':
