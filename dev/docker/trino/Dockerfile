@@ -48,13 +48,14 @@ RUN rm -rf /usr/lib/trino/plugin/accumulo  \
 COPY --chown=trino:trino packages/trino/conf /etc/trino
 COPY --chown=trino:trino packages/gravitino-trino-connector/mysql-connector-java-8.0.27.jar /usr/lib/trino/plugin/iceberg/
 COPY --chown=trino:trino packages/gravitino-trino-connector/postgresql-42.7.0.jar /usr/lib/trino/plugin/iceberg/
+COPY --chown=trino:trino packages/gravitino-trino-connector /tmp/
 
 ARG IMAGE_NAME
-RUN if [ "$IMAGE_NAME" = "datastrato/trino" ] ; then echo "Copying files for ${IMAGE_NAME} image" \
-  && COPY --chown=trino:trino packages/gravitino-trino-connector/mysql-connector-java-8.0.27.jar /usr/lib/trino/plugin/gravitino/ \
-  && COPY --chown=trino:trino packages/gravitino-trino-connector/postgresql-42.7.0.jar /usr/lib/trino/plugin/gravitino/;\
-  else echo "Copying files for other images"; \
-  fi
+RUN if [ "$IMAGE_NAME" = "datastrato/trino" ] ; then \
+    mkdir /usr/lib/trino/plugin/gravitino; \
+    cp -rf /tmp/*.jar /usr/lib/trino/plugin/gravitino/; \
+    else echo "Copying files for other images"; \
+    fi
 
 
 
