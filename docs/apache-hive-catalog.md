@@ -131,7 +131,7 @@ Hive automatically adds and manages some reserved properties. Users aren't allow
 | `comment`               | Used to store the table comment.                  | 0.2.0         |
 | `numFiles`              | Used to store the number of files in the table.   | 0.2.0         |
 | `totalSize`             | Used to store the total size of the table.        | 0.2.0         |
-| `EXTERNAL`              | Indicates whether the table is external. | 0.2.0         |
+| `EXTERNAL`              | Indicates whether the table is external.          | 0.2.0         |
 | `transient_lastDdlTime` | Used to store the last DDL time of the table.     | 0.2.0         |
 
 ### Table operations
