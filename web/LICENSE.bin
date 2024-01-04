@@ -213,7 +213,7 @@
    This product bundles various third-party components also under the
    MIT license.
 
-   MIT License Copyright (c) 2020-present, Vben
+   Vben
   ./web/lib/utils/axios
   ./web/types/axios.d.ts
 
