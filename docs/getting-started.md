@@ -21,7 +21,6 @@ or locally see [Installing Gravitino playground locally](#installing-gravitino-p
 
 If you are using AWS and want to access the instance remotely, be sure to read [Accessing Gravitino on AWS externally](#accessing-gravitino-on-aws-externally)
 
-
 ## Getting started on Amazon Web Services
 
 To begin using Gravitino on AWS, follow these steps:
@@ -156,7 +155,7 @@ You can install Apache Hive and Hadoop on AWS or Google Cloud Platform manually,
 the steps of how to install [Apache Hive](https://cwiki.apache.org/confluence/display/Hive/) and
 [Hadoop](https://hadoop.apache.org/docs/stable/hadoop-project-dist/hadoop-common/SingleCluster.html) instructions on their websites.
 
-Installing and configuring Hive can be a little complex. If you don't already have Hive setup and running you can use the Docker container Datastrato provide to get Gravitino up and running.
+Installing and configuring Hive can be a little complex. If you don't already have Hive setup and running you can use the Docker container Datastrato provides to get Gravitino up and running.
 
 You can follow the instructions for setting up [Docker on Ubuntu](https://docs.docker.com/engine/install/ubuntu/).
 
@@ -172,7 +171,7 @@ sudo docker start gravitino-container
 
 ## Installing Apache Hive locally
 
-The same steps apply for installing Hive locally as on AWS or Google Cloud Platform. You can
+The same steps apply to installing Hive locally as on AWS or Google Cloud Platform. You can
 follow the instructions for [Installing Apache Hive on AWS or Google Cloud Platform](#installing-apache-hive-on-aws-or-google-cloud-platform).
 
 ## Installing Gravitino playground on AWS or Google Cloud Platform
@@ -181,7 +180,7 @@ Gravitino provides a bundle of Docker images to launch a Gravitino playground, w
 includes Apache Hive, Apache Hadoop, Trino, MySQL, PostgreSQL, and Gravitino. You can use
 Docker compose to start them all.
 
-Installing Docker and Docker Compose is a requirement to using the playground.
+Installing Docker and Docker Compose is a requirement for using the playground.
 
 ```shell
 sudo apt install docker docker-compose
@@ -195,12 +194,12 @@ how to run the playground, please see [how-to-use-the-playground](./how-to-use-t
 
 ## Installing Gravitino playground locally
 
-The same steps apply for installing the playground locally as on AWS or Google Cloud Platform. You
+The same steps apply to installing the playground locally as on AWS or Google Cloud Platform. You
 can follow the instructions for [Installing Gravitino playground on AWS or Google Cloud Platform](#installing-gravitino-playground-on-aws-or-google-cloud-platform).
 
 ## Using REST to interact with Gravitino
 
-After starting the Gravitino distribution, issue REST commands to create and modify metadata. While you are using localhost in these examples, run these commands remotely via a host name or IP address once you establish correct access.
+After starting the Gravitino distribution, issue REST commands to create and modify metadata. While you are using localhost in these examples, run these commands remotely via a hostname or IP address once you establish correct access.
 
 1. Create a Metalake
 
@@ -257,7 +256,7 @@ After starting the Gravitino distribution, issue REST commands to create and mod
    http://localhost:8090/api/metalakes/metalake/catalogs
    ```
 
-   Note that the metastore.uris used for the Hive catalog and would need updating if you change your configuration.
+   Note that the metastore.uris property used for the Hive catalog and would need updating if you change your configuration.
 
 ## Accessing Gravitino on AWS externally
 
