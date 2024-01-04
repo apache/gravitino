@@ -3,15 +3,14 @@
  * This software is licensed under the Apache License version 2.
  */
 
-import defHttp from '@/lib/api'
+import { defHttp } from '@/lib/utils/axios'
 
 const Apis = {
   GET: '/api/version'
 }
 
 export const getVersionApi = () => {
-  return defHttp.request({
-    method: 'get',
+  return defHttp.get({
     url: `${Apis.GET}`
   })
 }
