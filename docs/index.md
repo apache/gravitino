@@ -25,8 +25,8 @@ your system `PATH`, or the `JAVA_HOME` environment variable pointing to a Java i
 
 See [How to install Gravitino](./how-to-install.md) to learn how to install Gravitino server.
 
-Gravitino provides Docker image on [Docker Hub](https://hub.docker.com/u/datastrato).
-Please pull the image and run it. For the details of Gravitino Docker image, please see
+Gravitino provides Docker images on [Docker Hub](https://hub.docker.com/u/datastrato).
+Please pull the image and run it. For the details of the Gravitino Docker image, please see
 [Dock image details](./docker-image-details.md).
 
 Gravitino also provides a playground to experience the whole Gravitino system with other components.
@@ -92,9 +92,9 @@ Gravitino supports different catalogs to manage the metadata in different source
   manage Apache Iceberg data.
 * [Iceberg REST catalog service](./iceberg-rest-service.md): a
   complete guide to use Gravitino as an Apache Iceberg REST catalog service.
-* [Hive catalog](./apache-hive-catalog.md): a complete guide to using Gravitino manage Apache Hive data.
-* [MySQL catalog](./jdbc-mysql-catalog.md): a complete guide to using Gravitino manage MySQL data.
-* [PostgreSQL catalog](./jdbc-postgresql-catalog.md): a complete guide to using Gravitino manage PostgreSQL data.
+* [Hive catalog](./apache-hive-catalog.md): a complete guide to using Gravitino to manage Apache Hive data.
+* [MySQL catalog](./jdbc-mysql-catalog.md): a complete guide to using Gravitino to manage MySQL data.
+* [PostgreSQL catalog](./jdbc-postgresql-catalog.md): a complete guide to using Gravitino to manage PostgreSQL data.
 
 ### Trino connector
 
@@ -123,9 +123,9 @@ Gravitino provides several ways to configure and manage the Gravitino server. Pl
 
 * [How to build Gravitino](./how-to-build.md): a complete guide to build Gravitino from
   source.
-* [How to test Gravitino](./how-to-test.md): a complete guide to run Gravitino unit tests and
+* [How to test Gravitino](./how-to-test.md): a complete guide to running Gravitino unit tests and
   integration tests.
-* [How to sign and verify a Gravitino releases](./how-to-sign-releases.md): a guide to sign and verify
+* [How to sign and verify Gravitino releases](./how-to-sign-releases.md): a guide to sign and verify
   a Gravitino release.
 * [Publish Docker images](./publish-docker-images.md): a guide to publish Gravitino Docker images,
   also list the change logs of Gravitino CI Docker images and release images.

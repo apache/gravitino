@@ -13,7 +13,7 @@ import TabItem from '@theme/TabItem';
 
 To create a partitioned table, you should provide the following two components to construct a valid partitioned table.
 
-- Partitioning strategy. It defines how Gravitino will distribute table data across partitions. currently Gravitino supports the following partitioning strategies.
+- Partitioning strategy. It defines how Gravitino distributes table data across partitions. Currently, Gravitino supports the following partitioning strategies.
 
 :::note
 The `score`, `createTime`, and `city` appearing in the table below refer to the field names in a table.
@@ -36,7 +36,7 @@ For complex functions, please refer to [FunctionPartitioningDTO](https://github.
 
 - Field names: It defines which fields Gravitino uses to partition the table.
 
-- Other messages may also be needed. For example, if the partitioning strategy is `bucket`, you should provide the number of buckets; if the partitioning strategy is `truncate`, you should provide the width of the truncate.
+- In some cases, you require other information. For example, if the partitioning strategy is `bucket`, you should provide the number of buckets; if the partitioning strategy is `truncate`, you should provide the width of the truncate.
 
 The following is an example of creating a partitioned table:
 
@@ -72,18 +72,18 @@ new Transform[] {
 
 To create a bucketed table, you should use the following three components to construct a valid bucketed table.
 
-- Strategy. It defines how Gravitino will distribute table data across partitions.
+- Strategy. It defines how Gravitino distributes table data across partitions.
 
 | Bucket strategy | Description                                                                                                                   | JSON     | Java             |
 |-----------------|-------------------------------------------------------------------------------------------------------------------------------|----------|------------------|
-| hash            | Bucket table using hash. Gravitino will distribute table data into buckets based on the hash value of the key.                | `hash`   | `Strategy.HASH`  |
-| range           | Bucket table using range. Gravitino will distribute table data into buckets based on a specified range or interval of values. | `range`  | `Strategy.RANGE` |
-| even            | Bucket table using even.  Gravitino will distribute table data, ensuring an equal distribution of data.                       | `even`   | `Strategy.EVEN`  |
+| hash            | Bucket table using hash. Gravitino distributes table data into buckets based on the hash value of the key.                | `hash`   | `Strategy.HASH`  |
+| range           | Bucket table using range. Gravitino distributes table data into buckets based on a specified range or interval of values. | `range`  | `Strategy.RANGE` |
+| even            | Bucket table using even. Gravitino distributes table data, ensuring an equal distribution of data.                       | `even`   | `Strategy.EVEN`  |
 
 - Number. It defines how many buckets you use to bucket the table.
-- Function arguments. It defines the arguments of the strategy above, Gravitino supports the following three kinds of arguments, for more, you can refer to Java class [FunctionArg](https://github.com/datastrato/gravitino/blob/main/common/src/main/java/com/datastrato/gravitino/dto/rel/expressions/FunctionArg.java) and [DistributionDTO](https://github.com/datastrato/gravitino/blob/main/common/src/main/java/com/datastrato/gravitino/dto/rel/DistributionDTO.java) to use more complex function arguments.
+- Function arguments. It defines the arguments of the strategy, Gravitino supports the following three kinds of arguments, for more, you can refer to Java class [FunctionArg](https://github.com/datastrato/gravitino/blob/main/common/src/main/java/com/datastrato/gravitino/dto/rel/expressions/FunctionArg.java) and [DistributionDTO](https://github.com/datastrato/gravitino/blob/main/common/src/main/java/com/datastrato/gravitino/dto/rel/DistributionDTO.java) to use more complex function arguments.
 
-| Expression type | JSON example                                                   | Java example                                                                              | Equivalent SQL semantics | Description                       | 
+| Expression type | JSON example                                                   | Java example                                                                              | Equivalent SQL semantics | Description                       |
 |-----------------|----------------------------------------------------------------|-------------------------------------------------------------------------------------------|--------------------------|-----------------------------------|
 | field           | `{"type":"field","fieldName":["score"]}`                       | `FieldReferenceDTO.of("score")`                                                           | `score`                  | The field reference value `score` |
 | function        | `{"type":"function","functionName":"hour","fieldName":["dt"]}` | `new FuncExpressionDTO.Builder().withFunctionName("hour").withFunctionArgs("dt").build()` | `hour(dt)`               | The function value `hour(dt)`     |

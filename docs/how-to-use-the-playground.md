@@ -10,7 +10,7 @@ This software is licensed under the Apache License version 2."
 
 The playground is a complete Gravitino Docker runtime environment with `Hive`, `HDFS`, `Trino`, `MySQL`, `PostgreSQL`, and a `Gravitino` server.
 
-Depending on your network and computer, startup time may take 3-5 minutes. Once the playground environment has started, you can open http://localhost:8090 in a browser to access the Gravitino Web UI.
+Depending on your network and computer, startup time may take 3-5 minutes. Once the playground environment has started, you can open <http://localhost:8090> in a browser to access the Gravitino Web UI.
 
 ## Prerequisites
 
@@ -89,7 +89,7 @@ ORDER BY total_sales DESC
 LIMIT 1;
 ```
 
-If you want to know top customers who bought the most by state, you can run this SQL.
+If you want to know the top customers who bought the most by state, you can run this SQL.
 
 ```SQL
 SELECT customer_name, location, SUM(total_amount) AS total_spent
