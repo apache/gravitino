@@ -100,4 +100,4 @@ networks:
     name: trino-net
     ipam:
       config:
-        - subnet: 10.20.30.16/28
+        - subnet: 10.20.31.16/28
