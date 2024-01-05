@@ -33,6 +33,9 @@ public class ColumnDTO implements Column {
   @JsonProperty("nullable")
   private boolean nullable = true;
 
+  @JsonProperty("autoIncrement")
+  private boolean autoIncrement = false;
+
   private ColumnDTO() {}
 
   /**
@@ -41,24 +44,16 @@ public class ColumnDTO implements Column {
    * @param name The name of the column.
    * @param dataType The data type of the column.
    * @param comment The comment associated with the column.
-   */
-  private ColumnDTO(String name, Type dataType, String comment) {
-    this(name, dataType, comment, true);
-  }
-
-  /**
-   * Constructs a Column DTO.
-   *
-   * @param name The name of the column.
-   * @param dataType The data type of the column.
-   * @param comment The comment associated with the column.
    * @param nullable Whether the column value can be null.
+   * @param autoIncrement Whether the column is an auto-increment column.
    */
-  private ColumnDTO(String name, Type dataType, String comment, boolean nullable) {
+  private ColumnDTO(
+      String name, Type dataType, String comment, boolean nullable, boolean autoIncrement) {
     this.name = name;
     this.dataType = dataType;
     this.comment = comment;
     this.nullable = nullable;
+    this.autoIncrement = autoIncrement;
   }
 
   @Override
@@ -81,6 +76,11 @@ public class ColumnDTO implements Column {
     return nullable;
   }
 
+  @Override
+  public boolean autoIncrement() {
+    return autoIncrement;
+  }
+
   /**
    * Creates a new Builder to build a Column DTO.
    *
@@ -101,6 +101,7 @@ public class ColumnDTO implements Column {
     protected Type dataType;
     protected String comment;
     protected boolean nullable = true;
+    protected boolean autoIncrement = false;
 
     public Builder() {}
 
@@ -149,6 +150,17 @@ public class ColumnDTO implements Column {
     }
 
     /**
+     * Sets whether the column is an auto-increment column.
+     *
+     * @param autoIncrement Whether the column is an auto-increment column.
+     * @return The Builder instance.
+     */
+    public S withAutoIncrement(boolean autoIncrement) {
+      this.autoIncrement = autoIncrement;
+      return (S) this;
+    }
+
+    /**
      * Builds a Column DTO based on the provided builder parameters.
      *
      * @return A new ColumnDTO instance.
@@ -157,7 +169,20 @@ public class ColumnDTO implements Column {
     public ColumnDTO build() {
       Preconditions.checkNotNull(name, "Column name cannot be null");
       Preconditions.checkNotNull(dataType, "Column data type cannot be null");
-      return new ColumnDTO(name, dataType, comment, nullable);
+      return new ColumnDTO(name, dataType, comment, nullable, autoIncrement);
+    }
+  }
+
+  public void validate() throws IllegalArgumentException {
+    if (autoIncrement()) {
+      // TODO This part of the code will be deleted after underlying support.
+      throw new UnsupportedOperationException("Auto-increment column is not supported yet.");
+    }
+    if (name() == null || name().isEmpty()) {
+      throw new IllegalArgumentException("Column name cannot be null or empty.");
+    }
+    if (dataType() == null) {
+      throw new IllegalArgumentException("Column data type cannot be null.");
     }
   }
 }

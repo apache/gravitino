@@ -30,5 +30,8 @@ public interface Column {
   /** @return True if this column may produce null values. Default is true. */
   boolean nullable();
 
+  /** @return True if this column is an auto-increment column. Default is false. */
+  boolean autoIncrement();
+
   // TODO. Support column default value. @Jerry
 }
