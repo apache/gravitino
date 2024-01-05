@@ -8,11 +8,11 @@ This software is licensed under the Apache License version 2."
 
 # User Docker images
 
-There are 2 kinds of docker images for user Docker images: the Gravitino Docker image and playground Docker images.
+There are 2 kinds of Docker images for users to use: the Gravitino Docker image and playground Docker images.
 
 ## Gravitino Docker image
 
-You can deploy the service with Gravitino Docker image.
+You can deploy the service with the Gravitino Docker image.
 
 Container startup commands
 
@@ -27,7 +27,7 @@ gravitino:0.3.0
 - Docker image `datastrato/gravitino:0.3.0`
 - Gravitino Server
 - Expose ports:
-  - `8090` Gravitino web UI
+  - `8090` Gravitino Web UI
   - `9001` Iceberg REST service
 
 ## Playground Docker image
@@ -36,7 +36,7 @@ You can use the [playground](https://github.com/datastrato/gravitino-playground)
 
 The playground consists of multiple Docker images.
 
-The Docker images of playground have suitable configurations for users to experience.
+The Docker images of the playground have suitable configurations for users to experience.
 
 ### Hive image
 
@@ -59,12 +59,12 @@ Changelog
 
 # Developer Docker images
 
-You can use these kinds of the Docker images to facilitate Gravitino integration testing.
+You can use these kinds of Docker images to facilitate Gravitino integration testing.
 You can use it to test all catalog and connector modules within Gravitino.
 
 ## Gravitino CI Apache Hive image
 
-You can use this kind of images to test the catalog of Apache Hive.
+You can use this kind of image to test the catalog of Apache Hive.
 
 Changelog
 
@@ -121,6 +121,9 @@ Changelog
 You can use this image to test Trino.
 
 Changelog
+
+- gravitino-ci-trino:0.1.3
+  - Remove copy content in folder `gravitino-trino-connector` to plugin folder `/usr/lib/trino/plugin/gravitino`
 
 - gravitino-ci-trino:0.1.2
   - Copy JDBC driver 'mysql-connector-java' and 'postgres' to `/usr/lib/trino/iceberg/` folder

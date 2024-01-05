@@ -70,7 +70,7 @@ const TabsContent = props => {
         <TableView page={page} />
       </CustomTabPanel>
       <CustomTabPanel value='details'>
-        <DetailsView store={store} />
+        <DetailsView store={store} page={page} />
       </CustomTabPanel>
     </TabContext>
   )

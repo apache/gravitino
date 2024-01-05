@@ -23,7 +23,7 @@ If you build Gravitino yourself by `./gradlew compileDistribution` command, you 
 Gravitino binary distribution package in `distribution/package` directory.
 
 If you build Gravitino yourself by `./gradlew assembleDistribution` command, you can get the
-compressed Gravitino binary distribution package with name `gravitino-<version>-bin.tar.gz` in
+compressed Gravitino binary distribution package with the name `gravitino-<version>-bin.tar.gz` in
 `distribution` directory with sha256 checksum file `gravitino-<version>-bin.tar.gz.sha256`.
 
 The Gravitino binary distribution package contains the following files:
@@ -50,7 +50,7 @@ The Gravitino binary distribution package contains the following files:
 
 The Gravitino server configuration file is `conf/gravitino.conf`. You can configure the Gravitino
 server by modifying this file. Basic configurations are already added to this file, all the
-configurations list in [Gravitino Server Configurations](./gravitino-server-config.md).
+configurations are listed in [Gravitino Server Configurations](./gravitino-server-config.md).
 
 #### Configure Gravitino server log
 
@@ -70,7 +70,7 @@ modifying the related configuration file in `catalogs/<catalog-provider>/conf` d
 configurations you set here apply to all the catalogs of the same type you create.
 
 For example, if you want to configure the Hive catalog, you can modify the file
-`catalogs/hive/conf/hive.conf`. The detailed configurations list in the specific catalog
+`catalogs/hive/conf/hive.conf`. The detailed configurations are listed in the specific catalog
 documentation.
 
 :::note
@@ -85,11 +85,11 @@ file.
 
 Gravitino supports pass in catalog specific configurations by adding `gravitino.bypass.`. For
 example, if you want to pass in HMS specific configuration
-`hive.metastore.client.capability.check` to the underlying Hive client in Hive catalog, you can
+`hive.metastore.client.capability.check` to the underlying Hive client in the Hive catalog, you can
 simply add `gravitino.bypass.` prefix to it.
 
 Also, Gravitino supports loading catalog specific configurations from external files. For example,
-you can put your own `hive-site.xml` file in `catalogs/hive/conf` directory, Gravitino loads
+you can put your own `hive-site.xml` file in `catalogs/hive/conf` directory, and Gravitino loads
 it automatically.
 
 #### Start Gravitino server
@@ -100,7 +100,7 @@ After configuring the Gravitino server, you can start the Gravitino server by ru
 ./bin/gravitino.sh start
 ```
 
-You can access the Gravitino Web UI by typing `http://localhost:8090` in your browser. or you
+You can access the Gravitino Web UI by typing <http://localhost:8090> in your browser. or you
 can run
 
 ```shell
@@ -137,7 +137,7 @@ to make sure Gravitino is running.
 
 ## Install Gravitino using Docker compose
 
-The published Gravitino Docker image only contains Gravitino server with basic configurations. If
+The published Gravitino Docker image only contains the Gravitino server with basic configurations. If
 you want to experience the whole Gravitino system with other components, you can use the Docker
 compose file.
 

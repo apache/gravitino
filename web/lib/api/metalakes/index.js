@@ -3,7 +3,7 @@
  * This software is licensed under the Apache License version 2.
  */
 
-import defHttp from '@/lib/api'
+import { defHttp } from '@/lib/utils/axios'
 
 const Apis = {
   GET: '/api/metalakes',
@@ -13,38 +13,33 @@ const Apis = {
 }
 
 export const getMetalakesApi = () => {
-  return defHttp.request({
-    url: `${Apis.GET}`,
-    method: 'get'
+  return defHttp.get({
+    url: `${Apis.GET}`
   })
 }
 
 export const getMetalakeDetailsApi = name => {
-  return defHttp.request({
-    url: `${Apis.GET}/${name}`,
-    method: 'get'
+  return defHttp.get({
+    url: `${Apis.GET}/${name}`
   })
 }
 
 export const createMetalakeApi = data => {
-  return defHttp.request({
+  return defHttp.post({
     url: `${Apis.CREATE}`,
-    method: 'post',
     data
   })
 }
 
 export const deleteMetalakeApi = name => {
-  return defHttp.request({
-    url: `${Apis.DELETE}/${name}`,
-    method: 'delete'
+  return defHttp.delete({
+    url: `${Apis.DELETE}/${name}`
   })
 }
 
 export const updateMetalakeApi = ({ name, data }) => {
-  return defHttp.request({
+  return defHttp.put({
     url: `${Apis.UPDATE}/${name}`,
-    method: 'put',
     data
   })
 }

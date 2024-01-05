@@ -15,7 +15,7 @@ Gravitino Metrics builds upon the [Dropwizard Metrics](https://metrics.dropwizar
 // Use Gravitino Server address or Iceberg REST server address to replace 127.0.0.1:8090
 // Get metrics in JSON format
 curl http://127.0.0.1:8090/metrics
-// Get metrics in Promethus format
+// Get metrics in Prometheus format
 curl http://127.0.0.1:8090/prometheus/metrics
 ```
 
@@ -48,5 +48,5 @@ Metrics with the `gravitino-server` prefix pertain to the Gravitino server, whil
 
 #### JVM metrics
 
-JVM metrics source uses [JVM instrumentation](https://metrics.dropwizard.io/4.2.0/manual/jvm.html) with BufferPoolMetricSet, GarbageCollectorMetricSet and MemoryUsageGaugeSet.
+JVM metrics source uses [JVM instrumentation](https://metrics.dropwizard.io/4.2.0/manual/jvm.html) with BufferPoolMetricSet, GarbageCollectorMetricSet, and MemoryUsageGaugeSet.
 These metrics start with the `jvm` prefix, like `jvm.heap.used` in JSON format, `jvm_head_used` in Prometheus format.

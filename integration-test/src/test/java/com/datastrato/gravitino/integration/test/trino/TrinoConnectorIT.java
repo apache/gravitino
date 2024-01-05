@@ -801,6 +801,7 @@ public class TrinoConnectorIT extends AbstractIT {
   @Test
   void testIcebergCatalogCreatedByGravitino() throws InterruptedException {
     String catalogName = GravitinoITUtils.genRandomName("iceberg_catalog").toLowerCase();
+    String schemaName = GravitinoITUtils.genRandomName("iceberg_catalog").toLowerCase();
     GravitinoMetaLake createdMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
     String[] command = {
       "mysql",
@@ -842,6 +843,43 @@ public class TrinoConnectorIT extends AbstractIT {
 
     String data = containerSuite.getTrinoContainer().executeQuerySQL(sql).get(0).get(0);
     Assertions.assertEquals(metalakeName + "." + catalogName, data);
+
+    catalog
+        .asSchemas()
+        .createSchema(
+            NameIdentifier.of(metalakeName, catalogName, schemaName),
+            "Created by gravitino client",
+            ImmutableMap.<String, String>builder().build());
+
+    sql =
+        String.format("show schemas in \"%s.%s\" like '%s'", metalakeName, catalogName, schemaName);
+    Assertions.assertTrue(checkTrinoHasLoaded(sql, 30));
+
+    final String sql1 =
+        String.format("drop schema \"%s.%s\".%s cascade", metalakeName, catalogName, schemaName);
+    // Will fail because the iceberg catalog does not support cascade drop
+    Assertions.assertThrows(
+        RuntimeException.class, () -> containerSuite.getTrinoContainer().executeUpdateSQL(sql1));
+
+    final String sql2 =
+        String.format("show schemas in \"%s.%s\" like '%s'", metalakeName, catalogName, schemaName);
+    success = checkTrinoHasLoaded(sql2, 30);
+    if (!success) {
+      Assertions.fail("Trino fail to load catalogs created by gravitino: " + sql2);
+    }
+
+    // Do not support the cascade drop
+    success =
+        catalog
+            .asSchemas()
+            .dropSchema(NameIdentifier.of(metalakeName, catalogName, schemaName), true);
+    Assertions.assertFalse(success);
+    final String sql3 =
+        String.format("show schemas in \"%s.%s\" like '%s'", metalakeName, catalogName, schemaName);
+    success = checkTrinoHasLoaded(sql3, 30);
+    if (!success) {
+      Assertions.fail("Trino fail to load catalogs created by gravitino: " + sql);
+    }
   }
 
   @Test
@@ -1001,7 +1039,7 @@ public class TrinoConnectorIT extends AbstractIT {
       createdMetalake.dropCatalog(NameIdentifier.of(metalakeName, catalogName));
       // We need to test we can't load this catalog any more by Trino.
       success = checkTrinoHasRemoved(sql, 30);
-      Assertions.assertFalse(success, "Trino should not load the catalog any more: " + sql);
+      Assertions.assertTrue(success, "Trino should not load the catalog any more: " + sql);
     }
   }
 

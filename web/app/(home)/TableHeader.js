@@ -8,11 +8,12 @@ import { Box, Button, TextField } from '@mui/material'
 import Icon from '@/components/Icon'
 
 const TableHeader = props => {
-  const { handleFilter, value, setOpenDialog, setDialogData } = props
+  const { handleFilter, value, setOpenDialog, setDialogData, setDialogType } = props
 
   const handleCreate = () => {
     setDialogData({})
     setOpenDialog(true)
+    setDialogType('create')
   }
 
   return (
