@@ -75,6 +75,8 @@ else
   exit 1
 fi
 
+build_args="${build_args} --build-arg IMAGE_NAME=${image_name}"
+
 # Create multi-arch builder
 BUILDER_NAME="gravitino-builder"
 builders=$(docker buildx ls)
