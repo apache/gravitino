@@ -37,8 +37,8 @@ import org.slf4j.LoggerFactory;
  * locked.
  */
 public class LockManager {
-  public static final Logger LOG = LoggerFactory.getLogger(LockManager.class);
-  public static final long TIME_AFTER_LAST_ACCESS_TO_EVICT_IN_MS = 24 * 60 * 60 * 1000; // 1 day
+  private static final Logger LOG = LoggerFactory.getLogger(LockManager.class);
+  private static final long TIME_AFTER_LAST_ACCESS_TO_EVICT_IN_MS = 24 * 60 * 60 * 1000; // 1 day
 
   private static final NameIdentifier ROOT = NameIdentifier.ROOT;
   private final ThreadLocal<Stack<LockObject>> currentLocked = ThreadLocal.withInitial(Stack::new);
