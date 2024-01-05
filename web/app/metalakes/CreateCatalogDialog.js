@@ -124,8 +124,23 @@ const CreateCatalogDialog = props => {
     return check
   }
 
+  const handleChangeProvider = (onChange, e) => {
+    onChange(e.target.value)
+  }
+
+  const resetPropsFields = (providers = [], index = -1) => {
+    if (index !== -1) {
+      providers[index].defaultProps.forEach((item, index) => {
+        if (item.key !== 'catalog-backend') {
+          item.value = ''
+        }
+      })
+    }
+  }
+
   const handleClose = () => {
     reset()
+    resetPropsFields(providers, 0)
     setInnerProps(providers[0].defaultProps)
     setValue('propItems', providers[0].defaultProps)
     setOpen(false)
@@ -152,9 +167,21 @@ const CreateCatalogDialog = props => {
     handleClose()
   }
 
+  const onError = errors => {
+    console.error('fields error', errors)
+  }
+
   useEffect(() => {
     const providerItemIndex = providers.findIndex(i => i.value === providerSelect)
-    setInnerProps(providers[providerItemIndex].defaultProps)
+
+    let defaultProps = []
+
+    if (providerItemIndex !== -1) {
+      defaultProps = providers[providerItemIndex].defaultProps
+
+      resetPropsFields(providers, providerItemIndex)
+      setInnerProps(defaultProps)
+    }
   }, [providerSelect, setInnerProps])
 
   useEffect(() => {
@@ -178,7 +205,7 @@ const CreateCatalogDialog = props => {
 
   return (
     <Dialog fullWidth maxWidth='sm' scroll='body' TransitionComponent={Transition} open={open} onClose={handleClose}>
-      <form onSubmit={handleSubmit(onSubmit)}>
+      <form onSubmit={handleSubmit(onSubmit, onError)}>
         <DialogContent
           sx={{
             position: 'relative',
@@ -261,7 +288,7 @@ const CreateCatalogDialog = props => {
                       value={value}
                       label='Provider'
                       defaultValue='hive'
-                      onChange={onChange}
+                      onChange={e => handleChangeProvider(onChange, e)}
                       error={Boolean(errors.provider)}
                       labelId='select-catalog-provider'
                     >
