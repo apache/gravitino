@@ -16,6 +16,7 @@ import com.datastrato.gravitino.exceptions.RESTException;
 import com.datastrato.gravitino.integration.test.container.ContainerSuite;
 import com.datastrato.gravitino.integration.test.container.TrinoITContainers;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
+import com.datastrato.gravitino.integration.test.util.ITUtils;
 import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.datastrato.gravitino.rel.TableCatalog;
 import io.trino.cli.Query;
@@ -95,8 +96,7 @@ public class TrinoQueryIT {
       trinoITContainers.launch(AbstractIT.getGravitinoServerPort());
       gravitinoClient = AbstractIT.getGravitinoClient();
 
-      gravitinoUri =
-          String.format("http://%s:%d", "127.0.0.1", AbstractIT.getGravitinoServerPort());
+      gravitinoUri = String.format("http://127.0.0.1:%d", AbstractIT.getGravitinoServerPort());
       trinoUri = trinoITContainers.getTrinoUri();
       hiveMetastoreUri = trinoITContainers.getHiveMetastoreUri();
       hdfsUri = trinoITContainers.getHdfsUri();
@@ -353,7 +353,7 @@ public class TrinoQueryIT {
   }
 
   private String[] loadAllTestFiles(String dirName, String filterPrefix) {
-    String targetDir = testQueriesDir + "/" + dirName;
+    String targetDir = ITUtils.joinPath(testQueriesDir, dirName);
     File targetDirFile = new File(targetDir);
     if (!targetDirFile.exists()) {
       return new String[0];
@@ -380,7 +380,7 @@ public class TrinoQueryIT {
     Arrays.sort(testFileNames);
     for (int i = 0; i < testFileNames.length; i += 2) {
       String fileNamePrefix = testFileNames[i].substring(0, testFileNames[i].lastIndexOf('.'));
-      fileNamePrefix = testQueriesDir + "/" + testDirName + "/" + fileNamePrefix;
+      fileNamePrefix = ITUtils.joinPath(testQueriesDir, testDirName, fileNamePrefix);
       String testFileName = fileNamePrefix + ".sql";
       String testResultFileName = fileNamePrefix + ".txt";
 
@@ -470,7 +470,7 @@ public class TrinoQueryIT {
     // E.g., the expected result can be matched with the following actual result:
     // query result:
     //    ...
-    //    location = 'hdfs://10.l.30.1:9000/user/hive/warehouse/gt_db1.db/tb01',
+    //    location = 'hdfs://10.1.30.1:9000/user/hive/warehouse/gt_db1.db/tb01',
     //    ...
     // expectResult:
     //

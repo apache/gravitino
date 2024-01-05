@@ -5,6 +5,7 @@
 package com.datastrato.gravitino.integration.test.container;
 
 import com.datastrato.gravitino.integration.test.util.CommandExecutor;
+import com.datastrato.gravitino.integration.test.util.ITUtils;
 import com.datastrato.gravitino.integration.test.util.ProcessData;
 import java.util.HashMap;
 import java.util.Map;
@@ -30,7 +31,7 @@ public class TrinoITContainers implements AutoCloseable {
       throw new RuntimeException("GRAVITINO_ROOT_DIR is not set");
     }
 
-    dockerComposeDir = dir + "/integration-test/trino-it/";
+    dockerComposeDir = ITUtils.joinPath(dir, "integration-test", "trino-it");
   }
 
   public void launch(int gravitinoServerPort) throws Exception {
@@ -40,7 +41,7 @@ public class TrinoITContainers implements AutoCloseable {
     env.put("GRAVITINO_SERVER_PORT", String.valueOf(gravitinoServerPort));
     env.put("GRAVITINO_LOG_PATH", System.getProperty("gravitino.log.path"));
 
-    String command = dockerComposeDir + "launch.sh";
+    String command = ITUtils.joinPath(dockerComposeDir, "launch.sh");
     Object output =
         CommandExecutor.executeCommandLocalHost(
             command, false, ProcessData.TypesOfData.STREAMS_MERGED, env);
@@ -50,7 +51,7 @@ public class TrinoITContainers implements AutoCloseable {
   }
 
   private void resolveServerAddress() throws Exception {
-    String command = dockerComposeDir + "inspect_ip.sh";
+    String command = ITUtils.joinPath(dockerComposeDir, "inspect_ip.sh");
     Object output =
         CommandExecutor.executeCommandLocalHost(
             command, false, ProcessData.TypesOfData.STREAMS_MERGED);
@@ -102,7 +103,7 @@ public class TrinoITContainers implements AutoCloseable {
   }
 
   public void shutdown() {
-    String command = dockerComposeDir + "shutdown.sh";
+    String command = ITUtils.joinPath(dockerComposeDir, "shutdown.sh");
     Object output =
         CommandExecutor.executeCommandLocalHost(
             command, false, ProcessData.TypesOfData.STREAMS_MERGED);
