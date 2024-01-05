@@ -132,13 +132,13 @@ public class TestLockManager {
         lockManager.lockResourcePath(identifier, lockType);
         // App logic here...
         Thread.sleep(1);
-        lockManager.unlockResourcePath(lockType);
       } catch (Exception e) {
         if (e.getMessage().contains("mock")) {
           return 0;
         }
-
         throw e;
+      } finally {
+        lockManager.unlockResourcePath();
       }
     }
 

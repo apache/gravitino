@@ -131,16 +131,16 @@ public class LockManager {
         NameIdentifier parent = parents.pop();
         LockNode lockNode = getOrCreateLockNode(parent);
         lockNode.lock(LockType.READ);
-        addLock(lockNode, LockType.READ);
+        addLockToStack(lockNode, LockType.READ);
       }
 
       // Lock self with the value of `lockType`
       LockNode node = getOrCreateLockNode(identifier);
       node.lock(lockType);
-      addLock(node, lockType);
+      addLockToStack(node, lockType);
     } catch (Exception e) {
       // Unlock those that have been locked.
-      rollbackLocks();
+      unlockResourcePath();
       LOG.error("Failed to lock resource path {}", identifier, e);
       throw e;
     }
@@ -149,32 +149,16 @@ public class LockManager {
   /**
    * Unlock the resource path from root to the resource path. We would get the resource path from
    * {@link ThreadLocal} instance.
-   *
-   * @param lockType The lock type to unlock the resource path.
    */
-  public void unlockResourcePath(LockType lockType) {
+  public void unlockResourcePath() {
     Stack<LockObject> stack = currentLocked.get();
-    if (stack.isEmpty()) {
-      return;
-    }
-    stack.pop().lockNode.release(lockType);
-
     while (!stack.isEmpty()) {
       LockObject lockObject = stack.pop();
       lockObject.lockNode.release(lockObject.lockType);
     }
   }
 
-  /** Rollback the locks that have been locked if we failed to lock the resource path. */
-  private void rollbackLocks() {
-    Stack<LockObject> locks = currentLocked.get();
-    while (!locks.isEmpty()) {
-      LockObject lockObject = locks.pop();
-      lockObject.lockNode.release(lockObject.lockType);
-    }
-  }
-
-  private void addLock(LockNode lockNode, LockType lockType) {
+  private void addLockToStack(LockNode lockNode, LockType lockType) {
     currentLocked.get().push(LockObject.of(lockNode, lockType));
   }
 }
