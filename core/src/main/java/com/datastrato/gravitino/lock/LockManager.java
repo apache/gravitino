@@ -48,6 +48,12 @@ public class LockManager {
     this.lockNodeMap =
         Caffeine.newBuilder()
             .expireAfterAccess(TIME_AFTER_LAST_ACCESS_TO_EVICT_IN_MS, TimeUnit.MILLISECONDS)
+            .maximumSize(100000)
+            .evictionListener(
+                (k, v, c) -> {
+                  LOG.info("Evicting lockNode for {}.", k);
+                  ((CatalogWrapper) v).close();
+                })
             .removalListener(
                 (k, v, c) -> {
                   LOG.info("Removing lockNode for {}.", k);
