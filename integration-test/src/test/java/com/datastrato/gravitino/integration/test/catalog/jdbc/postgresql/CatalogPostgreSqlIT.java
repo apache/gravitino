@@ -19,6 +19,7 @@ import com.datastrato.gravitino.integration.test.catalog.jdbc.utils.JdbcDriverDo
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
 import com.datastrato.gravitino.integration.test.util.ITUtils;
+import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.Schema;
 import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.datastrato.gravitino.rel.Table;
@@ -38,6 +39,7 @@ import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.AfterAll;
@@ -193,6 +195,80 @@ public class CatalogPostgreSqlIT extends AbstractIT {
             .withComment("col_3_comment")
             .build();
     return new ColumnDTO[] {col1, col2, col3};
+  }
+
+  private ColumnDTO[] columnsWithSpecialNames() {
+    return new ColumnDTO[] {
+      new ColumnDTO.Builder()
+          .withName("integer")
+          .withDataType(Types.IntegerType.get())
+          .withComment("integer")
+          .build(),
+      new ColumnDTO.Builder()
+          .withName("long")
+          .withDataType(Types.LongType.get())
+          .withComment("long")
+          .build(),
+      new ColumnDTO.Builder()
+          .withName("float")
+          .withDataType(Types.FloatType.get())
+          .withComment("float")
+          .build(),
+      new ColumnDTO.Builder()
+          .withName("double")
+          .withDataType(Types.DoubleType.get())
+          .withComment("double")
+          .build(),
+      new ColumnDTO.Builder()
+          .withName("decimal")
+          .withDataType(Types.DecimalType.of(10, 3))
+          .withComment("decimal")
+          .build(),
+      new ColumnDTO.Builder()
+          .withName("date")
+          .withDataType(Types.DateType.get())
+          .withComment("date")
+          .build(),
+      new ColumnDTO.Builder()
+          .withName("time")
+          .withDataType(Types.TimeType.get())
+          .withComment("time")
+          .build(),
+      new ColumnDTO.Builder()
+          .withName("binary")
+          .withDataType(Types.TimestampType.withoutTimeZone())
+          .withComment("binary")
+          .build()
+    };
+  }
+
+  @Test
+  void testCreateTableWithSpecialColumnNames() {
+    // Create table from Gravitino API
+    ColumnDTO[] columns = columnsWithSpecialNames();
+
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
+    Distribution distribution = Distributions.NONE;
+
+    SortOrder[] sortOrders = new SortOrder[0];
+    Partitioning[] partitioning = Partitioning.EMPTY_PARTITIONING;
+
+    Map<String, String> properties = createProperties();
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    tableCatalog.createTable(
+        tableIdentifier,
+        columns,
+        table_comment,
+        properties,
+        partitioning,
+        distribution,
+        sortOrders);
+
+    Table t = tableCatalog.loadTable(tableIdentifier);
+    Optional<Column> column =
+        Arrays.stream(t.columns()).filter(c -> c.name().equals("binary")).findFirst();
+    Assertions.assertTrue(column.isPresent());
   }
 
   private Map<String, String> createProperties() {
