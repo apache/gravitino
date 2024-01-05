@@ -923,4 +923,12 @@ public class Types {
       return Arrays.hashCode(types);
     }
   }
+
+  /**
+   * @param dataType The data type to check.
+   * @return True if the given data type is allowed to be an auto-increment column.
+   */
+  public static boolean allowAutoIncrement(Type dataType) {
+    return dataType instanceof IntegerType || dataType instanceof LongType;
+  }
 }

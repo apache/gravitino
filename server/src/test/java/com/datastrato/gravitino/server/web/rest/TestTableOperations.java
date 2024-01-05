@@ -310,7 +310,9 @@ public class TestTableOperations extends JerseyTest {
   public void testCreatePartitionedTable() {
     Column[] columns =
         new Column[] {
-          mockColumn("col1", Types.StringType.get()), mockColumn("col2", Types.ByteType.get())
+          mockColumn("col1", Types.StringType.get()),
+          mockColumn("col2", Types.ByteType.get()),
+          mockColumn("col3", Types.IntegerType.get(), "test", false, false)
         };
     Partitioning[] partitioning =
         new Partitioning[] {IdentityPartitioningDTO.of(columns[0].name())};
@@ -345,14 +347,21 @@ public class TestTableOperations extends JerseyTest {
     Assertions.assertEquals(ImmutableMap.of("k1", "v1"), tableDTO.properties());
 
     Column[] columnDTOs = tableDTO.columns();
-    Assertions.assertEquals(2, columnDTOs.length);
+    Assertions.assertEquals(3, columnDTOs.length);
     Assertions.assertEquals(columns[0].name(), columnDTOs[0].name());
     Assertions.assertEquals(columns[0].dataType(), columnDTOs[0].dataType());
     Assertions.assertEquals(columns[0].comment(), columnDTOs[0].comment());
+    Assertions.assertEquals(columns[0].autoIncrement(), columnDTOs[0].autoIncrement());
 
     Assertions.assertEquals(columns[1].name(), columnDTOs[1].name());
     Assertions.assertEquals(columns[1].dataType(), columnDTOs[1].dataType());
     Assertions.assertEquals(columns[1].comment(), columnDTOs[1].comment());
+    Assertions.assertEquals(columns[1].autoIncrement(), columnDTOs[1].autoIncrement());
+
+    Assertions.assertEquals(columns[2].name(), columnDTOs[2].name());
+    Assertions.assertEquals(columns[2].dataType(), columnDTOs[2].dataType());
+    Assertions.assertEquals(columns[2].comment(), columnDTOs[2].comment());
+    Assertions.assertEquals(columns[2].autoIncrement(), columnDTOs[2].autoIncrement());
 
     Assertions.assertArrayEquals(partitioning, tableDTO.partitioning());
 
@@ -774,6 +783,17 @@ public class TestTableOperations extends JerseyTest {
     when(column.dataType()).thenReturn(type);
     when(column.comment()).thenReturn(comment);
     when(column.nullable()).thenReturn(nullable);
+    return column;
+  }
+
+  private static Column mockColumn(
+      String name, Type type, String comment, boolean nullable, boolean autoIncrement) {
+    Column column = mock(Column.class);
+    when(column.name()).thenReturn(name);
+    when(column.dataType()).thenReturn(type);
+    when(column.comment()).thenReturn(comment);
+    when(column.nullable()).thenReturn(nullable);
+    when(column.autoIncrement()).thenReturn(autoIncrement);
     return column;
   }
 

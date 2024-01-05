@@ -13,7 +13,9 @@ import com.datastrato.gravitino.rest.RESTRequest;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
@@ -108,5 +110,17 @@ public class TableCreateRequest implements RESTRequest {
     if (partitioning != null) {
       Arrays.stream(partitioning).forEach(p -> p.validate(columns));
     }
+
+    List<ColumnDTO> autoIncrementCols =
+        Arrays.stream(columns)
+            .peek(ColumnDTO::validate)
+            .filter(ColumnDTO::autoIncrement)
+            .collect(Collectors.toList());
+    String autoIncrementColsStr =
+        autoIncrementCols.stream().map(ColumnDTO::name).collect(Collectors.joining(",", "[", "]"));
+    Preconditions.checkArgument(
+        autoIncrementCols.size() <= 1,
+        "Only one column can be auto-incremented. There are multiple auto-increment columns in your table: "
+            + autoIncrementColsStr);
   }
 }
