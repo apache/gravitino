@@ -149,8 +149,14 @@ public class CatalogConnectorMetadata {
 
   public void dropSchema(String schemaName, boolean cascade) {
     try {
-      schemaCatalog.dropSchema(
-          NameIdentifier.ofSchema(metalake.name(), catalogName, schemaName), cascade);
+      boolean success =
+          schemaCatalog.dropSchema(
+              NameIdentifier.ofSchema(metalake.name(), catalogName, schemaName), cascade);
+
+      if (!success) {
+        throw new TrinoException(GRAVITINO_SCHEMA_NOT_EXISTS, "Drop schema failed");
+      }
+
     } catch (NonEmptySchemaException e) {
       throw new TrinoException(GRAVITINO_SCHEMA_NOT_EMPTY, "Schema does not empty", e);
     }

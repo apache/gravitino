@@ -51,13 +51,13 @@ Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravit
 ### Schema capabilities
 
 - Gravitino schema corresponds to the MySQL database.
-- Support create schema with comments.
-- Support drop schema.
+- Supports create schema with comments.
+- Supports drop schema.
 - Doesn't support cascade drop database.
 
 ### Schema properties
 
-- Doesn't support are database property settings.
+- Doesn't support any database property settings.
 
 ### Schema operations
 
@@ -122,5 +122,5 @@ You cannot submit the `RenameTable` operation at the same time as other operatio
 :::
 
 :::caution
-If you update a nullability column to non nullability, there may be compatibility issue.
+If you update a nullability column to non nullability, there may be compatibility issues.
 :::

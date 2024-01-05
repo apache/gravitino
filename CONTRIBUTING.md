@@ -32,7 +32,7 @@ Before you get started, please read and follow these guidelines to ensure a smoo
 Either click the "Fork" button at the top right of the repository's page on GitHub OR create a fork on your local machine using `git clone`.
 
 ```bash
-git clone https://github.com/datastarto/gravitino.git
+git clone https://github.com/datastrato/gravitino.git
 cd gravitino
 ```
 
