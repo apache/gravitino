@@ -850,7 +850,8 @@ public class TrinoConnectorIT extends AbstractIT {
     final String sql1 =
         String.format("drop schema \"%s.%s\".%s cascade", metalakeName, catalogName, schemaName);
     // Will fail because the iceberg catalog does not support cascade drop
-    containerSuite.getTrinoContainer().executeUpdateSQL(sql1);
+    Assertions.assertThrows(
+        RuntimeException.class, () -> containerSuite.getTrinoContainer().executeUpdateSQL(sql1));
 
     final String sql2 =
         String.format("show schemas in \"%s.%s\" like '%s'", metalakeName, catalogName, schemaName);
