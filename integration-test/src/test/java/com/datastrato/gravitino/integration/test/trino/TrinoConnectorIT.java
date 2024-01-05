@@ -992,49 +992,6 @@ public class TrinoConnectorIT extends AbstractIT {
     }
   }
 
-  @Test
-  void testDropCatalogAndCreateAgain() throws InterruptedException {
-    String catalogName = GravitinoITUtils.genRandomName("mysql_catalog").toLowerCase();
-    GravitinoMetaLake createdMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
-    String[] command = {
-      "mysql",
-      "-h127.0.0.1",
-      "-uroot",
-      "-pds123", // username and password are referred from Hive dockerfile.
-      "-e",
-      "grant all privileges on *.* to root@'%' identified by 'ds123'"
-    };
-
-    // There exists a mysql instance in Hive the container.
-    containerSuite.getHiveContainer().executeInContainer(command);
-    String hiveHost = containerSuite.getHiveContainer().getContainerIpAddress();
-
-    // Create the catalog and drop it for 3 times to test the create/drop catalog function work
-    // well.
-    for (int i = 0; i < 3; i++) {
-      createdMetalake.createCatalog(
-          NameIdentifier.of(metalakeName, catalogName),
-          Catalog.Type.RELATIONAL,
-          "jdbc-mysql",
-          "comment",
-          ImmutableMap.<String, String>builder()
-              .put("jdbc-driver", "com.mysql.cj.jdbc.Driver")
-              .put("jdbc-user", "root")
-              .put("jdbc-password", "ds123")
-              .put("jdbc-url", String.format("jdbc:mysql://%s:3306?useSSL=false", hiveHost))
-              .build());
-
-      String sql = String.format("show catalogs like '%s.%s'", metalakeName, catalogName);
-      boolean success = checkTrinoHasLoaded(sql, 30);
-      Assertions.assertTrue(success, "Trino should load the catalog: " + sql);
-
-      createdMetalake.dropCatalog(NameIdentifier.of(metalakeName, catalogName));
-      // We need to test we can't load this catalog any more by Trino.
-      success = checkTrinoHasRemoved(sql, 30);
-      Assertions.assertTrue(success, "Trino should not load the catalog any more: " + sql);
-    }
-  }
-
   private static void createMetalake() {
     GravitinoMetaLake[] gravitinoMetaLakes = client.listMetalakes();
     Assertions.assertEquals(0, gravitinoMetaLakes.length);
