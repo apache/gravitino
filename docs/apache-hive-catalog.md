@@ -24,7 +24,7 @@ The Hive catalog is available for Apache Hive **2.x** only. Support for Apache H
 
 ### Catalog capabilities
 
-The Hive catalog supports to create, update, and delete databases and tables in the HMS.
+The Hive catalog supports creating, updating, and deleting databases and tables in the HMS.
 
 ### Catalog properties
 
@@ -61,12 +61,12 @@ see [Manage Metadata Using Gravitino](./manage-metadata-using-gravitino.md#schem
 
 ### Table capabilities
 
-The Hive catalog supports to create, update, and delete tables in the HMS.
+The Hive catalog supports creating, updating, and deleting of tables in the HMS.
 
 #### Table partitions
 
-The Hive catalog supports [partitioned tables](https://cwiki.apache.org/confluence/display/Hive/LanguageManual+DDL#LanguageManualDDL-PartitionedTables). Users can create partitioned tables in the Hive catalog with specific partitioning attribute.
-Although Gravitino supports several partitioning strategies, the Apache Hive inherently only supports a single partitioning strategy (partitioned by column), therefore the Hive catalog only support `Identity` partitioning.
+The Hive catalog supports [partitioned tables](https://cwiki.apache.org/confluence/display/Hive/LanguageManual+DDL#LanguageManualDDL-PartitionedTables). Users can create partitioned tables in the Hive catalog with the specific partitioning attribute.
+Although Gravitino supports several partitioning strategies, the Apache Hive inherently only supports a single partitioning strategy (partitioned by column), therefore the Hive catalog only supports `Identity` partitioning.
 
 :::caution
 The `fieldName` specified in the partitioning attribute must be a column defined in the table.
@@ -75,7 +75,7 @@ The `fieldName` specified in the partitioning attribute must be a column defined
 #### Table sort orders and distributions
 
 The Hive catalog supports [bucketed sorted tables](https://cwiki.apache.org/confluence/display/Hive/LanguageManual+DDL#LanguageManualDDL-BucketedSortedTables). Users can create bucketed sorted tables in the Hive catalog with specific `distribution` and `sortOrders` attributes.
-Although Gravitino supports several distribution strategies, the Apache Hive inherently only supports a single distribution strategy (clustered by column), therefore the Hive catalog only support `Hash` distribution.
+Although Gravitino supports several distribution strategies, the Apache Hive inherently only supports a single distribution strategy (clustered by column), therefore the Hive catalog only supports `Hash` distribution.
 
 :::caution
 The `fieldName` specified in the `distribution` and `sortOrders` attribute must be a column defined in the table.
@@ -131,7 +131,7 @@ Hive automatically adds and manages some reserved properties. Users aren't allow
 | `comment`               | Used to store the table comment.                  | 0.2.0         |
 | `numFiles`              | Used to store the number of files in the table.   | 0.2.0         |
 | `totalSize`             | Used to store the total size of the table.        | 0.2.0         |
-| `EXTERNAL`              | Indicates whether the table is an external table. | 0.2.0         |
+| `EXTERNAL`              | Indicates whether the table is external.          | 0.2.0         |
 | `transient_lastDdlTime` | Used to store the last DDL time of the table.     | 0.2.0         |
 
 ### Table operations
@@ -141,7 +141,7 @@ Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravit
 #### Alter operations
 
 Gravitino has already defined a unified set of [metadata operation interfaces](./manage-metadata-using-gravitino.md#alter-a-table), and almost all [Hive Alter operations](https://cwiki.apache.org/confluence/display/Hive/LanguageManual+DDL#LanguageManualDDL-AlterTable/Partition/Column) have corresponding table update request which enable you to change the struct of an existing table.
-The following table lists the mapping relationship between Hive Alter operations and Gravitino table update request.
+The following table lists the mapping relationship between Hive Alter operations and the Gravitino table update requests.
 
 ##### Alter table
 
@@ -157,7 +157,7 @@ The following table lists the mapping relationship between Hive Alter operations
 | `Alter Table Constraints`                     | Unsupported                    | -             |
 
 :::note
-As Gravitino has a separate interface for updating the comment of a table, the Hive catalog sets `comment` as a reserved property for the table, preventing users from setting the comment property, Although Apache Hive change the comment of a table by modifying the comment property of the table.
+As Gravitino has a separate interface for updating the comment of a table, the Hive catalog sets `comment` as a reserved property for the table, preventing users from setting the comment property, Although Apache Hive changes the comment of a table by modifying the comment property of the table.
 :::
 
 ##### Alter column
