@@ -16,8 +16,14 @@ public class MySQLDataTypeTransformer extends GeneralDataTypeTransformer {
   @Override
   public Type getGravitinoType(io.trino.spi.type.Type type) {
     Type gravitinoType = super.getGravitinoType(type);
-    if (gravitinoType.name() == Name.VARCHAR || gravitinoType.name() == Name.FIXEDCHAR) {
-      return Types.StringType.get();
+    if (gravitinoType.name() == Name.VARCHAR
+        && ((Types.VarCharType) gravitinoType).length() > 16383) {
+      return Types.VarCharType.of(16383);
+    }
+
+    if (gravitinoType.name() == Name.FIXEDCHAR
+        && ((Types.FixedCharType) gravitinoType).length() > 16383) {
+      return Types.FixedCharType.of(16383);
     }
     return gravitinoType;
   }

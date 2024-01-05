@@ -121,6 +121,7 @@ dependencies {
   testImplementation(libs.okhttp3.loginterceptor)
   testImplementation(libs.mysql.driver)
   testImplementation(libs.postgresql.driver)
+  implementation("commons-cli:commons-cli:1.2")
 }
 
 /* Optimizing integration test execution conditions */

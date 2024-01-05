@@ -86,7 +86,7 @@ public class ProcessData {
     switch (type) {
       case OUTPUT:
         {
-          return this.getOutPutStream();
+          return this.getOutPutStream(false);
         }
       case ERROR:
         {
@@ -98,7 +98,7 @@ public class ProcessData {
         }
       case STREAMS_MERGED:
         {
-          return this.getOutPutStream() + "\n" + this.getErrorStream();
+          return this.getOutPutStream(true);
         }
       case PROCESS_DATA_OBJECT:
         {
@@ -127,10 +127,10 @@ public class ProcessData {
     return this.returnCode;
   }
 
-  public String getOutPutStream() {
+  public String getOutPutStream(boolean mergeStreams) {
     if (this.outPutStream == null) {
       try {
-        buildOutputAndErrorStreamData();
+        buildOutputAndErrorStreamData(mergeStreams);
       } catch (Exception e) {
         throw new RuntimeException(
             "Couldn't retrieve Output Stream data from process: " + this.checkedProcess.toString(),
@@ -149,7 +149,7 @@ public class ProcessData {
   public String getErrorStream() {
     if (this.errorStream == null) {
       try {
-        buildOutputAndErrorStreamData();
+        buildOutputAndErrorStreamData(false);
       } catch (Exception e) {
         throw new RuntimeException(
             "Couldn't retrieve Error Stream data from process: " + this.checkedProcess.toString(),
@@ -171,7 +171,7 @@ public class ProcessData {
         + String.format("[EXIT CODE]\n%d", this.returnCode);
   }
 
-  private void buildOutputAndErrorStreamData() throws IOException {
+  private void buildOutputAndErrorStreamData(boolean mergeStreams) throws IOException {
     StringBuilder sbInStream = new StringBuilder();
     StringBuilder sbErrorStream = new StringBuilder();
 
@@ -233,7 +233,11 @@ public class ProcessData {
             break;
           }
           tempSB.append(charBuffer, 0, readCount);
-          sbErrorStream.append(tempSB);
+          if (mergeStreams) {
+            sbInStream.append(tempSB);
+          } else {
+            sbErrorStream.append(tempSB);
+          }
           if (tempSB.length() > 0) {
             outputProduced = true;
             String temp = new String(tempSB);
