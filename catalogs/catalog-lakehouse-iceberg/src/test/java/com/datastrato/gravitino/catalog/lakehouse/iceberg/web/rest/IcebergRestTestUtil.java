@@ -5,9 +5,11 @@
 
 package com.datastrato.gravitino.catalog.lakehouse.iceberg.web.rest;
 
+import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergConfig;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.ops.IcebergTableOps;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.web.IcebergExceptionMapper;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.web.IcebergObjectMapperProvider;
+import com.datastrato.gravitino.catalog.lakehouse.iceberg.web.metrics.IcebergMetricsManager;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
@@ -51,11 +53,13 @@ public class IcebergRestTestUtil {
 
     if (bindIcebergTableOps) {
       IcebergTableOps icebergTableOps = new IcebergTableOps();
+      IcebergMetricsManager icebergMetricsManager = new IcebergMetricsManager(new IcebergConfig());
       resourceConfig.register(
           new AbstractBinder() {
             @Override
             protected void configure() {
               bind(icebergTableOps).to(IcebergTableOps.class).ranked(2);
+              bind(icebergMetricsManager).to(IcebergMetricsManager.class).ranked(2);
             }
           });
     }

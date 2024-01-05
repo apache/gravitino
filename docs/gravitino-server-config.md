@@ -10,6 +10,7 @@ This software is licensed under the Apache License version 2."
 ## Introduction
 
 Gravitino supports several configurations:
+
 1. **Gravitino server configuration**: Used to start up Gravitino server.
 2. **Gravitino catalog properties configuration**: Used to make default values for different catalogs.
 3. **Some other configurations**: Includes configurations such as HDFS configuration.
@@ -35,10 +36,10 @@ The `gravitino.conf` file lists the configuration items in the following table. 
 | `gravitino.server.webserver.requestHeaderSize`        | Maximum size of HTTP requests.                                                                                                                                                    | `131072`                                                                     | No       | 0.1.0         |
 | `gravitino.server.webserver.responseHeaderSize`       | Maximum size of HTTP responses.                                                                                                                                                   | `131072`                                                                     | No       | 0.1.0         |
 | `gravitino.server.shutdown.timeout`                   | Time in milliseconds to gracefully shutdown of the Gravitino webserver.                                                                                                           | `3000`                                                                       | No       | 0.2.0         |
-| `gravitino.server.webserver.customFilters`            | Comma separated list of filter class names to apply to the APIs.                                                                                                                  | (none)                                                                       | No       | 0.4.0         |
+| `gravitino.server.webserver.customFilters`            | Comma separated list of filter class names to apply to the API.                                                                                                                  | (none)                                                                       | No       | 0.4.0         |
 
 The filter in the customFilters should be a standard javax servlet Filter.
-Filter parameters can also be specified in the configuration, by setting config entries of the form `gravitino.server.webserver.<class name of filter>.param.<param name>=<value>`
+Filter parameters can also be specified in the configuration, by setting configuration entries of the form `gravitino.server.webserver.<class name of filter>.param.<param name>=<value>`
 
 ### Storage configuration
 
@@ -52,7 +53,7 @@ Filter parameters can also be specified in the configuration, by setting config 
 | `gravitino.entity.store.kv.deleteAfterTimeMs`     | The maximum time in milliseconds that the deleted data and old version data is kept. Set to at least 10 minutes and no longer than 30 days. | `604800000`(7 days)              | No       | 0.3.0         |
 
 :::caution
-It's highly recommend that you change the default value of `gravitino.entity.store.kv.rocksdbPath`, as it's under the deployment directory and future version upgrades may remove it.
+It's highly recommended that you change the default value of `gravitino.entity.store.kv.rocksdbPath`, as it's under the deployment directory and future version upgrades may remove it.
 :::
 
 ### Catalog configuration
@@ -85,11 +86,11 @@ There are three types of catalog properties:
 Catalog properties are either defined in catalog configuration files as default values or specified explicitly when creating a catalog.
 
 :::info
-Explicit specifications take precedence over the formal configurations.
+Explicit specifications take precedence over formal configurations.
 :::
 
 :::caution
-These rules only apply on the catalog properties, doesn't affect on the schema or table properties.
+These rules only apply to the catalog properties and don't affect the schema or table properties.
 :::
 
 | catalog provider    | catalog properties                                                                      | catalog properties configuration file path               |
@@ -100,7 +101,7 @@ These rules only apply on the catalog properties, doesn't affect on the schema o
 | `jdbc-postgresql`   | [PostgreSQL catalog properties](jdbc-postgresql-catalog.md#catalog-properties)          | `catalogs/jdbc-postgresql/conf/jdbc-postgresql.conf`     |
 
 :::info
-Gravitino server automatically add catalog properties configuration dir to classpath.
+Gravitino server automatically adds catalog properties configuration dir to classpath.
 :::
 
 ## Some other configurations

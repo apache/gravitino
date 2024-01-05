@@ -30,13 +30,12 @@ import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.CatalogChange;
 import com.datastrato.gravitino.MetalakeChange;
 import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.auth.AuthConstants;
 import com.datastrato.gravitino.catalog.hive.HiveClientPool;
 import com.datastrato.gravitino.catalog.hive.HiveSchemaPropertiesMetadata;
 import com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata;
 import com.datastrato.gravitino.client.GravitinoMetaLake;
 import com.datastrato.gravitino.dto.rel.ColumnDTO;
-import com.datastrato.gravitino.dto.rel.DistributionDTO;
-import com.datastrato.gravitino.dto.rel.SortOrderDTO;
 import com.datastrato.gravitino.dto.rel.expressions.FieldReferenceDTO;
 import com.datastrato.gravitino.dto.rel.partitions.IdentityPartitioningDTO;
 import com.datastrato.gravitino.dto.rel.partitions.Partitioning;
@@ -52,12 +51,14 @@ import com.datastrato.gravitino.rel.Schema;
 import com.datastrato.gravitino.rel.SchemaChange;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.TableChange;
+import com.datastrato.gravitino.rel.expressions.NamedReference;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
 import com.datastrato.gravitino.rel.expressions.distributions.Strategy;
 import com.datastrato.gravitino.rel.expressions.sorts.NullOrdering;
 import com.datastrato.gravitino.rel.expressions.sorts.SortDirection;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
+import com.datastrato.gravitino.rel.expressions.sorts.SortOrders;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.types.Types;
 import com.google.common.collect.ImmutableMap;
@@ -336,20 +337,16 @@ public class CatalogHiveIT extends AbstractIT {
 
     NameIdentifier nameIdentifier =
         NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
-    DistributionDTO distribution =
-        new DistributionDTO.Builder()
-            .withNumber(10)
-            .withArgs(FieldReferenceDTO.of(HIVE_COL_NAME1))
-            .withStrategy(Strategy.EVEN)
-            .build();
 
-    final SortOrderDTO[] sortOrders =
-        new SortOrderDTO[] {
-          new SortOrderDTO.Builder()
-              .withNullOrder(NullOrdering.NULLS_FIRST)
-              .withDirection(SortDirection.DESCENDING)
-              .withSortTerm(FieldReferenceDTO.of(HIVE_COL_NAME2))
-              .build()
+    Distribution distribution =
+        Distributions.of(Strategy.EVEN, 10, NamedReference.field(HIVE_COL_NAME1));
+
+    final SortOrder[] sortOrders =
+        new SortOrder[] {
+          SortOrders.of(
+              NamedReference.field(HIVE_COL_NAME2),
+              SortDirection.DESCENDING,
+              NullOrdering.NULLS_FIRST)
         };
 
     Map<String, String> properties = createProperties();
@@ -395,12 +392,8 @@ public class CatalogHiveIT extends AbstractIT {
 
     // Test bad request
     // Bad name in distribution
-    final DistributionDTO badDistribution =
-        new DistributionDTO.Builder()
-            .withNumber(10)
-            .withArgs(FieldReferenceDTO.of(HIVE_COL_NAME1 + "bad_name"))
-            .withStrategy(Strategy.EVEN)
-            .build();
+    final Distribution badDistribution =
+        Distributions.of(Strategy.EVEN, 10, NamedReference.field(HIVE_COL_NAME1 + "bad_name"));
     Assertions.assertThrows(
         Exception.class,
         () -> {
@@ -416,13 +409,12 @@ public class CatalogHiveIT extends AbstractIT {
                   sortOrders);
         });
 
-    final SortOrderDTO[] badSortOrders =
-        new SortOrderDTO[] {
-          new SortOrderDTO.Builder()
-              .withNullOrder(NullOrdering.NULLS_FIRST)
-              .withDirection(SortDirection.DESCENDING)
-              .withSortTerm(FieldReferenceDTO.of(HIVE_COL_NAME2 + "bad_name"))
-              .build()
+    final SortOrder[] badSortOrders =
+        new SortOrder[] {
+          SortOrders.of(
+              NamedReference.field(HIVE_COL_NAME2 + "bad_name"),
+              SortDirection.DESCENDING,
+              NullOrdering.NULLS_FIRST)
         };
 
     Assertions.assertThrows(
@@ -728,14 +720,17 @@ public class CatalogHiveIT extends AbstractIT {
   @Test
   public void testAlterHiveTable() throws TException, InterruptedException {
     ColumnDTO[] columns = createColumns();
-    catalog
-        .asTableCatalog()
-        .createTable(
-            NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
-            columns,
-            TABLE_COMMENT,
-            createProperties(),
-            new Partitioning[] {IdentityPartitioningDTO.of(columns[2].name())});
+    Table createdTable =
+        catalog
+            .asTableCatalog()
+            .createTable(
+                NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
+                columns,
+                TABLE_COMMENT,
+                createProperties(),
+                new Partitioning[] {IdentityPartitioningDTO.of(columns[2].name())});
+    Assertions.assertNull(createdTable.auditInfo().lastModifier());
+    Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, createdTable.auditInfo().creator());
     Table alteredTable =
         catalog
             .asTableCatalog()
@@ -754,7 +749,8 @@ public class CatalogHiveIT extends AbstractIT {
                 TableChange.updateColumnComment(new String[] {HIVE_COL_NAME1}, "comment_new"),
                 TableChange.updateColumnType(
                     new String[] {HIVE_COL_NAME1}, Types.IntegerType.get()));
-
+    Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, alteredTable.auditInfo().creator());
+    Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, alteredTable.auditInfo().lastModifier());
     // Direct get table from hive metastore to check if the table is altered successfully.
     org.apache.hadoop.hive.metastore.api.Table hiveTab =
         hiveClientPool.run(client -> client.getTable(schemaName, ALTER_TABLE_NAME));
@@ -897,12 +893,19 @@ public class CatalogHiveIT extends AbstractIT {
 
     GravitinoMetaLake metalake = client.loadMetalake(NameIdentifier.of(metalakeName));
     Catalog catalog = metalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
-    catalog
-        .asSchemas()
-        .alterSchema(
-            ident,
-            SchemaChange.removeProperty("key1"),
-            SchemaChange.setProperty("key2", "val2-alter"));
+    Schema schema = catalog.asSchemas().loadSchema(ident);
+    Assertions.assertNull(schema.auditInfo().lastModifier());
+    Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, schema.auditInfo().creator());
+    schema =
+        catalog
+            .asSchemas()
+            .alterSchema(
+                ident,
+                SchemaChange.removeProperty("key1"),
+                SchemaChange.setProperty("key2", "val2-alter"));
+
+    Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, schema.auditInfo().lastModifier());
+    Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, schema.auditInfo().creator());
 
     Map<String, String> properties2 = catalog.asSchemas().loadSchema(ident).properties();
     Assertions.assertFalse(properties2.containsKey("key1"));

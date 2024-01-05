@@ -13,7 +13,7 @@ This page introduces how to manage metadata by Gravitino. Through Gravitino, you
 like metalakes, catalogs, schemas, and tables. This page includes the following contents:
 
 In this document, Gravitino uses Apache Hive catalog as an example to show how to manage metadata by Gravitino. Other catalogs are similar to Hive catalog,
-but they may have some differences, especially in catalog property, table property and column type. For more details, please refer to the related doc.
+but they may have some differences, especially in catalog property, table property, and column type. For more details, please refer to the related doc.
 
 - [**Apache Hive**](./apache-hive-catalog.md)
 - [**MySQL**](./jdbc-postgresql-catalog.md)
@@ -21,7 +21,7 @@ but they may have some differences, especially in catalog property, table proper
 - [**Apache Iceberg**](./lakehouse-iceberg-catalog.md)
 
 
-Assuming Gravitino has just started, and the host and port is `http://localhost:8090`.
+Assuming Gravitino has just started, and the host and port is <http://localhost:8090>.
 
 ## Metalake operations
 
@@ -31,9 +31,9 @@ You can create a metalake by sending a `POST` request to the `/api/metalakes` en
 The following is an example of creating a metalake:
 
 <Tabs>
-<TabItem value="bash" label="Bash">
+<TabItem value="shell" label="Shell">
 
-```bash
+```shell
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{"name":"metalake","comment":"comment","properties":{}}' \
 http://localhost:8090/api/metalakes
@@ -61,9 +61,9 @@ GravitinoMetaLake newMetalake = gravitinoClient.createMetalake(
 You can create a metalake by sending a `GET` request to the `/api/metalakes/{metalake_name}` endpoint or just use the Gravitino Java client. The following is an example of loading a metalake:
 
 <Tabs>
-<TabItem value="bash" label="Bash">
+<TabItem value="shell" label="Shell">
 
-```bash
+```shell
 curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json"  http://localhost:8090/api/metalakes/metalake
 ```
@@ -86,9 +86,9 @@ GravitinoMetaLake loaded = gravitinoClient.loadMetalake(
 You can modify a metalake by sending a `PUT` request to the `/api/metalakes/{metalake_name}` endpoint or just use the Gravitino Java client. The following is an example of altering a metalake:
 
 <Tabs>
-<TabItem value="bash" label="Bash">
+<TabItem value="shell" label="Shell">
 
-```bash
+```shell
 curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
   "updates": [
@@ -136,9 +136,9 @@ Currently, Gravitino supports the following changes to a metalake:
 You can remove a metalake by sending a `DELETE` request to the `/api/metalakes/{metalake_name}` endpoint or just use the Gravitino Java client. The following is an example of dropping a metalake:
 
 <Tabs>
-<TabItem value="bash" label="Bash">
+<TabItem value="shell" label="Shell">
 
-```bash
+```shell
 curl -X DELETE -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" http://localhost:8090/api/metalakes/metalake
 ```
@@ -158,17 +158,17 @@ boolean success = gravitinoClient.dropMetalake(
 </Tabs>
 
 :::note
-Drop a metalake only removes metadata about the metalake and catalogs, schemas, tables under the metalake in Gravitino, It doesn't remove the real schema and table data in Apache Hive.
+Dropping a metalake only removes metadata about the metalake and catalogs, schemas, tables under the metalake in Gravitino, It doesn't remove the real schema and table data in Apache Hive.
 :::
 
 ### List all metalakes
 
-You can list metalakes by sending a `GET` request to the `/api/metalakes` endpoint or just use the Gravitino Java client. The following is an example of listing all metalake name:
+You can list metalakes by sending a `GET` request to the `/api/metalakes` endpoint or just use the Gravitino Java client. The following is an example of listing all metalake names:
 
 <Tabs>
-<TabItem value="bash" label="Bash">
+<TabItem value="shell" label="Shell">
 
-```bash
+```shell
 curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json"  http://localhost:8090/api/metalakes
 ```
@@ -185,7 +185,7 @@ GravitinoMetaLake[] allMetalakes = gravitinoClient.listMetalakes();
 </TabItem>
 </Tabs>
 
-## Catalogs operations
+## Catalog operations
 
 ### Create a catalog
 
@@ -198,9 +198,9 @@ The code below is an example of creating a Hive catalog. For other catalogs, the
 You can create a catalog by sending a `POST` request to the `/api/metalakes/{metalake_name}/catalogs` endpoint or just use the Gravitino Java client. The following is an example of creating a catalog:
 
 <Tabs>
-<TabItem value="bash" label="Bash">
+<TabItem value="shell" label="Shell">
 
-```bash
+```shell
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
   "name": "catalog",
@@ -235,7 +235,7 @@ Catalog catalog = gravitinoMetaLake.createCatalog(
     Type.RELATIONAL,
     "hive", // provider, We support hive, jdbc-mysql, jdbc-postgresql, lakehouse-iceberg, etc.
     "This is a hive catalog",
-    hiveProperties); // Please change the properties according to the value of provider.
+    hiveProperties); // Please change the properties according to the value of the provider.
 // ...
 ```
 
@@ -256,9 +256,9 @@ Currently, Gravitino supports the following catalog providers:
 You can load a catalog by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}` endpoint or just use the Gravitino Java client. The following is an example of loading a catalog:
 
 <Tabs>
-<TabItem value="bash" label="Bash">
+<TabItem value="shell" label="Shell">
 
-```bash
+```shell
 curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" http://localhost:8090/api/metalakes/metalake/catalogs/catalog
 ```
@@ -284,9 +284,9 @@ Catalog catalog = gravitinoMetaLake.loadCatalog(NameIdentifier.of("metalake", "c
 You can modify a catalog by sending a `PUT` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}` endpoint or just use the Gravitino Java client. The following is an example of altering a catalog:
 
 <Tabs>
-<TabItem value="bash" label="Bash">
+<TabItem value="shell" label="Shell">
 
-```bash
+```shell
 curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
   "updates": [
@@ -334,9 +334,9 @@ Currently, Gravitino supports the following changes to a catalog:
 You can remove a catalog by sending a `DELETE` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}` endpoint or just use the Gravitino Java client. The following is an example of dropping a catalog:
 
 <Tabs>
-<TabItem value="bash" label="Bash">
+<TabItem value="shell" label="Shell">
 
-```bash
+```shell
 curl -X DELETE -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" \
 http://localhost:8090/api/metalakes/metalake/catalogs/catalog
@@ -359,7 +359,7 @@ gravitinoMetaLake.dropCatalog(NameIdentifier.of("metalake", "catalog"));
 </Tabs>
 
 :::note
-Drop a catalog only removes metadata about the catalog and schemas, tables under the catalog in Gravitino, It doesn't remove the real data (table and schema) in Apache Hive.
+Dropping a catalog only removes metadata about the catalog, schemas, and tables under the catalog in Gravitino, It doesn't remove the real data (table and schema) in Apache Hive.
 :::
 
 ### List all catalogs in a metalake
@@ -368,9 +368,9 @@ You can list all catalogs under a metalake by sending a `GET` request to the `/a
 a metalake:
 
 <Tabs>
-<TabItem value="bash" label="Bash">
+<TabItem value="shell" label="Shell">
 
-```bash
+```shell
 curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" \
 http://localhost:8090/api/metalakes/metalake/catalogs
@@ -392,7 +392,7 @@ NameIdentifier[] catalogsIdents = gravitinoMetaLake.listCatalogs(Namespace.ofCat
 </TabItem>
 </Tabs>
 
-## Schemas operations
+## Schema operations
 
 :::tip
 Users should create a metalake and a catalog before creating a schema.
@@ -403,9 +403,9 @@ Users should create a metalake and a catalog before creating a schema.
 You can create a schema by sending a `POST` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas` endpoint or just use the Gravitino Java client. The following is an example of creating a schema:
 
 <Tabs>
-<TabItem value="bash" label="Bash">
+<TabItem value="shell" label="Shell">
 
-```bash
+```shell
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
   "name": "schema",
@@ -460,9 +460,9 @@ Currently, Gravitino supports the following schema property:
 You can create a schema by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}` endpoint or just use the Gravitino Java client. The following is an example of loading a schema:
 
 <Tabs>
-<TabItem value="bash" label="Bash">
+<TabItem value="shell" label="Shell">
 
-```bash
+```shell
 curl -X GET \-H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" \
 http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema
@@ -488,9 +488,9 @@ Schema schema = supportsSchemas.loadSchema(NameIdentifier.of("metalake", "catalo
 You can change a schema by sending a `PUT` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}` endpoint or just use the Gravitino Java client. The following is an example of modifying a schema:
 
 <Tabs>
-<TabItem value="bash" label="Bash">
+<TabItem value="shell" label="Shell">
 
-```bash
+```shell
 curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
   "updates": [
@@ -536,9 +536,9 @@ Currently, Gravitino supports the following changes to a schema:
 You can remove a schema by sending a `DELETE` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}` endpoint or just use the Gravitino Java client. The following is an example of dropping a schema:
 
 <Tabs>
-<TabItem value="bash" label="Bash">
+<TabItem value="shell" label="Shell">
 
-```bash
+```shell
 // cascade can be true or false
 curl -X DELETE -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" \
@@ -571,9 +571,9 @@ You can alter all schemas under a catalog by sending a `GET` request to the `/ap
 
 
 <Tabs>
-<TabItem value="bash" label="Bash">
+<TabItem value="shell" label="Shell">
 
-```bash
+```shell
 curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas
 ```
@@ -593,7 +593,7 @@ NameIdentifier[] schemas = supportsSchemas.listSchemas(Namespace.ofSchema("metal
 </TabItem>
 </Tabs>
 
-## Tables operations
+## Table operations
 
 :::tip
 Users should create a metalake, a catalog and a schema before creating a table.
@@ -604,9 +604,9 @@ Users should create a metalake, a catalog and a schema before creating a table.
 You can create a table by sending a `POST` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables` endpoint or just use the Gravitino Java client. The following is an example of creating a table:
 
 <Tabs>
-<TabItem value="bash" label="Bash">
+<TabItem value="shell" label="Shell">
 
-```bash
+```shell
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
   "name": "table",
@@ -711,7 +711,7 @@ The following types that Gravitino supports:
 | List                      | `Types.ListType.of(elementType, elementNullable)`                        | `{"type": "list", "containsNull": JSON Boolean, "elementType": type JSON}`                                                           | List type, indicate a list of elements with the same type                                        |
 | Map                       | `Types.MapType.of(keyType, valueType)`                                   | `{"type": "map", "keyType": type JSON, "valueType": type JSON, "valueContainsNull": JSON Boolean}`                                   | Map type, indicate a map of key-value pairs                                                      |
 | Struct                    | `Types.StructType.of([Types.StructType.Field.of(name, type, nullable)])` | `{"type": "struct", "fields": [JSON StructField, {"name": string, "type": type JSON, "nullable": JSON Boolean, "comment": string}]}` | Struct type, indicate a struct of fields                                                         |
-| Union                     | `Types.UnionType.of([type1, type2, ...])`                                | `{"type": "union", "types": [type JSON, ...]}`                                                                                       | Union type, indicate a union of types
+| Union                     | `Types.UnionType.of([type1, type2, ...])`                                | `{"type": "union", "types": [type JSON, ...]}`                                                                                       | Union type, indicates a union of types
 
 
 The related java doc is [here](pathname:///docs/0.3.0/api/java/com/datastrato/gravitino/rel/types/Type.html).
@@ -730,145 +730,17 @@ The following is the table property that Gravitino supports:
 
 In addition to the basic settings, Gravitino supports the following features:
 
-| Feature             | Description                                                                                  | Java doc                                                                                                                 |
-|---------------------|----------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------|
-| Partitioned table   | Equal to `PARTITION BY` in Apache Hive and other engine that support partitioning.           | [Partition](pathname:///docs/0.3.0/api/java/com/datastrato/gravitino/dto/rel/partitions/Partitioning.html)               |
-| Bucketed table      | Equal to `CLUSTERED BY` in Apache Hive, some engine may use different words to describe it.  | [Distribution](pathname:///docs/0.3.0/api/java/com/datastrato/gravitino/rel/expressions/distributions/Distribution.html) |
-| Sorted order table  | Equal to `SORTED BY` in Apache Hive, some engine may use different words to describe it.     | [SortOrder](pathname:///docs/0.3.0/api/java/com/datastrato/gravitino/rel/expressions/sorts/SortOrder.html)               |
+| Feature             | Description                                                                                                                                                                                                                                                                      | Java doc                                                                                                                 |
+|---------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------|
+| Table partitioning  | Equal to `PARTITION BY` in Apache Hive, It is a partitioning strategy that is used to split a table into parts based on partition keys. Some table engine may not support this feature                                                                                           | [Partition](pathname:///docs/0.3.0/api/java/com/datastrato/gravitino/dto/rel/partitions/Partitioning.html)               |
+| Table bucketing     | Equal to `CLUSTERED BY` in Apache Hive, Bucketing a.k.a (Clustering) is a technique to split the data into more manageable files/parts, (By specifying the number of buckets to create). The value of the bucketing column will be hashed by a user-defined number into buckets. | [Distribution](pathname:///docs/0.3.0/api/java/com/datastrato/gravitino/rel/expressions/distributions/Distribution.html) |
+| Table sort ordering | Equal to `SORTED BY` in Apache Hive, sort ordering is a method to sort the data in specific ways such as by a column or a function, and then store table data. it will highly improve the query performance under certain scenarios.                                              | [SortOrder](pathname:///docs/0.3.0/api/java/com/datastrato/gravitino/rel/expressions/sorts/SortOrder.html)               |
 
-:::tip
-**Not all catalogs may support those features.**. Please refer to the related document for more details.
-:::
 
-The following is an example of creating a partitioned, bucketed table and sorted order table:
-
-<Tabs>
-<TabItem value="bash" label="Bash">
-
-```bash
-curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json" -d '{
-  "name": "table",
-  "columns": [
-    {
-      "name": "id",
-      "type": "integer",
-      "nullable": true,
-      "comment": "Id of the user"
-    },
-    {
-      "name": "name",
-      "type": "varchar(2000)",
-      "nullable": true,
-      "comment": "Name of the user"
-    },
-    {
-      "name": "age",
-      "type": "short",
-      "nullable": true,
-      "comment": "Age of the user"
-    },
-    {
-      "name": "score",
-      "type": "double",
-      "nullable": true,
-      "comment": "Score of the user"
-    }
-  ],
-  "comment": "Create a new Table",
-  "properties": {
-    "format": "ORC"
-  },
-  "partitioning": [
-    {
-      "strategy": "identity",
-      "fieldName": ["score"]
-    }
-  ],
-  "distribution": {
-    "strategy": "hash",
-    "number": 4,
-    "funcArgs": [
-      {
-        "type": "field",
-        "fieldName": ["score"]
-      }
-    ]
-  },
-  "sortOrders": [
-    {
-      "direction": "asc",
-      "nullOrder": "NULLS_LAST",
-      "sortTerm":  {
-        "type": "field",
-        "fieldName": ["name"]
-      }
-    }
-  ]
-}' http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema/tables
-```
-
-</TabItem>
-<TabItem value="java" label="Java">
-
-```java
-tableCatalog.createTable(
-    NameIdentifier.of("metalake", "hive_catalog", "schema", "table"),
-    new ColumnDTO[] {
-    ColumnDTO.builder()
-    .withComment("Id of the user")
-    .withName("id")
-    .withDataType(Types.IntegerType.get())
-    .withNullable(true)
-    .build(),
-    ColumnDTO.builder()
-    .withComment("Name of the user")
-    .withName("name")
-    .withDataType(Types.VarCharType.of(1000))
-    .withNullable(true)
-    .build(),
-    ColumnDTO.builder()
-    .withComment("Age of the user")
-    .withName("age")
-    .withDataType(Types.ShortType.get())
-    .withNullable(true)
-    .build(),
-
-    ColumnDTO.builder()
-    .withComment("Score of the user")
-    .withName("score")
-    .withDataType(Types.DoubleType.get())
-    .withNullable(true)
-    .build(),
-    },
-    "Create a new Table",
-    tablePropertiesMap,
-    new Transform[] {
-    // Partition by id
-    Transforms.identity("score")
-    },
-    // CLUSTERED BY id
-    new DistributionDTO.Builder()
-    .withStrategy(Strategy.HASH)
-    .withNumber(4)
-    .withArgs(FieldReferenceDTO.of("id"))
-    .build(),
-    // SORTED BY name asc
-    new SortOrderDTO[] {
-    new SortOrderDTO.Builder()
-    .withDirection(SortDirection.ASCENDING)
-    .withNullOrder(NullOrdering.NULLS_LAST)
-    .withSortTerm(FieldReferenceDTO.of("name"))
-    .build()
-    }
-    );
-```
-
-</TabItem>
-</Tabs>
+For more information, please see the related document on [partitioning, bucketing, and sorting](table-partitioning-bucketing-sort-order.md).
 
 :::note
-The code above is an example of creating a Hive table. For other catalogs, the code is similar, but the supported column type, table properties may be different. For more details, please refer to the related doc.
+The code above is an example of creating a Hive table. For other catalogs, the code is similar, but the supported column type, and table properties may be different. For more details, please refer to the related doc.
 :::
 
 ### Load a table
@@ -876,9 +748,9 @@ The code above is an example of creating a Hive table. For other catalogs, the c
 You can load a table by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables/{table_name}` endpoint or just use the Gravitino Java client. The following is an example of loading a table:
 
 <Tabs>
-<TabItem value="bash" label="Bash">
+<TabItem value="shell" label="Shell">
 
-```bash
+```shell
 curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json"  \
 http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema/tables/table
@@ -905,9 +777,9 @@ tableCatalog.loadTable(NameIdentifier.of("metalake", "hive_catalog", "schema", "
 You can modify a table by sending a `PUT` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables/{table_name}` endpoint or just use the Gravitino Java client. The following is an example of modifying a table:
 
 <Tabs>
-<TabItem value="bash" label="Bash">
+<TabItem value="shell" label="Shell">
 
-```bash
+```shell
 curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
   "updates": [
@@ -962,10 +834,10 @@ Currently, Gravitino supports the following changes to a table:
 You can remove a table by sending a `DELETE` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables/{table_name}` endpoint or just use the Gravitino Java client. The following is an example of dropping a table:
 
 <Tabs>
-<TabItem value="bash" label="Bash">
+<TabItem value="shell" label="Shell">
 
-```bash
-## purge can be true or false, if purge is true, Gravitino will remove the data of the table.
+```shell
+## Purge can be true or false, if purge is true, Gravitino will remove the data from the table.
 
 curl -X DELETE -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" \
@@ -993,17 +865,17 @@ tableCatalog.purgeTable(NameIdentifier.of("metalake", "catalog", "schema", "tabl
 </TabItem>
 </Tabs>
 
-There are two ways to drop a table: `dropTable` and `purgeTable`, the difference between them is that `purgeTable` will remove data of the table, while `dropTable` only removes the metadata of the table. Some engine such as 
-Apache Hive support both, `dropTable` will only remove the metadata of a table and the data in HDFS can be reused later through the format of external table.
+There are two ways to drop a table: `dropTable` and `purgeTable`, the difference between them is that `purgeTable` will remove data of the table, while `dropTable` only removes the metadata of the table. Some engines such as 
+Apache Hive support both, `dropTable` will only remove the metadata of a table and the data in HDFS can be reused later through the format of the external table.
 
 ### List all tables under a schema
 
 You can list all tables in a schema by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables` endpoint or just use the Gravitino Java client. The following is an example of list all tables in a schema:
 
 <Tabs>
-<TabItem value="bash" label="Bash">
+<TabItem value="shell" label="Shell">
 
-```bash
+```shell
 curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" \
 http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema/tables

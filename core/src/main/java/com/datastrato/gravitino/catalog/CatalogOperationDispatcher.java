@@ -40,6 +40,7 @@ import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.storage.IdGenerator;
+import com.datastrato.gravitino.utils.PrincipalUtils;
 import com.datastrato.gravitino.utils.ThrowableFunction;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Maps;
@@ -150,8 +151,7 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
             .withNamespace(ident.namespace())
             .withAuditInfo(
                 new AuditInfo.Builder()
-                    .withCreator("gravitino") // TODO. hardcoded as user "gravitino" for now, will
-                    // change to real user once user system is ready.
+                    .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
                     .withCreateTime(Instant.now())
                     .build())
             .build();
@@ -262,8 +262,7 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
                                     .withCreator(schemaEntity.auditInfo().creator())
                                     .withCreateTime(schemaEntity.auditInfo().createTime())
                                     .withLastModifier(
-                                        "gravitino") // TODO. hardcoded as user "gravitino"
-                                    // for now, will change to real user once user system is ready.
+                                        PrincipalUtils.getCurrentPrincipal().getName())
                                     .withLastModifiedTime(Instant.now())
                                     .build())
                             .build()),
@@ -455,7 +454,7 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
             .withNamespace(ident.namespace())
             .withAuditInfo(
                 new AuditInfo.Builder()
-                    .withCreator("gravitino")
+                    .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
                     .withCreateTime(Instant.now())
                     .build())
             .build();
@@ -537,10 +536,7 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
                               new AuditInfo.Builder()
                                   .withCreator(tableEntity.auditInfo().creator())
                                   .withCreateTime(tableEntity.auditInfo().createTime())
-                                  .withLastModifier(
-                                      "gravitino") //  hardcoded as user "gravitino" for now, will
-                                  // change
-                                  // to real user once user system is ready.
+                                  .withLastModifier(PrincipalUtils.getCurrentPrincipal().getName())
                                   .withLastModifiedTime(Instant.now())
                                   .build())
                           .build();

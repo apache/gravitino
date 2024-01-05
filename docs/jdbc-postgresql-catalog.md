@@ -1,5 +1,5 @@
 ---
-title: "JDBC PostgreSQL catalog"
+title: "PostgreSQL catalog"
 slug: /jdbc-postgresql-catalog
 keywords:
 - jdbc
@@ -63,7 +63,7 @@ Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravit
 
 ### Schema properties
 
-- Doesn't are schema property settings.
+- Doesn't support any schema property settings.
 
 ### Schema operations
 
@@ -73,7 +73,7 @@ Please refer to [Manage Metadata Using Gravitino](./manage-metadata-using-gravit
 
 ### Table capabilities
 
-- Gravitino table corresponds to the PostgreSQL table.
+- The Gravitino table corresponds to the PostgreSQL table.
 - Supports DDL operation for PostgreSQL tables.
 - Doesn't support setting certain column properties, such as default value and check constraints.
 - Doesn't support index definition.
@@ -131,5 +131,5 @@ You can't submit the `RenameTable` operation at the same time as other operation
 
 :::caution
 PostgreSQL doesn't support the `UpdateColumnPosition` operation, so you can only use `ColumnPosition.defaultPosition()` when `AddColumn`.
-If you update a nullability column to non nullability, there may be compatibility issue.
+If you update a nullability column to non nullability, there may be compatibility issues.
 :::

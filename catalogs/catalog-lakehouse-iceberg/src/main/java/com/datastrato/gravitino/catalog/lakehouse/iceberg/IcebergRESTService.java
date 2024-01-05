@@ -10,6 +10,7 @@ import com.datastrato.gravitino.aux.GravitinoAuxiliaryService;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.ops.IcebergTableOps;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.web.IcebergExceptionMapper;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.web.IcebergObjectMapperProvider;
+import com.datastrato.gravitino.catalog.lakehouse.iceberg.web.metrics.IcebergMetricsManager;
 import com.datastrato.gravitino.metrics.MetricsSystem;
 import com.datastrato.gravitino.metrics.source.MetricsSource;
 import com.datastrato.gravitino.server.web.HttpServerMetricsSource;
@@ -33,6 +34,7 @@ public class IcebergRESTService implements GravitinoAuxiliaryService {
   public static final String SERVICE_NAME = "iceberg-rest";
 
   private IcebergTableOps icebergTableOps;
+  private IcebergMetricsManager icebergMetricsManager;
 
   private void initServer(IcebergConfig icebergConfig) {
     JettyServerConfig serverConfig = JettyServerConfig.fromConfig(icebergConfig);
@@ -50,11 +52,13 @@ public class IcebergRESTService implements GravitinoAuxiliaryService {
     metricsSystem.register(httpServerMetricsSource);
 
     icebergTableOps = new IcebergTableOps(icebergConfig);
+    icebergMetricsManager = new IcebergMetricsManager(icebergConfig);
     config.register(
         new AbstractBinder() {
           @Override
           protected void configure() {
             bind(icebergTableOps).to(IcebergTableOps.class).ranked(1);
+            bind(icebergMetricsManager).to(IcebergMetricsManager.class).ranked(1);
           }
         });
 
@@ -78,6 +82,7 @@ public class IcebergRESTService implements GravitinoAuxiliaryService {
 
   @Override
   public void serviceStart() {
+    icebergMetricsManager.start();
     if (server != null) {
       try {
         server.start();
@@ -96,6 +101,9 @@ public class IcebergRESTService implements GravitinoAuxiliaryService {
     }
     if (icebergTableOps != null) {
       icebergTableOps.close();
+    }
+    if (icebergMetricsManager != null) {
+      icebergMetricsManager.close();
     }
   }
 }

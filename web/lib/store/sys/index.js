@@ -13,12 +13,14 @@ export const initialVersion = createAsyncThunk('sys/fetchVersion', async (params
   let version = null
   const [err, res] = await to(getVersionApi())
 
-  if (!err && res) {
-    version = res.data.version
-    typeof window !== 'undefined' && window.localStorage.setItem('version', JSON.stringify(version))
-
-    loggerVersion(version.version)
+  if (err || !res) {
+    throw new Error(err)
   }
+
+  version = res.version
+  typeof window !== 'undefined' && window.localStorage.setItem('version', JSON.stringify(version))
+
+  loggerVersion(version.version)
 
   return version
 })

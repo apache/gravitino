@@ -25,8 +25,8 @@ your system `PATH`, or the `JAVA_HOME` environment variable pointing to a Java i
 
 See [How to install Gravitino](./how-to-install.md) to learn how to install Gravitino server.
 
-Gravitino provides Docker image on [Docker Hub](https://hub.docker.com/u/datastrato).
-Please pull the image and run it. For the details of Gravitino Docker image, please see
+Gravitino provides Docker images on [Docker Hub](https://hub.docker.com/u/datastrato).
+Please pull the image and run it. For the details of the Gravitino Docker image, please see
 [Dock image details](./docker-image-details.md).
 
 Gravitino also provides a playground to experience the whole Gravitino system with other components.
@@ -43,6 +43,29 @@ To get started with Gravitino, please see [Getting started](./getting-started.md
   quick guide to start and use Gravitino on AWS.
 * [Running on Google Cloud Platform](./getting-started.md#getting-started-on-google-cloud-platform):
   a quick guide to start and use Gravitino on GCP.
+
+## How to use Gravitino
+
+Gravitino provides two SDKs to manage metadata from different catalogs in a unified way, one is
+REST API, another is Java SDK. You can use either to manage metadata, please see
+[Manage metadata using Gravitino](./manage-metadata-using-gravitino.md) for the details.
+
+Also, you can find the complete REST API definition in
+[Gravitino Open API](./api/rest/gravitino-rest-api),
+Java SDK definition in [Gravitino Javadoc](pathname:///docs/0.3.0/api/java/index.html).
+
+Gravitino provides a web UI to manage the metadata, you can visit the web UI in the browser via
+the URL address `http://<ip-address>:8090`. Please see [Gravitino web UI](./webui.md) for the details.
+
+Gravitino currently supports the following catalogs:
+
+* [**Iceberg catalog**](./lakehouse-iceberg-catalog.md)
+* [**Hive catalog**](./apache-hive-catalog.md)
+* [**MySQL catalog**](./jdbc-mysql-catalog.md)
+* [**PostgreSQL catalog**](./jdbc-postgresql-catalog.md)
+
+Gravitino also provides an Iceberg REST catalog service for Iceberg table format, please see the
+[Iceberg REST catalog service](./iceberg-rest-service.md) for the details.
 
 ## Gravitino playground
 
@@ -61,37 +84,17 @@ to learn how to use the playground.
 
 ## Where to go from here
 
-### Programming guides
-
-* [Manage metadata using Gravitino](./manage-metadata-using-gravitino.md): provides the complete
-  functionalities of Gravitino metadata management. Including metalake, catalog, schema and
-  table management.
-* [Gravitino Open API](./api/rest/gravitino-rest-api): provides the complete Open API definition of
-  Gravitino.
-* [Gravitino Javadoc](pathname:///docs/0.3.0/api/java/index.html): provides the Javadoc for Gravitino API.
-
-### Server administration
-
-Gravitino provides several ways to configure and manage the Gravitino server. Please see:
-
-* [How to customize Gravitino server configurations](./gravitino-server-config.md): provides the
-  complete Gravitino server configurations.
-* [Security](./security.md): provides the security configurations for Gravitino, including HTTPS
-  and OAuth2 configurations.
-* [Gravitino metrics](./metrics.md): provides the metrics configurations and detailed metrics list
-  of Gravitino server.
-
-### Catalog details
+### Catalogs
 
 Gravitino supports different catalogs to manage the metadata in different sources. Please see:
 
-* [Lakehouse Iceberg catalog](./lakehouse-iceberg-catalog.md): a complete guide to use Gravitino
+* [Iceberg catalog](./lakehouse-iceberg-catalog.md): a complete guide to using Gravitino to
   manage Apache Iceberg data.
-* [How to set up Gravitino Apache Iceberg REST catalog service](./iceberg-rest-service.md): a
-  complete guide to use Gravitino as Apache Iceberg REST catalog service.
-* [Apache Hive catalog](./apache-hive-catalog.md): a complete guide to use Gravitino manage Apache Hive data.
-* [JDBC MySQL catalog](./jdbc-mysql-catalog.md): a complete guide to use Gravitino manage MySQL data.
-* [JDBC PostgreSQL catalog](./jdbc-postgresql-catalog.md): a complete guide to use Gravitino manage PostgreSQL data.
+* [Iceberg REST catalog service](./iceberg-rest-service.md): a
+  complete guide to use Gravitino as an Apache Iceberg REST catalog service.
+* [Hive catalog](./apache-hive-catalog.md): a complete guide to using Gravitino to manage Apache Hive data.
+* [MySQL catalog](./jdbc-mysql-catalog.md): a complete guide to using Gravitino to manage MySQL data.
+* [PostgreSQL catalog](./jdbc-postgresql-catalog.md): a complete guide to using Gravitino to manage PostgreSQL data.
 
 ### Trino connector
 
@@ -101,13 +104,28 @@ way. to use the Trino connector, please see:
 * [How to use Gravitino Trino connector](./trino-connector/index.md): a complete guide to use Gravitino
   Trino connector.
 
+### Server administration
+
+Gravitino provides several ways to configure and manage the Gravitino server. Please see:
+
+* [Security](./security.md): provides security configurations for Gravitino, including HTTPS
+  and OAuth2 configurations.
+* [Gravitino metrics](./metrics.md): provides metrics configurations and detailed metrics list
+  of the Gravitino server.
+
+### Programming guides
+
+* [Gravitino Open API](./api/rest/gravitino-rest-api): provides the complete Open API definition of
+  Gravitino.
+* [Gravitino Javadoc](pathname:///docs/0.3.0/api/java/index.html): provides the Javadoc for the Gravitino API.
+
 ### Development guides
 
 * [How to build Gravitino](./how-to-build.md): a complete guide to build Gravitino from
   source.
-* [How to test Gravitino](./how-to-test.md): a complete guide to run Gravitino unit tests and
+* [How to test Gravitino](./how-to-test.md): a complete guide to running Gravitino unit tests and
   integration tests.
-* [How to sign and verify a Gravitino releases](./how-to-sign-releases.md): a guide to sign and verify
+* [How to sign and verify Gravitino releases](./how-to-sign-releases.md): a guide to sign and verify
   a Gravitino release.
 * [Publish Docker images](./publish-docker-images.md): a guide to publish Gravitino Docker images,
   also list the change logs of Gravitino CI Docker images and release images.
