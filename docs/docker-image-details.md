@@ -122,6 +122,9 @@ You can use this image to test Trino.
 
 Changelog
 
+- gravitino-ci-trino:0.1.3
+  - Remove copy content in folder `gravitino-trino-connector` to plugin folder `/usr/lib/trino/plugin/gravitino`
+
 - gravitino-ci-trino:0.1.2
   - Copy JDBC driver 'mysql-connector-java' and 'postgres' to `/usr/lib/trino/iceberg/` folder
 
