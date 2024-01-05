@@ -45,9 +45,10 @@ public class TestPostgreSqlTableOperations extends TestPostgreSqlAbstractIT {
     columns.add(
         new JdbcColumn.Builder()
             .withName("col_1")
-            .withType(VARCHAR)
-            .withComment("test_comment_col1")
-            .withNullable(true)
+            .withType(Types.LongType.get())
+            .withComment("increment key")
+            .withNullable(false)
+            .withAutoIncrement(true)
             .build());
     columns.add(
         new JdbcColumn.Builder()
@@ -110,9 +111,10 @@ public class TestPostgreSqlTableOperations extends TestPostgreSqlAbstractIT {
     alterColumns.add(
         new JdbcColumn.Builder()
             .withName("col_1")
-            .withType(VARCHAR)
+            .withType(Types.LongType.get())
             .withComment("test_new_comment")
-            .withNullable(true)
+            .withNullable(false)
+            .withAutoIncrement(true)
             .build());
     alterColumns.add(
         new JdbcColumn.Builder()
@@ -135,9 +137,10 @@ public class TestPostgreSqlTableOperations extends TestPostgreSqlAbstractIT {
     alterColumns.add(
         new JdbcColumn.Builder()
             .withName("col_1_new")
-            .withType(VARCHAR)
+            .withType(Types.LongType.get())
             .withComment("test_new_comment")
-            .withNullable(true)
+            .withNullable(false)
+            .withAutoIncrement(true)
             .build());
     alterColumns.add(
         new JdbcColumn.Builder()
@@ -152,18 +155,16 @@ public class TestPostgreSqlTableOperations extends TestPostgreSqlAbstractIT {
 
     // alter column Nullability
     TABLE_OPERATIONS.alterTable(
-        TEST_DB_NAME,
-        newName,
-        TableChange.updateColumnNullability(new String[] {"col_1_new"}, false),
-        TableChange.updateColumnNullability(new String[] {"col_2"}, true));
+        TEST_DB_NAME, newName, TableChange.updateColumnNullability(new String[] {"col_2"}, true));
     load = TABLE_OPERATIONS.load(TEST_DB_NAME, newName);
     alterColumns.clear();
     alterColumns.add(
         new JdbcColumn.Builder()
             .withName("col_1_new")
-            .withType(VARCHAR)
+            .withType(Types.LongType.get())
             .withComment("test_new_comment")
             .withNullable(false)
+            .withAutoIncrement(true)
             .build());
     alterColumns.add(
         new JdbcColumn.Builder()
