@@ -16,6 +16,7 @@ import com.datastrato.gravitino.exceptions.MetalakeAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
 import com.datastrato.gravitino.storage.IdGenerator;
+import com.datastrato.gravitino.utils.PrincipalUtils;
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.time.Instant;
@@ -107,7 +108,7 @@ public class MetalakeManager implements SupportsMetalakes {
             .withVersion(SchemaVersion.V_0_1)
             .withAuditInfo(
                 new AuditInfo.Builder()
-                    .withCreator("gravitino") /*TODO: Use real user later on.  */
+                    .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
                     .withCreateTime(Instant.now())
                     .build())
             .build();

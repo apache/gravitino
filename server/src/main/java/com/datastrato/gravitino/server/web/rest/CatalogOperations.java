@@ -53,10 +53,13 @@ public class CatalogOperations {
   @Produces("application/vnd.gravitino.v1+json")
   public Response listCatalogs(@PathParam("metalake") String metalake) {
     try {
-      Namespace catalogNS = Namespace.ofCatalog(metalake);
-      NameIdentifier[] idents = manager.listCatalogs(catalogNS);
-      return Utils.ok(new EntityListResponse(idents));
-
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            Namespace catalogNS = Namespace.ofCatalog(metalake);
+            NameIdentifier[] idents = manager.listCatalogs(catalogNS);
+            return Utils.ok(new EntityListResponse(idents));
+          });
     } catch (Exception e) {
       return ExceptionHandlers.handleCatalogException(OperationType.LIST, "", metalake, e);
     }
@@ -67,16 +70,20 @@ public class CatalogOperations {
   public Response createCatalog(
       @PathParam("metalake") String metalake, CatalogCreateRequest request) {
     try {
-      request.validate();
-      NameIdentifier ident = NameIdentifier.ofCatalog(metalake, request.getName());
-      Catalog catalog =
-          manager.createCatalog(
-              ident,
-              request.getType(),
-              request.getProvider(),
-              request.getComment(),
-              request.getProperties());
-      return Utils.ok(new CatalogResponse(DTOConverters.toDTO(catalog)));
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            request.validate();
+            NameIdentifier ident = NameIdentifier.ofCatalog(metalake, request.getName());
+            Catalog catalog =
+                manager.createCatalog(
+                    ident,
+                    request.getType(),
+                    request.getProvider(),
+                    request.getComment(),
+                    request.getProperties());
+            return Utils.ok(new CatalogResponse(DTOConverters.toDTO(catalog)));
+          });
 
     } catch (Exception e) {
       return ExceptionHandlers.handleCatalogException(
@@ -108,15 +115,19 @@ public class CatalogOperations {
       @PathParam("catalog") String catalogName,
       CatalogUpdatesRequest request) {
     try {
-      request.validate();
-      NameIdentifier ident = NameIdentifier.ofCatalog(metalakeName, catalogName);
-      CatalogChange[] changes =
-          request.getUpdates().stream()
-              .map(CatalogUpdateRequest::catalogChange)
-              .toArray(CatalogChange[]::new);
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            request.validate();
+            NameIdentifier ident = NameIdentifier.ofCatalog(metalakeName, catalogName);
+            CatalogChange[] changes =
+                request.getUpdates().stream()
+                    .map(CatalogUpdateRequest::catalogChange)
+                    .toArray(CatalogChange[]::new);
 
-      Catalog catalog = manager.alterCatalog(ident, changes);
-      return Utils.ok(new CatalogResponse(DTOConverters.toDTO(catalog)));
+            Catalog catalog = manager.alterCatalog(ident, changes);
+            return Utils.ok(new CatalogResponse(DTOConverters.toDTO(catalog)));
+          });
 
     } catch (Exception e) {
       return ExceptionHandlers.handleCatalogException(
@@ -130,14 +141,17 @@ public class CatalogOperations {
   public Response dropCatalog(
       @PathParam("metalake") String metalakeName, @PathParam("catalog") String catalogName) {
     try {
-      NameIdentifier ident = NameIdentifier.ofCatalog(metalakeName, catalogName);
-      boolean dropped = manager.dropCatalog(ident);
-      if (!dropped) {
-        LOG.warn("Failed to drop catalog {} under metalake {}", catalogName, metalakeName);
-      }
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            NameIdentifier ident = NameIdentifier.ofCatalog(metalakeName, catalogName);
+            boolean dropped = manager.dropCatalog(ident);
+            if (!dropped) {
+              LOG.warn("Failed to drop catalog {} under metalake {}", catalogName, metalakeName);
+            }
 
-      return Utils.ok(new DropResponse(dropped));
-
+            return Utils.ok(new DropResponse(dropped));
+          });
     } catch (Exception e) {
       return ExceptionHandlers.handleCatalogException(
           OperationType.DROP, catalogName, metalakeName, e);

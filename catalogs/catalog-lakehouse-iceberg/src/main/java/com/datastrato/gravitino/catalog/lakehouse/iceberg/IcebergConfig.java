@@ -14,6 +14,7 @@ import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogP
 import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogPropertiesMetadata.WAREHOUSE;
 
 import com.datastrato.gravitino.Config;
+import com.datastrato.gravitino.catalog.lakehouse.iceberg.web.metrics.IcebergMetricsManager;
 import com.datastrato.gravitino.config.ConfigBuilder;
 import com.datastrato.gravitino.config.ConfigConstants;
 import com.datastrato.gravitino.config.ConfigEntry;
@@ -75,6 +76,29 @@ public class IcebergConfig extends Config {
           .version("0.2.0")
           .booleanConf()
           .createWithDefault(true);
+
+  public static final ConfigEntry<String> ICEBERG_METRICS_STORE =
+      new ConfigBuilder(IcebergMetricsManager.ICEBERG_METRICS_STORE)
+          .doc("The store to save Iceberg metrics")
+          .version("0.4.0")
+          .stringConf()
+          .create();
+
+  public static final ConfigEntry<Integer> ICEBERG_METRICS_STORE_RETAIN_DAYS =
+      new ConfigBuilder(IcebergMetricsManager.ICEBERG_METRICS_STORE_RETAIN_DAYS)
+          .doc(
+              "The retain days of Iceberg metrics, the value not greater than 0 means retain forever")
+          .version("0.4.0")
+          .intConf()
+          .createWithDefault(-1);
+
+  public static final ConfigEntry<Integer> ICEBERG_METRICS_QUEUE_CAPACITY =
+      new ConfigBuilder(IcebergMetricsManager.ICEBERG_METRICS_QUEUE_CAPACITY)
+          .doc("The capacity for Iceberg metrics queues, should greater than 0")
+          .version("0.4.0")
+          .intConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
+          .createWithDefault(1000);
 
   public String getJdbcDriver() {
     return get(JDBC_DRIVER);

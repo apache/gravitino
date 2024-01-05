@@ -7,10 +7,10 @@ package com.datastrato.gravitino.integration.test.catalog.jdbc.postgresql;
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
+import com.datastrato.gravitino.auth.AuthConstants;
 import com.datastrato.gravitino.catalog.jdbc.config.JdbcConfig;
 import com.datastrato.gravitino.client.GravitinoMetaLake;
 import com.datastrato.gravitino.dto.rel.ColumnDTO;
-import com.datastrato.gravitino.dto.rel.SortOrderDTO;
 import com.datastrato.gravitino.dto.rel.partitions.Partitioning;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
@@ -280,8 +280,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
         NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
     Distribution distribution = Distributions.NONE;
 
-    final SortOrderDTO[] sortOrders = SortOrderDTO.EMPTY_SORT;
-
+    SortOrder[] sortOrders = new SortOrder[0];
     Partitioning[] partitioning = Partitioning.EMPTY_PARTITIONING;
 
     Map<String, String> properties = createProperties();
@@ -324,13 +323,16 @@ public class CatalogPostgreSqlIT extends AbstractIT {
   @Test
   void testAlterAndDropPostgreSqlTable() {
     ColumnDTO[] columns = createColumns();
-    catalog
-        .asTableCatalog()
-        .createTable(
-            NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
-            columns,
-            table_comment,
-            createProperties());
+    Table table =
+        catalog
+            .asTableCatalog()
+            .createTable(
+                NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
+                columns,
+                table_comment,
+                createProperties());
+    Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, table.auditInfo().creator());
+    Assertions.assertNull(table.auditInfo().lastModifier());
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () -> {
@@ -343,11 +345,14 @@ public class CatalogPostgreSqlIT extends AbstractIT {
         });
 
     // rename table
-    catalog
-        .asTableCatalog()
-        .alterTable(
-            NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
-            TableChange.rename(alertTableName));
+    table =
+        catalog
+            .asTableCatalog()
+            .alterTable(
+                NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
+                TableChange.rename(alertTableName));
+    Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, table.auditInfo().creator());
+    Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, table.auditInfo().lastModifier());
 
     // update table
     catalog
@@ -360,7 +365,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
             TableChange.updateColumnType(
                 new String[] {POSTGRESQL_COL_NAME1}, Types.IntegerType.get()));
 
-    Table table =
+    table =
         catalog
             .asTableCatalog()
             .loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, alertTableName));

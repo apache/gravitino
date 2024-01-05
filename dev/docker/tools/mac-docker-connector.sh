@@ -23,7 +23,7 @@ fi
 DOCKER_CONNECTOR_PACKAGE_NAME="docker-connector-darwin.tar.gz"
 DOCKER_CONNECTOR_DOWNLOAD_URL="https://github.com/wenjunxiao/mac-docker-connector/releases/download/v3.2/${DOCKER_CONNECTOR_PACKAGE_NAME}"
 if [ ! -f "${bin}/docker-connector" ]; then
-  wget -q -P "${bin}" ${DOCKER_CONNECTOR_DOWNLOAD_URL}
+  curl -s -L -o "${bin}/${DOCKER_CONNECTOR_PACKAGE_NAME}" ${DOCKER_CONNECTOR_DOWNLOAD_URL}
   tar -xzf "${bin}/${DOCKER_CONNECTOR_PACKAGE_NAME}" -C "${bin}"
   rm -rf "${bin}/${DOCKER_CONNECTOR_PACKAGE_NAME}"
 fi

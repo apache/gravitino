@@ -23,9 +23,9 @@ Gravitino aims to provide several key features:
 
 ![Gravitino Model and Arch](assets/gravitino-model-arch.png)
 
-* **Functionality Layer**: Gravitino provides a set of APIs for users to manage and govern the
+* **Functionality Layer**: Gravitino provides an API for users to manage and govern the
   metadata, including standard metadata creation, update, and delete operations. In the meantime, it also provides the ability to govern the metadata in a unified way, including access control, discovery, and others.
-* **Interface Layer**: Gravitino provides standard REST APIs as the interface layer for users. Future support includes Thrift and JDBC interfaces.
+* **Interface Layer**: Gravitino provides a standard REST API as the interface layer for users. Future support includes Thrift and JDBC interfaces.
 * **Core Object Model**: Gravitino defines a generic metadata model to represent the metadata in different sources and types and manages them in a unified way.
 * **Connection Layer**: In the connection layer, Gravitino provides a set of connectors to connect to different metadata sources, including Apache Hive, MySQL, PostgreSQL, and others. It also allows connecting and managing heterogeneous metadata other than Tabular data.
 
@@ -43,7 +43,7 @@ others.
 
 ### Direct metadata management
 
-Unlike the traditional metadata management systems, which need to collect the metadata
+Unlike traditional metadata management systems, which need to collect the metadata
 actively or passively from underlying systems, Gravitino manages these systems directly.
 It provides a set of connectors to connect to different metadata sources.
 The changes in Gravitino directly reflect in the underlying systems, and vice versa.
@@ -78,10 +78,10 @@ assets like models, features, and others are under development.
 * **Metalake**: The top-level container for metadata. Typically, one group has one metalake
   to manage all the metadata in it. Each metalake exposes a three-level namespace(catalog.schema.
   table) to organize the data.
-* **Catalog**: catalog is a collection of metadata from a specific metadata source.
+* **Catalog**: A catalog is a collection of metadata from a specific metadata source.
   Each catalog has a related connector to connect to the specific metadata source.
-* **Schema**: Schema is equivalent to a database, Schemas only exist in the specific catalogs
+* **Schema**: A schema is equivalent to a database, Schemas only exist in the specific catalogs
   that support relational metadata sources, such as Apache Hive, MySQL, PostgreSQL, and others.
 * **Table**: The lowest level in the object hierarchy for catalogs that support relational
   metadata sources. You can create Tables in specific schemas in the catalogs.
-* **Model**: Model represents the metadata in the specific catalogs that support model management.
+* **Model**: The model represents the metadata in the specific catalogs that support model management.
