@@ -19,6 +19,7 @@ jobs:
       - name: Cherry pick into branch-0.1
         uses: carloscastrojumo/github-cherry-pick-action@v1.0.9
         with:
+          token: ${{ secrets.BOT_TOKEN }}
           branch: branch-0.1
           labels: |
             cherry-pick
@@ -36,6 +37,7 @@ jobs:
       - name: Cherry pick into branch-0.2
         uses: carloscastrojumo/github-cherry-pick-action@v1.0.9
         with:
+          token: ${{ secrets.BOT_TOKEN }}
           branch: branch-0.2
           labels: |
             cherry-pick
@@ -53,6 +55,7 @@ jobs:
       - name: Cherry pick into branch-0.3
         uses: carloscastrojumo/github-cherry-pick-action@v1.0.9
         with:
+          token: ${{ secrets.BOT_TOKEN }}
           branch: branch-0.3
           labels: |
             cherry-pick
