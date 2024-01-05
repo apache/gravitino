@@ -5,6 +5,8 @@
 package com.datastrato.gravitino.catalog.hive;
 
 import static com.datastrato.gravitino.catalog.BaseCatalog.CATALOG_BYPASS_PREFIX;
+import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.CLIENT_POOL_CACHE_EVICTION_INTERVAL_MS;
+import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.CLIENT_POOL_CACHE_KEYS;
 import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.CLIENT_POOL_SIZE;
 import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.METASTORE_URIS;
 import static com.datastrato.gravitino.catalog.hive.HiveTable.SUPPORT_TABLE_TYPES;
@@ -40,7 +42,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
-import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
@@ -69,7 +70,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
   public static final Logger LOG = LoggerFactory.getLogger(HiveCatalogOperations.class);
 
-  @VisibleForTesting HiveClientPool clientPool;
+  @VisibleForTesting CachedClientPool clientPool;
 
   @VisibleForTesting HiveConf hiveConf;
 
@@ -133,7 +134,9 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     mergeConfig.forEach(hadoopConf::set);
     hiveConf = new HiveConf(hadoopConf, HiveCatalogOperations.class);
 
-    this.clientPool = new HiveClientPool(getClientPoolSize(conf), hiveConf);
+    this.clientPool =
+        new CachedClientPool(
+            getClientPoolSize(conf), hiveConf, getCacheEvictionInterval(conf), getCacheKeys(conf));
   }
 
   @VisibleForTesting
@@ -141,13 +144,19 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     return (int) catalogPropertiesMetadata.getOrDefault(conf, CLIENT_POOL_SIZE);
   }
 
+  long getCacheEvictionInterval(Map<String, String> conf) {
+    return (long)
+        catalogPropertiesMetadata.getOrDefault(conf, CLIENT_POOL_CACHE_EVICTION_INTERVAL_MS);
+  }
+
+  String getCacheKeys(Map<String, String> conf) {
+    return (String) catalogPropertiesMetadata.getOrDefault(conf, CLIENT_POOL_CACHE_KEYS);
+  }
+
   /** Closes the Hive catalog and releases the associated client pool. */
   @Override
   public void close() {
-    if (clientPool != null) {
-      clientPool.close();
-      clientPool = null;
-    }
+    // We used a cached client pool, the pool will close clients after expiration.
   }
 
   /**
@@ -203,7 +212,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
               .withConf(hiveConf)
               .withAuditInfo(
                   new AuditInfo.Builder()
-                      .withCreator(currentUser())
+                      .withCreator(UserGroupInformation.getCurrentUser().getUserName())
                       .withCreateTime(Instant.now())
                       .build())
               .build();
@@ -586,7 +595,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
               .withSortOrders(sortOrders)
               .withAuditInfo(
                   new AuditInfo.Builder()
-                      .withCreator(currentUser())
+                      .withCreator(UserGroupInformation.getCurrentUser().getUserName())
                       .withCreateTime(Instant.now())
                       .build())
               .withPartitioning(partitioning)
@@ -898,23 +907,6 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
           "Failed to drop Hive table " + tableIdent.name() + " in Hive Metastore", e);
     } catch (Exception e) {
       throw new RuntimeException(e);
-    }
-  }
-
-  // TODO. We should figure out a better way to get the current user from servlet container.
-  private static String currentUser() {
-    String username = null;
-    try {
-      username = UserGroupInformation.getCurrentUser().getShortUserName();
-    } catch (IOException e) {
-      LOG.warn("Failed to get Hadoop user", e);
-    }
-
-    if (username != null) {
-      return username;
-    } else {
-      LOG.warn("Hadoop user is null, defaulting to user.name");
-      return System.getProperty("user.name");
     }
   }
 

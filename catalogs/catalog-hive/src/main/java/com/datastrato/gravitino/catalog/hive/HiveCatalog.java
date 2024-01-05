@@ -6,6 +6,7 @@ package com.datastrato.gravitino.catalog.hive;
 
 import com.datastrato.gravitino.catalog.BaseCatalog;
 import com.datastrato.gravitino.catalog.CatalogOperations;
+import com.datastrato.gravitino.catalog.CatalogProxyPlugin;
 import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.datastrato.gravitino.rel.TableCatalog;
 import java.util.Map;
@@ -43,7 +44,7 @@ public class HiveCatalog extends BaseCatalog<HiveCatalog> {
    */
   @Override
   public SupportsSchemas asSchemas() {
-    return (HiveCatalogOperations) ops();
+    return (SupportsSchemas) ops();
   }
 
   /**
@@ -53,6 +54,18 @@ public class HiveCatalog extends BaseCatalog<HiveCatalog> {
    */
   @Override
   public TableCatalog asTableCatalog() {
-    return (HiveCatalogOperations) ops();
+    return (TableCatalog) ops();
+  }
+
+  @Override
+  protected CatalogProxyPlugin newProxyPlugin(Map<String, String> config) {
+    boolean impersonationEnable =
+        (boolean)
+            new HiveCatalogPropertiesMeta()
+                .getOrDefault(config, HiveCatalogPropertiesMeta.IMPERSONATION_ENABLE);
+    if (!impersonationEnable) {
+      return null;
+    }
+    return new HiveCatalogProxyPlugin();
   }
 }

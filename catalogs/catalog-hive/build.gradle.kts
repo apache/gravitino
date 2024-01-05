@@ -17,6 +17,9 @@ dependencies {
   compileOnly(libs.lombok)
   annotationProcessor(libs.lombok)
 
+  compileOnly(libs.immutables.value)
+  annotationProcessor(libs.immutables.value)
+
   implementation(libs.hive2.metastore) {
     exclude("org.apache.hbase")
     exclude("org.apache.hadoop", "hadoop-yarn-server-resourcemanager")
@@ -68,6 +71,7 @@ dependencies {
 
   implementation(libs.slf4j.api)
   implementation(libs.guava)
+  implementation(libs.caffeine)
 
   testImplementation(libs.junit.jupiter.api)
   testRuntimeOnly(libs.junit.jupiter.engine)
