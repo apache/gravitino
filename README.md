@@ -103,10 +103,8 @@ Gravitino provides a Trino connector to access the metadata in Gravitino. To use
 2. [How to test Gravitino](docs/how-to-test.md)
 3. [How to publish Docker images](docs/publish-docker-images.md)
 
-
 ## License
 
 Gravitino is under the Apache License Version 2.0, See the [LICENSE](LICENSE) for the details.
 
 <sub>Apache®, Apache Hadoop&reg;, Apache Hive&trade;, Apache Iceberg&trade;, Apache Kafka&reg;, Apache Spark&trade;, Apache Submarine&trade;, Apache Thrift&trade; and Apache Zeppelin&trade; are either registered trademarks or trademarks of the Apache Software Foundation in the United States and/or other countries.</sub>
-
