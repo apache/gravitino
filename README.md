@@ -8,6 +8,13 @@
 [![GitHub Actions Build](https://github.com/datastrato/gravitino/actions/workflows/build.yml/badge.svg)](https://github.com/datastrato/gravitino/actions/workflows/build.yml)
 [![GitHub Actions Integration Test](https://github.com/datastrato/gravitino/actions/workflows/integration-test.yml/badge.svg)](https://github.com/datastrato/gravitino/actions/workflows/integration-test.yml)
 
+
+[![License](https://img.shields.io/github/license/datastrato/gravitino)](https://github.com/datastrato/gravitino/blob/main/LICENSE)
+[![Contributors](https://img.shields.io/github/contributors/datastrato/gravitino)](https://github.com/datastrato/gravitino/graphs/contributors)
+[![Release](https://img.shields.io/github/v/release/datastrato/gravitino)](https://github.com/datastrato/gravitino/releases)
+[![Open Issues](https://img.shields.io/github/issues-raw/datastrato/gravitino)](https://github.com/datastrato/gravitino/issues)
+[![Last Committed](https://img.shields.io/github/last-commit/datastrato/gravitino)](https://github.com/datastrato/gravitino/commits/main/)
+
 ## Introduction
 
 Gravitino is a high-performance, geo-distributed, and federated metadata lake. It manages the metadata directly in different sources, types, and regions. It also provides users with unified metadata access for data and AI assets.
@@ -90,8 +97,10 @@ Gravitino provides a Trino connector to access the metadata in Gravitino. To use
 2. [How to test Gravitino](docs/how-to-test.md)
 3. [How to publish Docker images](docs/publish-docker-images.md)
 
+
 ## License
 
 Gravitino is under the Apache License Version 2.0, See the [LICENSE](LICENSE) for the details.
 
 <sub>Apache®, Apache Hadoop&reg;, Apache Hive&trade;, Apache Iceberg&trade;, Apache Kafka&reg;, Apache Spark&trade;, Apache Submarine&trade;, Apache Thrift&trade; and Apache Zeppelin&trade; are either registered trademarks or trademarks of the Apache Software Foundation in the United States and/or other countries.</sub>
+
