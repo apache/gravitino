@@ -330,13 +330,33 @@ public interface TableChange {
    *
    * <p>If the property does not exist, the change should succeed.
    */
-  @EqualsAndHashCode
-  @Getter
   final class RemoveProperty implements TableChange {
     private final String property;
 
     private RemoveProperty(String property) {
       this.property = property;
+    }
+
+    public String getProperty() {
+      return property;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) return true;
+      if (o == null || getClass() != o.getClass()) return false;
+      RemoveProperty that = (RemoveProperty) o;
+      return property.equals(that.property);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(property);
+    }
+
+    @Override
+    public String toString() {
+      return "REMOVEPROPERTY " +property;
     }
   }
 
@@ -380,14 +400,29 @@ public interface TableChange {
    * that, the specified column may be a nested field, and then the given `column` refers to a field
    * in the same struct.
    */
-  @EqualsAndHashCode
-  @Getter
   final class After implements ColumnPosition {
     private final String column;
 
     private After(String column) {
       assert column != null;
       this.column = column;
+    }
+
+    public String getColumn() {
+      return column;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) return true;
+      if (o == null || getClass() != o.getClass()) return false;
+      After after = (After) o;
+      return column.equals(after.column);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(column);
     }
 
     @Override
@@ -427,29 +462,63 @@ public interface TableChange {
    * If the new field is nested and its parent does not exist or is not a struct, the change must
    * result in an {@link IllegalArgumentException}.
    */
-  @EqualsAndHashCode
   final class AddColumn implements ColumnChange {
     private final String[] fieldName;
-
-    @Getter private final Type dataType;
-
-    @Getter private final String comment;
-
-    @Getter private final ColumnPosition position;
-
-    @Getter private final boolean nullable;
+    private final Type dataType;
+    private final String comment;
+    private final ColumnPosition position;
+    private final boolean nullable;
 
     private AddColumn(
-        String[] fieldName,
-        Type dataType,
-        String comment,
-        ColumnPosition position,
-        boolean nullable) {
+            String[] fieldName,
+            Type dataType,
+            String comment,
+            ColumnPosition position,
+            boolean nullable) {
       this.fieldName = fieldName;
       this.dataType = dataType;
       this.comment = comment;
       this.position = position == null ? ColumnPosition.defaultPos() : position;
       this.nullable = nullable;
+    }
+
+    public String[] getFieldName() {
+      return fieldName;
+    }
+
+    public Type getDataType() {
+      return dataType;
+    }
+
+    public String getComment() {
+      return comment;
+    }
+
+    public ColumnPosition getPosition() {
+      return position;
+    }
+
+    public boolean isNullable() {
+      return nullable;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) return true;
+      if (o == null || getClass() != o.getClass()) return false;
+      AddColumn addColumn = (AddColumn) o;
+      return nullable == addColumn.nullable &&
+              Arrays.equals(fieldName, addColumn.fieldName) &&
+              Objects.equals(dataType, addColumn.dataType) &&
+              Objects.equals(comment, addColumn.comment) &&
+              Objects.equals(position, addColumn.position);
+    }
+
+    @Override
+    public int hashCode() {
+      int result = Objects.hash(dataType, comment, position, nullable);
+      result = 31 * result + Arrays.hashCode(fieldName);
+      return result;
     }
 
     @Override
@@ -466,15 +535,37 @@ public interface TableChange {
    *
    * <p>If the field does not exist, the change must result in an {@link IllegalArgumentException}.
    */
-  @EqualsAndHashCode
   final class RenameColumn implements ColumnChange {
     private final String[] fieldName;
-
-    @Getter private final String newName;
+    private final String newName;
 
     private RenameColumn(String[] fieldName, String newName) {
       this.fieldName = fieldName;
       this.newName = newName;
+    }
+
+    public String[] getFieldName() {
+      return fieldName;
+    }
+
+    public String getNewName() {
+      return newName;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) return true;
+      if (o == null || getClass() != o.getClass()) return false;
+      RenameColumn that = (RenameColumn) o;
+      return Arrays.equals(fieldName, that.fieldName) &&
+              Objects.equals(newName, that.newName);
+    }
+
+    @Override
+    public int hashCode() {
+      int result = Objects.hash(newName);
+      result = 31 * result + Arrays.hashCode(fieldName);
+      return result;
     }
 
     @Override
@@ -483,22 +574,37 @@ public interface TableChange {
     }
   }
 
-  /**
-   * A TableChange to update the type of a field.
-   *
-   * <p>The field names are used to find the field to update.
-   *
-   * <p>If the field does not exist, the change must result in an {@link IllegalArgumentException}.
-   */
-  @EqualsAndHashCode
   final class UpdateColumnType implements ColumnChange {
     private final String[] fieldName;
-
-    @Getter private final Type newDataType;
+    private final Type newDataType;
 
     private UpdateColumnType(String[] fieldName, Type newDataType) {
       this.fieldName = fieldName;
       this.newDataType = newDataType;
+    }
+
+    public String[] getFieldName() {
+      return fieldName;
+    }
+
+    public Type getNewDataType() {
+      return newDataType;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) return true;
+      if (o == null || getClass() != o.getClass()) return false;
+      UpdateColumnType that = (UpdateColumnType) o;
+      return Arrays.equals(fieldName, that.fieldName) &&
+              Objects.equals(newDataType, that.newDataType);
+    }
+
+    @Override
+    public int hashCode() {
+      int result = Objects.hash(newDataType);
+      result = 31 * result + Arrays.hashCode(fieldName);
+      return result;
     }
 
     @Override
@@ -514,15 +620,37 @@ public interface TableChange {
    *
    * <p>If the field does not exist, the change must result in an {@link IllegalArgumentException}.
    */
-  @EqualsAndHashCode
   final class UpdateColumnComment implements ColumnChange {
     private final String[] fieldName;
-
-    @Getter private final String newComment;
+    private final String newComment;
 
     private UpdateColumnComment(String[] fieldName, String newComment) {
       this.fieldName = fieldName;
       this.newComment = newComment;
+    }
+
+    public String[] getFieldName() {
+      return fieldName;
+    }
+
+    public String getNewComment() {
+      return newComment;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) return true;
+      if (o == null || getClass() != o.getClass()) return false;
+      UpdateColumnComment that = (UpdateColumnComment) o;
+      return Arrays.equals(fieldName, that.fieldName) &&
+              Objects.equals(newComment, that.newComment);
+    }
+
+    @Override
+    public int hashCode() {
+      int result = Objects.hash(newComment);
+      result = 31 * result + Arrays.hashCode(fieldName);
+      return result;
     }
 
     @Override
@@ -538,15 +666,37 @@ public interface TableChange {
    *
    * <p>If the field does not exist, the change must result in an {@link IllegalArgumentException}.
    */
-  @EqualsAndHashCode
   final class UpdateColumnPosition implements ColumnChange {
     private final String[] fieldName;
-
-    @Getter private final ColumnPosition position;
+    private final ColumnPosition position;
 
     private UpdateColumnPosition(String[] fieldName, ColumnPosition position) {
       this.fieldName = fieldName;
       this.position = position;
+    }
+
+    public String[] getFieldName() {
+      return fieldName;
+    }
+
+    public ColumnPosition getPosition() {
+      return position;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) return true;
+      if (o == null || getClass() != o.getClass()) return false;
+      UpdateColumnPosition that = (UpdateColumnPosition) o;
+      return Arrays.equals(fieldName, that.fieldName) &&
+              Objects.equals(position, that.position);
+    }
+
+    @Override
+    public int hashCode() {
+      int result = Objects.hash(position);
+      result = 31 * result + Arrays.hashCode(fieldName);
+      return result;
     }
 
     @Override
@@ -560,15 +710,37 @@ public interface TableChange {
    *
    * <p>If the field does not exist, the change must result in an {@link IllegalArgumentException}.
    */
-  @EqualsAndHashCode
   final class DeleteColumn implements ColumnChange {
     private final String[] fieldName;
-
-    @Getter private final Boolean ifExists;
+    private final Boolean ifExists;
 
     private DeleteColumn(String[] fieldName, Boolean ifExists) {
       this.fieldName = fieldName;
       this.ifExists = ifExists;
+    }
+
+    public String[] getFieldName() {
+      return fieldName;
+    }
+
+    public Boolean getIfExists() {
+      return ifExists;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) return true;
+      if (o == null || getClass() != o.getClass()) return false;
+      DeleteColumn that = (DeleteColumn) o;
+      return Arrays.equals(fieldName, that.fieldName) &&
+              Objects.equals(ifExists, that.ifExists);
+    }
+
+    @Override
+    public int hashCode() {
+      int result = Objects.hash(ifExists);
+      result = 31 * result + Arrays.hashCode(fieldName);
+      return result;
     }
 
     @Override
