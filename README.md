@@ -7,8 +7,6 @@
 
 [![GitHub Actions Build](https://github.com/datastrato/gravitino/actions/workflows/build.yml/badge.svg)](https://github.com/datastrato/gravitino/actions/workflows/build.yml)
 [![GitHub Actions Integration Test](https://github.com/datastrato/gravitino/actions/workflows/integration-test.yml/badge.svg)](https://github.com/datastrato/gravitino/actions/workflows/integration-test.yml)
-
-
 [![License](https://img.shields.io/github/license/datastrato/gravitino)](https://github.com/datastrato/gravitino/blob/main/LICENSE)
 [![Contributors](https://img.shields.io/github/contributors/datastrato/gravitino)](https://github.com/datastrato/gravitino/graphs/contributors)
 [![Release](https://img.shields.io/github/v/release/datastrato/gravitino)](https://github.com/datastrato/gravitino/releases)
