@@ -7,6 +7,8 @@ package com.datastrato.gravitino;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 
+import java.util.Objects;
+
 /**
  * A metalake change is a change to a metalake. It can be used to rename a metalake, update the
  * comment of a metalake, set a property and value pair for a metalake, or remove a property from a
@@ -67,19 +69,37 @@ public interface MetalakeChange {
   }
 
   /** A metalake change to update the metalake comment. */
-  @Getter
-  @EqualsAndHashCode
   final class UpdateMetalakeComment implements MetalakeChange {
     private final String newComment;
 
     private UpdateMetalakeComment(String newComment) {
       this.newComment = newComment;
     }
+
+    public String getNewComment() {
+      return newComment;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) return true;
+      if (o == null || getClass() != o.getClass()) return false;
+      UpdateMetalakeComment that = (UpdateMetalakeComment) o;
+      return Objects.equals(newComment, that.newComment);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(newComment);
+    }
+
+    @Override
+    public String toString() {
+      return "UPDATEMETALAKECOMMENT " + newComment;
+    }
   }
 
   /** A metalake change to set a property and value pair for the metalake. */
-  @Getter
-  @EqualsAndHashCode
   final class SetProperty implements MetalakeChange {
     private final String property;
     private final String value;
@@ -88,16 +108,63 @@ public interface MetalakeChange {
       this.property = property;
       this.value = value;
     }
+
+    public String getProperty() {
+      return property;
+    }
+
+    public String getValue() {
+      return value;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) return true;
+      if (o == null || getClass() != o.getClass()) return false;
+      SetProperty that = (SetProperty) o;
+      return Objects.equals(property, that.property) &&
+              Objects.equals(value, that.value);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(property, value);
+    }
+
+    @Override
+    public String toString() {
+      return "SETPROPERTY " + property + " " + value;
+    }
   }
 
   /** A metalake change to remove a property from the metalake. */
-  @Getter
-  @EqualsAndHashCode
   final class RemoveProperty implements MetalakeChange {
     private final String property;
 
     private RemoveProperty(String property) {
       this.property = property;
+    }
+
+    public String getProperty() {
+      return property;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) return true;
+      if (o == null || getClass() != o.getClass()) return false;
+      RemoveProperty that = (RemoveProperty) o;
+      return Objects.equals(property, that.property);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(property);
+    }
+
+    @Override
+    public String toString() {
+      return "REMOVEPROPERTY " + property;
     }
   }
 }
