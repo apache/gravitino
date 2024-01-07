@@ -23,8 +23,6 @@ package com.datastrato.gravitino.rel;
 import com.datastrato.gravitino.rel.types.Type;
 import java.util.Arrays;
 import java.util.Objects;
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
 
 /**
  * The TableChange interface defines the public API for managing tables in a schema. If the catalog
@@ -304,8 +302,8 @@ public interface TableChange {
     }
 
     /**
-     * Compares this RenameTable instance with another object for equality.
-     * The comparison is based on the new name of the table.
+     * Compares this RenameTable instance with another object for equality. The comparison is based
+     * on the new name of the table.
      *
      * @param o The object to compare with this instance.
      * @return true if the given object represents the same table renaming; false otherwise.
@@ -319,8 +317,8 @@ public interface TableChange {
     }
 
     /**
-     * Generates a hash code for this RenameTable instance.
-     * The hash code is based on the new name of the table.
+     * Generates a hash code for this RenameTable instance. The hash code is based on the new name
+     * of the table.
      *
      * @return A hash code value for this table renaming operation.
      */
@@ -330,8 +328,8 @@ public interface TableChange {
     }
 
     /**
-     * Returns a string representation of the RenameTable instance.
-     * This string format includes the class name followed by the property name to be renamed.
+     * Returns a string representation of the RenameTable instance. This string format includes the
+     * class name followed by the property name to be renamed.
      *
      * @return A string summary of the property rename instance.
      */
@@ -359,8 +357,8 @@ public interface TableChange {
     }
 
     /**
-     * Compares this UpdateComment instance with another object for equality.
-     * The comparison is based on the new comment of the table.
+     * Compares this UpdateComment instance with another object for equality. The comparison is
+     * based on the new comment of the table.
      *
      * @param o The object to compare with this instance.
      * @return true if the given object represents the same table comment update; false otherwise.
@@ -374,8 +372,8 @@ public interface TableChange {
     }
 
     /**
-     * Generates a hash code for this UpdateComment instance.
-     * The hash code is based on the new comment of the table.
+     * Generates a hash code for this UpdateComment instance. The hash code is based on the new
+     * comment of the table.
      *
      * @return A hash code value for this table comment update operation.
      */
@@ -385,8 +383,8 @@ public interface TableChange {
     }
 
     /**
-     * Returns a string representation of the UpdateComment instance.
-     * This string format includes the class name followed by the property name to be updated.
+     * Returns a string representation of the UpdateComment instance. This string format includes
+     * the class name followed by the property name to be updated.
      *
      * @return A string representation of the UpdateComment instance.
      */
@@ -429,8 +427,8 @@ public interface TableChange {
     }
 
     /**
-     * Compares this SetProperty instance with another object for equality.
-     * The comparison is based on both the property name and its value.
+     * Compares this SetProperty instance with another object for equality. The comparison is based
+     * on both the property name and its value.
      *
      * @param o The object to compare with this instance.
      * @return true if the given object represents the same property setting; false otherwise.
@@ -440,13 +438,12 @@ public interface TableChange {
       if (this == o) return true;
       if (o == null || getClass() != o.getClass()) return false;
       SetProperty that = (SetProperty) o;
-      return property.equals(that.property) &&
-              value.equals(that.value);
+      return property.equals(that.property) && value.equals(that.value);
     }
 
     /**
-     * Generates a hash code for this SetProperty instance.
-     * The hash code is based on both the property name and its value.
+     * Generates a hash code for this SetProperty instance. The hash code is based on both the
+     * property name and its value.
      *
      * @return A hash code value for this property setting.
      */
@@ -456,8 +453,8 @@ public interface TableChange {
     }
 
     /**
-     * Returns a string representation of the SetProperty instance.
-     * This string format includes the class name followed by the property name and value to be set.
+     * Returns a string representation of the SetProperty instance. This string format includes the
+     * class name followed by the property name and value to be set.
      *
      * @return A string representation of the SetProperty instance.
      */
@@ -489,8 +486,8 @@ public interface TableChange {
     }
 
     /**
-     * Compares this RemoveProperty instance with another object for equality.
-     * Two instances are considered equal if they target the same property for removal from the table.
+     * Compares this RemoveProperty instance with another object for equality. Two instances are
+     * considered equal if they target the same property for removal from the table.
      *
      * @param o The object to compare with this instance.
      * @return true if the given object represents the same property removal; false otherwise.
@@ -504,8 +501,8 @@ public interface TableChange {
     }
 
     /**
-     * Generates a hash code for this RemoveProperty instance.
-     * The hash code is based on the property name that is to be removed from the table.
+     * Generates a hash code for this RemoveProperty instance. The hash code is based on the
+     * property name that is to be removed from the table.
      *
      * @return A hash code value for this property removal operation.
      */
@@ -515,14 +512,14 @@ public interface TableChange {
     }
 
     /**
-     * Provides a string representation of the RemoveProperty instance.
-     * This string format includes the class name followed by the property name to be removed.
+     * Provides a string representation of the RemoveProperty instance. This string format includes
+     * the class name followed by the property name to be removed.
      *
      * @return A string summary of the property removal operation.
      */
     @Override
     public String toString() {
-      return "REMOVEPROPERTY " +property;
+      return "REMOVEPROPERTY " + property;
     }
   }
 
@@ -584,8 +581,8 @@ public interface TableChange {
     }
 
     /**
-     * Compares this After instance with another object for equality.
-     * Two instances are considered equal if they refer to the same column name.
+     * Compares this After instance with another object for equality. Two instances are considered
+     * equal if they refer to the same column name.
      *
      * @param o The object to compare with this instance.
      * @return true if the given object refers to the same column; false otherwise.
@@ -599,8 +596,7 @@ public interface TableChange {
     }
 
     /**
-     * Generates a hash code for this After instance.
-     * The hash code is based on the column name.
+     * Generates a hash code for this After instance. The hash code is based on the column name.
      *
      * @return A hash code value for this column positioning operation.
      */
@@ -654,11 +650,11 @@ public interface TableChange {
     private final boolean nullable;
 
     private AddColumn(
-            String[] fieldName,
-            Type dataType,
-            String comment,
-            ColumnPosition position,
-            boolean nullable) {
+        String[] fieldName,
+        Type dataType,
+        String comment,
+        ColumnPosition position,
+        boolean nullable) {
       this.fieldName = fieldName;
       this.dataType = dataType;
       this.comment = comment;
@@ -712,8 +708,8 @@ public interface TableChange {
     }
 
     /**
-     * Compares this AddColumn instance with another object for equality.
-     * The comparison is based on the field name, data type, comment, position, and nullability.
+     * Compares this AddColumn instance with another object for equality. The comparison is based on
+     * the field name, data type, comment, position, and nullability.
      *
      * @param o The object to compare with this instance.
      * @return true if the given object represents the same column addition; false otherwise.
@@ -723,16 +719,16 @@ public interface TableChange {
       if (this == o) return true;
       if (o == null || getClass() != o.getClass()) return false;
       AddColumn addColumn = (AddColumn) o;
-      return nullable == addColumn.nullable &&
-              Arrays.equals(fieldName, addColumn.fieldName) &&
-              Objects.equals(dataType, addColumn.dataType) &&
-              Objects.equals(comment, addColumn.comment) &&
-              Objects.equals(position, addColumn.position);
+      return nullable == addColumn.nullable
+          && Arrays.equals(fieldName, addColumn.fieldName)
+          && Objects.equals(dataType, addColumn.dataType)
+          && Objects.equals(comment, addColumn.comment)
+          && Objects.equals(position, addColumn.position);
     }
 
     /**
-     * Generates a hash code for this AddColumn instance.
-     * This hash code is based on the field name, data type, comment, position, and nullability.
+     * Generates a hash code for this AddColumn instance. This hash code is based on the field name,
+     * data type, comment, position, and nullability.
      *
      * @return A hash code value for this column addition operation.
      */
@@ -785,8 +781,8 @@ public interface TableChange {
     }
 
     /**
-     * Compares this RenameColumn instance with another object for equality.
-     * The comparison is based on the field name array and the new name.
+     * Compares this RenameColumn instance with another object for equality. The comparison is based
+     * on the field name array and the new name.
      *
      * @param o The object to compare with this instance.
      * @return true if the given object represents the same column renaming; false otherwise.
@@ -796,13 +792,12 @@ public interface TableChange {
       if (this == o) return true;
       if (o == null || getClass() != o.getClass()) return false;
       RenameColumn that = (RenameColumn) o;
-      return Arrays.equals(fieldName, that.fieldName) &&
-              Objects.equals(newName, that.newName);
+      return Arrays.equals(fieldName, that.fieldName) && Objects.equals(newName, that.newName);
     }
 
     /**
-     * Generates a hash code for this RenameColumn instance.
-     * This hash code is based on both the hierarchical field name and the new name.
+     * Generates a hash code for this RenameColumn instance. This hash code is based on both the
+     * hierarchical field name and the new name.
      *
      * @return A hash code value for this column renaming operation.
      */
@@ -854,8 +849,8 @@ public interface TableChange {
     }
 
     /**
-     * Compares this UpdateColumnType instance with another object for equality.
-     * The comparison is based on the field name array and the new data type.
+     * Compares this UpdateColumnType instance with another object for equality. The comparison is
+     * based on the field name array and the new data type.
      *
      * @param o The object to compare with this instance.
      * @return true if the given object represents the same data type update; false otherwise.
@@ -865,13 +860,13 @@ public interface TableChange {
       if (this == o) return true;
       if (o == null || getClass() != o.getClass()) return false;
       UpdateColumnType that = (UpdateColumnType) o;
-      return Arrays.equals(fieldName, that.fieldName) &&
-              Objects.equals(newDataType, that.newDataType);
+      return Arrays.equals(fieldName, that.fieldName)
+          && Objects.equals(newDataType, that.newDataType);
     }
 
     /**
-     * Generates a hash code for this UpdateColumnType instance.
-     * The hash code is based on both the hierarchical field name and the new data type.
+     * Generates a hash code for this UpdateColumnType instance. The hash code is based on both the
+     * hierarchical field name and the new data type.
      *
      * @return A hash code value for this data type update operation.
      */
@@ -923,8 +918,8 @@ public interface TableChange {
     }
 
     /**
-     * Compares this UpdateColumnComment instance with another object for equality.
-     * The comparison is based on the field name array and the new comment.
+     * Compares this UpdateColumnComment instance with another object for equality. The comparison
+     * is based on the field name array and the new comment.
      *
      * @param o The object to compare with this instance.
      * @return true if the given object represents the same comment update; false otherwise.
@@ -934,13 +929,13 @@ public interface TableChange {
       if (this == o) return true;
       if (o == null || getClass() != o.getClass()) return false;
       UpdateColumnComment that = (UpdateColumnComment) o;
-      return Arrays.equals(fieldName, that.fieldName) &&
-              Objects.equals(newComment, that.newComment);
+      return Arrays.equals(fieldName, that.fieldName)
+          && Objects.equals(newComment, that.newComment);
     }
 
     /**
-     * Generates a hash code for this UpdateColumnComment instance.
-     * The hash code is based on both the hierarchical field name and the new comment.
+     * Generates a hash code for this UpdateColumnComment instance. The hash code is based on both
+     * the hierarchical field name and the new comment.
      *
      * @return A hash code value for this comment update operation.
      */
@@ -992,8 +987,8 @@ public interface TableChange {
     }
 
     /**
-     * Compares this UpdateColumnPosition instance with another object for equality.
-     * The comparison is based on the field name array and the new position.
+     * Compares this UpdateColumnPosition instance with another object for equality. The comparison
+     * is based on the field name array and the new position.
      *
      * @param o The object to compare with this instance.
      * @return true if the given object represents the same position update; false otherwise.
@@ -1003,13 +998,12 @@ public interface TableChange {
       if (this == o) return true;
       if (o == null || getClass() != o.getClass()) return false;
       UpdateColumnPosition that = (UpdateColumnPosition) o;
-      return Arrays.equals(fieldName, that.fieldName) &&
-              Objects.equals(position, that.position);
+      return Arrays.equals(fieldName, that.fieldName) && Objects.equals(position, that.position);
     }
 
     /**
-     * Generates a hash code for this UpdateColumnPosition instance.
-     * The hash code is based on both the hierarchical field name and the new position.
+     * Generates a hash code for this UpdateColumnPosition instance. The hash code is based on both
+     * the hierarchical field name and the new position.
      *
      * @return A hash code value for this position update operation.
      */
@@ -1059,8 +1053,8 @@ public interface TableChange {
     }
 
     /**
-     * Compares this DeleteColumn instance with another object for equality.
-     * The comparison is based on the field name array and the 'ifExists' flag.
+     * Compares this DeleteColumn instance with another object for equality. The comparison is based
+     * on the field name array and the 'ifExists' flag.
      *
      * @param o The object to compare with this instance.
      * @return true if the given object represents the same field deletion; false otherwise.
@@ -1070,13 +1064,12 @@ public interface TableChange {
       if (this == o) return true;
       if (o == null || getClass() != o.getClass()) return false;
       DeleteColumn that = (DeleteColumn) o;
-      return Arrays.equals(fieldName, that.fieldName) &&
-              Objects.equals(ifExists, that.ifExists);
+      return Arrays.equals(fieldName, that.fieldName) && Objects.equals(ifExists, that.ifExists);
     }
 
     /**
-     * Generates a hash code for this DeleteColumn instance.
-     * The hash code is based on both the hierarchical field name and the 'ifExists' flag.
+     * Generates a hash code for this DeleteColumn instance. The hash code is based on both the
+     * hierarchical field name and the 'ifExists' flag.
      *
      * @return A hash code value for this field deletion operation.
      */

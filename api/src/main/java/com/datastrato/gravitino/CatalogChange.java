@@ -4,9 +4,6 @@
  */
 package com.datastrato.gravitino;
 
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
-
 import java.util.Objects;
 
 /**
@@ -74,11 +71,12 @@ public interface CatalogChange {
     }
 
     /**
-     * Compares this RenameCatalog instance with another object for equality.
-     * Two instances are considered equal if they designate the same new name for the catalog.
+     * Compares this RenameCatalog instance with another object for equality. Two instances are
+     * considered equal if they designate the same new name for the catalog.
      *
      * @param o The object to compare with this instance.
-     * @return true if the given object represents an identical catalog renaming operation; false otherwise.
+     * @return true if the given object represents an identical catalog renaming operation; false
+     *     otherwise.
      */
     @Override
     public boolean equals(Object o) {
@@ -89,8 +87,8 @@ public interface CatalogChange {
     }
 
     /**
-     * Generates a hash code for this RenameCatalog instance.
-     * The hash code is primarily based on the new name for the catalog.
+     * Generates a hash code for this RenameCatalog instance. The hash code is primarily based on
+     * the new name for the catalog.
      *
      * @return A hash code value for this renaming operation.
      */
@@ -100,8 +98,8 @@ public interface CatalogChange {
     }
 
     /**
-     * Provides a string representation of the RenameCatalog instance.
-     * This string includes the class name followed by the new name of the catalog.
+     * Provides a string representation of the RenameCatalog instance. This string includes the
+     * class name followed by the new name of the catalog.
      *
      * @return A string summary of this renaming operation.
      */
@@ -129,8 +127,8 @@ public interface CatalogChange {
     }
 
     /**
-     * Compares this UpdateCatalogComment instance with another object for equality.
-     * Two instances are considered equal if they designate the same new comment for the catalog.
+     * Compares this UpdateCatalogComment instance with another object for equality. Two instances
+     * are considered equal if they designate the same new comment for the catalog.
      *
      * @param o The object to compare with this instance.
      * @return true if the given object represents the same comment update; false otherwise.
@@ -144,8 +142,8 @@ public interface CatalogChange {
     }
 
     /**
-     * Generates a hash code for this UpdateCatalogComment instance.
-     * The hash code is based on the new comment for the catalog.
+     * Generates a hash code for this UpdateCatalogComment instance. The hash code is based on the
+     * new comment for the catalog.
      *
      * @return A hash code representing this comment update operation.
      */
@@ -155,8 +153,8 @@ public interface CatalogChange {
     }
 
     /**
-     * Provides a string representation of the UpdateCatalogComment instance.
-     * This string format includes the class name followed by the new comment for the catalog.
+     * Provides a string representation of the UpdateCatalogComment instance. This string format
+     * includes the class name followed by the new comment for the catalog.
      *
      * @return A string summary of this comment update operation.
      */
@@ -195,8 +193,8 @@ public interface CatalogChange {
     }
 
     /**
-     * Compares this SetProperty instance with another object for equality.
-     * Two instances are considered equal if they have the same property and value for the catalog.
+     * Compares this SetProperty instance with another object for equality. Two instances are
+     * considered equal if they have the same property and value for the catalog.
      *
      * @param o The object to compare with this instance.
      * @return true if the given object represents the same property setting; false otherwise.
@@ -206,13 +204,12 @@ public interface CatalogChange {
       if (this == o) return true;
       if (o == null || getClass() != o.getClass()) return false;
       SetProperty that = (SetProperty) o;
-      return Objects.equals(property, that.property) &&
-              Objects.equals(value, that.value);
+      return Objects.equals(property, that.property) && Objects.equals(value, that.value);
     }
 
     /**
-     * Generates a hash code for this SetProperty instance.
-     * The hash code is based on both the property name and its assigned value.
+     * Generates a hash code for this SetProperty instance. The hash code is based on both the
+     * property name and its assigned value.
      *
      * @return A hash code value for this property setting.
      */
@@ -222,8 +219,8 @@ public interface CatalogChange {
     }
 
     /**
-     * Provides a string representation of the SetProperty instance.
-     * This string format includes the class name followed by the property and its value.
+     * Provides a string representation of the SetProperty instance. This string format includes the
+     * class name followed by the property and its value.
      *
      * @return A string summary of the property setting.
      */
@@ -232,7 +229,6 @@ public interface CatalogChange {
       return "SETPROPERTY " + property + " " + value;
     }
   }
-
 
   /** A catalog change to remove a property from the catalog. */
   final class RemoveProperty implements CatalogChange {
@@ -252,8 +248,8 @@ public interface CatalogChange {
     }
 
     /**
-     * Compares this RemoveProperty instance with another object for equality.
-     * Two instances are considered equal if they target the same property for removal from the catalog.
+     * Compares this RemoveProperty instance with another object for equality. Two instances are
+     * considered equal if they target the same property for removal from the catalog.
      *
      * @param o The object to compare with this instance.
      * @return true if the given object represents the same property removal; false otherwise.
@@ -267,8 +263,8 @@ public interface CatalogChange {
     }
 
     /**
-     * Generates a hash code for this RemoveProperty instance.
-     * The hash code is based on the property name that is to be removed from the catalog.
+     * Generates a hash code for this RemoveProperty instance. The hash code is based on the
+     * property name that is to be removed from the catalog.
      *
      * @return A hash code value for this property removal operation.
      */
@@ -278,8 +274,8 @@ public interface CatalogChange {
     }
 
     /**
-     * Provides a string representation of the RemoveProperty instance.
-     * This string format includes the class name followed by the property name to be removed.
+     * Provides a string representation of the RemoveProperty instance. This string format includes
+     * the class name followed by the property name to be removed.
      *
      * @return A string summary of the property removal operation.
      */

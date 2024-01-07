@@ -4,9 +4,6 @@
  */
 package com.datastrato.gravitino;
 
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
-
 import java.util.Objects;
 
 /**
@@ -99,8 +96,8 @@ public interface MetalakeChange {
     }
 
     /**
-     * Provides a string representation of the RenameMetalake instance.
-     * This string includes the class name and the new name set for the Metalake
+     * Provides a string representation of the RenameMetalake instance. This string includes the
+     * class name and the new name set for the Metalake
      *
      * @return A string summary of this renaming operation.
      */
@@ -131,7 +128,8 @@ public interface MetalakeChange {
      * Compares this UpdateMetalakeComment instance with another object for equality.
      *
      * @param o The object to compare with this instance.
-     * @return true if the given object is an UpdateMetalakeComment with the same new comment; false otherwise.
+     * @return true if the given object is an UpdateMetalakeComment with the same new comment; false
+     *     otherwise.
      */
     @Override
     public boolean equals(Object o) {
@@ -152,8 +150,8 @@ public interface MetalakeChange {
     }
 
     /**
-     * Provides a string representation of the UpdateMetalakeComment instance.
-     * This string format includes the class name followed by the new comment.
+     * Provides a string representation of the UpdateMetalakeComment instance. This string format
+     * includes the class name followed by the new comment.
      *
      * @return A string summary of the object.
      */
@@ -192,8 +190,8 @@ public interface MetalakeChange {
     }
 
     /**
-     * Compares this SetProperty instance with another object for equality.
-     * Two instances are considered equal if they have the same property name and value.
+     * Compares this SetProperty instance with another object for equality. Two instances are
+     * considered equal if they have the same property name and value.
      *
      * @param o The object to compare with this instance.
      * @return true if the given object represents the same property setting; false otherwise.
@@ -203,13 +201,12 @@ public interface MetalakeChange {
       if (this == o) return true;
       if (o == null || getClass() != o.getClass()) return false;
       SetProperty that = (SetProperty) o;
-      return Objects.equals(property, that.property) &&
-              Objects.equals(value, that.value);
+      return Objects.equals(property, that.property) && Objects.equals(value, that.value);
     }
 
     /**
-     * Generates a hash code for this SetProperty instance.
-     * This hash code is based on both the property name and value.
+     * Generates a hash code for this SetProperty instance. This hash code is based on both the
+     * property name and value.
      *
      * @return A hash code value for this property setting.
      */
@@ -219,8 +216,8 @@ public interface MetalakeChange {
     }
 
     /**
-     * Provides a string representation of the SetProperty instance.
-     * This string format includes the class name followed by the property name and its value.
+     * Provides a string representation of the SetProperty instance. This string format includes the
+     * class name followed by the property name and its value.
      *
      * @return A string summary of the property setting.
      */
@@ -248,8 +245,8 @@ public interface MetalakeChange {
     }
 
     /**
-     * Compares this RemoveProperty instance with another object for equality.
-     * Two instances are considered equal if they target the same property for removal.
+     * Compares this RemoveProperty instance with another object for equality. Two instances are
+     * considered equal if they target the same property for removal.
      *
      * @param o The object to compare with this instance.
      * @return true if the given object represents the same property removal; false otherwise.
@@ -263,8 +260,8 @@ public interface MetalakeChange {
     }
 
     /**
-     * Generates a hash code for this RemoveProperty instance.
-     * This hash code is based on the property name that is to be removed.
+     * Generates a hash code for this RemoveProperty instance. This hash code is based on the
+     * property name that is to be removed.
      *
      * @return A hash code value for this property removal operation.
      */
@@ -274,8 +271,8 @@ public interface MetalakeChange {
     }
 
     /**
-     * Provides a string representation of the RemoveProperty instance.
-     * This string format includes the class name followed by the property name to be removed.
+     * Provides a string representation of the RemoveProperty instance. This string format includes
+     * the class name followed by the property name to be removed.
      *
      * @return A string summary of the property removal operation.
      */
