@@ -287,24 +287,112 @@ public interface TableChange {
   }
 
   /** A TableChange to rename a table. */
-  @EqualsAndHashCode
-  @Getter
   final class RenameTable implements TableChange {
     private final String newName;
 
     private RenameTable(String newName) {
       this.newName = newName;
     }
+
+    /**
+     * Retrieves the new name for the table.
+     *
+     * @return The new name of the table.
+     */
+    public String getNewName() {
+      return newName;
+    }
+
+    /**
+     * Compares this RenameTable instance with another object for equality.
+     * The comparison is based on the new name of the table.
+     *
+     * @param o The object to compare with this instance.
+     * @return true if the given object represents the same table renaming; false otherwise.
+     */
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) return true;
+      if (o == null || getClass() != o.getClass()) return false;
+      RenameTable that = (RenameTable) o;
+      return newName.equals(that.newName);
+    }
+
+    /**
+     * Generates a hash code for this RenameTable instance.
+     * The hash code is based on the new name of the table.
+     *
+     * @return A hash code value for this table renaming operation.
+     */
+    @Override
+    public int hashCode() {
+      return newName.hashCode();
+    }
+
+    /**
+     * Returns a string representation of the RenameTable instance.
+     * This string format includes the class name followed by the property name to be renamed.
+     *
+     * @return A string summary of the property rename instance.
+     */
+    @Override
+    public String toString() {
+      return "RENAMETABLE " + newName;
+    }
   }
 
   /** A TableChange to update a table's comment. */
-  @EqualsAndHashCode
-  @Getter
   final class UpdateComment implements TableChange {
     private final String newComment;
 
     private UpdateComment(String newComment) {
       this.newComment = newComment;
+    }
+
+    /**
+     * Retrieves the new comment for the table.
+     *
+     * @return The new comment of the table.
+     */
+    public String getNewComment() {
+      return newComment;
+    }
+
+    /**
+     * Compares this UpdateComment instance with another object for equality.
+     * The comparison is based on the new comment of the table.
+     *
+     * @param o The object to compare with this instance.
+     * @return true if the given object represents the same table comment update; false otherwise.
+     */
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) return true;
+      if (o == null || getClass() != o.getClass()) return false;
+      UpdateComment that = (UpdateComment) o;
+      return newComment.equals(that.newComment);
+    }
+
+    /**
+     * Generates a hash code for this UpdateComment instance.
+     * The hash code is based on the new comment of the table.
+     *
+     * @return A hash code value for this table comment update operation.
+     */
+    @Override
+    public int hashCode() {
+      return newComment.hashCode();
+    }
+
+    /**
+     * Returns a string representation of the UpdateComment instance.
+     * This string format includes the class name followed by the property name to be updated.
+     *
+     * @return A string representation of the UpdateComment instance.
+     */
+    @Override
+    public String toString() {
+      return "UPDATECOMMENT " + newComment;
     }
   }
 
@@ -313,8 +401,6 @@ public interface TableChange {
    *
    * <p>If the property already exists, it must be replaced with the new value.
    */
-  @EqualsAndHashCode
-  @Getter
   final class SetProperty implements TableChange {
     private final String property;
     private final String value;
@@ -322,6 +408,62 @@ public interface TableChange {
     public SetProperty(String property, String value) {
       this.property = property;
       this.value = value;
+    }
+
+    /**
+     * Retrieves the name of the property.
+     *
+     * @return The name of the property.
+     */
+    public String getProperty() {
+      return property;
+    }
+
+    /**
+     * Retrieves the value of the property.
+     *
+     * @return The value of the property.
+     */
+    public String getValue() {
+      return value;
+    }
+
+    /**
+     * Compares this SetProperty instance with another object for equality.
+     * The comparison is based on both the property name and its value.
+     *
+     * @param o The object to compare with this instance.
+     * @return true if the given object represents the same property setting; false otherwise.
+     */
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) return true;
+      if (o == null || getClass() != o.getClass()) return false;
+      SetProperty that = (SetProperty) o;
+      return property.equals(that.property) &&
+              value.equals(that.value);
+    }
+
+    /**
+     * Generates a hash code for this SetProperty instance.
+     * The hash code is based on both the property name and its value.
+     *
+     * @return A hash code value for this property setting.
+     */
+    @Override
+    public int hashCode() {
+      return Objects.hash(property, value);
+    }
+
+    /**
+     * Returns a string representation of the SetProperty instance.
+     * This string format includes the class name followed by the property name and value to be set.
+     *
+     * @return A string representation of the SetProperty instance.
+     */
+    @Override
+    public String toString() {
+      return "SETPROPERTY " + property + " " + value;
     }
   }
 
@@ -337,10 +479,22 @@ public interface TableChange {
       this.property = property;
     }
 
+    /**
+     * Retrieves the name of the property to be removed from the table.
+     *
+     * @return The name of the property scheduled for removal.
+     */
     public String getProperty() {
       return property;
     }
 
+    /**
+     * Compares this RemoveProperty instance with another object for equality.
+     * Two instances are considered equal if they target the same property for removal from the table.
+     *
+     * @param o The object to compare with this instance.
+     * @return true if the given object represents the same property removal; false otherwise.
+     */
     @Override
     public boolean equals(Object o) {
       if (this == o) return true;
@@ -349,11 +503,23 @@ public interface TableChange {
       return property.equals(that.property);
     }
 
+    /**
+     * Generates a hash code for this RemoveProperty instance.
+     * The hash code is based on the property name that is to be removed from the table.
+     *
+     * @return A hash code value for this property removal operation.
+     */
     @Override
     public int hashCode() {
       return Objects.hash(property);
     }
 
+    /**
+     * Provides a string representation of the RemoveProperty instance.
+     * This string format includes the class name followed by the property name to be removed.
+     *
+     * @return A string summary of the property removal operation.
+     */
     @Override
     public String toString() {
       return "REMOVEPROPERTY " +property;
@@ -408,10 +574,22 @@ public interface TableChange {
       this.column = column;
     }
 
+    /**
+     * Retrieves the name of the reference column after which the specified column will be placed.
+     *
+     * @return The name of the reference column.
+     */
     public String getColumn() {
       return column;
     }
 
+    /**
+     * Compares this After instance with another object for equality.
+     * Two instances are considered equal if they refer to the same column name.
+     *
+     * @param o The object to compare with this instance.
+     * @return true if the given object refers to the same column; false otherwise.
+     */
     @Override
     public boolean equals(Object o) {
       if (this == o) return true;
@@ -420,6 +598,12 @@ public interface TableChange {
       return column.equals(after.column);
     }
 
+    /**
+     * Generates a hash code for this After instance.
+     * The hash code is based on the column name.
+     *
+     * @return A hash code value for this column positioning operation.
+     */
     @Override
     public int hashCode() {
       return Objects.hash(column);
@@ -482,26 +666,58 @@ public interface TableChange {
       this.nullable = nullable;
     }
 
+    /**
+     * Retrieves the field name of the new column.
+     *
+     * @return An array of strings representing the field name.
+     */
     public String[] getFieldName() {
       return fieldName;
     }
 
+    /**
+     * Retrieves the data type of the new column.
+     *
+     * @return The data type of the column.
+     */
     public Type getDataType() {
       return dataType;
     }
 
+    /**
+     * Retrieves the comment for the new column.
+     *
+     * @return The comment associated with the column.
+     */
     public String getComment() {
       return comment;
     }
 
+    /**
+     * Retrieves the position where the new column should be added.
+     *
+     * @return The position of the column.
+     */
     public ColumnPosition getPosition() {
       return position;
     }
 
+    /**
+     * Checks if the new column is nullable.
+     *
+     * @return true if the column is nullable; false otherwise.
+     */
     public boolean isNullable() {
       return nullable;
     }
 
+    /**
+     * Compares this AddColumn instance with another object for equality.
+     * The comparison is based on the field name, data type, comment, position, and nullability.
+     *
+     * @param o The object to compare with this instance.
+     * @return true if the given object represents the same column addition; false otherwise.
+     */
     @Override
     public boolean equals(Object o) {
       if (this == o) return true;
@@ -514,6 +730,12 @@ public interface TableChange {
               Objects.equals(position, addColumn.position);
     }
 
+    /**
+     * Generates a hash code for this AddColumn instance.
+     * This hash code is based on the field name, data type, comment, position, and nullability.
+     *
+     * @return A hash code value for this column addition operation.
+     */
     @Override
     public int hashCode() {
       int result = Objects.hash(dataType, comment, position, nullable);
@@ -544,14 +766,31 @@ public interface TableChange {
       this.newName = newName;
     }
 
+    /**
+     * Retrieves the hierarchical field name of the column to be renamed.
+     *
+     * @return An array of strings representing the field name.
+     */
     public String[] getFieldName() {
       return fieldName;
     }
 
+    /**
+     * Retrieves the new name for the column.
+     *
+     * @return The new name of the column.
+     */
     public String getNewName() {
       return newName;
     }
 
+    /**
+     * Compares this RenameColumn instance with another object for equality.
+     * The comparison is based on the field name array and the new name.
+     *
+     * @param o The object to compare with this instance.
+     * @return true if the given object represents the same column renaming; false otherwise.
+     */
     @Override
     public boolean equals(Object o) {
       if (this == o) return true;
@@ -561,6 +800,12 @@ public interface TableChange {
               Objects.equals(newName, that.newName);
     }
 
+    /**
+     * Generates a hash code for this RenameColumn instance.
+     * This hash code is based on both the hierarchical field name and the new name.
+     *
+     * @return A hash code value for this column renaming operation.
+     */
     @Override
     public int hashCode() {
       int result = Objects.hash(newName);
@@ -574,6 +819,13 @@ public interface TableChange {
     }
   }
 
+  /**
+   * A TableChange to update the type of a field.
+   *
+   * <p>The field names are used to find the field to update.
+   *
+   * <p>If the field does not exist, the change must result in an {@link IllegalArgumentException}.
+   */
   final class UpdateColumnType implements ColumnChange {
     private final String[] fieldName;
     private final Type newDataType;
@@ -583,14 +835,31 @@ public interface TableChange {
       this.newDataType = newDataType;
     }
 
+    /**
+     * Retrieves the field name of the column whose data type is being updated.
+     *
+     * @return An array of strings representing the field name.
+     */
     public String[] getFieldName() {
       return fieldName;
     }
 
+    /**
+     * Retrieves the new data type for the column.
+     *
+     * @return The new data type of the column.
+     */
     public Type getNewDataType() {
       return newDataType;
     }
 
+    /**
+     * Compares this UpdateColumnType instance with another object for equality.
+     * The comparison is based on the field name array and the new data type.
+     *
+     * @param o The object to compare with this instance.
+     * @return true if the given object represents the same data type update; false otherwise.
+     */
     @Override
     public boolean equals(Object o) {
       if (this == o) return true;
@@ -600,6 +869,12 @@ public interface TableChange {
               Objects.equals(newDataType, that.newDataType);
     }
 
+    /**
+     * Generates a hash code for this UpdateColumnType instance.
+     * The hash code is based on both the hierarchical field name and the new data type.
+     *
+     * @return A hash code value for this data type update operation.
+     */
     @Override
     public int hashCode() {
       int result = Objects.hash(newDataType);
@@ -629,14 +904,31 @@ public interface TableChange {
       this.newComment = newComment;
     }
 
+    /**
+     * Retrieves the field name of the column whose comment is being updated.
+     *
+     * @return An array of strings representing the field name.
+     */
     public String[] getFieldName() {
       return fieldName;
     }
 
+    /**
+     * Retrieves the new comment for the column.
+     *
+     * @return The new comment of the column.
+     */
     public String getNewComment() {
       return newComment;
     }
 
+    /**
+     * Compares this UpdateColumnComment instance with another object for equality.
+     * The comparison is based on the field name array and the new comment.
+     *
+     * @param o The object to compare with this instance.
+     * @return true if the given object represents the same comment update; false otherwise.
+     */
     @Override
     public boolean equals(Object o) {
       if (this == o) return true;
@@ -646,6 +938,12 @@ public interface TableChange {
               Objects.equals(newComment, that.newComment);
     }
 
+    /**
+     * Generates a hash code for this UpdateColumnComment instance.
+     * The hash code is based on both the hierarchical field name and the new comment.
+     *
+     * @return A hash code value for this comment update operation.
+     */
     @Override
     public int hashCode() {
       int result = Objects.hash(newComment);
@@ -675,14 +973,31 @@ public interface TableChange {
       this.position = position;
     }
 
+    /**
+     * Retrieves the field name of the column whose position is being updated.
+     *
+     * @return An array of strings representing the field name.
+     */
     public String[] getFieldName() {
       return fieldName;
     }
 
+    /**
+     * Retrieves the new position for the column.
+     *
+     * @return The new position of the column.
+     */
     public ColumnPosition getPosition() {
       return position;
     }
 
+    /**
+     * Compares this UpdateColumnPosition instance with another object for equality.
+     * The comparison is based on the field name array and the new position.
+     *
+     * @param o The object to compare with this instance.
+     * @return true if the given object represents the same position update; false otherwise.
+     */
     @Override
     public boolean equals(Object o) {
       if (this == o) return true;
@@ -692,6 +1007,12 @@ public interface TableChange {
               Objects.equals(position, that.position);
     }
 
+    /**
+     * Generates a hash code for this UpdateColumnPosition instance.
+     * The hash code is based on both the hierarchical field name and the new position.
+     *
+     * @return A hash code value for this position update operation.
+     */
     @Override
     public int hashCode() {
       int result = Objects.hash(position);
@@ -719,14 +1040,31 @@ public interface TableChange {
       this.ifExists = ifExists;
     }
 
+    /**
+     * Retrieves the field name of the column to be deleted.
+     *
+     * @return An array of strings representing the field name.
+     */
     public String[] getFieldName() {
       return fieldName;
     }
 
+    /**
+     * Checks if the field should be deleted only if it exists.
+     *
+     * @return true if the field should be deleted only if it exists; false otherwise.
+     */
     public Boolean getIfExists() {
       return ifExists;
     }
 
+    /**
+     * Compares this DeleteColumn instance with another object for equality.
+     * The comparison is based on the field name array and the 'ifExists' flag.
+     *
+     * @param o The object to compare with this instance.
+     * @return true if the given object represents the same field deletion; false otherwise.
+     */
     @Override
     public boolean equals(Object o) {
       if (this == o) return true;
@@ -736,6 +1074,12 @@ public interface TableChange {
               Objects.equals(ifExists, that.ifExists);
     }
 
+    /**
+     * Generates a hash code for this DeleteColumn instance.
+     * The hash code is based on both the hierarchical field name and the 'ifExists' flag.
+     *
+     * @return A hash code value for this field deletion operation.
+     */
     @Override
     public int hashCode() {
       int result = Objects.hash(ifExists);
