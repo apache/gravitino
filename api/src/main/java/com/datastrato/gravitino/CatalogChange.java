@@ -64,10 +64,22 @@ public interface CatalogChange {
       this.newName = newName;
     }
 
+    /**
+     * Retrieves the new name set for the catalog.
+     *
+     * @return The new name of the catalog.
+     */
     public String getNewName() {
       return newName;
     }
 
+    /**
+     * Compares this RenameCatalog instance with another object for equality.
+     * Two instances are considered equal if they designate the same new name for the catalog.
+     *
+     * @param o The object to compare with this instance.
+     * @return true if the given object represents an identical catalog renaming operation; false otherwise.
+     */
     @Override
     public boolean equals(Object o) {
       if (this == o) return true;
@@ -76,11 +88,23 @@ public interface CatalogChange {
       return Objects.equals(newName, that.newName);
     }
 
+    /**
+     * Generates a hash code for this RenameCatalog instance.
+     * The hash code is primarily based on the new name for the catalog.
+     *
+     * @return A hash code value for this renaming operation.
+     */
     @Override
     public int hashCode() {
       return Objects.hash(newName);
     }
 
+    /**
+     * Provides a string representation of the RenameCatalog instance.
+     * This string includes the class name followed by the new name of the catalog.
+     *
+     * @return A string summary of this renaming operation.
+     */
     @Override
     public String toString() {
       return "RENAMECATALOG " + newName;
@@ -95,10 +119,22 @@ public interface CatalogChange {
       this.newComment = newComment;
     }
 
+    /**
+     * Retrieves the new comment intended for the catalog.
+     *
+     * @return The new comment that has been set for the catalog.
+     */
     public String getNewComment() {
       return newComment;
     }
 
+    /**
+     * Compares this UpdateCatalogComment instance with another object for equality.
+     * Two instances are considered equal if they designate the same new comment for the catalog.
+     *
+     * @param o The object to compare with this instance.
+     * @return true if the given object represents the same comment update; false otherwise.
+     */
     @Override
     public boolean equals(Object o) {
       if (this == o) return true;
@@ -107,11 +143,23 @@ public interface CatalogChange {
       return Objects.equals(newComment, that.newComment);
     }
 
+    /**
+     * Generates a hash code for this UpdateCatalogComment instance.
+     * The hash code is based on the new comment for the catalog.
+     *
+     * @return A hash code representing this comment update operation.
+     */
     @Override
     public int hashCode() {
       return Objects.hash(newComment);
     }
 
+    /**
+     * Provides a string representation of the UpdateCatalogComment instance.
+     * This string format includes the class name followed by the new comment for the catalog.
+     *
+     * @return A string summary of this comment update operation.
+     */
     @Override
     public String toString() {
       return "UPDATECATALOGCOMMENT " + newComment;
@@ -128,14 +176,31 @@ public interface CatalogChange {
       this.value = value;
     }
 
+    /**
+     * Retrieves the name of the property being set in the catalog.
+     *
+     * @return The name of the property.
+     */
     public String getProperty() {
       return property;
     }
 
+    /**
+     * Retrieves the value assigned to the property in the catalog.
+     *
+     * @return The value of the property.
+     */
     public String getValue() {
       return value;
     }
 
+    /**
+     * Compares this SetProperty instance with another object for equality.
+     * Two instances are considered equal if they have the same property and value for the catalog.
+     *
+     * @param o The object to compare with this instance.
+     * @return true if the given object represents the same property setting; false otherwise.
+     */
     @Override
     public boolean equals(Object o) {
       if (this == o) return true;
@@ -145,11 +210,23 @@ public interface CatalogChange {
               Objects.equals(value, that.value);
     }
 
+    /**
+     * Generates a hash code for this SetProperty instance.
+     * The hash code is based on both the property name and its assigned value.
+     *
+     * @return A hash code value for this property setting.
+     */
     @Override
     public int hashCode() {
       return Objects.hash(property, value);
     }
 
+    /**
+     * Provides a string representation of the SetProperty instance.
+     * This string format includes the class name followed by the property and its value.
+     *
+     * @return A string summary of the property setting.
+     */
     @Override
     public String toString() {
       return "SETPROPERTY " + property + " " + value;
@@ -165,10 +242,22 @@ public interface CatalogChange {
       this.property = property;
     }
 
+    /**
+     * Retrieves the name of the property to be removed from the catalog.
+     *
+     * @return The name of the property for removal.
+     */
     public String getProperty() {
       return property;
     }
 
+    /**
+     * Compares this RemoveProperty instance with another object for equality.
+     * Two instances are considered equal if they target the same property for removal from the catalog.
+     *
+     * @param o The object to compare with this instance.
+     * @return true if the given object represents the same property removal; false otherwise.
+     */
     @Override
     public boolean equals(Object o) {
       if (this == o) return true;
@@ -177,11 +266,23 @@ public interface CatalogChange {
       return Objects.equals(property, that.property);
     }
 
+    /**
+     * Generates a hash code for this RemoveProperty instance.
+     * The hash code is based on the property name that is to be removed from the catalog.
+     *
+     * @return A hash code value for this property removal operation.
+     */
     @Override
     public int hashCode() {
       return Objects.hash(property);
     }
 
+    /**
+     * Provides a string representation of the RemoveProperty instance.
+     * This string format includes the class name followed by the property name to be removed.
+     *
+     * @return A string summary of the property removal operation.
+     */
     @Override
     public String toString() {
       return "REMOVEPROPERTY " + property;
