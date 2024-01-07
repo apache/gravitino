@@ -902,19 +902,23 @@ public class CatalogHiveIT extends AbstractIT {
             .alterSchema(
                 ident,
                 SchemaChange.removeProperty("key1"),
-                SchemaChange.setProperty("key2", "val2-alter"));
+                SchemaChange.setProperty("key2", "val2-alter"),
+                SchemaChange.updateComment("comment1"));
 
     Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, schema.auditInfo().lastModifier());
     Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, schema.auditInfo().creator());
 
-    Map<String, String> properties2 = catalog.asSchemas().loadSchema(ident).properties();
+    schema = catalog.asSchemas().loadSchema(ident);
+    Map<String, String> properties2 = schema.properties();
     Assertions.assertFalse(properties2.containsKey("key1"));
     Assertions.assertEquals("val2-alter", properties2.get("key2"));
+    Assertions.assertEquals("comment1", schema.comment());
 
     Database database = hiveClientPool.run(client -> client.getDatabase(schemaName));
     Map<String, String> properties3 = database.getParameters();
     Assertions.assertFalse(properties3.containsKey("key1"));
     Assertions.assertEquals("val2-alter", properties3.get("key2"));
+    Assertions.assertEquals("comment1", database.getDescription());
   }
 
   @Test

@@ -275,37 +275,20 @@ public class TestSchemaOperations extends JerseyTest {
 
   @Test
   public void testAlterSchema() {
+    SchemaUpdateRequest commentReq =
+        new SchemaUpdateRequest.UpdateSchemaCommentRequest("new comment");
+    Schema commentSchema = mockSchema("schema1", "new comment", ImmutableMap.of("key", "value"));
+
     SchemaUpdateRequest setReq = new SchemaUpdateRequest.SetSchemaPropertyRequest("key2", "value2");
-    Schema updatedSchema =
+    Schema setSchema =
         mockSchema("schema1", "comment", ImmutableMap.of("key", "value", "key2", "value2"));
 
     SchemaUpdateRequest removeReq = new SchemaUpdateRequest.RemoveSchemaPropertyRequest("key2");
     Schema removedSchema = mockSchema("schema1", "comment", ImmutableMap.of("key", "value"));
 
-    // Test set property
-    when(dispatcher.alterSchema(any(), eq(setReq.schemaChange()))).thenReturn(updatedSchema);
-    SchemaUpdatesRequest req = new SchemaUpdatesRequest(ImmutableList.of(setReq));
-    Response resp =
-        target("/metalakes/" + metalake + "/catalogs/" + catalog + "/schemas/schema1")
-            .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.gravitino.v1+json")
-            .put(javax.ws.rs.client.Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
-
-    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
-    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
-
-    SchemaResponse schemaResp = resp.readEntity(SchemaResponse.class);
-    Assertions.assertEquals(0, schemaResp.getCode());
-
-    SchemaDTO schemaDTO = schemaResp.getSchema();
-    Assertions.assertEquals("schema1", schemaDTO.name());
-    Assertions.assertEquals("comment", schemaDTO.comment());
-    Assertions.assertEquals(
-        ImmutableMap.of("key", "value", "key2", "value2"), schemaDTO.properties());
-
-    // Test remove property
-    when(dispatcher.alterSchema(any(), eq(removeReq.schemaChange()))).thenReturn(removedSchema);
-    SchemaUpdatesRequest req1 = new SchemaUpdatesRequest(ImmutableList.of(removeReq));
+    // Test update comment
+    when(dispatcher.alterSchema(any(), eq(commentReq.schemaChange()))).thenReturn(commentSchema);
+    SchemaUpdatesRequest req1 = new SchemaUpdatesRequest(ImmutableList.of(commentReq));
     Response resp1 =
         target("/metalakes/" + metalake + "/catalogs/" + catalog + "/schemas/schema1")
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -320,39 +303,80 @@ public class TestSchemaOperations extends JerseyTest {
 
     SchemaDTO schemaDTO1 = schemaResp1.getSchema();
     Assertions.assertEquals("schema1", schemaDTO1.name());
-    Assertions.assertEquals("comment", schemaDTO1.comment());
+    Assertions.assertEquals("new comment", schemaDTO1.comment());
     Assertions.assertEquals(ImmutableMap.of("key", "value"), schemaDTO1.properties());
+
+    // Test set property
+    when(dispatcher.alterSchema(any(), eq(setReq.schemaChange()))).thenReturn(setSchema);
+    SchemaUpdatesRequest req2 = new SchemaUpdatesRequest(ImmutableList.of(setReq));
+    Response resp2 =
+        target("/metalakes/" + metalake + "/catalogs/" + catalog + "/schemas/schema1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(javax.ws.rs.client.Entity.entity(req2, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp2.getStatus());
+    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp2.getMediaType());
+
+    SchemaResponse schemaResp2 = resp2.readEntity(SchemaResponse.class);
+    Assertions.assertEquals(0, schemaResp2.getCode());
+
+    SchemaDTO schemaDTO2 = schemaResp2.getSchema();
+    Assertions.assertEquals("schema1", schemaDTO2.name());
+    Assertions.assertEquals("comment", schemaDTO2.comment());
+    Assertions.assertEquals(
+        ImmutableMap.of("key", "value", "key2", "value2"), schemaDTO2.properties());
+
+    // Test remove property
+    when(dispatcher.alterSchema(any(), eq(removeReq.schemaChange()))).thenReturn(removedSchema);
+    SchemaUpdatesRequest req3 = new SchemaUpdatesRequest(ImmutableList.of(removeReq));
+    Response resp3 =
+        target("/metalakes/" + metalake + "/catalogs/" + catalog + "/schemas/schema1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(javax.ws.rs.client.Entity.entity(req3, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp3.getStatus());
+    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp3.getMediaType());
+
+    SchemaResponse schemaResp3 = resp3.readEntity(SchemaResponse.class);
+    Assertions.assertEquals(0, schemaResp3.getCode());
+
+    SchemaDTO schemaDTO3 = schemaResp3.getSchema();
+    Assertions.assertEquals("schema1", schemaDTO3.name());
+    Assertions.assertEquals("comment", schemaDTO3.comment());
+    Assertions.assertEquals(ImmutableMap.of("key", "value"), schemaDTO3.properties());
 
     // Test throw NoSuchSchemaException
     doThrow(new NoSuchSchemaException("mock error")).when(dispatcher).alterSchema(any(), any());
-    Response resp2 =
+    Response resp4 =
         target("/metalakes/" + metalake + "/catalogs/" + catalog + "/schemas/schema1")
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.gravitino.v1+json")
             .put(javax.ws.rs.client.Entity.entity(req1, MediaType.APPLICATION_JSON_TYPE));
 
-    Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), resp2.getStatus());
-    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp2.getMediaType());
+    Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), resp4.getStatus());
+    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp4.getMediaType());
 
-    ErrorResponse errorResp = resp2.readEntity(ErrorResponse.class);
-    Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResp.getCode());
-    Assertions.assertEquals(NoSuchSchemaException.class.getSimpleName(), errorResp.getType());
+    ErrorResponse errorResp4 = resp4.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResp4.getCode());
+    Assertions.assertEquals(NoSuchSchemaException.class.getSimpleName(), errorResp4.getType());
 
     // Test throw RuntimeException
     doThrow(new RuntimeException("mock error")).when(dispatcher).alterSchema(any(), any());
-    Response resp3 =
+    Response resp5 =
         target("/metalakes/" + metalake + "/catalogs/" + catalog + "/schemas/schema1")
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.gravitino.v1+json")
             .put(javax.ws.rs.client.Entity.entity(req1, MediaType.APPLICATION_JSON_TYPE));
 
     Assertions.assertEquals(
-        Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), resp3.getStatus());
-    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp3.getMediaType());
+        Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), resp5.getStatus());
+    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp5.getMediaType());
 
-    ErrorResponse errorResp3 = resp3.readEntity(ErrorResponse.class);
-    Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResp3.getCode());
-    Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResp3.getType());
+    ErrorResponse errorResp5 = resp5.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResp5.getCode());
+    Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResp5.getType());
   }
 
   @Test

@@ -23,8 +23,21 @@ package com.datastrato.gravitino.rel;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 
-/** NamespaceChange class to set the property and value pairs for the namespace. */
+/**
+ * The SchemaChange interface defines the public API for managing schemas in a catalog. If the
+ * catalog implementation supports schemas, it must implement this interface.
+ */
 public interface SchemaChange {
+
+  /**
+   * SchemaChange class to update the comment for the schema.
+   *
+   * @param newComment The new comment to update.
+   * @return The SchemaChange object.
+   */
+  static SchemaChange updateComment(String newComment) {
+    return new UpdateComment(newComment);
+  }
 
   /**
    * SchemaChange class to set the property and value pairs for the schema.
@@ -47,6 +60,22 @@ public interface SchemaChange {
     return new RemoveProperty(property);
   }
 
+  /** A SchemaChange to update a schema's comment. */
+  @EqualsAndHashCode
+  @Getter
+  final class UpdateComment implements SchemaChange {
+    private final String newComment;
+
+    private UpdateComment(String newComment) {
+      this.newComment = newComment;
+    }
+  }
+
+  /**
+   * A SchemaChange to set a schema property.
+   *
+   * <p>If the property already exists, it must be replaced with the new value.
+   */
   @Getter
   @EqualsAndHashCode
   final class SetProperty implements SchemaChange {
@@ -59,6 +88,11 @@ public interface SchemaChange {
     }
   }
 
+  /**
+   * A SchemaChange to remove a schema property.
+   *
+   * <p>If the property does not exist, the change should succeed.
+   */
   @Getter
   @EqualsAndHashCode
   final class RemoveProperty implements SchemaChange {

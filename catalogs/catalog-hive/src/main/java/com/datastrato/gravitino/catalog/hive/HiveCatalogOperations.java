@@ -284,7 +284,9 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
           properties.keySet());
 
       for (SchemaChange change : changes) {
-        if (change instanceof SchemaChange.SetProperty) {
+        if (change instanceof SchemaChange.UpdateComment) {
+          database.setDescription(((SchemaChange.UpdateComment) change).getNewComment());
+        } else if (change instanceof SchemaChange.SetProperty) {
           properties.put(
               ((SchemaChange.SetProperty) change).getProperty(),
               ((SchemaChange.SetProperty) change).getValue());
