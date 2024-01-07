@@ -23,6 +23,8 @@ package com.datastrato.gravitino.rel;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 
+import java.util.Objects;
+
 /** NamespaceChange class to set the property and value pairs for the namespace. */
 public interface SchemaChange {
 
@@ -47,8 +49,7 @@ public interface SchemaChange {
     return new RemoveProperty(property);
   }
 
-  @Getter
-  @EqualsAndHashCode
+
   final class SetProperty implements SchemaChange {
     private final String property;
     private final String value;
@@ -57,15 +58,115 @@ public interface SchemaChange {
       this.property = property;
       this.value = value;
     }
+
+    /**
+     * Retrieves the name of the property to be set.
+     *
+     * @return The name of the property.
+     */
+    public String getProperty() {
+      return property;
+    }
+
+    /**
+     * Retrieves the value of the property to be set.
+     *
+     * @return The value of the property.
+     */
+    public String getValue() {
+      return value;
+    }
+
+    /**
+     * Compares this SetProperty instance with another object for equality.
+     * Two instances are considered equal if they have the same property and value.
+     *
+     * @param o The object to compare with this instance.
+     * @return true if the given object represents the same property setting; false otherwise.
+     */
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) return true;
+      if (o == null || getClass() != o.getClass()) return false;
+      SetProperty that = (SetProperty) o;
+      return Objects.equals(property, that.property) &&
+              Objects.equals(value, that.value);
+    }
+
+    /**
+     * Generates a hash code for this SetProperty instance.
+     * The hash code is based on both the property name and its value.
+     *
+     * @return A hash code value for this property setting.
+     */
+    @Override
+    public int hashCode() {
+      return Objects.hash(property, value);
+    }
+
+    /**
+     * Provides a string representation of the SetProperty instance.
+     * This string format includes the class name followed by the property name and its value.
+     *
+     * @return A string summary of the property setting.
+     */
+    @Override
+    public String toString() {
+      return "SETPROPERTY " + property + " " + value;
+    }
   }
 
-  @Getter
-  @EqualsAndHashCode
   final class RemoveProperty implements SchemaChange {
     private final String property;
 
     private RemoveProperty(String property) {
       this.property = property;
+    }
+
+    /**
+     * Retrieves the name of the property to be removed.
+     *
+     * @return The name of the property for removal.
+     */
+    public String getProperty() {
+      return property;
+    }
+
+    /**
+     * Compares this RemoveProperty instance with another object for equality.
+     * Two instances are considered equal if they target the same property for removal.
+     *
+     * @param o The object to compare with this instance.
+     * @return true if the given object represents the same property removal; false otherwise.
+     */
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) return true;
+      if (o == null || getClass() != o.getClass()) return false;
+      RemoveProperty that = (RemoveProperty) o;
+      return Objects.equals(property, that.property);
+    }
+
+    /**
+     * Generates a hash code for this RemoveProperty instance.
+     * This hash code is based on the property name that is to be removed.
+     *
+     * @return A hash code value for this property removal operation.
+     */
+    @Override
+    public int hashCode() {
+      return Objects.hash(property);
+    }
+
+    /**
+     * Provides a string representation of the RemoveProperty instance.
+     * This string format includes the class name followed by the property name to be removed.
+     *
+     * @return A string summary of the property removal operation.
+     */
+    @Override
+    public String toString() {
+      return "REMOVEPROPERTY " + property;
     }
   }
 }
