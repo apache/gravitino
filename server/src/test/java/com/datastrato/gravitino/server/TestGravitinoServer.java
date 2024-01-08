@@ -7,7 +7,7 @@ package com.datastrato.gravitino.server;
 import static com.datastrato.gravitino.Configs.ENTRY_KV_ROCKSDB_BACKEND_PATH;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import com.datastrato.gravitino.aux.AuxiliaryServiceManager;
+import com.datastrato.gravitino.auxiliary.AuxiliaryServiceManager;
 import com.datastrato.gravitino.rest.RESTUtils;
 import com.datastrato.gravitino.server.web.JettyServerConfig;
 import com.google.common.collect.ImmutableMap;

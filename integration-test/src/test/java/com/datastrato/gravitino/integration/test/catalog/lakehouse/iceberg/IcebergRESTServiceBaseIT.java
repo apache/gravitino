@@ -6,7 +6,7 @@
 package com.datastrato.gravitino.integration.test.catalog.lakehouse.iceberg;
 
 import com.datastrato.gravitino.Config;
-import com.datastrato.gravitino.aux.AuxiliaryServiceManager;
+import com.datastrato.gravitino.auxiliary.AuxiliaryServiceManager;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergConfig;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergRESTService;
