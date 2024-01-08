@@ -4,6 +4,7 @@
  */
 package com.datastrato.gravitino.rel.expressions.literals;
 
+import com.datastrato.gravitino.rel.types.Decimal;
 import com.datastrato.gravitino.rel.types.Type;
 import com.datastrato.gravitino.rel.types.Types;
 import java.time.LocalDate;
@@ -96,6 +97,17 @@ public class Literals {
    */
   public static LiteralImpl<Double> doubleLiteral(Double value) {
     return of(value, Types.DoubleType.get());
+  }
+
+  /**
+   * Creates a decimal type literal with the given value.
+   *
+   * @param value the decimal literal value
+   * @return a new {@link Literal} instance
+   */
+  public static LiteralImpl<Decimal> decimal(Decimal value) {
+
+    return of(value, Types.DecimalType.of(value.precision(), value.scale()));
   }
 
   /**

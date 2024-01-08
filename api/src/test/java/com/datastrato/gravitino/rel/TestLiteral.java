@@ -7,6 +7,7 @@ package com.datastrato.gravitino.rel;
 import static com.datastrato.gravitino.rel.expressions.literals.Literals.booleanLiteral;
 import static com.datastrato.gravitino.rel.expressions.literals.Literals.byteLiteral;
 import static com.datastrato.gravitino.rel.expressions.literals.Literals.date;
+import static com.datastrato.gravitino.rel.expressions.literals.Literals.decimal;
 import static com.datastrato.gravitino.rel.expressions.literals.Literals.doubleLiteral;
 import static com.datastrato.gravitino.rel.expressions.literals.Literals.floatLiteral;
 import static com.datastrato.gravitino.rel.expressions.literals.Literals.integer;
@@ -18,7 +19,9 @@ import static com.datastrato.gravitino.rel.expressions.literals.Literals.timesta
 
 import com.datastrato.gravitino.rel.expressions.literals.Literal;
 import com.datastrato.gravitino.rel.expressions.literals.Literals;
+import com.datastrato.gravitino.rel.types.Decimal;
 import com.datastrato.gravitino.rel.types.Types;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -29,7 +32,7 @@ public class TestLiteral {
 
   @Test
   public void testLiterals() {
-    Literal literal = booleanLiteral(Boolean.valueOf("true"));
+    Literal<?> literal = booleanLiteral(Boolean.valueOf("true"));
     Assertions.assertEquals(literal.value(), true);
     Assertions.assertEquals(literal.dataType(), Types.BooleanType.get());
 
@@ -74,5 +77,9 @@ public class TestLiteral {
     Assertions.assertEquals(literal.dataType(), Types.StringType.get());
 
     Assertions.assertEquals(Literals.of(null, Types.NullType.get()), Literals.NULL);
+
+    literal = decimal(Decimal.of("0.00"));
+    Assertions.assertEquals(literal.value(), Decimal.of(new BigDecimal("0.00")));
+    Assertions.assertEquals(literal.dataType(), Types.DecimalType.of(2, 2));
   }
 }
