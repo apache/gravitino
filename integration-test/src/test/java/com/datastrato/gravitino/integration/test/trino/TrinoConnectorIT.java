@@ -565,6 +565,25 @@ public class TrinoConnectorIT extends AbstractIT {
   }
 
   @Test
+  void testColumnTypeNotNullByTrino() {
+    String schemaName = GravitinoITUtils.genRandomName("schema").toLowerCase();
+    String tableName = GravitinoITUtils.genRandomName("table").toLowerCase();
+    String createSchemaSql =
+        String.format("CREATE SCHEMA \"%s.%s\".%s", metalakeName, catalogName, schemaName);
+    containerSuite.getTrinoContainer().executeUpdateSQL(createSchemaSql);
+
+    String createTableSql =
+        String.format(
+            "CREATE TABLE \"%s.%s\".%s.%s (id int not null, name varchar not null)",
+            metalakeName, catalogName, schemaName, tableName);
+    containerSuite.getTrinoContainer().executeUpdateSQL(createTableSql);
+
+    catalog
+        .asTableCatalog()
+        .loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, tableName));
+  }
+
+  @Test
   void testHiveTableCreatedByGravitino() throws InterruptedException {
     String catalogName = GravitinoITUtils.genRandomName("catalog").toLowerCase();
     String schemaName = GravitinoITUtils.genRandomName("schema").toLowerCase();
