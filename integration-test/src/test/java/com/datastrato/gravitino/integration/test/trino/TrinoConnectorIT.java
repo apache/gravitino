@@ -28,6 +28,7 @@ import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import org.apache.hadoop.hive.conf.HiveConf;
@@ -565,18 +566,92 @@ public class TrinoConnectorIT extends AbstractIT {
   }
 
   @Test
-  void testColumnTypeNotNullByTrino() {
+  void testColumnTypeNotNullByTrino() throws InterruptedException {
+    String catalogName = GravitinoITUtils.genRandomName("mysql_catalog").toLowerCase();
+    GravitinoMetaLake createdMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
+    String[] command = {
+      "mysql",
+      "-h127.0.0.1",
+      "-uroot",
+      "-pds123", // username and password are referred from Hive dockerfile.
+      "-e",
+      "grant all privileges on *.* to root@'%' identified by 'ds123'"
+    };
+
+    // There exists a mysql instance in Hive the container.
+    containerSuite.getHiveContainer().executeInContainer(command);
+    String hiveHost = containerSuite.getHiveContainer().getContainerIpAddress();
+
+    createdMetalake.createCatalog(
+        NameIdentifier.of(metalakeName, catalogName),
+        Catalog.Type.RELATIONAL,
+        "jdbc-mysql",
+        "comment",
+        ImmutableMap.<String, String>builder()
+            .put("jdbc-driver", "com.mysql.cj.jdbc.Driver")
+            .put("jdbc-user", "root")
+            .put("jdbc-password", "ds123")
+            .put("jdbc-url", String.format("jdbc:mysql://%s:3306?useSSL=false", hiveHost))
+            .build());
+
+    String sql = String.format("show catalogs like '%s.%s'", metalakeName, catalogName);
+    Assertions.assertTrue(checkTrinoHasLoaded(sql, 30));
+
     String schemaName = GravitinoITUtils.genRandomName("schema").toLowerCase();
     String tableName = GravitinoITUtils.genRandomName("table").toLowerCase();
     String createSchemaSql =
         String.format("CREATE SCHEMA \"%s.%s\".%s", metalakeName, catalogName, schemaName);
     containerSuite.getTrinoContainer().executeUpdateSQL(createSchemaSql);
 
+    sql = String.format("show create schema \"%s.%s\".%s", metalakeName, catalogName, schemaName);
+    Assertions.assertTrue(checkTrinoHasLoaded(sql, 30));
+
     String createTableSql =
         String.format(
             "CREATE TABLE \"%s.%s\".%s.%s (id int not null, name varchar not null)",
             metalakeName, catalogName, schemaName, tableName);
     containerSuite.getTrinoContainer().executeUpdateSQL(createTableSql);
+
+    String showCreateTableSql =
+        String.format(
+            "show create table \"%s.%s\".%s.%s", metalakeName, catalogName, schemaName, tableName);
+    ArrayList<ArrayList<String>> rs =
+        containerSuite.getTrinoContainer().executeQuerySQL(showCreateTableSql);
+    Assertions.assertTrue(rs.get(0).get(0).toLowerCase(Locale.ENGLISH).contains("not null"));
+
+    containerSuite
+        .getTrinoContainer()
+        .executeUpdateSQL(
+            String.format(
+                "insert into \"%s.%s\".%s.%s values(1, 'a')",
+                metalakeName, catalogName, schemaName, tableName));
+    Assertions.assertThrows(
+        RuntimeException.class,
+        () ->
+            containerSuite
+                .getTrinoContainer()
+                .executeUpdateSQL(
+                    String.format(
+                        "insert into \"%s.%s\".%s.%s values(null, 'a')",
+                        metalakeName, catalogName, schemaName, tableName)));
+    Assertions.assertThrows(
+        RuntimeException.class,
+        () ->
+            containerSuite
+                .getTrinoContainer()
+                .executeUpdateSQL(
+                    String.format(
+                        "insert into \"%s.%s\".%s.%s values(1, null)",
+                        metalakeName, catalogName, schemaName, tableName)));
+    Assertions.assertThrows(
+        RuntimeException.class,
+        () ->
+            containerSuite
+                .getTrinoContainer()
+                .executeUpdateSQL(
+                    String.format(
+                        "insert into \"%s.%s\".%s.%s values(null, null)",
+                        metalakeName, catalogName, schemaName, tableName)));
 
     catalog
         .asTableCatalog()
