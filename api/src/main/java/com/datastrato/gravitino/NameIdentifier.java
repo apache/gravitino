@@ -252,4 +252,9 @@ public class NameIdentifier {
     Namespace ns = Namespace.of(ArrayUtils.subarray(levels, 0, levels.length - 1));
     return NameIdentifier.of(ns, levels[levels.length - 1]);
   }
+
+  public String[] levels() {
+    String[] levels = namespace.levels();
+    return ArrayUtils.add(levels, this.name);
+  }
 }

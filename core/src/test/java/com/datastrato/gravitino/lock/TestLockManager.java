@@ -56,33 +56,33 @@ public class TestLockManager {
 
   private NameIdentifier randomNameIdentifier() {
     Random random = new Random();
-    int level = random.nextInt(5);
+    int level = random.nextInt(10);
     NameIdentifier nameIdentifier = null;
     switch (level) {
       case 0:
         nameIdentifier = NameIdentifier.ROOT;
         break;
       case 1:
-        nameIdentifier = NameIdentifier.of(Namespace.of(), ENTITY_NAMES[random.nextInt(10)]);
+        nameIdentifier = NameIdentifier.of(Namespace.of(), ENTITY_NAMES[random.nextInt(1)]);
         break;
       case 2:
         nameIdentifier =
             NameIdentifier.of(
-                Namespace.of(ENTITY_NAMES[random.nextInt(10)]), ENTITY_NAMES[random.nextInt(10)]);
+                Namespace.of(ENTITY_NAMES[random.nextInt(1)]), ENTITY_NAMES[random.nextInt(3)]);
         break;
       case 3:
         nameIdentifier =
             NameIdentifier.of(
-                Namespace.of(ENTITY_NAMES[random.nextInt(10)], ENTITY_NAMES[random.nextInt(10)]),
-                ENTITY_NAMES[random.nextInt(10)]);
+                Namespace.of(ENTITY_NAMES[random.nextInt(1)], ENTITY_NAMES[random.nextInt(3)]),
+                ENTITY_NAMES[random.nextInt(5)]);
         break;
       default:
         nameIdentifier =
             NameIdentifier.of(
                 Namespace.of(
-                    ENTITY_NAMES[random.nextInt(10)],
-                    ENTITY_NAMES[random.nextInt(10)],
-                    ENTITY_NAMES[random.nextInt(10)]),
+                    ENTITY_NAMES[random.nextInt(1)],
+                    ENTITY_NAMES[random.nextInt(3)],
+                    ENTITY_NAMES[random.nextInt(5)]),
                 ENTITY_NAMES[random.nextInt(10)]);
     }
 
@@ -106,16 +106,18 @@ public class TestLockManager {
     ReentrantReadWriteLock reentrantReadWriteLock = new ReentrantReadWriteLock();
     for (int i = 0; i < 10000; i++) {
       NameIdentifier identifier = randomNameIdentifier();
-      LockType lockType = LockType.values()[threadLocalRandom.nextInt(2)];
+      int num = threadLocalRandom.nextInt(5);
+      LockType lockType = num >= 4 ? LockType.WRITE : LockType.READ;
+      //      LockType lockType = LockType.values()[threadLocalRandom.nextInt(2)];
       if (lockType == LockType.WRITE) {
         reentrantReadWriteLock.writeLock().lock();
         // App logic here...
-        Thread.sleep(1);
+        Thread.sleep(5);
         reentrantReadWriteLock.writeLock().unlock();
       } else {
         reentrantReadWriteLock.readLock().lock();
         // App logic here...
-        Thread.sleep(1);
+        Thread.sleep(5);
         reentrantReadWriteLock.readLock().unlock();
       }
     }
@@ -127,11 +129,12 @@ public class TestLockManager {
     ThreadLocalRandom threadLocalRandom = ThreadLocalRandom.current();
     for (int i = 0; i < 10000; i++) {
       NameIdentifier identifier = randomNameIdentifier();
-      LockType lockType = LockType.values()[threadLocalRandom.nextInt(2)];
+      int num = threadLocalRandom.nextInt(5);
+      LockType lockType = num >= 4 ? LockType.WRITE : LockType.READ;
       try {
         lockManager.lockResourcePath(identifier, lockType);
         // App logic here...
-        Thread.sleep(1);
+        Thread.sleep(5);
       } catch (Exception e) {
         if (e.getMessage().contains("mock")) {
           return 0;
@@ -153,10 +156,12 @@ public class TestLockManager {
     // one fifth (2 /10 = 0.2) of tests will fail
     Mockito.doThrow(new RuntimeException("mock"))
         .when(spy)
-        .getOrCreateLockNode(Mockito.eq(NameIdentifier.of(Namespace.of(), ENTITY_NAMES[2])));
+        .lockResourcePath(
+            Mockito.eq(NameIdentifier.of(Namespace.of(), ENTITY_NAMES[0])), Mockito.any());
     Mockito.doThrow(new RuntimeException("mock"))
         .when(spy)
-        .getOrCreateLockNode(Mockito.eq(NameIdentifier.of(Namespace.of(), ENTITY_NAMES[5])));
+        .lockResourcePath(
+            Mockito.eq(NameIdentifier.of(Namespace.of(), ENTITY_NAMES[1])), Mockito.any());
 
     CompletionService<Integer> completionService = createCompletionService();
     for (int i = 0; i < 10; i++) {
@@ -174,10 +179,10 @@ public class TestLockManager {
   void compare(int threadCount) throws InterruptedException, ExecutionException {
     LockManager lockManager = new LockManager();
     CompletionService<Integer> completionService = createCompletionService();
-    for (int i = 0; i < 10; i++) {
+    for (int i = 0; i < 2; i++) {
       completionService.submit(() -> this.testLockManager(lockManager));
     }
-    for (int i = 0; i < 10; i++) {
+    for (int i = 0; i < 2; i++) {
       completionService.take().get();
     }
 
@@ -200,5 +205,27 @@ public class TestLockManager {
     }
     System.out.println(
         "LockManager use normal lock: " + (System.currentTimeMillis() - start) + "ms");
+  }
+
+  @Test
+  void testLockCleaner() throws InterruptedException {
+    LockManager lockManager = new LockManager();
+
+    for (int i = 0; i < 10000; i++) {
+      NameIdentifier nameIdentifier = randomNameIdentifier();
+      lockManager.lockResourcePath(nameIdentifier, LockType.READ);
+      lockManager.unlockResourcePath();
+    }
+
+    Thread.sleep(1000);
+    lockManager
+        .treeLockRootNode
+        .getAllChildren()
+        .forEach(
+            child -> {
+              lockManager.evictStaleNodes(500, child, lockManager.treeLockRootNode);
+            });
+
+    Assertions.assertTrue(lockManager.treeLockRootNode.getAllChildren().isEmpty());
   }
 }

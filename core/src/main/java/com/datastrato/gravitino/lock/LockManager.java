@@ -6,10 +6,6 @@
 package com.datastrato.gravitino.lock;
 
 import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.catalog.CatalogManager.CatalogWrapper;
-import com.github.benmanes.caffeine.cache.Cache;
-import com.github.benmanes.caffeine.cache.Caffeine;
-import com.github.benmanes.caffeine.cache.Scheduler;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.util.Stack;
@@ -40,80 +36,65 @@ public class LockManager {
   private static final Logger LOG = LoggerFactory.getLogger(LockManager.class);
   private static final long TIME_AFTER_LAST_ACCESS_TO_EVICT_IN_MS = 24 * 60 * 60 * 1000; // 1 day
 
-  private static final NameIdentifier ROOT = NameIdentifier.ROOT;
-  private final ThreadLocal<Stack<LockObject>> currentLocked = ThreadLocal.withInitial(Stack::new);
-  private final Cache<NameIdentifier, LockNode> lockNodeMap;
+  @VisibleForTesting final TreeLockNode treeLockRootNode = new TreeLockNode("root");
+  private final ThreadLocal<Stack<TreeLockPair>> holdingLocks = ThreadLocal.withInitial(Stack::new);
+  private final ScheduledThreadPoolExecutor lockCleaner;
 
-  public LockManager() {
-    this.lockNodeMap =
-        Caffeine.newBuilder()
-            .expireAfterAccess(TIME_AFTER_LAST_ACCESS_TO_EVICT_IN_MS, TimeUnit.MILLISECONDS)
-            .maximumSize(100000)
-            .evictionListener(
-                (k, v, c) -> {
-                  LOG.info("Evicting lockNode for {}.", k);
-                  ((CatalogWrapper) v).close();
-                })
-            .removalListener(
-                (k, v, c) -> {
-                  LOG.info("Removing lockNode for {}.", k);
-                  ((CatalogWrapper) v).close();
-                })
-            .scheduler(
-                Scheduler.forScheduledExecutorService(
-                    new ScheduledThreadPoolExecutor(
-                        1,
-                        new ThreadFactoryBuilder()
-                            .setDaemon(true)
-                            .setNameFormat("lock-cleaner-%d")
-                            .build())))
-            .build();
-
-    lockNodeMap.put(ROOT, new LockNode());
-  }
-
-  static class LockObject {
-    private final LockNode lockNode;
+  static class TreeLockPair {
+    private final TreeLockNode treeLockNode;
     private final LockType lockType;
 
-    private LockObject(LockNode lockNode, LockType lockType) {
-      this.lockNode = lockNode;
+    public TreeLockPair(TreeLockNode treeLockNode, LockType lockType) {
+      this.treeLockNode = treeLockNode;
       this.lockType = lockType;
     }
 
-    static LockObject of(LockNode lockNode, LockType lockType) {
-      return new LockObject(lockNode, lockType);
+    public static TreeLockPair of(TreeLockNode treeLockNode, LockType lockType) {
+      return new TreeLockPair(treeLockNode, lockType);
     }
   }
 
-  private Stack<NameIdentifier> getResourcePath(NameIdentifier identifier) {
-    Stack<NameIdentifier> nameIdentifiers = new Stack<>();
-    if (identifier == NameIdentifier.ROOT) {
-      return nameIdentifiers;
-    }
+  public LockManager() {
+    this.lockCleaner =
+        new ScheduledThreadPoolExecutor(
+            1,
+            new ThreadFactoryBuilder()
+                .setDaemon(true)
+                .setNameFormat("tree-lock-cleaner-%d")
+                .build());
 
-    NameIdentifier ref = identifier;
-    do {
-      ref = ref.parent();
-      nameIdentifiers.push(ref);
-    } while (ref.hasParent());
-
-    return nameIdentifiers;
+    lockCleaner.scheduleAtFixedRate(
+        () ->
+            treeLockRootNode
+                .getAllChildren()
+                .forEach(
+                    child ->
+                        evictStaleNodes(
+                            TIME_AFTER_LAST_ACCESS_TO_EVICT_IN_MS, child, treeLockRootNode)),
+        0,
+        10,
+        TimeUnit.MINUTES);
   }
 
+  /**
+   * Evict the stale nodes from the tree lock node if the last access time is earlier than the given
+   * time.
+   *
+   * @param timeAfterLastAccessToEvictInMs The time after last access to evict the node.
+   * @param treeNode The tree lock node to evict.
+   * @param parent The parent of the tree lock node.
+   */
   @VisibleForTesting
-  LockNode getOrCreateLockNode(NameIdentifier identifier) {
-    LockNode lockNode = lockNodeMap.asMap().get(identifier);
-    if (lockNode == null) {
-      synchronized (this) {
-        lockNode = lockNodeMap.asMap().get(identifier);
-        if (lockNode == null) {
-          lockNode = new LockNode();
-          lockNodeMap.put(identifier, lockNode);
-        }
-      }
+  void evictStaleNodes(
+      long timeAfterLastAccessToEvictInMs, TreeLockNode treeNode, TreeLockNode parent) {
+    if (treeNode.getLastAccessTime()
+        < System.currentTimeMillis() - timeAfterLastAccessToEvictInMs) {
+      parent.removeChild(treeNode.getName());
+      return;
     }
-    return lockNode;
+    treeNode
+        .getAllChildren()
+        .forEach(child -> evictStaleNodes(timeAfterLastAccessToEvictInMs, child, treeNode));
   }
 
   /**
@@ -123,23 +104,20 @@ public class LockManager {
    * @param lockType The lock type to lock the resource path.
    */
   public void lockResourcePath(NameIdentifier identifier, LockType lockType) {
-    Stack<NameIdentifier> parents = getResourcePath(identifier);
+    TreeLockNode lockNode = treeLockRootNode;
+    String[] levels = identifier.namespace().levels();
 
     try {
-      // Lock parent with read lock
-      while (!parents.isEmpty()) {
-        NameIdentifier parent = parents.pop();
-        LockNode lockNode = getOrCreateLockNode(parent);
+      for (String level : levels) {
+        lockNode = lockNode.getOrCreateChild(level);
         lockNode.lock(LockType.READ);
-        addLockToStack(lockNode, LockType.READ);
+        holdingLocks.get().push(TreeLockPair.of(lockNode, LockType.READ));
       }
 
-      // Lock self with the value of `lockType`
-      LockNode node = getOrCreateLockNode(identifier);
-      node.lock(lockType);
-      addLockToStack(node, lockType);
+      lockNode = lockNode.getOrCreateChild(identifier.name());
+      lockNode.lock(lockType);
+      holdingLocks.get().push(TreeLockPair.of(lockNode, lockType));
     } catch (Exception e) {
-      // Unlock those that have been locked.
       unlockResourcePath();
       LOG.error("Failed to lock resource path {}", identifier, e);
       throw e;
@@ -151,14 +129,10 @@ public class LockManager {
    * {@link ThreadLocal} instance.
    */
   public void unlockResourcePath() {
-    Stack<LockObject> stack = currentLocked.get();
+    Stack<TreeLockPair> stack = holdingLocks.get();
     while (!stack.isEmpty()) {
-      LockObject lockObject = stack.pop();
-      lockObject.lockNode.release(lockObject.lockType);
+      TreeLockPair treeLockPair = stack.pop();
+      treeLockPair.treeLockNode.unlock(treeLockPair.lockType);
     }
-  }
-
-  private void addLockToStack(LockNode lockNode, LockType lockType) {
-    currentLocked.get().push(LockObject.of(lockNode, lockType));
   }
 }
