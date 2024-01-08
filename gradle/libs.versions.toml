@@ -41,6 +41,8 @@ prometheus = "0.16.0"
 jsqlparser = "4.2"
 mysql = "8.0.23"
 postgresql = "42.6.0"
+kyuubi = "1.8.0"
+scala = "2.12.18"
 
 protobuf-plugin = "0.9.2"
 spotless-plugin = '6.11.0'
@@ -106,12 +108,14 @@ trino-testing= { group = "io.trino", name = "trino-testing", version.ref = "trin
 trino-memory= { group = "io.trino", name = "trino-memory", version.ref = "trino" }
 trino-cli= { group = "io.trino", name = "trino-cli", version.ref = "trino" }
 trino-client= { group = "io.trino", name = "trino-client", version.ref = "trino" }
-iceberg-spark-runtime = { group = "org.apache.iceberg", name = "iceberg-spark-runtime-3.4_2.13", version.ref = "iceberg" }
-spark-sql = { group = "org.apache.spark", name = "spark-sql_2.13", version.ref = "spark" }
-scala-collection-compat =  { group = "org.scala-lang.modules", name = "scala-collection-compat_2.13", version.ref = "scala-collection-compat" }
+iceberg-spark-runtime = { group = "org.apache.iceberg", name = "iceberg-spark-runtime-3.4_2.12", version.ref = "iceberg" }
+spark-sql = { group = "org.apache.spark", name = "spark-sql_2.12", version.ref = "spark" }
+spark-core = { group = "org.apache.spark", name = "spark-core_2.12", version.ref = "spark" }
+spark-catalyst = { group = "org.apache.spark", name = "spark-catalyst_2.12", version.ref = "spark" }
+scala-collection-compat =  { group = "org.scala-lang.modules", name = "scala-collection-compat_2.12", version.ref = "scala-collection-compat" }
 sqlite-jdbc = { group = "org.xerial", name = "sqlite-jdbc", version.ref = "sqlite-jdbc" }
 testng = { group = "org.testng", name = "testng", version.ref = "testng" }
-spark-hive = { group = "org.apache.spark", name = "spark-hive_2.13", version.ref = "spark" }
+spark-hive = { group = "org.apache.spark", name = "spark-hive_2.12", version.ref = "spark" }
 commons-dbcp2 = { group = "org.apache.commons", name = "commons-dbcp2", version.ref = "commons-dbcp2" }
 testcontainers = { group = "org.testcontainers", name = "testcontainers", version.ref = "testcontainers" }
 testcontainers-mysql = { group = "org.testcontainers", name = "mysql", version.ref = "testcontainers" }
@@ -135,6 +139,8 @@ jsqlparser = { group = "com.github.jsqlparser", name = "jsqlparser", version.ref
 mysql-driver = { group = "mysql", name = "mysql-connector-java", version.ref = "mysql" }
 postgresql-driver = { group = "org.postgresql", name = "postgresql", version.ref = "postgresql" }
 commons-cli = { group = "commons-cli", name = "commons-cli", version.ref = "commons-cli" }
+kyuubi-spark-connector = { group = "org.apache.kyuubi", name = "kyuubi-spark-connector-hive_2.12", version.ref = "kyuubi" }
+scala-library = { group = "org.scala-lang", name = "scala-library", version.ref = "scala" }
 
 [bundles]
 log4j = ["slf4j-api", "log4j-slf4j2-impl", "log4j-api", "log4j-core", "log4j-12-api"]
@@ -144,6 +150,7 @@ iceberg = ["iceberg-core", "iceberg-api"]
 jwt = ["jwt-api", "jwt-impl", "jwt-gson"]
 metrics = ["metrics-core", "metrics-jersey2", "metrics-jvm", "metrics-jmx", "metrics-servlets"]
 prometheus = ["prometheus-servlet", "prometheus-dropwizard", "prometheus-client"]
+spark = ["spark-catalyst"]
 
 [plugins]
 protobuf = { id = "com.google.protobuf", version.ref = "protobuf-plugin" }

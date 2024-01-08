@@ -12,5 +12,6 @@ include("api", "common", "core", "meta", "server", "integration-test", "server-c
 include("catalogs:bundled-catalog", "catalogs:catalog-hive", "catalogs:catalog-lakehouse-iceberg", "catalogs:catalog-jdbc-common", "catalogs:catalog-jdbc-mysql", "catalogs:catalog-jdbc-postgresql")
 include("clients:client-java", "clients:client-java-runtime")
 include("trino-connector")
+include("spark-connector")
 include("web")
 include("docs")
