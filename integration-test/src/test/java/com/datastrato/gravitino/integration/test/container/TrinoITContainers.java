@@ -13,6 +13,7 @@ import org.apache.logging.log4j.util.Strings;
 import org.mortbay.log.Log;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testcontainers.containers.ContainerLaunchException;
 import org.testcontainers.shaded.com.google.common.collect.ImmutableSet;
 
 public class TrinoITContainers implements AutoCloseable {
@@ -65,17 +66,13 @@ public class TrinoITContainers implements AutoCloseable {
 
     String containerIpMapping = output.toString();
     if (containerIpMapping.isEmpty()) {
-      throw new Exception("Missing to get container's ip");
+      throw new ContainerLaunchException("Missing to get container status");
     }
 
     try {
       String[] containerInfos = containerIpMapping.split("\n");
       for (String container : containerInfos) {
         String[] info = container.split(":");
-
-        if (info.length != 2) {
-          throw new Exception("Invalid container's ip info: " + container);
-        }
 
         String containerName = info[0];
         String address = info[1];
@@ -92,12 +89,13 @@ public class TrinoITContainers implements AutoCloseable {
         }
       }
     } catch (Exception e) {
-      throw new Exception("Failed to parse container ip:\n" + containerIpMapping, e);
+      throw new ContainerLaunchException("Unexpected container status :\n" + containerIpMapping, e);
     }
 
     for (String serviceName : servicesName) {
       if (!servicesUri.containsKey(serviceName)) {
-        throw new Exception("Missing to get container's ip for service: " + serviceName);
+        throw new ContainerLaunchException(
+            "The container for the {} service is not started: " + serviceName);
       }
     }
   }
