@@ -5,7 +5,7 @@
 package com.datastrato.gravitino.server;
 
 import com.datastrato.gravitino.Configs;
-import com.datastrato.gravitino.aux.AuxiliaryServiceManager;
+import com.datastrato.gravitino.auxiliary.AuxiliaryServiceManager;
 import com.datastrato.gravitino.config.ConfigEntry;
 import com.datastrato.gravitino.server.web.JettyServerConfig;
 import java.io.File;
