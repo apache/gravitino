@@ -5,8 +5,9 @@
 package com.datastrato.gravitino.rel.expressions.transforms;
 
 import com.datastrato.gravitino.rel.expressions.Expression;
-import com.datastrato.gravitino.rel.expressions.Literal;
 import com.datastrato.gravitino.rel.expressions.NamedReference;
+import com.datastrato.gravitino.rel.expressions.literals.Literal;
+import com.datastrato.gravitino.rel.expressions.literals.Literals;
 import com.google.common.collect.ObjectArrays;
 import java.util.Arrays;
 import java.util.Objects;
@@ -133,7 +134,7 @@ public class Transforms {
    */
   public static BucketTransform bucket(int numBuckets, String[]... fieldNames) {
     return new BucketTransform(
-        Literal.integer(numBuckets),
+        Literals.integer(numBuckets),
         Arrays.stream(fieldNames).map(NamedReference::field).toArray(NamedReference[]::new));
   }
 
@@ -166,7 +167,7 @@ public class Transforms {
    * @return The created transform
    */
   public static TruncateTransform truncate(int width, String[] fieldName) {
-    return new TruncateTransform(Literal.integer(width), NamedReference.field(fieldName));
+    return new TruncateTransform(Literals.integer(width), NamedReference.field(fieldName));
   }
 
   /**
