@@ -17,6 +17,21 @@ import com.datastrato.gravitino.catalog.mysql.operation.MysqlTableOperations;
 /** Implementation of a Mysql catalog in Gravitino. */
 public class MysqlCatalog extends JdbcCatalog {
 
+  public MysqlCatalog() {
+    try {
+      // Try to load the jdbc-driver automatically
+      Class.forName("com.mysql.jdbc.Driver");
+    } catch (ClassNotFoundException ignore) {
+      // Ignore
+      try {
+        // Try to load the jdbc-driver automatically
+        Class.forName("com.mysql.cj.jdbc.Driver");
+      } catch (ClassNotFoundException ignore2) {
+        // Ignore
+      }
+    }
+  }
+
   @Override
   public String shortName() {
     return "jdbc-mysql";

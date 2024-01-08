@@ -10,6 +10,7 @@ import com.datastrato.gravitino.config.ConfigBuilder;
 import com.datastrato.gravitino.config.ConfigConstants;
 import com.datastrato.gravitino.config.ConfigEntry;
 import java.util.Map;
+import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
 
 public class JdbcConfig extends Config {
@@ -30,13 +31,12 @@ public class JdbcConfig extends Config {
           .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .create();
 
-  public static final ConfigEntry<String> JDBC_DRIVER =
+  public static final ConfigEntry<Optional<String>> JDBC_DRIVER =
       new ConfigBuilder("jdbc-driver")
           .doc("The driver of the jdbc connection")
           .version("0.3.0")
           .stringConf()
-          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
-          .create();
+          .createWithOptional();
 
   public static final ConfigEntry<String> USERNAME =
       new ConfigBuilder("jdbc-user")
@@ -74,7 +74,7 @@ public class JdbcConfig extends Config {
     return get(JDBC_URL);
   }
 
-  public String getJdbcDriver() {
+  public Optional<String> getJdbcDriverOptional() {
     return get(JDBC_DRIVER);
   }
 

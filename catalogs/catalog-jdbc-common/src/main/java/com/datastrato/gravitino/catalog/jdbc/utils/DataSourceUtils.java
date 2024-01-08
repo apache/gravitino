@@ -6,6 +6,7 @@ package com.datastrato.gravitino.catalog.jdbc.utils;
 
 import com.datastrato.gravitino.catalog.jdbc.config.JdbcConfig;
 import com.datastrato.gravitino.exceptions.GravitinoRuntimeException;
+import com.google.common.annotations.VisibleForTesting;
 import java.sql.SQLException;
 import java.util.Map;
 import java.util.Properties;
@@ -23,6 +24,7 @@ public class DataSourceUtils {
   /** SQL statements for database connection pool testing. */
   private static final String POOL_TEST_QUERY = "SELECT 1";
 
+  @VisibleForTesting
   public static DataSource createDataSource(Map<String, String> properties) {
     return createDataSource(new JdbcConfig(properties));
   }
@@ -41,8 +43,7 @@ public class DataSourceUtils {
         BasicDataSourceFactory.createDataSource(getProperties(jdbcConfig));
     String jdbcUrl = jdbcConfig.getJdbcUrl();
     basicDataSource.setUrl(jdbcUrl);
-    String driverClassName = jdbcConfig.getJdbcDriver();
-    basicDataSource.setDriverClassName(driverClassName);
+    jdbcConfig.getJdbcDriverOptional().ifPresent(basicDataSource::setDriverClassName);
     String userName = jdbcConfig.getUsername();
     basicDataSource.setUsername(userName);
     String password = jdbcConfig.getPassword();

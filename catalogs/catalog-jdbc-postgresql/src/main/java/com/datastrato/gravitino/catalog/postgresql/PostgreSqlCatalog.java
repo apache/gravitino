@@ -16,6 +16,15 @@ import com.datastrato.gravitino.catalog.postgresql.operation.PostgreSqlTableOper
 
 public class PostgreSqlCatalog extends JdbcCatalog {
 
+  public PostgreSqlCatalog() {
+    try {
+      // Try to load the jdbc-driver automatically
+      Class.forName("org.postgresql.Driver");
+    } catch (ClassNotFoundException ignore) {
+      // Ignore
+    }
+  }
+
   @Override
   public String shortName() {
     return "jdbc-postgresql";

@@ -140,8 +140,6 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     try {
       String jdbcUrl = POSTGRESQL_CONTAINER.getJdbcUrl();
       String database = new URI(jdbcUrl.substring(jdbcUrl.lastIndexOf("/") + 1)).getPath();
-      catalogProperties.put(
-          JdbcConfig.JDBC_DRIVER.getKey(), POSTGRESQL_CONTAINER.getDriverClassName());
       catalogProperties.put(JdbcConfig.JDBC_URL.getKey(), jdbcUrl);
       catalogProperties.put(JdbcConfig.JDBC_DATABASE.getKey(), database);
       catalogProperties.put(JdbcConfig.USERNAME.getKey(), POSTGRESQL_CONTAINER.getUsername());

@@ -27,16 +27,16 @@ Gravitino provides the ability to manage MySQL metadata.
 Any property that isn't defined by Gravitino can pass to MySQL data source by adding `gravitino.bypass` prefix as a catalog property. For example, catalog property `gravitino.bypass.maxWaitMillis` will pass `maxWaitMillis` to the data source property.
 You can check the relevant data source configuration in [data source properties](https://commons.apache.org/proper/commons-dbcp/configuration.html)
 
-If you use JDBC catalog, you must provide `jdbc-url`, `jdbc-driver`, `jdbc-user` and `jdbc-password` to catalog properties.
+If you use JDBC catalog, you must provide `jdbc-url`, `jdbc-user` and `jdbc-password` to catalog properties.
 
-| Configuration item      | Description                                                                                                | Default value | Required | Since Version |
-|-------------------------|------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
-| `jdbc-url`              | JDBC URL for connecting to the database. For example `jdbc:mysql://localhost:3306`                         | (none)        | Yes      | 0.3.0         |
-| `jdbc-driver`           | The driver of the JDBC connection. For example `com.mysql.jdbc.Driver` or `com.mysql.cj.jdbc.Driver`.      | (none)        | Yes      | 0.3.0         |
-| `jdbc-user`             | The JDBC user name.                                                                                        | (none)        | Yes      | 0.3.0         |
-| `jdbc-password`         | The JDBC password.                                                                                         | (none)        | Yes      | 0.3.0         |
-| `jdbc.pool.min-size`    | The minimum number of connections in the pool. `2` by default.                                             | `2`           | No       | 0.3.0         |
-| `jdbc.pool.max-size`    | The maximum number of connections in the pool. `10` by default.                                            | `10`          | No       | 0.3.0         |
+| Configuration item      | Description                                                                                                             | Default value                                          | Required | Since Version |
+|-------------------------|-------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------|----------|---------------|
+| `jdbc-url`              | JDBC URL for connecting to the database. For example `jdbc:mysql://localhost:3306`                                      | (none)                                                 | Yes      | 0.3.0         |
+| `jdbc-driver`           | The driver of the JDBC connection. Will be loaded automatically `com.mysql.jdbc.Driver` and `com.mysql.cj.jdbc.Driver`. | `com.mysql.jdbc.Driver` and `com.mysql.cj.jdbc.Driver` | No       | 0.4.0         |
+| `jdbc-user`             | The JDBC user name.                                                                                                     | (none)                                                 | Yes      | 0.3.0         |
+| `jdbc-password`         | The JDBC password.                                                                                                      | (none)                                                 | Yes      | 0.3.0         |
+| `jdbc.pool.min-size`    | The minimum number of connections in the pool. `2` by default.                                                          | `2`                                                    | No       | 0.3.0         |
+| `jdbc.pool.max-size`    | The maximum number of connections in the pool. `10` by default.                                                         | `10`                                                   | No       | 0.3.0         |
 
 :::caution
 You must download the corresponding JDBC driver to the `catalogs/jdbc-mysql/libs` directory.
