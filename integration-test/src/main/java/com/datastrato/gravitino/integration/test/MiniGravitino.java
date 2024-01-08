@@ -9,7 +9,7 @@ import static com.datastrato.gravitino.Configs.ENTRY_KV_ROCKSDB_BACKEND_PATH;
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.auth.AuthenticatorType;
-import com.datastrato.gravitino.aux.AuxiliaryServiceManager;
+import com.datastrato.gravitino.auxiliary.AuxiliaryServiceManager;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergRESTService;
 import com.datastrato.gravitino.client.ErrorHandlers;
 import com.datastrato.gravitino.client.HTTPClient;
