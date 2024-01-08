@@ -18,8 +18,8 @@ import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.mon
 import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.year;
 
 import com.datastrato.gravitino.rel.expressions.Expression;
-import com.datastrato.gravitino.rel.expressions.Literal;
 import com.datastrato.gravitino.rel.expressions.NamedReference;
+import com.datastrato.gravitino.rel.expressions.literals.Literals;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.types.Type;
 import com.datastrato.gravitino.rel.types.Types;
@@ -110,7 +110,7 @@ public class TestTransforms {
         };
     // partition by foo(col_1, 'bar')
     NamedReference.FieldReference arg1 = field(column.name());
-    Literal.LiteralImpl<String> arg2 = Literal.string("bar");
+    Literals.LiteralImpl<String> arg2 = Literals.string("bar");
     Transform applyTransform = apply("foo", new Expression[] {arg1, arg2});
     Assertions.assertEquals("foo", applyTransform.name());
     Assertions.assertEquals(2, applyTransform.arguments().length);
