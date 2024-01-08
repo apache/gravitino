@@ -12,6 +12,28 @@ import java.util.StringJoiner;
 /** The helper class for {@link Type}. */
 public class Types {
 
+  /** The data type representing `NULL` values. */
+  public static class NullType implements Type {
+    private static final NullType INSTANCE = new NullType();
+
+    /** @return The singleton instance of {@link NullType}. */
+    public static NullType get() {
+      return INSTANCE;
+    }
+
+    private NullType() {}
+
+    @Override
+    public Name name() {
+      return Name.NULL;
+    }
+
+    @Override
+    public String simpleString() {
+      return "null";
+    }
+  }
+
   /** The boolean type in Gravitino. */
   public static class BooleanType extends Type.PrimitiveType {
     private static final BooleanType INSTANCE = new BooleanType();
