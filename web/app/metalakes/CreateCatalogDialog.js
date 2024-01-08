@@ -83,11 +83,13 @@ const CreateCatalogDialog = props => {
     reset,
     watch,
     setValue,
+    getValues,
     handleSubmit,
+    trigger,
     formState: { errors }
   } = useForm({
     defaultValues,
-    mode: 'onChange',
+    mode: 'all',
     resolver: yupResolver(schema)
   })
 
@@ -131,31 +133,65 @@ const CreateCatalogDialog = props => {
     setOpen(false)
   }
 
+  const handleClickSubmit = e => {
+    e.preventDefault()
+
+    return handleSubmit(onSubmit(getValues()), onError)
+  }
+
   const onSubmit = data => {
     const { propItems, ...mainData } = data
 
-    const properties = innerProps.reduce((acc, item) => {
-      acc[item.key] = item.value
+    let nextProps = []
 
-      return acc
-    }, {})
-
-    const catalogData = {
-      ...mainData,
-      properties
+    if (propItems[0]?.key === 'catalog-backend' && propItems[0]?.value === 'hive') {
+      nextProps = propItems.slice(0, 3)
+    } else {
+      nextProps = propItems
     }
 
-    if (type === 'create') {
-      dispatch(createCatalog({ data: catalogData, metalake }))
-    }
+    trigger()
 
-    handleClose()
+    const validData = { propItems: nextProps, ...mainData }
+
+    schema
+      .validate(validData)
+      .then(() => {
+        const properties = innerProps.reduce((acc, item) => {
+          acc[item.key] = item.value
+
+          return acc
+        }, {})
+
+        const catalogData = {
+          ...mainData,
+          properties
+        }
+
+        if (type === 'create') {
+          dispatch(createCatalog({ data: catalogData, metalake }))
+        }
+
+        handleClose()
+      })
+      .catch(err => {
+        console.error('valid error', err)
+      })
   }
 
   useEffect(() => {
+    let defaultProps = []
+
     const providerItemIndex = providers.findIndex(i => i.value === providerSelect)
-    setInnerProps(providers[providerItemIndex].defaultProps)
-  }, [providerSelect, setInnerProps])
+
+    if (providerItemIndex !== -1) {
+      defaultProps = providers[providerItemIndex].defaultProps
+
+      resetPropsFields(providers, providerItemIndex)
+      setInnerProps(defaultProps)
+      setValue('propItems', providers[providerItemIndex].defaultProps)
+    }
+  }, [providerSelect, setInnerProps, setValue])
 
   useEffect(() => {
     if (open && JSON.stringify(data) !== '{}') {
@@ -178,7 +214,7 @@ const CreateCatalogDialog = props => {
 
   return (
     <Dialog fullWidth maxWidth='sm' scroll='body' TransitionComponent={Transition} open={open} onClose={handleClose}>
-      <form onSubmit={handleSubmit(onSubmit)}>
+      <form onSubmit={e => handleClickSubmit(e)}>
         <DialogContent
           sx={{
             position: 'relative',
