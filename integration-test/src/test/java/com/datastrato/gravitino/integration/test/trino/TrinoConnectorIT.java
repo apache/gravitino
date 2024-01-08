@@ -506,7 +506,7 @@ public class TrinoConnectorIT extends AbstractIT {
     ColumnDTO[] columnDTO = createFullTypeColumns();
 
     Set<String> unsupportedType =
-        Sets.newHashSet("ByteType", "ShortType", "VarCharType", "FixedCharType", "FixedType");
+        Sets.newHashSet("ByteType", "ShortType", "VarCharType", "FixedCharType");
     return Arrays.stream(columnDTO)
         .filter(c -> !unsupportedType.contains(c.name()))
         .toArray(ColumnDTO[]::new);

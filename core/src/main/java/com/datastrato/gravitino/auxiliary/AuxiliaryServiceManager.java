@@ -3,7 +3,7 @@
  * This software is licensed under the Apache License version 2.
  */
 
-package com.datastrato.gravitino.aux;
+package com.datastrato.gravitino.auxiliary;
 
 import com.datastrato.gravitino.utils.IsolatedClassLoader;
 import com.datastrato.gravitino.utils.MapUtils;
