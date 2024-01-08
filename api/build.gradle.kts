@@ -12,11 +12,6 @@ dependencies {
   implementation(libs.guava)
   implementation(libs.slf4j.api)
 
-  compileOnly(libs.lombok)
-  annotationProcessor(libs.lombok)
-  testCompileOnly(libs.lombok)
-  testAnnotationProcessor(libs.lombok)
-
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
   testRuntimeOnly(libs.junit.jupiter.engine)
