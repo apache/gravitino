@@ -25,8 +25,10 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import org.apache.spark.sql.AnalysisException;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
+import org.junit.jupiter.api.Assertions;
 
 /**
  * Provides helper methods to execute SparkSQL and get SparkSQL result, will be reused by SparkIT
@@ -46,6 +48,26 @@ public abstract class SparkUtilIT extends AbstractIT {
     return convertToStringSet(sql("SHOW DATABASES"), 0);
   }
 
+  protected Set<String> getTables() {
+    // the first column is namespace, the second column is table name
+    return convertToStringSet(sql("SHOW TABLES"), 1);
+  }
+
+  protected Set<String> getTables(String database) {
+    return convertToStringSet(sql("SHOW TABLES in " + database), 1);
+  }
+
+  protected void dropDatabaseIfExists(String database) {
+    sql("DROP DATABASE IF EXISTS " + database);
+  }
+
+  // Specify Location explicitly because will add data read&write check for tables.
+  protected void createDatabaseIfNotExists(String database) {
+    sql(
+        String.format(
+            "create database IF NOT EXISTS %s LOCATION '/user/hive/%s'", database, database));
+  }
+
   protected Map<String, String> getDatabaseMetadata(String database) {
     return convertToStringMap(sql("DESC DATABASE EXTENDED " + database));
   }
@@ -53,6 +75,27 @@ public abstract class SparkUtilIT extends AbstractIT {
   protected List<Object[]> sql(String query) {
     List<Row> rows = getSparkSession().sql(query).collectAsList();
     return rowsToJava(rows);
+  }
+
+  protected SparkTableInfo getTableInfo(String tableName) {
+    return SparkTableInfo.getSparkTableInfo(sql("desc table extended " + tableName));
+  }
+
+  protected void dropTableIfExists(String tableName) {
+    sql("drop table if exists " + tableName);
+  }
+
+  protected boolean tableExists(String tableName) {
+    try {
+      SparkTableInfo tableInfo = getTableInfo(tableName);
+      Assertions.assertEquals(tableName, tableInfo.getTableName());
+      return true;
+    } catch (Exception e) {
+      if (e instanceof AnalysisException) {
+        return false;
+      }
+      throw e;
+    }
   }
 
   private List<Object[]> rowsToJava(List<Row> rows) {
@@ -83,7 +126,7 @@ public abstract class SparkUtilIT extends AbstractIT {
     return objects.stream().map(row -> String.valueOf(row[index])).collect(Collectors.toSet());
   }
 
-  private Map<String, String> convertToStringMap(List<Object[]> objects) {
+  private static Map<String, String> convertToStringMap(List<Object[]> objects) {
     return objects.stream()
         .collect(
             Collectors.toMap(

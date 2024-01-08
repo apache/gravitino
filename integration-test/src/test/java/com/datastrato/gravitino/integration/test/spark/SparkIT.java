@@ -4,10 +4,25 @@
  */
 package com.datastrato.gravitino.integration.test.spark;
 
+import static org.apache.hadoop.hive.serde.serdeConstants.DATE_TYPE_NAME;
+import static org.apache.hadoop.hive.serde.serdeConstants.INT_TYPE_NAME;
+import static org.apache.hadoop.hive.serde.serdeConstants.STRING_TYPE_NAME;
+import static org.apache.hadoop.hive.serde.serdeConstants.TINYINT_TYPE_NAME;
+
+import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfo;
+import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfo.SparkColumnInfo;
+import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfoChecker;
+import com.google.common.collect.ImmutableMap;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
+import org.apache.spark.sql.AnalysisException;
 import org.apache.spark.sql.catalyst.analysis.NoSuchNamespaceException;
+import org.apache.spark.sql.catalyst.analysis.NoSuchTableException;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -19,9 +34,40 @@ import org.junit.platform.commons.util.StringUtils;
 @TestInstance(Lifecycle.PER_CLASS)
 public class SparkIT extends SparkEnvIT {
 
+  private static final String SELECT_ALL_TEMPLATE = "SELECT * FROM %s";
+  private static final String INSERT_WITHOUT_PARTITION_TEMPLATE = "INSERT INTO %s VALUES (%s)";
+
+  private static final Map<String, String> typeConstant =
+      ImmutableMap.of(
+          TINYINT_TYPE_NAME,
+          "1",
+          INT_TYPE_NAME,
+          "2",
+          DATE_TYPE_NAME,
+          "'2023-01-01'",
+          STRING_TYPE_NAME,
+          "'gravitino_it_test'");
+
+  // Use a custom database not the original default database because SparkIT couldn't read&write
+  // data to tables in default database. The main reason is default database location is in
+  // determined by `hive.metastore.warehouse.dir` in hive-site.xml which is local HDFS address
+  // not real HDFS address. The location of tables created under default database is like
+  // hdfs://localhost:9000/xxx which couldn't read write data from SparkIT.
+  @BeforeAll
+  void initDefaultDatabase() {
+    sql("use " + hiveCatalogName);
+    createDatabaseIfNotExists(getDefaultDatabase());
+  }
+
   @BeforeEach
   void init() {
     sql("USE " + hiveCatalogName);
+    sql("use " + getDefaultDatabase());
+  }
+
+  private String getDefaultDatabase() {
+    return "defaultDB";
+>>>>>>> f1f75c51 (support table)
   }
 
   @Test
@@ -33,6 +79,7 @@ public class SparkIT extends SparkEnvIT {
   @Test
   void testCreateAndLoadSchema() {
     String testDatabaseName = "t_create1";
+    dropDatabaseIfExists(testDatabaseName);
     sql("CREATE DATABASE " + testDatabaseName);
     Map<String, String> databaseMeta = getDatabaseMetadata(testDatabaseName);
     Assertions.assertFalse(databaseMeta.containsKey("Comment"));
@@ -42,6 +89,7 @@ public class SparkIT extends SparkEnvIT {
     Assertions.assertTrue(StringUtils.isBlank(properties));
 
     testDatabaseName = "t_create2";
+    dropDatabaseIfExists(testDatabaseName);
     String testDatabaseLocation = "/tmp/" + testDatabaseName;
     sql(
         String.format(
@@ -91,5 +139,192 @@ public class SparkIT extends SparkEnvIT {
 
     Assertions.assertThrowsExactly(
         NoSuchNamespaceException.class, () -> sql("DROP DATABASE notExists"));
+  }
+
+  // Create simple tables without advanced features like comment, property, partition, bucket.
+  @Test
+  void testCreateSimpleTable() {
+    String tableName = "simpleTable";
+    dropTableIfExists(tableName);
+    createSimpleTable(tableName);
+    SparkTableInfo tableInfo = getTableInfo(tableName);
+
+    SparkTableInfoChecker checker =
+        SparkTableInfoChecker.create()
+            .withName(tableName)
+            .withColumns(getSimpleTableColumn())
+            .withComment(null);
+    checker.check(tableInfo);
+
+    checkTableReadWrite(tableInfo);
+  }
+
+  // testCreateSimpleTable create tables without database name,
+  // while this test create tables with specific database name.
+  @Test
+  void testCreateTableWithDatabase() {
+    // test db.table as table identifier
+    String databaseName = "db1";
+    String tableName = "dbTable1";
+    createDatabaseIfNotExists(databaseName);
+    String tableIdentifier = String.join(".", databaseName, tableName);
+
+    createSimpleTable(tableIdentifier);
+    SparkTableInfo tableInfo = getTableInfo(tableIdentifier);
+    SparkTableInfoChecker checker =
+        SparkTableInfoChecker.create().withName(tableName).withColumns(getSimpleTableColumn());
+    checker.check(tableInfo);
+    checkTableReadWrite(tableInfo);
+
+    // use db then create table with table name
+    databaseName = "db2";
+    tableName = "dbTable2";
+    createDatabaseIfNotExists(databaseName);
+
+    sql("use " + databaseName);
+    createSimpleTable(tableName);
+    tableInfo = getTableInfo(tableName);
+    checker =
+        SparkTableInfoChecker.create().withName(tableName).withColumns(getSimpleTableColumn());
+    checker.check(tableInfo);
+    checkTableReadWrite(tableInfo);
+  }
+
+  // Create tables with advanced features like comment, property, partition, bucket etc.
+  @Test
+  void testCreateComplexTable() {
+    String tableName = "complexTable";
+    dropTableIfExists(tableName);
+    String createTableSql = getCreateSimpleTableString(tableName);
+    String tableComment = "tableComment";
+    createTableSql = String.format("%s COMMENT '%s'", createTableSql, tableComment);
+    sql(createTableSql);
+    SparkTableInfo tableInfo = getTableInfo(tableName);
+
+    SparkTableInfoChecker checker =
+        SparkTableInfoChecker.create()
+            .withName(tableName)
+            .withColumns(getSimpleTableColumn())
+            .withComment(tableComment);
+    checker.check(tableInfo);
+
+    checkTableReadWrite(tableInfo);
+  }
+
+  @Test
+  void testDropTable() {
+    Assertions.assertThrowsExactly(NoSuchTableException.class, () -> sql("drop table notExists"));
+
+    String tableName = "dropTable";
+    createSimpleTable(tableName);
+    Assertions.assertEquals(true, tableExists(tableName));
+
+    dropTableIfExists(tableName);
+    Assertions.assertEquals(false, tableExists(tableName));
+  }
+
+  @Test
+  void testRenameTable() {
+    String tableName = "rename1";
+    String newTableName = "rename2";
+    dropTableIfExists(tableName);
+    dropTableIfExists(newTableName);
+
+    createSimpleTable(tableName);
+    Assertions.assertTrue(tableExists(tableName));
+    Assertions.assertFalse(tableExists(newTableName));
+
+    sql(String.format("ALTER TABLE %s RENAME to %s", tableName, newTableName));
+    Assertions.assertTrue(tableExists(newTableName));
+    Assertions.assertFalse(tableExists(tableName));
+
+    // rename to an existing table
+    createSimpleTable(tableName);
+    Assertions.assertThrows(
+        RuntimeException.class,
+        () -> sql(String.format("ALTER TABLE %s RENAME to %s", tableName, newTableName)));
+
+    // rename a not existing tables
+    Assertions.assertThrowsExactly(
+        AnalysisException.class, () -> sql("ALTER TABLE noExists RENAME to notExist2"));
+  }
+
+  @Test
+  void testListTable() {
+    String table1 = "list1";
+    String table2 = "list2";
+    createSimpleTable(table1);
+    createSimpleTable(table2);
+    Set<String> tables = getTables();
+    Assertions.assertTrue(tables.contains(table1));
+    Assertions.assertTrue(tables.contains(table2));
+
+    // show tables from not current db
+    String database = "dbList";
+    String table3 = "list3";
+    String table4 = "list4";
+    createDatabaseIfNotExists(database);
+    createSimpleTable(String.join(".", database, table3));
+    createSimpleTable(String.join(".", database, table4));
+    tables = getTables(database);
+
+    Assertions.assertTrue(tables.contains(table3));
+    Assertions.assertTrue(tables.contains(table4));
+  }
+
+  private void checkTableReadWrite(SparkTableInfo table) {
+    String name = table.getTableIdentifier();
+    String insertValues =
+        table.getColumns().stream()
+            .map(columnInfo -> typeConstant.get(columnInfo.getType()))
+            .map(Object::toString)
+            .collect(Collectors.joining(","));
+
+    sql(String.format(INSERT_WITHOUT_PARTITION_TEMPLATE, name, insertValues));
+
+    // remove "'" from values, such as 'a' is trans to a
+    String checkValues =
+        table.getColumns().stream()
+            .map(columnInfo -> typeConstant.get(columnInfo.getType()))
+            .map(Object::toString)
+            .map(
+                s -> {
+                  String tmp = org.apache.commons.lang3.StringUtils.removeEnd(s, "'");
+                  tmp = org.apache.commons.lang3.StringUtils.removeStart(tmp, "'");
+                  return tmp;
+                })
+            .collect(Collectors.joining(","));
+
+    List<String> queryResult =
+        sql(String.format(SELECT_ALL_TEMPLATE, name)).stream()
+            .map(
+                line ->
+                    Arrays.stream(line)
+                        .map(item -> item.toString())
+                        .collect(Collectors.joining(",")))
+            .collect(Collectors.toList());
+    Assertions.assertTrue(
+        queryResult.size() == 1, "Should just one row, table content: " + queryResult);
+    Assertions.assertEquals(checkValues, queryResult.get(0));
+  }
+
+  private String getCreateSimpleTableString(String tableName) {
+    return String.format(
+        "CREATE TABLE %s (id INT COMMENT 'id comment', name STRING COMMENT '', age INT)",
+        tableName);
+  }
+
+  private List<SparkColumnInfo> getSimpleTableColumn() {
+    return Arrays.asList(
+        SparkColumnInfo.of("id", "int", "id comment"),
+        SparkColumnInfo.of("name", "string", ""),
+        SparkColumnInfo.of("age", "int", null));
+  }
+
+  // Helper method to create a simple table, and could use corresponding
+  // getSimpleTableColumn to check table column.
+  private void createSimpleTable(String identifier) {
+    String createTableSql = getCreateSimpleTableString(identifier);
+    sql(createTableSql);
   }
 }
