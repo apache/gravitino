@@ -50,6 +50,11 @@ public class TestTransforms {
           public boolean nullable() {
             return true;
           }
+
+          @Override
+          public boolean autoIncrement() {
+            return false;
+          }
         };
     String[] fieldName = new String[] {column.name()};
 
@@ -96,6 +101,11 @@ public class TestTransforms {
           @Override
           public boolean nullable() {
             return true;
+          }
+
+          @Override
+          public boolean autoIncrement() {
+            return false;
           }
         };
     // partition by foo(col_1, 'bar')

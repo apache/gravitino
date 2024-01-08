@@ -97,6 +97,7 @@ public class DTOConverters {
         .withDataType(column.dataType())
         .withComment(column.comment())
         .withNullable(column.nullable())
+        .withAutoIncrement(column.autoIncrement())
         .build();
   }
 
