@@ -93,7 +93,7 @@ if [ ! -e $APP_HOME/gradle/wrapper/gradle-wrapper.jar ]; then
     GRADLE_VERSION=${GRADLE_VERSION%-bin}
     GRADLE_VERSION=${GRADLE_VERSION%-all}
     # when GRADLE_VERSION is X.Y, the tag is vX.Y.0
-    if [[ $(echo $GRADLE_VERSION | tr -cd '.' | wc -c) -eq 1 ]]; then
+    if [ $(echo $GRADLE_VERSION | tr -cd '.' | wc -c) -eq 1 ]; then
       GRADLE_TAG="v$GRADLE_VERSION.0"
     else
       GRADLE_TAG="v$GRADLE_VERSION"
