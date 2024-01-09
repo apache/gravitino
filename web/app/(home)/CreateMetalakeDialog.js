@@ -118,7 +118,7 @@ const CreateMetalakeDialog = props => {
   useEffect(() => {
     if (open && JSON.stringify(data) !== '{}') {
       setCacheData(data)
-      const { properties } = data
+      const { properties = {} } = data
 
       const propsArr = Object.keys(properties).map(item => {
         return {
