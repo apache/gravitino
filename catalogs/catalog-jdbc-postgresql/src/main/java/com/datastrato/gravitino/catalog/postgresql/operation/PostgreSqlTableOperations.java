@@ -126,7 +126,8 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
           JdbcColumn.Builder builder =
               new JdbcColumn.Builder()
                   .withName(columnName)
-                  .withDefaultValue(extractDefaultValue(resultSet.getString("column_default")))
+                  // TODO: uncomment this once we support column default values.
+                  // .withDefaultValue(extractDefaultValue(resultSet.getString("column_default")))
                   .withNullable("YES".equalsIgnoreCase(resultSet.getString("is_nullable")))
                   .withType(typeConverter.toGravitinoType(colDataType))
                   .withAutoIncrement("YES".equalsIgnoreCase(resultSet.getString("is_identity")));
@@ -304,9 +305,10 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
       sqlBuilder.append("NOT NULL ");
     }
     // Add DEFAULT value if specified
-    if (StringUtils.isNotEmpty(column.getDefaultValue())) {
-      sqlBuilder.append("DEFAULT '").append(column.getDefaultValue()).append("'").append(SPACE);
-    }
+    // TODO: uncomment this once we support column default values.
+    // if (StringUtils.isNotEmpty(column.getDefaultValue())) {
+    //   sqlBuilder.append("DEFAULT '").append(column.getDefaultValue()).append("'").append(SPACE);
+    // }
 
     // Add column properties if specified
     if (CollectionUtils.isNotEmpty(column.getProperties())) {
