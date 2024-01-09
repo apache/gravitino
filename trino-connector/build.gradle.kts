@@ -14,6 +14,7 @@ repositories {
 
 dependencies {
   implementation(project(":clients:client-java-runtime", configuration = "shadow"))
+//  implementation(files("/Users/yuqi/Downloads/gravitino-client-java-runtime-0.4.0-SNAPSHOT.jar"))
   implementation(libs.jackson.databind)
   implementation(libs.jackson.annotations)
   implementation(libs.guava)

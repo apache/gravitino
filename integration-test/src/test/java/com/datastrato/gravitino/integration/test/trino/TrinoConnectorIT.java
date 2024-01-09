@@ -28,6 +28,7 @@ import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import org.apache.hadoop.hive.conf.HiveConf;
@@ -998,6 +999,26 @@ public class TrinoConnectorIT extends AbstractIT {
     if (!success) {
       Assertions.fail("Trino fail to load table created by gravitino: " + sql);
     }
+
+    // Create a table by Trino SQL and try to load the create table sentence by Trino.
+    tableName = GravitinoITUtils.genRandomName("mysql_table").toLowerCase();
+    containerSuite
+        .getTrinoContainer()
+        .executeUpdateSQL(
+            String.format(
+                "create table \"%s.%s\".%s.%s (col1 varchar(100), col2 char(100))",
+                metalakeName, catalogName, schemaName, tableName));
+
+    ArrayList<ArrayList<String>> createTableResult =
+        containerSuite
+            .getTrinoContainer()
+            .executeQuerySQL(
+                String.format(
+                    "show create table \"%s.%s\".%s.%s",
+                    metalakeName, catalogName, schemaName, tableName));
+    sql = createTableResult.get(0).get(0).toLowerCase(Locale.ENGLISH);
+    Assertions.assertTrue(sql.contains("varchar(100)"));
+    Assertions.assertTrue(sql.contains("char(100)"));
   }
 
   @Test
