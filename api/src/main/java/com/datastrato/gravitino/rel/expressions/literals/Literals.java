@@ -6,6 +6,9 @@ package com.datastrato.gravitino.rel.expressions.literals;
 
 import com.datastrato.gravitino.rel.types.Type;
 import com.datastrato.gravitino.rel.types.Types;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.Objects;
 
 /** The helper class to create literals to pass into Gravitino. */
@@ -24,6 +27,36 @@ public class Literals {
   }
 
   /**
+   * Creates a boolean type literal with the given value.
+   *
+   * @param value the boolean literal value
+   * @return a new {@link Literal} instance
+   */
+  public static LiteralImpl<Boolean> booleanLiteral(Boolean value) {
+    return of(value, Types.BooleanType.get());
+  }
+
+  /**
+   * Creates a byte type literal with the given value.
+   *
+   * @param value the byte literal value
+   * @return a new {@link Literal} instance
+   */
+  public static LiteralImpl<Byte> byteLiteral(Byte value) {
+    return of(value, Types.ByteType.get());
+  }
+
+  /**
+   * Creates a short type literal with the given value.
+   *
+   * @param value the short literal value
+   * @return a new {@link Literal} instance
+   */
+  public static LiteralImpl<Short> shortLiteral(Short value) {
+    return of(value, Types.ShortType.get());
+  }
+
+  /**
    * Creates an integer type literal with the given value.
    *
    * @param value the integer literal value
@@ -31,6 +64,66 @@ public class Literals {
    */
   public static LiteralImpl<Integer> integer(Integer value) {
     return of(value, Types.IntegerType.get());
+  }
+
+  /**
+   * Creates a long type literal with the given value.
+   *
+   * @param value the long literal value
+   * @return a new {@link Literal} instance
+   */
+  public static LiteralImpl<Long> longLiteral(Long value) {
+    return of(value, Types.LongType.get());
+  }
+
+  /**
+   * Creates a float type literal with the given value.
+   *
+   * @param value the float literal value
+   * @return a new {@link Literal} instance
+   */
+  public static LiteralImpl<Float> floatLiteral(Float value) {
+    return of(value, Types.FloatType.get());
+  }
+
+  /**
+   * Creates a double type literal with the given value.
+   *
+   * @param value the double literal value
+   * @return a new {@link Literal} instance
+   */
+  public static LiteralImpl<Double> doubleLiteral(Double value) {
+    return of(value, Types.DoubleType.get());
+  }
+
+  /**
+   * Creates a date type literal with the given value.
+   *
+   * @param value the date literal value
+   * @return a new {@link Literal} instance
+   */
+  public static LiteralImpl<LocalDate> date(LocalDate value) {
+    return of(value, Types.DateType.get());
+  }
+
+  /**
+   * Creates a time type literal with the given value.
+   *
+   * @param value the time literal value
+   * @return a new {@link Literal} instance
+   */
+  public static LiteralImpl<LocalTime> time(LocalTime value) {
+    return of(value, Types.TimeType.get());
+  }
+
+  /**
+   * Creates a timestamp type literal with the given value.
+   *
+   * @param value the timestamp literal value
+   * @return a new {@link Literal} instance
+   */
+  public static LiteralImpl<LocalDateTime> timestamp(LocalDateTime value) {
+    return of(value, Types.TimestampType.withoutTimeZone());
   }
 
   /**
