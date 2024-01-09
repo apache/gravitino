@@ -63,7 +63,7 @@ function check_java_version() {
 
   # JDK 8u151 version fixed a number of security vulnerabilities and issues to improve system stability and security.
   # https://www.oracle.com/java/technologies/javase/8u151-relnotes.html
-  if [ "$JVM_VERSION" -lt 8 ] || { [ "$JVM_VERSION" -eq 8 ] && [ "${jvmver#*_}" -lt 151 ]; } ; then
+  if [[ "$JVM_VERSION" -eq 8 && "${jvmver#*_}" -lt 151 ]] ; then
     echo "[WARNING] Gravitino highly recommends using either Java 8 update 151 or newer"
   fi
 }
