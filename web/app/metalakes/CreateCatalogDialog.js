@@ -126,8 +126,23 @@ const CreateCatalogDialog = props => {
     return check
   }
 
+  const handleChangeProvider = (onChange, e) => {
+    onChange(e.target.value)
+  }
+
+  const resetPropsFields = (providers = [], index = -1) => {
+    if (index !== -1) {
+      providers[index].defaultProps.forEach((item, index) => {
+        if (item.key !== 'catalog-backend') {
+          item.value = ''
+        }
+      })
+    }
+  }
+
   const handleClose = () => {
     reset()
+    resetPropsFields(providers, 0)
     setInnerProps(providers[0].defaultProps)
     setValue('propItems', providers[0].defaultProps)
     setOpen(false)
@@ -177,6 +192,10 @@ const CreateCatalogDialog = props => {
       .catch(err => {
         console.error('valid error', err)
       })
+  }
+
+  const onError = errors => {
+    console.error('fields error', errors)
   }
 
   useEffect(() => {
@@ -297,7 +316,7 @@ const CreateCatalogDialog = props => {
                       value={value}
                       label='Provider'
                       defaultValue='hive'
-                      onChange={onChange}
+                      onChange={e => handleChangeProvider(onChange, e)}
                       error={Boolean(errors.provider)}
                       labelId='select-catalog-provider'
                     >
