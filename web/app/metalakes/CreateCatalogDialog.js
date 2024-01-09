@@ -172,11 +172,30 @@ const CreateCatalogDialog = props => {
     schema
       .validate(validData)
       .then(() => {
-        const properties = innerProps.reduce((acc, item) => {
+        let properties = {}
+
+        const prevProperties = innerProps.reduce((acc, item) => {
           acc[item.key] = item.value
 
           return acc
         }, {})
+
+        const {
+          'catalog-backend': catalogBackend,
+          'jdbc-driver': jdbcDriver,
+          'jdbc-user': jdbcUser,
+          'jdbc-password': jdbcPwd,
+          ...others
+        } = prevProperties
+
+        if (catalogBackend && catalogBackend === 'hive') {
+          properties = {
+            'catalog-backend': catalogBackend,
+            ...others
+          }
+        } else {
+          properties = prevProperties
+        }
 
         const catalogData = {
           ...mainData,
