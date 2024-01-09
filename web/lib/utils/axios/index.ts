@@ -240,7 +240,10 @@ function createAxios(opt?: Partial<CreateAxiosOptions>) {
         // ** authentication schemes, e.g: Bearer
         authenticationScheme: 'Bearer',
         timeout: 0,
-        headers: { 'Content-Type': ContentTypeEnum.JSON },
+        headers: {
+          'Content-Type': ContentTypeEnum.JSON,
+          Accept: 'application/vnd.gravitino.v1+json'
+        },
         transform: clone(transform),
 
         // ** request configuration settings
