@@ -39,6 +39,8 @@ import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
+import com.datastrato.gravitino.rel.indexes.Index;
+import com.datastrato.gravitino.rel.indexes.Indexes;
 import com.datastrato.gravitino.storage.IdGenerator;
 import com.datastrato.gravitino.utils.PrincipalUtils;
 import com.datastrato.gravitino.utils.ThrowableFunction;
@@ -392,6 +394,7 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
    * @param comment A description or comment associated with the table.
    * @param properties Additional properties to set for the table.
    * @param partitions An array of {@link Transform} objects representing the partitioning of table
+   * @param indexes An array of {@link Index} objects representing the indexes of the table.
    * @return The newly created {@link Table} object.
    * @throws NoSuchSchemaException If the schema in which to create the table does not exist.
    * @throws TableAlreadyExistsException If a table with the same name already exists in the schema.
@@ -404,7 +407,8 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
       Map<String, String> properties,
       Transform[] partitions,
       Distribution distribution,
-      SortOrder[] sortOrders)
+      SortOrder[] sortOrders,
+      Index[] indexes)
       throws NoSuchSchemaException, TableAlreadyExistsException {
     NameIdentifier catalogIdent = getCatalogIdentifier(ident);
     doWithCatalog(
@@ -436,7 +440,8 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
                         updatedProperties,
                         partitions == null ? EMPTY_TRANSFORM : partitions,
                         distribution == null ? Distributions.NONE : distribution,
-                        sortOrders == null ? new SortOrder[0] : sortOrders)),
+                        sortOrders == null ? new SortOrder[0] : sortOrders,
+                        indexes == null ? Indexes.EMPTY_INDEXES : indexes)),
         NoSuchSchemaException.class,
         TableAlreadyExistsException.class);
 

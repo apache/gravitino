@@ -12,6 +12,7 @@ import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
+import com.datastrato.gravitino.rel.indexes.Index;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -82,6 +83,11 @@ public final class EntityCombinedTable implements Table {
   @Override
   public Distribution distribution() {
     return table.distribution();
+  }
+
+  @Override
+  public Index[] index() {
+    return table.index();
   }
 
   @Override
