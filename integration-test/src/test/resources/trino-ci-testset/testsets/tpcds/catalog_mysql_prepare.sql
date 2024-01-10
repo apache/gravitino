@@ -9,8 +9,8 @@ call gravitino.system.create_catalog(
 
 show catalogs;
 
-create schema "test.gt_mysql1".gt_tcph;
-use "test.gt_mysql1".gt_tcph;
+create schema "test.gt_mysql1".gt_tpcds;
+use "test.gt_mysql1".gt_tpcds;
 
 CREATE TABLE call_center (
    cc_call_center_sk bigint,
@@ -174,7 +174,6 @@ CREATE TABLE customer_demographics (
    cd_dep_college_count integer
 );
 
-------------------------------------
  CREATE TABLE date_dim (
     d_date_sk bigint,
     d_date_id char(16),

@@ -13,7 +13,7 @@ RENAME TABLE
 DROP COLUMN
 
 "CREATE TABLE ""test.gt_mysql"".gt_db1.tb01 (
-   name varchar(16383),
+   name varchar(200),
    salary integer
 )
 COMMENT ''"
@@ -21,7 +21,7 @@ COMMENT ''"
 SET COLUMN TYPE
 
 "CREATE TABLE ""test.gt_mysql"".gt_db1.tb01 (
-   name varchar(16383),
+   name varchar(200),
    salary bigint
 )
 COMMENT ''"
@@ -29,9 +29,9 @@ COMMENT ''"
 ADD COLUMN
 
 "CREATE TABLE ""test.gt_mysql"".gt_db1.tb01 (
-   name varchar(16383),
+   name varchar(200),
    salary bigint,
-   city varchar(16383) COMMENT 'aaa'
+   city varchar(50) COMMENT 'aaa'
 )
 COMMENT ''"
 

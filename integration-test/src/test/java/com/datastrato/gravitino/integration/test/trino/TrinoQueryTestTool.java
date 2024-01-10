@@ -95,8 +95,8 @@ public class TrinoQueryTestTool {
         testSetDir = TrinoQueryIT.class.getClassLoader().getResource("trino-ci-testset").getPath();
         testSetDir = testSetDir + "/testsets";
       }
-      TrinoQueryIT2.testsetsDir = testSetDir;
-      String path = TrinoQueryIT2.testsetsDir + "/" + testSet;
+      TrinoQueryIT.testsetsDir = testSetDir;
+      String path = TrinoQueryIT.testsetsDir + "/" + testSet;
 
       if (testSet != null) {
         if (!new File(path).exists()) {
@@ -113,11 +113,13 @@ public class TrinoQueryTestTool {
         }
       }
 
+      checkEnv();
+
       TrinoQueryITBase.autoStart = autoStart;
       TrinoQueryITBase.autoStartGravition = autoStartGravitino;
 
-      TrinoQueryIT2.setup();
-      TrinoQueryIT2 testerRunner = new TrinoQueryIT2();
+      TrinoQueryIT.setup();
+      TrinoQueryIT testerRunner = new TrinoQueryIT();
 
       String gen = commandLine.getOptionValue("gen_output");
       if (Strings.isNotEmpty(gen)) {
@@ -135,7 +137,21 @@ public class TrinoQueryTestTool {
     } catch (Exception e) {
       System.out.println(e.getMessage());
     } finally {
-      TrinoQueryIT2.cleanup();
+      TrinoQueryIT.cleanup();
+    }
+  }
+
+  private static void checkEnv() {
+    if (Strings.isEmpty(System.getenv("GRAVITINO_ROOT_DIR"))) {
+      throw new RuntimeException("GRAVITINO_ROOT_DIR is not set");
+    }
+
+    if (Strings.isEmpty(System.getenv("GRAVITINO_HOME"))) {
+      throw new RuntimeException("GRAVITINO_HOME is not set");
+    }
+
+    if (Strings.isEmpty(System.getenv("GRAVITINO_TEST"))) {
+      throw new RuntimeException("GRAVITINO_TEST is not set");
     }
   }
 }

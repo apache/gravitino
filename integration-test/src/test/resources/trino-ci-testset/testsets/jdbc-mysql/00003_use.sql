@@ -3,7 +3,7 @@ CREATE SCHEMA "test.gt_mysql".gt_db1;
 USE "test.gt_mysql".gt_db1;
 
 CREATE TABLE tb01 (
-    name varchar,
+    name varchar(200),
     salary int
 );
 

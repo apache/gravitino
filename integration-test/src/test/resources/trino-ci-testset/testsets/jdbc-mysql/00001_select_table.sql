@@ -1,7 +1,7 @@
 CREATE SCHEMA "test.gt_mysql".gt_db1;
 
 CREATE TABLE "test.gt_mysql".gt_db1.tb01 (
-    name varchar,
+    name varchar(200),
     salary int
 );
 
@@ -12,7 +12,7 @@ insert into "test.gt_mysql".gt_db1.tb01(name, salary) values ('bob', 14), ('tom'
 select * from "test.gt_mysql".gt_db1.tb01 order by name;
 
 CREATE TABLE "test.gt_mysql".gt_db1.tb02 (
-    name varchar,
+    name varchar(200),
     salary int
 );
 

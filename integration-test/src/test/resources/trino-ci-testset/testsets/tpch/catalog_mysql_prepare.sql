@@ -7,8 +7,8 @@ call gravitino.system.create_catalog(
     )
 );
 
-create schema "test.gt_mysql2".gt_tcph;
-use "test.gt_mysql2".gt_tcph;
+create schema "test.gt_mysql2".gt_tpch;
+use "test.gt_mysql2".gt_tpch;
 
 CREATE TABLE customer (
    custkey bigint NOT NULL,

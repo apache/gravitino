@@ -53,14 +53,13 @@ public class TrinoQueryITBase {
   private static void setEnv() throws Exception {
     if (autoStart) {
       AbstractIT.startIntegrationTest();
-      AbstractIT.getGravitinoServerPort();
-      ContainerSuite.getInstance();
-      trinoITContainers = ContainerSuite.getTrinoITContainers();
-      trinoITContainers.launch(AbstractIT.getGravitinoServerPort());
-      gravitinoClient = AbstractIT.getGravitinoClient();
 
-      gravitinoUri =
-          String.format("http://%s:%d", "127.0.0.1", AbstractIT.getGravitinoServerPort());
+      trinoITContainers = ContainerSuite.getInstance().getTrinoITContainers();
+      trinoITContainers.launch(AbstractIT.getGravitinoServerPort());
+
+      gravitinoClient = AbstractIT.getGravitinoClient();
+      gravitinoUri = String.format("http://127.0.0.1:%d", AbstractIT.getGravitinoServerPort());
+
       trinoUri = trinoITContainers.getTrinoUri();
       hiveMetastoreUri = trinoITContainers.getHiveMetastoreUri();
       hdfsUri = trinoITContainers.getHdfsUri();
@@ -157,6 +156,7 @@ public class TrinoQueryITBase {
         String result = trinoQueryRunner.runQuery("show catalogs");
         if (result.contains(metalakeName + "." + catalogName)) {
           catalogCreated = true;
+          break;
         }
         LOG.info("Waiting for catalog {} to be created", catalogName);
         // connection exception need retry.
