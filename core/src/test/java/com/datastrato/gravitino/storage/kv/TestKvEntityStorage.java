@@ -887,4 +887,73 @@ public class TestKvEntityStorage {
       Assertions.assertEquals(StorageLayoutVersion.V1, entityStore.storageLayoutVersion);
     }
   }
+
+  @Test
+  void testDeleteAndRename() throws IOException {
+    Config config = Mockito.mock(Config.class);
+    File baseDir = new File(System.getProperty("java.io.tmpdir"));
+    File file = Files.createTempDirectory(baseDir.toPath(), "test").toFile();
+    file.deleteOnExit();
+    Mockito.when(config.get(ENTITY_STORE)).thenReturn("kv");
+    Mockito.when(config.get(ENTITY_KV_STORE)).thenReturn(DEFAULT_ENTITY_KV_STORE);
+    Mockito.when(config.get(Configs.ENTITY_SERDE)).thenReturn("proto");
+    Mockito.when(config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)).thenReturn(file.getAbsolutePath());
+    Mockito.when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(1000L);
+    Mockito.when(config.get(KV_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
+
+    try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
+      store.initialize(config);
+      Assertions.assertTrue(store instanceof KvEntityStore);
+      store.setSerDe(EntitySerDeFactory.createEntitySerDe(config.get(Configs.ENTITY_SERDE)));
+
+      AuditInfo auditInfo =
+          new AuditInfo.Builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+      BaseMetalake metalake1 = createBaseMakeLake("metalake1", auditInfo);
+      BaseMetalake metalake2 = createBaseMakeLake("metalake2", auditInfo);
+      BaseMetalake metalake3 = createBaseMakeLake("metalake3", auditInfo);
+
+      store.put(metalake1);
+      store.put(metalake2);
+      store.put(metalake3);
+
+      store.delete(NameIdentifier.of("metalake1"), EntityType.METALAKE);
+      store.delete(NameIdentifier.of("metalake2"), EntityType.METALAKE);
+      store.delete(NameIdentifier.of("metalake3"), EntityType.METALAKE);
+
+      // Rename metalake1 --> metalake2
+      store.put(metalake1);
+      store.update(
+          NameIdentifier.of("metalake1"),
+          BaseMetalake.class,
+          EntityType.METALAKE,
+          e -> createBaseMakeLake("metalake2", (AuditInfo) e.auditInfo()));
+
+      // Rename metalake3 --> metalake1
+      store.put(metalake3);
+      store.update(
+          NameIdentifier.of("metalake3"),
+          BaseMetalake.class,
+          EntityType.METALAKE,
+          e -> createBaseMakeLake("metalake1", (AuditInfo) e.auditInfo()));
+
+      // Rename metalake3 --> metalake2
+      store.put(metalake3);
+      store.delete(NameIdentifier.of("metalake2"), EntityType.METALAKE);
+      store.update(
+          NameIdentifier.of("metalake3"),
+          BaseMetalake.class,
+          EntityType.METALAKE,
+          e -> createBaseMakeLake("metalake2", (AuditInfo) e.auditInfo()));
+
+      // Finally, only metalake2 and metalake1 are left.
+      Assertions.assertDoesNotThrow(
+          () -> store.get(NameIdentifier.of("metalake2"), EntityType.METALAKE, BaseMetalake.class));
+      Assertions.assertDoesNotThrow(
+          () -> store.get(NameIdentifier.of("metalake1"), EntityType.METALAKE, BaseMetalake.class));
+      Assertions.assertThrows(
+          NoSuchEntityException.class,
+          () -> store.get(NameIdentifier.of("metalake3"), EntityType.METALAKE, BaseMetalake.class));
+    }
+  }
 }
