@@ -11,8 +11,19 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.Objects;
 
-/** Used to represent a {@link Types.DecimalType} value in Gravitino. */
+/**
+ * Used to represent a {@link Types.DecimalType} value in Gravitino.
+ *
+ * <p>For Decimal, we expect the precision is equal to or larger than the scale, however, in {@link
+ * BigDecimal}, the digit count starts from the leftmost nonzero digit of the exact result. For
+ * example, the precision of 0.01 equals to 1 based on the definition, but the scale is 2. The
+ * expected precision should be 2.
+ */
 public class Decimal {
+
+  private final BigDecimal value;
+  private final int precision;
+  private final int scale;
 
   /**
    * Creates a decimal value with the given value, precision and scale.
@@ -73,10 +84,6 @@ public class Decimal {
     return scale;
   }
 
-  private final BigDecimal value;
-  private final int precision;
-  private final int scale;
-
   private Decimal(BigDecimal value, int precision, int scale) {
     checkPrecisionScale(precision, scale);
     Preconditions.checkArgument(
@@ -90,14 +97,7 @@ public class Decimal {
   }
 
   private Decimal(BigDecimal value) {
-    this(
-        value,
-        // For Decimal, we expect the precision is equal to or larger than the scale, however,
-        // in BigDecimal, the digit count starts from the leftmost nonzero digit of the exact
-        // result. For example, the precision of 0.01 equals to 1 based on the definition, but
-        // the scale is 2. The expected precision should be 2.
-        Math.max(value.precision(), value.scale()),
-        value.scale());
+    this(value, Math.max(value.precision(), value.scale()), value.scale());
   }
 
   @Override
