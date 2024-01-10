@@ -91,11 +91,13 @@ const CreateMetalakeDialog = props => {
   }
 
   const onSubmit = data => {
-    const properties = innerProps.reduce((acc, item) => {
-      acc[item.key] = item.value
+    const properties = innerProps
+      .filter(i => i.key.trim() !== '')
+      .reduce((acc, item) => {
+        acc[item.key] = item.value
 
-      return acc
-    }, {})
+        return acc
+      }, {})
 
     const metalakeData = {
       ...data,
