@@ -454,6 +454,8 @@ public class TestPostgreSqlTableOperations extends TestPostgreSqlAbstractIT {
             .withNullable(false)
             .withComment("set test key")
             .build());
+
+    //Testing does not support auto increment column types
     IllegalArgumentException illegalArgumentException =
         Assertions.assertThrows(
             IllegalArgumentException.class,
