@@ -8,7 +8,7 @@
   },
   "eslint.validate": ["javascript", "javascriptreact"],
   "eslint.format.enable": true,
-  "npm.packageManager": "yarn",
+  "npm.packageManager": "pnpm",
   "cSpell.words": [
     "clsx",
     "Datastrato",
