@@ -91,11 +91,13 @@ const CreateMetalakeDialog = props => {
   }
 
   const onSubmit = data => {
-    const properties = innerProps.reduce((acc, item) => {
-      acc[item.key] = item.value
+    const properties = innerProps
+      .filter(i => i.key.trim() !== '')
+      .reduce((acc, item) => {
+        acc[item.key] = item.value
 
-      return acc
-    }, {})
+        return acc
+      }, {})
 
     const metalakeData = {
       ...data,
@@ -118,7 +120,7 @@ const CreateMetalakeDialog = props => {
   useEffect(() => {
     if (open && JSON.stringify(data) !== '{}') {
       setCacheData(data)
-      const { properties } = data
+      const { properties = {} } = data
 
       const propsArr = Object.keys(properties).map(item => {
         return {

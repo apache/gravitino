@@ -28,7 +28,10 @@ import java.util.Objects;
  * Represents a constant literal value in the public expression API.
  *
  * @param <T> the JVM type of value held by the literal
+ * @deprecated This interface will be removed. Use {@link
+ *     com.datastrato.gravitino.rel.expressions.literals.Literal} instead.
  */
+@Deprecated
 public interface Literal<T> extends Expression {
   /** @return The literal value. */
   T value();

@@ -24,6 +24,8 @@ public abstract class BaseColumn implements Column {
 
   protected boolean nullable;
 
+  protected boolean autoIncrement;
+
   /**
    * Returns the name of the column.
    *
@@ -61,6 +63,12 @@ public abstract class BaseColumn implements Column {
     return nullable;
   }
 
+  /** @return True if this column is an auto-increment column. Default is false. */
+  @Override
+  public boolean autoIncrement() {
+    return autoIncrement;
+  }
+
   /**
    * Builder interface for creating instances of {@link BaseColumn}.
    *
@@ -75,6 +83,8 @@ public abstract class BaseColumn implements Column {
     SELF withType(Type dataType);
 
     SELF withNullable(boolean nullable);
+
+    SELF withAutoIncrement(boolean autoIncrement);
 
     T build();
   }
@@ -92,6 +102,7 @@ public abstract class BaseColumn implements Column {
     protected String comment;
     protected Type dataType;
     protected boolean nullable = true;
+    protected boolean autoIncrement = false;
 
     /**
      * Sets the name of the column.
@@ -138,6 +149,18 @@ public abstract class BaseColumn implements Column {
     @Override
     public SELF withNullable(boolean nullable) {
       this.nullable = nullable;
+      return self();
+    }
+
+    /**
+     * Sets whether the column is an auto-increment column.
+     *
+     * @param autoIncrement Whether the column is an auto-increment column.
+     * @return The builder instance.
+     */
+    @Override
+    public SELF withAutoIncrement(boolean autoIncrement) {
+      this.autoIncrement = autoIncrement;
       return self();
     }
 

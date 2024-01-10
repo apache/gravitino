@@ -41,20 +41,23 @@ const MetalakeView = props => {
       case 'metalakes':
         dispatch(fetchCatalogs({ init: true, page, metalake }))
         dispatch(getMetalakeDetails({ metalake }))
-
         break
       case 'catalogs':
-        dispatch(fetchSchemas({ init: true, page, metalake, catalog }))
-        dispatch(getCatalogDetails({ metalake, catalog }))
-
+        if (catalog !== null) {
+          dispatch(fetchSchemas({ init: true, page, metalake, catalog }))
+          dispatch(getCatalogDetails({ metalake, catalog }))
+        }
         break
       case 'schemas':
-        dispatch(fetchTables({ init: true, page, metalake, catalog, schema }))
-        dispatch(getSchemaDetails({ metalake, catalog, schema }))
-
+        if (catalog !== null && schema !== null) {
+          dispatch(fetchTables({ init: true, page, metalake, catalog, schema }))
+          dispatch(getSchemaDetails({ metalake, catalog, schema }))
+        }
         break
       case 'tables':
-        dispatch(getTableDetails({ metalake, catalog, schema, table }))
+        if (catalog !== null && schema !== null && table !== null) {
+          dispatch(getTableDetails({ metalake, catalog, schema, table }))
+        }
         break
       default:
         break

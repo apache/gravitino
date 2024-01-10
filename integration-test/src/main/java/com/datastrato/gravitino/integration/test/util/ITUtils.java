@@ -17,7 +17,7 @@ public class ITUtils {
   public static final String TEST_MODE = "testMode";
   public static final String EMBEDDED_TEST_MODE = "embedded";
 
-  public static String joinDirPath(String... dirs) {
+  public static String joinPath(String... dirs) {
     return String.join(File.separator, dirs);
   }
 

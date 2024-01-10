@@ -11,5 +11,4 @@ show tables from "test.gt_mysql".gt_db1;
 
 drop table tb01;
 
-
 drop schema "test.gt_mysql".gt_db1;

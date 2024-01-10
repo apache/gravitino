@@ -64,7 +64,7 @@ public class TrinoQueryTestTool {
         } else if (auto.equals("gravitino")) {
           autoStart = false;
           autoStartGravitino = true;
-        } else if (auto.equals("none")){
+        } else if (auto.equals("none")) {
           autoStart = false;
           autoStartGravitino = false;
         } else {

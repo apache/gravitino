@@ -1,10 +1,11 @@
 /*
- * Copyright 2023 Datastrato Pvt Ltd.
+ * Copyright 2024 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 package com.datastrato.gravitino.integration.test.container;
 
 import com.datastrato.gravitino.integration.test.util.CommandExecutor;
+import com.datastrato.gravitino.integration.test.util.ITUtils;
 import com.datastrato.gravitino.integration.test.util.ProcessData;
 import java.util.HashMap;
 import java.util.Map;
@@ -12,6 +13,7 @@ import org.apache.logging.log4j.util.Strings;
 import org.mortbay.log.Log;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testcontainers.containers.ContainerLaunchException;
 import org.testcontainers.shaded.com.google.common.collect.ImmutableSet;
 
 public class TrinoITContainers implements AutoCloseable {
@@ -30,7 +32,7 @@ public class TrinoITContainers implements AutoCloseable {
       throw new RuntimeException("GRAVITINO_ROOT_DIR is not set");
     }
 
-    dockerComposeDir = dir + "/integration-test/trino-it/";
+    dockerComposeDir = ITUtils.joinPath(dir, "integration-test", "trino-it");
   }
 
   public void launch(int gravitinoServerPort) throws Exception {
@@ -40,7 +42,7 @@ public class TrinoITContainers implements AutoCloseable {
     env.put("GRAVITINO_SERVER_PORT", String.valueOf(gravitinoServerPort));
     env.put("GRAVITINO_LOG_PATH", System.getProperty("gravitino.log.path"));
 
-    String command = dockerComposeDir + "launch.sh";
+    String command = ITUtils.joinPath(dockerComposeDir, "launch.sh");
     Object output =
         CommandExecutor.executeCommandLocalHost(
             command, false, ProcessData.TypesOfData.STREAMS_MERGED, env);
@@ -50,7 +52,7 @@ public class TrinoITContainers implements AutoCloseable {
   }
 
   private void resolveServerAddress() throws Exception {
-    String command = dockerComposeDir + "inspect_ip.sh";
+    String command = ITUtils.joinPath(dockerComposeDir, "inspect_ip.sh");
     Object output =
         CommandExecutor.executeCommandLocalHost(
             command, false, ProcessData.TypesOfData.STREAMS_MERGED);
@@ -64,17 +66,13 @@ public class TrinoITContainers implements AutoCloseable {
 
     String containerIpMapping = output.toString();
     if (containerIpMapping.isEmpty()) {
-      throw new Exception("Missing to get container's ip");
+      throw new ContainerLaunchException("Missing to get container status");
     }
 
     try {
       String[] containerInfos = containerIpMapping.split("\n");
       for (String container : containerInfos) {
         String[] info = container.split(":");
-
-        if (info.length != 2) {
-          throw new Exception("Invalid container's ip info: " + container);
-        }
 
         String containerName = info[0];
         String address = info[1];
@@ -91,18 +89,19 @@ public class TrinoITContainers implements AutoCloseable {
         }
       }
     } catch (Exception e) {
-      throw new Exception("Failed to parse container ip:\n" + containerIpMapping, e);
+      throw new ContainerLaunchException("Unexpected container status :\n" + containerIpMapping, e);
     }
 
     for (String serviceName : servicesName) {
       if (!servicesUri.containsKey(serviceName)) {
-        throw new Exception("Missing to get container's ip for service: " + serviceName);
+        throw new ContainerLaunchException(
+            "The container for the {} service is not started: " + serviceName);
       }
     }
   }
 
   public void shutdown() {
-    String command = dockerComposeDir + "shutdown.sh";
+    String command = ITUtils.joinPath(dockerComposeDir, "shutdown.sh");
     Object output =
         CommandExecutor.executeCommandLocalHost(
             command, false, ProcessData.TypesOfData.STREAMS_MERGED);
