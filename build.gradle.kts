@@ -213,8 +213,6 @@ subprojects {
     plugins.apply(NodePlugin::class)
     configure<NodeExtension> {
       version.set("20.9.0")
-      npmVersion.set("10.1.0")
-      yarnVersion.set("1.22.19")
       nodeProjectDir.set(file("$rootDir/.node"))
       download.set(true)
     }
