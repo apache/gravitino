@@ -280,6 +280,8 @@ tasks.rat {
     "web/lib/enums/httpEnum.ts",
     "web/types/axios.d.ts",
     "web/yarn.lock",
+    "web/package-lock.json",
+    "web/pnpm-lock.yaml",
     "**/LICENSE.*",
     "**/NOTICE.*"
   )
