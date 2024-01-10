@@ -36,7 +36,8 @@ public interface Type {
     STRUCT,
     LIST,
     MAP,
-    UNION
+    UNION,
+    NULL
   }
 
   /** The base type of all primitive types. */
