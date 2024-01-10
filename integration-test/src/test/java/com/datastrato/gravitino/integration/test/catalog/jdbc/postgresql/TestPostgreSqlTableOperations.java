@@ -442,7 +442,7 @@ public class TestPostgreSqlTableOperations extends TestPostgreSqlAbstractIT {
     columns.add(
         new JdbcColumn.Builder()
             .withName("col_1")
-            .withType(INT)
+            .withType(Types.ShortType.get())
             .withComment("increment key")
             .withNullable(false)
             .withAutoIncrement(true)
@@ -454,15 +454,19 @@ public class TestPostgreSqlTableOperations extends TestPostgreSqlAbstractIT {
             .withNullable(false)
             .withComment("set test key")
             .build());
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () ->
-            TABLE_OPERATIONS.create(
-                TEST_DB_NAME,
-                GravitinoITUtils.genRandomName("increment_table_"),
-                columns.toArray(new JdbcColumn[0]),
-                tableComment,
-                properties,
-                null));
+    IllegalArgumentException illegalArgumentException =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                TABLE_OPERATIONS.create(
+                    TEST_DB_NAME,
+                    GravitinoITUtils.genRandomName("increment_table_"),
+                    columns.toArray(new JdbcColumn[0]),
+                    tableComment,
+                    properties,
+                    null));
+
+    Assertions.assertTrue(
+        StringUtils.contains(illegalArgumentException.getMessage(), "Not support auto-increment"));
   }
 }
