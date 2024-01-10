@@ -399,4 +399,70 @@ public class TestPostgreSqlTableOperations extends TestPostgreSqlAbstractIT {
     JdbcTable load = TABLE_OPERATIONS.load(TEST_DB_NAME, table_2);
     Assertions.assertEquals(table_2, load.name());
   }
+
+  @Test
+  public void testCreateAutoIncrementTable() {
+    String tableName = GravitinoITUtils.genRandomName("increment_table_");
+    String tableComment = "test_comment";
+    List<JdbcColumn> columns = new ArrayList<>();
+    columns.add(
+        new JdbcColumn.Builder()
+            .withName("col_1")
+            .withType(Types.LongType.get())
+            .withComment("increment key")
+            .withNullable(false)
+            .withAutoIncrement(true)
+            .build());
+    columns.add(
+        new JdbcColumn.Builder()
+            .withName("col_2")
+            .withType(INT)
+            .withNullable(false)
+            .withComment("set test key")
+            .build());
+    Map<String, String> properties = new HashMap<>();
+    // create table
+    TABLE_OPERATIONS.create(
+        TEST_DB_NAME,
+        tableName,
+        columns.toArray(new JdbcColumn[0]),
+        tableComment,
+        properties,
+        null);
+
+    // list table
+    List<String> tables = TABLE_OPERATIONS.listTables(TEST_DB_NAME);
+    Assertions.assertTrue(tables.contains(tableName));
+
+    // load table
+    JdbcTable load = TABLE_OPERATIONS.load(TEST_DB_NAME, tableName);
+    assertionsTableInfo(tableName, tableComment, columns, properties, load);
+
+    columns.clear();
+    columns.add(
+        new JdbcColumn.Builder()
+            .withName("col_1")
+            .withType(INT)
+            .withComment("increment key")
+            .withNullable(false)
+            .withAutoIncrement(true)
+            .build());
+    columns.add(
+        new JdbcColumn.Builder()
+            .withName("col_2")
+            .withType(INT)
+            .withNullable(false)
+            .withComment("set test key")
+            .build());
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            TABLE_OPERATIONS.create(
+                TEST_DB_NAME,
+                GravitinoITUtils.genRandomName("increment_table_"),
+                columns.toArray(new JdbcColumn[0]),
+                tableComment,
+                properties,
+                null));
+  }
 }
