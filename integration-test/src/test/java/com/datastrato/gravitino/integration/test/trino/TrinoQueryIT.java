@@ -22,6 +22,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.logging.log4j.util.Strings;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
@@ -79,7 +80,7 @@ public class TrinoQueryIT extends TrinoQueryITBase {
     }
   }
 
-  @BeforeAll
+  @AfterAll
   public static void cleanup() {
     TrinoQueryITBase.cleanup();
   }
