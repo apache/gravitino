@@ -174,11 +174,13 @@ const CreateCatalogDialog = props => {
       .then(() => {
         let properties = {}
 
-        const prevProperties = innerProps.reduce((acc, item) => {
-          acc[item.key] = item.value
+        const prevProperties = innerProps
+          .filter(i => i.key.trim() !== '')
+          .reduce((acc, item) => {
+            acc[item.key] = item.value
 
-          return acc
-        }, {})
+            return acc
+          }, {})
 
         const {
           'catalog-backend': catalogBackend,
