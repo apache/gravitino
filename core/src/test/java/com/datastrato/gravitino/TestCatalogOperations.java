@@ -293,7 +293,7 @@ public class TestCatalogOperations implements CatalogOperations, TableCatalog, S
     if (config.containsKey("mock")) {
       return new BasePropertiesMetadata() {
         @Override
-        public Map<String, PropertyEntry<?>> specificPropertyEntries() {
+        protected Map<String, PropertyEntry<?>> specificPropertyEntries() {
           return ImmutableMap.<String, PropertyEntry<?>>builder()
               .put(
                   "key1",
@@ -345,7 +345,7 @@ public class TestCatalogOperations implements CatalogOperations, TableCatalog, S
     } else if (config.containsKey("hive")) {
       return new BasePropertiesMetadata() {
         @Override
-        public Map<String, PropertyEntry<?>> specificPropertyEntries() {
+        protected Map<String, PropertyEntry<?>> specificPropertyEntries() {
           return ImmutableMap.<String, PropertyEntry<?>>builder()
               .put(
                   "hive.metastore.uris",

@@ -189,7 +189,7 @@ public class HiveTablePropertiesMetadata extends BasePropertiesMetadata {
   }
 
   @Override
-  public Map<String, PropertyEntry<?>> specificPropertyEntries() {
+  protected Map<String, PropertyEntry<?>> specificPropertyEntries() {
     return propertiesMetadata;
   }
 }
