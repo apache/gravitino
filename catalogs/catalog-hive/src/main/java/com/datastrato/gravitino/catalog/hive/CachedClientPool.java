@@ -50,45 +50,35 @@ import org.immutables.value.Value;
  */
 public class CachedClientPool implements ClientPool<IMetaStoreClient, TException> {
 
-  private static Cache<Key, HiveClientPool> clientPoolCache;
+  private final Cache<Key, HiveClientPool> clientPoolCache;
 
   private final Configuration conf;
   private final int clientPoolSize;
-  private final long evictionInterval;
-  private final String cacheKeys;
 
   CachedClientPool(
       int clientPoolSize, Configuration conf, long evictionInterval, String cacheKeys) {
     this.conf = conf;
     this.clientPoolSize = clientPoolSize;
-    this.evictionInterval = evictionInterval;
-    this.cacheKeys = cacheKeys;
-    init();
+    // Since Caffeine does not ensure that removalListener will be involved after expiration
+    // We use a scheduler with one thread to clean up expired clients.
+    this.clientPoolCache =
+            Caffeine.newBuilder()
+                    .expireAfterAccess(evictionInterval, TimeUnit.MILLISECONDS)
+                    .removalListener((ignored, value, cause) -> ((HiveClientPool) value).close())
+                    .scheduler(
+                            Scheduler.forScheduledExecutorService(
+                                    new ScheduledThreadPoolExecutor(1, newDaemonThreadFactory())))
+                    .build();
   }
 
   @VisibleForTesting
   HiveClientPool clientPool() {
-    Key key = extractKey(clientPoolSize, cacheKeys, conf);
+    Key key = extractKey();
     return clientPoolCache.get(key, k -> new HiveClientPool(clientPoolSize, conf));
   }
 
-  private synchronized void init() {
-    if (clientPoolCache == null) {
-      // Since Caffeine does not ensure that removalListener will be involved after expiration
-      // We use a scheduler with one thread to clean up expired clients.
-      clientPoolCache =
-          Caffeine.newBuilder()
-              .expireAfterAccess(evictionInterval, TimeUnit.MILLISECONDS)
-              .removalListener((ignored, value, cause) -> ((HiveClientPool) value).close())
-              .scheduler(
-                  Scheduler.forScheduledExecutorService(
-                      new ScheduledThreadPoolExecutor(1, newDaemonThreadFactory())))
-              .build();
-    }
-  }
-
   @VisibleForTesting
-  static Cache<Key, HiveClientPool> clientPoolCache() {
+  Cache<Key, HiveClientPool>  clientPoolCache() {
     return clientPoolCache;
   }
 
@@ -105,32 +95,14 @@ public class CachedClientPool implements ClientPool<IMetaStoreClient, TException
   }
 
   @VisibleForTesting
-  static Key extractKey(int clientPoolSize, String cacheKeys, Configuration conf) {
-    // generate key elements in a certain order, so that the Key instances are comparable
+  static Key extractKey() {
     List<Object> elements = Lists.newArrayList();
-    elements.add(conf.get(HiveConf.ConfVars.METASTOREURIS.varname, ""));
-    elements.add(clientPoolSize);
     try {
       elements.add(UserGroupInformation.getCurrentUser().getUserName());
     } catch (IOException e) {
       throw new UncheckedIOException(e);
     }
 
-    if (cacheKeys == null || cacheKeys.isEmpty()) {
-      return Key.of(elements);
-    }
-
-    Map<String, String> confElements = Maps.newTreeMap();
-    for (String element : cacheKeys.split(",", -1)) {
-      String trimmed = element.trim();
-        Preconditions.checkArgument(
-            !confElements.containsKey(trimmed), "Conf key element %s already specified", trimmed);
-        confElements.put(trimmed, conf.get(trimmed));
-    }
-
-    for (String key : confElements.keySet()) {
-      elements.add(ConfElement.of(key, confElements.get(key)));
-    }
     return Key.of(elements);
   }
 
