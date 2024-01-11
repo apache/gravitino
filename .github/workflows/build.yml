@@ -68,7 +68,7 @@ jobs:
           distribution: 'temurin'
 
       - name: Build with Gradle
-        run: docker image rm datastrato/gravitino-ci-hive:0.1.7 && ./gradlew build -PskipITs -PjdkVersion=${{ matrix.java-version }}
+        run: apt-get install docker && docker image rm datastrato/gravitino-ci-hive:0.1.7 && ./gradlew build -PskipITs -PjdkVersion=${{ matrix.java-version }}
 
       - name: Upload unit tests report
         uses: actions/upload-artifact@v3
