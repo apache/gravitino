@@ -66,9 +66,13 @@ jobs:
         with:
           java-version: ${{ matrix.java-version }}
           distribution: 'temurin'
+      - uses: docker-practice/actions-setup-docker@master
+        timeout-minutes: 12
 
       - name: Build with Gradle
-        run: apt-get install docker && docker image rm datastrato/gravitino-ci-hive:0.1.7 && ./gradlew build -PskipITs -PjdkVersion=${{ matrix.java-version }}
+        run: |
+          docker image rm datastrato/gravitino-ci-hive:0.1.7
+          ./gradlew build -PskipITs -PjdkVersion=${{ matrix.java-version }}
 
       - name: Upload unit tests report
         uses: actions/upload-artifact@v3
