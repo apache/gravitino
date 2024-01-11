@@ -52,7 +52,7 @@ public class CachedClientPool implements ClientPool<IMetaStoreClient, TException
   private final int clientPoolSize;
 
   CachedClientPool(
-      int clientPoolSize, Configuration conf, long evictionInterval, String cacheKeys) {
+      int clientPoolSize, Configuration conf, long evictionInterval) {
     this.conf = conf;
     this.clientPoolSize = clientPoolSize;
     // Since Caffeine does not ensure that removalListener will be involved after expiration

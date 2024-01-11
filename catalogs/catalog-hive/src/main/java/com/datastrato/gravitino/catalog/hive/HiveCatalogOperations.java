@@ -138,8 +138,8 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
         new CachedClientPool(
             getClientPoolSize(conf),
             hiveConf,
-            getCacheEvictionInterval(conf),
-            getCacheKeys(byPassConfig));
+            getCacheEvictionInterval(conf)
+        );
   }
 
   @VisibleForTesting
@@ -150,10 +150,6 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
   long getCacheEvictionInterval(Map<String, String> conf) {
     return (long)
         catalogPropertiesMetadata.getOrDefault(conf, CLIENT_POOL_CACHE_EVICTION_INTERVAL_MS);
-  }
-
-  String getCacheKeys(Map<String, String> conf) {
-    return StringUtils.join(conf.keySet(), ",");
   }
 
   /** Closes the Hive catalog and releases the associated client pool. */

@@ -31,7 +31,7 @@ import org.junit.jupiter.api.Test;
 public class TestCachedClientPool extends MiniHiveMetastoreService {
   @Test
   public void testClientPoolCleaner() throws InterruptedException {
-    CachedClientPool clientPool = new CachedClientPool(1, hiveConf, 5000, "");
+    CachedClientPool clientPool = new CachedClientPool(1, hiveConf, 5000);
     HiveClientPool clientPool1 = clientPool.clientPool();
     HiveClientPool cachedClientPool =
         clientPool.clientPoolCache().getIfPresent(CachedClientPool.extractKey());
