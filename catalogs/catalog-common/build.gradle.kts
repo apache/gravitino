@@ -11,9 +11,6 @@ plugins {
   `maven-publish`
 }
 
-group = "org.example"
-version = "0.4.0-SNAPSHOT"
-
 dependencies {
   implementation(project(":core"))
   implementation(project(":catalogs:catalog-hive"))
@@ -36,7 +33,6 @@ tasks.withType<ShadowJar>(ShadowJar::class.java) {
     exclude("javax.*")
   }
 
-  // 排除不需要的类和文件
   exclude("**/package-info.class")
   exclude("**/*.properties")
   exclude("**/*.html")
@@ -56,7 +52,7 @@ tasks.withType<ShadowJar>(ShadowJar::class.java) {
   exclude("**/*.sxd")
   exclude("**/*.ddl")
 
-  minimize() // 移除所有未使用的类
+  minimize()
 }
 
 tasks.jar {
