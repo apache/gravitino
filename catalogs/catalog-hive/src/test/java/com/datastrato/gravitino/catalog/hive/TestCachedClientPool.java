@@ -34,7 +34,7 @@ public class TestCachedClientPool extends MiniHiveMetastoreService {
     public void testClientPoolCleaner() throws InterruptedException {
         CachedClientPool clientPool = new CachedClientPool(hiveConf, Collections.emptyMap());
         HiveClientPool clientPool1 = clientPool.clientPool();
-        assertThat(clientPool1)
+        Assertions.assertEquals(clientPool1, )
                 .isSameAs(
                         CachedClientPool.clientPoolCache()
                                 .getIfPresent(CachedClientPool.extractKey(null, hiveConf)));
@@ -117,7 +117,7 @@ public class TestCachedClientPool extends MiniHiveMetastoreService {
                 .isInstanceOf(ValidationException.class)
                 .hasMessageContaining("UGI key element already specified");
 
-        assertThatThrownBy(
+        Assertions.assertThrows(
                 () -> CachedClientPool.extractKey("conf:k1,conf:k2,CONF:k1", hiveConf),
                 "Duplicate conf key elements should result in an error")
                 .isInstanceOf(ValidationException.class)
