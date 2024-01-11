@@ -267,7 +267,7 @@ tasks.test {
 
       // Default use MiniGravitino to run integration tests
       environment("GRAVITINO_ROOT_DIR", rootDir.path)
-      environment("HADOOP_USER_NAME", "datastrato")
+      environment("HADOOP_USER_NAME", "root")
       environment("HADOOP_HOME", "/tmp")
       environment("PROJECT_VERSION", version)
       environment("TRINO_CONF_DIR", buildDir.path + "/trino-conf")
