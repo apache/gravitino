@@ -16,7 +16,7 @@ import java.util.Map;
 public class IcebergSchemaPropertiesMetadata extends BasePropertiesMetadata {
 
   public static final String COMMENT = "comment";
-  private static final Map<String, PropertyEntry<?>> PROPERTIES_METADATA;
+  public static final Map<String, PropertyEntry<?>> PROPERTIES_METADATA;
 
   static {
     List<PropertyEntry<?>> propertyEntries =

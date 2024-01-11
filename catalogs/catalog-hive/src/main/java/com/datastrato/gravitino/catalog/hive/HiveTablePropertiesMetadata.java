@@ -9,7 +9,7 @@ import static com.datastrato.gravitino.catalog.PropertyEntry.enumImmutableProper
 import static com.datastrato.gravitino.catalog.PropertyEntry.stringImmutablePropertyEntry;
 import static com.datastrato.gravitino.catalog.PropertyEntry.stringReservedPropertyEntry;
 import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.StorageFormat.TEXTFILE;
-import static org.apache.hadoop.hive.metastore.TableType.MANAGED_TABLE;
+import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.TableType.MANAGED_TABLE;
 
 import com.datastrato.gravitino.catalog.BasePropertiesMetadata;
 import com.datastrato.gravitino.catalog.PropertyEntry;
@@ -19,7 +19,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
 import java.util.List;
 import java.util.Map;
-import org.apache.hadoop.hive.metastore.TableType;
 
 public class HiveTablePropertiesMetadata extends BasePropertiesMetadata {
   public static final String COMMENT = "comment";
@@ -82,6 +81,14 @@ public class HiveTablePropertiesMetadata extends BasePropertiesMetadata {
 
   private static final String REGEX_SERDE_CLASS = "org.apache.hadoop.hive.serde2.RegexSerDe";
 
+  public enum TableType {
+    MANAGED_TABLE,
+    EXTERNAL_TABLE,
+    VIRTUAL_VIEW,
+    INDEX_TABLE,
+    VIRTUAL_INDEX,
+  }
+
   enum StorageFormat {
     SEQUENCEFILE(
         SEQUENCEFILE_INPUT_FORMAT_CLASS, SEQUENCEFILE_OUTPUT_FORMAT_CLASS, LAZY_SIMPLE_SERDE_CLASS),
@@ -120,7 +127,7 @@ public class HiveTablePropertiesMetadata extends BasePropertiesMetadata {
     }
   }
 
-  private static final Map<String, PropertyEntry<?>> propertiesMetadata;
+  public static final Map<String, PropertyEntry<?>> propertiesMetadata;
 
   static {
     List<PropertyEntry<?>> propertyEntries =
@@ -182,7 +189,7 @@ public class HiveTablePropertiesMetadata extends BasePropertiesMetadata {
   }
 
   @Override
-  protected Map<String, PropertyEntry<?>> specificPropertyEntries() {
+  public Map<String, PropertyEntry<?>> specificPropertyEntries() {
     return propertiesMetadata;
   }
 }

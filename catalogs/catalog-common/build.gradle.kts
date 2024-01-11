@@ -17,6 +17,9 @@ version = "0.4.0-SNAPSHOT"
 dependencies {
   implementation(project(":core"))
   implementation(project(":catalogs:catalog-hive"))
+  implementation(project(":catalogs:catalog-lakehouse-iceberg"))
+  implementation(project(":catalogs:catalog-jdbc-mysql"))
+  implementation(project(":catalogs:catalog-jdbc-postgresql"))
 }
 
 tasks.test {
@@ -44,6 +47,14 @@ tasks.withType<ShadowJar>(ShadowJar::class.java) {
   exclude("com/fasterxml/**")
   exclude("javax/**")
   exclude("schema/**")
+  exclude("fr/**")
+  exclude("google/**")
+  exclude("groovy/**")
+  exclude("images/**")
+  exclude("**/*.conf")
+  exclude("**/*.so")
+  exclude("**/*.sxd")
+  exclude("**/*.ddl")
 
   minimize() // 移除所有未使用的类
 }

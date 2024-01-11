@@ -5,6 +5,8 @@
 
 package com.datastrato.gravitino.trino.connector.catalog.hive;
 
+import com.datastrato.gravitino.catalog.PropertyEntry;
+import com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata;
 import java.util.Map;
 import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
 import org.testng.Assert;
@@ -27,5 +29,14 @@ public class TestHiveCatalogPropertyConverter {
     Assert.assertEquals(re.get("hive.immutable-partitions"), "true");
     Assert.assertEquals(re.get("hive.compression-codec"), "ZSTD");
     Assert.assertEquals(re.get("hive.unknown-key"), null);
+  }
+
+  @Test
+  // To test whether we can load property metadata from HiveTablePropertiesMetadata successfully.
+  public void testPropertyMetadata() {
+    for (Map.Entry<String, PropertyEntry<?>> entryEntry :
+        HiveTablePropertiesMetadata.propertiesMetadata.entrySet()) {
+      System.out.println(entryEntry.getKey() + " " + entryEntry.getValue());
+    }
   }
 }

@@ -5,6 +5,8 @@
 
 package com.datastrato.gravitino.trino.connector.catalog.iceberg;
 
+import com.datastrato.gravitino.catalog.PropertyEntry;
+import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergTablePropertiesMetadata;
 import com.datastrato.gravitino.trino.connector.catalog.PropertyConverter;
 import io.trino.spi.TrinoException;
 import java.util.Map;
@@ -70,5 +72,14 @@ public class TestIcebergCatalogPropertyConverter {
     Assertions.assertThatThrownBy(() -> propertyConverter.toTrinoProperties(wrongMap))
         .isInstanceOf(TrinoException.class)
         .hasMessageContaining("Missing required property for JDBC backend: [jdbc-driver]");
+  }
+
+  @Test
+  // To test whether we can load property metadata from IcebergTablePropertiesMetadata successfully.
+  public void testPropertyMetadata() {
+    for (Map.Entry<String, PropertyEntry<?>> entryEntry :
+        IcebergTablePropertiesMetadata.PROPERTIES_METADATA.entrySet()) {
+      System.out.println(entryEntry.getKey() + " " + entryEntry.getValue());
+    }
   }
 }
