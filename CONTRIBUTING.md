@@ -80,15 +80,15 @@ After you have pushed your changes, create a pull request (PR) in the Gravitino 
 
 ## Development setup
 
-Once you have cloned the [GitHub repository](https://github.com/datastrato/gravitino), see [how to build](/docs/how-to-build) for instructions on how to build, or you can use the provided docker images at [Datastrato's DockerHub repository](https://hub.docker.com/u/datastrato).
+Once you have cloned the [GitHub repository](https://github.com/datastrato/gravitino), see [how to build](/docs/how-to-build.md) for instructions on how to build, or you can use the provided docker images at [Datastrato's DockerHub repository](https://hub.docker.com/u/datastrato).
 
-To stop and start a local Gravitino server via ``bin/gravitino.sh start`` and ``bin/gravitino.sh stop`` in a Gravitino distribution, see [how to build](/docs/how-to-build) for more instructions.
+To stop and start a local Gravitino server via ``bin/gravitino.sh start`` and ``bin/gravitino.sh stop`` in a Gravitino distribution, see [how to build](/docs/how-to-build.md) for more instructions.
 
 ## Testing
 
 The CI infrastructure runs unit and integration tests on each pull request, please make sure these tests pass before making a pull request.
 
-The unit tests run on every build and integration tests run as needed. See [how to test](docs/how-to-test) for more information.
+The unit tests run on every build and integration tests run as needed. See [how to test](docs/how-to-test.md) for more information.
 
 When adding new code or fixing a bug be sure to add unit tests to provide coverage.
 
