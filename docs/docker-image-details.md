@@ -122,6 +122,9 @@ You can use this image to test Trino.
 
 Changelog
 
+- gravitino-ci-trino:0.1.4
+  - Change `-Xmx1G` to `-Xmx2G` in the config file `/etc/trino/jvm.config`
+
 - gravitino-ci-trino:0.1.3
   - Remove copy content in folder `gravitino-trino-connector` to plugin folder `/usr/lib/trino/plugin/gravitino`
 
