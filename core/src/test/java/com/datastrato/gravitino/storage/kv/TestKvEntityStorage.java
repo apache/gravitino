@@ -954,6 +954,70 @@ public class TestKvEntityStorage {
       Assertions.assertThrows(
           NoSuchEntityException.class,
           () -> store.get(NameIdentifier.of("metalake3"), EntityType.METALAKE, BaseMetalake.class));
+
+      // Test catalog
+      CatalogEntity catalog1 = createCatalog(Namespace.of("metalake1"), "catalog1", auditInfo);
+      CatalogEntity catalog2 = createCatalog(Namespace.of("metalake1"), "catalog2", auditInfo);
+
+      store.put(catalog1);
+      store.put(catalog2);
+
+      store.delete(NameIdentifier.of("metalake1", "catalog1"), EntityType.CATALOG);
+      store.delete(NameIdentifier.of("metalake1", "catalog2"), EntityType.CATALOG);
+
+      store.put(catalog1);
+      // Should be OK;
+      store.update(
+          NameIdentifier.of("metalake1", "catalog1"),
+          CatalogEntity.class,
+          EntityType.CATALOG,
+          e -> createCatalog(Namespace.of("metalake1"), "catalog2", (AuditInfo) e.auditInfo()));
+
+      // Test schema
+      SchemaEntity schema1 =
+          createSchemaEntity(Namespace.of("metalake1", "catalog2"), "schema1", auditInfo);
+      SchemaEntity schema2 =
+          createSchemaEntity(Namespace.of("metalake1", "catalog2"), "schema2", auditInfo);
+
+      store.put(schema1);
+      store.put(schema2);
+
+      store.delete(NameIdentifier.of("metalake1", "catalog2", "schema1"), EntityType.SCHEMA);
+      store.delete(NameIdentifier.of("metalake1", "catalog2", "schema2"), EntityType.SCHEMA);
+
+      store.put(schema1);
+      store.update(
+          NameIdentifier.of("metalake1", "catalog2", "schema1"),
+          SchemaEntity.class,
+          EntityType.SCHEMA,
+          e ->
+              createSchemaEntity(
+                  Namespace.of("metalake1", "catalog2"), "schema2", (AuditInfo) e.auditInfo()));
+
+      // Test table
+      TableEntity table1 =
+          createTableEntity(Namespace.of("metalake1", "catalog2", "schema2"), "table1", auditInfo);
+      TableEntity table2 =
+          createTableEntity(Namespace.of("metalake1", "catalog2", "schema2"), "table2", auditInfo);
+
+      store.put(table1);
+      store.put(table2);
+
+      store.delete(
+          NameIdentifier.of("metalake1", "catalog2", "schema2", "table1"), EntityType.TABLE);
+      store.delete(
+          NameIdentifier.of("metalake1", "catalog2", "schema2", "table2"), EntityType.TABLE);
+
+      store.put(table1);
+      store.update(
+          NameIdentifier.of("metalake1", "catalog2", "schema2", "table1"),
+          TableEntity.class,
+          EntityType.TABLE,
+          e ->
+              createTableEntity(
+                  Namespace.of("metalake1", "catalog2", "schema2"),
+                  "table2",
+                  (AuditInfo) e.auditInfo()));
     }
   }
 }
