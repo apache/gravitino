@@ -73,6 +73,7 @@ jobs:
 
       - name: Package Gravitino
         run: |
+          docker image rm datastrato/gravitino-ci-hive:0.1.7
           ./gradlew build -x test -PjdkVersion=${{ matrix.java-version }}
           ./gradlew compileDistribution -x test -PjdkVersion=${{ matrix.java-version }}
 
