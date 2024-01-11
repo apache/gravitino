@@ -30,7 +30,7 @@ public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
   public static final String WAREHOUSE = "warehouse";
   public static final String URI = "uri";
 
-  private static final Map<String, PropertyEntry<?>> PROPERTIES_METADATA;
+  public static final Map<String, PropertyEntry<?>> PROPERTIES_METADATA;
 
   // Map that maintains the mapping of keys in Gravitino to that in Iceberg, for example, users
   // will only need to set the configuration 'catalog-backend' in Gravitino and Gravitino will

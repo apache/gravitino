@@ -4,10 +4,10 @@
  */
 package com.datastrato.gravitino.trino.connector.catalog.hive;
 
+import com.datastrato.gravitino.engine.PropertyConverter;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorAdapter;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
 import com.datastrato.gravitino.trino.connector.catalog.HasPropertyMeta;
-import com.datastrato.gravitino.trino.connector.catalog.PropertyConverter;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoCatalog;
 import com.google.common.collect.Maps;
 import io.trino.spi.session.PropertyMetadata;
@@ -27,7 +27,7 @@ public class HiveConnectorAdapter implements CatalogConnectorAdapter {
 
   public HiveConnectorAdapter() {
     this.propertyMetadata = new HivePropertyMeta();
-    this.catalogConverter = new HiveCatalogPropertyConverter();
+    this.catalogConverter = new HiveCatalogPropertyConverterV2();
   }
 
   public Map<String, Object> buildInternalConnectorConfig(GravitinoCatalog catalog)
@@ -38,7 +38,7 @@ public class HiveConnectorAdapter implements CatalogConnectorAdapter {
 
     Map<String, Object> properties = new HashMap<>();
     properties.put("hive.metastore.uri", catalog.getRequiredProperty("metastore.uris"));
-    Map<String, String> trinoProperty = catalogConverter.toTrinoProperties(catalog.getProperties());
+    Map<String, String> trinoProperty = catalogConverter.fromGravitino(catalog.getProperties());
 
     // Trino only supports properties that define in catalogPropertyMeta, the name of entries in
     // catalogPropertyMeta is in the format of "catalogName_propertyName", so we need to replace

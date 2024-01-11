@@ -4,11 +4,12 @@
  */
 package com.datastrato.gravitino.trino.connector.catalog.hive;
 
+import com.datastrato.gravitino.engine.PropertyConverter;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
-import com.datastrato.gravitino.trino.connector.catalog.PropertyConverter;
 import io.trino.spi.session.PropertyMetadata;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /** Transforming gravitino hive metadata to trino. */
 public class HiveMetadataAdapter extends CatalogConnectorMetadataAdapter {
@@ -21,31 +22,37 @@ public class HiveMetadataAdapter extends CatalogConnectorMetadataAdapter {
       List<PropertyMetadata<?>> tableProperties,
       List<PropertyMetadata<?>> columnProperties) {
     super(schemaProperties, tableProperties, columnProperties, new HiveDataTypeTransformer());
-    this.tableConverter = new HiveTablePropertyConverter();
-    this.schemaConverter = new HiveSchemaPropertyConverter();
+    this.tableConverter = new HiveTablePropertyConverterV2();
+    this.schemaConverter = new HiveSchemaPropertyConverterV2();
   }
 
   @Override
   public Map<String, Object> toTrinoTableProperties(Map<String, String> properties) {
-    Map<String, String> objectMap = tableConverter.toTrinoProperties(properties);
+    Map<String, String> objectMap = tableConverter.fromGravitino(properties);
     return super.toTrinoTableProperties(objectMap);
   }
 
   @Override
   public Map<String, Object> toTrinoSchemaProperties(Map<String, String> properties) {
-    Map<String, String> objectMap = schemaConverter.toTrinoProperties(properties);
+    Map<String, String> objectMap = schemaConverter.fromGravitino(properties);
     return super.toTrinoSchemaProperties(objectMap);
   }
 
   @Override
   public Map<String, String> toGravitinoTableProperties(Map<String, Object> properties) {
-    Map<String, Object> stringMap = tableConverter.toGravitinoProperties(properties);
-    return super.toGravitinoTableProperties(stringMap);
+    Map<String, String> stringMap = tableConverter.toGravitino(properties);
+    Map<String, Object> objectMap =
+        stringMap.entrySet().stream()
+            .collect(Collectors.toMap(Map.Entry::getKey, entry -> (Object) entry.getValue()));
+    return super.toGravitinoTableProperties(objectMap);
   }
 
   @Override
   public Map<String, String> toGravitinoSchemaProperties(Map<String, Object> properties) {
-    Map<String, Object> stringMap = schemaConverter.toGravitinoProperties(properties);
-    return super.toGravitinoSchemaProperties(stringMap);
+    Map<String, String> stringMap = schemaConverter.toGravitino(properties);
+    Map<String, Object> objectMap =
+        stringMap.entrySet().stream()
+            .collect(Collectors.toMap(Map.Entry::getKey, entry -> (Object) entry.getValue()));
+    return super.toGravitinoSchemaProperties(objectMap);
   }
 }

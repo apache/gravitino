@@ -14,6 +14,17 @@ repositories {
 
 dependencies {
   implementation(project(":clients:client-java-runtime", configuration = "shadow"))
+  implementation(project(":engine-common"))
+  implementation(project(":catalogs:catalog-hive")) {
+    exclude("*")
+  }
+
+  implementation(project(":core")) {
+    exclude("*")
+  }
+
+  implementation(libs.commons.collections4)
+
   implementation(libs.jackson.databind)
   implementation(libs.jackson.annotations)
   implementation(libs.guava)

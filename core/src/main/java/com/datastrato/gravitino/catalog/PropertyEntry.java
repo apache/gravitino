@@ -152,6 +152,21 @@ public final class PropertyEntry<T> implements Comparable<PropertyEntry<?>> {
     }
   }
 
+  public PropertyEntry<T> rename(String rename) {
+    return new Builder<T>()
+        .withName(rename)
+        .withDescription(description)
+        .withRequired(required)
+        .withImmutable(immutable)
+        .withJavaType(javaType)
+        .withDefaultValue(defaultValue)
+        .withDecoder(decoder)
+        .withEncoder(encoder)
+        .withHidden(hidden)
+        .withReserved(reserved)
+        .build();
+  }
+
   public T decode(String value) {
     return decoder.apply(value);
   }

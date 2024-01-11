@@ -9,6 +9,8 @@ import static io.trino.spi.session.PropertyMetadata.booleanProperty;
 import static io.trino.spi.session.PropertyMetadata.enumProperty;
 import static io.trino.spi.session.PropertyMetadata.stringProperty;
 
+import com.datastrato.gravitino.catalog.hive.HiveSchemaPropertiesMetadata;
+import com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata;
 import com.datastrato.gravitino.trino.connector.catalog.HasPropertyMeta;
 import com.google.common.collect.ImmutableList;
 import io.trino.spi.session.PropertyMetadata;
@@ -17,34 +19,76 @@ import java.util.List;
 /** Implementation of {@link HasPropertyMeta} for Hive catalog. */
 public class HivePropertyMeta implements HasPropertyMeta {
 
+  //  private static final List<PropertyMetadata<?>> SCHEMA_PROPERTY_META =
+  //      ImmutableList.of(
+  //          stringProperty("location", "Hive storage location for the schema", null, false));
+
   private static final List<PropertyMetadata<?>> SCHEMA_PROPERTY_META =
-      ImmutableList.of(
-          stringProperty("location", "Hive storage location for the schema", null, false));
+      HiveSchemaPropertiesMetadata.propertiesMetadata.values().stream()
+          .filter(
+              entry ->
+                  HiveSchemaPropertyConverterV2.TRINO_KEY_TO_GRAVITINO_KEY
+                      .inverseBidiMap()
+                      .containsKey(entry.getName()))
+          .map(
+              propertyEntry ->
+                  stringProperty(
+                      HiveSchemaPropertyConverterV2.TRINO_KEY_TO_GRAVITINO_KEY
+                          .inverseBidiMap()
+                          .get(propertyEntry.getName()),
+                      propertyEntry.getDescription(),
+                      propertyEntry.getDefaultValue() == null
+                          ? null
+                          : propertyEntry.getDefaultValue().toString(),
+                      propertyEntry.isImmutable()))
+          .collect(ImmutableList.toImmutableList());
+
+  //  private static final List<PropertyMetadata<?>> TABLE_PROPERTY_META =
+  //      ImmutableList.of(
+  //          stringProperty("format", "Hive storage format for the table", "TEXTFILE", false),
+  //          stringProperty("total_size", "total size of the table", null, false),
+  //          stringProperty("num_files", "number of files", null, false),
+  //          stringProperty("external", "Indicate whether it is an external table", null, true),
+  //          stringProperty("location", "HDFS location for table storage", null, false),
+  //          stringProperty("table_type", "The type of Hive table", null, false),
+  //          stringProperty(
+  //              "input_format",
+  //              "The input format class for the table",
+  //              "org.apache.hadoop.mapred.TextInputFormat",
+  //              false),
+  //          stringProperty(
+  //              "output_format",
+  //              "The output format class for the table",
+  //              "org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat",
+  //              false),
+  //          stringProperty(
+  //              "serde_lib",
+  //              "The serde library class for the table",
+  //              "org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe",
+  //              false),
+  //          stringProperty("serde_name", "Name of the serde, table name by default", null,
+  // false));
+  //
 
   private static final List<PropertyMetadata<?>> TABLE_PROPERTY_META =
-      ImmutableList.of(
-          stringProperty("format", "Hive storage format for the table", "TEXTFILE", false),
-          stringProperty("total_size", "total size of the table", null, false),
-          stringProperty("num_files", "number of files", null, false),
-          stringProperty("external", "Indicate whether it is an external table", null, true),
-          stringProperty("location", "HDFS location for table storage", null, false),
-          stringProperty("table_type", "The type of Hive table", null, false),
-          stringProperty(
-              "input_format",
-              "The input format class for the table",
-              "org.apache.hadoop.mapred.TextInputFormat",
-              false),
-          stringProperty(
-              "output_format",
-              "The output format class for the table",
-              "org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat",
-              false),
-          stringProperty(
-              "serde_lib",
-              "The serde library class for the table",
-              "org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe",
-              false),
-          stringProperty("serde_name", "Name of the serde, table name by default", null, false));
+      HiveTablePropertiesMetadata.propertiesMetadata.values().stream()
+          .filter(
+              entry ->
+                  HiveTablePropertyConverterV2.TRINO_KEY_TO_GRAVITINO_KEY
+                      .inverseBidiMap()
+                      .containsKey(entry.getName()))
+          .map(
+              propertyEntry ->
+                  stringProperty(
+                      HiveTablePropertyConverterV2.TRINO_KEY_TO_GRAVITINO_KEY
+                          .inverseBidiMap()
+                          .get(propertyEntry.getName()),
+                      propertyEntry.getDescription(),
+                      propertyEntry.getDefaultValue() == null
+                          ? null
+                          : propertyEntry.getDefaultValue().toString(),
+                      propertyEntry.isImmutable()))
+          .collect(ImmutableList.toImmutableList());
 
   enum CatalogStorageFormat {
     AVRO,
