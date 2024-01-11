@@ -347,7 +347,7 @@ public class TrinoQueryIT extends TrinoQueryITBase {
     if (testerNames.length == 0 || catalogNames.length == 0) {
       return;
     }
-    catalogFileName = testerNames[0];
+    catalogFileName = catalogNames[0];
 
     String catalog = catalogFileName.replace("_prepare.sql", "").replace("catalog_", "");
     String catalogPrefix = catalogFileName.replace("prepare.sql", "");
@@ -377,8 +377,8 @@ public class TrinoQueryIT extends TrinoQueryITBase {
     while (sqlMatcher.find()) {
       if (!firstLine) {
         outputStream.write("\n".getBytes());
-        firstLine = false;
       }
+      firstLine = false;
 
       String sql = sqlMatcher.group(1);
       String result = queryRunner.runQuery(sql).trim();
@@ -393,6 +393,7 @@ public class TrinoQueryIT extends TrinoQueryITBase {
                 + result);
       }
       outputStream.write(result.getBytes());
+      outputStream.write("\n".getBytes());
     }
 
     outputStream.close();

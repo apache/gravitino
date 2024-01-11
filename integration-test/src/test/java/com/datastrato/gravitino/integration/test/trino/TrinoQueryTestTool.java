@@ -27,7 +27,7 @@ public class TrinoQueryTestTool {
 
       options.addOption(
           "gen_output",
-          true,
+          false,
           "Generate the output file for the test set, the default value is 'false'");
 
       options.addOption(
@@ -44,9 +44,9 @@ public class TrinoQueryTestTool {
           "URL for PostgreSQL, if --auto is set to 'all', this option is ignored");
 
       options.addOption(
-          "test_set_dir",
+          "test_sets_dir",
           true,
-          "Specify the test set directory, "
+          "Specify the test sets directory, "
               + "the default value is 'integration-test/src/test/resources/trino-queries'");
       options.addOption("test_set", true, "Specify the test set name to test");
       options.addOption("tester_id", true, "Specify the tester name prefix to select to test");
@@ -90,7 +90,7 @@ public class TrinoQueryTestTool {
       String testSet = commandLine.getOptionValue("test_set");
       String testerId = commandLine.getOptionValue("tester_id", "");
       String catalog = commandLine.getOptionValue("catalog", "");
-      String testSetsDir = commandLine.getOptionValue("test_set_dir", "");
+      String testSetsDir = commandLine.getOptionValue("test_sets_dir", "");
 
       if (testSetsDir.isEmpty()) {
         testSetsDir = TrinoQueryIT.class.getClassLoader().getResource("trino-ci-testset").getPath();
@@ -99,20 +99,21 @@ public class TrinoQueryTestTool {
         TrinoQueryIT.testsetsDir = testSetsDir;
       }
 
-      String path = ITUtils.joinPath(testSetsDir, testSet);
+      String testSetDir = ITUtils.joinPath(testSetsDir, testSet);
       if (testSet != null) {
-        if (!new File(path).exists()) {
-          System.out.println("The test set directory " + path + " does not exist");
+        if (!new File(testSetDir).exists()) {
+          System.out.println("The test set directory " + testSetDir + " does not exist");
           System.exit(1);
         }
         if (Strings.isNotEmpty(catalog)) {
-          if (!new File(ITUtils.joinPath(path, "catalog_" + catalog + "_prepare.sql")).exists()) {
+          if (!new File(ITUtils.joinPath(testSetDir, "catalog_" + catalog + "_prepare.sql"))
+              .exists()) {
             System.out.println("The catalog " + catalog + " does not found in testset");
             System.exit(1);
           }
         }
         if (Strings.isNotEmpty(testerId)) {
-          if (Arrays.stream(TrinoQueryITBase.listDirectory(path))
+          if (Arrays.stream(TrinoQueryITBase.listDirectory(testSetDir))
                   .filter(f -> f.startsWith(testerId))
                   .count()
               == 0) {
@@ -130,10 +131,10 @@ public class TrinoQueryTestTool {
       TrinoQueryIT.setup();
       TrinoQueryIT testerRunner = new TrinoQueryIT();
 
-      String gen = commandLine.getOptionValue("gen_output");
-      if (Strings.isNotEmpty(gen)) {
-        testerRunner.runOneTestSetAndGenOutput(path, "catalog_tpcds_prepare.sql", testerId);
-        System.out.println("The output file is generated successfully in the path " + path);
+      if (commandLine.hasOption("gen_output")) {
+        String catalogFileName = "catalog_" + catalog + "_prepare.sql";
+        testerRunner.runOneTestSetAndGenOutput(testSetDir, catalogFileName, testerId);
+        System.out.println("The output file is generated successfully in the path " + testSetDir);
         return;
       }
 
@@ -141,7 +142,7 @@ public class TrinoQueryTestTool {
         testerRunner.testSql();
       } else {
         String catalogFileName = "catalog_" + catalog + "_prepare.sql";
-        testerRunner.testSql(ITUtils.joinPath(testSetsDir, testSet), catalogFileName, testerId);
+        testerRunner.testSql(testSetDir, catalogFileName, testerId);
       }
       System.out.println("All the testers completed");
     } catch (Exception e) {
