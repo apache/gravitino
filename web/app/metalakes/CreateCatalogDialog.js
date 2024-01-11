@@ -172,11 +172,32 @@ const CreateCatalogDialog = props => {
     schema
       .validate(validData)
       .then(() => {
-        const properties = innerProps.reduce((acc, item) => {
-          acc[item.key] = item.value
+        let properties = {}
 
-          return acc
-        }, {})
+        const prevProperties = innerProps
+          .filter(i => i.key.trim() !== '')
+          .reduce((acc, item) => {
+            acc[item.key] = item.value
+
+            return acc
+          }, {})
+
+        const {
+          'catalog-backend': catalogBackend,
+          'jdbc-driver': jdbcDriver,
+          'jdbc-user': jdbcUser,
+          'jdbc-password': jdbcPwd,
+          ...others
+        } = prevProperties
+
+        if (catalogBackend && catalogBackend === 'hive') {
+          properties = {
+            'catalog-backend': catalogBackend,
+            ...others
+          }
+        } else {
+          properties = prevProperties
+        }
 
         const catalogData = {
           ...mainData,
@@ -215,7 +236,7 @@ const CreateCatalogDialog = props => {
   useEffect(() => {
     if (open && JSON.stringify(data) !== '{}') {
       setCacheData(data)
-      const { properties } = data
+      const { properties = {} } = data
 
       const propsArr = Object.keys(properties).map(item => {
         return {
