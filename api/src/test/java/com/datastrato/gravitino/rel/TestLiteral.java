@@ -17,6 +17,7 @@ import static com.datastrato.gravitino.rel.expressions.literals.Literals.time;
 import static com.datastrato.gravitino.rel.expressions.literals.Literals.timestamp;
 
 import com.datastrato.gravitino.rel.expressions.literals.Literal;
+import com.datastrato.gravitino.rel.expressions.literals.Literals;
 import com.datastrato.gravitino.rel.types.Types;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -71,5 +72,7 @@ public class TestLiteral {
     literal = string("hello");
     Assertions.assertEquals(literal.value(), "hello");
     Assertions.assertEquals(literal.dataType(), Types.StringType.get());
+
+    Assertions.assertEquals(Literals.of(null, Types.NullType.get()), Literals.NULL);
   }
 }
