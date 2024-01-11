@@ -12,6 +12,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /** Transforming between gravitino schema/table/column property and Trino property. */
+@Deprecated
 public abstract class PropertyConverter {
 
   private static final Logger LOG = LoggerFactory.getLogger(PropertyConverter.class);
@@ -22,12 +23,12 @@ public abstract class PropertyConverter {
    *
    * @return a map that holds the mapping from Trino to Gravitino properties.
    */
-  public abstract TreeBidiMap<String, String> trinoPropertyKeyToGravitino();
+  public abstract TreeBidiMap<String, String> engineToGravitino();
 
   /** Convert Trino properties to Gravitino properties. */
-  public Map<String, String> toTrinoProperties(Map<String, String> properties) {
+  public Map<String, String> fromGravitinoProperties(Map<String, String> properties) {
     Map<String, String> trinoProperties = new HashMap<>();
-    Map<String, String> gravitinoToTrinoMapping = trinoPropertyKeyToGravitino().inverseBidiMap();
+    Map<String, String> gravitinoToTrinoMapping = engineToGravitino().inverseBidiMap();
     for (Map.Entry<String, String> entry : properties.entrySet()) {
       String trinoKey = gravitinoToTrinoMapping.get(entry.getKey());
       if (trinoKey != null) {
@@ -42,7 +43,7 @@ public abstract class PropertyConverter {
   /** Convert Gravitino properties to Trino properties. */
   public Map<String, Object> toGravitinoProperties(Map<String, Object> properties) {
     Map<String, Object> gravitinoProperties = new HashMap<>();
-    Map<String, String> trinoToGravitinoMapping = trinoPropertyKeyToGravitino();
+    Map<String, String> trinoToGravitinoMapping = engineToGravitino();
     for (Map.Entry<String, Object> entry : properties.entrySet()) {
       String gravitinoKey = trinoToGravitinoMapping.get(entry.getKey());
       if (gravitinoKey != null) {

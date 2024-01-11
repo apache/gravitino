@@ -6,9 +6,9 @@ package com.datastrato.gravitino.trino.connector.catalog.iceberg;
 
 import static java.util.Collections.emptyList;
 
+import com.datastrato.catalog.common.property.PropertyConverter;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorAdapter;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
-import com.datastrato.gravitino.trino.connector.catalog.PropertyConverter;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoCatalog;
 import io.trino.spi.session.PropertyMetadata;
 import java.util.HashMap;
@@ -32,7 +32,8 @@ public class IcebergConnectorAdapter implements CatalogConnectorAdapter {
     config.put("catalogHandle", catalog.getName() + ":normal:default");
     config.put("connectorName", "iceberg");
 
-    Map<String, String> properties = catalogConverter.toTrinoProperties(catalog.getProperties());
+    Map<String, String> properties =
+        catalogConverter.fromGravitinoProperties(catalog.getProperties());
     config.put("properties", properties);
     return config;
   }

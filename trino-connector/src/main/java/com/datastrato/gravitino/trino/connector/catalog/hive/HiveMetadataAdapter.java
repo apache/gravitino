@@ -4,8 +4,8 @@
  */
 package com.datastrato.gravitino.trino.connector.catalog.hive;
 
+import com.datastrato.catalog.common.property.PropertyConverter;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
-import com.datastrato.gravitino.trino.connector.catalog.PropertyConverter;
 import io.trino.spi.session.PropertyMetadata;
 import java.util.List;
 import java.util.Map;
@@ -27,13 +27,13 @@ public class HiveMetadataAdapter extends CatalogConnectorMetadataAdapter {
 
   @Override
   public Map<String, Object> toTrinoTableProperties(Map<String, String> properties) {
-    Map<String, String> objectMap = tableConverter.toTrinoProperties(properties);
+    Map<String, String> objectMap = tableConverter.fromGravitinoProperties(properties);
     return super.toTrinoTableProperties(objectMap);
   }
 
   @Override
   public Map<String, Object> toTrinoSchemaProperties(Map<String, String> properties) {
-    Map<String, String> objectMap = schemaConverter.toTrinoProperties(properties);
+    Map<String, String> objectMap = schemaConverter.fromGravitinoProperties(properties);
     return super.toTrinoSchemaProperties(objectMap);
   }
 

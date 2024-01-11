@@ -5,9 +5,11 @@
 
 package com.datastrato.gravitino.trino.connector.catalog.hive;
 
+import com.datastrato.catalog.common.property.PropertyConverter;
+import com.datastrato.gravitino.catalog.PropertyEntry;
 import com.datastrato.gravitino.shaded.org.apache.commons.collections4.bidimap.TreeBidiMap;
-import com.datastrato.gravitino.trino.connector.catalog.PropertyConverter;
 import com.google.common.collect.ImmutableMap;
+import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -23,7 +25,7 @@ public class HiveCatalogPropertyConverter extends PropertyConverter {
               .put("hive.storage-format", "hive.storage-format")
               .put("hive.compression-codec", "hive.compression-codec")
               .put("hive.config.resources", "hive.config.resources")
-              .put("hive.recursive-directories", "hive.ignore-absent-partitions")
+              .put("hive.recursive-directories", "hive.recursive-directories")
               .put("hive.ignore-absent-partitions", "hive.ignore-absent-partitions")
               .put("hive.force-local-scheduling", "hive.force-local-scheduling")
               .put("hive.respect-table-format", "hive.respect-table-format")
@@ -41,7 +43,12 @@ public class HiveCatalogPropertyConverter extends PropertyConverter {
               .build());
 
   @Override
-  public TreeBidiMap<String, String> trinoPropertyKeyToGravitino() {
+  public TreeBidiMap<String, String> engineToGravitino() {
     return TRINO_KEY_TO_GRAVITINO_KEY;
+  }
+
+  @Override
+  public Map<String, PropertyEntry<?>> gravitinoPropertyMeta() {
+    return ImmutableMap.of();
   }
 }

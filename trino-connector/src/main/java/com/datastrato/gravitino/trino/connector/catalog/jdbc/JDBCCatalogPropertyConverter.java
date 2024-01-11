@@ -5,8 +5,9 @@
 
 package com.datastrato.gravitino.trino.connector.catalog.jdbc;
 
+import com.datastrato.catalog.common.property.PropertyConverter;
+import com.datastrato.gravitino.catalog.PropertyEntry;
 import com.datastrato.gravitino.shaded.org.apache.commons.collections4.bidimap.TreeBidiMap;
-import com.datastrato.gravitino.trino.connector.catalog.PropertyConverter;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Sets;
 import java.util.Map;
@@ -32,13 +33,13 @@ public class JDBCCatalogPropertyConverter extends PropertyConverter {
           JDBC_CONNECTION_PASSWORD_KEY, JDBC_CONNECTION_USER_KEY, JDBC_CONNECTION_PASSWORD_KEY);
 
   @Override
-  public TreeBidiMap<String, String> trinoPropertyKeyToGravitino() {
+  public TreeBidiMap<String, String> engineToGravitino() {
     return TRINO_KEY_TO_GRAVITINO_KEY;
   }
 
   @Override
-  public Map<String, String> toTrinoProperties(Map<String, String> properties) {
-    Map<String, String> trinoProperties = super.toTrinoProperties(properties);
+  public Map<String, String> fromGravitinoProperties(Map<String, String> properties) {
+    Map<String, String> trinoProperties = super.fromGravitinoProperties(properties);
     for (String requiredProperty : REQUIRED_PROPERTIES) {
       if (!trinoProperties.containsKey(requiredProperty)) {
         throw new IllegalArgumentException("Missing required property: " + requiredProperty);
@@ -46,5 +47,10 @@ public class JDBCCatalogPropertyConverter extends PropertyConverter {
     }
 
     return trinoProperties;
+  }
+
+  @Override
+  public Map<String, PropertyEntry<?>> gravitinoPropertyMeta() {
+    return ImmutableMap.of();
   }
 }
