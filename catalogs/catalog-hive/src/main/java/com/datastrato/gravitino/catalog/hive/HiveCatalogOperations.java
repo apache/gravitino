@@ -48,7 +48,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.ArrayUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
@@ -135,11 +134,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     hiveConf = new HiveConf(hadoopConf, HiveCatalogOperations.class);
 
     this.clientPool =
-        new CachedClientPool(
-            getClientPoolSize(conf),
-            hiveConf,
-            getCacheEvictionInterval(conf)
-        );
+        new CachedClientPool(getClientPoolSize(conf), hiveConf, getCacheEvictionInterval(conf));
   }
 
   @VisibleForTesting
