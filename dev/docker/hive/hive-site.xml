@@ -1,7 +1,7 @@
 <configuration>
   <property>
     <name>hive.server2.enable.doAs</name>
-    <value>false</value>
+    <value>true</value>
     <description>Disable user impersonation for HiveServer2</description>
   </property>
 
