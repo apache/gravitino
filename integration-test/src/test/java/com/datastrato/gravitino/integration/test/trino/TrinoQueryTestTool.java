@@ -94,7 +94,7 @@ public class TrinoQueryTestTool {
 
       if (testSetsDir.isEmpty()) {
         testSetsDir = TrinoQueryIT.class.getClassLoader().getResource("trino-ci-testset").getPath();
-        testSetsDir = ITUtils.joinPath(testSetsDir + "testsets");
+        testSetsDir = ITUtils.joinPath(testSetsDir, "testsets");
       } else {
         TrinoQueryIT.testsetsDir = testSetsDir;
       }
@@ -105,12 +105,19 @@ public class TrinoQueryTestTool {
           System.out.println("The test set directory " + path + " does not exist");
           System.exit(1);
         }
+        if (Strings.isNotEmpty(catalog)) {
+          if (!new File(ITUtils.joinPath(path, "catalog_" + catalog + "_prepare.sql")).exists()) {
+            System.out.println("The catalog " + catalog + " does not found in testset");
+            System.exit(1);
+          }
+        }
         if (Strings.isNotEmpty(testerId)) {
           if (Arrays.stream(TrinoQueryITBase.listDirectory(path))
                   .filter(f -> f.startsWith(testerId))
                   .count()
               == 0) {
             System.out.println("The tester " + testerId + " does not found in testset");
+            System.exit(1);
           }
         }
       }

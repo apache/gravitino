@@ -28,7 +28,6 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.mortbay.log.Log;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -58,6 +57,8 @@ public class TrinoQueryIT extends TrinoQueryITBase {
     queryParams.put("trino_uri", trinoUri);
     queryParams.put("postgresql_uri", postgresqlUri);
     queryParams.put("gravitino_uri", gravitinoUri);
+
+    LOG.info("Test query env parameters: {}", queryParams);
   }
 
   private static void cleanupTestEnv() throws Exception {
@@ -91,20 +92,22 @@ public class TrinoQueryIT extends TrinoQueryITBase {
     String[] testerNames = getTesterNames(testSetDirName, testFilterPrefix);
     if (testerNames.length == 0) return;
 
+    String catalog = catalogFileName.replace("_prepare.sql", "").replace("catalog_", "");
     String catalogPrefix = catalogFileName.replace("prepare.sql", "");
     TrinoQueryRunner queryRunner = new TrinoQueryRunner(TrinoQueryITBase.trinoUri);
-    executeSqlFile(testSetDirName, catalogPrefix + "prepare.sql", queryRunner);
+    executeSqlFile(testSetDirName, catalogPrefix + "prepare.sql", queryRunner, catalog);
 
     Arrays.sort(testerNames);
     for (String testerName : testerNames) {
-      executeSqlFileWithCheckResult(testSetDirName, testerName, queryRunner);
+      executeSqlFileWithCheckResult(testSetDirName, testerName, queryRunner, catalog);
     }
 
-    executeSqlFile(testSetDirName, catalogPrefix + "cleanup.sql", queryRunner);
+    executeSqlFile(testSetDirName, catalogPrefix + "cleanup.sql", queryRunner, catalog);
     queryRunner.stop();
   }
 
-  void executeSqlFile(String testSetDirName, String filename, TrinoQueryRunner queryRunner)
+  void executeSqlFile(
+      String testSetDirName, String filename, TrinoQueryRunner queryRunner, String catalog)
       throws Exception {
     String path = ITUtils.joinPath(testSetDirName, filename);
     String sqls = TrinoQueryITBase.readFileToString(path);
@@ -115,14 +118,21 @@ public class TrinoQueryIT extends TrinoQueryITBase {
       String sql = sqlMatcher.group(1);
       sql = resolveParameters(sql);
       String result = queryRunner.runQuery(sql);
-      LOG.info("Execute sql:\n{}\nResult:\n{}", sql, result);
+      LOG.info(
+          "Execute sql in the tester {} under catalog {} :\n{}\nResult:\n{}",
+          simpleTesterName(path),
+          catalog,
+          sql,
+          result);
       if (isQueryFailed(result)) {
         throw new RuntimeException(
             "Failed to execute sql in the test set. "
                 + simpleTesterName(path)
-                + "sql: \n"
+                + " under catalog "
+                + catalog
+                + "Sql: \n"
                 + sql
-                + "\nresult: \n"
+                + "\nResult: \n"
                 + result);
       }
     }
@@ -151,7 +161,8 @@ public class TrinoQueryIT extends TrinoQueryITBase {
   }
 
   void executeSqlFileWithCheckResult(
-      String testSetDirName, String filename, TrinoQueryRunner queryRunner) throws IOException {
+      String testSetDirName, String filename, TrinoQueryRunner queryRunner, String catalog)
+      throws IOException {
     String path = ITUtils.joinPath(testSetDirName, filename);
     String sqls = TrinoQueryITBase.readFileToString(path);
     String resultFileName = path.replace(".sql", ".txt");
@@ -175,8 +186,9 @@ public class TrinoQueryIT extends TrinoQueryITBase {
 
       if (match) {
         LOG.info(
-            "Test {} success.\nSql:\n{};\nExpect:\n{}\nActual:\n{}",
+            "Execute sql in the tester {} under catalog {} successfully.\nSql:\n{};\nExpect:\n{}\nActual:\n{}",
             simpleTesterName(path),
+            catalog,
             sql,
             expectResult,
             result);
@@ -184,8 +196,8 @@ public class TrinoQueryIT extends TrinoQueryITBase {
         queryRunner.stop();
         String errorMessage =
             String.format(
-                "Test %s failed for query.\nSql:\n%s\nExpect:\n%s\nActual:\n%s",
-                simpleTesterName(path), sql, expectResult, result);
+                "Execute sql in the tester %s under catalog %s failed.\nSql:\n%s\nExpect:\n%s\nActual:\n%s",
+                simpleTesterName(path), catalog, sql, expectResult, result);
         LOG.error(errorMessage);
         Assertions.fail(errorMessage);
       }
@@ -291,7 +303,7 @@ public class TrinoQueryIT extends TrinoQueryITBase {
       }
     }
     executor.shutdownNow();
-    Log.info("All testers completed");
+    LOG.info("All testers completed");
   }
 
   public List<Future<Integer>> runOneTestset(
@@ -337,16 +349,17 @@ public class TrinoQueryIT extends TrinoQueryITBase {
     }
     catalogFileName = testerNames[0];
 
+    String catalog = catalogFileName.replace("_prepare.sql", "").replace("catalog_", "");
     String catalogPrefix = catalogFileName.replace("prepare.sql", "");
     TrinoQueryRunner queryRunner = new TrinoQueryRunner(TrinoQueryITBase.trinoUri);
-    executeSqlFile(testSetDirName, catalogPrefix + "prepare.sql", queryRunner);
+    executeSqlFile(testSetDirName, catalogPrefix + "prepare.sql", queryRunner, catalog);
 
     Arrays.sort(testerNames);
     for (String testerName : testerNames) {
       executeSqlFileWithGenOutput(testSetDirName, testerName, queryRunner);
     }
 
-    executeSqlFile(testSetDirName, catalogPrefix + "cleanup.sql", queryRunner);
+    executeSqlFile(testSetDirName, catalogPrefix + "cleanup.sql", queryRunner, catalog);
     queryRunner.stop();
   }
 

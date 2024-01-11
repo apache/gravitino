@@ -4,6 +4,8 @@
 #
 
 /etc/trino/update-trino-conf.sh
+sed -i 's/-Xmx1G/-Xmx2G/g' /etc/trino/jvm.config
+
 nohup /usr/lib/trino/bin/run-trino &
 
 counter=0
