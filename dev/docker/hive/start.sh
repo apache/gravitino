@@ -29,8 +29,8 @@ echo """
 
 # start hive
 ${HIVE_HOME}/bin/schematool -initSchema -dbType mysql
-${HIVE_HOME}/bin/hive --service hiveserver2 > /tmp/hiveserver2.log 2>&1 &
-${HIVE_HOME}/bin/hive --service metastore > /tmp/metastore.log 2>&1 &
+${HIVE_HOME}/bin/hive --service hiveserver2 > /dev/null 2>&1 &
+${HIVE_HOME}/bin/hive --service metastore > /dev/null 2>&1 &
 
 # persist the container
 tail -f /dev/null
