@@ -26,15 +26,11 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
-import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.util.Comparator;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
@@ -47,26 +43,12 @@ import org.apache.thrift.TException;
 import org.immutables.value.Value;
 
 /**
+ * Referred from Apache Iceberg's CachedClientPool implementation
+ * hive-metastore/src/main/java/org/apache/iceberg/hive/CachedClientPool.java
+ *
  * A ClientPool that caches the underlying HiveClientPool instances.
- *
- * <p>The following key elements are supported and can be specified.
- *
- * <ul>
- *   <li>ugi - the Hadoop UserGroupInformation instance that represents the current user using the
- *       cache.
- *   <li>user_name - similar to UGI but only includes the user's name determined by
- *       UserGroupInformation#getUserName.
- *   <li>conf - name of an arbitrary configuration. The value of the configuration will be extracted
- *       from catalog properties and added to the cache key. A conf element should start with a
- *       "conf:" prefix which is followed by the configuration name. E.g. specifying "conf:a.b.c"
- *       will add "a.b.c" to the key, and so that configurations with different default catalog
- *       wouldn't share the same client pool. Multiple conf elements can be specified.
- * </ul>
  */
 public class CachedClientPool implements ClientPool<IMetaStoreClient, TException> {
-
-  private static final String CONF_ELEMENT_PREFIX = "conf:";
-  private static final String HIVE_CONF_CATALOG = "metastore.catalog.default";
 
   private static Cache<Key, HiveClientPool> clientPoolCache;
 
@@ -127,55 +109,25 @@ public class CachedClientPool implements ClientPool<IMetaStoreClient, TException
     // generate key elements in a certain order, so that the Key instances are comparable
     List<Object> elements = Lists.newArrayList();
     elements.add(conf.get(HiveConf.ConfVars.METASTOREURIS.varname, ""));
-    elements.add(conf.get(HIVE_CONF_CATALOG, "hive"));
     elements.add(clientPoolSize);
+    try {
+      elements.add(UserGroupInformation.getCurrentUser().getUserName());
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
+    }
+
     if (cacheKeys == null || cacheKeys.isEmpty()) {
       return Key.of(elements);
     }
 
-    Set<KeyElementType> types = Sets.newTreeSet(Comparator.comparingInt(Enum::ordinal));
     Map<String, String> confElements = Maps.newTreeMap();
     for (String element : cacheKeys.split(",", -1)) {
       String trimmed = element.trim();
-      if (trimmed.toLowerCase(Locale.ROOT).startsWith(CONF_ELEMENT_PREFIX)) {
-        String key = trimmed.substring(CONF_ELEMENT_PREFIX.length());
         Preconditions.checkArgument(
-            !confElements.containsKey(key), "Conf key element %s already specified", key);
-        confElements.put(key, conf.get(key));
-      } else {
-        KeyElementType type = KeyElementType.valueOf(trimmed.toUpperCase());
-        switch (type) {
-          case UGI:
-          case USER_NAME:
-            Preconditions.checkArgument(
-                !types.contains(type), "%s key element already specified", type.name());
-            types.add(type);
-            break;
-          default:
-            throw new IllegalArgumentException(String.format("Unknown key element %s", trimmed));
-        }
-      }
+            !confElements.containsKey(trimmed), "Conf key element %s already specified", trimmed);
+        confElements.put(trimmed, conf.get(trimmed));
     }
-    for (KeyElementType type : types) {
-      switch (type) {
-        case UGI:
-          try {
-            elements.add(UserGroupInformation.getCurrentUser());
-          } catch (IOException e) {
-            throw new UncheckedIOException(e);
-          }
-          break;
-        case USER_NAME:
-          try {
-            elements.add(UserGroupInformation.getCurrentUser().getUserName());
-          } catch (IOException e) {
-            throw new UncheckedIOException(e);
-          }
-          break;
-        default:
-          throw new RuntimeException("Unexpected key element " + type.name());
-      }
-    }
+
     for (String key : confElements.keySet()) {
       elements.add(ConfElement.of(key, confElements.get(key)));
     }
@@ -202,12 +154,6 @@ public class CachedClientPool implements ClientPool<IMetaStoreClient, TException
     static ConfElement of(String key, String value) {
       return ImmutableConfElement.builder().key(key).value(value).build();
     }
-  }
-
-  private enum KeyElementType {
-    UGI,
-    USER_NAME,
-    CONF
   }
 
   private static ThreadFactory newDaemonThreadFactory() {

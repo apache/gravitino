@@ -6,7 +6,6 @@ package com.datastrato.gravitino.catalog.hive;
 
 import static com.datastrato.gravitino.catalog.BaseCatalog.CATALOG_BYPASS_PREFIX;
 import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.CLIENT_POOL_CACHE_EVICTION_INTERVAL_MS;
-import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.CLIENT_POOL_CACHE_KEYS;
 import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.CLIENT_POOL_SIZE;
 import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.METASTORE_URIS;
 import static com.datastrato.gravitino.catalog.hive.HiveTable.SUPPORT_TABLE_TYPES;
@@ -49,6 +48,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
@@ -136,7 +136,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
     this.clientPool =
         new CachedClientPool(
-            getClientPoolSize(conf), hiveConf, getCacheEvictionInterval(conf), getCacheKeys(conf));
+            getClientPoolSize(conf), hiveConf, getCacheEvictionInterval(conf), getCacheKeys(byPassConfig));
   }
 
   @VisibleForTesting
@@ -150,7 +150,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
   }
 
   String getCacheKeys(Map<String, String> conf) {
-    return (String) catalogPropertiesMetadata.getOrDefault(conf, CLIENT_POOL_CACHE_KEYS);
+    return StringUtils.join(conf.keySet(), ",");
   }
 
   /** Closes the Hive catalog and releases the associated client pool. */

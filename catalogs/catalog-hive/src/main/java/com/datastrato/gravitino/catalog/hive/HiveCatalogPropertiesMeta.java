@@ -24,10 +24,6 @@ public class HiveCatalogPropertiesMeta extends BaseCatalogPropertiesMetadata {
   public static final long DEFAULT_CLIENT_POOL_CACHE_EVICTION_INTERVAL_MS =
       TimeUnit.MINUTES.toMillis(5);;
 
-  public static final String CLIENT_POOL_CACHE_KEYS = "client.pool.cache.keys";
-
-  public static final String DEFAULT_CLIENT_POOL_CACHE_KEYS = "UGI";
-
   public static final String IMPERSONATION_ENABLE = "impersonation.enable";
 
   public static final boolean DEFAULT_IMPERSONATION_ENABLE = false;
@@ -47,18 +43,10 @@ public class HiveCatalogPropertiesMeta extends BaseCatalogPropertiesMetadata {
                   DEFAULT_CLIENT_POOL_SIZE,
                   false))
           .put(
-              CLIENT_POOL_CACHE_KEYS,
-              PropertyEntry.stringOptionalPropertyEntry(
-                  CLIENT_POOL_CACHE_KEYS,
-                  "The cache keys of Hive metastore clients in the cached pool for Gravitino",
-                  true,
-                  DEFAULT_CLIENT_POOL_CACHE_KEYS,
-                  false))
-          .put(
               CLIENT_POOL_CACHE_EVICTION_INTERVAL_MS,
               PropertyEntry.longOptionalPropertyEntry(
                   CLIENT_POOL_CACHE_EVICTION_INTERVAL_MS,
-                  "The cache pool eviction interval for the cached pool ",
+                  "The cache pool eviction interval",
                   true,
                   DEFAULT_CLIENT_POOL_CACHE_EVICTION_INTERVAL_MS,
                   false))
