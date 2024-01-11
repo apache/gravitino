@@ -481,7 +481,8 @@ tasks {
       ":catalogs:catalog-hive:copyLibAndConfig",
       ":catalogs:catalog-lakehouse-iceberg:copyLibAndConfig",
       ":catalogs:catalog-jdbc-mysql:copyLibAndConfig",
-      ":catalogs:catalog-jdbc-postgresql:copyLibAndConfig"
+      ":catalogs:catalog-jdbc-postgresql:copyLibAndConfig",
+      ":catalogs:catalog-jdbc-duckdb:copyLibAndConfig"
     )
   }
 
