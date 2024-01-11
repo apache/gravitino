@@ -35,7 +35,7 @@ public class TestHiveCatalogPropertyConverter {
   // To test whether we can load property metadata from HiveTablePropertiesMetadata successfully.
   public void testPropertyMetadata() {
     for (Map.Entry<String, PropertyEntry<?>> entryEntry :
-        HiveTablePropertiesMetadata.propertiesMetadata.entrySet()) {
+        new HiveTablePropertiesMetadata().propertyEntries().entrySet()) {
       System.out.println(entryEntry.getKey() + " " + entryEntry.getValue());
     }
   }

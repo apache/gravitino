@@ -80,7 +80,7 @@ public class TestIcebergCatalogPropertyConverter {
   // To test whether we can load property metadata from IcebergTablePropertiesMetadata successfully.
   public void testPropertyMetadata() {
     for (Map.Entry<String, PropertyEntry<?>> entryEntry :
-        IcebergTablePropertiesMetadata.PROPERTIES_METADATA.entrySet()) {
+        new IcebergTablePropertiesMetadata().propertyEntries().entrySet()) {
       System.out.println(entryEntry.getKey() + " " + entryEntry.getValue());
     }
   }
