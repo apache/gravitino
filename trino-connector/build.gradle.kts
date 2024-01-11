@@ -14,6 +14,7 @@ repositories {
 
 dependencies {
   implementation(project(":clients:client-java-runtime", configuration = "shadow"))
+  implementation(project(":catalogs:catalog-common", configuration = "shadow"))
   implementation(libs.jackson.databind)
   implementation(libs.jackson.annotations)
   implementation(libs.guava)
