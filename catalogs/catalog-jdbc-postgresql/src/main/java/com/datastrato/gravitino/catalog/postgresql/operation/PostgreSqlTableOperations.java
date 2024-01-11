@@ -289,7 +289,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
     if (column.autoIncrement()) {
       if (!Types.allowAutoIncrement(column.dataType())) {
         throw new IllegalArgumentException(
-            "Not support auto-increment , column: "
+            "Unsupported auto-increment , column: "
                 + column.name()
                 + ", type: "
                 + column.dataType());

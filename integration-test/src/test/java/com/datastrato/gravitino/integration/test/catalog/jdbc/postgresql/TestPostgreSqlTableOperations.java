@@ -469,6 +469,6 @@ public class TestPostgreSqlTableOperations extends TestPostgreSqlAbstractIT {
                     null));
 
     Assertions.assertTrue(
-        StringUtils.contains(illegalArgumentException.getMessage(), "Not support auto-increment"));
+        StringUtils.contains(illegalArgumentException.getMessage(), "Unsupported auto-increment"));
   }
 }
