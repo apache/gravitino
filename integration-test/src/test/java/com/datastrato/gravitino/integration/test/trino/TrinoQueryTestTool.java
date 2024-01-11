@@ -4,6 +4,7 @@
  */
 package com.datastrato.gravitino.integration.test.trino;
 
+import com.datastrato.gravitino.integration.test.util.ITUtils;
 import java.io.File;
 import java.util.Arrays;
 import org.apache.commons.cli.CommandLine;
@@ -89,15 +90,16 @@ public class TrinoQueryTestTool {
       String testSet = commandLine.getOptionValue("test_set");
       String testerId = commandLine.getOptionValue("tester_id", "");
       String catalog = commandLine.getOptionValue("catalog", "");
-      String testSetDir = commandLine.getOptionValue("test_set_dir", "");
+      String testSetsDir = commandLine.getOptionValue("test_set_dir", "");
 
-      if (testSetDir.isEmpty()) {
-        testSetDir = TrinoQueryIT.class.getClassLoader().getResource("trino-ci-testset").getPath();
-        testSetDir = testSetDir + "/testsets";
+      if (testSetsDir.isEmpty()) {
+        testSetsDir = TrinoQueryIT.class.getClassLoader().getResource("trino-ci-testset").getPath();
+        testSetsDir = ITUtils.joinPath(testSetsDir + "testsets");
+      } else {
+        TrinoQueryIT.testsetsDir = testSetsDir;
       }
-      TrinoQueryIT.testsetsDir = testSetDir;
-      String path = TrinoQueryIT.testsetsDir + "/" + testSet;
 
+      String path = ITUtils.joinPath(testSetsDir, testSet);
       if (testSet != null) {
         if (!new File(path).exists()) {
           System.out.println("The test set directory " + path + " does not exist");
@@ -131,7 +133,8 @@ public class TrinoQueryTestTool {
       if (testSet == null) {
         testerRunner.testSql();
       } else {
-        testerRunner.testSql(testSetDir + "/" + testSet, catalog, testerId);
+        String catalogFileName = "catalog_" + catalog + "_prepare.sql";
+        testerRunner.testSql(ITUtils.joinPath(testSetsDir, testSet), catalogFileName, testerId);
       }
       System.out.println("All the testers completed");
     } catch (Exception e) {

@@ -5,6 +5,7 @@
 package com.datastrato.gravitino.integration.test.trino;
 
 import com.datastrato.gravitino.Namespace;
+import com.datastrato.gravitino.integration.test.util.ITUtils;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -46,7 +47,7 @@ public class TrinoQueryIT extends TrinoQueryITBase {
     TrinoQueryITBase.setup();
     if (testsetsDir.isEmpty()) {
       testsetsDir = TrinoQueryIT.class.getClassLoader().getResource("trino-ci-testset").getPath();
-      testsetsDir = testsetsDir + "/testsets";
+      testsetsDir = ITUtils.joinPath(testsetsDir, "testsets");
       LOG.info("Test Queries directory is {}", testsetsDir);
     }
     cleanupTestEnv();
@@ -105,7 +106,7 @@ public class TrinoQueryIT extends TrinoQueryITBase {
 
   void executeSqlFile(String testSetDirName, String filename, TrinoQueryRunner queryRunner)
       throws Exception {
-    String path = testSetDirName + "/" + filename;
+    String path = ITUtils.joinPath(testSetDirName, filename);
     String sqls = TrinoQueryITBase.readFileToString(path);
 
     Matcher sqlMatcher =
@@ -151,7 +152,7 @@ public class TrinoQueryIT extends TrinoQueryITBase {
 
   void executeSqlFileWithCheckResult(
       String testSetDirName, String filename, TrinoQueryRunner queryRunner) throws IOException {
-    String path = testSetDirName + "/" + filename;
+    String path = ITUtils.joinPath(testSetDirName, filename);
     String sqls = TrinoQueryITBase.readFileToString(path);
     String resultFileName = path.replace(".sql", ".txt");
     String testResults = TrinoQueryITBase.readFileToString(resultFileName);
@@ -253,7 +254,7 @@ public class TrinoQueryIT extends TrinoQueryITBase {
         Arrays.stream(TrinoQueryITBase.listDirectory(testsetsDir)).toArray(String[]::new);
     List<Future<Integer>> allFutures = new ArrayList<>();
     for (String testSetName : testSetNames) {
-      String path = testsetsDir + "/" + testSetName;
+      String path = ITUtils.joinPath(testsetsDir, testSetName);
       totalCount.addAndGet(getTesterCount(path, "", ""));
       List<Future<Integer>> futures = runOneTestset(completionService, path, "", "");
       allFutures.addAll(futures);
@@ -262,14 +263,15 @@ public class TrinoQueryIT extends TrinoQueryITBase {
     waitForCompleted(executor, completionService, allFutures);
   }
 
-  public void testSql(String testSetDirName, String catalog, String testerPrefix) throws Exception {
+  public void testSql(String testSetDirName, String catalogFileName, String testerPrefix)
+      throws Exception {
     ExecutorService executor = Executors.newFixedThreadPool(4);
     CompletionService completionService = new ExecutorCompletionService<>(executor);
 
     List<Future<Integer>> allFutures = new ArrayList<>();
-    totalCount.addAndGet(getTesterCount(testSetDirName, catalog, testerPrefix));
+    totalCount.addAndGet(getTesterCount(testSetDirName, catalogFileName, testerPrefix));
     List<Future<Integer>> futures =
-        runOneTestset(completionService, testSetDirName, catalog, testerPrefix);
+        runOneTestset(completionService, testSetDirName, catalogFileName, testerPrefix);
     allFutures.addAll(futures);
 
     waitForCompleted(executor, completionService, allFutures);
@@ -295,10 +297,10 @@ public class TrinoQueryIT extends TrinoQueryITBase {
   public List<Future<Integer>> runOneTestset(
       CompletionService completionService,
       String testSetDirName,
-      String catalog,
+      String catalogFileName,
       String testerFilter)
       throws Exception {
-    String[] testCatalogs = getTesterCatalogNames(testSetDirName, catalog);
+    String[] testCatalogs = getTesterCatalogNames(testSetDirName, catalogFileName);
 
     List<Future<Integer>> futures = new ArrayList<>();
     for (int i = 0; i < testCatalogs.length; i++) {
@@ -327,13 +329,13 @@ public class TrinoQueryIT extends TrinoQueryITBase {
   }
 
   public void runOneTestSetAndGenOutput(
-      String testSetDirName, String catalog, String testFilterPrefix) throws Exception {
+      String testSetDirName, String catalogFileName, String testFilterPrefix) throws Exception {
     String[] testerNames = getTesterNames(testSetDirName, testFilterPrefix);
-    String[] catalogNams = getTesterCatalogNames(testSetDirName, catalog);
-    if (testerNames.length == 0 || catalogNams.length == 0) {
+    String[] catalogNames = getTesterCatalogNames(testSetDirName, catalogFileName);
+    if (testerNames.length == 0 || catalogNames.length == 0) {
       return;
     }
-    String catalogFileName = testerNames[0];
+    catalogFileName = testerNames[0];
 
     String catalogPrefix = catalogFileName.replace("prepare.sql", "");
     TrinoQueryRunner queryRunner = new TrinoQueryRunner(TrinoQueryITBase.trinoUri);
@@ -350,7 +352,7 @@ public class TrinoQueryIT extends TrinoQueryITBase {
 
   void executeSqlFileWithGenOutput(
       String testSetDirName, String filename, TrinoQueryRunner queryRunner) throws IOException {
-    String path = testSetDirName + "/" + filename;
+    String path = ITUtils.joinPath(testSetDirName, filename);
     String sqls = TrinoQueryITBase.readFileToString(path);
     String resultFileName = path.replace(".sql", ".txt");
     FileOutputStream outputStream = new FileOutputStream(resultFileName);
@@ -383,19 +385,15 @@ public class TrinoQueryIT extends TrinoQueryITBase {
     outputStream.close();
   }
 
-  static int getTesterCount(String testSetDirName, String catalog, String testFilterPrefix)
+  static int getTesterCount(String testSetDirName, String catalogFileName, String testFilterPrefix)
       throws Exception {
     String[] testerNames = getTesterNames(testSetDirName, testFilterPrefix);
 
-    if (Strings.isEmpty(catalog)) {
+    if (Strings.isNotEmpty(catalogFileName)) {
       return testerNames.length;
     }
 
-    String[] files = listDirectory(testSetDirName);
-    String[] testCatalogs =
-        Arrays.stream(files)
-            .filter(s -> s.matches("catalog_.*_prepare.sql"))
-            .toArray(String[]::new);
+    String[] testCatalogs = getTesterCatalogNames(testSetDirName, "");
 
     return testerNames.length * testCatalogs.length;
   }
@@ -407,10 +405,11 @@ public class TrinoQueryIT extends TrinoQueryITBase {
         .toArray(String[]::new);
   }
 
-  static String[] getTesterCatalogNames(String testSetDirName, String catalog) throws Exception {
+  static String[] getTesterCatalogNames(String testSetDirName, String catalogFileName)
+      throws Exception {
     return Arrays.stream(listDirectory(testSetDirName))
         .filter(s -> s.matches("catalog_.*_prepare.sql"))
-        .filter(s -> catalog.isEmpty() || s.equals("catalog_" + catalog + "_prepare.sql"))
+        .filter(s -> catalogFileName.isEmpty() || s.equals(catalogFileName))
         .toArray(String[]::new);
   }
 
