@@ -15,7 +15,7 @@ import java.util.Map;
 
 public class HiveSchemaPropertiesMetadata extends BasePropertiesMetadata {
   public static final String LOCATION = "location";
-  public static final Map<String, PropertyEntry<?>> propertiesMetadata;
+  private static final Map<String, PropertyEntry<?>> propertiesMetadata;
 
   static {
     List<PropertyEntry<?>> propertyEntries =

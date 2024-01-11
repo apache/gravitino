@@ -22,7 +22,7 @@ public class IcebergTablePropertiesMetadata extends BasePropertiesMetadata {
   public static final String SORT_ORDER = "sort-order";
   public static final String IDENTIFIER_FIELDS = "identifier-fields";
 
-  public static final Map<String, PropertyEntry<?>> PROPERTIES_METADATA;
+  private static final Map<String, PropertyEntry<?>> PROPERTIES_METADATA;
 
   static {
     List<PropertyEntry<?>> propertyEntries =
