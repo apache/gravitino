@@ -136,7 +136,10 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
     this.clientPool =
         new CachedClientPool(
-            getClientPoolSize(conf), hiveConf, getCacheEvictionInterval(conf), getCacheKeys(byPassConfig));
+            getClientPoolSize(conf),
+            hiveConf,
+            getCacheEvictionInterval(conf),
+            getCacheKeys(byPassConfig));
   }
 
   @VisibleForTesting

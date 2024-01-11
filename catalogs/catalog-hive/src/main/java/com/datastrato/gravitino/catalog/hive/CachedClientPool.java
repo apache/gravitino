@@ -23,20 +23,16 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.Scheduler;
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.thrift.TException;
@@ -46,7 +42,7 @@ import org.immutables.value.Value;
  * Referred from Apache Iceberg's CachedClientPool implementation
  * hive-metastore/src/main/java/org/apache/iceberg/hive/CachedClientPool.java
  *
- * A ClientPool that caches the underlying HiveClientPool instances.
+ * <p>A ClientPool that caches the underlying HiveClientPool instances.
  */
 public class CachedClientPool implements ClientPool<IMetaStoreClient, TException> {
 
@@ -62,13 +58,13 @@ public class CachedClientPool implements ClientPool<IMetaStoreClient, TException
     // Since Caffeine does not ensure that removalListener will be involved after expiration
     // We use a scheduler with one thread to clean up expired clients.
     this.clientPoolCache =
-            Caffeine.newBuilder()
-                    .expireAfterAccess(evictionInterval, TimeUnit.MILLISECONDS)
-                    .removalListener((ignored, value, cause) -> ((HiveClientPool) value).close())
-                    .scheduler(
-                            Scheduler.forScheduledExecutorService(
-                                    new ScheduledThreadPoolExecutor(1, newDaemonThreadFactory())))
-                    .build();
+        Caffeine.newBuilder()
+            .expireAfterAccess(evictionInterval, TimeUnit.MILLISECONDS)
+            .removalListener((ignored, value, cause) -> ((HiveClientPool) value).close())
+            .scheduler(
+                Scheduler.forScheduledExecutorService(
+                    new ScheduledThreadPoolExecutor(1, newDaemonThreadFactory())))
+            .build();
   }
 
   @VisibleForTesting
@@ -78,7 +74,7 @@ public class CachedClientPool implements ClientPool<IMetaStoreClient, TException
   }
 
   @VisibleForTesting
-  Cache<Key, HiveClientPool>  clientPoolCache() {
+  Cache<Key, HiveClientPool> clientPoolCache() {
     return clientPoolCache;
   }
 
