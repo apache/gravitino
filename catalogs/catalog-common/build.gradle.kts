@@ -25,7 +25,7 @@ tasks.test {
 
 tasks.withType<ShadowJar>(ShadowJar::class.java) {
   isZip64 = true
-  configurations = listOf(project.configurations.runtimeClasspath.get())
+  configurations = listOf(project.configurations.compileClasspath.get())
   archiveClassifier.set("")
 
   dependencies {
