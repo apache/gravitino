@@ -111,10 +111,33 @@ For `bucket` and `truncate`, the first argument must be integer literal, and the
 
 ### Table distributions
 
-- Doesn't support `Distribution`, you should use `BucketPartition` instead.
+- Gravitino used by default `NoneDistribution`.
+```json
+{
+  "strategy": "hash"
+}
+```
+
+- Support `HashDistribution`, Hash distribute by partition key.
+```java
+Distributions.hash();
+```
+
+- Support `RangeDistribution`, You can pass `range` as values through the API. Range distribute by partition key or sort key if table has an SortOrder.
+```json
+{
+  "strategy": "range"
+}
+```
+```java
+Distributions.range();
+```
 
 :::info
-If you load Iceberg tables, the table distribution strategy is `hash` with num 0, which means no distribution.
+Iceberg automatically distributes the data according to the partition or table sort order. It is forbidden to specify distribution expressions.
+:::
+:::info
+Apache Iceberg doesn't support Gravitino `EvenDistribution` type.
 :::
 
 ### Table column types
@@ -149,15 +172,16 @@ You can pass [Iceberg table properties](https://iceberg.apache.org/docs/1.3.1/co
 
 The Gravitino server doesn't allow passing the following reserved fields.
 
-| Configuration item        | Description                                             |
-|---------------------------|---------------------------------------------------------|
-| `comment`                 | The table comment.                                      |
-| `creator`                 | The table creator.                                      |
-| `location`                | Iceberg location for table storage.                     |
-| `current-snapshot-id`     | The snapshot represents the current state of the table. |
-| `cherry-pick-snapshot-id` | Selecting a specific snapshot in a merge operation.     |
-| `sort-order`              | Selecting a specific snapshot in a merge operation.     |
-| `identifier-fields`       | The identifier fields for defining the table.           |
+| Configuration item              | Description                                             |
+|---------------------------------|---------------------------------------------------------|
+| `comment`                       | The table comment.                                      |
+| `creator`                       | The table creator.                                      |
+| `location`                      | Iceberg location for table storage.                     |
+| `current-snapshot-id`           | The snapshot represents the current state of the table. |
+| `cherry-pick-snapshot-id`       | Selecting a specific snapshot in a merge operation.     |
+| `sort-order`                    | Selecting a specific snapshot in a merge operation.     |
+| `identifier-fields`             | The identifier fields for defining the table.           |
+| `write.distribution-mode`       | Defines distribution of write data                      |
 
 ### Table operations
 
