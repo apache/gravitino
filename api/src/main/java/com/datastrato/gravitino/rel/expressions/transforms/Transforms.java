@@ -134,7 +134,7 @@ public class Transforms {
    */
   public static BucketTransform bucket(int numBuckets, String[]... fieldNames) {
     return new BucketTransform(
-        Literals.integer(numBuckets),
+        Literals.integerLiteral(numBuckets),
         Arrays.stream(fieldNames).map(NamedReference::field).toArray(NamedReference[]::new));
   }
 
@@ -167,7 +167,7 @@ public class Transforms {
    * @return The created transform
    */
   public static TruncateTransform truncate(int width, String[] fieldName) {
-    return new TruncateTransform(Literals.integer(width), NamedReference.field(fieldName));
+    return new TruncateTransform(Literals.integerLiteral(width), NamedReference.field(fieldName));
   }
 
   /**
