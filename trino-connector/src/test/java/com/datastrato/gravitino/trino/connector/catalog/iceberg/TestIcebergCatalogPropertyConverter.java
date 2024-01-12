@@ -11,12 +11,17 @@ import com.datastrato.gravitino.trino.connector.catalog.PropertyConverter;
 import io.trino.spi.TrinoException;
 import java.util.Map;
 import org.assertj.core.api.Assertions;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 import org.testng.collections.Maps;
 
 public class TestIcebergCatalogPropertyConverter {
+
+  private static final Logger LOG =
+      LoggerFactory.getLogger(TestIcebergCatalogPropertyConverter.class);
 
   @Test
   public void testHiveBackendProperty() {
@@ -74,8 +79,8 @@ public class TestIcebergCatalogPropertyConverter {
         .hasMessageContaining("Missing required property for JDBC backend: [jdbc-driver]");
   }
 
+  // To test whether we load jar `bundled-catalog` successfully.
   @Test
-  // To test whether we can load property metadata from IcebergTablePropertiesMetadata successfully.
   public void testPropertyMetadata() {
     for (Map.Entry<String, PropertyEntry<?>> entryEntry :
         new IcebergTablePropertiesMetadata().propertyEntries().entrySet()) {
