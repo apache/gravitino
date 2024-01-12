@@ -27,7 +27,7 @@ See [How to install Gravitino](./how-to-install.md) to learn how to install Grav
 
 Gravitino provides Docker images on [Docker Hub](https://hub.docker.com/u/datastrato).
 Please pull the image and run it. For the details of the Gravitino Docker image, please see
-[Dock image details](./docker-image-details.md).
+[Docker image details](./docker-image-details.md).
 
 Gravitino also provides a playground to experience the whole Gravitino system with other components.
 Please see the [Gravitino playground repository](https://github.com/datastrato/gravitino-playground)
@@ -52,7 +52,7 @@ REST API, another is Java SDK. You can use either to manage metadata, please see
 
 Also, you can find the complete REST API definition in
 [Gravitino Open API](./api/rest/gravitino-rest-api),
-Java SDK definition in [Gravitino Javadoc](pathname:///docs/0.3.0/api/java/index.html).
+Java SDK definition in [Gravitino Javadoc](pathname:///docs/0.3.1/api/java/index.html).
 
 Gravitino provides a web UI to manage the metadata, you can visit the web UI in the browser via
 the URL address `http://<ip-address>:8090`. Please see [Gravitino web UI](./webui.md) for the details.
@@ -117,7 +117,7 @@ Gravitino provides several ways to configure and manage the Gravitino server. Pl
 
 * [Gravitino Open API](./api/rest/gravitino-rest-api): provides the complete Open API definition of
   Gravitino.
-* [Gravitino Javadoc](pathname:///docs/0.3.0/api/java/index.html): provides the Javadoc for the Gravitino API.
+* [Gravitino Javadoc](pathname:///docs/0.3.1/api/java/index.html): provides the Javadoc for the Gravitino API.
 
 ### Development guides
 
