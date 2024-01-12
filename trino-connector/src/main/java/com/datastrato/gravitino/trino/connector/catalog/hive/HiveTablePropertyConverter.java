@@ -27,7 +27,7 @@ public class HiveTablePropertyConverter extends PropertyConverter {
               .put("location", HiveTablePropertiesMetadata.LOCATION)
               .put("table_type", HiveTablePropertiesMetadata.TABLE_TYPE)
               .put("input_format", HiveTablePropertiesMetadata.INPUT_FORMAT)
-              .put("output_format", HiveTablePropertiesMetadata.INPUT_FORMAT)
+              .put("output_format", HiveTablePropertiesMetadata.OUTPUT_FORMAT)
               .put("serde_lib", HiveTablePropertiesMetadata.SERDE_LIB)
               .put("serde_name", HiveTablePropertiesMetadata.SERDE_NAME)
               .build());
