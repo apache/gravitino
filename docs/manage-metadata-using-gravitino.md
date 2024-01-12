@@ -16,8 +16,8 @@ In this document, Gravitino uses Apache Hive catalog as an example to show how t
 but they may have some differences, especially in catalog property, table property, and column type. For more details, please refer to the related doc.
 
 - [**Apache Hive**](./apache-hive-catalog.md)
-- [**MySQL**](./jdbc-postgresql-catalog.md)
-- [**PostgreSQL**](./jdbc-mysql-catalog.md)
+- [**MySQL**](./jdbc-mysql-catalog.md)
+- [**PostgreSQL**](./jdbc-postgresql-catalog.md)
 - [**Apache Iceberg**](./lakehouse-iceberg-catalog.md)
 
 
@@ -714,7 +714,7 @@ The following types that Gravitino supports:
 | Union                     | `Types.UnionType.of([type1, type2, ...])`                                | `{"type": "union", "types": [type JSON, ...]}`                                                                                       | Union type, indicates a union of types
 
 
-The related java doc is [here](pathname:///docs/0.3.0/api/java/com/datastrato/gravitino/rel/types/Type.html).
+The related java doc is [here](pathname:///docs/0.3.1/api/java/com/datastrato/gravitino/rel/types/Type.html).
 
 #### Table property and type mapping
 
@@ -732,9 +732,9 @@ In addition to the basic settings, Gravitino supports the following features:
 
 | Feature             | Description                                                                                                                                                                                                                                                                      | Java doc                                                                                                                 |
 |---------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------|
-| Table partitioning  | Equal to `PARTITION BY` in Apache Hive, It is a partitioning strategy that is used to split a table into parts based on partition keys. Some table engine may not support this feature                                                                                           | [Partition](pathname:///docs/0.3.0/api/java/com/datastrato/gravitino/dto/rel/partitions/Partitioning.html)               |
-| Table bucketing     | Equal to `CLUSTERED BY` in Apache Hive, Bucketing a.k.a (Clustering) is a technique to split the data into more manageable files/parts, (By specifying the number of buckets to create). The value of the bucketing column will be hashed by a user-defined number into buckets. | [Distribution](pathname:///docs/0.3.0/api/java/com/datastrato/gravitino/rel/expressions/distributions/Distribution.html) |
-| Table sort ordering | Equal to `SORTED BY` in Apache Hive, sort ordering is a method to sort the data in specific ways such as by a column or a function, and then store table data. it will highly improve the query performance under certain scenarios.                                              | [SortOrder](pathname:///docs/0.3.0/api/java/com/datastrato/gravitino/rel/expressions/sorts/SortOrder.html)               |
+| Table partitioning  | Equal to `PARTITION BY` in Apache Hive, It is a partitioning strategy that is used to split a table into parts based on partition keys. Some table engine may not support this feature                                                                                           | [Partition](pathname:///docs/0.3.1/api/java/com/datastrato/gravitino/dto/rel/partitions/Partitioning.html)               |
+| Table bucketing     | Equal to `CLUSTERED BY` in Apache Hive, Bucketing a.k.a (Clustering) is a technique to split the data into more manageable files/parts, (By specifying the number of buckets to create). The value of the bucketing column will be hashed by a user-defined number into buckets. | [Distribution](pathname:///docs/0.3.1/api/java/com/datastrato/gravitino/rel/expressions/distributions/Distribution.html) |
+| Table sort ordering | Equal to `SORTED BY` in Apache Hive, sort ordering is a method to sort the data in specific ways such as by a column or a function, and then store table data. it will highly improve the query performance under certain scenarios.                                              | [SortOrder](pathname:///docs/0.3.1/api/java/com/datastrato/gravitino/rel/expressions/sorts/SortOrder.html)               |
 
 
 For more information, please see the related document on [partitioning, bucketing, and sorting](table-partitioning-bucketing-sort-order.md).
