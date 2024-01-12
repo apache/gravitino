@@ -4,6 +4,7 @@
  */
 package com.datastrato.gravitino.rel.expressions.literals;
 
+import com.datastrato.gravitino.rel.types.Decimal;
 import com.datastrato.gravitino.rel.types.Type;
 import com.datastrato.gravitino.rel.types.Types;
 import java.time.LocalDate;
@@ -64,7 +65,7 @@ public class Literals {
    * @param value the integer literal value
    * @return a new {@link Literal} instance
    */
-  public static LiteralImpl<Integer> integer(Integer value) {
+  public static LiteralImpl<Integer> integerLiteral(Integer value) {
     return of(value, Types.IntegerType.get());
   }
 
@@ -99,12 +100,23 @@ public class Literals {
   }
 
   /**
+   * Creates a decimal type literal with the given value.
+   *
+   * @param value the decimal literal value
+   * @return a new {@link Literal} instance
+   */
+  public static LiteralImpl<Decimal> decimalLiteral(Decimal value) {
+
+    return of(value, Types.DecimalType.of(value.precision(), value.scale()));
+  }
+
+  /**
    * Creates a date type literal with the given value.
    *
    * @param value the date literal value
    * @return a new {@link Literal} instance
    */
-  public static LiteralImpl<LocalDate> date(LocalDate value) {
+  public static LiteralImpl<LocalDate> dateLiteral(LocalDate value) {
     return of(value, Types.DateType.get());
   }
 
@@ -114,7 +126,7 @@ public class Literals {
    * @param value the time literal value
    * @return a new {@link Literal} instance
    */
-  public static LiteralImpl<LocalTime> time(LocalTime value) {
+  public static LiteralImpl<LocalTime> timeLiteral(LocalTime value) {
     return of(value, Types.TimeType.get());
   }
 
@@ -124,7 +136,7 @@ public class Literals {
    * @param value the timestamp literal value
    * @return a new {@link Literal} instance
    */
-  public static LiteralImpl<LocalDateTime> timestamp(LocalDateTime value) {
+  public static LiteralImpl<LocalDateTime> timestampLiteral(LocalDateTime value) {
     return of(value, Types.TimestampType.withoutTimeZone());
   }
 
@@ -134,7 +146,7 @@ public class Literals {
    * @param value the string literal value
    * @return a new {@link Literal} instance
    */
-  public static LiteralImpl<String> string(String value) {
+  public static LiteralImpl<String> stringLiteral(String value) {
     return of(value, Types.StringType.get());
   }
 

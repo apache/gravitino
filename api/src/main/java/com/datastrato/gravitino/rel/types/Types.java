@@ -203,14 +203,18 @@ public class Types {
     private final int scale;
 
     private DecimalType(int precision, int scale) {
+      checkPrecisionScale(precision, scale);
+      this.precision = precision;
+      this.scale = scale;
+    }
+
+    public static void checkPrecisionScale(int precision, int scale) {
       Preconditions.checkArgument(
           precision <= 38,
           "Decimals with precision larger than 38 are not supported: %s",
           precision);
       Preconditions.checkArgument(
           scale <= precision, "Scale cannot be larger than precision: %s > %s", scale, precision);
-      this.precision = precision;
-      this.scale = scale;
     }
 
     @Override

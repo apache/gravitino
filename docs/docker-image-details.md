@@ -68,6 +68,9 @@ You can use this kind of image to test the catalog of Apache Hive.
 
 Changelog
 
+- gravitino-ci-hive:0.1.8
+  - Change the value of `hive.server2.enable.doAs` to `true`
+
 - gravitino-ci-hive:0.1.7
   - Download MySQL JDBC driver before building the Docker image
   - Set `hdfs` as HDFS superuser group
@@ -121,6 +124,9 @@ Changelog
 You can use this image to test Trino.
 
 Changelog
+
+- gravitino-ci-trino:0.1.4
+  - Change `-Xmx1G` to `-Xmx2G` in the config file `/etc/trino/jvm.config`
 
 - gravitino-ci-trino:0.1.3
   - Remove copy content in folder `gravitino-trino-connector` to plugin folder `/usr/lib/trino/plugin/gravitino`

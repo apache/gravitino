@@ -1105,4 +1105,25 @@ public class CatalogHiveIT extends AbstractIT {
       Assertions.assertNotNull(table);
     }
   }
+
+  @Test
+  void testDropAndRename() {
+    String metalakeName1 = GravitinoITUtils.genRandomName("CatalogHiveIT_metalake1");
+    String metalakeName2 = GravitinoITUtils.genRandomName("CatalogHiveIT_metalake2");
+
+    client.createMetalake(NameIdentifier.of(metalakeName1), "comment", Collections.emptyMap());
+    client.createMetalake(NameIdentifier.of(metalakeName2), "comment", Collections.emptyMap());
+
+    client.dropMetalake(NameIdentifier.of(metalakeName1));
+    client.dropMetalake(NameIdentifier.of(metalakeName2));
+
+    client.createMetalake(NameIdentifier.of(metalakeName1), "comment", Collections.emptyMap());
+
+    client.alterMetalake(NameIdentifier.of(metalakeName1), MetalakeChange.rename(metalakeName2));
+
+    client.loadMetalake(NameIdentifier.of(metalakeName2));
+
+    Assertions.assertThrows(
+        NoSuchMetalakeException.class, () -> client.loadMetalake(NameIdentifier.of(metalakeName1)));
+  }
 }
