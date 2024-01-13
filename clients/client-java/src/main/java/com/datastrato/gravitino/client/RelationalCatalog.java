@@ -245,21 +245,15 @@ public class RelationalCatalog extends CatalogDTO implements TableCatalog, Suppo
 
     Map<String, String> params = new HashMap<>();
     params.put("purge", "true");
-    try {
-      DropResponse resp =
-          restClient.delete(
-              formatTableRequestPath(ident.namespace()) + "/" + ident.name(),
-              params,
-              DropResponse.class,
-              Collections.emptyMap(),
-              ErrorHandlers.tableErrorHandler());
-      resp.validate();
-      return resp.dropped();
-
-    } catch (Exception e) {
-      LOG.warn("Failed to purge table {}", ident, e);
-      return false;
-    }
+    DropResponse resp =
+        restClient.delete(
+            formatTableRequestPath(ident.namespace()) + "/" + ident.name(),
+            params,
+            DropResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.tableErrorHandler());
+    resp.validate();
+    return resp.dropped();
   }
 
   /**
