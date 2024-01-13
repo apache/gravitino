@@ -103,7 +103,7 @@ This software is licensed under the Apache License version 2."
 
 ## Geo-Distributed
 
-- Refers to the distribution of data or services across multiple geographic locations.
+- The distribution of data or services across multiple geographic locations.
 
 ## GitHub
 
@@ -211,7 +211,7 @@ This software is licensed under the Apache License version 2."
 
 ## JMX 
 
-- Java Management Extensions, a Java technology that provides tools for managing and monitoring Java applications.
+- Java Management Extensions provides tools for managing and monitoring Java applications.
 
 ## JSON
 
