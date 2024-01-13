@@ -78,3 +78,10 @@ tasks.jar {
   dependsOn(tasks.named("shadowJar"))
   archiveClassifier.set("empty")
 }
+
+tasks.compileJava {
+  dependsOn(":catalogs:catalog-hive:copyDepends")
+  dependsOn(":catalogs:catalog-jdbc-mysql:copyDepends")
+  dependsOn(":catalogs:catalog-jdbc-postgresql:copyDepends")
+  dependsOn(":catalogs:catalog-lakehouse-iceberg:copyDepends")
+}
