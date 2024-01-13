@@ -105,6 +105,31 @@ public class TestKvNameMappingService {
   }
 
   @Test
+  void testUpdateNameWithExistingName() throws Exception {
+    try (KvEntityStore kvEntityStore = getKvEntityStore(getConfig())) {
+      NameMappingService nameMappingService = kvEntityStore.nameMappingService;
+      IdGenerator idGenerator = getIdGeneratorByReflection(nameMappingService);
+      Mockito.doReturn(1L).when(idGenerator).nextId();
+      long name1IdRead = nameMappingService.getOrCreateIdFromName("name1");
+      Assertions.assertNotNull(nameMappingService.getIdByName("name1"));
+
+      Mockito.doReturn(2L).when(idGenerator).nextId();
+      long name2IdRead = nameMappingService.getOrCreateIdFromName("name2");
+      Assertions.assertNotNull(nameMappingService.getIdByName("name1"));
+      Assertions.assertNotEquals(name1IdRead, name2IdRead);
+
+      // Update name1 to an existing name like name2.
+      boolean result = nameMappingService.updateName("name1", "name2");
+      Assertions.assertTrue(result);
+
+      Long name2Id = nameMappingService.getIdByName("name2");
+      Assertions.assertEquals(1L, name2Id);
+
+      Assertions.assertNull(nameMappingService.getIdByName("name1"));
+    }
+  }
+
+  @Test
   public void testBindAndUnBind() throws Exception {
     try (KvEntityStore kvEntityStore = getKvEntityStore(getConfig())) {
       KvNameMappingService nameMappingService =

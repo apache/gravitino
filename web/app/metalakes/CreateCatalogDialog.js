@@ -83,11 +83,13 @@ const CreateCatalogDialog = props => {
     reset,
     watch,
     setValue,
+    getValues,
     handleSubmit,
+    trigger,
     formState: { errors }
   } = useForm({
     defaultValues,
-    mode: 'onChange',
+    mode: 'all',
     resolver: yupResolver(schema)
   })
 
@@ -124,43 +126,117 @@ const CreateCatalogDialog = props => {
     return check
   }
 
+  const handleChangeProvider = (onChange, e) => {
+    onChange(e.target.value)
+  }
+
+  const resetPropsFields = (providers = [], index = -1) => {
+    if (index !== -1) {
+      providers[index].defaultProps.forEach((item, index) => {
+        if (item.key !== 'catalog-backend') {
+          item.value = ''
+        }
+      })
+    }
+  }
+
   const handleClose = () => {
     reset()
+    resetPropsFields(providers, 0)
     setInnerProps(providers[0].defaultProps)
     setValue('propItems', providers[0].defaultProps)
     setOpen(false)
   }
 
+  const handleClickSubmit = e => {
+    e.preventDefault()
+
+    return handleSubmit(onSubmit(getValues()), onError)
+  }
+
   const onSubmit = data => {
     const { propItems, ...mainData } = data
 
-    const properties = innerProps.reduce((acc, item) => {
-      acc[item.key] = item.value
+    let nextProps = []
 
-      return acc
-    }, {})
-
-    const catalogData = {
-      ...mainData,
-      properties
+    if (propItems[0]?.key === 'catalog-backend' && propItems[0]?.value === 'hive') {
+      nextProps = propItems.slice(0, 3)
+    } else {
+      nextProps = propItems
     }
 
-    if (type === 'create') {
-      dispatch(createCatalog({ data: catalogData, metalake }))
-    }
+    trigger()
 
-    handleClose()
+    const validData = { propItems: nextProps, ...mainData }
+
+    schema
+      .validate(validData)
+      .then(() => {
+        let properties = {}
+
+        const prevProperties = innerProps
+          .filter(i => i.key.trim() !== '')
+          .reduce((acc, item) => {
+            acc[item.key] = item.value
+
+            return acc
+          }, {})
+
+        const {
+          'catalog-backend': catalogBackend,
+          'jdbc-driver': jdbcDriver,
+          'jdbc-user': jdbcUser,
+          'jdbc-password': jdbcPwd,
+          ...others
+        } = prevProperties
+
+        if (catalogBackend && catalogBackend === 'hive') {
+          properties = {
+            'catalog-backend': catalogBackend,
+            ...others
+          }
+        } else {
+          properties = prevProperties
+        }
+
+        const catalogData = {
+          ...mainData,
+          properties
+        }
+
+        if (type === 'create') {
+          dispatch(createCatalog({ data: catalogData, metalake }))
+        }
+
+        handleClose()
+      })
+      .catch(err => {
+        console.error('valid error', err)
+      })
+  }
+
+  const onError = errors => {
+    console.error('fields error', errors)
   }
 
   useEffect(() => {
+    let defaultProps = []
+
     const providerItemIndex = providers.findIndex(i => i.value === providerSelect)
-    setInnerProps(providers[providerItemIndex].defaultProps)
-  }, [providerSelect, setInnerProps])
+
+    if (providerItemIndex !== -1) {
+      defaultProps = providers[providerItemIndex].defaultProps
+
+      resetPropsFields(providers, providerItemIndex)
+      setInnerProps(defaultProps)
+      setValue('propItems', providers[providerItemIndex].defaultProps)
+    }
+  }, [providerSelect, setInnerProps, setValue])
 
   useEffect(() => {
     if (open && JSON.stringify(data) !== '{}') {
       setCacheData(data)
-      const { properties } = data
+      const { properties = {} } = data
 
       const propsArr = Object.keys(properties).map(item => {
         return {
@@ -178,7 +254,7 @@ const CreateCatalogDialog = props => {
 
   return (
     <Dialog fullWidth maxWidth='sm' scroll='body' TransitionComponent={Transition} open={open} onClose={handleClose}>
-      <form onSubmit={handleSubmit(onSubmit)}>
+      <form onSubmit={e => handleClickSubmit(e)}>
         <DialogContent
           sx={{
             position: 'relative',
@@ -261,7 +337,7 @@ const CreateCatalogDialog = props => {
                       value={value}
                       label='Provider'
                       defaultValue='hive'
-                      onChange={onChange}
+                      onChange={e => handleChangeProvider(onChange, e)}
                       error={Boolean(errors.provider)}
                       labelId='select-catalog-provider'
                     >

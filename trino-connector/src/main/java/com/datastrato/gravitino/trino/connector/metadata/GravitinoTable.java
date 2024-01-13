@@ -88,6 +88,7 @@ public class GravitinoTable {
               .withName(columns.get(i).getName())
               .withDataType(columns.get(i).getType())
               .withComment(columns.get(i).getComment())
+              .withNullable(columns.get(i).isNullable())
               .build();
     }
     return gravitinoColumns;

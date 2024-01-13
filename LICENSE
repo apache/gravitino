@@ -206,9 +206,6 @@
    This product bundles various third-party components also under the
    Apache Software License 2.0.
 
-   Gradle Wrapper
-   ./gradlew
-
    Apache Spark
    ./api/src/main/java/com/datastrato/gravitino/rel/SchemaChange.java
    ./api/src/main/java/com/datastrato/gravitino/rel/SupportsSchemas.java
@@ -241,6 +238,7 @@
    ./core/src/main/java/com/datastrato/gravitino/utils/ClientPoolImpl.java
    ./common/src/main/java/com/datastrato/gravitino/dto/responses/OAuth2TokenResponse.java
    ./clients/client-java/src/main/java/com/datastrato/gravitino/client/OAuth2ClientUtil.java
+   ./gradlew
 
    Apache Hive
    ./catalogs/catalog-hive/src/test/resources/hive-schema-3.1.0.derby.sql

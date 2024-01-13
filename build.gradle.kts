@@ -297,6 +297,7 @@ subprojects {
 
 tasks.rat {
   substringMatcher("DS", "Datastrato", "Copyright 2023 Datastrato Pvt Ltd.")
+  substringMatcher("DS", "Datastrato", "Copyright 2024 Datastrato Pvt Ltd.")
   approvedLicense("Datastrato")
   approvedLicense("Apache License Version 2.0")
 

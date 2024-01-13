@@ -12,6 +12,28 @@ import java.util.StringJoiner;
 /** The helper class for {@link Type}. */
 public class Types {
 
+  /** The data type representing `NULL` values. */
+  public static class NullType implements Type {
+    private static final NullType INSTANCE = new NullType();
+
+    /** @return The singleton instance of {@link NullType}. */
+    public static NullType get() {
+      return INSTANCE;
+    }
+
+    private NullType() {}
+
+    @Override
+    public Name name() {
+      return Name.NULL;
+    }
+
+    @Override
+    public String simpleString() {
+      return "null";
+    }
+  }
+
   /** The boolean type in Gravitino. */
   public static class BooleanType extends Type.PrimitiveType {
     private static final BooleanType INSTANCE = new BooleanType();
@@ -181,14 +203,18 @@ public class Types {
     private final int scale;
 
     private DecimalType(int precision, int scale) {
+      checkPrecisionScale(precision, scale);
+      this.precision = precision;
+      this.scale = scale;
+    }
+
+    public static void checkPrecisionScale(int precision, int scale) {
       Preconditions.checkArgument(
           precision <= 38,
           "Decimals with precision larger than 38 are not supported: %s",
           precision);
       Preconditions.checkArgument(
           scale <= precision, "Scale cannot be larger than precision: %s > %s", scale, precision);
-      this.precision = precision;
-      this.scale = scale;
     }
 
     @Override
