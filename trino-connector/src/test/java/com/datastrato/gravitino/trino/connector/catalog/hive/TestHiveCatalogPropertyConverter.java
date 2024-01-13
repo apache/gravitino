@@ -5,9 +5,10 @@
 
 package com.datastrato.gravitino.trino.connector.catalog.hive;
 
-import com.datastrato.gravitino.catalog.PropertyEntry;
 import com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata;
+import com.google.common.collect.Sets;
 import java.util.Map;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
@@ -38,9 +39,13 @@ public class TestHiveCatalogPropertyConverter {
   // To test whether we load jar `bundled-catalog` successfully.
   @Test
   public void testPropertyMetadata() {
-    for (Map.Entry<String, PropertyEntry<?>> entryEntry :
-        new HiveTablePropertiesMetadata().propertyEntries().entrySet()) {
-      LOG.info(entryEntry.getKey() + " " + entryEntry.getValue());
-    }
+    Set<String> gravitinoHiveKeys =
+        Sets.newHashSet(HiveTablePropertyConverter.TRINO_KEY_TO_GRAVITINO_KEY.values());
+    Set<String> actualGravitinoKeys =
+        Sets.newHashSet(new HiveTablePropertiesMetadata().propertyEntries().keySet());
+
+    // Needs to confirm whether external should be a property key for Trino.
+    gravitinoHiveKeys.remove("external");
+    Assert.assertTrue(actualGravitinoKeys.containsAll(gravitinoHiveKeys));
   }
 }

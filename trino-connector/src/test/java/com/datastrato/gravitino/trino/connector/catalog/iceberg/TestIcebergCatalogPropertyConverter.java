@@ -5,11 +5,12 @@
 
 package com.datastrato.gravitino.trino.connector.catalog.iceberg;
 
-import com.datastrato.gravitino.catalog.PropertyEntry;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergTablePropertiesMetadata;
 import com.datastrato.gravitino.trino.connector.catalog.PropertyConverter;
+import com.google.common.collect.Sets;
 import io.trino.spi.TrinoException;
 import java.util.Map;
+import java.util.Set;
 import org.assertj.core.api.Assertions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -82,9 +83,11 @@ public class TestIcebergCatalogPropertyConverter {
   // To test whether we load jar `bundled-catalog` successfully.
   @Test
   public void testPropertyMetadata() {
-    for (Map.Entry<String, PropertyEntry<?>> entryEntry :
-        new IcebergTablePropertiesMetadata().propertyEntries().entrySet()) {
-      System.out.println(entryEntry.getKey() + " " + entryEntry.getValue());
-    }
+    Set<String> gravitinoHiveKeys =
+        Sets.newHashSet(IcebergTablePropertyConverter.TRINO_KEY_TO_GRAVITINO_KEY.values());
+    Set<String> actualGravitinoKeys =
+        Sets.newHashSet(new IcebergTablePropertiesMetadata().propertyEntries().keySet());
+
+    Assert.assertTrue(actualGravitinoKeys.containsAll(gravitinoHiveKeys));
   }
 }
