@@ -127,6 +127,6 @@ public class TestUtils {
     assertEquals(Response.Status.METHOD_NOT_ALLOWED.getStatusCode(), response.getStatus());
     assertEquals(MediaType.APPLICATION_JSON, response.getMediaType().toString());
     ErrorResponse errorResponse = (ErrorResponse) response.getEntity();
-    assertEquals("Invalid argument", errorResponse.getMessage());
+    assertEquals("Unsupported operation", errorResponse.getMessage());
   }
 }
