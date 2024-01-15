@@ -63,7 +63,8 @@ public class TestPostgreSqlTableOperations extends TestPostgreSqlAbstractIT {
         new JdbcColumn.Builder()
             .withName("col_4")
             .withType(VARCHAR)
-            .withDefaultValue("hello world")
+            // TODO: umcomment this line when default value is supported
+            // .withDefaultValue("hello world")
             .withNullable(false)
             .build());
     Map<String, String> properties = new HashMap<>();

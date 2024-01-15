@@ -40,8 +40,9 @@ plugins {
   alias(libs.plugins.publish)
   // Apply one top level rat plugin to perform any required license enforcement analysis
   alias(libs.plugins.rat)
-  id("com.github.jk1.dependency-license-report") version "2.5"
-  id("org.cyclonedx.bom") version "1.5.0" // Newer version fail due to our setup
+  alias(libs.plugins.bom)
+  alias(libs.plugins.dependencyLicenseReport)
+  alias(libs.plugins.tasktree)
 }
 
 if (extra["jdkVersion"] !in listOf("8", "11", "17")) {
@@ -490,3 +491,5 @@ tasks {
     dependsOn(cleanDistribution)
   }
 }
+
+apply(plugin = "com.dorongold.task-tree")
