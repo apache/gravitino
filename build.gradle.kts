@@ -42,6 +42,7 @@ plugins {
   alias(libs.plugins.rat)
   id("com.github.jk1.dependency-license-report") version "2.5"
   id("org.cyclonedx.bom") version "1.5.0" // Newer version fail due to our setup
+  id("com.dorongold.task-tree") version "2.1.1"
 }
 
 if (extra["jdkVersion"] !in listOf("8", "11", "17")) {
@@ -489,3 +490,15 @@ tasks {
     dependsOn(cleanDistribution)
   }
 }
+
+buildscript {
+  repositories {
+    maven {
+      url = uri("https://plugins.gradle.org/m2/")
+    }
+  }
+  dependencies {
+    classpath("com.dorongold.plugins:task-tree:2.1.1")
+  }
+}
+apply(plugin = "com.dorongold.task-tree")
