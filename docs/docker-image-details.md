@@ -22,13 +22,16 @@ docker run --rm -d -p 8090:8090 datastrato/gravitino
 
 Changelog
 
-gravitino:0.3.0
+- gravitino:0.3.1
+  - Fix some issues
 
-- Docker image `datastrato/gravitino:0.3.0`
-- Gravitino Server
-- Expose ports:
-  - `8090` Gravitino Web UI
-  - `9001` Iceberg REST service
+
+- gravitino:0.3.0
+  - Docker image `datastrato/gravitino:0.3.0`
+  - Gravitino Server
+  - Expose ports:
+    - `8090` Gravitino Web UI
+    - `9001` Iceberg REST service
 
 ## Playground Docker image
 
@@ -52,6 +55,10 @@ Changelog
 
 Changelog
 
+- trino:426-gravitino-0.3.1
+  - Fix some issues
+
+
 - trino:426-gravitino-0.3.0
   - Docker image `datastrato/trino:426-gravitino-0.3.0`
   - Base on `trino:462`
@@ -67,6 +74,9 @@ You can use it to test all catalog and connector modules within Gravitino.
 You can use this kind of image to test the catalog of Apache Hive.
 
 Changelog
+
+- gravitino-ci-hive:0.1.8
+  - Change the value of `hive.server2.enable.doAs` to `true`
 
 - gravitino-ci-hive:0.1.7
   - Download MySQL JDBC driver before building the Docker image
@@ -121,6 +131,9 @@ Changelog
 You can use this image to test Trino.
 
 Changelog
+
+- gravitino-ci-trino:0.1.4
+  - Change `-Xmx1G` to `-Xmx2G` in the config file `/etc/trino/jvm.config`
 
 - gravitino-ci-trino:0.1.3
   - Remove copy content in folder `gravitino-trino-connector` to plugin folder `/usr/lib/trino/plugin/gravitino`

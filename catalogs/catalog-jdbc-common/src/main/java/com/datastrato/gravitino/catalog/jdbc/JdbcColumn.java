@@ -58,6 +58,7 @@ public class JdbcColumn extends BaseColumn {
       jdbcColumn.nullable = nullable;
       jdbcColumn.defaultValue = defaultValue;
       jdbcColumn.properties = properties;
+      jdbcColumn.autoIncrement = autoIncrement;
       return jdbcColumn;
     }
   }
