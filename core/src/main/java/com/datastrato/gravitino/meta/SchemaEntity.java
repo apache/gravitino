@@ -98,7 +98,8 @@ public class SchemaEntity implements Entity, Auditable, HasIdentifier {
   }
 
   /**
-   * Returns the comment of the schema.
+   * Returns the comment of the schema. The returned string can be null if it is not stored in the
+   * Gravitino storage.
    *
    * @return The comment of the schema.
    */
@@ -107,10 +108,10 @@ public class SchemaEntity implements Entity, Auditable, HasIdentifier {
   }
 
   /**
-   * Return the properties of the schema.
+   * Return the properties of the schema. The returned map can be null if it is not stored in the
+   * Gravitino storage.
    *
-   * @return The properties of the schema. The returned map can be null if it is not stored in the
-   *     Gravitino storage.
+   * @return The properties of the schema.
    */
   public Map<String, String> properties() {
     return properties;
