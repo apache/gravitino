@@ -27,9 +27,9 @@ This software is licensed under the Apache License version 2."
   for macOS. For the details of "docker-connector", please see [docker-connector](https://github.com/wenjunxiao/mac-docker-connector)
   , `$GRAVITINO_HOME/dev/docker/tools/mac-docker-connector.sh`, and
   `$GRAVITINO_HOME/dev/docker/tools/README.md` for more details.
-+ Alternatively, you can use OrbStack to replace Docker for macOS, please see
-  [OrbStack](https://orbstack.dev/), with OrbStack you can run Gravitino integration tests
-  without needing to install "docker-connector".
++ Alternatively, you can use OrbStack as a replacement for Docker for macOS, please see
+  [OrbStack](https://orbstack.dev/). With OrbStack you can run Gravitino integration tests
+  without needing to install the "docker-connector".
 :::
 
 ## Quick start
