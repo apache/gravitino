@@ -452,7 +452,7 @@ tasks {
     subprojects.forEach() {
       if (!it.name.startsWith("catalog") &&
         !it.name.startsWith("client") && it.name != "trino-connector" &&
-        it.name != "integration-test" && !it.name.contains("bundled")
+        it.name != "integration-test" && it.name != "bundled-catalog"
       ) {
         from(it.configurations.runtimeClasspath)
         into("distribution/package/libs")
@@ -466,7 +466,7 @@ tasks {
         !it.name.startsWith("client") &&
         it.name != "trino-connector" &&
         it.name != "integration-test" &&
-        !it.name.contains("bundled")
+        it.name != "bundled-catalog"
       ) {
         dependsOn("${it.name}:build")
         from("${it.name}/build/libs")

@@ -12,17 +12,12 @@ import io.trino.spi.TrinoException;
 import java.util.Map;
 import java.util.Set;
 import org.assertj.core.api.Assertions;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 import org.testng.collections.Maps;
 
 public class TestIcebergCatalogPropertyConverter {
-
-  private static final Logger LOG =
-      LoggerFactory.getLogger(TestIcebergCatalogPropertyConverter.class);
 
   @Test
   public void testHiveBackendProperty() {

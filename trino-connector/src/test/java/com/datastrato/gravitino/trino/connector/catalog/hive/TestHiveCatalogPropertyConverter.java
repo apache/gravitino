@@ -9,15 +9,11 @@ import com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata;
 import com.google.common.collect.Sets;
 import java.util.Map;
 import java.util.Set;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
 public class TestHiveCatalogPropertyConverter {
-
-  private static final Logger LOG = LoggerFactory.getLogger(TestHiveCatalogPropertyConverter.class);
 
   @Test
   public void testConverter() {

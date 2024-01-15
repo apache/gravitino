@@ -8,7 +8,6 @@ import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
 plugins {
   id("java")
   alias(libs.plugins.shadow)
-  `maven-publish`
 }
 
 dependencies {
@@ -17,10 +16,6 @@ dependencies {
   implementation(project(":catalogs:catalog-lakehouse-iceberg"))
   implementation(project(":catalogs:catalog-jdbc-mysql"))
   implementation(project(":catalogs:catalog-jdbc-postgresql"))
-}
-
-tasks.test {
-  useJUnitPlatform()
 }
 
 tasks.withType<ShadowJar>(ShadowJar::class.java) {
