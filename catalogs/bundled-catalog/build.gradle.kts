@@ -38,6 +38,7 @@ tasks.withType<ShadowJar>(ShadowJar::class.java) {
   exclude("**/*.html")
   exclude("org/**")
   exclude("META-INF")
+  exclude("META-INF/**")
   exclude("module-info.class")
   exclude("com/google/**")
   exclude("com/fasterxml/**")
@@ -77,11 +78,4 @@ tasks.withType<ShadowJar>(ShadowJar::class.java) {
 tasks.jar {
   dependsOn(tasks.named("shadowJar"))
   archiveClassifier.set("empty")
-}
-
-tasks.compileJava {
-  dependsOn(":catalogs:catalog-hive:copyDepends")
-  dependsOn(":catalogs:catalog-jdbc-mysql:copyDepends")
-  dependsOn(":catalogs:catalog-jdbc-postgresql:copyDepends")
-  dependsOn(":catalogs:catalog-lakehouse-iceberg:copyDepends")
 }
