@@ -6,6 +6,7 @@ package com.datastrato.gravitino.meta;
 
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.Field;
+import com.datastrato.gravitino.file.File;
 import com.google.common.collect.ImmutableMap;
 import java.time.Instant;
 import java.util.Map;
@@ -37,6 +38,11 @@ public class TestEntity {
   // Table test data
   private final Long tableId = 1L;
   private final String tableName = "testTable";
+
+  // File test data
+  private final Long fileId = 1L;
+  private final String fileName = "testFile";
+  private final File.Format format = File.Format.CSV;
 
   @Test
   public void testMetalake() {
@@ -94,6 +100,18 @@ public class TestEntity {
     Assertions.assertEquals(schemaId, fields.get(SchemaEntity.ID));
     Assertions.assertEquals(schemaName, fields.get(SchemaEntity.NAME));
     Assertions.assertEquals(auditInfo, fields.get(SchemaEntity.AUDIT_INFO));
+
+    SchemaEntity testSchema1 =
+        new SchemaEntity.Builder()
+            .withId(schemaId)
+            .withName(schemaName)
+            .withAuditInfo(auditInfo)
+            .withComment("testComment")
+            .withProperties(map)
+            .build();
+    Map<Field, Object> fields1 = testSchema1.fields();
+    Assertions.assertEquals("testComment", fields1.get(SchemaEntity.COMMENT));
+    Assertions.assertEquals(map, fields1.get(SchemaEntity.PROPERTIES));
   }
 
   @Test
@@ -109,5 +127,25 @@ public class TestEntity {
     Assertions.assertEquals(tableId, fields.get(TableEntity.ID));
     Assertions.assertEquals(tableName, fields.get(TableEntity.NAME));
     Assertions.assertEquals(auditInfo, fields.get(TableEntity.AUDIT_INFO));
+  }
+
+  @Test
+  public void testFile() {
+    FileEntity testFile =
+        new FileEntity.Builder()
+            .withId(fileId)
+            .withName(fileName)
+            .withAuditInfo(auditInfo)
+            .withFormat(format)
+            .withProperties(map)
+            .build();
+
+    Map<Field, Object> fields = testFile.fields();
+    Assertions.assertEquals(fileId, fields.get(FileEntity.ID));
+    Assertions.assertEquals(fileName, fields.get(FileEntity.NAME));
+    Assertions.assertEquals(auditInfo, fields.get(FileEntity.AUDIT_INFO));
+    Assertions.assertEquals(format, fields.get(FileEntity.FORMAT));
+    Assertions.assertEquals(map, fields.get(FileEntity.PROPERTIES));
+    Assertions.assertNull(fields.get(FileEntity.COMMENT));
   }
 }
