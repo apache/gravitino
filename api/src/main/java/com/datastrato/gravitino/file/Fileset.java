@@ -14,12 +14,12 @@ import javax.annotation.Nullable;
  * An interface representing a fileset under a schema {@link Namespace}. A fileset is a virtual
  * concept of the file or directory that is managed by Gravitino. Users can create a fileset object
  * to manage the non-tabular data on the FS-like storage. The typical use case is to manage the
- * training data for AI workloads. The major difference compare to the relational table is that
- * the fileset is schema-free, the main property of the fileset is the storage location of the
+ * training data for AI workloads. The major difference compare to the relational table is that the
+ * fileset is schema-free, the main property of the fileset is the storage location of the
  * underlying data.
  *
- * {@link Fileset} defines the basic properties of a fileset object. A catalog implementation with
- * {@link FilesetCatalog} should implement this interface.
+ * <p>{@link Fileset} defines the basic properties of a fileset object. A catalog implementation
+ * with {@link FilesetCatalog} should implement this interface.
  */
 public interface Fileset extends Auditable {
 
