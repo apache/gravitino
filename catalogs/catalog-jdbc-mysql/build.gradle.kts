@@ -28,7 +28,7 @@ tasks {
   }
   val copyCatalogLibs by registering(Copy::class) {
     dependsOn(copyDepends, "build")
-    from("build/libs_all")
+    from("build/libs_all", "build/libs")
     into("$rootDir/distribution/package/catalogs/jdbc-mysql/libs")
   }
 
