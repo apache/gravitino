@@ -66,6 +66,9 @@ public class ExceptionHandlers {
       } else if (e instanceof TableAlreadyExistsException) {
         return Utils.alreadyExists(errorMsg, e);
 
+      } else if (e instanceof UnsupportedOperationException) {
+        return Utils.unsupportedOperation(errorMsg, e);
+
       } else {
         return super.handle(op, table, schema, e);
       }
