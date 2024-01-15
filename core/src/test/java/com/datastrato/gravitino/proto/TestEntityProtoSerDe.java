@@ -6,7 +6,6 @@ package com.datastrato.gravitino.proto;
 
 import com.datastrato.gravitino.EntitySerDe;
 import com.datastrato.gravitino.EntitySerDeFactory;
-import com.datastrato.gravitino.file.File;
 import com.datastrato.gravitino.meta.SchemaVersion;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
@@ -183,50 +182,51 @@ public class TestEntityProtoSerDe {
     // Test FileEntity
     Long fileId = 1L;
     String fileName = "file";
-    com.datastrato.gravitino.meta.FileEntity fileEntity =
-        new com.datastrato.gravitino.meta.FileEntity.Builder()
+    com.datastrato.gravitino.meta.FilesetEntity fileEntity =
+        new com.datastrato.gravitino.meta.FilesetEntity.Builder()
             .withId(fileId)
             .withName(fileName)
             .withAuditInfo(auditInfo)
-            .withFileType(com.datastrato.gravitino.file.File.Type.MANAGED)
+            .withFilesetType(com.datastrato.gravitino.file.Fileset.Type.MANAGED)
             .withProperties(props)
             .withComment(comment)
             .build();
     byte[] fileBytes = protoEntitySerDe.serialize(fileEntity);
-    com.datastrato.gravitino.meta.FileEntity fileEntityFromBytes =
-        protoEntitySerDe.deserialize(fileBytes, com.datastrato.gravitino.meta.FileEntity.class);
+    com.datastrato.gravitino.meta.FilesetEntity fileEntityFromBytes =
+        protoEntitySerDe.deserialize(fileBytes, com.datastrato.gravitino.meta.FilesetEntity.class);
     Assertions.assertEquals(fileEntity, fileEntityFromBytes);
 
-    com.datastrato.gravitino.meta.FileEntity fileEntity1 =
-        new com.datastrato.gravitino.meta.FileEntity.Builder()
+    com.datastrato.gravitino.meta.FilesetEntity fileEntity1 =
+        new com.datastrato.gravitino.meta.FilesetEntity.Builder()
             .withId(fileId)
             .withName(fileName)
             .withAuditInfo(auditInfo)
-            .withFileType(File.Type.MANAGED)
+            .withFilesetType(com.datastrato.gravitino.file.Fileset.Type.MANAGED)
             .build();
     byte[] fileBytes1 = protoEntitySerDe.serialize(fileEntity1);
-    com.datastrato.gravitino.meta.FileEntity fileEntityFromBytes1 =
-        protoEntitySerDe.deserialize(fileBytes1, com.datastrato.gravitino.meta.FileEntity.class);
+    com.datastrato.gravitino.meta.FilesetEntity fileEntityFromBytes1 =
+        protoEntitySerDe.deserialize(fileBytes1, com.datastrato.gravitino.meta.FilesetEntity.class);
     Assertions.assertEquals(fileEntity1, fileEntityFromBytes1);
     Assertions.assertNull(fileEntityFromBytes1.comment());
     Assertions.assertNull(fileEntityFromBytes1.properties());
     Assertions.assertNull(fileEntityFromBytes1.storageLocation());
 
-    com.datastrato.gravitino.meta.FileEntity fileEntity2 =
-        new com.datastrato.gravitino.meta.FileEntity.Builder()
+    com.datastrato.gravitino.meta.FilesetEntity fileEntity2 =
+        new com.datastrato.gravitino.meta.FilesetEntity.Builder()
             .withId(fileId)
             .withName(fileName)
             .withAuditInfo(auditInfo)
-            .withFileType(File.Type.EXTERNAL)
+            .withFilesetType(com.datastrato.gravitino.file.Fileset.Type.EXTERNAL)
             .withProperties(props)
             .withComment(comment)
             .withStorageLocation("testLocation")
             .build();
     byte[] fileBytes2 = protoEntitySerDe.serialize(fileEntity2);
-    com.datastrato.gravitino.meta.FileEntity fileEntityFromBytes2 =
-        protoEntitySerDe.deserialize(fileBytes2, com.datastrato.gravitino.meta.FileEntity.class);
+    com.datastrato.gravitino.meta.FilesetEntity fileEntityFromBytes2 =
+        protoEntitySerDe.deserialize(fileBytes2, com.datastrato.gravitino.meta.FilesetEntity.class);
     Assertions.assertEquals(fileEntity2, fileEntityFromBytes2);
     Assertions.assertEquals("testLocation", fileEntityFromBytes2.storageLocation());
-    Assertions.assertEquals(File.Type.EXTERNAL, fileEntityFromBytes2.fileType());
+    Assertions.assertEquals(
+        com.datastrato.gravitino.file.Fileset.Type.EXTERNAL, fileEntityFromBytes2.filesetType());
   }
 }

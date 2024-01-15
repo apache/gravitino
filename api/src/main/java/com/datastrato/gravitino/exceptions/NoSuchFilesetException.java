@@ -5,13 +5,13 @@
 package com.datastrato.gravitino.exceptions;
 
 /** Exception thrown when a file with specified name is not existed. */
-public class NoSuchFileException extends NotFoundException {
+public class NoSuchFilesetException extends NotFoundException {
 
-  public NoSuchFileException(String message) {
+  public NoSuchFilesetException(String message) {
     super(message);
   }
 
-  public NoSuchFileException(String message, Throwable cause) {
+  public NoSuchFilesetException(String message, Throwable cause) {
     super(message, cause);
   }
 }

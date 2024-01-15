@@ -35,8 +35,8 @@ public class ProtoEntitySerDe implements EntitySerDe {
               "com.datastrato.gravitino.meta.TableEntity",
               "com.datastrato.gravitino.proto.TableEntitySerDe")
           .put(
-              "com.datastrato.gravitino.meta.FileEntity",
-              "com.datastrato.gravitino.proto.FileEntitySerDe")
+              "com.datastrato.gravitino.meta.FilesetEntity",
+              "com.datastrato.gravitino.proto.FilesetEntitySerDe")
           .build();
 
   private static final Map<String, String> ENTITY_TO_PROTO =
@@ -51,8 +51,8 @@ public class ProtoEntitySerDe implements EntitySerDe {
           "com.datastrato.gravitino.proto.Schema",
           "com.datastrato.gravitino.meta.TableEntity",
           "com.datastrato.gravitino.proto.Table",
-          "com.datastrato.gravitino.meta.FileEntity",
-          "com.datastrato.gravitino.proto.File");
+          "com.datastrato.gravitino.meta.FilesetEntity",
+          "com.datastrato.gravitino.proto.Fileset");
 
   private final Map<Class<? extends Entity>, ProtoSerDe<? extends Entity, ? extends Message>>
       entityToSerDe;

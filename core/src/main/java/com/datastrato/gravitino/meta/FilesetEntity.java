@@ -8,7 +8,7 @@ import com.datastrato.gravitino.Auditable;
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.Field;
 import com.datastrato.gravitino.HasIdentifier;
-import com.datastrato.gravitino.file.File;
+import com.datastrato.gravitino.file.Fileset;
 import com.google.common.collect.Maps;
 import java.util.Collections;
 import java.util.Map;
@@ -17,22 +17,23 @@ import javax.annotation.Nullable;
 import lombok.ToString;
 
 @ToString
-public class FileEntity implements Entity, Auditable, HasIdentifier {
+public class FilesetEntity implements Entity, Auditable, HasIdentifier {
 
   public static final Field ID =
-      Field.required("id", Long.class, "The unique id of the file entity.");
+      Field.required("id", Long.class, "The unique id of the fileset entity.");
   public static final Field NAME =
-      Field.required("name", String.class, "The name of the file entity.");
+      Field.required("name", String.class, "The name of the fileset entity.");
   public static final Field COMMENT =
-      Field.optional("comment", String.class, "The comment or description of the file entity.");
+      Field.optional("comment", String.class, "The comment or description of the fileset entity.");
   public static final Field TYPE =
-      Field.required("type", File.Type.class, "The type of the file entity.");
+      Field.required("type", Fileset.Type.class, "The type of the fileset entity.");
   public static final Field STORAGE_LOCATION =
-      Field.optional("storage_location", String.class, "The storage location of the file entity.");
+      Field.optional(
+          "storage_location", String.class, "The storage location of the fileset entity.");
   public static final Field AUDIT_INFO =
-      Field.required("audit_info", AuditInfo.class, "The audit details of the file entity.");
+      Field.required("audit_info", AuditInfo.class, "The audit details of the fileset entity.");
   public static final Field PROPERTIES =
-      Field.optional("properties", Map.class, "The properties of the file entity.");
+      Field.optional("properties", Map.class, "The properties of the fileset entity.");
 
   private Long id;
 
@@ -40,7 +41,7 @@ public class FileEntity implements Entity, Auditable, HasIdentifier {
 
   private String comment;
 
-  private File.Type type;
+  private Fileset.Type type;
 
   @Nullable private String storageLocation;
 
@@ -48,10 +49,10 @@ public class FileEntity implements Entity, Auditable, HasIdentifier {
 
   private Map<String, String> properties;
 
-  private FileEntity() {}
+  private FilesetEntity() {}
 
   /**
-   * Returns a map of fields and their corresponding values for this file entity.
+   * Returns a map of fields and their corresponding values for this fileset entity.
    *
    * @return An unmodifiable map of the fields and values.
    */
@@ -70,9 +71,9 @@ public class FileEntity implements Entity, Auditable, HasIdentifier {
   }
 
   /**
-   * Returns the name of the file entity.
+   * Returns the name of the fileset entity.
    *
-   * @return The name of the file entity.
+   * @return The name of the fileset entity.
    */
   @Override
   public String name() {
@@ -80,9 +81,9 @@ public class FileEntity implements Entity, Auditable, HasIdentifier {
   }
 
   /**
-   * Returns the unique id of the file entity.
+   * Returns the unique id of the fileset entity.
    *
-   * @return The unique id of the file entity.
+   * @return The unique id of the fileset entity.
    */
   @Override
   public Long id() {
@@ -90,9 +91,9 @@ public class FileEntity implements Entity, Auditable, HasIdentifier {
   }
 
   /**
-   * Returns the audit details of the file entity.
+   * Returns the audit details of the fileset entity.
    *
-   * @return The audit details of the file entity.
+   * @return The audit details of the fileset entity.
    */
   @Override
   public AuditInfo auditInfo() {
@@ -106,40 +107,40 @@ public class FileEntity implements Entity, Auditable, HasIdentifier {
    */
   @Override
   public EntityType type() {
-    return EntityType.FILE;
+    return EntityType.FILESET;
   }
 
   /**
-   * Returns the comment of the file entity.
+   * Returns the comment of the fileset entity.
    *
-   * @return The comment of the file entity.
+   * @return The comment of the fileset entity.
    */
   public String comment() {
     return comment;
   }
 
   /**
-   * Returns the type of the file entity.
+   * Returns the type of the fileset entity.
    *
-   * @return The type of the file entity.
+   * @return The type of the fileset entity.
    */
-  public File.Type fileType() {
+  public Fileset.Type filesetType() {
     return type;
   }
 
   /**
-   * Returns the storage location of the file entity.
+   * Returns the storage location of the fileset entity.
    *
-   * @return The storage location of the file entity.
+   * @return The storage location of the fileset entity.
    */
   public String storageLocation() {
     return storageLocation;
   }
 
   /**
-   * Returns the properties of the file entity.
+   * Returns the properties of the fileset entity.
    *
-   * @return The properties of the file entity.
+   * @return The properties of the fileset entity.
    */
   public Map<String, String> properties() {
     return properties;
@@ -148,9 +149,9 @@ public class FileEntity implements Entity, Auditable, HasIdentifier {
   @Override
   public boolean equals(Object o) {
     if (this == o) return true;
-    if (!(o instanceof FileEntity)) return false;
+    if (!(o instanceof FilesetEntity)) return false;
 
-    FileEntity that = (FileEntity) o;
+    FilesetEntity that = (FilesetEntity) o;
     return Objects.equals(id, that.id)
         && Objects.equals(name, that.name)
         && Objects.equals(comment, that.comment)
@@ -167,104 +168,104 @@ public class FileEntity implements Entity, Auditable, HasIdentifier {
 
   public static class Builder {
 
-    private final FileEntity file;
+    private final FilesetEntity fileset;
 
     public Builder() {
-      file = new FileEntity();
+      fileset = new FilesetEntity();
     }
 
     /**
-     * Sets the unique id of the file entity.
+     * Sets the unique id of the fileset entity.
      *
-     * @param id The unique id of the file entity.
+     * @param id The unique id of the fileset entity.
      * @return The builder instance.
      */
     public Builder withId(Long id) {
-      file.id = id;
+      fileset.id = id;
       return this;
     }
 
     /**
-     * Sets the name of the file entity.
+     * Sets the name of the fileset entity.
      *
-     * @param name The name of the file entity.
+     * @param name The name of the fileset entity.
      * @return The builder instance.
      */
     public Builder withName(String name) {
-      file.name = name;
+      fileset.name = name;
       return this;
     }
 
     /**
-     * Sets the comment of the file entity.
+     * Sets the comment of the fileset entity.
      *
-     * @param comment The comment of the file entity.
+     * @param comment The comment of the fileset entity.
      * @return The builder instance.
      */
     public Builder withComment(String comment) {
-      file.comment = comment;
+      fileset.comment = comment;
       return this;
     }
 
     /**
-     * Sets the type of the file entity.
+     * Sets the type of the fileset entity.
      *
-     * @param type The type of the file entity.
+     * @param type The type of the fileset entity.
      * @return The builder instance.
      */
-    public Builder withFileType(File.Type type) {
-      file.type = type;
+    public Builder withFilesetType(Fileset.Type type) {
+      fileset.type = type;
       return this;
     }
 
     /**
-     * Sets the storage location of the file entity.
+     * Sets the storage location of the fileset entity.
      *
-     * <p>Only the EXTERNAL type of file entity requires a storage location.
+     * <p>Only the EXTERNAL type of fileset entity requires a storage location.
      *
-     * @param storageLocation The storage location of the file entity.
+     * @param storageLocation The storage location of the fileset entity.
      * @return The builder instance.
      */
     public Builder withStorageLocation(String storageLocation) {
-      file.storageLocation = storageLocation;
+      fileset.storageLocation = storageLocation;
       return this;
     }
 
     /**
-     * Sets the audit details of the file entity.
+     * Sets the audit details of the fileset entity.
      *
-     * @param auditInfo The audit details of the file entity.
+     * @param auditInfo The audit details of the fileset entity.
      * @return The builder instance.
      */
     public Builder withAuditInfo(AuditInfo auditInfo) {
-      file.auditInfo = auditInfo;
+      fileset.auditInfo = auditInfo;
       return this;
     }
 
     /**
-     * Sets the properties of the file entity.
+     * Sets the properties of the fileset entity.
      *
-     * @param properties The properties of the file entity.
+     * @param properties The properties of the fileset entity.
      * @return The builder instance.
      */
     public Builder withProperties(Map<String, String> properties) {
-      file.properties = properties;
+      fileset.properties = properties;
       return this;
     }
 
     /**
-     * Builds the file entity.
+     * Builds the fileset entity.
      *
-     * @return The file entity.
+     * @return The fileset entity.
      */
-    public FileEntity build() {
-      file.validate();
+    public FilesetEntity build() {
+      fileset.validate();
 
-      if (file.type == File.Type.EXTERNAL && file.storageLocation == null) {
-        throw new IllegalArgumentException("Storage location is required for EXTERNAL file.");
+      if (fileset.type == Fileset.Type.EXTERNAL && fileset.storageLocation == null) {
+        throw new IllegalArgumentException("Storage location is required for EXTERNAL fileset.");
       }
 
-      return file;
+      return fileset;
     }
   }
 }

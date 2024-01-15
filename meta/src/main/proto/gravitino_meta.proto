@@ -74,10 +74,10 @@ message Table {
 }
 
 /**
- * The File message is used to record the file object information. File object represents
+ * The Fileset message is used to record the fileset object information. Fileset object represents
  * the non-tabular data on FS-like storage, like HDFS, S3, etc.
  */
-message File {
+message Fileset {
   enum Type {
     MANAGED = 0; // The storage location is managed by Gravitino. When specified, the data will be
                  // deleted when the file object is deleted.

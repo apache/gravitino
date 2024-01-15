@@ -6,7 +6,7 @@ package com.datastrato.gravitino.meta;
 
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.Field;
-import com.datastrato.gravitino.file.File;
+import com.datastrato.gravitino.file.Fileset;
 import com.google.common.collect.ImmutableMap;
 import java.time.Instant;
 import java.util.Map;
@@ -130,29 +130,29 @@ public class TestEntity {
 
   @Test
   public void testFile() {
-    FileEntity testFile =
-        new FileEntity.Builder()
+    FilesetEntity testFile =
+        new FilesetEntity.Builder()
             .withId(fileId)
             .withName(fileName)
             .withAuditInfo(auditInfo)
-            .withFileType(File.Type.MANAGED)
+            .withFilesetType(Fileset.Type.MANAGED)
             .withProperties(map)
             .build();
 
     Map<Field, Object> fields = testFile.fields();
-    Assertions.assertEquals(fileId, fields.get(FileEntity.ID));
-    Assertions.assertEquals(fileName, fields.get(FileEntity.NAME));
-    Assertions.assertEquals(auditInfo, fields.get(FileEntity.AUDIT_INFO));
-    Assertions.assertEquals(File.Type.MANAGED, fields.get(FileEntity.TYPE));
-    Assertions.assertEquals(map, fields.get(FileEntity.PROPERTIES));
-    Assertions.assertNull(fields.get(FileEntity.COMMENT));
+    Assertions.assertEquals(fileId, fields.get(FilesetEntity.ID));
+    Assertions.assertEquals(fileName, fields.get(FilesetEntity.NAME));
+    Assertions.assertEquals(auditInfo, fields.get(FilesetEntity.AUDIT_INFO));
+    Assertions.assertEquals(Fileset.Type.MANAGED, fields.get(FilesetEntity.TYPE));
+    Assertions.assertEquals(map, fields.get(FilesetEntity.PROPERTIES));
+    Assertions.assertNull(fields.get(FilesetEntity.COMMENT));
 
-    FileEntity testFile1 =
-        new FileEntity.Builder()
+    FilesetEntity testFile1 =
+        new FilesetEntity.Builder()
             .withId(fileId)
             .withName(fileName)
             .withAuditInfo(auditInfo)
-            .withFileType(File.Type.MANAGED)
+            .withFilesetType(Fileset.Type.MANAGED)
             .withProperties(map)
             .withComment("testComment")
             .withStorageLocation("testLocation")
@@ -164,16 +164,16 @@ public class TestEntity {
         Assertions.assertThrows(
             IllegalArgumentException.class,
             () -> {
-              new FileEntity.Builder()
+              new FilesetEntity.Builder()
                   .withId(fileId)
                   .withName(fileName)
                   .withAuditInfo(auditInfo)
-                  .withFileType(File.Type.EXTERNAL)
+                  .withFilesetType(Fileset.Type.EXTERNAL)
                   .withProperties(map)
                   .withComment("testComment")
                   .build();
             });
     Assertions.assertEquals(
-        "Storage location is required for EXTERNAL file.", exception.getMessage());
+        "Storage location is required for EXTERNAL fileset.", exception.getMessage());
   }
 }

@@ -7,88 +7,88 @@ package com.datastrato.gravitino.file;
 import java.util.Objects;
 
 /**
- * A file change is a change to a file. It can be used to rename a file, update the comment of a
- * file, set a property and value pair for a file, or remove a property from a file.
+ * A fileset change is a change to a fileset. It can be used to rename a fileset, update the comment
+ * of a fileset, set a property and value pair for a fileset, or remove a property from a fileset.
  */
-public interface FileChange {
+public interface FilesetChange {
 
   /**
-   * Creates a new file change to rename the file.
+   * Creates a new fileset change to rename the fileset.
    *
-   * @param newName The new name of the file.
-   * @return The file change.
+   * @param newName The new name of the fileset.
+   * @return The fileset change.
    */
-  static FileChange rename(String newName) {
-    return new RenameFile(newName);
+  static FilesetChange rename(String newName) {
+    return new RenameFileset(newName);
   }
 
   /**
-   * Creates a new file change to update the file comment.
+   * Creates a new fileset change to update the fileset comment.
    *
-   * @param newComment The new comment for the file.
-   * @return The file change.
+   * @param newComment The new comment for the fileset.
+   * @return The fileset change.
    */
-  static FileChange updateComment(String newComment) {
-    return new UpdateFileComment(newComment);
+  static FilesetChange updateComment(String newComment) {
+    return new UpdateFilesetComment(newComment);
   }
 
   /**
-   * Creates a new file change to set the property and value for the file.
+   * Creates a new fileset change to set the property and value for the fileset.
    *
    * @param property The property name to set.
    * @param value The value to set the property to.
-   * @return The file change.
+   * @return The fileset change.
    */
-  static FileChange setProperty(String property, String value) {
+  static FilesetChange setProperty(String property, String value) {
     return new SetProperty(property, value);
   }
 
   /**
-   * Creates a new file change to remove a property from the file.
+   * Creates a new fileset change to remove a property from the fileset.
    *
    * @param property The property name to remove.
-   * @return The file change.
+   * @return The fileset change.
    */
-  static FileChange removeProperty(String property) {
+  static FilesetChange removeProperty(String property) {
     return new RemoveProperty(property);
   }
 
-  /** A file change to rename the file. */
-  final class RenameFile implements FileChange {
+  /** A fileset change to rename the fileset. */
+  final class RenameFileset implements FilesetChange {
     private final String newName;
 
-    private RenameFile(String newName) {
+    private RenameFileset(String newName) {
       this.newName = newName;
     }
 
     /**
-     * Retrieves the new name set for the file.
+     * Retrieves the new name set for the fileset.
      *
-     * @return The new name of the file.
+     * @return The new name of the fileset.
      */
     public String getNewName() {
       return newName;
     }
 
     /**
-     * Compares this RenameFile instance with another object for equality. Two instances are
-     * considered equal if they designate the same new name for the file.
+     * Compares this RenameFileset instance with another object for equality. Two instances are
+     * considered equal if they designate the same new name for the fileset.
      *
      * @param o The object to compare with this instance.
-     * @return true if the given object represents an identical file renaming operation; false
+     * @return true if the given object represents an identical fileset renaming operation; false
      *     otherwise.
      */
     @Override
     public boolean equals(Object o) {
       if (this == o) return true;
       if (o == null || getClass() != o.getClass()) return false;
-      RenameFile that = (RenameFile) o;
+      RenameFileset that = (RenameFileset) o;
       return Objects.equals(newName, that.newName);
     }
 
     /**
-     * Generates a hash code for this RenameFile instance. The hash code is primarily based on the
-     * new name for the file.
+     * Generates a hash code for this RenameFileset instance. The hash code is primarily based on
+     * the new name for the fileset.
      *
      * @return A hash code value for this renaming operation.
      */
@@ -99,36 +99,36 @@ public interface FileChange {
 
     /**
      * Provides a string representation of the RenameFile instance. This string includes the class
-     * name followed by the new name of the file.
+     * name followed by the new name of the fileset.
      *
      * @return A string summary of this renaming operation.
      */
     @Override
     public String toString() {
-      return "RENAMEFILE " + newName;
+      return "RENAMEFILESET " + newName;
     }
   }
 
-  /** A file change to update the file comment. */
-  final class UpdateFileComment implements FileChange {
+  /** A fileset change to update the fileset comment. */
+  final class UpdateFilesetComment implements FilesetChange {
     private final String newComment;
 
-    private UpdateFileComment(String newComment) {
+    private UpdateFilesetComment(String newComment) {
       this.newComment = newComment;
     }
 
     /**
-     * Retrieves the new comment intended for the file.
+     * Retrieves the new comment intended for the fileset.
      *
-     * @return The new comment that has been set for the file.
+     * @return The new comment that has been set for the fileset.
      */
     public String getNewComment() {
       return newComment;
     }
 
     /**
-     * Compares this UpdateFileComment instance with another object for equality. Two instances are
-     * considered equal if they designate the same new comment for the file.
+     * Compares this UpdateFilesetComment instance with another object for equality. Two instances
+     * are considered equal if they designate the same new comment for the fileset.
      *
      * @param o The object to compare with this instance.
      * @return true if the given object represents the same comment update; false otherwise.
@@ -137,13 +137,13 @@ public interface FileChange {
     public boolean equals(Object o) {
       if (this == o) return true;
       if (o == null || getClass() != o.getClass()) return false;
-      UpdateFileComment that = (UpdateFileComment) o;
+      UpdateFilesetComment that = (UpdateFilesetComment) o;
       return Objects.equals(newComment, that.newComment);
     }
 
     /**
      * Generates a hash code for this UpdateFileComment instance. The hash code is based on the new
-     * comment for the file.
+     * comment for the fileset.
      *
      * @return A hash code representing this comment update operation.
      */
@@ -153,19 +153,19 @@ public interface FileChange {
     }
 
     /**
-     * Provides a string representation of the UpdateFileComment instance. This string format
-     * includes the class name followed by the new comment for the file.
+     * Provides a string representation of the UpdateFilesetComment instance. This string format
+     * includes the class name followed by the new comment for the fileset.
      *
      * @return A string summary of this comment update operation.
      */
     @Override
     public String toString() {
-      return "UPDATEFILECOMMENT " + newComment;
+      return "UPDATEFILESETCOMMENT " + newComment;
     }
   }
 
-  /** A file change to set the property and value for the file. */
-  final class SetProperty implements FileChange {
+  /** A fileset change to set the property and value for the fileset. */
+  final class SetProperty implements FilesetChange {
     private final String property;
     private final String value;
 
@@ -175,7 +175,7 @@ public interface FileChange {
     }
 
     /**
-     * Retrieves the name of the property being set in the file.
+     * Retrieves the name of the property being set in the fileset.
      *
      * @return The name of the property.
      */
@@ -184,7 +184,7 @@ public interface FileChange {
     }
 
     /**
-     * Retrieves the value assigned to the property in the file.
+     * Retrieves the value assigned to the property in the fileset.
      *
      * @return The value of the property.
      */
@@ -194,7 +194,7 @@ public interface FileChange {
 
     /**
      * Compares this SetProperty instance with another object for equality. Two instances are
-     * considered equal if they have the same property and value for the file.
+     * considered equal if they have the same property and value for the fileset.
      *
      * @param o The object to compare with this instance.
      * @return true if the given object represents the same property setting; false otherwise.
@@ -230,8 +230,8 @@ public interface FileChange {
     }
   }
 
-  /** A file change to remove a property from the file. */
-  final class RemoveProperty implements FileChange {
+  /** A fileset change to remove a property from the fileset. */
+  final class RemoveProperty implements FilesetChange {
     private final String property;
 
     private RemoveProperty(String property) {
@@ -239,7 +239,7 @@ public interface FileChange {
     }
 
     /**
-     * Retrieves the name of the property to be removed from the file.
+     * Retrieves the name of the property to be removed from the fileset.
      *
      * @return The name of the property for removal.
      */
@@ -249,7 +249,7 @@ public interface FileChange {
 
     /**
      * Compares this RemoveProperty instance with another object for equality. Two instances are
-     * considered equal if they target the same property for removal from the file.
+     * considered equal if they target the same property for removal from the fileset.
      *
      * @param o The object to compare with this instance.
      * @return true if the given object represents the same property removal; false otherwise.
@@ -264,7 +264,7 @@ public interface FileChange {
 
     /**
      * Generates a hash code for this RemoveProperty instance. The hash code is based on the
-     * property name that is to be removed from the file.
+     * property name that is to be removed from the fileset.
      *
      * @return A hash code value for this property removal operation.
      */

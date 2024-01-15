@@ -5,13 +5,13 @@
 package com.datastrato.gravitino.exceptions;
 
 /** Exception thrown when a file with specified name already exists. */
-public class FileAlreadyExistsException extends AlreadyExistsException {
+public class FilesetAlreadyExistsException extends AlreadyExistsException {
 
-  public FileAlreadyExistsException(String message) {
+  public FilesetAlreadyExistsException(String message) {
     super(message);
   }
 
-  public FileAlreadyExistsException(String message, Throwable cause) {
+  public FilesetAlreadyExistsException(String message, Throwable cause) {
     super(message, cause);
   }
 }
