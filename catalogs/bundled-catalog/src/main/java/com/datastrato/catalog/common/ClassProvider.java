@@ -18,9 +18,21 @@ import java.util.HashSet;
 import java.util.Set;
 
 /**
- * {@link ClassProvider} holds the set of classes that are required for the query engine to use
- * Gravitino, currently, it mainly focuses on the classes that are required for the property
- * metadata.
+ * The {@link ClassProvider} class serves as a container for the necessary classes used by the
+ * Gravitino query engine, with a primary focus on classes related to property metadata.
+ *
+ * <p>Purpose of this module and class:
+ *
+ * <pre>
+ * - Catalog-related classes are essential for the query engine to directly access catalog information.
+ * - The query engine should be able to detect catalog changes and automatically reload catalog-related
+ *   information to ensure synchronization.
+ * - Including catalog-related jar packages directly is suboptimal for query engines as it may introduce
+ *   unnecessary content.
+ * </pre>
+ *
+ * Therefore, this module is used to store the required classes for the query engine's
+ * functionality.
  */
 public class ClassProvider {
 

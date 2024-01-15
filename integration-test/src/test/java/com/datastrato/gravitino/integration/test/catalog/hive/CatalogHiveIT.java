@@ -20,6 +20,7 @@ import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.
 import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.TOTAL_SIZE;
 import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.TRANSIENT_LAST_DDL_TIME;
 import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.TableType.EXTERNAL_TABLE;
+import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.TableType.MANAGED_TABLE;
 import static org.apache.hadoop.hive.serde.serdeConstants.DATE_TYPE_NAME;
 import static org.apache.hadoop.hive.serde.serdeConstants.INT_TYPE_NAME;
 import static org.apache.hadoop.hive.serde.serdeConstants.STRING_TYPE_NAME;
@@ -69,6 +70,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.hadoop.conf.Configuration;
@@ -1125,5 +1127,64 @@ public class CatalogHiveIT extends AbstractIT {
 
     Assertions.assertThrows(
         NoSuchMetalakeException.class, () -> client.loadMetalake(NameIdentifier.of(metalakeName1)));
+  }
+
+  @Test
+  public void testPurgeHiveManagedTable() throws TException, InterruptedException, IOException {
+    ColumnDTO[] columns = createColumns();
+    catalog
+        .asTableCatalog()
+        .createTable(
+            NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
+            columns,
+            TABLE_COMMENT,
+            createProperties(),
+            new Partitioning[] {IdentityPartitioningDTO.of(columns[2].name())});
+    // Directly get table from hive metastore to check if the table is created successfully.
+    org.apache.hadoop.hive.metastore.api.Table hiveTab =
+        hiveClientPool.run(client -> client.getTable(schemaName, tableName));
+    checkTableReadWrite(hiveTab);
+    Assertions.assertEquals(MANAGED_TABLE.name(), hiveTab.getTableType());
+    catalog
+        .asTableCatalog()
+        .purgeTable(NameIdentifier.of(metalakeName, catalogName, schemaName, tableName));
+    Boolean existed = hiveClientPool.run(client -> client.tableExists(schemaName, tableName));
+    Assertions.assertFalse(existed, "The hive table should not exist");
+    Path tableDirectory = new Path(hiveTab.getSd().getLocation());
+    Assertions.assertFalse(hdfs.exists(tableDirectory), "The table directory should not exist");
+    Path trashDirectory = hdfs.getTrashRoot(tableDirectory);
+    Assertions.assertFalse(hdfs.exists(trashDirectory), "The trash should not exist");
+  }
+
+  @Test
+  public void testPurgeHiveExternalTable() throws TException, InterruptedException, IOException {
+    ColumnDTO[] columns = createColumns();
+    catalog
+        .asTableCatalog()
+        .createTable(
+            NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
+            columns,
+            TABLE_COMMENT,
+            ImmutableMap.of(TABLE_TYPE, EXTERNAL_TABLE.name().toLowerCase(Locale.ROOT)),
+            new Partitioning[] {IdentityPartitioningDTO.of(columns[2].name())});
+    // Directly get table from hive metastore to check if the table is created successfully.
+    org.apache.hadoop.hive.metastore.api.Table hiveTab =
+        hiveClientPool.run(client -> client.getTable(schemaName, tableName));
+    checkTableReadWrite(hiveTab);
+    Assertions.assertEquals(EXTERNAL_TABLE.name(), hiveTab.getTableType());
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () -> {
+          catalog
+              .asTableCatalog()
+              .purgeTable(NameIdentifier.of(metalakeName, catalogName, schemaName, tableName));
+        },
+        "Can't purge a external hive table");
+
+    Boolean existed = hiveClientPool.run(client -> client.tableExists(schemaName, tableName));
+    Assertions.assertTrue(existed, "The table should be still exist");
+    Path tableDirectory = new Path(hiveTab.getSd().getLocation());
+    Assertions.assertTrue(
+        hdfs.listStatus(tableDirectory).length > 0, "The table should not be empty");
   }
 }

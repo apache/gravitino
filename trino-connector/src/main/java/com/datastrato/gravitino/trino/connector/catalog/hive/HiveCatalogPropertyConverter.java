@@ -5,7 +5,7 @@
 
 package com.datastrato.gravitino.trino.connector.catalog.hive;
 
-import com.datastrato.catalog.common.property.PropertyConverter;
+import com.datastrato.catalog.property.PropertyConverter;
 import com.datastrato.gravitino.catalog.PropertyEntry;
 import com.datastrato.gravitino.shaded.org.apache.commons.collections4.bidimap.TreeBidiMap;
 import com.google.common.collect.ImmutableMap;

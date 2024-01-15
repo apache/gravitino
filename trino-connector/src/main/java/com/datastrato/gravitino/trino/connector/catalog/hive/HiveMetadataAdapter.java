@@ -4,7 +4,7 @@
  */
 package com.datastrato.gravitino.trino.connector.catalog.hive;
 
-import com.datastrato.catalog.common.property.PropertyConverter;
+import com.datastrato.catalog.property.PropertyConverter;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
 import io.trino.spi.session.PropertyMetadata;
 import java.util.List;

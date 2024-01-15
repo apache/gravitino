@@ -16,7 +16,7 @@ The Gravitino Iceberg REST Server follows the [Apache Iceberg REST API specifica
 - Supports the Apache Iceberg REST API defined in Iceberg 1.3.1, and supports all namespace and table interfaces. `Token`, `ReportMetrics`, and `Config` interfaces aren't supported yet.
 - Works as a catalog proxy, supporting `HiveCatalog` and `JDBCCatalog`.
 - When writing to HDFS, the Gravitino Iceberg REST catalog service can only operate as the specified HDFS user and
-  doesn't support proxying to other HDFS users. See [How to access Apache Hadoop](gravitino-server-config.md) for more details.
+  doesn't support proxying to other HDFS users. See [How to access Apache Hadoop](gravitino-server-config.md#how-to-access-apache-hadoop) for more details.
 
 :::info
 Builds with Apache Iceberg `1.3.1`. The Apache Iceberg table format version is `1` by default.

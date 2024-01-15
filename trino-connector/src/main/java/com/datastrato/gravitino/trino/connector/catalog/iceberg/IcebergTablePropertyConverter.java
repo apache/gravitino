@@ -5,11 +5,12 @@
 
 package com.datastrato.gravitino.trino.connector.catalog.iceberg;
 
-import com.datastrato.catalog.common.property.PropertyConverter;
+import com.datastrato.catalog.property.PropertyConverter;
 import com.datastrato.gravitino.catalog.BasePropertiesMetadata;
 import com.datastrato.gravitino.catalog.PropertyEntry;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergTablePropertiesMetadata;
 import com.datastrato.gravitino.shaded.org.apache.commons.collections4.bidimap.TreeBidiMap;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 
@@ -19,7 +20,8 @@ public class IcebergTablePropertyConverter extends PropertyConverter {
       new IcebergTablePropertiesMetadata();
 
   // TODO (yuqi) add more properties
-  private static final TreeBidiMap<String, String> TRINO_KEY_TO_GRAVITINO_KEY =
+  @VisibleForTesting
+  static final TreeBidiMap<String, String> TRINO_KEY_TO_GRAVITINO_KEY =
       new TreeBidiMap<>(new ImmutableMap.Builder<String, String>().build());
 
   @Override

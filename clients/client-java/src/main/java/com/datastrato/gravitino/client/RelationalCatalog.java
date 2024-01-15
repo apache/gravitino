@@ -256,6 +256,8 @@ public class RelationalCatalog extends CatalogDTO implements TableCatalog, Suppo
       resp.validate();
       return resp.dropped();
 
+    } catch (UnsupportedOperationException e) {
+      throw e;
     } catch (Exception e) {
       LOG.warn("Failed to purge table {}", ident, e);
       return false;

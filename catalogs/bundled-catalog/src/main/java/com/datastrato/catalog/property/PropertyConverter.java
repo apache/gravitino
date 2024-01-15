@@ -3,7 +3,7 @@
  * This software is licensed under the Apache License version 2.
  */
 
-package com.datastrato.catalog.common.property;
+package com.datastrato.catalog.property;
 
 import com.datastrato.gravitino.catalog.PropertyEntry;
 import com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata;

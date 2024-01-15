@@ -5,9 +5,10 @@
 
 package com.datastrato.gravitino.trino.connector.catalog.hive;
 
-import com.datastrato.gravitino.catalog.PropertyEntry;
 import com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata;
+import com.google.common.collect.Sets;
 import java.util.Map;
+import java.util.Set;
 import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -31,12 +32,16 @@ public class TestHiveCatalogPropertyConverter {
     Assert.assertEquals(re.get("hive.unknown-key"), null);
   }
 
+  // To test whether we load jar `bundled-catalog` successfully.
   @Test
-  // To test whether we can load property metadata from HiveTablePropertiesMetadata successfully.
   public void testPropertyMetadata() {
-    for (Map.Entry<String, PropertyEntry<?>> entryEntry :
-        new HiveTablePropertiesMetadata().propertyEntries().entrySet()) {
-      System.out.println(entryEntry.getKey() + " " + entryEntry.getValue());
-    }
+    Set<String> gravitinoHiveKeys =
+        Sets.newHashSet(HiveTablePropertyConverter.TRINO_KEY_TO_GRAVITINO_KEY.values());
+    Set<String> actualGravitinoKeys =
+        Sets.newHashSet(new HiveTablePropertiesMetadata().propertyEntries().keySet());
+
+    // Needs to confirm whether external should be a property key for Trino.
+    gravitinoHiveKeys.remove("external");
+    Assert.assertTrue(actualGravitinoKeys.containsAll(gravitinoHiveKeys));
   }
 }

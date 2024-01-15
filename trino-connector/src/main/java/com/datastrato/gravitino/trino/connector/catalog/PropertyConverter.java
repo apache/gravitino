@@ -5,6 +5,7 @@
 
 package com.datastrato.gravitino.trino.connector.catalog;
 
+import com.datastrato.gravitino.catalog.PropertyEntry;
 import com.datastrato.gravitino.shaded.org.apache.commons.collections4.bidimap.TreeBidiMap;
 import java.util.HashMap;
 import java.util.Map;
@@ -54,4 +55,6 @@ public abstract class PropertyConverter {
     }
     return gravitinoProperties;
   }
+
+  public abstract Map<String, PropertyEntry<?>> gravitinoPropertyMeta();
 }

@@ -77,12 +77,12 @@ dependencies {
 tasks {
   val copyDepends by registering(Copy::class) {
     from(configurations.runtimeClasspath)
-    into("build/libs")
+    into("build/libs_all")
   }
 
   val copyCatalogLibs by registering(Copy::class) {
     dependsOn(copyDepends, "build")
-    from("build/libs")
+    from("build/libs_all", "build/libs")
     into("$rootDir/distribution/package/catalogs/hive/libs")
   }
 

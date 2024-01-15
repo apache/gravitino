@@ -149,7 +149,7 @@ const MetalakeList = () => {
             </IconButton>
           </Tooltip>
 
-          <Tooltip title='Update' placement='top'>
+          <Tooltip title='Edit' placement='top'>
             <IconButton
               size='small'
               sx={{ color: theme => theme.palette.text.secondary }}
