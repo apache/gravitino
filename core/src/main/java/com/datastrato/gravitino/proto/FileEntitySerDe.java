@@ -23,8 +23,12 @@ public class FileEntitySerDe implements ProtoSerDe<FileEntity, File> {
       builder.putAllProperties(fileEntity.properties());
     }
 
-    File.Format format = File.Format.valueOf(fileEntity.format().name());
-    builder.setFormat(format);
+    File.Type type = File.Type.valueOf(fileEntity.fileType().name());
+    builder.setType(type);
+
+    if (fileEntity.storageLocation() != null) {
+      builder.setStorageLocation(fileEntity.storageLocation());
+    }
 
     return builder.build();
   }
@@ -36,10 +40,14 @@ public class FileEntitySerDe implements ProtoSerDe<FileEntity, File> {
             .withId(p.getId())
             .withName(p.getName())
             .withAuditInfo(new AuditInfoSerDe().deserialize(p.getAuditInfo()))
-            .withFormat(com.datastrato.gravitino.file.File.Format.valueOf(p.getFormat().name()));
+            .withFileType(com.datastrato.gravitino.file.File.Type.valueOf(p.getType().name()));
 
     if (p.hasComment()) {
       builder.withComment(p.getComment());
+    }
+
+    if (p.hasStorageLocation()) {
+      builder.withStorageLocation(p.getStorageLocation());
     }
 
     if (p.getPropertiesCount() > 0) {

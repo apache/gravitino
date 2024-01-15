@@ -53,16 +53,26 @@ public interface FileCatalog {
   /**
    * Create a file metadata in the catalog.
    *
+   * <p>If the type of the file object is "MANAGED", the underlying storageLocation can be null, and
+   * Gravitino will manage the storage location based on the location of the schema.
+   *
+   * <p>If the type of the file object is "EXTERNAL", the underlying storageLocation must be set.
+   *
    * @param ident A file identifier.
    * @param comment The comment of the file.
-   * @param format The format of the underlying filesets that is managed by this file object.
+   * @param type The type of the file.
+   * @param storageLocation The storage location of the file.
    * @param properties The properties of the file.
    * @return The created file metadata
    * @throws NoSuchSchemaException If the schema does not exist.
    * @throws FileAlreadyExistsException If the file already exists.
    */
   File createFile(
-      NameIdentifier ident, String comment, File.Format format, Map<String, String> properties)
+      NameIdentifier ident,
+      String comment,
+      File.Type type,
+      String storageLocation,
+      Map<String, String> properties)
       throws NoSuchSchemaException, FileAlreadyExistsException;
 
   /**

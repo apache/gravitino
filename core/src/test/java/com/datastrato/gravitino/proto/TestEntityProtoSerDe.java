@@ -183,13 +183,12 @@ public class TestEntityProtoSerDe {
     // Test FileEntity
     Long fileId = 1L;
     String fileName = "file";
-    File.Format format = File.Format.CSV;
     com.datastrato.gravitino.meta.FileEntity fileEntity =
         new com.datastrato.gravitino.meta.FileEntity.Builder()
             .withId(fileId)
             .withName(fileName)
             .withAuditInfo(auditInfo)
-            .withFormat(format)
+            .withFileType(com.datastrato.gravitino.file.File.Type.MANAGED)
             .withProperties(props)
             .withComment(comment)
             .build();
@@ -203,7 +202,7 @@ public class TestEntityProtoSerDe {
             .withId(fileId)
             .withName(fileName)
             .withAuditInfo(auditInfo)
-            .withFormat(format)
+            .withFileType(File.Type.MANAGED)
             .build();
     byte[] fileBytes1 = protoEntitySerDe.serialize(fileEntity1);
     com.datastrato.gravitino.meta.FileEntity fileEntityFromBytes1 =
@@ -211,5 +210,23 @@ public class TestEntityProtoSerDe {
     Assertions.assertEquals(fileEntity1, fileEntityFromBytes1);
     Assertions.assertNull(fileEntityFromBytes1.comment());
     Assertions.assertNull(fileEntityFromBytes1.properties());
+    Assertions.assertNull(fileEntityFromBytes1.storageLocation());
+
+    com.datastrato.gravitino.meta.FileEntity fileEntity2 =
+        new com.datastrato.gravitino.meta.FileEntity.Builder()
+            .withId(fileId)
+            .withName(fileName)
+            .withAuditInfo(auditInfo)
+            .withFileType(File.Type.EXTERNAL)
+            .withProperties(props)
+            .withComment(comment)
+            .withStorageLocation("testLocation")
+            .build();
+    byte[] fileBytes2 = protoEntitySerDe.serialize(fileEntity2);
+    com.datastrato.gravitino.meta.FileEntity fileEntityFromBytes2 =
+        protoEntitySerDe.deserialize(fileBytes2, com.datastrato.gravitino.meta.FileEntity.class);
+    Assertions.assertEquals(fileEntity2, fileEntityFromBytes2);
+    Assertions.assertEquals("testLocation", fileEntityFromBytes2.storageLocation());
+    Assertions.assertEquals(File.Type.EXTERNAL, fileEntityFromBytes2.fileType());
   }
 }

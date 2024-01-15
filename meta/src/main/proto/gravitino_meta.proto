@@ -78,23 +78,18 @@ message Table {
  * the non-tabular data on FS-like storage, like HDFS, S3, etc.
  */
 message File {
-  enum Format {
-    CSV = 0;
-    JSON = 1;
-    PARQUET = 2;
-    AVRO = 3;
-    ORC = 4;
-    TEXT = 5;
-    BINARY = 6;
-    IMAGE = 7;
-    TFRECORD = 8;
-    UNKNOWN = 9;
+  enum Type {
+    MANAGED = 0; // The storage location is managed by Gravitino. When specified, the data will be
+                 // deleted when the file object is deleted.
+    EXTERNAL = 1; // The storage location is managed by user. When specified, the data will not be
+                  // deleted when the file object is deleted.
   }
 
   uint64 id = 1;
   string name = 2;
   optional string comment = 3;
-  Format format = 4;
-  map<string, string> properties = 5;
-  AuditInfo audit_info = 6;
+  Type type = 4;
+  optional string storage_location = 5;
+  map<string, string> properties = 6;
+  AuditInfo audit_info = 7;
 }

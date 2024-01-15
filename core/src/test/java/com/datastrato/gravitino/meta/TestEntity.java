@@ -42,7 +42,6 @@ public class TestEntity {
   // File test data
   private final Long fileId = 1L;
   private final String fileName = "testFile";
-  private final File.Format format = File.Format.CSV;
 
   @Test
   public void testMetalake() {
@@ -136,7 +135,7 @@ public class TestEntity {
             .withId(fileId)
             .withName(fileName)
             .withAuditInfo(auditInfo)
-            .withFormat(format)
+            .withFileType(File.Type.MANAGED)
             .withProperties(map)
             .build();
 
@@ -144,8 +143,37 @@ public class TestEntity {
     Assertions.assertEquals(fileId, fields.get(FileEntity.ID));
     Assertions.assertEquals(fileName, fields.get(FileEntity.NAME));
     Assertions.assertEquals(auditInfo, fields.get(FileEntity.AUDIT_INFO));
-    Assertions.assertEquals(format, fields.get(FileEntity.FORMAT));
+    Assertions.assertEquals(File.Type.MANAGED, fields.get(FileEntity.TYPE));
     Assertions.assertEquals(map, fields.get(FileEntity.PROPERTIES));
     Assertions.assertNull(fields.get(FileEntity.COMMENT));
+
+    FileEntity testFile1 =
+        new FileEntity.Builder()
+            .withId(fileId)
+            .withName(fileName)
+            .withAuditInfo(auditInfo)
+            .withFileType(File.Type.MANAGED)
+            .withProperties(map)
+            .withComment("testComment")
+            .withStorageLocation("testLocation")
+            .build();
+    Assertions.assertEquals("testComment", testFile1.comment());
+    Assertions.assertEquals("testLocation", testFile1.storageLocation());
+
+    Throwable exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> {
+              new FileEntity.Builder()
+                  .withId(fileId)
+                  .withName(fileName)
+                  .withAuditInfo(auditInfo)
+                  .withFileType(File.Type.EXTERNAL)
+                  .withProperties(map)
+                  .withComment("testComment")
+                  .build();
+            });
+    Assertions.assertEquals(
+        "Storage location is required for EXTERNAL file.", exception.getMessage());
   }
 }

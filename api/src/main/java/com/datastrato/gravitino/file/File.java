@@ -17,18 +17,12 @@ import javax.annotation.Nullable;
  */
 public interface File extends Auditable {
 
-  /** An enum representing the format of the file. */
-  enum Format {
-    CSV,
-    JSON,
-    PARQUET,
-    AVRO,
-    ORC,
-    TEXT,
-    BINARY,
-    IMAGE,
-    TFRECORD,
-    UNKNOWN
+  /** An enum representing the type of the file object. */
+  enum Type {
+    MANAGED, // File is managed by Gravitino. When specified, the data will be deleted when the
+    // file object is deleted.
+    EXTERNAL // File is not managed by Gravitino. When specified, the data will not be deleted when
+    // the file object is deleted.
   }
 
   /** @return Name of the file object. */
@@ -40,8 +34,15 @@ public interface File extends Auditable {
     return null;
   }
 
-  /** @return the format of the underlying filesets that is managed by this file object. */
-  Format format();
+  /** @return The type of the file object. */
+  Type type();
+
+  /**
+   * Get the storage location of the file or directory path that is managed by this file object.
+   *
+   * @return The storage location of the file object.
+   */
+  String storageLocation();
 
   /** @return The properties of the file object. Empty map is returned if no properties are set. */
   default Map<String, String> properties() {

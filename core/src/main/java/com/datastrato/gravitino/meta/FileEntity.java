@@ -13,6 +13,7 @@ import com.google.common.collect.Maps;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Objects;
+import javax.annotation.Nullable;
 import lombok.ToString;
 
 @ToString
@@ -24,8 +25,10 @@ public class FileEntity implements Entity, Auditable, HasIdentifier {
       Field.required("name", String.class, "The name of the file entity.");
   public static final Field COMMENT =
       Field.optional("comment", String.class, "The comment or description of the file entity.");
-  public static final Field FORMAT =
-      Field.required("format", File.Format.class, "The format of the file entity.");
+  public static final Field TYPE =
+      Field.required("type", File.Type.class, "The type of the file entity.");
+  public static final Field STORAGE_LOCATION =
+      Field.optional("storage_location", String.class, "The storage location of the file entity.");
   public static final Field AUDIT_INFO =
       Field.required("audit_info", AuditInfo.class, "The audit details of the file entity.");
   public static final Field PROPERTIES =
@@ -37,7 +40,9 @@ public class FileEntity implements Entity, Auditable, HasIdentifier {
 
   private String comment;
 
-  private File.Format format;
+  private File.Type type;
+
+  @Nullable private String storageLocation;
 
   private AuditInfo auditInfo;
 
@@ -56,7 +61,8 @@ public class FileEntity implements Entity, Auditable, HasIdentifier {
     fields.put(ID, id);
     fields.put(NAME, name);
     fields.put(COMMENT, comment);
-    fields.put(FORMAT, format);
+    fields.put(TYPE, type);
+    fields.put(STORAGE_LOCATION, storageLocation);
     fields.put(AUDIT_INFO, auditInfo);
     fields.put(PROPERTIES, properties);
 
@@ -113,12 +119,21 @@ public class FileEntity implements Entity, Auditable, HasIdentifier {
   }
 
   /**
-   * Returns the format of the file entity.
+   * Returns the type of the file entity.
    *
-   * @return The format of the file entity.
+   * @return The type of the file entity.
    */
-  public File.Format format() {
-    return format;
+  public File.Type fileType() {
+    return type;
+  }
+
+  /**
+   * Returns the storage location of the file entity.
+   *
+   * @return The storage location of the file entity.
+   */
+  public String storageLocation() {
+    return storageLocation;
   }
 
   /**
@@ -139,14 +154,15 @@ public class FileEntity implements Entity, Auditable, HasIdentifier {
     return Objects.equals(id, that.id)
         && Objects.equals(name, that.name)
         && Objects.equals(comment, that.comment)
-        && Objects.equals(format, that.format)
+        && Objects.equals(type, that.type)
+        && Objects.equals(storageLocation, that.storageLocation)
         && Objects.equals(auditInfo, that.auditInfo)
         && Objects.equals(properties, that.properties);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(id, name, comment, format, auditInfo, properties);
+    return Objects.hash(id, name, comment, type, storageLocation, auditInfo, properties);
   }
 
   public static class Builder {
@@ -191,13 +207,26 @@ public class FileEntity implements Entity, Auditable, HasIdentifier {
     }
 
     /**
-     * Sets the format of the file entity.
+     * Sets the type of the file entity.
      *
-     * @param format The format of the file entity.
+     * @param type The type of the file entity.
      * @return The builder instance.
      */
-    public Builder withFormat(File.Format format) {
-      file.format = format;
+    public Builder withFileType(File.Type type) {
+      file.type = type;
+      return this;
+    }
+
+    /**
+     * Sets the storage location of the file entity.
+     *
+     * <p>Only the EXTERNAL type of file entity requires a storage location.
+     *
+     * @param storageLocation The storage location of the file entity.
+     * @return The builder instance.
+     */
+    public Builder withStorageLocation(String storageLocation) {
+      file.storageLocation = storageLocation;
       return this;
     }
 
@@ -230,6 +259,11 @@ public class FileEntity implements Entity, Auditable, HasIdentifier {
      */
     public FileEntity build() {
       file.validate();
+
+      if (file.type == File.Type.EXTERNAL && file.storageLocation == null) {
+        throw new IllegalArgumentException("Storage location is required for EXTERNAL file.");
+      }
+
       return file;
     }
   }
