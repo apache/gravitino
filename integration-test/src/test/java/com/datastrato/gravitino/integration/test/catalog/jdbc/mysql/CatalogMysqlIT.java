@@ -30,6 +30,7 @@ import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
+import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
 import com.datastrato.gravitino.rel.types.Types;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
@@ -279,7 +280,7 @@ public class CatalogMysqlIT extends AbstractIT {
 
     final SortOrder[] sortOrders = new SortOrder[0];
 
-    Transform[] partitioning = new Transform[0];
+    Transform[] partitioning = Transforms.EMPTY_TRANSFORM;
 
     Map<String, String> properties = createProperties();
     TableCatalog tableCatalog = catalog.asTableCatalog();
@@ -366,7 +367,7 @@ public class CatalogMysqlIT extends AbstractIT {
 
     final SortOrder[] sortOrders = new SortOrder[0];
 
-    Transform[] partitioning = new Transform[0];
+    Transform[] partitioning = Transforms.EMPTY_TRANSFORM;
 
     Map<String, String> properties = createProperties();
     TableCatalog tableCatalog = catalog.asTableCatalog();
@@ -476,7 +477,7 @@ public class CatalogMysqlIT extends AbstractIT {
             newColumns,
             table_comment,
             ImmutableMap.of(),
-            new Transform[0],
+            Transforms.EMPTY_TRANSFORM,
             Distributions.NONE,
             new SortOrder[0]);
 

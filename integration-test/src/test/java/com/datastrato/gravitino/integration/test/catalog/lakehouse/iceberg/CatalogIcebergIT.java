@@ -416,7 +416,7 @@ public class CatalogIcebergIT extends AbstractIT {
                     columns,
                     table_comment,
                     properties,
-                    new Transform[0],
+                    Transforms.EMPTY_TRANSFORM,
                     distribution,
                     sortOrders));
   }
@@ -434,7 +434,7 @@ public class CatalogIcebergIT extends AbstractIT {
         columns,
         table_comment,
         properties,
-        new Transform[0],
+        Transforms.EMPTY_TRANSFORM,
         Distributions.NONE,
         new SortOrder[0]);
     NameIdentifier[] nameIdentifiers =
@@ -453,7 +453,7 @@ public class CatalogIcebergIT extends AbstractIT {
         columns,
         table_comment,
         properties,
-        new Transform[0],
+        Transforms.EMPTY_TRANSFORM,
         Distributions.NONE,
         new SortOrder[0]);
     nameIdentifiers = tableCatalog.listTables(Namespace.of(metalakeName, catalogName, schemaName));
@@ -590,7 +590,7 @@ public class CatalogIcebergIT extends AbstractIT {
             newColumns,
             table_comment,
             ImmutableMap.of(),
-            new Transform[0],
+            Transforms.EMPTY_TRANSFORM,
             Distributions.NONE,
             new SortOrder[0]);
 

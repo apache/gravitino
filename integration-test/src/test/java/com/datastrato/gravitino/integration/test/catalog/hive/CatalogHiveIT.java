@@ -62,6 +62,7 @@ import com.datastrato.gravitino.rel.expressions.sorts.SortDirection;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrders;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
+import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
 import com.datastrato.gravitino.rel.types.Types;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
@@ -360,7 +361,7 @@ public class CatalogHiveIT extends AbstractIT {
                 columns,
                 TABLE_COMMENT,
                 properties,
-                new Transform[0],
+                Transforms.EMPTY_TRANSFORM,
                 distribution,
                 sortOrders);
 
@@ -406,7 +407,7 @@ public class CatalogHiveIT extends AbstractIT {
                   columns,
                   TABLE_COMMENT,
                   properties,
-                  new Transform[0],
+                  Transforms.EMPTY_TRANSFORM,
                   badDistribution,
                   sortOrders);
         });
@@ -429,7 +430,7 @@ public class CatalogHiveIT extends AbstractIT {
                   columns,
                   TABLE_COMMENT,
                   properties,
-                  new Transform[0],
+                  Transforms.EMPTY_TRANSFORM,
                   distribution,
                   badSortOrders);
         });
@@ -446,7 +447,8 @@ public class CatalogHiveIT extends AbstractIT {
     Table createdTable =
         catalog
             .asTableCatalog()
-            .createTable(nameIdentifier, columns, TABLE_COMMENT, properties, new Transform[0]);
+            .createTable(
+                nameIdentifier, columns, TABLE_COMMENT, properties, Transforms.EMPTY_TRANSFORM);
 
     // Directly get table from hive metastore to check if the table is created successfully.
     org.apache.hadoop.hive.metastore.api.Table hiveTab =
@@ -487,7 +489,11 @@ public class CatalogHiveIT extends AbstractIT {
         catalog
             .asTableCatalog()
             .createTable(
-                nameIdentifier, columns, TABLE_COMMENT, ImmutableMap.of(), new Transform[0]);
+                nameIdentifier,
+                columns,
+                TABLE_COMMENT,
+                ImmutableMap.of(),
+                Transforms.EMPTY_TRANSFORM);
     HiveTablePropertiesMetadata tablePropertiesMetadata = new HiveTablePropertiesMetadata();
     org.apache.hadoop.hive.metastore.api.Table actualTable =
         hiveClientPool.run(client -> client.getTable(schemaName, tableName));
@@ -515,7 +521,7 @@ public class CatalogHiveIT extends AbstractIT {
                     "textfile",
                     SERDE_LIB,
                     OPENCSV_SERDE_CLASS),
-                new Transform[0]);
+                Transforms.EMPTY_TRANSFORM);
     org.apache.hadoop.hive.metastore.api.Table actualTable2 =
         hiveClientPool.run(client -> client.getTable(schemaName, table2));
 
@@ -577,7 +583,11 @@ public class CatalogHiveIT extends AbstractIT {
     catalog
         .asTableCatalog()
         .createTable(
-            tableIdent, createColumns(), TABLE_COMMENT, ImmutableMap.of(), new Transform[0]);
+            tableIdent,
+            createColumns(),
+            TABLE_COMMENT,
+            ImmutableMap.of(),
+            Transforms.EMPTY_TRANSFORM);
     org.apache.hadoop.hive.metastore.api.Table actualTable =
         hiveClientPool.run(client -> client.getTable(schemaIdent.name(), tableIdent.name()));
     String actualTableLocation = actualTable.getSd().getLocation();
@@ -811,7 +821,7 @@ public class CatalogHiveIT extends AbstractIT {
             newColumns,
             TABLE_COMMENT,
             ImmutableMap.of(),
-            new Transform[0],
+            Transforms.EMPTY_TRANSFORM,
             Distributions.NONE,
             new SortOrder[0]);
 
@@ -865,7 +875,7 @@ public class CatalogHiveIT extends AbstractIT {
             createColumns(),
             TABLE_COMMENT,
             createProperties(),
-            new Transform[0]);
+            Transforms.EMPTY_TRANSFORM);
     catalog
         .asTableCatalog()
         .dropTable(NameIdentifier.of(metalakeName, catalogName, schemaName, ALTER_TABLE_NAME));
@@ -1054,7 +1064,7 @@ public class CatalogHiveIT extends AbstractIT {
             columns,
             TABLE_COMMENT,
             createProperties(),
-            new Transform[0]);
+            Transforms.EMPTY_TRANSFORM);
 
     for (int i = 0; i < 2; i++) {
       // The table to be renamed does not exist
