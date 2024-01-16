@@ -1,0 +1,36 @@
+/*
+ * Copyright 2024 Datastrato Pvt Ltd.
+ * This software is licensed under the Apache License version 2.
+ */
+package com.datastrato.gravitino.catalog.file;
+
+import com.datastrato.gravitino.catalog.BaseCatalog;
+import com.datastrato.gravitino.catalog.CatalogOperations;
+import com.datastrato.gravitino.file.FilesetCatalog;
+import com.datastrato.gravitino.rel.SupportsSchemas;
+import java.util.Map;
+
+public class HadoopCatalog extends BaseCatalog<HadoopCatalog> {
+
+  @Override
+  public String shortName() {
+    return "hadoop";
+  }
+
+  @Override
+  protected CatalogOperations newOps(Map<String, String> config) {
+    HadoopCatalogOperations ops = new HadoopCatalogOperations(entity());
+    ops.initialize(config);
+    return ops;
+  }
+
+  @Override
+  public SupportsSchemas asSchemas() {
+    return (HadoopCatalogOperations) ops();
+  }
+
+  @Override
+  public FilesetCatalog asFilesetCatalog() {
+    return (HadoopCatalogOperations) ops();
+  }
+}

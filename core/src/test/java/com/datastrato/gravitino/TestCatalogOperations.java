@@ -41,6 +41,9 @@ public class TestCatalogOperations implements CatalogOperations, TableCatalog, S
   private final BasePropertiesMetadata tablePropertiesMetadata;
 
   private final BasePropertiesMetadata schemaPropertiesMetadata;
+
+  private final BasePropertiesMetadata filesetPropertiesMetadata;
+
   private Map<String, String> config;
 
   public static final String FAIL_CREATE = "fail-create";
@@ -50,6 +53,7 @@ public class TestCatalogOperations implements CatalogOperations, TableCatalog, S
     schemas = Maps.newHashMap();
     tablePropertiesMetadata = new TestBasePropertiesMetadata();
     schemaPropertiesMetadata = new TestBasePropertiesMetadata();
+    filesetPropertiesMetadata = new TestBasePropertiesMetadata();
     this.config = config;
   }
 
@@ -362,5 +366,10 @@ public class TestCatalogOperations implements CatalogOperations, TableCatalog, S
       };
     }
     return Maps::newHashMap;
+  }
+
+  @Override
+  public PropertiesMetadata filesetPropertiesMetadata() throws UnsupportedOperationException {
+    return filesetPropertiesMetadata;
   }
 }
