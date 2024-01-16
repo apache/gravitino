@@ -8,6 +8,7 @@ import com.datastrato.gravitino.json.JsonUtils;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.expressions.Expression;
 import com.datastrato.gravitino.rel.types.Type;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
@@ -37,6 +38,14 @@ public class ColumnDTO implements Column {
   @JsonProperty("autoIncrement")
   private boolean autoIncrement = false;
 
+  @JsonProperty("defaultValue")
+  // the NON_EMPTY annotation is used to avoid serializing the defaultValue field if it is not set
+  // or null.
+  @JsonInclude(JsonInclude.Include.NON_EMPTY)
+  @JsonSerialize(using = JsonUtils.ColumnDefaultValueSerializer.class)
+  @JsonDeserialize(using = JsonUtils.ColumnDefaultValueDeserializer.class)
+  private Expression defaultValue = Column.DEFAULT_VALUE_NOT_SET;
+
   private ColumnDTO() {}
 
   /**
@@ -47,14 +56,21 @@ public class ColumnDTO implements Column {
    * @param comment The comment associated with the column.
    * @param nullable Whether the column value can be null.
    * @param autoIncrement Whether the column is an auto-increment column.
+   * @param defaultValue The default value of the column.
    */
   private ColumnDTO(
-      String name, Type dataType, String comment, boolean nullable, boolean autoIncrement) {
+      String name,
+      Type dataType,
+      String comment,
+      boolean nullable,
+      boolean autoIncrement,
+      Expression defaultValue) {
     this.name = name;
     this.dataType = dataType;
     this.comment = comment;
     this.nullable = nullable;
     this.autoIncrement = autoIncrement;
+    this.defaultValue = defaultValue == null ? Column.DEFAULT_VALUE_NOT_SET : defaultValue;
   }
 
   @Override
@@ -84,7 +100,7 @@ public class ColumnDTO implements Column {
 
   @Override
   public Expression defaultValue() {
-    throw new UnsupportedOperationException("Column default value is not supported yet.");
+    return defaultValue;
   }
 
   /**
@@ -108,6 +124,7 @@ public class ColumnDTO implements Column {
     protected String comment;
     protected boolean nullable = true;
     protected boolean autoIncrement = false;
+    protected Expression defaultValue;
 
     public Builder() {}
 
@@ -166,6 +183,11 @@ public class ColumnDTO implements Column {
       return (S) this;
     }
 
+    public S withDefaultValue(Expression defaultValue) {
+      this.defaultValue = defaultValue;
+      return (S) this;
+    }
+
     /**
      * Builds a Column DTO based on the provided builder parameters.
      *
@@ -175,7 +197,7 @@ public class ColumnDTO implements Column {
     public ColumnDTO build() {
       Preconditions.checkNotNull(name, "Column name cannot be null");
       Preconditions.checkNotNull(dataType, "Column data type cannot be null");
-      return new ColumnDTO(name, dataType, comment, nullable, autoIncrement);
+      return new ColumnDTO(name, dataType, comment, nullable, autoIncrement, defaultValue);
     }
   }
 
