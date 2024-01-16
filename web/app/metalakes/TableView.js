@@ -7,7 +7,8 @@ import { useState } from 'react'
 
 import Link from 'next/link'
 
-import { Box, Typography } from '@mui/material'
+import { Box, Typography, Chip } from '@mui/material'
+import ColumnTypeChip from '@/components/ColumnTypeChip'
 import { DataGrid } from '@mui/x-data-grid'
 import { useAppSelector, useAppDispatch } from '@/lib/hooks/useStore'
 import { resetTableData } from '@/lib/store/metalakes'
@@ -43,7 +44,7 @@ const TableView = props => {
               href={path ?? '/'}
               onClick={() => handleClickUrl()}
               sx={{
-                fontWeight: 500,
+                fontWeight: 400,
                 color: 'primary.main',
                 textDecoration: 'none',
                 '&:hover': { color: 'primary.main', textDecoration: 'underline' }
@@ -71,7 +72,7 @@ const TableView = props => {
             <Typography
               noWrap
               sx={{
-                fontWeight: 500,
+                fontWeight: 400,
                 color: 'text.main',
                 textDecoration: 'none'
               }}
@@ -94,9 +95,10 @@ const TableView = props => {
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
             <Typography
               noWrap
+              variant='body2'
               sx={{
-                fontWeight: 500,
-                color: 'text.main',
+                fontWeight: 400,
+                color: 'text.secondary',
                 textDecoration: 'none'
               }}
             >
@@ -116,16 +118,7 @@ const TableView = props => {
 
         return (
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <Typography
-              noWrap
-              sx={{
-                fontWeight: 500,
-                color: 'text.main',
-                textDecoration: 'none'
-              }}
-            >
-              {type}
-            </Typography>
+            <ColumnTypeChip type={type} />
           </Box>
         )
       }

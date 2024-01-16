@@ -9,6 +9,7 @@ import static com.datastrato.gravitino.rel.expressions.sorts.SortDirection.DESCE
 import static org.apache.hc.core5.http.HttpStatus.SC_BAD_REQUEST;
 import static org.apache.hc.core5.http.HttpStatus.SC_CONFLICT;
 import static org.apache.hc.core5.http.HttpStatus.SC_INTERNAL_SERVER_ERROR;
+import static org.apache.hc.core5.http.HttpStatus.SC_METHOD_NOT_ALLOWED;
 import static org.apache.hc.core5.http.HttpStatus.SC_NOT_FOUND;
 import static org.apache.hc.core5.http.HttpStatus.SC_OK;
 
@@ -935,6 +936,32 @@ public class TestRelationalCatalog extends TestBase {
     buildMockResource(Method.DELETE, tablePath, null, errorResp, SC_INTERNAL_SERVER_ERROR);
 
     Assertions.assertFalse(catalog.asTableCatalog().purgeTable(tableId));
+  }
+
+  @Test
+  public void testPurgeExternalTable() throws JsonProcessingException {
+    NameIdentifier tableId = NameIdentifier.of(metalakeName, catalogName, "schema1", "table1");
+    String tablePath =
+        withSlash(
+            RelationalCatalog.formatTableRequestPath(tableId.namespace()) + "/" + tableId.name());
+    DropResponse resp = new DropResponse(true);
+    buildMockResource(Method.DELETE, tablePath, null, resp, SC_OK);
+
+    Assertions.assertTrue(catalog.asTableCatalog().purgeTable(tableId));
+
+    // return false
+    resp = new DropResponse(false);
+    buildMockResource(Method.DELETE, tablePath, null, resp, SC_OK);
+    Assertions.assertFalse(catalog.asTableCatalog().purgeTable(tableId));
+
+    // Test with exception
+    ErrorResponse errorResp = ErrorResponse.unsupportedOperation("Unsupported operation");
+    buildMockResource(Method.DELETE, tablePath, null, errorResp, SC_METHOD_NOT_ALLOWED);
+
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () -> catalog.asTableCatalog().purgeTable(tableId),
+        "Unsupported operation");
   }
 
   private void testAlterTable(NameIdentifier ident, TableUpdateRequest req, TableDTO updatedTable)

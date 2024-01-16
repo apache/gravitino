@@ -99,7 +99,8 @@ const StyledTreeItem = props => {
           <Icon icon={labelIcon} color='inherit' />
           <Typography
             variant='body2'
-            sx={{ flexGrow: 1, fontWeight: 'inherit' }}
+            sx={{ fontWeight: 'inherit', width: '100%', overflow: 'hidden', textOverflow: 'ellipsis' }}
+            title={labelText}
             {...(href
               ? {
                   component: StyledLink,

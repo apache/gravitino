@@ -9,19 +9,39 @@ import com.datastrato.gravitino.meta.SchemaEntity;
 public class SchemaEntitySerDe implements ProtoSerDe<SchemaEntity, Schema> {
   @Override
   public Schema serialize(SchemaEntity schemaEntity) {
-    return Schema.newBuilder()
-        .setId(schemaEntity.id())
-        .setName(schemaEntity.name())
-        .setAuditInfo(new AuditInfoSerDe().serialize(schemaEntity.auditInfo()))
-        .build();
+    Schema.Builder builder =
+        Schema.newBuilder()
+            .setId(schemaEntity.id())
+            .setName(schemaEntity.name())
+            .setAuditInfo(new AuditInfoSerDe().serialize(schemaEntity.auditInfo()));
+
+    if (schemaEntity.comment() != null) {
+      builder.setComment(schemaEntity.comment());
+    }
+
+    if (schemaEntity.properties() != null && !schemaEntity.properties().isEmpty()) {
+      builder.putAllProperties(schemaEntity.properties());
+    }
+
+    return builder.build();
   }
 
   @Override
   public SchemaEntity deserialize(Schema p) {
-    return new SchemaEntity.Builder()
-        .withId(p.getId())
-        .withName(p.getName())
-        .withAuditInfo(new AuditInfoSerDe().deserialize(p.getAuditInfo()))
-        .build();
+    SchemaEntity.Builder builder =
+        new SchemaEntity.Builder()
+            .withId(p.getId())
+            .withName(p.getName())
+            .withAuditInfo(new AuditInfoSerDe().deserialize(p.getAuditInfo()));
+
+    if (p.hasComment()) {
+      builder.withComment(p.getComment());
+    }
+
+    if (p.getPropertiesCount() > 0) {
+      builder.withProperties(p.getPropertiesMap());
+    }
+
+    return builder.build();
   }
 }

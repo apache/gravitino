@@ -99,6 +99,11 @@ public class DTOConverters {
         .withComment(column.comment())
         .withNullable(column.nullable())
         .withAutoIncrement(column.autoIncrement())
+        .withDefaultValue(
+            (column.defaultValue() == null
+                    || column.defaultValue().equals(Column.DEFAULT_VALUE_NOT_SET))
+                ? Column.DEFAULT_VALUE_NOT_SET
+                : toFunctionArg(column.defaultValue()))
         .build();
   }
 
@@ -242,10 +247,10 @@ public class DTOConverters {
     return Distributions.of(
         distributionDTO.strategy(),
         distributionDTO.number(),
-        fromFunctionArg(distributionDTO.args()));
+        fromFunctionArgs(distributionDTO.args()));
   }
 
-  public static Expression[] fromFunctionArg(FunctionArg[] args) {
+  public static Expression[] fromFunctionArgs(FunctionArg[] args) {
     if (ArrayUtils.isEmpty(args)) {
       return Expression.EMPTY_EXPRESSION;
     }
@@ -255,13 +260,16 @@ public class DTOConverters {
   public static Expression fromFunctionArg(FunctionArg arg) {
     switch (arg.argType()) {
       case LITERAL:
+        if (((LiteralDTO) arg).value() == null) {
+          return Literals.NULL;
+        }
         return Literals.of(((LiteralDTO) arg).value(), ((LiteralDTO) arg).dataType());
       case FIELD:
         return NamedReference.field(((FieldReferenceDTO) arg).fieldName());
       case FUNCTION:
         return FunctionExpression.of(
             ((FuncExpressionDTO) arg).functionName(),
-            fromFunctionArg(((FuncExpressionDTO) arg).args()));
+            fromFunctionArgs(((FuncExpressionDTO) arg).args()));
       default:
         throw new IllegalArgumentException("Unsupported expression type: " + arg.getClass());
     }
@@ -287,6 +295,26 @@ public class DTOConverters {
       return new Transform[0];
     }
     return Arrays.stream(partitioning).map(DTOConverters::fromDTO).toArray(Transform[]::new);
+  }
+
+  public static Column[] fromDTOs(ColumnDTO[] columns) {
+    if (ArrayUtils.isEmpty(columns)) {
+      return new Column[0];
+    }
+    return Arrays.stream(columns).map(DTOConverters::fromDTO).toArray(Column[]::new);
+  }
+
+  public static Column fromDTO(ColumnDTO column) {
+    if (column.defaultValue().equals(Column.DEFAULT_VALUE_NOT_SET)) {
+      return column;
+    }
+    return ColumnDTO.builder()
+        .withName(column.name())
+        .withDataType(column.dataType())
+        .withComment(column.comment())
+        .withNullable(column.nullable())
+        .withDefaultValue(fromFunctionArg((FunctionArg) column.defaultValue()))
+        .build();
   }
 
   public static Transform fromDTO(Partitioning partitioning) {
@@ -317,7 +345,7 @@ public class DTOConverters {
       case FUNCTION:
         return Transforms.apply(
             ((FunctionPartitioningDTO) partitioning).functionName(),
-            fromFunctionArg(((FunctionPartitioningDTO) partitioning).args()));
+            fromFunctionArgs(((FunctionPartitioningDTO) partitioning).args()));
       default:
         throw new IllegalArgumentException("Unsupported partitioning: " + partitioning.strategy());
     }
