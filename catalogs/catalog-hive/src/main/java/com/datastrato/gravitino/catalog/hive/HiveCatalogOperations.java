@@ -10,11 +10,13 @@ import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.ME
 import static com.datastrato.gravitino.catalog.hive.HiveTable.SUPPORT_TABLE_TYPES;
 import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.COMMENT;
 import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.TABLE_TYPE;
+import static org.apache.hadoop.hive.metastore.TableType.EXTERNAL_TABLE;
 
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.catalog.CatalogOperations;
 import com.datastrato.gravitino.catalog.PropertiesMetadata;
+import com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.TableType;
 import com.datastrato.gravitino.catalog.hive.converter.ToHiveType;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
@@ -51,7 +53,6 @@ import org.apache.commons.lang3.ArrayUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
-import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.AlreadyExistsException;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
@@ -416,15 +417,20 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
    */
   @Override
   public Table loadTable(NameIdentifier tableIdent) throws NoSuchTableException {
+    org.apache.hadoop.hive.metastore.api.Table table = loadHiveTable(tableIdent);
+    HiveTable hiveTable = HiveTable.fromHiveTable(table);
+
+    LOG.info("Loaded Hive table {} from Hive Metastore ", tableIdent.name());
+    return hiveTable;
+  }
+
+  private org.apache.hadoop.hive.metastore.api.Table loadHiveTable(NameIdentifier tableIdent) {
     NameIdentifier schemaIdent = NameIdentifier.of(tableIdent.namespace().levels());
 
     try {
       org.apache.hadoop.hive.metastore.api.Table table =
           clientPool.run(c -> c.getTable(schemaIdent.name(), tableIdent.name()));
-      HiveTable hiveTable = HiveTable.fromHiveTable(table);
-
-      LOG.info("Loaded Hive table {} from Hive Metastore ", tableIdent.name());
-      return hiveTable;
+      return table;
 
     } catch (NoSuchObjectException e) {
       throw new NoSuchTableException(
@@ -866,9 +872,13 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
    */
   @Override
   public boolean purgeTable(NameIdentifier tableIdent) throws UnsupportedOperationException {
-    // TODO(minghuang): HiveTable support specify `tableType`, then reject purge Hive table with
-    //  `tableType` EXTERNAL_TABLE
-    return dropHiveTable(tableIdent, true, true);
+    org.apache.hadoop.hive.metastore.api.Table hiveTable = loadHiveTable(tableIdent);
+    boolean isExternal = EXTERNAL_TABLE.name().equalsIgnoreCase(hiveTable.getTableType());
+    if (isExternal) {
+      throw new UnsupportedOperationException("Can't purge a external hive table");
+    } else {
+      return dropHiveTable(tableIdent, true, true);
+    }
   }
 
   /**

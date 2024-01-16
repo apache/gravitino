@@ -73,7 +73,8 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
         new JdbcColumn.Builder()
             .withName("col_4")
             .withType(VARCHAR)
-            .withDefaultValue("hello world")
+            // TODO: uncomment this after supporting default values
+            // .withDefaultValue("hello world")
             .withNullable(false)
             .build());
     Map<String, String> properties = new HashMap<>();
@@ -179,7 +180,8 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
             .withName("col_2")
             .withType(VARCHAR)
             .withComment("name")
-            .withDefaultValue("hello world")
+            // TODO: uncomment this after supporting default values
+            // .withDefaultValue("hello world")
             .withNullable(false)
             .build();
     columns.add(col_2);
@@ -212,7 +214,8 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
             .withType(VARCHAR)
             .withComment(col_1.comment())
             .withNullable(col_1.nullable())
-            .withDefaultValue(col_1.getDefaultValue())
+            // TODO: uncomment this after supporting default values
+            // .withDefaultValue(col_1.getDefaultValue())
             .build();
     columns.add(col_1);
     columns.add(col_2);
@@ -235,7 +238,8 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
             .withComment(col_1.comment())
             .withProperties(col_1.getProperties())
             .withNullable(col_1.nullable())
-            .withDefaultValue(col_1.getDefaultValue())
+            // TODO: uncomment this after supporting default values
+            // .withDefaultValue(col_1.getDefaultValue())
             .build();
     col_2 =
         new JdbcColumn.Builder()
@@ -244,7 +248,8 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
             .withComment(newComment)
             .withProperties(col_2.getProperties())
             .withNullable(col_2.nullable())
-            .withDefaultValue(col_2.getDefaultValue())
+            // TODO: uncomment this after supporting default values
+            // .withDefaultValue(col_2.getDefaultValue())
             .build();
     columns.add(col_1);
     columns.add(col_2);
@@ -269,7 +274,8 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
             .withComment(col_1.comment())
             .withProperties(col_1.getProperties())
             .withNullable(col_1.nullable())
-            .withDefaultValue(col_1.getDefaultValue())
+            // TODO: uncomment this after supporting default values
+            // .withDefaultValue(col_1.getDefaultValue())
             .build();
     col_2 =
         new JdbcColumn.Builder()
@@ -278,7 +284,8 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
             .withComment(col_2.comment())
             .withProperties(col_2.getProperties())
             .withNullable(col_2.nullable())
-            .withDefaultValue(col_2.getDefaultValue())
+            // TODO: uncomment this after supporting default values
+            // .withDefaultValue(col_2.getDefaultValue())
             .build();
     columns.add(col_1);
     columns.add(col_2);
@@ -305,7 +312,8 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
             .withType(col_2.dataType())
             .withComment(newCol2Comment)
             .withProperties(col_2.getProperties())
-            .withDefaultValue(col_2.getDefaultValue())
+            // TODO: uncomment this after supporting default values
+            // .withDefaultValue(col_2.getDefaultValue())
             .withNullable(col_2.nullable())
             .build());
     columns.add(col_1);
@@ -354,14 +362,16 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
             .withType(Types.DecimalType.of(10, 2))
             .withComment("test_decimal")
             .withNullable(false)
-            .withDefaultValue("0.00")
+            // TODO: uncomment this after supporting default values
+            // .withDefaultValue("0.00")
             .build());
     columns.add(
         new JdbcColumn.Builder()
             .withName("col_2")
             .withType(Types.LongType.get())
             .withNullable(false)
-            .withDefaultValue("0")
+            // TODO: uncomment this after supporting default values
+            // .withDefaultValue("0")
             .withComment("long type")
             .build());
     columns.add(
@@ -371,7 +381,8 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
             // MySQL 5.7 doesn't support nullable timestamp
             .withNullable(false)
             .withComment("timestamp")
-            .withDefaultValue("2013-01-01 00:00:00")
+            // TODO: uncomment this after supporting default values
+            // .withDefaultValue("2013-01-01 00:00:00")
             .build());
     columns.add(
         new JdbcColumn.Builder()
@@ -540,7 +551,8 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
               .withType(Types.DecimalType.of(10, 2))
               .withComment("test_decimal")
               .withNullable(false)
-              .withDefaultValue("0.00")
+              // TODO: uncomment this after supporting default values
+              // .withDefaultValue("0.00")
               .build()
         },
         "test_comment",
@@ -563,7 +575,8 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
               .withType(Types.DecimalType.of(10, 2))
               .withComment("test_decimal")
               .withNullable(false)
-              .withDefaultValue("0.00")
+              // TODO: uncomment this after supporting default values
+              // .withDefaultValue("0.00")
               .build()
         },
         "test_comment",

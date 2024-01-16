@@ -6,6 +6,7 @@ package com.datastrato.gravitino.dto.rel;
 
 import com.datastrato.gravitino.json.JsonUtils;
 import com.datastrato.gravitino.rel.Column;
+import com.datastrato.gravitino.rel.expressions.Expression;
 import com.datastrato.gravitino.rel.types.Type;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
@@ -79,6 +80,11 @@ public class ColumnDTO implements Column {
   @Override
   public boolean autoIncrement() {
     return autoIncrement;
+  }
+
+  @Override
+  public Expression defaultValue() {
+    throw new UnsupportedOperationException("Column default value is not supported yet.");
   }
 
   /**
