@@ -115,7 +115,8 @@ public class TrinoQueryTestTool {
           }
         }
         if (Strings.isNotEmpty(testerId)) {
-          if (Arrays.stream(TrinoQueryIT.listDirectory(testSetDir)).noneMatch(f -> f.startsWith(testerId))) {
+          if (Arrays.stream(TrinoQueryIT.listDirectory(testSetDir))
+              .noneMatch(f -> f.startsWith(testerId))) {
             System.out.println("The tester " + testerId + " does not found in testset");
             System.exit(1);
           }
@@ -140,11 +141,12 @@ public class TrinoQueryTestTool {
       if (testSet == null) {
         testerRunner.testSql();
       } else {
-        String catalogFileName = catalog.isEmpty()? "" : "catalog_" + catalog + "_prepare.sql";
+        String catalogFileName = catalog.isEmpty() ? "" : "catalog_" + catalog + "_prepare.sql";
         testerRunner.testSql(testSetDir, catalogFileName, testerId);
       }
-      System.out.printf("All the testers completed (%d/%d)%n",
-              testerRunner.testCount.get(), testerRunner.totalCount.get());
+      System.out.printf(
+          "All the testers completed (%d/%d)%n",
+          testerRunner.testCount.get(), testerRunner.totalCount.get());
     } catch (Exception e) {
       System.out.println(e.getMessage());
       e.printStackTrace();
