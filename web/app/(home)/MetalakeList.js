@@ -149,7 +149,7 @@ const MetalakeList = () => {
             </IconButton>
           </Tooltip>
 
-          <Tooltip title='Update' placement='top'>
+          <Tooltip title='Edit' placement='top'>
             <IconButton
               size='small'
               sx={{ color: theme => theme.palette.text.secondary }}
@@ -182,6 +182,7 @@ const MetalakeList = () => {
             handleFilter={handleFilter}
             setOpenDialog={setOpenDialog}
             setDialogData={setDialogData}
+            setDialogType={setDialogType}
           />
           <DataGrid
             autoHeight

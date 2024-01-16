@@ -14,11 +14,11 @@ are end-to-end tests that cover the whole system.
   environment.
 * Please refer to [How to build Gravitino](./how-to-build.md) for more details to make sure you have
   a build environment ready.
-* [OrbStack](https://orbstack.dev/) is highly recommended to replace Docker Desktop for
-  macOS. OrbStack automatically configures the network between Docker containers.
-* If you insist on using Docker Desktop for macOS, please launch
-  [mac-docker-connector](https://github.com/wenjunxiao/mac-docker-connector) before running tests,
-  you can read `$GRAVITINO_HOME/dev/docker/tools/README.md` and
+* [OrbStack](https://orbstack.dev/) can be used to replace Docker Desktop
+  on macOS. OrbStack automatically configures the network between the Docker containers.
+* If you are using Docker Desktop for macOS, please launch
+  [mac-docker-connector](https://github.com/wenjunxiao/mac-docker-connector) before running the tests.
+  You can read `$GRAVITINO_HOME/dev/docker/tools/README.md` and
   `$GRAVITINO_HOME/dev/docker/tools/mac-docker-connector.sh` for more details.
 :::
 
@@ -51,8 +51,7 @@ Gravitino has two modes to run the integration tests, the default `embedded` mod
    integration tests.
 
 :::note
-Running the `./gradlew build` command triggers the build and run the integration tests in embedded
-mode.
+Running the `./gradlew build` command triggers the build and runs the integration tests in embedded mode.
 :::
 
 ### Deploy the Gravitino server and run the integration tests in deploy mode
@@ -118,14 +117,11 @@ only parts of the integration tests without `gravitino-docker-it` tag run.
 
 ## How to debug Gravitino server and integration tests in embedded mode
 
-By default, the integration tests runs in the embedded mode, `MiniGravitino` starts in the
-same process. Debugging `MiniGravitino` is simple and easy. You can modify any code in the
-Gravitino project and set breakpoints anywhere.
+By default, the integration tests run in the embedded mode, `MiniGravitino` starts in the same process. Debugging `MiniGravitino` is simple and easy. You can modify any code in the Gravitino project and set breakpoints anywhere.
 
 ## How to debug Gravitino server and integration tests in deploy mode
 
-This mode is closer to the actual environment but more complex to debug. To debug the Gravitino
-server code, follow these steps:
+This mode is closer to the actual environment but more complex to debug. To debug the Gravitino server code, follow these steps:
 
 * Run the `./gradlew build -x test` command to build the Gravitino project.
 * Use the `./gradlew compileDistribution` command to republish the packaged project in the `distribution` directory.
@@ -145,13 +141,13 @@ server code, follow these steps:
 * View the test results in the `Actions` tab of the pull request page.
 * Run the integration tests in several steps:
   * The Gravitino integration tests pull the CI Docker image from the Docker Hub repository. This step typically takes around 15 seconds.
-  * If you set the `debug action` label in the pull request, GitHub actions runs an SSH server with `csexton/debugger-action@master`, allowing you to log in to the actions environment for remote debugging.
+  * If you set the `debug action` label in the pull request, GitHub actions runs an SSH server with `csexton/debugger-action@master`, allowing you to log into the GitHub actions environment for remote debugging.
   * The Gravitino project compiles and packages in the `distribution` directory using the `./gradlew compileDistribution` command.
   * Run the `./gradlew test -PtestMode=[embedded|deploy]` command.
 
 ## Test failure
 
-If a test fails, you can retrieve valuable information from the logs and test report. Test reports are in the `./build/reports` directory. The integration test logs are in the `./integrate-test/build` directory. In deploy mode, Gravitino server logs are in the `./distribution/package/logs/` directory. In the event of a test failure within the GitHub workflow, the system generates archived logs and test reports. To obtain the archive, follow these steps:
+If a test fails, you can retrieve valuable information from the logs and test reports. Test reports are in the `./build/reports` directory. The integration test logs are in the `./integrate-test/build` directory. In deploy mode, Gravitino server logs are in the `./distribution/package/logs/` directory. In the event of a test failure within the GitHub workflow, the system generates archived logs and test reports. To obtain the archive, follow these steps:
 
 1. Click the `detail` link associated with the failed integration test in the pull request. This redirects you to the job page.
 

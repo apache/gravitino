@@ -9,7 +9,7 @@ import static com.datastrato.gravitino.Configs.ENTRY_KV_ROCKSDB_BACKEND_PATH;
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.auth.AuthenticatorType;
-import com.datastrato.gravitino.aux.AuxiliaryServiceManager;
+import com.datastrato.gravitino.auxiliary.AuxiliaryServiceManager;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergRESTService;
 import com.datastrato.gravitino.client.ErrorHandlers;
 import com.datastrato.gravitino.client.HTTPClient;
@@ -65,16 +65,16 @@ public class MiniGravitino {
 
     // Generate random Gravitino Server port and backend storage path, avoiding conflicts
     customizeConfigFile(
-        ITUtils.joinDirPath(gravitinoRootDir, "conf", "gravitino.conf.template"),
-        ITUtils.joinDirPath(mockConfDir.getAbsolutePath(), GravitinoServer.CONF_FILE));
+        ITUtils.joinPath(gravitinoRootDir, "conf", "gravitino.conf.template"),
+        ITUtils.joinPath(mockConfDir.getAbsolutePath(), GravitinoServer.CONF_FILE));
 
     Files.copy(
-        Paths.get(ITUtils.joinDirPath(gravitinoRootDir, "conf", "gravitino-env.sh.template")),
-        Paths.get(ITUtils.joinDirPath(mockConfDir.getAbsolutePath(), "gravitino-env.sh")));
+        Paths.get(ITUtils.joinPath(gravitinoRootDir, "conf", "gravitino-env.sh.template")),
+        Paths.get(ITUtils.joinPath(mockConfDir.getAbsolutePath(), "gravitino-env.sh")));
 
     Properties properties =
         serverConfig.loadPropertiesFromFile(
-            new File(ITUtils.joinDirPath(mockConfDir.getAbsolutePath(), "gravitino.conf")));
+            new File(ITUtils.joinPath(mockConfDir.getAbsolutePath(), "gravitino.conf")));
     serverConfig.loadFromProperties(properties);
 
     // Prepare delete the rocksdb backend storage directory
@@ -109,7 +109,7 @@ public class MiniGravitino {
               try {
                 GravitinoServer.main(
                     new String[] {
-                      ITUtils.joinDirPath(mockConfDir.getAbsolutePath(), "gravitino.conf")
+                      ITUtils.joinPath(mockConfDir.getAbsolutePath(), "gravitino.conf")
                     });
               } catch (Exception e) {
                 LOG.error("Exception in startup MiniGravitino Server ", e);
@@ -220,7 +220,7 @@ public class MiniGravitino {
               Collections.emptyMap(),
               ErrorHandlers.restErrorHandler());
     } catch (RESTException e) {
-      LOG.warn("checkIfServerIsRunning() fails, GravitinoServer is not running", e);
+      LOG.warn("checkIfServerIsRunning() fails, GravitinoServer is not running {}", e.getMessage());
       return false;
     }
     if (response != null && response.getCode() == 0) {

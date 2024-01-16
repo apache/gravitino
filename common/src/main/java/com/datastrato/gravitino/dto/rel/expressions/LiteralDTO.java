@@ -4,7 +4,7 @@
  */
 package com.datastrato.gravitino.dto.rel.expressions;
 
-import com.datastrato.gravitino.rel.expressions.Literal;
+import com.datastrato.gravitino.rel.expressions.literals.Literal;
 import com.datastrato.gravitino.rel.types.Type;
 import lombok.EqualsAndHashCode;
 

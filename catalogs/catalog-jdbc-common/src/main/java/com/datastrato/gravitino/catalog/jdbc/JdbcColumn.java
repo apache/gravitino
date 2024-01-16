@@ -9,15 +9,9 @@ import java.util.List;
 
 /** Represents a column in the Jdbc column. */
 public class JdbcColumn extends BaseColumn {
-  private String defaultValue;
-
   private List<String> properties;
 
   private JdbcColumn() {}
-
-  public String getDefaultValue() {
-    return defaultValue;
-  }
 
   public List<String> getProperties() {
     return properties;
@@ -26,18 +20,8 @@ public class JdbcColumn extends BaseColumn {
   /** A builder class for constructing JdbcColumn instances. */
   public static class Builder extends BaseColumnBuilder<Builder, JdbcColumn> {
 
-    /**
-     * The default value for this field. This value will be used if the corresponding value is null.
-     */
-    private String defaultValue;
-
     /** Attribute value of the field, such as AUTO_INCREMENT, PRIMARY KEY, etc. */
     private List<String> properties;
-
-    public Builder withDefaultValue(String defaultValue) {
-      this.defaultValue = defaultValue;
-      return this;
-    }
 
     public Builder withProperties(List<String> properties) {
       this.properties = properties;
@@ -58,6 +42,7 @@ public class JdbcColumn extends BaseColumn {
       jdbcColumn.nullable = nullable;
       jdbcColumn.defaultValue = defaultValue;
       jdbcColumn.properties = properties;
+      jdbcColumn.autoIncrement = autoIncrement;
       return jdbcColumn;
     }
   }

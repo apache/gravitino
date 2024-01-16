@@ -13,27 +13,23 @@ This software is licensed under the Apache License version 2."
 + Optionally Docker to run integration tests
 
 :::info Please read the following notes first
+
 + Gravitino requires at least JDK8 and at most JDK17 to run Gradle, so you need to
   install JDK8 to 17 version to launch the build environment.
-
 + Gravitino itself supports using JDK8, 11, and 17 to build, Gravitino Trino connector uses
   JDK17 to build. You don't have to preinstall the specified JDK environment,
 + Gradle detects the JDK version needed and downloads it automatically.
-
 + Gravitino uses Gradle Java Toolchain to detect and manage JDK versions, it checks the
   installed JDK by running `./gradlew javaToolchains` command. For the details of Gradle Java
   Toolchain, please see [Gradle Java Toolchain](https://docs.gradle.org/current/userguide/toolchains.html#sec:java_toolchain).
-
 + Make sure you have installed Docker in your environment as Gravitino uses it to run integration tests; without it, some Docker-related tests may not run.
-
 + macOS uses "docker-connector" to make the Gravitino Trino connector work with Docker
   for macOS. For the details of "docker-connector", please see [docker-connector](https://github.com/wenjunxiao/mac-docker-connector)
   , `$GRAVITINO_HOME/dev/docker/tools/mac-docker-connector.sh`, and
   `$GRAVITINO_HOME/dev/docker/tools/README.md` for more details.
-
-+ Alternatively, you can use OrbStack to replace Docker for macOS, please see
-  [OrbStack](https://orbstack.dev/), with OrbStack you can run Gravitino integration tests
-  without needing to install "docker-connector".
++ Alternatively, you can use OrbStack as a replacement for Docker for macOS, please see
+  [OrbStack](https://orbstack.dev/). With OrbStack you can run Gravitino integration tests
+  without needing to install the "docker-connector".
 :::
 
 ## Quick start

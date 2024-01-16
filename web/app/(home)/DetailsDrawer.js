@@ -93,7 +93,7 @@ const DetailsDrawer = props => {
           <Typography variant='body2' sx={{ mb: 2 }}>
             Comment
           </Typography>
-          <Typography sx={{ fontWeight: 500 }}>{drawerData.comment}</Typography>
+          <Typography sx={{ fontWeight: 500, whiteSpace: 'pre' }}>{drawerData.comment}</Typography>
         </Grid>
 
         <Grid item xs={12} sx={{ mb: [0, 5] }}>

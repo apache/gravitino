@@ -5,6 +5,7 @@
 package com.datastrato.gravitino.rel;
 
 import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.rel.expressions.Expression;
 import com.datastrato.gravitino.rel.types.Type;
 import java.util.Map;
 
@@ -18,6 +19,8 @@ import java.util.Map;
  */
 public interface Column {
 
+  Expression DEFAULT_VALUE_NOT_SET = () -> Expression.EMPTY_EXPRESSION;
+
   /** @return The name of this column. */
   String name();
 
@@ -30,5 +33,11 @@ public interface Column {
   /** @return True if this column may produce null values. Default is true. */
   boolean nullable();
 
-  // TODO. Support column default value. @Jerry
+  /** @return True if this column is an auto-increment column. Default is false. */
+  boolean autoIncrement();
+
+  /**
+   * @return The default value of this column, {@link Column#DEFAULT_VALUE_NOT_SET} if not specified
+   */
+  Expression defaultValue();
 }

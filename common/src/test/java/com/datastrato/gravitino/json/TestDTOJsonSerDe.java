@@ -42,7 +42,8 @@ public class TestDTOJsonSerDe {
 
   private final String metalakeJson = "{\"name\":%s,\"comment\":%s,\"properties\":%s,\"audit\":%s}";
 
-  private final String columnJson = "{\"name\":%s,\"type\":%s,\"comment\":%s,\"nullable\":%s}";
+  private final String columnJson =
+      "{\"name\":%s,\"type\":%s,\"comment\":%s,\"nullable\":%s,\"autoIncrement\":%s}";
 
   private final String tableJson =
       "{\"name\":%s,\"comment\":%s,\"columns\":[%s],\"properties\":%s,\"audit\":%s,\"distribution\":%s,\"sortOrders\":%s,\"partitioning\":%s}";
@@ -183,7 +184,8 @@ public class TestDTOJsonSerDe {
             withQuotes(name),
             withQuotes(type.simpleString()),
             withQuotes(comment),
-            column.nullable());
+            column.nullable(),
+            column.autoIncrement());
     Assertions.assertEquals(expectedJson, serJson);
     ColumnDTO deserColumn = JsonUtils.objectMapper().readValue(serJson, ColumnDTO.class);
     Assertions.assertEquals(column, deserColumn);
@@ -234,7 +236,8 @@ public class TestDTOJsonSerDe {
                 withQuotes(name),
                 withQuotes(type.simpleString()),
                 withQuotes(comment),
-                column.nullable()),
+                column.nullable(),
+                column.autoIncrement()),
             JsonUtils.objectMapper().writeValueAsString(properties),
             String.format(auditJson, withQuotes(creator), withQuotes(now.toString()), null, null),
             null,

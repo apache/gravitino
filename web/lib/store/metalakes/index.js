@@ -5,6 +5,8 @@
 
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit'
 
+import { to } from '@/lib/utils'
+
 import {
   createMetalakeApi,
   getMetalakesApi,
@@ -18,53 +20,51 @@ import { getSchemasApi, getSchemaDetailsApi } from '@/lib/api/schemas'
 import { getTablesApi, getTableDetailsApi } from '@/lib/api/tables'
 
 export const fetchMetalakes = createAsyncThunk('appMetalakes/fetchMetalakes', async (params, { getState }) => {
-  try {
-    const response = await getMetalakesApi()
+  const [err, res] = await to(getMetalakesApi())
 
-    const { metalakes } = response.data
-
-    return {
-      metalakes
-    }
-  } catch (error) {
-    throw new Error(error)
+  if (err || !res) {
+    throw new Error(err)
   }
+
+  const { metalakes } = res
+
+  return { metalakes }
 })
 
 export const createMetalake = createAsyncThunk('appMetalakes/createMetalake', async (data, { getState, dispatch }) => {
-  try {
-    const response = await createMetalakeApi(data)
+  const [err, res] = await to(createMetalakeApi(data))
 
-    dispatch(fetchMetalakes())
-
-    return response.metalake
-  } catch (error) {
-    throw new Error(error)
+  if (err || !res) {
+    throw new Error(err)
   }
+
+  dispatch(fetchMetalakes())
+
+  return res.metalake
 })
 
 export const deleteMetalake = createAsyncThunk('appMetalakes/deleteMetalake', async (name, { dispatch }) => {
-  try {
-    const response = await deleteMetalakeApi(name)
+  const [err, res] = await to(deleteMetalakeApi(name))
 
-    dispatch(fetchMetalakes())
-
-    return response.data
-  } catch (error) {
-    throw new Error(error)
+  if (err || !res) {
+    throw new Error(err)
   }
+
+  dispatch(fetchMetalakes())
+
+  return res
 })
 
 export const updateMetalake = createAsyncThunk('appMetalakes/updateMetalake', async ({ name, data }, { dispatch }) => {
-  try {
-    const response = await updateMetalakeApi({ name, data })
+  const [err, res] = await to(updateMetalakeApi({ name, data }))
 
-    dispatch(fetchMetalakes())
-
-    return response.data
-  } catch (error) {
-    throw new Error(error)
+  if (err || !res) {
+    throw new Error(err)
   }
+
+  dispatch(fetchMetalakes())
+
+  return res
 })
 
 export const initMetalakeTree = createAsyncThunk(
@@ -75,7 +75,7 @@ export const initMetalakeTree = createAsyncThunk(
 
       const catalogsData = await getCatalogsApi({ metalake })
 
-      const { identifiers: catalogs = [] } = catalogsData.data
+      const { identifiers: catalogs = [] } = catalogsData
 
       for (const catalogItem of catalogs) {
         const catalogNode = {
@@ -92,7 +92,7 @@ export const initMetalakeTree = createAsyncThunk(
             dispatch(setExpandedTreeNode([catalogNode.id]))
 
             const schemasData = await getSchemasApi({ metalake, catalog })
-            const { identifiers: schemas = [] } = schemasData.data
+            const { identifiers: schemas = [] } = schemasData
 
             for (const schemaItem of schemas) {
               const schemaNode = {
@@ -111,7 +111,7 @@ export const initMetalakeTree = createAsyncThunk(
               if (schema) {
                 if (schema === schemaNode.name) {
                   const tablesData = await getTablesApi({ metalake, catalog, schema })
-                  const { identifiers: tables = [] } = tablesData.data
+                  const { identifiers: tables = [] } = tablesData
 
                   for (const tableItem of tables) {
                     const tableNode = {
@@ -197,9 +197,13 @@ export const setIntoTreeAction = createAsyncThunk(
 )
 
 export const getMetalakeDetails = createAsyncThunk('appMetalakes/getMetalakeDetails', async ({ metalake }) => {
-  const response = await getMetalakeDetailsApi(metalake)
+  const [err, res] = await to(getMetalakeDetailsApi(metalake))
 
-  const { metalake: resMetalake } = response.data
+  if (err || !res) {
+    throw new Error(err)
+  }
+
+  const { metalake: resMetalake } = res
 
   return resMetalake
 })
@@ -207,37 +211,41 @@ export const getMetalakeDetails = createAsyncThunk('appMetalakes/getMetalakeDeta
 export const fetchCatalogs = createAsyncThunk(
   'appMetalakes/fetchCatalogs',
   async ({ init, page, metalake }, { dispatch }) => {
-    try {
-      const response = await getCatalogsApi({ metalake })
+    const [err, res] = await to(getCatalogsApi({ metalake }))
 
-      const { identifiers = [] } = response.data
+    if (err || !res) {
+      throw new Error(err)
+    }
 
-      const catalogs = identifiers.map(catalog => {
-        return {
-          ...catalog,
-          node: 'catalog',
-          id: `${metalake}____${catalog.name}`,
-          path: `?${new URLSearchParams({ metalake, catalog: catalog.name }).toString()}`,
-          name: catalog.name,
-          schemas: []
-        }
-      })
+    const { identifiers = [] } = res
 
+    const catalogs = identifiers.map(catalog => {
       return {
-        catalogs,
-        page,
-        init
+        ...catalog,
+        node: 'catalog',
+        id: `${metalake}____${catalog.name}`,
+        path: `?${new URLSearchParams({ metalake, catalog: catalog.name }).toString()}`,
+        name: catalog.name,
+        schemas: []
       }
-    } catch (error) {
-      throw new Error(error)
+    })
+
+    return {
+      catalogs,
+      page,
+      init
     }
   }
 )
 
 export const getCatalogDetails = createAsyncThunk('appMetalakes/getCatalogDetails', async ({ metalake, catalog }) => {
-  const response = await getCatalogDetailsApi({ metalake, catalog })
+  const [err, res] = await to(getCatalogDetailsApi({ metalake, catalog }))
 
-  const { catalog: resCatalog } = response.data
+  if (err || !res) {
+    throw new Error(err)
+  }
+
+  const { catalog: resCatalog } = res
 
   return resCatalog
 })
@@ -245,49 +253,53 @@ export const getCatalogDetails = createAsyncThunk('appMetalakes/getCatalogDetail
 export const createCatalog = createAsyncThunk(
   'appMetalakes/createCatalog',
   async ({ data, metalake }, { dispatch }) => {
-    try {
-      const response = await createCatalogApi({ data, metalake })
+    const [err, res] = await to(createCatalogApi({ data, metalake }))
 
-      const { catalog: catalogItem } = response.data
-
-      dispatch(setIntoTreeAction({ catalogItem, nodeIds: [metalake] }))
-
-      return response.catalog
-    } catch (error) {
-      throw new Error(error)
+    if (err || !res) {
+      throw new Error(err)
     }
+
+    const { catalog: catalogItem } = res
+
+    dispatch(setIntoTreeAction({ catalogItem, nodeIds: [metalake] }))
+
+    return res.catalog
   }
 )
 
 export const fetchSchemas = createAsyncThunk('appMetalakes/fetchSchemas', async ({ init, page, metalake, catalog }) => {
-  try {
-    const response = await getSchemasApi({ metalake, catalog })
+  const [err, res] = await to(getSchemasApi({ metalake, catalog }))
 
-    const { identifiers = [] } = response.data
-
-    const schemas = identifiers.map(schema => {
-      return {
-        ...schema,
-        node: 'schema',
-        id: `${metalake}____${catalog}____${schema.name}`,
-        path: `?${new URLSearchParams({ metalake, catalog, schema: schema.name }).toString()}`,
-        name: schema.name,
-        tables: []
-      }
-    })
-
-    return { schemas, page, init }
-  } catch (error) {
-    throw new Error(error)
+  if (err || !res) {
+    throw new Error(err)
   }
+
+  const { identifiers = [] } = res
+
+  const schemas = identifiers.map(schema => {
+    return {
+      ...schema,
+      node: 'schema',
+      id: `${metalake}____${catalog}____${schema.name}`,
+      path: `?${new URLSearchParams({ metalake, catalog, schema: schema.name }).toString()}`,
+      name: schema.name,
+      tables: []
+    }
+  })
+
+  return { schemas, page, init }
 })
 
 export const getSchemaDetails = createAsyncThunk(
   'appMetalakes/getSchemaDetails',
   async ({ metalake, catalog, schema }) => {
-    const response = await getSchemaDetailsApi({ metalake, catalog, schema })
+    const [err, res] = await to(getSchemaDetailsApi({ metalake, catalog, schema }))
 
-    const { schema: resSchema } = response.data
+    if (err || !res) {
+      throw new Error(err)
+    }
+
+    const { schema: resSchema } = res
 
     return resSchema
   }
@@ -296,35 +308,39 @@ export const getSchemaDetails = createAsyncThunk(
 export const fetchTables = createAsyncThunk(
   'appMetalakes/fetchTables',
   async ({ init, page, metalake, catalog, schema }) => {
-    try {
-      const response = await getTablesApi({ metalake, catalog, schema })
+    const [err, res] = await to(getTablesApi({ metalake, catalog, schema }))
 
-      const { identifiers = [] } = response.data
-
-      const tables = identifiers.map(table => {
-        return {
-          ...table,
-          node: 'table',
-          id: `${metalake}____${catalog}____${schema}____${table.name}`,
-          path: `?${new URLSearchParams({ metalake, catalog, schema, table: table.name }).toString()}`,
-          name: table.name,
-          columns: []
-        }
-      })
-
-      return { tables, page, init }
-    } catch (error) {
-      throw new Error(error)
+    if (err || !res) {
+      throw new Error(err)
     }
+
+    const { identifiers = [] } = res
+
+    const tables = identifiers.map(table => {
+      return {
+        ...table,
+        node: 'table',
+        id: `${metalake}____${catalog}____${schema}____${table.name}`,
+        path: `?${new URLSearchParams({ metalake, catalog, schema, table: table.name }).toString()}`,
+        name: table.name,
+        columns: []
+      }
+    })
+
+    return { tables, page, init }
   }
 )
 
 export const getTableDetails = createAsyncThunk(
   'appMetalakes/getTableDetails',
   async ({ metalake, catalog, schema, table }, { dispatch }) => {
-    const response = await getTableDetailsApi({ metalake, catalog, schema, table })
+    const [err, res] = await to(getTableDetailsApi({ metalake, catalog, schema, table }))
 
-    const { table: resTable } = response.data
+    if (err || !res) {
+      throw new Error(err)
+    }
+
+    const { table: resTable } = res
 
     return resTable
   }

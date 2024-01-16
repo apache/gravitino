@@ -25,9 +25,9 @@ your system `PATH`, or the `JAVA_HOME` environment variable pointing to a Java i
 
 See [How to install Gravitino](./how-to-install.md) to learn how to install Gravitino server.
 
-Gravitino provides Docker image on [Docker Hub](https://hub.docker.com/u/datastrato).
-Please pull the image and run it. For the details of Gravitino Docker image, please see
-[Dock image details](./docker-image-details.md).
+Gravitino provides Docker images on [Docker Hub](https://hub.docker.com/u/datastrato).
+Please pull the image and run it. For the details of the Gravitino Docker image, please see
+[Docker image details](./docker-image-details.md).
 
 Gravitino also provides a playground to experience the whole Gravitino system with other components.
 Please see the [Gravitino playground repository](https://github.com/datastrato/gravitino-playground)
@@ -52,7 +52,7 @@ REST API, another is Java SDK. You can use either to manage metadata, please see
 
 Also, you can find the complete REST API definition in
 [Gravitino Open API](./api/rest/gravitino-rest-api),
-Java SDK definition in [Gravitino Javadoc](pathname:///docs/0.3.0/api/java/index.html).
+Java SDK definition in [Gravitino Javadoc](pathname:///docs/0.3.1/api/java/index.html).
 
 Gravitino provides a web UI to manage the metadata, you can visit the web UI in the browser via
 the URL address `http://<ip-address>:8090`. Please see [Gravitino web UI](./webui.md) for the details.
@@ -92,9 +92,9 @@ Gravitino supports different catalogs to manage the metadata in different source
   manage Apache Iceberg data.
 * [Iceberg REST catalog service](./iceberg-rest-service.md): a
   complete guide to use Gravitino as an Apache Iceberg REST catalog service.
-* [Hive catalog](./apache-hive-catalog.md): a complete guide to using Gravitino manage Apache Hive data.
-* [MySQL catalog](./jdbc-mysql-catalog.md): a complete guide to using Gravitino manage MySQL data.
-* [PostgreSQL catalog](./jdbc-postgresql-catalog.md): a complete guide to using Gravitino manage PostgreSQL data.
+* [Hive catalog](./apache-hive-catalog.md): a complete guide to using Gravitino to manage Apache Hive data.
+* [MySQL catalog](./jdbc-mysql-catalog.md): a complete guide to using Gravitino to manage MySQL data.
+* [PostgreSQL catalog](./jdbc-postgresql-catalog.md): a complete guide to using Gravitino to manage PostgreSQL data.
 
 ### Trino connector
 
@@ -117,15 +117,15 @@ Gravitino provides several ways to configure and manage the Gravitino server. Pl
 
 * [Gravitino Open API](./api/rest/gravitino-rest-api): provides the complete Open API definition of
   Gravitino.
-* [Gravitino Javadoc](pathname:///docs/0.3.0/api/java/index.html): provides the Javadoc for the Gravitino API.
+* [Gravitino Javadoc](pathname:///docs/0.3.1/api/java/index.html): provides the Javadoc for the Gravitino API.
 
 ### Development guides
 
 * [How to build Gravitino](./how-to-build.md): a complete guide to build Gravitino from
   source.
-* [How to test Gravitino](./how-to-test.md): a complete guide to run Gravitino unit tests and
+* [How to test Gravitino](./how-to-test.md): a complete guide to running Gravitino unit tests and
   integration tests.
-* [How to sign and verify a Gravitino releases](./how-to-sign-releases.md): a guide to sign and verify
+* [How to sign and verify Gravitino releases](./how-to-sign-releases.md): a guide to sign and verify
   a Gravitino release.
 * [Publish Docker images](./publish-docker-images.md): a guide to publish Gravitino Docker images,
   also list the change logs of Gravitino CI Docker images and release images.

@@ -52,7 +52,7 @@ const CreateMetalakeDialog = props => {
   const [innerProps, setInnerProps] = useState([])
   const [cacheData, setCacheData] = useState()
 
-  const typeText = type === 'create' ? 'Create' : 'Update'
+  const typeText = type === 'create' ? 'Create' : 'Edit'
 
   const {
     control,
@@ -91,11 +91,13 @@ const CreateMetalakeDialog = props => {
   }
 
   const onSubmit = data => {
-    const properties = innerProps.reduce((acc, item) => {
-      acc[item.key] = item.value
+    const properties = innerProps
+      .filter(i => i.key.trim() !== '')
+      .reduce((acc, item) => {
+        acc[item.key] = item.value
 
-      return acc
-    }, {})
+        return acc
+      }, {})
 
     const metalakeData = {
       ...data,
@@ -118,7 +120,7 @@ const CreateMetalakeDialog = props => {
   useEffect(() => {
     if (open && JSON.stringify(data) !== '{}') {
       setCacheData(data)
-      const { properties } = data
+      const { properties = {} } = data
 
       const propsArr = Object.keys(properties).map(item => {
         return {
@@ -250,7 +252,7 @@ const CreateMetalakeDialog = props => {
         </DialogContent>
         <DialogActions className={' twc-px-5 md:twc-px-15 twc-pb-5 md:twc-pb-[12.5 0.25 rem]'}>
           <Button variant='contained' type='submit'>
-            {typeText}
+            {typeText === 'Edit' ? 'Update' : typeText}
           </Button>
           <Button variant='outlined' className={'twc-ml-1'} onClick={handleClose} type='reset'>
             Cancel

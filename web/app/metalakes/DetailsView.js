@@ -16,7 +16,7 @@ import TableContainer from '@mui/material/TableContainer'
 import { formatToDateTime } from '@/lib/utils/date'
 
 const DetailsView = props => {
-  const { store, data = {} } = props
+  const { store, data = {}, page } = props
 
   const activatedItem = store.activatedDetails
 
@@ -29,14 +29,32 @@ const DetailsView = props => {
     }
   })
 
+  console.log(activatedItem)
+
   return (
     <Box sx={{ p: 4 }}>
       <Grid container spacing={6}>
+        {page && page === 'catalogs' ? (
+          <>
+            <Grid item xs={12} md={6} sx={{ mb: [0, 5] }}>
+              <Typography variant='body2' sx={{ mb: 2 }}>
+                Type
+              </Typography>
+              <Typography sx={{ fontWeight: 500 }}>{activatedItem?.type || ''}</Typography>
+            </Grid>
+            <Grid item xs={12} md={6} sx={{ mb: [0, 5] }}>
+              <Typography variant='body2' sx={{ mb: 2 }}>
+                Provider
+              </Typography>
+              <Typography sx={{ fontWeight: 500 }}>{activatedItem?.provider || ''}</Typography>
+            </Grid>
+          </>
+        ) : null}
         <Grid item xs={12} sx={{ mb: [0, 5] }}>
           <Typography variant='body2' sx={{ mb: 2 }}>
             Comment
           </Typography>
-          <Typography sx={{ fontWeight: 500 }}>{activatedItem.comment}</Typography>
+          <Typography sx={{ fontWeight: 500, whiteSpace: 'pre' }}>{activatedItem?.comment || ''}</Typography>
         </Grid>
 
         <Grid item xs={12} md={6} sx={{ mb: [0, 5] }}>

@@ -40,8 +40,9 @@ plugins {
   alias(libs.plugins.publish)
   // Apply one top level rat plugin to perform any required license enforcement analysis
   alias(libs.plugins.rat)
-  id("com.github.jk1.dependency-license-report") version "2.5"
-  id("org.cyclonedx.bom") version "1.5.0" // Newer version fail due to our setup
+  alias(libs.plugins.bom)
+  alias(libs.plugins.dependencyLicenseReport)
+  alias(libs.plugins.tasktree)
 }
 
 if (extra["jdkVersion"] !in listOf("8", "11", "17")) {
@@ -297,6 +298,7 @@ subprojects {
 
 tasks.rat {
   substringMatcher("DS", "Datastrato", "Copyright 2023 Datastrato Pvt Ltd.")
+  substringMatcher("DS", "Datastrato", "Copyright 2024 Datastrato Pvt Ltd.")
   approvedLicense("Datastrato")
   approvedLicense("Apache License Version 2.0")
 
@@ -313,10 +315,12 @@ tasks.rat {
     "**/licenses/*.md",
     "integration-test/**",
     "web/.**",
+    "web/next-env.d.ts",
     "web/dist/**/*",
     "web/node_modules/**/*",
-    "web/src/iconify-bundle/bundle-icons-react.js",
-    "web/src/iconify-bundle/icons-bundle-react.js",
+    "web/lib/utils/axios/**/*",
+    "web/lib/enums/httpEnum.ts",
+    "web/types/axios.d.ts",
     "web/yarn.lock",
     "**/LICENSE.*",
     "**/NOTICE.*"
@@ -449,7 +453,7 @@ tasks {
     subprojects.forEach() {
       if (!it.name.startsWith("catalog") &&
         !it.name.startsWith("client") && it.name != "trino-connector" &&
-        it.name != "integration-test"
+        it.name != "integration-test" && it.name != "bundled-catalog"
       ) {
         from(it.configurations.runtimeClasspath)
         into("distribution/package/libs")
@@ -462,7 +466,8 @@ tasks {
       if (!it.name.startsWith("catalog") &&
         !it.name.startsWith("client") &&
         it.name != "trino-connector" &&
-        it.name != "integration-test"
+        it.name != "integration-test" &&
+        it.name != "bundled-catalog"
       ) {
         dependsOn("${it.name}:build")
         from("${it.name}/build/libs")
@@ -486,3 +491,5 @@ tasks {
     dependsOn(cleanDistribution)
   }
 }
+
+apply(plugin = "com.dorongold.task-tree")

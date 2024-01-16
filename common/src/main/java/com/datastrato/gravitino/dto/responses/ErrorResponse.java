@@ -138,6 +138,18 @@ public class ErrorResponse extends BaseResponse {
     return new ErrorResponse(code, type, message, null);
   }
 
+  public static ErrorResponse unsupportedOperation(String message) {
+    return unsupportedOperation(message, null);
+  }
+
+  public static ErrorResponse unsupportedOperation(String message, Throwable throwable) {
+    return new ErrorResponse(
+        ErrorConstants.UNSUPPORTED_OPERATION_CODE,
+        UnsupportedOperationException.class.getSimpleName(),
+        message,
+        getStackTrace(throwable));
+  }
+
   private static List<String> getStackTrace(Throwable throwable) {
     if (throwable == null) {
       return null;

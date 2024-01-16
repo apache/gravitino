@@ -304,4 +304,19 @@ public final class PropertyEntry<T> {
     return enumPropertyEntry(
         name, description, required, true, javaType, defaultValue, hidden, reserved);
   }
+
+  @Override
+  public String toString() {
+    final StringBuilder sb = new StringBuilder("PropertyEntry{");
+    sb.append("name='").append(name).append('\'');
+    sb.append(", description='").append(description).append('\'');
+    sb.append(", required=").append(required);
+    sb.append(", immutable=").append(immutable);
+    sb.append(", javaType=").append(javaType);
+    sb.append(", defaultValue=").append(defaultValue);
+    sb.append(", hidden=").append(hidden);
+    sb.append(", reserved=").append(reserved);
+    sb.append('}');
+    return sb.toString();
+  }
 }

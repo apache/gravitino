@@ -19,6 +19,11 @@ public class TestTypes {
     Assertions.assertSame(booleanType, Types.BooleanType.get());
     Assertions.assertEquals("boolean", booleanType.simpleString());
 
+    Types.NullType nullType = Types.NullType.get();
+    Assertions.assertEquals(Type.Name.NULL, nullType.name());
+    Assertions.assertSame(nullType, Types.NullType.get());
+    Assertions.assertEquals("null", nullType.simpleString());
+
     Types.ByteType byteType = Types.ByteType.get();
     Assertions.assertEquals(Type.Name.BYTE, byteType.name());
     Assertions.assertSame(byteType, Types.ByteType.get());

@@ -226,7 +226,7 @@ public final class JettyServerConfig {
                   + " Default value is GET,POST,HEAD,DELETE")
           .version("0.4.0")
           .stringConf()
-          .createWithDefault("GET,POST,HEAD,DELETE");
+          .createWithDefault("GET,POST,HEAD,DELETE,PUT");
 
   public static final ConfigEntry<String> ALLOWED_HEADERS =
       new ConfigBuilder("allowedHeaders")

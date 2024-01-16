@@ -13,15 +13,15 @@ This page introduces how to manage metadata by Gravitino. Through Gravitino, you
 like metalakes, catalogs, schemas, and tables. This page includes the following contents:
 
 In this document, Gravitino uses Apache Hive catalog as an example to show how to manage metadata by Gravitino. Other catalogs are similar to Hive catalog,
-but they may have some differences, especially in catalog property, table property and column type. For more details, please refer to the related doc.
+but they may have some differences, especially in catalog property, table property, and column type. For more details, please refer to the related doc.
 
 - [**Apache Hive**](./apache-hive-catalog.md)
-- [**MySQL**](./jdbc-postgresql-catalog.md)
-- [**PostgreSQL**](./jdbc-mysql-catalog.md)
+- [**MySQL**](./jdbc-mysql-catalog.md)
+- [**PostgreSQL**](./jdbc-postgresql-catalog.md)
 - [**Apache Iceberg**](./lakehouse-iceberg-catalog.md)
 
 
-Assuming Gravitino has just started, and the host and port is `http://localhost:8090`.
+Assuming Gravitino has just started, and the host and port is <http://localhost:8090>.
 
 ## Metalake operations
 
@@ -158,12 +158,12 @@ boolean success = gravitinoClient.dropMetalake(
 </Tabs>
 
 :::note
-Drop a metalake only removes metadata about the metalake and catalogs, schemas, tables under the metalake in Gravitino, It doesn't remove the real schema and table data in Apache Hive.
+Dropping a metalake only removes metadata about the metalake and catalogs, schemas, tables under the metalake in Gravitino, It doesn't remove the real schema and table data in Apache Hive.
 :::
 
 ### List all metalakes
 
-You can list metalakes by sending a `GET` request to the `/api/metalakes` endpoint or just use the Gravitino Java client. The following is an example of listing all metalake name:
+You can list metalakes by sending a `GET` request to the `/api/metalakes` endpoint or just use the Gravitino Java client. The following is an example of listing all metalake names:
 
 <Tabs>
 <TabItem value="shell" label="Shell">
@@ -185,7 +185,7 @@ GravitinoMetaLake[] allMetalakes = gravitinoClient.listMetalakes();
 </TabItem>
 </Tabs>
 
-## Catalogs operations
+## Catalog operations
 
 ### Create a catalog
 
@@ -235,7 +235,7 @@ Catalog catalog = gravitinoMetaLake.createCatalog(
     Type.RELATIONAL,
     "hive", // provider, We support hive, jdbc-mysql, jdbc-postgresql, lakehouse-iceberg, etc.
     "This is a hive catalog",
-    hiveProperties); // Please change the properties according to the value of provider.
+    hiveProperties); // Please change the properties according to the value of the provider.
 // ...
 ```
 
@@ -359,7 +359,7 @@ gravitinoMetaLake.dropCatalog(NameIdentifier.of("metalake", "catalog"));
 </Tabs>
 
 :::note
-Drop a catalog only removes metadata about the catalog and schemas, tables under the catalog in Gravitino, It doesn't remove the real data (table and schema) in Apache Hive.
+Dropping a catalog only removes metadata about the catalog, schemas, and tables under the catalog in Gravitino, It doesn't remove the real data (table and schema) in Apache Hive.
 :::
 
 ### List all catalogs in a metalake
@@ -392,7 +392,7 @@ NameIdentifier[] catalogsIdents = gravitinoMetaLake.listCatalogs(Namespace.ofCat
 </TabItem>
 </Tabs>
 
-## Schemas operations
+## Schema operations
 
 :::tip
 Users should create a metalake and a catalog before creating a schema.
@@ -593,7 +593,7 @@ NameIdentifier[] schemas = supportsSchemas.listSchemas(Namespace.ofSchema("metal
 </TabItem>
 </Tabs>
 
-## Tables operations
+## Table operations
 
 :::tip
 Users should create a metalake, a catalog and a schema before creating a table.
@@ -711,10 +711,10 @@ The following types that Gravitino supports:
 | List                      | `Types.ListType.of(elementType, elementNullable)`                        | `{"type": "list", "containsNull": JSON Boolean, "elementType": type JSON}`                                                           | List type, indicate a list of elements with the same type                                        |
 | Map                       | `Types.MapType.of(keyType, valueType)`                                   | `{"type": "map", "keyType": type JSON, "valueType": type JSON, "valueContainsNull": JSON Boolean}`                                   | Map type, indicate a map of key-value pairs                                                      |
 | Struct                    | `Types.StructType.of([Types.StructType.Field.of(name, type, nullable)])` | `{"type": "struct", "fields": [JSON StructField, {"name": string, "type": type JSON, "nullable": JSON Boolean, "comment": string}]}` | Struct type, indicate a struct of fields                                                         |
-| Union                     | `Types.UnionType.of([type1, type2, ...])`                                | `{"type": "union", "types": [type JSON, ...]}`                                                                                       | Union type, indicate a union of types
+| Union                     | `Types.UnionType.of([type1, type2, ...])`                                | `{"type": "union", "types": [type JSON, ...]}`                                                                                       | Union type, indicates a union of types
 
 
-The related java doc is [here](pathname:///docs/0.3.0/api/java/com/datastrato/gravitino/rel/types/Type.html).
+The related java doc is [here](pathname:///docs/0.3.1/api/java/com/datastrato/gravitino/rel/types/Type.html).
 
 #### Table property and type mapping
 
@@ -732,15 +732,15 @@ In addition to the basic settings, Gravitino supports the following features:
 
 | Feature             | Description                                                                                                                                                                                                                                                                      | Java doc                                                                                                                 |
 |---------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------|
-| Table partitioning  | Equal to `PARTITION BY` in Apache Hive, It is a partitioning strategy that is used to split a table into parts based on partition keys. Some table engine may not support this feature                                                                                           | [Partition](pathname:///docs/0.3.0/api/java/com/datastrato/gravitino/dto/rel/partitions/Partitioning.html)               |
-| Table bucketing     | Equal to `CLUSTERED BY` in Apache Hive, Bucketing a.k.a (Clustering) is a technique to split the data into more manageable files/parts, (By specifying the number of buckets to create). The value of the bucketing column will be hashed by a user-defined number into buckets. | [Distribution](pathname:///docs/0.3.0/api/java/com/datastrato/gravitino/rel/expressions/distributions/Distribution.html) |
-| Table sort ordering | Equal to `SORTED BY` in Apache Hive, sort ordering is a method to sort the data by specific ways such as by a column or a function and then store table data. it will highly improve the query performance under certain scenarios.                                              | [SortOrder](pathname:///docs/0.3.0/api/java/com/datastrato/gravitino/rel/expressions/sorts/SortOrder.html)               |
+| Table partitioning  | Equal to `PARTITION BY` in Apache Hive, It is a partitioning strategy that is used to split a table into parts based on partition keys. Some table engine may not support this feature                                                                                           | [Partition](pathname:///docs/0.3.1/api/java/com/datastrato/gravitino/dto/rel/partitions/Partitioning.html)               |
+| Table bucketing     | Equal to `CLUSTERED BY` in Apache Hive, Bucketing a.k.a (Clustering) is a technique to split the data into more manageable files/parts, (By specifying the number of buckets to create). The value of the bucketing column will be hashed by a user-defined number into buckets. | [Distribution](pathname:///docs/0.3.1/api/java/com/datastrato/gravitino/rel/expressions/distributions/Distribution.html) |
+| Table sort ordering | Equal to `SORTED BY` in Apache Hive, sort ordering is a method to sort the data in specific ways such as by a column or a function, and then store table data. it will highly improve the query performance under certain scenarios.                                              | [SortOrder](pathname:///docs/0.3.1/api/java/com/datastrato/gravitino/rel/expressions/sorts/SortOrder.html)               |
 
 
 For more information, please see the related document on [partitioning, bucketing, and sorting](table-partitioning-bucketing-sort-order.md).
 
 :::note
-The code above is an example of creating a Hive table. For other catalogs, the code is similar, but the supported column type, table properties may be different. For more details, please refer to the related doc.
+The code above is an example of creating a Hive table. For other catalogs, the code is similar, but the supported column type, and table properties may be different. For more details, please refer to the related doc.
 :::
 
 ### Load a table
@@ -837,7 +837,7 @@ You can remove a table by sending a `DELETE` request to the `/api/metalakes/{met
 <TabItem value="shell" label="Shell">
 
 ```shell
-## purge can be true or false, if purge is true, Gravitino will remove the data of the table.
+## Purge can be true or false, if purge is true, Gravitino will remove the data from the table.
 
 curl -X DELETE -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" \
@@ -865,8 +865,8 @@ tableCatalog.purgeTable(NameIdentifier.of("metalake", "catalog", "schema", "tabl
 </TabItem>
 </Tabs>
 
-There are two ways to drop a table: `dropTable` and `purgeTable`, the difference between them is that `purgeTable` will remove data of the table, while `dropTable` only removes the metadata of the table. Some engine such as 
-Apache Hive support both, `dropTable` will only remove the metadata of a table and the data in HDFS can be reused later through the format of external table.
+There are two ways to drop a table: `dropTable` and `purgeTable`, the difference between them is that `purgeTable` will remove data of the table, while `dropTable` only removes the metadata of the table. Some engines such as 
+Apache Hive support both, `dropTable` will only remove the metadata of a table and the data in HDFS can be reused later through the format of the external table.
 
 ### List all tables under a schema
 
