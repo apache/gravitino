@@ -93,7 +93,7 @@ public interface FilesetCatalog {
   /**
    * Drop a fileset from the catalog.
    *
-   * <p>The underlying files will be deleted if this fileset is managed, otherwise, only the
+   * <p>The underlying files will be deleted if this fileset type is managed, otherwise, only the
    * metadata will be dropped.
    *
    * @param ident A fileset identifier.
