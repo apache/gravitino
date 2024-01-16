@@ -55,6 +55,11 @@ public class TestTransforms {
           public boolean autoIncrement() {
             return false;
           }
+
+          @Override
+          public Expression defaultValue() {
+            return Column.DEFAULT_VALUE_NOT_SET;
+          }
         };
     String[] fieldName = new String[] {column.name()};
 
@@ -106,6 +111,11 @@ public class TestTransforms {
           @Override
           public boolean autoIncrement() {
             return false;
+          }
+
+          @Override
+          public Expression defaultValue() {
+            return Column.DEFAULT_VALUE_NOT_SET;
           }
         };
     // partition by foo(col_1, 'bar')

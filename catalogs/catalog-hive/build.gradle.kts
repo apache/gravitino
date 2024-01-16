@@ -77,12 +77,16 @@ dependencies {
 tasks {
   val copyDepends by registering(Copy::class) {
     from(configurations.runtimeClasspath)
-    into("build/libs")
+    // Why should we rename the jar files? Because the directory `build/libs` is the output directory of
+    // the task `build` and `copyDepends`. Task `shadowJar` of project `bundled-catalog` depends on the output
+    // of task `build` and mistakenly thinks that it depends on the task `copyDepends`, and errors occur.
+    // The same goes for `catalog-lakehouse-iceberg`, `catalog-jdbc-mysql` and `catalog-jdbc-postgresql`.
+    into("build/libs_all")
   }
 
   val copyCatalogLibs by registering(Copy::class) {
     dependsOn(copyDepends, "build")
-    from("build/libs")
+    from("build/libs_all", "build/libs")
     into("$rootDir/distribution/package/catalogs/hive/libs")
   }
 

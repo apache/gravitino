@@ -9,7 +9,7 @@ import static com.datastrato.gravitino.catalog.PropertyEntry.enumImmutableProper
 import static com.datastrato.gravitino.catalog.PropertyEntry.stringImmutablePropertyEntry;
 import static com.datastrato.gravitino.catalog.PropertyEntry.stringReservedPropertyEntry;
 import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.StorageFormat.TEXTFILE;
-import static org.apache.hadoop.hive.metastore.TableType.MANAGED_TABLE;
+import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.TableType.MANAGED_TABLE;
 
 import com.datastrato.gravitino.catalog.BasePropertiesMetadata;
 import com.datastrato.gravitino.catalog.PropertyEntry;
@@ -19,7 +19,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
 import java.util.List;
 import java.util.Map;
-import org.apache.hadoop.hive.metastore.TableType;
 
 public class HiveTablePropertiesMetadata extends BasePropertiesMetadata {
   public static final String COMMENT = "comment";
@@ -81,6 +80,14 @@ public class HiveTablePropertiesMetadata extends BasePropertiesMetadata {
   public static final String OPENCSV_SERDE_CLASS = "org.apache.hadoop.hive.serde2.OpenCSVSerde";
 
   private static final String REGEX_SERDE_CLASS = "org.apache.hadoop.hive.serde2.RegexSerDe";
+
+  public enum TableType {
+    MANAGED_TABLE,
+    EXTERNAL_TABLE,
+    VIRTUAL_VIEW,
+    INDEX_TABLE,
+    VIRTUAL_INDEX,
+  }
 
   enum StorageFormat {
     SEQUENCEFILE(

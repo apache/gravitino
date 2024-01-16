@@ -8,10 +8,15 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
-import MUILink from '@mui/material/Link'
-import Breadcrumbs from '@mui/material/Breadcrumbs'
+import { Link as MUILink, Breadcrumbs, Typography, styled } from '@mui/material'
 
 import Icon from '@/components/Icon'
+
+const Text = styled(Typography)(({ theme }) => ({
+  maxWidth: '120px',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis'
+}))
 
 const MetalakePath = props => {
   const { routeParams } = props
@@ -52,19 +57,19 @@ const MetalakePath = props => {
       {catalog && (
         <MUILink component={Link} href={catalogUrl} onClick={event => handleClick(event, catalogUrl)} underline='hover'>
           <Icon icon='bx:book' fontSize={20} />
-          {catalog}
+          <Text title={catalog}>{catalog}</Text>
         </MUILink>
       )}
       {schema && (
         <MUILink component={Link} href={schemaUrl} onClick={event => handleClick(event, schemaUrl)} underline='hover'>
           <Icon icon='bx:coin-stack' fontSize={20} />
-          {schema}
+          <Text title={schema}>{schema}</Text>
         </MUILink>
       )}
       {table && (
         <MUILink component={Link} href={tableUrl} onClick={event => handleClick(event, tableUrl)} underline='hover'>
           <Icon icon='bx:table' fontSize={20} />
-          {table}
+          <Text title={table}>{table}</Text>
         </MUILink>
       )}
     </Breadcrumbs>
