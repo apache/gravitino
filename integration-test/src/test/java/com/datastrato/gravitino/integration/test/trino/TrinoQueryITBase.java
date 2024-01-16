@@ -19,20 +19,20 @@ import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.datastrato.gravitino.rel.TableCatalog;
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Paths;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Map;
 import org.junit.jupiter.api.Assertions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testcontainers.shaded.org.apache.commons.io.FileUtils;
 
 public class TrinoQueryITBase {
   private static final Logger LOG = LoggerFactory.getLogger(TrinoQueryITBase.class);
 
   protected static boolean autoStart = true;
-  protected static boolean autoStartGravition = true;
+  protected static boolean autoStartGravitino = true;
   protected static boolean started = false;
 
   // TODO(yuhui) redo get the configs after we have the Docker image ready for testing.
@@ -53,18 +53,22 @@ public class TrinoQueryITBase {
   private static void setEnv() throws Exception {
     if (autoStart) {
       AbstractIT.startIntegrationTest();
+      gravitinoClient = AbstractIT.getGravitinoClient();
+      gravitinoUri = String.format("http://127.0.0.1:%d", AbstractIT.getGravitinoServerPort());
 
       trinoITContainers = ContainerSuite.getInstance().getTrinoITContainers();
       trinoITContainers.launch(AbstractIT.getGravitinoServerPort());
-
-      gravitinoClient = AbstractIT.getGravitinoClient();
-      gravitinoUri = String.format("http://127.0.0.1:%d", AbstractIT.getGravitinoServerPort());
 
       trinoUri = trinoITContainers.getTrinoUri();
       hiveMetastoreUri = trinoITContainers.getHiveMetastoreUri();
       hdfsUri = trinoITContainers.getHdfsUri();
       mysqlUri = trinoITContainers.getMysqlUri();
       postgresqlUri = trinoITContainers.getPostgresqlUri();
+
+    } else if (autoStartGravitino) {
+      AbstractIT.startIntegrationTest();
+      gravitinoClient = AbstractIT.getGravitinoClient();
+      gravitinoUri = String.format("http://127.0.0.1:%d", AbstractIT.getGravitinoServerPort());
 
     } else {
       gravitinoClient = GravitinoClient.builder(gravitinoUri).build();
@@ -225,7 +229,7 @@ public class TrinoQueryITBase {
 
   public static String readFileToString(String filename) throws IOException {
     try {
-      return new String(Files.readAllBytes(Paths.get(filename))) + "\n\n";
+      return FileUtils.readFileToString(new File(filename), StandardCharsets.UTF_8) + "\n\n";
     } catch (Exception e) {
       throw new IOException("Failed to read test file " + filename);
     }

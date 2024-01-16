@@ -36,6 +36,8 @@ import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+
 import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -126,6 +128,11 @@ public class MiniGravitino {
       Thread.sleep(500);
     }
     if (!started) {
+      try {
+        future.get(5, TimeUnit.SECONDS);
+      } catch (Exception e) {
+        throw new RuntimeException("Gravitino server start failed", e);
+      }
       throw new RuntimeException("Can not start Gravitino server");
     }
 

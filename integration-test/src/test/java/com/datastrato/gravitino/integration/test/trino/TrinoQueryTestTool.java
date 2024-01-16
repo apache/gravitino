@@ -46,7 +46,7 @@ public class TrinoQueryTestTool {
       options.addOption(
           "test_sets_dir",
           true,
-          "Specify the test sets directory, "
+          "Specify the test sets' directory, "
               + "the default value is 'integration-test/src/test/resources/trino-queries'");
       options.addOption("test_set", true, "Specify the test set name to test");
       options.addOption("tester_id", true, "Specify the tester name prefix to select to test");
@@ -74,18 +74,20 @@ public class TrinoQueryTestTool {
         }
       }
 
+      TrinoQueryIT.ciTestsets.clear();
+
       String trinoUri = commandLine.getOptionValue("trino_uri");
-      TrinoQueryITBase.trinoUri = Strings.isBlank(trinoUri) ? TrinoQueryITBase.trinoUri : trinoUri;
+      TrinoQueryIT.trinoUri = Strings.isBlank(trinoUri) ? TrinoQueryIT.trinoUri : trinoUri;
       String hiveUri = commandLine.getOptionValue("hive_uri");
-      TrinoQueryITBase.hiveMetastoreUri =
-          Strings.isBlank(hiveUri) ? TrinoQueryITBase.hiveMetastoreUri : hiveUri;
+      TrinoQueryIT.hiveMetastoreUri =
+          Strings.isBlank(hiveUri) ? TrinoQueryIT.hiveMetastoreUri : hiveUri;
       String mysqlUri = commandLine.getOptionValue("mysql_uri");
-      TrinoQueryITBase.mysqlUri = Strings.isBlank(mysqlUri) ? TrinoQueryITBase.mysqlUri : mysqlUri;
+      TrinoQueryIT.mysqlUri = Strings.isBlank(mysqlUri) ? TrinoQueryIT.mysqlUri : mysqlUri;
       String hdfsUri = commandLine.getOptionValue("hdfs_uri");
-      TrinoQueryITBase.hdfsUri = Strings.isBlank(hdfsUri) ? TrinoQueryITBase.hdfsUri : hdfsUri;
+      TrinoQueryIT.hdfsUri = Strings.isBlank(hdfsUri) ? TrinoQueryIT.hdfsUri : hdfsUri;
       String postgresqlUri = commandLine.getOptionValue("postgresql_uri");
-      TrinoQueryITBase.postgresqlUri =
-          Strings.isBlank(postgresqlUri) ? TrinoQueryITBase.postgresqlUri : postgresqlUri;
+      TrinoQueryIT.postgresqlUri =
+          Strings.isBlank(postgresqlUri) ? TrinoQueryIT.postgresqlUri : postgresqlUri;
 
       String testSet = commandLine.getOptionValue("test_set");
       String testerId = commandLine.getOptionValue("tester_id", "");
@@ -113,10 +115,7 @@ public class TrinoQueryTestTool {
           }
         }
         if (Strings.isNotEmpty(testerId)) {
-          if (Arrays.stream(TrinoQueryITBase.listDirectory(testSetDir))
-                  .filter(f -> f.startsWith(testerId))
-                  .count()
-              == 0) {
+          if (Arrays.stream(TrinoQueryIT.listDirectory(testSetDir)).noneMatch(f -> f.startsWith(testerId))) {
             System.out.println("The tester " + testerId + " does not found in testset");
             System.exit(1);
           }
@@ -126,7 +125,7 @@ public class TrinoQueryTestTool {
       checkEnv();
 
       TrinoQueryITBase.autoStart = autoStart;
-      TrinoQueryITBase.autoStartGravition = autoStartGravitino;
+      TrinoQueryITBase.autoStartGravitino = autoStartGravitino;
 
       TrinoQueryIT.setup();
       TrinoQueryIT testerRunner = new TrinoQueryIT();
@@ -141,12 +140,14 @@ public class TrinoQueryTestTool {
       if (testSet == null) {
         testerRunner.testSql();
       } else {
-        String catalogFileName = "catalog_" + catalog + "_prepare.sql";
+        String catalogFileName = catalog.isEmpty()? "" : "catalog_" + catalog + "_prepare.sql";
         testerRunner.testSql(testSetDir, catalogFileName, testerId);
       }
-      System.out.println("All the testers completed");
+      System.out.printf("All the testers completed (%d/%d)%n",
+              testerRunner.testCount.get(), testerRunner.totalCount.get());
     } catch (Exception e) {
       System.out.println(e.getMessage());
+      e.printStackTrace();
     } finally {
       TrinoQueryIT.cleanup();
     }
@@ -162,7 +163,7 @@ public class TrinoQueryTestTool {
     }
 
     if (Strings.isEmpty(System.getenv("GRAVITINO_TEST"))) {
-      throw new RuntimeException("GRAVITINO_TEST is not set");
+      throw new RuntimeException("GRAVITINO_TEST is not set, please set it to 'true'");
     }
   }
 }

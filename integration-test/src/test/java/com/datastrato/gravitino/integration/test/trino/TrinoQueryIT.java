@@ -11,8 +11,10 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CompletionService;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorCompletionService;
@@ -36,19 +38,27 @@ public class TrinoQueryIT extends TrinoQueryITBase {
   private static final Logger LOG = LoggerFactory.getLogger(TrinoQueryIT.class);
 
   protected static String testsetsDir = "";
-  private AtomicInteger testCount = new AtomicInteger(0);
-  private AtomicInteger totalCount = new AtomicInteger(0);
+  protected AtomicInteger testCount = new AtomicInteger(0);
+  protected AtomicInteger totalCount = new AtomicInteger(0);
 
   private static Map<String, String> queryParams = new HashMap<>();
+
+  public static Set<String> ciTestsets = new HashSet<>();
+
+  static {
+    testsetsDir = TrinoQueryIT.class.getClassLoader().getResource("trino-ci-testset").getPath();
+    testsetsDir = ITUtils.joinPath(testsetsDir, "testsets");
+
+    ciTestsets.add("hive");
+    ciTestsets.add("lakehouse-iceberg");
+    ciTestsets.add("jdbc-mysql");
+    ciTestsets.add("jdbc-postgresql");
+    ciTestsets.add("tpcds");
+  }
 
   @BeforeAll
   public static void setup() throws Exception {
     TrinoQueryITBase.setup();
-    if (testsetsDir.isEmpty()) {
-      testsetsDir = TrinoQueryIT.class.getClassLoader().getResource("trino-ci-testset").getPath();
-      testsetsDir = ITUtils.joinPath(testsetsDir, "testsets");
-      LOG.info("Test Queries directory is {}", testsetsDir);
-    }
     cleanupTestEnv();
 
     queryParams.put("mysql_uri", mysqlUri);
@@ -263,7 +273,9 @@ public class TrinoQueryIT extends TrinoQueryITBase {
     CompletionService completionService = new ExecutorCompletionService<>(executor);
 
     String[] testSetNames =
-        Arrays.stream(TrinoQueryITBase.listDirectory(testsetsDir)).toArray(String[]::new);
+        Arrays.stream(TrinoQueryITBase.listDirectory(testsetsDir))
+            .filter(s -> ciTestsets.isEmpty() || ciTestsets.contains(s))
+            .toArray(String[]::new);
     List<Future<Integer>> allFutures = new ArrayList<>();
     for (String testSetName : testSetNames) {
       String path = ITUtils.joinPath(testsetsDir, testSetName);
@@ -303,7 +315,7 @@ public class TrinoQueryIT extends TrinoQueryITBase {
       }
     }
     executor.shutdownNow();
-    LOG.info("All testers completed");
+    LOG.info("All testers completed ({}/{})", testCount, totalCount);
   }
 
   public List<Future<Integer>> runOneTestset(
