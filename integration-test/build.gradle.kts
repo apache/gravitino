@@ -18,7 +18,7 @@ tasks.register<JavaExec>("TrinoTest") {
   systemProperty("gravitino.log.path", buildDir.path + "/integration-test.log")
   mainClass.set("com.datastrato.gravitino.integration.test.trino.TrinoQueryTestTool")
 
-  if (JavaVersion.current() >= JavaVersion.VERSION_1_8) {
+  if (JavaVersion.current() > JavaVersion.VERSION_1_8) {
     jvmArgs = listOf(
       "--add-opens",
       "java.base/java.lang=ALL-UNNAMED"
