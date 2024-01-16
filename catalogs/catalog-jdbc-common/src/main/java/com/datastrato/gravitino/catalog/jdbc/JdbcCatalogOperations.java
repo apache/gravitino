@@ -12,6 +12,7 @@ import com.datastrato.gravitino.StringIdentifier;
 import com.datastrato.gravitino.catalog.CatalogOperations;
 import com.datastrato.gravitino.catalog.PropertiesMetadata;
 import com.datastrato.gravitino.catalog.jdbc.config.JdbcConfig;
+import com.datastrato.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import com.datastrato.gravitino.catalog.jdbc.operation.DatabaseOperation;
@@ -75,6 +76,8 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
 
   private DataSource dataSource;
 
+  private final JdbcColumnDefaultValueConverter columnDefaultValueConverter;
+
   /**
    * Constructs a new instance of JdbcCatalogOperations.
    *
@@ -89,12 +92,14 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
       JdbcExceptionConverter exceptionConverter,
       JdbcTypeConverter jdbcTypeConverter,
       JdbcDatabaseOperations databaseOperation,
-      JdbcTableOperations tableOperation) {
+      JdbcTableOperations tableOperation,
+      JdbcColumnDefaultValueConverter columnDefaultValueConverter) {
     this.entity = entity;
     this.exceptionConverter = exceptionConverter;
     this.jdbcTypeConverter = jdbcTypeConverter;
     this.databaseOperation = databaseOperation;
     this.tableOperation = tableOperation;
+    this.columnDefaultValueConverter = columnDefaultValueConverter;
   }
 
   /**
@@ -118,7 +123,8 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
     JdbcConfig jdbcConfig = new JdbcConfig(resultConf);
     this.dataSource = DataSourceUtils.createDataSource(jdbcConfig);
     this.databaseOperation.initialize(dataSource, exceptionConverter, resultConf);
-    this.tableOperation.initialize(dataSource, exceptionConverter, jdbcTypeConverter, resultConf);
+    this.tableOperation.initialize(
+        dataSource, exceptionConverter, jdbcTypeConverter, columnDefaultValueConverter, resultConf);
     this.jdbcTablePropertiesMetadata = new JdbcTablePropertiesMetadata();
     this.jdbcSchemaPropertiesMetadata = new JdbcSchemaPropertiesMetadata();
   }
@@ -379,6 +385,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
                         .withType(column.dataType())
                         .withComment(column.comment())
                         .withNullable(column.nullable())
+                        .withDefaultValue(column.defaultValue())
                         .build())
             .toArray(JdbcColumn[]::new);
     String databaseName = NameIdentifier.of(tableIdent.namespace().levels()).name();

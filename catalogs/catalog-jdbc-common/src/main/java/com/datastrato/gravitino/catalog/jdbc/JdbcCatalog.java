@@ -6,6 +6,7 @@ package com.datastrato.gravitino.catalog.jdbc;
 
 import com.datastrato.gravitino.catalog.BaseCatalog;
 import com.datastrato.gravitino.catalog.CatalogOperations;
+import com.datastrato.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import com.datastrato.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
@@ -25,13 +26,15 @@ public abstract class JdbcCatalog extends BaseCatalog<JdbcCatalog> {
    */
   @Override
   protected CatalogOperations newOps(Map<String, String> config) {
+    JdbcTypeConverter jdbcTypeConverter = createJdbcTypeConverter();
     JdbcCatalogOperations ops =
         new JdbcCatalogOperations(
             entity(),
             createExceptionConverter(),
-            createJdbcTypeConverter(),
+            jdbcTypeConverter,
             createJdbcDatabaseOperations(),
-            createJdbcTableOperations());
+            createJdbcTableOperations(),
+            createJdbcColumnDefaultValueConverter(jdbcTypeConverter));
     ops.initialize(config);
     return ops;
   }
@@ -63,4 +66,8 @@ public abstract class JdbcCatalog extends BaseCatalog<JdbcCatalog> {
 
   /** @return The {@link JdbcTableOperations} to be used by the catalog to manage tables in the */
   protected abstract JdbcTableOperations createJdbcTableOperations();
+
+  /** @return The {@link JdbcColumnDefaultValueConverter} to be used by the catalog */
+  protected abstract JdbcColumnDefaultValueConverter createJdbcColumnDefaultValueConverter(
+      JdbcTypeConverter jdbcTypeConverter);
 }

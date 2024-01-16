@@ -13,38 +13,54 @@ import net.sf.jsqlparser.statement.create.table.ColDataType;
 /** Type converter for MySQL. */
 public class MysqlTypeConverter extends JdbcTypeConverter<ColDataType, String> {
 
+  public static final String TINYINT = "tinyint";
+  public static final String SMALLINT = "smallint";
+  public static final String INT = "int";
+  public static final String BIGINT = "bigint";
+  public static final String FLOAT = "float";
+  public static final String DOUBLE = "double";
+  public static final String DATE = "date";
+  public static final String TIME = "time";
+  public static final String TIMESTAMP = "timestamp";
+  public static final String DATETIME = "datetime";
+  public static final String DECIMAL = "decimal";
+  public static final String VARCHAR = "varchar";
+  public static final String CHAR = "char";
+  public static final String TEXT = "text";
+  public static final String BINARY = "binary";
+
   @Override
   public Type toGravitinoType(ColDataType type) {
     List<String> arguments = type.getArgumentsStringList();
     switch (type.getDataType().toLowerCase()) {
-      case "tinyint":
+      case TINYINT:
         return Types.ByteType.get();
-      case "smallint":
+      case SMALLINT:
         return Types.ShortType.get();
-      case "int":
+      case INT:
         return Types.IntegerType.get();
-      case "bigint":
+      case BIGINT:
         return Types.LongType.get();
-      case "float":
+      case FLOAT:
         return Types.FloatType.get();
-      case "double":
+      case DOUBLE:
         return Types.DoubleType.get();
-      case "date":
+      case DATE:
         return Types.DateType.get();
-      case "time":
+      case TIME:
         return Types.TimeType.get();
-      case "timestamp":
+      case TIMESTAMP:
         return Types.TimestampType.withoutTimeZone();
-      case "decimal":
+      case DECIMAL:
         return Types.DecimalType.of(
             Integer.parseInt(arguments.get(0)), Integer.parseInt(arguments.get(1)));
-      case "varchar":
+      case VARCHAR:
         return Types.VarCharType.of(Integer.parseInt(arguments.get(0)));
-      case "char":
+      case CHAR:
         return Types.FixedCharType.of(Integer.parseInt(arguments.get(0)));
-      case "text":
+      case TEXT:
         return Types.StringType.get();
-      case "binary":
+      case BINARY:
         return Types.BinaryType.get();
       default:
         throw new IllegalArgumentException("Not a supported type: " + type);
@@ -54,25 +70,25 @@ public class MysqlTypeConverter extends JdbcTypeConverter<ColDataType, String> {
   @Override
   public String fromGravitinoType(Type type) {
     if (type instanceof Types.ByteType) {
-      return "tinyint";
+      return TINYINT;
     } else if (type instanceof Types.ShortType) {
-      return "smallint";
+      return SMALLINT;
     } else if (type instanceof Types.IntegerType) {
-      return "int";
+      return INT;
     } else if (type instanceof Types.LongType) {
-      return "bigint";
+      return BIGINT;
     } else if (type instanceof Types.FloatType) {
-      return type.simpleString();
+      return FLOAT;
     } else if (type instanceof Types.DoubleType) {
-      return type.simpleString();
+      return DOUBLE;
     } else if (type instanceof Types.StringType) {
-      return "text";
+      return TEXT;
     } else if (type instanceof Types.DateType) {
-      return type.simpleString();
+      return DATE;
     } else if (type instanceof Types.TimeType) {
-      return type.simpleString();
+      return TIME;
     } else if (type instanceof Types.TimestampType && !((Types.TimestampType) type).hasTimeZone()) {
-      return type.simpleString();
+      return TIMESTAMP;
     } else if (type instanceof Types.DecimalType) {
       return type.simpleString();
     } else if (type instanceof Types.VarCharType) {
@@ -80,7 +96,7 @@ public class MysqlTypeConverter extends JdbcTypeConverter<ColDataType, String> {
     } else if (type instanceof Types.FixedCharType) {
       return type.simpleString();
     } else if (type instanceof Types.BinaryType) {
-      return type.simpleString();
+      return BINARY;
     }
     throw new IllegalArgumentException("Not a supported type: " + type.toString());
   }

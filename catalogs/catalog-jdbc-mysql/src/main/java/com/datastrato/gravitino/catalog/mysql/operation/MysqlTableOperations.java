@@ -4,6 +4,8 @@
  */
 package com.datastrato.gravitino.catalog.mysql.operation;
 
+import static com.datastrato.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
+
 import com.datastrato.gravitino.StringIdentifier;
 import com.datastrato.gravitino.catalog.jdbc.JdbcColumn;
 import com.datastrato.gravitino.catalog.jdbc.JdbcTable;
@@ -14,6 +16,7 @@ import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NoSuchTableException;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.rel.TableChange;
+import com.datastrato.gravitino.rel.expressions.literals.Literals;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import java.sql.Connection;
 import java.sql.ResultSet;
@@ -31,6 +34,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import net.sf.jsqlparser.JSQLParserException;
 import net.sf.jsqlparser.parser.CCJSqlParserUtil;
+import net.sf.jsqlparser.statement.create.table.ColDataType;
 import net.sf.jsqlparser.statement.create.table.ColumnDefinition;
 import net.sf.jsqlparser.statement.create.table.CreateTable;
 import net.sf.jsqlparser.statement.create.table.Index;
@@ -66,14 +70,14 @@ public class MysqlTableOperations extends JdbcTableOperations {
       String comment = findPropertiesValue(columnSpecs, COMMENT);
       List<String> properties = getColumnProperties(columnProperties);
       Optional.ofNullable(indexGroupByName.get(columnName)).ifPresent(properties::addAll);
+      ColDataType colDataType = columnDefinition.getColDataType();
       jdbcColumns.add(
           new JdbcColumn.Builder()
               .withName(columnName)
-              .withType(typeConverter.toGravitinoType(columnDefinition.getColDataType()))
+              .withType(typeConverter.toGravitinoType(colDataType))
               .withNullable(nullable)
               .withComment(comment)
-              // TODO: uncomment this once we support column default values.
-              // .withDefaultValue("NULL".equals(defaultValue) ? null : defaultValue)
+              .withDefaultValue(columnDefaultValueConverter.toGravitino(colDataType, defaultValue))
               .withProperties(properties)
               .build());
     }
@@ -130,13 +134,13 @@ public class MysqlTableOperations extends JdbcTableOperations {
       String comment = findPropertiesValue(columnSpecs, COMMENT);
       List<String> properties = getColumnProperties(columnProperties);
       Optional.ofNullable(indexGroupByName.get(columnName)).ifPresent(properties::addAll);
+      ColDataType colDataType = columnDefinition.getColDataType();
       return new JdbcColumn.Builder()
           .withName(columnName)
-          .withType(typeConverter.toGravitinoType(columnDefinition.getColDataType()))
+          .withType(typeConverter.toGravitinoType(colDataType))
           .withNullable(nullable)
           .withComment(comment)
-          // TODO: uncomment this once we support column default values.
-          // .withDefaultValue("NULL".equals(defaultValue) ? null : defaultValue)
+          .withDefaultValue(columnDefaultValueConverter.toGravitino(colDataType, defaultValue))
           .withProperties(properties)
           .build();
     }
@@ -382,12 +386,15 @@ public class MysqlTableOperations extends JdbcTableOperations {
     }
     String col = change.fieldName()[0];
     JdbcColumn column = getJdbcColumnFromCreateTable(table, col);
+    if (!change.nullable() && column.defaultValue().equals(Literals.NULL)) {
+      throw new IllegalArgumentException(
+          "column " + col + " with null default value cannot be changed to not null");
+    }
     column.getProperties().remove(PRIMARY_KEY);
     JdbcColumn updateColumn =
         new JdbcColumn.Builder()
             .withName(col)
-            // TODO: uncomment this once we support column default values.
-            // .withDefaultValue(column.getDefaultValue())
+            .withDefaultValue(column.defaultValue())
             .withNullable(change.nullable())
             .withProperties(column.getProperties())
             .withType(column.dataType())
@@ -425,8 +432,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
     JdbcColumn updateColumn =
         new JdbcColumn.Builder()
             .withName(col)
-            // TODO: uncomment this once we support column default values.
-            // .withDefaultValue(column.getDefaultValue())
+            .withDefaultValue(column.defaultValue())
             .withNullable(column.nullable())
             .withProperties(column.getProperties())
             .withType(column.dataType())
@@ -481,8 +487,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
             .withType(column.dataType())
             .withComment(column.comment())
             .withProperties(column.getProperties())
-            // TODO: uncomment this once we support column default values.
-            // .withDefaultValue(column.getDefaultValue())
+            .withDefaultValue(column.defaultValue())
             .withNullable(column.nullable())
             .build();
     return appendColumnDefinition(newColumn, sqlBuilder).toString();
@@ -552,7 +557,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
             // additional attributes are required, they must be modified separately.
             // TODO #839
             .withProperties(null)
-            .withDefaultValue(null)
+            .withDefaultValue(DEFAULT_VALUE_NOT_SET)
             .withNullable(column.nullable())
             .build();
     return appendColumnDefinition(newColumn, sqlBuilder).toString();
@@ -572,10 +577,12 @@ public class MysqlTableOperations extends JdbcTableOperations {
       sqlBuilder.append("NOT NULL ");
     }
     // Add DEFAULT value if specified
-    // TODO: uncomment this once we support column default values.
-    // if (StringUtils.isNotEmpty(column.getDefaultValue())) {
-    //   sqlBuilder.append("DEFAULT '").append(column.getDefaultValue()).append("'").append(SPACE);
-    // }
+    if (!DEFAULT_VALUE_NOT_SET.equals(column.defaultValue())) {
+      sqlBuilder
+          .append("DEFAULT ")
+          .append(columnDefaultValueConverter.fromGravitino(column))
+          .append(SPACE);
+    }
 
     // Add column properties if specified
     if (CollectionUtils.isNotEmpty(column.getProperties())) {
@@ -631,7 +638,10 @@ public class MysqlTableOperations extends JdbcTableOperations {
     for (int i = 0; i < columnSpecs.length; i++) {
       String columnSpec = columnSpecs[i];
       if (propertyKey.equalsIgnoreCase(columnSpec) && i < columnSpecs.length - 1) {
-        return columnSpecs[i + 1].replaceAll("'", SPACE).trim();
+        String columnSpecVal = columnSpecs[i + 1];
+        return DEFAULT.equals(propertyKey)
+            ? columnSpecVal
+            : columnSpecVal.replaceAll("'", SPACE).trim();
       }
     }
     return null;

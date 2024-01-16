@@ -14,6 +14,8 @@ import com.datastrato.gravitino.catalog.jdbc.operation.JdbcTableOperations;
 import com.datastrato.gravitino.catalog.jdbc.utils.DataSourceUtils;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
+import com.datastrato.gravitino.rel.Column;
+import com.datastrato.gravitino.rel.expressions.literals.Literals;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -85,9 +87,12 @@ public abstract class TestJdbcAbstractIT {
       Assertions.assertEquals(columns.get(i).nullable(), table.columns()[i].nullable());
       Assertions.assertEquals(columns.get(i).comment(), table.columns()[i].comment());
       Assertions.assertEquals(columns.get(i).autoIncrement(), table.columns()[i].autoIncrement());
-      // TODO: uncomment this after default value is supported.
-      // Assertions.assertEquals(
-      //    columns.get(i).getDefaultValue(), ((JdbcColumn) table.columns()[i]).getDefaultValue());
+      if (columns.get(i).defaultValue().equals(Column.DEFAULT_VALUE_NOT_SET)
+          && columns.get(i).nullable()) {
+        Assertions.assertEquals(Literals.NULL, table.columns()[i].defaultValue());
+      } else {
+        Assertions.assertEquals(columns.get(i).defaultValue(), table.columns()[i].defaultValue());
+      }
       if (null != columns.get(i).getProperties()) {
         Assertions.assertEquals(
             columns.get(i).getProperties(), ((JdbcColumn) table.columns()[i]).getProperties());

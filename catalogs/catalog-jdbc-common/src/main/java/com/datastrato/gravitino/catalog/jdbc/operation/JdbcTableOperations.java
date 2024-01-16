@@ -6,6 +6,7 @@ package com.datastrato.gravitino.catalog.jdbc.operation;
 
 import com.datastrato.gravitino.catalog.jdbc.JdbcColumn;
 import com.datastrato.gravitino.catalog.jdbc.JdbcTable;
+import com.datastrato.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import com.datastrato.gravitino.catalog.jdbc.utils.JdbcConnectorUtils;
@@ -44,15 +45,19 @@ public abstract class JdbcTableOperations implements TableOperation {
   protected JdbcExceptionConverter exceptionMapper;
   protected JdbcTypeConverter typeConverter;
 
+  protected JdbcColumnDefaultValueConverter columnDefaultValueConverter;
+
   @Override
   public void initialize(
       DataSource dataSource,
       JdbcExceptionConverter exceptionMapper,
       JdbcTypeConverter jdbcTypeConverter,
+      JdbcColumnDefaultValueConverter jdbcColumnDefaultValueConverter,
       Map<String, String> conf) {
     this.dataSource = dataSource;
     this.exceptionMapper = exceptionMapper;
     this.typeConverter = jdbcTypeConverter;
+    this.columnDefaultValueConverter = jdbcColumnDefaultValueConverter;
   }
 
   @Override

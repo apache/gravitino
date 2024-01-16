@@ -11,43 +11,61 @@ import java.util.List;
 import net.sf.jsqlparser.statement.create.table.ColDataType;
 
 public class PostgreSqlTypeConverter extends JdbcTypeConverter<ColDataType, String> {
+
+  public static final String BOOLEAN = "boolean";
+  public static final String SMALLINT = "smallint";
+  public static final String INTEGER = "integer";
+  public static final String BIGINT = "bigint";
+  public static final String REAL = "real";
+  public static final String DOUBLE_PRECISION = "double precision";
+  public static final String DATE = "date";
+  public static final String TIME_WITHOUT_TIME_ZONE = "time without time zone";
+  public static final String TIMESTAMP_WITHOUT_TIME_ZONE = "timestamp without time zone";
+  public static final String TIMESTAMP_WITH_TIME_ZONE = "timestamp with time zone";
+  public static final String NUMERIC = "numeric";
+  public static final String CHARACTER_VARYING = "character varying";
+  public static final String CHAR = "char";
+  public static final String CHARACTER = "character";
+  public static final String TEXT = "text";
+  public static final String BYTEA = "bytea";
+
   @Override
   public Type toGravitinoType(ColDataType type) {
     List<String> arguments = type.getArgumentsStringList();
     // TODO #947 Complex types are not considered for support in this issue, which will bring more
     // testing needs
     switch (type.getDataType().toLowerCase()) {
-      case "boolean":
+      case BOOLEAN:
         return Types.BooleanType.get();
-      case "smallint":
+      case SMALLINT:
         return Types.ShortType.get();
-      case "integer":
+      case INTEGER:
         return Types.IntegerType.get();
-      case "bigint":
+      case BIGINT:
         return Types.LongType.get();
-      case "real":
+      case REAL:
         return Types.FloatType.get();
-      case "double precision":
+      case DOUBLE_PRECISION:
         return Types.DoubleType.get();
-      case "date":
+      case DATE:
         return Types.DateType.get();
-      case "time without time zone":
+      case TIME_WITHOUT_TIME_ZONE:
         return Types.TimeType.get();
-      case "timestamp without time zone":
+      case TIMESTAMP_WITHOUT_TIME_ZONE:
         return Types.TimestampType.withoutTimeZone();
-      case "timestamp with time zone":
+      case TIMESTAMP_WITH_TIME_ZONE:
         return Types.TimestampType.withTimeZone();
-      case "numeric":
+      case NUMERIC:
         return Types.DecimalType.of(
             Integer.parseInt(arguments.get(0)), Integer.parseInt(arguments.get(1)));
-      case "character varying":
+      case CHARACTER_VARYING:
         return Types.VarCharType.of(Integer.parseInt(arguments.get(0)));
-      case "char":
-      case "character":
+      case CHAR:
+      case CHARACTER:
         return Types.FixedCharType.of(Integer.parseInt(arguments.get(0)));
-      case "text":
+      case TEXT:
         return Types.StringType.get();
-      case "bytea":
+      case BYTEA:
         return Types.BinaryType.get();
       default:
         throw new IllegalArgumentException("Not a supported type: " + type);

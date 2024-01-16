@@ -4,6 +4,7 @@
  */
 package com.datastrato.gravitino.integration.test.catalog.jdbc.mysql;
 
+import com.datastrato.gravitino.catalog.mysql.converter.MysqlColumnDefaultValueConverter;
 import com.datastrato.gravitino.catalog.mysql.converter.MysqlExceptionConverter;
 import com.datastrato.gravitino.catalog.mysql.converter.MysqlTypeConverter;
 import com.datastrato.gravitino.catalog.mysql.operation.MysqlDatabaseOperations;
@@ -27,7 +28,12 @@ public class TestMysqlAbstractIT extends TestJdbcAbstractIT {
     JDBC_EXCEPTION_CONVERTER = new MysqlExceptionConverter();
     TestJdbcAbstractIT.startup();
     DATABASE_OPERATIONS.initialize(DATA_SOURCE, JDBC_EXCEPTION_CONVERTER, Collections.emptyMap());
+    MysqlTypeConverter mysqlTypeConverter = new MysqlTypeConverter();
     TABLE_OPERATIONS.initialize(
-        DATA_SOURCE, JDBC_EXCEPTION_CONVERTER, new MysqlTypeConverter(), Collections.emptyMap());
+        DATA_SOURCE,
+        JDBC_EXCEPTION_CONVERTER,
+        mysqlTypeConverter,
+        new MysqlColumnDefaultValueConverter(mysqlTypeConverter),
+        Collections.emptyMap());
   }
 }

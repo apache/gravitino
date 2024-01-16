@@ -11,6 +11,8 @@ import com.datastrato.gravitino.auth.AuthConstants;
 import com.datastrato.gravitino.catalog.jdbc.config.JdbcConfig;
 import com.datastrato.gravitino.client.GravitinoMetaLake;
 import com.datastrato.gravitino.dto.rel.ColumnDTO;
+import com.datastrato.gravitino.dto.rel.expressions.LiteralDTO;
+import com.datastrato.gravitino.dto.rel.partitions.Partitioning;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.gravitino.integration.test.catalog.jdbc.postgresql.service.PostgreSqlService;
@@ -380,7 +382,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     Assertions.assertEquals(createdTable.columns().length, columns.length);
 
     for (int i = 0; i < columns.length; i++) {
-      Assertions.assertEquals(createdTable.columns()[i], columns[i]);
+      assertColumn(columns[i], createdTable.columns()[i]);
     }
 
     Table loadTable = tableCatalog.loadTable(tableIdentifier);
@@ -393,7 +395,22 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     }
     Assertions.assertEquals(loadTable.columns().length, columns.length);
     for (int i = 0; i < columns.length; i++) {
-      Assertions.assertEquals(columns[i], loadTable.columns()[i]);
+      assertColumn(columns[i], loadTable.columns()[i]);
+    }
+  }
+
+  private void assertColumn(ColumnDTO expected, Column actual) {
+    Assertions.assertEquals(expected.name(), actual.name());
+    Assertions.assertEquals(expected.dataType(), actual.dataType());
+    Assertions.assertEquals(expected.nullable(), actual.nullable());
+    Assertions.assertEquals(expected.comment(), actual.comment());
+    Assertions.assertEquals(expected.autoIncrement(), actual.autoIncrement());
+    if (expected.defaultValue().equals(Column.DEFAULT_VALUE_NOT_SET) && expected.nullable()) {
+      Assertions.assertEquals(
+          new LiteralDTO.Builder().withDataType(Types.NullType.get()).withValue(null).build(),
+          actual.defaultValue());
+    } else {
+      Assertions.assertEquals(expected.defaultValue(), actual.defaultValue());
     }
   }
 

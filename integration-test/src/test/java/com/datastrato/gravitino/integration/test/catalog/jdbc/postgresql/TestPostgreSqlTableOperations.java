@@ -9,12 +9,15 @@ import com.datastrato.gravitino.catalog.jdbc.JdbcTable;
 import com.datastrato.gravitino.catalog.jdbc.config.JdbcConfig;
 import com.datastrato.gravitino.catalog.jdbc.utils.DataSourceUtils;
 import com.datastrato.gravitino.catalog.jdbc.utils.JdbcConnectorUtils;
+import com.datastrato.gravitino.catalog.postgresql.converter.PostgreSqlColumnDefaultValueConverter;
 import com.datastrato.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter;
 import com.datastrato.gravitino.catalog.postgresql.operation.PostgreSqlSchemaOperations;
 import com.datastrato.gravitino.catalog.postgresql.operation.PostgreSqlTableOperations;
 import com.datastrato.gravitino.exceptions.NoSuchTableException;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
+import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.TableChange;
+import com.datastrato.gravitino.rel.expressions.literals.Literals;
 import com.datastrato.gravitino.rel.types.Type;
 import com.datastrato.gravitino.rel.types.Types;
 import java.sql.Connection;
@@ -49,6 +52,7 @@ public class TestPostgreSqlTableOperations extends TestPostgreSqlAbstractIT {
             .withComment("increment key")
             .withNullable(false)
             .withAutoIncrement(true)
+            .withDefaultValue(Column.DEFAULT_VALUE_NOT_SET)
             .build());
     columns.add(
         new JdbcColumn.Builder()
@@ -56,15 +60,20 @@ public class TestPostgreSqlTableOperations extends TestPostgreSqlAbstractIT {
             .withType(INT)
             .withNullable(false)
             .withComment("set test key")
+            .withDefaultValue(Column.DEFAULT_VALUE_NOT_SET)
             .build());
     columns.add(
-        new JdbcColumn.Builder().withName("col_3").withType(INT).withNullable(true).build());
+        new JdbcColumn.Builder()
+            .withName("col_3")
+            .withType(INT)
+            .withNullable(true)
+            .withDefaultValue(Column.DEFAULT_VALUE_NOT_SET)
+            .build());
     columns.add(
         new JdbcColumn.Builder()
             .withName("col_4")
             .withType(VARCHAR)
-            // TODO: umcomment this line when default value is supported
-            // .withDefaultValue("hello world")
+            .withDefaultValue(Literals.of("hello world", VARCHAR))
             .withNullable(false)
             .build());
     Map<String, String> properties = new HashMap<>();
@@ -97,6 +106,7 @@ public class TestPostgreSqlTableOperations extends TestPostgreSqlAbstractIT {
             .withType(VARCHAR)
             .withComment("new_add")
             .withNullable(true)
+            .withDefaultValue(Column.DEFAULT_VALUE_NOT_SET)
             .build();
     TABLE_OPERATIONS.alterTable(
         TEST_DB_NAME,
@@ -116,6 +126,7 @@ public class TestPostgreSqlTableOperations extends TestPostgreSqlAbstractIT {
             .withComment("test_new_comment")
             .withNullable(false)
             .withAutoIncrement(true)
+            .withDefaultValue(Column.DEFAULT_VALUE_NOT_SET)
             .build());
     alterColumns.add(
         new JdbcColumn.Builder()
@@ -123,6 +134,7 @@ public class TestPostgreSqlTableOperations extends TestPostgreSqlAbstractIT {
             .withType(Types.DecimalType.of(10, 2))
             .withNullable(false)
             .withComment("set test key")
+            .withDefaultValue(Column.DEFAULT_VALUE_NOT_SET)
             .build());
     alterColumns.add(columns.get(3));
     alterColumns.add(newColumn);
@@ -142,6 +154,7 @@ public class TestPostgreSqlTableOperations extends TestPostgreSqlAbstractIT {
             .withComment("test_new_comment")
             .withNullable(false)
             .withAutoIncrement(true)
+            .withDefaultValue(Column.DEFAULT_VALUE_NOT_SET)
             .build());
     alterColumns.add(
         new JdbcColumn.Builder()
@@ -149,6 +162,7 @@ public class TestPostgreSqlTableOperations extends TestPostgreSqlAbstractIT {
             .withType(Types.DoubleType.get())
             .withNullable(false)
             .withComment("set test key")
+            .withDefaultValue(Column.DEFAULT_VALUE_NOT_SET)
             .build());
     alterColumns.add(columns.get(3));
     alterColumns.add(newColumn);
@@ -166,6 +180,7 @@ public class TestPostgreSqlTableOperations extends TestPostgreSqlAbstractIT {
             .withComment("test_new_comment")
             .withNullable(false)
             .withAutoIncrement(true)
+            .withDefaultValue(Column.DEFAULT_VALUE_NOT_SET)
             .build());
     alterColumns.add(
         new JdbcColumn.Builder()
@@ -173,6 +188,7 @@ public class TestPostgreSqlTableOperations extends TestPostgreSqlAbstractIT {
             .withType(Types.DoubleType.get())
             .withNullable(true)
             .withComment("set test key")
+            .withDefaultValue(Column.DEFAULT_VALUE_NOT_SET)
             .build());
     alterColumns.add(columns.get(3));
     alterColumns.add(newColumn);
@@ -218,82 +234,105 @@ public class TestPostgreSqlTableOperations extends TestPostgreSqlAbstractIT {
             .withName("col_1")
             .withType(Types.BooleanType.get())
             .withNullable(true)
+            .withDefaultValue(Column.DEFAULT_VALUE_NOT_SET)
             .build());
     columns.add(
         new JdbcColumn.Builder()
             .withName("col_2")
             .withType(Types.ShortType.get())
             .withNullable(false)
+            .withDefaultValue(Column.DEFAULT_VALUE_NOT_SET)
             .build());
     columns.add(
-        new JdbcColumn.Builder().withName("col_3").withType(INT).withNullable(true).build());
+        new JdbcColumn.Builder()
+            .withName("col_3")
+            .withType(INT)
+            .withNullable(true)
+            .withDefaultValue(Column.DEFAULT_VALUE_NOT_SET)
+            .build());
     columns.add(
         new JdbcColumn.Builder()
             .withName("col_4")
             .withType(Types.LongType.get())
             .withNullable(false)
+            .withDefaultValue(Column.DEFAULT_VALUE_NOT_SET)
             .build());
     columns.add(
         new JdbcColumn.Builder()
             .withName("col_5")
             .withType(Types.FloatType.get())
             .withNullable(false)
+            .withDefaultValue(Column.DEFAULT_VALUE_NOT_SET)
             .build());
     columns.add(
         new JdbcColumn.Builder()
             .withName("col_6")
             .withType(Types.DoubleType.get())
             .withNullable(false)
+            .withDefaultValue(Column.DEFAULT_VALUE_NOT_SET)
             .build());
     columns.add(
         new JdbcColumn.Builder()
             .withName("col_7")
             .withType(Types.DateType.get())
             .withNullable(false)
+            .withDefaultValue(Column.DEFAULT_VALUE_NOT_SET)
             .build());
     columns.add(
         new JdbcColumn.Builder()
             .withName("col_8")
             .withType(Types.TimeType.get())
             .withNullable(false)
+            .withDefaultValue(Column.DEFAULT_VALUE_NOT_SET)
             .build());
     columns.add(
         new JdbcColumn.Builder()
             .withName("col_9")
             .withType(Types.TimestampType.withoutTimeZone())
             .withNullable(false)
+            .withDefaultValue(Column.DEFAULT_VALUE_NOT_SET)
             .build());
     columns.add(
         new JdbcColumn.Builder()
             .withName("col_10")
             .withType(Types.TimestampType.withTimeZone())
             .withNullable(false)
+            .withDefaultValue(Column.DEFAULT_VALUE_NOT_SET)
             .build());
     columns.add(
         new JdbcColumn.Builder()
             .withName("col_11")
             .withType(Types.DecimalType.of(10, 2))
             .withNullable(false)
+            .withDefaultValue(Column.DEFAULT_VALUE_NOT_SET)
             .build());
     columns.add(
-        new JdbcColumn.Builder().withName("col_12").withType(VARCHAR).withNullable(false).build());
+        new JdbcColumn.Builder()
+            .withName("col_12")
+            .withType(VARCHAR)
+            .withNullable(false)
+            .withDefaultValue(Column.DEFAULT_VALUE_NOT_SET)
+            .build());
     columns.add(
         new JdbcColumn.Builder()
             .withName("col_13")
             .withType(Types.FixedCharType.of(10))
             .withNullable(false)
+            .withDefaultValue(Column.DEFAULT_VALUE_NOT_SET)
             .build());
     columns.add(
         new JdbcColumn.Builder()
             .withName("col_14")
             .withType(Types.StringType.get())
             .withNullable(false)
+            .withDefaultValue(Column.DEFAULT_VALUE_NOT_SET)
             .build());
     columns.add(
         new JdbcColumn.Builder()
             .withName("col_15")
             .withType(Types.BinaryType.get())
             .withNullable(false)
+            .withDefaultValue(Column.DEFAULT_VALUE_NOT_SET)
             .build());
 
     // create table
@@ -335,8 +374,13 @@ public class TestPostgreSqlTableOperations extends TestPostgreSqlAbstractIT {
 
     PostgreSqlTableOperations postgreSqlTableOperations = new PostgreSqlTableOperations();
 
+    PostgreSqlTypeConverter postgreSqlTypeConverter = new PostgreSqlTypeConverter();
     postgreSqlTableOperations.initialize(
-        dataSource, JDBC_EXCEPTION_CONVERTER, new PostgreSqlTypeConverter(), config);
+        dataSource,
+        JDBC_EXCEPTION_CONVERTER,
+        postgreSqlTypeConverter,
+        new PostgreSqlColumnDefaultValueConverter(postgreSqlTypeConverter),
+        config);
 
     String table_1 = "table_multiple_1";
     postgreSqlTableOperations.create(
@@ -348,6 +392,7 @@ public class TestPostgreSqlTableOperations extends TestPostgreSqlAbstractIT {
               .withType(VARCHAR)
               .withComment("test_comment_col1")
               .withNullable(true)
+              .withDefaultValue(Column.DEFAULT_VALUE_NOT_SET)
               .build()
         },
         null,
@@ -375,6 +420,7 @@ public class TestPostgreSqlTableOperations extends TestPostgreSqlAbstractIT {
               .withType(VARCHAR)
               .withComment("test_comment_col1")
               .withNullable(true)
+              .withDefaultValue(Column.DEFAULT_VALUE_NOT_SET)
               .build()
         },
         null,
@@ -413,6 +459,7 @@ public class TestPostgreSqlTableOperations extends TestPostgreSqlAbstractIT {
             .withComment("increment key")
             .withNullable(false)
             .withAutoIncrement(true)
+            .withDefaultValue(Column.DEFAULT_VALUE_NOT_SET)
             .build());
     columns.add(
         new JdbcColumn.Builder()
@@ -420,6 +467,7 @@ public class TestPostgreSqlTableOperations extends TestPostgreSqlAbstractIT {
             .withType(INT)
             .withNullable(false)
             .withComment("set test key")
+            .withDefaultValue(Column.DEFAULT_VALUE_NOT_SET)
             .build());
     Map<String, String> properties = new HashMap<>();
     // create table
@@ -447,6 +495,7 @@ public class TestPostgreSqlTableOperations extends TestPostgreSqlAbstractIT {
             .withComment("increment key")
             .withNullable(false)
             .withAutoIncrement(true)
+            .withDefaultValue(Column.DEFAULT_VALUE_NOT_SET)
             .build());
     columns.add(
         new JdbcColumn.Builder()
@@ -454,6 +503,7 @@ public class TestPostgreSqlTableOperations extends TestPostgreSqlAbstractIT {
             .withType(INT)
             .withNullable(false)
             .withComment("set test key")
+            .withDefaultValue(Column.DEFAULT_VALUE_NOT_SET)
             .build());
 
     // Testing does not support auto increment column types

@@ -76,13 +76,14 @@ public class SqliteTableOperations extends JdbcTableOperations {
 
   @Override
   protected JdbcColumn extractJdbcColumnFromResultSet(ResultSet resultSet) throws SQLException {
+    String type = resultSet.getString("TYPE_NAME");
     return new JdbcColumn.Builder()
         .withName(resultSet.getString("COLUMN_NAME"))
         .withComment(null)
-        .withType(typeConverter.toGravitinoType(resultSet.getString("TYPE_NAME")))
+        .withType(typeConverter.toGravitinoType(type))
         .withNullable(resultSet.getBoolean("NULLABLE"))
-        // TODO: uncomment this once we support column default values.
-        // .withDefaultValue(resultSet.getString("COLUMN_DEF"))
+        .withDefaultValue(
+            columnDefaultValueConverter.toGravitino(type, resultSet.getString("COLUMN_DEF")))
         .build();
   }
 

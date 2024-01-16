@@ -8,6 +8,7 @@ import com.datastrato.gravitino.StringIdentifier;
 import com.datastrato.gravitino.catalog.jdbc.JdbcColumn;
 import com.datastrato.gravitino.catalog.jdbc.JdbcTable;
 import com.datastrato.gravitino.catalog.jdbc.config.JdbcConfig;
+import com.datastrato.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import com.datastrato.gravitino.catalog.jdbc.operation.JdbcTableOperations;
@@ -15,6 +16,7 @@ import com.datastrato.gravitino.exceptions.NoSuchColumnException;
 import com.datastrato.gravitino.exceptions.NoSuchTableException;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.rel.TableChange;
+import com.datastrato.gravitino.rel.expressions.literals.Literals;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.types.Types;
 import com.google.common.base.Preconditions;
@@ -73,8 +75,10 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
       DataSource dataSource,
       JdbcExceptionConverter exceptionMapper,
       JdbcTypeConverter jdbcTypeConverter,
+      JdbcColumnDefaultValueConverter jdbcColumnDefaultValueConverter,
       Map<String, String> conf) {
-    super.initialize(dataSource, exceptionMapper, jdbcTypeConverter, conf);
+    super.initialize(
+        dataSource, exceptionMapper, jdbcTypeConverter, jdbcColumnDefaultValueConverter, conf);
     database = new JdbcConfig(conf).getJdbcDatabase();
     Preconditions.checkArgument(
         StringUtils.isNotBlank(database),
@@ -125,11 +129,15 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
           colDataType.setDataType(resultSet.getString("data_type"));
           colDataType.setArgumentsStringList(getArgList(resultSet));
           String columnName = resultSet.getString("column_name");
+          boolean nullable = "YES".equalsIgnoreCase(resultSet.getString("is_nullable"));
+          String defaultValue = extractDefaultValue(resultSet.getString("column_default"));
           JdbcColumn.Builder builder =
               new JdbcColumn.Builder()
                   .withName(columnName)
-                  // TODO: uncomment this once we support column default values.
-                  // .withDefaultValue(extractDefaultValue(resultSet.getString("column_default")))
+                  .withDefaultValue(
+                      (nullable && defaultValue == null)
+                          ? Literals.NULL
+                          : columnDefaultValueConverter.toGravitino(colDataType, defaultValue))
                   .withNullable("YES".equalsIgnoreCase(resultSet.getString("is_nullable")))
                   .withType(typeConverter.toGravitinoType(colDataType))
                   .withAutoIncrement("YES".equalsIgnoreCase(resultSet.getString("is_identity")));
@@ -215,8 +223,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
     if (-1 != i) {
       columnDefault = columnDefault.substring(0, i);
     }
-    String replace = columnDefault.replace("'", "");
-    return "NULL".equalsIgnoreCase(replace) ? null : replace;
+    return columnDefault;
   }
 
   @Override
@@ -307,10 +314,12 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
       sqlBuilder.append("NOT NULL ");
     }
     // Add DEFAULT value if specified
-    // TODO: uncomment this once we support column default values.
-    // if (StringUtils.isNotEmpty(column.getDefaultValue())) {
-    //   sqlBuilder.append("DEFAULT '").append(column.getDefaultValue()).append("'").append(SPACE);
-    // }
+    if (!JdbcColumn.DEFAULT_VALUE_NOT_SET.equals(column.defaultValue())) {
+      sqlBuilder
+          .append("DEFAULT")
+          .append(columnDefaultValueConverter.fromGravitino(column))
+          .append(SPACE);
+    }
 
     // Add column properties if specified
     if (CollectionUtils.isNotEmpty(column.getProperties())) {

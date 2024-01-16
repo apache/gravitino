@@ -177,18 +177,21 @@ public class CatalogMysqlIT extends AbstractIT {
             .withName(MYSQL_COL_NAME1)
             .withDataType(Types.IntegerType.get())
             .withComment("col_1_comment")
+            .withNullable(false)
             .build();
     ColumnDTO col2 =
         new ColumnDTO.Builder()
             .withName(MYSQL_COL_NAME2)
             .withDataType(Types.DateType.get())
             .withComment("col_2_comment")
+            .withNullable(false)
             .build();
     ColumnDTO col3 =
         new ColumnDTO.Builder()
             .withName(MYSQL_COL_NAME3)
             .withDataType(Types.StringType.get())
             .withComment("col_3_comment")
+            .withNullable(false)
             .build();
     return new ColumnDTO[] {col1, col2, col3};
   }
