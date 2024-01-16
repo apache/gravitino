@@ -12,7 +12,6 @@ import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.catalog.jdbc.config.JdbcConfig;
 import com.datastrato.gravitino.client.GravitinoMetaLake;
 import com.datastrato.gravitino.dto.rel.ColumnDTO;
-import com.datastrato.gravitino.dto.rel.partitions.Partitioning;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NotFoundException;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
@@ -30,6 +29,7 @@ import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
+import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.types.Types;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
@@ -279,7 +279,7 @@ public class CatalogMysqlIT extends AbstractIT {
 
     final SortOrder[] sortOrders = new SortOrder[0];
 
-    Partitioning[] partitioning = Partitioning.EMPTY_PARTITIONING;
+    Transform[] partitioning = new Transform[0];
 
     Map<String, String> properties = createProperties();
     TableCatalog tableCatalog = catalog.asTableCatalog();
@@ -366,7 +366,7 @@ public class CatalogMysqlIT extends AbstractIT {
 
     final SortOrder[] sortOrders = new SortOrder[0];
 
-    Partitioning[] partitioning = Partitioning.EMPTY_PARTITIONING;
+    Transform[] partitioning = new Transform[0];
 
     Map<String, String> properties = createProperties();
     TableCatalog tableCatalog = catalog.asTableCatalog();
@@ -476,7 +476,7 @@ public class CatalogMysqlIT extends AbstractIT {
             newColumns,
             table_comment,
             ImmutableMap.of(),
-            Partitioning.EMPTY_PARTITIONING,
+            new Transform[0],
             Distributions.NONE,
             new SortOrder[0]);
 

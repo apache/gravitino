@@ -360,7 +360,7 @@ public class CatalogHiveIT extends AbstractIT {
                 columns,
                 TABLE_COMMENT,
                 properties,
-                Partitioning.EMPTY_PARTITIONING,
+                new Transform[0],
                 distribution,
                 sortOrders);
 
@@ -379,7 +379,7 @@ public class CatalogHiveIT extends AbstractIT {
     Table createdTable1 =
         catalog
             .asTableCatalog()
-            .createTable(nameIdentifier, columns, TABLE_COMMENT, properties, (Partitioning[]) null);
+            .createTable(nameIdentifier, columns, TABLE_COMMENT, properties, (Transform[]) null);
 
     // Directly get table from hive metastore to check if the table is created successfully.
     org.apache.hadoop.hive.metastore.api.Table hiveTable1 =
@@ -406,7 +406,7 @@ public class CatalogHiveIT extends AbstractIT {
                   columns,
                   TABLE_COMMENT,
                   properties,
-                  Partitioning.EMPTY_PARTITIONING,
+                  new Transform[0],
                   badDistribution,
                   sortOrders);
         });
@@ -429,7 +429,7 @@ public class CatalogHiveIT extends AbstractIT {
                   columns,
                   TABLE_COMMENT,
                   properties,
-                  Partitioning.EMPTY_PARTITIONING,
+                  new Transform[0],
                   distribution,
                   badSortOrders);
         });
@@ -446,12 +446,7 @@ public class CatalogHiveIT extends AbstractIT {
     Table createdTable =
         catalog
             .asTableCatalog()
-            .createTable(
-                nameIdentifier,
-                columns,
-                TABLE_COMMENT,
-                properties,
-                Partitioning.EMPTY_PARTITIONING);
+            .createTable(nameIdentifier, columns, TABLE_COMMENT, properties, new Transform[0]);
 
     // Directly get table from hive metastore to check if the table is created successfully.
     org.apache.hadoop.hive.metastore.api.Table hiveTab =
@@ -468,7 +463,7 @@ public class CatalogHiveIT extends AbstractIT {
     Table createdTable1 =
         catalog
             .asTableCatalog()
-            .createTable(nameIdentifier, columns, TABLE_COMMENT, properties, (Partitioning[]) null);
+            .createTable(nameIdentifier, columns, TABLE_COMMENT, properties, (Transform[]) null);
 
     // Directly get table from hive metastore to check if the table is created successfully.
     org.apache.hadoop.hive.metastore.api.Table hiveTable1 =
@@ -492,11 +487,7 @@ public class CatalogHiveIT extends AbstractIT {
         catalog
             .asTableCatalog()
             .createTable(
-                nameIdentifier,
-                columns,
-                TABLE_COMMENT,
-                ImmutableMap.of(),
-                Partitioning.EMPTY_PARTITIONING);
+                nameIdentifier, columns, TABLE_COMMENT, ImmutableMap.of(), new Transform[0]);
     HiveTablePropertiesMetadata tablePropertiesMetadata = new HiveTablePropertiesMetadata();
     org.apache.hadoop.hive.metastore.api.Table actualTable =
         hiveClientPool.run(client -> client.getTable(schemaName, tableName));
@@ -524,7 +515,7 @@ public class CatalogHiveIT extends AbstractIT {
                     "textfile",
                     SERDE_LIB,
                     OPENCSV_SERDE_CLASS),
-                Partitioning.EMPTY_PARTITIONING);
+                new Transform[0]);
     org.apache.hadoop.hive.metastore.api.Table actualTable2 =
         hiveClientPool.run(client -> client.getTable(schemaName, table2));
 
@@ -586,11 +577,7 @@ public class CatalogHiveIT extends AbstractIT {
     catalog
         .asTableCatalog()
         .createTable(
-            tableIdent,
-            createColumns(),
-            TABLE_COMMENT,
-            ImmutableMap.of(),
-            Partitioning.EMPTY_PARTITIONING);
+            tableIdent, createColumns(), TABLE_COMMENT, ImmutableMap.of(), new Transform[0]);
     org.apache.hadoop.hive.metastore.api.Table actualTable =
         hiveClientPool.run(client -> client.getTable(schemaIdent.name(), tableIdent.name()));
     String actualTableLocation = actualTable.getSd().getLocation();
@@ -616,7 +603,7 @@ public class CatalogHiveIT extends AbstractIT {
                 columns,
                 TABLE_COMMENT,
                 properties,
-                new Partitioning[] {
+                new Transform[] {
                   IdentityPartitioningDTO.of(columns[1].name()),
                   IdentityPartitioningDTO.of(columns[2].name())
                 });
@@ -643,7 +630,7 @@ public class CatalogHiveIT extends AbstractIT {
                       columns,
                       TABLE_COMMENT,
                       properties,
-                      new Partitioning[] {
+                      new Transform[] {
                         IdentityPartitioningDTO.of(columns[0].name()),
                         IdentityPartitioningDTO.of(columns[1].name())
                       });
@@ -730,7 +717,7 @@ public class CatalogHiveIT extends AbstractIT {
                 columns,
                 TABLE_COMMENT,
                 createProperties(),
-                new Partitioning[] {IdentityPartitioningDTO.of(columns[2].name())});
+                new Transform[] {IdentityPartitioningDTO.of(columns[2].name())});
     Assertions.assertNull(createdTable.auditInfo().lastModifier());
     Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, createdTable.auditInfo().creator());
     Table alteredTable =
@@ -1139,7 +1126,7 @@ public class CatalogHiveIT extends AbstractIT {
             columns,
             TABLE_COMMENT,
             createProperties(),
-            new Partitioning[] {IdentityPartitioningDTO.of(columns[2].name())});
+            new Transform[] {IdentityPartitioningDTO.of(columns[2].name())});
     // Directly get table from hive metastore to check if the table is created successfully.
     org.apache.hadoop.hive.metastore.api.Table hiveTab =
         hiveClientPool.run(client -> client.getTable(schemaName, tableName));
@@ -1166,7 +1153,7 @@ public class CatalogHiveIT extends AbstractIT {
             columns,
             TABLE_COMMENT,
             ImmutableMap.of(TABLE_TYPE, EXTERNAL_TABLE.name().toLowerCase(Locale.ROOT)),
-            new Partitioning[] {IdentityPartitioningDTO.of(columns[2].name())});
+            new Transform[] {IdentityPartitioningDTO.of(columns[2].name())});
     // Directly get table from hive metastore to check if the table is created successfully.
     org.apache.hadoop.hive.metastore.api.Table hiveTab =
         hiveClientPool.run(client -> client.getTable(schemaName, tableName));
