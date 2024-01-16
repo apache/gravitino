@@ -39,6 +39,8 @@ public class ColumnDTO implements Column {
   private boolean autoIncrement = false;
 
   @JsonProperty("defaultValue")
+  // the NON_EMPTY annotation is used to avoid serializing the defaultValue field if it is not set
+  // or null.
   @JsonInclude(JsonInclude.Include.NON_EMPTY)
   @JsonSerialize(using = JsonUtils.ColumnDefaultValueSerializer.class)
   @JsonDeserialize(using = JsonUtils.ColumnDefaultValueDeserializer.class)
