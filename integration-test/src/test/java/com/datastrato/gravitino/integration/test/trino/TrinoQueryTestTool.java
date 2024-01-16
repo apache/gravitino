@@ -9,6 +9,7 @@ import java.io.File;
 import java.util.Arrays;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
+import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.PosixParser;
 import org.apache.logging.log4j.util.Strings;
@@ -52,8 +53,16 @@ public class TrinoQueryTestTool {
       options.addOption("tester_id", true, "Specify the tester name prefix to select to test");
       options.addOption("catalog", true, "Specify the catalog name to test");
 
+      options.addOption("help", false, "Print this help message");
+
       CommandLineParser parser = new PosixParser();
       CommandLine commandLine = parser.parse(options, args);
+
+      if (commandLine.hasOption("help")) {
+        HelpFormatter formatter = new HelpFormatter();
+        formatter.printHelp("TrinoTestTool", options);
+        return;
+      }
 
       boolean autoStart = true;
       boolean autoStartGravitino = true;
