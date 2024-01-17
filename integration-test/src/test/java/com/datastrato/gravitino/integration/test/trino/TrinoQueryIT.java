@@ -67,7 +67,7 @@ import org.slf4j.LoggerFactory;
 public class TrinoQueryIT {
   private static final Logger LOG = LoggerFactory.getLogger(TrinoQueryIT.class);
 
-  private static boolean autoStartEnv = true;
+  private static boolean autoStartEnv = false;
 
   // TODO(yuhui) redo get the configs after we have the Docker image ready for testing.
   private static String gravitinoUri = "http://127.0.0.1:8090";
