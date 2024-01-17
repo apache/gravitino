@@ -34,7 +34,7 @@ public class CatalogConnectorMetadataAdapter {
   protected final List<PropertyMetadata<?>> tableProperties;
   protected final List<PropertyMetadata<?>> columnProperties;
 
-  private final GeneralDataTypeTransformer dataTypeTransformer;
+  protected final GeneralDataTypeTransformer dataTypeTransformer;
 
   protected CatalogConnectorMetadataAdapter(
       List<PropertyMetadata<?>> schemaProperties,

@@ -7,11 +7,15 @@ package com.datastrato.gravitino.trino.connector.catalog.hive;
 
 import static io.trino.spi.session.PropertyMetadata.booleanProperty;
 import static io.trino.spi.session.PropertyMetadata.enumProperty;
+import static io.trino.spi.session.PropertyMetadata.integerProperty;
 import static io.trino.spi.session.PropertyMetadata.stringProperty;
 
 import com.datastrato.gravitino.trino.connector.catalog.HasPropertyMeta;
 import com.google.common.collect.ImmutableList;
 import io.trino.spi.session.PropertyMetadata;
+import io.trino.spi.type.ArrayType;
+import io.trino.spi.type.VarcharType;
+import java.util.Collections;
 import java.util.List;
 
 /** Implementation of {@link HasPropertyMeta} for Hive catalog. */
@@ -20,6 +24,11 @@ public class HivePropertyMeta implements HasPropertyMeta {
   private static final List<PropertyMetadata<?>> SCHEMA_PROPERTY_META =
       ImmutableList.of(
           stringProperty("location", "Hive storage location for the schema", null, false));
+
+  public static final String HIVE_PARTITION_KEY = "partitioned_by";
+  public static final String HIVE_BUCKET_KEY = "bucketed_by";
+  public static final String HIVE_BUCKET_COUNT_KEY = "bucket_count";
+  public static final String HIVE_SORT_ORDER_KEY = "sorted_by";
 
   private static final List<PropertyMetadata<?>> TABLE_PROPERTY_META =
       ImmutableList.of(
@@ -44,7 +53,36 @@ public class HivePropertyMeta implements HasPropertyMeta {
               "The serde library class for the table",
               "org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe",
               false),
-          stringProperty("serde_name", "Name of the serde, table name by default", null, false));
+          stringProperty("serde_name", "Name of the serde, table name by default", null, false),
+          new PropertyMetadata<List>(
+              HIVE_PARTITION_KEY,
+              "The partition columns for the table",
+              new ArrayType(VarcharType.createUnboundedVarcharType()),
+              List.class,
+              Collections.EMPTY_LIST,
+              false,
+              a -> (List<Object>) a,
+              a -> a),
+          new PropertyMetadata<List>(
+              HIVE_BUCKET_KEY,
+              "The bucket columns for the table",
+              new ArrayType(VarcharType.createUnboundedVarcharType()),
+              List.class,
+              Collections.EMPTY_LIST,
+              false,
+              a -> (List<Object>) a,
+              a -> a),
+          new PropertyMetadata<List>(
+              HIVE_SORT_ORDER_KEY,
+              "The ordered by columns for the table",
+              new ArrayType(VarcharType.createUnboundedVarcharType()),
+              List.class,
+              Collections.EMPTY_LIST,
+              false,
+              a -> (List<Object>) a,
+              a -> a),
+          integerProperty(
+              HIVE_BUCKET_COUNT_KEY, "The number of buckets for the table", null, false));
 
   enum CatalogStorageFormat {
     AVRO,

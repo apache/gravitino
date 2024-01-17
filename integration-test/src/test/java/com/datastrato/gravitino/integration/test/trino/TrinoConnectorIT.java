@@ -19,6 +19,15 @@ import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
 import com.datastrato.gravitino.integration.test.util.ITUtils;
 import com.datastrato.gravitino.rel.Schema;
 import com.datastrato.gravitino.rel.Table;
+import com.datastrato.gravitino.rel.expressions.NamedReference;
+import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
+import com.datastrato.gravitino.rel.expressions.distributions.Strategy;
+import com.datastrato.gravitino.rel.expressions.sorts.NullOrdering;
+import com.datastrato.gravitino.rel.expressions.sorts.SortDirection;
+import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
+import com.datastrato.gravitino.rel.expressions.sorts.SortOrders;
+import com.datastrato.gravitino.rel.expressions.transforms.Transform;
+import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
 import com.datastrato.gravitino.rel.types.Types;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
@@ -711,7 +720,15 @@ public class TrinoConnectorIT extends AbstractIT {
                     "hdfs://localhost:9000/user/hive/warehouse/hive_schema.db/hive_table")
                 .put("serde-name", "mock11")
                 .put("table-type", "EXTERNAL_TABLE")
-                .build());
+                .build(),
+            new Transform[] {Transforms.identity("IntegerType")},
+            Distributions.of(Strategy.HASH, 4, NamedReference.field("BooleanType")),
+            new SortOrder[] {
+              SortOrders.of(
+                  NamedReference.field("LongType"),
+                  SortDirection.ASCENDING,
+                  NullOrdering.NULLS_FIRST)
+            });
     LOG.info("create table \"{}.{}\".{}.{}", metalakeName, catalogName, schemaName, tableName);
 
     Table table =
@@ -739,6 +756,9 @@ public class TrinoConnectorIT extends AbstractIT {
     Assertions.assertTrue(
         data.contains("input_format = 'org.apache.hadoop.hive.ql.io.orc.OrcInputFormat'"));
     Assertions.assertTrue(data.contains("serde_lib = 'org.apache.hadoop.hive.ql.io.orc.OrcSerde'"));
+    Assertions.assertTrue(data.contains("bucket_count = 4"));
+    Assertions.assertTrue(data.contains("bucketed_by = ARRAY['BooleanType']"));
+    Assertions.assertTrue(data.contains("partitioned_by = ARRAY['IntegerType']"));
   }
 
   @Test
