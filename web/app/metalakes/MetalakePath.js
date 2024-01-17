@@ -6,7 +6,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 
 import { Link as MUILink, Breadcrumbs, Typography, styled } from '@mui/material'
 
@@ -24,6 +24,7 @@ const MetalakePath = props => {
   const { metalake, catalog, schema, table } = routeParams
 
   const router = useRouter()
+  const searchParams = useSearchParams()
 
   const metalakeUrl = `?metalake=${metalake}`
   const catalogUrl = `?metalake=${metalake}&catalog=${catalog}`
@@ -31,7 +32,7 @@ const MetalakePath = props => {
   const tableUrl = `?metalake=${metalake}&catalog=${catalog}&schema=${schema}&table=${table}`
 
   const handleClick = (event, path) => {
-    router.asPath === path && event.preventDefault()
+    path === `?${searchParams.toString()}` && event.preventDefault()
   }
 
   return (

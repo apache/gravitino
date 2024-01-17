@@ -7,7 +7,7 @@ import { useState } from 'react'
 
 import Link from 'next/link'
 
-import { Box, Typography, Chip } from '@mui/material'
+import { Box, Typography } from '@mui/material'
 import ColumnTypeChip from '@/components/ColumnTypeChip'
 import { DataGrid } from '@mui/x-data-grid'
 import { useAppSelector, useAppDispatch } from '@/lib/hooks/useStore'
