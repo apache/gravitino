@@ -28,7 +28,7 @@ public class TestIcebergCatalogPropertyConverter {
             .put("catalog-backend", "hive")
             .build();
     Map<String, String> hiveBackendConfig =
-        propertyConverter.fromGravitinoProperties(gravitinoIcebergConfig);
+        propertyConverter.gravitinoToEngineProperties(gravitinoIcebergConfig);
 
     Assert.assertEquals(hiveBackendConfig.get("iceberg.catalog.type"), "hive_metastore");
     Assert.assertEquals(hiveBackendConfig.get("hive.metastore.uri"), "1111");
@@ -36,7 +36,7 @@ public class TestIcebergCatalogPropertyConverter {
     Map<String, String> wrongMap = Maps.newHashMap(gravitinoIcebergConfig);
     wrongMap.remove("uri");
 
-    Assertions.assertThatThrownBy(() -> propertyConverter.fromGravitinoProperties(wrongMap))
+    Assertions.assertThatThrownBy(() -> propertyConverter.gravitinoToEngineProperties(wrongMap))
         .isInstanceOf(TrinoException.class)
         .hasMessageContaining("Missing required property for Hive backend: [uri]");
   }
@@ -54,7 +54,7 @@ public class TestIcebergCatalogPropertyConverter {
             .put("other-key", "other")
             .build();
     Map<String, String> hiveBackendConfig =
-        propertyConverter.fromGravitinoProperties(gravitinoIcebergConfig);
+        propertyConverter.gravitinoToEngineProperties(gravitinoIcebergConfig);
 
     // Test all properties are converted
     Assert.assertEquals(
@@ -70,7 +70,7 @@ public class TestIcebergCatalogPropertyConverter {
     Map<String, String> wrongMap = Maps.newHashMap(gravitinoIcebergConfig);
     wrongMap.remove("jdbc-driver");
 
-    Assertions.assertThatThrownBy(() -> propertyConverter.fromGravitinoProperties(wrongMap))
+    Assertions.assertThatThrownBy(() -> propertyConverter.gravitinoToEngineProperties(wrongMap))
         .isInstanceOf(TrinoException.class)
         .hasMessageContaining("Missing required property for JDBC backend: [jdbc-driver]");
   }

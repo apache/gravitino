@@ -25,7 +25,7 @@ public class IcebergTablePropertyConverter extends PropertyConverter {
       new TreeBidiMap<>(new ImmutableMap.Builder<String, String>().build());
 
   @Override
-  public TreeBidiMap<String, String> engineToGravitino() {
+  public TreeBidiMap<String, String> engineToGravitinoMapping() {
     // Note: As the properties for Iceberg table loaded from Gravitino are always empty currently,
     // no matter what the mapping is, the properties will be empty.
     return TRINO_KEY_TO_GRAVITINO_KEY;

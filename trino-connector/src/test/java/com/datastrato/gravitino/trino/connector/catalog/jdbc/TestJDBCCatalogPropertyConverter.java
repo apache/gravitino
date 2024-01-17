@@ -27,7 +27,7 @@ public class TestJDBCCatalogPropertyConverter {
             "jdbc-password", "root");
 
     Map<String, String> trinoProperties =
-        propertyConverter.fromGravitinoProperties(gravitinoProperties);
+        propertyConverter.gravitinoToEngineProperties(gravitinoProperties);
     Assert.assertEquals(
         trinoProperties.get(JDBC_CONNECTION_URL_KEY), "jdbc:mysql://localhost:3306");
     Assert.assertEquals(trinoProperties.get(JDBC_CONNECTION_USER_KEY), "root");
@@ -41,7 +41,7 @@ public class TestJDBCCatalogPropertyConverter {
     Assert.assertThrows(
         IllegalArgumentException.class,
         () -> {
-          propertyConverter.fromGravitinoProperties(gravitinoPropertiesWithoutPassword);
+          propertyConverter.gravitinoToEngineProperties(gravitinoPropertiesWithoutPassword);
         });
   }
 }
