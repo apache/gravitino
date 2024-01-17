@@ -11,6 +11,7 @@ import com.github.jk1.license.render.ReportRenderer
 import com.github.vlsi.gradle.dsl.configureEach
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 import org.gradle.internal.hash.ChecksumService
+import org.gradle.internal.os.OperatingSystem
 import org.gradle.kotlin.dsl.support.serviceOf
 import java.io.File
 import java.util.Locale
@@ -500,3 +501,24 @@ tasks {
 }
 
 apply(plugin = "com.dorongold.task-tree")
+
+tasks.register("checkJDKVersionOnMacOsX") {
+  doLast {
+    if (OperatingSystem.current().isMacOsX()) {
+      val vender = System.getProperty("java.vendor").lowercase(Locale.getDefault())
+      println("Java vendor: $vender")
+      if (JavaVersion.current() == JavaVersion.VERSION_17 && (vender.contains("oracle") || vender.contains("homebrew"))) {
+        throw GradleException(
+          "Gravitino current doesn't support building with " +
+            "Java version: OpenJDK 17 on MacOsX. Please use other JDK 17."
+        )
+      }
+    }
+  }
+}
+
+tasks.all {
+  if (this.name != "checkJDKVersionOnMacOsX") {
+    dependsOn("checkJDKVersionOnMacOsX")
+  }
+}

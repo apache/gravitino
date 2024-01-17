@@ -9,7 +9,7 @@ This software is licensed under the Apache License version 2."
 
 + Linux or macOS operating system
 + Git
-+ A Java Development Kit version 8 to 17 installed in your environment to launch Gradle
++ A Java Development Kit version 8 to 17 installed in your environment to launch Gradle, **Due to some unknown issues, [OpenJDK 17](https://openjdk.org/projects/jdk/17/) is not supported on macOSX**.
 + Optionally Docker to run integration tests
 
 :::info Please read the following notes first
