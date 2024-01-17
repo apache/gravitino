@@ -7,12 +7,14 @@ package com.datastrato.gravitino.trino.connector.catalog.iceberg;
 
 import com.datastrato.gravitino.shaded.org.apache.commons.collections4.bidimap.TreeBidiMap;
 import com.datastrato.gravitino.trino.connector.catalog.PropertyConverter;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
 
 public class IcebergTablePropertyConverter extends PropertyConverter {
 
   // TODO (yuqi) add more properties
-  private static final TreeBidiMap<String, String> TRINO_KEY_TO_GRAVITINO_KEY =
+  @VisibleForTesting
+  static final TreeBidiMap<String, String> TRINO_KEY_TO_GRAVITINO_KEY =
       new TreeBidiMap<>(new ImmutableMap.Builder<String, String>().build());
 
   @Override

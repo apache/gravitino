@@ -6,6 +6,7 @@
 package com.datastrato.gravitino.catalog.rel;
 
 import com.datastrato.gravitino.rel.Column;
+import com.datastrato.gravitino.rel.expressions.Expression;
 import com.datastrato.gravitino.rel.types.Type;
 import javax.annotation.Nullable;
 import lombok.EqualsAndHashCode;
@@ -25,6 +26,8 @@ public abstract class BaseColumn implements Column {
   protected boolean nullable;
 
   protected boolean autoIncrement;
+
+  protected Expression defaultValue;
 
   /**
    * Returns the name of the column.
@@ -70,6 +73,14 @@ public abstract class BaseColumn implements Column {
   }
 
   /**
+   * @return The default value of this column, {@link Column#DEFAULT_VALUE_NOT_SET} if not specified
+   */
+  @Override
+  public Expression defaultValue() {
+    return defaultValue;
+  }
+
+  /**
    * Builder interface for creating instances of {@link BaseColumn}.
    *
    * @param <SELF> The type of the builder.
@@ -85,6 +96,8 @@ public abstract class BaseColumn implements Column {
     SELF withNullable(boolean nullable);
 
     SELF withAutoIncrement(boolean autoIncrement);
+
+    SELF withDefaultValue(Expression defaultValue);
 
     T build();
   }
@@ -103,6 +116,7 @@ public abstract class BaseColumn implements Column {
     protected Type dataType;
     protected boolean nullable = true;
     protected boolean autoIncrement = false;
+    protected Expression defaultValue;
 
     /**
      * Sets the name of the column.
@@ -161,6 +175,18 @@ public abstract class BaseColumn implements Column {
     @Override
     public SELF withAutoIncrement(boolean autoIncrement) {
       this.autoIncrement = autoIncrement;
+      return self();
+    }
+
+    /**
+     * Sets the default value of the column.
+     *
+     * @param defaultValue The default value of the column.
+     * @return The builder instance.
+     */
+    @Override
+    public SELF withDefaultValue(Expression defaultValue) {
+      this.defaultValue = defaultValue;
       return self();
     }
 

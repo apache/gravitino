@@ -144,8 +144,9 @@ public class TestJdbcTableOperations {
       Assertions.assertEquals(jdbcColumn.comment(), column.comment());
       Assertions.assertEquals(jdbcColumn.dataType(), column.dataType());
       Assertions.assertEquals(jdbcColumn.nullable(), column.nullable());
-      Assertions.assertEquals(
-          jdbcColumn.getDefaultValue(), ((JdbcColumn) column).getDefaultValue());
+      // TODO: uncomment this once we support column default values.
+      // Assertions.assertEquals(
+      //    jdbcColumn.getDefaultValue(), ((JdbcColumn) column).getDefaultValue());
     }
 
     String newName = "table2";

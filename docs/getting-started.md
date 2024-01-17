@@ -1,7 +1,7 @@
 ---
 title: "Getting started with Gravitino"
 slug: /getting-started
-license: "Copyright 2023 Datastrato Pvt Ltd.
+license: "Copyright 2023 Datastrato Pvt. Ltd.
 This software is licensed under the Apache License version 2."
 ---
 
@@ -282,3 +282,49 @@ webserver.host` parameter from `127.0.0.1` to your AWS instance's private IP4 ad
 You'll also need to open port 8090 in the security group of your AWS instance to access Gravitino. To access Hive you need to open port 10000 in the security group.
 
 After completing these steps, you should be able to access the Gravitino REST interface from either the command line or a web browser on your local computer. You can also connect to Hive via DBeaver or any other database IDE.
+
+## Conclusion and Next Steps
+
+Congratulations! You've successfully set up Gravitino on your chosen platform. Here's a quick summary of key points and some next steps:
+
+### Key Points:
+
+1. **Installation Methods:**
+   - You learned various methods to install Gravitino, including using Docker, installing it on cloud platforms like AWS and Google Cloud, and setting it up locally.
+
+2. **Java Development Kit (JDK):**
+   - Ensure you have the required Java Development Kit (JDK) installed, as Gravitino supports Java 8, 11, and 17.
+
+3. **Gravitino Installation:**
+   - You installed Gravitino either from the binary release package, Docker image, or by building it from scratch. Followed by starting Gravitino using the `gravitino.sh` script.
+
+4. **Accessing Services:**
+   - For AWS users, specific considerations were given to accessing Gravitino externally, and port configurations were discussed for Hive.
+
+5. **Installing Hive and Gravitino Playground:**
+   - Additional information was provided for those interested in integrating Apache Hive with Gravitino, either on cloud platforms or locally. The process for installing the Gravitino playground using Docker compose was also outlined.
+
+6. **REST Interaction:**
+   - You explored how to interact with Gravitino using REST commands, creating MetaLakes, catalogs, and understanding the use of the Gravitino REST interface.
+
+### Next Steps:
+
+1. **Explore Documentation:**
+   - Delve deeper into the Gravitino documentation for advanced features, configuration options, and troubleshooting tips.
+
+2. **Community Engagement:**
+   - Join the Gravitino community forums or mailing lists to connect with other users, share experiences, and seek assistance if needed.
+
+3. **Custom Configurations:**
+   - Tailor Gravitino to your specific needs by exploring and adjusting configurations in the `gravitino.conf` file.
+
+4. **Integration with Other Tools:**
+   - Consider integrating Gravitino with other tools or databases to enhance your data processing capabilities.
+
+5. **Continuous Updates:**
+   - Stay informed about Gravitino updates and new releases to benefit from the latest features, optimizations, and security enhancements.
+
+Remember, this document serves as a starting point. Feel free to customize your Gravitino setup based on your requirements and explore the vast possibilities this powerful tool offers. If you encounter any issues or have questions, don't hesitate to reach out to the Gravitino community for support.
+
+Happy data processing with Gravitino!
+

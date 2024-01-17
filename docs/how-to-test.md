@@ -14,11 +14,11 @@ are end-to-end tests that cover the whole system.
   environment.
 * Please refer to [How to build Gravitino](./how-to-build.md) for more details to make sure you have
   a build environment ready.
-* [OrbStack](https://orbstack.dev/) is highly recommended to replace Docker Desktop for
-  macOS. OrbStack automatically configures the network between Docker containers.
-* If you insist on using Docker Desktop for macOS, please launch
-  [mac-docker-connector](https://github.com/wenjunxiao/mac-docker-connector) before running tests,
-  you can read `$GRAVITINO_HOME/dev/docker/tools/README.md` and
+* [OrbStack](https://orbstack.dev/) can be used to replace Docker Desktop
+  on macOS. OrbStack automatically configures the network between the Docker containers.
+* If you are using Docker Desktop for macOS, please launch
+  [mac-docker-connector](https://github.com/wenjunxiao/mac-docker-connector) before running the tests.
+  You can read `$GRAVITINO_HOME/dev/docker/tools/README.md` and
   `$GRAVITINO_HOME/dev/docker/tools/mac-docker-connector.sh` for more details.
 :::
 

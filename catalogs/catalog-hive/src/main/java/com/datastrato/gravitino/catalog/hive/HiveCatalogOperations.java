@@ -10,11 +10,13 @@ import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.ME
 import static com.datastrato.gravitino.catalog.hive.HiveTable.SUPPORT_TABLE_TYPES;
 import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.COMMENT;
 import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.TABLE_TYPE;
+import static org.apache.hadoop.hive.metastore.TableType.EXTERNAL_TABLE;
 
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.catalog.CatalogOperations;
 import com.datastrato.gravitino.catalog.PropertiesMetadata;
+import com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.TableType;
 import com.datastrato.gravitino.catalog.hive.converter.ToHiveType;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
@@ -51,7 +53,6 @@ import org.apache.commons.lang3.ArrayUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
-import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.AlreadyExistsException;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
@@ -416,15 +417,20 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
    */
   @Override
   public Table loadTable(NameIdentifier tableIdent) throws NoSuchTableException {
+    org.apache.hadoop.hive.metastore.api.Table table = loadHiveTable(tableIdent);
+    HiveTable hiveTable = HiveTable.fromHiveTable(table);
+
+    LOG.info("Loaded Hive table {} from Hive Metastore ", tableIdent.name());
+    return hiveTable;
+  }
+
+  private org.apache.hadoop.hive.metastore.api.Table loadHiveTable(NameIdentifier tableIdent) {
     NameIdentifier schemaIdent = NameIdentifier.of(tableIdent.namespace().levels());
 
     try {
       org.apache.hadoop.hive.metastore.api.Table table =
           clientPool.run(c -> c.getTable(schemaIdent.name(), tableIdent.name()));
-      HiveTable hiveTable = HiveTable.fromHiveTable(table);
-
-      LOG.info("Loaded Hive table {} from Hive Metastore ", tableIdent.name());
-      return hiveTable;
+      return table;
 
     } catch (NoSuchObjectException e) {
       throw new NoSuchTableException(
@@ -697,7 +703,8 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       return HiveTable.fromHiveTable(alteredHiveTable);
 
     } catch (TException | InterruptedException e) {
-      if (e.getMessage().contains("types incompatible with the existing columns")) {
+      if (e.getMessage() != null
+          && e.getMessage().contains("types incompatible with the existing columns")) {
         throw new IllegalArgumentException(
             "Failed to alter Hive table ["
                 + tableIdent.name()
@@ -847,18 +854,25 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
   }
 
   /**
-   * Drops a table from the Hive Metastore.
+   * Drops a table from the Hive Metastore. Deletes the table and removes the directory associated
+   * with the table from the file system if the table is not EXTERNAL table. In case of an external
+   * table, only the associated metadata information is removed.
    *
    * @param tableIdent The identifier of the table to drop.
    * @return true if the table is successfully dropped; false if the table does not exist.
    */
   @Override
   public boolean dropTable(NameIdentifier tableIdent) {
-    return dropHiveTable(tableIdent, false, false);
+    if (isExternalTable(tableIdent)) {
+      return dropHiveTable(tableIdent, false, false);
+    } else {
+      return dropHiveTable(tableIdent, true, false);
+    }
   }
 
   /**
-   * Purges a table from the Hive Metastore.
+   * Purges a table from the Hive Metastore. Completely purge the table skipping trash for managed
+   * table, external table aren't supported to purge table.
    *
    * @param tableIdent The identifier of the table to purge.
    * @return true if the table is successfully purged; false if the table does not exist.
@@ -866,15 +880,19 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
    */
   @Override
   public boolean purgeTable(NameIdentifier tableIdent) throws UnsupportedOperationException {
-    // TODO(minghuang): HiveTable support specify `tableType`, then reject purge Hive table with
-    //  `tableType` EXTERNAL_TABLE
-    return dropHiveTable(tableIdent, true, true);
+    if (isExternalTable(tableIdent)) {
+      throw new UnsupportedOperationException("Can't purge a external hive table");
+    } else {
+      return dropHiveTable(tableIdent, true, true);
+    }
   }
 
   /**
    * Checks if the given namespace is a valid namespace for the Hive schema.
    *
    * @param tableIdent The namespace to validate.
+   * @param deleteData Whether to delete the table data.
+   * @param ifPurge Whether to purge the table.
    * @return true if the namespace is valid; otherwise, false.
    */
   private boolean dropHiveTable(NameIdentifier tableIdent, boolean deleteData, boolean ifPurge) {
@@ -931,5 +949,10 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
   @Override
   public PropertiesMetadata schemaPropertiesMetadata() throws UnsupportedOperationException {
     return schemaPropertiesMetadata;
+  }
+
+  private boolean isExternalTable(NameIdentifier tableIdent) {
+    org.apache.hadoop.hive.metastore.api.Table hiveTable = loadHiveTable(tableIdent);
+    return EXTERNAL_TABLE.name().equalsIgnoreCase(hiveTable.getTableType());
   }
 }

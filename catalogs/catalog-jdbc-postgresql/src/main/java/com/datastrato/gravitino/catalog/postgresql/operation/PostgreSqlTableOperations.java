@@ -40,6 +40,8 @@ import org.apache.commons.lang3.StringUtils;
 /** Table operations for PostgreSQL. */
 public class PostgreSqlTableOperations extends JdbcTableOperations {
 
+  public static final String PG_QUOTE = "\"";
+
   private static final String SHOW_COLUMN_COMMENT_SQL =
       "SELECT \n"
           + "    a.attname as col_name,\n"
@@ -126,7 +128,8 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
           JdbcColumn.Builder builder =
               new JdbcColumn.Builder()
                   .withName(columnName)
-                  .withDefaultValue(extractDefaultValue(resultSet.getString("column_default")))
+                  // TODO: uncomment this once we support column default values.
+                  // .withDefaultValue(extractDefaultValue(resultSet.getString("column_default")))
                   .withNullable("YES".equalsIgnoreCase(resultSet.getString("is_nullable")))
                   .withType(typeConverter.toGravitinoType(colDataType))
                   .withAutoIncrement("YES".equalsIgnoreCase(resultSet.getString("is_identity")));
@@ -233,7 +236,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
     // Add columns
     for (int i = 0; i < columns.length; i++) {
       JdbcColumn column = columns[i];
-      sqlBuilder.append("    ").append(column.name());
+      sqlBuilder.append("    \"").append(column.name()).append(PG_QUOTE);
 
       appendColumnDefinition(column, sqlBuilder);
       // Add a comma for the next column, unless it's the last one
@@ -304,9 +307,10 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
       sqlBuilder.append("NOT NULL ");
     }
     // Add DEFAULT value if specified
-    if (StringUtils.isNotEmpty(column.getDefaultValue())) {
-      sqlBuilder.append("DEFAULT '").append(column.getDefaultValue()).append("'").append(SPACE);
-    }
+    // TODO: uncomment this once we support column default values.
+    // if (StringUtils.isNotEmpty(column.getDefaultValue())) {
+    //   sqlBuilder.append("DEFAULT '").append(column.getDefaultValue()).append("'").append(SPACE);
+    // }
 
     // Add column properties if specified
     if (CollectionUtils.isNotEmpty(column.getProperties())) {

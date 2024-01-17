@@ -95,7 +95,7 @@ public class TableOperations {
             Table table =
                 dispatcher.createTable(
                     ident,
-                    request.getColumns(),
+                    fromDTOs(request.getColumns()),
                     request.getComment(),
                     request.getProperties(),
                     fromDTOs(request.getPartitioning()),

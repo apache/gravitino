@@ -19,7 +19,7 @@ const SidebarLeft = props => {
 
         <Box
           className={`twc-overflow-y-auto`}
-          sx={{ p: theme => theme.spacing(2.5, 2.5, 2.5), height: `calc(100% - 4rem)` }}
+          sx={{ p: theme => theme.spacing(2.5, 2.5, 2.5), height: `calc(100% - 1.5rem)` }}
         >
           <MetalakeTree routeParams={routeParams} />
         </Box>

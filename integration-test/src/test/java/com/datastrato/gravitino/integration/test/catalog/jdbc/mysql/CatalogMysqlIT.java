@@ -12,7 +12,6 @@ import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.catalog.jdbc.config.JdbcConfig;
 import com.datastrato.gravitino.client.GravitinoMetaLake;
 import com.datastrato.gravitino.dto.rel.ColumnDTO;
-import com.datastrato.gravitino.dto.rel.partitions.Partitioning;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NotFoundException;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
@@ -30,6 +29,8 @@ import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
+import com.datastrato.gravitino.rel.expressions.transforms.Transform;
+import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
 import com.datastrato.gravitino.rel.types.Types;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
@@ -279,7 +280,7 @@ public class CatalogMysqlIT extends AbstractIT {
 
     final SortOrder[] sortOrders = new SortOrder[0];
 
-    Partitioning[] partitioning = Partitioning.EMPTY_PARTITIONING;
+    Transform[] partitioning = Transforms.EMPTY_TRANSFORM;
 
     Map<String, String> properties = createProperties();
     TableCatalog tableCatalog = catalog.asTableCatalog();
@@ -316,6 +317,70 @@ public class CatalogMysqlIT extends AbstractIT {
     for (int i = 0; i < columns.length; i++) {
       Assertions.assertEquals(columns[i], loadTable.columns()[i]);
     }
+  }
+
+  @Test
+  void testColumnNameWithKeyWords() {
+    // Create table from Gravitino API
+    ColumnDTO[] columns =
+        new ColumnDTO[] {
+          new ColumnDTO.Builder()
+              .withName("integer")
+              .withDataType(Types.IntegerType.get())
+              .withComment("integer")
+              .build(),
+          new ColumnDTO.Builder()
+              .withName("long")
+              .withDataType(Types.LongType.get())
+              .withComment("long")
+              .build(),
+          new ColumnDTO.Builder()
+              .withName("float")
+              .withDataType(Types.FloatType.get())
+              .withComment("float")
+              .build(),
+          new ColumnDTO.Builder()
+              .withName("double")
+              .withDataType(Types.DoubleType.get())
+              .withComment("double")
+              .build(),
+          new ColumnDTO.Builder()
+              .withName("decimal")
+              .withDataType(Types.DecimalType.of(10, 3))
+              .withComment("decimal")
+              .build(),
+          new ColumnDTO.Builder()
+              .withName("date")
+              .withDataType(Types.DateType.get())
+              .withComment("date")
+              .build(),
+          new ColumnDTO.Builder()
+              .withName("time")
+              .withDataType(Types.TimeType.get())
+              .withComment("time")
+              .build()
+        };
+
+    String name = GravitinoITUtils.genRandomName("table") + "_keyword";
+    NameIdentifier tableIdentifier = NameIdentifier.of(metalakeName, catalogName, schemaName, name);
+    Distribution distribution = Distributions.NONE;
+
+    final SortOrder[] sortOrders = new SortOrder[0];
+
+    Transform[] partitioning = Transforms.EMPTY_TRANSFORM;
+
+    Map<String, String> properties = createProperties();
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    Table createdTable =
+        tableCatalog.createTable(
+            tableIdentifier,
+            columns,
+            table_comment,
+            properties,
+            partitioning,
+            distribution,
+            sortOrders);
+    Assertions.assertEquals(createdTable.name(), name);
   }
 
   @Test
@@ -412,7 +477,7 @@ public class CatalogMysqlIT extends AbstractIT {
             newColumns,
             table_comment,
             ImmutableMap.of(),
-            Partitioning.EMPTY_PARTITIONING,
+            Transforms.EMPTY_TRANSFORM,
             Distributions.NONE,
             new SortOrder[0]);
 

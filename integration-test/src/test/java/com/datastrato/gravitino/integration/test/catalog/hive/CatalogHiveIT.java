@@ -19,7 +19,8 @@ import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.
 import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.TEXT_INPUT_FORMAT_CLASS;
 import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.TOTAL_SIZE;
 import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.TRANSIENT_LAST_DDL_TIME;
-import static org.apache.hadoop.hive.metastore.TableType.EXTERNAL_TABLE;
+import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.TableType.EXTERNAL_TABLE;
+import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.TableType.MANAGED_TABLE;
 import static org.apache.hadoop.hive.serde.serdeConstants.DATE_TYPE_NAME;
 import static org.apache.hadoop.hive.serde.serdeConstants.INT_TYPE_NAME;
 import static org.apache.hadoop.hive.serde.serdeConstants.STRING_TYPE_NAME;
@@ -34,6 +35,7 @@ import com.datastrato.gravitino.auth.AuthConstants;
 import com.datastrato.gravitino.catalog.hive.HiveClientPool;
 import com.datastrato.gravitino.catalog.hive.HiveSchemaPropertiesMetadata;
 import com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata;
+import com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.TableType;
 import com.datastrato.gravitino.client.GravitinoMetaLake;
 import com.datastrato.gravitino.dto.rel.ColumnDTO;
 import com.datastrato.gravitino.dto.rel.expressions.FieldReferenceDTO;
@@ -60,6 +62,7 @@ import com.datastrato.gravitino.rel.expressions.sorts.SortDirection;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrders;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
+import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
 import com.datastrato.gravitino.rel.types.Types;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
@@ -68,6 +71,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.hadoop.conf.Configuration;
@@ -75,7 +79,6 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.conf.HiveConf;
-import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
@@ -358,7 +361,7 @@ public class CatalogHiveIT extends AbstractIT {
                 columns,
                 TABLE_COMMENT,
                 properties,
-                Partitioning.EMPTY_PARTITIONING,
+                Transforms.EMPTY_TRANSFORM,
                 distribution,
                 sortOrders);
 
@@ -377,7 +380,7 @@ public class CatalogHiveIT extends AbstractIT {
     Table createdTable1 =
         catalog
             .asTableCatalog()
-            .createTable(nameIdentifier, columns, TABLE_COMMENT, properties, (Partitioning[]) null);
+            .createTable(nameIdentifier, columns, TABLE_COMMENT, properties, (Transform[]) null);
 
     // Directly get table from hive metastore to check if the table is created successfully.
     org.apache.hadoop.hive.metastore.api.Table hiveTable1 =
@@ -404,7 +407,7 @@ public class CatalogHiveIT extends AbstractIT {
                   columns,
                   TABLE_COMMENT,
                   properties,
-                  Partitioning.EMPTY_PARTITIONING,
+                  Transforms.EMPTY_TRANSFORM,
                   badDistribution,
                   sortOrders);
         });
@@ -427,7 +430,7 @@ public class CatalogHiveIT extends AbstractIT {
                   columns,
                   TABLE_COMMENT,
                   properties,
-                  Partitioning.EMPTY_PARTITIONING,
+                  Transforms.EMPTY_TRANSFORM,
                   distribution,
                   badSortOrders);
         });
@@ -445,11 +448,7 @@ public class CatalogHiveIT extends AbstractIT {
         catalog
             .asTableCatalog()
             .createTable(
-                nameIdentifier,
-                columns,
-                TABLE_COMMENT,
-                properties,
-                Partitioning.EMPTY_PARTITIONING);
+                nameIdentifier, columns, TABLE_COMMENT, properties, Transforms.EMPTY_TRANSFORM);
 
     // Directly get table from hive metastore to check if the table is created successfully.
     org.apache.hadoop.hive.metastore.api.Table hiveTab =
@@ -466,7 +465,7 @@ public class CatalogHiveIT extends AbstractIT {
     Table createdTable1 =
         catalog
             .asTableCatalog()
-            .createTable(nameIdentifier, columns, TABLE_COMMENT, properties, (Partitioning[]) null);
+            .createTable(nameIdentifier, columns, TABLE_COMMENT, properties, (Transform[]) null);
 
     // Directly get table from hive metastore to check if the table is created successfully.
     org.apache.hadoop.hive.metastore.api.Table hiveTable1 =
@@ -494,7 +493,7 @@ public class CatalogHiveIT extends AbstractIT {
                 columns,
                 TABLE_COMMENT,
                 ImmutableMap.of(),
-                Partitioning.EMPTY_PARTITIONING);
+                Transforms.EMPTY_TRANSFORM);
     HiveTablePropertiesMetadata tablePropertiesMetadata = new HiveTablePropertiesMetadata();
     org.apache.hadoop.hive.metastore.api.Table actualTable =
         hiveClientPool.run(client -> client.getTable(schemaName, tableName));
@@ -522,7 +521,7 @@ public class CatalogHiveIT extends AbstractIT {
                     "textfile",
                     SERDE_LIB,
                     OPENCSV_SERDE_CLASS),
-                Partitioning.EMPTY_PARTITIONING);
+                Transforms.EMPTY_TRANSFORM);
     org.apache.hadoop.hive.metastore.api.Table actualTable2 =
         hiveClientPool.run(client -> client.getTable(schemaName, table2));
 
@@ -588,7 +587,7 @@ public class CatalogHiveIT extends AbstractIT {
             createColumns(),
             TABLE_COMMENT,
             ImmutableMap.of(),
-            Partitioning.EMPTY_PARTITIONING);
+            Transforms.EMPTY_TRANSFORM);
     org.apache.hadoop.hive.metastore.api.Table actualTable =
         hiveClientPool.run(client -> client.getTable(schemaIdent.name(), tableIdent.name()));
     String actualTableLocation = actualTable.getSd().getLocation();
@@ -614,7 +613,7 @@ public class CatalogHiveIT extends AbstractIT {
                 columns,
                 TABLE_COMMENT,
                 properties,
-                new Partitioning[] {
+                new Transform[] {
                   IdentityPartitioningDTO.of(columns[1].name()),
                   IdentityPartitioningDTO.of(columns[2].name())
                 });
@@ -641,7 +640,7 @@ public class CatalogHiveIT extends AbstractIT {
                       columns,
                       TABLE_COMMENT,
                       properties,
-                      new Partitioning[] {
+                      new Transform[] {
                         IdentityPartitioningDTO.of(columns[0].name()),
                         IdentityPartitioningDTO.of(columns[1].name())
                       });
@@ -728,7 +727,7 @@ public class CatalogHiveIT extends AbstractIT {
                 columns,
                 TABLE_COMMENT,
                 createProperties(),
-                new Partitioning[] {IdentityPartitioningDTO.of(columns[2].name())});
+                new Transform[] {IdentityPartitioningDTO.of(columns[2].name())});
     Assertions.assertNull(createdTable.auditInfo().lastModifier());
     Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, createdTable.auditInfo().creator());
     Table alteredTable =
@@ -822,7 +821,7 @@ public class CatalogHiveIT extends AbstractIT {
             newColumns,
             TABLE_COMMENT,
             ImmutableMap.of(),
-            new Transform[0],
+            Transforms.EMPTY_TRANSFORM,
             Distributions.NONE,
             new SortOrder[0]);
 
@@ -876,7 +875,7 @@ public class CatalogHiveIT extends AbstractIT {
             createColumns(),
             TABLE_COMMENT,
             createProperties(),
-            new Transform[0]);
+            Transforms.EMPTY_TRANSFORM);
     catalog
         .asTableCatalog()
         .dropTable(NameIdentifier.of(metalakeName, catalogName, schemaName, ALTER_TABLE_NAME));
@@ -1065,7 +1064,7 @@ public class CatalogHiveIT extends AbstractIT {
             columns,
             TABLE_COMMENT,
             createProperties(),
-            new Transform[0]);
+            Transforms.EMPTY_TRANSFORM);
 
     for (int i = 0; i < 2; i++) {
       // The table to be renamed does not exist
@@ -1125,5 +1124,116 @@ public class CatalogHiveIT extends AbstractIT {
 
     Assertions.assertThrows(
         NoSuchMetalakeException.class, () -> client.loadMetalake(NameIdentifier.of(metalakeName1)));
+  }
+
+  @Test
+  public void testDropHiveManagedTable() throws TException, InterruptedException, IOException {
+    ColumnDTO[] columns = createColumns();
+    catalog
+        .asTableCatalog()
+        .createTable(
+            NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
+            columns,
+            TABLE_COMMENT,
+            createProperties(),
+            new Transform[] {IdentityPartitioningDTO.of(columns[2].name())});
+    // Directly get table from hive metastore to check if the table is created successfully.
+    org.apache.hadoop.hive.metastore.api.Table hiveTab =
+        hiveClientPool.run(client -> client.getTable(schemaName, tableName));
+    checkTableReadWrite(hiveTab);
+    Assertions.assertEquals(MANAGED_TABLE.name(), hiveTab.getTableType());
+    Path tableDirectory = new Path(hiveTab.getSd().getLocation());
+    catalog
+        .asTableCatalog()
+        .dropTable(NameIdentifier.of(metalakeName, catalogName, schemaName, tableName));
+    Boolean existed = hiveClientPool.run(client -> client.tableExists(schemaName, tableName));
+    Assertions.assertFalse(existed, "The hive table should not exist");
+    Assertions.assertFalse(hdfs.exists(tableDirectory), "The table directory should not exist");
+  }
+
+  @Test
+  public void testDropHiveExternalTable() throws TException, InterruptedException, IOException {
+    ColumnDTO[] columns = createColumns();
+    catalog
+        .asTableCatalog()
+        .createTable(
+            NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
+            columns,
+            TABLE_COMMENT,
+            ImmutableMap.of(TABLE_TYPE, EXTERNAL_TABLE.name().toLowerCase(Locale.ROOT)),
+            new Transform[] {IdentityPartitioningDTO.of(columns[2].name())});
+    // Directly get table from hive metastore to check if the table is created successfully.
+    org.apache.hadoop.hive.metastore.api.Table hiveTab =
+        hiveClientPool.run(client -> client.getTable(schemaName, tableName));
+    checkTableReadWrite(hiveTab);
+    Assertions.assertEquals(EXTERNAL_TABLE.name(), hiveTab.getTableType());
+    catalog
+        .asTableCatalog()
+        .dropTable(NameIdentifier.of(metalakeName, catalogName, schemaName, tableName));
+
+    Boolean existed = hiveClientPool.run(client -> client.tableExists(schemaName, tableName));
+    Assertions.assertFalse(existed, "The table should be not exist");
+    Path tableDirectory = new Path(hiveTab.getSd().getLocation());
+    Assertions.assertTrue(
+        hdfs.listStatus(tableDirectory).length > 0, "The table should not be empty");
+  }
+
+  @Test
+  public void testPurgeHiveManagedTable() throws TException, InterruptedException, IOException {
+    ColumnDTO[] columns = createColumns();
+    catalog
+        .asTableCatalog()
+        .createTable(
+            NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
+            columns,
+            TABLE_COMMENT,
+            createProperties(),
+            new Transform[] {IdentityPartitioningDTO.of(columns[2].name())});
+    // Directly get table from hive metastore to check if the table is created successfully.
+    org.apache.hadoop.hive.metastore.api.Table hiveTab =
+        hiveClientPool.run(client -> client.getTable(schemaName, tableName));
+    checkTableReadWrite(hiveTab);
+    Assertions.assertEquals(MANAGED_TABLE.name(), hiveTab.getTableType());
+    catalog
+        .asTableCatalog()
+        .purgeTable(NameIdentifier.of(metalakeName, catalogName, schemaName, tableName));
+    Boolean existed = hiveClientPool.run(client -> client.tableExists(schemaName, tableName));
+    Assertions.assertFalse(existed, "The hive table should not exist");
+    Path tableDirectory = new Path(hiveTab.getSd().getLocation());
+    Assertions.assertFalse(hdfs.exists(tableDirectory), "The table directory should not exist");
+    Path trashDirectory = hdfs.getTrashRoot(tableDirectory);
+    Assertions.assertFalse(hdfs.exists(trashDirectory), "The trash should not exist");
+  }
+
+  @Test
+  public void testPurgeHiveExternalTable() throws TException, InterruptedException, IOException {
+    ColumnDTO[] columns = createColumns();
+    catalog
+        .asTableCatalog()
+        .createTable(
+            NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
+            columns,
+            TABLE_COMMENT,
+            ImmutableMap.of(TABLE_TYPE, EXTERNAL_TABLE.name().toLowerCase(Locale.ROOT)),
+            new Transform[] {IdentityPartitioningDTO.of(columns[2].name())});
+    // Directly get table from hive metastore to check if the table is created successfully.
+    org.apache.hadoop.hive.metastore.api.Table hiveTab =
+        hiveClientPool.run(client -> client.getTable(schemaName, tableName));
+    checkTableReadWrite(hiveTab);
+    Assertions.assertEquals(EXTERNAL_TABLE.name(), hiveTab.getTableType());
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () -> {
+          catalog
+              .asTableCatalog()
+              .purgeTable(NameIdentifier.of(metalakeName, catalogName, schemaName, tableName));
+        },
+        "Can't purge a external hive table");
+
+    Boolean existed = hiveClientPool.run(client -> client.tableExists(schemaName, tableName));
+    Assertions.assertTrue(existed, "The table should be still exist");
+    Path tableDirectory = new Path(hiveTab.getSd().getLocation());
+    Assertions.assertTrue(
+        hdfs.listStatus(tableDirectory).length > 0, "The table should not be empty");
   }
 }
