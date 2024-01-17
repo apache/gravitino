@@ -1127,6 +1127,58 @@ public class CatalogHiveIT extends AbstractIT {
   }
 
   @Test
+  public void testDropHiveManagedTable() throws TException, InterruptedException, IOException {
+    ColumnDTO[] columns = createColumns();
+    catalog
+        .asTableCatalog()
+        .createTable(
+            NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
+            columns,
+            TABLE_COMMENT,
+            createProperties(),
+            new Transform[] {IdentityPartitioningDTO.of(columns[2].name())});
+    // Directly get table from hive metastore to check if the table is created successfully.
+    org.apache.hadoop.hive.metastore.api.Table hiveTab =
+        hiveClientPool.run(client -> client.getTable(schemaName, tableName));
+    checkTableReadWrite(hiveTab);
+    Assertions.assertEquals(MANAGED_TABLE.name(), hiveTab.getTableType());
+    Path tableDirectory = new Path(hiveTab.getSd().getLocation());
+    catalog
+        .asTableCatalog()
+        .dropTable(NameIdentifier.of(metalakeName, catalogName, schemaName, tableName));
+    Boolean existed = hiveClientPool.run(client -> client.tableExists(schemaName, tableName));
+    Assertions.assertFalse(existed, "The hive table should not exist");
+    Assertions.assertFalse(hdfs.exists(tableDirectory), "The table directory should not exist");
+  }
+
+  @Test
+  public void testDropHiveExternalTable() throws TException, InterruptedException, IOException {
+    ColumnDTO[] columns = createColumns();
+    catalog
+        .asTableCatalog()
+        .createTable(
+            NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
+            columns,
+            TABLE_COMMENT,
+            ImmutableMap.of(TABLE_TYPE, EXTERNAL_TABLE.name().toLowerCase(Locale.ROOT)),
+            new Transform[] {IdentityPartitioningDTO.of(columns[2].name())});
+    // Directly get table from hive metastore to check if the table is created successfully.
+    org.apache.hadoop.hive.metastore.api.Table hiveTab =
+        hiveClientPool.run(client -> client.getTable(schemaName, tableName));
+    checkTableReadWrite(hiveTab);
+    Assertions.assertEquals(EXTERNAL_TABLE.name(), hiveTab.getTableType());
+    catalog
+        .asTableCatalog()
+        .dropTable(NameIdentifier.of(metalakeName, catalogName, schemaName, tableName));
+
+    Boolean existed = hiveClientPool.run(client -> client.tableExists(schemaName, tableName));
+    Assertions.assertFalse(existed, "The table should be not exist");
+    Path tableDirectory = new Path(hiveTab.getSd().getLocation());
+    Assertions.assertTrue(
+        hdfs.listStatus(tableDirectory).length > 0, "The table should not be empty");
+  }
+
+  @Test
   public void testPurgeHiveManagedTable() throws TException, InterruptedException, IOException {
     ColumnDTO[] columns = createColumns();
     catalog
