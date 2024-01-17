@@ -6,7 +6,7 @@ package com.datastrato.gravitino.proto;
 
 import com.datastrato.gravitino.meta.TableEntity;
 
-public class TableEntitySerde implements ProtoSerDe<TableEntity, Table> {
+public class TableEntitySerDe implements ProtoSerDe<TableEntity, Table> {
   @Override
   public Table serialize(TableEntity tableEntity) {
     return Table.newBuilder()
