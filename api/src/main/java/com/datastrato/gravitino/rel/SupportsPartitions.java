@@ -68,8 +68,10 @@ public interface SupportsPartitions extends Table {
    * @return The altered partition.
    * @throws NoSuchPartitionException If the partition does not exist.
    */
-  Partition alterPartition(String partitionName, PartitionChange... changes)
-      throws NoSuchPartitionException;
+  default Partition alterPartition(String partitionName, PartitionChange... changes)
+      throws NoSuchPartitionException {
+    throw new UnsupportedOperationException("Partition altering is not supported");
+  }
 
   /**
    * Drop a partition with specified name.

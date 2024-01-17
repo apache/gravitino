@@ -14,7 +14,8 @@ import java.util.Objects;
 public class Partitions {
 
   /**
-   * Creates a range partition.
+   * Creates a range partition. For example, for range partition `PARTITION p20200321 VALUES LESS
+   * THAN ("2020-03-22")`, its upper bound is "2020-03-22" and its lower bound is null.
    *
    * @param name The name of the partition.
    * @param upper The upper bound of the partition.
@@ -28,7 +29,17 @@ public class Partitions {
   }
 
   /**
-   * Creates a list partition.
+   * Creates a list partition. For example, for list partition
+   *
+   * <pre>
+   * `PARTITION p202204_California VALUES IN (
+   *   ("2022-04-01", "Los Angeles"),
+   *   ("2022-04-01", "San Francisco")
+   * )`
+   * </pre>
+   *
+   * its name is "p202204_California" and lists are [["2022-04-01","Los Angeles"], ["2022-04-01",
+   * "San Francisco"]].
    *
    * @param name The name of the partition.
    * @param lists The values of the list partition.
@@ -40,7 +51,9 @@ public class Partitions {
   }
 
   /**
-   * Creates an identity partition.
+   * Creates an identity partition. For example, for Hive partition `PARTITION (dt='2008-08-08',
+   * country='us')`, its partition name is "dt=2008-08-08/country=us", field names are [["dt"],
+   * ["country"]] and values are ["2008-08-08", "us"].
    *
    * @param name The name of the partition.
    * @param fieldNames The field names of the identity partition.
