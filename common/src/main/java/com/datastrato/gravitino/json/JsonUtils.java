@@ -23,7 +23,9 @@ import com.datastrato.gravitino.dto.rel.partitions.Partitioning;
 import com.datastrato.gravitino.dto.rel.partitions.RangePartitioningDTO;
 import com.datastrato.gravitino.dto.rel.partitions.TruncatePartitioningDTO;
 import com.datastrato.gravitino.dto.rel.partitions.YearPartitioningDTO;
+import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.TableChange;
+import com.datastrato.gravitino.rel.expressions.Expression;
 import com.datastrato.gravitino.rel.expressions.distributions.Strategy;
 import com.datastrato.gravitino.rel.expressions.sorts.NullOrdering;
 import com.datastrato.gravitino.rel.expressions.sorts.SortDirection;
@@ -284,7 +286,8 @@ public class JsonUtils {
             "Cannot parse literal arg from missing literal value: %s",
             node);
         Type dataType = readDataType(node.get(DATA_TYPE));
-        String value = getString(LITERAL_VALUE, node);
+        JsonNode jsonNode = node.get(LITERAL_VALUE);
+        String value = jsonNode.isNull() ? null : jsonNode.asText();
         return new LiteralDTO.Builder().withDataType(dataType).withValue(value).build();
       case FIELD:
         Preconditions.checkArgument(
@@ -392,7 +395,8 @@ public class JsonUtils {
       case UUID:
       case FIXED:
       case BINARY:
-        // Primitive types are serialized as string
+      case NULL:
+        // Primitive types and nullType are serialized as string
         gen.writeString(dataType.simpleString());
         break;
       case STRUCT:
@@ -423,7 +427,10 @@ public class JsonUtils {
         node != null && !node.isNull(), "Cannot parse type from invalid JSON: %s", node);
 
     if (node.isTextual()) {
-      return fromPrimitiveTypeString(node.asText().toLowerCase());
+      String text = node.asText().toLowerCase();
+      return text.equals(Types.NullType.get().simpleString())
+          ? Types.NullType.get()
+          : fromPrimitiveTypeString(text);
     }
 
     if (node.isObject() && node.get(TYPE) != null) {
@@ -897,6 +904,33 @@ public class JsonUtils {
       List<FunctionArg> args = Lists.newArrayList();
       node.get(FUNCTION_ARGS).forEach(arg -> args.add(readFunctionArg(arg)));
       return builder.withArgs(args.toArray(FunctionArg.EMPTY_ARGS)).build();
+    }
+  }
+
+  public static class ColumnDefaultValueSerializer extends JsonSerializer<Expression> {
+    @Override
+    public void serialize(Expression value, JsonGenerator gen, SerializerProvider serializers)
+        throws IOException {
+      if (value == null || value.equals(Column.DEFAULT_VALUE_NOT_SET)) {
+        return;
+      }
+      writeFunctionArg((FunctionArg) value, gen);
+    }
+
+    @Override
+    public boolean isEmpty(SerializerProvider provider, Expression value) {
+      return value == null || value.equals(Column.DEFAULT_VALUE_NOT_SET);
+    }
+  }
+
+  public static class ColumnDefaultValueDeserializer extends JsonDeserializer<Expression> {
+    @Override
+    public Expression deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
+      JsonNode node = p.getCodec().readTree(p);
+      if (node == null || node.isNull()) {
+        return Column.DEFAULT_VALUE_NOT_SET;
+      }
+      return readFunctionArg(node);
     }
   }
 }
