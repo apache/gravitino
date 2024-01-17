@@ -12,6 +12,12 @@ plugins {
   id("idea")
 }
 
+val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extra["defaultScalaVersion"].toString()
+val sparkMajorVersion: String = project.properties["sparkVersion"] as? String ?: extra["defaultSparkVersion"].toString()
+val sparkVersion: String = libs.versions.spark.get()
+val icebergVersion: String = libs.versions.iceberg.get()
+val scalaCollectionCompatVersion: String = libs.versions.scala.collection.compat.get()
+
 dependencies {
   implementation(project(":server"))
   implementation(project(":common"))
@@ -96,8 +102,10 @@ dependencies {
   testRuntimeOnly(libs.junit.jupiter.engine)
   testImplementation(libs.mockito.core)
   testImplementation(libs.bundles.log4j)
-  testImplementation(libs.iceberg.spark.runtime)
-  testImplementation(libs.spark.sql) {
+  testImplementation("org.apache.iceberg:iceberg-spark-runtime-${sparkMajorVersion}_$scalaVersion:$icebergVersion")
+  testImplementation("org.apache.spark:spark-hive_$scalaVersion:$sparkVersion")
+  testImplementation("org.scala-lang.modules:scala-collection-compat_$scalaVersion:$scalaCollectionCompatVersion")
+  testImplementation("org.apache.spark:spark-sql_$scalaVersion:$sparkVersion") {
     exclude("org.apache.hadoop")
     exclude("org.rocksdb")
     exclude("org.apache.avro")
@@ -105,9 +113,8 @@ dependencies {
     exclude("io.dropwizard.metrics")
   }
   testImplementation(libs.slf4j.jdk14)
-  testImplementation(libs.scala.collection.compat)
   testImplementation(libs.sqlite.jdbc)
-  testImplementation(libs.spark.hive)
+
   testImplementation(libs.testcontainers)
   testImplementation(libs.testcontainers.junit.jupiter)
   testImplementation(libs.testcontainers.mysql)
