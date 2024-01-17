@@ -10,6 +10,7 @@ import static com.datastrato.gravitino.trino.connector.catalog.hive.HiveProperty
 import static com.datastrato.gravitino.trino.connector.catalog.hive.HivePropertyMeta.HIVE_SORT_ORDER_KEY;
 
 import com.datastrato.catalog.property.PropertyConverter;
+import com.datastrato.gravitino.dto.rel.DistributionDTO;
 import com.datastrato.gravitino.dto.rel.expressions.FieldReferenceDTO;
 import com.datastrato.gravitino.dto.rel.partitions.Partitioning.SingleFieldPartitioning;
 import com.datastrato.gravitino.rel.expressions.Expression;
@@ -22,6 +23,7 @@ import com.datastrato.gravitino.rel.expressions.sorts.SortOrders;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
+import com.datastrato.gravitino.trino.connector.catalog.hive.SortingColumn.Order;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoColumn;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoTable;
 import com.google.common.base.Preconditions;
@@ -33,6 +35,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -96,9 +99,9 @@ public class HiveMetadataAdapter extends CatalogConnectorMetadataAdapter {
         propertyMap.containsKey(HIVE_BUCKET_COUNT_KEY)
             ? (int) propertyMap.get(HIVE_BUCKET_COUNT_KEY)
             : 0;
-    List<String> sortColumns =
+    List<SortingColumn> sortColumns =
         propertyMap.containsKey(HIVE_SORT_ORDER_KEY)
-            ? (List<String>) propertyMap.get(HIVE_SORT_ORDER_KEY)
+            ? (List<SortingColumn>) propertyMap.get(HIVE_SORT_ORDER_KEY)
             : Collections.EMPTY_LIST;
 
     if (!sortColumns.isEmpty()) {
@@ -138,8 +141,15 @@ public class HiveMetadataAdapter extends CatalogConnectorMetadataAdapter {
     if (!sortColumns.isEmpty()) {
       SortOrder[] sorting =
           sortColumns.stream()
-              .map(NamedReference::field)
-              .map(trans -> SortOrders.of(trans, SortDirection.ASCENDING))
+              .map(
+                  sortingColumn -> {
+                    Expression expression = NamedReference.field(sortingColumn.getColumnName());
+                    SortDirection sortDirection =
+                        sortingColumn.getOrder() == Order.ASCENDING
+                            ? SortDirection.ASCENDING
+                            : SortDirection.DESCENDING;
+                    return SortOrders.of(expression, sortDirection);
+                  })
               .toArray(SortOrder[]::new);
       gravitinoTable.setSortOrders(sorting);
     }
@@ -165,17 +175,19 @@ public class HiveMetadataAdapter extends CatalogConnectorMetadataAdapter {
           HIVE_PARTITION_KEY,
           gravitinoTable.getPartitioning().length > 0
               ? Arrays.stream(gravitinoTable.getPartitioning())
-                  .map(ts -> ((SingleFieldPartitioning) ts).fieldName()[0])
+                  .map(
+                      ts ->
+                          ((SingleFieldPartitioning) ts).fieldName()[0].toLowerCase(Locale.ENGLISH))
                   .collect(Collectors.toList())
               : Collections.EMPTY_LIST);
     }
 
     if (gravitinoTable.getDistribution() != null
-        && gravitinoTable.getDistribution() != Distributions.NONE) {
+        && !DistributionDTO.NONE.equals(gravitinoTable.getDistribution())) {
       properties.put(
           HIVE_BUCKET_KEY,
           Arrays.stream(gravitinoTable.getDistribution().expressions())
-              .map(ts -> ((FieldReferenceDTO) ts).fieldName()[0])
+              .map(ts -> ((FieldReferenceDTO) ts).fieldName()[0].toLowerCase(Locale.ENGLISH))
               .collect(Collectors.toList()));
 
       properties.put(HIVE_BUCKET_COUNT_KEY, gravitinoTable.getDistribution().number());
@@ -186,7 +198,21 @@ public class HiveMetadataAdapter extends CatalogConnectorMetadataAdapter {
       properties.put(
           HIVE_SORT_ORDER_KEY,
           Arrays.stream(gravitinoTable.getSortOrders())
-              .map(ts -> ((FieldReferenceDTO) ts).fieldName()[0])
+              .map(
+                  sortOrder -> {
+                    Expression expression = sortOrder.expression();
+                    SortDirection sortDirection =
+                        sortOrder.direction() == SortDirection.ASCENDING
+                            ? SortDirection.ASCENDING
+                            : SortDirection.DESCENDING;
+                    Order order =
+                        sortDirection == SortDirection.ASCENDING
+                            ? Order.ASCENDING
+                            : Order.DESCENDING;
+                    return new SortingColumn(
+                        ((FieldReferenceDTO) expression).fieldName()[0].toLowerCase(Locale.ENGLISH),
+                        order);
+                  })
               .collect(Collectors.toList()));
     }
 

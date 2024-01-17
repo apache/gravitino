@@ -5,17 +5,20 @@
 
 package com.datastrato.gravitino.trino.connector.catalog.hive;
 
+import static com.datastrato.gravitino.trino.connector.catalog.hive.SortingColumn.Order.ASCENDING;
+import static com.datastrato.gravitino.trino.connector.catalog.hive.SortingColumn.Order.DESCENDING;
+import static com.google.common.collect.ImmutableList.toImmutableList;
 import static io.trino.spi.session.PropertyMetadata.booleanProperty;
 import static io.trino.spi.session.PropertyMetadata.enumProperty;
 import static io.trino.spi.session.PropertyMetadata.integerProperty;
 import static io.trino.spi.session.PropertyMetadata.stringProperty;
+import static io.trino.spi.type.VarcharType.VARCHAR;
+import static java.util.Locale.ENGLISH;
 
 import com.datastrato.gravitino.trino.connector.catalog.HasPropertyMeta;
 import com.google.common.collect.ImmutableList;
 import io.trino.spi.session.PropertyMetadata;
 import io.trino.spi.type.ArrayType;
-import io.trino.spi.type.VarcharType;
-import java.util.Collections;
 import java.util.List;
 
 /** Implementation of {@link HasPropertyMeta} for Hive catalog. */
@@ -54,33 +57,52 @@ public class HivePropertyMeta implements HasPropertyMeta {
               "org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe",
               false),
           stringProperty("serde_name", "Name of the serde, table name by default", null, false),
-          new PropertyMetadata<List>(
+          new PropertyMetadata<>(
               HIVE_PARTITION_KEY,
-              "The partition columns for the table",
-              new ArrayType(VarcharType.createUnboundedVarcharType()),
+              "Partition columns",
+              new ArrayType(VARCHAR),
               List.class,
-              Collections.EMPTY_LIST,
+              ImmutableList.of(),
               false,
-              a -> (List<Object>) a,
-              a -> a),
-          new PropertyMetadata<List>(
+              value ->
+                  ((List<?>) value)
+                      .stream()
+                          .map(name -> ((String) name).toLowerCase(ENGLISH))
+                          .collect(toImmutableList()),
+              value -> value),
+          new PropertyMetadata<>(
               HIVE_BUCKET_KEY,
-              "The bucket columns for the table",
-              new ArrayType(VarcharType.createUnboundedVarcharType()),
+              "Bucketing columns",
+              new ArrayType(VARCHAR),
               List.class,
-              Collections.EMPTY_LIST,
+              ImmutableList.of(),
               false,
-              a -> (List<Object>) a,
-              a -> a),
-          new PropertyMetadata<List>(
+              value ->
+                  ((List<?>) value)
+                      .stream()
+                          .map(name -> ((String) name).toLowerCase(ENGLISH))
+                          .collect(toImmutableList()),
+              value -> value),
+          new PropertyMetadata<>(
               HIVE_SORT_ORDER_KEY,
-              "The ordered by columns for the table",
-              new ArrayType(VarcharType.createUnboundedVarcharType()),
+              "Bucket sorting columns",
+              new ArrayType(VARCHAR),
               List.class,
-              Collections.EMPTY_LIST,
+              ImmutableList.of(),
               false,
-              a -> (List<Object>) a,
-              a -> a),
+              value ->
+                  ((List<?>) value)
+                      .stream()
+                          .map(String.class::cast)
+                          .map(String::toLowerCase)
+                          .map(HivePropertyMeta::sortingColumnFromString)
+                          .collect(toImmutableList()),
+              value ->
+                  ((List<?>) value)
+                      .stream()
+                          .map(SortingColumn.class::cast)
+                          .map(HivePropertyMeta::sortingColumnToString)
+                          .collect(toImmutableList())),
           integerProperty(
               HIVE_BUCKET_COUNT_KEY, "The number of buckets for the table", null, false));
 
@@ -197,6 +219,22 @@ public class HivePropertyMeta implements HasPropertyMeta {
               "Maximum number of partitions for a single table scan.",
               "1000000",
               false));
+
+  public static String sortingColumnToString(SortingColumn column) {
+    return column.getColumnName() + ((column.getOrder() == DESCENDING) ? " DESC" : "");
+  }
+
+  public static SortingColumn sortingColumnFromString(String name) {
+    SortingColumn.Order order = ASCENDING;
+    String lower = name.toUpperCase(ENGLISH);
+    if (lower.endsWith(" ASC")) {
+      name = name.substring(0, name.length() - 4).trim();
+    } else if (lower.endsWith(" DESC")) {
+      name = name.substring(0, name.length() - 5).trim();
+      order = DESCENDING;
+    }
+    return new SortingColumn(name, order);
+  }
 
   @Override
   public List<PropertyMetadata<?>> getSchemaPropertyMetadata() {

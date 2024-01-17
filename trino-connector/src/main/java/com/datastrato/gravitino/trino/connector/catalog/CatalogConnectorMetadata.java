@@ -126,17 +126,14 @@ public class CatalogConnectorMetadata {
     String comment = table.getComment();
     Map<String, String> properties = table.getProperties();
     try {
-      //      tableCatalog.createTable(identifier, gravitinoColumns, comment, properties);
-      Table t =
-          tableCatalog.createTable(
-              identifier,
-              gravitinoColumns,
-              comment,
-              properties,
-              table.getPartitioning(),
-              table.getDistribution(),
-              table.getSortOrders());
-      System.out.println(t);
+      tableCatalog.createTable(
+          identifier,
+          gravitinoColumns,
+          comment,
+          properties,
+          table.getPartitioning(),
+          table.getDistribution(),
+          table.getSortOrders());
     } catch (NoSuchSchemaException e) {
       throw new TrinoException(GRAVITINO_SCHEMA_NOT_EXISTS, "Schema does not exist", e);
     } catch (TableAlreadyExistsException e) {

@@ -721,7 +721,7 @@ public class TrinoConnectorIT extends AbstractIT {
                 .put("serde-name", "mock11")
                 .put("table-type", "EXTERNAL_TABLE")
                 .build(),
-            new Transform[] {Transforms.identity("IntegerType")},
+            new Transform[] {Transforms.identity("BinaryType")},
             Distributions.of(Strategy.HASH, 4, NamedReference.field("BooleanType")),
             new SortOrder[] {
               SortOrders.of(
@@ -757,8 +757,9 @@ public class TrinoConnectorIT extends AbstractIT {
         data.contains("input_format = 'org.apache.hadoop.hive.ql.io.orc.OrcInputFormat'"));
     Assertions.assertTrue(data.contains("serde_lib = 'org.apache.hadoop.hive.ql.io.orc.OrcSerde'"));
     Assertions.assertTrue(data.contains("bucket_count = 4"));
-    Assertions.assertTrue(data.contains("bucketed_by = ARRAY['BooleanType']"));
-    Assertions.assertTrue(data.contains("partitioned_by = ARRAY['IntegerType']"));
+    Assertions.assertTrue(data.contains("bucketed_by = ARRAY['booleantype']"));
+    Assertions.assertTrue(data.contains("partitioned_by = ARRAY['binarytype']"));
+    Assertions.assertTrue(data.contains("sorted_by = ARRAY['longtype']"));
   }
 
   @Test
