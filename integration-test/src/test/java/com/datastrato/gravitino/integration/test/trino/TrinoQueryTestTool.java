@@ -61,6 +61,17 @@ public class TrinoQueryTestTool {
       if (commandLine.hasOption("help")) {
         HelpFormatter formatter = new HelpFormatter();
         formatter.printHelp("TrinoTestTool", options);
+        String example =
+            "Examples:\n"
+                + "Run all the testers:\n"
+                + "TrinoTestTool --auto=all\n\n"
+                + "Run all the testers in the tpch testset under all catalogs:\n"
+                + "TrinoTestTool --testset=tpch --auto=all\n\n"
+                + "Run special tester in the tpch testset under hive catalog :\n"
+                + "TrinoTestTool --testset=tpch --tester_id=0005 --catalog=hive --auto=all\n\n"
+                + "Run all the testers in the tpch testset under mysql catalogs with manual start environment:\n"
+                + "TrinoTestTool --testset=tpch -- catalog=mysql --auto=none --trino_uri=http://10.3.21.12:8080 --mysql_url=jdbc:mysql:/10.3.21.12 \n";
+        System.out.println(example);
         return;
       }
 
@@ -68,18 +79,19 @@ public class TrinoQueryTestTool {
       boolean autoStartGravitino = true;
       if (commandLine.getOptionValue("auto") != null) {
         String auto = commandLine.getOptionValue("auto");
-        if (auto.equals("all")) {
-          autoStart = true;
-          autoStartGravitino = true;
-        } else if (auto.equals("gravitino")) {
-          autoStart = false;
-          autoStartGravitino = true;
-        } else if (auto.equals("none")) {
-          autoStart = false;
-          autoStartGravitino = false;
-        } else {
-          System.out.println("The value of --auto must be 'all' or 'gravitino'");
-          return;
+        switch (auto) {
+          case "all":
+            break;
+          case "gravitino":
+            autoStart = false;
+            break;
+          case "none":
+            autoStart = false;
+            autoStartGravitino = false;
+            break;
+          default:
+            System.out.println("The value of --auto must be 'all', 'gravitino' or 'none'");
+            return;
         }
       }
 

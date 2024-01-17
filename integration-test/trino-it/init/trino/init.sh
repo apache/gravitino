@@ -4,7 +4,6 @@
 #
 
 /etc/trino/update-trino-conf.sh
-
 nohup /usr/lib/trino/bin/run-trino &
 
 counter=0
