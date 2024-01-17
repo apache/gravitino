@@ -703,7 +703,8 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       return HiveTable.fromHiveTable(alteredHiveTable);
 
     } catch (TException | InterruptedException e) {
-      if (e.getMessage().contains("types incompatible with the existing columns")) {
+      if (e.getMessage() != null
+          && e.getMessage().contains("types incompatible with the existing columns")) {
         throw new IllegalArgumentException(
             "Failed to alter Hive table ["
                 + tableIdent.name()
