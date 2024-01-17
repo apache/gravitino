@@ -34,6 +34,11 @@ public class LiteralDTO implements Literal<String>, FunctionArg {
     return ArgType.LITERAL;
   }
 
+  @Override
+  public String toString() {
+    return "LiteralDTO{" + "value='" + value + '\'' + ", dataType=" + dataType + '}';
+  }
+
   public static class Builder {
     private String value;
     private Type dataType;

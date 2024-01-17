@@ -190,5 +190,10 @@ public class Literals {
     public int hashCode() {
       return Objects.hash(value, dataType);
     }
+
+    @Override
+    public String toString() {
+      return value == null ? "NULL" : value.toString();
+    }
   }
 }

@@ -331,10 +331,13 @@ public class JsonUtils {
         gen.writeObject(((FieldReferenceDTO) arg).fieldName());
         break;
       case FUNCTION:
-        gen.writeStringField(FUNCTION_NAME, ((FuncExpressionDTO) arg).functionName());
+        FuncExpressionDTO funcExpression = (FuncExpressionDTO) arg;
+        gen.writeStringField(FUNCTION_NAME, funcExpression.functionName());
         gen.writeArrayFieldStart(FUNCTION_ARGS);
-        for (FunctionArg funcArg : ((FuncExpressionDTO) arg).args()) {
-          writeFunctionArg(funcArg, gen);
+        if (funcExpression.args() != null) {
+          for (FunctionArg funcArg : funcExpression.args()) {
+            writeFunctionArg(funcArg, gen);
+          }
         }
         gen.writeEndArray();
         break;

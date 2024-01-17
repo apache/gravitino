@@ -19,7 +19,6 @@ public abstract class JdbcColumnDefaultValueConverter<T, V> {
 
   protected static final String CURRENT_TIMESTAMP = "CURRENT_TIMESTAMP";
   protected static final String NULL = "NULL";
-  private static final String CURRENT_DATE = "curdate()";
   protected static final Pattern EXPRESSION = Pattern.compile("^\\((.*)\\)$");
   protected static final Pattern LITERAL = Pattern.compile("^'(.*?)'$");
   protected static final DateTimeFormatter DATE_TIME_FORMATTER =
@@ -41,8 +40,7 @@ public abstract class JdbcColumnDefaultValueConverter<T, V> {
       if (functionExpression.functionName().equalsIgnoreCase(CURRENT_TIMESTAMP)) {
         return CURRENT_TIMESTAMP;
       } else {
-        throw new IllegalArgumentException(
-            "Not a supported function expression: " + functionExpression);
+        return String.format("(%s)", functionExpression);
       }
     }
 

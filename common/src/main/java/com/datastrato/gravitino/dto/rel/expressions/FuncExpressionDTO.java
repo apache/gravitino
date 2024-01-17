@@ -6,6 +6,7 @@ package com.datastrato.gravitino.dto.rel.expressions;
 
 import com.datastrato.gravitino.rel.expressions.Expression;
 import com.datastrato.gravitino.rel.expressions.FunctionExpression;
+import java.util.Arrays;
 import lombok.EqualsAndHashCode;
 
 @EqualsAndHashCode
@@ -53,6 +54,15 @@ public class FuncExpressionDTO implements FunctionExpression, FunctionArg {
 
     public FuncExpressionDTO build() {
       return new FuncExpressionDTO(functionName, functionArgs);
+    }
+  }
+
+  @Override
+  public String toString() {
+    if (functionArgs.length == 0) {
+      return functionName + "()";
+    } else {
+      return functionName + "(" + Arrays.toString(functionArgs) + ")";
     }
   }
 }

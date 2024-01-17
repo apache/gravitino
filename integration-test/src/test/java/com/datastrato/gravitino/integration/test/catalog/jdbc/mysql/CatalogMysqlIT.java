@@ -4,6 +4,7 @@
  */
 package com.datastrato.gravitino.integration.test.catalog.jdbc.mysql;
 
+import static com.datastrato.gravitino.dto.util.DTOConverters.toFunctionArg;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.datastrato.gravitino.Catalog;
@@ -12,6 +13,8 @@ import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.catalog.jdbc.config.JdbcConfig;
 import com.datastrato.gravitino.client.GravitinoMetaLake;
 import com.datastrato.gravitino.dto.rel.ColumnDTO;
+import com.datastrato.gravitino.dto.rel.expressions.FuncExpressionDTO;
+import com.datastrato.gravitino.dto.rel.expressions.LiteralDTO;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NotFoundException;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
@@ -28,6 +31,7 @@ import com.datastrato.gravitino.rel.TableCatalog;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
+import com.datastrato.gravitino.rel.expressions.literals.Literals;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
@@ -384,6 +388,96 @@ public class CatalogMysqlIT extends AbstractIT {
             distribution,
             sortOrders);
     Assertions.assertEquals(createdTable.name(), name);
+  }
+
+  @Test
+  void testColumnDefaultValue() {
+    // todo: uncomment this after fix jdbc parser issue.
+    // ColumnDTO col1 =
+    //    new ColumnDTO.Builder()
+    //        .withName(MYSQL_COL_NAME1)
+    //        .withDataType(Types.IntegerType.get())
+    //        .withComment("col_1_comment")
+    //        .withNullable(false)
+    //        .withDefaultValue(new FuncExpressionDTO.Builder().withFunctionName("rand").build())
+    //        .build();
+    ColumnDTO col2 =
+        new ColumnDTO.Builder()
+            .withName(MYSQL_COL_NAME2)
+            .withDataType(Types.TimestampType.withoutTimeZone())
+            .withComment("col_2_comment")
+            .withNullable(false)
+            .withDefaultValue(
+                new FuncExpressionDTO.Builder().withFunctionName("current_timestamp").build())
+            .build();
+    ColumnDTO col3 =
+        new ColumnDTO.Builder()
+            .withName(MYSQL_COL_NAME3)
+            .withDataType(Types.VarCharType.of(255))
+            .withComment("col_3_comment")
+            .withNullable(true)
+            .withDefaultValue(
+                new LiteralDTO.Builder()
+                    .withValue("null")
+                    .withDataType(Types.NullType.get())
+                    .build())
+            .build();
+    ColumnDTO col4 =
+        new ColumnDTO.Builder()
+            .withName("col_4")
+            .withDataType(Types.StringType.get())
+            .withComment("col_4_comment")
+            .withNullable(true)
+            .withDefaultValue(
+                new LiteralDTO.Builder()
+                    .withValue("null")
+                    .withDataType(Types.NullType.get())
+                    .build())
+            .build();
+    ColumnDTO col5 =
+        new ColumnDTO.Builder()
+            .withName("col_5")
+            .withDataType(Types.VarCharType.of(255))
+            .withComment("col_5_comment")
+            .withNullable(true)
+            .withDefaultValue(
+                new LiteralDTO.Builder()
+                    .withValue("current_timestamp")
+                    .withDataType(Types.StringType.get())
+                    .build())
+            .build();
+    ColumnDTO[] newColumns =
+        new ColumnDTO[] {
+          /*col1,*/
+          col2, col3, col4, col5
+        };
+
+    Table createdTable =
+        catalog
+            .asTableCatalog()
+            .createTable(
+                NameIdentifier.of(
+                    metalakeName,
+                    catalogName,
+                    schemaName,
+                    GravitinoITUtils.genRandomName("mysql_it_table")),
+                newColumns,
+                null,
+                ImmutableMap.of());
+    // todo: uncomment this after fix jdbc parser issue.
+    // Assertions.assertEquals(
+    //    UnparsedExpression.of("rand()"), createdTable.columns()[0].defaultValue());
+    Assertions.assertEquals(
+        toFunctionArg(Column.DEFAULT_VALUE_OF_CURRENT_TIMESTAMP),
+        createdTable.columns()[0].defaultValue());
+    Assertions.assertEquals(toFunctionArg(Literals.NULL), createdTable.columns()[1].defaultValue());
+    Assertions.assertEquals(Column.DEFAULT_VALUE_NOT_SET, createdTable.columns()[2].defaultValue());
+    Assertions.assertEquals(
+        new LiteralDTO.Builder()
+            .withValue("current_timestamp")
+            .withDataType(Types.VarCharType.of(255))
+            .build(),
+        createdTable.columns()[3].defaultValue());
   }
 
   @Test
