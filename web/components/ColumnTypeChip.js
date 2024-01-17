@@ -11,17 +11,11 @@ import { alpha } from '@/lib/utils/color'
 const ColumnTypeChip = props => {
   const { type } = props
 
-  const bgColor = alpha(colors[ColumnTypeColorEnum[type]].main, 0.1)
+  const columnTypeColor = ColumnTypeColorEnum[type] || 'secondary'
+  const color = colors[columnTypeColor]?.main || '#8592A3'
+  const bgColor = alpha(color, 0.1)
 
-  return (
-    <Chip
-      size='small'
-      label={type}
-      sx={{ backgroundColor: bgColor }}
-      color={ColumnTypeColorEnum[type]}
-      variant='outlined'
-    />
-  )
+  return <Chip size='small' label={type} sx={{ backgroundColor: bgColor }} color={columnTypeColor} variant='outlined' />
 }
 
 export default ColumnTypeChip
