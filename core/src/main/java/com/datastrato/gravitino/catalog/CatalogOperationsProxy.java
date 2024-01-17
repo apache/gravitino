@@ -10,6 +10,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.util.Collections;
 
+/** Proxy wrapper on CatalogOperations to execute operations by impersonating given user */
 public class CatalogOperationsProxy implements InvocationHandler {
 
   private final CatalogProxyPlugin plugin;

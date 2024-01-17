@@ -22,7 +22,7 @@ public class HiveCatalogPropertiesMeta extends BaseCatalogPropertiesMetadata {
       "client.pool.cache.eviction-interval-ms";
 
   public static final long DEFAULT_CLIENT_POOL_CACHE_EVICTION_INTERVAL_MS =
-      TimeUnit.MINUTES.toMillis(5);;
+      TimeUnit.MINUTES.toMillis(5);
 
   public static final String IMPERSONATION_ENABLE = "impersonation.enable";
 

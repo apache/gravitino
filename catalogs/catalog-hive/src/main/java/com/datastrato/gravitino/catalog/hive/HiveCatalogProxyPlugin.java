@@ -44,7 +44,7 @@ class HiveCatalogProxyPlugin implements CatalogProxyPlugin {
       } else if (innerException instanceof InvocationTargetException) {
         throw innerException.getCause();
       } else {
-        throw e.getCause();
+        throw innerException;
       }
     }
   }
