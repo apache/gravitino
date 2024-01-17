@@ -85,6 +85,30 @@ const TableView = props => {
     {
       flex: 0.1,
       minWidth: 60,
+      field: 'type',
+      headerName: 'Type',
+      renderCell: ({ row }) => {
+        const { type } = row
+
+        return (
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            <Typography
+              noWrap
+              sx={{
+                fontWeight: 500,
+                color: 'text.main',
+                textDecoration: 'none'
+              }}
+            >
+              {type}
+            </Typography>
+          </Box>
+        )
+      }
+    },
+    {
+      flex: 0.1,
+      minWidth: 60,
       field: 'nullable',
       headerName: 'Nullable',
       renderCell: ({ row }) => {
@@ -106,30 +130,7 @@ const TableView = props => {
         )
       }
     },
-    {
-      flex: 0.1,
-      minWidth: 60,
-      field: 'type',
-      headerName: 'Type',
-      renderCell: ({ row }) => {
-        const { type } = row
-
-        return (
-          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <Typography
-              noWrap
-              sx={{
-                fontWeight: 500,
-                color: 'text.main',
-                textDecoration: 'none'
-              }}
-            >
-              {type}
-            </Typography>
-          </Box>
-        )
-      }
-    }
+    
   ]
 
   return (
