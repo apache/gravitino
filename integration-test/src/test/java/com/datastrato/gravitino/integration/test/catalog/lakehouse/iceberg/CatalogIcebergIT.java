@@ -17,8 +17,6 @@ import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergTable;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.ops.IcebergTableOpsHelper;
 import com.datastrato.gravitino.client.GravitinoMetaLake;
 import com.datastrato.gravitino.dto.rel.ColumnDTO;
-import com.datastrato.gravitino.dto.rel.partitions.DayPartitioningDTO;
-import com.datastrato.gravitino.dto.rel.partitions.IdentityPartitioningDTO;
 import com.datastrato.gravitino.dto.rel.partitions.Partitioning;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
@@ -345,8 +343,7 @@ public class CatalogIcebergIT extends AbstractIT {
               NullOrdering.NULLS_FIRST)
         };
 
-    Partitioning[] partitioning = new Partitioning[] {DayPartitioningDTO.of(columns[1].name())};
-
+    Transform[] partitioning = new Transform[] {Transforms.day(columns[1].name())};
     Map<String, String> properties = createProperties();
     TableCatalog tableCatalog = catalog.asTableCatalog();
     Table createdTable =
@@ -419,7 +416,7 @@ public class CatalogIcebergIT extends AbstractIT {
                     columns,
                     table_comment,
                     properties,
-                    Partitioning.EMPTY_PARTITIONING,
+                    Transforms.EMPTY_TRANSFORM,
                     distribution,
                     sortOrders));
   }
@@ -437,7 +434,7 @@ public class CatalogIcebergIT extends AbstractIT {
         columns,
         table_comment,
         properties,
-        Partitioning.EMPTY_PARTITIONING,
+        Transforms.EMPTY_TRANSFORM,
         Distributions.NONE,
         new SortOrder[0]);
     NameIdentifier[] nameIdentifiers =
@@ -456,7 +453,7 @@ public class CatalogIcebergIT extends AbstractIT {
         columns,
         table_comment,
         properties,
-        Partitioning.EMPTY_PARTITIONING,
+        Transforms.EMPTY_TRANSFORM,
         Distributions.NONE,
         new SortOrder[0]);
     nameIdentifiers = tableCatalog.listTables(Namespace.of(metalakeName, catalogName, schemaName));
@@ -497,7 +494,7 @@ public class CatalogIcebergIT extends AbstractIT {
                 columns,
                 table_comment,
                 createProperties(),
-                new Partitioning[] {IdentityPartitioningDTO.of(columns[0].name())});
+                new Transform[] {Transforms.identity(columns[0].name())});
     Assertions.assertNull(table.auditInfo().lastModifier());
     Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, table.auditInfo().creator());
     Assertions.assertThrows(
@@ -593,7 +590,7 @@ public class CatalogIcebergIT extends AbstractIT {
             newColumns,
             table_comment,
             ImmutableMap.of(),
-            Partitioning.EMPTY_PARTITIONING,
+            Transforms.EMPTY_TRANSFORM,
             Distributions.NONE,
             new SortOrder[0]);
 
@@ -696,8 +693,8 @@ public class CatalogIcebergIT extends AbstractIT {
           SortDirection.DESCENDING,
           NullOrdering.NULLS_FIRST),
     };
-    Partitioning[] transforms = {
-      DayPartitioningDTO.of(columns[1].name()), IdentityPartitioningDTO.of(columns[2].name())
+    Transform[] transforms = {
+      Transforms.day(columns[1].name()), Transforms.identity(columns[2].name())
     };
     catalog
         .asTableCatalog()
