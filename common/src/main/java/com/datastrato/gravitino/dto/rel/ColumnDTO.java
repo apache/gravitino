@@ -4,10 +4,12 @@
  */
 package com.datastrato.gravitino.dto.rel;
 
+import com.datastrato.gravitino.dto.rel.expressions.LiteralDTO;
 import com.datastrato.gravitino.json.JsonUtils;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.expressions.Expression;
 import com.datastrato.gravitino.rel.types.Type;
+import com.datastrato.gravitino.rel.types.Types;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
@@ -211,6 +213,12 @@ public class ColumnDTO implements Column {
     }
     if (dataType() == null) {
       throw new IllegalArgumentException("Column data type cannot be null.");
+    }
+    if (!nullable()
+        && defaultValue() instanceof LiteralDTO
+        && ((LiteralDTO) defaultValue()).dataType().equals(Types.NullType.get())) {
+      throw new IllegalArgumentException(
+          "Column cannot be non-nullable with a null default value: " + name());
     }
   }
 }

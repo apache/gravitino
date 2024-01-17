@@ -185,7 +185,7 @@ const MetalakeList = () => {
             setDialogType={setDialogType}
           />
           <DataGrid
-            autoHeight
+            style={{ maxHeight: 'calc(100vh - 23.2rem)' }}
             getRowId={row => row?.name}
             rows={store.filteredMetalakes}
             columns={columns}

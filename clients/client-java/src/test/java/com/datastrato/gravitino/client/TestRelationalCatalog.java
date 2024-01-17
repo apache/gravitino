@@ -25,6 +25,7 @@ import com.datastrato.gravitino.dto.rel.SortOrderDTO;
 import com.datastrato.gravitino.dto.rel.TableDTO;
 import com.datastrato.gravitino.dto.rel.expressions.FieldReferenceDTO;
 import com.datastrato.gravitino.dto.rel.expressions.FunctionArg;
+import com.datastrato.gravitino.dto.rel.expressions.LiteralDTO;
 import com.datastrato.gravitino.dto.rel.partitions.DayPartitioningDTO;
 import com.datastrato.gravitino.dto.rel.partitions.IdentityPartitioningDTO;
 import com.datastrato.gravitino.dto.rel.partitions.Partitioning;
@@ -380,6 +381,28 @@ public class TestRelationalCatalog extends TestBase {
     Assertions.assertEquals(expectedTable.columns()[1].dataType(), table.columns()[1].dataType());
     Assertions.assertEquals(expectedTable.columns()[1].comment(), table.columns()[1].comment());
     assertTableEquals(expectedTable, table);
+
+    // test validate column default value
+    ColumnDTO[] errorColumns =
+        new ColumnDTO[] {
+          createMockColumn("col1", Types.ByteType.get(), "comment1"),
+          createMockColumn(
+              "col2",
+              Types.StringType.get(),
+              "comment2",
+              false,
+              new LiteralDTO.Builder().withValue(null).withDataType(Types.NullType.get()).build())
+        };
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                catalog
+                    .asTableCatalog()
+                    .createTable(tableId, errorColumns, "comment", Collections.emptyMap()));
+    Assertions.assertEquals(
+        "Column cannot be non-nullable with a null default value: col2", exception.getMessage());
 
     // Test throw NoSuchSchemaException
     ErrorResponse errorResp =
@@ -1033,6 +1056,17 @@ public class TestRelationalCatalog extends TestBase {
         .withDataType(type)
         .withComment(comment)
         .withNullable(nullable)
+        .build();
+  }
+
+  private static ColumnDTO createMockColumn(
+      String name, Type type, String comment, boolean nullable, LiteralDTO defaultValue) {
+    return new ColumnDTO.Builder<>()
+        .withName(name)
+        .withDataType(type)
+        .withComment(comment)
+        .withNullable(nullable)
+        .withDefaultValue(defaultValue)
         .build();
   }
 
