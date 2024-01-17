@@ -1,7 +1,7 @@
 ---
 title: "Getting started with Gravitino"
 slug: /getting-started
-license: "Copyright 2023 Datastrato Pvt Ltd.
+license: "Copyright 2023 Datastrato Pvt. Ltd.
 This software is licensed under the Apache License version 2."
 ---
 
@@ -51,14 +51,14 @@ If you are using AWS and want to access the instance remotely, be sure to read [
    - Guidelines for accessing Gravitino externally when deployed on AWS, including necessary configurations and considerations.
 
 10. **Next Steps and Conclusion:**
-    - Concluding thoughts, summarizing key points, and suggesting next steps for users who have completed the setup.
+    - Concluding thoughts and suggesting next steps for users who have completed the setup.
 
 
 ## Getting started on Amazon Web Services
 
 To begin using Gravitino on AWS, follow these steps:
 
-1. In the AWS console, launch a new instance. Select `Ubuntu` as the operating system and `t2.xlarge` as the instance type. Create a key pair named *Gravitino.pem* for SSH access and download it. Allow HTTP and HTTPS traffic, if you want to connect to the instance remotely. Set the Elastic Block Store storage to 20GiB. Leave all other settings as their defaults. Other operating systems and instance types may work, but they have yet to be fully tested.
+1. In the AWS console, launch a new instance. Select `Ubuntu` as the operating system and `t2.xlarge` as the instance type. Create a key pair named *Gravitino.pem* for SSH access and download it. Allow HTTP and HTTPS traffic, if you want to connect to the instance remotely. Set the Elastic Block Store storage to 20GiB. Leave all other settings at their defaults. Other operating systems and instance types may work, but they have yet to be fully tested.
 
 2. Start the instance and connect to it via SSH using the downloaded .pem file:
 
@@ -216,7 +216,8 @@ Gravitino provides a bundle of Docker images to launch a Gravitino playground, w
 includes Apache Hive, Apache Hadoop, Trino, MySQL, PostgreSQL, and Gravitino. You can use
 Docker compose to start them all.
 
-Installing Docker and Docker Compose is a requirement for using the playground.
+Installing Docker and Docker Compose is a requirement for using the playground. 
+Note : The following command is more suitable for Debian/Ubuntu systems. Users on other systems (like Fedora, CentOS) should use the appropriate package manager.
 
 ```shell
 sudo apt install docker docker-compose
@@ -339,4 +340,3 @@ Congratulations! You've successfully set up Gravitino on your chosen platform. H
 
 Remember, this document serves as a starting point. Feel free to customize your Gravitino setup based on your requirements and explore the vast possibilities this powerful tool offers. If you encounter any issues or have questions, don't hesitate to reach out to the Gravitino community for support.
 
-Happy data processing with Gravitino!
