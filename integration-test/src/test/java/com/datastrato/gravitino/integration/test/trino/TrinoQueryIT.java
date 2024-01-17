@@ -121,6 +121,7 @@ public class TrinoQueryIT extends TrinoQueryITBase {
       throws Exception {
     String path = ITUtils.joinPath(testSetDirName, filename);
     String sqls = TrinoQueryITBase.readFileToString(path);
+    sqls = removeSqlComments(sqls);
 
     Matcher sqlMatcher =
         Pattern.compile("(\\w.*?);", Pattern.DOTALL | Pattern.UNIX_LINES).matcher(sqls);
@@ -148,6 +149,10 @@ public class TrinoQueryIT extends TrinoQueryITBase {
     }
   }
 
+  private static String removeSqlComments(String sql) {
+    return sql.replaceAll("--.*?\\n", "");
+  }
+
   private static String resolveParameters(String sql) throws Exception {
     Matcher sqlMatcher = Pattern.compile("\\$\\{([\\w_]+)\\}").matcher(sql);
     StringBuffer replacedString = new StringBuffer();
@@ -172,9 +177,11 @@ public class TrinoQueryIT extends TrinoQueryITBase {
 
   void executeSqlFileWithCheckResult(
       String testSetDirName, String filename, TrinoQueryRunner queryRunner, String catalog)
-      throws IOException {
+      throws Exception {
     String path = ITUtils.joinPath(testSetDirName, filename);
     String sqls = TrinoQueryITBase.readFileToString(path);
+    sqls = removeSqlComments(sqls);
+
     String resultFileName = path.replace(".sql", ".txt");
     String testResults = TrinoQueryITBase.readFileToString(resultFileName);
 
@@ -186,6 +193,7 @@ public class TrinoQueryIT extends TrinoQueryITBase {
 
     while (sqlMatcher.find()) {
       String sql = sqlMatcher.group(1);
+      sql = resolveParameters(sql);
       String expectResult = "";
       if (resultMatcher.find()) {
         expectResult = resultMatcher.group(1).trim();
@@ -231,10 +239,14 @@ public class TrinoQueryIT extends TrinoQueryITBase {
       return false;
     }
 
-    // match text
-    boolean match = expectResult.equals(result);
-    if (match) {
-      return true;
+    // match black line
+    // E.g., the expected result can be matched with the following actual result:
+    // query result:
+    //
+    // expectResult:
+    // <BLANK_LINE>
+    if (expectResult.equals("<BLANK_LINE>")) {
+      return result.isEmpty();
     }
 
     // Match query failed result.
@@ -243,10 +255,20 @@ public class TrinoQueryIT extends TrinoQueryITBase {
     // Query 20240103_132722_00006_pijfx failed: line 8:6: Schema must be specified when session
     // schema is not set
     // expectResult:
-    // Schema must be specified when session schema is not set
-    if (Pattern.compile("^Query \\w+ failed:").matcher(result).find()) {
-      match = Pattern.compile("^Query \\w+ failed.*: " + expectResult).matcher(result).find();
+    // <QUERY_FAILED> Schema must be specified when session schema is not set
+    if (expectResult.startsWith("<QUERY_FAILED>")) {
+      boolean match =
+          Pattern.compile(
+                  "^Query \\w+ failed.*: " + expectResult.replace("<QUERY_FAILED>", "").trim())
+              .matcher(result)
+              .find();
       return match;
+    }
+
+    // match text
+    boolean match = expectResult.equals(result);
+    if (match) {
+      return true;
     }
 
     // Match Wildcard.

@@ -230,11 +230,14 @@ public class CatalogConnectorMetadata {
   public void addColumn(SchemaTableName schemaTableName, GravitinoColumn column) {
     String[] columnNames = {column.getName()};
     if (Strings.isNullOrEmpty(column.getComment()))
-      applyAlter(schemaTableName, TableChange.addColumn(columnNames, column.getType()));
+      applyAlter(
+          schemaTableName,
+          TableChange.addColumn(columnNames, column.getType(), column.isNullable()));
     else {
       applyAlter(
           schemaTableName,
-          TableChange.addColumn(columnNames, column.getType(), column.getComment()));
+          TableChange.addColumn(
+              columnNames, column.getType(), column.getComment(), column.isNullable()));
     }
   }
 
