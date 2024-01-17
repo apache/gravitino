@@ -11,6 +11,8 @@ import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.catalog.hive.HiveClientPool;
 import com.datastrato.gravitino.client.GravitinoMetaLake;
 import com.datastrato.gravitino.dto.rel.ColumnDTO;
+import com.datastrato.gravitino.dto.rel.expressions.FieldReferenceDTO;
+import com.datastrato.gravitino.dto.rel.partitions.Partitioning.SingleFieldPartitioning;
 import com.datastrato.gravitino.integration.test.catalog.jdbc.utils.JdbcDriverDownloader;
 import com.datastrato.gravitino.integration.test.container.ContainerSuite;
 import com.datastrato.gravitino.integration.test.container.HiveContainer;
@@ -878,7 +880,15 @@ public class TrinoConnectorIT extends AbstractIT {
             ImmutableMap.<String, String>builder()
                 .put("format-version", "1")
                 .put("key1", "value1")
-                .build());
+                .build(),
+            new Transform[] {Transforms.identity("BinaryType")},
+            Distributions.NONE,
+            new SortOrder[] {
+              SortOrders.of(
+                  NamedReference.field("LongType"),
+                  SortDirection.ASCENDING,
+                  NullOrdering.NULLS_FIRST)
+            });
     LOG.info("create table \"{}.{}\".{}.{}", metalakeName, catalogName, schemaName, tableName);
 
     Table table =
@@ -900,6 +910,26 @@ public class TrinoConnectorIT extends AbstractIT {
     LOG.info("create iceberg hive table sql is: " + data);
     // Iceberg does not contain any properties;
     Assertions.assertFalse(data.contains("key1"));
+    Assertions.assertTrue(data.contains("partitioning = ARRAY['BinaryType']"));
+    Assertions.assertTrue(data.contains("sorted_by = ARRAY['LongType']"));
+
+    String tableCreatedByTrino = GravitinoITUtils.genRandomName("table").toLowerCase();
+    String createTableSql =
+        String.format(
+            "CREATE TABLE \"%s.%s\".%s.%s (id int, name varchar) with (partitioning = ARRAY['name'], sorted_by = ARRAY['id'])",
+            metalakeName, catalogName, schemaName, tableCreatedByTrino);
+    containerSuite.getTrinoContainer().executeUpdateSQL(createTableSql);
+
+    table =
+        catalog
+            .asTableCatalog()
+            .loadTable(
+                NameIdentifier.of(metalakeName, catalogName, schemaName, tableCreatedByTrino));
+
+    Arrays.stream(table.partitioning())
+        .anyMatch(p -> ((SingleFieldPartitioning) p).fieldName()[0].equals("name"));
+    Arrays.stream(table.sortOrder())
+        .anyMatch(p -> ((FieldReferenceDTO) p.expression()).fieldName()[0].equals("id"));
   }
 
   @Test
