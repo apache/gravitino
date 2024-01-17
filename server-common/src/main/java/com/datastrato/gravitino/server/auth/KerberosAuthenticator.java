@@ -1,14 +1,29 @@
-/*
- * Copyright 2024 Datastrato Pvt Ltd.
- * This software is licensed under the Apache License version 2.
+/**
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License. See accompanying LICENSE file.
  */
+
 package com.datastrato.gravitino.server.auth;
 
 import com.datastrato.gravitino.Config;
+import com.datastrato.gravitino.UserPrincipal;
 import com.datastrato.gravitino.auth.AuthConstants;
 import com.datastrato.gravitino.exceptions.UnauthorizedException;
 import org.apache.commons.lang3.StringUtils;
+import org.ietf.jgss.GSSContext;
+import org.ietf.jgss.GSSCredential;
+import org.ietf.jgss.GSSException;
 import org.ietf.jgss.GSSManager;
+import org.ietf.jgss.Oid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -16,18 +31,20 @@ import javax.security.auth.Subject;
 import javax.security.auth.kerberos.KerberosPrincipal;
 import javax.security.auth.kerberos.KeyTab;
 import java.io.File;
-import java.io.IOException;
 import java.security.Principal;
 import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
 import java.util.Base64;
 
+/**
+ * Provides Kerberos authentication mechanism.
+ * Referred from Apache Hadoop KerberosAuthenticationHandler.java
+ * hadoop-common-project/hadoop-auth/src/main/java/org/apache/hadoop/\
+ * security/authentication/server/KerberosAuthenticationHandler.java
+ */
 public class KerberosAuthenticator implements Authenticator {
 
-    public static final Logger LOG = LoggerFactory.getLogger(
-            KerberosAuthenticator.class);
-    private static final String PRINCIPAL = "kerberos.principal";
-
+    public static final Logger LOG = LoggerFactory.getLogger(KerberosAuthenticator.class);
     private final Subject serverSubject = new Subject();
     private GSSManager gssManager;
 
@@ -54,7 +71,7 @@ public class KerberosAuthenticator implements Authenticator {
                         return GSSManager.getInstance();
                     }
                 });
-        } catch (PrivilegedActionException | IOException ex) {
+        } catch (PrivilegedActionException ex) {
             throw new RuntimeException(ex);
         }
 
@@ -68,22 +85,82 @@ public class KerberosAuthenticator implements Authenticator {
     @Override
     public Principal authenticateToken(byte[] tokenData) {
         if (tokenData == null) {
-            throw new UnauthorizedException("Empty token authorization header");
+            throw new UnauthorizedException("Empty token authorization header", AuthConstants.NEGOTIATE);
         }
         String authData = new String(tokenData);
         if (StringUtils.isBlank(authData)
                 || !authData.startsWith(AuthConstants.AUTHORIZATION_NEGOTIATE_HEADER)) {
-            throw new UnauthorizedException("Invalid token authorization header");
+            throw new UnauthorizedException("Invalid token authorization header", AuthConstants.NEGOTIATE);
         }
         String token = authData.substring(AuthConstants.AUTHORIZATION_NEGOTIATE_HEADER.length());
         byte[] clientToken = Base64.getDecoder().decode(token);
         if (StringUtils.isBlank(token)) {
-            throw new UnauthorizedException("Blank token found");
+            throw new UnauthorizedException("Blank token found", AuthConstants.NEGOTIATE);
         }
         try {
-            String serverPrincipal =
-
+            String serverPrincipal = KerberosUtil.getTokenServerName(clientToken);
+            return Subject.doAs(serverSubject,
+                    new PrivilegedExceptionAction<Principal>() {
+                        @Override
+                        public Principal run() throws Exception {
+                            return validClientToken(serverPrincipal, clientToken);
+                        }
+                    });
+        } catch (Exception e) {
+            throw new UnauthorizedException("Fail to valid the token", AuthConstants.NEGOTIATE);
         }
     }
+    private Principal validClientToken(String serverPrincipal, byte[] clientToken) throws GSSException {
+        GSSContext gssContext = null;
+        GSSCredential gssCreds = null;
+        try {
+            LOG.trace("SPNEGO initiated with server principal [{}]", serverPrincipal);
+            gssCreds = this.gssManager.createCredential(
+                    this.gssManager.createName(serverPrincipal,
+                            KerberosUtil.NT_GSS_KRB5_PRINCIPAL_OID),
+                    GSSCredential.INDEFINITE_LIFETIME,
+                    new Oid[]{
+                            KerberosUtil.GSS_SPNEGO_MECH_OID,
+                            KerberosUtil.GSS_KRB5_MECH_OID },
+                    GSSCredential.ACCEPT_ONLY);
+            gssContext = this.gssManager.createContext(gssCreds);
+            byte[] serverToken = gssContext.acceptSecContext(clientToken, 0,
+                    clientToken.length);
 
+            String authenticateToken = null;
+            if (serverToken != null && serverToken.length > 0) {
+                authenticateToken = Base64.getEncoder().encodeToString(serverToken);
+            }
+            if (!gssContext.isEstablished()) {
+                LOG.trace("SPNEGO in progress");
+                String challenge = AuthConstants.AUTHORIZATION_NEGOTIATE_HEADER + authenticateToken;
+                throw new UnauthorizedException("GssContext isn't established", challenge);
+            }
+            // Usually principal names are in the form 'user/instance@REALM' or 'user@REALM'.
+            String[] principalComponents = gssContext.getSrcName().toString().split("@");
+            if (principalComponents.length != 2) {
+                throw new UnauthorizedException("Principal has wrong format", AuthConstants.NEGOTIATE);
+            }
+            String[] userAndInstance = principalComponents[0].split("/");
+            if (userAndInstance.length > 2) {
+                throw new UnauthorizedException("Principal has wrong format", AuthConstants.NEGOTIATE);
+            }
+            String user = userAndInstance[0];
+            // TODO: We will have KerberosUserPrincipal in the future.
+            //  We can put more information of Kerberos to the KerberosUserPrincipal
+            // For example, we can put the token into the KerberosUserPrincipal,
+            // We can return the token to the client. It will be convenient for client
+            // to establish the security context. Hadoop uses the cookie to store the token.
+            // For now, we don't store it in the cookie. It's not required for the protocol.
+            // https://datatracker.ietf.org/doc/html/rfc4559
+            return new UserPrincipal(user);
+        } finally {
+            if (gssContext != null) {
+                gssContext.dispose();
+            }
+            if (gssCreds != null) {
+                gssCreds.dispose();
+            }
+        }
+    }
 }

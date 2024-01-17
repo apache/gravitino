@@ -12,7 +12,7 @@ import java.util.List;
 /** Exception thrown when a user is not authorized to perform an action. */
 public class UnauthorizedException extends GravitinoRuntimeException {
 
-  List<String> challenges = Lists.newArrayList();
+  private final List<String> challenges = Lists.newArrayList();
 
   public UnauthorizedException(String message) {
     super(message);
@@ -22,8 +22,12 @@ public class UnauthorizedException extends GravitinoRuntimeException {
     super(message, cause);
   }
 
+  public UnauthorizedException(String message, String challenge) {
+    super(message);
+    challenges.add(challenge);
+  }
+
   public List<String> getChallenges() {
     return challenges;
   }
-
 }

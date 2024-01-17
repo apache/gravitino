@@ -59,6 +59,12 @@ public class AuthenticationFilter implements Filter {
       chain.doFilter(request, response);
     } catch (UnauthorizedException ue) {
       HttpServletResponse resp = (HttpServletResponse) response;
+      if (!ue.getChallenges().isEmpty()) {
+        // Refer to https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/WWW-Authenticate
+        for (String challenge : ue.getChallenges()) {
+          resp.setHeader(AuthConstants.HTTP_CHALLENGE_HEADER, challenge);
+        }
+      }
       resp.sendError(HttpServletResponse.SC_UNAUTHORIZED, ue.getMessage());
     }
   }
