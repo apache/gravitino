@@ -21,6 +21,39 @@ or locally see [Installing Gravitino playground locally](#installing-gravitino-p
 
 If you are using AWS and want to access the instance remotely, be sure to read [Accessing Gravitino on AWS externally](#accessing-gravitino-on-aws-externally)
 
+### Key Sections:
+
+1. **Installation Methods:**
+   - Explore different installation methods, from using Docker to setting up Gravitino on cloud platforms or locally.
+
+2. **Java Development Kit (JDK):**
+   - Ensure you have the required Java Development Kit (JDK) installed to run Gravitino successfully.
+
+3. **Configuring and Starting Gravitino:**
+   - Learn how to configure Gravitino, install it from binary releases or Docker images, and start the Gravitino server.
+
+4. **Getting Started on AWS and GCP:**
+   - Detailed steps for setting up Gravitino on Amazon Web Services (AWS) and Google Cloud Platform (GCP), including instance setup, Java installation, and Gravitino deployment.
+
+5. **Getting Started Locally:**
+   - Instructions for using Gravitino locally on macOS or Linux, covering JDK installation and Gravitino setup.
+
+6. **Integrating with Apache Hive:**
+   - Information on installing and configuring Apache Hive on AWS, GCP, and locally. Docker container options for quick setup are also provided.
+
+7. **Gravitino Playground:**
+   - Explore a bundled Docker image for a Gravitino playground, incorporating various tools like Apache Hive, Apache Hadoop, Trino, MySQL, and PostgreSQL.
+
+8. **Using REST to Interact with Gravitino:**
+   - Examples of interacting with Gravitino via REST commands, demonstrating how to create and modify metadata.
+
+9. **Accessing Gravitino on AWS Externally:**
+   - Guidelines for accessing Gravitino externally when deployed on AWS, including necessary configurations and considerations.
+
+10. **Next Steps and Conclusion:**
+    - Concluding thoughts, summarizing key points, and suggesting next steps for users who have completed the setup.
+
+
 ## Getting started on Amazon Web Services
 
 To begin using Gravitino on AWS, follow these steps:
@@ -282,3 +315,28 @@ webserver.host` parameter from `127.0.0.1` to your AWS instance's private IP4 ad
 You'll also need to open port 8090 in the security group of your AWS instance to access Gravitino. To access Hive you need to open port 10000 in the security group.
 
 After completing these steps, you should be able to access the Gravitino REST interface from either the command line or a web browser on your local computer. You can also connect to Hive via DBeaver or any other database IDE.
+
+## Conclusion and Next Steps
+
+Congratulations! You've successfully set up Gravitino on your chosen platform. Here's a quick summary of key points and some next steps:
+
+### Next Steps:
+
+1. **Explore Documentation:**
+   - Delve deeper into the Gravitino documentation for advanced features, configuration options, and troubleshooting tips.
+
+2. **Community Engagement:**
+   - Join the Gravitino community forums or mailing lists to connect with other users, share experiences, and seek assistance if needed.
+
+3. **Custom Configurations:**
+   - Tailor Gravitino to your specific needs by exploring and adjusting configurations in the `gravitino.conf` file.
+
+4. **Integration with Other Tools:**
+   - Consider integrating Gravitino with other tools or databases to enhance your data processing capabilities.
+
+5. **Continuous Updates:**
+   - Stay informed about Gravitino updates and new releases to benefit from the latest features, optimizations, and security enhancements.
+
+Remember, this document serves as a starting point. Feel free to customize your Gravitino setup based on your requirements and explore the vast possibilities this powerful tool offers. If you encounter any issues or have questions, don't hesitate to reach out to the Gravitino community for support.
+
+Happy data processing with Gravitino!
