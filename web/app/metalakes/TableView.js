@@ -132,9 +132,6 @@ const TableView = props => {
         )
       }
     },
-<<<<<<< HEAD
-    
-=======
     {
       flex: 0.1,
       minWidth: 60,
@@ -150,7 +147,6 @@ const TableView = props => {
         )
       }
     }
->>>>>>> b80127e6878f7008c11dc591960468fa5b0a63b0
   ]
 
   return (
