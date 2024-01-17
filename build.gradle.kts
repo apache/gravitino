@@ -40,8 +40,9 @@ plugins {
   alias(libs.plugins.publish)
   // Apply one top level rat plugin to perform any required license enforcement analysis
   alias(libs.plugins.rat)
-  id("com.github.jk1.dependency-license-report") version "2.5"
-  id("org.cyclonedx.bom") version "1.5.0" // Newer version fail due to our setup
+  alias(libs.plugins.bom)
+  alias(libs.plugins.dependencyLicenseReport)
+  alias(libs.plugins.tasktree)
 }
 
 if (extra["jdkVersion"] !in listOf("8", "11", "17")) {
@@ -87,39 +88,40 @@ licenseReport {
 repositories { mavenCentral() }
 
 allprojects {
-  apply(plugin = "com.diffplug.spotless")
+  if ((project.name != "catalogs") && project.name != "clients") {
+    apply(plugin = "com.diffplug.spotless")
+    repositories {
+      mavenCentral()
+      mavenLocal()
+    }
 
-  repositories {
-    mavenCentral()
-    mavenLocal()
-  }
+    plugins.withType<com.diffplug.gradle.spotless.SpotlessPlugin>().configureEach {
+      configure<com.diffplug.gradle.spotless.SpotlessExtension> {
+        java {
+          // Fix the Google Java Format version to 1.7. Since JDK8 only support Google Java Format
+          // 1.7, which is not compatible with JDK17. We will use a newer version when we upgrade to
+          // JDK17.
+          googleJavaFormat("1.7")
+          removeUnusedImports()
+          trimTrailingWhitespace()
+          replaceRegex(
+            "Remove wildcard imports",
+            "import\\s+[^\\*\\s]+\\*;(\\r\\n|\\r|\\n)",
+            "$1"
+          )
+          replaceRegex(
+            "Remove static wildcard imports",
+            "import\\s+(?:static\\s+)?[^*\\s]+\\*;(\\r\\n|\\r|\\n)",
+            "$1"
+          )
 
-  plugins.withType<com.diffplug.gradle.spotless.SpotlessPlugin>().configureEach {
-    configure<com.diffplug.gradle.spotless.SpotlessExtension> {
-      java {
-        // Fix the Google Java Format version to 1.7. Since JDK8 only support Google Java Format
-        // 1.7, which is not compatible with JDK17. We will use a newer version when we upgrade to
-        // JDK17.
-        googleJavaFormat("1.7")
-        removeUnusedImports()
-        trimTrailingWhitespace()
-        replaceRegex(
-          "Remove wildcard imports",
-          "import\\s+[^\\*\\s]+\\*;(\\r\\n|\\r|\\n)",
-          "$1"
-        )
-        replaceRegex(
-          "Remove static wildcard imports",
-          "import\\s+(?:static\\s+)?[^*\\s]+\\*;(\\r\\n|\\r|\\n)",
-          "$1"
-        )
+          targetExclude("**/build/**")
+        }
 
-        targetExclude("**/build/**")
-      }
-
-      kotlinGradle {
-        target("*.gradle.kts")
-        ktlint().editorConfigOverride(mapOf("indent_size" to 2))
+        kotlinGradle {
+          target("*.gradle.kts")
+          ktlint().editorConfigOverride(mapOf("indent_size" to 2))
+        }
       }
     }
   }
@@ -169,6 +171,12 @@ subprojects {
         sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8
       }
+    }
+  }
+
+  if ((project.name == "catalogs") || project.name == "clients") {
+    tasks.withType<Jar> {
+      enabled = false
     }
   }
 
@@ -452,7 +460,7 @@ tasks {
     subprojects.forEach() {
       if (!it.name.startsWith("catalog") &&
         !it.name.startsWith("client") && it.name != "trino-connector" &&
-        it.name != "integration-test"
+        it.name != "integration-test" && it.name != "bundled-catalog"
       ) {
         from(it.configurations.runtimeClasspath)
         into("distribution/package/libs")
@@ -465,7 +473,8 @@ tasks {
       if (!it.name.startsWith("catalog") &&
         !it.name.startsWith("client") &&
         it.name != "trino-connector" &&
-        it.name != "integration-test"
+        it.name != "integration-test" &&
+        it.name != "bundled-catalog"
       ) {
         dependsOn("${it.name}:build")
         from("${it.name}/build/libs")
@@ -489,3 +498,5 @@ tasks {
     dependsOn(cleanDistribution)
   }
 }
+
+apply(plugin = "com.dorongold.task-tree")

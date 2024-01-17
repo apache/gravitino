@@ -6,8 +6,10 @@ package com.datastrato.gravitino.catalog.hive;
 
 import static com.datastrato.gravitino.catalog.BaseCatalog.CATALOG_BYPASS_PREFIX;
 import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.METASTORE_URIS;
+import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.TABLE_TYPE;
 import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.day;
 import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.identity;
+import static org.apache.hadoop.hive.metastore.TableType.EXTERNAL_TABLE;
 
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
@@ -31,6 +33,7 @@ import com.datastrato.gravitino.rel.types.Types;
 import com.google.common.collect.Maps;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.Locale;
 import java.util.Map;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.junit.jupiter.api.AfterEach;
@@ -598,5 +601,91 @@ public class TestHiveTable extends MiniHiveMetastoreService {
     Assertions.assertNull(alteredTable1.auditInfo().lastModifiedTime());
     Assertions.assertNotNull(alteredTable.partitioning());
     Assertions.assertArrayEquals(createdTable.partitioning(), alteredTable.partitioning());
+  }
+
+  @Test
+  public void testPurgeHiveTable() {
+    String hiveTableName = "test_hive_table";
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(META_LAKE_NAME, hiveCatalog.name(), hiveSchema.name(), hiveTableName);
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put("key1", "val1");
+    properties.put("key2", "val2");
+
+    HiveColumn col1 =
+        new HiveColumn.Builder()
+            .withName("col_1")
+            .withType(Types.ByteType.get())
+            .withComment(HIVE_COMMENT)
+            .build();
+    HiveColumn col2 =
+        new HiveColumn.Builder()
+            .withName("col_2")
+            .withType(Types.DateType.get())
+            .withComment(HIVE_COMMENT)
+            .build();
+    Column[] columns = new Column[] {col1, col2};
+
+    Distribution distribution = createDistribution();
+    SortOrder[] sortOrders = createSortOrder();
+
+    hiveCatalog
+        .asTableCatalog()
+        .createTable(
+            tableIdentifier,
+            columns,
+            HIVE_COMMENT,
+            properties,
+            new Transform[0],
+            distribution,
+            sortOrders);
+    Assertions.assertTrue(hiveCatalog.asTableCatalog().tableExists(tableIdentifier));
+    hiveCatalog.asTableCatalog().purgeTable(tableIdentifier);
+    Assertions.assertFalse(hiveCatalog.asTableCatalog().tableExists(tableIdentifier));
+  }
+
+  @Test
+  public void testPurgeExternalHiveTable() {
+    String hiveTableName = "test_hive_table";
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(META_LAKE_NAME, hiveCatalog.name(), hiveSchema.name(), hiveTableName);
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put(TABLE_TYPE, EXTERNAL_TABLE.name().toLowerCase(Locale.ROOT));
+
+    HiveColumn col1 =
+        new HiveColumn.Builder()
+            .withName("col_1")
+            .withType(Types.ByteType.get())
+            .withComment(HIVE_COMMENT)
+            .build();
+    HiveColumn col2 =
+        new HiveColumn.Builder()
+            .withName("col_2")
+            .withType(Types.DateType.get())
+            .withComment(HIVE_COMMENT)
+            .build();
+    Column[] columns = new Column[] {col1, col2};
+
+    Distribution distribution = createDistribution();
+    SortOrder[] sortOrders = createSortOrder();
+
+    hiveCatalog
+        .asTableCatalog()
+        .createTable(
+            tableIdentifier,
+            columns,
+            HIVE_COMMENT,
+            properties,
+            new Transform[0],
+            distribution,
+            sortOrders);
+    Assertions.assertTrue(hiveCatalog.asTableCatalog().tableExists(tableIdentifier));
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () -> {
+          hiveCatalog.asTableCatalog().purgeTable(tableIdentifier);
+        },
+        "Can't purge a external hive table");
+    Assertions.assertTrue(hiveCatalog.asTableCatalog().tableExists(tableIdentifier));
   }
 }

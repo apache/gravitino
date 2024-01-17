@@ -81,7 +81,8 @@ public class SqliteTableOperations extends JdbcTableOperations {
         .withComment(null)
         .withType(typeConverter.toGravitinoType(resultSet.getString("TYPE_NAME")))
         .withNullable(resultSet.getBoolean("NULLABLE"))
-        .withDefaultValue(resultSet.getString("COLUMN_DEF"))
+        // TODO: uncomment this once we support column default values.
+        // .withDefaultValue(resultSet.getString("COLUMN_DEF"))
         .build();
   }
 

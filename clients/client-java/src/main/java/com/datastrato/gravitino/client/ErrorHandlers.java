@@ -139,6 +139,8 @@ public class ErrorHandlers {
 
         case ErrorConstants.INTERNAL_ERROR_CODE:
           throw new RuntimeException(errorMessage);
+        case ErrorConstants.UNSUPPORTED_OPERATION_CODE:
+          throw new UnsupportedOperationException(errorMessage);
       }
 
       super.accept(errorResponse);
