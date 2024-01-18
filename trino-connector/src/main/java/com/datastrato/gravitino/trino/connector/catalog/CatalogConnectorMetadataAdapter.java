@@ -18,6 +18,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.NotImplementedException;
 import org.slf4j.Logger;
@@ -91,6 +92,13 @@ public class CatalogConnectorMetadataAdapter {
               column.isNullable()));
     }
     return new GravitinoTable(schemaName, tableName, columns, comment, properties);
+  }
+
+  protected Map<String, Object> removeKeys(
+      Map<String, Object> properties, Set<String> keyToDelete) {
+    return properties.entrySet().stream()
+        .filter(entry -> !keyToDelete.contains(entry.getKey()))
+        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
   }
 
   /** Transform trino schema metadata to gravitino schema metadata */

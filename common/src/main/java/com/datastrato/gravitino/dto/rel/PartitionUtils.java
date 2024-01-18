@@ -18,8 +18,8 @@ public class PartitionUtils {
 
     List<ColumnDTO> partitionColumn =
         Arrays.stream(columns)
-            // Need to consider the case sensitivity issues.
-            // To be optimized.
+            // (TODO) Need to consider the case sensitivity issues.
+            //   To be optimized.
             .filter(c -> c.name().equalsIgnoreCase(fieldName[0]))
             .collect(Collectors.toList());
     Preconditions.checkArgument(

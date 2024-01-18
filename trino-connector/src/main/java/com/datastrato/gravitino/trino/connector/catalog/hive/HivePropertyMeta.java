@@ -5,8 +5,6 @@
 
 package com.datastrato.gravitino.trino.connector.catalog.hive;
 
-import static com.datastrato.gravitino.trino.connector.catalog.hive.SortingColumn.Order.ASCENDING;
-import static com.datastrato.gravitino.trino.connector.catalog.hive.SortingColumn.Order.DESCENDING;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static io.trino.spi.session.PropertyMetadata.booleanProperty;
 import static io.trino.spi.session.PropertyMetadata.enumProperty;
@@ -83,6 +81,8 @@ public class HivePropertyMeta implements HasPropertyMeta {
                           .map(name -> ((String) name).toLowerCase(ENGLISH))
                           .collect(toImmutableList()),
               value -> value),
+          integerProperty(
+              HIVE_BUCKET_COUNT_KEY, "The number of buckets for the table", null, false),
           new PropertyMetadata<>(
               HIVE_SORT_ORDER_KEY,
               "Bucket sorting columns",
@@ -95,16 +95,14 @@ public class HivePropertyMeta implements HasPropertyMeta {
                       .stream()
                           .map(String.class::cast)
                           .map(String::toLowerCase)
-                          .map(HivePropertyMeta::sortingColumnFromString)
+                          .map(SortingColumn::sortingColumnFromString)
                           .collect(toImmutableList()),
               value ->
                   ((List<?>) value)
                       .stream()
                           .map(SortingColumn.class::cast)
-                          .map(HivePropertyMeta::sortingColumnToString)
-                          .collect(toImmutableList())),
-          integerProperty(
-              HIVE_BUCKET_COUNT_KEY, "The number of buckets for the table", null, false));
+                          .map(SortingColumn::sortingColumnToString)
+                          .collect(toImmutableList())));
 
   enum CatalogStorageFormat {
     AVRO,
@@ -219,22 +217,6 @@ public class HivePropertyMeta implements HasPropertyMeta {
               "Maximum number of partitions for a single table scan.",
               "1000000",
               false));
-
-  public static String sortingColumnToString(SortingColumn column) {
-    return column.getColumnName() + ((column.getOrder() == DESCENDING) ? " DESC" : "");
-  }
-
-  public static SortingColumn sortingColumnFromString(String name) {
-    SortingColumn.Order order = ASCENDING;
-    String lower = name.toUpperCase(ENGLISH);
-    if (lower.endsWith(" ASC")) {
-      name = name.substring(0, name.length() - 4).trim();
-    } else if (lower.endsWith(" DESC")) {
-      name = name.substring(0, name.length() - 5).trim();
-      order = DESCENDING;
-    }
-    return new SortingColumn(name, order);
-  }
 
   @Override
   public List<PropertyMetadata<?>> getSchemaPropertyMetadata() {

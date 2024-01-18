@@ -27,6 +27,7 @@ import com.datastrato.gravitino.trino.connector.catalog.hive.SortingColumn.Order
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoColumn;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoTable;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableSet;
 import io.trino.spi.connector.ColumnMetadata;
 import io.trino.spi.connector.ConnectorTableMetadata;
 import io.trino.spi.connector.SchemaTableName;
@@ -38,6 +39,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.ArrayUtils;
 
@@ -46,6 +48,10 @@ public class HiveMetadataAdapter extends CatalogConnectorMetadataAdapter {
 
   private final PropertyConverter tableConverter;
   private final PropertyConverter schemaConverter;
+
+  private static final Set<String> HIVE_PROPERTIES_TO_REMOVE =
+      ImmutableSet.of(
+          HIVE_PARTITION_KEY, HIVE_BUCKET_KEY, HIVE_BUCKET_COUNT_KEY, HIVE_SORT_ORDER_KEY);
 
   public HiveMetadataAdapter(
       List<PropertyMetadata<?>> schemaProperties,
@@ -110,7 +116,9 @@ public class HiveMetadataAdapter extends CatalogConnectorMetadataAdapter {
           "Bucket columns and bucket count must be specified when bucket count is set");
     }
 
-    Map<String, String> properties = toGravitinoTableProperties(tableMetadata.getProperties());
+    Map<String, String> properties =
+        toGravitinoTableProperties(
+            removeKeys(tableMetadata.getProperties(), HIVE_PROPERTIES_TO_REMOVE));
 
     List<GravitinoColumn> columns = new ArrayList<>();
     for (int i = 0; i < tableMetadata.getColumns().size(); i++) {
