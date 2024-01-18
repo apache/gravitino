@@ -23,7 +23,7 @@ public class EntityStoreFactory {
       ImmutableMap.of("kv", KvEntityStore.class.getCanonicalName());
 
   // Private constructor to prevent instantiation of this factory class.
-  private EntityStoreFactory() {}
+  public EntityStoreFactory() {}
 
   /**
    * Creates an instance of EntityStore based on the configuration settings.

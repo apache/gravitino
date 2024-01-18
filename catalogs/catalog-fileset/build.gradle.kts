@@ -13,9 +13,12 @@ plugins {
 dependencies {
   implementation(project(":api"))
   implementation(project(":core"))
+  implementation(project(":common"))
 
   implementation(libs.slf4j.api)
   implementation(libs.guava)
+  implementation(libs.hadoop2.common)
+  implementation(libs.hadoop2.hdfs)
 
   testImplementation(libs.junit.jupiter.api)
   testRuntimeOnly(libs.junit.jupiter.engine)
