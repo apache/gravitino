@@ -5,7 +5,7 @@
 
 'use client'
 
-import { forwardRef } from 'react'
+import { forwardRef, useEffect } from 'react'
 
 import Link from 'next/link'
 
@@ -18,7 +18,14 @@ import Icon from '@/components/Icon'
 import clsx from 'clsx'
 
 import { useAppDispatch, useAppSelector } from '@/lib/hooks/useStore'
-import { setExpandedTreeNode, setIntoTreeAction, resetTableData } from '@/lib/store/metalakes'
+import {
+  setExpandedTreeNode,
+  setIntoTreeAction,
+  setClickedExpandedNode,
+  removeExpandedNode,
+  resetTableData,
+  resetTree
+} from '@/lib/store/metalakes'
 
 const StyledLink = styled(Link)(({ theme }) => ({
   textDecoration: 'none'
@@ -37,12 +44,16 @@ const CustomContent = forwardRef(function CustomContent(props, ref) {
     preventSelection(event)
   }
 
-  const handleExpansionClick = event => {
-    handleExpansion(event)
+  const handleExpansionClick = async (event, nodeId, expanded) => {
+    new Promise(resolve => {
+      dispatch(setClickedExpandedNode({ nodeId, expanded }))
+      resolve()
+    }).then(() => {
+      handleExpansion(event)
+    })
   }
 
   const handleSelectionClick = event => {
-    dispatch(resetTableData())
     handleSelection(event)
   }
 
@@ -57,7 +68,11 @@ const CustomContent = forwardRef(function CustomContent(props, ref) {
       onMouseDown={handleMouseDown}
       ref={ref}
     >
-      <div onClick={handleExpansionClick} className={classes.iconContainer} data-node-id={nodeId}>
+      <div
+        onClick={e => handleExpansionClick(e, nodeId, expanded)}
+        className={classes.iconContainer}
+        data-node-id={nodeId}
+      >
         {icon}
       </div>
       <Typography onClick={handleSelectionClick} component='div' className={classes.label}>
@@ -142,19 +157,30 @@ const MetalakeTree = props => {
   const dispatch = useAppDispatch()
   const store = useAppSelector(state => state.metalakes)
 
-  const handleToggle = async (event, nodeIds) => {
+  const handleToggle = async (event, nodeIds = []) => {
+    nodeIds = Array.from(new Set(nodeIds.flat()))
+
     const isExpanding = nodeIds.some(nodeId => !store.expendedTreeNode.includes(nodeId))
 
     if (isExpanding) {
-      dispatch(setIntoTreeAction({ nodeIds }))
+      nodeIds.forEach(node => {
+        dispatch(setIntoTreeAction({ nodeIds: [node] }))
+      })
+      dispatch(setExpandedTreeNode({ nodeIds }))
+    } else {
+      dispatch(removeExpandedNode(store.clickedExpandedNode.nodeId))
     }
-
-    dispatch(setExpandedTreeNode(nodeIds))
   }
 
   const handleSelect = (event, nodeId) => {
     event.stopPropagation()
   }
+
+  useEffect(() => {
+    return () => {
+      dispatch(resetTree())
+    }
+  }, [dispatch])
 
   return (
     <TreeView
