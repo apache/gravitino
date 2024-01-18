@@ -182,7 +182,12 @@ const MetalakeList = () => {
             setDialogType={setDialogType}
           />
           <DataGrid
-            style={{ maxHeight: 'calc(100vh - 23.2rem)' }}
+            sx={{
+              '& .MuiDataGrid-virtualScroller': {
+                height: store.filteredMetalakes.length === 0 ? 100 : 'auto'
+              },
+              maxHeight: 'calc(100vh - 23.2rem)'
+            }}
             getRowId={row => row?.name}
             rows={store.filteredMetalakes}
             columns={columns}
