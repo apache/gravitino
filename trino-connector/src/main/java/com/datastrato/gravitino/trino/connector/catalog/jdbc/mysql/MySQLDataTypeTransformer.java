@@ -29,7 +29,7 @@ public class MySQLDataTypeTransformer extends GeneralDataTypeTransformer {
       if (((Types.FixedCharType) gravitinoType).length() > MYSQL_CHAR_LENGTH_LIMIT) {
         throw new TrinoException(
             GravitinoErrorCode.GRAVITINO_ILLEGAL_ARGUMENT,
-            "MySQL does not support fixed char length > 255");
+            "MySQL does not support the datatype CHAR with the length greater than 255");
       }
     }
     return gravitinoType;
