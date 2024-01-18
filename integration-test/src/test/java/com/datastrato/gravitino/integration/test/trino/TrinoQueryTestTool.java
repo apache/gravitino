@@ -23,14 +23,18 @@ public class TrinoQueryTestTool {
       options.addOption(
           "auto",
           true,
-          "Start the test containers and gravitino server automatically, the default value is 'all'. "
-              + "If the value is 'gravitino', only the gravitino server will be started automatically.");
+          "Start the test containers and gravitino server automatically, the values are 'all','gravitation','none'."
+              + "The default value is 'all'. If the value is 'gravitino', only the gravitino server will be started automatically.");
 
       options.addOption(
           "gen_output",
           false,
           "Generate the output file for the test set, the default value is 'false'");
 
+      options.addOption(
+          "gravitino_uri",
+          true,
+          "URL for Gravitino server, if --auto is set to 'all', this option is ignored");
       options.addOption(
           "trino_uri", true, "URL for Trino, if --auto is set to 'all', this option is ignored");
       options.addOption(
@@ -50,7 +54,7 @@ public class TrinoQueryTestTool {
           "Specify the test sets' directory, "
               + "the default value is 'integration-test/src/test/resources/trino-queries'");
       options.addOption("test_set", true, "Specify the test set name to test");
-      options.addOption("tester_id", true, "Specify the tester name prefix to select to test");
+      options.addOption("tester_id", true, "Specify the tester file name prefix to select to test");
       options.addOption("catalog", true, "Specify the catalog name to test");
 
       options.addOption("help", false, "Print this help message");
@@ -63,14 +67,16 @@ public class TrinoQueryTestTool {
         formatter.printHelp("TrinoTestTool", options);
         String example =
             "Examples:\n"
-                + "Run all the testers:\n"
+                + "Run all the testers in the 'testsets' directory:\n"
                 + "TrinoTestTool --auto=all\n\n"
-                + "Run all the testers in the tpch testset under all catalogs:\n"
+                + "Run all the tpch testset's testers in the 'testsets/tpch' directory:\n"
                 + "TrinoTestTool --testset=tpch --auto=all\n\n"
-                + "Run special tester in the tpch testset under hive catalog :\n"
-                + "TrinoTestTool --testset=tpch --tester_id=0005 --catalog=hive --auto=all\n\n"
-                + "Run all the testers in the tpch testset under mysql catalogs with manual start environment:\n"
-                + "TrinoTestTool --testset=tpch -- catalog=mysql --auto=none --trino_uri=http://10.3.21.12:8080 --mysql_url=jdbc:mysql:/10.3.21.12 \n";
+                + "Run the tester 'testsets/tpch/00005.sql' in the tpch testset under hive catalog :\n"
+                + "TrinoTestTool --testset=tpch --tester_id=00005 --catalog=hive --auto=all\n\n"
+                + "Run all the tpch testset's testers in the 'testsets/tpch' directory under 'mysql' "
+                + "catalog with manual start the test environment:\n"
+                + "TrinoTestTool --testset=tpch -- catalog=mysql --auto=none --gravition_uri=http://10.3.21.12:8090 "
+                + "--trino_uri=http://10.3.21.12:8080 --mysql_url=jdbc:mysql:/10.3.21.12 \n";
         System.out.println(example);
         return;
       }
@@ -97,6 +103,9 @@ public class TrinoQueryTestTool {
 
       TrinoQueryIT.ciTestsets.clear();
 
+      String gravitinoUri = commandLine.getOptionValue("gravitino_uri");
+      TrinoQueryIT.gravitinoUri =
+          Strings.isBlank(gravitinoUri) ? TrinoQueryIT.gravitinoUri : gravitinoUri;
       String trinoUri = commandLine.getOptionValue("trino_uri");
       TrinoQueryIT.trinoUri = Strings.isBlank(trinoUri) ? TrinoQueryIT.trinoUri : trinoUri;
       String hiveUri = commandLine.getOptionValue("hive_uri");
