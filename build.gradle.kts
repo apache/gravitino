@@ -164,8 +164,10 @@ subprojects {
 
   java {
     toolchain {
-      // Some JDK vendors like Oracle OpenJDK have problems in building trino-connector.
-      // So we will use AMAZON OpenJDK for trino-connector.
+      // Some JDK vendors like Oracle OpenJDK have problems in building trino-connector: It will
+      // cause tests of Trino-connector hangs forever on MacOSX, to avoid this issue and other
+      // vendor-related problems, Gravitino will use the specified AMAZON OpenJDK 17 to build
+      // Trino-connector on MacOSX.
       if (project.name == "trino-connector") {
         val osName = System.getProperty("os.name").lowercase(Locale.getDefault())
         if (osName.contains("mac")) {
