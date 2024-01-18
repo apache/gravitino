@@ -4,7 +4,6 @@
  */
 package com.datastrato.gravitino.rel.expressions.partitions;
 
-import com.datastrato.gravitino.rel.expressions.NamedReference;
 import com.datastrato.gravitino.rel.expressions.literals.Literal;
 import java.util.Arrays;
 import java.util.Map;
@@ -24,7 +23,7 @@ public class Partitions {
    * @return The created partition.
    */
   public static RangePartition range(
-      String name, Literal upper, Literal lower, Map<String, String> properties) {
+      String name, Literal<?> upper, Literal<?> lower, Map<String, String> properties) {
     return new RangePartition(name, upper, lower, properties);
   }
 
@@ -46,7 +45,8 @@ public class Partitions {
    * @param properties The properties of the partition.
    * @return The created partition.
    */
-  public static ListPartition list(String name, Literal[][] lists, Map<String, String> properties) {
+  public static ListPartition list(
+      String name, Literal<?>[][] lists, Map<String, String> properties) {
     return new ListPartition(name, lists, properties);
   }
 
@@ -62,20 +62,20 @@ public class Partitions {
    * @return The created partition.
    */
   public static IdentityPartition identity(
-      String name, String[][] fieldNames, Literal[] value, Map<String, String> properties) {
+      String name, String[][] fieldNames, Literal<?>[] value, Map<String, String> properties) {
     return new IdentityPartition(name, fieldNames, value, properties);
   }
 
   /** Represents a result of range partitioning. */
   public static class RangePartition implements Partition {
     private final String name;
-    private final Literal upper;
-    private final Literal lower;
+    private final Literal<?> upper;
+    private final Literal<?> lower;
 
     private final Map<String, String> properties;
 
     private RangePartition(
-        String name, Literal upper, Literal lower, Map<String, String> properties) {
+        String name, Literal<?> upper, Literal<?> lower, Map<String, String> properties) {
       this.name = name;
       this.properties = properties;
       this.upper = upper;
@@ -83,12 +83,12 @@ public class Partitions {
     }
 
     /** @return The upper bound of the partition. */
-    public Literal upper() {
+    public Literal<?> upper() {
       return upper;
     }
 
     /** @return The lower bound of the partition. */
-    public Literal lower() {
+    public Literal<?> lower() {
       return lower;
     }
 
@@ -126,18 +126,18 @@ public class Partitions {
   /** Represents a result of list partitioning. */
   public static class ListPartition implements Partition {
     private final String name;
-    private final Literal[][] lists;
+    private final Literal<?>[][] lists;
 
     private final Map<String, String> properties;
 
-    private ListPartition(String name, Literal[][] lists, Map<String, String> properties) {
+    private ListPartition(String name, Literal<?>[][] lists, Map<String, String> properties) {
       this.name = name;
       this.properties = properties;
       this.lists = lists;
     }
 
     /** @return The values of the list partition. */
-    public Literal[][] lists() {
+    public Literal<?>[][] lists() {
       return lists;
     }
 
@@ -161,14 +161,14 @@ public class Partitions {
       }
       ListPartition that = (ListPartition) o;
       return Objects.equals(name, that.name)
-          && Arrays.equals(lists, that.lists)
+          && Arrays.deepEquals(lists, that.lists)
           && Objects.equals(properties, that.properties);
     }
 
     @Override
     public int hashCode() {
       int result = Objects.hash(name, properties);
-      result = 31 * result + Arrays.hashCode(lists);
+      result = 31 * result + Arrays.deepHashCode(lists);
       return result;
     }
   }
@@ -177,11 +177,11 @@ public class Partitions {
   public static class IdentityPartition implements Partition {
     private final String name;
     private final String[][] fieldNames;
-    private final Literal[] value;
+    private final Literal<?>[] value;
     private final Map<String, String> properties;
 
     private IdentityPartition(
-        String name, String[][] fieldNames, Literal[] value, Map<String, String> properties) {
+        String name, String[][] fieldNames, Literal<?>[] value, Map<String, String> properties) {
       this.name = name;
       this.fieldNames = fieldNames;
       this.value = value;
@@ -194,7 +194,7 @@ public class Partitions {
     }
 
     /** @return The values of the identity partition. */
-    public Literal[] value() {
+    public Literal<?>[] value() {
       return value;
     }
 
@@ -206,11 +206,6 @@ public class Partitions {
     @Override
     public Map<String, String> properties() {
       return properties;
-    }
-
-    @Override
-    public NamedReference[] references() {
-      return Arrays.stream(fieldNames()).map(NamedReference::field).toArray(NamedReference[]::new);
     }
 
     @Override
@@ -231,7 +226,7 @@ public class Partitions {
     @Override
     public int hashCode() {
       int result = Objects.hash(name, properties);
-      result = 31 * result + Arrays.hashCode(fieldNames);
+      result = 31 * result + Arrays.deepHashCode(fieldNames);
       result = 31 * result + Arrays.hashCode(value);
       return result;
     }

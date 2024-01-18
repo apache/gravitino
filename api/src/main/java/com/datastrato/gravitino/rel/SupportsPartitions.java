@@ -26,7 +26,7 @@ public interface SupportsPartitions extends Table {
   Partition[] listPartitions();
 
   /**
-   * get a partition by partition name
+   * Get a partition by partition name
    *
    * @param partitionName the name of the partition
    * @return the partition
