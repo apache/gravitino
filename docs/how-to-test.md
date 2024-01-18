@@ -64,7 +64,7 @@ Deploy the Gravitino server locally to run the integration tests. Follow these s
 3. Use the `./gradlew test [--rerun-tasks] -PskipTests -PtestMode=deploy` command to run the
    integration tests in the `distribution` directory.
 4. Use the `bash integration-test/trino-test-tools/trino_test.sh` command to run all the
-   trino test sets in the `integration-test/src/test/resources/trino-ci-testset/testsets` directory.
+   Trino test sets in the `integration-test/src/test/resources/trino-ci-testset/testsets` directory.
 
 ## Skip tests
 

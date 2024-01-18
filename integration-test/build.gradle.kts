@@ -13,23 +13,6 @@ plugins {
   id("idea")
 }
 
-tasks.register<JavaExec>("TrinoTest") {
-  classpath = sourceSets["test"].runtimeClasspath
-  systemProperty("gravitino.log.path", buildDir.path + "/integration-test.log")
-  mainClass.set("com.datastrato.gravitino.integration.test.trino.TrinoQueryTestTool")
-
-  if (JavaVersion.current() > JavaVersion.VERSION_1_8) {
-    jvmArgs = listOf(
-      "--add-opens",
-      "java.base/java.lang=ALL-UNNAMED"
-    )
-  }
-
-  if (project.hasProperty("appArgs")) {
-    args = (project.property("appArgs") as String).removeSurrounding("\"").split(" ")
-  }
-}
-
 dependencies {
   implementation(project(":server"))
   implementation(project(":common"))
@@ -324,5 +307,22 @@ tasks.test {
         }
       }
     }
+  }
+}
+
+tasks.register<JavaExec>("TrinoTest") {
+  classpath = sourceSets["test"].runtimeClasspath
+  systemProperty("gravitino.log.path", buildDir.path + "/integration-test.log")
+  mainClass.set("com.datastrato.gravitino.integration.test.trino.TrinoQueryTestTool")
+
+  if (JavaVersion.current() > JavaVersion.VERSION_1_8) {
+    jvmArgs = listOf(
+      "--add-opens",
+      "java.base/java.lang=ALL-UNNAMED"
+    )
+  }
+
+  if (project.hasProperty("appArgs")) {
+    args = (project.property("appArgs") as String).removeSurrounding("\"").split(" ")
   }
 }

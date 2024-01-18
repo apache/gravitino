@@ -20,20 +20,16 @@ public class MySQLDataTypeTransformer extends GeneralDataTypeTransformer {
   public Type getGravitinoType(io.trino.spi.type.Type type) {
     Type gravitinoType = super.getGravitinoType(type);
     if (gravitinoType.name() == Name.VARCHAR) {
-      if (((Types.VarCharType) gravitinoType).length() <= MYSQL_CHAR_LENGTH_LIMIT) {
-        return Types.VarCharType.of(((Types.VarCharType) gravitinoType).length());
-      } else {
+      if (((Types.VarCharType) gravitinoType).length() > MYSQL_CHAR_LENGTH_LIMIT) {
         return Types.StringType.get();
       }
     }
 
     if (gravitinoType.name() == Name.FIXEDCHAR) {
-      if (((Types.FixedCharType) gravitinoType).length() <= MYSQL_CHAR_LENGTH_LIMIT) {
-        return Types.FixedCharType.of(((Types.FixedCharType) gravitinoType).length());
-      } else {
+      if (((Types.FixedCharType) gravitinoType).length() > MYSQL_CHAR_LENGTH_LIMIT) {
         throw new TrinoException(
             GravitinoErrorCode.GRAVITINO_ILLEGAL_ARGUMENT,
-            "MySQL does not support fixed char length > 255");
+            "MySQL does not support the datatype CHAR with the length greater than 255");
       }
     }
     return gravitinoType;
