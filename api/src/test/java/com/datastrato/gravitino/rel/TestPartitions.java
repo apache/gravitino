@@ -6,8 +6,8 @@ package com.datastrato.gravitino.rel;
 
 import com.datastrato.gravitino.rel.expressions.literals.Literal;
 import com.datastrato.gravitino.rel.expressions.literals.Literals;
-import com.datastrato.gravitino.rel.expressions.partitions.Partition;
-import com.datastrato.gravitino.rel.expressions.partitions.Partitions;
+import com.datastrato.gravitino.rel.partitions.Partition;
+import com.datastrato.gravitino.rel.partitions.Partitions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.time.LocalDate;

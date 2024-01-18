@@ -6,8 +6,7 @@ package com.datastrato.gravitino.rel;
 
 import com.datastrato.gravitino.exceptions.NoSuchPartitionException;
 import com.datastrato.gravitino.exceptions.PartitionAlreadyExistsException;
-import com.datastrato.gravitino.rel.expressions.partitions.Partition;
-import java.util.Map;
+import com.datastrato.gravitino.rel.partitions.Partition;
 
 public interface SupportsPartitions extends Table {
 
@@ -52,13 +51,11 @@ public interface SupportsPartitions extends Table {
   /**
    * Add a partition with specified name and properties to the table.
    *
-   * @param partitionName The identifier of the partition.
-   * @param properties The properties of the partition.
+   * @param partition The partition to add.
    * @return The created partition.
    * @throws PartitionAlreadyExistsException If the partition already exists.
    */
-  Partition addPartition(String partitionName, Map<String, String> properties)
-      throws PartitionAlreadyExistsException;
+  Partition addPartition(Partition partition) throws PartitionAlreadyExistsException;
 
   /**
    * Alter a partition with specified identifier.
