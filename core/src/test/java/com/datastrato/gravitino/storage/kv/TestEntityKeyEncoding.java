@@ -28,6 +28,7 @@ import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
+import org.apache.commons.lang3.tuple.Pair;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
@@ -92,6 +93,9 @@ public class TestEntityKeyEncoding {
               ByteUtils.longToByte(0L));
       Assertions.assertArrayEquals(expectKey, realKey);
 
+      NameIdentifier decodeIdentifier = encoder.decode(realKey).getKey();
+      Assertions.assertEquals(mateLakeIdentifier1, decodeIdentifier);
+
       // name ---> id
       // catalog1 --> 1
       // catalog2 --> 2
@@ -115,6 +119,8 @@ public class TestEntityKeyEncoding {
                 BYTABLE_NAMESPACE_SEPARATOR,
                 ByteUtils.longToByte(1L + i));
         Assertions.assertArrayEquals(expectKey, realKey);
+        decodeIdentifier = encoder.decode(realKey).getKey();
+        Assertions.assertEquals(identifier, decodeIdentifier);
       }
 
       // name ---> id
@@ -142,6 +148,8 @@ public class TestEntityKeyEncoding {
                 BYTABLE_NAMESPACE_SEPARATOR,
                 ByteUtils.longToByte(4L + i));
         Assertions.assertArrayEquals(expectKey, realKey);
+        decodeIdentifier = encoder.decode(realKey).getKey();
+        Assertions.assertEquals(identifier, decodeIdentifier);
       }
 
       // name ---> id
@@ -171,6 +179,8 @@ public class TestEntityKeyEncoding {
                 BYTABLE_NAMESPACE_SEPARATOR,
                 ByteUtils.longToByte(i + 7L));
         Assertions.assertArrayEquals(expectKey, realKey);
+        decodeIdentifier = encoder.decode(realKey).getKey();
+        Assertions.assertEquals(identifier, decodeIdentifier);
       }
 
       // Unsupported operation
@@ -260,6 +270,52 @@ public class TestEntityKeyEncoding {
                   NameIdentifier.of(
                       Namespace.of("metalake1", "catalog2", "schema3", "table1"), WILD_CARD),
                   EntityType.COLUMN));
+    }
+  }
+
+  @Test
+  void testSpecialCharacterDecoder() throws IOException {
+    Config config = getConfig();
+    try (KvEntityStore kvEntityStore = getKvEntityStore(config)) {
+      BinaryEntityKeyEncoder encoder = (BinaryEntityKeyEncoder) kvEntityStore.entityKeyEncoder;
+
+      NameIdentifier identifier =
+          NameIdentifier.of(Namespace.of(), "name1/xadfsa/asdfa/sd/dasdfa/as/dfasd/");
+      byte[] key = encoder.encode(identifier, EntityType.METALAKE);
+
+      Pair<NameIdentifier, EntityType> nameIdentifierEntityTypePair = encoder.decode(key);
+      Assertions.assertEquals(identifier, nameIdentifierEntityTypePair.getKey());
+      Assertions.assertEquals(EntityType.METALAKE, nameIdentifierEntityTypePair.getValue());
+
+      identifier =
+          NameIdentifier.of(
+              Namespace.of("asafdaf/asdfaf/as//asdfa/fd/sf/asdf/"),
+              "name1/xadfsa/asdfa/sd/dasdfa/as/dfasd");
+      key = encoder.encode(identifier, EntityType.CATALOG);
+      nameIdentifierEntityTypePair = encoder.decode(key);
+      Assertions.assertEquals(identifier, nameIdentifierEntityTypePair.getKey());
+      Assertions.assertEquals(EntityType.CATALOG, nameIdentifierEntityTypePair.getValue());
+
+      // Test Schema
+      identifier =
+          NameIdentifier.of(
+              Namespace.of("asafdaf/asdfaf/as//asdfa/fd/sf/asdf/", "sdfafas/asdfa/"),
+              "name1/xadfsa/asdfa/sd/dasdfa/as/dfasd");
+      key = encoder.encode(identifier, EntityType.SCHEMA);
+      nameIdentifierEntityTypePair = encoder.decode(key);
+      Assertions.assertEquals(identifier, nameIdentifierEntityTypePair.getKey());
+      Assertions.assertEquals(EntityType.SCHEMA, nameIdentifierEntityTypePair.getValue());
+
+      // Test Table
+      identifier =
+          NameIdentifier.of(
+              Namespace.of(
+                  "asafdaf/asdfaf/as//asdfa/fd/sf/asdf/", "sdfafas/asdfa/", "asdfasdf/asdfasdf/"),
+              "name1/xadfsa/asdfa/sd/dasdfa/as/dfasd");
+      key = encoder.encode(identifier, EntityType.TABLE);
+      nameIdentifierEntityTypePair = encoder.decode(key);
+      Assertions.assertEquals(identifier, nameIdentifierEntityTypePair.getKey());
+      Assertions.assertEquals(EntityType.TABLE, nameIdentifierEntityTypePair.getValue());
     }
   }
 }
