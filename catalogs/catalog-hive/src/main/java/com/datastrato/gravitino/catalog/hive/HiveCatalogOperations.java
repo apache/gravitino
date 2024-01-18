@@ -951,6 +951,12 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     return schemaPropertiesMetadata;
   }
 
+  @Override
+  public PropertiesMetadata filesetPropertiesMetadata() throws UnsupportedOperationException {
+    throw new UnsupportedOperationException(
+        "Hive catalog does not support fileset properties metadata");
+  }
+
   private boolean isExternalTable(NameIdentifier tableIdent) {
     org.apache.hadoop.hive.metastore.api.Table hiveTable = loadHiveTable(tableIdent);
     return EXTERNAL_TABLE.name().equalsIgnoreCase(hiveTable.getTableType());
