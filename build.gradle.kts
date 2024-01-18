@@ -164,9 +164,13 @@ subprojects {
 
   java {
     toolchain {
-      // We set the vendor AMAZON OpenJDK
-      vendor.set(JvmVendorSpec.AMAZON)
+      // Some JDK vendors like Oracle OpenJDK have problems in building trino-connector.
+      // So we will use AMAZON OpenJDK for trino-connector.
       if (project.name == "trino-connector") {
+        val osName = System.getProperty("os.name").lowercase(Locale.getDefault())
+        if (osName.contains("mac")) {
+          vendor.set(JvmVendorSpec.AMAZON)
+        }
         languageVersion.set(JavaLanguageVersion.of(17))
       } else {
         languageVersion.set(JavaLanguageVersion.of(extra["jdkVersion"].toString().toInt()))
