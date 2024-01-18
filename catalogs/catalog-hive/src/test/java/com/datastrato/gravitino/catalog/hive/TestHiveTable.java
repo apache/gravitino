@@ -24,11 +24,13 @@ import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.NamedReference;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
+import com.datastrato.gravitino.rel.expressions.literals.Literals;
 import com.datastrato.gravitino.rel.expressions.sorts.NullOrdering;
 import com.datastrato.gravitino.rel.expressions.sorts.SortDirection;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrders;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
+import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
 import com.datastrato.gravitino.rel.types.Types;
 import com.google.common.collect.Maps;
 import java.time.Instant;
@@ -229,6 +231,36 @@ public class TestHiveTable extends MiniHiveMetastoreService {
             .contains(
                 "The NOT NULL constraint for column is only supported since Hive 3.0, "
                     + "but the current Gravitino Hive catalog only supports Hive 2.x"));
+
+    HiveColumn withDefault =
+        new HiveColumn.Builder()
+            .withName("col_3")
+            .withType(Types.ByteType.get())
+            .withComment(HIVE_COMMENT)
+            .withNullable(true)
+            .withDefaultValue(Literals.NULL)
+            .build();
+    exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                hiveCatalog
+                    .asTableCatalog()
+                    .createTable(
+                        tableIdentifier,
+                        new Column[] {withDefault},
+                        HIVE_COMMENT,
+                        properties,
+                        Transforms.EMPTY_TRANSFORM,
+                        distribution,
+                        sortOrders));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains(
+                "The DEFAULT constraint for column is only supported since Hive 3.0, "
+                    + "but the current Gravitino Hive catalog only supports Hive 2.x"),
+        "The exception message is: " + exception.getMessage());
   }
 
   @Test

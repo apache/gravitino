@@ -32,6 +32,7 @@ import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.TableCatalog;
 import com.datastrato.gravitino.rel.TableChange;
+import com.datastrato.gravitino.rel.expressions.Expression;
 import com.datastrato.gravitino.rel.expressions.NamedReference;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
@@ -568,7 +569,12 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     validatePartitionForCreate(columns, partitioning);
     validateDistributionAndSort(distribution, sortOrders);
 
-    Arrays.stream(columns).forEach(c -> validateNullable(c.name(), c.nullable()));
+    Arrays.stream(columns)
+        .forEach(
+            c -> {
+              validateNullable(c.name(), c.nullable());
+              validateColumnDefaultValue(c.name(), c.defaultValue());
+            });
 
     TableType tableType = (TableType) tablePropertiesMetadata.getOrDefault(properties, TABLE_TYPE);
     Preconditions.checkArgument(
@@ -720,6 +726,17 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       throw e;
     } catch (Exception e) {
       throw new RuntimeException(e);
+    }
+  }
+
+  private void validateColumnDefaultValue(String fieldName, Expression defaultValue) {
+    // The DEFAULT constraint for column is supported since Hive3.0, see
+    // https://issues.apache.org/jira/browse/HIVE-18726
+    if (!defaultValue.equals(Column.DEFAULT_VALUE_NOT_SET)) {
+      throw new IllegalArgumentException(
+          "The DEFAULT constraint for column is only supported since Hive 3.0, "
+              + "but the current Gravitino Hive catalog only supports Hive 2.x. Illegal column: "
+              + fieldName);
     }
   }
 
