@@ -29,8 +29,6 @@ const DetailsView = props => {
     }
   })
 
-  console.log(activatedItem)
-
   return (
     <Box sx={{ p: 4 }}>
       <Grid container spacing={6}>

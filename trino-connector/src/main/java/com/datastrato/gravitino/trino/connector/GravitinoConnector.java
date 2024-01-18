@@ -4,9 +4,6 @@
  */
 package com.datastrato.gravitino.trino.connector;
 
-import static com.google.common.collect.Sets.immutableEnumSet;
-import static io.trino.spi.connector.ConnectorCapabilities.NOT_NULL_COLUMN_CONSTRAINT;
-
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.client.GravitinoMetaLake;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorContext;
@@ -142,6 +139,6 @@ public class GravitinoConnector implements Connector {
 
   @Override
   public Set<ConnectorCapabilities> getCapabilities() {
-    return immutableEnumSet(NOT_NULL_COLUMN_CONSTRAINT);
+    return catalogConnectorContext.getInternalConnector().getCapabilities();
   }
 }

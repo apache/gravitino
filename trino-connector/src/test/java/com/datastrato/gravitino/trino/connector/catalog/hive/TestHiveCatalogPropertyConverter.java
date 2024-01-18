@@ -26,7 +26,7 @@ public class TestHiveCatalogPropertyConverter {
             .put("hive.unknown-key", "1")
             .build();
 
-    Map<String, String> re = hiveCatalogPropertyConverter.toTrinoProperties(map);
+    Map<String, String> re = hiveCatalogPropertyConverter.gravitinoToEngineProperties(map);
     Assert.assertEquals(re.get("hive.immutable-partitions"), "true");
     Assert.assertEquals(re.get("hive.compression-codec"), "ZSTD");
     Assert.assertEquals(re.get("hive.unknown-key"), null);
