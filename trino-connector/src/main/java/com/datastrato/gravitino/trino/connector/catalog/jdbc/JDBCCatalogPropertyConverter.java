@@ -33,13 +33,13 @@ public class JDBCCatalogPropertyConverter extends PropertyConverter {
           JDBC_CONNECTION_PASSWORD_KEY, JDBC_CONNECTION_USER_KEY, JDBC_CONNECTION_PASSWORD_KEY);
 
   @Override
-  public TreeBidiMap<String, String> engineToGravitino() {
+  public TreeBidiMap<String, String> engineToGravitinoMapping() {
     return TRINO_KEY_TO_GRAVITINO_KEY;
   }
 
   @Override
-  public Map<String, String> fromGravitinoProperties(Map<String, String> properties) {
-    Map<String, String> trinoProperties = super.fromGravitinoProperties(properties);
+  public Map<String, String> gravitinoToEngineProperties(Map<String, String> properties) {
+    Map<String, String> trinoProperties = super.gravitinoToEngineProperties(properties);
     for (String requiredProperty : REQUIRED_PROPERTIES) {
       if (!trinoProperties.containsKey(requiredProperty)) {
         throw new IllegalArgumentException("Missing required property: " + requiredProperty);

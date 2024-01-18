@@ -35,7 +35,7 @@ public class HiveTablePropertyConverter extends PropertyConverter {
               .build());
 
   @Override
-  public TreeBidiMap<String, String> engineToGravitino() {
+  public TreeBidiMap<String, String> engineToGravitinoMapping() {
     return TRINO_KEY_TO_GRAVITINO_KEY;
   }
 
