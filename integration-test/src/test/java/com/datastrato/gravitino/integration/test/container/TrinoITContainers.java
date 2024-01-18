@@ -40,7 +40,9 @@ public class TrinoITContainers implements AutoCloseable {
 
     Map<String, String> env = new HashMap<>();
     env.put("GRAVITINO_SERVER_PORT", String.valueOf(gravitinoServerPort));
-    env.put("GRAVITINO_LOG_PATH", System.getProperty("gravitino.log.path"));
+    if (System.getProperty("gravitino.log.path") != null) {
+      env.put("GRAVITINO_LOG_PATH", System.getProperty("gravitino.log.path"));
+    }
 
     String command = ITUtils.joinPath(dockerComposeDir, "launch.sh");
     Object output =
