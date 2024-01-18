@@ -22,12 +22,13 @@ import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrders;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
+import com.datastrato.gravitino.trino.connector.GravitinoErrorCode;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
 import com.datastrato.gravitino.trino.connector.catalog.hive.SortingColumn.Order;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoColumn;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoTable;
-import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
+import io.trino.spi.TrinoException;
 import io.trino.spi.connector.ColumnMetadata;
 import io.trino.spi.connector.ConnectorTableMetadata;
 import io.trino.spi.connector.SchemaTableName;
@@ -110,10 +111,10 @@ public class HiveMetadataAdapter extends CatalogConnectorMetadataAdapter {
             ? (List<SortingColumn>) propertyMap.get(HIVE_SORT_ORDER_KEY)
             : Collections.EMPTY_LIST;
 
-    if (!sortColumns.isEmpty()) {
-      Preconditions.checkArgument(
-          !bucketColumns.isEmpty() && bucketCount > 0,
-          "Bucket columns and bucket count must be specified when bucket count is set");
+    if (!sortColumns.isEmpty() && (bucketColumns.isEmpty() || bucketCount == 0)) {
+      throw new TrinoException(
+          GravitinoErrorCode.GRAVITINO_ILLEGAL_ARGUMENT,
+          "Sort columns can only be set when bucket columns and bucket count are set");
     }
 
     Map<String, String> properties =
