@@ -11,7 +11,6 @@ import com.github.jk1.license.render.ReportRenderer
 import com.github.vlsi.gradle.dsl.configureEach
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 import org.gradle.internal.hash.ChecksumService
-import org.gradle.internal.os.OperatingSystem
 import org.gradle.kotlin.dsl.support.serviceOf
 import java.io.File
 import java.util.Locale
@@ -165,6 +164,8 @@ subprojects {
 
   java {
     toolchain {
+      // We set the vendor AMAZON OpenJDK
+      vendor.set(JvmVendorSpec.AMAZON)
       if (project.name == "trino-connector") {
         languageVersion.set(JavaLanguageVersion.of(17))
       } else {
@@ -501,27 +502,3 @@ tasks {
 }
 
 apply(plugin = "com.dorongold.task-tree")
-
-tasks.register("checkJDKVersionOnMacOsX") {
-  doLast {
-    if (OperatingSystem.current().isMacOsX()) {
-      val vendor = System.getProperty("java.vendor").lowercase(Locale.getDefault())
-      val jdkRuntime = System.getProperty("java.runtime.name")
-      println("Java vendor: $vendor, JDK runtime: $jdkRuntime")
-      if (JavaVersion.current() == JavaVersion.VERSION_17 && jdkRuntime.contains("OpenJDK") &&
-        (vendor.contains("oracle") || vendor.contains("homebrew"))
-      ) {
-        throw GradleException(
-          "Gravitino current doesn't support building with " +
-            "Java version: OpenJDK 17 on MacOsX. Please use other JDK 17."
-        )
-      }
-    }
-  }
-}
-
-tasks.all {
-  if (this.name != "checkJDKVersionOnMacOsX") {
-    dependsOn("checkJDKVersionOnMacOsX")
-  }
-}
