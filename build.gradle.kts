@@ -493,6 +493,7 @@ tasks {
       ":catalogs:catalog-lakehouse-iceberg:copyLibAndConfig",
       ":catalogs:catalog-jdbc-mysql:copyLibAndConfig",
       ":catalogs:catalog-jdbc-postgresql:copyLibAndConfig"
+      // TODO. add fileset catalog to the distribution when ready.
     )
   }
 

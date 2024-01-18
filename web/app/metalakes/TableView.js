@@ -7,7 +7,7 @@ import { useState } from 'react'
 
 import Link from 'next/link'
 
-import { Box, Typography, Chip } from '@mui/material'
+import { Box, Typography } from '@mui/material'
 import ColumnTypeChip from '@/components/ColumnTypeChip'
 import { DataGrid } from '@mui/x-data-grid'
 import { useAppSelector, useAppDispatch } from '@/lib/hooks/useStore'
@@ -86,6 +86,21 @@ const TableView = props => {
     {
       flex: 0.1,
       minWidth: 60,
+      field: 'type',
+      headerName: 'Type',
+      renderCell: ({ row }) => {
+        const { type } = row
+
+        return (
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            <ColumnTypeChip type={type} />
+          </Box>
+        )
+      }
+    },
+    {
+      flex: 0.1,
+      minWidth: 60,
       field: 'nullable',
       headerName: 'Nullable',
       renderCell: ({ row }) => {
@@ -104,21 +119,6 @@ const TableView = props => {
             >
               {`${nullable}`}
             </Typography>
-          </Box>
-        )
-      }
-    },
-    {
-      flex: 0.1,
-      minWidth: 60,
-      field: 'type',
-      headerName: 'Type',
-      renderCell: ({ row }) => {
-        const { type } = row
-
-        return (
-          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <ColumnTypeChip type={type} />
           </Box>
         )
       }

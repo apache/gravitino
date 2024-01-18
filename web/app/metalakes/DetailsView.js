@@ -3,17 +3,11 @@
  * This software is licensed under the Apache License version 2.
  */
 
-import Box from '@mui/material/Box'
-import Grid from '@mui/material/Grid'
-import Typography from '@mui/material/Typography'
-import Table from '@mui/material/Table'
-import TableHead from '@mui/material/TableHead'
-import TableBody from '@mui/material/TableBody'
-import TableRow from '@mui/material/TableRow'
-import TableCell from '@mui/material/TableCell'
-import TableContainer from '@mui/material/TableContainer'
+import { Box, Grid, Typography, Table, TableHead, TableBody, TableRow, TableCell, TableContainer } from '@mui/material'
 
-import { formatToDateTime } from '@/lib/utils/date'
+import EmptyText from '@/components/EmptyText'
+
+import { formatToDateTime, isValidDate } from '@/lib/utils/date'
 
 const DetailsView = props => {
   const { store, data = {}, page } = props
@@ -29,7 +23,17 @@ const DetailsView = props => {
     }
   })
 
-  console.log(activatedItem)
+  const renderFieldText = (value, linkBreak = false) => {
+    if (!value) {
+      return <EmptyText />
+    }
+
+    return (
+      <Typography sx={{ fontWeight: 500, whiteSpace: linkBreak ? 'pre' : 'normal' }}>
+        {isValidDate(value) ? formatToDateTime(value) : value}
+      </Typography>
+    )
+  }
 
   return (
     <Box sx={{ p: 4 }}>
@@ -40,13 +44,13 @@ const DetailsView = props => {
               <Typography variant='body2' sx={{ mb: 2 }}>
                 Type
               </Typography>
-              <Typography sx={{ fontWeight: 500 }}>{activatedItem?.type || ''}</Typography>
+              {renderFieldText(activatedItem?.type)}
             </Grid>
             <Grid item xs={12} md={6} sx={{ mb: [0, 5] }}>
               <Typography variant='body2' sx={{ mb: 2 }}>
                 Provider
               </Typography>
-              <Typography sx={{ fontWeight: 500 }}>{activatedItem?.provider || ''}</Typography>
+              {renderFieldText(activatedItem?.provider)}
             </Grid>
           </>
         ) : null}
@@ -54,39 +58,35 @@ const DetailsView = props => {
           <Typography variant='body2' sx={{ mb: 2 }}>
             Comment
           </Typography>
-          <Typography sx={{ fontWeight: 500, whiteSpace: 'pre' }}>{activatedItem?.comment || ''}</Typography>
+          {renderFieldText(activatedItem?.comment, true)}
         </Grid>
 
         <Grid item xs={12} md={6} sx={{ mb: [0, 5] }}>
           <Typography variant='body2' sx={{ mb: 2 }}>
             Created by
           </Typography>
-          <Typography sx={{ fontWeight: 500 }}>{audit?.creator ? audit.creator : ''}</Typography>
+          {renderFieldText(audit.creator)}
         </Grid>
 
         <Grid item xs={12} md={6} sx={{ mb: [0, 5] }}>
           <Typography variant='body2' sx={{ mb: 2 }}>
             Created at
           </Typography>
-          <Typography sx={{ fontWeight: 500 }}>
-            {audit?.createTime ? formatToDateTime(audit?.createTime) : ''}
-          </Typography>
+          {renderFieldText(audit.createTime)}
         </Grid>
 
         <Grid item xs={12} md={6} sx={{ mb: [0, 5] }}>
           <Typography variant='body2' sx={{ mb: 2 }}>
             Last modified by
           </Typography>
-          <Typography sx={{ fontWeight: 500 }}>{audit?.lastModifier ? audit.lastModifier : ''}</Typography>
+          {renderFieldText(audit.lastModifier)}
         </Grid>
 
         <Grid item xs={12} md={6} sx={{ mb: [0, 5] }}>
           <Typography variant='body2' sx={{ mb: 2 }}>
             Last modified at
           </Typography>
-          <Typography sx={{ fontWeight: 500 }}>
-            {audit?.lastModifiedTime ? formatToDateTime(audit?.lastModifiedTime) : ''}
-          </Typography>
+          {renderFieldText(audit.lastModifiedTime)}
         </Grid>
 
         <Grid item xs={12} sx={{ mb: [0, 5] }}>
