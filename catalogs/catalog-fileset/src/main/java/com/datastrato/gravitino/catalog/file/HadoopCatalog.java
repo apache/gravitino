@@ -12,8 +12,8 @@ import java.util.Map;
 
 /**
  * Hadoop catalog is a fileset catalog that can manage filesets on the Hadoop Compatible File
- * Systems, like Local, HDFS, S3, ADLS, etc, using the Hadoop FileSystem API. It can manage
- * filesets from different Hadoop Compatible File Systems in the same catalog.
+ * Systems, like Local, HDFS, S3, ADLS, etc, using the Hadoop FileSystem API. It can manage filesets
+ * from different Hadoop Compatible File Systems in the same catalog.
  */
 public class HadoopCatalog extends BaseCatalog<HadoopCatalog> {
 
