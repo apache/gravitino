@@ -267,7 +267,11 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
     } catch (NoSuchEntityException nsee) {
       throw new NoSuchSchemaException("Schema " + ident.name() + " does not exist", nsee);
     } catch (AlreadyExistsException aee) {
-      throw new RuntimeException("Schema " + ident.name() + " already exists", aee);
+      throw new RuntimeException(
+          "Schema "
+              + ident.name()
+              + " already exists, this is unexpected because schema doesn't support rename",
+          aee);
     }
   }
 
@@ -298,22 +302,18 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
         return true;
       }
 
-      if (fs.listStatus(schemaPath).length > 0) {
-        if (!cascade) {
-          throw new NonEmptySchemaException(
-              "Schema " + ident.name() + " with location " + schemaPath + " is not empty");
-        } else {
-          fs.delete(schemaPath, true);
-        }
+      if (fs.listStatus(schemaPath).length > 0 && !cascade) {
+        throw new NonEmptySchemaException(
+            "Schema " + ident.name() + " with location " + schemaPath + " is not empty");
       } else {
         fs.delete(schemaPath, true);
       }
 
-      LOG.info("Dropped schema {} with location {}", ident.name(), schemaPath);
+      LOG.info("Deleted schema {} location {}", ident.name(), schemaPath);
       return true;
 
     } catch (IOException ioe) {
-      throw new RuntimeException("Failed to delete schema " + ident.name(), ioe);
+      throw new RuntimeException("Failed to delete schema " + ident.name() + " location", ioe);
     }
   }
 
