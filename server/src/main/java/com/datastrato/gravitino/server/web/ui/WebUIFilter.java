@@ -21,10 +21,11 @@ public class WebUIFilter implements Filter {
       throws IOException, ServletException {
     HttpServletRequest httpRequest = (HttpServletRequest) request;
     String path = httpRequest.getRequestURI();
+    String lastPathSegment = path.substring(path.lastIndexOf("/") + 1);
     if (path.equals("/")) {
       // Redirect to the index page.
       httpRequest.getRequestDispatcher("/ui/index.html").forward(request, response);
-    } else if (path.startsWith("/ui/") && !path.contains(".")) {
+    } else if (path.startsWith("/ui/") && !lastPathSegment.contains(".")) {
       // Redirect to the static HTML file.
       httpRequest.getRequestDispatcher(path + ".html").forward(request, response);
     } else {
