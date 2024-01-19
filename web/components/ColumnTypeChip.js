@@ -12,9 +12,11 @@ import { isString } from 'lodash-es'
 const ColumnTypeChip = props => {
   const { type = '' } = props
 
+  const formatType = type && isString(type) ? type.replace(/\(.*\)/, '') : type
+
   const label = isString(type) ? type : `${type?.type}<${type?.elementType ?? 'unknown'}>` ?? 'unknown'
 
-  const columnTypeColor = ColumnTypeColorEnum[type] || 'secondary'
+  const columnTypeColor = ColumnTypeColorEnum[formatType] || 'secondary'
   const color = colors[columnTypeColor]?.main || '#8592A3'
   const bgColor = alpha(color, 0.1)
 
