@@ -2,7 +2,7 @@
  * Copyright 2024 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.gravitino.catalog.file;
+package com.datastrato.gravitino.catalog.hadoop;
 
 import static com.datastrato.gravitino.Configs.DEFAULT_ENTITY_KV_STORE;
 import static com.datastrato.gravitino.Configs.ENTITY_KV_STORE;

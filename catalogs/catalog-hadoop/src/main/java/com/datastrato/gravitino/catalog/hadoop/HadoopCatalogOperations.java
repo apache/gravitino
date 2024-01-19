@@ -2,7 +2,7 @@
  * Copyright 2024 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.gravitino.catalog.file;
+package com.datastrato.gravitino.catalog.hadoop;
 
 import static com.datastrato.gravitino.catalog.BaseCatalog.CATALOG_BYPASS_PREFIX;
 
@@ -74,7 +74,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
   @VisibleForTesting Optional<Path> catalogStorageLocation;
 
   // For testing only.
-  public HadoopCatalogOperations(CatalogEntity entity, EntityStore store, IdGenerator idGenerator) {
+  HadoopCatalogOperations(CatalogEntity entity, EntityStore store, IdGenerator idGenerator) {
     this.entity = entity;
     this.store = store;
     this.idGenerator = idGenerator;
