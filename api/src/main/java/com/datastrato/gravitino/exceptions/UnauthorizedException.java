@@ -6,7 +6,6 @@
 package com.datastrato.gravitino.exceptions;
 
 import com.google.common.collect.Lists;
-
 import java.util.List;
 
 /** Exception thrown when a user is not authorized to perform an action. */

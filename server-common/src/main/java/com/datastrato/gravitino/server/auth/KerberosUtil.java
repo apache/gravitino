@@ -1,22 +1,18 @@
 /**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more contributor license
+ * agreements. See the NOTICE file distributed with this work for additional information regarding
+ * copyright ownership. The ASF licenses this file to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance with the License. You may obtain a
+ * copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ * <p>http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
+ * <p>Unless required by applicable law or agreed to in writing, software distributed under the
+ * License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language governing permissions and
  * limitations under the License.
  */
 package com.datastrato.gravitino.server.auth;
-
 
 import java.io.File;
 import java.io.IOException;
@@ -34,16 +30,14 @@ import java.util.Locale;
 import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.regex.Pattern;
-
-import org.apache.kerby.kerberos.kerb.keytab.Keytab;
-import org.apache.kerby.kerberos.kerb.type.base.PrincipalName;
-import org.ietf.jgss.GSSException;
-import org.ietf.jgss.Oid;
-
 import javax.security.auth.Subject;
 import javax.security.auth.kerberos.KerberosPrincipal;
 import javax.security.auth.kerberos.KerberosTicket;
 import javax.security.auth.kerberos.KeyTab;
+import org.apache.kerby.kerberos.kerb.keytab.Keytab;
+import org.apache.kerby.kerberos.kerb.type.base.PrincipalName;
+import org.ietf.jgss.GSSException;
+import org.ietf.jgss.Oid;
 
 public class KerberosUtil {
 
@@ -52,10 +46,8 @@ public class KerberosUtil {
     return "com.sun.security.auth.module.Krb5LoginModule";
   }
 
-  public static final Oid GSS_SPNEGO_MECH_OID =
-      getNumericOidInstance("1.3.6.1.5.5.2");
-  public static final Oid GSS_KRB5_MECH_OID =
-      getNumericOidInstance("1.2.840.113554.1.2.2");
+  public static final Oid GSS_SPNEGO_MECH_OID = getNumericOidInstance("1.3.6.1.5.5.2");
+  public static final Oid GSS_KRB5_MECH_OID = getNumericOidInstance("1.2.840.113554.1.2.2");
   public static final Oid NT_GSS_KRB5_PRINCIPAL_OID =
       getNumericOidInstance("1.2.840.113554.1.2.2.1");
 
@@ -70,9 +62,8 @@ public class KerberosUtil {
   }
 
   /**
-   * Returns the Oid instance from string oidName.
-   * Use {@link GSS_SPNEGO_MECH_OID}, {@link GSS_KRB5_MECH_OID},
-   * or {@link NT_GSS_KRB5_PRINCIPAL_OID} instead.
+   * Returns the Oid instance from string oidName. Use {@link GSS_SPNEGO_MECH_OID}, {@link
+   * GSS_KRB5_MECH_OID}, or {@link NT_GSS_KRB5_PRINCIPAL_OID} instead.
    *
    * @return Oid instance
    * @param oidName The oid Name
@@ -80,22 +71,19 @@ public class KerberosUtil {
    * @throws GSSException for backward compatibility.
    * @throws NoSuchFieldException if the input is not supported.
    * @throws IllegalAccessException for backward compatibility.
-   *
    */
   @Deprecated
   public static Oid getOidInstance(String oidName)
-      throws ClassNotFoundException, GSSException, NoSuchFieldException,
-      IllegalAccessException {
+      throws ClassNotFoundException, GSSException, NoSuchFieldException, IllegalAccessException {
     switch (oidName) {
-    case "GSS_SPNEGO_MECH_OID":
-      return GSS_SPNEGO_MECH_OID;
-    case "GSS_KRB5_MECH_OID":
-      return GSS_KRB5_MECH_OID;
-    case "NT_GSS_KRB5_PRINCIPAL":
-      return NT_GSS_KRB5_PRINCIPAL_OID;
-    default:
-      throw new NoSuchFieldException(
-          "oidName: " + oidName + " is not supported.");
+      case "GSS_SPNEGO_MECH_OID":
+        return GSS_SPNEGO_MECH_OID;
+      case "GSS_KRB5_MECH_OID":
+        return GSS_KRB5_MECH_OID;
+      case "NT_GSS_KRB5_PRINCIPAL":
+        return NT_GSS_KRB5_PRINCIPAL_OID;
+      default:
+        throw new NoSuchFieldException("oidName: " + oidName + " is not supported.");
     }
   }
 
@@ -110,16 +98,15 @@ public class KerberosUtil {
    * @throws InvocationTargetException Not thrown. Exists for compatibility.
    */
   public static String getDefaultRealm()
-      throws ClassNotFoundException, NoSuchMethodException,
-      IllegalArgumentException, IllegalAccessException,
-      InvocationTargetException {
+      throws ClassNotFoundException, NoSuchMethodException, IllegalArgumentException,
+          IllegalAccessException, InvocationTargetException {
     // Any name is okay.
     return new KerberosPrincipal("tmp", 1).getRealm();
   }
 
   /**
-   * Return the default realm for this JVM.
-   * If the default realm does not exist, this method returns null.
+   * Return the default realm for this JVM. If the default realm does not exist, this method returns
+   * null.
    *
    * @return The default realm
    */
@@ -127,7 +114,7 @@ public class KerberosUtil {
     try {
       return getDefaultRealm();
     } catch (Exception e) {
-      //silently catch everything
+      // silently catch everything
       return null;
     }
   }
@@ -151,19 +138,22 @@ public class KerberosUtil {
    */
   public static String getDomainRealm(String shortprinc) {
     Class<?> classRef;
-    Object principalName; //of type sun.security.krb5.PrincipalName or IBM equiv
+    Object principalName; // of type sun.security.krb5.PrincipalName or IBM equiv
     String realmString = null;
     try {
       classRef = Class.forName("sun.security.krb5.PrincipalName");
       int tKrbNtSrvHst = classRef.getField("KRB_NT_SRV_HST").getInt(null);
-      principalName = classRef.getConstructor(String.class, int.class).
-          newInstance(shortprinc, tKrbNtSrvHst);
-      realmString = (String)classRef.getMethod("getRealmString", new Class[0]).
-          invoke(principalName, new Object[0]);
+      principalName =
+          classRef.getConstructor(String.class, int.class).newInstance(shortprinc, tKrbNtSrvHst);
+      realmString =
+          (String)
+              classRef
+                  .getMethod("getRealmString", new Class[0])
+                  .invoke(principalName, new Object[0]);
     } catch (RuntimeException rte) {
-      //silently catch everything
+      // silently catch everything
     } catch (Exception e) {
-      //silently return default realm (which may itself be null)
+      // silently return default realm (which may itself be null)
     }
     if (null == realmString || realmString.equals("")) {
       return getDefaultRealmProtected();
@@ -176,28 +166,21 @@ public class KerberosUtil {
   public static String getLocalHostName() throws UnknownHostException {
     return InetAddress.getLocalHost().getCanonicalHostName();
   }
-  
+
   /**
-   * Create Kerberos principal for a given service and hostname,
-   * inferring realm from the fqdn of the hostname. It converts
-   * hostname to lower case. If hostname is null or "0.0.0.0", it uses
-   * dynamically looked-up fqdn of the current host instead.
-   * If domain_realm mappings are inadequately specified, it will
-   * use default_realm, per usual Kerberos behavior.
-   * If default_realm also gives a null value, then a principal
-   * without realm will be returned, which by Kerberos definitions is
-   * just another way to specify default realm.
+   * Create Kerberos principal for a given service and hostname, inferring realm from the fqdn of
+   * the hostname. It converts hostname to lower case. If hostname is null or "0.0.0.0", it uses
+   * dynamically looked-up fqdn of the current host instead. If domain_realm mappings are
+   * inadequately specified, it will use default_realm, per usual Kerberos behavior. If
+   * default_realm also gives a null value, then a principal without realm will be returned, which
+   * by Kerberos definitions is just another way to specify default realm.
    *
-   * @param service
-   *          Service for which you want to generate the principal.
-   * @param hostname
-   *          Fully-qualified domain name.
+   * @param service Service for which you want to generate the principal.
+   * @param hostname Fully-qualified domain name.
    * @return Converted Kerberos principal name.
-   * @throws UnknownHostException
-   *           If no IP address for the local host could be found.
+   * @throws UnknownHostException If no IP address for the local host could be found.
    */
-  public static final String getServicePrincipal(String service,
-      String hostname)
+  public static final String getServicePrincipal(String service, String hostname)
       throws UnknownHostException {
     String fqdn = hostname;
     String shortprinc = null;
@@ -220,12 +203,10 @@ public class KerberosUtil {
 
   /**
    * Get all the unique principals present in the keytabfile.
-   * 
-   * @param keytabFileName 
-   *          Name of the keytab file to be read.
+   *
+   * @param keytabFileName Name of the keytab file to be read.
    * @return list of unique principals in the keytab.
-   * @throws IOException 
-   *          If keytab entries cannot be read from the file.
+   * @throws IOException If keytab entries cannot be read from the file.
    */
   static final String[] getPrincipalNames(String keytabFileName) throws IOException {
     Keytab keytab = Keytab.loadKeytab(new File(keytabFileName));
@@ -239,14 +220,14 @@ public class KerberosUtil {
 
   /**
    * Get all the unique principals from keytabfile which matches a pattern.
-   * 
+   *
    * @param keytab Name of the keytab file to be read.
    * @param pattern pattern to be matched.
    * @return list of unique principals which matches the pattern.
    * @throws IOException if cannot get the principal name
    */
-  public static final String[] getPrincipalNames(String keytab,
-      Pattern pattern) throws IOException {
+  public static final String[] getPrincipalNames(String keytab, Pattern pattern)
+      throws IOException {
     String[] principals = getPrincipalNames(keytab);
     if (principals.length != 0) {
       List<String> matchingPrincipals = new ArrayList<String>();
@@ -261,10 +242,8 @@ public class KerberosUtil {
   }
 
   /**
-   * Check if the subject contains Kerberos keytab related objects.
-   * The Kerberos keytab object attached in subject has been changed
-   * from KerberosKey (JDK 7) to KeyTab (JDK 8)
-   *
+   * Check if the subject contains Kerberos keytab related objects. The Kerberos keytab object
+   * attached in subject has been changed from KerberosKey (JDK 7) to KeyTab (JDK 8)
    *
    * @param subject subject to be checked
    * @return true if the subject contains Kerberos keytab
@@ -276,7 +255,6 @@ public class KerberosUtil {
   /**
    * Check if the subject contains Kerberos ticket.
    *
-   *
    * @param subject subject to be checked
    * @return true if the subject contains Kerberos ticket
    */
@@ -285,8 +263,8 @@ public class KerberosUtil {
   }
 
   /**
-   * Extract the TGS server principal from the given gssapi kerberos or spnego
-   * wrapped token.
+   * Extract the TGS server principal from the given gssapi kerberos or spnego wrapped token.
+   *
    * @param rawToken bytes of the gss token
    * @return String of server principal
    * @throws IllegalArgumentException if token is undecodable
@@ -379,10 +357,10 @@ public class KerberosUtil {
     // standard ASN.1 encoding.
     private static int readLength(ByteBuffer bb) {
       int length = bb.get();
-      if ((length & (byte)0x80) != 0) {
+      if ((length & (byte) 0x80) != 0) {
         int varlength = length & 0x7f;
         length = 0;
-        for (int i=0; i < varlength; i++) {
+        for (int i = 0; i < varlength; i++) {
           length = (length << 8) | (bb.get() & 0xff);
         }
       }
@@ -401,7 +379,7 @@ public class KerberosUtil {
 
     DER get(int... tags) {
       DER der = this;
-      for (int i=0; i < tags.length; i++) {
+      for (int i = 0; i < tags.length; i++) {
         int expectedTag = tags[i];
         // lookup for exact match, else scan if it's sequenced.
         if (der.getTag() != expectedTag) {
@@ -409,7 +387,7 @@ public class KerberosUtil {
         }
         if (der == null) {
           StringBuilder sb = new StringBuilder("Tag not found:");
-          for (int ii=0; ii <= i; ii++) {
+          for (int ii = 0; ii <= i; ii++) {
             sb.append(" 0x").append(Integer.toHexString(tags[ii]));
           }
           throw new IllegalStateException(sb.toString());
@@ -420,8 +398,7 @@ public class KerberosUtil {
 
     String getAsString() {
       try {
-        return new String(bb.array(), bb.arrayOffset() + bb.position(),
-            bb.remaining(), "UTF-8");
+        return new String(bb.array(), bb.arrayOffset() + bb.position(), bb.remaining(), "UTF-8");
       } catch (UnsupportedEncodingException e) {
         throw new IllegalCharsetNameException("UTF-8"); // won't happen.
       }
@@ -434,8 +411,7 @@ public class KerberosUtil {
 
     @Override
     public boolean equals(Object o) {
-      return (o instanceof DER) &&
-          tag == ((DER)o).tag && bb.equals(((DER)o).bb);
+      return (o instanceof DER) && tag == ((DER) o).tag && bb.equals(((DER) o).bb);
     }
 
     @Override
@@ -454,7 +430,7 @@ public class KerberosUtil {
 
     @Override
     public String toString() {
-      return "[tag=0x"+Integer.toHexString(tag)+" bb="+bb+"]";
+      return "[tag=0x" + Integer.toHexString(tag) + " bb=" + bb + "]";
     }
   }
 }
