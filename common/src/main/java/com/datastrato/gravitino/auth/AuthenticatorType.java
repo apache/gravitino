@@ -9,6 +9,5 @@ public enum AuthenticatorType {
   NONE,
   SIMPLE,
   OAUTH,
-
   KERBEROS
 }
