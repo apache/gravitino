@@ -17,6 +17,7 @@ airlift-units = "1.8"
 airlift-log = "231"
 hive2 = "2.3.9"
 hadoop2 = "2.10.2"
+hadoop-minikdc = "3.3.6"
 httpclient5 = "5.2.1"
 mockserver = "5.15.0"
 commons-lang3 = "3.14.0"
@@ -137,7 +138,7 @@ prometheus-servlet = { group = "io.prometheus", name = "simpleclient_servlet", v
 jsqlparser = { group = "com.github.jsqlparser", name = "jsqlparser", version.ref = "jsqlparser" }
 mysql-driver = { group = "mysql", name = "mysql-connector-java", version.ref = "mysql" }
 postgresql-driver = { group = "org.postgresql", name = "postgresql", version.ref = "postgresql" }
-minikdc = { group = "org.apache.hadoop", name = "hadoop-minikdc", version.ref = "hadoop2"}
+minikdc = { group = "org.apache.hadoop", name = "hadoop-minikdc", version.ref = "hadoop-minikdc"}
 commons-cli = { group = "commons-cli", name = "commons-cli", version.ref = "commons-cli" }
 
 [bundles]
