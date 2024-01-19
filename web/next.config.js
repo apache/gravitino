@@ -19,15 +19,6 @@ const nextConfig = {
     ? {}
     : {
         // ** Just for development
-        // async redirects() {
-        //   return [
-        //     {
-        //       source: '/',
-        //       destination: `/ui`,
-        //       permanent: true
-        //     }
-        //   ]
-        // },
         async rewrites() {
           return {
             fallback: [
