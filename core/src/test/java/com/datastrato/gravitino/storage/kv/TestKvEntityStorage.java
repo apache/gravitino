@@ -550,9 +550,11 @@ public class TestKvEntityStorage {
       Assertions.assertTrue(store.exists(table1InSchema2.nameIdentifier(), EntityType.TABLE));
 
       // Delete the schema 'metalake.catalog.schema1' but failed, because it ha sub-entities;
-      Assertions.assertThrowsExactly(
-          NonEmptyEntityException.class,
-          () -> store.delete(schema1.nameIdentifier(), EntityType.SCHEMA));
+      NonEmptyEntityException exception =
+          Assertions.assertThrowsExactly(
+              NonEmptyEntityException.class,
+              () -> store.delete(schema1.nameIdentifier(), EntityType.SCHEMA));
+      Assertions.assertTrue(exception.getMessage().contains("metalake.catalog.schema1.table1"));
       // Make sure schema 'metalake.catalog.schema1' and table 'metalake.catalog.schema1.table1'
       // has not been deleted yet;
       Assertions.assertTrue(store.exists(schema1.nameIdentifier(), EntityType.SCHEMA));
