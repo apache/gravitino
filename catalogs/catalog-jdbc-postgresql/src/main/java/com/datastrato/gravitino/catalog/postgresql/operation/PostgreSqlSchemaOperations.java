@@ -16,14 +16,27 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import javax.sql.DataSource;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 
 /** Database operations for PostgreSQL. */
 public class PostgreSqlSchemaOperations extends JdbcDatabaseOperations {
+
+  public static final Set<String> SYS_PG_DATABASE_NAMES =
+      Collections.unmodifiableSet(
+          new HashSet<String>() {
+            {
+              add("pg_toast");
+              add("pg_catalog");
+              add("public");
+              add("information_schema");
+            }
+          });
 
   private String database;
 
@@ -70,7 +83,9 @@ public class PostgreSqlSchemaOperations extends JdbcDatabaseOperations {
         ResultSet resultSet = statement.executeQuery();
         while (resultSet.next()) {
           String databaseName = resultSet.getString(1);
-          result.add(databaseName);
+          if (!isSystemDatabase(databaseName)) {
+            result.add(databaseName);
+          }
         }
       }
     } catch (final SQLException se) {
@@ -113,5 +128,10 @@ public class PostgreSqlSchemaOperations extends JdbcDatabaseOperations {
     Connection connection = dataSource.getConnection();
     connection.setCatalog(database);
     return connection;
+  }
+
+  @Override
+  protected boolean isSystemDatabase(String dbName) {
+    return SYS_PG_DATABASE_NAMES.contains(dbName);
   }
 }

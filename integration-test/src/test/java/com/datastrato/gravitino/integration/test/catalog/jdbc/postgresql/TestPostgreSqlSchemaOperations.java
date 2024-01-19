@@ -4,6 +4,8 @@
  */
 package com.datastrato.gravitino.integration.test.catalog.jdbc.postgresql;
 
+import static com.datastrato.gravitino.catalog.postgresql.operation.PostgreSqlSchemaOperations.SYS_PG_DATABASE_NAMES;
+
 import com.datastrato.gravitino.catalog.jdbc.JdbcSchema;
 import com.datastrato.gravitino.catalog.jdbc.config.JdbcConfig;
 import com.datastrato.gravitino.catalog.jdbc.utils.DataSourceUtils;
@@ -32,14 +34,18 @@ public class TestPostgreSqlSchemaOperations extends TestPostgreSqlAbstractIT {
     Map<String, String> properties = new HashMap<>();
     // PostgreSql does not support filling in comments directly when creating a table.
     String comment = null;
+    List<String> initDatabases = DATABASE_OPERATIONS.listDatabases();
+
+    SYS_PG_DATABASE_NAMES.forEach(
+        sysPgDatabaseName -> Assertions.assertFalse(initDatabases.contains(sysPgDatabaseName)));
+
     testBaseOperation(databaseName, properties, comment);
-    List<String> databases;
     // delete database.
     Assertions.assertDoesNotThrow(() -> DATABASE_OPERATIONS.delete(databaseName, true));
 
     Assertions.assertThrows(
         NoSuchSchemaException.class, () -> DATABASE_OPERATIONS.load(databaseName));
-    databases = DATABASE_OPERATIONS.listDatabases();
+    List<String> databases = DATABASE_OPERATIONS.listDatabases();
     Assertions.assertFalse(databases.contains(databaseName));
   }
 
