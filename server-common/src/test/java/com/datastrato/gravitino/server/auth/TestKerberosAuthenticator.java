@@ -138,7 +138,8 @@ public class TestKerberosAuthenticator extends KerberosSecurityTestcase {
   private void initKeyTab() throws Exception {
     File keytabFile = new File(KerberosTestUtils.getKeytabFile());
     String clientPrincipal = removeRealm(KerberosTestUtils.getClientPrincipal());
-    String serverPrincipal = removeRealm(KerberosTestUtils.getServerPrincipal());;
+    String serverPrincipal = removeRealm(KerberosTestUtils.getServerPrincipal());
+    ;
     getKdc().createPrincipal(keytabFile, clientPrincipal, serverPrincipal);
   }
 
