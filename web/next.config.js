@@ -19,18 +19,22 @@ const nextConfig = {
     ? {}
     : {
         // ** Just for development
-        async redirects() {
-          return [
-            {
-              source: '/',
-              destination: `/ui`,
-              permanent: true
-            }
-          ]
-        },
+        // async redirects() {
+        //   return [
+        //     {
+        //       source: '/',
+        //       destination: `/ui`,
+        //       permanent: true
+        //     }
+        //   ]
+        // },
         async rewrites() {
           return {
             fallback: [
+              {
+                source: '/',
+                destination: `/ui`
+              },
               {
                 source: '/api/:path*',
                 destination: `${apiUrl}/api/:path*`

@@ -41,7 +41,7 @@ const RightContent = props => {
         <Box className={`twc-flex twc-items-center`}>
           <Box className={`twc-flex twc-items-center twc-justify-between`}>
             <Box className={`twc-flex twc-items-center`}>
-              <IconButton color='primary' component={Link} href='/ui' sx={{ mr: 2 }}>
+              <IconButton color='primary' component={Link} href='/' sx={{ mr: 2 }}>
                 <Icon icon='mdi:arrow-left' />
               </IconButton>
               <MetalakePath routeParams={routeParams} />
