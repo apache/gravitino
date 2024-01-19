@@ -28,11 +28,18 @@ import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
+import java.util.Random;
+import java.util.stream.Stream;
 import org.apache.commons.lang3.tuple.Pair;
+import org.checkerframework.checker.units.qual.A;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mockito;
 
 @TestInstance(Lifecycle.PER_CLASS)
@@ -273,24 +280,53 @@ public class TestEntityKeyEncoding {
     }
   }
 
-  @Test
-  void testSpecialCharacterDecoder() throws IOException {
+  // Create random names for name identifiers.
+  private static Stream<Arguments> provideParameters() {
+    Random random = new Random();
+    Arguments[] arguments = new Arguments[100];
+    int identifierNameLen = 16;
+
+    for (int i = 0; i < 100; i++) {
+       String[] value = new String[4];
+       for (int j = 0; j < 4; j++) {
+         String tmp = "";
+         int current = 0;
+         while (current < identifierNameLen) {
+           int v;
+           while ((v = random.nextInt(127)) < 32) {}
+           if (v % 4 == 0) {
+             v = 47;
+           }
+
+           tmp += ((char) v);
+           current++;
+         }
+
+         value[j] = tmp;
+       }
+
+       arguments[i] = Arguments.of((Object[]) value);
+    }
+
+    return Stream.of(arguments);
+  }
+
+  @ParameterizedTest
+  @MethodSource("provideParameters")
+  void testSpecialCharacterDecoder(String metalakeName, String catalogName, String schemaName, String tableName) throws IOException {
     Config config = getConfig();
     try (KvEntityStore kvEntityStore = getKvEntityStore(config)) {
       BinaryEntityKeyEncoder encoder = (BinaryEntityKeyEncoder) kvEntityStore.entityKeyEncoder;
 
       NameIdentifier identifier =
-          NameIdentifier.of(Namespace.of(), "name1/xadfsa/asdfa/sd/dasdfa/as/dfasd/");
+          NameIdentifier.of(Namespace.of(), metalakeName);
       byte[] key = encoder.encode(identifier, EntityType.METALAKE);
 
       Pair<NameIdentifier, EntityType> nameIdentifierEntityTypePair = encoder.decode(key);
       Assertions.assertEquals(identifier, nameIdentifierEntityTypePair.getKey());
       Assertions.assertEquals(EntityType.METALAKE, nameIdentifierEntityTypePair.getValue());
 
-      identifier =
-          NameIdentifier.of(
-              Namespace.of("asafdaf/asdfaf/as//asdfa/fd/sf/asdf/"),
-              "name1/xadfsa/asdfa/sd/dasdfa/as/dfasd");
+      identifier = NameIdentifier.of(Namespace.of(metalakeName), catalogName);
       key = encoder.encode(identifier, EntityType.CATALOG);
       nameIdentifierEntityTypePair = encoder.decode(key);
       Assertions.assertEquals(identifier, nameIdentifierEntityTypePair.getKey());
@@ -299,8 +335,7 @@ public class TestEntityKeyEncoding {
       // Test Schema
       identifier =
           NameIdentifier.of(
-              Namespace.of("asafdaf/asdfaf/as//asdfa/fd/sf/asdf/", "sdfafas/asdfa/"),
-              "name1/xadfsa/asdfa/sd/dasdfa/as/dfasd");
+              Namespace.of(catalogName, catalogName), schemaName);
       key = encoder.encode(identifier, EntityType.SCHEMA);
       nameIdentifierEntityTypePair = encoder.decode(key);
       Assertions.assertEquals(identifier, nameIdentifierEntityTypePair.getKey());
@@ -310,8 +345,7 @@ public class TestEntityKeyEncoding {
       identifier =
           NameIdentifier.of(
               Namespace.of(
-                  "asafdaf/asdfaf/as//asdfa/fd/sf/asdf/", "sdfafas/asdfa/", "asdfasdf/asdfasdf/"),
-              "name1/xadfsa/asdfa/sd/dasdfa/as/dfasd");
+                  catalogName, catalogName, schemaName), tableName);
       key = encoder.encode(identifier, EntityType.TABLE);
       nameIdentifierEntityTypePair = encoder.decode(key);
       Assertions.assertEquals(identifier, nameIdentifierEntityTypePair.getKey());
