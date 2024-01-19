@@ -165,10 +165,10 @@ subprojects {
 
   java {
     toolchain {
-      // Some JDK vendors like Oracle OpenJDK have problems in building trino-connector: It will
-      // cause tests of Trino-connector hangs forever on MacOSX, to avoid this issue and other
-      // vendor-related problems, Gravitino will use the specified AMAZON OpenJDK 17 to build
-      // Trino-connector on MacOSX.
+      // Some JDK vendors like Homebrew installed OpenJDK 17 have problems in building trino-connector:
+      // It will cause tests of Trino-connector hanging forever on macOS, to avoid this issue and
+      // other vendor-related problems, Gravitino will use the specified AMAZON OpenJDK 17 to build
+      // Trino-connector on macOS.
       if (project.name == "trino-connector") {
         if (OperatingSystem.current().isMacOsX) {
           vendor.set(JvmVendorSpec.AMAZON)
