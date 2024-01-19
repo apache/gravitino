@@ -31,7 +31,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.Random;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.tuple.Pair;
-import org.checkerframework.checker.units.qual.A;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
@@ -39,7 +38,6 @@ import org.junit.jupiter.api.TestInstance.Lifecycle;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mockito;
 
 @TestInstance(Lifecycle.PER_CLASS)
@@ -287,25 +285,25 @@ public class TestEntityKeyEncoding {
     int identifierNameLen = 16;
 
     for (int i = 0; i < 100; i++) {
-       String[] value = new String[4];
-       for (int j = 0; j < 4; j++) {
-         String tmp = "";
-         int current = 0;
-         while (current < identifierNameLen) {
-           int v;
-           while ((v = random.nextInt(127)) < 32) {}
-           if (v % 4 == 0) {
-             v = 47;
-           }
+      String[] value = new String[4];
+      for (int j = 0; j < 4; j++) {
+        String tmp = "";
+        int current = 0;
+        while (current < identifierNameLen) {
+          int v;
+          while ((v = random.nextInt(127)) < 32) {}
+          if (v % 4 == 0) {
+            v = 47;
+          }
 
-           tmp += ((char) v);
-           current++;
-         }
+          tmp += ((char) v);
+          current++;
+        }
 
-         value[j] = tmp;
-       }
+        value[j] = tmp;
+      }
 
-       arguments[i] = Arguments.of((Object[]) value);
+      arguments[i] = Arguments.of((Object[]) value);
     }
 
     return Stream.of(arguments);
@@ -313,13 +311,14 @@ public class TestEntityKeyEncoding {
 
   @ParameterizedTest
   @MethodSource("provideParameters")
-  void testSpecialCharacterDecoder(String metalakeName, String catalogName, String schemaName, String tableName) throws IOException {
+  void testSpecialCharacterDecoder(
+      String metalakeName, String catalogName, String schemaName, String tableName)
+      throws IOException {
     Config config = getConfig();
     try (KvEntityStore kvEntityStore = getKvEntityStore(config)) {
       BinaryEntityKeyEncoder encoder = (BinaryEntityKeyEncoder) kvEntityStore.entityKeyEncoder;
 
-      NameIdentifier identifier =
-          NameIdentifier.of(Namespace.of(), metalakeName);
+      NameIdentifier identifier = NameIdentifier.of(Namespace.of(), metalakeName);
       byte[] key = encoder.encode(identifier, EntityType.METALAKE);
 
       Pair<NameIdentifier, EntityType> nameIdentifierEntityTypePair = encoder.decode(key);
@@ -333,19 +332,14 @@ public class TestEntityKeyEncoding {
       Assertions.assertEquals(EntityType.CATALOG, nameIdentifierEntityTypePair.getValue());
 
       // Test Schema
-      identifier =
-          NameIdentifier.of(
-              Namespace.of(catalogName, catalogName), schemaName);
+      identifier = NameIdentifier.of(Namespace.of(catalogName, catalogName), schemaName);
       key = encoder.encode(identifier, EntityType.SCHEMA);
       nameIdentifierEntityTypePair = encoder.decode(key);
       Assertions.assertEquals(identifier, nameIdentifierEntityTypePair.getKey());
       Assertions.assertEquals(EntityType.SCHEMA, nameIdentifierEntityTypePair.getValue());
 
       // Test Table
-      identifier =
-          NameIdentifier.of(
-              Namespace.of(
-                  catalogName, catalogName, schemaName), tableName);
+      identifier = NameIdentifier.of(Namespace.of(catalogName, catalogName, schemaName), tableName);
       key = encoder.encode(identifier, EntityType.TABLE);
       nameIdentifierEntityTypePair = encoder.decode(key);
       Assertions.assertEquals(identifier, nameIdentifierEntityTypePair.getKey());
