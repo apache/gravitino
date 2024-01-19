@@ -11,6 +11,7 @@ import com.github.jk1.license.render.ReportRenderer
 import com.github.vlsi.gradle.dsl.configureEach
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 import org.gradle.internal.hash.ChecksumService
+import org.gradle.internal.os.OperatingSystem
 import org.gradle.kotlin.dsl.support.serviceOf
 import java.io.File
 import java.util.Locale
@@ -169,8 +170,7 @@ subprojects {
       // vendor-related problems, Gravitino will use the specified AMAZON OpenJDK 17 to build
       // Trino-connector on MacOSX.
       if (project.name == "trino-connector") {
-        val osName = System.getProperty("os.name").lowercase(Locale.getDefault())
-        if (osName.contains("mac")) {
+        if (OperatingSystem.current().isMacOsX) {
           vendor.set(JvmVendorSpec.AMAZON)
         }
         languageVersion.set(JavaLanguageVersion.of(17))
