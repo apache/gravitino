@@ -69,7 +69,7 @@ export const updateMetalake = createAsyncThunk('appMetalakes/updateMetalake', as
 
 export const initMetalakeTree = createAsyncThunk(
   'appMetalakes/fetchMetalakeTree',
-  async ({ metalake, catalog, schema, table }, { dispatch }) => {
+  async ({ metalake, catalog, schema, table }, { getState, dispatch }) => {
     try {
       const tree = []
 
@@ -84,12 +84,13 @@ export const initMetalakeTree = createAsyncThunk(
           id: `${metalake}____${catalogItem.name}`,
           path: `?${new URLSearchParams({ metalake, catalog: catalogItem.name }).toString()}`,
           name: catalogItem.name,
-          schemas: []
+          schemas: [],
+          children: []
         }
 
         if (catalog) {
           if (catalog === catalogNode.name) {
-            dispatch(setExpandedTreeNode([catalogNode.id]))
+            dispatch(setExpandedTreeNode({ nodeIds: catalogNode.id }))
 
             const schemasData = await getSchemasApi({ metalake, catalog })
             const { identifiers: schemas = [] } = schemasData
@@ -105,11 +106,13 @@ export const initMetalakeTree = createAsyncThunk(
                   schema: schemaItem.name
                 }).toString()}`,
                 name: schemaItem.name,
-                tables: []
+                tables: [],
+                children: []
               }
 
               if (schema) {
                 if (schema === schemaNode.name) {
+                  dispatch(setExpandedTreeNode({ nodeIds: schemaNode.id }))
                   const tablesData = await getTablesApi({ metalake, catalog, schema })
                   const { identifiers: tables = [] } = tablesData
 
@@ -128,11 +131,13 @@ export const initMetalakeTree = createAsyncThunk(
                     }
 
                     schemaNode.tables.push(tableNode)
+                    schemaNode.children.push(tableNode)
                   }
                 }
               }
 
               catalogNode.schemas.push(schemaNode)
+              catalogNode.children.push(schemaNode)
             }
           }
         }
@@ -157,6 +162,7 @@ export const setIntoTreeAction = createAsyncThunk(
 
     const data = {
       updated: '',
+      nodeIds,
       id: nodeIds[0],
       metalake,
       catalogs: [],
@@ -360,6 +366,10 @@ export const appMetalakesSlice = createSlice({
     isLoadedTree: false,
     selectedTreeNode: null,
     expendedTreeNode: [],
+    clickedExpandedNode: {
+      nodeId: null,
+      expanded: false
+    },
     activatedDetails: null,
     clickedExpandNode: null
   },
@@ -374,10 +384,23 @@ export const appMetalakesSlice = createSlice({
       state.selectedTreeNode = action.payload
     },
     setExpandedTreeNode(state, action) {
-      state.expendedTreeNode = action.payload
+      const expendedTreeNode = JSON.parse(JSON.stringify(state.expendedTreeNode))
+      const nodes = Array.from(new Set([...expendedTreeNode, action.payload.nodeIds].flat()))
+      state.expendedTreeNode = nodes
+    },
+    removeExpandedNode(state, action) {
+      const expandedNodes = state.expendedTreeNode.filter(i => i !== action.payload)
+      state.expendedTreeNode = expandedNodes
+    },
+    setClickedExpandedNode(state, action) {
+      state.clickedExpandedNode = action.payload
     },
     resetTableData(state, action) {
       state.tableData = []
+    },
+    resetTree(state, action) {
+      state.metalakeTree = []
+      state.expendedTreeNode = []
     },
     resetMetalakeStore(state, action) {}
   },
@@ -454,8 +477,11 @@ export const {
   setIsLoadedTree,
   setSelectedTreeNode,
   setExpandedTreeNode,
+  setClickedExpandedNode,
+  removeExpandedNode,
   resetMetalakeStore,
-  resetTableData
+  resetTableData,
+  resetTree
 } = appMetalakesSlice.actions
 
 export default appMetalakesSlice.reducer

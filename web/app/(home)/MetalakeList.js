@@ -7,7 +7,7 @@ import { useEffect, useCallback, useState } from 'react'
 
 import Link from 'next/link'
 
-import { Box, Grid, Card, IconButton, Typography, Tooltip } from '@mui/material'
+import { Box, Grid, Card, IconButton, Typography } from '@mui/material'
 import { DataGrid } from '@mui/x-data-grid'
 
 import Icon from '@/components/Icon'
@@ -139,35 +139,32 @@ const MetalakeList = () => {
       headerName: 'Actions',
       renderCell: ({ row }) => (
         <>
-          <Tooltip title='Details' placement='top'>
-            <IconButton
-              size='small'
-              sx={{ color: theme => theme.palette.text.secondary }}
-              onClick={() => handleShowDetails(row)}
-            >
-              <Icon icon='bx:show-alt' />
-            </IconButton>
-          </Tooltip>
+          <IconButton
+            title='Details'
+            size='small'
+            sx={{ color: theme => theme.palette.text.secondary }}
+            onClick={() => handleShowDetails(row)}
+          >
+            <Icon icon='bx:show-alt' />
+          </IconButton>
 
-          <Tooltip title='Edit' placement='top'>
-            <IconButton
-              size='small'
-              sx={{ color: theme => theme.palette.text.secondary }}
-              onClick={() => handleShowEditDialog(row)}
-            >
-              <Icon icon='mdi:square-edit-outline' />
-            </IconButton>
-          </Tooltip>
+          <IconButton
+            title='Edit'
+            size='small'
+            sx={{ color: theme => theme.palette.text.secondary }}
+            onClick={() => handleShowEditDialog(row)}
+          >
+            <Icon icon='mdi:square-edit-outline' />
+          </IconButton>
 
-          <Tooltip title='Delete' placement='top'>
-            <IconButton
-              size='small'
-              sx={{ color: theme => theme.palette.error.light }}
-              onClick={() => handleDeleteMetalake(row.name)}
-            >
-              <Icon icon='mdi:delete-outline' />
-            </IconButton>
-          </Tooltip>
+          <IconButton
+            title='Delete'
+            size='small'
+            sx={{ color: theme => theme.palette.error.light }}
+            onClick={() => handleDeleteMetalake(row.name)}
+          >
+            <Icon icon='mdi:delete-outline' />
+          </IconButton>
         </>
       )
     }
@@ -185,7 +182,12 @@ const MetalakeList = () => {
             setDialogType={setDialogType}
           />
           <DataGrid
-            autoHeight
+            sx={{
+              '& .MuiDataGrid-virtualScroller': {
+                height: store.filteredMetalakes.length === 0 ? 100 : 'auto'
+              },
+              maxHeight: 'calc(100vh - 23.2rem)'
+            }}
             getRowId={row => row?.name}
             rows={store.filteredMetalakes}
             columns={columns}

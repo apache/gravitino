@@ -50,6 +50,7 @@ rat-plugin = '0.8.0'
 shadow-plugin = "8.1.1"
 node-plugin = "3.1.0"
 kerby = "2.0.3"
+commons-cli = "1.2"
 
 [libraries]
 protobuf-java = { group = "com.google.protobuf", name = "protobuf-java", version.ref = "protoc" }
@@ -137,6 +138,7 @@ jsqlparser = { group = "com.github.jsqlparser", name = "jsqlparser", version.ref
 mysql-driver = { group = "mysql", name = "mysql-connector-java", version.ref = "mysql" }
 postgresql-driver = { group = "org.postgresql", name = "postgresql", version.ref = "postgresql" }
 minikdc = { group = "org.apache.hadoop", name = "hadoop-minikdc", version.ref = "hadoop2"}
+commons-cli = { group = "commons-cli", name = "commons-cli", version.ref = "commons-cli" }
 
 [bundles]
 log4j = ["slf4j-api", "log4j-slf4j2-impl", "log4j-api", "log4j-core", "log4j-12-api"]

@@ -40,6 +40,8 @@ import org.apache.commons.lang3.StringUtils;
 /** Table operations for PostgreSQL. */
 public class PostgreSqlTableOperations extends JdbcTableOperations {
 
+  public static final String PG_QUOTE = "\"";
+
   private static final String SHOW_COLUMN_COMMENT_SQL =
       "SELECT \n"
           + "    a.attname as col_name,\n"
@@ -234,7 +236,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
     // Add columns
     for (int i = 0; i < columns.length; i++) {
       JdbcColumn column = columns[i];
-      sqlBuilder.append("    ").append(column.name());
+      sqlBuilder.append("    \"").append(column.name()).append(PG_QUOTE);
 
       appendColumnDefinition(column, sqlBuilder);
       // Add a comma for the next column, unless it's the last one

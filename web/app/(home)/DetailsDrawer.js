@@ -21,17 +21,31 @@ import {
 
 import Icon from '@/components/Icon'
 
-import { formatToDateTime } from '@/lib/utils/date'
+import EmptyText from '@/components/EmptyText'
+
+import { formatToDateTime, isValidDate } from '@/lib/utils/date'
 
 const DetailsDrawer = props => {
   const { openDrawer, setOpenDrawer, drawerData = {} } = props
 
-  const { audit } = drawerData
+  const { audit = {} } = drawerData
 
   const [properties, setProperties] = useState([])
 
   const handleClose = () => {
     setOpenDrawer(false)
+  }
+
+  const renderFieldText = (value, linkBreak = false) => {
+    if (!value) {
+      return <EmptyText />
+    }
+
+    return (
+      <Typography sx={{ fontWeight: 500, whiteSpace: linkBreak ? 'pre' : 'normal' }}>
+        {isValidDate(value) ? formatToDateTime(value) : value}
+      </Typography>
+    )
   }
 
   useEffect(() => {
@@ -45,7 +59,7 @@ const DetailsDrawer = props => {
 
       setProperties(propsData)
     }
-  }, [drawerData.properties])
+  }, [drawerData])
 
   return (
     <Drawer
@@ -93,23 +107,35 @@ const DetailsDrawer = props => {
           <Typography variant='body2' sx={{ mb: 2 }}>
             Comment
           </Typography>
-          <Typography sx={{ fontWeight: 500, whiteSpace: 'pre' }}>{drawerData.comment}</Typography>
+          {renderFieldText(drawerData.comment, true)}
+        </Grid>
+
+        <Grid item xs={12} sx={{ mb: [0, 5] }}>
+          <Typography variant='body2' sx={{ mb: 2 }}>
+            Created by
+          </Typography>
+          {renderFieldText(audit.creator)}
+        </Grid>
+
+        <Grid item xs={12} sx={{ mb: [0, 5] }}>
+          <Typography variant='body2' sx={{ mb: 2 }}>
+            Created at
+          </Typography>
+          {renderFieldText(audit.createTime)}
         </Grid>
 
         <Grid item xs={12} sx={{ mb: [0, 5] }}>
           <Typography variant='body2' sx={{ mb: 2 }}>
             Last modified by
           </Typography>
-          <Typography sx={{ fontWeight: 500 }}>{audit?.lastModifier ? audit.lastModifier : ''}</Typography>
+          {renderFieldText(audit.lastModifier)}
         </Grid>
 
         <Grid item xs={12} sx={{ mb: [0, 5] }}>
           <Typography variant='body2' sx={{ mb: 2 }}>
             Last modified at
           </Typography>
-          <Typography sx={{ fontWeight: 500 }}>
-            {audit?.lastModifiedTime ? formatToDateTime(audit?.lastModifiedTime) : ''}
-          </Typography>
+          {renderFieldText(audit.lastModifiedTime)}
         </Grid>
 
         <Grid item xs={12} sx={{ mb: [0, 5] }}>

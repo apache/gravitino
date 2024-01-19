@@ -1,0 +1,7 @@
+"AAAAAAAADOCAAAAA","Joy                 ","Baker                         ","Y"
+"AAAAAAAAHMBAAAAA","Eunice              ","Shaw                          ","N"
+"AAAAAAAAIICAAAAA","Sherri              ","Tyler                         ","Y"
+"AAAAAAAAJCAAAAAA","Maxine              ","Carlson                       ","N"
+"AAAAAAAAJGBAAAAA","Bonnie              ","Harrison                      ","Y"
+"AAAAAAAALJBAAAAA","Cleo                ","Spangler                      ","N"
+"AAAAAAAAMOAAAAAA","Becky               ","Downey                        ","N"

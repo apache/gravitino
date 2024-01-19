@@ -6,9 +6,9 @@ package com.datastrato.gravitino.trino.connector.catalog.jdbc.postgresql;
 
 import static java.util.Collections.emptyList;
 
+import com.datastrato.catalog.property.PropertyConverter;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorAdapter;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
-import com.datastrato.gravitino.trino.connector.catalog.PropertyConverter;
 import com.datastrato.gravitino.trino.connector.catalog.jdbc.JDBCCatalogPropertyConverter;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoCatalog;
 import java.util.HashMap;
@@ -28,7 +28,8 @@ public class PostgreSQLConnectorAdapter implements CatalogConnectorAdapter {
     config.put("catalogHandle", catalog.getName() + ":normal:default");
     config.put("connectorName", "postgresql");
 
-    Map<String, String> properties = catalogConverter.toTrinoProperties(catalog.getProperties());
+    Map<String, String> properties =
+        catalogConverter.gravitinoToEngineProperties(catalog.getProperties());
     config.put("properties", properties);
     return config;
   }
