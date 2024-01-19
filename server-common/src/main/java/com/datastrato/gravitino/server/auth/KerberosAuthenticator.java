@@ -147,8 +147,7 @@ public class KerberosAuthenticator implements Authenticator {
       //  We can put more information of Kerberos to the KerberosUserPrincipal
       // For example, we can put the token into the KerberosUserPrincipal,
       // We can return the token to the client in the AuthenticationFilter. It will be convenient
-      // for client
-      // to establish the security context. Hadoop uses the cookie to store the token.
+      // for client to establish the security context. Hadoop uses the cookie to store the token.
       // For now, we don't store it in the cookie. I can have a simple implementation. first.
       // It's also not required for the protocol.
       // https://datatracker.ietf.org/doc/html/rfc4559
