@@ -319,12 +319,10 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
     }
 
     try {
-      store.delete(ident, SCHEMA, cascade);
+      return store.delete(ident, SCHEMA, cascade);
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
-
-    return true;
   }
 
   /**
