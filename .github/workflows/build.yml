@@ -67,7 +67,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        java-version: [ 8, 11 ]
+        java-version: [ 8, 11, 17 ]
     timeout-minutes: 30
     needs: changes
     if: needs.changes.outputs.source_changes == 'true'
