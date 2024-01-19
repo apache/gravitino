@@ -39,6 +39,9 @@ import org.apache.kerby.kerberos.kerb.type.base.PrincipalName;
 import org.ietf.jgss.GSSException;
 import org.ietf.jgss.Oid;
 
+// Referred from Apache Hadoop KerberosUtil.java
+// hadoop-common-project/hadoop-auth/src/main/java/org/apache/hadoop/\
+// security/authentication/util/KerberosUtil.java
 public class KerberosUtil {
 
   /* Return the Kerberos login module name */

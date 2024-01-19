@@ -9,6 +9,11 @@
  * express or implied. See the License for the specific language governing permissions and
  * limitations under the License. See accompanying LICENSE file.
  */
+
+// Referred from Apache Hadoop KerberosTestUtils.java
+// hadoop-common-project/hadoop-auth/src/test/java/org/apache/hadoop/security/\
+// authentication/KerberosTestUtils.java
+
 package com.datastrato.gravitino.server.auth;
 
 import java.io.File;
