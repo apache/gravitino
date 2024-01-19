@@ -4,13 +4,15 @@
   "engines": {
     "node": ">=18.18.2",
     "npm": ">=9.8.1",
-    "yarn": ">=1.22.19"
+    "yarn": ">=1.22.19",
+    "pnpm": ">=8.14.0"
   },
   "scripts": {
-    "analyze": "env-cmd -f .env.analyze yarn build",
+    "analyze": "env-cmd -f .env.analyze pnpm build",
+    "dev": "next dev --turbo",
     "server": "next dev --turbo",
-    "build": "yarn format && next build",
-    "dist": "env-cmd -f .env.static yarn build",
+    "build": "pnpm format && next build",
+    "dist": "env-cmd -f .env.static pnpm build",
     "start": "next start",
     "lint": "next lint",
     "format": "prettier --write .",
@@ -26,7 +28,7 @@
     "@mui/x-data-grid": "^6.18.2",
     "@mui/x-tree-view": "^6.17.0",
     "@reduxjs/toolkit": "^1.9.7",
-    "axios": "^1.6.2",
+    "axios": "^1.6.5",
     "chroma-js": "^2.4.2",
     "clsx": "^2.0.0",
     "dayjs": "^1.11.10",
