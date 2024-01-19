@@ -53,8 +53,7 @@ public class ExceptionHandlers {
     public Response handle(OperationType op, String table, String schema, Exception e) {
       String formatted = StringUtil.isBlank(table) ? "" : " [" + table + "]";
       String errorMsg =
-          String.format(
-              TABLE_MSG_TEMPLATE, formatted, op.name(), schema, e.getClass().getSimpleName());
+          String.format(TABLE_MSG_TEMPLATE, formatted, op.name(), schema, getErrorMsg(e));
       LOG.warn(errorMsg, e);
 
       if (e instanceof IllegalArgumentException) {
@@ -86,8 +85,7 @@ public class ExceptionHandlers {
     public Response handle(OperationType op, String schema, String catalog, Exception e) {
       String formatted = StringUtil.isBlank(schema) ? "" : " [" + schema + "]";
       String errorMsg =
-          String.format(
-              SCHEMA_MSG_TEMPLATE, formatted, op.name(), catalog, e.getClass().getSimpleName());
+          String.format(SCHEMA_MSG_TEMPLATE, formatted, op.name(), catalog, getErrorMsg(e));
       LOG.warn(errorMsg, e);
 
       if (e instanceof IllegalArgumentException) {
@@ -119,8 +117,7 @@ public class ExceptionHandlers {
     public Response handle(OperationType op, String catalog, String metalake, Exception e) {
       String formatted = StringUtil.isBlank(catalog) ? "" : " [" + catalog + "]";
       String errorMsg =
-          String.format(
-              CATALOG_MSG_TEMPLATE, formatted, op.name(), metalake, e.getClass().getSimpleName());
+          String.format(CATALOG_MSG_TEMPLATE, formatted, op.name(), metalake, getErrorMsg(e));
       LOG.warn(errorMsg, e);
 
       if (e instanceof IllegalArgumentException) {
@@ -148,8 +145,7 @@ public class ExceptionHandlers {
     @Override
     public Response handle(OperationType op, String metalake, String parent, Exception e) {
       String formatted = StringUtil.isBlank(metalake) ? "" : " [" + metalake + "]";
-      String errorMsg =
-          String.format(METALAKE_MSG_TEMPLATE, formatted, op.name(), e.getClass().getSimpleName());
+      String errorMsg = String.format(METALAKE_MSG_TEMPLATE, formatted, op.name(), getErrorMsg(e));
       LOG.warn(errorMsg, e);
 
       if (e instanceof IllegalArgumentException) {
@@ -181,13 +177,23 @@ public class ExceptionHandlers {
 
       String errorMsg =
           String.format(
-              BASE_MSG_TEMPLATE,
-              formattedObject,
-              op.name(),
-              formattedParent,
-              e.getClass().getSimpleName());
+              BASE_MSG_TEMPLATE, formattedObject, op.name(), formattedParent, getErrorMsg(e));
       LOG.error(errorMsg, e);
       return Utils.internalError(errorMsg, e);
+    }
+
+    protected String getErrorMsg(Throwable throwable) {
+      if (throwable == null || throwable.getMessage() == null) {
+        return "";
+      }
+
+      String message = throwable.getMessage();
+      int pos = message.lastIndexOf(": ");
+      if (pos == -1) {
+        return message;
+      } else {
+        return message.substring(pos + 2);
+      }
     }
   }
 }
