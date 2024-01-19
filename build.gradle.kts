@@ -213,8 +213,6 @@ subprojects {
     plugins.apply(NodePlugin::class)
     configure<NodeExtension> {
       version.set("20.9.0")
-      npmVersion.set("10.1.0")
-      yarnVersion.set("1.22.19")
       nodeProjectDir.set(file("$rootDir/.node"))
       download.set(true)
     }
@@ -337,6 +335,8 @@ tasks.rat {
     "web/lib/enums/httpEnum.ts",
     "web/types/axios.d.ts",
     "web/yarn.lock",
+    "web/package-lock.json",
+    "web/pnpm-lock.yaml",
     "**/LICENSE.*",
     "**/NOTICE.*"
   )
