@@ -4,6 +4,7 @@
  */
 package com.datastrato.gravitino.catalog.rel;
 
+import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.Table;
@@ -17,6 +18,8 @@ import lombok.ToString;
 /** An abstract class representing a base table in a relational database. */
 @ToString
 public abstract class BaseTable implements Table {
+
+  protected Namespace namespace;
 
   protected String name;
 
@@ -33,6 +36,10 @@ public abstract class BaseTable implements Table {
   @Nullable protected SortOrder[] sortOrders;
 
   @Nullable protected Distribution distribution;
+
+  public Namespace namespace() {
+    return namespace;
+  }
 
   /** Returns the audit details of the table. */
   @Override
@@ -95,6 +102,8 @@ public abstract class BaseTable implements Table {
    */
   interface Builder<SELF extends Builder<SELF, T>, T extends BaseTable> {
 
+    SELF withNamespace(Namespace namespace);
+
     SELF withName(String name);
 
     SELF withColumns(Column[] columns);
@@ -131,6 +140,13 @@ public abstract class BaseTable implements Table {
     protected SortOrder[] sortOrders;
 
     protected Distribution distribution;
+    protected Namespace namespace;
+
+    @Override
+    public SELF withNamespace(Namespace namespace) {
+      this.namespace = namespace;
+      return self();
+    }
 
     /**
      * Sets the name of the table.

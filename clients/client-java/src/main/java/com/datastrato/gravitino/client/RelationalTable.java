@@ -1,0 +1,135 @@
+/*
+ * Copyright 2024 Datastrato Pvt Ltd.
+ * This software is licensed under the Apache License version 2.
+ */
+package com.datastrato.gravitino.client;
+
+import com.datastrato.gravitino.Audit;
+import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.Namespace;
+import com.datastrato.gravitino.dto.rel.TableDTO;
+import com.datastrato.gravitino.dto.responses.EntityListResponse;
+import com.datastrato.gravitino.exceptions.NoSuchPartitionException;
+import com.datastrato.gravitino.exceptions.PartitionAlreadyExistsException;
+import com.datastrato.gravitino.rel.Column;
+import com.datastrato.gravitino.rel.SupportsPartitions;
+import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
+import com.datastrato.gravitino.rel.expressions.partitions.Partition;
+import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
+import com.datastrato.gravitino.rel.expressions.transforms.Transform;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Map;
+import javax.annotation.Nullable;
+
+public class RelationalTable implements SupportsPartitions {
+
+  public static RelationalTable from(TableDTO tableDTO, RESTClient restClient) {
+    return new RelationalTable(tableDTO, restClient);
+  }
+
+  private final TableDTO tableDTO;
+  private final RESTClient restClient;
+
+  public RelationalTable(TableDTO tableDTO, RESTClient restClient) {
+    this.tableDTO = tableDTO;
+    this.restClient = restClient;
+  }
+
+  @Override
+  public Namespace namespace() {
+    return tableDTO.namespace();
+  }
+
+  @Override
+  public String name() {
+    return tableDTO.name();
+  }
+
+  @Override
+  public Column[] columns() {
+    return tableDTO.columns();
+  }
+
+  @Override
+  public Transform[] partitioning() {
+    return tableDTO.partitioning();
+  }
+
+  @Override
+  public SortOrder[] sortOrder() {
+    return tableDTO.sortOrder();
+  }
+
+  @Override
+  public Distribution distribution() {
+    return tableDTO.distribution();
+  }
+
+  @Nullable
+  @Override
+  public String comment() {
+    return tableDTO.comment();
+  }
+
+  @Override
+  public Map<String, String> properties() {
+    return tableDTO.properties();
+  }
+
+  @Override
+  public Audit auditInfo() {
+    return tableDTO.auditInfo();
+  }
+
+  @Override
+  public String[] listPartitionNames() {
+    Namespace tableNS =
+        Namespace.of(namespace().level(0), namespace().level(1), namespace().level(2), name());
+    EntityListResponse resp =
+        restClient.get(
+            formatPartitionRequestPath(tableNS),
+            EntityListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.tableErrorHandler());
+    return Arrays.stream(resp.identifiers()).map(NameIdentifier::name).toArray(String[]::new);
+  }
+
+  private static String formatPartitionRequestPath(Namespace ns) {
+    return "api/metalakes/"
+        + ns.level(0)
+        + "/catalogs/"
+        + ns.level(1)
+        + "/schemas/"
+        + ns.level(2)
+        + "/tables/"
+        + ns.level(3)
+        + "/partitions";
+  }
+
+  @Override
+  public Partition[] listPartitions() {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public Partition getPartition(String partitionName) throws NoSuchPartitionException {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public Partition addPartition(String partitionName, Map<String, String> properties)
+      throws PartitionAlreadyExistsException {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public boolean dropPartition(String partitionName) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public SupportsPartitions supportPartitions() throws UnsupportedOperationException {
+    return this;
+  }
+}

@@ -171,7 +171,7 @@ public class RelationalCatalog extends CatalogDTO implements TableCatalog, Suppo
             ErrorHandlers.tableErrorHandler());
     resp.validate();
 
-    return resp.getTable();
+    return RelationalTable.from(resp.getTable(), restClient);
   }
 
   /**

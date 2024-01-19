@@ -678,6 +678,31 @@ public class JsonUtils {
     }
   }
 
+  /** Custom JSON serializer for Namespace objects. */
+  public static class NamespaceSerializer extends JsonSerializer<Namespace> {
+
+    @Override
+    public void serialize(Namespace value, JsonGenerator gen, SerializerProvider serializers)
+        throws IOException {
+      gen.writeArray(value.levels(), 0, value.length());
+    }
+  }
+
+  /** Custom JSON deserializer for Namespace objects. */
+  public static class NamespaceDeserializer extends JsonDeserializer<Namespace> {
+
+    @Override
+    public Namespace deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
+      JsonNode node = p.getCodec().readTree(p);
+      Preconditions.checkArgument(
+          node != null && !node.isNull() && node.isArray(),
+          "Cannot parse namespace from invalid JSON: %s",
+          node);
+      String[] stringArray = getStringArray((ArrayNode) node);
+      return Namespace.of(stringArray);
+    }
+  }
+
   public static class ColumnPositionSerializer extends JsonSerializer<TableChange.ColumnPosition> {
     @Override
     public void serialize(

@@ -22,12 +22,16 @@ import com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.TableTy
 import com.datastrato.gravitino.catalog.hive.converter.FromHiveType;
 import com.datastrato.gravitino.catalog.hive.converter.ToHiveType;
 import com.datastrato.gravitino.catalog.rel.BaseTable;
+import com.datastrato.gravitino.exceptions.NoSuchPartitionException;
+import com.datastrato.gravitino.exceptions.PartitionAlreadyExistsException;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.rel.Column;
+import com.datastrato.gravitino.rel.SupportsPartitions;
 import com.datastrato.gravitino.rel.expressions.Expression;
 import com.datastrato.gravitino.rel.expressions.NamedReference;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
+import com.datastrato.gravitino.rel.expressions.partitions.Partition;
 import com.datastrato.gravitino.rel.expressions.sorts.SortDirection;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrders;
@@ -51,15 +55,17 @@ import org.apache.hadoop.hive.metastore.api.Order;
 import org.apache.hadoop.hive.metastore.api.SerDeInfo;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.Table;
+import org.apache.thrift.TException;
 
 /** Represents a Hive Table entity in the Hive Metastore catalog. */
 @ToString
-public class HiveTable extends BaseTable {
+public class HiveTable extends BaseTable implements SupportsPartitions {
 
   // A set of supported Hive table types.
   public static final Set<String> SUPPORT_TABLE_TYPES =
       Sets.newHashSet(MANAGED_TABLE.name(), EXTERNAL_TABLE.name());
   private String schemaName;
+  private HiveClientPool clientPool;
 
   private HiveTable() {}
 
@@ -69,7 +75,7 @@ public class HiveTable extends BaseTable {
    * @param table The inner Table representing the HiveTable.
    * @return A new HiveTable instance.
    */
-  public static HiveTable fromHiveTable(Table table) {
+  public static HiveTable.Builder fromHiveTable(Table table) {
     // Get audit info from Hive's Table object. Because Hive's table doesn't store last modifier
     // and last modified time, we only get creator and create time from Hive's table.
     AuditInfo.Builder auditInfoBuilder = new AuditInfo.Builder();
@@ -132,8 +138,7 @@ public class HiveTable extends BaseTable {
             table.getPartitionKeys().stream()
                 .map(p -> identity(p.getName()))
                 .toArray(Transform[]::new))
-        .withSchemaName(table.getDbName())
-        .build();
+        .withSchemaName(table.getDbName());
   }
 
   private static Map<String, String> buildTableProperties(Table table) {
@@ -154,6 +159,43 @@ public class HiveTable extends BaseTable {
         .ifPresent(p -> p.forEach((k, v) -> properties.put(SERDE_PARAMETER_PREFIX + k, v)));
 
     return properties;
+  }
+
+  @Override
+  public SupportsPartitions supportPartitions() throws UnsupportedOperationException {
+    return this;
+  }
+
+  @Override
+  public String[] listPartitionNames() {
+    try {
+      return clientPool.run(
+          c -> c.listPartitionNames(schemaName, name, (short) -1).toArray(new String[0]));
+    } catch (TException | InterruptedException e) {
+      throw new RuntimeException(
+          "Failed to list partition names of table " + name + "from Hive Metastore", e);
+    }
+  }
+
+  @Override
+  public Partition[] listPartitions() {
+    return new Partition[0];
+  }
+
+  @Override
+  public Partition getPartition(String partitionName) throws NoSuchPartitionException {
+    return null;
+  }
+
+  @Override
+  public Partition addPartition(String partitionName, Map<String, String> properties)
+      throws PartitionAlreadyExistsException {
+    return null;
+  }
+
+  @Override
+  public boolean dropPartition(String partitionName) {
+    return false;
   }
 
   /**
@@ -290,6 +332,7 @@ public class HiveTable extends BaseTable {
   public static class Builder extends BaseTableBuilder<Builder, HiveTable> {
 
     private String schemaName;
+    private HiveClientPool clientPool;
 
     /**
      * Sets the Hive schema (database) name to be used for building the HiveTable.
@@ -299,6 +342,17 @@ public class HiveTable extends BaseTable {
      */
     public Builder withSchemaName(String schemaName) {
       this.schemaName = schemaName;
+      return this;
+    }
+
+    /**
+     * Sets the HiveClientPool to be used for operate partition.
+     *
+     * @param clientPool The HiveClientPool instance.
+     * @return This Builder instance.
+     */
+    public Builder withClientPool(HiveClientPool clientPool) {
+      this.clientPool = clientPool;
       return this;
     }
 
@@ -319,6 +373,7 @@ public class HiveTable extends BaseTable {
       hiveTable.sortOrders = sortOrders;
       hiveTable.partitioning = partitioning;
       hiveTable.schemaName = schemaName;
+      hiveTable.clientPool = clientPool;
 
       // HMS put table comment in parameters
       if (comment != null) {

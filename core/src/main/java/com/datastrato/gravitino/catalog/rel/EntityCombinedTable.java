@@ -5,11 +5,16 @@
 package com.datastrato.gravitino.catalog.rel;
 
 import com.datastrato.gravitino.Audit;
+import com.datastrato.gravitino.Namespace;
+import com.datastrato.gravitino.exceptions.NoSuchPartitionException;
+import com.datastrato.gravitino.exceptions.PartitionAlreadyExistsException;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.TableEntity;
 import com.datastrato.gravitino.rel.Column;
+import com.datastrato.gravitino.rel.SupportsPartitions;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
+import com.datastrato.gravitino.rel.expressions.partitions.Partition;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import java.util.Map;
@@ -20,7 +25,7 @@ import java.util.stream.Collectors;
  * A Table class to represent a table metadata object that combines the metadata both from {@link
  * Table} and {@link TableEntity}.
  */
-public final class EntityCombinedTable implements Table {
+public final class EntityCombinedTable implements SupportsPartitions {
 
   private final Table table;
 
@@ -48,6 +53,11 @@ public final class EntityCombinedTable implements Table {
   }
 
   @Override
+  public Namespace namespace() {
+    return tableEntity.namespace();
+  }
+
+  @Override
   public String name() {
     return table.name();
   }
@@ -67,6 +77,11 @@ public final class EntityCombinedTable implements Table {
     return table.properties().entrySet().stream()
         .filter(p -> !hiddenProperties.contains(p.getKey()))
         .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+  }
+
+  @Override
+  public SupportsPartitions supportPartitions() throws UnsupportedOperationException {
+    return table.supportPartitions();
   }
 
   @Override
@@ -97,5 +112,31 @@ public final class EntityCombinedTable implements Table {
     return tableEntity == null
         ? table.auditInfo()
         : mergedAudit.merge(tableEntity.auditInfo(), true /* overwrite */);
+  }
+
+  @Override
+  public String[] listPartitionNames() {
+    return supportPartitions().listPartitionNames();
+  }
+
+  @Override
+  public Partition[] listPartitions() {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public Partition getPartition(String partitionName) throws NoSuchPartitionException {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public Partition addPartition(String partitionName, Map<String, String> properties)
+      throws PartitionAlreadyExistsException {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public boolean dropPartition(String partitionName) {
+    throw new UnsupportedOperationException();
   }
 }

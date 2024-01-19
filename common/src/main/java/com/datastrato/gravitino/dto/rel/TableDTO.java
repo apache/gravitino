@@ -4,19 +4,31 @@
  */
 package com.datastrato.gravitino.dto.rel;
 
+import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.dto.AuditDTO;
 import com.datastrato.gravitino.dto.rel.partitions.Partitioning;
+import com.datastrato.gravitino.exceptions.NoSuchPartitionException;
+import com.datastrato.gravitino.exceptions.PartitionAlreadyExistsException;
+import com.datastrato.gravitino.json.JsonUtils;
 import com.datastrato.gravitino.rel.Column;
-import com.datastrato.gravitino.rel.Table;
+import com.datastrato.gravitino.rel.SupportsPartitions;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
+import com.datastrato.gravitino.rel.expressions.partitions.Partition;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.google.common.base.Preconditions;
 import java.util.Map;
 
 /** Represents a Table DTO (Data Transfer Object). */
-public class TableDTO implements Table {
+public class TableDTO implements SupportsPartitions {
+
+  @JsonSerialize(using = JsonUtils.NamespaceSerializer.class)
+  @JsonDeserialize(using = JsonUtils.NamespaceDeserializer.class)
+  @JsonProperty("namespace")
+  private Namespace namespace;
 
   @JsonProperty("name")
   private String name;
@@ -73,6 +85,32 @@ public class TableDTO implements Table {
     this.partitioning = partitioning;
   }
 
+  private TableDTO(
+      String name,
+      String comment,
+      ColumnDTO[] columns,
+      Map<String, String> properties,
+      AuditDTO audit,
+      Partitioning[] partitioning,
+      DistributionDTO distribution,
+      SortOrderDTO[] sortOrderDTOs,
+      Namespace namespace) {
+    this.name = name;
+    this.comment = comment;
+    this.columns = columns;
+    this.properties = properties;
+    this.audit = audit;
+    this.distribution = distribution;
+    this.sortOrders = sortOrderDTOs;
+    this.partitioning = partitioning;
+    this.namespace = namespace;
+  }
+
+  @Override
+  public Namespace namespace() {
+    return namespace;
+  }
+
   @Override
   public String name() {
     return name;
@@ -113,6 +151,11 @@ public class TableDTO implements Table {
     return distribution;
   }
 
+  @Override
+  public SupportsPartitions supportPartitions() throws UnsupportedOperationException {
+    return this;
+  }
+
   /**
    * Creates a new Builder to build a Table DTO.
    *
@@ -120,6 +163,32 @@ public class TableDTO implements Table {
    */
   public static Builder builder() {
     return new Builder();
+  }
+
+  @Override
+  public String[] listPartitionNames() {
+    return new String[0];
+  }
+
+  @Override
+  public Partition[] listPartitions() {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public Partition getPartition(String partitionName) throws NoSuchPartitionException {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public Partition addPartition(String partitionName, Map<String, String> properties)
+      throws PartitionAlreadyExistsException {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public boolean dropPartition(String partitionName) {
+    throw new UnsupportedOperationException();
   }
 
   /**
@@ -136,8 +205,14 @@ public class TableDTO implements Table {
     protected SortOrderDTO[] sortOrderDTOs;
     protected DistributionDTO distributionDTO;
     protected Partitioning[] Partitioning;
+    protected Namespace namespace;
 
     public Builder() {}
+
+    public S withNamespace(Namespace namespace) {
+      this.namespace = namespace;
+      return (S) this;
+    }
 
     /**
      * Sets the name of the table.
@@ -222,7 +297,15 @@ public class TableDTO implements Table {
       Preconditions.checkArgument(audit != null, "audit cannot be null");
 
       return new TableDTO(
-          name, comment, columns, properties, audit, Partitioning, distributionDTO, sortOrderDTOs);
+          name,
+          comment,
+          columns,
+          properties,
+          audit,
+          Partitioning,
+          distributionDTO,
+          sortOrderDTOs,
+          namespace);
     }
   }
 }

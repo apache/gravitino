@@ -330,6 +330,39 @@ public class TestHiveTable extends MiniHiveMetastoreService {
   }
 
   @Test
+  public void testListPartitionNames() {
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(META_LAKE_NAME, hiveCatalog.name(), hiveSchema.name(), genRandomName());
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put("key1", "val1");
+    properties.put("key2", "val2");
+
+    HiveColumn col1 =
+        new HiveColumn.Builder()
+            .withName("city")
+            .withType(Types.ByteType.get())
+            .withComment(HIVE_COMMENT)
+            .build();
+    HiveColumn col2 =
+        new HiveColumn.Builder()
+            .withName("dt")
+            .withType(Types.DateType.get())
+            .withComment(HIVE_COMMENT)
+            .build();
+    Column[] columns = new Column[] {col1, col2};
+
+    Transform[] partitions = new Transform[] {identity(col2.name())};
+
+    String[] partitionNames =
+        hiveCatalog
+            .asTableCatalog()
+            .createTable(tableIdentifier, columns, HIVE_COMMENT, properties, partitions)
+            .supportPartitions()
+            .listPartitionNames();
+    System.out.println("test: " + Arrays.toString(partitionNames));
+  }
+
+  @Test
   public void testDropHiveTable() {
     NameIdentifier tableIdentifier =
         NameIdentifier.of(META_LAKE_NAME, hiveCatalog.name(), hiveSchema.name(), genRandomName());

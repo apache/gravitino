@@ -47,7 +47,7 @@ public class TestDTOJsonSerDe {
       "{\"name\":%s,\"type\":%s,\"comment\":%s,\"nullable\":%s,\"autoIncrement\":%s}";
 
   private final String tableJson =
-      "{\"name\":%s,\"comment\":%s,\"columns\":[%s],\"properties\":%s,\"audit\":%s,\"distribution\":%s,\"sortOrders\":%s,\"partitioning\":%s}";
+      "{\"namespace\":null,\"name\":%s,\"comment\":%s,\"columns\":[%s],\"properties\":%s,\"audit\":%s,\"distribution\":%s,\"sortOrders\":%s,\"partitioning\":%s}";
 
   private String withQuotes(String str) {
     return "\"" + str + "\"";

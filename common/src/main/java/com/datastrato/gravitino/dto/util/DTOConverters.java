@@ -109,6 +109,7 @@ public class DTOConverters {
 
   public static TableDTO toDTO(Table table) {
     return new TableDTO.Builder()
+        .withNamespace(table.namespace())
         .withName(table.name())
         .withComment(table.comment())
         .withColumns(

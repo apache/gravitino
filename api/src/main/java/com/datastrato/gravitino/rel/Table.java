@@ -22,6 +22,8 @@ import javax.annotation.Nullable;
  */
 public interface Table extends Auditable {
 
+  Namespace namespace();
+
   /** @return Name of the table. */
   String name();
 
