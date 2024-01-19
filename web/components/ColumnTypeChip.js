@@ -10,9 +10,9 @@ import { alpha } from '@/lib/utils/color'
 import { isString } from 'lodash-es'
 
 const ColumnTypeChip = props => {
-  const { type } = props
+  const { type = '' } = props
 
-  const label = isString(type) ? type : `${type.type}<${type.elementType ?? 'unknown'}>` ?? 'unknown'
+  const label = isString(type) ? type : `${type?.type}<${type?.elementType ?? 'unknown'}>` ?? 'unknown'
 
   const columnTypeColor = ColumnTypeColorEnum[type] || 'secondary'
   const color = colors[columnTypeColor]?.main || '#8592A3'
