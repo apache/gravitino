@@ -8,7 +8,7 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 
-import MetalakeView from '@/app/metalakes/MetalakeView'
+import MetalakeView from '@/app/ui/metalakes/MetalakeView'
 
 const MetalakePage = () => {
   const params = useSearchParams()

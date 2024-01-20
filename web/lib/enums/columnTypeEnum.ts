@@ -10,8 +10,8 @@ export enum ColumnTypeColorEnum {
   long = 'primary',
   float = 'primary',
   double = 'primary',
-  'decimal(10,2)' = 'primary',
-  'fixed(16)' = 'primary',
+  decimal = 'primary',
+  fixed = 'primary',
 
   date = 'info',
   time = 'info',
@@ -21,8 +21,8 @@ export enum ColumnTypeColorEnum {
   interval_year = 'info',
 
   string = 'warning',
-  'char(10)' = 'warning',
-  'varchar(10)' = 'warning',
+  char = 'warning',
+  varchar = 'warning',
 
   byte = 'success',
   uuid = 'success',

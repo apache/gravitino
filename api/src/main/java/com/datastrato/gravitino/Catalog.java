@@ -4,6 +4,7 @@
  */
 package com.datastrato.gravitino;
 
+import com.datastrato.gravitino.file.FilesetCatalog;
 import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.datastrato.gravitino.rel.TableCatalog;
 import java.util.Map;
@@ -73,5 +74,13 @@ public interface Catalog extends Auditable {
    */
   default TableCatalog asTableCatalog() throws UnsupportedOperationException {
     throw new UnsupportedOperationException("Catalog does not support table operations");
+  }
+
+  /**
+   * @return the {@link FilesetCatalog} if the catalog supports fileset operations.
+   * @throws UnsupportedOperationException if the catalog does not support fileset operations.
+   */
+  default FilesetCatalog asFilesetCatalog() throws UnsupportedOperationException {
+    throw new UnsupportedOperationException("Catalog does not support fileset operations");
   }
 }

@@ -31,6 +31,15 @@ public interface Entity extends Serializable {
       this.shortName = shortName;
       this.index = index;
     }
+
+    public static EntityType fromShortName(String shortName) {
+      for (EntityType entityType : EntityType.values()) {
+        if (entityType.shortName.equals(shortName)) {
+          return entityType;
+        }
+      }
+      throw new IllegalArgumentException("Unknown entity type: " + shortName);
+    }
   }
 
   /**
