@@ -496,13 +496,12 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
           Arrays.stream(columns)
               .map(
                   column -> {
-                    if (!column.defaultValue().equals(Column.DEFAULT_VALUE_NOT_SET)) {
-                      // Iceberg column default value is WIP, see
-                      // https://github.com/apache/iceberg/pull/4525
-                      throw new IllegalArgumentException(
-                          "Iceberg does not support column default value. Illegal column: "
-                              + column.name());
-                    }
+                    // Iceberg column default value is WIP, see
+                    // https://github.com/apache/iceberg/pull/4525
+                    Preconditions.checkArgument(
+                        column.defaultValue().equals(Column.DEFAULT_VALUE_NOT_SET),
+                        "Iceberg does not support column default value. Illegal column: "
+                            + column.name());
                     return new IcebergColumn.Builder()
                         .withName(column.name())
                         .withType(column.dataType())
