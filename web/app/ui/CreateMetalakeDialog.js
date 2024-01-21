@@ -70,9 +70,29 @@ const CreateMetalakeDialog = props => {
     let data = [...innerProps]
     data[index][event.target.name] = event.target.value
     setInnerProps(data)
+
+    const nonEmptyKeys = data.filter(item => item.key.trim() !== '');
+
+    const duplicateKeys = nonEmptyKeys.some(
+      (item, i) => i !== index && item.key === event.target.value
+    );
+    data[index].hasDuplicateKey = duplicateKeys;
   }
 
   const addFields = () => {
+    const duplicateKeys = innerProps
+      .filter(item => item.key.trim() !== '')
+      .some((item, index, filteredItems) =>
+        filteredItems.findIndex(
+          otherItem =>
+            otherItem !== item && otherItem.key.trim() === item.key.trim()
+        ) !== -1
+      );
+
+    if (duplicateKeys) {
+      return;
+    }
+
     let newField = { key: '', value: '' }
 
     setInnerProps([...innerProps, newField])
@@ -91,6 +111,19 @@ const CreateMetalakeDialog = props => {
   }
 
   const onSubmit = data => {
+    const duplicateKeys = innerProps
+      .filter(item => item.key.trim() !== '')
+      .some((item, index, filteredItems) =>
+        filteredItems.findIndex(
+          otherItem =>
+            otherItem !== item && otherItem.key.trim() === item.key.trim()
+        ) !== -1
+      );
+
+    if (duplicateKeys) {
+      return;
+    }
+
     const properties = innerProps
       .filter(i => i.key.trim() !== '')
       .reduce((acc, item) => {
@@ -218,6 +251,7 @@ const CreateMetalakeDialog = props => {
                           label='Key'
                           value={item.key}
                           onChange={event => handleFormChange(index, event)}
+                          error={item.hasDuplicateKey}
                         />
                         <TextField
                           size='small'
@@ -232,6 +266,9 @@ const CreateMetalakeDialog = props => {
                           </IconButton>
                         </Box>
                       </Box>
+                      {item.hasDuplicateKey && (
+                        <FormHelperText className={'twc-text-error-main'}>Key already exists</FormHelperText>
+                      )}
                     </FormControl>
                   </Grid>
                 )
