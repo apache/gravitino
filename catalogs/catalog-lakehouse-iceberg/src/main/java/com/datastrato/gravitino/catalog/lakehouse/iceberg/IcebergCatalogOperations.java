@@ -485,7 +485,7 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
       SortOrder[] sortOrders,
       Index[] indexes)
       throws NoSuchSchemaException, TableAlreadyExistsException {
-    Preconditions.checkArgument(indexes.length == 0, "iceberg-catalog does not support indexes");
+    Preconditions.checkArgument(indexes.length == 0, "Iceberg-catalog does not support indexes");
     try {
       if (!Distributions.NONE.equals(distribution)) {
         throw new UnsupportedOperationException("Iceberg does not support distribution");

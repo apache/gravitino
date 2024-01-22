@@ -184,7 +184,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
   }
 
   /**
-   * cre Creates a new schema with the provided identifier, comment, and metadata.
+   * Creates a new schema with the provided identifier, comment, and metadata.
    *
    * @param ident The identifier of the schema to create.
    * @param comment The comment for the schema.
@@ -568,7 +568,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       throws NoSuchSchemaException, TableAlreadyExistsException {
     Preconditions.checkArgument(
         indexes.length == 0,
-        "Hive-catalog does not support indexes, current Gravitino hive-catalog only supports Hive 2.x");
+        "Hive-catalog does not support indexes, since indexing was removed since 3.0");
     NameIdentifier schemaIdent = NameIdentifier.of(tableIdent.namespace().levels());
 
     validatePartitionForCreate(columns, partitioning);

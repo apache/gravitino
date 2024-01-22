@@ -10,7 +10,6 @@ import com.datastrato.gravitino.dto.rel.SortOrderDTO;
 import com.datastrato.gravitino.dto.rel.expressions.FunctionArg;
 import com.datastrato.gravitino.dto.rel.partitions.Partitioning;
 import com.datastrato.gravitino.rel.indexes.Index;
-import com.datastrato.gravitino.rel.indexes.Indexes;
 import com.datastrato.gravitino.rest.RESTRequest;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
@@ -64,38 +63,7 @@ public class TableCreateRequest implements RESTRequest {
   private final Index[] indexes;
 
   public TableCreateRequest() {
-    this(null, null, null, null, null, null, null);
-  }
-
-  public TableCreateRequest(
-      String name, String comment, ColumnDTO[] columns, Map<String, String> properties) {
-    this(
-        name,
-        comment,
-        columns,
-        properties,
-        new SortOrderDTO[0],
-        DistributionDTO.NONE,
-        new Partitioning[0]);
-  }
-
-  public TableCreateRequest(
-      String name,
-      String comment,
-      ColumnDTO[] columns,
-      Map<String, String> properties,
-      SortOrderDTO[] sortOrders,
-      DistributionDTO distribution,
-      Partitioning[] partitioning) {
-    this(
-        name,
-        comment,
-        columns,
-        properties,
-        sortOrders,
-        distribution,
-        partitioning,
-        Indexes.EMPTY_INDEXES);
+    this(null, null, null, null, null, null, null, null);
   }
 
   public TableCreateRequest(

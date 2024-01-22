@@ -8,29 +8,9 @@ package com.datastrato.gravitino.rel.indexes;
 public class Indexes {
 
   public static final Index[] EMPTY_INDEXES = new Index[0];
-  private static final String UNIQUE_KEY_FORMAT = "%s_uk";
-  private static final String PRIMARY_KEY_FORMAT = "%s_pk";
-
-  public static Index unique(String fieldName) {
-    String[] fieldNames = {fieldName};
-    return unique(new String[][] {fieldNames});
-  }
-
-  public static Index unique(String[][] fieldNames) {
-    return unique(String.format(UNIQUE_KEY_FORMAT, fieldNames[0][0]), fieldNames);
-  }
 
   public static Index unique(String name, String[][] fieldNames) {
     return of(Index.IndexType.UNIQUE_KEY, name, fieldNames);
-  }
-
-  public static Index primary(String fieldName) {
-    String[] fieldNames = {fieldName};
-    return primary(new String[][] {fieldNames});
-  }
-
-  public static Index primary(String[][] fieldNames) {
-    return primary(String.format(PRIMARY_KEY_FORMAT, fieldNames[0][0]), fieldNames);
   }
 
   public static Index primary(String name, String[][] fieldNames) {

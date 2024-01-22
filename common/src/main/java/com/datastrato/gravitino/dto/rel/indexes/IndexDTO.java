@@ -6,12 +6,15 @@ package com.datastrato.gravitino.dto.rel.indexes;
 
 import com.datastrato.gravitino.rel.indexes.Index;
 import com.google.common.base.Preconditions;
+import org.apache.commons.lang3.StringUtils;
 
 public class IndexDTO implements Index {
 
-  private final IndexType indexType;
-  private final String name;
-  private final String[][] fieldNames;
+  private IndexType indexType;
+  private String name;
+  private String[][] fieldNames;
+
+  public IndexDTO() {}
 
   public IndexDTO(IndexType indexType, String name, String[][] fieldNames) {
     this.indexType = indexType;
@@ -64,9 +67,10 @@ public class IndexDTO implements Index {
 
     public IndexDTO build() {
       Preconditions.checkArgument(indexType != null, "Index type cannot be null");
-      Preconditions.checkArgument(name != null, "Index name cannot be null");
+      Preconditions.checkArgument(StringUtils.isNotBlank(name), "Index name cannot be blank");
       Preconditions.checkArgument(
-          fieldNames != null, "The index must be set with corresponding column names");
+          fieldNames != null && fieldNames.length > 0,
+          "The index must be set with corresponding column names");
       return new IndexDTO(indexType, name, fieldNames);
     }
   }

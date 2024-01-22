@@ -359,7 +359,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
       SortOrder[] sortOrders,
       Index[] indexes)
       throws NoSuchSchemaException, TableAlreadyExistsException {
-    Preconditions.checkArgument(indexes.length == 0, "jdbc-catalog does not support indexes");
+    Preconditions.checkArgument(indexes.length == 0, "Jdbc-catalog does not support indexes");
     Preconditions.checkArgument(
         null == distribution || distribution == Distributions.NONE,
         "jdbc-catalog does not support distribution");
