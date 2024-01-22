@@ -11,6 +11,10 @@ import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.catalog.hive.HiveClientPool;
 import com.datastrato.gravitino.client.GravitinoMetaLake;
 import com.datastrato.gravitino.dto.rel.ColumnDTO;
+import com.datastrato.gravitino.dto.rel.DistributionDTO;
+import com.datastrato.gravitino.dto.rel.SortOrderDTO;
+import com.datastrato.gravitino.dto.rel.expressions.FieldReferenceDTO;
+import com.datastrato.gravitino.dto.rel.partitions.IdentityPartitioningDTO;
 import com.datastrato.gravitino.integration.test.catalog.jdbc.utils.JdbcDriverDownloader;
 import com.datastrato.gravitino.integration.test.container.ContainerSuite;
 import com.datastrato.gravitino.integration.test.container.HiveContainer;
@@ -19,6 +23,16 @@ import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
 import com.datastrato.gravitino.integration.test.util.ITUtils;
 import com.datastrato.gravitino.rel.Schema;
 import com.datastrato.gravitino.rel.Table;
+import com.datastrato.gravitino.rel.expressions.NamedReference;
+import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
+import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
+import com.datastrato.gravitino.rel.expressions.distributions.Strategy;
+import com.datastrato.gravitino.rel.expressions.sorts.NullOrdering;
+import com.datastrato.gravitino.rel.expressions.sorts.SortDirection;
+import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
+import com.datastrato.gravitino.rel.expressions.sorts.SortOrders;
+import com.datastrato.gravitino.rel.expressions.transforms.Transform;
+import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
 import com.datastrato.gravitino.rel.types.Types;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
@@ -376,7 +390,9 @@ public class TrinoConnectorIT extends AbstractIT {
     String createTableSql =
         String.format(
             "CREATE TABLE \"%s.%s\".%s.%s (id int, name varchar)"
-                + " with ( serde_name = '123455', location = 'hdfs://localhost:9000/user/hive/warehouse/hive_schema.db/hive_table')",
+                + " with ( serde_name = '123455', location = 'hdfs://localhost:9000/user/hive/warehouse/hive_schema.db/hive_table'"
+                + ", partitioned_by = ARRAY['name'], bucketed_by = ARRAY['id'], bucket_count = 50, sorted_by = ARRAY['name']"
+                + ")",
             metalakeName, catalogName, schemaName, tableName);
     containerSuite.getTrinoContainer().executeUpdateSQL(createTableSql);
 
@@ -396,6 +412,20 @@ public class TrinoConnectorIT extends AbstractIT {
     Assertions.assertEquals(
         "org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat",
         table.properties().get("output-format"));
+
+    Distribution distribution = table.distribution();
+    Assertions.assertEquals(Strategy.HASH, distribution.strategy());
+    Assertions.assertEquals(50, distribution.number());
+    Assertions.assertEquals(
+        "id", ((FieldReferenceDTO) ((DistributionDTO) distribution).args()[0]).fieldName()[0]);
+
+    Assertions.assertEquals(1, table.partitioning().length);
+    Transform partitioning = table.partitioning()[0];
+    Assertions.assertEquals("name", ((IdentityPartitioningDTO) partitioning).fieldName()[0]);
+
+    Assertions.assertEquals(1, table.sortOrder().length);
+    SortOrderDTO sortOrder = (SortOrderDTO) table.sortOrder()[0];
+    Assertions.assertEquals("name", ((FieldReferenceDTO) sortOrder.sortTerm()).fieldName()[0]);
   }
 
   @Test
@@ -711,7 +741,15 @@ public class TrinoConnectorIT extends AbstractIT {
                     "hdfs://localhost:9000/user/hive/warehouse/hive_schema.db/hive_table")
                 .put("serde-name", "mock11")
                 .put("table-type", "EXTERNAL_TABLE")
-                .build());
+                .build(),
+            new Transform[] {Transforms.identity("BinaryType")},
+            Distributions.of(Strategy.HASH, 4, NamedReference.field("BooleanType")),
+            new SortOrder[] {
+              SortOrders.of(
+                  NamedReference.field("LongType"),
+                  SortDirection.ASCENDING,
+                  NullOrdering.NULLS_FIRST)
+            });
     LOG.info("create table \"{}.{}\".{}.{}", metalakeName, catalogName, schemaName, tableName);
 
     Table table =
@@ -739,6 +777,10 @@ public class TrinoConnectorIT extends AbstractIT {
     Assertions.assertTrue(
         data.contains("input_format = 'org.apache.hadoop.hive.ql.io.orc.OrcInputFormat'"));
     Assertions.assertTrue(data.contains("serde_lib = 'org.apache.hadoop.hive.ql.io.orc.OrcSerde'"));
+    Assertions.assertTrue(data.contains("bucket_count = 4"));
+    Assertions.assertTrue(data.contains("bucketed_by = ARRAY['booleantype']"));
+    Assertions.assertTrue(data.contains("partitioned_by = ARRAY['binarytype']"));
+    Assertions.assertTrue(data.contains("sorted_by = ARRAY['longtype']"));
   }
 
   @Test

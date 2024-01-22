@@ -11,6 +11,10 @@ import com.datastrato.gravitino.dto.rel.ColumnDTO;
 import com.datastrato.gravitino.dto.rel.TableDTO;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.Table;
+import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
+import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
+import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
+import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.google.common.collect.ImmutableList;
 import io.trino.spi.TrinoException;
@@ -28,6 +32,10 @@ public class GravitinoTable {
   private final String comment;
   private final Map<String, String> properties;
 
+  private SortOrder[] sortOrders = new SortOrder[0];
+  private Transform[] partitioning = new Transform[0];
+  private Distribution distribution = Distributions.NONE;
+
   @JsonCreator
   public GravitinoTable(String schemaName, String tableName, Table tableMetadata) {
     this.schemaName = schemaName;
@@ -40,6 +48,10 @@ public class GravitinoTable {
     this.columns = tableColumns.build();
     this.comment = tableMetadata.comment();
     properties = tableMetadata.properties();
+
+    sortOrders = tableMetadata.sortOrder();
+    partitioning = tableMetadata.partitioning();
+    distribution = tableMetadata.distribution();
   }
 
   public GravitinoTable(
@@ -124,5 +136,29 @@ public class GravitinoTable {
         .withProperties(properties)
         .withAudit(new AuditDTO.Builder().build())
         .build();
+  }
+
+  public void setSortOrders(SortOrder[] sortOrders) {
+    this.sortOrders = sortOrders;
+  }
+
+  public void setPartitioning(Transform[] partitioning) {
+    this.partitioning = partitioning;
+  }
+
+  public void setDistribution(Distribution distribution) {
+    this.distribution = distribution;
+  }
+
+  public SortOrder[] getSortOrders() {
+    return sortOrders;
+  }
+
+  public Transform[] getPartitioning() {
+    return partitioning;
+  }
+
+  public Distribution getDistribution() {
+    return distribution;
   }
 }
