@@ -2,7 +2,7 @@
  * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.gravitino.dto.rel.partitions;
+package com.datastrato.gravitino.dto.rel.partitioning;
 
 import static com.datastrato.gravitino.dto.rel.PartitionUtils.validateFieldExistence;
 import static com.datastrato.gravitino.rel.expressions.NamedReference.field;

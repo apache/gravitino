@@ -2,17 +2,20 @@
  * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.gravitino.dto.rel.partitions;
+package com.datastrato.gravitino.dto.rel.partitioning;
 
 import com.google.common.base.Preconditions;
+import lombok.EqualsAndHashCode;
 import org.apache.commons.lang3.ArrayUtils;
 
-public final class HourPartitioningDTO extends Partitioning.SingleFieldPartitioning {
-  public static HourPartitioningDTO of(String[] fieldName) {
-    return new HourPartitioningDTO(fieldName);
+@EqualsAndHashCode(callSuper = true)
+public final class DayPartitioningDTO extends Partitioning.SingleFieldPartitioning {
+
+  public static DayPartitioningDTO of(String... fieldName) {
+    return new DayPartitioningDTO(fieldName);
   }
 
-  private HourPartitioningDTO(String[] fieldName) {
+  private DayPartitioningDTO(String[] fieldName) {
     Preconditions.checkArgument(
         ArrayUtils.isNotEmpty(fieldName), "fieldName cannot be null or empty");
     this.fieldName = fieldName;
@@ -20,6 +23,6 @@ public final class HourPartitioningDTO extends Partitioning.SingleFieldPartition
 
   @Override
   public Strategy strategy() {
-    return Strategy.HOUR;
+    return Strategy.DAY;
   }
 }
