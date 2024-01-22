@@ -27,12 +27,12 @@ public class IcebergCatalogPropertyConverter extends PropertyConverter {
   private static final Set<String> HIVE_BACKEND_REQUIRED_PROPERTIES = Set.of("uri");
 
   @Override
-  public TreeBidiMap<String, String> engineToGravitino() {
+  public TreeBidiMap<String, String> engineToGravitinoMapping() {
     return TRINO_ICEBERG_TO_GRAVITINO_ICEBERG;
   }
 
   @Override
-  public Map<String, String> fromGravitinoProperties(Map<String, String> properties) {
+  public Map<String, String> gravitinoToEngineProperties(Map<String, String> properties) {
     String backend = properties.get("catalog-backend");
     switch (backend) {
       case "hive":

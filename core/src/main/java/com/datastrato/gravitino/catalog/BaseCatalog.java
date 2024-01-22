@@ -69,6 +69,11 @@ public abstract class BaseCatalog<T extends BaseCatalog>
     return ops().schemaPropertiesMetadata();
   }
 
+  @Override
+  public PropertiesMetadata filesetPropertiesMetadata() throws UnsupportedOperationException {
+    return ops().filesetPropertiesMetadata();
+  }
+
   /**
    * Retrieves the CatalogOperations instance associated with this catalog. Lazily initializes the
    * instance if not already created.

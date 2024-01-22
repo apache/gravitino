@@ -17,6 +17,7 @@ import com.datastrato.gravitino.server.web.JettyServer;
 import com.datastrato.gravitino.server.web.JettyServerConfig;
 import com.datastrato.gravitino.server.web.ObjectMapperProvider;
 import com.datastrato.gravitino.server.web.VersioningFilter;
+import com.datastrato.gravitino.server.web.ui.WebUIFilter;
 import java.io.File;
 import java.util.Properties;
 import javax.servlet.Servlet;
@@ -89,6 +90,8 @@ public class GravitinoServer extends ResourceConfig {
     server.addCustomFilters("/api/*");
     server.addFilter(new VersioningFilter(), "/api/*");
     server.addSystemFilters("/api/*");
+    server.addFilter(new WebUIFilter(), "/"); // Redirect to the /ui/index html page.
+    server.addFilter(new WebUIFilter(), "/ui/*"); // Redirect to the static html file.
   }
 
   public void start() throws Exception {

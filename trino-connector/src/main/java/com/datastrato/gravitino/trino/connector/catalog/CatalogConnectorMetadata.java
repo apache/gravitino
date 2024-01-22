@@ -17,7 +17,6 @@ import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.client.GravitinoMetaLake;
-import com.datastrato.gravitino.dto.rel.ColumnDTO;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NoSuchTableException;
@@ -122,15 +121,12 @@ public class CatalogConnectorMetadata {
     NameIdentifier identifier =
         NameIdentifier.ofTable(
             metalake.name(), catalogName, table.getSchemaName(), table.getName());
-    ColumnDTO[] gravitinoColumns = table.getColumnDTOs();
-    String comment = table.getComment();
-    Map<String, String> properties = table.getProperties();
     try {
       tableCatalog.createTable(
           identifier,
-          gravitinoColumns,
-          comment,
-          properties,
+          table.getColumnDTOs(),
+          table.getComment(),
+          table.getProperties(),
           table.getPartitioning(),
           table.getDistribution(),
           table.getSortOrders());

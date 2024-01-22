@@ -29,7 +29,7 @@ public class PostgreSQLConnectorAdapter implements CatalogConnectorAdapter {
     config.put("connectorName", "postgresql");
 
     Map<String, String> properties =
-        catalogConverter.fromGravitinoProperties(catalog.getProperties());
+        catalogConverter.gravitinoToEngineProperties(catalog.getProperties());
     config.put("properties", properties);
     return config;
   }

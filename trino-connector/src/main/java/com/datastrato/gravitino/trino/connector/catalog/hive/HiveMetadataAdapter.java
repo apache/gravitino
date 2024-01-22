@@ -22,11 +22,13 @@ import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrders;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
+import com.datastrato.gravitino.trino.connector.GravitinoErrorCode;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
 import com.datastrato.gravitino.trino.connector.catalog.hive.SortingColumn.Order;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoColumn;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoTable;
-import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableSet;
+import io.trino.spi.TrinoException;
 import io.trino.spi.connector.ColumnMetadata;
 import io.trino.spi.connector.ConnectorTableMetadata;
 import io.trino.spi.connector.SchemaTableName;
@@ -38,6 +40,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.ArrayUtils;
 
@@ -46,6 +49,10 @@ public class HiveMetadataAdapter extends CatalogConnectorMetadataAdapter {
 
   private final PropertyConverter tableConverter;
   private final PropertyConverter schemaConverter;
+
+  private static final Set<String> HIVE_PROPERTIES_TO_REMOVE =
+      ImmutableSet.of(
+          HIVE_PARTITION_KEY, HIVE_BUCKET_KEY, HIVE_BUCKET_COUNT_KEY, HIVE_SORT_ORDER_KEY);
 
   public HiveMetadataAdapter(
       List<PropertyMetadata<?>> schemaProperties,
@@ -58,25 +65,25 @@ public class HiveMetadataAdapter extends CatalogConnectorMetadataAdapter {
 
   @Override
   public Map<String, Object> toTrinoTableProperties(Map<String, String> properties) {
-    Map<String, String> objectMap = tableConverter.fromGravitinoProperties(properties);
+    Map<String, String> objectMap = tableConverter.gravitinoToEngineProperties(properties);
     return super.toTrinoTableProperties(objectMap);
   }
 
   @Override
   public Map<String, Object> toTrinoSchemaProperties(Map<String, String> properties) {
-    Map<String, String> objectMap = schemaConverter.fromGravitinoProperties(properties);
+    Map<String, String> objectMap = schemaConverter.gravitinoToEngineProperties(properties);
     return super.toTrinoSchemaProperties(objectMap);
   }
 
   @Override
   public Map<String, String> toGravitinoTableProperties(Map<String, Object> properties) {
-    Map<String, Object> stringMap = tableConverter.toGravitinoProperties(properties);
+    Map<String, Object> stringMap = tableConverter.engineToGravitinoProperties(properties);
     return super.toGravitinoTableProperties(stringMap);
   }
 
   @Override
   public Map<String, String> toGravitinoSchemaProperties(Map<String, Object> properties) {
-    Map<String, Object> stringMap = schemaConverter.toGravitinoProperties(properties);
+    Map<String, Object> stringMap = schemaConverter.engineToGravitinoProperties(properties);
     return super.toGravitinoSchemaProperties(stringMap);
   }
 
@@ -104,13 +111,15 @@ public class HiveMetadataAdapter extends CatalogConnectorMetadataAdapter {
             ? (List<SortingColumn>) propertyMap.get(HIVE_SORT_ORDER_KEY)
             : Collections.EMPTY_LIST;
 
-    if (!sortColumns.isEmpty()) {
-      Preconditions.checkArgument(
-          !bucketColumns.isEmpty() && bucketCount > 0,
-          "Bucket columns and bucket count must be specified when bucket count is set");
+    if (!sortColumns.isEmpty() && (bucketColumns.isEmpty() || bucketCount == 0)) {
+      throw new TrinoException(
+          GravitinoErrorCode.GRAVITINO_ILLEGAL_ARGUMENT,
+          "Sort columns can only be set when bucket columns and bucket count are set");
     }
 
-    Map<String, String> properties = toGravitinoTableProperties(tableMetadata.getProperties());
+    Map<String, String> properties =
+        toGravitinoTableProperties(
+            removeKeys(tableMetadata.getProperties(), HIVE_PROPERTIES_TO_REMOVE));
 
     List<GravitinoColumn> columns = new ArrayList<>();
     for (int i = 0; i < tableMetadata.getColumns().size(); i++) {

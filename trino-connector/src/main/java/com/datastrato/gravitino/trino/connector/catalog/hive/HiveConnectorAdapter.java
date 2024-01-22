@@ -39,7 +39,7 @@ public class HiveConnectorAdapter implements CatalogConnectorAdapter {
     Map<String, Object> properties = new HashMap<>();
     properties.put("hive.metastore.uri", catalog.getRequiredProperty("metastore.uris"));
     Map<String, String> trinoProperty =
-        catalogConverter.fromGravitinoProperties(catalog.getProperties());
+        catalogConverter.gravitinoToEngineProperties(catalog.getProperties());
 
     // Trino only supports properties that define in catalogPropertyMeta, the name of entries in
     // catalogPropertyMeta is in the format of "catalogName_propertyName", so we need to replace

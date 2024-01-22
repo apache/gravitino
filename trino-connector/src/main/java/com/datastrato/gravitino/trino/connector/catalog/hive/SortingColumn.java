@@ -13,9 +13,12 @@
  */
 package com.datastrato.gravitino.trino.connector.catalog.hive;
 
+import static com.datastrato.gravitino.trino.connector.catalog.hive.SortingColumn.Order.ASCENDING;
+import static com.datastrato.gravitino.trino.connector.catalog.hive.SortingColumn.Order.DESCENDING;
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static io.trino.spi.connector.SortOrder.ASC_NULLS_FIRST;
 import static io.trino.spi.connector.SortOrder.DESC_NULLS_LAST;
+import static java.util.Locale.ENGLISH;
 import static java.util.Objects.requireNonNull;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
@@ -24,6 +27,8 @@ import com.google.errorprone.annotations.Immutable;
 import io.trino.spi.connector.SortOrder;
 import java.util.Objects;
 
+// This class is referred from Trino:
+// plugin/trino-gravitino/src/main/java/com/datastrato/gravitino/trino/connector/catalog/hive/SortingColumn.java
 @Immutable
 public class SortingColumn {
   public enum Order {
@@ -88,5 +93,21 @@ public class SortingColumn {
   @Override
   public int hashCode() {
     return Objects.hash(columnName, order);
+  }
+
+  public static String sortingColumnToString(SortingColumn column) {
+    return column.getColumnName() + ((column.getOrder() == DESCENDING) ? " DESC" : "");
+  }
+
+  public static SortingColumn sortingColumnFromString(String name) {
+    SortingColumn.Order order = ASCENDING;
+    String lower = name.toUpperCase(ENGLISH);
+    if (lower.endsWith(" ASC")) {
+      name = name.substring(0, name.length() - 4).trim();
+    } else if (lower.endsWith(" DESC")) {
+      name = name.substring(0, name.length() - 5).trim();
+      order = DESCENDING;
+    }
+    return new SortingColumn(name, order);
   }
 }
