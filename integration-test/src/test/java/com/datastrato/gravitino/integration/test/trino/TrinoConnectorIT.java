@@ -1165,14 +1165,15 @@ public class TrinoConnectorIT extends AbstractIT {
             metalakeName, catalogName, schemaName, tableName);
     containerSuite.getTrinoContainer().executeUpdateSQL(sql);
 
-    sql = String.format(
-        "alter table \"%s.%s\".%s.%s add column address varchar(20) not null comment 'address of users'",
-        metalakeName, catalogName, schemaName, tableName);
+    sql =
+        String.format(
+            "alter table \"%s.%s\".%s.%s add column address varchar(20) not null comment 'address of users'",
+            metalakeName, catalogName, schemaName, tableName);
     containerSuite.getTrinoContainer().executeUpdateSQL(sql);
 
     catalog
-            .asTableCatalog()
-            .loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, tableName));
+        .asTableCatalog()
+        .loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, tableName));
 
     sql =
         String.format(
