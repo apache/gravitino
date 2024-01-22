@@ -13,7 +13,6 @@ plugins {
 }
 
 val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extra["defaultScalaVersion"].toString()
-val sparkMajorVersion: String = project.properties["sparkVersion"] as? String ?: extra["defaultSparkVersion"].toString()
 val sparkVersion: String = libs.versions.spark.get()
 val icebergVersion: String = libs.versions.iceberg.get()
 val scalaCollectionCompatVersion: String = libs.versions.scala.collection.compat.get()
@@ -102,7 +101,7 @@ dependencies {
   testRuntimeOnly(libs.junit.jupiter.engine)
   testImplementation(libs.mockito.core)
   testImplementation(libs.bundles.log4j)
-  testImplementation("org.apache.iceberg:iceberg-spark-runtime-${sparkMajorVersion}_$scalaVersion:$icebergVersion")
+  testImplementation("org.apache.iceberg:iceberg-spark-runtime-3.4_$scalaVersion:$icebergVersion")
   testImplementation("org.apache.spark:spark-hive_$scalaVersion:$sparkVersion")
   testImplementation("org.scala-lang.modules:scala-collection-compat_$scalaVersion:$scalaCollectionCompatVersion")
   testImplementation("org.apache.spark:spark-sql_$scalaVersion:$sparkVersion") {
