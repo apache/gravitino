@@ -460,6 +460,17 @@ public class CatalogHiveIT extends AbstractIT {
     assertTableEquals(createdTable, hiveTab);
     checkTableReadWrite(hiveTab);
 
+    // test null comment
+    resetSchema();
+    createdTable =
+        catalog
+            .asTableCatalog()
+            .createTable(nameIdentifier, columns, null, properties, Transforms.EMPTY_TRANSFORM);
+    org.apache.hadoop.hive.metastore.api.Table hiveTab2 =
+        hiveClientPool.run(client -> client.getTable(schemaName, tableName));
+    assertTableEquals(createdTable, hiveTab2);
+    checkTableReadWrite(hiveTab);
+
     // test null partition
     resetSchema();
     Table createdTable1 =
@@ -662,7 +673,7 @@ public class CatalogHiveIT extends AbstractIT {
     Assertions.assertEquals(schemaName.toLowerCase(), hiveTab.getDbName());
     Assertions.assertEquals(tableName.toLowerCase(), hiveTab.getTableName());
     Assertions.assertEquals("MANAGED_TABLE", hiveTab.getTableType());
-    Assertions.assertEquals(TABLE_COMMENT, hiveTab.getParameters().get("comment"));
+    Assertions.assertEquals(createdTable.comment(), hiveTab.getParameters().get("comment"));
 
     Assertions.assertEquals(HIVE_COL_NAME1, actualColumns.get(0).getName());
     Assertions.assertEquals("tinyint", actualColumns.get(0).getType());

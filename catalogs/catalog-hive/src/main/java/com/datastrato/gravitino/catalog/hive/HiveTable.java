@@ -183,7 +183,7 @@ public class HiveTable extends BaseTable {
 
   private Map<String, String> buildTableParameters() {
     Map<String, String> parameters = Maps.newHashMap(properties());
-    parameters.put(COMMENT, comment);
+    Optional.ofNullable(comment).ifPresent(c -> parameters.put(COMMENT, c));
     String ignore =
         EXTERNAL_TABLE.name().equalsIgnoreCase(properties().get(TABLE_TYPE))
             ? parameters.put(EXTERNAL, "TRUE")
