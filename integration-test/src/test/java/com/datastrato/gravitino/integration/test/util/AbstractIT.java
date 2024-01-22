@@ -130,6 +130,15 @@ public class AbstractIT {
         .toLowerCase()
         .equals(customConfigs.get(OAuthConfig.AUTHENTICATOR.getKey()))) {
       client = GravitinoClient.builder(uri).withSimpleAuth().build();
+    } else if (AuthenticatorType.KERBEROS
+        .name()
+        .toLowerCase()
+        .equals(customConfigs.get(OAuthConfig.AUTHENTICATOR.getKey()))) {
+      uri = "http://localhost:" + jettyServerConfig.getHttpPort();
+      client =
+          GravitinoClient.builder(uri)
+              .withKerberosAuth(KerberosProviderHelper.getProvider())
+              .build();
     } else {
       client = GravitinoClient.builder(uri).build();
     }
@@ -137,14 +146,14 @@ public class AbstractIT {
 
   @AfterAll
   public static void stopIntegrationTest() throws IOException, InterruptedException {
-    if (client != null) {
-      client.close();
-    }
     if (testMode != null && testMode.equals(ITUtils.EMBEDDED_TEST_MODE)) {
       miniGravitino.stop();
     } else {
       GravitinoITUtils.stopGravitinoServer();
       recoverGravitinoServerConfig();
+    }
+    if (client != null) {
+      client.close();
     }
     customConfigs.clear();
     LOG.info("Tearing down Gravitino Server");

@@ -52,6 +52,10 @@ public class KerberosAuthenticator implements Authenticator {
   public void initialize(Config config) throws RuntimeException {
     try {
       String principal = config.get(KerberosConfig.PRINCIPAL);
+      if (!principal.startsWith("HTTP/")) {
+        throw new IllegalArgumentException("Principal must starts with `HTTP/`");
+      }
+
       String keytab = config.get(KerberosConfig.KEYTAB);
       File keytabFile = new File(keytab);
       if (!keytabFile.exists()) {
@@ -108,6 +112,10 @@ public class KerberosAuthenticator implements Authenticator {
 
     try {
       String serverPrincipal = KerberosServerUtils.getTokenServerName(clientToken);
+      if (!serverPrincipal.startsWith("HTTP/")) {
+        throw new IllegalArgumentException("Principal must starts with `HTTP/`");
+      }
+
       return Subject.doAs(
           serverSubject,
           new PrivilegedExceptionAction<Principal>() {

@@ -51,6 +51,36 @@ GravitinoClient client = GravitinoClient.builder(uri)
     .build();
 ```
 
+### Kerberos mode
+
+Gravitino supports Kerberos mode.
+
+For the server side, users should set `gravitino.authenticator` as `kerberos` and give
+`gravitino.authenticator.kerberos.principal` and `gravitino.authenticator.kerberos.keytab` a proper value.
+
+For the client side, users can enable `kerberos` mode by the following code:
+
+```java
+// Use keytab to create KerberosTokenProvider
+KerberosTokenProvider provider = KerberosTokenProvider.builder()
+        .withClientPrincipal(clientPrincipal)
+        .withKeyTabFile(new File(keytabFile))
+        .build();
+
+// Use ticketCache to create KerberosTokenProvider
+KerberosTokenProvider provider = KerberosTokenProvider.builder()
+        .withClientPrincipal(clientPrincipal)
+        .build();        
+
+GravitinoClient client = GravitinoClient.builder(uri)
+    .withKerberosAuth(provider)
+    .build();
+```
+
+:::info
+Now Iceberg REST service doesn't support Kerberos authentication.
+:::
+
 ### Server configuration
 
 | Configuration item                                | Description                                                                        | Default value     | Required                                   | Since version |
