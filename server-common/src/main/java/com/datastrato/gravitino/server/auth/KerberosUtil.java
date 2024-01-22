@@ -34,6 +34,8 @@ import javax.security.auth.Subject;
 import javax.security.auth.kerberos.KerberosPrincipal;
 import javax.security.auth.kerberos.KerberosTicket;
 import javax.security.auth.kerberos.KeyTab;
+
+import com.datastrato.gravitino.auth.KerberosUtils;
 import org.apache.kerby.kerberos.kerb.keytab.Keytab;
 import org.apache.kerby.kerberos.kerb.type.base.PrincipalName;
 import org.ietf.jgss.GSSException;
@@ -43,52 +45,6 @@ import org.ietf.jgss.Oid;
 // hadoop-common-project/hadoop-auth/src/main/java/org/apache/hadoop/\
 // security/authentication/util/KerberosUtil.java
 public class KerberosUtil {
-
-  /* Return the Kerberos login module name */
-  public static String getKrb5LoginModuleName() {
-    return "com.sun.security.auth.module.Krb5LoginModule";
-  }
-
-  public static final Oid GSS_SPNEGO_MECH_OID = getNumericOidInstance("1.3.6.1.5.5.2");
-  public static final Oid GSS_KRB5_MECH_OID = getNumericOidInstance("1.2.840.113554.1.2.2");
-  public static final Oid NT_GSS_KRB5_PRINCIPAL_OID =
-      getNumericOidInstance("1.2.840.113554.1.2.2.1");
-
-  // numeric oids will never generate a GSSException for a malformed oid.
-  // use to initialize statics.
-  private static Oid getNumericOidInstance(String oidName) {
-    try {
-      return new Oid(oidName);
-    } catch (GSSException ex) {
-      throw new IllegalArgumentException(ex);
-    }
-  }
-
-  /**
-   * Returns the Oid instance from string oidName. Use {@link GSS_SPNEGO_MECH_OID}, {@link
-   * GSS_KRB5_MECH_OID}, or {@link NT_GSS_KRB5_PRINCIPAL_OID} instead.
-   *
-   * @return Oid instance
-   * @param oidName The oid Name
-   * @throws ClassNotFoundException for backward compatibility.
-   * @throws GSSException for backward compatibility.
-   * @throws NoSuchFieldException if the input is not supported.
-   * @throws IllegalAccessException for backward compatibility.
-   */
-  @Deprecated
-  public static Oid getOidInstance(String oidName)
-      throws ClassNotFoundException, GSSException, NoSuchFieldException, IllegalAccessException {
-    switch (oidName) {
-      case "GSS_SPNEGO_MECH_OID":
-        return GSS_SPNEGO_MECH_OID;
-      case "GSS_KRB5_MECH_OID":
-        return GSS_KRB5_MECH_OID;
-      case "NT_GSS_KRB5_PRINCIPAL":
-        return NT_GSS_KRB5_PRINCIPAL_OID;
-      default:
-        throw new NoSuchFieldException("oidName: " + oidName + " is not supported.");
-    }
-  }
 
   /**
    * Return the default realm for this JVM.
@@ -326,8 +282,8 @@ public class KerberosUtil {
 
   // basic ASN.1 DER decoder to traverse encoded byte arrays.
   private static class DER implements Iterator<DER> {
-    static final DER SPNEGO_MECH_OID = getDER(GSS_SPNEGO_MECH_OID);
-    static final DER KRB5_MECH_OID = getDER(GSS_KRB5_MECH_OID);
+    static final DER SPNEGO_MECH_OID = getDER(KerberosUtils.GSS_SPNEGO_MECH_OID);
+    static final DER KRB5_MECH_OID = getDER(KerberosUtils.GSS_KRB5_MECH_OID);
 
     private static DER getDER(Oid oid) {
       try {

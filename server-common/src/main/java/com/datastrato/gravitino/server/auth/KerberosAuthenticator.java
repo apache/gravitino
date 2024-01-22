@@ -14,6 +14,7 @@ package com.datastrato.gravitino.server.auth;
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.UserPrincipal;
 import com.datastrato.gravitino.auth.AuthConstants;
+import com.datastrato.gravitino.auth.KerberosUtils;
 import com.datastrato.gravitino.exceptions.UnauthorizedException;
 import java.io.File;
 import java.security.Principal;
@@ -117,9 +118,9 @@ public class KerberosAuthenticator implements Authenticator {
       LOG.trace("SPNEGO initiated with server principal [{}]", serverPrincipal);
       gssCreds =
           this.gssManager.createCredential(
-              this.gssManager.createName(serverPrincipal, KerberosUtil.NT_GSS_KRB5_PRINCIPAL_OID),
+              this.gssManager.createName(serverPrincipal, KerberosUtils.NT_GSS_KRB5_PRINCIPAL_OID),
               GSSCredential.INDEFINITE_LIFETIME,
-              new Oid[] {KerberosUtil.GSS_SPNEGO_MECH_OID, KerberosUtil.GSS_KRB5_MECH_OID},
+              new Oid[] {KerberosUtils.GSS_SPNEGO_MECH_OID, KerberosUtils.GSS_KRB5_MECH_OID},
               GSSCredential.ACCEPT_ONLY);
       gssContext = this.gssManager.createContext(gssCreds);
       byte[] serverToken = gssContext.acceptSecContext(clientToken, 0, clientToken.length);

@@ -10,6 +10,7 @@ import static com.datastrato.gravitino.server.auth.KerberosConfig.PRINCIPAL;
 
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.auth.AuthConstants;
+import com.datastrato.gravitino.auth.KerberosUtils;
 import com.datastrato.gravitino.exceptions.UnauthorizedException;
 import java.io.File;
 import java.nio.charset.StandardCharsets;
@@ -112,9 +113,9 @@ public class TestKerberosAuthenticator extends KerberosSecurityTestcase {
                 GSSContext gssContext = null;
                 try {
                   String servicePrincipal = KerberosTestUtils.getServerPrincipal();
-                  Oid oid = KerberosUtil.NT_GSS_KRB5_PRINCIPAL_OID;
+                  Oid oid = KerberosUtils.NT_GSS_KRB5_PRINCIPAL_OID;
                   GSSName serviceName = gssManager.createName(servicePrincipal, oid);
-                  oid = KerberosUtil.GSS_KRB5_MECH_OID;
+                  oid = KerberosUtils.GSS_KRB5_MECH_OID;
                   gssContext =
                       gssManager.createContext(serviceName, oid, null, GSSContext.DEFAULT_LIFETIME);
                   gssContext.requestCredDeleg(true);
