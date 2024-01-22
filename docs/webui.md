@@ -25,7 +25,7 @@ More features are under development. For the details, please refer to the [Manag
 
 The web UI homepage displayed in Gravitino depends on the configuration parameter for OAuth mode, see the details in [Security](security.md).
 
-Set parameter for `gravitino.authenticator`, [`simple`](#simple-mode) or [`oauth`](#oauth-mode).
+Set parameter for `gravitino.authenticator`, [`simple`](#simple-mode) or [`oauth`](#oauth-mode). Simple mode is the default authentication option.
 
 :::tip
 After changing the configuration, make sure to restart the Gravitino server.

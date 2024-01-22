@@ -388,6 +388,14 @@ public class TrinoConnectorIT extends AbstractIT {
     Assertions.assertEquals(
         "hdfs://localhost:9000/user/hive/warehouse/hive_schema.db/hive_table",
         table.properties().get("location"));
+    Assertions.assertEquals("MANAGED_TABLE", table.properties().get("table-type"));
+    Assertions.assertEquals(
+        "org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe", table.properties().get("serde-lib"));
+    Assertions.assertEquals(
+        "org.apache.hadoop.mapred.TextInputFormat", table.properties().get("input-format"));
+    Assertions.assertEquals(
+        "org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat",
+        table.properties().get("output-format"));
   }
 
   @Test
@@ -728,6 +736,9 @@ public class TrinoConnectorIT extends AbstractIT {
     Assertions.assertTrue(
         data.contains(
             "location = 'hdfs://localhost:9000/user/hive/warehouse/hive_schema.db/hive_table'"));
+    Assertions.assertTrue(
+        data.contains("input_format = 'org.apache.hadoop.hive.ql.io.orc.OrcInputFormat'"));
+    Assertions.assertTrue(data.contains("serde_lib = 'org.apache.hadoop.hive.ql.io.orc.OrcSerde'"));
   }
 
   @Test

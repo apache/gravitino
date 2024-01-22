@@ -11,6 +11,7 @@ import com.github.jk1.license.render.ReportRenderer
 import com.github.vlsi.gradle.dsl.configureEach
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 import org.gradle.internal.hash.ChecksumService
+import org.gradle.internal.os.OperatingSystem
 import org.gradle.kotlin.dsl.support.serviceOf
 import java.io.File
 import java.util.Locale
@@ -88,39 +89,40 @@ licenseReport {
 repositories { mavenCentral() }
 
 allprojects {
-  apply(plugin = "com.diffplug.spotless")
+  if ((project.name != "catalogs") && project.name != "clients") {
+    apply(plugin = "com.diffplug.spotless")
+    repositories {
+      mavenCentral()
+      mavenLocal()
+    }
 
-  repositories {
-    mavenCentral()
-    mavenLocal()
-  }
+    plugins.withType<com.diffplug.gradle.spotless.SpotlessPlugin>().configureEach {
+      configure<com.diffplug.gradle.spotless.SpotlessExtension> {
+        java {
+          // Fix the Google Java Format version to 1.7. Since JDK8 only support Google Java Format
+          // 1.7, which is not compatible with JDK17. We will use a newer version when we upgrade to
+          // JDK17.
+          googleJavaFormat("1.7")
+          removeUnusedImports()
+          trimTrailingWhitespace()
+          replaceRegex(
+            "Remove wildcard imports",
+            "import\\s+[^\\*\\s]+\\*;(\\r\\n|\\r|\\n)",
+            "$1"
+          )
+          replaceRegex(
+            "Remove static wildcard imports",
+            "import\\s+(?:static\\s+)?[^*\\s]+\\*;(\\r\\n|\\r|\\n)",
+            "$1"
+          )
 
-  plugins.withType<com.diffplug.gradle.spotless.SpotlessPlugin>().configureEach {
-    configure<com.diffplug.gradle.spotless.SpotlessExtension> {
-      java {
-        // Fix the Google Java Format version to 1.7. Since JDK8 only support Google Java Format
-        // 1.7, which is not compatible with JDK17. We will use a newer version when we upgrade to
-        // JDK17.
-        googleJavaFormat("1.7")
-        removeUnusedImports()
-        trimTrailingWhitespace()
-        replaceRegex(
-          "Remove wildcard imports",
-          "import\\s+[^\\*\\s]+\\*;(\\r\\n|\\r|\\n)",
-          "$1"
-        )
-        replaceRegex(
-          "Remove static wildcard imports",
-          "import\\s+(?:static\\s+)?[^*\\s]+\\*;(\\r\\n|\\r|\\n)",
-          "$1"
-        )
+          targetExclude("**/build/**")
+        }
 
-        targetExclude("**/build/**")
-      }
-
-      kotlinGradle {
-        target("*.gradle.kts")
-        ktlint().editorConfigOverride(mapOf("indent_size" to 2))
+        kotlinGradle {
+          target("*.gradle.kts")
+          ktlint().editorConfigOverride(mapOf("indent_size" to 2))
+        }
       }
     }
   }
@@ -163,13 +165,26 @@ subprojects {
 
   java {
     toolchain {
+      // Some JDK vendors like Homebrew installed OpenJDK 17 have problems in building trino-connector:
+      // It will cause tests of Trino-connector hanging forever on macOS, to avoid this issue and
+      // other vendor-related problems, Gravitino will use the specified AMAZON OpenJDK 17 to build
+      // Trino-connector on macOS.
       if (project.name == "trino-connector") {
+        if (OperatingSystem.current().isMacOsX) {
+          vendor.set(JvmVendorSpec.AMAZON)
+        }
         languageVersion.set(JavaLanguageVersion.of(17))
       } else {
         languageVersion.set(JavaLanguageVersion.of(extra["jdkVersion"].toString().toInt()))
         sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8
       }
+    }
+  }
+
+  if ((project.name == "catalogs") || project.name == "clients") {
+    tasks.withType<Jar> {
+      enabled = false
     }
   }
 
@@ -198,8 +213,6 @@ subprojects {
     plugins.apply(NodePlugin::class)
     configure<NodeExtension> {
       version.set("20.9.0")
-      npmVersion.set("10.1.0")
-      yarnVersion.set("1.22.19")
       nodeProjectDir.set(file("$rootDir/.node"))
       download.set(true)
     }
@@ -322,6 +335,8 @@ tasks.rat {
     "web/lib/enums/httpEnum.ts",
     "web/types/axios.d.ts",
     "web/yarn.lock",
+    "web/package-lock.json",
+    "web/pnpm-lock.yaml",
     "**/LICENSE.*",
     "**/NOTICE.*"
   )
@@ -484,6 +499,7 @@ tasks {
       ":catalogs:catalog-lakehouse-iceberg:copyLibAndConfig",
       ":catalogs:catalog-jdbc-mysql:copyLibAndConfig",
       ":catalogs:catalog-jdbc-postgresql:copyLibAndConfig"
+      // TODO. add fileset catalog to the distribution when ready.
     )
   }
 

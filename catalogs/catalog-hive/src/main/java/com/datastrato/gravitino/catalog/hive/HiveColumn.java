@@ -29,6 +29,7 @@ public class HiveColumn extends BaseColumn {
       hiveColumn.comment = comment;
       hiveColumn.dataType = dataType;
       hiveColumn.nullable = nullable;
+      hiveColumn.defaultValue = defaultValue == null ? DEFAULT_VALUE_NOT_SET : defaultValue;
       return hiveColumn;
     }
   }
