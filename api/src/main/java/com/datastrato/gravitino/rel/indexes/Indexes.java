@@ -11,6 +11,7 @@ public class Indexes {
 
   /**
    * Create a unique index on columns. Like unique (a) or unique (a, b), for complex like unique
+   *
    * @param name The name of the index
    * @param fieldNames The field names under the table contained in the index.
    * @return
@@ -21,6 +22,7 @@ public class Indexes {
 
   /**
    * Create a primary index on columns. Like primary (a), for complex like primary
+   *
    * @param name The name of the index
    * @param fieldNames The field names under the table contained in the index.
    * @return
@@ -29,6 +31,12 @@ public class Indexes {
     return of(Index.IndexType.PRIMARY_KEY, name, fieldNames);
   }
 
+  /**
+   * @param indexType The type of the index
+   * @param name The name of the index
+   * @param fieldNames The field names under the table contained in the index.
+   * @return
+   */
   public static Index of(Index.IndexType indexType, String name, String[][] fieldNames) {
     return IndexImpl.builder()
         .withIndexType(indexType)
