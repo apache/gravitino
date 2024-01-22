@@ -2,7 +2,7 @@
  * Copyright 2024 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
-description = "catalog-fileset"
+description = "catalog-hadoop"
 
 plugins {
   `maven-publish`
@@ -13,9 +13,12 @@ plugins {
 dependencies {
   implementation(project(":api"))
   implementation(project(":core"))
+  implementation(project(":common"))
 
   implementation(libs.slf4j.api)
   implementation(libs.guava)
+  implementation(libs.hadoop2.common)
+  implementation(libs.hadoop2.hdfs)
 
   testImplementation(libs.junit.jupiter.api)
   testRuntimeOnly(libs.junit.jupiter.engine)
@@ -31,12 +34,12 @@ tasks {
   val copyCatalogLibs by registering(Copy::class) {
     dependsOn(copyDepends, "build")
     from("build/libs_all", "build/libs")
-    into("$rootDir/distribution/package/catalogs/fileset/libs")
+    into("$rootDir/distribution/package/catalogs/hadoop/libs")
   }
 
   val copyCatalogConfig by registering(Copy::class) {
     from("src/main/resources")
-    into("$rootDir/distribution/package/catalogs/fileset/conf")
+    into("$rootDir/distribution/package/catalogs/hadoop/conf")
 
     // TODO. add configuration file later on.
 
