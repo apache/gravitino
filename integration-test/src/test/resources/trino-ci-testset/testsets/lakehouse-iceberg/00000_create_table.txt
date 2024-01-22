@@ -2,6 +2,16 @@ CREATE SCHEMA
 
 CREATE TABLE
 
+"CREATE TABLE ""test.gt_iceberg"".gt_db2.tb01 (
+   name varchar,
+   salary integer
+)
+COMMENT ''
+WITH (
+   partitioning = ARRAY['name'],
+   sorted_by = ARRAY['salary']
+)"
+
 DROP TABLE
 
 DROP SCHEMA
