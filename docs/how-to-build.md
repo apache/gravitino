@@ -17,7 +17,7 @@ This software is licensed under the Apache License version 2."
 + Gravitino requires at least JDK8 and at most JDK17 to run Gradle, so you need to
   install JDK8 to 17 version to launch the build environment.
 + Gravitino itself supports using JDK8, 11, and 17 to build, Gravitino Trino connector uses
-  JDK17 to build. You don't have to preinstall the specified JDK environment,
+  JDK17 to build (to avoid the vendor-related issues on some platform, Gravitino will use the specified Amazon Corretto OpenJDK 17 to build Trino connector on macOS). You don't have to preinstall the specified JDK environment,
 + Gradle detects the JDK version needed and downloads it automatically.
 + Gravitino uses Gradle Java Toolchain to detect and manage JDK versions, it checks the
   installed JDK by running `./gradlew javaToolchains` command. For the details of Gradle Java

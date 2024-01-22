@@ -462,4 +462,10 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
   public PropertiesMetadata schemaPropertiesMetadata() throws UnsupportedOperationException {
     return jdbcSchemaPropertiesMetadata;
   }
+
+  @Override
+  public PropertiesMetadata filesetPropertiesMetadata() throws UnsupportedOperationException {
+    throw new UnsupportedOperationException(
+        "Jdbc catalog doesn't support fileset related operations");
+  }
 }

@@ -40,12 +40,13 @@ public class GravitinoDataSourceProvider implements ConnectorPageSourceProvider 
     for (ColumnHandle column : columns) {
       internalHandles.add(((GravitinoColumnHandle) column).getInternalColumnHandler());
     }
+    // TODO(yuhui) add dynamic filter
     return internalPageSourceProvider.createPageSource(
         gravitinoTransactionHandle.getInternalTransactionHandle(),
         session,
         split,
         gravitinoTableHandle.getInternalTableHandle(),
         internalHandles,
-        dynamicFilter);
+        DynamicFilter.EMPTY);
   }
 }

@@ -380,10 +380,15 @@ public class KvEntityStore implements EntityStore {
                               .build());
 
                   if (!cascade && !kvs.isEmpty()) {
+                    List<NameIdentifier> subEntities = Lists.newArrayListWithCapacity(kvs.size());
+                    for (Pair<byte[], byte[]> pair : kvs) {
+                      subEntities.add(entityKeyEncoder.decode(pair.getLeft()).getLeft());
+                    }
+
                     throw new NonEmptyEntityException(
                         String.format(
-                            "Entity %s has sub-entities, you should remove sub-entities first",
-                            ident));
+                            "Entity %s has sub-entities %s, you should remove sub-entities first",
+                            ident, subEntities));
                   }
 
                   for (byte[] prefix : subEntityPrefix) {

@@ -15,7 +15,7 @@
 
 ### Preparation | framework & dependencies
 
-- [Node.js](https://nodejs.org)(v20.x+) & [npm](https://www.npmjs.com/) / [yarn](https://yarnpkg.com/)
+- [Node.js](https://nodejs.org)(v20.x+) & [npm](https://www.npmjs.com/) / [pnpm](https://pnpm.io/)
 - [React](https://react.dev/)
 - [Next.js](https://nextjs.org)
 - [MUI](https://mui.com/)
@@ -24,11 +24,11 @@
 
 > **TIP**
 >
-> You should use the Yarn package manager.
+> You should use the Pnpm package manager.
 >
 > **Requirements**
 >
-> Please make sure you use the node’s LTS version
+> Please make sure you use the node's LTS version
 > Before installing the **node_modules**, make sure you have files starting with a **dot(.eslintrc, .env etc..)**
 
 ## Installation
@@ -38,13 +38,13 @@
 - Run the below command in the console to install the required dependencies.
 
 ```bash
-yarn install
+pnpm install
 ```
 
 - After installing the modules start the development server with following command:
 
 ```bash
-yarn server
+pnpm dev
 ```
 
 - Visit <http://localhost:3000> to view the Gravitino Web UI in your browser. You can start editing the page such as `pages/index.js`. The page auto-updates as you edit the file.
@@ -58,19 +58,19 @@ The Gravitino Web UI only works in the latest version of the Chrome browser. You
 This command runs ESLint to help you inspect the code. If errors occur, please make modifications based on the provided prompts.
 
 ```bash
-yarn lint
+pnpm lint
 ```
 
-This command runs Prettier to help you check your code styles. You can manually fix the code when errors are shown, or use `yarn format` to fix the code with Prettier CLI.
+This command runs Prettier to help you check your code styles. You can manually fix the code when errors are shown, or use `pnpm format` to fix the code with Prettier CLI.
 
 ```bash
-yarn prettier:check
+pnpm prettier:check
 ```
 
 This command automatically formats the code.
 
 ```bash
-yarn format
+pnpm format
 ```
 
 ## Self-hosting deployment
@@ -82,18 +82,18 @@ You can deploy Next.js to any hosting provider that supports Node.js. Make sure 
 ```json
 {
   "scripts": {
-    "server": "next dev",
+    "dev": "next dev",
     "build": "next build",
     "start": "next start"
   }
 }
 ```
 
-`yarn build` builds the production application in the `.next` folder. After building, `yarn start` starts a Node.js server that supports hybrid pages, serving both statically generated and server-side rendered pages.
+`pnpm build` builds the production application in the `.next` folder. After building, `pnpm start` starts a Node.js server that supports hybrid pages, serving both statically generated and server-side rendered pages.
 
 ```bash
-yarn build
-yarn start
+pnpm build
+pnpm start
 ```
 
 ### Static HTML export
@@ -102,7 +102,7 @@ The command `next export` allows you to export your app to static HTML, which ru
 
 `next export` will generate a `dist` directory, producing content for any static hosting service.
 
-The command `yarn dist` copies the files within the 'dist' directory to the root directory of the static server.
+The command `pnpm dist` copies the files within the 'dist' directory to the root directory of the static server.
 
 ## Docker
 
@@ -118,19 +118,19 @@ Run the following commands in the console:
 
 ```bash
 # ensure you are in the `web` directory
-docker run -it --rm --name gravitino-web-docker -v ${PWD}:/web -w /web node:20-slim /bin/bash -c "yarn install && yarn dist"
+docker run -it --rm --name gravitino-web-docker -v ${PWD}:/web -w /web node:20-slim /bin/bash -c "pnpm install && pnpm dist"
 docker run -it -p 3000:3000 -v ${PWD}:/web -w /web --name gravitino-web node:20-slim /bin/bash
-docker run -p 3000:3000 -v ${PWD}:/web --name gravitino-web node:20-slim /bin/bash -c "yarn install && yarn dist"
+docker run -p 3000:3000 -v ${PWD}:/web --name gravitino-web node:20-slim /bin/bash -c "pnpm install && pnpm dist"
 ```
 
-This command runs `yarn install` to install the dependencies specified in the `package.json` file and then runs `yarn export` to export a static version of the application.
+This command runs `pnpm install` to install the dependencies specified in the `package.json` file and then runs `pnpm export` to export a static version of the application.
 The exported files are saved to the `dist` directory inside the container, and mounted in the `dist` directory in the current directory of the host machine.
 This means that the exported files are accessible on the host machine after running the command.
 
 If you also want to start a server to view the demo, please use the following code:
 
 ```bash
-docker run -it --rm --name gravitino-web-docker -v ${PWD}:/web -p 3000:3000 -w /web node:20-slim /bin/bash -c "yarn install && yarn server"
+docker run -it --rm --name gravitino-web-docker -v ${PWD}:/web -p 3000:3000 -w /web node:20-slim /bin/bash -c "pnpm install && pnpm dev"
 ```
 
 You can access the Gravitino Web UI by typing <http://localhost:3000> in your browser.

@@ -18,7 +18,9 @@ public class PartitionUtils {
 
     List<ColumnDTO> partitionColumn =
         Arrays.stream(columns)
-            .filter(c -> c.name().equals(fieldName[0]))
+            // (TODO) Need to consider the case sensitivity issues.
+            //   To be optimized.
+            .filter(c -> c.name().equalsIgnoreCase(fieldName[0]))
             .collect(Collectors.toList());
     Preconditions.checkArgument(
         partitionColumn.size() == 1, "partition field %s not found in table", fieldName[0]);
