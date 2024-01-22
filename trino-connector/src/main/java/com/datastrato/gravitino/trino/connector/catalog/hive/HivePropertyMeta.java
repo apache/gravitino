@@ -5,13 +5,18 @@
 
 package com.datastrato.gravitino.trino.connector.catalog.hive;
 
+import static com.google.common.collect.ImmutableList.toImmutableList;
 import static io.trino.spi.session.PropertyMetadata.booleanProperty;
 import static io.trino.spi.session.PropertyMetadata.enumProperty;
+import static io.trino.spi.session.PropertyMetadata.integerProperty;
 import static io.trino.spi.session.PropertyMetadata.stringProperty;
+import static io.trino.spi.type.VarcharType.VARCHAR;
+import static java.util.Locale.ENGLISH;
 
 import com.datastrato.gravitino.trino.connector.catalog.HasPropertyMeta;
 import com.google.common.collect.ImmutableList;
 import io.trino.spi.session.PropertyMetadata;
+import io.trino.spi.type.ArrayType;
 import java.util.List;
 
 /** Implementation of {@link HasPropertyMeta} for Hive catalog. */
@@ -20,6 +25,11 @@ public class HivePropertyMeta implements HasPropertyMeta {
   private static final List<PropertyMetadata<?>> SCHEMA_PROPERTY_META =
       ImmutableList.of(
           stringProperty("location", "Hive storage location for the schema", null, false));
+
+  public static final String HIVE_PARTITION_KEY = "partitioned_by";
+  public static final String HIVE_BUCKET_KEY = "bucketed_by";
+  public static final String HIVE_BUCKET_COUNT_KEY = "bucket_count";
+  public static final String HIVE_SORT_ORDER_KEY = "sorted_by";
 
   private static final List<PropertyMetadata<?>> TABLE_PROPERTY_META =
       ImmutableList.of(
@@ -44,7 +54,55 @@ public class HivePropertyMeta implements HasPropertyMeta {
               "The serde library class for the table",
               "org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe",
               false),
-          stringProperty("serde_name", "Name of the serde, table name by default", null, false));
+          stringProperty("serde_name", "Name of the serde, table name by default", null, false),
+          new PropertyMetadata<>(
+              HIVE_PARTITION_KEY,
+              "Partition columns",
+              new ArrayType(VARCHAR),
+              List.class,
+              ImmutableList.of(),
+              false,
+              value ->
+                  ((List<?>) value)
+                      .stream()
+                          .map(name -> ((String) name).toLowerCase(ENGLISH))
+                          .collect(toImmutableList()),
+              value -> value),
+          new PropertyMetadata<>(
+              HIVE_BUCKET_KEY,
+              "Bucketing columns",
+              new ArrayType(VARCHAR),
+              List.class,
+              ImmutableList.of(),
+              false,
+              value ->
+                  ((List<?>) value)
+                      .stream()
+                          .map(name -> ((String) name).toLowerCase(ENGLISH))
+                          .collect(toImmutableList()),
+              value -> value),
+          integerProperty(
+              HIVE_BUCKET_COUNT_KEY, "The number of buckets for the table", null, false),
+          new PropertyMetadata<>(
+              HIVE_SORT_ORDER_KEY,
+              "Bucket sorting columns",
+              new ArrayType(VARCHAR),
+              List.class,
+              ImmutableList.of(),
+              false,
+              value ->
+                  ((List<?>) value)
+                      .stream()
+                          .map(String.class::cast)
+                          .map(String::toLowerCase)
+                          .map(SortingColumn::sortingColumnFromString)
+                          .collect(toImmutableList()),
+              value ->
+                  ((List<?>) value)
+                      .stream()
+                          .map(SortingColumn.class::cast)
+                          .map(SortingColumn::sortingColumnToString)
+                          .collect(toImmutableList())));
 
   enum CatalogStorageFormat {
     AVRO,

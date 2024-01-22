@@ -23,6 +23,10 @@ const nextConfig = {
           return {
             fallback: [
               {
+                source: '/',
+                destination: `/ui`
+              },
+              {
                 source: '/api/:path*',
                 destination: `${apiUrl}/api/:path*`
               },

@@ -65,6 +65,20 @@ public class KvNameMappingService implements NameMappingService {
         lock);
   }
 
+  @Override
+  public String getNameById(long id) throws IOException {
+    byte[] idByte = getIdKey(id);
+    return FunctionUtils.executeWithReadLock(
+        () ->
+            FunctionUtils.executeInTransaction(
+                () -> {
+                  byte[] name = transactionalKvBackend.get(idByte);
+                  return idByte == null ? null : new String(name);
+                },
+                transactionalKvBackend),
+        lock);
+  }
+
   private long bindNameAndId(String name) throws IOException {
     byte[] nameByte = getNameKey(name);
     long id = idGenerator.nextId();

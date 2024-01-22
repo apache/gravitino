@@ -11,6 +11,7 @@ import com.github.jk1.license.render.ReportRenderer
 import com.github.vlsi.gradle.dsl.configureEach
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 import org.gradle.internal.hash.ChecksumService
+import org.gradle.internal.os.OperatingSystem
 import org.gradle.kotlin.dsl.support.serviceOf
 import java.io.File
 import java.util.Locale
@@ -164,7 +165,14 @@ subprojects {
 
   java {
     toolchain {
+      // Some JDK vendors like Homebrew installed OpenJDK 17 have problems in building trino-connector:
+      // It will cause tests of Trino-connector hanging forever on macOS, to avoid this issue and
+      // other vendor-related problems, Gravitino will use the specified AMAZON OpenJDK 17 to build
+      // Trino-connector on macOS.
       if (project.name == "trino-connector") {
+        if (OperatingSystem.current().isMacOsX) {
+          vendor.set(JvmVendorSpec.AMAZON)
+        }
         languageVersion.set(JavaLanguageVersion.of(17))
       } else {
         languageVersion.set(JavaLanguageVersion.of(extra["jdkVersion"].toString().toInt()))
@@ -205,8 +213,6 @@ subprojects {
     plugins.apply(NodePlugin::class)
     configure<NodeExtension> {
       version.set("20.9.0")
-      npmVersion.set("10.1.0")
-      yarnVersion.set("1.22.19")
       nodeProjectDir.set(file("$rootDir/.node"))
       download.set(true)
     }
@@ -329,6 +335,8 @@ tasks.rat {
     "web/lib/enums/httpEnum.ts",
     "web/types/axios.d.ts",
     "web/yarn.lock",
+    "web/package-lock.json",
+    "web/pnpm-lock.yaml",
     "**/LICENSE.*",
     "**/NOTICE.*"
   )
@@ -491,6 +499,7 @@ tasks {
       ":catalogs:catalog-lakehouse-iceberg:copyLibAndConfig",
       ":catalogs:catalog-jdbc-mysql:copyLibAndConfig",
       ":catalogs:catalog-jdbc-postgresql:copyLibAndConfig"
+      // TODO. add fileset catalog to the distribution when ready.
     )
   }
 

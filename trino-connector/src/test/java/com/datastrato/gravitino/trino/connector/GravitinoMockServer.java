@@ -311,7 +311,13 @@ public class GravitinoMockServer implements AutoCloseable {
   private TableCatalog createTableCatalog(NameIdentifier catalogName) {
     TableCatalog tableCatalog = mock(TableCatalog.class);
     when(tableCatalog.createTable(
-            any(NameIdentifier.class), any(Column[].class), anyString(), anyMap()))
+            any(NameIdentifier.class),
+            any(Column[].class),
+            anyString(),
+            anyMap(),
+            any(),
+            any(),
+            any()))
         .thenAnswer(
             new Answer<Table>() {
               @Override
