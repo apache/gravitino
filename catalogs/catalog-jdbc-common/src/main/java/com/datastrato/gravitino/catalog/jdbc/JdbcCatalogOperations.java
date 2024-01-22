@@ -38,7 +38,6 @@ import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.indexes.Index;
-import com.datastrato.gravitino.rel.indexes.Indexes;
 import com.datastrato.gravitino.utils.MapUtils;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
@@ -360,8 +359,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
       SortOrder[] sortOrders,
       Index[] indexes)
       throws NoSuchSchemaException, TableAlreadyExistsException {
-    Preconditions.checkArgument(
-        indexes.length == 0, "jdbc-catalog does not support indexes");
+    Preconditions.checkArgument(indexes.length == 0, "jdbc-catalog does not support indexes");
     Preconditions.checkArgument(
         null == distribution || distribution == Distributions.NONE,
         "jdbc-catalog does not support distribution");

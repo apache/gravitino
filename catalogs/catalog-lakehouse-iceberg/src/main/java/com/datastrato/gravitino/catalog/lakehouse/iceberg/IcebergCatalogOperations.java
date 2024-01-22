@@ -31,7 +31,6 @@ import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.indexes.Index;
-import com.datastrato.gravitino.rel.indexes.Indexes;
 import com.datastrato.gravitino.utils.MapUtils;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -486,8 +485,7 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
       SortOrder[] sortOrders,
       Index[] indexes)
       throws NoSuchSchemaException, TableAlreadyExistsException {
-    Preconditions.checkArgument(
-        indexes.length == 0, "iceberg-catalog does not support indexes");
+    Preconditions.checkArgument(indexes.length == 0, "iceberg-catalog does not support indexes");
     try {
       if (!Distributions.NONE.equals(distribution)) {
         throw new UnsupportedOperationException("Iceberg does not support distribution");
