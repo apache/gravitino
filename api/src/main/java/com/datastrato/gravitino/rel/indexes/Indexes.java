@@ -9,10 +9,22 @@ public class Indexes {
 
   public static final Index[] EMPTY_INDEXES = new Index[0];
 
+  /**
+   * Create a unique index on columns. Like unique (a) or unique (a, b), for complex like unique
+   * @param name The name of the index
+   * @param fieldNames The field names under the table contained in the index.
+   * @return
+   */
   public static Index unique(String name, String[][] fieldNames) {
     return of(Index.IndexType.UNIQUE_KEY, name, fieldNames);
   }
 
+  /**
+   * Create a primary index on columns. Like primary (a), for complex like primary
+   * @param name The name of the index
+   * @param fieldNames The field names under the table contained in the index.
+   * @return
+   */
   public static Index primary(String name, String[][] fieldNames) {
     return of(Index.IndexType.PRIMARY_KEY, name, fieldNames);
   }
