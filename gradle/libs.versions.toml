@@ -114,12 +114,8 @@ trino-testing= { group = "io.trino", name = "trino-testing", version.ref = "trin
 trino-memory= { group = "io.trino", name = "trino-memory", version.ref = "trino" }
 trino-cli= { group = "io.trino", name = "trino-cli", version.ref = "trino" }
 trino-client= { group = "io.trino", name = "trino-client", version.ref = "trino" }
-iceberg-spark-runtime = { group = "org.apache.iceberg", name = "iceberg-spark-runtime-3.4_2.13", version.ref = "iceberg" }
-spark-sql = { group = "org.apache.spark", name = "spark-sql_2.13", version.ref = "spark" }
-scala-collection-compat =  { group = "org.scala-lang.modules", name = "scala-collection-compat_2.13", version.ref = "scala-collection-compat" }
 sqlite-jdbc = { group = "org.xerial", name = "sqlite-jdbc", version.ref = "sqlite-jdbc" }
 testng = { group = "org.testng", name = "testng", version.ref = "testng" }
-spark-hive = { group = "org.apache.spark", name = "spark-hive_2.13", version.ref = "spark" }
 commons-dbcp2 = { group = "org.apache.commons", name = "commons-dbcp2", version.ref = "commons-dbcp2" }
 testcontainers = { group = "org.testcontainers", name = "testcontainers", version.ref = "testcontainers" }
 testcontainers-mysql = { group = "org.testcontainers", name = "mysql", version.ref = "testcontainers" }
