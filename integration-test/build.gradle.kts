@@ -113,7 +113,6 @@ dependencies {
   }
   testImplementation(libs.slf4j.jdk14)
   testImplementation(libs.sqlite.jdbc)
-
   testImplementation(libs.testcontainers)
   testImplementation(libs.testcontainers.junit.jupiter)
   testImplementation(libs.testcontainers.mysql)
