@@ -17,7 +17,6 @@
 package com.datastrato.gravitino.server.auth;
 
 import com.datastrato.gravitino.auth.KerberosUtils;
-
 import java.io.File;
 import java.util.UUID;
 import java.util.concurrent.Callable;
