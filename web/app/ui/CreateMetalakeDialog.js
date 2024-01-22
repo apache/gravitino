@@ -71,26 +71,22 @@ const CreateMetalakeDialog = props => {
     data[index][event.target.name] = event.target.value
     setInnerProps(data)
 
-    const nonEmptyKeys = data.filter(item => item.key.trim() !== '');
+    const nonEmptyKeys = data.filter(item => item.key.trim() !== '')
 
-    const duplicateKeys = nonEmptyKeys.some(
-      (item, i) => i !== index && item.key === event.target.value
-    );
-    data[index].hasDuplicateKey = duplicateKeys;
+    const duplicateKeys = nonEmptyKeys.some((item, i) => i !== index && item.key === event.target.value)
+    data[index].hasDuplicateKey = duplicateKeys
   }
 
   const addFields = () => {
     const duplicateKeys = innerProps
       .filter(item => item.key.trim() !== '')
-      .some((item, index, filteredItems) =>
-        filteredItems.findIndex(
-          otherItem =>
-            otherItem !== item && otherItem.key.trim() === item.key.trim()
-        ) !== -1
-      );
+      .some(
+        (item, index, filteredItems) =>
+          filteredItems.findIndex(otherItem => otherItem !== item && otherItem.key.trim() === item.key.trim()) !== -1
+      )
 
     if (duplicateKeys) {
-      return;
+      return
     }
 
     let newField = { key: '', value: '' }
@@ -113,15 +109,13 @@ const CreateMetalakeDialog = props => {
   const onSubmit = data => {
     const duplicateKeys = innerProps
       .filter(item => item.key.trim() !== '')
-      .some((item, index, filteredItems) =>
-        filteredItems.findIndex(
-          otherItem =>
-            otherItem !== item && otherItem.key.trim() === item.key.trim()
-        ) !== -1
-      );
+      .some(
+        (item, index, filteredItems) =>
+          filteredItems.findIndex(otherItem => otherItem !== item && otherItem.key.trim() === item.key.trim()) !== -1
+      )
 
     if (duplicateKeys) {
-      return;
+      return
     }
 
     const properties = innerProps
