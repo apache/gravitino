@@ -31,7 +31,17 @@ ADD COLUMN
 "CREATE TABLE ""test.gt_mysql"".gt_db1.tb01 (
    name varchar(200),
    salary bigint,
-   city varchar(50) COMMENT 'aaa'
+   city varchar(50) NOT NULL COMMENT 'aaa'
+)
+COMMENT ''"
+
+ADD COLUMN
+
+"CREATE TABLE ""test.gt_mysql"".gt_db1.tb01 (
+   name varchar(200),
+   salary bigint,
+   city varchar(50) NOT NULL COMMENT 'aaa',
+   age integer NOT NULL COMMENT 'age of users'
 )
 COMMENT ''"
 

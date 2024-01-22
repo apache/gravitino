@@ -18,7 +18,10 @@ show create table "test.gt_mysql".gt_db1.tb01;
 alter table "test.gt_mysql".gt_db1.tb01 alter column salary set data type bigint;
 show create table "test.gt_mysql".gt_db1.tb01;
 
-alter table "test.gt_mysql".gt_db1.tb01 add column city varchar(50) comment 'aaa';
+alter table "test.gt_mysql".gt_db1.tb01 add column city varchar(50) not null comment 'aaa';
+show create table "test.gt_mysql".gt_db1.tb01;
+
+alter table "test.gt_mysql".gt_db1.tb01 add column age int comment 'age of users';
 show create table "test.gt_mysql".gt_db1.tb01;
 
 drop table "test.gt_mysql".gt_db1.tb01;
