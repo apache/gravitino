@@ -173,11 +173,15 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
     if (schemaPath != null) {
       try {
         FileSystem fs = schemaPath.getFileSystem(hadoopConf);
-        if (!fs.exists(schemaPath)) {
-          fs.mkdirs(schemaPath);
-        } else {
+        if (fs.exists(schemaPath)) {
           throw new SchemaAlreadyExistsException(
               "Schema " + ident.name() + " location " + schemaPath + " already exists");
+        }
+
+        if (!fs.mkdirs(schemaPath)) {
+          // Fail the operation when failed to create the schema path.
+          throw new RuntimeException(
+              "Failed to create schema " + ident.name() + " location " + schemaPath);
         }
       } catch (IOException ioe) {
         throw new RuntimeException(
