@@ -308,8 +308,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
         throw new IllegalArgumentException("Remove property is not supported yet");
       } else if (change instanceof TableChange.AddColumn) {
         TableChange.AddColumn addColumn = (TableChange.AddColumn) change;
-        lazyLoadCreateTable = getOrCreateTable(databaseName, tableName, lazyLoadCreateTable);
-        alterSql.add(addColumnFieldDefinition(addColumn, lazyLoadCreateTable));
+        alterSql.add(addColumnFieldDefinition(addColumn));
       } else if (change instanceof TableChange.RenameColumn) {
         lazyLoadCreateTable = getOrCreateTable(databaseName, tableName, lazyLoadCreateTable);
         TableChange.RenameColumn renameColumn = (TableChange.RenameColumn) change;
@@ -435,8 +434,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
     return "MODIFY COLUMN " + col + appendColumnDefinition(updateColumn, new StringBuilder());
   }
 
-  private String addColumnFieldDefinition(
-      TableChange.AddColumn addColumn, CreateTable createTable) {
+  private String addColumnFieldDefinition(TableChange.AddColumn addColumn) {
     String dataType = (String) typeConverter.fromGravitinoType(addColumn.getDataType());
     if (addColumn.fieldName().length > 1) {
       throw new UnsupportedOperationException("Mysql does not support nested column names.");
@@ -445,6 +443,11 @@ public class MysqlTableOperations extends JdbcTableOperations {
 
     StringBuilder columnDefinition = new StringBuilder();
     columnDefinition.append("ADD COLUMN ").append(col).append(SPACE).append(dataType).append(SPACE);
+
+    if (!addColumn.isNullable()) {
+      columnDefinition.append("NOT NULL ");
+    }
+
     // Append comment if available
     if (StringUtils.isNotEmpty(addColumn.getComment())) {
       columnDefinition.append("COMMENT '").append(addColumn.getComment()).append("' ");
