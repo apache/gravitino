@@ -499,13 +499,20 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
       IcebergColumn[] icebergColumns =
           Arrays.stream(columns)
               .map(
-                  column ->
-                      new IcebergColumn.Builder()
-                          .withName(column.name())
-                          .withType(column.dataType())
-                          .withComment(column.comment())
-                          .withNullable(column.nullable())
-                          .build())
+                  column -> {
+                    // Iceberg column default value is WIP, see
+                    // https://github.com/apache/iceberg/pull/4525
+                    Preconditions.checkArgument(
+                        column.defaultValue().equals(Column.DEFAULT_VALUE_NOT_SET),
+                        "Iceberg does not support column default value. Illegal column: "
+                            + column.name());
+                    return new IcebergColumn.Builder()
+                        .withName(column.name())
+                        .withType(column.dataType())
+                        .withComment(column.comment())
+                        .withNullable(column.nullable())
+                        .build();
+                  })
               .toArray(IcebergColumn[]::new);
 
       IcebergTable createdTable =
