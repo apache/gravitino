@@ -132,7 +132,7 @@ public class TestHadoopCatalogOperations {
     Throwable exception =
         Assertions.assertThrows(
             SchemaAlreadyExistsException.class, () -> createSchema(name, comment, null, null));
-    Assertions.assertEquals("Schema schema11 already exists", exception.getMessage());
+    Assertions.assertEquals("Schema m1.c1.schema11 already exists", exception.getMessage());
   }
 
   @Test
@@ -164,15 +164,6 @@ public class TestHadoopCatalogOperations {
     Assertions.assertTrue(fs.exists(schemaPath1));
     Assertions.assertTrue(fs.isDirectory(schemaPath1));
     Assertions.assertTrue(fs.listStatus(schemaPath1).length == 0);
-
-    // Test create schema on the same location
-    String name1 = "schema13_1";
-    Throwable exception =
-        Assertions.assertThrows(
-            SchemaAlreadyExistsException.class,
-            () -> createSchema(name1, comment, null, schemaPath));
-    Assertions.assertEquals(
-        "Schema schema13_1 location " + schemaPath1 + " already exists", exception.getMessage());
   }
 
   @Test
@@ -219,7 +210,7 @@ public class TestHadoopCatalogOperations {
           Assertions.assertThrows(
               NoSuchSchemaException.class,
               () -> ops.loadSchema(NameIdentifier.ofSchema("m1", "c1", "schema16")));
-      Assertions.assertEquals("Schema schema16 does not exist", exception.getMessage());
+      Assertions.assertEquals("Schema m1.c1.schema16 does not exist", exception.getMessage());
     }
   }
 
@@ -328,7 +319,8 @@ public class TestHadoopCatalogOperations {
               NonEmptySchemaException.class,
               () -> ops.dropSchema(NameIdentifier.ofSchema("m1", "c1", name), false));
       Assertions.assertEquals(
-          "Schema schema20 with location " + schemaPath + " is not empty", exception1.getMessage());
+          "Schema m1.c1.schema20 with location " + schemaPath + " is not empty",
+          exception1.getMessage());
 
       // Test drop non-empty schema with cascade = true
       ops.dropSchema(NameIdentifier.ofSchema("m1", "c1", name), true);
@@ -402,7 +394,7 @@ public class TestHadoopCatalogOperations {
             () -> createFileset(name, schemaName, comment, Fileset.Type.MANAGED, null, null));
     Assertions.assertEquals(
         "Storage location must be set for fileset "
-            + name
+            + filesetIdent
             + " when it's catalog and schema "
             + "location are not set",
         exception.getMessage());
@@ -411,7 +403,7 @@ public class TestHadoopCatalogOperations {
       Throwable e =
           Assertions.assertThrows(
               NoSuchFilesetException.class, () -> ops.loadFileset(filesetIdent));
-      Assertions.assertEquals("Fileset fileset22 does not exist", e.getMessage());
+      Assertions.assertEquals("Fileset m1.c1.schema22.fileset22 does not exist", e.getMessage());
     }
 
     // For external fileset, if storageLocation is not specified.
@@ -420,13 +412,14 @@ public class TestHadoopCatalogOperations {
             IllegalArgumentException.class,
             () -> createFileset(name, schemaName, comment, Fileset.Type.EXTERNAL, null, null));
     Assertions.assertEquals(
-        "Storage location must be set for external fileset " + name, exception1.getMessage());
+        "Storage location must be set for external fileset " + filesetIdent,
+        exception1.getMessage());
     try (HadoopCatalogOperations ops = new HadoopCatalogOperations(null, store, idGenerator)) {
       ops.initialize(Maps.newHashMap());
       Throwable e =
           Assertions.assertThrows(
               NoSuchFilesetException.class, () -> ops.loadFileset(filesetIdent));
-      Assertions.assertEquals("Fileset fileset22 does not exist", e.getMessage());
+      Assertions.assertEquals("Fileset " + filesetIdent + " does not exist", e.getMessage());
     }
   }
 
