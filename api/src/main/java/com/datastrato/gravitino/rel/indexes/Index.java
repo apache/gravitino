@@ -25,16 +25,21 @@ public interface Index {
 
   enum IndexType {
     /**
-     * Primary key index. Primary key in a relational database is a field or a combination of fields
-     * that uniquely identifies each record in a table. It serves as a unique identifier for each
-     * row, ensuring that no two rows have the same key.
+     * PRIMARY KEY index in a relational database is a field or a combination of fields that
+     * uniquely identifies each record in a table. It serves as a unique identifier for each row,
+     * ensuring that no two rows have the same key. The PRIMARY KEY is used to establish
+     * relationships between tables and enforce the entity integrity of a database. Additionally, it
+     * helps in indexing and organizing the data for efficient retrieval and maintenance.
      */
     PRIMARY_KEY,
     /**
-     * Unique key index. A unique key in a relational database is a field or a combination of fields
-     * that ensures each record in a table has a distinct value or combination of values. Unlike a
-     * primary key, a unique key allows for the presence of null values, but it still enforces the
-     * constraint that no two records can have the same unique key value(s).
+     * UNIQUE KEY in a relational database is a field or a combination of fields that ensures each
+     * record in a table has a distinct value or combination of values. Unlike a primary key, a
+     * UNIQUE KEY allows for the presence of null values, but it still enforces the constraint that
+     * no two records can have the same unique key value(s). UNIQUE KEYs are used to maintain data
+     * integrity by preventing duplicate entries in specific columns, and they can be applied to
+     * columns that are not designated as the primary key. The uniqueness constraint imposed by
+     * UNIQUE KEY helps in avoiding redundancy and ensuring data accuracy in the database.
      */
     UNIQUE_KEY,
   }
