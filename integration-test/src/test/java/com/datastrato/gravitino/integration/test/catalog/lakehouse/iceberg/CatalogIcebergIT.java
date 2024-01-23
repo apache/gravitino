@@ -334,14 +334,7 @@ public class CatalogIcebergIT extends AbstractIT {
 
     TableCatalog tableCatalog = catalog.asTableCatalog();
     Table createdTable =
-        tableCatalog.createTable(
-            tableIdentifier,
-            columns,
-            null,
-            null,
-            null,
-            null,
-            null);
+        tableCatalog.createTable(tableIdentifier, columns, null, null, null, null, null);
     Assertions.assertNull(createdTable.comment());
 
     Table loadTable = tableCatalog.loadTable(tableIdentifier);

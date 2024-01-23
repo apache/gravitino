@@ -9,7 +9,6 @@ import com.datastrato.gravitino.catalog.lakehouse.iceberg.converter.FromIcebergP
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.converter.FromIcebergSortOrder;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.converter.ToIcebergPartitionSpec;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.converter.ToIcebergSortOrder;
-import com.datastrato.gravitino.catalog.lakehouse.iceberg.ops.IcebergTableOpsHelper;
 import com.datastrato.gravitino.catalog.rel.BaseTable;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.google.common.collect.Maps;
