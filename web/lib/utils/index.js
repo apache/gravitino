@@ -64,13 +64,13 @@ export const genUpdates = (originalData, newData) => {
   return updates
 }
 
-/*
- * The following functions originally come from the MIT licensed Vben project.
- */
-
 export const hasNull = obj => {
   return Object.keys(obj).some(key => obj[key] === null)
 }
+
+/*
+ * The following functions originally come from the MIT licensed Vben project.
+ */
 
 export const deepMerge = (source, target, mergeArrays = 'replace') => {
   if (!target) {
