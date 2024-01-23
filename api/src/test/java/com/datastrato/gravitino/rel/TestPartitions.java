@@ -73,8 +73,8 @@ public class TestPartitions {
         new String[] {"country"}, ((Partitions.IdentityPartition) partition).fieldNames()[1]);
     Assertions.assertEquals(
         Literals.dateLiteral(LocalDate.parse("2008-08-08")),
-        ((Partitions.IdentityPartition) partition).value()[0]);
+        ((Partitions.IdentityPartition) partition).values()[0]);
     Assertions.assertEquals(
-        Literals.stringLiteral("us"), ((Partitions.IdentityPartition) partition).value()[1]);
+        Literals.stringLiteral("us"), ((Partitions.IdentityPartition) partition).values()[1]);
   }
 }

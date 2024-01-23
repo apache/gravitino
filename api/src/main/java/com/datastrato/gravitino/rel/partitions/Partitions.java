@@ -177,14 +177,14 @@ public class Partitions {
   public static class IdentityPartition implements Partition {
     private final String name;
     private final String[][] fieldNames;
-    private final Literal<?>[] value;
+    private final Literal<?>[] values;
     private final Map<String, String> properties;
 
     private IdentityPartition(
-        String name, String[][] fieldNames, Literal<?>[] value, Map<String, String> properties) {
+        String name, String[][] fieldNames, Literal<?>[] values, Map<String, String> properties) {
       this.name = name;
       this.fieldNames = fieldNames;
-      this.value = value;
+      this.values = values;
       this.properties = properties;
     }
 
@@ -194,8 +194,8 @@ public class Partitions {
     }
 
     /** @return The values of the identity partition. */
-    public Literal<?>[] value() {
-      return value;
+    public Literal<?>[] values() {
+      return values;
     }
 
     @Override
@@ -219,7 +219,7 @@ public class Partitions {
       IdentityPartition that = (IdentityPartition) o;
       return Objects.equals(name, that.name)
           && Arrays.deepEquals(fieldNames, that.fieldNames)
-          && Arrays.equals(value, that.value)
+          && Arrays.equals(values, that.values)
           && Objects.equals(properties, that.properties);
     }
 
@@ -227,7 +227,7 @@ public class Partitions {
     public int hashCode() {
       int result = Objects.hash(name, properties);
       result = 31 * result + Arrays.deepHashCode(fieldNames);
-      result = 31 * result + Arrays.hashCode(value);
+      result = 31 * result + Arrays.hashCode(values);
       return result;
     }
   }
