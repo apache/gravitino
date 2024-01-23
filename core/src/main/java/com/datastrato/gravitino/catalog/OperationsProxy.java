@@ -10,23 +10,23 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.util.Collections;
 
-/** Proxy wrapper on CatalogOperations to execute operations by impersonating given user */
-public class CatalogOperationsProxy implements InvocationHandler {
+/** Proxy wrapper on a operation class to execute operations by impersonating given user */
+public class OperationsProxy implements InvocationHandler {
 
   private final CatalogProxyPlugin plugin;
   private final CatalogOperations ops;
 
-  private CatalogOperationsProxy(CatalogProxyPlugin plugin, CatalogOperations ops) {
+  private OperationsProxy(CatalogProxyPlugin plugin, CatalogOperations ops) {
     this.plugin = plugin;
     this.ops = ops;
   }
 
-  public static <T extends CatalogOperations> T getProxy(T ops, CatalogProxyPlugin plugin) {
+  public static <T> T getProxy(T ops, CatalogProxyPlugin plugin) {
     return (T)
         Proxy.newProxyInstance(
             ops.getClass().getClassLoader(),
             ops.getClass().getInterfaces(),
-            new CatalogOperationsProxy(plugin, ops));
+            new OperationsProxy(plugin, ops));
   }
 
   @Override

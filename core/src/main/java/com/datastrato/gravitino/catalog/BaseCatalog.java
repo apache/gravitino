@@ -180,7 +180,7 @@ public abstract class BaseCatalog<T extends BaseCatalog>
   }
 
   protected CatalogOperations asProxyOps(CatalogOperations ops, CatalogProxyPlugin plugin) {
-    return CatalogOperationsProxy.getProxy(ops, plugin);
+    return OperationsProxy.getProxy(ops, plugin);
   }
 
   protected CatalogProxyPlugin newProxyPlugin(Map<String, String> config) {
