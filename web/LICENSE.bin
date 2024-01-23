@@ -338,6 +338,7 @@
    react-dom
    react-hook-form
    react-hot-toast
+   react-is
    react-redux
    redux-thunk
    redux
