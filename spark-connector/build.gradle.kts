@@ -1,0 +1,29 @@
+/*
+ * Copyright 2024 Datastrato Pvt Ltd.
+ * This software is licensed under the Apache License version 2.
+ */
+plugins {
+  `maven-publish`
+  id("java")
+  id("idea")
+}
+
+repositories {
+  mavenCentral()
+}
+
+val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extra["defaultScalaVersion"].toString()
+val sparkVersion: String = libs.versions.spark.get()
+val icebergVersion: String = libs.versions.iceberg.get()
+val kyuubiVersion: String = libs.versions.kyuubi.get()
+
+dependencies {
+  implementation(project(":clients:client-java"))
+  implementation(project(":api"))
+  implementation(project(":common"))
+  implementation(libs.guava)
+  implementation("org.apache.iceberg:iceberg-spark-runtime-3.4_$scalaVersion:$icebergVersion")
+  implementation("org.apache.spark:spark-catalyst_$scalaVersion:$sparkVersion")
+  implementation("org.apache.kyuubi:kyuubi-spark-connector-hive_$scalaVersion:$kyuubiVersion")
+  implementation(libs.bundles.log4j)
+}
