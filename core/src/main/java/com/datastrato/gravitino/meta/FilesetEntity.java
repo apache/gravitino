@@ -8,6 +8,7 @@ import com.datastrato.gravitino.Auditable;
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.Field;
 import com.datastrato.gravitino.HasIdentifier;
+import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.file.Fileset;
 import com.google.common.collect.Maps;
 import java.util.Collections;
@@ -15,6 +16,7 @@ import java.util.Map;
 import java.util.Objects;
 import javax.annotation.Nullable;
 import lombok.ToString;
+import org.apache.commons.lang3.StringUtils;
 
 @ToString
 public class FilesetEntity implements Entity, Auditable, HasIdentifier {
@@ -38,6 +40,8 @@ public class FilesetEntity implements Entity, Auditable, HasIdentifier {
   private Long id;
 
   private String name;
+
+  private Namespace namespace;
 
   private String comment;
 
@@ -78,6 +82,16 @@ public class FilesetEntity implements Entity, Auditable, HasIdentifier {
   @Override
   public String name() {
     return name;
+  }
+
+  /**
+   * Returns the namespace of the fileset entity.
+   *
+   * @return The namespace of the fileset entity.
+   */
+  @Override
+  public Namespace namespace() {
+    return namespace;
   }
 
   /**
@@ -197,6 +211,17 @@ public class FilesetEntity implements Entity, Auditable, HasIdentifier {
     }
 
     /**
+     * Sets the namespace of the fileset entity.
+     *
+     * @param namespace The namespace of the fileset entity.
+     * @return The builder instance.
+     */
+    public Builder withNamespace(Namespace namespace) {
+      fileset.namespace = namespace;
+      return this;
+    }
+
+    /**
      * Sets the comment of the fileset entity.
      *
      * @param comment The comment of the fileset entity.
@@ -261,7 +286,7 @@ public class FilesetEntity implements Entity, Auditable, HasIdentifier {
     public FilesetEntity build() {
       fileset.validate();
 
-      if (fileset.type == Fileset.Type.EXTERNAL && fileset.storageLocation == null) {
+      if (fileset.type == Fileset.Type.EXTERNAL && StringUtils.isBlank(fileset.storageLocation)) {
         throw new IllegalArgumentException("Storage location is required for EXTERNAL fileset.");
       }
 

@@ -9,6 +9,7 @@ import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.exceptions.FilesetAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchFilesetException;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
+import com.datastrato.gravitino.file.FilesetChange.RenameFileset;
 import java.util.Map;
 
 /**
@@ -80,6 +81,10 @@ public interface FilesetCatalog {
    *
    * <p>Implementation may reject the change. If any change is rejected, no changes should be
    * applied to the fileset.
+   *
+   * <p>For managed fileset, if the storageLocation is not specified during creating. When applying
+   * {@link RenameFileset}, the implementation will also rename the underlying storageLocation from
+   * old name to newName specified in the {@link RenameFileset} change.
    *
    * @param ident A fileset identifier.
    * @param changes The changes to apply to the fileset.
