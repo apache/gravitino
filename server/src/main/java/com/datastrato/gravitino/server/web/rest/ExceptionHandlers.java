@@ -13,6 +13,8 @@ import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.TableAlreadyExistsException;
 import com.datastrato.gravitino.server.web.Utils;
 import javax.ws.rs.core.Response;
+
+import com.google.common.annotations.VisibleForTesting;
 import org.eclipse.jetty.util.StringUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -163,7 +165,8 @@ public class ExceptionHandlers {
     }
   }
 
-  private static class BaseExceptionHandler extends ExceptionHandler {
+  @VisibleForTesting
+  static class BaseExceptionHandler extends ExceptionHandler {
 
     private static final String EXCEPTION_KEYWORD = "Exception: ";
 
@@ -184,7 +187,8 @@ public class ExceptionHandlers {
       return Utils.internalError(errorMsg, e);
     }
 
-    protected String getErrorMsg(Throwable throwable) {
+    @VisibleForTesting
+    static String getErrorMsg(Throwable throwable) {
       if (throwable == null || throwable.getMessage() == null) {
         return "";
       }
