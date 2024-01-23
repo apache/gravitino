@@ -45,16 +45,12 @@ public class IcebergTable extends BaseTable {
 
   public CreateTableRequest toCreateTableRequest() {
     Schema schema = ConvertUtil.toIcebergSchema(this);
-
-    Map<String, String> resultProperties =
-        Maps.newHashMap(IcebergTableOpsHelper.removeReservedProperties(properties));
-    resultProperties.putIfAbsent(ICEBERG_COMMENT_FIELD_NAME, comment);
     CreateTableRequest.Builder builder =
         CreateTableRequest.builder()
             .withName(name)
             .withLocation(location)
             .withSchema(schema)
-            .setProperties(resultProperties)
+            .setProperties(properties)
             .withPartitionSpec(ToIcebergPartitionSpec.toPartitionSpec(schema, partitioning))
             .withWriteOrder(ToIcebergSortOrder.toSortOrder(schema, sortOrders));
     return builder.build();

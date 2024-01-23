@@ -327,6 +327,28 @@ public class CatalogIcebergIT extends AbstractIT {
   }
 
   @Test
+  void testCreateCreateWithNullComment() {
+    ColumnDTO[] columns = createColumns();
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
+
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    Table createdTable =
+        tableCatalog.createTable(
+            tableIdentifier,
+            columns,
+            null,
+            null,
+            null,
+            null,
+            null);
+    Assertions.assertNull(createdTable.comment());
+
+    Table loadTable = tableCatalog.loadTable(tableIdentifier);
+    Assertions.assertNull(loadTable.comment());
+  }
+
+  @Test
   void testCreateAndLoadIcebergTable() {
     // Create table from Gravitino API
     ColumnDTO[] columns = createColumns();
