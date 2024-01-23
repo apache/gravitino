@@ -245,9 +245,9 @@
    @floating-ui/utils
    @hookform/resolvers
    @jridgewell/sourcemap-codec
-   @mui/base@5.0.0-beta.26
+   @mui/base
    @mui/core-downloads-tracker
-   @mui/lab@5.0.0-alpha.155
+   @mui/lab
    @mui/material
    @mui/private-theming
    @mui/styled-engine
@@ -274,6 +274,7 @@
    axios
    babel-plugin-macros
    busboy
+   call-bind
    callsites
    chalk
    client-only
@@ -288,11 +289,11 @@
    css-tree
    csstype
    dayjs
+   define-data-property
    delayed-stream
    dom-helpers
    error-ex
    error-stack-parser
-   escape-string-regexp
    escape-string-regexp
    fast-deep-equal
    fast-loops
@@ -302,7 +303,11 @@
    form-data
    function-bind
    goober
+   gopd
    has-flag
+   has-property-descriptors
+   has-proto
+   has-symbols
    hasown
    immer
    import-fresh
@@ -313,6 +318,7 @@
    js-tokens
    json-parse-even-better-errors
    lines-and-columns
+   lodash-es
    loose-envify
    mime-db
    mime-types
@@ -320,6 +326,7 @@
    next
    nprogress
    object-assign
+   object-inspect
    parent-module
    parse-json
    path-parse
@@ -328,24 +335,23 @@
    prop-types
    property-expr
    proxy-from-env
-   qs
+   react
    react-dom
    react-hook-form
    react-hot-toast
    react-is
-   react-is
    react-redux
-   react
    redux-thunk
    redux
    regenerator-runtime
    reselect
    resize-observer-polyfill
-   resolve-from
    resolve
+   resolve-from
    rtl-css-js
    scheduler
    screenfull
+   set-function-length
    side-channel
    stack-generator
    stackframe
@@ -353,7 +359,6 @@
    stacktrace-js
    streamsearch
    styled-jsx
-   stylis
    stylis
    supports-color
    supports-preserve-symlinks-flag
@@ -363,7 +368,6 @@
    to-fast-properties
    toggle-selection
    toposort
-   undici-types
    use-sync-external-store
    watchpack
    yup
@@ -390,6 +394,7 @@
    hoist-non-react-statics
    hyphenate-style-name
    react-transition-group
+   qs
    source-map-js
    source-map
    tslib
@@ -404,6 +409,7 @@
 
    graceful-fs
    picocolors
+   yaml
 
    This product bundles various third-party components also under the
    CC0 1.0 license.
