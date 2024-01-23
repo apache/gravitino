@@ -4,8 +4,7 @@
   "engines": {
     "node": ">=18.18.2",
     "npm": ">=9.8.1",
-    "yarn": ">=1.22.19",
-    "pnpm": ">=8.14.0"
+    "yarn": ">=1.22.19"
   },
   "scripts": {
     "analyze": "env-cmd -f .env.analyze pnpm build",
