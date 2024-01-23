@@ -165,6 +165,8 @@ public class ExceptionHandlers {
 
   private static class BaseExceptionHandler extends ExceptionHandler {
 
+    private static final String EXCEPTION_KEYWORD = "Exception: ";
+
     private static final ExceptionHandler INSTANCE = new BaseExceptionHandler();
 
     private static final String BASE_MSG_TEMPLATE =
@@ -188,11 +190,11 @@ public class ExceptionHandlers {
       }
 
       String message = throwable.getMessage();
-      int pos = message.lastIndexOf(": ");
+      int pos = message.lastIndexOf(EXCEPTION_KEYWORD);
       if (pos == -1) {
         return message;
       } else {
-        return message.substring(pos + 2);
+        return message.substring(pos + EXCEPTION_KEYWORD.length());
       }
     }
   }
