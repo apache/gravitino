@@ -327,7 +327,7 @@ public class CatalogIcebergIT extends AbstractIT {
   }
 
   @Test
-  void testCreateCreateWithNullComment() {
+  void testCreateTableWithNullComment() {
     ColumnDTO[] columns = createColumns();
     NameIdentifier tableIdentifier =
         NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
