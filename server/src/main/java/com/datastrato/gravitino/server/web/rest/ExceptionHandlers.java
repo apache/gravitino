@@ -12,9 +12,8 @@ import com.datastrato.gravitino.exceptions.NotFoundException;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.TableAlreadyExistsException;
 import com.datastrato.gravitino.server.web.Utils;
-import javax.ws.rs.core.Response;
-
 import com.google.common.annotations.VisibleForTesting;
+import javax.ws.rs.core.Response;
 import org.eclipse.jetty.util.StringUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
