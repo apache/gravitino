@@ -1,7 +1,7 @@
 ---
 title: "Getting started with Gravitino"
 slug: /getting-started
-license: "Copyright 2023 Datastrato Pvt. Ltd.
+license: "Copyright 2023 Datastrato Pvt Ltd.
 This software is licensed under the Apache License version 2."
 ---
 
