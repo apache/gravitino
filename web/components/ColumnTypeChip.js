@@ -14,7 +14,7 @@ const ColumnTypeChip = props => {
 
   const formatType = type && isString(type) ? type.replace(/\(.*\)/, '') : type
 
-  const label = isString(type) ? type : `${type?.type}<${type?.elementType ?? 'unknown'}>` ?? 'unknown'
+  const label = isString(type) ? type : `${type?.type}`
 
   const columnTypeColor = ColumnTypeColorEnum[formatType] || 'secondary'
   const color = colors[columnTypeColor]?.main || '#8592A3'
