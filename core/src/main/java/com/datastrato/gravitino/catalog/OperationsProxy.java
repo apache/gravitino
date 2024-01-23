@@ -21,7 +21,7 @@ public class OperationsProxy<T> implements InvocationHandler {
     this.ops = ops;
   }
 
-  public static <T> T getProxy(T ops, ProxyPlugin plugin) {
+  public static <T> T createProxy(T ops, ProxyPlugin plugin) {
     return (T)
         Proxy.newProxyInstance(
             ops.getClass().getClassLoader(),

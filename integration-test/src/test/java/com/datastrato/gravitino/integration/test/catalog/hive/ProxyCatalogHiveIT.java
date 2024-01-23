@@ -14,12 +14,12 @@ import com.datastrato.gravitino.auth.AuthenticatorType;
 import com.datastrato.gravitino.catalog.hive.HiveClientPool;
 import com.datastrato.gravitino.client.GravitinoClient;
 import com.datastrato.gravitino.client.GravitinoMetaLake;
-import com.datastrato.gravitino.dto.rel.ColumnDTO;
 import com.datastrato.gravitino.dto.rel.partitions.Partitioning;
 import com.datastrato.gravitino.integration.test.container.ContainerSuite;
 import com.datastrato.gravitino.integration.test.container.HiveContainer;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
+import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.types.Types;
 import com.datastrato.gravitino.server.auth.OAuthConfig;
@@ -146,7 +146,7 @@ public class ProxyCatalogHiveIT extends AbstractIT {
 
   @Test
   public void testOperateTable() throws Exception {
-    ColumnDTO[] columns = createColumns();
+    Column[] columns = createColumns();
     String schemaName = GravitinoITUtils.genRandomName(SCHEMA_PREFIX);
     String tableName = GravitinoITUtils.genRandomName(TABLE_PREFIX);
     String anotherTableName = GravitinoITUtils.genRandomName(TABLE_PREFIX);
@@ -194,26 +194,11 @@ public class ProxyCatalogHiveIT extends AbstractIT {
                     Partitioning.EMPTY_PARTITIONING));
   }
 
-  private ColumnDTO[] createColumns() {
-    ColumnDTO col1 =
-        new ColumnDTO.Builder<>()
-            .withName("col1")
-            .withDataType(Types.ByteType.get())
-            .withComment("col_1_comment")
-            .build();
-    ColumnDTO col2 =
-        new ColumnDTO.Builder<>()
-            .withName("col2")
-            .withDataType(Types.DateType.get())
-            .withComment("col_2_comment")
-            .build();
-    ColumnDTO col3 =
-        new ColumnDTO.Builder<>()
-            .withName("col3")
-            .withDataType(Types.StringType.get())
-            .withComment("col_3_comment")
-            .build();
-    return new ColumnDTO[] {col1, col2, col3};
+  private Column[] createColumns() {
+    Column col1 = Column.of("col1", Types.ByteType.get(), "col_1_comment");
+    Column col2 = Column.of("col2", Types.DateType.get(), "col_2_comment");
+    Column col3 = Column.of("col3", Types.StringType.get(), "col_3_comment");
+    return new Column[] {col1, col2, col3};
   }
 
   private static void createMetalake() {

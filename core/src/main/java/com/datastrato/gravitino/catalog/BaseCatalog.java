@@ -11,6 +11,7 @@ import com.datastrato.gravitino.meta.CatalogEntity;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import java.util.Map;
+import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -88,12 +89,13 @@ public abstract class BaseCatalog<T extends BaseCatalog>
           Preconditions.checkArgument(
               entity != null && conf != null, "entity and conf must be set before calling ops()");
           CatalogOperations newOps = newOps(conf);
-          ProxyPlugin plugin = newProxyPlugin(conf);
-          if (plugin == null) {
-            ops = newOps;
-          } else {
-            ops = asProxyOps(newOps, plugin);
-          }
+          ops =
+              newProxyPlugin(conf)
+                  .map(
+                      proxyPlugin -> {
+                        return asProxyOps(newOps, proxyPlugin);
+                      })
+                  .orElse(newOps);
         }
       }
     }
@@ -180,10 +182,10 @@ public abstract class BaseCatalog<T extends BaseCatalog>
   }
 
   protected CatalogOperations asProxyOps(CatalogOperations ops, ProxyPlugin plugin) {
-    return OperationsProxy.getProxy(ops, plugin);
+    return OperationsProxy.createProxy(ops, plugin);
   }
 
-  protected ProxyPlugin newProxyPlugin(Map<String, String> config) {
-    return null;
+  protected Optional<ProxyPlugin> newProxyPlugin(Map<String, String> config) {
+    return Optional.empty();
   }
 }
