@@ -17,7 +17,6 @@ import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.client.GravitinoMetaLake;
-import com.datastrato.gravitino.dto.rel.ColumnDTO;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NoSuchTableException;
@@ -122,11 +121,15 @@ public class CatalogConnectorMetadata {
     NameIdentifier identifier =
         NameIdentifier.ofTable(
             metalake.name(), catalogName, table.getSchemaName(), table.getName());
-    ColumnDTO[] gravitinoColumns = table.getColumnDTOs();
-    String comment = table.getComment();
-    Map<String, String> properties = table.getProperties();
     try {
-      tableCatalog.createTable(identifier, gravitinoColumns, comment, properties);
+      tableCatalog.createTable(
+          identifier,
+          table.getColumnDTOs(),
+          table.getComment(),
+          table.getProperties(),
+          table.getPartitioning(),
+          table.getDistribution(),
+          table.getSortOrders());
     } catch (NoSuchSchemaException e) {
       throw new TrinoException(GRAVITINO_SCHEMA_NOT_EXISTS, "Schema does not exist", e);
     } catch (TableAlreadyExistsException e) {
@@ -184,7 +187,7 @@ public class CatalogConnectorMetadata {
     throw new NotImplementedException();
   }
 
-  private void applyAlter(SchemaTableName tableName, TableChange change) {
+  private void applyAlter(SchemaTableName tableName, TableChange... change) {
     try {
       tableCatalog.alterTable(
           NameIdentifier.ofTable(
@@ -230,11 +233,14 @@ public class CatalogConnectorMetadata {
   public void addColumn(SchemaTableName schemaTableName, GravitinoColumn column) {
     String[] columnNames = {column.getName()};
     if (Strings.isNullOrEmpty(column.getComment()))
-      applyAlter(schemaTableName, TableChange.addColumn(columnNames, column.getType()));
+      applyAlter(
+          schemaTableName,
+          TableChange.addColumn(columnNames, column.getType(), column.isNullable()));
     else {
       applyAlter(
           schemaTableName,
-          TableChange.addColumn(columnNames, column.getType(), column.getComment()));
+          TableChange.addColumn(
+              columnNames, column.getType(), column.getComment(), column.isNullable()));
     }
   }
 

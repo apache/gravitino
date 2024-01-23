@@ -22,13 +22,16 @@ docker run --rm -d -p 8090:8090 datastrato/gravitino
 
 Changelog
 
-gravitino:0.3.0
+- gravitino:0.3.1
+  - Fix some issues
 
-- Docker image `datastrato/gravitino:0.3.0`
-- Gravitino Server
-- Expose ports:
-  - `8090` Gravitino Web UI
-  - `9001` Iceberg REST service
+
+- gravitino:0.3.0
+  - Docker image `datastrato/gravitino:0.3.0`
+  - Gravitino Server
+  - Expose ports:
+    - `8090` Gravitino Web UI
+    - `9001` Iceberg REST service
 
 ## Playground Docker image
 
@@ -51,6 +54,10 @@ Changelog
 ### Trino image
 
 Changelog
+
+- trino:426-gravitino-0.3.1
+  - Fix some issues
+
 
 - trino:426-gravitino-0.3.0
   - Docker image `datastrato/trino:426-gravitino-0.3.0`

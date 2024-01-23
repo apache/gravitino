@@ -1,0 +1,63 @@
+CREATE SCHEMA
+
+CREATE TABLE
+
+RENAME TABLE
+
+"tb03"
+
+RENAME TABLE
+
+"tb01"
+
+DROP COLUMN
+
+"CREATE TABLE ""test.gt_mysql"".gt_db1.tb01 (
+   name varchar(200),
+   salary integer
+)
+COMMENT ''"
+
+SET COLUMN TYPE
+
+"CREATE TABLE ""test.gt_mysql"".gt_db1.tb01 (
+   name varchar(200),
+   salary bigint
+)
+COMMENT ''"
+
+ADD COLUMN
+
+"CREATE TABLE ""test.gt_mysql"".gt_db1.tb01 (
+   name varchar(200),
+   salary bigint,
+   city varchar(50) COMMENT 'aaa'
+)
+COMMENT ''"
+
+ADD COLUMN
+
+"CREATE TABLE ""test.gt_mysql"".gt_db1.tb01 (
+   name varchar(200),
+   salary bigint,
+   city varchar(50) COMMENT 'aaa',
+   age integer NOT NULL COMMENT 'age of users'
+)
+COMMENT ''"
+
+ADD COLUMN
+
+"CREATE TABLE ""test.gt_mysql"".gt_db1.tb01 (
+   name varchar(200),
+   salary bigint,
+   city varchar(50) COMMENT 'aaa',
+   age integer NOT NULL COMMENT 'age of users',
+   address varchar(200) NOT NULL COMMENT 'address of users'
+)
+COMMENT ''"
+
+DROP TABLE
+
+DROP SCHEMA
+
+

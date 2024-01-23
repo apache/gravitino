@@ -63,7 +63,7 @@ class TestHiveCatalogOperations {
 
     Map<String, PropertyEntry<?>> propertyEntryMap =
         hiveCatalogOperations.catalogPropertiesMetadata().propertyEntries();
-    Assertions.assertEquals(6, propertyEntryMap.size());
+    Assertions.assertEquals(7, propertyEntryMap.size());
     Assertions.assertTrue(propertyEntryMap.containsKey(METASTORE_URIS));
     Assertions.assertTrue(propertyEntryMap.containsKey(Catalog.PROPERTY_PACKAGE));
     Assertions.assertTrue(propertyEntryMap.containsKey(CLIENT_POOL_SIZE));

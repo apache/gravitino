@@ -44,6 +44,7 @@ import org.apache.commons.lang3.StringUtils;
 public class MysqlTableOperations extends JdbcTableOperations {
 
   public static final String AUTO_INCREMENT = "AUTO_INCREMENT";
+  public static final String BACK_QUOTE = "`";
 
   @Override
   public JdbcTable load(String databaseName, String tableName) throws NoSuchTableException {
@@ -71,7 +72,8 @@ public class MysqlTableOperations extends JdbcTableOperations {
               .withType(typeConverter.toGravitinoType(columnDefinition.getColDataType()))
               .withNullable(nullable)
               .withComment(comment)
-              .withDefaultValue("NULL".equals(defaultValue) ? null : defaultValue)
+              // TODO: uncomment this once we support column default values.
+              // .withDefaultValue("NULL".equals(defaultValue) ? null : defaultValue)
               .withProperties(properties)
               .build());
     }
@@ -133,7 +135,8 @@ public class MysqlTableOperations extends JdbcTableOperations {
           .withType(typeConverter.toGravitinoType(columnDefinition.getColDataType()))
           .withNullable(nullable)
           .withComment(comment)
-          .withDefaultValue("NULL".equals(defaultValue) ? null : defaultValue)
+          // TODO: uncomment this once we support column default values.
+          // .withDefaultValue("NULL".equals(defaultValue) ? null : defaultValue)
           .withProperties(properties)
           .build();
     }
@@ -226,7 +229,12 @@ public class MysqlTableOperations extends JdbcTableOperations {
     // Add columns
     for (int i = 0; i < columns.length; i++) {
       JdbcColumn column = columns[i];
-      sqlBuilder.append(SPACE).append(SPACE).append(column.name());
+      sqlBuilder
+          .append(SPACE)
+          .append(SPACE)
+          .append(BACK_QUOTE)
+          .append(column.name())
+          .append(BACK_QUOTE);
 
       appendColumnDefinition(column, sqlBuilder);
       // Add a comma for the next column, unless it's the last one
@@ -300,8 +308,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
         throw new IllegalArgumentException("Remove property is not supported yet");
       } else if (change instanceof TableChange.AddColumn) {
         TableChange.AddColumn addColumn = (TableChange.AddColumn) change;
-        lazyLoadCreateTable = getOrCreateTable(databaseName, tableName, lazyLoadCreateTable);
-        alterSql.add(addColumnFieldDefinition(addColumn, lazyLoadCreateTable));
+        alterSql.add(addColumnFieldDefinition(addColumn));
       } else if (change instanceof TableChange.RenameColumn) {
         lazyLoadCreateTable = getOrCreateTable(databaseName, tableName, lazyLoadCreateTable);
         TableChange.RenameColumn renameColumn = (TableChange.RenameColumn) change;
@@ -378,7 +385,8 @@ public class MysqlTableOperations extends JdbcTableOperations {
     JdbcColumn updateColumn =
         new JdbcColumn.Builder()
             .withName(col)
-            .withDefaultValue(column.getDefaultValue())
+            // TODO: uncomment this once we support column default values.
+            // .withDefaultValue(column.getDefaultValue())
             .withNullable(change.nullable())
             .withProperties(column.getProperties())
             .withType(column.dataType())
@@ -416,7 +424,8 @@ public class MysqlTableOperations extends JdbcTableOperations {
     JdbcColumn updateColumn =
         new JdbcColumn.Builder()
             .withName(col)
-            .withDefaultValue(column.getDefaultValue())
+            // TODO: uncomment this once we support column default values.
+            // .withDefaultValue(column.getDefaultValue())
             .withNullable(column.nullable())
             .withProperties(column.getProperties())
             .withType(column.dataType())
@@ -425,8 +434,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
     return "MODIFY COLUMN " + col + appendColumnDefinition(updateColumn, new StringBuilder());
   }
 
-  private String addColumnFieldDefinition(
-      TableChange.AddColumn addColumn, CreateTable createTable) {
+  private String addColumnFieldDefinition(TableChange.AddColumn addColumn) {
     String dataType = (String) typeConverter.fromGravitinoType(addColumn.getDataType());
     if (addColumn.fieldName().length > 1) {
       throw new UnsupportedOperationException("Mysql does not support nested column names.");
@@ -435,6 +443,11 @@ public class MysqlTableOperations extends JdbcTableOperations {
 
     StringBuilder columnDefinition = new StringBuilder();
     columnDefinition.append("ADD COLUMN ").append(col).append(SPACE).append(dataType).append(SPACE);
+
+    if (!addColumn.isNullable()) {
+      columnDefinition.append("NOT NULL ");
+    }
+
     // Append comment if available
     if (StringUtils.isNotEmpty(addColumn.getComment())) {
       columnDefinition.append("COMMENT '").append(addColumn.getComment()).append("' ");
@@ -471,7 +484,8 @@ public class MysqlTableOperations extends JdbcTableOperations {
             .withType(column.dataType())
             .withComment(column.comment())
             .withProperties(column.getProperties())
-            .withDefaultValue(column.getDefaultValue())
+            // TODO: uncomment this once we support column default values.
+            // .withDefaultValue(column.getDefaultValue())
             .withNullable(column.nullable())
             .build();
     return appendColumnDefinition(newColumn, sqlBuilder).toString();
@@ -561,9 +575,10 @@ public class MysqlTableOperations extends JdbcTableOperations {
       sqlBuilder.append("NOT NULL ");
     }
     // Add DEFAULT value if specified
-    if (StringUtils.isNotEmpty(column.getDefaultValue())) {
-      sqlBuilder.append("DEFAULT '").append(column.getDefaultValue()).append("'").append(SPACE);
-    }
+    // TODO: uncomment this once we support column default values.
+    // if (StringUtils.isNotEmpty(column.getDefaultValue())) {
+    //   sqlBuilder.append("DEFAULT '").append(column.getDefaultValue()).append("'").append(SPACE);
+    // }
 
     // Add column properties if specified
     if (CollectionUtils.isNotEmpty(column.getProperties())) {

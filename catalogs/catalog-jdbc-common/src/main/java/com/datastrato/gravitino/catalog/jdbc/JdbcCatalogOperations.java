@@ -37,6 +37,7 @@ import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
+import com.datastrato.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.utils.MapUtils;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
@@ -342,6 +343,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
    * @param comment The comment for the new table.
    * @param properties The properties for the new table.
    * @param partitioning The partitioning for the new table.
+   * @param indexes The indexes for the new table.
    * @return The newly created JdbcTable instance.
    * @throws NoSuchSchemaException If the schema for the table does not exist.
    * @throws TableAlreadyExistsException If the table with the same name already exists.
@@ -354,8 +356,10 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
       Map<String, String> properties,
       Transform[] partitioning,
       Distribution distribution,
-      SortOrder[] sortOrders)
+      SortOrder[] sortOrders,
+      Index[] indexes)
       throws NoSuchSchemaException, TableAlreadyExistsException {
+    Preconditions.checkArgument(indexes.length == 0, "Jdbc-catalog does not support indexes");
     Preconditions.checkArgument(
         null == distribution || distribution == Distributions.NONE,
         "jdbc-catalog does not support distribution");
@@ -461,5 +465,11 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
   @Override
   public PropertiesMetadata schemaPropertiesMetadata() throws UnsupportedOperationException {
     return jdbcSchemaPropertiesMetadata;
+  }
+
+  @Override
+  public PropertiesMetadata filesetPropertiesMetadata() throws UnsupportedOperationException {
+    throw new UnsupportedOperationException(
+        "Jdbc catalog doesn't support fileset related operations");
   }
 }

@@ -31,6 +31,8 @@ import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
+import com.datastrato.gravitino.rel.indexes.Index;
+import com.datastrato.gravitino.rel.indexes.Indexes;
 import java.util.Map;
 
 /**
@@ -197,7 +199,7 @@ public interface TableCatalog {
    * @throws NoSuchSchemaException If the schema does not exist.
    * @throws TableAlreadyExistsException If the table already exists.
    */
-  Table createTable(
+  default Table createTable(
       NameIdentifier ident,
       Column[] columns,
       String comment,
@@ -205,6 +207,42 @@ public interface TableCatalog {
       Transform[] partitions,
       Distribution distribution,
       SortOrder[] sortOrders)
+      throws NoSuchSchemaException, TableAlreadyExistsException {
+    return createTable(
+        ident,
+        columns,
+        comment,
+        properties,
+        partitions,
+        distribution,
+        sortOrders,
+        Indexes.EMPTY_INDEXES);
+  }
+
+  /**
+   * Create a table in the catalog.
+   *
+   * @param ident A table identifier.
+   * @param columns The columns of the new table.
+   * @param comment The table comment.
+   * @param properties The table properties.
+   * @param distribution The distribution of the table
+   * @param sortOrders The sort orders of the table
+   * @param partitions The table partitioning.
+   * @param indexes The table indexes.
+   * @return The created table metadata.
+   * @throws NoSuchSchemaException If the schema does not exist.
+   * @throws TableAlreadyExistsException If the table already exists.
+   */
+  Table createTable(
+      NameIdentifier ident,
+      Column[] columns,
+      String comment,
+      Map<String, String> properties,
+      Transform[] partitions,
+      Distribution distribution,
+      SortOrder[] sortOrders,
+      Index[] indexes)
       throws NoSuchSchemaException, TableAlreadyExistsException;
 
   /**

@@ -25,6 +25,7 @@ import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
+import com.datastrato.gravitino.rel.indexes.Index;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.IOException;
@@ -41,6 +42,9 @@ public class TestCatalogOperations implements CatalogOperations, TableCatalog, S
   private final BasePropertiesMetadata tablePropertiesMetadata;
 
   private final BasePropertiesMetadata schemaPropertiesMetadata;
+
+  private final BasePropertiesMetadata filesetPropertiesMetadata;
+
   private Map<String, String> config;
 
   public static final String FAIL_CREATE = "fail-create";
@@ -50,6 +54,7 @@ public class TestCatalogOperations implements CatalogOperations, TableCatalog, S
     schemas = Maps.newHashMap();
     tablePropertiesMetadata = new TestBasePropertiesMetadata();
     schemaPropertiesMetadata = new TestBasePropertiesMetadata();
+    filesetPropertiesMetadata = new TestBasePropertiesMetadata();
     this.config = config;
   }
 
@@ -83,7 +88,8 @@ public class TestCatalogOperations implements CatalogOperations, TableCatalog, S
       Map<String, String> properties,
       Transform[] partitions,
       Distribution distribution,
-      SortOrder[] sortOrders)
+      SortOrder[] sortOrders,
+      Index[] indexes)
       throws NoSuchSchemaException, TableAlreadyExistsException {
     AuditInfo auditInfo =
         new AuditInfo.Builder().withCreator("test").withCreateTime(Instant.now()).build();
@@ -98,6 +104,7 @@ public class TestCatalogOperations implements CatalogOperations, TableCatalog, S
             .withDistribution(distribution)
             .withSortOrders(sortOrders)
             .withPartitioning(partitions)
+            .withIndexes(indexes)
             .build();
 
     if (tables.containsKey(ident)) {
@@ -115,6 +122,7 @@ public class TestCatalogOperations implements CatalogOperations, TableCatalog, S
         .withDistribution(distribution)
         .withSortOrders(sortOrders)
         .withPartitioning(partitions)
+        .withIndexes(indexes)
         .build();
   }
 
@@ -362,5 +370,10 @@ public class TestCatalogOperations implements CatalogOperations, TableCatalog, S
       };
     }
     return Maps::newHashMap;
+  }
+
+  @Override
+  public PropertiesMetadata filesetPropertiesMetadata() throws UnsupportedOperationException {
+    return filesetPropertiesMetadata;
   }
 }

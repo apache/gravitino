@@ -5,9 +5,10 @@
 
 package com.datastrato.gravitino.trino.connector.catalog.iceberg;
 
+import com.datastrato.catalog.property.PropertyConverter;
+import com.datastrato.gravitino.catalog.PropertyEntry;
 import com.datastrato.gravitino.shaded.org.apache.commons.collections4.bidimap.TreeBidiMap;
 import com.datastrato.gravitino.trino.connector.GravitinoErrorCode;
-import com.datastrato.gravitino.trino.connector.catalog.PropertyConverter;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Sets;
 import io.trino.spi.TrinoException;
@@ -26,12 +27,12 @@ public class IcebergCatalogPropertyConverter extends PropertyConverter {
   private static final Set<String> HIVE_BACKEND_REQUIRED_PROPERTIES = Set.of("uri");
 
   @Override
-  public TreeBidiMap<String, String> trinoPropertyKeyToGravitino() {
+  public TreeBidiMap<String, String> engineToGravitinoMapping() {
     return TRINO_ICEBERG_TO_GRAVITINO_ICEBERG;
   }
 
   @Override
-  public Map<String, String> toTrinoProperties(Map<String, String> properties) {
+  public Map<String, String> gravitinoToEngineProperties(Map<String, String> properties) {
     String backend = properties.get("catalog-backend");
     switch (backend) {
       case "hive":
@@ -79,5 +80,10 @@ public class IcebergCatalogPropertyConverter extends PropertyConverter {
     jdbcProperties.put("iceberg.jdbc-catalog.catalog-name", "jdbc");
 
     return jdbcProperties;
+  }
+
+  @Override
+  public Map<String, PropertyEntry<?>> gravitinoPropertyMeta() {
+    return ImmutableMap.of();
   }
 }
