@@ -41,6 +41,10 @@ import org.immutables.value.Value;
 /**
  * Referred from Apache Iceberg's CachedClientPool implementation
  * hive-metastore/src/main/java/org/apache/iceberg/hive/CachedClientPool.java
+ * 
+ * ClientPoolCache is used for every HiveCatalog, I changed the type of `clientPoolCache`
+ * from static variable to variable. I change cache key from user and configuration options
+ * to the username.
  *
  * <p>A ClientPool that caches the underlying HiveClientPool instances.
  */

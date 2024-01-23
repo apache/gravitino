@@ -19,12 +19,12 @@ public class HiveCatalogPropertiesMeta extends BaseCatalogPropertiesMetadata {
   public static final String METASTORE_URIS = "metastore.uris";
 
   public static final String CLIENT_POOL_CACHE_EVICTION_INTERVAL_MS =
-      "client.pool.cache.eviction-interval-ms";
+      "client.pool-cache.eviction-interval-ms";
 
   public static final long DEFAULT_CLIENT_POOL_CACHE_EVICTION_INTERVAL_MS =
       TimeUnit.MINUTES.toMillis(5);
 
-  public static final String IMPERSONATION_ENABLE = "impersonation.enable";
+  public static final String IMPERSONATION_ENABLE = "impersonation-enable";
 
   public static final boolean DEFAULT_IMPERSONATION_ENABLE = false;
 

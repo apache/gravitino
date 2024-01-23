@@ -59,11 +59,11 @@ public class HiveCatalog extends BaseCatalog<HiveCatalog> {
 
   @Override
   protected CatalogProxyPlugin newProxyPlugin(Map<String, String> config) {
-    boolean impersonationEnable =
+    boolean impersonationEnabled =
         (boolean)
             new HiveCatalogPropertiesMeta()
                 .getOrDefault(config, HiveCatalogPropertiesMeta.IMPERSONATION_ENABLE);
-    if (!impersonationEnable) {
+    if (!impersonationEnabled) {
       return null;
     }
     return new HiveCatalogProxyPlugin();
