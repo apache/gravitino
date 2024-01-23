@@ -55,6 +55,7 @@ import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.distributions.Strategy;
 import com.datastrato.gravitino.rel.expressions.sorts.SortDirection;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
+import com.datastrato.gravitino.rel.indexes.Indexes;
 import com.datastrato.gravitino.rel.types.Type;
 import com.datastrato.gravitino.rel.types.Types;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -360,7 +361,8 @@ public class TestRelationalCatalog extends TestBase {
             Collections.emptyMap(),
             sortOrderDTOs,
             DistributionDTO.NONE,
-            EMPTY_PARTITIONING);
+            EMPTY_PARTITIONING,
+            Indexes.EMPTY_INDEXES);
     TableResponse resp = new TableResponse(expectedTable);
     buildMockResource(Method.POST, tablePath, req, resp, SC_OK);
 
@@ -478,7 +480,8 @@ public class TestRelationalCatalog extends TestBase {
             Collections.emptyMap(),
             SortOrderDTO.EMPTY_SORT,
             DistributionDTO.NONE,
-            EMPTY_PARTITIONING);
+            EMPTY_PARTITIONING,
+            Indexes.EMPTY_INDEXES);
     TableResponse resp = new TableResponse(expectedTable);
     buildMockResource(Method.POST, tablePath, req, resp, SC_OK);
 
@@ -510,7 +513,8 @@ public class TestRelationalCatalog extends TestBase {
             Collections.emptyMap(),
             SortOrderDTO.EMPTY_SORT,
             DistributionDTO.NONE,
-            partitioning);
+            partitioning,
+            Indexes.EMPTY_INDEXES);
     resp = new TableResponse(expectedTable);
     buildMockResource(Method.POST, tablePath, req, resp, SC_OK);
 

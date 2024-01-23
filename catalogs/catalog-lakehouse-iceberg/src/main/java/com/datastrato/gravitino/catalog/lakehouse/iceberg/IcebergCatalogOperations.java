@@ -30,6 +30,7 @@ import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
+import com.datastrato.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.utils.MapUtils;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -468,6 +469,7 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
    * @param comment The comment for the new table.
    * @param properties The properties for the new table.
    * @param partitioning The partitioning for the new table.
+   * @param indexes The indexes for the new table.
    * @return The newly created IcebergTable instance.
    * @throws NoSuchSchemaException If the schema for the table does not exist.
    * @throws TableAlreadyExistsException If the table with the same name already exists.
@@ -480,8 +482,10 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
       Map<String, String> properties,
       Transform[] partitioning,
       Distribution distribution,
-      SortOrder[] sortOrders)
+      SortOrder[] sortOrders,
+      Index[] indexes)
       throws NoSuchSchemaException, TableAlreadyExistsException {
+    Preconditions.checkArgument(indexes.length == 0, "Iceberg-catalog does not support indexes");
     try {
       if (!Distributions.NONE.equals(distribution)) {
         throw new UnsupportedOperationException("Iceberg does not support distribution");
@@ -495,13 +499,20 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
       IcebergColumn[] icebergColumns =
           Arrays.stream(columns)
               .map(
-                  column ->
-                      new IcebergColumn.Builder()
-                          .withName(column.name())
-                          .withType(column.dataType())
-                          .withComment(column.comment())
-                          .withNullable(column.nullable())
-                          .build())
+                  column -> {
+                    // Iceberg column default value is WIP, see
+                    // https://github.com/apache/iceberg/pull/4525
+                    Preconditions.checkArgument(
+                        column.defaultValue().equals(Column.DEFAULT_VALUE_NOT_SET),
+                        "Iceberg does not support column default value. Illegal column: "
+                            + column.name());
+                    return new IcebergColumn.Builder()
+                        .withName(column.name())
+                        .withType(column.dataType())
+                        .withComment(column.comment())
+                        .withNullable(column.nullable())
+                        .build();
+                  })
               .toArray(IcebergColumn[]::new);
 
       IcebergTable createdTable =
