@@ -11,17 +11,17 @@ import java.lang.reflect.Proxy;
 import java.util.Collections;
 
 /** Proxy wrapper on a operation class to execute operations by impersonating given user */
-public class OperationsProxy implements InvocationHandler {
+public class OperationsProxy<T> implements InvocationHandler {
 
-  private final CatalogProxyPlugin plugin;
-  private final CatalogOperations ops;
+  private final ProxyPlugin plugin;
+  private final T ops;
 
-  private OperationsProxy(CatalogProxyPlugin plugin, CatalogOperations ops) {
+  private OperationsProxy(ProxyPlugin plugin, T ops) {
     this.plugin = plugin;
     this.ops = ops;
   }
 
-  public static <T> T getProxy(T ops, CatalogProxyPlugin plugin) {
+  public static <T> T getProxy(T ops, ProxyPlugin plugin) {
     return (T)
         Proxy.newProxyInstance(
             ops.getClass().getClassLoader(),

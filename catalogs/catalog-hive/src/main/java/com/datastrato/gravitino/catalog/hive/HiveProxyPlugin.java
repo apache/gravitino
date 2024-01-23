@@ -4,7 +4,7 @@
  */
 package com.datastrato.gravitino.catalog.hive;
 
-import com.datastrato.gravitino.catalog.CatalogProxyPlugin;
+import com.datastrato.gravitino.catalog.ProxyPlugin;
 import com.datastrato.gravitino.utils.Executable;
 import com.datastrato.gravitino.utils.PrincipalUtils;
 import java.io.IOException;
@@ -16,11 +16,11 @@ import java.security.PrivilegedExceptionAction;
 import java.util.Map;
 import org.apache.hadoop.security.UserGroupInformation;
 
-class HiveCatalogProxyPlugin implements CatalogProxyPlugin {
+class HiveProxyPlugin implements ProxyPlugin {
 
   private final UserGroupInformation currentUser;
 
-  HiveCatalogProxyPlugin() {
+  HiveProxyPlugin() {
     try {
       currentUser = UserGroupInformation.getCurrentUser();
     } catch (IOException ioe) {

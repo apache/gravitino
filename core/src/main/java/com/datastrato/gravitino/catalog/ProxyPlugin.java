@@ -8,8 +8,8 @@ import com.datastrato.gravitino.utils.Executable;
 import java.security.Principal;
 import java.util.Map;
 
-/** The catalog can implement their own CatalogProxyPlugin to execute operations by given user. */
-public interface CatalogProxyPlugin {
+/** The catalog can implement their own ProxyPlugin to execute operations by given user. */
+public interface ProxyPlugin {
 
   /**
    * @param principal The given principal to execute the action

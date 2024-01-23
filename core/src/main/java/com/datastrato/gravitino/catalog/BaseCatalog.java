@@ -88,7 +88,7 @@ public abstract class BaseCatalog<T extends BaseCatalog>
           Preconditions.checkArgument(
               entity != null && conf != null, "entity and conf must be set before calling ops()");
           CatalogOperations newOps = newOps(conf);
-          CatalogProxyPlugin plugin = newProxyPlugin(conf);
+          ProxyPlugin plugin = newProxyPlugin(conf);
           if (plugin == null) {
             ops = newOps;
           } else {
@@ -179,11 +179,11 @@ public abstract class BaseCatalog<T extends BaseCatalog>
     return entity.auditInfo();
   }
 
-  protected CatalogOperations asProxyOps(CatalogOperations ops, CatalogProxyPlugin plugin) {
+  protected CatalogOperations asProxyOps(CatalogOperations ops, ProxyPlugin plugin) {
     return OperationsProxy.getProxy(ops, plugin);
   }
 
-  protected CatalogProxyPlugin newProxyPlugin(Map<String, String> config) {
+  protected ProxyPlugin newProxyPlugin(Map<String, String> config) {
     return null;
   }
 }
