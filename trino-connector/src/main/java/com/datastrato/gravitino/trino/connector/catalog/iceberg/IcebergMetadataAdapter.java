@@ -18,6 +18,7 @@ import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoColumn;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoTable;
+import com.google.common.collect.ImmutableSet;
 import io.trino.spi.connector.ColumnMetadata;
 import io.trino.spi.connector.ConnectorTableMetadata;
 import io.trino.spi.connector.SchemaTableName;
@@ -28,6 +29,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.ArrayUtils;
 
@@ -37,6 +39,9 @@ public class IcebergMetadataAdapter extends CatalogConnectorMetadataAdapter {
   // Move all this logic to CatalogConnectorMetadataAdapter
   private final PropertyConverter tableConverter;
   private final PropertyConverter schemaConverter;
+
+  private static final Set<String> ICEBERG_PROPERTIES_TO_REMOVE =
+      ImmutableSet.of(ICEBERG_PARTITIONING_PROPERTY, ICEBERG_SORTED_BY_PROPERTY);
 
   public IcebergMetadataAdapter(
       List<PropertyMetadata<?>> schemaProperties,
@@ -88,11 +93,9 @@ public class IcebergMetadataAdapter extends CatalogConnectorMetadataAdapter {
             ? (List<String>) propertyMap.get(ICEBERG_SORTED_BY_PROPERTY)
             : Collections.EMPTY_LIST;
 
-    if (!sortColumns.isEmpty()) {
-      // Do some check
-    }
-
-    Map<String, String> properties = toGravitinoTableProperties(tableMetadata.getProperties());
+    Map<String, String> properties =
+        toGravitinoTableProperties(
+            removeKeys(tableMetadata.getProperties(), ICEBERG_PROPERTIES_TO_REMOVE));
 
     List<GravitinoColumn> columns = new ArrayList<>();
     for (int i = 0; i < tableMetadata.getColumns().size(); i++) {
