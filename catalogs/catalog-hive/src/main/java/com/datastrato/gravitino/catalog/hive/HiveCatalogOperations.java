@@ -34,8 +34,8 @@ import com.datastrato.gravitino.rel.SchemaChange;
 import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.TableCatalog;
+import com.datastrato.gravitino.rel.TableCatalogInability;
 import com.datastrato.gravitino.rel.TableChange;
-import com.datastrato.gravitino.rel.expressions.Expression;
 import com.datastrato.gravitino.rel.expressions.NamedReference;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
@@ -46,6 +46,7 @@ import com.datastrato.gravitino.rel.indexes.Index;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.File;
@@ -109,6 +110,14 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
           ConfVars.METASTOREURIS.varname,
           PRINCIPAL,
           ConfVars.METASTORE_KERBEROS_PRINCIPAL.varname);
+
+  private static final Set<TableCatalogInability> HIVE_CATALOG_INABILITIES =
+      ImmutableSet.of(
+          // The DEFAULT constraint for column is supported since Hive3.0, see
+          // https://issues.apache.org/jira/browse/HIVE-18726
+          TableCatalogInability.unsupported(
+              TableCatalogInability.Capability.COLUMN_DEFAULT_VALUE,
+              "The DEFAULT constraint for column is only supported since Hive 3.0, but the current Gravitino Hive catalog only supports Hive 2.x."));
 
   /**
    * Constructs a new instance of HiveCatalogOperations.
@@ -692,12 +701,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     validatePartitionForCreate(columns, partitioning);
     validateDistributionAndSort(distribution, sortOrders);
 
-    Arrays.stream(columns)
-        .forEach(
-            c -> {
-              validateNullable(c.name(), c.nullable());
-              validateColumnDefaultValue(c.name(), c.defaultValue());
-            });
+    Arrays.stream(columns).forEach(c -> validateNullable(c.name(), c.nullable()));
 
     TableType tableType = (TableType) tablePropertiesMetadata.getOrDefault(properties, TABLE_TYPE);
     Preconditions.checkArgument(
@@ -854,17 +858,6 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       throw e;
     } catch (Exception e) {
       throw new RuntimeException(e);
-    }
-  }
-
-  private void validateColumnDefaultValue(String fieldName, Expression defaultValue) {
-    // The DEFAULT constraint for column is supported since Hive3.0, see
-    // https://issues.apache.org/jira/browse/HIVE-18726
-    if (!defaultValue.equals(Column.DEFAULT_VALUE_NOT_SET)) {
-      throw new IllegalArgumentException(
-          "The DEFAULT constraint for column is only supported since Hive 3.0, "
-              + "but the current Gravitino Hive catalog only supports Hive 2.x. Illegal column: "
-              + fieldName);
     }
   }
 
@@ -1091,6 +1084,11 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
   HiveConf getHiveConf() {
     return hiveConf;
+  }
+
+  @Override
+  public Set<TableCatalogInability> inability() {
+    return HIVE_CATALOG_INABILITIES;
   }
 
   private boolean isExternalTable(NameIdentifier tableIdent) {

@@ -25,6 +25,7 @@ import com.datastrato.gravitino.rel.SchemaChange;
 import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.TableCatalog;
+import com.datastrato.gravitino.rel.TableCatalogInability;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
@@ -33,6 +34,7 @@ import com.datastrato.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.utils.MapUtils;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -41,6 +43,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -73,6 +76,14 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
   private final CatalogEntity entity;
 
   private IcebergTableOpsHelper icebergTableOpsHelper;
+
+  private static final Set<TableCatalogInability> ICEBERG_CATALOG_INABILITIES =
+      ImmutableSet.of(
+          // Iceberg column default value is WIP, see
+          // https://github.com/apache/iceberg/pull/4525
+          TableCatalogInability.unsupported(
+              TableCatalogInability.Capability.COLUMN_DEFAULT_VALUE,
+              "Iceberg does not support column default value."));
 
   /**
    * Constructs a new instance of IcebergCatalogOperations.
@@ -494,20 +505,13 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
       IcebergColumn[] icebergColumns =
           Arrays.stream(columns)
               .map(
-                  column -> {
-                    // Iceberg column default value is WIP, see
-                    // https://github.com/apache/iceberg/pull/4525
-                    Preconditions.checkArgument(
-                        column.defaultValue().equals(Column.DEFAULT_VALUE_NOT_SET),
-                        "Iceberg does not support column default value. Illegal column: "
-                            + column.name());
-                    return new IcebergColumn.Builder()
-                        .withName(column.name())
-                        .withType(column.dataType())
-                        .withComment(column.comment())
-                        .withNullable(column.nullable())
-                        .build();
-                  })
+                  column ->
+                      new IcebergColumn.Builder()
+                          .withName(column.name())
+                          .withType(column.dataType())
+                          .withComment(column.comment())
+                          .withNullable(column.nullable())
+                          .build())
               .toArray(IcebergColumn[]::new);
 
       IcebergTable createdTable =
@@ -557,6 +561,11 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
       LOG.warn("Iceberg table {} does not exist", tableIdent.name());
       return false;
     }
+  }
+
+  @Override
+  public Set<TableCatalogInability> inability() {
+    return ICEBERG_CATALOG_INABILITIES;
   }
 
   // TODO. We should figure out a better way to get the current user from servlet container.

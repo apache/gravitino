@@ -33,7 +33,9 @@ import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.rel.indexes.Indexes;
+import java.util.Collections;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * The TableCatalog interface defines the public API for managing tables in a schema. If the catalog
@@ -285,5 +287,10 @@ public interface TableCatalog {
    */
   default boolean purgeTable(NameIdentifier ident) throws UnsupportedOperationException {
     throw new UnsupportedOperationException("purgeTable not supported.");
+  }
+
+  /** @return The set of capabilities that this catalog does not support. */
+  default Set<TableCatalogInability> inability() {
+    return Collections.emptySet();
   }
 }

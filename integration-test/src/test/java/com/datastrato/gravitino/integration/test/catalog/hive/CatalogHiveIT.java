@@ -49,6 +49,7 @@ import com.datastrato.gravitino.integration.test.container.ContainerSuite;
 import com.datastrato.gravitino.integration.test.container.HiveContainer;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
+import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.Schema;
 import com.datastrato.gravitino.rel.SchemaChange;
 import com.datastrato.gravitino.rel.Table;
@@ -571,6 +572,29 @@ public class CatalogHiveIT extends AbstractIT {
                       TableChange.setProperty(TRANSIENT_LAST_DDL_TIME, "1234"));
             });
     Assertions.assertTrue(exception.getMessage().contains("cannot be set"));
+
+    // test column default value exception
+    Column withDefaultValue =
+        Column.of("col1", Types.StringType.get(), "col1 comment", Literals.NULL);
+    exception =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                catalog
+                    .asTableCatalog()
+                    .createTable(
+                        NameIdentifier.of(metalakeName, catalogName, schemaName, table2),
+                        new Column[] {withDefaultValue},
+                        TABLE_COMMENT,
+                        ImmutableMap.of(),
+                        Transforms.EMPTY_TRANSFORM));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains(
+                "The DEFAULT constraint for column is only supported since Hive 3.0, "
+                    + "but the current Gravitino Hive catalog only supports Hive 2.x."),
+        exception.getMessage());
   }
 
   @Test

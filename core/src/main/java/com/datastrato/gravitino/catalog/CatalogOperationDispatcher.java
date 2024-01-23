@@ -39,6 +39,7 @@ import com.datastrato.gravitino.rel.SchemaChange;
 import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.TableCatalog;
+import com.datastrato.gravitino.rel.TableCatalogInability;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
@@ -50,6 +51,7 @@ import com.datastrato.gravitino.storage.IdGenerator;
 import com.datastrato.gravitino.utils.PrincipalUtils;
 import com.datastrato.gravitino.utils.ThrowableFunction;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import java.time.Instant;
 import java.util.Arrays;
@@ -444,12 +446,29 @@ public class CatalogOperationDispatcher implements TableCatalog, FilesetCatalog,
     NameIdentifier catalogIdent = getCatalogIdentifier(ident);
     doWithCatalog(
         catalogIdent,
-        c ->
-            c.doWithPropertiesMeta(
-                p -> {
-                  p.tablePropertiesMetadata().validatePropertyForCreate(properties);
-                  return null;
-                }),
+        c -> {
+          Set<TableCatalogInability> tableCatalogInabilities =
+              c.doWithTableOps(TableCatalog::inability);
+          Optional<TableCatalogInability> columnDefaultInability =
+              tableCatalogInabilities.stream()
+                  .filter(
+                      i -> i.isCapability(TableCatalogInability.Capability.COLUMN_DEFAULT_VALUE))
+                  .findAny();
+          columnDefaultInability.ifPresent(
+              i -> {
+                for (Column column : columns) {
+                  Preconditions.checkArgument(
+                      Column.DEFAULT_VALUE_NOT_SET.equals(column.defaultValue()),
+                      i.unsupportedReason() + " Illegal column " + column.name());
+                }
+              });
+          c.doWithPropertiesMeta(
+              p -> {
+                p.tablePropertiesMetadata().validatePropertyForCreate(properties);
+                return null;
+              });
+          return null;
+        },
         IllegalArgumentException.class);
     long uid = idGenerator.nextId();
     // Add StringIdentifier to the properties, the specific catalog will handle this

@@ -37,6 +37,7 @@ import com.datastrato.gravitino.rel.expressions.NamedReference;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
 import com.datastrato.gravitino.rel.expressions.distributions.Strategy;
+import com.datastrato.gravitino.rel.expressions.literals.Literals;
 import com.datastrato.gravitino.rel.expressions.sorts.NullOrdering;
 import com.datastrato.gravitino.rel.expressions.sorts.SortDirection;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
@@ -346,6 +347,25 @@ public class CatalogIcebergIT extends AbstractIT {
 
   @Test
   void testCreateAndLoadIcebergTable() {
+    // test column default value exception
+    Column withDefaultValue =
+        Column.of("col1", Types.StringType.get(), "col1 comment", Literals.NULL);
+    IllegalArgumentException exception =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                catalog
+                    .asTableCatalog()
+                    .createTable(
+                        NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
+                        new Column[] {withDefaultValue},
+                        "TABLE_COMMENT",
+                        ImmutableMap.of(),
+                        Transforms.EMPTY_TRANSFORM));
+    Assertions.assertTrue(
+        exception.getMessage().contains("Iceberg does not support column default value."),
+        exception.getMessage());
+
     // Create table from Gravitino API
     ColumnDTO[] columns = createColumns();
 
