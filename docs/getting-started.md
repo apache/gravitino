@@ -320,14 +320,21 @@ After completing these steps, you should be able to access the Gravitino REST in
 
 1. **Explore documentation:**
    - Delve deeper into the Gravitino documentation for advanced features and configuration options.
+   - Check out : https://datastrato.ai/docs/0.3.1/
 
 2. **Community engagement:**
    - Join the Gravitino community forums to connect with other users, share experiences, and seek assistance if needed.
+   - Check out our GitHub repository : https://github.com/datastrato
+   - Check out our Discourse group : https://gravitino.discourse.group/
+   
+3. **Read our blogs:**
+   - Check out : https://datastrato.ai/blog
 
-4. **Integration with other tools:**
-   - Consider integrating Gravitino with other tools or databases to enhance your data processing capabilities.
-
-5. **Continuous updates:**
-   - Stay informed about Gravitino updates and new releases to benefit from the latest features, optimizations, and security enhancements.
+4. **Continuous updates:**
+   - Stay informed about Gravitino updates and new releases to benefit from the latest features, optimizations, and security       
+     enhancements.
+   - Check out our Website : https://datastrato.ai/
+   - Check out our Twitter page : https://twitter.com/datastrato
+  
 
 This document is just a beginning. You're welcome to customize your Gravitino setup based on your requirements and explore the vast possibilities this powerful tool offers. If you encounter any issues or have questions, you can always connect with the Gravitino community for assistance. 
