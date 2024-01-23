@@ -3,7 +3,7 @@
  * This software is licensed under the Apache License version 2.
  */
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 import Link from 'next/link'
 
@@ -11,7 +11,16 @@ import { Box, Typography } from '@mui/material'
 import ColumnTypeChip from '@/components/ColumnTypeChip'
 import { DataGrid } from '@mui/x-data-grid'
 import { useAppSelector, useAppDispatch } from '@/lib/hooks/useStore'
-import { resetTableData } from '@/lib/store/metalakes'
+import { setExpandedTreeNode, setIntoTreeAction } from '@/lib/store/metalakes'
+
+function removeLastSegment(inputString, separator = '____') {
+  const lastIndex = inputString.lastIndexOf(separator)
+  if (lastIndex === -1) {
+    return inputString
+  }
+
+  return inputString.substring(0, lastIndex)
+}
 
 const TableView = props => {
   const { page } = props
@@ -33,7 +42,30 @@ const TableView = props => {
         const { name, path } = row
 
         const handleClickUrl = () => {
-          dispatch(resetTableData())
+          const [metalake, catalog, schema, table] = new URLSearchParams(path)
+
+          const id = `${(metalake && metalake[1]) ?? ''}${
+            catalog && catalog[1]
+              ? `____${catalog[1]}${
+                  schema && schema[1] ? `____${schema[1]}${table && table[1] ? `____${table[1]}` : ''}` : ''
+                }`
+              : ''
+          }`
+
+          if (table) {
+            dispatch(setExpandedTreeNode({ nodeIds: removeLastSegment(id) }))
+            dispatch(setIntoTreeAction({ nodeIds: [removeLastSegment(id)] }))
+            store.expandedTreeNode.forEach(node => {
+              dispatch(setIntoTreeAction({ nodeIds: [node] }))
+            })
+            dispatch(setIntoTreeAction({ nodeIds: [removeLastSegment(id)] }))
+          } else {
+            dispatch(setExpandedTreeNode({ nodeIds: id }))
+            dispatch(setIntoTreeAction({ nodeIds: [id] }))
+            store.expandedTreeNode.forEach(node => {
+              dispatch(setIntoTreeAction({ nodeIds: [node] }))
+            })
+          }
         }
 
         return (
@@ -125,6 +157,11 @@ const TableView = props => {
     }
   ]
 
+  useEffect(() => {
+    setPaginationModel({ ...paginationModel, page: 0 })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [store.tableLoading])
+
   return (
     <DataGrid
       sx={{
@@ -135,6 +172,7 @@ const TableView = props => {
         }
       }}
       autoHeight
+      loading={store.tableLoading}
       rows={store.tableData}
       getRowId={row => row?.name}
       columns={page === 'tables' ? tableColumns : columns}

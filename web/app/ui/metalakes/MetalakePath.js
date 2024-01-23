@@ -12,6 +12,9 @@ import { Link as MUILink, Breadcrumbs, Typography, styled } from '@mui/material'
 
 import Icon from '@/components/Icon'
 
+import { useAppDispatch, useAppSelector } from '@/lib/hooks/useStore'
+import { setIntoTreeAction } from '@/lib/store/metalakes'
+
 const Text = styled(Typography)(({ theme }) => ({
   maxWidth: '120px',
   overflow: 'hidden',
@@ -20,7 +23,6 @@ const Text = styled(Typography)(({ theme }) => ({
 
 const MetalakePath = props => {
   const { routeParams } = props
-
   const { metalake, catalog, schema, table } = routeParams
 
   const router = useRouter()
@@ -31,8 +33,15 @@ const MetalakePath = props => {
   const schemaUrl = `?metalake=${metalake}&catalog=${catalog}&schema=${schema}`
   const tableUrl = `?metalake=${metalake}&catalog=${catalog}&schema=${schema}&table=${table}`
 
+  const dispatch = useAppDispatch()
+  const store = useAppSelector(state => state.metalakes)
+
   const handleClick = (event, path) => {
     path === `?${searchParams.toString()}` && event.preventDefault()
+
+    store.expandedTreeNode.forEach(node => {
+      dispatch(setIntoTreeAction({ nodeIds: [node] }))
+    })
   }
 
   return (
