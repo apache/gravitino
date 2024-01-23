@@ -50,6 +50,7 @@ rat-plugin = '0.8.0'
 shadow-plugin = "8.1.1"
 node-plugin = "7.0.1"
 commons-cli = "1.2"
+javax-activation = "1.1.1"
 
 [libraries]
 protobuf-java = { group = "com.google.protobuf", name = "protobuf-java", version.ref = "protoc" }
@@ -135,6 +136,7 @@ jsqlparser = { group = "com.github.jsqlparser", name = "jsqlparser", version.ref
 mysql-driver = { group = "mysql", name = "mysql-connector-java", version.ref = "mysql" }
 postgresql-driver = { group = "org.postgresql", name = "postgresql", version.ref = "postgresql" }
 commons-cli = { group = "commons-cli", name = "commons-cli", version.ref = "commons-cli" }
+javax-activation = { group = "javax.activation", name = "activation", version.ref = "javax-activation" }
 
 [bundles]
 log4j = ["slf4j-api", "log4j-slf4j2-impl", "log4j-api", "log4j-core", "log4j-12-api"]
