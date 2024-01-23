@@ -20,4 +20,15 @@ public class TestColumn {
     actualColumn = Column.of("col_1", Types.ByteType.get(), null);
     Assertions.assertEquals(expectedColumn, actualColumn);
   }
+
+  @Test
+  public void testColumnException() {
+    IllegalArgumentException exception =
+        Assertions.assertThrows(IllegalArgumentException.class, () -> Column.of(null, null));
+    Assertions.assertEquals("Column name cannot be null", exception.getMessage());
+
+    exception =
+        Assertions.assertThrows(IllegalArgumentException.class, () -> Column.of("col_1", null));
+    Assertions.assertEquals("Column data type cannot be null", exception.getMessage());
+  }
 }

@@ -7,6 +7,8 @@ package com.datastrato.gravitino.rel;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.rel.expressions.Expression;
 import com.datastrato.gravitino.rel.types.Type;
+import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
 import java.util.Map;
 import java.util.Objects;
 
@@ -122,6 +124,8 @@ public interface Column {
         boolean nullable,
         boolean autoIncrement,
         Expression defaultValue) {
+      Preconditions.checkArgument(!Strings.isNullOrEmpty(name), "Column name cannot be null");
+      Preconditions.checkArgument(dataType != null, "Column data type cannot be null");
       this.name = name;
       this.dataType = dataType;
       this.comment = comment;
