@@ -111,6 +111,7 @@ public class ProxyCatalogHiveIT extends AbstractIT {
 
   @Test
   public void testOperateSchema() throws Exception {
+    // create schema normally using user datastrato
     String schemaName = GravitinoITUtils.genRandomName(SCHEMA_PREFIX);
     String anotherSchemaName = GravitinoITUtils.genRandomName(SCHEMA_PREFIX);
     NameIdentifier ident = NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, schemaName);
@@ -132,6 +133,8 @@ public class ProxyCatalogHiveIT extends AbstractIT {
     Assertions.assertEquals(EXPECT_USER, db.getOwnerName());
     Assertions.assertEquals(
         EXPECT_USER, hdfs.getFileStatus(new Path(db.getLocationUri())).getOwner());
+
+    // create schema with exception using the system user
     properties.put(
         "location",
         String.format(
@@ -139,13 +142,16 @@ public class ProxyCatalogHiveIT extends AbstractIT {
             containerSuite.getHiveContainer().getContainerIpAddress(),
             HiveContainer.HDFS_DEFAULTFS_PORT,
             anotherSchemaName.toLowerCase()));
-    Assertions.assertThrows(
-        RuntimeException.class,
-        () -> anotherCatalog.asSchemas().createSchema(anotherIdent, comment, properties));
+    Exception e =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () -> anotherCatalog.asSchemas().createSchema(anotherIdent, comment, properties));
+    Assertions.assertTrue(e.getMessage().contains("AccessControlException Permission denied"));
   }
 
   @Test
   public void testOperateTable() throws Exception {
+    // create table normally using user datastrato
     Column[] columns = createColumns();
     String schemaName = GravitinoITUtils.genRandomName(SCHEMA_PREFIX);
     String tableName = GravitinoITUtils.genRandomName(TABLE_PREFIX);
@@ -181,17 +187,21 @@ public class ProxyCatalogHiveIT extends AbstractIT {
     org.apache.hadoop.hive.metastore.api.Table hiveTab =
         hiveClientPool.run(client -> client.getTable(schemaName, tableName));
     Assertions.assertEquals(EXPECT_USER, hiveTab.getOwner());
-    Assertions.assertThrows(
-        RuntimeException.class,
-        () ->
-            anotherCatalog
-                .asTableCatalog()
-                .createTable(
-                    anotherNameIdentifier,
-                    columns,
-                    comment,
-                    ImmutableMap.of(),
-                    Partitioning.EMPTY_PARTITIONING));
+
+    // create table with exception with system user
+    Exception e =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () ->
+                anotherCatalog
+                    .asTableCatalog()
+                    .createTable(
+                        anotherNameIdentifier,
+                        columns,
+                        comment,
+                        ImmutableMap.of(),
+                        Partitioning.EMPTY_PARTITIONING));
+    Assertions.assertTrue(e.getMessage().contains("AccessControlException Permission denied"));
   }
 
   private Column[] createColumns() {
