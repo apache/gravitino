@@ -238,6 +238,13 @@ public class DTOConverters {
     return Arrays.stream(expressions).map(DTOConverters::toFunctionArg).toArray(FunctionArg[]::new);
   }
 
+  public static ColumnDTO[] toDTOs(Column[] columns) {
+    if (ArrayUtils.isEmpty(columns)) {
+      return new ColumnDTO[0];
+    }
+    return Arrays.stream(columns).map(DTOConverters::toDTO).toArray(ColumnDTO[]::new);
+  }
+
   public static SortOrderDTO[] toDTOs(SortOrder[] sortOrders) {
     if (ArrayUtils.isEmpty(sortOrders)) {
       return new SortOrderDTO[0];
@@ -328,13 +335,13 @@ public class DTOConverters {
     if (column.defaultValue().equals(Column.DEFAULT_VALUE_NOT_SET)) {
       return column;
     }
-    return ColumnDTO.builder()
-        .withName(column.name())
-        .withDataType(column.dataType())
-        .withComment(column.comment())
-        .withNullable(column.nullable())
-        .withDefaultValue(fromFunctionArg((FunctionArg) column.defaultValue()))
-        .build();
+    return Column.of(
+        column.name(),
+        column.dataType(),
+        column.comment(),
+        column.nullable(),
+        column.autoIncrement(),
+        fromFunctionArg((FunctionArg) column.defaultValue()));
   }
 
   public static Transform fromDTO(Partitioning partitioning) {
