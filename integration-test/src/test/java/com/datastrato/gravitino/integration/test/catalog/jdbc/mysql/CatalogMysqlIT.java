@@ -82,9 +82,9 @@ public class CatalogMysqlIT extends AbstractIT {
 
   protected final String TEST_DB_NAME = RandomUtils.nextInt(10000) + "_test_db";
 
-  public static String defaultMysqlImageName = "mysql:8.0";
+  public static final String defaultMysqlImageName = "mysql:8.0";
 
-  protected String mysqlImageName = "mysql:8.0";
+  protected String mysqlImageName = defaultMysqlImageName;
 
   @BeforeAll
   public void startup() throws IOException {
@@ -94,8 +94,6 @@ public class CatalogMysqlIT extends AbstractIT {
       Path tmpPath = Paths.get(gravitinoHome, "/catalogs/jdbc-mysql/libs");
       JdbcDriverDownloader.downloadJdbcDriver(DOWNLOAD_JDBC_DRIVER_URL, tmpPath.toString());
     }
-
-    System.out.println(mysqlImageName);
 
     MYSQL_CONTAINER =
         new MySQLContainer<>(mysqlImageName)
