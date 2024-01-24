@@ -16,6 +16,7 @@ import java.sql.Statement;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.collections4.MapUtils;
@@ -125,6 +126,6 @@ public class MysqlDatabaseOperations extends JdbcDatabaseOperations {
 
   @Override
   protected boolean isSystemDatabase(String dbName) {
-    return SYS_MYSQL_DATABASE_NAMES.contains(dbName.toLowerCase());
+    return SYS_MYSQL_DATABASE_NAMES.contains(dbName.toLowerCase(Locale.ROOT));
   }
 }

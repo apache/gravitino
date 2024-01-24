@@ -18,6 +18,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import javax.sql.DataSource;
@@ -132,6 +133,6 @@ public class PostgreSqlSchemaOperations extends JdbcDatabaseOperations {
 
   @Override
   protected boolean isSystemDatabase(String dbName) {
-    return SYS_PG_DATABASE_NAMES.contains(dbName.toLowerCase());
+    return SYS_PG_DATABASE_NAMES.contains(dbName.toLowerCase(Locale.ROOT));
   }
 }
