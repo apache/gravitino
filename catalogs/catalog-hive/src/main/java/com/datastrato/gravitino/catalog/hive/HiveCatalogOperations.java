@@ -155,6 +155,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
   public void close() {
     if (clientPool != null) {
       clientPool.close();
+      clientPool = null;
     }
   }
 
