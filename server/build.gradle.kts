@@ -26,7 +26,9 @@ dependencies {
   implementation(libs.bundles.jetty)
   implementation(libs.bundles.jersey)
   implementation(libs.metrics.jersey2)
-  implementation(libs.javax.activation)
+
+  // Workaround for the task copyActivation.
+  compileOnly(libs.javax.activation)
 
   compileOnly(libs.lombok)
   annotationProcessor(libs.lombok)
