@@ -169,7 +169,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
     }
 
     // For external fileset, the storageLocation must be set.
-    if (type.equals(Fileset.Type.EXTERNAL) && StringUtils.isBlank(storageLocation)) {
+    if (type == Fileset.Type.EXTERNAL && StringUtils.isBlank(storageLocation)) {
       throw new IllegalArgumentException(
           "Storage location must be set for external fileset " + ident);
     }
@@ -294,7 +294,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
       Path filesetPath = new Path(filesetEntity.storageLocation());
 
       // For managed fileset, we should delete the related files.
-      if (filesetEntity.filesetType().equals(Fileset.Type.MANAGED)) {
+      if (filesetEntity.filesetType() == Fileset.Type.MANAGED) {
         FileSystem fs = filesetPath.getFileSystem(hadoopConf);
         if (fs.exists(filesetPath)) {
           if (!fs.delete(filesetPath, true)) {
