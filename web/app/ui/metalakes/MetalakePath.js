@@ -20,6 +20,7 @@ const Text = styled(Typography)(({ theme }) => ({
 
 const MetalakePath = props => {
   const { routeParams } = props
+
   const { metalake, catalog, schema, table } = routeParams
 
   const router = useRouter()
