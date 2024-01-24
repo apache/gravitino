@@ -11,7 +11,7 @@ import { Box, Typography } from '@mui/material'
 import ColumnTypeChip from '@/components/ColumnTypeChip'
 import { DataGrid } from '@mui/x-data-grid'
 import { useAppSelector, useAppDispatch } from '@/lib/hooks/useStore'
-import { setExpandedTreeNode, setIntoTreeAction } from '@/lib/store/metalakes'
+import { setIntoTreeAction } from '@/lib/store/metalakes'
 
 function removeLastSegment(inputString, separator = '____') {
   const lastIndex = inputString.lastIndexOf(separator)
@@ -32,6 +32,27 @@ const TableView = props => {
   const [paginationModel, setPaginationModel] = useState(defaultPaginationConfig)
   const store = useAppSelector(state => state.metalakes)
 
+  const handleClickUrl = () => {
+    const [metalake, catalog, schema, table] = new URLSearchParams(path)
+
+    const id = `${(metalake && metalake[1]) ?? ''}${
+      catalog && catalog[1]
+        ? `____${catalog[1]}${
+            schema && schema[1] ? `____${schema[1]}${table && table[1] ? `____${table[1]}` : ''}` : ''
+          }`
+        : ''
+    }`
+    if (id.split('____').length <= 2) {
+      if (store.expandedTreeNode.length === 0 || !store.expandedTreeNode.includes(id)) {
+        dispatch(setIntoTreeAction({ nodeIds: [id] }))
+      }
+    } else if (table) {
+      dispatch(setIntoTreeAction({ nodeIds: [removeLastSegment(id)] }))
+    } else {
+      dispatch(setIntoTreeAction({ nodeIds: [id] }))
+    }
+  }
+
   const columns = [
     {
       flex: 0.1,
@@ -40,27 +61,6 @@ const TableView = props => {
       headerName: 'Name',
       renderCell: ({ row }) => {
         const { name, path } = row
-
-        const handleClickUrl = () => {
-          const [metalake, catalog, schema, table] = new URLSearchParams(path)
-
-          const id = `${(metalake && metalake[1]) ?? ''}${
-            catalog && catalog[1]
-              ? `____${catalog[1]}${
-                  schema && schema[1] ? `____${schema[1]}${table && table[1] ? `____${table[1]}` : ''}` : ''
-                }`
-              : ''
-          }`
-          if (id.split('____').length <= 2) {
-            if (store.expandedTreeNode.length === 0 || !store.expandedTreeNode.includes(id)) {
-              dispatch(setIntoTreeAction({ nodeIds: [id] }))
-            }
-          } else if (table) {
-            dispatch(setIntoTreeAction({ nodeIds: [removeLastSegment(id)] }))
-          } else {
-            dispatch(setIntoTreeAction({ nodeIds: [id] }))
-          }
-        }
 
         return (
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
