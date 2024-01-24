@@ -133,4 +133,8 @@ public class CachedClientPool implements ClientPool<IMetaStoreClient, TException
         .setNameFormat("hive-metastore-cleaner" + "-%d")
         .build();
   }
+
+  public void close() {
+    clientPoolCache.invalidateAll();
+  }
 }

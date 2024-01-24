@@ -153,7 +153,9 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
   /** Closes the Hive catalog and releases the associated client pool. */
   @Override
   public void close() {
-    // We used a cached client pool, the pool will close clients after expiration.
+    if (clientPool != null) {
+      clientPool.close();
+    }
   }
 
   /**
