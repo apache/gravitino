@@ -5,9 +5,6 @@
 package com.datastrato.gravitino.catalog.hive;
 
 import static com.datastrato.gravitino.catalog.BaseCatalog.CATALOG_BYPASS_PREFIX;
-import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.CLIENT_POOL_CACHE_EVICTION_INTERVAL_MS;
-import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.CLIENT_POOL_SIZE;
-import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.METASTORE_URIS;
 import static com.datastrato.gravitino.catalog.hive.HiveTable.SUPPORT_TABLE_TYPES;
 import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.COMMENT;
 import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.TABLE_TYPE;
@@ -45,12 +42,23 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
+
+import java.io.File;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.conf.HiveConf;
@@ -62,6 +70,7 @@ import org.apache.hadoop.hive.metastore.api.InvalidOperationException;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.UnknownDBException;
+import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.thrift.TException;
 import org.slf4j.Logger;
@@ -84,11 +93,14 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
   private HiveSchemaPropertiesMetadata schemaPropertiesMetadata;
 
+  private ScheduledThreadPoolExecutor refreshScheduledExecutor;
+
+
   // Map that maintains the mapping of keys in Gravitino to that in Hive, for example, users
   // will only need to set the configuration 'METASTORE_URL' in Gravitino and Gravitino will change
   // it to `METASTOREURIS` automatically and pass it to Hive.
   public static final Map<String, String> GRAVITINO_CONFIG_TO_HIVE =
-      ImmutableMap.of(METASTORE_URIS, ConfVars.METASTOREURIS.varname);
+      ImmutableMap.of(HiveCatalogPropertiesMeta.METASTORE_URIS, ConfVars.METASTOREURIS.varname);
 
   /**
    * Constructs a new instance of HiveCatalogOperations.
@@ -135,6 +147,35 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     // and gravitinoConfig will be passed to Hive config, and gravitinoConfig has higher priority
     mergeConfig.forEach(hadoopConf::set);
     hiveConf = new HiveConf(hadoopConf, HiveCatalogOperations.class);
+    UserGroupInformation.setConfiguration(hadoopConf);
+
+
+    if (UserGroupInformation.AuthenticationMethod.KERBEROS
+        == SecurityUtil.getAuthenticationMethod(hadoopConf)) {
+      try {
+        // todo: check blank
+        String keyTab = (String) catalogPropertiesMetadata.getOrDefault(conf, HiveCatalogPropertiesMeta.KET_TAB);
+        String principal = (String) catalogPropertiesMetadata.getOrDefault(conf, HiveCatalogPropertiesMeta.PRINCIPAL);
+        String krb5Conf = (String) catalogPropertiesMetadata.getOrDefault(conf, HiveCatalogPropertiesMeta.KRB5_CONF);
+        FileUtils.writeByteArrayToFile(new File("/tmp/krb5.conf"), Base64.getDecoder().decode(krb5Conf));
+        FileUtils.writeByteArrayToFile(new File("/tmp/keytab"), Base64.getDecoder().decode(keyTab));
+        // todo: separate class loader for system properties
+        System.setProperty("java.security.krb5.conf", "/tmp/krb5.conf");
+        refreshScheduledExecutor =
+                new ScheduledThreadPoolExecutor(1, getThreadFactory(String.format("Kerberos-fresh-%s", entity.nameIdentifier())));
+        UserGroupInformation loginUgi = UserGroupInformation.loginUserFromKeytabAndReturnUGI(principal, "/tmp/keytab");
+        refreshScheduledExecutor.scheduleAtFixedRate(
+                () -> {
+                  try {
+                    loginUgi.checkTGTAndReloginFromKeytab();
+                  } catch (Throwable throwable) {
+                    LOG.error("Fail to refresh ugi token: ", throwable);
+                  }
+                }, 5, 5, TimeUnit.SECONDS);
+      } catch (IOException ioe) {
+        throw new UncheckedIOException(ioe);
+      }
+    }
 
     this.clientPool =
         new CachedClientPool(getClientPoolSize(conf), hiveConf, getCacheEvictionInterval(conf));
@@ -142,12 +183,12 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
   @VisibleForTesting
   int getClientPoolSize(Map<String, String> conf) {
-    return (int) catalogPropertiesMetadata.getOrDefault(conf, CLIENT_POOL_SIZE);
+    return (int) catalogPropertiesMetadata.getOrDefault(conf, HiveCatalogPropertiesMeta.CLIENT_POOL_SIZE);
   }
 
   long getCacheEvictionInterval(Map<String, String> conf) {
     return (long)
-        catalogPropertiesMetadata.getOrDefault(conf, CLIENT_POOL_CACHE_EVICTION_INTERVAL_MS);
+        catalogPropertiesMetadata.getOrDefault(conf, HiveCatalogPropertiesMeta.CLIENT_POOL_CACHE_EVICTION_INTERVAL_MS);
   }
 
   /** Closes the Hive catalog and releases the associated client pool. */
@@ -156,6 +197,10 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     if (clientPool != null) {
       clientPool.close();
       clientPool = null;
+    }
+    if (refreshScheduledExecutor != null) {
+      refreshScheduledExecutor.shutdown();
+      refreshScheduledExecutor = null;
     }
   }
 
@@ -971,5 +1016,9 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
   private boolean isExternalTable(NameIdentifier tableIdent) {
     org.apache.hadoop.hive.metastore.api.Table hiveTable = loadHiveTable(tableIdent);
     return EXTERNAL_TABLE.name().equalsIgnoreCase(hiveTable.getTableType());
+  }
+
+  private static ThreadFactory getThreadFactory(String factoryName) {
+    return new ThreadFactoryBuilder().setDaemon(true).setNameFormat(factoryName + "-%d").build();
   }
 }
