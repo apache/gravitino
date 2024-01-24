@@ -106,7 +106,7 @@ public class KerberosAuthenticator implements Authenticator {
             }
           });
     } catch (Exception e) {
-      throw new UnauthorizedException("Fail to valid the token", AuthConstants.NEGOTIATE);
+      throw new UnauthorizedException("Fail to validate the token", AuthConstants.NEGOTIATE);
     }
   }
 

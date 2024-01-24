@@ -41,30 +41,40 @@ public class TestKerberosAuthenticator extends KerberosSecurityTestcase {
   @Test
   public void testAuthenticatorInitialization() throws Exception {
     KerberosAuthenticator kerberosAuthenticator = new KerberosAuthenticator();
+
+    // case 1: lack different parameters
     Config config = new Config(false) {};
-    Assertions.assertThrows(
+    Exception e = Assertions.assertThrows(
         IllegalArgumentException.class,
         () -> {
           kerberosAuthenticator.initialize(config);
         });
+    Assertions.assertTrue(e.getMessage().contains("The value can't be blank"));
+
     config.set(PRINCIPAL, KerberosTestUtils.getServerPrincipal());
-    Assertions.assertThrows(
+    e = Assertions.assertThrows(
         IllegalArgumentException.class,
         () -> {
           kerberosAuthenticator.initialize(config);
         });
+    Assertions.assertTrue(e.getMessage().contains("The value can't be blank"));
+
+    // case 2: keytab file doesn't exist
     config.set(KEYTAB, KerberosTestUtils.getKeytabFile());
-    Assertions.assertThrows(
+    e = Assertions.assertThrows(
         IllegalArgumentException.class,
         () -> {
           kerberosAuthenticator.initialize(config);
         });
+    Assertions.assertTrue(e.getMessage().contains("Keytab doesn't exist"));
+
     initKeyTab();
     kerberosAuthenticator.initialize(config);
   }
 
   @Test
   public void testAuthenticationWithException() throws Exception {
+    // case 1: Empty token authorization header
     KerberosAuthenticator kerberosAuthenticator = new KerberosAuthenticator();
     Config config = new Config(false) {};
     config.set(PRINCIPAL, KerberosTestUtils.getServerPrincipal());
@@ -76,11 +86,15 @@ public class TestKerberosAuthenticator extends KerberosSecurityTestcase {
         Assertions.assertThrows(
             UnauthorizedException.class, () -> kerberosAuthenticator.authenticateToken(null));
     Assertions.assertEquals("Empty token authorization header", e.getMessage());
+
+    // case2 : Invalid token authorization header
     e =
         Assertions.assertThrows(
             UnauthorizedException.class,
             () -> kerberosAuthenticator.authenticateToken("Xx".getBytes(StandardCharsets.UTF_8)));
     Assertions.assertEquals("Invalid token authorization header", e.getMessage());
+
+    // case 3: Blank token found
     e =
         Assertions.assertThrows(
             UnauthorizedException.class,
@@ -88,12 +102,15 @@ public class TestKerberosAuthenticator extends KerberosSecurityTestcase {
                 kerberosAuthenticator.authenticateToken(
                     AuthConstants.AUTHORIZATION_NEGOTIATE_HEADER.getBytes(StandardCharsets.UTF_8)));
     Assertions.assertEquals("Blank token found", e.getMessage());
-    Assertions.assertThrows(
+
+    // case 4: Fail to validate the token
+    e = Assertions.assertThrows(
         UnauthorizedException.class,
         () ->
             kerberosAuthenticator.authenticateToken(
                 (AuthConstants.AUTHORIZATION_NEGOTIATE_HEADER + "xxxx")
                     .getBytes(StandardCharsets.UTF_8)));
+    Assertions.assertEquals("Fail to validate the token", e.getMessage());
   }
 
   @Test
