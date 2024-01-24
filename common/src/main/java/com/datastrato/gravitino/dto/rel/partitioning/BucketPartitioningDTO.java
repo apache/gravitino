@@ -2,27 +2,33 @@
  * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.gravitino.dto.rel.partitions;
+package com.datastrato.gravitino.dto.rel.partitioning;
 
 import static com.datastrato.gravitino.dto.rel.PartitionUtils.validateFieldExistence;
+import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.bucket;
 
 import com.datastrato.gravitino.dto.rel.ColumnDTO;
 import com.datastrato.gravitino.rel.expressions.Expression;
-import com.datastrato.gravitino.rel.expressions.NamedReference;
 import java.util.Arrays;
 import lombok.EqualsAndHashCode;
 
 @EqualsAndHashCode
-public final class ListPartitioningDTO implements Partitioning {
+public final class BucketPartitioningDTO implements Partitioning {
 
-  public static ListPartitioningDTO of(String[][] fieldNames) {
-    return new ListPartitioningDTO(fieldNames);
+  public static BucketPartitioningDTO of(int numBuckets, String[]... fieldNames) {
+    return new BucketPartitioningDTO(numBuckets, fieldNames);
   }
 
+  private final int numBuckets;
   private final String[][] fieldNames;
 
-  private ListPartitioningDTO(String[][] fieldNames) {
+  private BucketPartitioningDTO(int numBuckets, String[][] fieldNames) {
+    this.numBuckets = numBuckets;
     this.fieldNames = fieldNames;
+  }
+
+  public int numBuckets() {
+    return numBuckets;
   }
 
   public String[][] fieldNames() {
@@ -31,7 +37,7 @@ public final class ListPartitioningDTO implements Partitioning {
 
   @Override
   public Strategy strategy() {
-    return Strategy.LIST;
+    return Strategy.BUCKET;
   }
 
   @Override
@@ -46,19 +52,6 @@ public final class ListPartitioningDTO implements Partitioning {
 
   @Override
   public Expression[] arguments() {
-    return Arrays.stream(fieldNames).map(NamedReference::field).toArray(Expression[]::new);
-  }
-
-  public static class Builder {
-    private String[][] fieldNames;
-
-    public Builder withFieldNames(String[][] fieldNames) {
-      this.fieldNames = fieldNames;
-      return this;
-    }
-
-    public ListPartitioningDTO build() {
-      return new ListPartitioningDTO(fieldNames);
-    }
+    return bucket(numBuckets, fieldNames).arguments();
   }
 }

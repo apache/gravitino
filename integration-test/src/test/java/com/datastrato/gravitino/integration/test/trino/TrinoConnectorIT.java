@@ -14,8 +14,8 @@ import com.datastrato.gravitino.dto.rel.ColumnDTO;
 import com.datastrato.gravitino.dto.rel.DistributionDTO;
 import com.datastrato.gravitino.dto.rel.SortOrderDTO;
 import com.datastrato.gravitino.dto.rel.expressions.FieldReferenceDTO;
-import com.datastrato.gravitino.dto.rel.partitions.IdentityPartitioningDTO;
-import com.datastrato.gravitino.dto.rel.partitions.Partitioning.SingleFieldPartitioning;
+import com.datastrato.gravitino.dto.rel.partitioning.IdentityPartitioningDTO;
+import com.datastrato.gravitino.dto.rel.partitioning.Partitioning;
 import com.datastrato.gravitino.integration.test.catalog.jdbc.utils.JdbcDriverDownloader;
 import com.datastrato.gravitino.integration.test.container.ContainerSuite;
 import com.datastrato.gravitino.integration.test.container.HiveContainer;
@@ -947,7 +947,7 @@ public class TrinoConnectorIT extends AbstractIT {
                 NameIdentifier.of(metalakeName, catalogName, schemaName, tableCreatedByTrino));
 
     Arrays.stream(table.partitioning())
-        .anyMatch(p -> ((SingleFieldPartitioning) p).fieldName()[0].equals("name"));
+        .anyMatch(p -> ((Partitioning.SingleFieldPartitioning) p).fieldName()[0].equals("name"));
     Arrays.stream(table.sortOrder())
         .anyMatch(p -> ((FieldReferenceDTO) p.expression()).fieldName()[0].equals("id"));
   }

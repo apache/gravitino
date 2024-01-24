@@ -5,7 +5,7 @@
 package com.datastrato.gravitino.dto.rel;
 
 import com.datastrato.gravitino.dto.AuditDTO;
-import com.datastrato.gravitino.dto.rel.partitions.Partitioning;
+import com.datastrato.gravitino.dto.rel.partitioning.Partitioning;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
