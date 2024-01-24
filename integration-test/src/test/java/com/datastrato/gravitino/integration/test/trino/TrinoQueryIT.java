@@ -37,8 +37,6 @@ import org.slf4j.LoggerFactory;
 public class TrinoQueryIT extends TrinoQueryITBase {
   private static final Logger LOG = LoggerFactory.getLogger(TrinoQueryIT.class);
 
-  private static boolean autoStartEnv = false;
-
   protected static String testsetsDir = "";
   protected AtomicInteger testCount = new AtomicInteger(0);
   protected AtomicInteger totalCount = new AtomicInteger(0);
