@@ -40,7 +40,6 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.time.Instant;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -126,16 +125,12 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
     try {
       FilesetEntity filesetEntity =
           store.get(ident, Entity.EntityType.FILESET, FilesetEntity.class);
-      Path filesetPath = getFilesetPath(ident, filesetEntity);
 
       return new HadoopFileset.Builder()
           .withName(ident.name())
           .withType(filesetEntity.filesetType())
           .withComment(filesetEntity.comment())
-          // The returned storageLocation is a calculated one. If the fileset is managed and
-          // storageLocation is null, then the calculated location is the schema location + fileset
-          // name.
-          .withStorageLocation(filesetPath.toString())
+          .withStorageLocation(filesetEntity.storageLocation())
           .withProperties(filesetEntity.properties())
           .withAuditInfo(filesetEntity.auditInfo())
           .build();
@@ -222,9 +217,10 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
             .withNamespace(ident.namespace())
             .withComment(comment)
             .withFilesetType(type)
-            // Store the storageLocation to the store. The "storageLocation" can be null for managed
-            // fileset, Gravitino will get the location based on the catalog/schema's location.
-            .withStorageLocation(storageLocation)
+            // Store the storageLocation to the store. If the "storageLocation" is null for
+            // managed fileset, Gravitino will get and store the location based on the
+            // catalog/schema's location.
+            .withStorageLocation(filesetPath.toString())
             .withProperties(addManagedFlagToProperties(properties))
             .withAuditInfo(
                 new AuditInfo.Builder()
@@ -255,31 +251,12 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
   @Override
   public Fileset alterFileset(NameIdentifier ident, FilesetChange... changes)
       throws NoSuchFilesetException, IllegalArgumentException {
-    FilesetEntity filesetEntity;
     try {
-      filesetEntity = store.get(ident, Entity.EntityType.FILESET, FilesetEntity.class);
-    } catch (NoSuchEntityException exception) {
-      throw new NoSuchFilesetException("Fileset " + ident + " does not exist", exception);
+      if (!store.exists(ident, Entity.EntityType.FILESET)) {
+        throw new NoSuchFilesetException("Fileset " + ident + " does not exist");
+      }
     } catch (IOException ioe) {
       throw new RuntimeException("Failed to load fileset " + ident, ioe);
-    }
-
-    List<FilesetChange> renames =
-        Arrays.stream(changes)
-            .filter(c -> c instanceof FilesetChange.RenameFileset)
-            .collect(Collectors.toList());
-    Preconditions.checkArgument(
-        renames.size() <= 1,
-        "Only at most one rename operation is allowed once for fileset operations: "
-            + ident.name());
-
-    String newPath = null;
-    if (!renames.isEmpty()) {
-      FilesetChange.RenameFileset rename = (FilesetChange.RenameFileset) renames.get(0);
-      String newName = rename.getNewName();
-      newPath = renameStorageLocation(ident, filesetEntity, newName);
-    } else {
-      newPath = getFilesetPath(ident, filesetEntity).toString();
     }
 
     try {
@@ -294,7 +271,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
           .withName(updatedFilesetEntity.name())
           .withComment(updatedFilesetEntity.comment())
           .withType(updatedFilesetEntity.filesetType())
-          .withStorageLocation(newPath)
+          .withStorageLocation(updatedFilesetEntity.storageLocation())
           .withProperties(updatedFilesetEntity.properties())
           .withAuditInfo(updatedFilesetEntity.auditInfo())
           .build();
@@ -314,8 +291,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
     try {
       FilesetEntity filesetEntity =
           store.get(ident, Entity.EntityType.FILESET, FilesetEntity.class);
-
-      Path filesetPath = getFilesetPath(ident, filesetEntity);
+      Path filesetPath = new Path(filesetEntity.storageLocation());
 
       // For managed fileset, we should delete the related files.
       if (filesetEntity.filesetType().equals(Fileset.Type.MANAGED)) {
@@ -574,52 +550,6 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
         .build();
   }
 
-  private String renameStorageLocation(
-      NameIdentifier nameIdent, FilesetEntity filesetEntity, String newName) {
-    if (StringUtils.isNotBlank(filesetEntity.storageLocation())) {
-      // For specified storageLocation, we should not rename the physical location.
-      return filesetEntity.storageLocation();
-
-    } else if (filesetEntity.filesetType().equals(Fileset.Type.MANAGED)) {
-      // For managed fileset with no storage location, we should also rename the physical location.
-      Path oldFilesetPath = getFilesetPath(nameIdent, filesetEntity);
-      Path newFilesetPath = new Path(oldFilesetPath.getParent(), newName);
-
-      try {
-        FileSystem fs = oldFilesetPath.getFileSystem(hadoopConf);
-        if (!fs.exists(oldFilesetPath)) {
-          throw new NoSuchFilesetException(
-              "Fileset " + nameIdent + " location " + oldFilesetPath + " does not exist");
-        }
-        if (fs.exists(newFilesetPath)) {
-          throw new RuntimeException(
-              "Renamed Fileset " + newName + " location " + newFilesetPath + " already exists");
-        }
-
-        if (!fs.rename(oldFilesetPath, newFilesetPath)) {
-          throw new RuntimeException(
-              "Failed to rename fileset location from "
-                  + oldFilesetPath
-                  + " to new location "
-                  + newFilesetPath);
-        }
-
-        return newFilesetPath.toString();
-
-      } catch (IOException ioe) {
-        throw new RuntimeException(
-            "Failed to rename fileset location from "
-                + oldFilesetPath
-                + " to new location "
-                + newFilesetPath,
-            ioe);
-      }
-    } else {
-      throw new IllegalArgumentException(
-          "Storage location should not be blank for external fileset: " + nameIdent.name());
-    }
-  }
-
   private FilesetEntity updateFilesetEntity(
       NameIdentifier ident, FilesetEntity filesetEntity, FilesetChange... changes) {
     Map<String, String> props =
@@ -670,34 +600,5 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
     return Optional.ofNullable(schemaLocation)
         .map(Path::new)
         .orElse(catalogStorageLocation.map(p -> new Path(p, name)).orElse(null));
-  }
-
-  private Path getFilesetPath(NameIdentifier ident, FilesetEntity filesetEntity) {
-    if (StringUtils.isNotBlank(filesetEntity.storageLocation())) {
-      return new Path(filesetEntity.storageLocation());
-
-    } else if (filesetEntity.filesetType().equals(Fileset.Type.MANAGED)) {
-      // If the fileset is managed and storageLocation is null, then the calculated location is the
-      // schema location + fileset name.
-      SchemaEntity schemaEntity;
-      NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
-      try {
-        schemaEntity = store.get(schemaIdent, Entity.EntityType.SCHEMA, SchemaEntity.class);
-      } catch (Exception e) {
-        throw new RuntimeException("Failed to load schema " + schemaIdent, e);
-      }
-
-      Map<String, String> properties =
-          Optional.ofNullable(schemaEntity.properties()).orElse(Collections.emptyMap());
-      Path schemaPath = getSchemaPath(schemaIdent.name(), properties);
-      Preconditions.checkArgument(
-          schemaPath != null, "Schema location should not be null for managed fileset: " + ident);
-
-      return new Path(schemaPath, ident.name());
-
-    } else {
-      throw new IllegalArgumentException(
-          "Storage location should not be null for external fileset: " + ident);
-    }
   }
 }

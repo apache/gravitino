@@ -620,7 +620,7 @@ public class TestHadoopCatalogOperations {
             TEST_ROOT_PATH + "/catalog21",
             null,
             null,
-            TEST_ROOT_PATH + "/catalog21/s24_fileset31/fileset31_new"),
+            TEST_ROOT_PATH + "/catalog21/s24_fileset31/fileset31"),
         Arguments.of(
             // honor the schema location
             "fileset32",
@@ -629,7 +629,7 @@ public class TestHadoopCatalogOperations {
             null,
             TEST_ROOT_PATH + "/s24_fileset32",
             null,
-            TEST_ROOT_PATH + "/s24_fileset32/fileset32_new"),
+            TEST_ROOT_PATH + "/s24_fileset32/fileset32"),
         Arguments.of(
             // honor the schema location
             "fileset33",
@@ -638,9 +638,9 @@ public class TestHadoopCatalogOperations {
             TEST_ROOT_PATH + "/catalog22",
             TEST_ROOT_PATH + "/s24_fileset33",
             null,
-            TEST_ROOT_PATH + "/s24_fileset33/fileset33_new"),
+            TEST_ROOT_PATH + "/s24_fileset33/fileset33"),
         Arguments.of(
-            // honor the storage location, cannot rename specified storage location
+            // honor the storage location
             "fileset34",
             "fileset34_new",
             Fileset.Type.MANAGED,
@@ -649,7 +649,7 @@ public class TestHadoopCatalogOperations {
             TEST_ROOT_PATH + "/fileset34",
             TEST_ROOT_PATH + "/fileset34"),
         Arguments.of(
-            // honor the storage location, cannot rename specified storage location
+            // honor the storage location
             "fileset35",
             "fileset35_new",
             Fileset.Type.MANAGED,
@@ -658,7 +658,7 @@ public class TestHadoopCatalogOperations {
             TEST_ROOT_PATH + "/fileset35",
             TEST_ROOT_PATH + "/fileset35"),
         Arguments.of(
-            // honor the storage location, cannot rename specified storage location
+            // honor the storage location
             "fileset36",
             "fileset36_new",
             Fileset.Type.MANAGED,
@@ -667,7 +667,7 @@ public class TestHadoopCatalogOperations {
             TEST_ROOT_PATH + "/fileset36",
             TEST_ROOT_PATH + "/fileset36"),
         Arguments.of(
-            // honor the storage location, cannot rename specified storage location
+            // honor the storage location
             "fileset37",
             "fileset37_new",
             Fileset.Type.EXTERNAL,
@@ -676,7 +676,7 @@ public class TestHadoopCatalogOperations {
             TEST_ROOT_PATH + "/fileset37",
             TEST_ROOT_PATH + "/fileset37"),
         Arguments.of(
-            // honor the storage location, cannot rename specified storage location
+            // honor the storage location
             "fileset38",
             "fileset38_new",
             Fileset.Type.EXTERNAL,
@@ -685,7 +685,7 @@ public class TestHadoopCatalogOperations {
             TEST_ROOT_PATH + "/fileset38",
             TEST_ROOT_PATH + "/fileset38"),
         Arguments.of(
-            // honor the storage location, cannot rename specified storage location
+            // honor the storage location
             "fileset39",
             "fileset39_new",
             Fileset.Type.EXTERNAL,
