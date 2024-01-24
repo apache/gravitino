@@ -32,7 +32,10 @@ const TableView = props => {
   const [paginationModel, setPaginationModel] = useState(defaultPaginationConfig)
   const store = useAppSelector(state => state.metalakes)
 
-  const handleClickUrl = () => {
+  const handleClickUrl = path => {
+    if (!path) {
+      return
+    }
     const [metalake, catalog, schema, table] = new URLSearchParams(path)
 
     const id = `${(metalake && metalake[1]) ?? ''}${
@@ -66,9 +69,13 @@ const TableView = props => {
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
             <Typography
               noWrap
-              component={Link}
-              href={path ?? '/'}
-              onClick={() => handleClickUrl()}
+              {...(path
+                ? {
+                    component: Link,
+                    href: path
+                  }
+                : {})}
+              onClick={() => handleClickUrl(path)}
               sx={{
                 fontWeight: 400,
                 color: 'primary.main',
