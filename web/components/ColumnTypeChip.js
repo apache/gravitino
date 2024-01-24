@@ -21,7 +21,11 @@ const ColumnTypeChip = props => {
   const bgColor = alpha(color, 0.1)
 
   return (
-    <Chip size='small' label={label} sx={{ backgroundColor: bgColor }} color={columnTypeColor} variant='outlined' />
+    <>
+      {label ? (
+        <Chip size='small' label={label} sx={{ backgroundColor: bgColor }} color={columnTypeColor} variant='outlined' />
+      ) : null}
+    </>
   )
 }
 

@@ -52,19 +52,18 @@ const TableView = props => {
               : ''
           }`
 
-          if (table) {
+          if (id.split('____').length <= 2) {
+            dispatch(setExpandedTreeNode({ nodeIds: id }))
+
+            if (store.expandedTreeNode.length === 0) {
+              dispatch(setIntoTreeAction({ nodeIds: [id] }))
+            }
+          } else if (table) {
             dispatch(setExpandedTreeNode({ nodeIds: removeLastSegment(id) }))
-            dispatch(setIntoTreeAction({ nodeIds: [removeLastSegment(id)] }))
-            store.expandedTreeNode.forEach(node => {
-              dispatch(setIntoTreeAction({ nodeIds: [node] }))
-            })
             dispatch(setIntoTreeAction({ nodeIds: [removeLastSegment(id)] }))
           } else {
             dispatch(setExpandedTreeNode({ nodeIds: id }))
             dispatch(setIntoTreeAction({ nodeIds: [id] }))
-            store.expandedTreeNode.forEach(node => {
-              dispatch(setIntoTreeAction({ nodeIds: [node] }))
-            })
           }
         }
 

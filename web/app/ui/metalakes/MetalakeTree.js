@@ -23,7 +23,6 @@ import {
   setIntoTreeAction,
   setClickedExpandedNode,
   removeExpandedNode,
-  resetTableData,
   resetTree
 } from '@/lib/store/metalakes'
 

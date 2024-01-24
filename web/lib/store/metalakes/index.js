@@ -157,6 +157,7 @@ export const initMetalakeTree = createAsyncThunk(
 export const setIntoTreeAction = createAsyncThunk(
   'appMetalakes/setIntoTreeAction',
   async ({ catalogItem, nodeIds }, { getState, dispatch }) => {
+    dispatch(setTreeLoading(true))
     const nodeArr = nodeIds[0].split('____')
     const [metalake, catalog, schema, table] = nodeArr
 
@@ -181,12 +182,16 @@ export const setIntoTreeAction = createAsyncThunk(
       data.catalogs = catalogs.payload.catalogs
       data.catalogItem = catalogItem
 
+      dispatch(setTreeLoading(false))
+
       return data
     } else if (nodeArr.length === 2) {
       const schemas = await dispatch(fetchSchemas({ metalake, catalog }))
 
       data.updated = 'catalog'
       data.schemas = schemas.payload.schemas
+
+      dispatch(setTreeLoading(false))
 
       return data
     } else if (nodeArr.length === 3) {
@@ -195,8 +200,12 @@ export const setIntoTreeAction = createAsyncThunk(
       data.updated = 'schema'
       data.tables = tables.payload.tables
 
+      dispatch(setTreeLoading(false))
+
       return data
     } else {
+      dispatch(setTreeLoading(false))
+
       return null
     }
   }
@@ -225,6 +234,7 @@ export const fetchCatalogs = createAsyncThunk(
     dispatch(setTableLoading(false))
 
     if (err || !res) {
+      dispatch(resetTableData())
       throw new Error(err)
     }
 
@@ -282,13 +292,13 @@ export const fetchSchemas = createAsyncThunk(
   'appMetalakes/fetchSchemas',
   async ({ init, page, metalake, catalog }, { dispatch }) => {
     if (init) {
-      dispatch(resetTableData())
       dispatch(setTableLoading(true))
     }
     const [err, res] = await to(getSchemasApi({ metalake, catalog }))
     dispatch(setTableLoading(false))
 
     if (err || !res) {
+      dispatch(resetTableData())
       throw new Error(err)
     }
 
@@ -328,13 +338,13 @@ export const fetchTables = createAsyncThunk(
   'appMetalakes/fetchTables',
   async ({ init, page, metalake, catalog, schema }, { dispatch }) => {
     if (init) {
-      dispatch(resetTableData())
       dispatch(setTableLoading(true))
     }
     const [err, res] = await to(getTablesApi({ metalake, catalog, schema }))
     dispatch(setTableLoading(false))
 
     if (err || !res) {
+      dispatch(resetTableData())
       throw new Error(err)
     }
 
@@ -359,13 +369,13 @@ export const getTableDetails = createAsyncThunk(
   'appMetalakes/getTableDetails',
   async ({ init, metalake, catalog, schema, table }, { dispatch }) => {
     if (init) {
-      dispatch(resetTableData())
       dispatch(setTableLoading(true))
     }
     const [err, res] = await to(getTableDetailsApi({ metalake, catalog, schema, table }))
     dispatch(setTableLoading(false))
 
     if (err || !res) {
+      dispatch(resetTableData())
       throw new Error(err)
     }
 
