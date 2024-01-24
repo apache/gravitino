@@ -102,6 +102,11 @@ public class TestTableUpdatesRequest {
             + "}";
     Assertions.assertEquals(
         JsonUtils.objectMapper().readTree(expected), JsonUtils.objectMapper().readTree(jsonString));
+
+    // test validate blank property value
+    TableUpdateRequest.SetTablePropertyRequest setTablePropertyRequest =
+        new TableUpdateRequest.SetTablePropertyRequest("key", " ");
+    Assertions.assertDoesNotThrow(setTablePropertyRequest::validate);
   }
 
   @Test
