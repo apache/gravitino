@@ -383,5 +383,4 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
     byte[] reverted = revertByteArray(binaryTransactionId);
     return ByteUtils.byteToLong(reverted);
   }
-
 }
