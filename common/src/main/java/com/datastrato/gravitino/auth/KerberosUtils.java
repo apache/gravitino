@@ -21,6 +21,9 @@ import javax.security.auth.login.LoginContext;
 import org.ietf.jgss.GSSException;
 import org.ietf.jgss.Oid;
 
+// Referred from Apache Hadoop KerberosTestUtils.java
+// hadoop-common-project/hadoop-auth/src/test/java/org/apache/hadoop/security/\
+// authentication/KerberosTestUtils.java
 public class KerberosUtils {
 
   private KerberosUtils() {}
