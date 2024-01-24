@@ -58,19 +58,6 @@ public interface SupportsPartitions extends Table {
   Partition addPartition(Partition partition) throws PartitionAlreadyExistsException;
 
   /**
-   * Alter a partition with specified identifier.
-   *
-   * @param partitionName The identifier of the partition.
-   * @param changes The changes to apply.
-   * @return The altered partition.
-   * @throws NoSuchPartitionException If the partition does not exist.
-   */
-  default Partition alterPartition(String partitionName, PartitionChange... changes)
-      throws NoSuchPartitionException {
-    throw new UnsupportedOperationException("Partition altering is not supported");
-  }
-
-  /**
    * Drop a partition with specified name.
    *
    * @param partitionName The identifier of the partition.

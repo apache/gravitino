@@ -60,13 +60,13 @@ public interface Table extends Auditable {
   }
 
   /**
-   * Table method for working with partitions. If the table does not support partitions, an {@link
-   * UnsupportedOperationException} is thrown.
+   * Table method for working with partitions. If the table does not support partition operations,
+   * an {@link UnsupportedOperationException} is thrown.
    *
    * @return The partition support table.
    * @throws UnsupportedOperationException If the table does not support partition operations.
    */
   default SupportsPartitions supportPartitions() throws UnsupportedOperationException {
-    throw new UnsupportedOperationException();
+    throw new UnsupportedOperationException("Table does not support partition operations.");
   }
 }
