@@ -4,6 +4,7 @@
  */
 package com.datastrato.gravitino.catalog.lakehouse.iceberg;
 
+import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.EMPTY_TRANSFORM;
 import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.bucket;
 import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.day;
 import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.identity;
@@ -22,6 +23,7 @@ import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.NamedReference;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
+import com.datastrato.gravitino.rel.expressions.literals.Literals;
 import com.datastrato.gravitino.rel.expressions.sorts.NullOrdering;
 import com.datastrato.gravitino.rel.expressions.sorts.SortDirection;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
@@ -29,7 +31,6 @@ import com.datastrato.gravitino.rel.expressions.sorts.SortOrders;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.types.Types;
 import com.google.common.collect.Maps;
-import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -116,7 +117,7 @@ public class TestIcebergTable {
   }
 
   @Test
-  public void testCreateIcebergTable() throws IOException {
+  public void testCreateIcebergTable() {
     String icebergTableName = "test_iceberg_table";
     NameIdentifier tableIdentifier =
         NameIdentifier.of(
@@ -194,6 +195,32 @@ public class TestIcebergTable {
                         Distributions.NONE,
                         sortOrders));
     Assertions.assertTrue(exception.getMessage().contains("Table already exists"));
+
+    IcebergColumn withDefaultValue =
+        new IcebergColumn.Builder()
+            .withName("col")
+            .withType(Types.DateType.get())
+            .withComment(ICEBERG_COMMENT)
+            .withNullable(false)
+            .withDefaultValue(Literals.NULL)
+            .build();
+    exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                icebergCatalog
+                    .asTableCatalog()
+                    .createTable(
+                        tableIdentifier,
+                        new Column[] {withDefaultValue},
+                        ICEBERG_COMMENT,
+                        properties,
+                        EMPTY_TRANSFORM,
+                        Distributions.NONE,
+                        null));
+    Assertions.assertTrue(
+        exception.getMessage().contains("Iceberg does not support column default value"),
+        "The exception message is: " + exception.getMessage());
   }
 
   @Test
