@@ -12,6 +12,8 @@ import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
+import com.datastrato.gravitino.rel.indexes.Index;
+import com.datastrato.gravitino.rel.indexes.Indexes;
 import java.util.Collections;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -46,6 +48,14 @@ public interface Table extends Auditable {
    */
   default Distribution distribution() {
     return Distributions.NONE;
+  }
+
+  /**
+   * @return The indexes of the table. If no indexes are specified, Indexes.EMPTY_INDEXES is
+   *     returned.
+   */
+  default Index[] index() {
+    return Indexes.EMPTY_INDEXES;
   }
 
   /** @return The comment of the table. Null is returned if no comment is set. */

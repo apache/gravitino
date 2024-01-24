@@ -18,8 +18,8 @@ import com.datastrato.gravitino.dto.rel.DistributionDTO;
 import com.datastrato.gravitino.dto.rel.SortOrderDTO;
 import com.datastrato.gravitino.dto.rel.TableDTO;
 import com.datastrato.gravitino.dto.rel.expressions.FieldReferenceDTO;
-import com.datastrato.gravitino.dto.rel.partitions.IdentityPartitioningDTO;
-import com.datastrato.gravitino.dto.rel.partitions.Partitioning;
+import com.datastrato.gravitino.dto.rel.partitioning.IdentityPartitioningDTO;
+import com.datastrato.gravitino.dto.rel.partitioning.Partitioning;
 import com.datastrato.gravitino.dto.requests.TableCreateRequest;
 import com.datastrato.gravitino.dto.requests.TableUpdateRequest;
 import com.datastrato.gravitino.dto.requests.TableUpdatesRequest;
@@ -41,6 +41,7 @@ import com.datastrato.gravitino.rel.expressions.sorts.NullOrdering;
 import com.datastrato.gravitino.rel.expressions.sorts.SortDirection;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
+import com.datastrato.gravitino.rel.indexes.Indexes;
 import com.datastrato.gravitino.rel.types.Type;
 import com.datastrato.gravitino.rel.types.Types;
 import com.datastrato.gravitino.rest.RESTUtils;
@@ -197,7 +198,8 @@ public class TestTableOperations extends JerseyTest {
             ImmutableMap.of("k1", "v1"),
             sortOrderDTOs,
             distributionDTO,
-            Partitioning.EMPTY_PARTITIONING);
+            Partitioning.EMPTY_PARTITIONING,
+            Indexes.EMPTY_INDEXES);
 
     Response resp =
         target(tablePath(metalake, catalog, schema))
@@ -237,7 +239,8 @@ public class TestTableOperations extends JerseyTest {
             ImmutableMap.of("k1", "v1"),
             sortOrderDTOs,
             distributionDTO,
-            Partitioning.EMPTY_PARTITIONING);
+            Partitioning.EMPTY_PARTITIONING,
+            Indexes.EMPTY_INDEXES);
 
     resp =
         target(tablePath(metalake, catalog, schema))
@@ -328,7 +331,8 @@ public class TestTableOperations extends JerseyTest {
             ImmutableMap.of("k1", "v1"),
             SortOrderDTO.EMPTY_SORT,
             DistributionDTO.NONE,
-            partitioning);
+            partitioning,
+            Indexes.EMPTY_INDEXES);
 
     Response resp =
         target(tablePath(metalake, catalog, schema))
@@ -376,7 +380,8 @@ public class TestTableOperations extends JerseyTest {
             ImmutableMap.of("k1", "v1"),
             SortOrderDTO.EMPTY_SORT,
             null,
-            new Partitioning[] {errorPartition});
+            new Partitioning[] {errorPartition},
+            Indexes.EMPTY_INDEXES);
     resp =
         target(tablePath(metalake, catalog, schema))
             .request(MediaType.APPLICATION_JSON_TYPE)

@@ -22,17 +22,18 @@ import com.datastrato.gravitino.dto.rel.expressions.FieldReferenceDTO;
 import com.datastrato.gravitino.dto.rel.expressions.FuncExpressionDTO;
 import com.datastrato.gravitino.dto.rel.expressions.FunctionArg;
 import com.datastrato.gravitino.dto.rel.expressions.LiteralDTO;
-import com.datastrato.gravitino.dto.rel.partitions.BucketPartitioningDTO;
-import com.datastrato.gravitino.dto.rel.partitions.DayPartitioningDTO;
-import com.datastrato.gravitino.dto.rel.partitions.FunctionPartitioningDTO;
-import com.datastrato.gravitino.dto.rel.partitions.HourPartitioningDTO;
-import com.datastrato.gravitino.dto.rel.partitions.IdentityPartitioningDTO;
-import com.datastrato.gravitino.dto.rel.partitions.ListPartitioningDTO;
-import com.datastrato.gravitino.dto.rel.partitions.MonthPartitioningDTO;
-import com.datastrato.gravitino.dto.rel.partitions.Partitioning;
-import com.datastrato.gravitino.dto.rel.partitions.RangePartitioningDTO;
-import com.datastrato.gravitino.dto.rel.partitions.TruncatePartitioningDTO;
-import com.datastrato.gravitino.dto.rel.partitions.YearPartitioningDTO;
+import com.datastrato.gravitino.dto.rel.indexes.IndexDTO;
+import com.datastrato.gravitino.dto.rel.partitioning.BucketPartitioningDTO;
+import com.datastrato.gravitino.dto.rel.partitioning.DayPartitioningDTO;
+import com.datastrato.gravitino.dto.rel.partitioning.FunctionPartitioningDTO;
+import com.datastrato.gravitino.dto.rel.partitioning.HourPartitioningDTO;
+import com.datastrato.gravitino.dto.rel.partitioning.IdentityPartitioningDTO;
+import com.datastrato.gravitino.dto.rel.partitioning.ListPartitioningDTO;
+import com.datastrato.gravitino.dto.rel.partitioning.MonthPartitioningDTO;
+import com.datastrato.gravitino.dto.rel.partitioning.Partitioning;
+import com.datastrato.gravitino.dto.rel.partitioning.RangePartitioningDTO;
+import com.datastrato.gravitino.dto.rel.partitioning.TruncatePartitioningDTO;
+import com.datastrato.gravitino.dto.rel.partitioning.YearPartitioningDTO;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.Schema;
 import com.datastrato.gravitino.rel.Table;
@@ -47,6 +48,7 @@ import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrders;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
+import com.datastrato.gravitino.rel.indexes.Index;
 import java.util.Arrays;
 import org.apache.commons.lang3.ArrayUtils;
 
@@ -191,6 +193,17 @@ public class DTOConverters {
     }
   }
 
+  public static IndexDTO toDTO(Index index) {
+    if (index instanceof IndexDTO) {
+      return (IndexDTO) index;
+    }
+    return IndexDTO.builder()
+        .withIndexType(index.type())
+        .withName(index.name())
+        .withFieldNames(index.fieldNames())
+        .build();
+  }
+
   public static FunctionArg toFunctionArg(Expression expression) {
     if (expression instanceof FunctionArg) {
       return (FunctionArg) expression;
@@ -225,6 +238,13 @@ public class DTOConverters {
     return Arrays.stream(expressions).map(DTOConverters::toFunctionArg).toArray(FunctionArg[]::new);
   }
 
+  public static ColumnDTO[] toDTOs(Column[] columns) {
+    if (ArrayUtils.isEmpty(columns)) {
+      return new ColumnDTO[0];
+    }
+    return Arrays.stream(columns).map(DTOConverters::toDTO).toArray(ColumnDTO[]::new);
+  }
+
   public static SortOrderDTO[] toDTOs(SortOrder[] sortOrders) {
     if (ArrayUtils.isEmpty(sortOrders)) {
       return new SortOrderDTO[0];
@@ -237,6 +257,13 @@ public class DTOConverters {
       return new Partitioning[0];
     }
     return Arrays.stream(transforms).map(DTOConverters::toDTO).toArray(Partitioning[]::new);
+  }
+
+  public static IndexDTO[] toDTOs(Index[] indexes) {
+    if (ArrayUtils.isEmpty(indexes)) {
+      return new IndexDTO[0];
+    }
+    return Arrays.stream(indexes).map(DTOConverters::toDTO).toArray(IndexDTO[]::new);
   }
 
   public static Distribution fromDTO(DistributionDTO distributionDTO) {
@@ -308,13 +335,13 @@ public class DTOConverters {
     if (column.defaultValue().equals(Column.DEFAULT_VALUE_NOT_SET)) {
       return column;
     }
-    return ColumnDTO.builder()
-        .withName(column.name())
-        .withDataType(column.dataType())
-        .withComment(column.comment())
-        .withNullable(column.nullable())
-        .withDefaultValue(fromFunctionArg((FunctionArg) column.defaultValue()))
-        .build();
+    return Column.of(
+        column.name(),
+        column.dataType(),
+        column.comment(),
+        column.nullable(),
+        column.autoIncrement(),
+        fromFunctionArg((FunctionArg) column.defaultValue()));
   }
 
   public static Transform fromDTO(Partitioning partitioning) {
