@@ -481,6 +481,8 @@ export const appMetalakesSlice = createSlice({
         const schemaIndex = state.metalakeTree[catalogIndex].schemas.findIndex(i => i.id === action.payload.id)
         state.metalakeTree[catalogIndex].schemas[schemaIndex].tables = action.payload.tables
       }
+
+      appMetalakesSlice.caseReducers.setExpandedTreeNode(state, { payload: { nodeIds: action.payload.nodeIds } })
     })
     builder.addCase(getMetalakeDetails.fulfilled, (state, action) => {
       state.activatedDetails = action.payload

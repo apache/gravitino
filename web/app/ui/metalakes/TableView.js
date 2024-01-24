@@ -51,18 +51,13 @@ const TableView = props => {
                 }`
               : ''
           }`
-
           if (id.split('____').length <= 2) {
-            dispatch(setExpandedTreeNode({ nodeIds: id }))
-
-            if (store.expandedTreeNode.length === 0) {
+            if (store.expandedTreeNode.length === 0 || !store.expandedTreeNode.includes(id)) {
               dispatch(setIntoTreeAction({ nodeIds: [id] }))
             }
           } else if (table) {
-            dispatch(setExpandedTreeNode({ nodeIds: removeLastSegment(id) }))
             dispatch(setIntoTreeAction({ nodeIds: [removeLastSegment(id)] }))
           } else {
-            dispatch(setExpandedTreeNode({ nodeIds: id }))
             dispatch(setIntoTreeAction({ nodeIds: [id] }))
           }
         }
