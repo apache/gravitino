@@ -125,6 +125,6 @@ public class MysqlDatabaseOperations extends JdbcDatabaseOperations {
 
   @Override
   protected boolean isSystemDatabase(String dbName) {
-    return SYS_MYSQL_DATABASE_NAMES.contains(dbName);
+    return SYS_MYSQL_DATABASE_NAMES.contains(dbName.toLowerCase());
   }
 }

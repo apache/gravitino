@@ -132,6 +132,6 @@ public class PostgreSqlSchemaOperations extends JdbcDatabaseOperations {
 
   @Override
   protected boolean isSystemDatabase(String dbName) {
-    return SYS_PG_DATABASE_NAMES.contains(dbName);
+    return SYS_PG_DATABASE_NAMES.contains(dbName.toLowerCase());
   }
 }
