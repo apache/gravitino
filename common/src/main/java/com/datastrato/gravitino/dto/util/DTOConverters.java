@@ -245,6 +245,13 @@ public class DTOConverters {
     return Arrays.stream(sortOrders).map(DTOConverters::toDTO).toArray(SortOrderDTO[]::new);
   }
 
+  public static ColumnDTO[] toDTOs(Column[] columns) {
+    if (ArrayUtils.isEmpty(columns)) {
+      return new ColumnDTO[0];
+    }
+    return Arrays.stream(columns).map(DTOConverters::toDTO).toArray(ColumnDTO[]::new);
+  }
+
   public static Partitioning[] toDTOs(Transform[] transforms) {
     if (ArrayUtils.isEmpty(transforms)) {
       return new Partitioning[0];
