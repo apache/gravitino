@@ -60,25 +60,25 @@ public class CatalogPostgreSqlIT extends AbstractIT {
   public static final String DOWNLOAD_JDBC_DRIVER_URL =
       "https://jdbc.postgresql.org/download/postgresql-42.7.0.jar";
 
-  public  String metalakeName = GravitinoITUtils.genRandomName("postgresql_it_metalake");
-  public  String catalogName = GravitinoITUtils.genRandomName("postgresql_it_catalog");
-  public  String schemaName = GravitinoITUtils.genRandomName("postgresql_it_schema");
-  public  String tableName = GravitinoITUtils.genRandomName("postgresql_it_table");
-  public  String alertTableName = "alert_table_name";
-  public  String table_comment = "table_comment";
-  public  String schema_comment = "schema_comment";
-  public  String POSTGRESQL_COL_NAME1 = "postgresql_col_name1";
-  public  String POSTGRESQL_COL_NAME2 = "postgresql_col_name2";
-  public  String POSTGRESQL_COL_NAME3 = "postgresql_col_name3";
-  private  final String provider = "jdbc-postgresql";
+  public String metalakeName = GravitinoITUtils.genRandomName("postgresql_it_metalake");
+  public String catalogName = GravitinoITUtils.genRandomName("postgresql_it_catalog");
+  public String schemaName = GravitinoITUtils.genRandomName("postgresql_it_schema");
+  public String tableName = GravitinoITUtils.genRandomName("postgresql_it_table");
+  public String alertTableName = "alert_table_name";
+  public String table_comment = "table_comment";
+  public String schema_comment = "schema_comment";
+  public String POSTGRESQL_COL_NAME1 = "postgresql_col_name1";
+  public String POSTGRESQL_COL_NAME2 = "postgresql_col_name2";
+  public String POSTGRESQL_COL_NAME3 = "postgresql_col_name3";
+  private final String provider = "jdbc-postgresql";
 
-  private  GravitinoMetaLake metalake;
+  private GravitinoMetaLake metalake;
 
-  private  Catalog catalog;
+  private Catalog catalog;
 
-  private  PostgreSqlService postgreSqlService;
+  private PostgreSqlService postgreSqlService;
 
-  private  PostgreSQLContainer<?> POSTGRESQL_CONTAINER;
+  private PostgreSQLContainer<?> POSTGRESQL_CONTAINER;
 
   protected final String TEST_DB_NAME = GravitinoITUtils.genRandomName("test_db");
 
