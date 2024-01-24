@@ -6,8 +6,11 @@ package com.datastrato.gravitino.rel;
 
 import com.datastrato.gravitino.rel.expressions.literals.Literal;
 import com.datastrato.gravitino.rel.expressions.literals.Literals;
+import com.datastrato.gravitino.rel.partitions.IdentityPartition;
+import com.datastrato.gravitino.rel.partitions.ListPartition;
 import com.datastrato.gravitino.rel.partitions.Partition;
 import com.datastrato.gravitino.rel.partitions.Partitions;
+import com.datastrato.gravitino.rel.partitions.RangePartition;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.time.LocalDate;
@@ -22,9 +25,8 @@ public class TestPartitions {
         Partitions.range("p0", Literals.NULL, Literals.integerLiteral(6), Maps.newHashMap());
     Assertions.assertEquals("p0", partition.name());
     Assertions.assertEquals(Maps.newHashMap(), partition.properties());
-    Assertions.assertEquals(Literals.NULL, ((Partitions.RangePartition) partition).upper());
-    Assertions.assertEquals(
-        Literals.integerLiteral(6), ((Partitions.RangePartition) partition).lower());
+    Assertions.assertEquals(Literals.NULL, ((RangePartition) partition).upper());
+    Assertions.assertEquals(Literals.integerLiteral(6), ((RangePartition) partition).lower());
 
     partition =
         Partitions.list(
@@ -44,16 +46,14 @@ public class TestPartitions {
     Assertions.assertEquals(Maps.newHashMap(), partition.properties());
     Assertions.assertEquals(
         Literals.dateLiteral(LocalDate.parse("2022-04-01")),
-        ((Partitions.ListPartition) partition).lists()[0][0]);
+        ((ListPartition) partition).lists()[0][0]);
     Assertions.assertEquals(
-        Literals.stringLiteral("Los Angeles"),
-        ((Partitions.ListPartition) partition).lists()[0][1]);
+        Literals.stringLiteral("Los Angeles"), ((ListPartition) partition).lists()[0][1]);
     Assertions.assertEquals(
         Literals.dateLiteral(LocalDate.parse("2022-04-01")),
-        ((Partitions.ListPartition) partition).lists()[1][0]);
+        ((ListPartition) partition).lists()[1][0]);
     Assertions.assertEquals(
-        Literals.stringLiteral("San Francisco"),
-        ((Partitions.ListPartition) partition).lists()[1][1]);
+        Literals.stringLiteral("San Francisco"), ((ListPartition) partition).lists()[1][1]);
 
     partition =
         Partitions.identity(
@@ -68,13 +68,13 @@ public class TestPartitions {
         ImmutableMap.of("location", "/user/hive/warehouse/tpch_flat_orc_2.db/orders"),
         partition.properties());
     Assertions.assertArrayEquals(
-        new String[] {"dt"}, ((Partitions.IdentityPartition) partition).fieldNames()[0]);
+        new String[] {"dt"}, ((IdentityPartition) partition).fieldNames()[0]);
     Assertions.assertArrayEquals(
-        new String[] {"country"}, ((Partitions.IdentityPartition) partition).fieldNames()[1]);
+        new String[] {"country"}, ((IdentityPartition) partition).fieldNames()[1]);
     Assertions.assertEquals(
         Literals.dateLiteral(LocalDate.parse("2008-08-08")),
-        ((Partitions.IdentityPartition) partition).values()[0]);
+        ((IdentityPartition) partition).values()[0]);
     Assertions.assertEquals(
-        Literals.stringLiteral("us"), ((Partitions.IdentityPartition) partition).values()[1]);
+        Literals.stringLiteral("us"), ((IdentityPartition) partition).values()[1]);
   }
 }
