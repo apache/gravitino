@@ -50,9 +50,12 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.api.TestInstance.Lifecycle;
 import org.testcontainers.containers.MySQLContainer;
 
 @Tag("gravitino-docker-it")
+@TestInstance(Lifecycle.PER_CLASS)
 public class CatalogMysqlIT extends AbstractIT {
   public static String metalakeName = GravitinoITUtils.genRandomName("mysql_it_metalake");
   public static String catalogName = GravitinoITUtils.genRandomName("mysql_it_catalog");
@@ -69,26 +72,30 @@ public class CatalogMysqlIT extends AbstractIT {
       "https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.27/mysql-connector-java-8.0.27.jar";
   private static final String provider = "jdbc-mysql";
 
-  private static GravitinoMetaLake metalake;
+  private GravitinoMetaLake metalake;
 
-  private static Catalog catalog;
+  private Catalog catalog;
 
-  private static MysqlService mysqlService;
+  private MysqlService mysqlService;
 
-  private static MySQLContainer<?> MYSQL_CONTAINER;
+  private MySQLContainer<?> MYSQL_CONTAINER;
 
-  protected static final String TEST_DB_NAME = RandomUtils.nextInt(10000) + "_test_db";
+  protected final String TEST_DB_NAME = RandomUtils.nextInt(10000) + "_test_db";
 
-  public static final String mysqlImageName = "mysql:8.0";
+  public static String defaultMysqlImageName = "mysql:8.0";
+
+  protected String mysqlImageName = "mysql:8.0";
 
   @BeforeAll
-  public static void startup() throws IOException {
+  public void startup() throws IOException {
 
     if (!ITUtils.EMBEDDED_TEST_MODE.equals(testMode)) {
       String gravitinoHome = System.getenv("GRAVITINO_HOME");
       Path tmpPath = Paths.get(gravitinoHome, "/catalogs/jdbc-mysql/libs");
       JdbcDriverDownloader.downloadJdbcDriver(DOWNLOAD_JDBC_DRIVER_URL, tmpPath.toString());
     }
+
+    System.out.println(mysqlImageName);
 
     MYSQL_CONTAINER =
         new MySQLContainer<>(mysqlImageName)
@@ -103,7 +110,7 @@ public class CatalogMysqlIT extends AbstractIT {
   }
 
   @AfterAll
-  public static void stop() {
+  public void stop() {
     clearTableAndSchema();
     client.dropMetalake(NameIdentifier.of(metalakeName));
     mysqlService.close();
@@ -116,7 +123,7 @@ public class CatalogMysqlIT extends AbstractIT {
     createSchema();
   }
 
-  private static void clearTableAndSchema() {
+  private void clearTableAndSchema() {
     NameIdentifier[] nameIdentifiers =
         catalog.asTableCatalog().listTables(Namespace.of(metalakeName, catalogName, schemaName));
     for (NameIdentifier nameIdentifier : nameIdentifiers) {
@@ -125,7 +132,7 @@ public class CatalogMysqlIT extends AbstractIT {
     catalog.asSchemas().dropSchema(NameIdentifier.of(metalakeName, catalogName, schemaName), false);
   }
 
-  private static void createMetalake() {
+  private void createMetalake() {
     GravitinoMetaLake[] gravitinoMetaLakes = client.listMetalakes();
     Assertions.assertEquals(0, gravitinoMetaLakes.length);
 
@@ -137,7 +144,7 @@ public class CatalogMysqlIT extends AbstractIT {
     metalake = loadMetalake;
   }
 
-  private static void createCatalog() {
+  private void createCatalog() {
     Map<String, String> catalogProperties = Maps.newHashMap();
 
     catalogProperties.put(
@@ -161,7 +168,7 @@ public class CatalogMysqlIT extends AbstractIT {
     catalog = loadCatalog;
   }
 
-  private static void createSchema() {
+  private void createSchema() {
     NameIdentifier ident = NameIdentifier.of(metalakeName, catalogName, schemaName);
     Map<String, String> prop = Maps.newHashMap();
 

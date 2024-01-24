@@ -60,7 +60,7 @@ public class TestMultipleJdbcLoad extends AbstractIT {
           CatalogMysqlIT.DOWNLOAD_JDBC_DRIVER_URL, tmpPath.toString(), icebergLibsPath.toString());
     }
     mySQLContainer =
-        new MySQLContainer<>(CatalogMysqlIT.mysqlImageName)
+        new MySQLContainer<>(CatalogMysqlIT.defaultMysqlImageName)
             .withDatabaseName(TEST_DB_NAME)
             .withUsername("root")
             .withPassword("root");
