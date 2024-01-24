@@ -17,7 +17,7 @@ import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergTable;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.ops.IcebergTableOpsHelper;
 import com.datastrato.gravitino.client.GravitinoMetaLake;
 import com.datastrato.gravitino.dto.rel.ColumnDTO;
-import com.datastrato.gravitino.dto.rel.partitions.Partitioning;
+import com.datastrato.gravitino.dto.rel.partitioning.Partitioning;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.TableAlreadyExistsException;
@@ -324,6 +324,21 @@ public class CatalogIcebergIT extends AbstractIT {
     schemaNames =
         icebergNamespaces.stream().map(ns -> ns.level(ns.length() - 1)).collect(Collectors.toSet());
     Assertions.assertTrue(schemaNames.contains(schemaName));
+  }
+
+  @Test
+  void testCreateTableWithNullComment() {
+    ColumnDTO[] columns = createColumns();
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
+
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    Table createdTable =
+        tableCatalog.createTable(tableIdentifier, columns, null, null, null, null, null);
+    Assertions.assertNull(createdTable.comment());
+
+    Table loadTable = tableCatalog.loadTable(tableIdentifier);
+    Assertions.assertNull(loadTable.comment());
   }
 
   @Test
