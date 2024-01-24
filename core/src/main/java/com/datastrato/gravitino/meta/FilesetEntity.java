@@ -14,9 +14,7 @@ import com.google.common.collect.Maps;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Objects;
-import javax.annotation.Nullable;
 import lombok.ToString;
-import org.apache.commons.lang3.StringUtils;
 
 @ToString
 public class FilesetEntity implements Entity, Auditable, HasIdentifier {
@@ -30,7 +28,7 @@ public class FilesetEntity implements Entity, Auditable, HasIdentifier {
   public static final Field TYPE =
       Field.required("type", Fileset.Type.class, "The type of the fileset entity.");
   public static final Field STORAGE_LOCATION =
-      Field.optional(
+      Field.required(
           "storage_location", String.class, "The storage location of the fileset entity.");
   public static final Field AUDIT_INFO =
       Field.required("audit_info", AuditInfo.class, "The audit details of the fileset entity.");
@@ -47,7 +45,7 @@ public class FilesetEntity implements Entity, Auditable, HasIdentifier {
 
   private Fileset.Type type;
 
-  @Nullable private String storageLocation;
+  private String storageLocation;
 
   private AuditInfo auditInfo;
 
@@ -285,11 +283,6 @@ public class FilesetEntity implements Entity, Auditable, HasIdentifier {
      */
     public FilesetEntity build() {
       fileset.validate();
-
-      if (fileset.type == Fileset.Type.EXTERNAL && StringUtils.isBlank(fileset.storageLocation)) {
-        throw new IllegalArgumentException("Storage location is required for EXTERNAL fileset.");
-      }
-
       return fileset;
     }
   }

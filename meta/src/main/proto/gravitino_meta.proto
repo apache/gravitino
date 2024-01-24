@@ -89,7 +89,7 @@ message Fileset {
   string name = 2;
   optional string comment = 3;
   Type type = 4;
-  optional string storage_location = 5;
+  string storage_location = 5;
   map<string, string> properties = 6;
   AuditInfo audit_info = 7;
 }

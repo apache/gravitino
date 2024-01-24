@@ -82,9 +82,8 @@ public interface FilesetCatalog {
    * <p>Implementation may reject the change. If any change is rejected, no changes should be
    * applied to the fileset.
    *
-   * <p>For managed fileset, if the storageLocation is not specified during creating. When applying
-   * {@link RenameFileset}, the implementation will also rename the underlying storageLocation from
-   * old name to newName specified in the {@link RenameFileset} change.
+   * <p>The {@link RenameFileset} change will only update the fileset name, the underlying storage
+   * location for managed fileset will not be renamed.
    *
    * @param ident A fileset identifier.
    * @param changes The changes to apply to the fileset.
