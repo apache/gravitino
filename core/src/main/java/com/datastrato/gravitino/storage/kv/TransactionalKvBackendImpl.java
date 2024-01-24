@@ -110,6 +110,7 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
     } finally {
       putPairs.get().clear();
       originalKeys.get().clear();
+      txId.remove();
     }
   }
 
@@ -119,6 +120,18 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
     for (Pair<byte[], byte[]> pair : putPairs.get()) {
       kvBackend.delete(pair.getKey());
     }
+  }
+
+  @Override
+  public void closeTransaction() {
+    putPairs.get().clear();
+    originalKeys.get().clear();
+    txId.remove();
+  }
+
+  @Override
+  public boolean inTransaction() {
+    return txId.get() != null;
   }
 
   @Override
@@ -242,12 +255,6 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
 
   @Override
   public void close() throws IOException {}
-
-  @Override
-  public void closeTransaction() {
-    putPairs.get().clear();
-    originalKeys.get().clear();
-  }
 
   public static byte[] getRealValue(byte[] rawValue) {
     byte[] firstType = ArrayUtils.subarray(rawValue, 0, LENGTH_OF_VALUE_STATUS);

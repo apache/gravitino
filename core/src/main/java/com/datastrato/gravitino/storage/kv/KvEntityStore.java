@@ -80,7 +80,7 @@ public class KvEntityStore implements EntityStore {
   @VisibleForTesting StorageLayoutVersion storageLayoutVersion;
 
   private TransactionIdGenerator txIdGenerator;
-  private KvGarbageCollector kvGarbageCollector;
+  @VisibleForTesting KvGarbageCollector kvGarbageCollector;
   private TransactionalKvBackend transactionalKvBackend;
 
   @Override
