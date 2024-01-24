@@ -94,8 +94,8 @@ public class CatalogIcebergIT extends AbstractIT {
   private static String WAREHOUSE;
   private static String HIVE_METASTORE_URIS;
 
-  private static final String SELECT_ALL_TEMPLATE = "SELECT * FROM iceberg.%s";
-  private static final String INSERT_BATCH_WITHOUT_PARTITION_TEMPLATE =
+  private static String SELECT_ALL_TEMPLATE = "SELECT * FROM iceberg.%s";
+  private static String INSERT_BATCH_WITHOUT_PARTITION_TEMPLATE =
       "INSERT INTO iceberg.%s VALUES %s";
   private static GravitinoMetaLake metalake;
 
@@ -741,7 +741,7 @@ public class CatalogIcebergIT extends AbstractIT {
     // select data
     Dataset<Row> sql = spark.sql(String.format(SELECT_ALL_TEMPLATE, tableIdentifier));
     Assertions.assertEquals(4, sql.count());
-    Row[] result = sql.sort(ICEBERG_COL_NAME1).collect();
+    Row[] result = (Row[]) sql.sort(ICEBERG_COL_NAME1).collect();
     LocalDate currentDate = LocalDate.now();
     DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
     for (int i = 0; i < result.length; i++) {
@@ -758,7 +758,7 @@ public class CatalogIcebergIT extends AbstractIT {
             tableIdentifier, ICEBERG_COL_NAME1, ICEBERG_COL_NAME1));
     sql = spark.sql(String.format(SELECT_ALL_TEMPLATE, tableIdentifier));
     Assertions.assertEquals(4, sql.count());
-    result = sql.sort(ICEBERG_COL_NAME1).collect();
+    result = (Row[]) sql.sort(ICEBERG_COL_NAME1).collect();
     for (int i = 0; i < result.length; i++) {
       if (i == result.length - 1) {
         LocalDate previousDay = currentDate.minusDays(1);
@@ -777,7 +777,7 @@ public class CatalogIcebergIT extends AbstractIT {
         String.format("DELETE FROM iceberg.%s WHERE %s = 100", tableIdentifier, ICEBERG_COL_NAME1));
     sql = spark.sql(String.format(SELECT_ALL_TEMPLATE, tableIdentifier));
     Assertions.assertEquals(3, sql.count());
-    result = sql.sort(ICEBERG_COL_NAME1).collect();
+    result = (Row[]) sql.sort(ICEBERG_COL_NAME1).collect();
     for (int i = 0; i < result.length; i++) {
       LocalDate previousDay = currentDate.minusDays(i + 2);
       Assertions.assertEquals(
