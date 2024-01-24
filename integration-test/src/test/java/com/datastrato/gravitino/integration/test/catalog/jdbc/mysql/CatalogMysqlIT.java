@@ -57,20 +57,21 @@ import org.testcontainers.containers.MySQLContainer;
 @Tag("gravitino-docker-it")
 @TestInstance(Lifecycle.PER_CLASS)
 public class CatalogMysqlIT extends AbstractIT {
-  public static String metalakeName = GravitinoITUtils.genRandomName("mysql_it_metalake");
-  public static String catalogName = GravitinoITUtils.genRandomName("mysql_it_catalog");
-  public static String schemaName = GravitinoITUtils.genRandomName("mysql_it_schema");
-  public static String tableName = GravitinoITUtils.genRandomName("mysql_it_table");
-  public static String alertTableName = "alert_table_name";
-  public static String table_comment = "table_comment";
-
-  public static String schema_comment = "schema_comment";
-  public static String MYSQL_COL_NAME1 = "mysql_col_name1";
-  public static String MYSQL_COL_NAME2 = "mysql_col_name2";
-  public static String MYSQL_COL_NAME3 = "mysql_col_name3";
+  private static final String provider = "jdbc-mysql";
   public static final String DOWNLOAD_JDBC_DRIVER_URL =
       "https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.27/mysql-connector-java-8.0.27.jar";
-  private static final String provider = "jdbc-mysql";
+
+  public String metalakeName = GravitinoITUtils.genRandomName("mysql_it_metalake");
+  public String catalogName = GravitinoITUtils.genRandomName("mysql_it_catalog");
+  public String schemaName = GravitinoITUtils.genRandomName("mysql_it_schema");
+  public String tableName = GravitinoITUtils.genRandomName("mysql_it_table");
+  public String alertTableName = "alert_table_name";
+  public String table_comment = "table_comment";
+
+  public String schema_comment = "schema_comment";
+  public String MYSQL_COL_NAME1 = "mysql_col_name1";
+  public String MYSQL_COL_NAME2 = "mysql_col_name2";
+  public String MYSQL_COL_NAME3 = "mysql_col_name3";
 
   private GravitinoMetaLake metalake;
 
