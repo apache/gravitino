@@ -93,13 +93,14 @@ public class KvEntityStore implements EntityStore {
 
     this.transactionalKvBackend = new TransactionalKvBackendImpl(backend, txIdGenerator);
 
-    this.kvGarbageCollector = new KvGarbageCollector(backend, config);
-    kvGarbageCollector.start();
     this.reentrantReadWriteLock = new ReentrantReadWriteLock();
 
     this.nameMappingService =
         new KvNameMappingService(transactionalKvBackend, reentrantReadWriteLock);
     this.entityKeyEncoder = new BinaryEntityKeyEncoder(nameMappingService);
+
+    this.kvGarbageCollector = new KvGarbageCollector(backend, config, entityKeyEncoder);
+    kvGarbageCollector.start();
 
     this.storageLayoutVersion = initStorageVersionInfo();
   }

@@ -12,7 +12,11 @@ import static com.datastrato.gravitino.storage.kv.TransactionalKvBackendImpl.gen
 import static com.datastrato.gravitino.storage.kv.TransactionalKvBackendImpl.getBinaryTransactionId;
 
 import com.datastrato.gravitino.Config;
+import com.datastrato.gravitino.Entity.EntityType;
+import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.storage.EntityKeyEncoder;
 import com.datastrato.gravitino.utils.Bytes;
+import com.datastrato.gravitino.utils.TimeStampUtils;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.Closeable;
 import java.io.IOException;
@@ -35,6 +39,7 @@ public final class KvGarbageCollector implements Closeable {
   private static final Logger LOG = LoggerFactory.getLogger(KvGarbageCollector.class);
   private final KvBackend kvBackend;
   private final Config config;
+  private final EntityKeyEncoder<byte[]> entityKeyEncoder;
 
   private static final long MAX_DELETE_TIME_ALLOW = 1000 * 60 * 60 * 24 * 30L; // 30 days
   private static final long MIN_DELETE_TIME_ALLOW = 1000 * 60 * 10L; // 10 minutes
@@ -50,9 +55,11 @@ public final class KvGarbageCollector implements Closeable {
           },
           new ThreadPoolExecutor.AbortPolicy());
 
-  public KvGarbageCollector(KvBackend kvBackend, Config config) {
+  public KvGarbageCollector(
+      KvBackend kvBackend, Config config, EntityKeyEncoder<byte[]> entityKeyEncoder) {
     this.kvBackend = kvBackend;
     this.config = config;
+    this.entityKeyEncoder = entityKeyEncoder;
 
     long deleteTimeLine = config.get(KV_DELETE_AFTER_TIME);
     if (deleteTimeLine > MAX_DELETE_TIME_ALLOW || deleteTimeLine < MIN_DELETE_TIME_ALLOW) {
@@ -108,7 +115,14 @@ public final class KvGarbageCollector implements Closeable {
     LOG.info("Start to remove {} uncommitted data", kvs.size());
     for (Pair<byte[], byte[]> pair : kvs) {
       // Remove is a high-risk operation, So we log every delete operation
-      LOG.info("Remove uncommitted data: Key {}", Bytes.wrap(pair.getKey()));
+      LogHelper logHelper = decodeKey(pair.getKey());
+      LOG.info(
+          "Physically delete key that has marked uncommitted: name identity: '{}', entity type: '{}', createTime: '{}({})', key: '{}'",
+          logHelper.identifier,
+          logHelper.type,
+          logHelper.createTimeAsString,
+          logHelper.createTimeInMs,
+          pair.getKey());
       kvBackend.delete(pair.getKey());
     }
   }
@@ -156,7 +170,14 @@ public final class KvGarbageCollector implements Closeable {
 
         // Value has deleted mark, we can remove it.
         if (null == TransactionalKvBackendImpl.getRealValue(rawValue)) {
-          LOG.info("Physically delete key that has marked deleted: {}", Bytes.wrap(key));
+          LogHelper logHelper = decodeKey(key, transactionId);
+          LOG.info(
+              "Physically delete key that has marked deleted:name identity: '{}', entity type: '{}', createTime: '{}({})', key: '{}'",
+              logHelper.identifier,
+              logHelper.type,
+              logHelper.createTimeAsString,
+              logHelper.createTimeInMs,
+              Bytes.wrap(key));
           kvBackend.delete(rawKey);
           keysDeletedCount++;
           continue;
@@ -176,10 +197,20 @@ public final class KvGarbageCollector implements Closeable {
                     .build());
         if (!newVersionOfKey.isEmpty()) {
           // Has a newer version, we can remove it.
+          LogHelper logHelper = decodeKey(key, transactionId);
+          byte[] newVersionKey = newVersionOfKey.get(0).getKey();
+          LogHelper newVersionLogHelper = decodeKey(newVersionKey);
           LOG.info(
-              "Physically delete key that has newer version: {}, a newer version {}",
+              "Physically delete key that has newer version: name identity: '{}', entity type: '{}', createTime: '{}({})', newVersion createTime: '{}({})',"
+                  + " key: '{}', newVersion key: '{}'",
+              logHelper.identifier,
+              logHelper.type,
+              logHelper.createTimeAsString,
+              logHelper.createTimeInMs,
+              newVersionLogHelper.createTimeAsString,
+              newVersionLogHelper.createTimeInMs,
               Bytes.wrap(rawKey),
-              Bytes.wrap(newVersionOfKey.get(0).getKey()));
+              Bytes.wrap(newVersionKey));
           kvBackend.delete(rawKey);
           keysDeletedCount++;
         }
@@ -187,10 +218,62 @@ public final class KvGarbageCollector implements Closeable {
 
       // All keys in this transaction have been deleted, we can remove the commit mark.
       if (keysDeletedCount == keysInTheTransaction.size()) {
-        LOG.info("Physically delete commit mark: {}", Bytes.wrap(kv.getKey()));
+        long timestamp = TransactionalKvBackendImpl.getTransactionId(transactionId) >> 18;
+        LOG.info(
+            "Physically delete commit mark: {}, createTime: '{}({})', key: '{}'",
+            Bytes.wrap(kv.getKey()),
+            TimeStampUtils.formatTimestamp(timestamp),
+            timestamp,
+            Bytes.wrap(kv.getKey()));
         kvBackend.delete(kv.getKey());
       }
     }
+  }
+
+  static class LogHelper {
+    private final NameIdentifier identifier;
+    private final EntityType type;
+
+    private final long createTimeInMs;
+    // Formatted create time
+    private final String createTimeAsString;
+
+    public static final LogHelper NONE = new LogHelper(null, null, 0L, null);
+
+    public LogHelper(
+        NameIdentifier identifier,
+        EntityType type,
+        long createTimeInMs,
+        String createTimeAsString) {
+      this.identifier = identifier;
+      this.type = type;
+      this.createTimeInMs = createTimeInMs;
+      this.createTimeAsString = createTimeAsString;
+    }
+  }
+
+  private LogHelper decodeKey(byte[] key, byte[] timestampArray) {
+    if (entityKeyEncoder == null) {
+      return LogHelper.NONE;
+    }
+
+    Pair<NameIdentifier, EntityType> entityTypePair;
+    try {
+      entityTypePair = entityKeyEncoder.decode(key);
+    } catch (Exception e) {
+      LOG.warn("Unable to decode key: {}", Bytes.wrap(key), e);
+      return LogHelper.NONE;
+    }
+    long timestamp = TransactionalKvBackendImpl.getTransactionId(timestampArray) >> 18;
+    String ts = TimeStampUtils.formatTimestamp(timestamp);
+
+    return new LogHelper(entityTypePair.getKey(), entityTypePair.getValue(), timestamp, ts);
+  }
+
+  private LogHelper decodeKey(byte[] rawKey) {
+    byte[] key = TransactionalKvBackendImpl.getRealKey(rawKey);
+    byte[] timestampArray = TransactionalKvBackendImpl.getBinaryTransactionId(rawKey);
+    return decodeKey(key, timestampArray);
   }
 
   @Override

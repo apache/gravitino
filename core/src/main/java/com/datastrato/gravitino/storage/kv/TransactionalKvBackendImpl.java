@@ -330,11 +330,12 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
    * versions quickly.
    */
   private static byte[] revertByteArray(byte[] bytes) {
+    byte[] result = ArrayUtils.clone(bytes);
     for (int i = 0; i < bytes.length; i++) {
-      bytes[i] = (byte) (bytes[i] ^ (byte) 0xff);
+      result[i] = (byte) (result[i] ^ (byte) 0xff);
     }
 
-    return bytes;
+    return result;
   }
 
   /** Generate a key of data for a specific transaction id. */
@@ -377,4 +378,10 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
   static byte[] getBinaryTransactionId(byte[] rawKey) {
     return ArrayUtils.subarray(rawKey, rawKey.length - LENGTH_OF_TRANSACTION_ID, rawKey.length);
   }
+
+  static long getTransactionId(byte[] binaryTransactionId) {
+    byte[] reverted = revertByteArray(binaryTransactionId);
+    return ByteUtils.byteToLong(reverted);
+  }
+
 }

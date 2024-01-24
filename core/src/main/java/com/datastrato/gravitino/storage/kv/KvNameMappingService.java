@@ -73,7 +73,7 @@ public class KvNameMappingService implements NameMappingService {
             FunctionUtils.executeInTransaction(
                 () -> {
                   byte[] name = transactionalKvBackend.get(idByte);
-                  return idByte == null ? null : new String(name);
+                  return name == null ? null : new String(name);
                 },
                 transactionalKvBackend),
         lock);
