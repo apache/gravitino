@@ -1076,7 +1076,6 @@ public class TestKvEntityStorage {
       Assertions.assertDoesNotThrow(
           () -> store.get(NameIdentifier.of("metalake3"), EntityType.METALAKE, BaseMetalake.class));
 
-
       // Test catalog
       CatalogEntity catalog1 = createCatalog(Namespace.of("metalake1"), "catalog1", auditInfo);
       CatalogEntity catalog2 = createCatalog(Namespace.of("metalake1"), "catalog2", auditInfo);
@@ -1096,14 +1095,23 @@ public class TestKvEntityStorage {
       kvEntityStore.kvGarbageCollector.collectAndClean();
 
       Assertions.assertDoesNotThrow(
-          () -> store.get(NameIdentifier.of("metalake1", "catalog1"), EntityType.CATALOG, CatalogEntity.class));
+          () ->
+              store.get(
+                  NameIdentifier.of("metalake1", "catalog1"),
+                  EntityType.CATALOG,
+                  CatalogEntity.class));
       Assertions.assertDoesNotThrow(
-          () -> store.get(NameIdentifier.of("metalake1", "catalog2"), EntityType.CATALOG, CatalogEntity.class));
+          () ->
+              store.get(
+                  NameIdentifier.of("metalake1", "catalog2"),
+                  EntityType.CATALOG,
+                  CatalogEntity.class));
 
       // Test schema
       SchemaEntity schema1 =
           createSchemaEntity(Namespace.of("metalake1", "catalog2"), "schema1", auditInfo);
-      SchemaEntity schema2 = createSchemaEntity(Namespace.of("metalake1", "catalog2"), "schema2", auditInfo);
+      SchemaEntity schema2 =
+          createSchemaEntity(Namespace.of("metalake1", "catalog2"), "schema2", auditInfo);
 
       store.put(schema1);
       store.put(schema2);
@@ -1119,20 +1127,31 @@ public class TestKvEntityStorage {
       kvEntityStore.kvGarbageCollector.collectAndClean();
 
       Assertions.assertDoesNotThrow(
-          () -> store.get(NameIdentifier.of("metalake1", "catalog2", "schema1"), EntityType.SCHEMA, SchemaEntity.class));
+          () ->
+              store.get(
+                  NameIdentifier.of("metalake1", "catalog2", "schema1"),
+                  EntityType.SCHEMA,
+                  SchemaEntity.class));
       Assertions.assertDoesNotThrow(
-          () -> store.get(NameIdentifier.of("metalake1", "catalog2", "schema2"), EntityType.SCHEMA, SchemaEntity.class));
+          () ->
+              store.get(
+                  NameIdentifier.of("metalake1", "catalog2", "schema2"),
+                  EntityType.SCHEMA,
+                  SchemaEntity.class));
 
       // Test table
       TableEntity table1 =
           createTableEntity(Namespace.of("metalake1", "catalog2", "schema2"), "table1", auditInfo);
-      TableEntity table2 = createTableEntity(Namespace.of("metalake1", "catalog2", "schema2"), "table2", auditInfo);
+      TableEntity table2 =
+          createTableEntity(Namespace.of("metalake1", "catalog2", "schema2"), "table2", auditInfo);
 
       store.put(table1);
       store.put(table2);
 
-      store.delete(NameIdentifier.of("metalake1", "catalog2", "schema2", "table1"), EntityType.TABLE);
-      store.delete(NameIdentifier.of("metalake1", "catalog2", "schema2", "table2"), EntityType.TABLE);
+      store.delete(
+          NameIdentifier.of("metalake1", "catalog2", "schema2", "table1"), EntityType.TABLE);
+      store.delete(
+          NameIdentifier.of("metalake1", "catalog2", "schema2", "table2"), EntityType.TABLE);
 
       store.put(table1);
       store.put(table2);
@@ -1142,9 +1161,17 @@ public class TestKvEntityStorage {
       kvEntityStore.kvGarbageCollector.collectAndClean();
 
       Assertions.assertDoesNotThrow(
-          () -> store.get(NameIdentifier.of("metalake1", "catalog2", "schema2", "table1"), EntityType.TABLE, TableEntity.class));
+          () ->
+              store.get(
+                  NameIdentifier.of("metalake1", "catalog2", "schema2", "table1"),
+                  EntityType.TABLE,
+                  TableEntity.class));
       Assertions.assertDoesNotThrow(
-          () -> store.get(NameIdentifier.of("metalake1", "catalog2", "schema2", "table2"), EntityType.TABLE, TableEntity.class));
+          () ->
+              store.get(
+                  NameIdentifier.of("metalake1", "catalog2", "schema2", "table2"),
+                  EntityType.TABLE,
+                  TableEntity.class));
     }
   }
 }
