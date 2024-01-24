@@ -5,6 +5,9 @@
 
 package com.datastrato.gravitino.integration.test.catalog.jdbc.mysql;
 
+import org.junit.jupiter.api.Tag;
+
+@Tag("gravitino-docker-it")
 public class CatalogMysqlVersion5IT extends CatalogMysqlIT {
   public CatalogMysqlVersion5IT() {
     super();
