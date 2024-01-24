@@ -4,6 +4,7 @@
  */
 package com.datastrato.gravitino.catalog;
 
+import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.utils.PrincipalUtils;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
@@ -31,9 +32,13 @@ public class OperationsProxy<T> implements InvocationHandler {
 
   @Override
   public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
-    return plugin.doAs(
+    Object object = plugin.doAs(
         PrincipalUtils.getCurrentPrincipal(),
         () -> method.invoke(ops, args),
         Collections.emptyMap());
+    if (object instanceof Table) {
+      return createProxy(object, plugin);
+    }
+    return object;
   }
 }
