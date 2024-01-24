@@ -5,6 +5,9 @@
 
 package com.datastrato.gravitino.integration.test.catalog.jdbc.postgresql;
 
+import org.junit.jupiter.api.Tag;
+
+@Tag("gravitino-docker-it")
 public class CatalogPostgreSqlVersion16IT extends CatalogPostgreSqlIT {
   public CatalogPostgreSqlVersion16IT() {
     postgreImageName = "postgres:16";
