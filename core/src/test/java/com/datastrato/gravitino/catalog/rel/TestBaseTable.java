@@ -7,6 +7,7 @@ package com.datastrato.gravitino.catalog.rel;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import com.datastrato.gravitino.catalog.TableOperations;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
@@ -18,6 +19,11 @@ import org.junit.jupiter.api.Test;
 final class BaseTableExtension extends BaseTable {
 
   private BaseTableExtension() {}
+
+  @Override
+  protected TableOperations newOps() {
+    return null;
+  }
 
   public static class Builder extends BaseTableBuilder<Builder, BaseTableExtension> {
 

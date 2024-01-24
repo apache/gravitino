@@ -4,6 +4,7 @@
  */
 package com.datastrato.gravitino.catalog.rel;
 
+import com.datastrato.gravitino.catalog.TableOperations;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.Table;
@@ -36,6 +37,29 @@ public abstract class BaseTable implements Table {
   @Nullable protected Distribution distribution;
 
   @Nullable protected Index[] indexes;
+
+  private volatile TableOperations ops;
+
+  /** @return The {@link TableOperations} instance associated with this table. */
+  protected abstract TableOperations newOps();
+
+  /**
+   * Retrieves the {@link TableOperations} instance associated with this table. If the instance is
+   * not initialized, it is initialized and returned.
+   *
+   * @return The {@link TableOperations} instance associated with this table.
+   */
+  public TableOperations ops() {
+    if (ops == null) {
+      synchronized (this) {
+        if (ops == null) {
+          ops = newOps();
+        }
+      }
+    }
+
+    return ops;
+  }
 
   /** Returns the audit details of the table. */
   @Override
