@@ -14,7 +14,7 @@ public class Indexes {
    *
    * @param name The name of the index
    * @param fieldNames The field names under the table contained in the index.
-   * @return
+   * @return The unique index
    */
   public static Index unique(String name, String[][] fieldNames) {
     return of(Index.IndexType.UNIQUE_KEY, name, fieldNames);
@@ -25,7 +25,7 @@ public class Indexes {
    *
    * @param name The name of the index
    * @param fieldNames The field names under the table contained in the index.
-   * @return
+   * @return The primary index
    */
   public static Index primary(String name, String[][] fieldNames) {
     return of(Index.IndexType.PRIMARY_KEY, name, fieldNames);
@@ -35,7 +35,7 @@ public class Indexes {
    * @param indexType The type of the index
    * @param name The name of the index
    * @param fieldNames The field names under the table contained in the index.
-   * @return
+   * @return The index
    */
   public static Index of(Index.IndexType indexType, String name, String[][] fieldNames) {
     return IndexImpl.builder()

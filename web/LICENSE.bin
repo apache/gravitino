@@ -362,7 +362,6 @@
    stylis
    supports-color
    supports-preserve-symlinks-flag
-   sweetalert2
    throttle-debounce
    tiny-case
    to-fast-properties
