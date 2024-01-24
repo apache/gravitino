@@ -4,14 +4,11 @@
  */
 package com.datastrato.gravitino.catalog;
 
-import com.datastrato.gravitino.catalog.rel.BaseTable;
-import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.utils.PrincipalUtils;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.util.Collections;
-import org.apache.commons.lang3.ArrayUtils;
 
 /** Proxy wrapper on an operation class to execute operations by impersonating given user */
 public class OperationsProxy<T> implements InvocationHandler {
@@ -39,18 +36,9 @@ public class OperationsProxy<T> implements InvocationHandler {
 
   @Override
   public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
-    Object object =
-        plugin.doAs(
-            PrincipalUtils.getCurrentPrincipal(),
-            () -> method.invoke(ops, args),
-            Collections.emptyMap());
-    if (object instanceof Table) {
-
-      return createProxyInternal(
-          object,
-          plugin,
-          ArrayUtils.addAll(BaseTable.class.getInterfaces(), object.getClass().getInterfaces()));
-    }
-    return object;
+    return plugin.doAs(
+        PrincipalUtils.getCurrentPrincipal(),
+        () -> method.invoke(ops, args),
+        Collections.emptyMap());
   }
 }
