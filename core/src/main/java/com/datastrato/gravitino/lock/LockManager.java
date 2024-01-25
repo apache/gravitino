@@ -30,7 +30,7 @@ import org.slf4j.LoggerFactory;
  * </pre>
  *
  * If the lock manager fails to lock the resource path, it will release all the locks that have been
- * locked.
+ * locked in the inverse sequences it locks the resource path.
  */
 public class LockManager {
   private static final Logger LOG = LoggerFactory.getLogger(LockManager.class);
@@ -111,12 +111,12 @@ public class LockManager {
       for (String level : levels) {
         lockNode = lockNode.getOrCreateChild(level);
         lockNode.lock(LockType.READ);
-        holdingLocks.get().push(TreeLockPair.of(lockNode, LockType.READ));
+        putLockToStack(lockNode, LockType.READ);
       }
 
       lockNode = lockNode.getOrCreateChild(identifier.name());
       lockNode.lock(lockType);
-      holdingLocks.get().push(TreeLockPair.of(lockNode, lockType));
+      putLockToStack(lockNode, lockType);
     } catch (Exception e) {
       unlockResourcePath();
       LOG.error("Failed to lock resource path {}", identifier, e);
@@ -124,15 +124,24 @@ public class LockManager {
     }
   }
 
+  private void putLockToStack(TreeLockNode lockNode, LockType lockType) {
+    Stack<TreeLockPair> stack = holdingLocks.get();
+    stack.push(TreeLockPair.of(lockNode, lockType));
+  }
+
   /**
-   * Unlock the resource path from root to the resource path. We would get the resource path from
-   * {@link ThreadLocal} instance.
+   * Unlock the resource path from root to the resource path. We would get the locks holds by the
+   * current thread.
    */
   public void unlockResourcePath() {
-    Stack<TreeLockPair> stack = holdingLocks.get();
-    while (!stack.isEmpty()) {
-      TreeLockPair treeLockPair = stack.pop();
-      treeLockPair.treeLockNode.unlock(treeLockPair.lockType);
+    try {
+      Stack<TreeLockPair> stack = holdingLocks.get();
+      while (!stack.isEmpty()) {
+        TreeLockPair treeLockPair = stack.pop();
+        treeLockPair.treeLockNode.unlock(treeLockPair.lockType);
+      }
+    } finally {
+      holdingLocks.remove();
     }
   }
 }

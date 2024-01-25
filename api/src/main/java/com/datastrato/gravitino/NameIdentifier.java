@@ -8,7 +8,6 @@ import com.datastrato.gravitino.exceptions.IllegalNameIdentifierException;
 import com.google.common.base.Splitter;
 import com.google.common.collect.Iterables;
 import java.util.Arrays;
-import org.apache.commons.lang3.ArrayUtils;
 
 /**
  * A name identifier is a sequence of names separated by dots. It's used to identify a metalake, a
@@ -227,34 +226,5 @@ public class NameIdentifier {
     if (!condition) {
       throw new IllegalNameIdentifierException(String.format(message, args));
     }
-  }
-
-  public NameIdentifier child(String childName) {
-    String[] levels = ArrayUtils.add(namespace.levels(), this.name);
-    Namespace ns = Namespace.of(levels);
-    return NameIdentifier.of(ns, childName);
-  }
-
-  public boolean hasParent() {
-    return this != ROOT;
-  }
-
-  public NameIdentifier parent() {
-    if (this == ROOT) {
-      throw new IllegalArgumentException("Cannot get parent of ROOT");
-    }
-
-    String[] levels = namespace.levels();
-    if (levels.length == 0) {
-      return ROOT;
-    }
-
-    Namespace ns = Namespace.of(ArrayUtils.subarray(levels, 0, levels.length - 1));
-    return NameIdentifier.of(ns, levels[levels.length - 1]);
-  }
-
-  public String[] levels() {
-    String[] levels = namespace.levels();
-    return ArrayUtils.add(levels, this.name);
   }
 }

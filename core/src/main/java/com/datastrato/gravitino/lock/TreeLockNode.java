@@ -12,20 +12,23 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import javax.annotation.concurrent.ThreadSafe;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @ThreadSafe
 public class TreeLockNode {
+  public static final Logger LOG = LoggerFactory.getLogger(TreeLockNode.class);
   private final String name;
-  private final ReentrantReadWriteLock reentrantReadWriteLock;
-  private final Map<String, TreeLockNode> children;
+  private final ReentrantReadWriteLock readWriteLock;
+  private final Map<String, TreeLockNode> childMap;
 
   private final AtomicLong referenceCount = new AtomicLong();
   private long lastAccessTime;
 
   public TreeLockNode(String name) {
     this.name = name;
-    this.reentrantReadWriteLock = new ReentrantReadWriteLock();
-    this.children = new ConcurrentHashMap<>();
+    this.readWriteLock = new ReentrantReadWriteLock();
+    this.childMap = new ConcurrentHashMap<>();
   }
 
   public long getLastAccessTime() {
@@ -45,10 +48,16 @@ public class TreeLockNode {
   public void lock(LockType lockType) {
     referenceCount.getAndIncrement();
     if (lockType == LockType.READ) {
-      reentrantReadWriteLock.readLock().lock();
+      readWriteLock.readLock().lock();
     } else {
-      reentrantReadWriteLock.writeLock().lock();
+      readWriteLock.writeLock().lock();
     }
+
+    LOG.info(
+        "Node {} has been lock with '{}' lock, reference count = {}",
+        name,
+        lockType,
+        referenceCount.get());
   }
 
   /**
@@ -62,10 +71,15 @@ public class TreeLockNode {
     referenceCount.getAndDecrement();
     lastAccessTime = System.currentTimeMillis();
     if (lockType == LockType.READ) {
-      reentrantReadWriteLock.readLock().unlock();
+      readWriteLock.readLock().unlock();
     } else {
-      reentrantReadWriteLock.writeLock().unlock();
+      readWriteLock.writeLock().unlock();
     }
+    LOG.info(
+        "Node {} has been unlock with '{}' lock, reference count = {}",
+        name,
+        lockType,
+        referenceCount.get());
   }
 
   /**
@@ -75,14 +89,14 @@ public class TreeLockNode {
    * @return The tree lock node of the resource.
    */
   public TreeLockNode getOrCreateChild(String name) {
-    TreeLockNode treeNode = children.get(name);
+    TreeLockNode treeNode = childMap.get(name);
     lastAccessTime = System.currentTimeMillis();
     if (treeNode == null) {
       synchronized (this) {
-        treeNode = children.get(name);
+        treeNode = childMap.get(name);
         if (treeNode == null) {
           treeNode = new TreeLockNode(name);
-          children.put(name, treeNode);
+          childMap.put(name, treeNode);
         }
       }
     }
@@ -91,10 +105,10 @@ public class TreeLockNode {
   }
 
   public List<TreeLockNode> getAllChildren() {
-    return Lists.newArrayList(children.values());
+    return Lists.newArrayList(childMap.values());
   }
 
   public synchronized void removeChild(String name) {
-    children.remove(name);
+    childMap.remove(name);
   }
 }
