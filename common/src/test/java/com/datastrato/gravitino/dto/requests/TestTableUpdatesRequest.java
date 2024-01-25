@@ -107,6 +107,9 @@ public class TestTableUpdatesRequest {
     TableUpdateRequest.SetTablePropertyRequest setTablePropertyRequest =
         new TableUpdateRequest.SetTablePropertyRequest("key", " ");
     Assertions.assertDoesNotThrow(setTablePropertyRequest::validate);
+
+    setTablePropertyRequest = new TableUpdateRequest.SetTablePropertyRequest("key", "");
+    Assertions.assertDoesNotThrow(setTablePropertyRequest::validate);
   }
 
   @Test
