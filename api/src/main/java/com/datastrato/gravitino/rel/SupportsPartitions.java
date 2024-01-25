@@ -25,7 +25,23 @@ public interface SupportsPartitions {
   Partition[] listPartitions();
 
   /**
-   * Get a partition by partition name
+   * Get a partition by partition name, you may get one of the following types of partitions:
+   *
+   * <ul>
+   *   <li>{@link com.datastrato.gravitino.rel.partitions.IdentityPartition}
+   *   <li>{@link com.datastrato.gravitino.rel.partitions.ListPartition}
+   *   <li>{@link com.datastrato.gravitino.rel.partitions.RangePartition}
+   * </ul>
+   *
+   * It depends on the {@link Table#partitioning()}. A Java type conversion is required before
+   * getting the specific partition, for example:
+   *
+   * <pre>
+   *   RangePartition rangePartition = (RangePartition) table.supportPartitions().getPartition("p20200321");
+   *   Literal&lt;?&gt; upper = rangePartition.upper();
+   *   Literal&lt;?&gt; lower = rangePartition.lower();
+   *   ...
+   * </pre>
    *
    * @param partitionName the name of the partition
    * @return the partition
