@@ -865,7 +865,7 @@ tableCatalog.purgeTable(NameIdentifier.of("metalake", "catalog", "schema", "tabl
 </TabItem>
 </Tabs>
 
-There are two ways to drop a table: `dropTable` and `purgeTable`: 
+There are two ways to remove a table: `dropTable` and `purgeTable`: 
 
 * `dropTable`  removes both the metadata and data of the table. If the catalog supports recycling, such as Hive catalog, the data will be moved to the trash.
 * `purgeTable` if the catalog support recycling, removes both the metadata and data without moving the data to the trash. If the catalog doesn't support recycling, an UnsupportedException is thrown.
