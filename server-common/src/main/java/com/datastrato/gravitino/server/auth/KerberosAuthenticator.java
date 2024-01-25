@@ -60,6 +60,7 @@ public class KerberosAuthenticator implements Authenticator {
       serverSubject.getPrincipals().add(krbPrincipal);
       KeyTab keytabInstance = KeyTab.getInstance(keytabFile);
       serverSubject.getPrivateCredentials().add(keytabInstance);
+
       gssManager =
           Subject.doAs(
               serverSubject,
@@ -84,17 +85,20 @@ public class KerberosAuthenticator implements Authenticator {
     if (tokenData == null) {
       throw new UnauthorizedException("Empty token authorization header", AuthConstants.NEGOTIATE);
     }
+
     String authData = new String(tokenData);
     if (StringUtils.isBlank(authData)
         || !authData.startsWith(AuthConstants.AUTHORIZATION_NEGOTIATE_HEADER)) {
       throw new UnauthorizedException(
           "Invalid token authorization header", AuthConstants.NEGOTIATE);
     }
+
     String token = authData.substring(AuthConstants.AUTHORIZATION_NEGOTIATE_HEADER.length());
     byte[] clientToken = Base64.getDecoder().decode(token);
     if (StringUtils.isBlank(token)) {
       throw new UnauthorizedException("Blank token found", AuthConstants.NEGOTIATE);
     }
+
     try {
       String serverPrincipal = KerberosUtil.getTokenServerName(clientToken);
       return Subject.doAs(
@@ -116,12 +120,14 @@ public class KerberosAuthenticator implements Authenticator {
     GSSCredential gssCreds = null;
     try {
       LOG.trace("SPNEGO initiated with server principal [{}]", serverPrincipal);
+
       gssCreds =
           this.gssManager.createCredential(
               this.gssManager.createName(serverPrincipal, KerberosUtils.NT_GSS_KRB5_PRINCIPAL_OID),
               GSSCredential.INDEFINITE_LIFETIME,
               new Oid[] {KerberosUtils.GSS_SPNEGO_MECH_OID, KerberosUtils.GSS_KRB5_MECH_OID},
               GSSCredential.ACCEPT_ONLY);
+
       gssContext = this.gssManager.createContext(gssCreds);
       byte[] serverToken = gssContext.acceptSecContext(clientToken, 0, clientToken.length);
 
@@ -129,20 +135,24 @@ public class KerberosAuthenticator implements Authenticator {
       if (serverToken != null && serverToken.length > 0) {
         authenticateToken = Base64.getEncoder().encodeToString(serverToken);
       }
+
       if (!gssContext.isEstablished()) {
         LOG.trace("SPNEGO in progress");
         String challenge = AuthConstants.AUTHORIZATION_NEGOTIATE_HEADER + authenticateToken;
         throw new UnauthorizedException("GssContext isn't established", challenge);
       }
+
       // Usually principal names are in the form 'user/instance@REALM' or 'user@REALM'.
       String[] principalComponents = gssContext.getSrcName().toString().split("@");
       if (principalComponents.length != 2) {
         throw new UnauthorizedException("Principal has wrong format", AuthConstants.NEGOTIATE);
       }
+
       String[] userAndInstance = principalComponents[0].split("/");
       if (userAndInstance.length > 2) {
         throw new UnauthorizedException("Principal has wrong format", AuthConstants.NEGOTIATE);
       }
+
       String user = userAndInstance[0];
       // TODO: We will have KerberosUserPrincipal in the future.
       //  We can put more information of Kerberos to the KerberosUserPrincipal
@@ -157,6 +167,7 @@ public class KerberosAuthenticator implements Authenticator {
       if (gssContext != null) {
         gssContext.dispose();
       }
+
       if (gssCreds != null) {
         gssCreds.dispose();
       }
