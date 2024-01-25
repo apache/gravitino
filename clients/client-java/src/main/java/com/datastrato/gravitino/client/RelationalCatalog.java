@@ -11,7 +11,6 @@ import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.dto.AuditDTO;
 import com.datastrato.gravitino.dto.CatalogDTO;
-import com.datastrato.gravitino.dto.rel.ColumnDTO;
 import com.datastrato.gravitino.dto.requests.SchemaCreateRequest;
 import com.datastrato.gravitino.dto.requests.SchemaUpdateRequest;
 import com.datastrato.gravitino.dto.requests.SchemaUpdatesRequest;
@@ -38,6 +37,7 @@ import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
+import com.datastrato.gravitino.rel.indexes.Index;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
@@ -135,6 +135,7 @@ public class RelationalCatalog extends CatalogDTO implements TableCatalog, Suppo
    * @param comment The comment of the table.
    * @param properties The properties of the table.
    * @param partitioning The partitioning of the table.
+   * @param indexes The indexes of the table.
    * @return The created {@link Table}.
    * @throws NoSuchSchemaException if the schema with specified namespace does not exist.
    * @throws TableAlreadyExistsException if the table with specified identifier already exists.
@@ -147,7 +148,8 @@ public class RelationalCatalog extends CatalogDTO implements TableCatalog, Suppo
       Map<String, String> properties,
       Transform[] partitioning,
       Distribution distribution,
-      SortOrder[] sortOrders)
+      SortOrder[] sortOrders,
+      Index[] indexes)
       throws NoSuchSchemaException, TableAlreadyExistsException {
     NameIdentifier.checkTable(ident);
 
@@ -155,11 +157,12 @@ public class RelationalCatalog extends CatalogDTO implements TableCatalog, Suppo
         new TableCreateRequest(
             ident.name(),
             comment,
-            (ColumnDTO[]) columns,
+            toDTOs(columns),
             properties,
             toDTOs(sortOrders),
             toDTO(distribution),
-            toDTOs(partitioning));
+            toDTOs(partitioning),
+            toDTOs(indexes));
     req.validate();
 
     TableResponse resp =
@@ -256,6 +259,8 @@ public class RelationalCatalog extends CatalogDTO implements TableCatalog, Suppo
       resp.validate();
       return resp.dropped();
 
+    } catch (UnsupportedOperationException e) {
+      throw e;
     } catch (Exception e) {
       LOG.warn("Failed to purge table {}", ident, e);
       return false;

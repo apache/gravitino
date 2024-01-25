@@ -4,11 +4,12 @@
  */
 package com.datastrato.gravitino.client;
 
-import static com.datastrato.gravitino.dto.rel.partitions.Partitioning.EMPTY_PARTITIONING;
+import static com.datastrato.gravitino.dto.rel.partitioning.Partitioning.EMPTY_PARTITIONING;
 import static com.datastrato.gravitino.rel.expressions.sorts.SortDirection.DESCENDING;
 import static org.apache.hc.core5.http.HttpStatus.SC_BAD_REQUEST;
 import static org.apache.hc.core5.http.HttpStatus.SC_CONFLICT;
 import static org.apache.hc.core5.http.HttpStatus.SC_INTERNAL_SERVER_ERROR;
+import static org.apache.hc.core5.http.HttpStatus.SC_METHOD_NOT_ALLOWED;
 import static org.apache.hc.core5.http.HttpStatus.SC_NOT_FOUND;
 import static org.apache.hc.core5.http.HttpStatus.SC_OK;
 
@@ -24,9 +25,10 @@ import com.datastrato.gravitino.dto.rel.SortOrderDTO;
 import com.datastrato.gravitino.dto.rel.TableDTO;
 import com.datastrato.gravitino.dto.rel.expressions.FieldReferenceDTO;
 import com.datastrato.gravitino.dto.rel.expressions.FunctionArg;
-import com.datastrato.gravitino.dto.rel.partitions.DayPartitioningDTO;
-import com.datastrato.gravitino.dto.rel.partitions.IdentityPartitioningDTO;
-import com.datastrato.gravitino.dto.rel.partitions.Partitioning;
+import com.datastrato.gravitino.dto.rel.expressions.LiteralDTO;
+import com.datastrato.gravitino.dto.rel.partitioning.DayPartitioningDTO;
+import com.datastrato.gravitino.dto.rel.partitioning.IdentityPartitioningDTO;
+import com.datastrato.gravitino.dto.rel.partitioning.Partitioning;
 import com.datastrato.gravitino.dto.requests.CatalogCreateRequest;
 import com.datastrato.gravitino.dto.requests.SchemaCreateRequest;
 import com.datastrato.gravitino.dto.requests.SchemaUpdateRequest;
@@ -53,6 +55,7 @@ import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.distributions.Strategy;
 import com.datastrato.gravitino.rel.expressions.sorts.SortDirection;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
+import com.datastrato.gravitino.rel.indexes.Indexes;
 import com.datastrato.gravitino.rel.types.Type;
 import com.datastrato.gravitino.rel.types.Types;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -358,7 +361,8 @@ public class TestRelationalCatalog extends TestBase {
             Collections.emptyMap(),
             sortOrderDTOs,
             DistributionDTO.NONE,
-            EMPTY_PARTITIONING);
+            EMPTY_PARTITIONING,
+            Indexes.EMPTY_INDEXES);
     TableResponse resp = new TableResponse(expectedTable);
     buildMockResource(Method.POST, tablePath, req, resp, SC_OK);
 
@@ -379,6 +383,28 @@ public class TestRelationalCatalog extends TestBase {
     Assertions.assertEquals(expectedTable.columns()[1].dataType(), table.columns()[1].dataType());
     Assertions.assertEquals(expectedTable.columns()[1].comment(), table.columns()[1].comment());
     assertTableEquals(expectedTable, table);
+
+    // test validate column default value
+    ColumnDTO[] errorColumns =
+        new ColumnDTO[] {
+          createMockColumn("col1", Types.ByteType.get(), "comment1"),
+          createMockColumn(
+              "col2",
+              Types.StringType.get(),
+              "comment2",
+              false,
+              new LiteralDTO.Builder().withValue(null).withDataType(Types.NullType.get()).build())
+        };
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                catalog
+                    .asTableCatalog()
+                    .createTable(tableId, errorColumns, "comment", Collections.emptyMap()));
+    Assertions.assertEquals(
+        "Column cannot be non-nullable with a null default value: col2", exception.getMessage());
 
     // Test throw NoSuchSchemaException
     ErrorResponse errorResp =
@@ -454,7 +480,8 @@ public class TestRelationalCatalog extends TestBase {
             Collections.emptyMap(),
             SortOrderDTO.EMPTY_SORT,
             DistributionDTO.NONE,
-            EMPTY_PARTITIONING);
+            EMPTY_PARTITIONING,
+            Indexes.EMPTY_INDEXES);
     TableResponse resp = new TableResponse(expectedTable);
     buildMockResource(Method.POST, tablePath, req, resp, SC_OK);
 
@@ -486,7 +513,8 @@ public class TestRelationalCatalog extends TestBase {
             Collections.emptyMap(),
             SortOrderDTO.EMPTY_SORT,
             DistributionDTO.NONE,
-            partitioning);
+            partitioning,
+            Indexes.EMPTY_INDEXES);
     resp = new TableResponse(expectedTable);
     buildMockResource(Method.POST, tablePath, req, resp, SC_OK);
 
@@ -937,6 +965,32 @@ public class TestRelationalCatalog extends TestBase {
     Assertions.assertFalse(catalog.asTableCatalog().purgeTable(tableId));
   }
 
+  @Test
+  public void testPurgeExternalTable() throws JsonProcessingException {
+    NameIdentifier tableId = NameIdentifier.of(metalakeName, catalogName, "schema1", "table1");
+    String tablePath =
+        withSlash(
+            RelationalCatalog.formatTableRequestPath(tableId.namespace()) + "/" + tableId.name());
+    DropResponse resp = new DropResponse(true);
+    buildMockResource(Method.DELETE, tablePath, null, resp, SC_OK);
+
+    Assertions.assertTrue(catalog.asTableCatalog().purgeTable(tableId));
+
+    // return false
+    resp = new DropResponse(false);
+    buildMockResource(Method.DELETE, tablePath, null, resp, SC_OK);
+    Assertions.assertFalse(catalog.asTableCatalog().purgeTable(tableId));
+
+    // Test with exception
+    ErrorResponse errorResp = ErrorResponse.unsupportedOperation("Unsupported operation");
+    buildMockResource(Method.DELETE, tablePath, null, errorResp, SC_METHOD_NOT_ALLOWED);
+
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () -> catalog.asTableCatalog().purgeTable(tableId),
+        "Unsupported operation");
+  }
+
   private void testAlterTable(NameIdentifier ident, TableUpdateRequest req, TableDTO updatedTable)
       throws JsonProcessingException {
     String tablePath =
@@ -1006,6 +1060,17 @@ public class TestRelationalCatalog extends TestBase {
         .withDataType(type)
         .withComment(comment)
         .withNullable(nullable)
+        .build();
+  }
+
+  private static ColumnDTO createMockColumn(
+      String name, Type type, String comment, boolean nullable, LiteralDTO defaultValue) {
+    return new ColumnDTO.Builder<>()
+        .withName(name)
+        .withDataType(type)
+        .withComment(comment)
+        .withNullable(nullable)
+        .withDefaultValue(defaultValue)
         .build();
   }
 

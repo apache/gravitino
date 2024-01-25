@@ -58,8 +58,7 @@ const AuthProvider = ({ children }) => {
 
       if (authType === 'simple') {
         dispatch(initialVersion())
-        router.replace('/')
-      } else {
+      } else if (authType === 'oauth') {
         if (token) {
           dispatch(setIntervalId())
           dispatch(setAuthToken(token))

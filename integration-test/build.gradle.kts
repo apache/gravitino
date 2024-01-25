@@ -8,6 +8,7 @@ import java.util.*
 
 plugins {
   `maven-publish`
+  `application`
   id("java")
   id("idea")
 }
@@ -121,6 +122,7 @@ dependencies {
   testImplementation(libs.okhttp3.loginterceptor)
   testImplementation(libs.mysql.driver)
   testImplementation(libs.postgresql.driver)
+  implementation(libs.commons.cli)
 }
 
 /* Optimizing integration test execution conditions */
@@ -282,7 +284,7 @@ tasks.test {
       }
 
       // Gravitino CI Docker image
-      environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-hive:0.1.7")
+      environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-hive:0.1.8")
       environment("GRAVITINO_CI_TRINO_DOCKER_IMAGE", "datastrato/gravitino-ci-trino:0.1.3")
 
       val testMode = project.properties["testMode"] as? String ?: "embedded"
@@ -305,5 +307,22 @@ tasks.test {
         }
       }
     }
+  }
+}
+
+tasks.register<JavaExec>("TrinoTest") {
+  classpath = sourceSets["test"].runtimeClasspath
+  systemProperty("gravitino.log.path", buildDir.path + "/integration-test.log")
+  mainClass.set("com.datastrato.gravitino.integration.test.trino.TrinoQueryTestTool")
+
+  if (JavaVersion.current() > JavaVersion.VERSION_1_8) {
+    jvmArgs = listOf(
+      "--add-opens",
+      "java.base/java.lang=ALL-UNNAMED"
+    )
+  }
+
+  if (project.hasProperty("appArgs")) {
+    args = (project.property("appArgs") as String).removeSurrounding("\"").split(" ")
   }
 }

@@ -18,8 +18,8 @@ import com.datastrato.gravitino.dto.rel.DistributionDTO;
 import com.datastrato.gravitino.dto.rel.SortOrderDTO;
 import com.datastrato.gravitino.dto.rel.TableDTO;
 import com.datastrato.gravitino.dto.rel.expressions.FieldReferenceDTO;
-import com.datastrato.gravitino.dto.rel.partitions.IdentityPartitioningDTO;
-import com.datastrato.gravitino.dto.rel.partitions.Partitioning;
+import com.datastrato.gravitino.dto.rel.partitioning.IdentityPartitioningDTO;
+import com.datastrato.gravitino.dto.rel.partitioning.Partitioning;
 import com.datastrato.gravitino.dto.requests.TableCreateRequest;
 import com.datastrato.gravitino.dto.requests.TableUpdateRequest;
 import com.datastrato.gravitino.dto.requests.TableUpdatesRequest;
@@ -41,6 +41,7 @@ import com.datastrato.gravitino.rel.expressions.sorts.NullOrdering;
 import com.datastrato.gravitino.rel.expressions.sorts.SortDirection;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
+import com.datastrato.gravitino.rel.indexes.Indexes;
 import com.datastrato.gravitino.rel.types.Type;
 import com.datastrato.gravitino.rel.types.Types;
 import com.datastrato.gravitino.rest.RESTUtils;
@@ -197,7 +198,8 @@ public class TestTableOperations extends JerseyTest {
             ImmutableMap.of("k1", "v1"),
             sortOrderDTOs,
             distributionDTO,
-            Partitioning.EMPTY_PARTITIONING);
+            Partitioning.EMPTY_PARTITIONING,
+            Indexes.EMPTY_INDEXES);
 
     Response resp =
         target(tablePath(metalake, catalog, schema))
@@ -237,7 +239,8 @@ public class TestTableOperations extends JerseyTest {
             ImmutableMap.of("k1", "v1"),
             sortOrderDTOs,
             distributionDTO,
-            Partitioning.EMPTY_PARTITIONING);
+            Partitioning.EMPTY_PARTITIONING,
+            Indexes.EMPTY_INDEXES);
 
     resp =
         target(tablePath(metalake, catalog, schema))
@@ -310,7 +313,9 @@ public class TestTableOperations extends JerseyTest {
   public void testCreatePartitionedTable() {
     Column[] columns =
         new Column[] {
-          mockColumn("col1", Types.StringType.get()), mockColumn("col2", Types.ByteType.get())
+          mockColumn("col1", Types.StringType.get()),
+          mockColumn("col2", Types.ByteType.get()),
+          mockColumn("col3", Types.IntegerType.get(), "test", false, false)
         };
     Partitioning[] partitioning =
         new Partitioning[] {IdentityPartitioningDTO.of(columns[0].name())};
@@ -326,7 +331,8 @@ public class TestTableOperations extends JerseyTest {
             ImmutableMap.of("k1", "v1"),
             SortOrderDTO.EMPTY_SORT,
             DistributionDTO.NONE,
-            partitioning);
+            partitioning,
+            Indexes.EMPTY_INDEXES);
 
     Response resp =
         target(tablePath(metalake, catalog, schema))
@@ -345,14 +351,21 @@ public class TestTableOperations extends JerseyTest {
     Assertions.assertEquals(ImmutableMap.of("k1", "v1"), tableDTO.properties());
 
     Column[] columnDTOs = tableDTO.columns();
-    Assertions.assertEquals(2, columnDTOs.length);
+    Assertions.assertEquals(3, columnDTOs.length);
     Assertions.assertEquals(columns[0].name(), columnDTOs[0].name());
     Assertions.assertEquals(columns[0].dataType(), columnDTOs[0].dataType());
     Assertions.assertEquals(columns[0].comment(), columnDTOs[0].comment());
+    Assertions.assertEquals(columns[0].autoIncrement(), columnDTOs[0].autoIncrement());
 
     Assertions.assertEquals(columns[1].name(), columnDTOs[1].name());
     Assertions.assertEquals(columns[1].dataType(), columnDTOs[1].dataType());
     Assertions.assertEquals(columns[1].comment(), columnDTOs[1].comment());
+    Assertions.assertEquals(columns[1].autoIncrement(), columnDTOs[1].autoIncrement());
+
+    Assertions.assertEquals(columns[2].name(), columnDTOs[2].name());
+    Assertions.assertEquals(columns[2].dataType(), columnDTOs[2].dataType());
+    Assertions.assertEquals(columns[2].comment(), columnDTOs[2].comment());
+    Assertions.assertEquals(columns[2].autoIncrement(), columnDTOs[2].autoIncrement());
 
     Assertions.assertArrayEquals(partitioning, tableDTO.partitioning());
 
@@ -367,7 +380,8 @@ public class TestTableOperations extends JerseyTest {
             ImmutableMap.of("k1", "v1"),
             SortOrderDTO.EMPTY_SORT,
             null,
-            new Partitioning[] {errorPartition});
+            new Partitioning[] {errorPartition},
+            Indexes.EMPTY_INDEXES);
     resp =
         target(tablePath(metalake, catalog, schema))
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -774,6 +788,17 @@ public class TestTableOperations extends JerseyTest {
     when(column.dataType()).thenReturn(type);
     when(column.comment()).thenReturn(comment);
     when(column.nullable()).thenReturn(nullable);
+    return column;
+  }
+
+  private static Column mockColumn(
+      String name, Type type, String comment, boolean nullable, boolean autoIncrement) {
+    Column column = mock(Column.class);
+    when(column.name()).thenReturn(name);
+    when(column.dataType()).thenReturn(type);
+    when(column.comment()).thenReturn(comment);
+    when(column.nullable()).thenReturn(nullable);
+    when(column.autoIncrement()).thenReturn(autoIncrement);
     return column;
   }
 

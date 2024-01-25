@@ -12,7 +12,6 @@ import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.catalog.jdbc.config.JdbcConfig;
 import com.datastrato.gravitino.client.GravitinoMetaLake;
 import com.datastrato.gravitino.dto.rel.ColumnDTO;
-import com.datastrato.gravitino.dto.rel.partitions.Partitioning;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NotFoundException;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
@@ -30,6 +29,8 @@ import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
+import com.datastrato.gravitino.rel.expressions.transforms.Transform;
+import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
 import com.datastrato.gravitino.rel.types.Types;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
@@ -49,39 +50,45 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.api.TestInstance.Lifecycle;
 import org.testcontainers.containers.MySQLContainer;
 
 @Tag("gravitino-docker-it")
+@TestInstance(Lifecycle.PER_CLASS)
 public class CatalogMysqlIT extends AbstractIT {
-  public static String metalakeName = GravitinoITUtils.genRandomName("mysql_it_metalake");
-  public static String catalogName = GravitinoITUtils.genRandomName("mysql_it_catalog");
-  public static String schemaName = GravitinoITUtils.genRandomName("mysql_it_schema");
-  public static String tableName = GravitinoITUtils.genRandomName("mysql_it_table");
-  public static String alertTableName = "alert_table_name";
-  public static String table_comment = "table_comment";
-
-  public static String schema_comment = "schema_comment";
-  public static String MYSQL_COL_NAME1 = "mysql_col_name1";
-  public static String MYSQL_COL_NAME2 = "mysql_col_name2";
-  public static String MYSQL_COL_NAME3 = "mysql_col_name3";
+  private static final String provider = "jdbc-mysql";
   public static final String DOWNLOAD_JDBC_DRIVER_URL =
       "https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.27/mysql-connector-java-8.0.27.jar";
-  private static final String provider = "jdbc-mysql";
 
-  private static GravitinoMetaLake metalake;
+  public String metalakeName = GravitinoITUtils.genRandomName("mysql_it_metalake");
+  public String catalogName = GravitinoITUtils.genRandomName("mysql_it_catalog");
+  public String schemaName = GravitinoITUtils.genRandomName("mysql_it_schema");
+  public String tableName = GravitinoITUtils.genRandomName("mysql_it_table");
+  public String alertTableName = "alert_table_name";
+  public String table_comment = "table_comment";
 
-  private static Catalog catalog;
+  public String schema_comment = "schema_comment";
+  public String MYSQL_COL_NAME1 = "mysql_col_name1";
+  public String MYSQL_COL_NAME2 = "mysql_col_name2";
+  public String MYSQL_COL_NAME3 = "mysql_col_name3";
 
-  private static MysqlService mysqlService;
+  private GravitinoMetaLake metalake;
 
-  private static MySQLContainer<?> MYSQL_CONTAINER;
+  private Catalog catalog;
 
-  protected static final String TEST_DB_NAME = RandomUtils.nextInt(10000) + "_test_db";
+  private MysqlService mysqlService;
 
-  public static final String mysqlImageName = "mysql:8.0";
+  private MySQLContainer<?> MYSQL_CONTAINER;
+
+  protected final String TEST_DB_NAME = RandomUtils.nextInt(10000) + "_test_db";
+
+  public static final String defaultMysqlImageName = "mysql:8.0";
+
+  protected String mysqlImageName = defaultMysqlImageName;
 
   @BeforeAll
-  public static void startup() throws IOException {
+  public void startup() throws IOException {
 
     if (!ITUtils.EMBEDDED_TEST_MODE.equals(testMode)) {
       String gravitinoHome = System.getenv("GRAVITINO_HOME");
@@ -102,7 +109,7 @@ public class CatalogMysqlIT extends AbstractIT {
   }
 
   @AfterAll
-  public static void stop() {
+  public void stop() {
     clearTableAndSchema();
     client.dropMetalake(NameIdentifier.of(metalakeName));
     mysqlService.close();
@@ -115,7 +122,7 @@ public class CatalogMysqlIT extends AbstractIT {
     createSchema();
   }
 
-  private static void clearTableAndSchema() {
+  private void clearTableAndSchema() {
     NameIdentifier[] nameIdentifiers =
         catalog.asTableCatalog().listTables(Namespace.of(metalakeName, catalogName, schemaName));
     for (NameIdentifier nameIdentifier : nameIdentifiers) {
@@ -124,7 +131,7 @@ public class CatalogMysqlIT extends AbstractIT {
     catalog.asSchemas().dropSchema(NameIdentifier.of(metalakeName, catalogName, schemaName), false);
   }
 
-  private static void createMetalake() {
+  private void createMetalake() {
     GravitinoMetaLake[] gravitinoMetaLakes = client.listMetalakes();
     Assertions.assertEquals(0, gravitinoMetaLakes.length);
 
@@ -136,7 +143,7 @@ public class CatalogMysqlIT extends AbstractIT {
     metalake = loadMetalake;
   }
 
-  private static void createCatalog() {
+  private void createCatalog() {
     Map<String, String> catalogProperties = Maps.newHashMap();
 
     catalogProperties.put(
@@ -160,7 +167,7 @@ public class CatalogMysqlIT extends AbstractIT {
     catalog = loadCatalog;
   }
 
-  private static void createSchema() {
+  private void createSchema() {
     NameIdentifier ident = NameIdentifier.of(metalakeName, catalogName, schemaName);
     Map<String, String> prop = Maps.newHashMap();
 
@@ -279,7 +286,7 @@ public class CatalogMysqlIT extends AbstractIT {
 
     final SortOrder[] sortOrders = new SortOrder[0];
 
-    Partitioning[] partitioning = Partitioning.EMPTY_PARTITIONING;
+    Transform[] partitioning = Transforms.EMPTY_TRANSFORM;
 
     Map<String, String> properties = createProperties();
     TableCatalog tableCatalog = catalog.asTableCatalog();
@@ -316,6 +323,70 @@ public class CatalogMysqlIT extends AbstractIT {
     for (int i = 0; i < columns.length; i++) {
       Assertions.assertEquals(columns[i], loadTable.columns()[i]);
     }
+  }
+
+  @Test
+  void testColumnNameWithKeyWords() {
+    // Create table from Gravitino API
+    ColumnDTO[] columns =
+        new ColumnDTO[] {
+          new ColumnDTO.Builder()
+              .withName("integer")
+              .withDataType(Types.IntegerType.get())
+              .withComment("integer")
+              .build(),
+          new ColumnDTO.Builder()
+              .withName("long")
+              .withDataType(Types.LongType.get())
+              .withComment("long")
+              .build(),
+          new ColumnDTO.Builder()
+              .withName("float")
+              .withDataType(Types.FloatType.get())
+              .withComment("float")
+              .build(),
+          new ColumnDTO.Builder()
+              .withName("double")
+              .withDataType(Types.DoubleType.get())
+              .withComment("double")
+              .build(),
+          new ColumnDTO.Builder()
+              .withName("decimal")
+              .withDataType(Types.DecimalType.of(10, 3))
+              .withComment("decimal")
+              .build(),
+          new ColumnDTO.Builder()
+              .withName("date")
+              .withDataType(Types.DateType.get())
+              .withComment("date")
+              .build(),
+          new ColumnDTO.Builder()
+              .withName("time")
+              .withDataType(Types.TimeType.get())
+              .withComment("time")
+              .build()
+        };
+
+    String name = GravitinoITUtils.genRandomName("table") + "_keyword";
+    NameIdentifier tableIdentifier = NameIdentifier.of(metalakeName, catalogName, schemaName, name);
+    Distribution distribution = Distributions.NONE;
+
+    final SortOrder[] sortOrders = new SortOrder[0];
+
+    Transform[] partitioning = Transforms.EMPTY_TRANSFORM;
+
+    Map<String, String> properties = createProperties();
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    Table createdTable =
+        tableCatalog.createTable(
+            tableIdentifier,
+            columns,
+            table_comment,
+            properties,
+            partitioning,
+            distribution,
+            sortOrders);
+    Assertions.assertEquals(createdTable.name(), name);
   }
 
   @Test
@@ -412,7 +483,7 @@ public class CatalogMysqlIT extends AbstractIT {
             newColumns,
             table_comment,
             ImmutableMap.of(),
-            Partitioning.EMPTY_PARTITIONING,
+            Transforms.EMPTY_TRANSFORM,
             Distributions.NONE,
             new SortOrder[0]);
 

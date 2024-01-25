@@ -84,8 +84,10 @@ public abstract class TestJdbcAbstractIT {
       Assertions.assertEquals(columns.get(i).dataType(), table.columns()[i].dataType());
       Assertions.assertEquals(columns.get(i).nullable(), table.columns()[i].nullable());
       Assertions.assertEquals(columns.get(i).comment(), table.columns()[i].comment());
-      Assertions.assertEquals(
-          columns.get(i).getDefaultValue(), ((JdbcColumn) table.columns()[i]).getDefaultValue());
+      Assertions.assertEquals(columns.get(i).autoIncrement(), table.columns()[i].autoIncrement());
+      // TODO: uncomment this after default value is supported.
+      // Assertions.assertEquals(
+      //    columns.get(i).getDefaultValue(), ((JdbcColumn) table.columns()[i]).getDefaultValue());
       if (null != columns.get(i).getProperties()) {
         Assertions.assertEquals(
             columns.get(i).getProperties(), ((JdbcColumn) table.columns()[i]).getProperties());

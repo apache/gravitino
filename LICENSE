@@ -206,9 +206,6 @@
    This product bundles various third-party components also under the
    Apache Software License 2.0.
 
-   Gradle Wrapper
-   ./gradlew
-
    Apache Spark
    ./api/src/main/java/com/datastrato/gravitino/rel/SchemaChange.java
    ./api/src/main/java/com/datastrato/gravitino/rel/SupportsSchemas.java
@@ -224,6 +221,7 @@
 
    Apache Iceberg
    ./api/src/main/java/com/datastrato/gravitino/exceptions/RESTException.java
+   ./catalogs/catalog-hive/src/main/java/com/datastrato/gravitino/catalog/hive/CachedClientPool.java
    ./catalogs/catalog-hive/src/main/java/com/datastrato/gravitino/catalog/hive/HiveClientPool.java
    ./catalogs/catalog-hive/src/main/java/com/datastrato/gravitino/catalog/hive/dyn/DynConstructors.java
    ./catalogs/catalog-hive/src/main/java/com/datastrato/gravitino/catalog/hive/dyn/DynFields.java
@@ -231,6 +229,7 @@
    ./catalogs/catalog-hive/src/test/java/com/datastrato/gravitino/catalog/hive/miniHMS/MiniHiveMetastore.java
    ./catalogs/catalog-hive/src/test/java/com/datastrato/gravitino/catalog/hive/miniHMS/MiniHiveMetastoreService.java
    ./catalogs/catalog-hive/src/test/java/com/datastrato/gravitino/catalog/hive/miniHMS/ScriptRunner.java
+   ./catalogs/catalog-hive/src/test/java/com/datastrato/gravitino/catalog/hive/TestCachedClientPool.java
    ./catalogs/catalog-lakehouse-iceberg/src/main/java/com/datastrato/gravitino/catalog/lakehouse/iceberg/web/IcebergExceptionMapper.java
    ./clients/client-java/src/main/java/com/datastrato/gravitino/client/HTTPClient.java
    ./clients/client-java/src/main/java/com/datastrato/gravitino/client/RESTClient.java
@@ -241,6 +240,7 @@
    ./core/src/main/java/com/datastrato/gravitino/utils/ClientPoolImpl.java
    ./common/src/main/java/com/datastrato/gravitino/dto/responses/OAuth2TokenResponse.java
    ./clients/client-java/src/main/java/com/datastrato/gravitino/client/OAuth2ClientUtil.java
+   ./gradlew
 
    Apache Hive
    ./catalogs/catalog-hive/src/test/resources/hive-schema-3.1.0.derby.sql
@@ -262,3 +262,4 @@
 
    Trino
    ./integration-test/src/main/java/com/datastrato/gravitino/integration/test/util/CloseableGroup.java
+   ./trino-connector/src/main/java/com/datastrato/gravitino/trino/connector/catalog/hive/SortingColumn.java

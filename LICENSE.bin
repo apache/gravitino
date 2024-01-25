@@ -206,7 +206,6 @@
    This product bundles various third-party components also under the
    Apache Software License 2.0 from:
 
-   Gradle Wrapper
    Apache Hadoop
    Apache Hive
    Apache Iceberg
@@ -328,6 +327,7 @@
    Okio
    J2ObjC
    SQLite JDBC Driver
+   Immutables
 
    This product bundles various third-party components also under the
    Apache Software Foundation License 1.1

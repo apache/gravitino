@@ -11,6 +11,7 @@ import com.datastrato.gravitino.meta.CatalogEntity;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import java.util.Map;
+import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -69,6 +70,11 @@ public abstract class BaseCatalog<T extends BaseCatalog>
     return ops().schemaPropertiesMetadata();
   }
 
+  @Override
+  public PropertiesMetadata filesetPropertiesMetadata() throws UnsupportedOperationException {
+    return ops().filesetPropertiesMetadata();
+  }
+
   /**
    * Retrieves the CatalogOperations instance associated with this catalog. Lazily initializes the
    * instance if not already created.
@@ -82,7 +88,14 @@ public abstract class BaseCatalog<T extends BaseCatalog>
         if (ops == null) {
           Preconditions.checkArgument(
               entity != null && conf != null, "entity and conf must be set before calling ops()");
-          ops = newOps(conf);
+          CatalogOperations newOps = newOps(conf);
+          ops =
+              newProxyPlugin(conf)
+                  .map(
+                      proxyPlugin -> {
+                        return asProxyOps(newOps, proxyPlugin);
+                      })
+                  .orElse(newOps);
         }
       }
     }
@@ -166,5 +179,13 @@ public abstract class BaseCatalog<T extends BaseCatalog>
   public Audit auditInfo() {
     Preconditions.checkArgument(entity != null, "entity is not set");
     return entity.auditInfo();
+  }
+
+  protected CatalogOperations asProxyOps(CatalogOperations ops, ProxyPlugin plugin) {
+    return OperationsProxy.createProxy(ops, plugin);
+  }
+
+  protected Optional<ProxyPlugin> newProxyPlugin(Map<String, String> config) {
+    return Optional.empty();
   }
 }

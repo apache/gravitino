@@ -18,10 +18,9 @@ import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.mon
 import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.year;
 
 import com.datastrato.gravitino.rel.expressions.Expression;
-import com.datastrato.gravitino.rel.expressions.Literal;
 import com.datastrato.gravitino.rel.expressions.NamedReference;
+import com.datastrato.gravitino.rel.expressions.literals.Literals;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
-import com.datastrato.gravitino.rel.types.Type;
 import com.datastrato.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -29,28 +28,7 @@ import org.junit.jupiter.api.Test;
 public class TestTransforms {
   @Test
   public void testSingleFieldTransform() {
-    Column column =
-        new Column() {
-          @Override
-          public String name() {
-            return "col_1";
-          }
-
-          @Override
-          public Type dataType() {
-            return Types.ByteType.get();
-          }
-
-          @Override
-          public String comment() {
-            return null;
-          }
-
-          @Override
-          public boolean nullable() {
-            return true;
-          }
-        };
+    Column column = Column.of("col_1", Types.ByteType.get());
     String[] fieldName = new String[] {column.name()};
 
     Transform.SingleFieldTransform identity = identity(fieldName);
@@ -76,31 +54,10 @@ public class TestTransforms {
 
   @Test
   public void testApplyTransform() {
-    Column column =
-        new Column() {
-          @Override
-          public String name() {
-            return "col_1";
-          }
-
-          @Override
-          public Type dataType() {
-            return Types.ByteType.get();
-          }
-
-          @Override
-          public String comment() {
-            return null;
-          }
-
-          @Override
-          public boolean nullable() {
-            return true;
-          }
-        };
+    Column column = Column.of("col_1", Types.ByteType.get());
     // partition by foo(col_1, 'bar')
     NamedReference.FieldReference arg1 = field(column.name());
-    Literal.LiteralImpl<String> arg2 = Literal.string("bar");
+    Literals.LiteralImpl<String> arg2 = Literals.stringLiteral("bar");
     Transform applyTransform = apply("foo", new Expression[] {arg1, arg2});
     Assertions.assertEquals("foo", applyTransform.name());
     Assertions.assertEquals(2, applyTransform.arguments().length);

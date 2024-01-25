@@ -35,7 +35,6 @@ import type { AxiosTransform, CreateAxiosOptions } from './axiosTransform'
 import { NextAxios } from './Axios'
 import { checkStatus } from './checkStatus'
 import toast from 'react-hot-toast'
-import Swal from 'sweetalert2'
 import { RequestEnum, ResultEnum, ContentTypeEnum } from '@/lib/enums/httpEnum'
 import { isString, isUndefined, isNull, isEmpty } from '@/lib/utils/is'
 import { setObjToUrlParams, deepMerge } from '@/lib/utils'
@@ -82,7 +81,7 @@ const transform: AxiosTransform = {
       }
 
       if (options.successMessageMode === 'modal') {
-        Swal.fire({ title: 'Success Tip', text: successMsg, icon: 'success' })
+        console.log({ title: 'Success Tip', text: successMsg, icon: 'success' })
       } else if (options.successMessageMode === 'message') {
         toast.success(successMsg)
       }
@@ -104,7 +103,7 @@ const transform: AxiosTransform = {
     }
 
     if (options.errorMessageMode === 'modal') {
-      timeoutMsg && Swal.fire({ title: 'Error Tip', text: timeoutMsg, icon: 'error' })
+      timeoutMsg && console.log({ title: 'Error Tip', text: timeoutMsg, icon: 'error' })
     } else if (options.errorMessageMode === 'message') {
       timeoutMsg && toast.error(timeoutMsg)
     }
@@ -211,7 +210,7 @@ const transform: AxiosTransform = {
 
       if (errMessage) {
         if (errorMessageMode === 'modal') {
-          Swal.fire({ title: 'Error Tip', text: errMessage, icon: 'error' })
+          console.log({ title: 'Error Tip', text: errMessage, icon: 'error' })
         } else if (errorMessageMode === 'message') {
           toast.error(errMessage)
         }
@@ -240,7 +239,10 @@ function createAxios(opt?: Partial<CreateAxiosOptions>) {
         // ** authentication schemes, e.g: Bearer
         authenticationScheme: 'Bearer',
         timeout: 0,
-        headers: { 'Content-Type': ContentTypeEnum.JSON },
+        headers: {
+          'Content-Type': ContentTypeEnum.JSON,
+          Accept: 'application/vnd.gravitino.v1+json'
+        },
         transform: clone(transform),
 
         // ** request configuration settings

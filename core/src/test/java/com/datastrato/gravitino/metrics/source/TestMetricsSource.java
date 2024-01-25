@@ -98,7 +98,10 @@ public class TestMetricsSource extends MetricsSource {
             .getSnapshot();
     Assertions.assertEquals(99, snapshot.getMax());
     Assertions.assertEquals(0, snapshot.getMin());
-    Assertions.assertEquals(94.0, snapshot.get95thPercentile());
+    // ExponentiallyDecayingReservoir offers a 99.9% confidence level with a 5%
+    // margin of error assuming a normal distribution, and an alpha factor of 0.015,
+    // which heavily biases the reservoir to the past 5 minutes of measurements.
+    // Assertions.assertEquals(94.0, snapshot.get95thPercentile());
     Assertions.assertEquals(100, snapshot.size());
   }
 }

@@ -22,30 +22,33 @@ import com.datastrato.gravitino.dto.rel.expressions.FieldReferenceDTO;
 import com.datastrato.gravitino.dto.rel.expressions.FuncExpressionDTO;
 import com.datastrato.gravitino.dto.rel.expressions.FunctionArg;
 import com.datastrato.gravitino.dto.rel.expressions.LiteralDTO;
-import com.datastrato.gravitino.dto.rel.partitions.BucketPartitioningDTO;
-import com.datastrato.gravitino.dto.rel.partitions.DayPartitioningDTO;
-import com.datastrato.gravitino.dto.rel.partitions.FunctionPartitioningDTO;
-import com.datastrato.gravitino.dto.rel.partitions.HourPartitioningDTO;
-import com.datastrato.gravitino.dto.rel.partitions.IdentityPartitioningDTO;
-import com.datastrato.gravitino.dto.rel.partitions.ListPartitioningDTO;
-import com.datastrato.gravitino.dto.rel.partitions.MonthPartitioningDTO;
-import com.datastrato.gravitino.dto.rel.partitions.Partitioning;
-import com.datastrato.gravitino.dto.rel.partitions.RangePartitioningDTO;
-import com.datastrato.gravitino.dto.rel.partitions.TruncatePartitioningDTO;
-import com.datastrato.gravitino.dto.rel.partitions.YearPartitioningDTO;
+import com.datastrato.gravitino.dto.rel.indexes.IndexDTO;
+import com.datastrato.gravitino.dto.rel.partitioning.BucketPartitioningDTO;
+import com.datastrato.gravitino.dto.rel.partitioning.DayPartitioningDTO;
+import com.datastrato.gravitino.dto.rel.partitioning.FunctionPartitioningDTO;
+import com.datastrato.gravitino.dto.rel.partitioning.HourPartitioningDTO;
+import com.datastrato.gravitino.dto.rel.partitioning.IdentityPartitioningDTO;
+import com.datastrato.gravitino.dto.rel.partitioning.ListPartitioningDTO;
+import com.datastrato.gravitino.dto.rel.partitioning.MonthPartitioningDTO;
+import com.datastrato.gravitino.dto.rel.partitioning.Partitioning;
+import com.datastrato.gravitino.dto.rel.partitioning.RangePartitioningDTO;
+import com.datastrato.gravitino.dto.rel.partitioning.TruncatePartitioningDTO;
+import com.datastrato.gravitino.dto.rel.partitioning.YearPartitioningDTO;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.Schema;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.expressions.Expression;
 import com.datastrato.gravitino.rel.expressions.FunctionExpression;
-import com.datastrato.gravitino.rel.expressions.Literal;
 import com.datastrato.gravitino.rel.expressions.NamedReference;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
+import com.datastrato.gravitino.rel.expressions.literals.Literal;
+import com.datastrato.gravitino.rel.expressions.literals.Literals;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrders;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
+import com.datastrato.gravitino.rel.indexes.Index;
 import java.util.Arrays;
 import org.apache.commons.lang3.ArrayUtils;
 
@@ -97,6 +100,12 @@ public class DTOConverters {
         .withDataType(column.dataType())
         .withComment(column.comment())
         .withNullable(column.nullable())
+        .withAutoIncrement(column.autoIncrement())
+        .withDefaultValue(
+            (column.defaultValue() == null
+                    || column.defaultValue().equals(Column.DEFAULT_VALUE_NOT_SET))
+                ? Column.DEFAULT_VALUE_NOT_SET
+                : toFunctionArg(column.defaultValue()))
         .build();
   }
 
@@ -184,6 +193,17 @@ public class DTOConverters {
     }
   }
 
+  public static IndexDTO toDTO(Index index) {
+    if (index instanceof IndexDTO) {
+      return (IndexDTO) index;
+    }
+    return IndexDTO.builder()
+        .withIndexType(index.type())
+        .withName(index.name())
+        .withFieldNames(index.fieldNames())
+        .build();
+  }
+
   public static FunctionArg toFunctionArg(Expression expression) {
     if (expression instanceof FunctionArg) {
       return (FunctionArg) expression;
@@ -218,6 +238,13 @@ public class DTOConverters {
     return Arrays.stream(expressions).map(DTOConverters::toFunctionArg).toArray(FunctionArg[]::new);
   }
 
+  public static ColumnDTO[] toDTOs(Column[] columns) {
+    if (ArrayUtils.isEmpty(columns)) {
+      return new ColumnDTO[0];
+    }
+    return Arrays.stream(columns).map(DTOConverters::toDTO).toArray(ColumnDTO[]::new);
+  }
+
   public static SortOrderDTO[] toDTOs(SortOrder[] sortOrders) {
     if (ArrayUtils.isEmpty(sortOrders)) {
       return new SortOrderDTO[0];
@@ -232,6 +259,13 @@ public class DTOConverters {
     return Arrays.stream(transforms).map(DTOConverters::toDTO).toArray(Partitioning[]::new);
   }
 
+  public static IndexDTO[] toDTOs(Index[] indexes) {
+    if (ArrayUtils.isEmpty(indexes)) {
+      return new IndexDTO[0];
+    }
+    return Arrays.stream(indexes).map(DTOConverters::toDTO).toArray(IndexDTO[]::new);
+  }
+
   public static Distribution fromDTO(DistributionDTO distributionDTO) {
     if (DistributionDTO.NONE.equals(distributionDTO) || null == distributionDTO) {
       return Distributions.NONE;
@@ -240,10 +274,10 @@ public class DTOConverters {
     return Distributions.of(
         distributionDTO.strategy(),
         distributionDTO.number(),
-        fromFunctionArg(distributionDTO.args()));
+        fromFunctionArgs(distributionDTO.args()));
   }
 
-  public static Expression[] fromFunctionArg(FunctionArg[] args) {
+  public static Expression[] fromFunctionArgs(FunctionArg[] args) {
     if (ArrayUtils.isEmpty(args)) {
       return Expression.EMPTY_EXPRESSION;
     }
@@ -253,13 +287,16 @@ public class DTOConverters {
   public static Expression fromFunctionArg(FunctionArg arg) {
     switch (arg.argType()) {
       case LITERAL:
-        return Literal.of(((LiteralDTO) arg).value(), ((LiteralDTO) arg).dataType());
+        if (((LiteralDTO) arg).value() == null) {
+          return Literals.NULL;
+        }
+        return Literals.of(((LiteralDTO) arg).value(), ((LiteralDTO) arg).dataType());
       case FIELD:
         return NamedReference.field(((FieldReferenceDTO) arg).fieldName());
       case FUNCTION:
         return FunctionExpression.of(
             ((FuncExpressionDTO) arg).functionName(),
-            fromFunctionArg(((FuncExpressionDTO) arg).args()));
+            fromFunctionArgs(((FuncExpressionDTO) arg).args()));
       default:
         throw new IllegalArgumentException("Unsupported expression type: " + arg.getClass());
     }
@@ -285,6 +322,26 @@ public class DTOConverters {
       return new Transform[0];
     }
     return Arrays.stream(partitioning).map(DTOConverters::fromDTO).toArray(Transform[]::new);
+  }
+
+  public static Column[] fromDTOs(ColumnDTO[] columns) {
+    if (ArrayUtils.isEmpty(columns)) {
+      return new Column[0];
+    }
+    return Arrays.stream(columns).map(DTOConverters::fromDTO).toArray(Column[]::new);
+  }
+
+  public static Column fromDTO(ColumnDTO column) {
+    if (column.defaultValue().equals(Column.DEFAULT_VALUE_NOT_SET)) {
+      return column;
+    }
+    return Column.of(
+        column.name(),
+        column.dataType(),
+        column.comment(),
+        column.nullable(),
+        column.autoIncrement(),
+        fromFunctionArg((FunctionArg) column.defaultValue()));
   }
 
   public static Transform fromDTO(Partitioning partitioning) {
@@ -315,7 +372,7 @@ public class DTOConverters {
       case FUNCTION:
         return Transforms.apply(
             ((FunctionPartitioningDTO) partitioning).functionName(),
-            fromFunctionArg(((FunctionPartitioningDTO) partitioning).args()));
+            fromFunctionArgs(((FunctionPartitioningDTO) partitioning).args()));
       default:
         throw new IllegalArgumentException("Unsupported partitioning: " + partitioning.strategy());
     }

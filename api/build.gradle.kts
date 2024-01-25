@@ -13,11 +13,6 @@ dependencies {
   implementation(libs.slf4j.api)
   implementation(libs.commons.lang3)
 
-  compileOnly(libs.lombok)
-  annotationProcessor(libs.lombok)
-  testCompileOnly(libs.lombok)
-  testAnnotationProcessor(libs.lombok)
-
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
   testRuntimeOnly(libs.junit.jupiter.engine)

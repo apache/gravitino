@@ -177,6 +177,10 @@ public class AbstractIT {
     return hostIP;
   }
 
+  public static GravitinoClient getGravitinoClient() {
+    return client;
+  }
+
   protected String readGitCommitIdFromGitFile() {
     try {
       String gravitinoHome = System.getenv("GRAVITINO_HOME");

@@ -65,6 +65,20 @@ public class KvNameMappingService implements NameMappingService {
         lock);
   }
 
+  @Override
+  public String getNameById(long id) throws IOException {
+    byte[] idByte = getIdKey(id);
+    return FunctionUtils.executeWithReadLock(
+        () ->
+            FunctionUtils.executeInTransaction(
+                () -> {
+                  byte[] name = transactionalKvBackend.get(idByte);
+                  return idByte == null ? null : new String(name);
+                },
+                transactionalKvBackend),
+        lock);
+  }
+
   private long bindNameAndId(String name) throws IOException {
     byte[] nameByte = getNameKey(name);
     long id = idGenerator.nextId();
@@ -96,8 +110,14 @@ public class KvNameMappingService implements NameMappingService {
 
                   // Delete old name --> id mapping
                   transactionalKvBackend.delete(nameByte);
-
-                  transactionalKvBackend.put(getNameKey(newName), oldIdValue, false);
+                  // In case there exists the mapping of new_name --> id, so we should use
+                  // the overwritten strategy. In the following scenario, we should use the
+                  // overwritten strategy:
+                  // 1. Create name1
+                  // 2. Delete name1
+                  // 3. Create name2
+                  // 4. Rename name2 -> name1
+                  transactionalKvBackend.put(getNameKey(newName), oldIdValue, true);
                   transactionalKvBackend.put(
                       oldIdValue, newName.getBytes(StandardCharsets.UTF_8), true);
                   return true;

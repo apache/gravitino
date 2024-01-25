@@ -5,16 +5,19 @@
 package com.datastrato.gravitino.catalog.hive;
 
 import static com.datastrato.gravitino.catalog.BaseCatalog.CATALOG_BYPASS_PREFIX;
+import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.CLIENT_POOL_CACHE_EVICTION_INTERVAL_MS;
 import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.CLIENT_POOL_SIZE;
 import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.METASTORE_URIS;
 import static com.datastrato.gravitino.catalog.hive.HiveTable.SUPPORT_TABLE_TYPES;
 import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.COMMENT;
 import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.TABLE_TYPE;
+import static org.apache.hadoop.hive.metastore.TableType.EXTERNAL_TABLE;
 
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.catalog.CatalogOperations;
 import com.datastrato.gravitino.catalog.PropertiesMetadata;
+import com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.TableType;
 import com.datastrato.gravitino.catalog.hive.converter.ToHiveType;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
@@ -30,17 +33,18 @@ import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.TableCatalog;
 import com.datastrato.gravitino.rel.TableChange;
+import com.datastrato.gravitino.rel.expressions.Expression;
 import com.datastrato.gravitino.rel.expressions.NamedReference;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
+import com.datastrato.gravitino.rel.indexes.Index;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
-import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
@@ -51,7 +55,6 @@ import org.apache.commons.lang3.ArrayUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
-import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.AlreadyExistsException;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
@@ -69,7 +72,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
   public static final Logger LOG = LoggerFactory.getLogger(HiveCatalogOperations.class);
 
-  @VisibleForTesting HiveClientPool clientPool;
+  @VisibleForTesting CachedClientPool clientPool;
 
   @VisibleForTesting HiveConf hiveConf;
 
@@ -133,12 +136,18 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     mergeConfig.forEach(hadoopConf::set);
     hiveConf = new HiveConf(hadoopConf, HiveCatalogOperations.class);
 
-    this.clientPool = new HiveClientPool(getClientPoolSize(conf), hiveConf);
+    this.clientPool =
+        new CachedClientPool(getClientPoolSize(conf), hiveConf, getCacheEvictionInterval(conf));
   }
 
   @VisibleForTesting
   int getClientPoolSize(Map<String, String> conf) {
     return (int) catalogPropertiesMetadata.getOrDefault(conf, CLIENT_POOL_SIZE);
+  }
+
+  long getCacheEvictionInterval(Map<String, String> conf) {
+    return (long)
+        catalogPropertiesMetadata.getOrDefault(conf, CLIENT_POOL_CACHE_EVICTION_INTERVAL_MS);
   }
 
   /** Closes the Hive catalog and releases the associated client pool. */
@@ -203,7 +212,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
               .withConf(hiveConf)
               .withAuditInfo(
                   new AuditInfo.Builder()
-                      .withCreator(currentUser())
+                      .withCreator(UserGroupInformation.getCurrentUser().getUserName())
                       .withCreateTime(Instant.now())
                       .build())
               .build();
@@ -416,15 +425,20 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
    */
   @Override
   public Table loadTable(NameIdentifier tableIdent) throws NoSuchTableException {
+    org.apache.hadoop.hive.metastore.api.Table table = loadHiveTable(tableIdent);
+    HiveTable hiveTable = HiveTable.fromHiveTable(table);
+
+    LOG.info("Loaded Hive table {} from Hive Metastore ", tableIdent.name());
+    return hiveTable;
+  }
+
+  private org.apache.hadoop.hive.metastore.api.Table loadHiveTable(NameIdentifier tableIdent) {
     NameIdentifier schemaIdent = NameIdentifier.of(tableIdent.namespace().levels());
 
     try {
       org.apache.hadoop.hive.metastore.api.Table table =
           clientPool.run(c -> c.getTable(schemaIdent.name(), tableIdent.name()));
-      HiveTable hiveTable = HiveTable.fromHiveTable(table);
-
-      LOG.info("Loaded Hive table {} from Hive Metastore ", tableIdent.name());
-      return hiveTable;
+      return table;
 
     } catch (NoSuchObjectException e) {
       throw new NoSuchTableException(
@@ -555,14 +569,23 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       Map<String, String> properties,
       Transform[] partitioning,
       Distribution distribution,
-      SortOrder[] sortOrders)
+      SortOrder[] sortOrders,
+      Index[] indexes)
       throws NoSuchSchemaException, TableAlreadyExistsException {
+    Preconditions.checkArgument(
+        indexes.length == 0,
+        "Hive-catalog does not support indexes, since indexing was removed since 3.0");
     NameIdentifier schemaIdent = NameIdentifier.of(tableIdent.namespace().levels());
 
     validatePartitionForCreate(columns, partitioning);
     validateDistributionAndSort(distribution, sortOrders);
 
-    Arrays.stream(columns).forEach(c -> validateNullable(c.name(), c.nullable()));
+    Arrays.stream(columns)
+        .forEach(
+            c -> {
+              validateNullable(c.name(), c.nullable());
+              validateColumnDefaultValue(c.name(), c.defaultValue());
+            });
 
     TableType tableType = (TableType) tablePropertiesMetadata.getOrDefault(properties, TABLE_TYPE);
     Preconditions.checkArgument(
@@ -586,7 +609,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
               .withSortOrders(sortOrders)
               .withAuditInfo(
                   new AuditInfo.Builder()
-                      .withCreator(currentUser())
+                      .withCreator(UserGroupInformation.getCurrentUser().getUserName())
                       .withCreateTime(Instant.now())
                       .build())
               .withPartitioning(partitioning)
@@ -697,7 +720,8 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       return HiveTable.fromHiveTable(alteredHiveTable);
 
     } catch (TException | InterruptedException e) {
-      if (e.getMessage().contains("types incompatible with the existing columns")) {
+      if (e.getMessage() != null
+          && e.getMessage().contains("types incompatible with the existing columns")) {
         throw new IllegalArgumentException(
             "Failed to alter Hive table ["
                 + tableIdent.name()
@@ -713,6 +737,17 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       throw e;
     } catch (Exception e) {
       throw new RuntimeException(e);
+    }
+  }
+
+  private void validateColumnDefaultValue(String fieldName, Expression defaultValue) {
+    // The DEFAULT constraint for column is supported since Hive3.0, see
+    // https://issues.apache.org/jira/browse/HIVE-18726
+    if (!defaultValue.equals(Column.DEFAULT_VALUE_NOT_SET)) {
+      throw new IllegalArgumentException(
+          "The DEFAULT constraint for column is only supported since Hive 3.0, "
+              + "but the current Gravitino Hive catalog only supports Hive 2.x. Illegal column: "
+              + fieldName);
     }
   }
 
@@ -847,18 +882,25 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
   }
 
   /**
-   * Drops a table from the Hive Metastore.
+   * Drops a table from the Hive Metastore. Deletes the table and removes the directory associated
+   * with the table from the file system if the table is not EXTERNAL table. In case of an external
+   * table, only the associated metadata information is removed.
    *
    * @param tableIdent The identifier of the table to drop.
    * @return true if the table is successfully dropped; false if the table does not exist.
    */
   @Override
   public boolean dropTable(NameIdentifier tableIdent) {
-    return dropHiveTable(tableIdent, false, false);
+    if (isExternalTable(tableIdent)) {
+      return dropHiveTable(tableIdent, false, false);
+    } else {
+      return dropHiveTable(tableIdent, true, false);
+    }
   }
 
   /**
-   * Purges a table from the Hive Metastore.
+   * Purges a table from the Hive Metastore. Completely purge the table skipping trash for managed
+   * table, external table aren't supported to purge table.
    *
    * @param tableIdent The identifier of the table to purge.
    * @return true if the table is successfully purged; false if the table does not exist.
@@ -866,15 +908,19 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
    */
   @Override
   public boolean purgeTable(NameIdentifier tableIdent) throws UnsupportedOperationException {
-    // TODO(minghuang): HiveTable support specify `tableType`, then reject purge Hive table with
-    //  `tableType` EXTERNAL_TABLE
-    return dropHiveTable(tableIdent, true, true);
+    if (isExternalTable(tableIdent)) {
+      throw new UnsupportedOperationException("Can't purge a external hive table");
+    } else {
+      return dropHiveTable(tableIdent, true, true);
+    }
   }
 
   /**
    * Checks if the given namespace is a valid namespace for the Hive schema.
    *
    * @param tableIdent The namespace to validate.
+   * @param deleteData Whether to delete the table data.
+   * @param ifPurge Whether to purge the table.
    * @return true if the namespace is valid; otherwise, false.
    */
   private boolean dropHiveTable(NameIdentifier tableIdent, boolean deleteData, boolean ifPurge) {
@@ -901,23 +947,6 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     }
   }
 
-  // TODO. We should figure out a better way to get the current user from servlet container.
-  private static String currentUser() {
-    String username = null;
-    try {
-      username = UserGroupInformation.getCurrentUser().getShortUserName();
-    } catch (IOException e) {
-      LOG.warn("Failed to get Hadoop user", e);
-    }
-
-    if (username != null) {
-      return username;
-    } else {
-      LOG.warn("Hadoop user is null, defaulting to user.name");
-      return System.getProperty("user.name");
-    }
-  }
-
   @Override
   public PropertiesMetadata tablePropertiesMetadata() throws UnsupportedOperationException {
     return tablePropertiesMetadata;
@@ -931,5 +960,16 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
   @Override
   public PropertiesMetadata schemaPropertiesMetadata() throws UnsupportedOperationException {
     return schemaPropertiesMetadata;
+  }
+
+  @Override
+  public PropertiesMetadata filesetPropertiesMetadata() throws UnsupportedOperationException {
+    throw new UnsupportedOperationException(
+        "Hive catalog does not support fileset properties metadata");
+  }
+
+  private boolean isExternalTable(NameIdentifier tableIdent) {
+    org.apache.hadoop.hive.metastore.api.Table hiveTable = loadHiveTable(tableIdent);
+    return EXTERNAL_TABLE.name().equalsIgnoreCase(hiveTable.getTableType());
   }
 }

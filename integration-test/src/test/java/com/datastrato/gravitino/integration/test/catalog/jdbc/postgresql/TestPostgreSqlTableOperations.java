@@ -45,9 +45,10 @@ public class TestPostgreSqlTableOperations extends TestPostgreSqlAbstractIT {
     columns.add(
         new JdbcColumn.Builder()
             .withName("col_1")
-            .withType(VARCHAR)
-            .withComment("test_comment_col1")
-            .withNullable(true)
+            .withType(Types.LongType.get())
+            .withComment("increment key")
+            .withNullable(false)
+            .withAutoIncrement(true)
             .build());
     columns.add(
         new JdbcColumn.Builder()
@@ -62,7 +63,8 @@ public class TestPostgreSqlTableOperations extends TestPostgreSqlAbstractIT {
         new JdbcColumn.Builder()
             .withName("col_4")
             .withType(VARCHAR)
-            .withDefaultValue("hello world")
+            // TODO: umcomment this line when default value is supported
+            // .withDefaultValue("hello world")
             .withNullable(false)
             .build());
     Map<String, String> properties = new HashMap<>();
@@ -110,9 +112,10 @@ public class TestPostgreSqlTableOperations extends TestPostgreSqlAbstractIT {
     alterColumns.add(
         new JdbcColumn.Builder()
             .withName("col_1")
-            .withType(VARCHAR)
+            .withType(Types.LongType.get())
             .withComment("test_new_comment")
-            .withNullable(true)
+            .withNullable(false)
+            .withAutoIncrement(true)
             .build());
     alterColumns.add(
         new JdbcColumn.Builder()
@@ -135,9 +138,10 @@ public class TestPostgreSqlTableOperations extends TestPostgreSqlAbstractIT {
     alterColumns.add(
         new JdbcColumn.Builder()
             .withName("col_1_new")
-            .withType(VARCHAR)
+            .withType(Types.LongType.get())
             .withComment("test_new_comment")
-            .withNullable(true)
+            .withNullable(false)
+            .withAutoIncrement(true)
             .build());
     alterColumns.add(
         new JdbcColumn.Builder()
@@ -152,18 +156,16 @@ public class TestPostgreSqlTableOperations extends TestPostgreSqlAbstractIT {
 
     // alter column Nullability
     TABLE_OPERATIONS.alterTable(
-        TEST_DB_NAME,
-        newName,
-        TableChange.updateColumnNullability(new String[] {"col_1_new"}, false),
-        TableChange.updateColumnNullability(new String[] {"col_2"}, true));
+        TEST_DB_NAME, newName, TableChange.updateColumnNullability(new String[] {"col_2"}, true));
     load = TABLE_OPERATIONS.load(TEST_DB_NAME, newName);
     alterColumns.clear();
     alterColumns.add(
         new JdbcColumn.Builder()
             .withName("col_1_new")
-            .withType(VARCHAR)
+            .withType(Types.LongType.get())
             .withComment("test_new_comment")
             .withNullable(false)
+            .withAutoIncrement(true)
             .build());
     alterColumns.add(
         new JdbcColumn.Builder()
@@ -397,5 +399,77 @@ public class TestPostgreSqlTableOperations extends TestPostgreSqlAbstractIT {
 
     JdbcTable load = TABLE_OPERATIONS.load(TEST_DB_NAME, table_2);
     Assertions.assertEquals(table_2, load.name());
+  }
+
+  @Test
+  public void testCreateAutoIncrementTable() {
+    String tableName = GravitinoITUtils.genRandomName("increment_table_");
+    String tableComment = "test_comment";
+    List<JdbcColumn> columns = new ArrayList<>();
+    columns.add(
+        new JdbcColumn.Builder()
+            .withName("col_1")
+            .withType(Types.LongType.get())
+            .withComment("increment key")
+            .withNullable(false)
+            .withAutoIncrement(true)
+            .build());
+    columns.add(
+        new JdbcColumn.Builder()
+            .withName("col_2")
+            .withType(INT)
+            .withNullable(false)
+            .withComment("set test key")
+            .build());
+    Map<String, String> properties = new HashMap<>();
+    // create table
+    TABLE_OPERATIONS.create(
+        TEST_DB_NAME,
+        tableName,
+        columns.toArray(new JdbcColumn[0]),
+        tableComment,
+        properties,
+        null);
+
+    // list table
+    List<String> tables = TABLE_OPERATIONS.listTables(TEST_DB_NAME);
+    Assertions.assertTrue(tables.contains(tableName));
+
+    // load table
+    JdbcTable load = TABLE_OPERATIONS.load(TEST_DB_NAME, tableName);
+    assertionsTableInfo(tableName, tableComment, columns, properties, load);
+
+    columns.clear();
+    columns.add(
+        new JdbcColumn.Builder()
+            .withName("col_1")
+            .withType(Types.ShortType.get())
+            .withComment("increment key")
+            .withNullable(false)
+            .withAutoIncrement(true)
+            .build());
+    columns.add(
+        new JdbcColumn.Builder()
+            .withName("col_2")
+            .withType(INT)
+            .withNullable(false)
+            .withComment("set test key")
+            .build());
+
+    // Testing does not support auto increment column types
+    IllegalArgumentException illegalArgumentException =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                TABLE_OPERATIONS.create(
+                    TEST_DB_NAME,
+                    GravitinoITUtils.genRandomName("increment_table_"),
+                    columns.toArray(new JdbcColumn[0]),
+                    tableComment,
+                    properties,
+                    null));
+
+    Assertions.assertTrue(
+        StringUtils.contains(illegalArgumentException.getMessage(), "Unsupported auto-increment"));
   }
 }
