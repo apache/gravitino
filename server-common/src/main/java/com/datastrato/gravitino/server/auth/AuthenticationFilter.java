@@ -60,6 +60,8 @@ public class AuthenticationFilter implements Filter {
     } catch (UnauthorizedException ue) {
       HttpServletResponse resp = (HttpServletResponse) response;
       if (!ue.getChallenges().isEmpty()) {
+        // For some authentication, HTTP response can provide some challenge information
+        // to let client to create correct authenticated request.
         // Refer to https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/WWW-Authenticate
         for (String challenge : ue.getChallenges()) {
           resp.setHeader(AuthConstants.HTTP_CHALLENGE_HEADER, challenge);

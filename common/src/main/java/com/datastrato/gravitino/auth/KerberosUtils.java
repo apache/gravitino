@@ -27,10 +27,12 @@ import javax.security.auth.kerberos.KerberosPrincipal;
 import javax.security.auth.login.AppConfigurationEntry;
 import javax.security.auth.login.Configuration;
 import javax.security.auth.login.LoginContext;
+import javax.security.auth.login.LoginException;
 import org.ietf.jgss.GSSException;
 import org.ietf.jgss.Oid;
 
 // Referred from Apache Hadoop KerberosTestUtils.java
+// Copy the part methods and remove the support the IBM JDK
 // hadoop-common-project/hadoop-auth/src/test/java/org/apache/hadoop/security/\
 // authentication/KerberosTestUtils.java
 public class KerberosUtils {
@@ -52,17 +54,19 @@ public class KerberosUtils {
     }
   }
 
-  public static <T> T doAs(String principal, String keyTabFile, final Callable<T> callable)
-      throws Exception {
+  public static LoginContext login(String principal, String keyTabFile) throws LoginException {
     LoginContext loginContext = null;
+    Set<Principal> principals = new HashSet<>();
+    principals.add(new KerberosPrincipal(principal));
+    Subject subject = new Subject(false, principals, new HashSet<>(), new HashSet<>());
+    loginContext =
+        new LoginContext("", subject, null, new KerberosConfiguration(principal, keyTabFile));
+    loginContext.login();
+    return loginContext;
+  }
+
+  public static <T> T doAs(Subject subject, final Callable<T> callable) throws Exception {
     try {
-      Set<Principal> principals = new HashSet<>();
-      principals.add(new KerberosPrincipal(principal));
-      Subject subject = new Subject(false, principals, new HashSet<>(), new HashSet<>());
-      loginContext =
-          new LoginContext("", subject, null, new KerberosConfiguration(principal, keyTabFile));
-      loginContext.login();
-      subject = loginContext.getSubject();
       return Subject.doAs(
           subject,
           new PrivilegedExceptionAction<T>() {
@@ -73,10 +77,6 @@ public class KerberosUtils {
           });
     } catch (PrivilegedActionException ex) {
       throw ex.getException();
-    } finally {
-      if (loginContext != null) {
-        loginContext.logout();
-      }
     }
   }
 

@@ -36,7 +36,10 @@ import org.slf4j.LoggerFactory;
 /**
  * Provides Kerberos authentication mechanism. Referred from Apache Hadoop
  * KerberosAuthenticationHandler.java
- * hadoop-common-project/hadoop-auth/src/main/java/org/apache/hadoop/\
+ *
+ * <p>KerberosAuthenticator doesn't support to use * as principal.
+ *
+ * <p>hadoop-common-project/hadoop-auth/src/main/java/org/apache/hadoop/\
  * security/authentication/server/KerberosAuthenticationHandler.java
  */
 public class KerberosAuthenticator implements Authenticator {
@@ -52,7 +55,11 @@ public class KerberosAuthenticator implements Authenticator {
       String keytab = config.get(KerberosConfig.KEYTAB);
       File keytabFile = new File(keytab);
       if (!keytabFile.exists()) {
-        throw new IllegalArgumentException("Keytab doesn't exist: " + keytab);
+        throw new IllegalArgumentException(String.format("Keytab %s doesn't exist", keytab));
+      }
+
+      if (!keytabFile.canRead()) {
+        throw new IllegalArgumentException(String.format("Keytab %s can't be read", keytab));
       }
 
       Principal krbPrincipal = new KerberosPrincipal(principal);
@@ -106,7 +113,7 @@ public class KerberosAuthenticator implements Authenticator {
           new PrivilegedExceptionAction<Principal>() {
             @Override
             public Principal run() throws Exception {
-              return validClientToken(serverPrincipal, clientToken);
+              return validateClientToken(serverPrincipal, clientToken);
             }
           });
     } catch (Exception e) {
@@ -114,7 +121,7 @@ public class KerberosAuthenticator implements Authenticator {
     }
   }
 
-  private Principal validClientToken(String serverPrincipal, byte[] clientToken)
+  private Principal validateClientToken(String serverPrincipal, byte[] clientToken)
       throws GSSException {
     GSSContext gssContext = null;
     GSSCredential gssCreds = null;

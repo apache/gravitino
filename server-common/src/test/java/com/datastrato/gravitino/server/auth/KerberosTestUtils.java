@@ -11,6 +11,7 @@
  */
 
 // Referred from Apache Hadoop KerberosTestUtils.java
+// Copy part methods
 // hadoop-common-project/hadoop-auth/src/test/java/org/apache/hadoop/security/\
 // authentication/KerberosTestUtils.java
 
@@ -20,6 +21,7 @@ import com.datastrato.gravitino.auth.KerberosUtils;
 import java.io.File;
 import java.util.UUID;
 import java.util.concurrent.Callable;
+import javax.security.auth.login.LoginContext;
 
 /** Test helper class for Java Kerberos setup. */
 public class KerberosTestUtils {
@@ -44,6 +46,14 @@ public class KerberosTestUtils {
   }
 
   public static <T> T doAsClient(Callable<T> callable) throws Exception {
-    return KerberosUtils.doAs(getClientPrincipal(), getKeytabFile(), callable);
+    LoginContext context = null;
+    try {
+      context = KerberosUtils.login(getClientPrincipal(), getKeytabFile());
+      return KerberosUtils.doAs(context.getSubject(), callable);
+    } finally {
+      if (context != null) {
+        context.logout();
+      }
+    }
   }
 }
