@@ -21,13 +21,13 @@ public class GravitinoFileSystem extends FileSystem {
 
   @Override
   public void initialize(URI name, Configuration conf) throws IOException {
-    if (name.toString().startsWith(GravitinoFilesetFileSystemConfiguration.GTFS_SCHEME_PREFIX)) {
+    if (name.toString().startsWith(GravitinoFileSystemConfiguration.GTFS_SCHEME_PREFIX)) {
       // TODO We will interact with gravitino server to get the storage location,
       //  then we can get the truly file system; now we only support hdfs://
       try {
         URI newUri =
             new URI(
-                GravitinoFilesetFileSystemConfiguration.HDFS_SCHEME,
+                GravitinoFileSystemConfiguration.HDFS_SCHEME,
                 name.getUserInfo(),
                 name.getHost(),
                 name.getPort(),
@@ -45,7 +45,7 @@ public class GravitinoFileSystem extends FileSystem {
       throw new IllegalArgumentException(
           String.format(
               "Unsupported file system protocol: %s for %s: ",
-              name.getScheme(), GravitinoFilesetFileSystemConfiguration.GTFS_SCHEME));
+              name.getScheme(), GravitinoFileSystemConfiguration.GTFS_SCHEME));
     }
   }
 
@@ -98,7 +98,7 @@ public class GravitinoFileSystem extends FileSystem {
                 resolveFileStatusPathScheme(
                     fileStatus,
                     proxyFileSystem.getScheme(),
-                    GravitinoFilesetFileSystemConfiguration.GTFS_SCHEME))
+                    GravitinoFileSystemConfiguration.GTFS_SCHEME))
         .toArray(FileStatus[]::new);
   }
 
@@ -122,9 +122,7 @@ public class GravitinoFileSystem extends FileSystem {
   public FileStatus getFileStatus(Path f) throws IOException {
     FileStatus fileStatus = proxyFileSystem.getFileStatus(resolvePathScheme(f));
     return resolveFileStatusPathScheme(
-        fileStatus,
-        proxyFileSystem.getScheme(),
-        GravitinoFilesetFileSystemConfiguration.GTFS_SCHEME);
+        fileStatus, proxyFileSystem.getScheme(), GravitinoFileSystemConfiguration.GTFS_SCHEME);
   }
 
   private Path resolvePathScheme(Path path) {
@@ -133,7 +131,7 @@ public class GravitinoFileSystem extends FileSystem {
 
   private Path resolvePathScheme(Path path, String scheme) {
     URI uri = path.toUri();
-    if (uri.toString().startsWith(GravitinoFilesetFileSystemConfiguration.GTFS_SCHEME_PREFIX)) {
+    if (uri.toString().startsWith(GravitinoFileSystemConfiguration.GTFS_SCHEME_PREFIX)) {
       try {
         URI newUri =
             new URI(

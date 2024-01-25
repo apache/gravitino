@@ -88,8 +88,8 @@ public class TestGravitinoFileSystem {
             .getPath()
             .toString()
             .replaceFirst(
-                GravitinoFilesetFileSystemConfiguration.GTFS_SCHEME,
-                GravitinoFilesetFileSystemConfiguration.HDFS_SCHEME));
+                GravitinoFileSystemConfiguration.GTFS_SCHEME,
+                GravitinoFileSystemConfiguration.HDFS_SCHEME));
   }
 
   @Test
@@ -120,8 +120,8 @@ public class TestGravitinoFileSystem {
             .getPath()
             .toString()
             .replaceFirst(
-                GravitinoFilesetFileSystemConfiguration.GTFS_SCHEME,
-                GravitinoFilesetFileSystemConfiguration.HDFS_SCHEME));
+                GravitinoFileSystemConfiguration.GTFS_SCHEME,
+                GravitinoFileSystemConfiguration.HDFS_SCHEME));
   }
 
   @Test
@@ -155,8 +155,8 @@ public class TestGravitinoFileSystem {
             .getPath()
             .toString()
             .replaceFirst(
-                GravitinoFilesetFileSystemConfiguration.GTFS_SCHEME,
-                GravitinoFilesetFileSystemConfiguration.HDFS_SCHEME));
+                GravitinoFileSystemConfiguration.GTFS_SCHEME,
+                GravitinoFileSystemConfiguration.HDFS_SCHEME));
   }
 
   @Test
@@ -201,8 +201,8 @@ public class TestGravitinoFileSystem {
             .getPath()
             .toString()
             .replaceFirst(
-                GravitinoFilesetFileSystemConfiguration.GTFS_SCHEME,
-                GravitinoFilesetFileSystemConfiguration.HDFS_SCHEME));
+                GravitinoFileSystemConfiguration.GTFS_SCHEME,
+                GravitinoFileSystemConfiguration.HDFS_SCHEME));
   }
 
   @Test
@@ -223,8 +223,8 @@ public class TestGravitinoFileSystem {
             .getPath()
             .toString()
             .replaceFirst(
-                GravitinoFilesetFileSystemConfiguration.GTFS_SCHEME,
-                GravitinoFilesetFileSystemConfiguration.HDFS_SCHEME));
+                GravitinoFileSystemConfiguration.GTFS_SCHEME,
+                GravitinoFileSystemConfiguration.HDFS_SCHEME));
   }
 
   private void create(Path path, FileSystem fileSystem) throws IOException {
@@ -233,7 +233,13 @@ public class TestGravitinoFileSystem {
     boolean overwrite = true;
     FSDataOutputStream outputStream =
         fileSystem.create(
-            path, MOCK_PERMISSION, overwrite, BUFFER_SIZE, replication, blockSize, DEFAULT_PROGRESS);
+            path,
+            MOCK_PERMISSION,
+            overwrite,
+            BUFFER_SIZE,
+            replication,
+            blockSize,
+            DEFAULT_PROGRESS);
     outputStream.close();
   }
 
