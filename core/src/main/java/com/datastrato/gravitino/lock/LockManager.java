@@ -35,7 +35,7 @@ import org.slf4j.LoggerFactory;
  */
 public class LockManager {
   private static final Logger LOG = LoggerFactory.getLogger(LockManager.class);
-  private static final long TIME_AFTER_LAST_ACCESS_TO_EVICT_IN_MS = 24 * 60 * 60 * 1000; // 1 day
+  private static final long TIME_AFTER_LAST_ACCESS_TO_EVICT_IN_MS = 5 * 60 * 1000L; // 1 hour
 
   @VisibleForTesting final TreeLockNode treeLockRootNode = new TreeLockNode(NameIdentifier.ROOT);
   private final ThreadLocal<Stack<TreeLockPair>> holdingLocks = ThreadLocal.withInitial(Stack::new);
@@ -73,7 +73,7 @@ public class LockManager {
                         evictStaleNodes(
                             TIME_AFTER_LAST_ACCESS_TO_EVICT_IN_MS, child, treeLockRootNode)),
         1,
-        2,
+        1,
         TimeUnit.MINUTES);
   }
 
