@@ -19,6 +19,7 @@ import org.rauschig.jarchivelib.ArchiverFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+// ChromeWebDriverProvider provides a ChromeDriver instance for WEB UI tests.
 public class ChromeWebDriverProvider implements WebDriverProvider {
   protected static final Logger LOG = LoggerFactory.getLogger(ChromeWebDriverProvider.class);
   private final String chromeDriverBinName;
@@ -37,66 +38,44 @@ public class ChromeWebDriverProvider implements WebDriverProvider {
       this.chromeDriverBinName = ITUtils.joinPath("chromedriver_win32", "chromedriver.exe");
       this.chromeBinName = ITUtils.joinPath("chrome-win", "chrome.exe");
     } else {
-      throw new RuntimeException("Unsupported OS");
+      throw new RuntimeException("Unsupported OS : " + SystemUtils.OS_NAME);
     }
   }
 
   @Override
   public void downloadWebDriver() {
+    // Chrome release list in here:
     // https://commondatastorage.googleapis.com/chromium-browser-snapshots/index.html
-    StringBuilder downloadURL =
-        new StringBuilder(
-            "https://www.googleapis.com/download/storage/v1/b/chromium-browser-snapshots/o/");
-    StringBuilder chromeDownloadURL = new StringBuilder(downloadURL),
-        chromeDriverDownloadURL = new StringBuilder(downloadURL);
-
+    String chromeDownloadURL = "", chromeDriverDownloadURL = "";
     String chromeZipFile = "", chromeDriverZipFile = "";
     if (SystemUtils.IS_OS_LINUX) {
-      // https://www.googleapis.com/download/storage/v1/b/chromium-browser-snapshots/o/Linux_x64%2F1000022%2Fchrome-linux.zip?generation=1651778257041732&alt=media
       chromeZipFile = "chrome-linux.zip";
-      chromeDownloadURL
-          .append("Linux_x64%2F1000022%2F")
-          .append(chromeZipFile)
-          .append("?generation=1651778257041732&alt=media");
+      chromeDownloadURL =
+          "https://www.googleapis.com/download/storage/v1/b/chromium-browser-snapshots/o/Linux_x64%2F1000022%2Fchrome-linux.zip?generation=1651778257041732&alt=media";
 
-      // https://www.googleapis.com/download/storage/v1/b/chromium-browser-snapshots/o/Linux_x64%2F1000022%2Fchromedriver_linux64.zip?generation=1651778262235204&alt=media
       chromeDriverZipFile = "chromedriver_linux64.zip";
-      chromeDriverDownloadURL
-          .append("Linux_x64%2F1000022%2F")
-          .append(chromeDriverZipFile)
-          .append("?generation=1651778262235204&alt=media");
+      chromeDriverDownloadURL =
+          "https://www.googleapis.com/download/storage/v1/b/chromium-browser-snapshots/o/Linux_x64%2F1000022%2Fchromedriver_linux64.zip?generation=1651778262235204&alt=media";
     } else if (SystemUtils.IS_OS_MAC_OSX) {
-      // https://www.googleapis.com/download/storage/v1/b/chromium-browser-snapshots/o/Mac%2F1000022%2Fchrome-mac.zip?generation=1651779420087881&alt=media
       chromeZipFile = "chrome-mac.zip";
-      chromeDownloadURL
-          .append("Mac%2F1000022%2F")
-          .append(chromeZipFile)
-          .append("?generation=1651779420087881&alt=media");
+      chromeDownloadURL =
+          "https://www.googleapis.com/download/storage/v1/b/chromium-browser-snapshots/o/Mac%2F1000022%2Fchrome-mac.zip?generation=1651779420087881&alt=media";
 
-      // https://www.googleapis.com/download/storage/v1/b/chromium-browser-snapshots/o/Mac%2F1000022%2Fchromedriver_mac64.zip?generation=1651779426705083&alt=media
       chromeDriverZipFile = "chromedriver_mac64.zip";
-      chromeDriverDownloadURL
-          .append("Mac%2F1000022%2F")
-          .append(chromeDriverZipFile)
-          .append("?generation=1651779426705083&alt=media");
+      chromeDriverDownloadURL =
+          "https://www.googleapis.com/download/storage/v1/b/chromium-browser-snapshots/o/Mac%2F1000022%2Fchromedriver_mac64.zip?generation=1651779426705083&alt=media";
     } else if (SystemUtils.IS_OS_WINDOWS) {
-      // https://www.googleapis.com/download/storage/v1/b/chromium-browser-snapshots/o/Win_x64%2F1000027%2Fchrome-win.zip?generation=1651780728332948&alt=media
       chromeZipFile = "chrome-win.zip";
-      chromeDownloadURL
-          .append("Win_x64%2F1000027%2F")
-          .append(chromeZipFile)
-          .append("?generation=1651780728332948&alt=media");
+      chromeDownloadURL =
+          "https://www.googleapis.com/download/storage/v1/b/chromium-browser-snapshots/o/Win_x64%2F1000027%2Fchrome-win.zip?generation=1651780728332948&alt=media";
 
-      // https://www.googleapis.com/download/storage/v1/b/chromium-browser-snapshots/o/Win_x64%2F1000027%2Fchromedriver_win32.zip?generation=1651780916599219&alt=media
       chromeDriverZipFile = "chromedriver_win32.zip";
-      chromeDriverDownloadURL
-          .append("Win_x64%2F1000027%2F")
-          .append(chromeDriverZipFile)
-          .append("?generation=1651780916599219&alt=media");
+      chromeDriverDownloadURL =
+          "https://www.googleapis.com/download/storage/v1/b/chromium-browser-snapshots/o/Win_x64%2F1000027%2Fchromedriver_win32.zip?generation=1651780916599219&alt=media";
     }
 
-    downloadZipFile(chromeDriverDownloadURL.toString(), chromeDriverZipFile, chromeDriverBinName);
-    downloadZipFile(chromeDownloadURL.toString(), chromeZipFile, chromeBinName);
+    downloadZipFile(chromeDriverDownloadURL, chromeDriverZipFile, chromeDriverBinName);
+    downloadZipFile(chromeDownloadURL, chromeZipFile, chromeBinName);
 
     LOG.info("Download the chromeDriver to " + downLoadDir + " successfully.");
   }

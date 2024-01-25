@@ -11,6 +11,7 @@ import org.openqa.selenium.WebDriver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+// AbstractWebIT provides a WebDriver instance for WEB UI tests.
 public class AbstractWebIT extends AbstractIT {
   protected static final Logger LOG = LoggerFactory.getLogger(AbstractWebIT.class);
   protected static WebDriver driver;

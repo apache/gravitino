@@ -6,6 +6,7 @@ package com.datastrato.gravitino.integration.test.web.ui.utils;
 
 import org.openqa.selenium.WebDriver;
 
+// WebDriverProvider is an interface for WEB Driver provider.
 public interface WebDriverProvider {
 
   /** Download the browser web driver. */

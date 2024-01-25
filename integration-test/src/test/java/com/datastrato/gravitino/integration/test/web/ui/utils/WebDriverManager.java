@@ -4,8 +4,6 @@
  */
 package com.datastrato.gravitino.integration.test.web.ui.utils;
 
-import static org.junit.Assert.fail;
-
 import java.util.concurrent.TimeUnit;
 import org.openqa.selenium.By;
 import org.openqa.selenium.Dimension;
@@ -16,6 +14,7 @@ import org.openqa.selenium.support.ui.WebDriverWait;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+// WebDriverManager manage the multiple web drivers to run the WEB UI tests.
 public class WebDriverManager {
   public static final Logger LOG = LoggerFactory.getLogger(WebDriverManager.class);
 
@@ -51,9 +50,9 @@ public class WebDriverManager {
     }
 
     if (!loaded) {
-      fail();
+      throw new RuntimeException("Webpage not loaded in 60 seconds.");
     }
-    Dimension d = new Dimension(1920, 1080);
+    Dimension d = new Dimension(1440, 1080);
     driver.manage().window().setSize(d);
 
     return driver;
