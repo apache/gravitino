@@ -93,8 +93,8 @@ public class GravitinoFileSystem extends FileSystem {
             fileStatus ->
                 resolveFileStatusPathScheme(
                     fileStatus,
-                    proxyFileSystem.getScheme(),
-                    GravitinoFileSystemConfiguration.GTFS_SCHEME))
+                    proxyFileSystem.getScheme() + "://" + proxyFileSystem.getUri().getHost(),
+                    GravitinoFileSystemConfiguration.GTFS_FILESET_PREFIX))
         .toArray(FileStatus[]::new);
   }
 
@@ -118,7 +118,9 @@ public class GravitinoFileSystem extends FileSystem {
   public FileStatus getFileStatus(Path f) throws IOException {
     FileStatus fileStatus = proxyFileSystem.getFileStatus(resolvePathScheme(f));
     return resolveFileStatusPathScheme(
-        fileStatus, proxyFileSystem.getScheme(), GravitinoFileSystemConfiguration.GTFS_SCHEME);
+        fileStatus,
+        proxyFileSystem.getScheme() + "://" + proxyFileSystem.getUri().getHost(),
+        GravitinoFileSystemConfiguration.GTFS_FILESET_PREFIX);
   }
 
   private Path resolvePathScheme(Path path) {

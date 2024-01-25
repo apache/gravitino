@@ -88,8 +88,10 @@ public class TestGravitinoFileSystem {
             .getPath()
             .toString()
             .replaceFirst(
-                GravitinoFileSystemConfiguration.GTFS_SCHEME,
-                GravitinoFileSystemConfiguration.HDFS_SCHEME));
+                GravitinoFileSystemConfiguration.GTFS_FILESET_PREFIX,
+                GravitinoFileSystemConfiguration.HDFS_SCHEME
+                    + "://"
+                    + HDFS_CLUSTER.getFileSystem().getUri().getHost()));
   }
 
   @Test
@@ -120,8 +122,10 @@ public class TestGravitinoFileSystem {
             .getPath()
             .toString()
             .replaceFirst(
-                GravitinoFileSystemConfiguration.GTFS_SCHEME,
-                GravitinoFileSystemConfiguration.HDFS_SCHEME));
+                GravitinoFileSystemConfiguration.GTFS_FILESET_PREFIX,
+                GravitinoFileSystemConfiguration.HDFS_SCHEME
+                    + "://"
+                    + HDFS_CLUSTER.getFileSystem().getUri().getHost()));
   }
 
   @Test
@@ -155,8 +159,10 @@ public class TestGravitinoFileSystem {
             .getPath()
             .toString()
             .replaceFirst(
-                GravitinoFileSystemConfiguration.GTFS_SCHEME,
-                GravitinoFileSystemConfiguration.HDFS_SCHEME));
+                GravitinoFileSystemConfiguration.GTFS_FILESET_PREFIX,
+                GravitinoFileSystemConfiguration.HDFS_SCHEME
+                    + "://"
+                    + HDFS_CLUSTER.getFileSystem().getUri().getHost()));
   }
 
   @Test
@@ -201,8 +207,10 @@ public class TestGravitinoFileSystem {
             .getPath()
             .toString()
             .replaceFirst(
-                GravitinoFileSystemConfiguration.GTFS_SCHEME,
-                GravitinoFileSystemConfiguration.HDFS_SCHEME));
+                GravitinoFileSystemConfiguration.GTFS_FILESET_PREFIX,
+                GravitinoFileSystemConfiguration.HDFS_SCHEME
+                    + "://"
+                    + HDFS_CLUSTER.getFileSystem().getUri().getHost()));
   }
 
   @Test
@@ -223,8 +231,10 @@ public class TestGravitinoFileSystem {
             .getPath()
             .toString()
             .replaceFirst(
-                GravitinoFileSystemConfiguration.GTFS_SCHEME,
-                GravitinoFileSystemConfiguration.HDFS_SCHEME));
+                GravitinoFileSystemConfiguration.GTFS_FILESET_PREFIX,
+                GravitinoFileSystemConfiguration.HDFS_SCHEME
+                    + "://"
+                    + HDFS_CLUSTER.getFileSystem().getUri().getHost()));
   }
 
   private void create(Path path, FileSystem fileSystem) throws IOException {
