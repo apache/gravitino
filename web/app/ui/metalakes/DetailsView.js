@@ -29,7 +29,7 @@ const DetailsView = props => {
     }
 
     return (
-      <Typography sx={{ fontWeight: 500, whiteSpace: linkBreak ? 'pre' : 'normal' }}>
+      <Typography sx={{ fontWeight: 500, whiteSpace: linkBreak ? 'pre-wrap' : 'normal' }}>
         {isValidDate(value) ? formatToDateTime(value) : value}
       </Typography>
     )
