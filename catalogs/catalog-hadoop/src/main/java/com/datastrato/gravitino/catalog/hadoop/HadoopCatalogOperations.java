@@ -234,9 +234,6 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
         .withName(ident.name())
         .withComment(comment)
         .withType(type)
-        // The returned storageLocation is a calculated one. If the fileset is managed and
-        // storageLocation is null, then the calculated location is the
-        // schema location + fileset name.
         .withStorageLocation(filesetPath.toString())
         .withProperties(filesetEntity.properties())
         .withAuditInfo(filesetEntity.auditInfo())
