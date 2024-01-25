@@ -865,8 +865,12 @@ tableCatalog.purgeTable(NameIdentifier.of("metalake", "catalog", "schema", "tabl
 </TabItem>
 </Tabs>
 
-There are two ways to drop a table: `dropTable` and `purgeTable`, the difference between them is that `purgeTable` will remove data of the table, while `dropTable` only removes the metadata of the table. Some engines such as 
-Apache Hive support both, `dropTable` will only remove the metadata of a table and the data in HDFS can be reused later through the format of the external table.
+There are two ways to drop a table: `dropTable` and `purgeTable`: 
+
+* `dropTable`  removes both the metadata and data of the table. If the catalog supports recycling, such as Hive catalog, the data will be moved to the trash.
+* `purgeTable` removes both metadata and data without moving the data to the trash. If the catalog doesn't support recycling, like MySQL catalog, an UnsupportedException is thrown.
+
+The external table only support `dropTable`.
 
 ### List all tables under a schema
 

@@ -123,7 +123,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     NameIdentifier[] nameIdentifiers =
         catalog.asTableCatalog().listTables(Namespace.of(metalakeName, catalogName, schemaName));
     for (NameIdentifier nameIdentifier : nameIdentifiers) {
-      catalog.asTableCatalog().purgeTable(nameIdentifier);
+      catalog.asTableCatalog().dropTable(nameIdentifier);
     }
     catalog.asSchemas().dropSchema(NameIdentifier.of(metalakeName, catalogName, schemaName), false);
   }
