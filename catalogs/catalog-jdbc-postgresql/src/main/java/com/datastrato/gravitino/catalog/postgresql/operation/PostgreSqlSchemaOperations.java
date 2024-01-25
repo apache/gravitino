@@ -142,11 +142,10 @@ public class PostgreSqlSchemaOperations extends JdbcDatabaseOperations {
   }
 
   private String getShowSchemaCommentSql(String schema) {
-    return String.format(GET_SCHEMA_COMMENT_SQL_FORMAT,schema);
+    return String.format(GET_SCHEMA_COMMENT_SQL_FORMAT, schema);
   }
 
-  private String getSchemaComment(String schema, Connection connection)
-      throws SQLException {
+  private String getSchemaComment(String schema, Connection connection) throws SQLException {
     try (PreparedStatement preparedStatement =
         connection.prepareStatement(getShowSchemaCommentSql(schema))) {
       try (ResultSet resultSet = preparedStatement.executeQuery()) {

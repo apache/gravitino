@@ -562,15 +562,13 @@ public class CatalogMysqlIT extends AbstractIT {
                 .loadSchema(NameIdentifier.of(metalakeName, catalogName, schemaName)));
   }
 
-
   @Test
   void testCreateAndLoadSchema() {
     String testSchemaName = "ssss";
     NameIdentifier ident = NameIdentifier.of(metalakeName, catalogName, testSchemaName);
     System.out.println(ident);
 
-    Schema schema =
-        catalog.asSchemas().createSchema(ident, "comment", null);
+    Schema schema = catalog.asSchemas().createSchema(ident, "comment", null);
     System.out.println(schema.name());
     System.out.println(schema.comment());
     System.out.println(schema.auditInfo());

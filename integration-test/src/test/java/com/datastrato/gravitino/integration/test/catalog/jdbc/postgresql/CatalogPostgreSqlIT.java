@@ -43,6 +43,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.datanucleus.util.StringUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -526,23 +527,26 @@ public class CatalogPostgreSqlIT extends AbstractIT {
 
   @Test
   void testCreateAndLoadSchema() {
-    String testSchemaName = "ssss";
+    String testSchemaName = "test";
     NameIdentifier ident = NameIdentifier.of(metalakeName, catalogName, testSchemaName);
-    System.out.println(ident);
 
-    Schema schema =
-        catalog.asSchemas().createSchema(ident, "comment", null);
-    System.out.println(schema.name());
-    System.out.println(schema.comment());
-    System.out.println(schema.auditInfo());
-    System.out.println(schema.properties());
+    Schema schema = catalog.asSchemas().createSchema(ident, "comment", null);
+    Assertions.assertEquals("anonymous", schema.auditInfo().creator());
     Assertions.assertEquals("comment", schema.comment());
-
     schema = catalog.asSchemas().loadSchema(ident);
-    System.out.println(schema.name());
-    System.out.println(schema.comment());
-    System.out.println(schema.auditInfo());
-    System.out.println(schema.properties());
+    Assertions.assertEquals("anonymous", schema.auditInfo().creator());
     Assertions.assertEquals("comment", schema.comment());
+
+    // test null comment
+    testSchemaName = "test2";
+    ident = NameIdentifier.of(metalakeName, catalogName, testSchemaName);
+
+    schema = catalog.asSchemas().createSchema(ident, null, null);
+    Assertions.assertEquals("anonymous", schema.auditInfo().creator());
+    // todo: Gravitino put id to comment, makes comment is empty string not null.
+    Assertions.assertTrue(StringUtils.isEmpty(schema.comment()));
+    schema = catalog.asSchemas().loadSchema(ident);
+    Assertions.assertEquals("anonymous", schema.auditInfo().creator());
+    Assertions.assertTrue(StringUtils.isEmpty(schema.comment()));
   }
 }

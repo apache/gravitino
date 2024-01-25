@@ -204,12 +204,11 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
     }
     Map<String, String> properties =
         load.properties() == null ? Maps.newHashMap() : Maps.newHashMap(load.properties());
-    StringIdentifier.newPropertiesWithId(id, properties);
     return new JdbcSchema.Builder()
         .withAuditInfo(load.auditInfo())
         .withName(load.name())
         .withComment(StringIdentifier.removeIdFromComment(load.comment()))
-        .withProperties(properties)
+        .withProperties(StringIdentifier.newPropertiesWithId(id, properties))
         .build();
   }
 
