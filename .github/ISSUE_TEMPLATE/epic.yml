@@ -1,7 +1,9 @@
 name: Epic
 title: "[EPIC] "
 description: An epic issue with multiple sub-tasks
-labels: [ "kind:epic,priority:major" ]
+labels: [ "epic" ]
+projects: [ "datastrato/1" ]
+
 body:
 
   - type: textarea

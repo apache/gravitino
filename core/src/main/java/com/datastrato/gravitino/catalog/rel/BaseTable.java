@@ -10,6 +10,7 @@ import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
+import com.datastrato.gravitino.rel.indexes.Index;
 import java.util.Map;
 import javax.annotation.Nullable;
 import lombok.ToString;
@@ -33,6 +34,8 @@ public abstract class BaseTable implements Table {
   @Nullable protected SortOrder[] sortOrders;
 
   @Nullable protected Distribution distribution;
+
+  @Nullable protected Index[] indexes;
 
   /** Returns the audit details of the table. */
   @Override
@@ -87,6 +90,11 @@ public abstract class BaseTable implements Table {
     return distribution;
   }
 
+  @Override
+  public Index[] index() {
+    return indexes;
+  }
+
   /**
    * Builder interface for creating instances of {@link BaseTable}.
    *
@@ -111,6 +119,8 @@ public abstract class BaseTable implements Table {
 
     SELF withDistribution(Distribution distribution);
 
+    SELF withIndexes(Index[] indexes);
+
     T build();
   }
 
@@ -131,6 +141,7 @@ public abstract class BaseTable implements Table {
     protected SortOrder[] sortOrders;
 
     protected Distribution distribution;
+    protected Index[] indexes;
 
     /**
      * Sets the name of the table.
@@ -211,6 +222,11 @@ public abstract class BaseTable implements Table {
 
     public SELF withDistribution(Distribution distribution) {
       this.distribution = distribution;
+      return (SELF) this;
+    }
+
+    public SELF withIndexes(Index[] indexes) {
+      this.indexes = indexes;
       return (SELF) this;
     }
 

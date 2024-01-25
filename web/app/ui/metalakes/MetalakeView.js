@@ -58,7 +58,7 @@ const MetalakeView = props => {
         break
       case 'tables':
         if (catalog !== null && schema !== null && table !== null) {
-          dispatch(getTableDetails({ metalake, catalog, schema, table }))
+          dispatch(getTableDetails({ init: true, metalake, catalog, schema, table }))
         }
         break
       default:

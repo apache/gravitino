@@ -14,7 +14,8 @@ import com.datastrato.gravitino.dto.rel.ColumnDTO;
 import com.datastrato.gravitino.dto.rel.DistributionDTO;
 import com.datastrato.gravitino.dto.rel.SortOrderDTO;
 import com.datastrato.gravitino.dto.rel.expressions.FieldReferenceDTO;
-import com.datastrato.gravitino.dto.rel.partitions.IdentityPartitioningDTO;
+import com.datastrato.gravitino.dto.rel.partitioning.IdentityPartitioningDTO;
+import com.datastrato.gravitino.dto.rel.partitioning.Partitioning;
 import com.datastrato.gravitino.integration.test.catalog.jdbc.utils.JdbcDriverDownloader;
 import com.datastrato.gravitino.integration.test.container.ContainerSuite;
 import com.datastrato.gravitino.integration.test.container.HiveContainer;
@@ -899,7 +900,15 @@ public class TrinoConnectorIT extends AbstractIT {
             ImmutableMap.<String, String>builder()
                 .put("format-version", "1")
                 .put("key1", "value1")
-                .build());
+                .build(),
+            new Transform[] {Transforms.identity("BinaryType")},
+            Distributions.NONE,
+            new SortOrder[] {
+              SortOrders.of(
+                  NamedReference.field("LongType"),
+                  SortDirection.ASCENDING,
+                  NullOrdering.NULLS_FIRST)
+            });
     LOG.info("create table \"{}.{}\".{}.{}", metalakeName, catalogName, schemaName, tableName);
 
     Table table =
@@ -921,6 +930,26 @@ public class TrinoConnectorIT extends AbstractIT {
     LOG.info("create iceberg hive table sql is: " + data);
     // Iceberg does not contain any properties;
     Assertions.assertFalse(data.contains("key1"));
+    Assertions.assertTrue(data.contains("partitioning = ARRAY['BinaryType']"));
+    Assertions.assertTrue(data.contains("sorted_by = ARRAY['LongType']"));
+
+    String tableCreatedByTrino = GravitinoITUtils.genRandomName("table").toLowerCase();
+    String createTableSql =
+        String.format(
+            "CREATE TABLE \"%s.%s\".%s.%s (id int, name varchar) with (partitioning = ARRAY['name'], sorted_by = ARRAY['id'])",
+            metalakeName, catalogName, schemaName, tableCreatedByTrino);
+    containerSuite.getTrinoContainer().executeUpdateSQL(createTableSql);
+
+    table =
+        catalog
+            .asTableCatalog()
+            .loadTable(
+                NameIdentifier.of(metalakeName, catalogName, schemaName, tableCreatedByTrino));
+
+    Arrays.stream(table.partitioning())
+        .anyMatch(p -> ((Partitioning.SingleFieldPartitioning) p).fieldName()[0].equals("name"));
+    Arrays.stream(table.sortOrder())
+        .anyMatch(p -> ((FieldReferenceDTO) p.expression()).fieldName()[0].equals("id"));
   }
 
   @Test
@@ -1145,6 +1174,85 @@ public class TrinoConnectorIT extends AbstractIT {
     if (!success) {
       Assertions.fail("Trino fail to load table created by gravitino: " + sql);
     }
+  }
+
+  @Test
+  void testMySQLTableCreatedByTrino() throws InterruptedException {
+    String catalogName = GravitinoITUtils.genRandomName("mysql_catalog").toLowerCase();
+    String schemaName = GravitinoITUtils.genRandomName("mysql_schema").toLowerCase();
+    String tableName = GravitinoITUtils.genRandomName("mysql_table").toLowerCase();
+    GravitinoMetaLake createdMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
+    String[] command = {
+      "mysql",
+      "-h127.0.0.1",
+      "-uroot",
+      "-pds123", // username and password are referred from Hive dockerfile.
+      "-e",
+      "grant all privileges on *.* to root@'%' identified by 'ds123'"
+    };
+
+    // There exists a mysql instance in Hive the container.
+    containerSuite.getHiveContainer().executeInContainer(command);
+    String hiveHost = containerSuite.getHiveContainer().getContainerIpAddress();
+
+    createdMetalake.createCatalog(
+        NameIdentifier.of(metalakeName, catalogName),
+        Catalog.Type.RELATIONAL,
+        "jdbc-mysql",
+        "comment",
+        ImmutableMap.<String, String>builder()
+            .put("jdbc-driver", "com.mysql.cj.jdbc.Driver")
+            .put("jdbc-user", "root")
+            .put("jdbc-password", "ds123")
+            .put("jdbc-url", String.format("jdbc:mysql://%s:3306?useSSL=false", hiveHost))
+            .build());
+    Catalog catalog = createdMetalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
+    Assertions.assertEquals("root", catalog.properties().get("jdbc-user"));
+
+    String sql = String.format("show catalogs like '%s.%s'", metalakeName, catalogName);
+    boolean success = checkTrinoHasLoaded(sql, 30);
+    if (!success) {
+      Assertions.fail("Trino fail to load catalogs created by gravitino: " + sql);
+    }
+
+    String data = containerSuite.getTrinoContainer().executeQuerySQL(sql).get(0).get(0);
+    Assertions.assertEquals(metalakeName + "." + catalogName, data);
+
+    // Create schema
+    sql = String.format("create schema \"%s.%s\".%s", metalakeName, catalogName, schemaName);
+    containerSuite.getTrinoContainer().executeUpdateSQL(sql);
+
+    // create table
+    sql =
+        String.format(
+            "create table \"%s.%s\".%s.%s (id int, name varchar)",
+            metalakeName, catalogName, schemaName, tableName);
+    containerSuite.getTrinoContainer().executeUpdateSQL(sql);
+
+    // Add a not null column
+    sql =
+        String.format(
+            "alter table \"%s.%s\".%s.%s add column age int not null comment 'age of users'",
+            metalakeName, catalogName, schemaName, tableName);
+    containerSuite.getTrinoContainer().executeUpdateSQL(sql);
+
+    sql =
+        String.format(
+            "alter table \"%s.%s\".%s.%s add column address varchar(20) not null comment 'address of users'",
+            metalakeName, catalogName, schemaName, tableName);
+    containerSuite.getTrinoContainer().executeUpdateSQL(sql);
+
+    catalog
+        .asTableCatalog()
+        .loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, tableName));
+
+    sql =
+        String.format(
+            "show create table \"%s.%s\".%s.%s", metalakeName, catalogName, schemaName, tableName);
+
+    data = containerSuite.getTrinoContainer().executeQuerySQL(sql).get(0).get(0);
+    Assertions.assertTrue(data.contains("age integer NOT NULL"));
+    Assertions.assertTrue(data.contains("address varchar(20) NOT NULL"));
   }
 
   @Test
