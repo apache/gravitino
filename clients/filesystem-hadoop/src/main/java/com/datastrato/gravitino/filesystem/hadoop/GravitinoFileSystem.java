@@ -99,9 +99,9 @@ public class GravitinoFileSystem extends FileSystem {
   }
 
   @Override
-  public void setWorkingDirectory(Path new_dir) {
-    proxyFileSystem.setWorkingDirectory(resolvePathScheme(new_dir));
-    this.workingDirectory = new_dir;
+  public void setWorkingDirectory(Path newDir) {
+    proxyFileSystem.setWorkingDirectory(resolvePathScheme(newDir));
+    this.workingDirectory = newDir;
   }
 
   @Override
@@ -125,7 +125,7 @@ public class GravitinoFileSystem extends FileSystem {
     return resolvePathScheme(path, proxyFileSystem);
   }
 
-  private Path resolvePathScheme(Path path, FileSystem fileSystem) {
+  private static Path resolvePathScheme(Path path, FileSystem fileSystem) {
     URI uri = path.toUri();
     if (uri.toString().startsWith(GravitinoFileSystemConfiguration.GTFS_FILESET_PREFIX)) {
       try {
