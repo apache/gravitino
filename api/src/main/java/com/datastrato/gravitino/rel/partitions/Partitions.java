@@ -5,6 +5,7 @@
 package com.datastrato.gravitino.rel.partitions;
 
 import com.datastrato.gravitino.rel.expressions.literals.Literal;
+import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Objects;
@@ -29,6 +30,9 @@ public class Partitions {
   /**
    * Creates a list partition.
    *
+   * <p>Each list in the lists must have the same length. The values in each list must correspond to
+   * the field definitions in the {@link Transforms.ListTransform#fieldNames()}.
+   *
    * @param name The name of the partition.
    * @param lists The values of the list partition.
    * @param properties The properties of the partition.
@@ -41,19 +45,21 @@ public class Partitions {
   /**
    * Creates an identity partition.
    *
+   * <p>The {@code values} must correspond to the {@code fieldNames}.
+   *
    * @param name The name of the partition.
    * @param fieldNames The field names of the identity partition.
-   * @param value The value of the identity partition.
+   * @param values The value of the identity partition.
    * @param properties The properties of the partition.
    * @return The created partition.
    */
   public static Partition identity(
-      String name, String[][] fieldNames, Literal<?>[] value, Map<String, String> properties) {
-    return new IdentityPartitionImpl(name, fieldNames, value, properties);
+      String name, String[][] fieldNames, Literal<?>[] values, Map<String, String> properties) {
+    return new IdentityPartitionImpl(name, fieldNames, values, properties);
   }
 
   /** Represents a result of range partitioning. */
-  public static class RangePartitionImpl implements RangePartition {
+  private static class RangePartitionImpl implements RangePartition {
     private final String name;
     private final Literal<?> upper;
     private final Literal<?> lower;
@@ -110,7 +116,7 @@ public class Partitions {
   }
 
   /** Represents a result of list partitioning. */
-  public static class ListPartitionImpl implements ListPartition {
+  private static class ListPartitionImpl implements ListPartition {
     private final String name;
     private final Literal<?>[][] lists;
 
@@ -160,7 +166,7 @@ public class Partitions {
   }
 
   /** Represents a result of identity partitioning. */
-  public static class IdentityPartitionImpl implements IdentityPartition {
+  private static class IdentityPartitionImpl implements IdentityPartition {
     private final String name;
     private final String[][] fieldNames;
     private final Literal<?>[] values;
