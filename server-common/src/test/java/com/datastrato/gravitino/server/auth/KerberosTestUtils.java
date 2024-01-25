@@ -11,7 +11,7 @@
  */
 
 // Referred from Apache Hadoop KerberosTestUtils.java
-// Copy part methods
+// Remove part methods
 // hadoop-common-project/hadoop-auth/src/test/java/org/apache/hadoop/security/\
 // authentication/KerberosTestUtils.java
 
