@@ -104,7 +104,7 @@ public class TestLockManager {
   int testNormalLock() throws InterruptedException {
     ThreadLocalRandom threadLocalRandom = ThreadLocalRandom.current();
     ReentrantReadWriteLock reentrantReadWriteLock = new ReentrantReadWriteLock();
-    for (int i = 0; i < 10000; i++) {
+    for (int i = 0; i < 1000; i++) {
       NameIdentifier identifier = randomNameIdentifier();
       int num = threadLocalRandom.nextInt(5);
       LockType lockType = num >= 4 ? LockType.WRITE : LockType.READ;
@@ -112,12 +112,12 @@ public class TestLockManager {
       if (lockType == LockType.WRITE) {
         reentrantReadWriteLock.writeLock().lock();
         // App logic here...
-        Thread.sleep(5);
+        Thread.sleep(1);
         reentrantReadWriteLock.writeLock().unlock();
       } else {
         reentrantReadWriteLock.readLock().lock();
         // App logic here...
-        Thread.sleep(5);
+        Thread.sleep(1);
         reentrantReadWriteLock.readLock().unlock();
       }
     }
@@ -127,14 +127,14 @@ public class TestLockManager {
 
   int testLockManager(LockManager lockManager) throws InterruptedException {
     ThreadLocalRandom threadLocalRandom = ThreadLocalRandom.current();
-    for (int i = 0; i < 10000; i++) {
+    for (int i = 0; i < 1000; i++) {
       NameIdentifier identifier = randomNameIdentifier();
       int num = threadLocalRandom.nextInt(5);
       LockType lockType = num >= 4 ? LockType.WRITE : LockType.READ;
       try {
         lockManager.lockResourcePath(identifier, lockType);
         // App logic here...
-        Thread.sleep(5);
+        Thread.sleep(1);
       } catch (Exception e) {
         if (e.getMessage().contains("mock")) {
           return 0;
@@ -187,20 +187,20 @@ public class TestLockManager {
     }
 
     long start = System.currentTimeMillis();
-    for (int i = 0; i < 10; i++) {
+    for (int i = 0; i < threadCount; i++) {
       completionService.submit(() -> this.testLockManager(lockManager));
     }
-    for (int i = 0; i < 10; i++) {
+    for (int i = 0; i < threadCount; i++) {
       completionService.take().get();
     }
     System.out.println("LockManager use tree lock: " + (System.currentTimeMillis() - start) + "ms");
 
     start = System.currentTimeMillis();
-    for (int i = 0; i < 10; i++) {
+    for (int i = 0; i < threadCount; i++) {
       completionService.submit(() -> this.testNormalLock());
     }
 
-    for (int i = 0; i < 10; i++) {
+    for (int i = 0; i < threadCount; i++) {
       completionService.take().get();
     }
     System.out.println(

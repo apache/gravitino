@@ -5,6 +5,7 @@
 
 package com.datastrato.gravitino.lock;
 
+import com.datastrato.gravitino.NameIdentifier;
 import com.google.common.collect.Lists;
 import java.util.List;
 import java.util.Map;
@@ -18,15 +19,15 @@ import org.slf4j.LoggerFactory;
 @ThreadSafe
 public class TreeLockNode {
   public static final Logger LOG = LoggerFactory.getLogger(TreeLockNode.class);
-  private final String name;
+  private final NameIdentifier ident;
   private final ReentrantReadWriteLock readWriteLock;
-  private final Map<String, TreeLockNode> childMap;
+  private final Map<NameIdentifier, TreeLockNode> childMap;
 
   private final AtomicLong referenceCount = new AtomicLong();
   private long lastAccessTime;
 
-  public TreeLockNode(String name) {
-    this.name = name;
+  public TreeLockNode(NameIdentifier identifier) {
+    this.ident = identifier;
     this.readWriteLock = new ReentrantReadWriteLock();
     this.childMap = new ConcurrentHashMap<>();
   }
@@ -35,10 +36,16 @@ public class TreeLockNode {
     return lastAccessTime;
   }
 
-  public String getName() {
-    return name;
+  public NameIdentifier getIdent() {
+    return ident;
   }
 
+  /**
+   * Try to lock the node with the given lock type.
+   *
+   * @param lockType The lock type to lock the node.
+   * @return True if the node is locked successfully, false otherwise.
+   */
   public boolean tryLock(LockType lockType) {
     boolean success =
         lockType == LockType.READ
@@ -49,7 +56,7 @@ public class TreeLockNode {
 
       LOG.info(
           "Node {} has been lock with '{}' lock, reference count = {}",
-          name,
+          ident,
           lockType,
           referenceCount.get());
     }
@@ -73,7 +80,7 @@ public class TreeLockNode {
 
     LOG.info(
         "Node {} has been lock with '{}' lock, reference count = {}",
-        name,
+        ident,
         lockType,
         referenceCount.get());
   }
@@ -95,26 +102,27 @@ public class TreeLockNode {
     }
     LOG.info(
         "Node {} has been unlock with '{}' lock, reference count = {}",
-        name,
+        ident,
         lockType,
         referenceCount.get());
   }
 
   /**
-   * Get the tree lock node of resource 'name', it's the last part of the resource path.
+   * Get the tree lock node by the given name identifier. If the node doesn't exist, create a new
+   * TreeNode.
    *
-   * @param name The name of the resource.
-   * @return The tree lock node of the resource.
+   * @param ident The name identifier of a resource such as entity or others.
+   * @return The tree lock node of this ident.
    */
-  public TreeLockNode getOrCreateChild(String name) {
-    TreeLockNode treeNode = childMap.get(name);
+  public TreeLockNode getOrCreateChild(NameIdentifier ident) {
+    TreeLockNode treeNode = childMap.get(ident);
     lastAccessTime = System.currentTimeMillis();
     if (treeNode == null) {
       synchronized (this) {
-        treeNode = childMap.get(name);
+        treeNode = childMap.get(ident);
         if (treeNode == null) {
-          treeNode = new TreeLockNode(name);
-          childMap.put(name, treeNode);
+          treeNode = new TreeLockNode(ident);
+          childMap.put(ident, treeNode);
         }
       }
     }
@@ -126,7 +134,7 @@ public class TreeLockNode {
     return Lists.newArrayList(childMap.values());
   }
 
-  public synchronized void removeChild(String name) {
+  public synchronized void removeChild(NameIdentifier name) {
     childMap.remove(name);
   }
 }

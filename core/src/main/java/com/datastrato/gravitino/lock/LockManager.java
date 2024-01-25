@@ -11,6 +11,7 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.util.Stack;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import org.apache.commons.lang3.ArrayUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,7 +37,7 @@ public class LockManager {
   private static final Logger LOG = LoggerFactory.getLogger(LockManager.class);
   private static final long TIME_AFTER_LAST_ACCESS_TO_EVICT_IN_MS = 24 * 60 * 60 * 1000; // 1 day
 
-  @VisibleForTesting final TreeLockNode treeLockRootNode = new TreeLockNode("root");
+  @VisibleForTesting final TreeLockNode treeLockRootNode = new TreeLockNode(NameIdentifier.ROOT);
   private final ThreadLocal<Stack<TreeLockPair>> holdingLocks = ThreadLocal.withInitial(Stack::new);
   private final ScheduledThreadPoolExecutor lockCleaner;
 
@@ -106,9 +107,9 @@ public class LockManager {
             < System.currentTimeMillis() - timeAfterLastAccessToEvictInMs) {
           LOG.info(
               "Evicting stale node {} with last access time {}",
-              treeNode.getName(),
+              treeNode.getIdent(),
               treeNode.getLastAccessTime());
-          parent.removeChild(treeNode.getName());
+          parent.removeChild(treeNode.getIdent());
         }
       } finally {
         treeNode.unlock(LockType.WRITE);
@@ -131,13 +132,14 @@ public class LockManager {
     String[] levels = identifier.namespace().levels();
 
     try {
-      for (String level : levels) {
-        lockNode = lockNode.getOrCreateChild(level);
+      for (int i = 0; i < levels.length; i++) {
+        NameIdentifier ident = NameIdentifier.of(ArrayUtils.subarray(levels, 0, i + 1));
+        lockNode = lockNode.getOrCreateChild(ident);
         lockNode.lock(LockType.READ);
         putLockToStack(lockNode, LockType.READ);
       }
 
-      lockNode = lockNode.getOrCreateChild(identifier.name());
+      lockNode = lockNode.getOrCreateChild(identifier);
       lockNode.lock(lockType);
       putLockToStack(lockNode, lockType);
     } catch (Exception e) {
