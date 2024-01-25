@@ -208,8 +208,9 @@ public class TestLockManager {
   }
 
   @Test
-  void testLockCleaner() throws InterruptedException {
+  void testLockCleaner() throws InterruptedException, ExecutionException {
     LockManager lockManager = new LockManager();
+    Random random = new Random();
 
     for (int i = 0; i < 10000; i++) {
       NameIdentifier nameIdentifier = randomNameIdentifier();
@@ -227,5 +228,51 @@ public class TestLockManager {
             });
 
     Assertions.assertTrue(lockManager.treeLockRootNode.getAllChildren().isEmpty());
+
+    CompletionService<Integer> service = createCompletionService();
+    for (int i = 0; i < 10; i++) {
+      service.submit(
+          () -> {
+            for (int j = 0; j < 10000; j++) {
+              NameIdentifier nameIdentifier = randomNameIdentifier();
+              lockManager.lockResourcePath(
+                  nameIdentifier, random.nextInt(2) == 0 ? LockType.READ : LockType.WRITE);
+              lockManager.unlockResourcePath();
+            }
+            return 0;
+          });
+    }
+
+    Thread.sleep(1000);
+
+    for (int i = 0; i < 5; i++) {
+      service.submit(
+          () -> {
+            for (int j = 0; j < 10000; j++) {
+              NameIdentifier nameIdentifier = randomNameIdentifier();
+              lockManager.lockResourcePath(nameIdentifier, LockType.READ);
+              lockManager.unlockResourcePath();
+            }
+            return 0;
+          });
+    }
+
+    for (int i = 0; i < 5; i++) {
+      service.submit(
+          () -> {
+            lockManager
+                .treeLockRootNode
+                .getAllChildren()
+                .forEach(
+                    child -> {
+                      lockManager.evictStaleNodes(500, child, lockManager.treeLockRootNode);
+                    });
+            return 0;
+          });
+    }
+
+    for (int i = 0; i < 10; i++) {
+      service.take().get();
+    }
   }
 }

@@ -39,6 +39,24 @@ public class TreeLockNode {
     return name;
   }
 
+  public boolean tryLock(LockType lockType) {
+    boolean success =
+        lockType == LockType.READ
+            ? readWriteLock.readLock().tryLock()
+            : readWriteLock.writeLock().tryLock();
+    if (success) {
+      referenceCount.getAndIncrement();
+
+      LOG.info(
+          "Node {} has been lock with '{}' lock, reference count = {}",
+          name,
+          lockType,
+          referenceCount.get());
+    }
+
+    return success;
+  }
+
   /**
    * Lock the node with the given lock type. This method should be followed by {@link
    * #unlock(LockType)}.
@@ -104,7 +122,7 @@ public class TreeLockNode {
     return treeNode;
   }
 
-  public List<TreeLockNode> getAllChildren() {
+  public synchronized List<TreeLockNode> getAllChildren() {
     return Lists.newArrayList(childMap.values());
   }
 

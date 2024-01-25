@@ -71,8 +71,8 @@ public class LockManager {
                     child ->
                         evictStaleNodes(
                             TIME_AFTER_LAST_ACCESS_TO_EVICT_IN_MS, child, treeLockRootNode)),
-        0,
-        10,
+        1,
+        2,
         TimeUnit.MINUTES);
   }
 
@@ -89,12 +89,35 @@ public class LockManager {
       long timeAfterLastAccessToEvictInMs, TreeLockNode treeNode, TreeLockNode parent) {
     if (treeNode.getLastAccessTime()
         < System.currentTimeMillis() - timeAfterLastAccessToEvictInMs) {
-      parent.removeChild(treeNode.getName());
-      return;
+      // We need to assure that during the getLastAccessTime and removeChild, no other thread
+      // can access and change the tree node.
+      boolean success = treeNode.tryLock(LockType.WRITE);
+      if (!success) {
+        // This node is locked by another thread, we will skip it and try to evict its children.
+        treeNode
+            .getAllChildren()
+            .forEach(child -> evictStaleNodes(timeAfterLastAccessToEvictInMs, child, treeNode));
+        return;
+      }
+
+      try {
+        // Double check.
+        if (treeNode.getLastAccessTime()
+            < System.currentTimeMillis() - timeAfterLastAccessToEvictInMs) {
+          LOG.info(
+              "Evicting stale node {} with last access time {}",
+              treeNode.getName(),
+              treeNode.getLastAccessTime());
+          parent.removeChild(treeNode.getName());
+        }
+      } finally {
+        treeNode.unlock(LockType.WRITE);
+      }
+    } else {
+      treeNode
+          .getAllChildren()
+          .forEach(child -> evictStaleNodes(timeAfterLastAccessToEvictInMs, child, treeNode));
     }
-    treeNode
-        .getAllChildren()
-        .forEach(child -> evictStaleNodes(timeAfterLastAccessToEvictInMs, child, treeNode));
   }
 
   /**
