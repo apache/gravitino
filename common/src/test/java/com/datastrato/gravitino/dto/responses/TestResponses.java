@@ -17,7 +17,7 @@ import com.datastrato.gravitino.dto.MetalakeDTO;
 import com.datastrato.gravitino.dto.rel.ColumnDTO;
 import com.datastrato.gravitino.dto.rel.SchemaDTO;
 import com.datastrato.gravitino.dto.rel.TableDTO;
-import com.datastrato.gravitino.dto.rel.partitions.Partitioning;
+import com.datastrato.gravitino.dto.rel.partitioning.Partitioning;
 import com.datastrato.gravitino.rel.types.Types;
 import java.time.Instant;
 import org.junit.jupiter.api.Test;

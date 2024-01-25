@@ -17,7 +17,8 @@ import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergTable;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.ops.IcebergTableOpsHelper;
 import com.datastrato.gravitino.client.GravitinoMetaLake;
 import com.datastrato.gravitino.dto.rel.ColumnDTO;
-import com.datastrato.gravitino.dto.rel.partitions.Partitioning;
+import com.datastrato.gravitino.dto.rel.partitioning.Partitioning;
+import com.datastrato.gravitino.dto.util.DTOConverters;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.TableAlreadyExistsException;
@@ -35,6 +36,7 @@ import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.NamedReference;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
+import com.datastrato.gravitino.rel.expressions.distributions.Strategy;
 import com.datastrato.gravitino.rel.expressions.sorts.NullOrdering;
 import com.datastrato.gravitino.rel.expressions.sorts.SortDirection;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
@@ -53,6 +55,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.iceberg.NullOrder;
 import org.apache.iceberg.PartitionField;
@@ -822,5 +825,166 @@ public class CatalogIcebergIT extends AbstractIT {
     Assertions.assertTrue(catalog.asSchemas().dropSchema(ident, false));
     Assertions.assertThrows(
         NoSuchSchemaException.class, () -> catalog.asSchemas().loadSchema(ident));
+  }
+
+  @Test
+  public void testTableDistribution() {
+    ColumnDTO[] columns = createColumns();
+
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
+    Distribution distribution = Distributions.NONE;
+
+    final SortOrder[] sortOrders =
+        new SortOrder[] {
+          SortOrders.of(
+              NamedReference.field(ICEBERG_COL_NAME2),
+              SortDirection.DESCENDING,
+              NullOrdering.NULLS_FIRST)
+        };
+
+    Transform[] partitioning = new Transform[] {Transforms.day(columns[1].name())};
+
+    Map<String, String> properties = createProperties();
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    // Create a data table for Distributions.NONE
+    tableCatalog.createTable(
+        tableIdentifier,
+        columns,
+        table_comment,
+        properties,
+        partitioning,
+        distribution,
+        sortOrders);
+
+    Table loadTable = tableCatalog.loadTable(tableIdentifier);
+
+    // check table
+    assertionsTableInfo(
+        tableName,
+        table_comment,
+        Arrays.asList(columns),
+        properties,
+        distribution,
+        sortOrders,
+        partitioning,
+        loadTable);
+
+    Assertions.assertDoesNotThrow(() -> tableCatalog.dropTable(tableIdentifier));
+
+    distribution = Distributions.HASH;
+    // Create a data table for Distributions.hash
+    tableCatalog.createTable(
+        tableIdentifier,
+        columns,
+        table_comment,
+        properties,
+        partitioning,
+        distribution,
+        sortOrders);
+
+    loadTable = tableCatalog.loadTable(tableIdentifier);
+    // check table
+    assertionsTableInfo(
+        tableName,
+        table_comment,
+        Arrays.asList(columns),
+        properties,
+        distribution,
+        sortOrders,
+        partitioning,
+        loadTable);
+    Assertions.assertDoesNotThrow(() -> tableCatalog.dropTable(tableIdentifier));
+
+    // Create a data table for Distributions.NONE and set field name
+    IllegalArgumentException illegalArgumentException =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> {
+              tableCatalog.createTable(
+                  tableIdentifier,
+                  columns,
+                  table_comment,
+                  properties,
+                  partitioning,
+                  Distributions.hash(0, NamedReference.field(ICEBERG_COL_NAME1)),
+                  sortOrders);
+            });
+    Assertions.assertTrue(
+        StringUtils.contains(
+            illegalArgumentException.getMessage(),
+            "Iceberg's Distribution Mode.HASH does not support set expressions."));
+
+    distribution = Distributions.RANGE;
+    // Create a data table for Distributions.hash
+    tableCatalog.createTable(
+        tableIdentifier,
+        columns,
+        table_comment,
+        properties,
+        partitioning,
+        distribution,
+        sortOrders);
+
+    loadTable = tableCatalog.loadTable(tableIdentifier);
+    // check table
+    assertionsTableInfo(
+        tableName,
+        table_comment,
+        Arrays.asList(columns),
+        properties,
+        distribution,
+        sortOrders,
+        partitioning,
+        loadTable);
+
+    Assertions.assertDoesNotThrow(() -> tableCatalog.dropTable(tableIdentifier));
+
+    // Create a data table for Distributions.range and set field name
+    illegalArgumentException =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> {
+              tableCatalog.createTable(
+                  tableIdentifier,
+                  columns,
+                  table_comment,
+                  properties,
+                  partitioning,
+                  Distributions.of(Strategy.RANGE, 0, NamedReference.field(ICEBERG_COL_NAME1)),
+                  sortOrders);
+            });
+    Assertions.assertTrue(
+        StringUtils.contains(
+            illegalArgumentException.getMessage(),
+            "Iceberg's Distribution Mode.RANGE not support set expressions."));
+  }
+
+  protected static void assertionsTableInfo(
+      String tableName,
+      String tableComment,
+      List<Column> columns,
+      Map<String, String> properties,
+      Distribution distribution,
+      SortOrder[] sortOrder,
+      Transform[] partitioning,
+      Table table) {
+    Assertions.assertEquals(tableName, table.name());
+    Assertions.assertEquals(tableComment, table.comment());
+    Assertions.assertEquals(columns.size(), table.columns().length);
+    Assertions.assertEquals(DTOConverters.toDTO(distribution), table.distribution());
+    Assertions.assertArrayEquals(DTOConverters.toDTOs(sortOrder), table.sortOrder());
+    Assertions.assertArrayEquals(DTOConverters.toDTOs(partitioning), table.partitioning());
+    for (int i = 0; i < columns.size(); i++) {
+      Assertions.assertEquals(columns.get(i).name(), table.columns()[i].name());
+      Assertions.assertEquals(columns.get(i).dataType(), table.columns()[i].dataType());
+      Assertions.assertEquals(columns.get(i).nullable(), table.columns()[i].nullable());
+      Assertions.assertEquals(columns.get(i).comment(), table.columns()[i].comment());
+      Assertions.assertEquals(columns.get(i).autoIncrement(), table.columns()[i].autoIncrement());
+    }
+
+    for (Map.Entry<String, String> entry : properties.entrySet()) {
+      Assertions.assertEquals(entry.getValue(), table.properties().get(entry.getKey()));
+    }
   }
 }

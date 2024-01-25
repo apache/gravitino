@@ -31,6 +31,7 @@ import org.slf4j.LoggerFactory;
 /** Operations for managing tables in a JDBC data store. */
 public abstract class JdbcTableOperations implements TableOperation {
   public static final String PRIMARY_KEY = "PRIMARY KEY";
+  public static final String UNIQUE_KEY = "UNIQUE KEY";
 
   public static final String COMMENT = "COMMENT";
   public static final String SPACE = " ";

@@ -1,7 +1,9 @@
 name: Subtask
 title: "[Subtask] "
 description: A subtask issue
-labels: [ "kind:subtask" ]
+labels: [ "subtask" ]
+projects: [ "datastrato/1" ]
+
 body:
 
   - type: textarea
