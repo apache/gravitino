@@ -523,4 +523,26 @@ public class CatalogPostgreSqlIT extends AbstractIT {
           catalog.asTableCatalog().dropTable(tableIdentifier);
         });
   }
+
+  @Test
+  void testCreateAndLoadSchema() {
+    String testSchemaName = "ssss";
+    NameIdentifier ident = NameIdentifier.of(metalakeName, catalogName, testSchemaName);
+    System.out.println(ident);
+
+    Schema schema =
+        catalog.asSchemas().createSchema(ident, "comment", null);
+    System.out.println(schema.name());
+    System.out.println(schema.comment());
+    System.out.println(schema.auditInfo());
+    System.out.println(schema.properties());
+    Assertions.assertEquals("comment", schema.comment());
+
+    schema = catalog.asSchemas().loadSchema(ident);
+    System.out.println(schema.name());
+    System.out.println(schema.comment());
+    System.out.println(schema.auditInfo());
+    System.out.println(schema.properties());
+    Assertions.assertEquals("comment", schema.comment());
+  }
 }
