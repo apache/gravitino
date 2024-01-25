@@ -113,7 +113,7 @@ public class KerberosAuthenticator implements Authenticator {
           new PrivilegedExceptionAction<Principal>() {
             @Override
             public Principal run() throws Exception {
-              return validateClientToken(serverPrincipal, clientToken);
+              return retrievePrincipalFromToken(serverPrincipal, clientToken);
             }
           });
     } catch (Exception e) {
@@ -121,7 +121,7 @@ public class KerberosAuthenticator implements Authenticator {
     }
   }
 
-  private Principal validateClientToken(String serverPrincipal, byte[] clientToken)
+  private Principal retrievePrincipalFromToken(String serverPrincipal, byte[] clientToken)
       throws GSSException {
     GSSContext gssContext = null;
     GSSCredential gssCreds = null;

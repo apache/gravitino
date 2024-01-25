@@ -46,8 +46,8 @@ public class KerberosUtils {
   public static final Oid NT_GSS_KRB5_PRINCIPAL_OID =
       getNumericOidInstance("1.2.840.113554.1.2.2.1");
 
-  // numeric oids will never generate a GSSException for a malformed oid.
-  // use to initialize statics.
+  // Numeric oids will never generate a GSSException for a malformed oid.
+  // Use to initialize statics.
   private static Oid getNumericOidInstance(String oidName) {
     try {
       return new Oid(oidName);
