@@ -17,7 +17,6 @@ import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergTable;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.ops.IcebergTableOpsHelper;
 import com.datastrato.gravitino.client.GravitinoMetaLake;
 import com.datastrato.gravitino.dto.rel.ColumnDTO;
-import com.datastrato.gravitino.dto.rel.partitioning.DayPartitioningDTO;
 import com.datastrato.gravitino.dto.rel.partitioning.Partitioning;
 import com.datastrato.gravitino.dto.util.DTOConverters;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
@@ -94,8 +93,8 @@ public class CatalogIcebergIT extends AbstractIT {
   private static String WAREHOUSE;
   private static String HIVE_METASTORE_URIS;
 
-  private static String SELECT_ALL_TEMPLATE = "SELECT * FROM iceberg.%s";
-  private static String INSERT_BATCH_WITHOUT_PARTITION_TEMPLATE =
+  private static final String SELECT_ALL_TEMPLATE = "SELECT * FROM iceberg.%s";
+  private static final String INSERT_BATCH_WITHOUT_PARTITION_TEMPLATE =
       "INSERT INTO iceberg.%s VALUES %s";
   private static GravitinoMetaLake metalake;
 
@@ -741,7 +740,7 @@ public class CatalogIcebergIT extends AbstractIT {
     // select data
     Dataset<Row> sql = spark.sql(String.format(SELECT_ALL_TEMPLATE, tableIdentifier));
     Assertions.assertEquals(4, sql.count());
-    Row[] result = (Row[]) sql.sort(ICEBERG_COL_NAME1).collect();
+    Row[] result = sql.sort(ICEBERG_COL_NAME1).collect();
     LocalDate currentDate = LocalDate.now();
     DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
     for (int i = 0; i < result.length; i++) {
@@ -758,7 +757,7 @@ public class CatalogIcebergIT extends AbstractIT {
             tableIdentifier, ICEBERG_COL_NAME1, ICEBERG_COL_NAME1));
     sql = spark.sql(String.format(SELECT_ALL_TEMPLATE, tableIdentifier));
     Assertions.assertEquals(4, sql.count());
-    result = (Row[]) sql.sort(ICEBERG_COL_NAME1).collect();
+    result = sql.sort(ICEBERG_COL_NAME1).collect();
     for (int i = 0; i < result.length; i++) {
       if (i == result.length - 1) {
         LocalDate previousDay = currentDate.minusDays(1);
@@ -777,7 +776,7 @@ public class CatalogIcebergIT extends AbstractIT {
         String.format("DELETE FROM iceberg.%s WHERE %s = 100", tableIdentifier, ICEBERG_COL_NAME1));
     sql = spark.sql(String.format(SELECT_ALL_TEMPLATE, tableIdentifier));
     Assertions.assertEquals(3, sql.count());
-    result = (Row[]) sql.sort(ICEBERG_COL_NAME1).collect();
+    result = sql.sort(ICEBERG_COL_NAME1).collect();
     for (int i = 0; i < result.length; i++) {
       LocalDate previousDay = currentDate.minusDays(i + 2);
       Assertions.assertEquals(
@@ -844,7 +843,7 @@ public class CatalogIcebergIT extends AbstractIT {
               NullOrdering.NULLS_FIRST)
         };
 
-    Partitioning[] partitioning = new Partitioning[] {DayPartitioningDTO.of(columns[1].name())};
+    Transform[] partitioning = new Transform[] {Transforms.day(columns[1].name())};
 
     Map<String, String> properties = createProperties();
     TableCatalog tableCatalog = catalog.asTableCatalog();
@@ -968,7 +967,7 @@ public class CatalogIcebergIT extends AbstractIT {
       Map<String, String> properties,
       Distribution distribution,
       SortOrder[] sortOrder,
-      Partitioning[] partitioning,
+      Transform[] partitioning,
       Table table) {
     Assertions.assertEquals(tableName, table.name());
     Assertions.assertEquals(tableComment, table.comment());

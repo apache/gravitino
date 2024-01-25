@@ -9,6 +9,9 @@ license: "Copyright 2023 Datastrato Pvt Ltd.
 This software is licensed under the Apache License version 2."
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 ## Introduction
 
 Gravitino provides the ability to manage Apache Iceberg metadata.
@@ -112,26 +115,72 @@ For `bucket` and `truncate`, the first argument must be integer literal, and the
 ### Table distributions
 
 - Gravitino used by default `NoneDistribution`.
+
+<Tabs>
+<TabItem value="json" label="JSON">
+
 ```json
 {
-  "strategy": "hash"
+  "strategy": "none",
+  "number": 0,
+  "expressions": []
 }
 ```
+
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+Distributions.NONE;
+```
+
+</TabItem>
+</Tabs>
 
 - Support `HashDistribution`, Hash distribute by partition key.
-```java
-Distributions.hash();
-```
 
-- Support `RangeDistribution`, You can pass `range` as values through the API. Range distribute by partition key or sort key if table has an SortOrder.
+<Tabs>
+<TabItem value="json" label="JSON">
+
 ```json
 {
-  "strategy": "range"
+  "strategy": "hash",
+  "number": 0,
+  "expressions": []
 }
 ```
+</TabItem>
+<TabItem value="java" label="Java">
+
 ```java
-Distributions.range();
+Distributions.HASH;
 ```
+
+</TabItem>
+</Tabs>
+
+- Support `RangeDistribution`, You can pass `range` as values through the API. Range distribute by partition key or sort key if table has an SortOrder.
+
+<Tabs>
+<TabItem value="json" label="JSON">
+
+```json
+{
+  "strategy": "range",
+  "number": 0,
+  "expressions": []
+}
+```
+
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+Distributions.RANGE;
+```
+
+</TabItem>
+</Tabs>
 
 :::info
 Iceberg automatically distributes the data according to the partition or table sort order. It is forbidden to specify distribution expressions.
