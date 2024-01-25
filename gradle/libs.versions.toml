@@ -4,6 +4,7 @@
 #
 [versions]
 junit = "5.8.1"
+junit4 = "4.13.2"
 protoc = "3.24.4"
 jackson = "2.15.2"
 guava = "32.1.3-jre"
@@ -75,6 +76,7 @@ lombok = { group = "org.projectlombok", name = "lombok", version.ref = "lombok" 
 junit-jupiter-api = { group = "org.junit.jupiter", name = "junit-jupiter-api", version.ref = "junit" }
 junit-jupiter-params = { group = "org.junit.jupiter", name = "junit-jupiter-params", version.ref = "junit" }
 junit-jupiter-engine = { group = "org.junit.jupiter", name = "junit-jupiter-engine"}
+junit4 = { group = "junit", name = "junit", version.ref = "junit4"}
 slf4j-api = { group = "org.slf4j", name = "slf4j-api", version.ref = "slf4j" }
 slf4j-jdk14 = { group = "org.slf4j", name = "slf4j-jdk14", version = "1.7.30" }
 log4j-slf4j2-impl = { group = "org.apache.logging.log4j", name = "log4j-slf4j2-impl", version.ref = "log4j" }
@@ -97,6 +99,7 @@ hive2-metastore = { group = "org.apache.hive", name = "hive-metastore", version.
 hive2-exec = { group = "org.apache.hive", name = "hive-exec", version.ref = "hive2"}
 hive2-common = { group = "org.apache.hive", name = "hive-common", version.ref = "hive2"}
 hadoop2-hdfs = { group = "org.apache.hadoop", name = "hadoop-hdfs", version.ref = "hadoop2" }
+hadoop2-minicluster = { group = "org.apache.hadoop", name = "hadoop-minicluster", version.ref = "hadoop2" }
 hadoop2-common = { group = "org.apache.hadoop", name = "hadoop-common", version.ref = "hadoop2"}
 hadoop2-mapreduce-client-core = { group = "org.apache.hadoop", name = "hadoop-mapreduce-client-core", version.ref = "hadoop2"}
 airlift-units = { group = "io.airlift", name = "units", version.ref = "airlift-units"}
