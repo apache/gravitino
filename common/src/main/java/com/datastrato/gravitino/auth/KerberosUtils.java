@@ -32,7 +32,9 @@ import org.ietf.jgss.GSSException;
 import org.ietf.jgss.Oid;
 
 // Referred from Apache Hadoop KerberosTestUtils.java
-// Copy the part methods and remove the support the IBM JDK
+// Copy the part methods
+// Remove the support the IBM JDK
+// Split method `doAs` into two methods
 // hadoop-common-project/hadoop-auth/src/test/java/org/apache/hadoop/security/\
 // authentication/KerberosTestUtils.java
 public class KerberosUtils {
