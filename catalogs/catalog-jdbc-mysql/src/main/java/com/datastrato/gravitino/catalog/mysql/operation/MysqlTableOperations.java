@@ -93,18 +93,13 @@ public class MysqlTableOperations extends JdbcTableOperations {
 
   private String loadCommentFromSysTable(Connection connection, String tableName)
       throws SQLException {
-    try (PreparedStatement statement =
-        connection.prepareStatement(
-            "SELECT TABLE_NAME, TABLE_COMMENT\n"
-                + "FROM information_schema.TABLES\n"
-                + "WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?;")) {
-      statement.setString(1, connection.getCatalog());
-      statement.setString(2, tableName);
+    try (PreparedStatement statement = connection.prepareStatement("SHOW TABLE STATUS LIKE ?")) {
+      statement.setString(1, tableName);
       try (ResultSet resultSet = statement.executeQuery()) {
         if (!resultSet.next()) {
           return null;
         }
-        return resultSet.getString("TABLE_COMMENT");
+        return resultSet.getString("COMMENT");
       }
     }
   }
