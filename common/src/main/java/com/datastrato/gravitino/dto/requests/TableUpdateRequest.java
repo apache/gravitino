@@ -141,8 +141,7 @@ public interface TableUpdateRequest extends RESTRequest {
     public void validate() throws IllegalArgumentException {
       Preconditions.checkArgument(
           StringUtils.isNotBlank(property), "\"property\" field is required and cannot be empty");
-      Preconditions.checkArgument(
-          StringUtils.isNotBlank(value), "\"value\" field is required and cannot be empty");
+      Preconditions.checkArgument(value != null, "\"value\" field is required and cannot be null");
     }
 
     @Override

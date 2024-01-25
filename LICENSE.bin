@@ -327,6 +327,7 @@
    Okio
    J2ObjC
    SQLite JDBC Driver
+   Immutables
 
    This product bundles various third-party components also under the
    Apache Software Foundation License 1.1
