@@ -18,6 +18,7 @@ import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -49,6 +50,9 @@ public class MysqlTableOperations extends JdbcTableOperations {
             String.format("Table %s does not exist in %s.", tableName, databaseName));
       }
       String comment = table.getString("REMARKS");
+      if (StringUtils.isEmpty(comment)) {
+        comment = loadCommentFromSysTable(connection, tableName);
+      }
 
       // 2.Get column information
       ResultSet columns = metaData.getColumns(databaseName, null, tableName, null);
@@ -81,6 +85,24 @@ public class MysqlTableOperations extends JdbcTableOperations {
           .build();
     } catch (SQLException e) {
       throw exceptionMapper.toGravitinoException(e);
+    }
+  }
+
+  private String loadCommentFromSysTable(Connection connection, String tableName)
+      throws SQLException {
+    try (PreparedStatement statement =
+        connection.prepareStatement(
+            "SELECT TABLE_NAME, TABLE_COMMENT\n"
+                + "FROM information_schema.TABLES\n"
+                + "WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?;")) {
+      statement.setString(1, connection.getCatalog());
+      statement.setString(2, tableName);
+      try (ResultSet resultSet = statement.executeQuery()) {
+        if (!resultSet.next()) {
+          return null;
+        }
+        return resultSet.getString("TABLE_COMMENT");
+      }
     }
   }
 
