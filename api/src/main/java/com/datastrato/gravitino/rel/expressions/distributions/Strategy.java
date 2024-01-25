@@ -18,6 +18,11 @@ import java.util.Arrays;
  * </ul>
  */
 public enum Strategy {
+  /**
+   * No distribution strategy. This is the default strategy. Will depend on the allocation strategy
+   * of the underlying system.
+   */
+  NONE,
   HASH,
   RANGE,
   EVEN;
