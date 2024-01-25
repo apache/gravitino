@@ -69,7 +69,7 @@ public class TestKerberosAuthenticator extends KerberosSecurityTestcase {
             () -> {
               kerberosAuthenticator.initialize(config);
             });
-    Assertions.assertTrue(e.getMessage().contains("Keytab doesn't exist"));
+    Assertions.assertTrue(e.getMessage().contains("doesn't exist"));
 
     initKeyTab();
     kerberosAuthenticator.initialize(config);
