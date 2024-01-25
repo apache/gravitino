@@ -13,6 +13,8 @@ import com.datastrato.gravitino.exceptions.GravitinoRuntimeException;
 import com.datastrato.gravitino.exceptions.NoSuchTableException;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
 import com.datastrato.gravitino.rel.TableChange;
+import com.datastrato.gravitino.rel.indexes.Index;
+import com.datastrato.gravitino.rel.indexes.Indexes;
 import com.datastrato.gravitino.rel.types.Type;
 import com.datastrato.gravitino.rel.types.Types;
 import java.util.ArrayList;
@@ -63,8 +65,9 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
             .withNullable(false)
             .build());
     Map<String, String> properties = new HashMap<>();
-    properties.put(MYSQL_ENGINE_KEY, "InnoDB");
     properties.put(MYSQL_AUTO_INCREMENT_OFFSET_KEY, "10");
+
+    Index[] indexes = new Index[] {Indexes.unique("test", new String[][] {{"col_1"}, {"col_2"}})};
     // create table
     TABLE_OPERATIONS.create(
         TEST_DB_NAME,
@@ -72,7 +75,8 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
         columns.toArray(new JdbcColumn[0]),
         tableComment,
         properties,
-        null);
+        null,
+        indexes);
 
     // list table
     List<String> tables = TABLE_OPERATIONS.listTables(TEST_DB_NAME);
@@ -80,7 +84,7 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
 
     // load table
     JdbcTable load = TABLE_OPERATIONS.load(TEST_DB_NAME, tableName);
-    assertionsTableInfo(tableName, tableComment, columns, properties, load);
+    assertionsTableInfo(tableName, tableComment, columns, properties, indexes, load);
 
     // rename table
     String newName = "new_table";
@@ -103,8 +107,8 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
             newColumn.dataType(),
             newColumn.comment(),
             TableChange.ColumnPosition.after("col_1")),
-        TableChange.setProperty(MYSQL_ENGINE_KEY, "MyISAM"));
-    properties.put(MYSQL_ENGINE_KEY, "MyISAM");
+        TableChange.setProperty(MYSQL_ENGINE_KEY, "InnoDB"));
+    properties.put(MYSQL_ENGINE_KEY, "InnoDB");
     load = TABLE_OPERATIONS.load(TEST_DB_NAME, newName);
     List<JdbcColumn> alterColumns =
         new ArrayList<JdbcColumn>() {
@@ -116,7 +120,7 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
             add(columns.get(3));
           }
         };
-    assertionsTableInfo(newName, tableComment, alterColumns, properties, load);
+    assertionsTableInfo(newName, tableComment, alterColumns, properties, indexes, load);
 
     // Detect unsupported properties
     GravitinoRuntimeException gravitinoRuntimeException =
@@ -133,7 +137,7 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
     TABLE_OPERATIONS.alterTable(
         TEST_DB_NAME, newName, TableChange.deleteColumn(new String[] {newColumn.name()}, true));
     load = TABLE_OPERATIONS.load(TEST_DB_NAME, newName);
-    assertionsTableInfo(newName, tableComment, columns, properties, load);
+    assertionsTableInfo(newName, tableComment, columns, properties, indexes, load);
 
     IllegalArgumentException illegalArgumentException =
         Assertions.assertThrows(
@@ -184,6 +188,11 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
     columns.add(col_2);
     Map<String, String> properties = new HashMap<>();
 
+    Index[] indexes =
+        new Index[] {
+          Indexes.createMysqlPrimaryKey(new String[][] {{"col_1"}, {"col_2"}}),
+          Indexes.unique("uk_2", new String[][] {{"col_1"}, {"col_2"}})
+        };
     // create table
     TABLE_OPERATIONS.create(
         TEST_DB_NAME,
@@ -191,9 +200,10 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
         columns.toArray(new JdbcColumn[0]),
         tableComment,
         properties,
-        null);
+        null,
+        indexes);
     JdbcTable load = TABLE_OPERATIONS.load(TEST_DB_NAME, tableName);
-    assertionsTableInfo(tableName, tableComment, columns, properties, load);
+    assertionsTableInfo(tableName, tableComment, columns, properties, indexes, load);
 
     TABLE_OPERATIONS.alterTable(
         TEST_DB_NAME,
@@ -215,7 +225,7 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
             .build();
     columns.add(col_1);
     columns.add(col_2);
-    assertionsTableInfo(tableName, tableComment, columns, properties, load);
+    assertionsTableInfo(tableName, tableComment, columns, properties, indexes, load);
 
     String newComment = "new_comment";
     // update table comment and column comment
@@ -249,7 +259,7 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
             .build();
     columns.add(col_1);
     columns.add(col_2);
-    assertionsTableInfo(tableName, tableComment, columns, properties, load);
+    assertionsTableInfo(tableName, tableComment, columns, properties, indexes, load);
 
     String newColName_1 = "new_col_1";
     String newColName_2 = "new_col_2";
@@ -285,7 +295,7 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
             .build();
     columns.add(col_1);
     columns.add(col_2);
-    assertionsTableInfo(tableName, tableComment, columns, properties, load);
+    assertionsTableInfo(tableName, tableComment, columns, properties, indexes, load);
 
     newComment = "txt3";
     String newCol2Comment = "xxx";
@@ -322,7 +332,7 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
             .build();
     columns.add(
         new JdbcColumn.Builder().withName("col_3").withType(VARCHAR).withComment("txt3").build());
-    assertionsTableInfo(tableName, newComment, columns, properties, load);
+    assertionsTableInfo(tableName, newComment, columns, properties, indexes, load);
 
     TABLE_OPERATIONS.alterTable(
         TEST_DB_NAME,
@@ -344,7 +354,7 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
             .build());
     columns.add(col_2);
 
-    assertionsTableInfo(tableName, newComment, columns, properties, load);
+    assertionsTableInfo(tableName, newComment, columns, properties, indexes, load);
   }
 
   @Test
@@ -389,6 +399,11 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
             .build());
     Map<String, String> properties = new HashMap<>();
 
+    Index[] indexes =
+        new Index[] {
+          Indexes.createMysqlPrimaryKey(new String[][] {{"col_2"}}),
+          Indexes.unique("uk_col_4", new String[][] {{"col_4"}})
+        };
     // create table
     TABLE_OPERATIONS.create(
         TEST_DB_NAME,
@@ -396,10 +411,11 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
         columns.toArray(new JdbcColumn[0]),
         tableComment,
         properties,
-        null);
+        null,
+        indexes);
 
     JdbcTable loaded = TABLE_OPERATIONS.load(TEST_DB_NAME, tableName);
-    assertionsTableInfo(tableName, tableComment, columns, properties, loaded);
+    assertionsTableInfo(tableName, tableComment, columns, properties, indexes, loaded);
   }
 
   @Test
@@ -493,10 +509,11 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
         columns.toArray(new JdbcColumn[0]),
         tableComment,
         Collections.emptyMap(),
-        null);
+        null,
+        Indexes.EMPTY_INDEXES);
 
     JdbcTable load = TABLE_OPERATIONS.load(TEST_DB_NAME, tableName);
-    assertionsTableInfo(tableName, tableComment, columns, Collections.emptyMap(), load);
+    assertionsTableInfo(tableName, tableComment, columns, Collections.emptyMap(), null, load);
   }
 
   @Test
@@ -533,7 +550,8 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
                       columns.toArray(new JdbcColumn[0]),
                       tableComment,
                       Collections.emptyMap(),
-                      null));
+                      null,
+                      Indexes.EMPTY_INDEXES));
       Assertions.assertTrue(
           illegalArgumentException
               .getMessage()
@@ -559,7 +577,8 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
         },
         "test_comment",
         null,
-        null);
+        null,
+        Indexes.EMPTY_INDEXES);
 
     String testDb = "test_db_2";
 
@@ -583,7 +602,8 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
         },
         "test_comment",
         null,
-        null);
+        null,
+        Indexes.EMPTY_INDEXES);
 
     tables = TABLE_OPERATIONS.listTables(TEST_DB_NAME);
     Assertions.assertFalse(tables.contains(test_table_2));
@@ -605,7 +625,8 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
         },
         "test_comment",
         null,
-        null);
+        null,
+        Indexes.EMPTY_INDEXES);
     JdbcTable load = TABLE_OPERATIONS.load(TEST_DB_NAME, test_table_1);
     Assertions.assertEquals("InnoDB", load.properties().get(MYSQL_ENGINE_KEY));
   }

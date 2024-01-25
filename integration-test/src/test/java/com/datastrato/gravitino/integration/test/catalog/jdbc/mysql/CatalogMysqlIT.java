@@ -32,6 +32,8 @@ import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
+import com.datastrato.gravitino.rel.indexes.Index;
+import com.datastrato.gravitino.rel.indexes.Indexes;
 import com.datastrato.gravitino.rel.types.Types;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
@@ -568,5 +570,89 @@ public class CatalogMysqlIT extends AbstractIT {
             catalog
                 .asSchemas()
                 .loadSchema(NameIdentifier.of(metalakeName, catalogName, schemaName)));
+  }
+
+  @Test
+  void testCreateTableIndex() {
+    Column col1 = Column.of("col_1", Types.LongType.get(), "id", false, false, null);
+    Column col2 = Column.of("col_2", Types.ByteType.get(), "yes", false, false, null);
+    Column col3 = Column.of("col_3", Types.DateType.get(), "comment", false, false, null);
+    Column col4 = Column.of("col_4", Types.VarCharType.of(255), "code", false, false, null);
+    Column col5 = Column.of("col_5", Types.VarCharType.of(255), "config", false, false, null);
+    Column[] newColumns = new Column[] {col1, col2, col3, col4, col5};
+
+    Index[] indexes =
+        new Index[] {
+          Indexes.createMysqlPrimaryKey(new String[][] {{"col_1"}, {"col_2"}}),
+          Indexes.unique("u1_key", new String[][] {{"col_2"}, {"col_3"}}),
+          Indexes.unique("u2_key", new String[][] {{"col_3"}, {"col_4"}}),
+          Indexes.unique("u3_key", new String[][] {{"col_5"}, {"col_4"}}),
+          Indexes.unique("u4_key", new String[][] {{"col_2"}, {"col_3"}, {"col_4"}}),
+          Indexes.unique("u5_key", new String[][] {{"col_2"}, {"col_3"}, {"col_4"}}),
+          Indexes.unique("u6_key", new String[][] {{"col_1"}, {"col_2"}, {"col_3"}, {"col_4"}}),
+        };
+
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
+
+    Map<String, String> properties = createProperties();
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    Table createdTable =
+        tableCatalog.createTable(
+            tableIdentifier,
+            newColumns,
+            table_comment,
+            properties,
+            Transforms.EMPTY_TRANSFORM,
+            Distributions.NONE,
+            new SortOrder[0],
+            indexes);
+    assertionsTableInfo(
+        tableName, table_comment, Arrays.asList(newColumns), properties, indexes, createdTable);
+    Table table = tableCatalog.loadTable(tableIdentifier);
+    assertionsTableInfo(
+        tableName, table_comment, Arrays.asList(newColumns), properties, indexes, table);
+
+    IllegalArgumentException illegalArgumentException =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> {
+              tableCatalog.createTable(
+                  NameIdentifier.of(metalakeName, catalogName, schemaName, "test_failed"),
+                  newColumns,
+                  table_comment,
+                  properties,
+                  Transforms.EMPTY_TRANSFORM,
+                  Distributions.NONE,
+                  new SortOrder[0],
+                  new Index[] {
+                    Indexes.createMysqlPrimaryKey(new String[][] {{"col_1", "col_2"}}),
+                    Indexes.unique("u1_key", new String[][] {{"col_2", "col_3"}})
+                  });
+            });
+    Assertions.assertTrue(
+        StringUtils.contains(
+            illegalArgumentException.getMessage(),
+            "Index does not support complex fields in MySQL"));
+
+    table =
+        tableCatalog.createTable(
+            NameIdentifier.of(metalakeName, catalogName, schemaName, "test_null_key"),
+            newColumns,
+            table_comment,
+            properties,
+            Transforms.EMPTY_TRANSFORM,
+            Distributions.NONE,
+            new SortOrder[0],
+            new Index[] {
+              Indexes.of(
+                  Index.IndexType.UNIQUE_KEY,
+                  null,
+                  new String[][] {{"col_1"}, {"col_3"}, {"col_4"}}),
+              Indexes.of(Index.IndexType.UNIQUE_KEY, null, new String[][] {{"col_4"}}),
+            });
+    Assertions.assertEquals(2, table.index().length);
+    Assertions.assertNotNull(table.index()[0].name());
+    Assertions.assertNotNull(table.index()[1].name());
   }
 }

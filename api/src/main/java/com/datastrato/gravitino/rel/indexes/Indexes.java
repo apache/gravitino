@@ -9,6 +9,9 @@ public class Indexes {
 
   public static final Index[] EMPTY_INDEXES = new Index[0];
 
+  /** MySQL does not support setting the name of the primary key, so the default name is used. */
+  public static final String DEFAULT_MYSQL_PRIMARY_KEY_NAME = "PRIMARY";
+
   /**
    * Create a unique index on columns. Like unique (a) or unique (a, b), for complex like unique
    *
@@ -18,6 +21,16 @@ public class Indexes {
    */
   public static Index unique(String name, String[][] fieldNames) {
     return of(Index.IndexType.UNIQUE_KEY, name, fieldNames);
+  }
+
+  /**
+   * To create a MySQL primary key, you need to use the default primary key name.
+   *
+   * @param fieldNames The field names under the table contained in the index.
+   * @return The primary key index
+   */
+  public static Index createMysqlPrimaryKey(String[][] fieldNames) {
+    return primary(DEFAULT_MYSQL_PRIMARY_KEY_NAME, fieldNames);
   }
 
   /**
