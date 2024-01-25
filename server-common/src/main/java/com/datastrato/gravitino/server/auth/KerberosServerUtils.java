@@ -43,7 +43,7 @@ import org.ietf.jgss.Oid;
 // Remove part methods
 // hadoop-common-project/hadoop-auth/src/main/java/org/apache/hadoop/\
 // security/authentication/util/KerberosUtil.java
-public class KerberosUtils {
+public class KerberosServerUtils {
 
   /**
    * Return the default realm for this JVM.
@@ -281,8 +281,10 @@ public class KerberosUtils {
 
   // basic ASN.1 DER decoder to traverse encoded byte arrays.
   private static class DER implements Iterator<DER> {
-    static final DER SPNEGO_MECH_OID = getDER(com.datastrato.gravitino.auth.KerberosUtils.GSS_SPNEGO_MECH_OID);
-    static final DER KRB5_MECH_OID = getDER(com.datastrato.gravitino.auth.KerberosUtils.GSS_KRB5_MECH_OID);
+    static final DER SPNEGO_MECH_OID =
+        getDER(com.datastrato.gravitino.auth.KerberosUtils.GSS_SPNEGO_MECH_OID);
+    static final DER KRB5_MECH_OID =
+        getDER(com.datastrato.gravitino.auth.KerberosUtils.GSS_KRB5_MECH_OID);
 
     private static DER getDER(Oid oid) {
       try {
