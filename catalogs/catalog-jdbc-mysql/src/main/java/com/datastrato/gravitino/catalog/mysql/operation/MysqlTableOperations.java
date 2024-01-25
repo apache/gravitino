@@ -51,6 +51,9 @@ public class MysqlTableOperations extends JdbcTableOperations {
       }
       String comment = table.getString("REMARKS");
       if (StringUtils.isEmpty(comment)) {
+        // In Mysql version 5.7, the comment field value cannot be obtained in the driver API.
+        LOG.warn(
+            "Not found comment in mysql driver api. Will try to get comment from the system table");
         comment = loadCommentFromSysTable(connection, tableName);
       }
 
