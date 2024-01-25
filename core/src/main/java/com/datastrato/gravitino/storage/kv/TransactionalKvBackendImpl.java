@@ -331,10 +331,9 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
    */
   @VisibleForTesting
   static byte[] revertByteArray(byte[] bytes) {
-    // We should not change the value of the original byte array.
-    byte[] result = ArrayUtils.clone(bytes);
+    byte[] result = new byte[bytes.length];
     for (int i = 0; i < bytes.length; i++) {
-      result[i] = (byte) (result[i] ^ (byte) 0xff);
+      result[i] = (byte) (bytes[i] ^ (byte) 0xff);
     }
 
     return result;
