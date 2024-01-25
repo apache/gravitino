@@ -141,7 +141,7 @@ public class LockManager {
         treeLockPair.treeLockNode.unlock(treeLockPair.lockType);
       }
     } finally {
-      holdingLocks.remove();
+      holdingLocks.get().clear();
     }
   }
 }
