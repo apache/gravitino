@@ -51,8 +51,8 @@ public class TestGravitinoFileSystem {
     Configuration configuration = HDFS_CLUSTER.getFileSystem().getConf();
     configuration.set("fs.gtfs.impl", GTFS_IMPL_CLASS);
     configuration.set("fs.AbstractFileSystem.gtfs.impl", GTFS_ABSTRACT_IMPL_CLASS);
-    mockPath = new Path("hdfs://localhost/fileset_catalog_1/schema_1/fileset_test");
-    gravitinoPath = new Path("gtfs://metalake_1/fileset_catalog_1/schema_1/fileset_test");
+    mockPath = new Path("hdfs://localhost/metalake_1/fileset_catalog_1/schema_1/fileset_test");
+    gravitinoPath = new Path("gtfs://fileset/metalake_1/fileset_catalog_1/schema_1/fileset_test");
     mockFileSystem = HDFS_CLUSTER.getFileSystem();
     gravitinoFileSystem = gravitinoPath.getFileSystem(configuration);
   }

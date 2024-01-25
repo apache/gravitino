@@ -21,19 +21,15 @@ public class GravitinoFileSystem extends FileSystem {
 
   @Override
   public void initialize(URI name, Configuration conf) throws IOException {
-    if (name.toString().startsWith(GravitinoFileSystemConfiguration.GTFS_SCHEME_PREFIX)) {
+    if (name.toString().startsWith(GravitinoFileSystemConfiguration.GTFS_FILESET_PREFIX)) {
       // TODO We will interact with gravitino server to get the storage location,
       //  then we can get the truly file system; now we only support hdfs://
       try {
+        // TODO We will replace the uri when we can interact with gravitino server
+        URI defaultUri = FileSystem.getDefaultUri(conf);
         URI newUri =
             new URI(
-                GravitinoFileSystemConfiguration.HDFS_SCHEME,
-                name.getUserInfo(),
-                name.getHost(),
-                name.getPort(),
-                name.getPath(),
-                name.getQuery(),
-                name.getFragment());
+                GravitinoFileSystemConfiguration.HDFS_SCHEME + "://" + defaultUri.getAuthority());
         this.proxyFileSystem = FileSystem.get(newUri, conf);
         this.workingDirectory = new Path(name);
         this.uri = name;
@@ -126,18 +122,18 @@ public class GravitinoFileSystem extends FileSystem {
   }
 
   private Path resolvePathScheme(Path path) {
-    return resolvePathScheme(path, proxyFileSystem.getScheme());
+    return resolvePathScheme(path, proxyFileSystem);
   }
 
-  private Path resolvePathScheme(Path path, String scheme) {
+  private Path resolvePathScheme(Path path, FileSystem fileSystem) {
     URI uri = path.toUri();
-    if (uri.toString().startsWith(GravitinoFileSystemConfiguration.GTFS_SCHEME_PREFIX)) {
+    if (uri.toString().startsWith(GravitinoFileSystemConfiguration.GTFS_FILESET_PREFIX)) {
       try {
         URI newUri =
             new URI(
-                scheme,
+                fileSystem.getScheme(),
                 uri.getUserInfo(),
-                uri.getHost(),
+                fileSystem.getUri().getHost(),
                 uri.getPort(),
                 uri.getPath(),
                 uri.getQuery(),
