@@ -8,11 +8,11 @@ plugins {
 }
 
 dependencies {
-  implementation(libs.hadoop2.common)
+  compileOnly(libs.hadoop2.common)
 
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
-  testRuntimeOnly(libs.junit.jupiter.engine)
+  testImplementation(libs.junit.jupiter.engine)
   testImplementation(libs.junit4)
   testImplementation(libs.mockito.core)
   testImplementation(libs.hadoop2.minicluster)

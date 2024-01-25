@@ -1,3 +1,7 @@
+/*
+ * Copyright 2023 Datastrato Pvt Ltd.
+ * This software is licensed under the Apache License version 2.
+ */
 package com.datastrato.gravitino.filesystem.hadoop;
 
 import java.io.IOException;
@@ -136,7 +140,7 @@ public class GravitinoFileSystem extends FileSystem {
                 fileSystem.getScheme(),
                 uri.getUserInfo(),
                 fileSystem.getUri().getHost(),
-                uri.getPort(),
+                fileSystem.getUri().getPort(),
                 uri.getPath(),
                 uri.getQuery(),
                 uri.getFragment());
