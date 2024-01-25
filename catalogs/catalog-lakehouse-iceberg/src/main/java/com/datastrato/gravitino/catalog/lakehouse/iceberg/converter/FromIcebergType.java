@@ -26,7 +26,16 @@ public class FromIcebergType extends TypeUtil.SchemaVisitor<Type> {
 
   @Override
   public Type struct(Types.StructType struct, List<Type> fieldResults) {
-    throw new UnsupportedOperationException("Data conversion of struct type is not supported");
+    return com.datastrato.gravitino.rel.types.Types.StructType.of(
+        struct.fields().stream()
+            .map(
+                nestedField ->
+                    com.datastrato.gravitino.rel.types.Types.StructType.Field.of(
+                        nestedField.name(),
+                        fieldResults.get(struct.fields().indexOf(nestedField)),
+                        nestedField.isOptional(),
+                        nestedField.doc()))
+            .toArray(com.datastrato.gravitino.rel.types.Types.StructType.Field[]::new));
   }
 
   @Override

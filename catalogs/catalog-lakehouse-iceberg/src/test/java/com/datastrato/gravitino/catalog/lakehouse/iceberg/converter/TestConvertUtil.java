@@ -252,6 +252,37 @@ public class TestConvertUtil extends TestBaseConvert {
     Assertions.assertTrue(
         ((com.datastrato.gravitino.rel.types.Types.ListType) gravitinoListType).elementType()
             instanceof com.datastrato.gravitino.rel.types.Types.StringType);
+
+    Types.StructType structTypeInside =
+        Types.StructType.of(
+            Types.NestedField.optional(
+                2, "integer_type_inside", Types.IntegerType.get(), "integer type"),
+            Types.NestedField.optional(
+                3, "string_type_inside", Types.StringType.get(), "string type"));
+    Types.StructType structType =
+        Types.StructType.of(
+            Types.NestedField.optional(0, "integer_type", Types.IntegerType.get(), "integer type"),
+            Types.NestedField.optional(1, "struct_type", structTypeInside, "struct type inside"));
+    com.datastrato.gravitino.rel.types.Type gravitinoStructType =
+        ConvertUtil.formIcebergType(structType);
+    Assertions.assertTrue(
+        (gravitinoStructType) instanceof com.datastrato.gravitino.rel.types.Types.StructType);
+    Assertions.assertTrue(
+        ((com.datastrato.gravitino.rel.types.Types.StructType) gravitinoStructType)
+                .fields()[0].type()
+            instanceof com.datastrato.gravitino.rel.types.Types.IntegerType);
+    Assertions.assertTrue(
+        ((com.datastrato.gravitino.rel.types.Types.StructType)
+                    ((com.datastrato.gravitino.rel.types.Types.StructType) gravitinoStructType)
+                        .fields()[1].type())
+                .fields()[0].type()
+            instanceof com.datastrato.gravitino.rel.types.Types.IntegerType);
+    Assertions.assertTrue(
+        ((com.datastrato.gravitino.rel.types.Types.StructType)
+                    ((com.datastrato.gravitino.rel.types.Types.StructType) gravitinoStructType)
+                        .fields()[1].type())
+                .fields()[1].type()
+            instanceof com.datastrato.gravitino.rel.types.Types.StringType);
   }
 
   @Test

@@ -61,4 +61,22 @@ public class ConvertUtil {
         .withType(ConvertUtil.formIcebergType(nestedField.type()))
         .build();
   }
+
+  /**
+   * Convert the Gravitino field of Iceberg to the Iceberg column.
+   *
+   * @param field Gravitino field.
+   * @param id
+   * @return
+   */
+  public static IcebergColumn fromGravitinoField(
+      com.datastrato.gravitino.rel.types.Types.StructType.Field field, int id) {
+    return new IcebergColumn.Builder()
+        .withId(id)
+        .withName(field.name())
+        .withNullable(field.nullable())
+        .withComment(field.comment())
+        .withType(field.type())
+        .build();
+  }
 }

@@ -10,7 +10,9 @@ import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.types.Type;
 import com.datastrato.gravitino.rel.types.Types;
 import com.google.common.collect.Lists;
+import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * Type converter belonging to gravitino.
@@ -52,6 +54,19 @@ public class ToIcebergTypeVisitor<T> {
     } else if (type instanceof Types.ListType) {
       Types.ListType list = (Types.ListType) type;
       return visitor.array(list, visit(list.elementType(), visitor));
+    } else if (type instanceof Types.StructType) {
+      Types.StructType struct = (Types.StructType) type;
+      Types.StructType.Field[] fields = struct.fields();
+      List<IcebergColumn> columns =
+          Arrays.stream(fields)
+              .map(
+                  field -> {
+                    return ConvertUtil.fromGravitinoField(field, 0);
+                  })
+              .collect(Collectors.toList());
+      IcebergTable mockTable =
+          new IcebergTable.Builder().withColumns(columns.toArray(new IcebergColumn[0])).build();
+      return visit(mockTable, visitor);
     } else {
       return visitor.atomic((Type.PrimitiveType) type);
     }

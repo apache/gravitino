@@ -144,7 +144,25 @@ public class TestIcebergTable {
             .withComment(ICEBERG_COMMENT)
             .withNullable(false)
             .build();
-    Column[] columns = new Column[] {col1, col2};
+    Types.StructType structTypeInside =
+        Types.StructType.of(
+            Types.StructType.Field.notNullField("integer_field_inside", Types.IntegerType.get()),
+            Types.StructType.Field.notNullField(
+                "string_field_inside", Types.StringType.get(), "string field inside"));
+    Types.StructType structType =
+        Types.StructType.of(
+            Types.StructType.Field.notNullField("integer_field", Types.IntegerType.get()),
+            Types.StructType.Field.notNullField(
+                "string_field", Types.StringType.get(), "string field"),
+            Types.StructType.Field.nullableField("struct_field", structTypeInside, "struct field"));
+    IcebergColumn col3 =
+        new IcebergColumn.Builder()
+            .withName("col_3")
+            .withType(structType)
+            .withComment(ICEBERG_COMMENT)
+            .withNullable(false)
+            .build();
+    Column[] columns = new Column[] {col1, col2, col3};
 
     SortOrder[] sortOrders = createSortOrder();
     Table table =
@@ -169,6 +187,7 @@ public class TestIcebergTable {
     Assertions.assertEquals("val2", loadedTable.properties().get("key2"));
     Assertions.assertTrue(loadedTable.columns()[0].nullable());
     Assertions.assertFalse(loadedTable.columns()[1].nullable());
+    Assertions.assertFalse(loadedTable.columns()[2].nullable());
 
     Assertions.assertTrue(icebergCatalog.asTableCatalog().tableExists(tableIdentifier));
     NameIdentifier[] tableIdents =
