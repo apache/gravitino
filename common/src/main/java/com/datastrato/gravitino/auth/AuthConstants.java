@@ -12,6 +12,11 @@ public interface AuthConstants {
 
   String AUTHORIZATION_BASIC_HEADER = "Basic ";
 
+  String NEGOTIATE = "Negotiate";
+  String AUTHORIZATION_NEGOTIATE_HEADER = NEGOTIATE + " ";
+
+  String HTTP_CHALLENGE_HEADER = "WWW-Authenticate";
+
   String ANONYMOUS_USER = "anonymous";
 
   // Refer to the style of `AuthenticationFilter#AuthenticatedRoleAttributeName` of Apache Pulsar

@@ -53,15 +53,17 @@ GravitinoClient client = GravitinoClient.builder(uri)
 
 ### Server configuration
 
-| Configuration item                                | Description                                                                 | Default value     | Required                                | Since version |
-|---------------------------------------------------|-----------------------------------------------------------------------------|-------------------|-----------------------------------------|---------------|
-| `gravitino.authenticator`                         | The authenticator which Gravitino uses, setting as `simple` or `oauth`.     | `simple`          | No                                      | 0.3.0         |
-| `gravitino.authenticator.oauth.serviceAudience`   | The audience name when Gravitino uses OAuth as the authenticator.           | `GravitinoServer` | No                                      | 0.3.0         |
-| `gravitino.authenticator.oauth.allowSkewSecs`     | The JWT allows skew seconds when Gravitino uses OAuth as the authenticator. | `0`               | No                                      | 0.3.0         |
-| `gravitino.authenticator.oauth.defaultSignKey`    | The signing key of JWT when Gravitino uses OAuth as the authenticator.      | (none)            | Yes if use `oauth` as the authenticator | 0.3.0         |
-| `gravitino.authenticator.oauth.signAlgorithmType` | The signature algorithm when Gravitino uses OAuth as the authenticator.     | `RS256`           | No                                      | 0.3.0         |
-| `gravitino.authenticator.oauth.serverUri`         | The URI of the default OAuth server.                                        | (none)            | Yes if use `oauth` as the authenticator | 0.3.0         |
-| `gravitino.authenticator.oauth.tokenPath`         | The path for token of the default OAuth server.                             | (none)            | Yes if use `oauth` as the authenticator | 0.3.0         |
+| Configuration item                                | Description                                                                        | Default value     | Required                                   | Since version |
+|---------------------------------------------------|------------------------------------------------------------------------------------|-------------------|--------------------------------------------|---------------|
+| `gravitino.authenticator`                         | The authenticator which Gravitino uses, setting as `simple`,`oauth` or `kerberos`. | `simple`          | No                                         | 0.3.0         |
+| `gravitino.authenticator.oauth.serviceAudience`   | The audience name when Gravitino uses OAuth as the authenticator.                  | `GravitinoServer` | No                                         | 0.3.0         |
+| `gravitino.authenticator.oauth.allowSkewSecs`     | The JWT allows skew seconds when Gravitino uses OAuth as the authenticator.        | `0`               | No                                         | 0.3.0         |
+| `gravitino.authenticator.oauth.defaultSignKey`    | The signing key of JWT when Gravitino uses OAuth as the authenticator.             | (none)            | Yes if use `oauth` as the authenticator    | 0.3.0         |
+| `gravitino.authenticator.oauth.signAlgorithmType` | The signature algorithm when Gravitino uses OAuth as the authenticator.            | `RS256`           | No                                         | 0.3.0         |
+| `gravitino.authenticator.oauth.serverUri`         | The URI of the default OAuth server.                                               | (none)            | Yes if use `oauth` as the authenticator    | 0.3.0         |
+| `gravitino.authenticator.oauth.tokenPath`         | The path for token of the default OAuth server.                                    | (none)            | Yes if use `oauth` as the authenticator    | 0.3.0         |
+| `gravitino.authenticator.kerberos.principal`      | Indicates the Kerberos principal to be used for HTTP endpoint.                     | (none)            | Yes if use `kerberos` as the authenticator | 0.4.0         |
+| `gravitino.authenticator.kerberos.keytab`         | Location of the keytab file with the credentials for the principal.                | (none)            | Yes if use `kerberos` as the authenticator | 0.4.0         |
 
 The signature algorithms that Gravitino supports follows:
 

@@ -24,6 +24,7 @@ dependencies {
   implementation(libs.bundles.jetty)
   implementation(libs.bundles.jwt)
   implementation(libs.bundles.metrics)
+  implementation(libs.bundles.kerby)
   implementation(libs.prometheus.servlet)
 
   testImplementation(libs.junit.jupiter.api)
@@ -31,4 +32,7 @@ dependencies {
   testRuntimeOnly(libs.junit.jupiter.engine)
   testImplementation(libs.mockito.core)
   testImplementation(libs.commons.io)
+  testImplementation(libs.minikdc) {
+    exclude("org.apache.directory.api", "api-ldap-schema-data")
+  }
 }

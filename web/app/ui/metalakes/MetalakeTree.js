@@ -86,6 +86,7 @@ const StyledTreeItemRoot = styled(TreeItem)(({ theme, level = 0 }) => ({
     backgroundColor: theme.palette.action.hover
   },
   '& .MuiTreeItem-content': {
+    cursor: 'default',
     paddingRight: theme.spacing(3),
     fontWeight: theme.typography.fontWeightMedium
   },

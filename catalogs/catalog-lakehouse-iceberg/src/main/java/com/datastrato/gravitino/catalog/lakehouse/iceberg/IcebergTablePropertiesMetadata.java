@@ -12,6 +12,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
 import java.util.List;
 import java.util.Map;
+import org.apache.iceberg.TableProperties;
 
 public class IcebergTablePropertiesMetadata extends BasePropertiesMetadata {
   public static final String COMMENT = "comment";
@@ -21,6 +22,8 @@ public class IcebergTablePropertiesMetadata extends BasePropertiesMetadata {
   public static final String CHERRY_PICK_SNAPSHOT_ID = "cherry-pick-snapshot-id";
   public static final String SORT_ORDER = "sort-order";
   public static final String IDENTIFIER_FIELDS = "identifier-fields";
+
+  public static final String DISTRIBUTION_MODE = TableProperties.WRITE_DISTRIBUTION_MODE;
 
   private static final Map<String, PropertyEntry<?>> PROPERTIES_METADATA;
 
@@ -41,7 +44,8 @@ public class IcebergTablePropertiesMetadata extends BasePropertiesMetadata {
             stringReservedPropertyEntry(
                 SORT_ORDER, "Selecting a specific snapshot in a merge operation", false),
             stringReservedPropertyEntry(
-                IDENTIFIER_FIELDS, "The identifier field(s) for defining the table", false));
+                IDENTIFIER_FIELDS, "The identifier field(s) for defining the table", false),
+            stringReservedPropertyEntry(DISTRIBUTION_MODE, "Write distribution mode", false));
     PROPERTIES_METADATA = Maps.uniqueIndex(propertyEntries, PropertyEntry::getName);
   }
 
