@@ -6,6 +6,7 @@
 package com.datastrato.gravitino.storage.kv;
 
 import static com.datastrato.gravitino.Configs.KV_DELETE_AFTER_TIME;
+import static com.datastrato.gravitino.storage.kv.KvNameMappingService.GENERAL_NAME_MAPPING_PREFIX;
 import static com.datastrato.gravitino.storage.kv.TransactionalKvBackendImpl.endOfTransactionId;
 import static com.datastrato.gravitino.storage.kv.TransactionalKvBackendImpl.generateCommitKey;
 import static com.datastrato.gravitino.storage.kv.TransactionalKvBackendImpl.generateKey;
@@ -20,12 +21,14 @@ import com.datastrato.gravitino.utils.TimeStampUtils;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.Closeable;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.SerializationUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.slf4j.Logger;
@@ -254,6 +257,11 @@ public final class KvGarbageCollector implements Closeable {
 
   private LogHelper decodeKey(byte[] key, byte[] timestampArray) {
     if (entityKeyEncoder == null) {
+      return LogHelper.NONE;
+    }
+
+    // Name mapping data, we do not support it now.
+    if (Arrays.equals(GENERAL_NAME_MAPPING_PREFIX, ArrayUtils.subarray(key, 0, 3))) {
       return LogHelper.NONE;
     }
 
