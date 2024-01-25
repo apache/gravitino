@@ -32,7 +32,6 @@ import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.rel.Schema;
 import com.datastrato.gravitino.rel.SchemaChange;
 import com.datastrato.gravitino.rel.SupportsSchemas;
-import com.datastrato.gravitino.storage.IdGenerator;
 import com.datastrato.gravitino.utils.PrincipalUtils;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -69,22 +68,18 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
 
   private final EntityStore store;
 
-  private final IdGenerator idGenerator;
-
   @VisibleForTesting Configuration hadoopConf;
 
   @VisibleForTesting Optional<Path> catalogStorageLocation;
 
   // For testing only.
-  HadoopCatalogOperations(CatalogEntity entity, EntityStore store, IdGenerator idGenerator) {
+  HadoopCatalogOperations(CatalogEntity entity, EntityStore store) {
     this.entity = entity;
     this.store = store;
-    this.idGenerator = idGenerator;
   }
 
   public HadoopCatalogOperations(CatalogEntity entity) {
-    this(
-        entity, GravitinoEnv.getInstance().entityStore(), GravitinoEnv.getInstance().idGenerator());
+    this(entity, GravitinoEnv.getInstance().entityStore());
   }
 
   @Override
@@ -208,7 +203,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
     }
 
     StringIdentifier stringId = StringIdentifier.fromProperties(properties);
-    Preconditions.checkNotNull(stringId, "Property String identifier should not be null");
+    Preconditions.checkArgument(stringId != null, "Property String identifier should not be null");
 
     FilesetEntity filesetEntity =
         new FilesetEntity.Builder()
@@ -219,7 +214,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
             .withFilesetType(type)
             // Store the storageLocation to the store. If the "storageLocation" is null for
             // managed fileset, Gravitino will get and store the location based on the
-            // catalog/schema's location.
+            // catalog/schema's location and store it to the store.
             .withStorageLocation(filesetPath.toString())
             .withProperties(addManagedFlagToProperties(properties))
             .withAuditInfo(
@@ -282,7 +277,8 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
       throw new NoSuchFilesetException("Fileset " + ident + " does not exist", nsee);
     } catch (AlreadyExistsException aee) {
       // This is happened when renaming a fileset to an existing fileset name.
-      throw new RuntimeException("Fileset " + ident + " already exists", aee);
+      throw new RuntimeException(
+          "Fileset with the same name " + ident.name() + " already exists", aee);
     }
   }
 
@@ -442,8 +438,8 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
       throw new NoSuchSchemaException("Schema " + ident + " does not exist", nsee);
     } catch (AlreadyExistsException aee) {
       throw new RuntimeException(
-          "Schema "
-              + ident
+          "Schema with the same name "
+              + ident.name()
               + " already exists, this is unexpected because schema doesn't support rename",
           aee);
     }

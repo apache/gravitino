@@ -95,7 +95,7 @@ public class TestHadoopCatalogOperations {
   @Test
   public void testHadoopCatalogConfiguration() {
     Map<String, String> emptyProps = Maps.newHashMap();
-    HadoopCatalogOperations ops = new HadoopCatalogOperations(null, store, idGenerator);
+    HadoopCatalogOperations ops = new HadoopCatalogOperations(null, store);
     ops.initialize(emptyProps);
     Configuration conf = ops.hadoopConf;
     String value = conf.get("fs.defaultFS");
@@ -193,7 +193,7 @@ public class TestHadoopCatalogOperations {
     Schema schema = createSchema(name, comment, catalogPath, null);
     Assertions.assertEquals(name, schema.name());
 
-    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(null, store, idGenerator)) {
+    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(null, store)) {
       ops.initialize(Maps.newHashMap());
       Schema schema1 = ops.loadSchema(NameIdentifier.ofSchema("m1", "c1", name));
       Assertions.assertEquals(name, schema1.name());
@@ -223,7 +223,7 @@ public class TestHadoopCatalogOperations {
     createSchema(name, comment, null, null);
     createSchema(name1, comment1, null, null);
 
-    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(null, store, idGenerator)) {
+    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(null, store)) {
       ops.initialize(Maps.newHashMap());
       Set<NameIdentifier> idents =
           Arrays.stream(ops.listSchemas(Namespace.of("m1", "c1"))).collect(Collectors.toSet());
@@ -241,7 +241,7 @@ public class TestHadoopCatalogOperations {
     Schema schema = createSchema(name, comment, catalogPath, null);
     Assertions.assertEquals(name, schema.name());
 
-    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(null, store, idGenerator)) {
+    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(null, store)) {
       ops.initialize(Maps.newHashMap());
       Schema schema1 = ops.loadSchema(NameIdentifier.ofSchema("m1", "c1", name));
       Assertions.assertEquals(name, schema1.name());
@@ -290,7 +290,7 @@ public class TestHadoopCatalogOperations {
     Schema schema = createSchema(name, comment, catalogPath, null);
     Assertions.assertEquals(name, schema.name());
 
-    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(null, store, idGenerator)) {
+    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(null, store)) {
       ops.initialize(ImmutableMap.of(HadoopCatalogPropertiesMetadata.LOCATION, catalogPath));
       Schema schema1 = ops.loadSchema(NameIdentifier.ofSchema("m1", "c1", name));
       Assertions.assertEquals(name, schema1.name());
@@ -346,7 +346,7 @@ public class TestHadoopCatalogOperations {
     }
 
     NameIdentifier schemaIdent = NameIdentifier.ofSchema("m1", "c1", schemaName);
-    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(null, store, idGenerator)) {
+    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(null, store)) {
       ops.initialize(catalogProps);
       if (!ops.schemaExists(schemaIdent)) {
         createSchema(schemaName, comment, catalogPath, schemaPath);
@@ -398,7 +398,7 @@ public class TestHadoopCatalogOperations {
             + " when it's catalog and schema "
             + "location are not set",
         exception.getMessage());
-    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(null, store, idGenerator)) {
+    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(null, store)) {
       ops.initialize(Maps.newHashMap());
       Throwable e =
           Assertions.assertThrows(
@@ -414,7 +414,7 @@ public class TestHadoopCatalogOperations {
     Assertions.assertEquals(
         "Storage location must be set for external fileset " + filesetIdent,
         exception1.getMessage());
-    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(null, store, idGenerator)) {
+    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(null, store)) {
       ops.initialize(Maps.newHashMap());
       Throwable e =
           Assertions.assertThrows(
@@ -434,7 +434,7 @@ public class TestHadoopCatalogOperations {
       createFileset(fileset, schemaName, comment, Fileset.Type.MANAGED, null, null);
     }
 
-    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(null, store, idGenerator)) {
+    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(null, store)) {
       ops.initialize(Maps.newHashMap());
       Set<NameIdentifier> idents =
           Arrays.stream(ops.listFilesets(Namespace.of("m1", "c1", schemaName)))
@@ -465,7 +465,7 @@ public class TestHadoopCatalogOperations {
     }
 
     NameIdentifier schemaIdent = NameIdentifier.ofSchema("m1", "c1", schemaName);
-    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(null, store, idGenerator)) {
+    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(null, store)) {
       ops.initialize(catalogProps);
       if (!ops.schemaExists(schemaIdent)) {
         createSchema(schemaName, comment, catalogPath, schemaPath);
@@ -511,7 +511,7 @@ public class TestHadoopCatalogOperations {
     FilesetChange change1 = FilesetChange.setProperty("k1", "v1");
     FilesetChange change2 = FilesetChange.removeProperty("k1");
 
-    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(null, store, idGenerator)) {
+    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(null, store)) {
       ops.initialize(Maps.newHashMap());
       NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, name);
 
@@ -702,7 +702,7 @@ public class TestHadoopCatalogOperations {
       props.put(HadoopCatalogPropertiesMetadata.LOCATION, catalogPath);
     }
 
-    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(null, store, idGenerator)) {
+    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(null, store)) {
       ops.initialize(props);
 
       NameIdentifier schemaIdent = NameIdentifier.ofSchema("m1", "c1", name);
@@ -731,7 +731,7 @@ public class TestHadoopCatalogOperations {
       props.put(HadoopCatalogPropertiesMetadata.LOCATION, catalogPath);
     }
 
-    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(null, store, idGenerator)) {
+    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(null, store)) {
       ops.initialize(props);
 
       NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, name);
