@@ -188,6 +188,7 @@ public class TestEntityProtoSerDe {
             .withName(fileName)
             .withAuditInfo(auditInfo)
             .withFilesetType(com.datastrato.gravitino.file.Fileset.Type.MANAGED)
+            .withStorageLocation("testLocation")
             .withProperties(props)
             .withComment(comment)
             .build();
@@ -202,6 +203,7 @@ public class TestEntityProtoSerDe {
             .withName(fileName)
             .withAuditInfo(auditInfo)
             .withFilesetType(com.datastrato.gravitino.file.Fileset.Type.MANAGED)
+            .withStorageLocation("testLocation")
             .build();
     byte[] fileBytes1 = protoEntitySerDe.serialize(fileEntity1);
     com.datastrato.gravitino.meta.FilesetEntity fileEntityFromBytes1 =
@@ -209,7 +211,6 @@ public class TestEntityProtoSerDe {
     Assertions.assertEquals(fileEntity1, fileEntityFromBytes1);
     Assertions.assertNull(fileEntityFromBytes1.comment());
     Assertions.assertNull(fileEntityFromBytes1.properties());
-    Assertions.assertNull(fileEntityFromBytes1.storageLocation());
 
     com.datastrato.gravitino.meta.FilesetEntity fileEntity2 =
         new com.datastrato.gravitino.meta.FilesetEntity.Builder()

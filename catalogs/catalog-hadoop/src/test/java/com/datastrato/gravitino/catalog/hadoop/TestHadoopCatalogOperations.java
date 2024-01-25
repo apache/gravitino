@@ -21,9 +21,12 @@ import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.StringIdentifier;
 import com.datastrato.gravitino.catalog.BaseCatalogPropertiesMetadata;
+import com.datastrato.gravitino.exceptions.NoSuchFilesetException;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NonEmptySchemaException;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
+import com.datastrato.gravitino.file.Fileset;
+import com.datastrato.gravitino.file.FilesetChange;
 import com.datastrato.gravitino.rel.Schema;
 import com.datastrato.gravitino.rel.SchemaChange;
 import com.datastrato.gravitino.storage.IdGenerator;
@@ -36,6 +39,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -44,6 +48,9 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mockito;
 
 public class TestHadoopCatalogOperations {
@@ -52,7 +59,7 @@ public class TestHadoopCatalogOperations {
       "/tmp/gravitino_test_entityStore_" + UUID.randomUUID().toString().replace("-", "");
 
   private static final String TEST_ROOT_PATH =
-      "file:///tmp/gravitino_test_catalog_" + UUID.randomUUID().toString().replace("-", "");
+      "file:/tmp/gravitino_test_catalog_" + UUID.randomUUID().toString().replace("-", "");
 
   private static EntityStore store;
 
@@ -88,7 +95,7 @@ public class TestHadoopCatalogOperations {
   @Test
   public void testHadoopCatalogConfiguration() {
     Map<String, String> emptyProps = Maps.newHashMap();
-    HadoopCatalogOperations ops = new HadoopCatalogOperations(null, store, idGenerator);
+    HadoopCatalogOperations ops = new HadoopCatalogOperations(null, store);
     ops.initialize(emptyProps);
     Configuration conf = ops.hadoopConf;
     String value = conf.get("fs.defaultFS");
@@ -125,7 +132,7 @@ public class TestHadoopCatalogOperations {
     Throwable exception =
         Assertions.assertThrows(
             SchemaAlreadyExistsException.class, () -> createSchema(name, comment, null, null));
-    Assertions.assertEquals("Schema schema11 already exists", exception.getMessage());
+    Assertions.assertEquals("Schema m1.c1.schema11 already exists", exception.getMessage());
   }
 
   @Test
@@ -157,15 +164,6 @@ public class TestHadoopCatalogOperations {
     Assertions.assertTrue(fs.exists(schemaPath1));
     Assertions.assertTrue(fs.isDirectory(schemaPath1));
     Assertions.assertTrue(fs.listStatus(schemaPath1).length == 0);
-
-    // Test create schema on the same location
-    String name1 = "schema13_1";
-    Throwable exception =
-        Assertions.assertThrows(
-            SchemaAlreadyExistsException.class,
-            () -> createSchema(name1, comment, null, schemaPath));
-    Assertions.assertEquals(
-        "Schema schema13_1 location " + schemaPath1 + " already exists", exception.getMessage());
   }
 
   @Test
@@ -195,7 +193,7 @@ public class TestHadoopCatalogOperations {
     Schema schema = createSchema(name, comment, catalogPath, null);
     Assertions.assertEquals(name, schema.name());
 
-    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(null, store, idGenerator)) {
+    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(null, store)) {
       ops.initialize(Maps.newHashMap());
       Schema schema1 = ops.loadSchema(NameIdentifier.ofSchema("m1", "c1", name));
       Assertions.assertEquals(name, schema1.name());
@@ -212,7 +210,7 @@ public class TestHadoopCatalogOperations {
           Assertions.assertThrows(
               NoSuchSchemaException.class,
               () -> ops.loadSchema(NameIdentifier.ofSchema("m1", "c1", "schema16")));
-      Assertions.assertEquals("Schema schema16 does not exist", exception.getMessage());
+      Assertions.assertEquals("Schema m1.c1.schema16 does not exist", exception.getMessage());
     }
   }
 
@@ -225,7 +223,7 @@ public class TestHadoopCatalogOperations {
     createSchema(name, comment, null, null);
     createSchema(name1, comment1, null, null);
 
-    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(null, store, idGenerator)) {
+    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(null, store)) {
       ops.initialize(Maps.newHashMap());
       Set<NameIdentifier> idents =
           Arrays.stream(ops.listSchemas(Namespace.of("m1", "c1"))).collect(Collectors.toSet());
@@ -243,7 +241,7 @@ public class TestHadoopCatalogOperations {
     Schema schema = createSchema(name, comment, catalogPath, null);
     Assertions.assertEquals(name, schema.name());
 
-    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(null, store, idGenerator)) {
+    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(null, store)) {
       ops.initialize(Maps.newHashMap());
       Schema schema1 = ops.loadSchema(NameIdentifier.ofSchema("m1", "c1", name));
       Assertions.assertEquals(name, schema1.name());
@@ -292,7 +290,7 @@ public class TestHadoopCatalogOperations {
     Schema schema = createSchema(name, comment, catalogPath, null);
     Assertions.assertEquals(name, schema.name());
 
-    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(null, store, idGenerator)) {
+    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(null, store)) {
       ops.initialize(ImmutableMap.of(HadoopCatalogPropertiesMetadata.LOCATION, catalogPath));
       Schema schema1 = ops.loadSchema(NameIdentifier.ofSchema("m1", "c1", name));
       Assertions.assertEquals(name, schema1.name());
@@ -321,12 +319,380 @@ public class TestHadoopCatalogOperations {
               NonEmptySchemaException.class,
               () -> ops.dropSchema(NameIdentifier.ofSchema("m1", "c1", name), false));
       Assertions.assertEquals(
-          "Schema schema20 with location " + schemaPath + " is not empty", exception1.getMessage());
+          "Schema m1.c1.schema20 with location " + schemaPath + " is not empty",
+          exception1.getMessage());
 
       // Test drop non-empty schema with cascade = true
       ops.dropSchema(NameIdentifier.ofSchema("m1", "c1", name), true);
       Assertions.assertFalse(fs.exists(schemaPath));
     }
+  }
+
+  @ParameterizedTest
+  @MethodSource("locationArguments")
+  public void testCreateLoadAndDeleteFilesetWithLocations(
+      String name,
+      Fileset.Type type,
+      String catalogPath,
+      String schemaPath,
+      String storageLocation,
+      String expect)
+      throws IOException {
+    String schemaName = "s1_" + name;
+    String comment = "comment_s1";
+    Map<String, String> catalogProps = Maps.newHashMap();
+    if (catalogPath != null) {
+      catalogProps.put(HadoopCatalogPropertiesMetadata.LOCATION, catalogPath);
+    }
+
+    NameIdentifier schemaIdent = NameIdentifier.ofSchema("m1", "c1", schemaName);
+    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(null, store)) {
+      ops.initialize(catalogProps);
+      if (!ops.schemaExists(schemaIdent)) {
+        createSchema(schemaName, comment, catalogPath, schemaPath);
+      }
+      Fileset fileset =
+          createFileset(name, schemaName, "comment", type, catalogPath, storageLocation);
+
+      Assertions.assertEquals(name, fileset.name());
+      Assertions.assertEquals(type, fileset.type());
+      Assertions.assertEquals("comment", fileset.comment());
+      Assertions.assertEquals(expect, fileset.storageLocation());
+
+      // Test load
+      NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, name);
+      Fileset loadedFileset = ops.loadFileset(filesetIdent);
+      Assertions.assertEquals(name, loadedFileset.name());
+      Assertions.assertEquals(type, loadedFileset.type());
+      Assertions.assertEquals("comment", loadedFileset.comment());
+      Assertions.assertEquals(expect, loadedFileset.storageLocation());
+
+      // Test drop
+      ops.dropFileset(filesetIdent);
+      Path expectedPath = new Path(expect);
+      FileSystem fs = expectedPath.getFileSystem(new Configuration());
+      if (type == Fileset.Type.MANAGED) {
+        Assertions.assertFalse(fs.exists(expectedPath));
+      } else {
+        Assertions.assertTrue(fs.exists(expectedPath));
+      }
+    }
+  }
+
+  @Test
+  public void testCreateFilesetWithExceptions() throws IOException {
+    String schemaName = "schema22";
+    String comment = "comment22";
+    createSchema(schemaName, comment, null, null);
+    String name = "fileset22";
+    NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, name);
+
+    // If neither catalog location, nor schema location and storageLocation is specified.
+    Throwable exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> createFileset(name, schemaName, comment, Fileset.Type.MANAGED, null, null));
+    Assertions.assertEquals(
+        "Storage location must be set for fileset "
+            + filesetIdent
+            + " when it's catalog and schema "
+            + "location are not set",
+        exception.getMessage());
+    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(null, store)) {
+      ops.initialize(Maps.newHashMap());
+      Throwable e =
+          Assertions.assertThrows(
+              NoSuchFilesetException.class, () -> ops.loadFileset(filesetIdent));
+      Assertions.assertEquals("Fileset m1.c1.schema22.fileset22 does not exist", e.getMessage());
+    }
+
+    // For external fileset, if storageLocation is not specified.
+    Throwable exception1 =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> createFileset(name, schemaName, comment, Fileset.Type.EXTERNAL, null, null));
+    Assertions.assertEquals(
+        "Storage location must be set for external fileset " + filesetIdent,
+        exception1.getMessage());
+    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(null, store)) {
+      ops.initialize(Maps.newHashMap());
+      Throwable e =
+          Assertions.assertThrows(
+              NoSuchFilesetException.class, () -> ops.loadFileset(filesetIdent));
+      Assertions.assertEquals("Fileset " + filesetIdent + " does not exist", e.getMessage());
+    }
+  }
+
+  @Test
+  public void testListFilesets() throws IOException {
+    String schemaName = "schema23";
+    String comment = "comment23";
+    String schemaPath = TEST_ROOT_PATH + "/" + schemaName;
+    createSchema(schemaName, comment, null, schemaPath);
+    String[] filesets = new String[] {"fileset23_1", "fileset23_2", "fileset23_3"};
+    for (String fileset : filesets) {
+      createFileset(fileset, schemaName, comment, Fileset.Type.MANAGED, null, null);
+    }
+
+    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(null, store)) {
+      ops.initialize(Maps.newHashMap());
+      Set<NameIdentifier> idents =
+          Arrays.stream(ops.listFilesets(Namespace.of("m1", "c1", schemaName)))
+              .collect(Collectors.toSet());
+      Assertions.assertTrue(idents.size() >= 3);
+      for (String fileset : filesets) {
+        Assertions.assertTrue(idents.contains(NameIdentifier.of("m1", "c1", schemaName, fileset)));
+      }
+    }
+  }
+
+  @ParameterizedTest
+  @MethodSource("testRenameArguments")
+  public void testRenameFileset(
+      String name,
+      String newName,
+      Fileset.Type type,
+      String catalogPath,
+      String schemaPath,
+      String storageLocation,
+      String expect)
+      throws IOException {
+    String schemaName = "s24_" + name;
+    String comment = "comment_s24";
+    Map<String, String> catalogProps = Maps.newHashMap();
+    if (catalogPath != null) {
+      catalogProps.put(HadoopCatalogPropertiesMetadata.LOCATION, catalogPath);
+    }
+
+    NameIdentifier schemaIdent = NameIdentifier.ofSchema("m1", "c1", schemaName);
+    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(null, store)) {
+      ops.initialize(catalogProps);
+      if (!ops.schemaExists(schemaIdent)) {
+        createSchema(schemaName, comment, catalogPath, schemaPath);
+      }
+      Fileset fileset =
+          createFileset(name, schemaName, "comment", type, catalogPath, storageLocation);
+
+      Assertions.assertEquals(name, fileset.name());
+      Assertions.assertEquals(type, fileset.type());
+      Assertions.assertEquals("comment", fileset.comment());
+
+      NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, name);
+      Fileset loadedFileset = ops.loadFileset(filesetIdent);
+      Assertions.assertEquals(name, loadedFileset.name());
+      Assertions.assertEquals(type, loadedFileset.type());
+      Assertions.assertEquals("comment", loadedFileset.comment());
+
+      Fileset renamedFileset = ops.alterFileset(filesetIdent, FilesetChange.rename(newName));
+      Assertions.assertEquals(newName, renamedFileset.name());
+      Assertions.assertEquals(type, renamedFileset.type());
+      Assertions.assertEquals("comment", renamedFileset.comment());
+      Assertions.assertEquals(expect, renamedFileset.storageLocation());
+
+      Fileset loadedRenamedFileset =
+          ops.loadFileset(NameIdentifier.of("m1", "c1", schemaName, newName));
+      Assertions.assertEquals(newName, loadedRenamedFileset.name());
+      Assertions.assertEquals(type, loadedRenamedFileset.type());
+      Assertions.assertEquals("comment", loadedRenamedFileset.comment());
+      Assertions.assertEquals(expect, loadedRenamedFileset.storageLocation());
+    }
+  }
+
+  @Test
+  public void testAlterFilesetProperties() throws IOException {
+    String schemaName = "schema25";
+    String comment = "comment25";
+    String schemaPath = TEST_ROOT_PATH + "/" + schemaName;
+    createSchema(schemaName, comment, null, schemaPath);
+
+    String name = "fileset25";
+    Fileset fileset = createFileset(name, schemaName, comment, Fileset.Type.MANAGED, null, null);
+
+    FilesetChange change1 = FilesetChange.setProperty("k1", "v1");
+    FilesetChange change2 = FilesetChange.removeProperty("k1");
+
+    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(null, store)) {
+      ops.initialize(Maps.newHashMap());
+      NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, name);
+
+      Fileset fileset1 = ops.alterFileset(filesetIdent, change1);
+      Assertions.assertEquals(name, fileset1.name());
+      Assertions.assertEquals(Fileset.Type.MANAGED, fileset1.type());
+      Assertions.assertEquals("comment25", fileset1.comment());
+      Assertions.assertEquals(fileset.storageLocation(), fileset1.storageLocation());
+      Map<String, String> props1 = fileset1.properties();
+      Assertions.assertTrue(props1.containsKey("k1"));
+      Assertions.assertEquals("v1", props1.get("k1"));
+
+      Fileset fileset2 = ops.alterFileset(filesetIdent, change2);
+      Assertions.assertEquals(name, fileset2.name());
+      Assertions.assertEquals(Fileset.Type.MANAGED, fileset2.type());
+      Assertions.assertEquals("comment25", fileset2.comment());
+      Assertions.assertEquals(fileset.storageLocation(), fileset2.storageLocation());
+      Map<String, String> props2 = fileset2.properties();
+      Assertions.assertFalse(props2.containsKey("k1"));
+    }
+  }
+
+  private static Stream<Arguments> locationArguments() {
+    return Stream.of(
+        // Honor the catalog location
+        Arguments.of(
+            "fileset11",
+            Fileset.Type.MANAGED,
+            TEST_ROOT_PATH + "/catalog21",
+            null,
+            null,
+            TEST_ROOT_PATH + "/catalog21/s1_fileset11/fileset11"),
+        Arguments.of(
+            // honor the schema location
+            "fileset12",
+            Fileset.Type.MANAGED,
+            null,
+            TEST_ROOT_PATH + "/s1_fileset12",
+            null,
+            TEST_ROOT_PATH + "/s1_fileset12/fileset12"),
+        Arguments.of(
+            // honor the schema location
+            "fileset13",
+            Fileset.Type.MANAGED,
+            TEST_ROOT_PATH + "/catalog22",
+            TEST_ROOT_PATH + "/s1_fileset13",
+            null,
+            TEST_ROOT_PATH + "/s1_fileset13/fileset13"),
+        Arguments.of(
+            // honor the storage location
+            "fileset14",
+            Fileset.Type.MANAGED,
+            TEST_ROOT_PATH + "/catalog23",
+            TEST_ROOT_PATH + "/s1_fileset14",
+            TEST_ROOT_PATH + "/fileset14",
+            TEST_ROOT_PATH + "/fileset14"),
+        Arguments.of(
+            // honor the storage location
+            "fileset15",
+            Fileset.Type.MANAGED,
+            null,
+            null,
+            TEST_ROOT_PATH + "/fileset15",
+            TEST_ROOT_PATH + "/fileset15"),
+        Arguments.of(
+            // honor the storage location
+            "fileset16",
+            Fileset.Type.MANAGED,
+            TEST_ROOT_PATH + "/catalog24",
+            null,
+            TEST_ROOT_PATH + "/fileset16",
+            TEST_ROOT_PATH + "/fileset16"),
+        Arguments.of(
+            // honor the storage location
+            "fileset17",
+            Fileset.Type.EXTERNAL,
+            TEST_ROOT_PATH + "/catalog25",
+            TEST_ROOT_PATH + "/s1_fileset17",
+            TEST_ROOT_PATH + "/fileset17",
+            TEST_ROOT_PATH + "/fileset17"),
+        Arguments.of(
+            // honor the storage location
+            "fileset18",
+            Fileset.Type.EXTERNAL,
+            null,
+            TEST_ROOT_PATH + "/s1_fileset18",
+            TEST_ROOT_PATH + "/fileset18",
+            TEST_ROOT_PATH + "/fileset18"),
+        Arguments.of(
+            // honor the storage location
+            "fileset19",
+            Fileset.Type.EXTERNAL,
+            null,
+            null,
+            TEST_ROOT_PATH + "/fileset19",
+            TEST_ROOT_PATH + "/fileset19"));
+  }
+
+  private static Stream<Arguments> testRenameArguments() {
+    return Stream.of(
+        // Honor the catalog location
+        Arguments.of(
+            "fileset31",
+            "fileset31_new",
+            Fileset.Type.MANAGED,
+            TEST_ROOT_PATH + "/catalog21",
+            null,
+            null,
+            TEST_ROOT_PATH + "/catalog21/s24_fileset31/fileset31"),
+        Arguments.of(
+            // honor the schema location
+            "fileset32",
+            "fileset32_new",
+            Fileset.Type.MANAGED,
+            null,
+            TEST_ROOT_PATH + "/s24_fileset32",
+            null,
+            TEST_ROOT_PATH + "/s24_fileset32/fileset32"),
+        Arguments.of(
+            // honor the schema location
+            "fileset33",
+            "fileset33_new",
+            Fileset.Type.MANAGED,
+            TEST_ROOT_PATH + "/catalog22",
+            TEST_ROOT_PATH + "/s24_fileset33",
+            null,
+            TEST_ROOT_PATH + "/s24_fileset33/fileset33"),
+        Arguments.of(
+            // honor the storage location
+            "fileset34",
+            "fileset34_new",
+            Fileset.Type.MANAGED,
+            TEST_ROOT_PATH + "/catalog23",
+            TEST_ROOT_PATH + "/s24_fileset34",
+            TEST_ROOT_PATH + "/fileset34",
+            TEST_ROOT_PATH + "/fileset34"),
+        Arguments.of(
+            // honor the storage location
+            "fileset35",
+            "fileset35_new",
+            Fileset.Type.MANAGED,
+            null,
+            null,
+            TEST_ROOT_PATH + "/fileset35",
+            TEST_ROOT_PATH + "/fileset35"),
+        Arguments.of(
+            // honor the storage location
+            "fileset36",
+            "fileset36_new",
+            Fileset.Type.MANAGED,
+            TEST_ROOT_PATH + "/catalog24",
+            null,
+            TEST_ROOT_PATH + "/fileset36",
+            TEST_ROOT_PATH + "/fileset36"),
+        Arguments.of(
+            // honor the storage location
+            "fileset37",
+            "fileset37_new",
+            Fileset.Type.EXTERNAL,
+            TEST_ROOT_PATH + "/catalog25",
+            TEST_ROOT_PATH + "/s24_fileset37",
+            TEST_ROOT_PATH + "/fileset37",
+            TEST_ROOT_PATH + "/fileset37"),
+        Arguments.of(
+            // honor the storage location
+            "fileset38",
+            "fileset38_new",
+            Fileset.Type.EXTERNAL,
+            null,
+            TEST_ROOT_PATH + "/s24_fileset38",
+            TEST_ROOT_PATH + "/fileset38",
+            TEST_ROOT_PATH + "/fileset38"),
+        Arguments.of(
+            // honor the storage location
+            "fileset39",
+            "fileset39_new",
+            Fileset.Type.EXTERNAL,
+            null,
+            null,
+            TEST_ROOT_PATH + "/fileset39",
+            TEST_ROOT_PATH + "/fileset39"));
   }
 
   private Schema createSchema(String name, String comment, String catalogPath, String schemaPath)
@@ -336,7 +702,7 @@ public class TestHadoopCatalogOperations {
       props.put(HadoopCatalogPropertiesMetadata.LOCATION, catalogPath);
     }
 
-    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(null, store, idGenerator)) {
+    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(null, store)) {
       ops.initialize(props);
 
       NameIdentifier schemaIdent = NameIdentifier.ofSchema("m1", "c1", name);
@@ -349,6 +715,31 @@ public class TestHadoopCatalogOperations {
       }
 
       return ops.createSchema(schemaIdent, comment, schemaProps);
+    }
+  }
+
+  private Fileset createFileset(
+      String name,
+      String schemaName,
+      String comment,
+      Fileset.Type type,
+      String catalogPath,
+      String storageLocation)
+      throws IOException {
+    Map<String, String> props = Maps.newHashMap();
+    if (catalogPath != null) {
+      props.put(HadoopCatalogPropertiesMetadata.LOCATION, catalogPath);
+    }
+
+    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(null, store)) {
+      ops.initialize(props);
+
+      NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, name);
+      Map<String, String> filesetProps = Maps.newHashMap();
+      StringIdentifier stringId = StringIdentifier.fromId(idGenerator.nextId());
+      filesetProps = Maps.newHashMap(StringIdentifier.newPropertiesWithId(stringId, filesetProps));
+
+      return ops.createFileset(filesetIdent, comment, type, storageLocation, filesetProps);
     }
   }
 }
