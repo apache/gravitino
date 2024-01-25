@@ -105,6 +105,11 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
   @Override
   public NameIdentifier[] listFilesets(Namespace namespace) throws NoSuchSchemaException {
     try {
+      NameIdentifier schemaIdent = NameIdentifier.of(namespace.levels());
+      if (!store.exists(schemaIdent, Entity.EntityType.SCHEMA)) {
+        throw new NoSuchSchemaException("Schema " + schemaIdent + " does not exist");
+      }
+
       List<FilesetEntity> filesets =
           store.list(namespace, FilesetEntity.class, Entity.EntityType.FILESET);
       return filesets.stream()

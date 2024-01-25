@@ -8,12 +8,17 @@ import com.datastrato.gravitino.catalog.BasePropertiesMetadata;
 import com.datastrato.gravitino.catalog.CatalogOperations;
 import com.datastrato.gravitino.catalog.PropertiesMetadata;
 import com.datastrato.gravitino.catalog.PropertyEntry;
+import com.datastrato.gravitino.exceptions.FilesetAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
+import com.datastrato.gravitino.exceptions.NoSuchFilesetException;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NoSuchTableException;
 import com.datastrato.gravitino.exceptions.NonEmptySchemaException;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.TableAlreadyExistsException;
+import com.datastrato.gravitino.file.Fileset;
+import com.datastrato.gravitino.file.FilesetCatalog;
+import com.datastrato.gravitino.file.FilesetChange;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.Schema;
@@ -33,11 +38,14 @@ import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 
-public class TestCatalogOperations implements CatalogOperations, TableCatalog, SupportsSchemas {
+public class TestCatalogOperations
+    implements CatalogOperations, TableCatalog, FilesetCatalog, SupportsSchemas {
 
   private final Map<NameIdentifier, TestTable> tables;
 
   private final Map<NameIdentifier, TestSchema> schemas;
+
+  private final Map<NameIdentifier, TestFileset> filesets;
 
   private final BasePropertiesMetadata tablePropertiesMetadata;
 
@@ -52,6 +60,7 @@ public class TestCatalogOperations implements CatalogOperations, TableCatalog, S
   public TestCatalogOperations(Map<String, String> config) {
     tables = Maps.newHashMap();
     schemas = Maps.newHashMap();
+    filesets = Maps.newHashMap();
     tablePropertiesMetadata = new TestBasePropertiesMetadata();
     schemaPropertiesMetadata = new TestBasePropertiesMetadata();
     filesetPropertiesMetadata = new TestBasePropertiesMetadata();
@@ -375,5 +384,104 @@ public class TestCatalogOperations implements CatalogOperations, TableCatalog, S
   @Override
   public PropertiesMetadata filesetPropertiesMetadata() throws UnsupportedOperationException {
     return filesetPropertiesMetadata;
+  }
+
+  @Override
+  public NameIdentifier[] listFilesets(Namespace namespace) throws NoSuchSchemaException {
+    return filesets.keySet().stream()
+        .filter(ident -> ident.namespace().equals(namespace))
+        .toArray(NameIdentifier[]::new);
+  }
+
+  @Override
+  public Fileset loadFileset(NameIdentifier ident) throws NoSuchFilesetException {
+    if (filesets.containsKey(ident)) {
+      return filesets.get(ident);
+    } else {
+      throw new NoSuchFilesetException("Fileset " + ident + " does not exist");
+    }
+  }
+
+  @Override
+  public Fileset createFileset(
+      NameIdentifier ident,
+      String comment,
+      Fileset.Type type,
+      String storageLocation,
+      Map<String, String> properties)
+      throws NoSuchSchemaException, FilesetAlreadyExistsException {
+    AuditInfo auditInfo =
+        new AuditInfo.Builder().withCreator("test").withCreateTime(Instant.now()).build();
+    TestFileset fileset =
+        new TestFileset.Builder()
+            .withName(ident.name())
+            .withComment(comment)
+            .withProperties(properties)
+            .withAuditInfo(auditInfo)
+            .withType(type)
+            .withStorageLocation(storageLocation)
+            .build();
+
+    if (tables.containsKey(ident)) {
+      throw new FilesetAlreadyExistsException("Fileset " + ident + " already exists");
+    } else {
+      filesets.put(ident, fileset);
+    }
+
+    return fileset;
+  }
+
+  @Override
+  public Fileset alterFileset(NameIdentifier ident, FilesetChange... changes)
+      throws NoSuchFilesetException, IllegalArgumentException {
+    if (!filesets.containsKey(ident)) {
+      throw new NoSuchFilesetException("Fileset " + ident + " does not exist");
+    }
+
+    AuditInfo updatedAuditInfo =
+        new AuditInfo.Builder()
+            .withCreator("test")
+            .withCreateTime(Instant.now())
+            .withLastModifier("test")
+            .withLastModifiedTime(Instant.now())
+            .build();
+
+    TestFileset fileset = filesets.get(ident);
+    Map<String, String> newProps =
+        fileset.properties() != null ? Maps.newHashMap(fileset.properties()) : Maps.newHashMap();
+
+    for (FilesetChange change : changes) {
+      if (change instanceof FilesetChange.SetProperty) {
+        newProps.put(
+            ((FilesetChange.SetProperty) change).getProperty(),
+            ((FilesetChange.SetProperty) change).getValue());
+      } else if (change instanceof FilesetChange.RemoveProperty) {
+        newProps.remove(((FilesetChange.RemoveProperty) change).getProperty());
+      } else {
+        throw new IllegalArgumentException("Unsupported fileset change: " + change);
+      }
+    }
+
+    TestFileset updatedFileset =
+        new TestFileset.Builder()
+            .withName(ident.name())
+            .withComment(fileset.comment())
+            .withProperties(newProps)
+            .withAuditInfo(updatedAuditInfo)
+            .withType(fileset.type())
+            .withStorageLocation(fileset.storageLocation())
+            .build();
+    filesets.put(ident, updatedFileset);
+    return updatedFileset;
+  }
+
+  @Override
+  public boolean dropFileset(NameIdentifier ident) {
+    if (filesets.containsKey(ident)) {
+      filesets.remove(ident);
+      return true;
+    } else {
+      return false;
+    }
   }
 }
