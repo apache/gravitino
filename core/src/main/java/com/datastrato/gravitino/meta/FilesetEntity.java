@@ -15,7 +15,6 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.Objects;
 import lombok.ToString;
-import org.apache.commons.lang3.StringUtils;
 
 @ToString
 public class FilesetEntity implements Entity, Auditable, HasIdentifier {
