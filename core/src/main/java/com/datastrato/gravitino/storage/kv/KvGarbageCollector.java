@@ -17,7 +17,6 @@ import com.datastrato.gravitino.Entity.EntityType;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.storage.EntityKeyEncoder;
 import com.datastrato.gravitino.utils.Bytes;
-import com.datastrato.gravitino.utils.TimeStampUtils;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.Closeable;
 import java.io.IOException;
@@ -30,6 +29,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.SerializationUtils;
+import org.apache.commons.lang3.time.DateFormatUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,6 +46,8 @@ public final class KvGarbageCollector implements Closeable {
 
   private static final long MAX_DELETE_TIME_ALLOW = 1000 * 60 * 60 * 24 * 30L; // 30 days
   private static final long MIN_DELETE_TIME_ALLOW = 1000 * 60 * 10L; // 10 minutes
+
+  private static final String TIME_STAMP_FORMAT = "yyyy-MM-dd HH:mm:ss.SSS";
 
   @VisibleForTesting
   final ScheduledExecutorService garbageCollectorPool =
@@ -225,7 +227,7 @@ public final class KvGarbageCollector implements Closeable {
         LOG.info(
             "Physically delete commit mark: {}, createTime: '{}({})', key: '{}'",
             Bytes.wrap(kv.getKey()),
-            TimeStampUtils.formatTimestamp(timestamp),
+            DateFormatUtils.format(timestamp, TIME_STAMP_FORMAT),
             timestamp,
             Bytes.wrap(kv.getKey()));
         kvBackend.delete(kv.getKey());
@@ -234,12 +236,12 @@ public final class KvGarbageCollector implements Closeable {
   }
 
   static class LogHelper {
-    private final NameIdentifier identifier;
-    private final EntityType type;
 
-    private final long createTimeInMs;
-    // Formatted create time
-    private final String createTimeAsString;
+    @VisibleForTesting final NameIdentifier identifier;
+    @VisibleForTesting final EntityType type;
+    @VisibleForTesting final long createTimeInMs;
+    // Formatted createTime
+    @VisibleForTesting final String createTimeAsString;
 
     public static final LogHelper NONE = new LogHelper(null, null, 0L, null);
 
@@ -255,7 +257,8 @@ public final class KvGarbageCollector implements Closeable {
     }
   }
 
-  private LogHelper decodeKey(byte[] key, byte[] timestampArray) {
+  @VisibleForTesting
+  LogHelper decodeKey(byte[] key, byte[] timestampArray) {
     if (entityKeyEncoder == null) {
       return LogHelper.NONE;
     }
@@ -273,12 +276,13 @@ public final class KvGarbageCollector implements Closeable {
       return LogHelper.NONE;
     }
     long timestamp = TransactionalKvBackendImpl.getTransactionId(timestampArray) >> 18;
-    String ts = TimeStampUtils.formatTimestamp(timestamp);
+    String ts = DateFormatUtils.format(timestamp, TIME_STAMP_FORMAT);
 
     return new LogHelper(entityTypePair.getKey(), entityTypePair.getValue(), timestamp, ts);
   }
 
-  private LogHelper decodeKey(byte[] rawKey) {
+  @VisibleForTesting
+  LogHelper decodeKey(byte[] rawKey) {
     byte[] key = TransactionalKvBackendImpl.getRealKey(rawKey);
     byte[] timestampArray = TransactionalKvBackendImpl.getBinaryTransactionId(rawKey);
     return decodeKey(key, timestampArray);

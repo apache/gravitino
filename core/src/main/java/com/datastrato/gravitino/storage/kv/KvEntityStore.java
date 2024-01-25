@@ -65,7 +65,7 @@ public class KvEntityStore implements EntityStore {
       Bytes.concat(
           new byte[] {0x1D, 0x00, 0x02}, "layout_version".getBytes(StandardCharsets.UTF_8));
 
-  @Getter @VisibleForTesting private KvBackend backend;
+  @Getter @VisibleForTesting KvBackend backend;
 
   // Lock to control the concurrency of the entity store, to be more exact, the concurrency of
   // accessing the underlying kv store.

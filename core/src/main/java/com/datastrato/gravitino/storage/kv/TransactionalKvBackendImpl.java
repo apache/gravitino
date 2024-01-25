@@ -329,7 +329,9 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
    * <p>When we try to get the value of key1, we will first the value of key1 10 and can skip old
    * versions quickly.
    */
-  private static byte[] revertByteArray(byte[] bytes) {
+  @VisibleForTesting
+  static byte[] revertByteArray(byte[] bytes) {
+    // We should not change the value of the original byte array.
     byte[] result = ArrayUtils.clone(bytes);
     for (int i = 0; i < bytes.length; i++) {
       result[i] = (byte) (result[i] ^ (byte) 0xff);
