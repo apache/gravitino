@@ -89,9 +89,7 @@ public class TestGravitinoFileSystem {
             .toString()
             .replaceFirst(
                 GravitinoFileSystemConfiguration.GTFS_FILESET_PREFIX,
-                GravitinoFileSystemConfiguration.HDFS_SCHEME
-                    + "://"
-                    + HDFS_CLUSTER.getFileSystem().getUri().getHost()));
+                mockFileSystem.getScheme() + "://" + mockFileSystem.getUri().getHost()));
   }
 
   @Test
@@ -123,9 +121,7 @@ public class TestGravitinoFileSystem {
             .toString()
             .replaceFirst(
                 GravitinoFileSystemConfiguration.GTFS_FILESET_PREFIX,
-                GravitinoFileSystemConfiguration.HDFS_SCHEME
-                    + "://"
-                    + HDFS_CLUSTER.getFileSystem().getUri().getHost()));
+                mockFileSystem.getScheme() + "://" + mockFileSystem.getUri().getHost()));
   }
 
   @Test
@@ -160,9 +156,7 @@ public class TestGravitinoFileSystem {
             .toString()
             .replaceFirst(
                 GravitinoFileSystemConfiguration.GTFS_FILESET_PREFIX,
-                GravitinoFileSystemConfiguration.HDFS_SCHEME
-                    + "://"
-                    + HDFS_CLUSTER.getFileSystem().getUri().getHost()));
+                mockFileSystem.getScheme() + "://" + mockFileSystem.getUri().getHost()));
   }
 
   @Test
@@ -208,9 +202,7 @@ public class TestGravitinoFileSystem {
             .toString()
             .replaceFirst(
                 GravitinoFileSystemConfiguration.GTFS_FILESET_PREFIX,
-                GravitinoFileSystemConfiguration.HDFS_SCHEME
-                    + "://"
-                    + HDFS_CLUSTER.getFileSystem().getUri().getHost()));
+                mockFileSystem.getScheme() + "://" + mockFileSystem.getUri().getHost()));
   }
 
   @Test
@@ -232,9 +224,7 @@ public class TestGravitinoFileSystem {
             .toString()
             .replaceFirst(
                 GravitinoFileSystemConfiguration.GTFS_FILESET_PREFIX,
-                GravitinoFileSystemConfiguration.HDFS_SCHEME
-                    + "://"
-                    + HDFS_CLUSTER.getFileSystem().getUri().getHost()));
+                mockFileSystem.getScheme() + "://" + mockFileSystem.getUri().getHost()));
   }
 
   private void create(Path path, FileSystem fileSystem) throws IOException {
