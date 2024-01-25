@@ -5,11 +5,12 @@
 package com.datastrato.gravitino.dto.rel.partitions;
 
 import com.datastrato.gravitino.dto.rel.expressions.LiteralDTO;
+import com.datastrato.gravitino.rel.partitions.IdentityPartition;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Objects;
 
-public class IdentityPartitionDTO implements PartitionDTO {
+public class IdentityPartitionDTO implements PartitionDTO, IdentityPartition {
 
   private final String name;
   private final String[][] fieldNames;
@@ -37,10 +38,12 @@ public class IdentityPartitionDTO implements PartitionDTO {
     return name;
   }
 
+  @Override
   public String[][] fieldNames() {
     return fieldNames;
   }
 
+  @Override
   public LiteralDTO[] values() {
     return values;
   }
