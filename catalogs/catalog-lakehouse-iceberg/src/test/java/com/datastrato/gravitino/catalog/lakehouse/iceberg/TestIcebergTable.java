@@ -4,6 +4,7 @@
  */
 package com.datastrato.gravitino.catalog.lakehouse.iceberg;
 
+import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.EMPTY_TRANSFORM;
 import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.bucket;
 import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.day;
 import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.identity;
@@ -22,6 +23,7 @@ import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.NamedReference;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
+import com.datastrato.gravitino.rel.expressions.literals.Literals;
 import com.datastrato.gravitino.rel.expressions.sorts.NullOrdering;
 import com.datastrato.gravitino.rel.expressions.sorts.SortDirection;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
@@ -29,13 +31,16 @@ import com.datastrato.gravitino.rel.expressions.sorts.SortOrders;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.types.Types;
 import com.google.common.collect.Maps;
-import java.io.IOException;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.iceberg.DistributionMode;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -116,7 +121,7 @@ public class TestIcebergTable {
   }
 
   @Test
-  public void testCreateIcebergTable() throws IOException {
+  public void testCreateIcebergTable() {
     String icebergTableName = "test_iceberg_table";
     NameIdentifier tableIdentifier =
         NameIdentifier.of(
@@ -194,6 +199,32 @@ public class TestIcebergTable {
                         Distributions.NONE,
                         sortOrders));
     Assertions.assertTrue(exception.getMessage().contains("Table already exists"));
+
+    IcebergColumn withDefaultValue =
+        new IcebergColumn.Builder()
+            .withName("col")
+            .withType(Types.DateType.get())
+            .withComment(ICEBERG_COMMENT)
+            .withNullable(false)
+            .withDefaultValue(Literals.NULL)
+            .build();
+    exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                icebergCatalog
+                    .asTableCatalog()
+                    .createTable(
+                        tableIdentifier,
+                        new Column[] {withDefaultValue},
+                        ICEBERG_COMMENT,
+                        properties,
+                        EMPTY_TRANSFORM,
+                        Distributions.NONE,
+                        null));
+    Assertions.assertTrue(
+        exception.getMessage().contains("Iceberg does not support column default value"),
+        "The exception message is: " + exception.getMessage());
   }
 
   @Test
@@ -519,6 +550,86 @@ public class TestIcebergTable {
             });
       }
     }
+  }
+
+  @Test
+  public void testTableDistribution() {
+    IcebergColumn col_1 =
+        new IcebergColumn.Builder()
+            .withName("col_1")
+            .withType(Types.LongType.get())
+            .withComment("test")
+            .build();
+    IcebergColumn col_2 =
+        new IcebergColumn.Builder()
+            .withName("col_2")
+            .withType(Types.IntegerType.get())
+            .withComment("test2")
+            .build();
+    List<IcebergColumn> icebergColumns =
+        new ArrayList<IcebergColumn>() {
+          {
+            add(col_1);
+            add(col_2);
+          }
+        };
+    IcebergTable icebergTable =
+        new IcebergTable.Builder()
+            .withName("test_table")
+            .withAuditInfo(
+                new AuditInfo.Builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .withProperties(Maps.newHashMap())
+            .withColumns(icebergColumns.toArray(new IcebergColumn[0]))
+            .withComment("test_table")
+            .build();
+    String none =
+        Assertions.assertDoesNotThrow(() -> icebergTable.transformDistribution(Distributions.NONE));
+    Assertions.assertEquals(none, DistributionMode.NONE.modeName());
+
+    IllegalArgumentException illegalArgumentException =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> icebergTable.transformDistribution(Distributions.HASH));
+    Assertions.assertTrue(
+        StringUtils.contains(
+            illegalArgumentException.getMessage(),
+            "Iceberg's Distribution Mode.HASH is distributed based on partition, but the partition is empty"));
+
+    illegalArgumentException =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> icebergTable.transformDistribution(Distributions.RANGE));
+    Assertions.assertTrue(
+        StringUtils.contains(
+            illegalArgumentException.getMessage(),
+            "Iceberg's Distribution Mode.RANGE is distributed based on sortOrder or partition, but both are empty"));
+
+    IcebergTable newTable =
+        new IcebergTable.Builder()
+            .withName("test_table2")
+            .withAuditInfo(
+                new AuditInfo.Builder().withCreator("test2").withCreateTime(Instant.now()).build())
+            .withProperties(Maps.newHashMap())
+            .withPartitioning(new Transform[] {day("col_1")})
+            .withSortOrders(
+                new SortOrder[] {
+                  SortOrders.of(
+                      NamedReference.field("col_1"),
+                      SortDirection.DESCENDING,
+                      NullOrdering.NULLS_FIRST)
+                })
+            .withColumns(icebergColumns.toArray(new IcebergColumn[0]))
+            .withComment("test_table2")
+            .build();
+    String distributionName =
+        Assertions.assertDoesNotThrow(() -> newTable.transformDistribution(Distributions.NONE));
+    Assertions.assertEquals(distributionName, DistributionMode.NONE.modeName());
+    distributionName =
+        Assertions.assertDoesNotThrow(() -> newTable.transformDistribution(Distributions.HASH));
+    Assertions.assertEquals(distributionName, DistributionMode.HASH.modeName());
+    distributionName =
+        Assertions.assertDoesNotThrow(() -> newTable.transformDistribution(Distributions.RANGE));
+    Assertions.assertEquals(distributionName, DistributionMode.RANGE.modeName());
   }
 
   protected static String genRandomName() {

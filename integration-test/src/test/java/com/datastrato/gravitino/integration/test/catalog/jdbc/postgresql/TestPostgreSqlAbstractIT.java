@@ -22,7 +22,7 @@ public class TestPostgreSqlAbstractIT extends TestJdbcAbstractIT {
   @BeforeAll
   public static void startup() {
     CONTAINER =
-        new PostgreSQLContainer<>(CatalogPostgreSqlIT.POSTGRES_IMAGE)
+        new PostgreSQLContainer<>(CatalogPostgreSqlIT.DEFAULT_POSTGRES_IMAGE)
             .withDatabaseName(TEST_DB_NAME)
             .withUsername("root")
             .withPassword("root");

@@ -4,9 +4,6 @@
  */
 package com.datastrato.gravitino.integration.test.catalog.jdbc.mysql;
 
-import static com.datastrato.gravitino.catalog.mysql.operation.MysqlTableOperations.AUTO_INCREMENT;
-import static com.datastrato.gravitino.catalog.mysql.operation.MysqlTableOperations.PRIMARY_KEY;
-
 import com.datastrato.gravitino.catalog.jdbc.JdbcColumn;
 import com.datastrato.gravitino.catalog.jdbc.JdbcTable;
 import com.datastrato.gravitino.exceptions.NoSuchTableException;
@@ -49,26 +46,9 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
             .withType(INT)
             .withNullable(false)
             .withComment("set primary key")
-            .withProperties(
-                new ArrayList<String>() {
-                  {
-                    add(AUTO_INCREMENT);
-                    add(PRIMARY_KEY);
-                  }
-                })
             .build());
     columns.add(
-        new JdbcColumn.Builder()
-            .withName("col_3")
-            .withType(INT)
-            .withProperties(
-                new ArrayList<String>() {
-                  {
-                    add("UNIQUE KEY");
-                  }
-                })
-            .withNullable(true)
-            .build());
+        new JdbcColumn.Builder().withName("col_3").withType(INT).withNullable(true).build());
     columns.add(
         new JdbcColumn.Builder()
             .withName("col_4")
@@ -207,7 +187,6 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
 
     // After modifying the type, some attributes of the corresponding column are not supported.
     columns.clear();
-    properties.remove(AUTO_INCREMENT);
     col_1 =
         new JdbcColumn.Builder()
             .withName(col_1.name())
@@ -481,6 +460,12 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
         new JdbcColumn.Builder()
             .withName("col_14")
             .withType(Types.BinaryType.get())
+            .withNullable(false)
+            .build());
+    columns.add(
+        new JdbcColumn.Builder()
+            .withName("col_15")
+            .withType(Types.FixedCharType.of(10))
             .withNullable(false)
             .build());
 

@@ -5,12 +5,13 @@
 package com.datastrato.gravitino.dto.rel;
 
 import com.datastrato.gravitino.dto.AuditDTO;
-import com.datastrato.gravitino.dto.rel.partitions.Partitioning;
+import com.datastrato.gravitino.dto.rel.partitioning.Partitioning;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
+import com.datastrato.gravitino.rel.indexes.Index;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import java.util.Map;
@@ -42,6 +43,9 @@ public class TableDTO implements Table {
   @JsonProperty("partitioning")
   private Partitioning[] partitioning;
 
+  @JsonProperty("indexes")
+  private Index[] indexes;
+
   private TableDTO() {}
 
   /**
@@ -53,6 +57,7 @@ public class TableDTO implements Table {
    * @param properties The properties associated with the table.
    * @param audit The audit information for the table.
    * @param partitioning The partitioning of the table.
+   * @param indexes Teh indexes of the table.
    */
   private TableDTO(
       String name,
@@ -62,7 +67,8 @@ public class TableDTO implements Table {
       AuditDTO audit,
       Partitioning[] partitioning,
       DistributionDTO distribution,
-      SortOrderDTO[] sortOrderDTOs) {
+      SortOrderDTO[] sortOrderDTOs,
+      Index[] indexes) {
     this.name = name;
     this.comment = comment;
     this.columns = columns;
@@ -71,6 +77,7 @@ public class TableDTO implements Table {
     this.distribution = distribution;
     this.sortOrders = sortOrderDTOs;
     this.partitioning = partitioning;
+    this.indexes = indexes;
   }
 
   @Override
@@ -113,6 +120,11 @@ public class TableDTO implements Table {
     return distribution;
   }
 
+  @Override
+  public Index[] index() {
+    return indexes;
+  }
+
   /**
    * Creates a new Builder to build a Table DTO.
    *
@@ -136,6 +148,7 @@ public class TableDTO implements Table {
     protected SortOrderDTO[] sortOrderDTOs;
     protected DistributionDTO distributionDTO;
     protected Partitioning[] Partitioning;
+    protected Index[] indexes;
 
     public Builder() {}
 
@@ -209,6 +222,11 @@ public class TableDTO implements Table {
       return (S) this;
     }
 
+    public S withIndex(Index[] indexes) {
+      this.indexes = indexes;
+      return (S) this;
+    }
+
     /**
      * Builds a Table DTO based on the provided builder parameters.
      *
@@ -222,7 +240,15 @@ public class TableDTO implements Table {
       Preconditions.checkArgument(audit != null, "audit cannot be null");
 
       return new TableDTO(
-          name, comment, columns, properties, audit, Partitioning, distributionDTO, sortOrderDTOs);
+          name,
+          comment,
+          columns,
+          properties,
+          audit,
+          Partitioning,
+          distributionDTO,
+          sortOrderDTOs,
+          indexes);
     }
   }
 }

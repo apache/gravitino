@@ -7,16 +7,15 @@ package com.datastrato.gravitino.catalog.mysql.converter;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import com.datastrato.gravitino.rel.types.Type;
 import com.datastrato.gravitino.rel.types.Types;
-import java.util.List;
-import net.sf.jsqlparser.statement.create.table.ColDataType;
+import java.util.Objects;
 
 /** Type converter for MySQL. */
-public class MysqlTypeConverter extends JdbcTypeConverter<ColDataType, String> {
+public class MysqlTypeConverter
+    extends JdbcTypeConverter<MysqlTypeConverter.MysqlTypeBean, String> {
 
   @Override
-  public Type toGravitinoType(ColDataType type) {
-    List<String> arguments = type.getArgumentsStringList();
-    switch (type.getDataType().toLowerCase()) {
+  public Type toGravitinoType(MysqlTypeBean typeBean) {
+    switch (typeBean.getTypeName().toLowerCase()) {
       case "tinyint":
         return Types.ByteType.get();
       case "smallint":
@@ -37,17 +36,17 @@ public class MysqlTypeConverter extends JdbcTypeConverter<ColDataType, String> {
         return Types.TimestampType.withoutTimeZone();
       case "decimal":
         return Types.DecimalType.of(
-            Integer.parseInt(arguments.get(0)), Integer.parseInt(arguments.get(1)));
+            Integer.parseInt(typeBean.getColumnSize()), Integer.parseInt(typeBean.getScale()));
       case "varchar":
-        return Types.VarCharType.of(Integer.parseInt(arguments.get(0)));
+        return Types.VarCharType.of(Integer.parseInt(typeBean.getColumnSize()));
       case "char":
-        return Types.FixedCharType.of(Integer.parseInt(arguments.get(0)));
+        return Types.FixedCharType.of(Integer.parseInt(typeBean.getColumnSize()));
       case "text":
         return Types.StringType.get();
       case "binary":
         return Types.BinaryType.get();
       default:
-        throw new IllegalArgumentException("Not a supported type: " + type);
+        throw new IllegalArgumentException("Not a supported type: " + typeBean.getTypeName());
     }
   }
 
@@ -83,5 +82,54 @@ public class MysqlTypeConverter extends JdbcTypeConverter<ColDataType, String> {
       return type.simpleString();
     }
     throw new IllegalArgumentException("Not a supported type: " + type.toString());
+  }
+
+  public static class MysqlTypeBean {
+    private String typeName;
+    private String columnSize;
+    private String scale;
+
+    public MysqlTypeBean(String typeName) {
+      this.typeName = typeName;
+    }
+
+    public String getTypeName() {
+      return typeName;
+    }
+
+    public void setTypeName(String typeName) {
+      this.typeName = typeName;
+    }
+
+    public String getColumnSize() {
+      return columnSize;
+    }
+
+    public void setColumnSize(String columnSize) {
+      this.columnSize = columnSize;
+    }
+
+    public String getScale() {
+      return scale;
+    }
+
+    public void setScale(String scale) {
+      this.scale = scale;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) return true;
+      if (o == null || getClass() != o.getClass()) return false;
+      MysqlTypeBean typeBean = (MysqlTypeBean) o;
+      return Objects.equals(typeName, typeBean.typeName)
+          && Objects.equals(columnSize, typeBean.columnSize)
+          && Objects.equals(scale, typeBean.scale);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(typeName, columnSize, scale);
+    }
   }
 }

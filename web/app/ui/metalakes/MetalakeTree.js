@@ -23,7 +23,6 @@ import {
   setIntoTreeAction,
   setClickedExpandedNode,
   removeExpandedNode,
-  resetTableData,
   resetTree
 } from '@/lib/store/metalakes'
 
@@ -87,6 +86,7 @@ const StyledTreeItemRoot = styled(TreeItem)(({ theme, level = 0 }) => ({
     backgroundColor: theme.palette.action.hover
   },
   '& .MuiTreeItem-content': {
+    cursor: 'default',
     paddingRight: theme.spacing(3),
     fontWeight: theme.typography.fontWeightMedium
   },
@@ -160,13 +160,11 @@ const MetalakeTree = props => {
   const handleToggle = async (event, nodeIds = []) => {
     nodeIds = Array.from(new Set(nodeIds.flat()))
 
-    const isExpanding = nodeIds.some(nodeId => !store.expendedTreeNode.includes(nodeId))
+    const isExpanding = nodeIds.some(nodeId => !store.expandedTreeNode.includes(nodeId))
 
     if (isExpanding) {
-      nodeIds.forEach(node => {
-        dispatch(setIntoTreeAction({ nodeIds: [node] }))
-      })
-      dispatch(setExpandedTreeNode({ nodeIds }))
+      dispatch(setExpandedTreeNode({ nodeIds: store.clickedExpandedNode.nodeId }))
+      dispatch(setIntoTreeAction({ nodeIds: [store.clickedExpandedNode.nodeId] }))
     } else {
       dispatch(removeExpandedNode(store.clickedExpandedNode.nodeId))
     }
@@ -186,7 +184,7 @@ const MetalakeTree = props => {
     <TreeView
       onNodeToggle={handleToggle}
       onNodeSelect={handleSelect}
-      expanded={store.expendedTreeNode}
+      expanded={store.expandedTreeNode}
       selected={store.selectedTreeNode}
       defaultExpandIcon={
         <Box sx={{ display: 'flex' }}>
@@ -244,7 +242,7 @@ const MetalakeTree = props => {
             )
           })
         ) : (
-          <Box className={`twc-text-center`}>No Data</Box>
+          <Box className={`twc-text-center`}>No Catalogs</Box>
         )
       ) : (
         <Box className={`twc-w-full twc-text-center twc-h-full`}>
