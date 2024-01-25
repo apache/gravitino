@@ -385,6 +385,11 @@ public class GravitinoMetadata implements ConnectorMetadata {
           rightAssignments,
           statistics);
     }
+
+    if (!(left instanceof GravitinoTableHandle) || !(right instanceof GravitinoTableHandle)) {
+      return Optional.empty();
+    }
+
     GravitinoTableHandle gravitinoLeftTableHandle = (GravitinoTableHandle) left;
     GravitinoTableHandle gravitinoRightTableHandle = (GravitinoTableHandle) right;
 

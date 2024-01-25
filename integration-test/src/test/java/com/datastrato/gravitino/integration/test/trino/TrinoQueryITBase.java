@@ -33,7 +33,10 @@ public class TrinoQueryITBase {
 
   // Auto start docker containers and gravitino server
   protected static boolean autoStart = true;
+
+  // Auto start gravitino server
   protected static boolean autoStartGravitino = true;
+
   protected static boolean started = false;
 
   // TODO(yuhui) redo get the configs after we have the Docker image ready for testing.
