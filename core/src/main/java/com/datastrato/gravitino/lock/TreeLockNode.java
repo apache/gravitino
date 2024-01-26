@@ -24,7 +24,6 @@ public class TreeLockNode {
   private final Map<NameIdentifier, TreeLockNode> childMap;
 
   private final AtomicLong referenceCount = new AtomicLong();
-  private long lastAccessTime;
 
   public TreeLockNode(NameIdentifier identifier) {
     this.ident = identifier;
@@ -32,12 +31,22 @@ public class TreeLockNode {
     this.childMap = new ConcurrentHashMap<>();
   }
 
-  public long getLastAccessTime() {
-    return lastAccessTime;
-  }
-
   public NameIdentifier getIdent() {
     return ident;
+  }
+
+  // Why is this method synchronized, please see the comment in the method
+  // LockManager#evictStaleNodes
+  public synchronized void addReference() {
+    referenceCount.getAndIncrement();
+  }
+
+  public void decReference() {
+    referenceCount.getAndDecrement();
+  }
+
+  public long getReferenceCount() {
+    return referenceCount.get();
   }
 
   /**
@@ -71,7 +80,6 @@ public class TreeLockNode {
    * @param lockType The lock type to lock the node.
    */
   public void lock(LockType lockType) {
-    referenceCount.getAndIncrement();
     if (lockType == LockType.READ) {
       readWriteLock.readLock().lock();
     } else {
@@ -93,8 +101,6 @@ public class TreeLockNode {
    * @param lockType The lock type to unlock the node.
    */
   public void unlock(LockType lockType) {
-    referenceCount.getAndDecrement();
-    lastAccessTime = System.currentTimeMillis();
     if (lockType == LockType.READ) {
       readWriteLock.readLock().unlock();
     } else {
@@ -116,7 +122,6 @@ public class TreeLockNode {
    */
   public TreeLockNode getOrCreateChild(NameIdentifier ident) {
     TreeLockNode treeNode = childMap.get(ident);
-    lastAccessTime = System.currentTimeMillis();
     if (treeNode == null) {
       synchronized (this) {
         treeNode = childMap.get(ident);

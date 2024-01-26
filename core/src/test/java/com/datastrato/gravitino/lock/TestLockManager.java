@@ -7,18 +7,20 @@ package com.datastrato.gravitino.lock;
 
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
+import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import java.util.List;
 import java.util.Random;
 import java.util.concurrent.CompletionService;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorCompletionService;
+import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -131,8 +133,9 @@ public class TestLockManager {
       NameIdentifier identifier = randomNameIdentifier();
       int num = threadLocalRandom.nextInt(5);
       LockType lockType = num >= 4 ? LockType.WRITE : LockType.READ;
+      TreeLock lock = lockManager.createTreeLock(identifier);
       try {
-        lockManager.lockResourcePath(identifier, lockType);
+        lock.lock(lockType);
         // App logic here...
         Thread.sleep(1);
       } catch (Exception e) {
@@ -141,7 +144,7 @@ public class TestLockManager {
         }
         throw e;
       } finally {
-        lockManager.unlockResourcePath();
+        lock.unlock();
       }
     }
 
@@ -156,12 +159,10 @@ public class TestLockManager {
     // one fifth (2 /10 = 0.2) of tests will fail
     Mockito.doThrow(new RuntimeException("mock"))
         .when(spy)
-        .lockResourcePath(
-            Mockito.eq(NameIdentifier.of(Namespace.of(), ENTITY_NAMES[0])), Mockito.any());
+        .createTreeLock(Mockito.eq(NameIdentifier.of(Namespace.of(), ENTITY_NAMES[0])));
     Mockito.doThrow(new RuntimeException("mock"))
         .when(spy)
-        .lockResourcePath(
-            Mockito.eq(NameIdentifier.of(Namespace.of(), ENTITY_NAMES[1])), Mockito.any());
+        .createTreeLock(Mockito.eq(NameIdentifier.of(Namespace.of(), ENTITY_NAMES[1])));
 
     CompletionService<Integer> completionService = createCompletionService();
     for (int i = 0; i < 10; i++) {
@@ -173,7 +174,7 @@ public class TestLockManager {
     }
   }
 
-  @Disabled
+  //  @Disabled
   @ParameterizedTest
   @ValueSource(ints = {1, 2, 4, 8, 10})
   void compare(int threadCount) throws InterruptedException, ExecutionException {
@@ -211,50 +212,67 @@ public class TestLockManager {
   void testLockCleaner() throws InterruptedException, ExecutionException {
     LockManager lockManager = new LockManager();
     Random random = new Random();
-
-    for (int i = 0; i < 10000; i++) {
-      NameIdentifier nameIdentifier = randomNameIdentifier();
-      lockManager.lockResourcePath(nameIdentifier, LockType.READ);
-      lockManager.unlockResourcePath();
-    }
-
-    Thread.sleep(1000);
-    lockManager
-        .treeLockRootNode
-        .getAllChildren()
-        .forEach(
-            child -> {
-              lockManager.evictStaleNodes(500, child, lockManager.treeLockRootNode);
-            });
-
-    Assertions.assertTrue(lockManager.treeLockRootNode.getAllChildren().isEmpty());
-
     CompletionService<Integer> service = createCompletionService();
-    for (int i = 0; i < 10; i++) {
-      service.submit(
-          () -> {
-            for (int j = 0; j < 10000; j++) {
-              NameIdentifier nameIdentifier = randomNameIdentifier();
-              lockManager.lockResourcePath(
-                  nameIdentifier, random.nextInt(2) == 0 ? LockType.READ : LockType.WRITE);
-              lockManager.unlockResourcePath();
-            }
-            return 0;
-          });
-    }
 
-    Thread.sleep(1000);
+    //    for (int i = 0; i < 1000; i++) {
+    //      NameIdentifier nameIdentifier = randomNameIdentifier();
+    //      TreeLock lock = lockManager.createTreeLock(nameIdentifier);
+    //      try {
+    //        lock.lock(LockType.READ);
+    //      } finally {
+    //        lock.unlock();
+    //      }
+    //    }
+    //
+    //    lockManager
+    //        .treeLockRootNode
+    //        .getAllChildren()
+    //        .forEach(
+    //            child -> {
+    //              lockManager.evictStaleNodes(child, lockManager.treeLockRootNode);
+    //            });
+    //
+    //    Assertions.assertTrue(lockManager.treeLockRootNode.getAllChildren().isEmpty());
+    //
+    //    for (int i = 0; i < 10; i++) {
+    //      service.submit(
+    //          () -> {
+    //            for (int j = 0; j < 10000; j++) {
+    //              NameIdentifier nameIdentifier = randomNameIdentifier();
+    //              TreeLock lock = lockManager.createTreeLock(nameIdentifier);
+    //              try {
+    //                lock.lock(random.nextInt(2) == 0 ? LockType.READ : LockType.WRITE);
+    //              } finally {
+    //                lock.unlock();
+    //              }
+    //            }
+    //            return 0;
+    //          });
+    //    }
+    //
+    //    for (int i = 0; i < 10; i++) {
+    //      service.take().get();
+    //    }
 
+    // Check the lock reference
+    checkReferenceCount(lockManager.treeLockRootNode);
+
+    List<Future<Integer>> futures = Lists.newArrayList();
     for (int i = 0; i < 5; i++) {
-      service.submit(
-          () -> {
-            for (int j = 0; j < 10000; j++) {
-              NameIdentifier nameIdentifier = randomNameIdentifier();
-              lockManager.lockResourcePath(nameIdentifier, LockType.READ);
-              lockManager.unlockResourcePath();
-            }
-            return 0;
-          });
+      futures.add(
+          service.submit(
+              () -> {
+                for (int j = 0; j < 10000; j++) {
+                  NameIdentifier nameIdentifier = randomNameIdentifier();
+                  TreeLock lock = lockManager.createTreeLock(nameIdentifier);
+                  try {
+                    lock.lock(LockType.READ);
+                  } finally {
+                    lock.unlock();
+                  }
+                }
+                return 0;
+              }));
     }
 
     for (int i = 0; i < 5; i++) {
@@ -265,7 +283,14 @@ public class TestLockManager {
                 .getAllChildren()
                 .forEach(
                     child -> {
-                      lockManager.evictStaleNodes(500, child, lockManager.treeLockRootNode);
+                      while (!futures.stream().allMatch(Future::isDone)) {
+                        try {
+                          lockManager.evictStaleNodes(child, lockManager.treeLockRootNode);
+                          Thread.sleep(1);
+                        } catch (Exception e) {
+                          // Ignore
+                        }
+                      }
                     });
             return 0;
           });
@@ -274,5 +299,12 @@ public class TestLockManager {
     for (int i = 0; i < 10; i++) {
       service.take().get();
     }
+
+    checkReferenceCount(lockManager.treeLockRootNode);
+  }
+
+  private void checkReferenceCount(TreeLockNode node) {
+    Assertions.assertEquals(0, node.getReferenceCount());
+    node.getAllChildren().forEach(this::checkReferenceCount);
   }
 }

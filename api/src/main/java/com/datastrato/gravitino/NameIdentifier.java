@@ -168,7 +168,7 @@ public class NameIdentifier {
 
   private NameIdentifier() {
     this.namespace = Namespace.empty();
-    this.name = "";
+    this.name = ".";
   }
 
   /**
