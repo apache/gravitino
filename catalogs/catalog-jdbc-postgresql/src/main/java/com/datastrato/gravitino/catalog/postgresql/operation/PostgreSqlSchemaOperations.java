@@ -40,7 +40,7 @@ public class PostgreSqlSchemaOperations extends JdbcDatabaseOperations {
           });
 
   private static final String GET_SCHEMA_COMMENT_SQL_FORMAT =
-      "SELECT obj_description('%s'::regnamespace)";
+      "SELECT obj_description('%s'::regnamespace) as comment";
 
   private String database;
 
@@ -150,7 +150,7 @@ public class PostgreSqlSchemaOperations extends JdbcDatabaseOperations {
         connection.prepareStatement(getShowSchemaCommentSql(schema))) {
       try (ResultSet resultSet = preparedStatement.executeQuery()) {
         if (resultSet.next()) {
-          return resultSet.getString(1);
+          return resultSet.getString("comment");
         }
       }
     }
