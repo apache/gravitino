@@ -253,6 +253,10 @@
    Apache Hadoop
    ./dev/docker/hive/hadoop-env.sh
    ./dev/docker/hive/yarn-env.sh
+   ./common/src/main/java/com/datastrato/gravitino/auth/KerberosUtils.java
+   ./server-common/src/main/java/com/datastrato/gravitino/server/auth/KerberosAuthenticator.java
+   ./server-common/src/test/java/com/datastrato/gravitino/server/auth/KerberosTestUtils.java
+   ./server-common/src/main/java/com/datastrato/gravitino/server/auth/KerberosServerUtils.java
 
    Apache Kafka
    ./core/src/main/java/com/datastrato/gravitino/utils/Bytes.java

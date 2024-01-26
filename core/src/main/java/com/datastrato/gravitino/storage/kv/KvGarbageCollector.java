@@ -70,8 +70,7 @@ public final class KvGarbageCollector implements Closeable {
     long dateTimeLineMinute = config.get(KV_DELETE_AFTER_TIME) / 1000 / 60;
 
     // We will collect garbage every 10 minutes at least. If the dateTimeLineMinute is larger than
-    // 100
-    // minutes, we would collect garbage every dateTimeLineMinute/10 minutes.
+    // 100 minutes, we would collect garbage every dateTimeLineMinute/10 minutes.
     long frequency = Math.max(dateTimeLineMinute / 10, 10);
     garbageCollectorPool.scheduleAtFixedRate(this::collectAndClean, 5, frequency, TimeUnit.MINUTES);
   }
