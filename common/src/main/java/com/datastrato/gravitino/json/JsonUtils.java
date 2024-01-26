@@ -1026,6 +1026,15 @@ public class JsonUtils {
       String type = getString(PARTITION_TYPE, node);
       switch (PartitionDTO.Type.valueOf(type.toUpperCase())) {
         case IDENTITY:
+          Preconditions.checkArgument(
+              node.has(FIELD_NAMES) && node.get(FIELD_NAMES).isArray(),
+              "Identity partition must have array of fieldNames, but found: %s",
+              node);
+          Preconditions.checkArgument(
+              node.has(IDENTITY_PARTITION_VALUES) && node.get(IDENTITY_PARTITION_VALUES).isArray(),
+              "Identity partition must have array of values, but found: %s",
+              node);
+
           List<String[]> fieldNames = Lists.newArrayList();
           node.get(FIELD_NAMES).forEach(field -> fieldNames.add(getStringArray((ArrayNode) field)));
           List<LiteralDTO> values = Lists.newArrayList();
@@ -1037,7 +1046,15 @@ public class JsonUtils {
               .withValues(values.toArray(new LiteralDTO[0]))
               .withProperties(getStringMapOrNull(PARTITION_PROPERTIES, node))
               .build();
+
         case LIST:
+          Preconditions.checkArgument(
+              node.has(PARTITION_NAME), "List partition must have name, but found: %s", node);
+          Preconditions.checkArgument(
+              node.has(LIST_PARTITION_LISTS) && node.get(LIST_PARTITION_LISTS).isArray(),
+              "List partition must have array of lists, but found: %s",
+              node);
+
           List<LiteralDTO[]> lists = Lists.newArrayList();
           node.get(LIST_PARTITION_LISTS)
               .forEach(
@@ -1046,12 +1063,25 @@ public class JsonUtils {
                     list.forEach(literal -> literals.add((LiteralDTO) readFunctionArg(literal)));
                     lists.add(literals.toArray(new LiteralDTO[0]));
                   });
+
           return ListPartitionDTO.builder()
               .withName(getStringOrNull(PARTITION_NAME, node))
               .withLists(lists.toArray(new LiteralDTO[0][0]))
               .withProperties(getStringMapOrNull(PARTITION_PROPERTIES, node))
               .build();
+
         case RANGE:
+          Preconditions.checkArgument(
+              node.has(PARTITION_NAME), "Range partition must have name, but found: %s", node);
+          Preconditions.checkArgument(
+              node.has(RANGE_PARTITION_UPPER),
+              "Range partition must have upper, but found: %s",
+              node);
+          Preconditions.checkArgument(
+              node.has(RANGE_PARTITION_LOWER),
+              "Range partition must have lower, but found: %s",
+              node);
+
           LiteralDTO upper = (LiteralDTO) readFunctionArg(node.get(RANGE_PARTITION_UPPER));
           LiteralDTO lower = (LiteralDTO) readFunctionArg(node.get(RANGE_PARTITION_LOWER));
           return RangePartitionDTO.builder()
@@ -1060,6 +1090,7 @@ public class JsonUtils {
               .withLower(lower)
               .withProperties(getStringMapOrNull(PARTITION_PROPERTIES, node))
               .build();
+
         default:
           throw new IOException("Unknown partition type: " + type);
       }

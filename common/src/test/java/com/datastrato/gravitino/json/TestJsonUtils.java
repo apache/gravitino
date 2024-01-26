@@ -308,4 +308,85 @@ public class TestJsonUtils {
         objectMapper.readValue(expected, ListPartitionDTO.class),
         objectMapper.readValue(jsonValue, ListPartitionDTO.class));
   }
+
+  @Test
+  void testPartitionDTOSerdeException() {
+    String illegalJson1 =
+        "{\n"
+            + "  \"type\": \"identity\",\n"
+            + "  \"fieldNames\": [\n"
+            + "    [\n"
+            + "      \"dt\"\n"
+            + "    ],\n"
+            + "    [\n"
+            + "      \"country\"\n"
+            + "    ]\n"
+            + "  ]\n"
+            + "}";
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> objectMapper.readValue(illegalJson1, PartitionDTO.class));
+    Assertions.assertTrue(
+        exception.getMessage().contains("Identity partition must have array of values"),
+        exception.getMessage());
+
+    String illegalJson2 =
+        "{\n"
+            + "  \"type\": \"list\",\n"
+            + "  \"lists\": [\n"
+            + "    [\n"
+            + "      {\n"
+            + "        \"type\": \"literal\",\n"
+            + "        \"dataType\": \"date\",\n"
+            + "        \"value\": \"2022-04-01\"\n"
+            + "      },\n"
+            + "      {\n"
+            + "        \"type\": \"literal\",\n"
+            + "        \"dataType\": \"string\",\n"
+            + "        \"value\": \"Los Angeles\"\n"
+            + "      }\n"
+            + "    ],\n"
+            + "    [\n"
+            + "      {\n"
+            + "        \"type\": \"literal\",\n"
+            + "        \"dataType\": \"date\",\n"
+            + "        \"value\": \"2022-04-01\"\n"
+            + "      },\n"
+            + "      {\n"
+            + "        \"type\": \"literal\",\n"
+            + "        \"dataType\": \"string\",\n"
+            + "        \"value\": \"San Francisco\"\n"
+            + "      }\n"
+            + "    ]\n"
+            + "  ]\n"
+            + "}";
+    exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> objectMapper.readValue(illegalJson2, PartitionDTO.class));
+    Assertions.assertTrue(
+        exception.getMessage().contains("List partition must have name"), exception.getMessage());
+
+    String illegalJson3 =
+        "{\n"
+            + "  \"type\": \"range\",\n"
+            + "  \"upper\": {\n"
+            + "    \"type\": \"literal\",\n"
+            + "    \"dataType\": \"null\",\n"
+            + "    \"value\": \"null\"\n"
+            + "  },\n"
+            + "  \"lower\": {\n"
+            + "    \"type\": \"literal\",\n"
+            + "    \"dataType\": \"integer\",\n"
+            + "    \"value\": \"6\"\n"
+            + "  }\n"
+            + "}";
+    exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> objectMapper.readValue(illegalJson3, PartitionDTO.class));
+    Assertions.assertTrue(
+        exception.getMessage().contains("Range partition must have name"), exception.getMessage());
+  }
 }
