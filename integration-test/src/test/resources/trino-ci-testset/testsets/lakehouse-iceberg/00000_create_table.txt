@@ -64,7 +64,7 @@ CREATE TABLE
 )
 COMMENT ''
 WITH (
-   location = 'hdfs://127.0.0.1:9000/user/iceberg/warehouse/TrinoQueryIT/gt_iceberg/gt_db2/tb06'
+   location = 'hdfs://%/user/iceberg/warehouse/TrinoQueryIT/gt_iceberg/gt_db2/tb06'
 )"
 
 DROP TABLE
