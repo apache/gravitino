@@ -30,7 +30,6 @@ dependencies {
   implementation(project(":core"))
   implementation(project(":server-common"))
 
-
   implementation(libs.hive2.metastore) {
     exclude("co.cask.tephra")
     exclude("com.github.spotbugs")
