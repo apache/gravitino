@@ -8,12 +8,12 @@ import com.datastrato.gravitino.Auditable;
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.Field;
 import com.datastrato.gravitino.HasIdentifier;
+import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.file.Fileset;
 import com.google.common.collect.Maps;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Objects;
-import javax.annotation.Nullable;
 import lombok.ToString;
 
 @ToString
@@ -28,7 +28,7 @@ public class FilesetEntity implements Entity, Auditable, HasIdentifier {
   public static final Field TYPE =
       Field.required("type", Fileset.Type.class, "The type of the fileset entity.");
   public static final Field STORAGE_LOCATION =
-      Field.optional(
+      Field.required(
           "storage_location", String.class, "The storage location of the fileset entity.");
   public static final Field AUDIT_INFO =
       Field.required("audit_info", AuditInfo.class, "The audit details of the fileset entity.");
@@ -39,11 +39,13 @@ public class FilesetEntity implements Entity, Auditable, HasIdentifier {
 
   private String name;
 
+  private Namespace namespace;
+
   private String comment;
 
   private Fileset.Type type;
 
-  @Nullable private String storageLocation;
+  private String storageLocation;
 
   private AuditInfo auditInfo;
 
@@ -78,6 +80,16 @@ public class FilesetEntity implements Entity, Auditable, HasIdentifier {
   @Override
   public String name() {
     return name;
+  }
+
+  /**
+   * Returns the namespace of the fileset entity.
+   *
+   * @return The namespace of the fileset entity.
+   */
+  @Override
+  public Namespace namespace() {
+    return namespace;
   }
 
   /**
@@ -197,6 +209,17 @@ public class FilesetEntity implements Entity, Auditable, HasIdentifier {
     }
 
     /**
+     * Sets the namespace of the fileset entity.
+     *
+     * @param namespace The namespace of the fileset entity.
+     * @return The builder instance.
+     */
+    public Builder withNamespace(Namespace namespace) {
+      fileset.namespace = namespace;
+      return this;
+    }
+
+    /**
      * Sets the comment of the fileset entity.
      *
      * @param comment The comment of the fileset entity.
@@ -260,11 +283,6 @@ public class FilesetEntity implements Entity, Auditable, HasIdentifier {
      */
     public FilesetEntity build() {
       fileset.validate();
-
-      if (fileset.type == Fileset.Type.EXTERNAL && fileset.storageLocation == null) {
-        throw new IllegalArgumentException("Storage location is required for EXTERNAL fileset.");
-      }
-
       return fileset;
     }
   }

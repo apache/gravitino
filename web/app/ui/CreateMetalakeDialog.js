@@ -176,7 +176,7 @@ const CreateMetalakeDialog = props => {
           <IconButton
             className={'twc-absolute twc-right-[1rem] twc-top-[1rem]'}
             size='small'
-            onClick={() => setOpen(false)}
+            onClick={() => handleClose()}
           >
             <Icon icon='bx:x' />
           </IconButton>
