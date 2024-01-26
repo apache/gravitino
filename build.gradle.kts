@@ -127,6 +127,37 @@ allprojects {
       }
     }
   }
+
+  apply(plugin = "jacoco")
+  tasks.configureEach<Test> {
+    testLogging {
+      exceptionFormat = TestExceptionFormat.FULL
+      showExceptions = true
+      showCauses = true
+      showStackTraces = true
+    }
+    reports.html.outputLocation.set(file("${rootProject.projectDir}/build/test_reports/"))
+    val skipTests = project.hasProperty("skipTests")
+    if (!skipTests) {
+      if (project.name == "trino-connector") {
+        useTestNG()
+        maxHeapSize = "2G"
+      } else {
+        useJUnitPlatform()
+      }
+
+      jvmArgs(project.property("extraJvmArgs") as List<*>)
+      finalizedBy(tasks.getByName("jacocoTestReport"))
+    }
+  }
+
+  tasks.withType<JacocoReport> {
+    reports {
+      csv.required.set(true)
+      xml.required.set(true)
+      html.required.set(true)
+    }
+  }
 }
 
 nexusPublishing {
@@ -155,7 +186,6 @@ dependencies {
 }
 
 subprojects {
-  apply(plugin = "jacoco")
   apply(plugin = "maven-publish")
   apply(plugin = "java")
 
@@ -259,36 +289,6 @@ subprojects {
     val gpgKeyPassword = System.getenv("GPG_PASSPHRASE")
     useInMemoryPgpKeys(gpgId, gpgSecretKey, gpgKeyPassword)
     sign(publishing.publications)
-  }
-
-  tasks.configureEach<Test> {
-    testLogging {
-      exceptionFormat = TestExceptionFormat.FULL
-      showExceptions = true
-      showCauses = true
-      showStackTraces = true
-    }
-    reports.html.outputLocation.set(file("${rootProject.projectDir}/build/reports/"))
-    val skipTests = project.hasProperty("skipTests")
-    if (!skipTests) {
-      if (project.name == "trino-connector") {
-        useTestNG()
-        maxHeapSize = "2G"
-      } else {
-        useJUnitPlatform()
-      }
-
-      jvmArgs(project.property("extraJvmArgs") as List<*>)
-      finalizedBy(tasks.getByName("jacocoTestReport"))
-    }
-  }
-
-  tasks.withType<JacocoReport> {
-    reports {
-      csv.required.set(true)
-      xml.required.set(true)
-      html.required.set(true)
-    }
   }
 
   tasks.register("allDeps", DependencyReportTask::class)
