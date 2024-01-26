@@ -107,7 +107,7 @@ public class MetalakeManager implements SupportsMetalakes {
             .withProperties(StringIdentifier.newPropertiesWithId(stringId, properties))
             .withVersion(SchemaVersion.V_0_1)
             .withAuditInfo(
-                 AuditInfo.builder()
+                AuditInfo.builder()
                     .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
                     .withCreateTime(Instant.now())
                     .build())
@@ -153,7 +153,7 @@ public class MetalakeManager implements SupportsMetalakes {
                     .withVersion(metalake.getVersion());
 
             AuditInfo newInfo =
-                 AuditInfo.builder()
+                AuditInfo.builder()
                     .withCreator(metalake.auditInfo().creator())
                     .withCreateTime(metalake.auditInfo().createTime())
                     .withLastModifier(

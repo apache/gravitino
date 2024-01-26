@@ -18,7 +18,7 @@ public class TestEntity {
 
   private final SchemaVersion version = SchemaVersion.V_0_1;
   private final AuditInfo auditInfo =
-       AuditInfo.builder().withCreator("test").withCreateTime(now).build();
+      AuditInfo.builder().withCreator("test").withCreateTime(now).build();
 
   // Metalake test data
   private final Long metalakeId = 1L;

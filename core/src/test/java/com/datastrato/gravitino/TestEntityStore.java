@@ -144,7 +144,7 @@ public class TestEntityStore {
   @Test
   public void testEntityStoreAndRetrieve() throws Exception {
     AuditInfo auditInfo =
-         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
 
     BaseMetalake metalake =
         new BaseMetalake.Builder()

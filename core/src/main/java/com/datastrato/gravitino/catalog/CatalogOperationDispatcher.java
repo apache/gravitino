@@ -161,7 +161,7 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
             .withName(ident.name())
             .withNamespace(ident.namespace())
             .withAuditInfo(
-                 AuditInfo.builder()
+                AuditInfo.builder()
                     .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
                     .withCreateTime(Instant.now())
                     .build())
@@ -285,7 +285,7 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
                             .withName(schemaEntity.name())
                             .withNamespace(ident.namespace())
                             .withAuditInfo(
-                                 AuditInfo.builder()
+                                AuditInfo.builder()
                                     .withCreator(schemaEntity.auditInfo().creator())
                                     .withCreateTime(schemaEntity.auditInfo().createTime())
                                     .withLastModifier(
@@ -481,7 +481,7 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
             .withName(ident.name())
             .withNamespace(ident.namespace())
             .withAuditInfo(
-                 AuditInfo.builder()
+                AuditInfo.builder()
                     .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
                     .withCreateTime(Instant.now())
                     .build())
@@ -561,7 +561,7 @@ public class CatalogOperationDispatcher implements TableCatalog, SupportsSchemas
                           .withName(newName)
                           .withNamespace(ident.namespace())
                           .withAuditInfo(
-                               AuditInfo.builder()
+                              AuditInfo.builder()
                                   .withCreator(tableEntity.auditInfo().creator())
                                   .withCreateTime(tableEntity.auditInfo().createTime())
                                   .withLastModifier(PrincipalUtils.getCurrentPrincipal().getName())

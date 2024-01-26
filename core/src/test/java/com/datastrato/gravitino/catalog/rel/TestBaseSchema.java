@@ -38,7 +38,7 @@ public class TestBaseSchema {
     properties.put("key1", "value1");
     properties.put("key2", "value2");
     AuditInfo auditInfo =
-         AuditInfo.builder().withCreator("Justin").withCreateTime(Instant.now()).build();
+        AuditInfo.builder().withCreator("Justin").withCreateTime(Instant.now()).build();
 
     BaseSchema schema =
         new BaseSchemaExtension.Builder()

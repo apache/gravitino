@@ -93,7 +93,7 @@ public final class EntityCombinedTable implements Table {
   @Override
   public Audit auditInfo() {
     AuditInfo mergedAudit =
-         AuditInfo.builder()
+        AuditInfo.builder()
             .withCreator(table.auditInfo().creator())
             .withCreateTime(table.auditInfo().createTime())
             .withLastModifier(table.auditInfo().lastModifier())
