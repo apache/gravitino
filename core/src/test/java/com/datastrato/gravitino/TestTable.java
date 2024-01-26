@@ -4,11 +4,17 @@
  */
 package com.datastrato.gravitino;
 
+import com.datastrato.gravitino.catalog.TableOperations;
 import com.datastrato.gravitino.catalog.rel.BaseTable;
 import lombok.EqualsAndHashCode;
 
 @EqualsAndHashCode(callSuper = true)
 public class TestTable extends BaseTable {
+
+  @Override
+  protected TableOperations newOps() {
+    return null;
+  }
 
   public static class Builder extends BaseTable.BaseTableBuilder<Builder, TestTable> {
 
