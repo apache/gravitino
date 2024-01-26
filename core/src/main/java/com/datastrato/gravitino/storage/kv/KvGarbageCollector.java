@@ -177,7 +177,7 @@ public final class KvGarbageCollector implements Closeable {
         if (null == TransactionalKvBackendImpl.getRealValue(rawValue)) {
           LogHelper logHelper = decodeKey(key, transactionId);
           LOG.info(
-              "Physically delete key that has marked deleted:name identity: '{}', entity type: '{}', createTime: '{}({})', key: '{}'",
+              "Physically delete key that has marked deleted: name identifier: '{}', entity type: '{}', createTime: '{}({})', key: '{}'",
               logHelper.identifier,
               logHelper.type,
               logHelper.createTimeAsString,
@@ -206,7 +206,7 @@ public final class KvGarbageCollector implements Closeable {
           byte[] newVersionKey = newVersionOfKey.get(0).getKey();
           LogHelper newVersionLogHelper = decodeKey(newVersionKey);
           LOG.info(
-              "Physically delete key that has newer version: name identity: '{}', entity type: '{}', createTime: '{}({})', newVersion createTime: '{}({})',"
+              "Physically delete key that has newer version: name identifier: '{}', entity type: '{}', createTime: '{}({})', newVersion createTime: '{}({})',"
                   + " key: '{}', newVersion key: '{}'",
               logHelper.identifier,
               logHelper.type,
