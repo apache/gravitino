@@ -255,3 +255,7 @@ components:
       type: http
       scheme: basic
 
+    KerberosAuth:
+      type: http
+      scheme: negotiate
+

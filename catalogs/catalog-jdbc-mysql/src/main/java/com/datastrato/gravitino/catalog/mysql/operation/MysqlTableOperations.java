@@ -4,6 +4,9 @@
  */
 package com.datastrato.gravitino.catalog.mysql.operation;
 
+import static com.datastrato.gravitino.catalog.mysql.MysqlTablePropertiesMetadata.MYSQL_AUTO_INCREMENT_OFFSET_KEY;
+import static com.datastrato.gravitino.catalog.mysql.MysqlTablePropertiesMetadata.MYSQL_ENGINE_KEY;
+
 import com.datastrato.gravitino.StringIdentifier;
 import com.datastrato.gravitino.catalog.jdbc.JdbcColumn;
 import com.datastrato.gravitino.catalog.jdbc.JdbcTable;
@@ -18,14 +21,17 @@ import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.ArrayUtils;
@@ -48,7 +54,6 @@ public class MysqlTableOperations extends JdbcTableOperations {
         throw new NoSuchTableException(
             String.format("Table %s does not exist in %s.", tableName, databaseName));
       }
-      String comment = table.getString("REMARKS");
 
       // 2.Get column information
       ResultSet columns = metaData.getColumns(databaseName, null, tableName, null);
@@ -72,15 +77,61 @@ public class MysqlTableOperations extends JdbcTableOperations {
                 .build());
       }
 
+      // 3.Load table properties
+      Map<String, String> tableProperties = loadTablePropertiesFromSql(connection, tableName);
+
+      String comment = table.getString("REMARKS");
+      if (StringUtils.isEmpty(comment)) {
+        // In Mysql version 5.7, the comment field value cannot be obtained in the driver API.
+        LOG.warn("Not found comment in mysql driver api. Will try to get comment from sql");
+        comment = tableProperties.getOrDefault(COMMENT, comment);
+      }
+
       return new JdbcTable.Builder()
           .withName(tableName)
           .withColumns(jdbcColumns.toArray(new JdbcColumn[0]))
           .withComment(comment)
-          .withProperties(Collections.emptyMap())
+          .withProperties(
+              Collections.unmodifiableMap(
+                  new HashMap<String, String>() {
+                    {
+                      put(MYSQL_ENGINE_KEY, tableProperties.get(MYSQL_ENGINE_KEY));
+                      String autoIncrement = tableProperties.get(MYSQL_AUTO_INCREMENT_OFFSET_KEY);
+                      if (StringUtils.isNotEmpty(autoIncrement)) {
+                        put(MYSQL_AUTO_INCREMENT_OFFSET_KEY, autoIncrement);
+                      }
+                    }
+                  }))
           .withAuditInfo(AuditInfo.EMPTY)
           .build();
     } catch (SQLException e) {
       throw exceptionMapper.toGravitinoException(e);
+    }
+  }
+
+  private Map<String, String> loadTablePropertiesFromSql(Connection connection, String tableName)
+      throws SQLException {
+    try (PreparedStatement statement = connection.prepareStatement("SHOW TABLE STATUS LIKE ?")) {
+      statement.setString(1, tableName);
+      try (ResultSet resultSet = statement.executeQuery()) {
+        if (!resultSet.next() || !tableName.equals(resultSet.getString("NAME"))) {
+          throw new NoSuchTableException(
+              String.format("Table %s does not exist in %s.", tableName, connection.getCatalog()));
+        }
+        return Collections.unmodifiableMap(
+            new HashMap<String, String>() {
+              {
+                // It is not possible to get all column assembly returns here, because in version
+                // 5.7, some columns exist in metadata but get will report an error that they do not
+                // exist, such as: TABLE_NAME
+                put(COMMENT, resultSet.getString(COMMENT));
+                put(MYSQL_ENGINE_KEY, resultSet.getString(MYSQL_ENGINE_KEY));
+                put(
+                    MYSQL_AUTO_INCREMENT_OFFSET_KEY,
+                    resultSet.getString(MYSQL_AUTO_INCREMENT_OFFSET_KEY));
+              }
+            });
+      }
     }
   }
 
@@ -151,24 +202,22 @@ public class MysqlTableOperations extends JdbcTableOperations {
       }
     }
     sqlBuilder.append("\n)");
-    // Add table properties if any
-    if (MapUtils.isNotEmpty(properties)) {
-      // TODO #804 Properties will be unified in the future.
-      throw new UnsupportedOperationException("Properties are not supported yet");
-      //      StringJoiner joiner = new StringJoiner(SPACE + SPACE);
-      //      for (Map.Entry<String, String> entry : properties.entrySet()) {
-      //        joiner.add(entry.getKey() + "=" + entry.getValue());
-      //      }
-      //      sqlBuilder.append(joiner);
-    }
 
     // Add table comment if specified
     if (StringUtils.isNotEmpty(comment)) {
       sqlBuilder.append(" COMMENT='").append(comment).append("'");
     }
 
+    // Add table properties if any
+    if (MapUtils.isNotEmpty(properties)) {
+      sqlBuilder.append(
+          properties.entrySet().stream()
+              .map(entry -> String.format("%s = %s", entry.getKey(), entry.getValue()))
+              .collect(Collectors.joining(",\n", "\n", "")));
+    }
+
     // Return the generated SQL statement
-    String result = sqlBuilder.toString();
+    String result = sqlBuilder.append(";").toString();
 
     LOG.info("Generated create table:{} sql: {}", tableName, result);
     return result;
@@ -187,13 +236,13 @@ public class MysqlTableOperations extends JdbcTableOperations {
 
   @Override
   protected String generateDropTableSql(String tableName) {
-    throw new UnsupportedOperationException(
-        "MySQL does not support drop operation in Gravitino, please use purge operation");
+    return "DROP TABLE " + tableName;
   }
 
   @Override
   protected String generatePurgeTableSql(String tableName) {
-    return "DROP TABLE " + tableName;
+    throw new UnsupportedOperationException(
+        "MySQL does not support purge table in Gravitino, please use drop table");
   }
 
   @Override
@@ -271,6 +320,10 @@ public class MysqlTableOperations extends JdbcTableOperations {
       alterSql.add("COMMENT '" + newComment + "'");
     }
 
+    if (!setProperties.isEmpty()) {
+      alterSql.add(generateTableProperties(setProperties));
+    }
+
     if (CollectionUtils.isEmpty(alterSql)) {
       return "";
     }
@@ -301,13 +354,11 @@ public class MysqlTableOperations extends JdbcTableOperations {
   }
 
   private String generateTableProperties(List<TableChange.SetProperty> setProperties) {
-    // TODO #804 Properties will be unified in the future.
-    //    return setProperties.stream()
-    //        .map(
-    //            setProperty ->
-    //                String.format("%s = %s", setProperty.getProperty(), setProperty.getValue()))
-    //        .collect(Collectors.joining(",\n"));
-    return "";
+    return setProperties.stream()
+        .map(
+            setProperty ->
+                String.format("%s = %s", setProperty.getProperty(), setProperty.getValue()))
+        .collect(Collectors.joining(",\n"));
   }
 
   private JdbcTable getOrCreateTable(

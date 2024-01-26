@@ -17,7 +17,6 @@ dependencies {
   implementation(project(":catalogs:catalog-jdbc-postgresql"))
   implementation(project(":catalogs:catalog-lakehouse-iceberg"))
   implementation(project(":core"))
-  
 }
 
 tasks.withType<ShadowJar>(ShadowJar::class.java) {

@@ -4,8 +4,12 @@
  */
 package com.datastrato.gravitino.integration.test.catalog.jdbc.mysql;
 
+import static com.datastrato.gravitino.catalog.mysql.MysqlTablePropertiesMetadata.MYSQL_AUTO_INCREMENT_OFFSET_KEY;
+import static com.datastrato.gravitino.catalog.mysql.MysqlTablePropertiesMetadata.MYSQL_ENGINE_KEY;
+
 import com.datastrato.gravitino.catalog.jdbc.JdbcColumn;
 import com.datastrato.gravitino.catalog.jdbc.JdbcTable;
+import com.datastrato.gravitino.exceptions.GravitinoRuntimeException;
 import com.datastrato.gravitino.exceptions.NoSuchTableException;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
 import com.datastrato.gravitino.rel.TableChange;
@@ -18,6 +22,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang.math.RandomUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -58,9 +63,8 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
             .withNullable(false)
             .build());
     Map<String, String> properties = new HashMap<>();
-    // TODO #804 Properties will be unified in the future.
-    //    properties.put("ENGINE", "InnoDB");
-    //    properties.put(AUTO_INCREMENT, "10");
+    properties.put(MYSQL_ENGINE_KEY, "InnoDB");
+    properties.put(MYSQL_AUTO_INCREMENT_OFFSET_KEY, "10");
     // create table
     TABLE_OPERATIONS.create(
         TEST_DB_NAME,
@@ -98,7 +102,9 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
             new String[] {newColumn.name()},
             newColumn.dataType(),
             newColumn.comment(),
-            TableChange.ColumnPosition.after("col_1")));
+            TableChange.ColumnPosition.after("col_1")),
+        TableChange.setProperty(MYSQL_ENGINE_KEY, "MyISAM"));
+    properties.put(MYSQL_ENGINE_KEY, "MyISAM");
     load = TABLE_OPERATIONS.load(TEST_DB_NAME, newName);
     List<JdbcColumn> alterColumns =
         new ArrayList<JdbcColumn>() {
@@ -111,6 +117,17 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
           }
         };
     assertionsTableInfo(newName, tableComment, alterColumns, properties, load);
+
+    // Detect unsupported properties
+    GravitinoRuntimeException gravitinoRuntimeException =
+        Assertions.assertThrows(
+            GravitinoRuntimeException.class,
+            () ->
+                TABLE_OPERATIONS.alterTable(
+                    TEST_DB_NAME, newName, TableChange.setProperty(MYSQL_ENGINE_KEY, "ABC")));
+    Assertions.assertTrue(
+        StringUtils.contains(
+            gravitinoRuntimeException.getMessage(), "Unknown storage engine 'ABC'"));
 
     // delete column
     TABLE_OPERATIONS.alterTable(
@@ -137,9 +154,9 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
 
     TABLE_OPERATIONS.alterTable(
         TEST_DB_NAME, newName, TableChange.deleteColumn(new String[] {newColumn.name()}, true));
-    Assertions.assertDoesNotThrow(() -> TABLE_OPERATIONS.purge(TEST_DB_NAME, newName));
+    Assertions.assertDoesNotThrow(() -> TABLE_OPERATIONS.drop(TEST_DB_NAME, newName));
     Assertions.assertThrows(
-        NoSuchTableException.class, () -> TABLE_OPERATIONS.purge(TEST_DB_NAME, newName));
+        NoSuchTableException.class, () -> TABLE_OPERATIONS.drop(TEST_DB_NAME, newName));
   }
 
   @Test
@@ -570,5 +587,26 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
 
     tables = TABLE_OPERATIONS.listTables(TEST_DB_NAME);
     Assertions.assertFalse(tables.contains(test_table_2));
+  }
+
+  @Test
+  public void testLoadTableDefaultProperties() {
+    String test_table_1 = GravitinoITUtils.genRandomName("properties_table_");
+    TABLE_OPERATIONS.create(
+        TEST_DB_NAME,
+        test_table_1,
+        new JdbcColumn[] {
+          new JdbcColumn.Builder()
+              .withName("col_1")
+              .withType(Types.DecimalType.of(10, 2))
+              .withComment("test_decimal")
+              .withNullable(false)
+              .build()
+        },
+        "test_comment",
+        null,
+        null);
+    JdbcTable load = TABLE_OPERATIONS.load(TEST_DB_NAME, test_table_1);
+    Assertions.assertEquals("InnoDB", load.properties().get(MYSQL_ENGINE_KEY));
   }
 }
