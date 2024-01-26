@@ -867,12 +867,10 @@ tableCatalog.purgeTable(NameIdentifier.of("metalake", "catalog", "schema", "tabl
 
 There are two ways to remove a table: `dropTable` and `purgeTable`: 
 
-* `dropTable`  removes both the metadata and data of the table. If the catalog supports recycling, such as Hive catalog, the data will be moved to the trash.
-* `purgeTable` if the catalog support recycling, removes both the metadata and data without moving the data to the trash. If the catalog doesn't support recycling, an UnsupportedException is thrown.
+* `dropTable`  removes both the metadata and the directory associated with the table from the file system if the table is not an external table. In case of an external table, only the associated metadata is removed.
+* `purgeTable` completely removes both the metadata and the directory associated with the table and skipping trash, if the table is an external table or the catalogs don't support purge table, `UnsupportedOperationException` is thrown.
 
-Hive catalog and lakehouse-iceberg catalog supports recycling while mysql-jdbc and postgre-jdbc catalog doesn't supports.
-
-The external table only support `dropTable`.
+Hive catalog and lakehouse-iceberg catalog supports `purgeTable` while jdbc-mysql and jdbc-postgresql catalog doesn't support.
 
 ### List all tables under a schema
 
