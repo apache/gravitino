@@ -4,6 +4,7 @@
  */
 package com.datastrato.gravitino.integration.test.catalog.jdbc.mysql;
 
+import static com.datastrato.gravitino.catalog.mysql.MysqlTablePropertiesMetadata.GRAVITINO_ENGINE_KEY;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.datastrato.gravitino.Catalog;
@@ -201,6 +202,7 @@ public class CatalogMysqlIT extends AbstractIT {
 
   private Map<String, String> createProperties() {
     Map<String, String> properties = Maps.newHashMap();
+    properties.put(GRAVITINO_ENGINE_KEY, "InnoDB");
     return properties;
   }
 
