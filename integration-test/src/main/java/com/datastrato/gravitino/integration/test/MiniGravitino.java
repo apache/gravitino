@@ -113,7 +113,7 @@ public class MiniGravitino {
                       ITUtils.joinPath(mockConfDir.getAbsolutePath(), "gravitino.conf")
                     });
               } catch (Exception e) {
-                LOG.error("Exception in startup MiniGravitino Server. ", e);
+                LOG.error("Exception in startup MiniGravitino Server ", e);
                 throw new RuntimeException(e);
               }
             });

@@ -440,6 +440,9 @@ public class KvEntityStore implements EntityStore {
   private StorageLayoutVersion initStorageVersionInfo() {
     byte[] bytes;
     try {
+
+      // For test
+      System.out.println("xxxxx");
       bytes = backend.get(LAYOUT_VERSION_KEY);
       if (bytes == null) {
         // If the layout version is not set, we will set it to the default version.
