@@ -13,6 +13,8 @@ import com.datastrato.gravitino.catalog.jdbc.JdbcTablePropertiesMetadata;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.commons.collections4.BidiMap;
+import org.apache.commons.collections4.bidimap.TreeBidiMap;
 
 public class MysqlTablePropertiesMetadata extends JdbcTablePropertiesMetadata {
   public static final String GRAVITINO_ENGINE_KEY = "engine";
@@ -21,23 +23,13 @@ public class MysqlTablePropertiesMetadata extends JdbcTablePropertiesMetadata {
   public static final String MYSQL_AUTO_INCREMENT_OFFSET_KEY = "AUTO_INCREMENT";
   private static final Map<String, PropertyEntry<?>> PROPERTIES_METADATA;
 
-  public static final Map<String, String> GRAVITINO_CONFIG_TO_MYSQL =
-      Collections.unmodifiableMap(
-          new HashMap<String, String>() {
-            {
-              put(GRAVITINO_ENGINE_KEY, MYSQL_ENGINE_KEY);
-              put(GRAVITINO_AUTO_INCREMENT_OFFSET_KEY, MYSQL_AUTO_INCREMENT_OFFSET_KEY);
-            }
-          });
-
-  public static final Map<String, String> MYSQL_CONFIG_TO_GRAVITINO =
-      Collections.unmodifiableMap(
-          new HashMap<String, String>() {
-            {
-              put(MYSQL_ENGINE_KEY, GRAVITINO_ENGINE_KEY);
-              put(MYSQL_AUTO_INCREMENT_OFFSET_KEY, GRAVITINO_AUTO_INCREMENT_OFFSET_KEY);
-            }
-          });
+  public static final BidiMap<String, String> GRAVITINO_CONFIG_TO_MYSQL =
+      new TreeBidiMap<String, String>() {
+        {
+          put(GRAVITINO_ENGINE_KEY, MYSQL_ENGINE_KEY);
+          put(GRAVITINO_AUTO_INCREMENT_OFFSET_KEY, MYSQL_AUTO_INCREMENT_OFFSET_KEY);
+        }
+      };
 
   static {
     PROPERTIES_METADATA =
@@ -113,13 +105,14 @@ public class MysqlTablePropertiesMetadata extends JdbcTablePropertiesMetadata {
 
   @Override
   protected Map<String, String> convertFromJdbcProperties(Map<String, String> properties) {
+    BidiMap<String, String> mysqlConfigToGravitino = GRAVITINO_CONFIG_TO_MYSQL.inverseBidiMap();
     return Collections.unmodifiableMap(
         new HashMap<String, String>() {
           {
             properties.forEach(
                 (key, value) -> {
-                  if (MYSQL_CONFIG_TO_GRAVITINO.containsKey(key)) {
-                    put(MYSQL_CONFIG_TO_GRAVITINO.get(key), value);
+                  if (mysqlConfigToGravitino.containsKey(key)) {
+                    put(mysqlConfigToGravitino.get(key), value);
                   }
                 });
           }
