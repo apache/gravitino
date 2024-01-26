@@ -196,21 +196,17 @@ public class TrinoQueryITBase {
                             Namespace.ofTable(metalakeName, catalogName, schema.name())))
                     .forEach(
                         table -> {
-                          try {
-                            tableCatalog.purgeTable(
-                                NameIdentifier.ofTable(
-                                    metalakeName, catalogName, schema.name(), table.name()));
-                          } catch (UnsupportedOperationException e) {
-                            tableCatalog.dropTable(
-                                NameIdentifier.ofTable(
-                                    metalakeName, catalogName, schema.name(), table.name()));
-                            LOG.info(
-                                "Drop table \"{}.{}\".{}.{}",
-                                metalakeName,
-                                catalogName,
-                                schema.name(),
-                                table.name());
-                          } catch (Exception e) {
+                          boolean dropped =
+                              tableCatalog.dropTable(
+                                  NameIdentifier.ofTable(
+                                      metalakeName, catalogName, schema.name(), table.name()));
+                          LOG.info(
+                              "Drop table \"{}.{}\".{}.{}",
+                              metalakeName,
+                              catalogName,
+                              schema.name(),
+                              table.name());
+                          if (!dropped) {
                             LOG.error("Failed to drop table {}", table);
                           }
                         });
