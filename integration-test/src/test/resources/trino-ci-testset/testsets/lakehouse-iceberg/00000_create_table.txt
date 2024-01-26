@@ -56,6 +56,19 @@ WITH (
    partitioning = ARRAY['name']
 )"
 
+CREATE TABLE
+
+"CREATE TABLE ""test.gt_iceberg"".gt_db2.tb06 (
+   name varchar,
+   salary integer
+)
+COMMENT ''
+WITH (
+   location = 'hdfs://127.0.0.1:9000/user/iceberg/warehouse/TrinoQueryIT/gt_iceberg/gt_db2/tb06'
+)"
+
+DROP TABLE
+
 DROP TABLE
 
 DROP TABLE
