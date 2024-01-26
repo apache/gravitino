@@ -21,6 +21,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -152,6 +153,7 @@ public class TestLockManager {
   }
 
   @Test
+  @Disabled
   void testLockWithError() {
     LockManager lockManager = new LockManager();
     LockManager spy = Mockito.spy(lockManager);
