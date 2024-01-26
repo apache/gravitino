@@ -179,7 +179,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
         .withProperties(resultProperties)
         .withComment(comment)
         .withAuditInfo(
-            new AuditInfo.Builder()
+             AuditInfo.builder()
                 .withCreator(currentUser())
                 .withCreateTime(Instant.now())
                 .build())
@@ -398,7 +398,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
 
     return new JdbcTable.Builder()
         .withAuditInfo(
-            new AuditInfo.Builder()
+             AuditInfo.builder()
                 .withCreator(currentUser())
                 .withCreateTime(Instant.now())
                 .build())

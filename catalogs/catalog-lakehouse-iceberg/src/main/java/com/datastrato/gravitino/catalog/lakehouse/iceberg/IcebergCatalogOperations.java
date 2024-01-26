@@ -167,7 +167,7 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
               .withComment(comment)
               .withProperties(properties)
               .withAuditInfo(
-                  new AuditInfo.Builder()
+                   AuditInfo.builder()
                       .withCreator(currentUser)
                       .withCreateTime(Instant.now())
                       .build())
@@ -520,7 +520,7 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
               .withProperties(properties)
               .withDistribution(distribution)
               .withAuditInfo(
-                  new AuditInfo.Builder()
+                   AuditInfo.builder()
                       .withCreator(currentUser())
                       .withCreateTime(Instant.now())
                       .build())

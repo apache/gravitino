@@ -397,7 +397,7 @@ public class TestCatalogOperations extends JerseyTest {
             .withType(Catalog.Type.RELATIONAL)
             .withProvider("test")
             .withAuditInfo(
-                new AuditInfo.Builder()
+                 AuditInfo.builder()
                     .withCreator("creator")
                     .withCreateTime(Instant.now())
                     .build())

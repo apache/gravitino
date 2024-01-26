@@ -62,7 +62,7 @@ public final class EntityCombinedSchema implements Schema {
   @Override
   public Audit auditInfo() {
     AuditInfo mergedAudit =
-        new AuditInfo.Builder()
+         AuditInfo.builder()
             .withCreator(schema.auditInfo().creator())
             .withCreateTime(schema.auditInfo().createTime())
             .withLastModifier(schema.auditInfo().lastModifier())

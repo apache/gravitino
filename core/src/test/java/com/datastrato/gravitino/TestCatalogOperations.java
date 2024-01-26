@@ -92,7 +92,7 @@ public class TestCatalogOperations implements CatalogOperations, TableCatalog, S
       Index[] indexes)
       throws NoSuchSchemaException, TableAlreadyExistsException {
     AuditInfo auditInfo =
-        new AuditInfo.Builder().withCreator("test").withCreateTime(Instant.now()).build();
+         AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
 
     TestTable table =
         new TestTable.Builder()
@@ -134,7 +134,7 @@ public class TestCatalogOperations implements CatalogOperations, TableCatalog, S
     }
 
     AuditInfo updatedAuditInfo =
-        new AuditInfo.Builder()
+         AuditInfo.builder()
             .withCreator("test")
             .withCreateTime(Instant.now())
             .withLastModifier("test")
@@ -199,7 +199,7 @@ public class TestCatalogOperations implements CatalogOperations, TableCatalog, S
   public Schema createSchema(NameIdentifier ident, String comment, Map<String, String> properties)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
     AuditInfo auditInfo =
-        new AuditInfo.Builder().withCreator("test").withCreateTime(Instant.now()).build();
+         AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
 
     TestSchema schema =
         new TestSchema.Builder()
@@ -235,7 +235,7 @@ public class TestCatalogOperations implements CatalogOperations, TableCatalog, S
     }
 
     AuditInfo updatedAuditInfo =
-        new AuditInfo.Builder()
+         AuditInfo.builder()
             .withCreator("test")
             .withCreateTime(Instant.now())
             .withLastModifier("test")

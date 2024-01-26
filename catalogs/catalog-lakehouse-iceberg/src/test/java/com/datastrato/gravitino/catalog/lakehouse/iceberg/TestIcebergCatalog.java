@@ -20,7 +20,7 @@ public class TestIcebergCatalog {
   @Test
   public void testListDatabases() {
     AuditInfo auditInfo =
-        new AuditInfo.Builder().withCreator("creator").withCreateTime(Instant.now()).build();
+         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
 
     CatalogEntity entity =
         new CatalogEntity.Builder()
@@ -48,7 +48,7 @@ public class TestIcebergCatalog {
   @Test
   void testCatalogProperty() {
     AuditInfo auditInfo =
-        new AuditInfo.Builder().withCreator("creator").withCreateTime(Instant.now()).build();
+         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
 
     CatalogEntity entity =
         new CatalogEntity.Builder()

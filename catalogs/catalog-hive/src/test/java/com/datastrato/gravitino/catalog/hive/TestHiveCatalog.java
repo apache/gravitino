@@ -23,7 +23,7 @@ public class TestHiveCatalog extends MiniHiveMetastoreService {
   @Test
   public void testListDatabases() throws TException, InterruptedException {
     AuditInfo auditInfo =
-        new AuditInfo.Builder().withCreator("creator").withCreateTime(Instant.now()).build();
+         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
 
     CatalogEntity entity =
         new CatalogEntity.Builder()
@@ -50,7 +50,7 @@ public class TestHiveCatalog extends MiniHiveMetastoreService {
   @Test
   void testCatalogProperty() {
     AuditInfo auditInfo =
-        new AuditInfo.Builder().withCreator("creator").withCreateTime(Instant.now()).build();
+         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
 
     CatalogEntity entity =
         new CatalogEntity.Builder()

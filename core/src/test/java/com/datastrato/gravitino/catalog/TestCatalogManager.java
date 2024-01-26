@@ -54,7 +54,7 @@ public class TestCatalogManager {
           .withId(1L)
           .withName(metalake)
           .withAuditInfo(
-              new AuditInfo.Builder().withCreator("test").withCreateTime(Instant.now()).build())
+               AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
           .withVersion(SchemaVersion.V_0_1)
           .build();
 
