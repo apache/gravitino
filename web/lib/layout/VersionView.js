@@ -11,7 +11,11 @@ import { useAppSelector } from '@/lib/hooks/useStore'
 const VersionView = () => {
   const store = useAppSelector(state => state.sys)
 
-  return <Typography variant='subtitle2'>{store.version}</Typography>
+  return (
+    <Typography variant='subtitle2' id='gravitino_version'>
+      {store.version}
+    </Typography>
+  )
 }
 
 export default VersionView

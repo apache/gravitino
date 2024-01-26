@@ -21,6 +21,7 @@ dependencies {
   implementation(libs.hadoop2.hdfs)
 
   testImplementation(libs.junit.jupiter.api)
+  testImplementation(libs.junit.jupiter.params)
   testRuntimeOnly(libs.junit.jupiter.engine)
   testImplementation(libs.mockito.core)
 }

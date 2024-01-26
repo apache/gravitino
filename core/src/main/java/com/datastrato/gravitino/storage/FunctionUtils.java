@@ -49,6 +49,9 @@ public class FunctionUtils {
   public static <R, E extends Exception> R executeInTransaction(
       Executable<R, E> executable, TransactionalKvBackend transactionalKvBackend)
       throws E, IOException {
+    if (transactionalKvBackend.inTransaction()) {
+      return executable.execute();
+    }
 
     transactionalKvBackend.begin();
     try {
