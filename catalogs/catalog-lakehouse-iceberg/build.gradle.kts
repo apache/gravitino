@@ -57,7 +57,7 @@ dependencies {
 
   annotationProcessor(libs.lombok)
   compileOnly(libs.lombok)
-  
+
   implementation(libs.hadoop2.common) {
     exclude("com.github.spotbugs")
   }
