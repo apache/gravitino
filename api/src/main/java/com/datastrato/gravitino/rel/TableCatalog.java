@@ -261,9 +261,9 @@ public interface TableCatalog {
       throws NoSuchTableException, IllegalArgumentException;
 
   /**
-   * Removes both the metadata and the directory associated with the table from the file system
-   * if the table is not an external table. In case of an external table, only the associated
-   * metadata is removed.
+   * Removes both the metadata and the directory associated with the table from the file system if
+   * the table is not an external table. In case of an external table, only the associated metadata
+   * is removed.
    *
    * @param ident A table identifier.
    * @return True if the table was dropped, false if the table did not exist.
@@ -271,10 +271,10 @@ public interface TableCatalog {
   boolean dropTable(NameIdentifier ident);
 
   /**
-   * Drop a table from the catalog and completely remove its data.
-   * Removes both the metadata and the directory associated with the table completely and skipping
-   * trash. If the table is an external table or the catalogs don't support purge table,
-   * {@link UnsupportedOperationException} is thrown.
+   * Drop a table from the catalog and completely remove its data. Removes both the metadata and the
+   * directory associated with the table completely and skipping trash. If the table is an external
+   * table or the catalogs don't support purge table, {@link UnsupportedOperationException} is
+   * thrown.
    *
    * <p>If the catalog supports to purge a table, this method should be overridden. The default
    * implementation throws an {@link UnsupportedOperationException}.
