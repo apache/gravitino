@@ -11,6 +11,10 @@ plugins {
 }
 
 dependencies {
+  implementation(project(":api"))
+  implementation(project(":common"))
+  implementation(project(":core"))
+
   implementation(libs.bundles.iceberg)
   implementation(libs.bundles.jetty)
   implementation(libs.bundles.jersey)
@@ -25,9 +29,7 @@ dependencies {
   implementation(libs.jackson.datatype.jdk8)
   implementation(libs.jackson.datatype.jsr310)
   implementation(libs.sqlite.jdbc)
-  implementation(project(":api"))
-  implementation(project(":common"))
-  implementation(project(":core"))
+
   implementation(project(":server-common"))
 
   implementation(libs.hive2.metastore) {
@@ -55,12 +57,14 @@ dependencies {
 
   annotationProcessor(libs.lombok)
   compileOnly(libs.lombok)
+  
   implementation(libs.hadoop2.common) {
     exclude("com.github.spotbugs")
   }
   implementation(libs.hadoop2.hdfs)
   implementation(libs.hadoop2.mapreduce.client.core)
   implementation(libs.metrics.jersey2)
+
   testImplementation(libs.jersey.test.framework.core) {
     exclude(group = "org.junit.jupiter")
   }
@@ -70,6 +74,7 @@ dependencies {
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.mockito.core)
+
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
 
