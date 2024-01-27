@@ -12,6 +12,7 @@ import com.datastrato.gravitino.Metalake;
 import com.datastrato.gravitino.dto.AuditDTO;
 import com.datastrato.gravitino.dto.CatalogDTO;
 import com.datastrato.gravitino.dto.MetalakeDTO;
+import com.datastrato.gravitino.dto.file.FilesetDTO;
 import com.datastrato.gravitino.dto.rel.ColumnDTO;
 import com.datastrato.gravitino.dto.rel.DistributionDTO;
 import com.datastrato.gravitino.dto.rel.DistributionDTO.Builder;
@@ -38,6 +39,7 @@ import com.datastrato.gravitino.dto.rel.partitions.IdentityPartitionDTO;
 import com.datastrato.gravitino.dto.rel.partitions.ListPartitionDTO;
 import com.datastrato.gravitino.dto.rel.partitions.PartitionDTO;
 import com.datastrato.gravitino.dto.rel.partitions.RangePartitionDTO;
+import com.datastrato.gravitino.file.Fileset;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.Schema;
 import com.datastrato.gravitino.rel.Table;
@@ -286,6 +288,17 @@ public class DTOConverters {
       return FunctionArg.EMPTY_ARGS;
     }
     return Arrays.stream(expressions).map(DTOConverters::toFunctionArg).toArray(FunctionArg[]::new);
+  }
+
+  public static FilesetDTO toDTO(Fileset fileset) {
+    return FilesetDTO.builder()
+        .name(fileset.name())
+        .comment(fileset.comment())
+        .type(fileset.type())
+        .storageLocation(fileset.storageLocation())
+        .properties(fileset.properties())
+        .audit(toDTO(fileset.auditInfo()))
+        .build();
   }
 
   public static ColumnDTO[] toDTOs(Column[] columns) {
