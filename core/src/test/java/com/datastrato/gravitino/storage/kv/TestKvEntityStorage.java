@@ -1033,7 +1033,7 @@ public class TestKvEntityStorage {
 
       store.setSerDe(EntitySerDeFactory.createEntitySerDe(config.get(Configs.ENTITY_SERDE)));
       AuditInfo auditInfo =
-          new AuditInfo.Builder().withCreator("creator").withCreateTime(Instant.now()).build();
+          AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
 
       BaseMetalake metalake1 = createBaseMakeLake("metalake1", auditInfo);
       BaseMetalake metalake2 = createBaseMakeLake("metalake2", auditInfo);

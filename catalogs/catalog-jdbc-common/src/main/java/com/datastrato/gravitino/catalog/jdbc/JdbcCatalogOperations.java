@@ -183,10 +183,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
         .withProperties(resultProperties)
         .withComment(comment)
         .withAuditInfo(
-             AuditInfo.builder()
-                .withCreator(currentUser())
-                .withCreateTime(Instant.now())
-                .build())
+            AuditInfo.builder().withCreator(currentUser()).withCreateTime(Instant.now()).build())
         .build();
   }
 
@@ -403,10 +400,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
 
     return new JdbcTable.Builder()
         .withAuditInfo(
-             AuditInfo.builder()
-                .withCreator(currentUser())
-                .withCreateTime(Instant.now())
-                .build())
+            AuditInfo.builder().withCreator(currentUser()).withCreateTime(Instant.now()).build())
         .withName(tableName)
         .withColumns(columns)
         .withComment(comment)
