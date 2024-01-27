@@ -19,7 +19,6 @@ dependencies {
 
   annotationProcessor(libs.immutables.value)
   annotationProcessor(libs.lombok)
-  
 
   implementation(libs.hive2.metastore) {
     exclude("co.cask.tephra")
@@ -61,23 +60,21 @@ dependencies {
     exclude("org.openjdk.jol")
     exclude("org.pentaho")
     exclude("org.slf4j")
-
   }
 
   implementation(libs.caffeine)
   implementation(libs.guava)
   implementation(libs.hadoop2.common) {
-      exclude("*")
+    exclude("*")
   }
   implementation(libs.hadoop2.mapreduce.client.core) {
-      exclude("*")
+    exclude("*")
   }
   implementation(libs.slf4j.api)
 
-
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.mockito.core)
-  
+
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
 

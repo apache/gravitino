@@ -16,8 +16,7 @@ dependencies {
   implementation(project(":catalogs:catalog-jdbc-common"))
   implementation(project(":common"))
   implementation(project(":core"))
-  
-  
+
   implementation(libs.bundles.log4j)
   implementation(libs.commons.collections4)
   implementation(libs.commons.lang3)

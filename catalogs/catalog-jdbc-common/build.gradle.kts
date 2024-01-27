@@ -14,7 +14,7 @@ dependencies {
   implementation(project(":api"))
   implementation(project(":common"))
   implementation(project(":core"))
-  
+
   implementation(libs.bundles.log4j)
   implementation(libs.commons.collections4)
   implementation(libs.commons.dbcp2)
