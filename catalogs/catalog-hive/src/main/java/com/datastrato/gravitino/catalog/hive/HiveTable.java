@@ -72,7 +72,7 @@ public class HiveTable extends BaseTable {
   public static HiveTable fromHiveTable(Table table) {
     // Get audit info from Hive's Table object. Because Hive's table doesn't store last modifier
     // and last modified time, we only get creator and create time from Hive's table.
-    AuditInfo.Builder auditInfoBuilder =  AuditInfo.builder();
+    AuditInfo.Builder auditInfoBuilder = AuditInfo.builder();
     Optional.ofNullable(table.getOwner()).ifPresent(auditInfoBuilder::withCreator);
     if (table.isSetCreateTime()) {
       auditInfoBuilder.withCreateTime(Instant.ofEpochSecond(table.getCreateTime()));

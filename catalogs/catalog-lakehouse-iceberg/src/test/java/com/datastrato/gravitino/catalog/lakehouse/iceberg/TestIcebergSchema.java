@@ -27,7 +27,7 @@ public class TestIcebergSchema {
   private static final String COMMENT_VALUE = "comment";
 
   private static AuditInfo AUDIT_INFO =
-       AuditInfo.builder().withCreator("testIcebergUser").withCreateTime(Instant.now()).build();
+      AuditInfo.builder().withCreator("testIcebergUser").withCreateTime(Instant.now()).build();
 
   @Test
   public void testCreateIcebergSchema() {
@@ -127,7 +127,7 @@ public class TestIcebergSchema {
   @Test
   void testSchemaProperty() {
     AuditInfo auditInfo =
-         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
 
     CatalogEntity entity =
         new CatalogEntity.Builder()

@@ -35,7 +35,7 @@ public class HiveSchema extends BaseSchema {
 
     // Get audit info from Hive's Database object. Because Hive's database doesn't store create
     // time, last modifier and last modified time, we only get creator from Hive's database.
-    AuditInfo.Builder auditInfoBuilder =  AuditInfo.builder();
+    AuditInfo.Builder auditInfoBuilder = AuditInfo.builder();
     Optional.ofNullable(db.getOwnerName()).ifPresent(auditInfoBuilder::withCreator);
 
     return new HiveSchema.Builder()

@@ -27,7 +27,7 @@ public class TestHiveSchema extends MiniHiveMetastoreService {
 
   private HiveCatalog initHiveCatalog() {
     AuditInfo auditInfo =
-         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
 
     CatalogEntity entity =
         new CatalogEntity.Builder()

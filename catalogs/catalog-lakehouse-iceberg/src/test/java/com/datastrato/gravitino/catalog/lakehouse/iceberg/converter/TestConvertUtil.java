@@ -47,10 +47,7 @@ public class TestConvertUtil extends TestBaseConvert {
         new IcebergTable.Builder()
             .withName(TEST_NAME)
             .withAuditInfo(
-                 AuditInfo.builder()
-                    .withCreator(TEST_NAME)
-                    .withCreateTime(Instant.now())
-                    .build())
+                AuditInfo.builder().withCreator(TEST_NAME).withCreateTime(Instant.now()).build())
             .withProperties(Maps.newHashMap())
             .withSortOrders(sortOrder)
             .withColumns(columns)
