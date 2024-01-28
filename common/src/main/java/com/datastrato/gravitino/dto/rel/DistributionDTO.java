@@ -22,7 +22,11 @@ import java.util.Arrays;
 public class DistributionDTO implements Distribution {
 
   public static final DistributionDTO NONE =
-      new Builder().withStrategy(Strategy.NONE).withNumber(0).withArgs(EMPTY_ARGS).build();
+      builder().withStrategy(Strategy.NONE).withNumber(0).withArgs(EMPTY_ARGS).build();
+
+  public static Builder builder() {
+    return new Builder();
+  }
 
   // Distribution strategy/method
   private final Strategy strategy;

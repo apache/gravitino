@@ -218,7 +218,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
             .withStorageLocation(filesetPath.toString())
             .withProperties(addManagedFlagToProperties(properties))
             .withAuditInfo(
-                new AuditInfo.Builder()
+                AuditInfo.builder()
                     .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
                     .withCreateTime(Instant.now())
                     .build())
@@ -365,7 +365,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
             .withComment(comment)
             .withProperties(addManagedFlagToProperties(properties))
             .withAuditInfo(
-                new AuditInfo.Builder()
+                AuditInfo.builder()
                     .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
                     .withCreateTime(Instant.now())
                     .build())
@@ -534,7 +534,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
         .withComment(schemaEntity.comment())
         .withProperties(props)
         .withAuditInfo(
-            new AuditInfo.Builder()
+            AuditInfo.builder()
                 .withCreator(schemaEntity.auditInfo().creator())
                 .withCreateTime(schemaEntity.auditInfo().createTime())
                 .withLastModifier(PrincipalUtils.getCurrentPrincipal().getName())
@@ -575,7 +575,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
         .withStorageLocation(filesetEntity.storageLocation())
         .withProperties(props)
         .withAuditInfo(
-            new AuditInfo.Builder()
+            AuditInfo.builder()
                 .withCreator(filesetEntity.auditInfo().creator())
                 .withCreateTime(filesetEntity.auditInfo().createTime())
                 .withLastModifier(PrincipalUtils.getCurrentPrincipal().getName())

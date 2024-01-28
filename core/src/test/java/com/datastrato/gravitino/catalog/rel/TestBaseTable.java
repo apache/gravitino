@@ -43,7 +43,7 @@ public class TestBaseTable {
     properties.put("key1", "value1");
     properties.put("key2", "value2");
     AuditInfo auditInfo =
-        new AuditInfo.Builder().withCreator("Justin").withCreateTime(Instant.now()).build();
+        AuditInfo.builder().withCreator("Justin").withCreateTime(Instant.now()).build();
 
     BaseTable table =
         new BaseTableExtension.Builder()

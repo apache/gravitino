@@ -120,7 +120,7 @@ public class TestKvEntityStorage {
     Mockito.when(config.get(KV_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
 
     AuditInfo auditInfo =
-        new AuditInfo.Builder().withCreator("creator").withCreateTime(Instant.now()).build();
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
 
     try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
       store.initialize(config);
@@ -206,7 +206,7 @@ public class TestKvEntityStorage {
 
     Assertions.assertEquals(ROCKS_DB_STORE_PATH, config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH));
     AuditInfo auditInfo =
-        new AuditInfo.Builder().withCreator("creator").withCreateTime(Instant.now()).build();
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
 
     try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
       store.initialize(config);
@@ -243,10 +243,7 @@ public class TestKvEntityStorage {
           EntityType.METALAKE,
           e -> {
             AuditInfo auditInfo1 =
-                new AuditInfo.Builder()
-                    .withCreator("creator1")
-                    .withCreateTime(Instant.now())
-                    .build();
+                AuditInfo.builder().withCreator("creator1").withCreateTime(Instant.now()).build();
             return createBaseMakeLake("metalakeChanged", auditInfo1);
           });
 
@@ -291,10 +288,7 @@ public class TestKvEntityStorage {
           EntityType.CATALOG,
           e -> {
             AuditInfo auditInfo1 =
-                new AuditInfo.Builder()
-                    .withCreator("creator2")
-                    .withCreateTime(Instant.now())
-                    .build();
+                AuditInfo.builder().withCreator("creator2").withCreateTime(Instant.now()).build();
             return createCatalog(Namespace.of("metalakeChanged"), "catalogChanged", auditInfo1);
           });
       CatalogEntity updatedCatalog =
@@ -338,10 +332,7 @@ public class TestKvEntityStorage {
           EntityType.SCHEMA,
           e -> {
             AuditInfo auditInfo1 =
-                new AuditInfo.Builder()
-                    .withCreator("creator3")
-                    .withCreateTime(Instant.now())
-                    .build();
+                AuditInfo.builder().withCreator("creator3").withCreateTime(Instant.now()).build();
             return createSchemaEntity(
                 Namespace.of("metalakeChanged", "catalogChanged"), "schemaChanged", auditInfo1);
           });
@@ -388,10 +379,7 @@ public class TestKvEntityStorage {
           EntityType.TABLE,
           e -> {
             AuditInfo auditInfo1 =
-                new AuditInfo.Builder()
-                    .withCreator("creator4")
-                    .withCreateTime(Instant.now())
-                    .build();
+                AuditInfo.builder().withCreator("creator4").withCreateTime(Instant.now()).build();
             return createTableEntity(
                 Namespace.of("metalakeChanged", "catalogChanged", "schemaChanged"),
                 "tableChanged",
@@ -441,7 +429,7 @@ public class TestKvEntityStorage {
                   EntityType.SCHEMA,
                   e -> {
                     AuditInfo auditInfo1 =
-                        new AuditInfo.Builder()
+                        AuditInfo.builder()
                             .withCreator("creator5")
                             .withCreateTime(Instant.now())
                             .build();
@@ -457,10 +445,7 @@ public class TestKvEntityStorage {
           EntityType.SCHEMA,
           e -> {
             AuditInfo auditInfo1 =
-                new AuditInfo.Builder()
-                    .withCreator("creator6")
-                    .withCreateTime(Instant.now())
-                    .build();
+                AuditInfo.builder().withCreator("creator6").withCreateTime(Instant.now()).build();
             return createSchemaEntity(
                 Namespace.of("metalakeChanged", "catalogChanged"), "schema2", auditInfo1);
           });
@@ -490,7 +475,7 @@ public class TestKvEntityStorage {
     FileUtils.deleteDirectory(FileUtils.getFile("/tmp/gravitino"));
 
     AuditInfo auditInfo =
-        new AuditInfo.Builder().withCreator("creator").withCreateTime(Instant.now()).build();
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
 
     try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
       store.initialize(config);
@@ -662,7 +647,7 @@ public class TestKvEntityStorage {
       store.setSerDe(EntitySerDeFactory.createEntitySerDe(config.get(Configs.ENTITY_SERDE)));
 
       AuditInfo auditInfo =
-          new AuditInfo.Builder().withCreator("creator").withCreateTime(Instant.now()).build();
+          AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
 
       BaseMetalake metalake = createBaseMakeLake("metalake", auditInfo);
       BaseMetalake metalakeCopy = createBaseMakeLake("metalakeCopy", auditInfo);
@@ -774,7 +759,7 @@ public class TestKvEntityStorage {
       store.setSerDe(EntitySerDeFactory.createEntitySerDe(config.get(Configs.ENTITY_SERDE)));
 
       AuditInfo auditInfo =
-          new AuditInfo.Builder().withCreator("creator").withCreateTime(Instant.now()).build();
+          AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
 
       BaseMetalake metalake = createBaseMakeLake("metalake", auditInfo);
       CatalogEntity catalog = createCatalog(Namespace.of("metalake"), "catalog", auditInfo);
@@ -830,7 +815,7 @@ public class TestKvEntityStorage {
                   EntityType.CATALOG,
                   e -> {
                     AuditInfo auditInfo1 =
-                        new AuditInfo.Builder()
+                        AuditInfo.builder()
                             .withCreator("creator1")
                             .withCreateTime(Instant.now())
                             .build();
@@ -911,7 +896,7 @@ public class TestKvEntityStorage {
       store.setSerDe(EntitySerDeFactory.createEntitySerDe(config.get(Configs.ENTITY_SERDE)));
 
       AuditInfo auditInfo =
-          new AuditInfo.Builder().withCreator("creator").withCreateTime(Instant.now()).build();
+          AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
 
       BaseMetalake metalake1 = createBaseMakeLake("metalake1", auditInfo);
       BaseMetalake metalake2 = createBaseMakeLake("metalake2", auditInfo);
@@ -1048,7 +1033,7 @@ public class TestKvEntityStorage {
 
       store.setSerDe(EntitySerDeFactory.createEntitySerDe(config.get(Configs.ENTITY_SERDE)));
       AuditInfo auditInfo =
-          new AuditInfo.Builder().withCreator("creator").withCreateTime(Instant.now()).build();
+          AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
 
       BaseMetalake metalake1 = createBaseMakeLake("metalake1", auditInfo);
       BaseMetalake metalake2 = createBaseMakeLake("metalake2", auditInfo);

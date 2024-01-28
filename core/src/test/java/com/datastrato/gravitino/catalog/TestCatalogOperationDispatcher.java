@@ -87,7 +87,7 @@ public class TestCatalogOperationDispatcher {
             .withId(1L)
             .withName(metalake)
             .withAuditInfo(
-                new AuditInfo.Builder().withCreator("test").withCreateTime(Instant.now()).build())
+                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
             .withVersion(SchemaVersion.V_0_1)
             .build();
     entityStore.put(metalakeEntity, true);
@@ -218,7 +218,7 @@ public class TestCatalogOperationDispatcher {
             .withName("schema11")
             .withNamespace(Namespace.of(metalake, catalog))
             .withAuditInfo(
-                new AuditInfo.Builder()
+                AuditInfo.builder()
                     .withCreator(AuthConstants.ANONYMOUS_USER)
                     .withCreateTime(Instant.now())
                     .build())
@@ -287,7 +287,7 @@ public class TestCatalogOperationDispatcher {
             .withName("schema21")
             .withNamespace(Namespace.of(metalake, catalog))
             .withAuditInfo(
-                new AuditInfo.Builder()
+                AuditInfo.builder()
                     .withCreator(AuthConstants.ANONYMOUS_USER)
                     .withCreateTime(Instant.now())
                     .build())
@@ -439,10 +439,7 @@ public class TestCatalogOperationDispatcher {
             .withName("table11")
             .withNamespace(tableNs)
             .withAuditInfo(
-                new AuditInfo.Builder()
-                    .withCreator("gravitino")
-                    .withCreateTime(Instant.now())
-                    .build())
+                AuditInfo.builder().withCreator("gravitino").withCreateTime(Instant.now()).build())
             .build();
     doReturn(tableEntity).when(entityStore).get(any(), any(), any());
     Table loadedTable4 = dispatcher.loadTable(tableIdent1);
@@ -508,10 +505,7 @@ public class TestCatalogOperationDispatcher {
             .withName("table21")
             .withNamespace(tableNs)
             .withAuditInfo(
-                new AuditInfo.Builder()
-                    .withCreator("gravitino")
-                    .withCreateTime(Instant.now())
-                    .build())
+                AuditInfo.builder().withCreator("gravitino").withCreateTime(Instant.now()).build())
             .build();
     doReturn(unmatchedEntity).when(entityStore).update(any(), any(), any(), any());
     Table alteredTable4 = dispatcher.alterTable(tableIdent, changes);
