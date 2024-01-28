@@ -10,6 +10,7 @@ import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.exceptions.AlreadyExistsException;
 import com.datastrato.gravitino.utils.ByteUtils;
 import com.datastrato.gravitino.utils.Bytes;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
@@ -81,7 +82,8 @@ public class RocksDBKvBackend implements KvBackend {
     }
   }
 
-  private void handlePut(byte[] key, byte[] value, boolean overwrite) throws RocksDBException {
+  @VisibleForTesting
+  void handlePut(byte[] key, byte[] value, boolean overwrite) throws RocksDBException {
     if (overwrite) {
       db.put(key, value);
       return;
@@ -106,7 +108,7 @@ public class RocksDBKvBackend implements KvBackend {
   }
 
   @Override
-  public List<Pair<byte[], byte[]>> scan(KvRangeScan scanRange) throws IOException {
+  public List<Pair<byte[], byte[]>> scan(KvRange scanRange) throws IOException {
     RocksIterator rocksIterator = db.newIterator();
     rocksIterator.seek(scanRange.getStart());
 
@@ -158,7 +160,7 @@ public class RocksDBKvBackend implements KvBackend {
   }
 
   @Override
-  public boolean deleteRange(KvRangeScan deleteRange) throws IOException {
+  public boolean deleteRange(KvRange deleteRange) throws IOException {
     RocksIterator rocksIterator = db.newIterator();
     rocksIterator.seek(deleteRange.getStart());
 
@@ -192,5 +194,15 @@ public class RocksDBKvBackend implements KvBackend {
   @Override
   public void close() throws IOException {
     db.close();
+  }
+
+  @VisibleForTesting
+  public RocksDB getDb() {
+    return db;
+  }
+
+  @VisibleForTesting
+  public void setDb(RocksDB db) {
+    this.db = db;
   }
 }
