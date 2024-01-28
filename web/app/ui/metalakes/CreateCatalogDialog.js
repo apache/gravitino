@@ -265,7 +265,7 @@ const CreateCatalogDialog = props => {
         >
           <IconButton
             size='small'
-            onClick={() => setOpen(false)}
+            onClick={() => handleClose()}
             sx={{ position: 'absolute', right: '1rem', top: '1rem' }}
           >
             <Icon icon='bx:x' />

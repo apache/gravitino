@@ -13,6 +13,7 @@ public class FilesetEntitySerDe implements ProtoSerDe<FilesetEntity, Fileset> {
         Fileset.newBuilder()
             .setId(filesetEntity.id())
             .setName(filesetEntity.name())
+            .setStorageLocation(filesetEntity.storageLocation())
             .setAuditInfo(new AuditInfoSerDe().serialize(filesetEntity.auditInfo()));
 
     if (filesetEntity.comment() != null) {
@@ -26,10 +27,6 @@ public class FilesetEntitySerDe implements ProtoSerDe<FilesetEntity, Fileset> {
     Fileset.Type type = Fileset.Type.valueOf(filesetEntity.filesetType().name());
     builder.setType(type);
 
-    if (filesetEntity.storageLocation() != null) {
-      builder.setStorageLocation(filesetEntity.storageLocation());
-    }
-
     return builder.build();
   }
 
@@ -39,16 +36,13 @@ public class FilesetEntitySerDe implements ProtoSerDe<FilesetEntity, Fileset> {
         new FilesetEntity.Builder()
             .withId(p.getId())
             .withName(p.getName())
+            .withStorageLocation(p.getStorageLocation())
             .withAuditInfo(new AuditInfoSerDe().deserialize(p.getAuditInfo()))
             .withFilesetType(
                 com.datastrato.gravitino.file.Fileset.Type.valueOf(p.getType().name()));
 
     if (p.hasComment()) {
       builder.withComment(p.getComment());
-    }
-
-    if (p.hasStorageLocation()) {
-      builder.withStorageLocation(p.getStorageLocation());
     }
 
     if (p.getPropertiesCount() > 0) {

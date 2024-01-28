@@ -123,6 +123,8 @@ dependencies {
   testImplementation(libs.mysql.driver)
   testImplementation(libs.postgresql.driver)
   implementation(libs.commons.cli)
+  testImplementation(libs.selenium)
+  testImplementation(libs.rauschig)
 }
 
 /* Optimizing integration test execution conditions */
@@ -269,6 +271,7 @@ tasks.test {
 
       // Default use MiniGravitino to run integration tests
       environment("GRAVITINO_ROOT_DIR", rootDir.path)
+      environment("IT_PROJECT_DIR", buildDir.path)
       environment("HADOOP_USER_NAME", "datastrato")
       environment("HADOOP_HOME", "/tmp")
       environment("PROJECT_VERSION", version)
@@ -284,7 +287,7 @@ tasks.test {
       }
 
       // Gravitino CI Docker image
-      environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-hive:0.1.7")
+      environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-hive:0.1.8")
       environment("GRAVITINO_CI_TRINO_DOCKER_IMAGE", "datastrato/gravitino-ci-trino:0.1.3")
 
       val testMode = project.properties["testMode"] as? String ?: "embedded"
@@ -296,6 +299,7 @@ tasks.test {
       } else if (testMode == "embedded") {
         environment("GRAVITINO_HOME", rootDir.path)
         environment("GRAVITINO_TEST", "true")
+        environment("GRAVITINO_WAR", rootDir.path + "/web/dist/")
         systemProperty("testMode", "embedded")
       } else {
         throw GradleException("Gravitino integration tests only support [-PtestMode=embedded] or [-PtestMode=deploy] mode!")

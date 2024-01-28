@@ -13,13 +13,29 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 
 /** Database operations for MySQL. */
 public class MysqlDatabaseOperations extends JdbcDatabaseOperations {
+
+  public static final Set<String> SYS_MYSQL_DATABASE_NAMES =
+      Collections.unmodifiableSet(
+          new HashSet<String>() {
+            {
+              add("information_schema");
+              add("mysql");
+              add("performance_schema");
+              add("sys");
+            }
+          });
+
   @Override
   public String generateCreateDatabaseSql(
       String databaseName, String comment, Map<String, String> properties) {
@@ -106,5 +122,10 @@ public class MysqlDatabaseOperations extends JdbcDatabaseOperations {
     } catch (final SQLException se) {
       throw this.exceptionMapper.toGravitinoException(se);
     }
+  }
+
+  @Override
+  protected boolean isSystemDatabase(String dbName) {
+    return SYS_MYSQL_DATABASE_NAMES.contains(dbName.toLowerCase(Locale.ROOT));
   }
 }

@@ -110,6 +110,7 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
     } finally {
       putPairs.get().clear();
       originalKeys.get().clear();
+      txId.remove();
     }
   }
 
@@ -119,6 +120,18 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
     for (Pair<byte[], byte[]> pair : putPairs.get()) {
       kvBackend.delete(pair.getKey());
     }
+  }
+
+  @Override
+  public void closeTransaction() {
+    putPairs.get().clear();
+    originalKeys.get().clear();
+    txId.remove();
+  }
+
+  @Override
+  public boolean inTransaction() {
+    return txId.get() != null;
   }
 
   @Override
@@ -243,12 +256,6 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
   @Override
   public void close() throws IOException {}
 
-  @Override
-  public void closeTransaction() {
-    putPairs.get().clear();
-    originalKeys.get().clear();
-  }
-
   public static byte[] getRealValue(byte[] rawValue) {
     byte[] firstType = ArrayUtils.subarray(rawValue, 0, LENGTH_OF_VALUE_STATUS);
     ValueStatusEnum statusEnum = ValueStatusEnum.fromCode(firstType[0]);
@@ -322,12 +329,14 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
    * <p>When we try to get the value of key1, we will first the value of key1 10 and can skip old
    * versions quickly.
    */
-  private static byte[] revertByteArray(byte[] bytes) {
+  @VisibleForTesting
+  static byte[] revertByteArray(byte[] bytes) {
+    byte[] result = new byte[bytes.length];
     for (int i = 0; i < bytes.length; i++) {
-      bytes[i] = (byte) (bytes[i] ^ (byte) 0xff);
+      result[i] = (byte) (bytes[i] ^ (byte) 0xff);
     }
 
-    return bytes;
+    return result;
   }
 
   /** Generate a key of data for a specific transaction id. */
@@ -369,5 +378,10 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
   /** Get the binary transaction id from the raw key. */
   static byte[] getBinaryTransactionId(byte[] rawKey) {
     return ArrayUtils.subarray(rawKey, rawKey.length - LENGTH_OF_TRANSACTION_ID, rawKey.length);
+  }
+
+  static long getTransactionId(byte[] binaryTransactionId) {
+    byte[] reverted = revertByteArray(binaryTransactionId);
+    return ByteUtils.byteToLong(reverted);
   }
 }

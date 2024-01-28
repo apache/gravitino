@@ -11,7 +11,6 @@ import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.dto.AuditDTO;
 import com.datastrato.gravitino.dto.CatalogDTO;
-import com.datastrato.gravitino.dto.rel.ColumnDTO;
 import com.datastrato.gravitino.dto.requests.SchemaCreateRequest;
 import com.datastrato.gravitino.dto.requests.SchemaUpdateRequest;
 import com.datastrato.gravitino.dto.requests.SchemaUpdatesRequest;
@@ -158,7 +157,7 @@ public class RelationalCatalog extends CatalogDTO implements TableCatalog, Suppo
         new TableCreateRequest(
             ident.name(),
             comment,
-            (ColumnDTO[]) columns,
+            toDTOs(columns),
             properties,
             toDTOs(sortOrders),
             toDTO(distribution),
