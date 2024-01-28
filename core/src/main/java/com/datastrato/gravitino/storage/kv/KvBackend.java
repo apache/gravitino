@@ -6,7 +6,7 @@
 package com.datastrato.gravitino.storage.kv;
 
 import com.datastrato.gravitino.Config;
-import com.datastrato.gravitino.EntityAlreadyExistsException;
+import com.datastrato.gravitino.exceptions.AlreadyExistsException;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.List;
@@ -29,10 +29,9 @@ public interface KvBackend extends Closeable {
    * @param value The value of the pair.
    * @param overwrite If true, overwrites the existing value.
    * @throws IOException If an I/O exception occurs during the operation.
-   * @throws EntityAlreadyExistsException If the key already exists and overwrite is false.
+   * @throws AlreadyExistsException If the key already exists and overwrite is false.
    */
-  void put(byte[] key, byte[] value, boolean overwrite)
-      throws IOException, EntityAlreadyExistsException;
+  void put(byte[] key, byte[] value, boolean overwrite) throws IOException, AlreadyExistsException;
 
   /**
    * Retrieves the value associated with a given key.
