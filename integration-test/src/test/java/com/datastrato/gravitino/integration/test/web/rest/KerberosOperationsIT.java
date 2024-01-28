@@ -48,7 +48,6 @@ public class KerberosOperationsIT extends AbstractIT {
         KerberosTokenProvider.builder()
             .withClientPrincipal(clientPrincipal)
             .withKeyTabFile(new File(keytabFile))
-            .withReloginIntervalSec(5)
             .build());
     configs.put(
         KerberosConfig.AUTHENTICATOR.getKey(), AuthenticatorType.KERBEROS.name().toLowerCase());

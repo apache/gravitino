@@ -8,15 +8,13 @@ package com.datastrato.gravitino.client;
 import com.datastrato.gravitino.auth.AuthConstants;
 import com.datastrato.gravitino.auth.KerberosUtils;
 import com.google.common.base.Preconditions;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
+import java.util.Set;
 import java.util.concurrent.Callable;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.TimeUnit;
+import javax.security.auth.kerberos.KerberosTicket;
 import javax.security.auth.login.LoginContext;
 import javax.security.auth.login.LoginException;
 import org.apache.commons.lang3.StringUtils;
@@ -24,8 +22,6 @@ import org.ietf.jgss.GSSContext;
 import org.ietf.jgss.GSSManager;
 import org.ietf.jgss.GSSName;
 import org.ietf.jgss.Oid;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * KerberosTokenProvider will get Kerberos token using GSS context negotiation and then provide the
@@ -33,16 +29,11 @@ import org.slf4j.LoggerFactory;
  */
 public final class KerberosTokenProvider implements AuthDataProvider {
 
-  private static final Logger LOG = LoggerFactory.getLogger(KerberosTokenProvider.class);
-
   private final GSSManager gssManager = GSSManager.getInstance();
   private String clientPrincipal;
   private String keytabFile;
   private String host = "localhost";
   private LoginContext loginContext;
-  private long reloginIntervalSec;
-  private final ScheduledThreadPoolExecutor refreshScheduledExecutor =
-      new ScheduledThreadPoolExecutor(1, getThreadFactory("kerberos-token-provider"));
 
   private KerberosTokenProvider() {}
 
@@ -72,10 +63,22 @@ public final class KerberosTokenProvider implements AuthDataProvider {
     }
   }
 
-  private synchronized byte[] getTokenInternal() throws Exception {
+  private byte[] getTokenInternal() throws Exception {
 
     String[] principalComponents = clientPrincipal.split("@");
+    // Gravitino server's principal must start with HTTP. This restriction follows
+    // the style of Apache Hadoop.
     String serverPrincipal = "HTTP/" + host + "@" + principalComponents[1];
+
+    synchronized (this) {
+      if (loginContext == null) {
+        loginContext = KerberosUtils.login(clientPrincipal, keytabFile);
+      } else if (isLoginTicketExpired() && keytabFile != null) {
+        // We only support use keytab to re-login context
+        loginContext.logout();
+        loginContext = KerberosUtils.login(clientPrincipal, keytabFile);
+      }
+    }
 
     return KerberosUtils.doAs(
         loginContext.getSubject(),
@@ -108,32 +111,21 @@ public final class KerberosTokenProvider implements AuthDataProvider {
         });
   }
 
-  private synchronized void refreshLoginContext() throws LoginException {
-    if (loginContext != null) {
-      loginContext.logout();
-    }
-    loginContext = KerberosUtils.login(clientPrincipal, keytabFile);
-  }
+  private boolean isLoginTicketExpired() {
+    Set<KerberosTicket> tickets =
+        loginContext.getSubject().getPrivateCredentials(KerberosTicket.class);
 
-  private void periodicallyRefreshLoginContext() {
-    refreshScheduledExecutor.scheduleAtFixedRate(
-        () -> {
-          try {
-            refreshLoginContext();
-          } catch (LoginException e) {
-            LOG.warn("Fail to re-login", e);
-          }
-        },
-        reloginIntervalSec,
-        reloginIntervalSec,
-        TimeUnit.SECONDS);
+    if (tickets.isEmpty()) {
+      return false;
+    }
+
+    return tickets.iterator().next().getEndTime().getTime() < System.currentTimeMillis();
   }
 
   /** Closes the KerberosTokenProvider and releases any underlying resources. */
   @Override
   public void close() throws IOException {
     try {
-      refreshScheduledExecutor.shutdown();
       if (loginContext != null) {
         loginContext.logout();
       }
@@ -144,10 +136,6 @@ public final class KerberosTokenProvider implements AuthDataProvider {
 
   void setHost(String host) {
     this.host = host;
-  }
-
-  private static ThreadFactory getThreadFactory(String factoryName) {
-    return new ThreadFactoryBuilder().setDaemon(true).setNameFormat(factoryName + "-%d").build();
   }
 
   /**
@@ -162,7 +150,6 @@ public final class KerberosTokenProvider implements AuthDataProvider {
   public static class Builder {
     private String clientPrincipal;
     private File keyTabFile;
-    private long reloginIntervalSec = 5;
 
     /**
      * Sets the client principal for the HTTP token requests.
@@ -183,19 +170,6 @@ public final class KerberosTokenProvider implements AuthDataProvider {
      */
     public Builder withKeyTabFile(File file) {
       this.keyTabFile = file;
-      return this;
-    }
-
-    /**
-     * Kerberos need to re-login to keep credential active periodically.
-     *
-     * <p>Sets the re-login interval for KerberosTokenProvider. Default value is 5s.
-     *
-     * @param reloginIntervalSec The Kerberos re-login interval.
-     * @return This Builder instance for method chaining.
-     */
-    public Builder withReloginIntervalSec(long reloginIntervalSec) {
-      this.reloginIntervalSec = reloginIntervalSec;
       return this;
     }
 
@@ -221,15 +195,6 @@ public final class KerberosTokenProvider implements AuthDataProvider {
             keyTabFile.canRead(), "KerberosTokenProvider's keytabFile can't read");
         provider.keytabFile = keyTabFile.getAbsolutePath();
       }
-
-      try {
-        provider.refreshLoginContext();
-      } catch (LoginException le) {
-        throw new IllegalStateException("Fail to login", le);
-      }
-
-      provider.reloginIntervalSec = reloginIntervalSec;
-      provider.periodicallyRefreshLoginContext();
 
       return provider;
     }
