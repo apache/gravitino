@@ -78,7 +78,7 @@ public class TestHiveTable extends MiniHiveMetastoreService {
 
   private static void initHiveCatalog() {
     AuditInfo auditInfo =
-        new AuditInfo.Builder().withCreator("testHiveUser").withCreateTime(Instant.now()).build();
+        AuditInfo.builder().withCreator("testHiveUser").withCreateTime(Instant.now()).build();
 
     CatalogEntity entity =
         new CatalogEntity.Builder()

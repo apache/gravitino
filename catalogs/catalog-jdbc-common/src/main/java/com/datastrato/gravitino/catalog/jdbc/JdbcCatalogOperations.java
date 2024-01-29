@@ -183,10 +183,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
         .withProperties(resultProperties)
         .withComment(comment)
         .withAuditInfo(
-            new AuditInfo.Builder()
-                .withCreator(currentUser())
-                .withCreateTime(Instant.now())
-                .build())
+            AuditInfo.builder().withCreator(currentUser()).withCreateTime(Instant.now()).build())
         .build();
   }
 
@@ -208,12 +205,11 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
     }
     Map<String, String> properties =
         load.properties() == null ? Maps.newHashMap() : Maps.newHashMap(load.properties());
-    StringIdentifier.newPropertiesWithId(id, properties);
     return new JdbcSchema.Builder()
         .withAuditInfo(load.auditInfo())
         .withName(load.name())
         .withComment(StringIdentifier.removeIdFromComment(load.comment()))
-        .withProperties(properties)
+        .withProperties(StringIdentifier.newPropertiesWithId(id, properties))
         .build();
   }
 
@@ -404,10 +400,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
 
     return new JdbcTable.Builder()
         .withAuditInfo(
-            new AuditInfo.Builder()
-                .withCreator(currentUser())
-                .withCreateTime(Instant.now())
-                .build())
+            AuditInfo.builder().withCreator(currentUser()).withCreateTime(Instant.now()).build())
         .withName(tableName)
         .withColumns(columns)
         .withComment(comment)
