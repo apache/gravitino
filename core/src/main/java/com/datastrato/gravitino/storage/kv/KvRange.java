@@ -11,10 +11,10 @@ import com.google.common.base.Preconditions;
 import lombok.Builder;
 import lombok.Data;
 
-/** Represents a range scan configuration for the key-value store. */
+/** Represents a range scan/delete configuration for the key-value store. */
 @Builder
 @Data
-public class KvRangeScan {
+public class KvRange {
   private byte[] start;
   private byte[] end;
   private boolean startInclusive;
@@ -33,7 +33,7 @@ public class KvRangeScan {
    * @param limit The maximum number of results to retrieve.
    * @param predicate The predicate to use to filter key-value pairs.
    */
-  public KvRangeScan(
+  public KvRange(
       byte[] start,
       byte[] end,
       boolean startInclusive,
