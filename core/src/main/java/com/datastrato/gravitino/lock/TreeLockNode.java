@@ -22,13 +22,15 @@ public class TreeLockNode {
   private final NameIdentifier ident;
   private final ReentrantReadWriteLock readWriteLock;
   private final Map<NameIdentifier, TreeLockNode> childMap;
+  private final LockManager lockManager;
 
   private final AtomicLong referenceCount = new AtomicLong();
 
-  public TreeLockNode(NameIdentifier identifier) {
+  public TreeLockNode(NameIdentifier identifier, LockManager manager) {
     this.ident = identifier;
     this.readWriteLock = new ReentrantReadWriteLock();
     this.childMap = new ConcurrentHashMap<>();
+    this.lockManager = manager;
   }
 
   public NameIdentifier getIdent() {
@@ -123,7 +125,8 @@ public class TreeLockNode {
   public synchronized TreeLockNode getOrCreateChild(NameIdentifier ident) {
     TreeLockNode childNode = childMap.get(ident);
     if (childNode == null) {
-      childNode = new TreeLockNode(ident);
+      childNode = new TreeLockNode(ident, lockManager);
+      lockManager.totalNodeCount.getAndIncrement();
       childMap.put(ident, childNode);
     }
 

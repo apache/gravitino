@@ -12,6 +12,7 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.util.List;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.lang3.ArrayUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,13 +23,16 @@ import org.slf4j.LoggerFactory;
  */
 public class LockManager {
   private static final Logger LOG = LoggerFactory.getLogger(LockManager.class);
+  @VisibleForTesting final TreeLockNode treeLockRootNode;
+  final AtomicLong totalNodeCount = new AtomicLong(1);
 
-  @VisibleForTesting
-  final TreeLockNode treeLockRootNode = new TreeLockNode(NameIdentifier.ofRoot());
+  // TODO (yuqi) make this configurable
+  private static final long MAX_TREE_NODE_IN_MEMORY = 10000L;
 
   private final ScheduledThreadPoolExecutor lockCleaner;
 
   public LockManager() {
+    treeLockRootNode = new TreeLockNode(NameIdentifier.ofRoot(), this);
     this.lockCleaner =
         new ScheduledThreadPoolExecutor(
             1,
@@ -38,12 +42,16 @@ public class LockManager {
                 .build());
 
     lockCleaner.scheduleAtFixedRate(
-        () ->
+        () -> {
+          if (totalNodeCount.getAndIncrement() > MAX_TREE_NODE_IN_MEMORY) {
+            LOG.info("Total node count is {}", totalNodeCount.get());
             treeLockRootNode
                 .getAllChildren()
-                .forEach(child -> evictStaleNodes(child, treeLockRootNode)),
-        10,
-        30,
+                .forEach(child -> evictStaleNodes(child, treeLockRootNode));
+          }
+        },
+        1,
+        5,
         TimeUnit.SECONDS);
   }
 
@@ -60,6 +68,7 @@ public class LockManager {
         // Once goes here, the parent node has been locked, so the reference could not be changed.
         if (treeNode.getReferenceCount() == 0) {
           parent.removeChild(treeNode.getIdent());
+          totalNodeCount.addAndGet(-getAllNode(treeNode));
           LOG.info("Evict stale tree lock node '{}' and all its children", treeNode.getIdent());
         } else {
           treeNode.getAllChildren().forEach(child -> evictStaleNodes(child, treeNode));
@@ -68,6 +77,24 @@ public class LockManager {
     } else {
       treeNode.getAllChildren().forEach(child -> evictStaleNodes(child, treeNode));
     }
+  }
+
+  /**
+   * Count all the nodes in the tree lock node.
+   *
+   * @param node The tree lock node to count.
+   * @return The number of nodes in the tree lock node.
+   */
+  private long getAllNode(TreeLockNode node) {
+    if (node.getAllChildren().isEmpty()) {
+      return 1;
+    }
+
+    long r = 1L;
+    for (TreeLockNode child : node.getAllChildren()) {
+      r += getAllNode(child);
+    }
+    return r;
   }
 
   /**

@@ -8,10 +8,13 @@ package com.datastrato.gravitino.lock;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.CompletionService;
+import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.Future;
@@ -41,6 +44,10 @@ public class TestLockManager {
     "entity10"
   };
 
+  private static String getName(int i) {
+    return "entity_" + i;
+  }
+
   private static final LockManager lockManager = new LockManager();
 
   private CompletionService<Integer> createCompletionService() {
@@ -57,7 +64,7 @@ public class TestLockManager {
     return completionService;
   }
 
-  private NameIdentifier randomNameIdentifier() {
+  static NameIdentifier randomNameIdentifier() {
     Random random = new Random();
     int level = random.nextInt(10);
     NameIdentifier nameIdentifier = null;
@@ -66,27 +73,25 @@ public class TestLockManager {
         nameIdentifier = NameIdentifier.ofRoot();
         break;
       case 1:
-        nameIdentifier = NameIdentifier.of(Namespace.of(), ENTITY_NAMES[random.nextInt(1)]);
+        nameIdentifier = NameIdentifier.of(getName(random.nextInt(5)));
         break;
       case 2:
-        nameIdentifier =
-            NameIdentifier.of(
-                Namespace.of(ENTITY_NAMES[random.nextInt(1)]), ENTITY_NAMES[random.nextInt(3)]);
+        nameIdentifier = NameIdentifier.of(getName(random.nextInt(5)), getName(random.nextInt(20)));
         break;
       case 3:
         nameIdentifier =
             NameIdentifier.of(
-                Namespace.of(ENTITY_NAMES[random.nextInt(1)], ENTITY_NAMES[random.nextInt(3)]),
-                ENTITY_NAMES[random.nextInt(5)]);
+                getName(random.nextInt(5)),
+                getName(random.nextInt(20)),
+                getName(random.nextInt(30)));
         break;
       default:
         nameIdentifier =
             NameIdentifier.of(
-                Namespace.of(
-                    ENTITY_NAMES[random.nextInt(1)],
-                    ENTITY_NAMES[random.nextInt(3)],
-                    ENTITY_NAMES[random.nextInt(5)]),
-                ENTITY_NAMES[random.nextInt(10)]);
+                getName(random.nextInt(5)),
+                getName(random.nextInt(20)),
+                getName(random.nextInt(30)),
+                getName(random.nextInt(100)));
     }
 
     return nameIdentifier;
@@ -308,5 +313,153 @@ public class TestLockManager {
   private void checkReferenceCount(TreeLockNode node) {
     Assertions.assertEquals(0, node.getReferenceCount());
     node.getAllChildren().forEach(this::checkReferenceCount);
+  }
+
+  @Test
+  void testNodeCountAndCleaner() throws ExecutionException, InterruptedException {
+    LockManager lockManager = new LockManager();
+    CompletionService<Integer> service = createCompletionService();
+
+    Future<Integer> future =
+        service.submit(
+            () -> {
+              for (int i = 0; i < 20000; i++) {
+                TreeLock treeLock = lockManager.createTreeLock(randomNameIdentifier());
+                treeLock.lock(i % 2 == 0 ? LockType.WRITE : LockType.READ);
+                treeLock.unlock();
+              }
+
+              return 0;
+            });
+
+    future.get();
+    long totalCount = lockManager.totalNodeCount.get();
+    Assertions.assertTrue(totalCount > 0);
+  }
+
+  @Test
+  void testConcurrentRead() throws InterruptedException {
+    LockManager lockManager = new LockManager();
+    Map<String, Integer> stringMap = Maps.newHashMap();
+    stringMap.put("total", 0);
+
+    CompletionService<Integer> service = createCompletionService();
+    NameIdentifier nameIdentifier = NameIdentifier.of("a", "b", "c", "d");
+
+    CyclicBarrier cyclicBarrier = new CyclicBarrier(10);
+    // Can 2000 times ensure that the test is correct?
+    for (int t = 0; t < 2000; t++) {
+      for (int i = 0; i < 10; i++) {
+        service.submit(
+            () -> {
+              TreeLock treeLock = lockManager.createTreeLock(nameIdentifier);
+              treeLock.lock(LockType.READ);
+              try {
+                cyclicBarrier.await();
+                stringMap.compute("total", (k, v) -> ++v);
+              } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+              } finally {
+                treeLock.unlock();
+              }
+              return 0;
+            });
+      }
+
+      for (int i = 0; i < 10; i++) {
+        service.take();
+      }
+
+      int total = stringMap.get("total");
+      if (total < 10) {
+        return;
+      }
+
+      cyclicBarrier.reset();
+      stringMap.put("total", 0);
+    }
+
+    Assertions.fail("This should not happen...");
+  }
+
+  @Test
+  void testConcurrentWrite() throws InterruptedException {
+    LockManager lockManager = new LockManager();
+    Map<String, Integer> stringMap = Maps.newHashMap();
+    stringMap.put("total", 0);
+
+    CompletionService<Integer> service = createCompletionService();
+    NameIdentifier nameIdentifier = NameIdentifier.of("a", "b", "c", "d");
+
+    for (int t = 0; t < 200; t++) {
+      for (int i = 0; i < 10; i++) {
+        service.submit(
+            () -> {
+              TreeLock treeLock = lockManager.createTreeLock(nameIdentifier);
+              treeLock.lock(LockType.WRITE);
+              try {
+                stringMap.compute("total", (k, v) -> ++v);
+              } catch (Exception e) {
+                throw new RuntimeException(e);
+              } finally {
+                treeLock.unlock();
+              }
+              return 0;
+            });
+      }
+
+      for (int i = 0; i < 10; i++) {
+        service.take();
+      }
+
+      int total = stringMap.get("total");
+      Assertions.assertEquals(10, total, "Total should always 10");
+
+      stringMap.put("total", 0);
+    }
+  }
+
+  private NameIdentifier completeRandomNameIdentifier() {
+    Random random = new Random();
+
+    int level = 4;
+    int nameLength = 16;
+    String[] names = new String[level];
+    for (int i = 0; i < level; i++) {
+      String name = "";
+      for (int j = 0; j < nameLength; j++) {
+        int v;
+        while ((v = random.nextInt(123)) < 97) {}
+        name += ((char) v);
+      }
+
+      names[i] = name;
+    }
+
+    return NameIdentifier.of(names);
+  }
+
+  @Test
+  void testNodeCount() throws InterruptedException, ExecutionException {
+    LockManager lockManager = new LockManager();
+    CompletionService<Integer> service = createCompletionService();
+
+    for (int i = 0; i < 10; i++) {
+      service.submit(
+          () -> {
+            TreeLock treeLock;
+            for (int j = 0; j < 1000; j++) {
+              NameIdentifier nameIdentifier = completeRandomNameIdentifier();
+              treeLock = lockManager.createTreeLock(nameIdentifier);
+            }
+            return 0;
+          });
+    }
+
+    for (int i = 0; i < 10; i++) {
+      service.take().get();
+    }
+
+    Assertions.assertEquals(10 * 1000 * 4 + 1, lockManager.totalNodeCount.get());
   }
 }
