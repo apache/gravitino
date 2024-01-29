@@ -671,4 +671,138 @@ public class CatalogMysqlIT extends AbstractIT {
     Assertions.assertNotNull(table.index()[0].name());
     Assertions.assertNotNull(table.index()[1].name());
   }
+
+  @Test
+  public void testAutoIncrement() {
+    Column col1 = Column.of("col_1", Types.LongType.get(), "id", false, true, null);
+    Column col2 = Column.of("col_2", Types.ByteType.get(), "yes", false, false, null);
+    Column col3 = Column.of("col_3", Types.DateType.get(), "comment", false, false, null);
+    Column col4 = Column.of("col_4", Types.VarCharType.of(255), "code", false, false, null);
+    Column col5 = Column.of("col_5", Types.VarCharType.of(255), "config", false, false, null);
+    Column[] newColumns = new Column[] {col1, col2, col3, col4, col5};
+
+    Index[] indexes =
+        new Index[] {
+          Indexes.createMysqlPrimaryKey(new String[][] {{"col_1"}, {"col_2"}}),
+          Indexes.unique("u1_key", new String[][] {{"col_2"}, {"col_3"}})
+        };
+
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
+
+    Map<String, String> properties = createProperties();
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    Table createdTable =
+        tableCatalog.createTable(
+            tableIdentifier,
+            newColumns,
+            table_comment,
+            properties,
+            Transforms.EMPTY_TRANSFORM,
+            Distributions.NONE,
+            new SortOrder[0],
+            indexes);
+    // Test create auto increment key success.
+    assertionsTableInfo(
+        tableName, table_comment, Arrays.asList(newColumns), properties, indexes, createdTable);
+    Table table = tableCatalog.loadTable(tableIdentifier);
+    assertionsTableInfo(
+        tableName, table_comment, Arrays.asList(newColumns), properties, indexes, table);
+
+    // Test alter table. auto increment exist.
+    // UpdateColumnType
+    tableCatalog.alterTable(
+        tableIdentifier,
+        TableChange.updateColumnType(new String[] {"col_1"}, Types.IntegerType.get()));
+    table = tableCatalog.loadTable(tableIdentifier);
+    Column[] alterColumns =
+        new Column[] {
+          Column.of("col_1", Types.IntegerType.get(), "id", false, true, null),
+          col2,
+          col3,
+          col4,
+          col5
+        };
+    assertionsTableInfo(
+        tableName, table_comment, Arrays.asList(alterColumns), properties, indexes, table);
+
+    // UpdateColumnComment
+    tableCatalog.alterTable(
+        tableIdentifier, TableChange.updateColumnComment(new String[] {"col_1"}, "new_id_comment"));
+    table = tableCatalog.loadTable(tableIdentifier);
+    alterColumns =
+        new Column[] {
+          Column.of("col_1", Types.IntegerType.get(), "new_id_comment", false, true, null),
+          col2,
+          col3,
+          col4,
+          col5
+        };
+    assertionsTableInfo(
+        tableName, table_comment, Arrays.asList(alterColumns), properties, indexes, table);
+
+    // RenameColumn
+    tableCatalog.alterTable(
+        tableIdentifier, TableChange.renameColumn(new String[] {"col_1"}, "col_1_1"));
+    table = tableCatalog.loadTable(tableIdentifier);
+    alterColumns =
+        new Column[] {
+          Column.of("col_1_1", Types.IntegerType.get(), "new_id_comment", false, true, null),
+          col2,
+          col3,
+          col4,
+          col5
+        };
+    assertionsTableInfo(
+        tableName, table_comment, Arrays.asList(alterColumns), properties, indexes, table);
+
+    tableCatalog.dropTable(tableIdentifier);
+
+    // Test create auto increment fail(No index)
+    RuntimeException runtimeException =
+        assertThrows(
+            RuntimeException.class,
+            () ->
+                tableCatalog.createTable(
+                    tableIdentifier,
+                    newColumns,
+                    table_comment,
+                    properties,
+                    Transforms.EMPTY_TRANSFORM,
+                    Distributions.NONE,
+                    new SortOrder[0],
+                    Indexes.EMPTY_INDEXES));
+    Assertions.assertTrue(
+        StringUtils.contains(
+            runtimeException.getMessage(),
+            "Incorrect table definition; there can be only one auto column and it must be defined as a key"));
+
+    // Test create auto increment fail(Many index col)
+    runtimeException =
+        assertThrows(
+            RuntimeException.class,
+            () ->
+                tableCatalog.createTable(
+                    tableIdentifier,
+                    new Column[] {
+                      col1,
+                      col2,
+                      col3,
+                      col4,
+                      col5,
+                      Column.of("col_6", Types.LongType.get(), "id2", false, true, null)
+                    },
+                    table_comment,
+                    properties,
+                    Transforms.EMPTY_TRANSFORM,
+                    Distributions.NONE,
+                    new SortOrder[0],
+                    new Index[] {
+                      Indexes.createMysqlPrimaryKey(new String[][] {{"col_1"}, {"col_6"}})
+                    }));
+    Assertions.assertTrue(
+        StringUtils.contains(
+            runtimeException.getMessage(),
+            "Only one column can be auto-incremented. There are multiple auto-increment columns in your table: [col_1,col_6]"));
+  }
 }
