@@ -8,8 +8,8 @@ import com.datastrato.gravitino.dto.rel.ColumnDTO;
 import com.datastrato.gravitino.dto.rel.DistributionDTO;
 import com.datastrato.gravitino.dto.rel.SortOrderDTO;
 import com.datastrato.gravitino.dto.rel.expressions.FunctionArg;
+import com.datastrato.gravitino.dto.rel.indexes.IndexDTO;
 import com.datastrato.gravitino.dto.rel.partitioning.Partitioning;
-import com.datastrato.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.rest.RESTRequest;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
@@ -60,7 +60,7 @@ public class TableCreateRequest implements RESTRequest {
 
   @Nullable
   @JsonProperty("indexes")
-  private final Index[] indexes;
+  private final IndexDTO[] indexes;
 
   public TableCreateRequest() {
     this(null, null, null, null, null, null, null, null);
@@ -74,7 +74,7 @@ public class TableCreateRequest implements RESTRequest {
       @Nullable SortOrderDTO[] sortOrders,
       @Nullable DistributionDTO distribution,
       @Nullable Partitioning[] partitioning,
-      @Nullable Index[] indexes) {
+      @Nullable IndexDTO[] indexes) {
     this.name = name;
     this.columns = columns;
     this.comment = comment;
@@ -119,7 +119,13 @@ public class TableCreateRequest implements RESTRequest {
             + autoIncrementColsStr);
 
     if (indexes != null && indexes.length > 0) {
-      throw new UnsupportedOperationException("Support for indexing is currently not implemented");
+      Arrays.stream(indexes)
+          .forEach(
+              index -> {
+                Preconditions.checkArgument(index.type() != null, "Index type cannot be null");
+                Preconditions.checkArgument(
+                    index.fieldNames().length > 0, "Index field names cannot be null");
+              });
     }
   }
 }

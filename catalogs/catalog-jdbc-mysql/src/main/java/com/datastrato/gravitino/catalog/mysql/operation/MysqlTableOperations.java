@@ -19,6 +19,10 @@ import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
+import com.datastrato.gravitino.rel.indexes.Index;
+import com.datastrato.gravitino.rel.indexes.Indexes;
+import com.google.common.collect.HashMultimap;
+import com.google.common.collect.SetMultimap;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.PreparedStatement;
@@ -31,6 +35,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.MapUtils;
@@ -87,6 +92,9 @@ public class MysqlTableOperations extends JdbcTableOperations {
         comment = tableProperties.getOrDefault(COMMENT, comment);
       }
 
+      // 4.Get index information
+      List<Index> indexes = getIndexes(databaseName, tableName, metaData);
+
       return new JdbcTable.Builder()
           .withName(tableName)
           .withColumns(jdbcColumns.toArray(new JdbcColumn[0]))
@@ -102,11 +110,49 @@ public class MysqlTableOperations extends JdbcTableOperations {
                       }
                     }
                   }))
+          .withIndexes(indexes.toArray(new Index[0]))
           .withAuditInfo(AuditInfo.EMPTY)
           .build();
     } catch (SQLException e) {
       throw exceptionMapper.toGravitinoException(e);
     }
+  }
+
+  public List<Index> getIndexes(String databaseName, String tableName, DatabaseMetaData metaData)
+      throws SQLException {
+    List<Index> indexes = new ArrayList<>();
+
+    // Get primary key information
+    SetMultimap<String, String> primaryKeyGroupByName = HashMultimap.create();
+    ResultSet primaryKeys = metaData.getPrimaryKeys(databaseName, null, tableName);
+    while (primaryKeys.next()) {
+      String columnName = primaryKeys.getString("COLUMN_NAME");
+      primaryKeyGroupByName.put(primaryKeys.getString("PK_NAME"), columnName);
+    }
+    for (String key : primaryKeyGroupByName.keySet()) {
+      indexes.add(Indexes.primary(key, convertIndexFieldNames(primaryKeyGroupByName.get(key))));
+    }
+
+    // Get unique key information
+    SetMultimap<String, String> indexGroupByName = HashMultimap.create();
+    ResultSet indexInfo = metaData.getIndexInfo(databaseName, null, tableName, false, false);
+    while (indexInfo.next()) {
+      String indexName = indexInfo.getString("INDEX_NAME");
+      if (!indexInfo.getBoolean("NON_UNIQUE")
+          && !StringUtils.equalsIgnoreCase(Indexes.DEFAULT_MYSQL_PRIMARY_KEY_NAME, indexName)) {
+        String columnName = indexInfo.getString("COLUMN_NAME");
+        indexGroupByName.put(indexName, columnName);
+      }
+    }
+    for (String key : indexGroupByName.keySet()) {
+      indexes.add(Indexes.unique(key, convertIndexFieldNames(indexGroupByName.get(key))));
+    }
+
+    return indexes;
+  }
+
+  private String[][] convertIndexFieldNames(Set<String> fieldNames) {
+    return fieldNames.stream().map(colName -> new String[] {colName}).toArray(String[][]::new);
   }
 
   private Map<String, String> loadTablePropertiesFromSql(Connection connection, String tableName)
@@ -178,7 +224,8 @@ public class MysqlTableOperations extends JdbcTableOperations {
       JdbcColumn[] columns,
       String comment,
       Map<String, String> properties,
-      Transform[] partitioning) {
+      Transform[] partitioning,
+      Index[] indexes) {
     if (ArrayUtils.isNotEmpty(partitioning)) {
       throw new UnsupportedOperationException("Currently we do not support Partitioning in mysql");
     }
@@ -201,6 +248,9 @@ public class MysqlTableOperations extends JdbcTableOperations {
         sqlBuilder.append(",\n");
       }
     }
+
+    appendIndexesSql(indexes, sqlBuilder);
+
     sqlBuilder.append("\n)");
 
     // Add table comment if specified
@@ -221,6 +271,42 @@ public class MysqlTableOperations extends JdbcTableOperations {
 
     LOG.info("Generated create table:{} sql: {}", tableName, result);
     return result;
+  }
+
+  public static void appendIndexesSql(Index[] indexes, StringBuilder sqlBuilder) {
+    for (Index index : indexes) {
+      String fieldStr =
+          Arrays.stream(index.fieldNames())
+              .map(
+                  colNames -> {
+                    if (colNames.length > 1) {
+                      throw new IllegalArgumentException(
+                          "Index does not support complex fields in MySQL");
+                    }
+                    return BACK_QUOTE + colNames[0] + BACK_QUOTE;
+                  })
+              .collect(Collectors.joining(", "));
+      sqlBuilder.append(",\n");
+      switch (index.type()) {
+        case PRIMARY_KEY:
+          if (null != index.name()
+              && !StringUtils.equalsIgnoreCase(
+                  index.name(), Indexes.DEFAULT_MYSQL_PRIMARY_KEY_NAME)) {
+            throw new IllegalArgumentException("Primary key name must be PRIMARY in MySQL");
+          }
+          sqlBuilder.append("CONSTRAINT ").append("PRIMARY KEY (").append(fieldStr).append(")");
+          break;
+        case UNIQUE_KEY:
+          sqlBuilder.append("CONSTRAINT ");
+          if (null != index.name()) {
+            sqlBuilder.append(BACK_QUOTE).append(index.name()).append(BACK_QUOTE);
+          }
+          sqlBuilder.append(" UNIQUE (").append(fieldStr).append(")");
+          break;
+        default:
+          throw new IllegalArgumentException("MySQL doesn't support index : " + index.type());
+      }
+    }
   }
 
   @Override

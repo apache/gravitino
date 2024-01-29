@@ -9,10 +9,12 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 import com.datastrato.gravitino.dto.rel.expressions.LiteralDTO;
+import com.datastrato.gravitino.dto.rel.indexes.IndexDTO;
 import com.datastrato.gravitino.dto.rel.partitions.IdentityPartitionDTO;
 import com.datastrato.gravitino.dto.rel.partitions.ListPartitionDTO;
 import com.datastrato.gravitino.dto.rel.partitions.PartitionDTO;
 import com.datastrato.gravitino.dto.rel.partitions.RangePartitionDTO;
+import com.datastrato.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.rel.types.Type;
 import com.datastrato.gravitino.rel.types.Types;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -388,5 +390,40 @@ public class TestJsonUtils {
             () -> objectMapper.readValue(illegalJson3, PartitionDTO.class));
     Assertions.assertTrue(
         exception.getMessage().contains("Range partition must have name"), exception.getMessage());
+  }
+
+  @Test
+  void testIndexDTOSerde() throws JsonProcessingException {
+    Index idx1 =
+        IndexDTO.builder()
+            .withIndexType(Index.IndexType.UNIQUE_KEY)
+            .withName("idx1")
+            .withFieldNames(new String[][] {{"col_1"}})
+            .build();
+
+    String jsonValue = JsonUtils.objectMapper().writeValueAsString(idx1);
+
+    String expected =
+        "{\"indexType\":\"UNIQUE_KEY\",\"name\":\"idx1\",\"fieldNames\":[[\"col_1\"]]}";
+
+    Assertions.assertEquals(
+        objectMapper.readValue(expected, IndexDTO.class),
+        objectMapper.readValue(jsonValue, IndexDTO.class));
+
+    Index idx2 =
+        IndexDTO.builder()
+            .withIndexType(Index.IndexType.PRIMARY_KEY)
+            .withName("idx2")
+            .withFieldNames(new String[][] {{"col_2"}, {"col_3"}})
+            .build();
+
+    jsonValue = JsonUtils.objectMapper().writeValueAsString(idx2);
+
+    expected =
+        "{\"indexType\":\"PRIMARY_KEY\",\"name\":\"idx2\",\"fieldNames\":[[\"col_2\"],[\"col_3\"]]}";
+
+    Assertions.assertEquals(
+        objectMapper.readValue(expected, IndexDTO.class),
+        objectMapper.readValue(jsonValue, IndexDTO.class));
   }
 }

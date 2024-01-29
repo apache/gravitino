@@ -7,6 +7,7 @@ package com.datastrato.gravitino.catalog.jdbc.operation;
 import com.datastrato.gravitino.catalog.jdbc.JdbcColumn;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
+import com.datastrato.gravitino.rel.indexes.Index;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.Collections;
@@ -20,7 +21,8 @@ public class SqliteTableOperations extends JdbcTableOperations {
       JdbcColumn[] columns,
       String comment,
       Map<String, String> properties,
-      Transform[] partitioning) {
+      Transform[] partitioning,
+      Index[] indexes) {
     StringBuilder sqlBuilder = new StringBuilder();
     sqlBuilder.append("CREATE TABLE ").append(tableName).append(" (");
 

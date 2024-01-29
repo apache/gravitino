@@ -15,6 +15,7 @@ import com.datastrato.gravitino.exceptions.TableAlreadyExistsException;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
+import com.datastrato.gravitino.rel.indexes.Index;
 import com.google.common.collect.Lists;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
@@ -63,13 +64,14 @@ public abstract class JdbcTableOperations implements TableOperation {
       JdbcColumn[] columns,
       String comment,
       Map<String, String> properties,
-      Transform[] partitioning)
+      Transform[] partitioning,
+      Index[] indexes)
       throws TableAlreadyExistsException {
     LOG.info("Attempting to create table {} in database {}", tableName, databaseName);
     try (Connection connection = getConnection(databaseName)) {
       JdbcConnectorUtils.executeUpdate(
           connection,
-          generateCreateTableSql(tableName, columns, comment, properties, partitioning));
+          generateCreateTableSql(tableName, columns, comment, properties, partitioning, indexes));
       LOG.info("Created table {} in database {}", tableName, databaseName);
     } catch (final SQLException se) {
       throw this.exceptionMapper.toGravitinoException(se);
@@ -215,7 +217,8 @@ public abstract class JdbcTableOperations implements TableOperation {
       JdbcColumn[] columns,
       String comment,
       Map<String, String> properties,
-      Transform[] partitioning);
+      Transform[] partitioning,
+      Index[] indexes);
 
   protected abstract String generateRenameTableSql(String oldTableName, String newTableName);
 

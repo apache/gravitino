@@ -14,6 +14,7 @@ import com.datastrato.gravitino.exceptions.NoSuchTableException;
 import com.datastrato.gravitino.exceptions.TableAlreadyExistsException;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
+import com.datastrato.gravitino.rel.indexes.Index;
 import java.util.List;
 import java.util.Map;
 import javax.sql.DataSource;
@@ -41,6 +42,7 @@ public interface TableOperation {
    * @param comment The comment of the table.
    * @param properties The properties of the table.
    * @param partitioning The partitioning of the table.
+   * @param indexes The indexes of the table.
    */
   void create(
       String databaseName,
@@ -48,7 +50,8 @@ public interface TableOperation {
       JdbcColumn[] columns,
       String comment,
       Map<String, String> properties,
-      Transform[] partitioning)
+      Transform[] partitioning,
+      Index[] indexes)
       throws TableAlreadyExistsException;
 
   /**
