@@ -8,11 +8,10 @@ import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.catalog.CatalogOperationDispatcher;
-import com.datastrato.gravitino.dto.responses.EntityListResponse;
+import com.datastrato.gravitino.dto.responses.PartitionNameListResponse;
 import com.datastrato.gravitino.metrics.MetricNames;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.server.web.Utils;
-import java.util.Arrays;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.GET;
@@ -49,13 +48,7 @@ public class PartitionOperations {
             NameIdentifier tableIdent = NameIdentifier.of(metalake, catalog, schema, table);
             Table loadTable = dispatcher.loadTable(tableIdent);
             String[] partitionNames = loadTable.supportPartitions().listPartitionNames();
-            return Utils.ok(
-                new EntityListResponse(
-                    Arrays.stream(partitionNames)
-                        .map(
-                            partition ->
-                                NameIdentifier.of(metalake, catalog, schema, table, partition))
-                        .toArray(NameIdentifier[]::new)));
+            return Utils.ok(new PartitionNameListResponse(partitionNames));
           });
     } catch (Exception e) {
       return ExceptionHandlers.handlePartitionException(OperationType.LIST, "", table, e);

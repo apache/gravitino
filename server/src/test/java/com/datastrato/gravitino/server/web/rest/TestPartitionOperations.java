@@ -11,11 +11,10 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.catalog.CatalogOperationDispatcher;
-import com.datastrato.gravitino.dto.responses.EntityListResponse;
 import com.datastrato.gravitino.dto.responses.ErrorConstants;
 import com.datastrato.gravitino.dto.responses.ErrorResponse;
+import com.datastrato.gravitino.dto.responses.PartitionNameListResponse;
 import com.datastrato.gravitino.exceptions.NoSuchPartitionException;
 import com.datastrato.gravitino.exceptions.PartitionAlreadyExistsException;
 import com.datastrato.gravitino.rel.Column;
@@ -153,15 +152,13 @@ public class TestPartitionOperations extends JerseyTest {
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
     Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
 
-    EntityListResponse listResp = resp.readEntity(EntityListResponse.class);
+    PartitionNameListResponse listResp = resp.readEntity(PartitionNameListResponse.class);
     Assertions.assertEquals(0, listResp.getCode());
 
-    NameIdentifier[] names = listResp.identifiers();
+    String[] names = listResp.partitionNames();
     Assertions.assertEquals(2, names.length);
-    Assertions.assertEquals(
-        NameIdentifier.of(metalake, catalog, schema, table, partitionName1), names[0]);
-    Assertions.assertEquals(
-        NameIdentifier.of(metalake, catalog, schema, table, partitionName2), names[1]);
+    Assertions.assertEquals(partitionName1, names[0]);
+    Assertions.assertEquals(partitionName2, names[1]);
 
     // Test throws exception
     doThrow(new RuntimeException("test exception")).when(mockedTable).supportPartitions();
