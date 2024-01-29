@@ -24,7 +24,7 @@ Gravitino aims to provide several key features:
 * Single Source of Truth for multi-regional data with geo-distributed architecture support.
 * Unified Data and AI asset management for both users and engines.
 * Security in one place, centralizing the security for different sources.
-* Built-in data management and data access management.
+* Built-in data management and data access management. 
 
 ## Contributing to Gravitino
 
