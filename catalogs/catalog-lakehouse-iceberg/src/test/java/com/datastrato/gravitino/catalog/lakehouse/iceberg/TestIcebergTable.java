@@ -512,7 +512,6 @@ public class TestIcebergTable {
       Map<String, String> map = Maps.newHashMap();
       map.put(IcebergTablePropertiesMetadata.COMMENT, "test");
       map.put(IcebergTablePropertiesMetadata.CREATOR, "test");
-      map.put(IcebergTablePropertiesMetadata.LOCATION, "test");
       map.put(IcebergTablePropertiesMetadata.CURRENT_SNAPSHOT_ID, "test");
       map.put(IcebergTablePropertiesMetadata.CHERRY_PICK_SNAPSHOT_ID, "test");
       map.put(IcebergTablePropertiesMetadata.SORT_ORDER, "test");

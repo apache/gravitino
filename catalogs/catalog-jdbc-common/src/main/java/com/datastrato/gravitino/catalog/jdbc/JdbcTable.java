@@ -34,6 +34,7 @@ public class JdbcTable extends BaseTable {
       jdbcTable.columns = columns;
       jdbcTable.partitioning = partitioning;
       jdbcTable.sortOrders = sortOrders;
+      jdbcTable.indexes = indexes;
       return jdbcTable;
     }
   }

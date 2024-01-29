@@ -19,6 +19,7 @@ public class IcebergPropertyMeta implements HasPropertyMeta {
 
   public static final String ICEBERG_PARTITIONING_PROPERTY = "partitioning";
   public static final String ICEBERG_SORTED_BY_PROPERTY = "sorted_by";
+  public static final String ICEBERG_LOCATION_PROPERTY = "location";
 
   // Value is whether this property is reserved and cannot be used by users
   // TODO (yuqi) add more properties
@@ -44,7 +45,9 @@ public class IcebergPropertyMeta implements HasPropertyMeta {
               ImmutableList.of(),
               false,
               value -> (List<?>) value,
-              value -> value));
+              value -> value),
+          PropertyMetadata.stringProperty(
+              ICEBERG_LOCATION_PROPERTY, "Location for table storage", null, false));
 
   // TODO (yuqi) add more properties
   public static final Map<PropertyMetadata<?>, Boolean> SCHEMA_PROPERTY_TO_RESERVED_MAP =

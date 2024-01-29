@@ -4,6 +4,7 @@
  */
 package com.datastrato.gravitino.catalog.lakehouse.iceberg;
 
+import static com.datastrato.gravitino.catalog.PropertyEntry.stringImmutablePropertyEntry;
 import static com.datastrato.gravitino.catalog.PropertyEntry.stringReservedPropertyEntry;
 
 import com.datastrato.gravitino.catalog.BasePropertiesMetadata;
@@ -32,7 +33,8 @@ public class IcebergTablePropertiesMetadata extends BasePropertiesMetadata {
         ImmutableList.of(
             stringReservedPropertyEntry(COMMENT, "The table comment", true),
             stringReservedPropertyEntry(CREATOR, "The table creator", false),
-            stringReservedPropertyEntry(LOCATION, "Iceberg location for table storage", false),
+            stringImmutablePropertyEntry(
+                LOCATION, "Iceberg location for table storage", false, null, false, false),
             stringReservedPropertyEntry(
                 CURRENT_SNAPSHOT_ID,
                 "The snapshot represents the current state of the table",
