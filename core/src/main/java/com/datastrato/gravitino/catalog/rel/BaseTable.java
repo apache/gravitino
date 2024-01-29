@@ -40,8 +40,11 @@ public abstract class BaseTable implements Table {
 
   private volatile TableOperations ops;
 
-  /** @return The {@link TableOperations} instance associated with this table. */
-  protected abstract TableOperations newOps();
+  /**
+   * @return The {@link TableOperations} instance associated with this table.
+   * @throws UnsupportedOperationException if the table does not support operations.
+   */
+  protected abstract TableOperations newOps() throws UnsupportedOperationException;
 
   /**
    * Retrieves the {@link TableOperations} instance associated with this table. If the instance is
