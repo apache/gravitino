@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Datastrato Pvt Ltd.
+ * Copyright 2024 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 
@@ -23,7 +23,9 @@ import org.slf4j.LoggerFactory;
 public class LockManager {
   private static final Logger LOG = LoggerFactory.getLogger(LockManager.class);
 
-  @VisibleForTesting final TreeLockNode treeLockRootNode = new TreeLockNode(NameIdentifier.ROOT);
+  @VisibleForTesting
+  final TreeLockNode treeLockRootNode = new TreeLockNode(NameIdentifier.ofRoot());
+
   private final ScheduledThreadPoolExecutor lockCleaner;
 
   public LockManager() {
@@ -82,7 +84,7 @@ public class LockManager {
     treeLockRootNode.addReference();
 
     List<TreeLockNode> treeLockNodes = Lists.newArrayList(lockNode);
-    if (identifier.equals(NameIdentifier.ROOT)) {
+    if (identifier.equals(NameIdentifier.ofRoot())) {
       // The lock tree root node
       return new TreeLock(treeLockNodes);
     }

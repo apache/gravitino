@@ -63,7 +63,7 @@ public class TestLockManager {
     NameIdentifier nameIdentifier = null;
     switch (level) {
       case 0:
-        nameIdentifier = NameIdentifier.ROOT;
+        nameIdentifier = NameIdentifier.ofRoot();
         break;
       case 1:
         nameIdentifier = NameIdentifier.of(Namespace.of(), ENTITY_NAMES[random.nextInt(1)]);
@@ -176,7 +176,7 @@ public class TestLockManager {
     }
   }
 
-  //  @Disabled
+  @Disabled
   @ParameterizedTest
   @ValueSource(ints = {1, 2, 4, 8, 10})
   void compare(int threadCount) throws InterruptedException, ExecutionException {
@@ -216,45 +216,45 @@ public class TestLockManager {
     Random random = new Random();
     CompletionService<Integer> service = createCompletionService();
 
-    //    for (int i = 0; i < 1000; i++) {
-    //      NameIdentifier nameIdentifier = randomNameIdentifier();
-    //      TreeLock lock = lockManager.createTreeLock(nameIdentifier);
-    //      try {
-    //        lock.lock(LockType.READ);
-    //      } finally {
-    //        lock.unlock();
-    //      }
-    //    }
-    //
-    //    lockManager
-    //        .treeLockRootNode
-    //        .getAllChildren()
-    //        .forEach(
-    //            child -> {
-    //              lockManager.evictStaleNodes(child, lockManager.treeLockRootNode);
-    //            });
-    //
-    //    Assertions.assertTrue(lockManager.treeLockRootNode.getAllChildren().isEmpty());
-    //
-    //    for (int i = 0; i < 10; i++) {
-    //      service.submit(
-    //          () -> {
-    //            for (int j = 0; j < 10000; j++) {
-    //              NameIdentifier nameIdentifier = randomNameIdentifier();
-    //              TreeLock lock = lockManager.createTreeLock(nameIdentifier);
-    //              try {
-    //                lock.lock(random.nextInt(2) == 0 ? LockType.READ : LockType.WRITE);
-    //              } finally {
-    //                lock.unlock();
-    //              }
-    //            }
-    //            return 0;
-    //          });
-    //    }
-    //
-    //    for (int i = 0; i < 10; i++) {
-    //      service.take().get();
-    //    }
+    for (int i = 0; i < 1000; i++) {
+      NameIdentifier nameIdentifier = randomNameIdentifier();
+      TreeLock lock = lockManager.createTreeLock(nameIdentifier);
+      try {
+        lock.lock(LockType.READ);
+      } finally {
+        lock.unlock();
+      }
+    }
+
+    lockManager
+        .treeLockRootNode
+        .getAllChildren()
+        .forEach(
+            child -> {
+              lockManager.evictStaleNodes(child, lockManager.treeLockRootNode);
+            });
+
+    Assertions.assertTrue(lockManager.treeLockRootNode.getAllChildren().isEmpty());
+
+    for (int i = 0; i < 10; i++) {
+      service.submit(
+          () -> {
+            for (int j = 0; j < 10000; j++) {
+              NameIdentifier nameIdentifier = randomNameIdentifier();
+              TreeLock lock = lockManager.createTreeLock(nameIdentifier);
+              try {
+                lock.lock(random.nextInt(2) == 0 ? LockType.READ : LockType.WRITE);
+              } finally {
+                lock.unlock();
+              }
+            }
+            return 0;
+          });
+    }
+
+    for (int i = 0; i < 10; i++) {
+      service.take().get();
+    }
 
     // Check the lock reference
     checkReferenceCount(lockManager.treeLockRootNode);
