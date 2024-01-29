@@ -662,10 +662,6 @@ public class TestMysqlTableOperations extends TestMysqlAbstractIT {
     MysqlTableOperations.appendIndexesSql(indexes, sql);
     expectedStr =
         ",\n"
-            + "CONSTRAINT PRIMARY KEY (`col_2`, `col_1`),\n"
-            + "CONSTRAINT `uk_col_4` UNIQUE (`col_4`),\n"
-            + "CONSTRAINT `uk_col_5` UNIQUE (`col_4`, `col_5`),\n"
-            + "CONSTRAINT `uk_col_6` UNIQUE (`col_4`, `col_5`, `col_6`)> but was: <,\n"
             + "CONSTRAINT `uk_1` UNIQUE (`col_4`),\n"
             + "CONSTRAINT `uk_2` UNIQUE (`col_4`, `col_3`),\n"
             + "CONSTRAINT PRIMARY KEY (`col_2`, `col_1`, `col_3`),\n"
