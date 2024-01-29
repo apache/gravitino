@@ -87,25 +87,24 @@ public class RelationalTable implements Table, SupportsPartitions {
 
   @Override
   public String[] listPartitionNames() {
-    Namespace ofPartition = Namespace.ofPartition(NameIdentifier.of(namespace, name()));
     EntityListResponse resp =
         restClient.get(
-            formatPartitionRequestPath(ofPartition),
+            getPartitionRequestPath(),
             EntityListResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.tableErrorHandler());
     return Arrays.stream(resp.identifiers()).map(NameIdentifier::name).toArray(String[]::new);
   }
 
-  private static String formatPartitionRequestPath(Namespace ofPartition) {
+  private String getPartitionRequestPath() {
     return "api/metalakes/"
-        + ofPartition.level(0)
+        + namespace.level(0)
         + "/catalogs/"
-        + ofPartition.level(1)
+        + namespace.level(1)
         + "/schemas/"
-        + ofPartition.level(2)
+        + namespace.level(2)
         + "/tables/"
-        + ofPartition.level(3)
+        + name()
         + "/partitions";
   }
 

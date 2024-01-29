@@ -59,9 +59,6 @@ public class HiveTableOperations implements TableOperations, SupportsPartitions 
 
   @Override
   public void close() throws IOException {
-    if (table.clientPool() != null) {
-      table.clientPool().close();
-      table.setClientPool(null);
-    }
+    table.close();
   }
 }

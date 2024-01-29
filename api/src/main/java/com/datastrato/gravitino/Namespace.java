@@ -92,17 +92,6 @@ public class Namespace {
   }
 
   /**
-   * Create a namespace for partition of a table.
-   *
-   * @param tableIdent The table identifier
-   * @return A namespace for partition
-   */
-  public static Namespace ofPartition(NameIdentifier tableIdent) {
-    Namespace namespace = tableIdent.namespace();
-    return of(namespace.level(0), namespace.level(1), namespace.level(2), tableIdent.name());
-  }
-
-  /**
    * Check if the given metalake namespace is legal, throw an {@link IllegalNamespaceException} if
    * it's illegal.
    *

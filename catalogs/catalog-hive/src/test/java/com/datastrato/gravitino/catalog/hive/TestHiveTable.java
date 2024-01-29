@@ -391,6 +391,7 @@ public class TestHiveTable extends MiniHiveMetastoreService {
             .createTable(tableIdentifier, columns, HIVE_COMMENT, properties, partitions)
             .supportPartitions()
             .listPartitionNames();
+    // TODO: update following assertion after implementing addPartition
     Assertions.assertEquals(0, partitionNames.length);
   }
 

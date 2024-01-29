@@ -142,8 +142,11 @@ public class HiveTable extends BaseTable {
     return clientPool;
   }
 
-  public void setClientPool(CachedClientPool clientPool) {
-    this.clientPool = clientPool;
+  public void close() {
+    if (clientPool != null) {
+      clientPool.close();
+      clientPool = null;
+    }
   }
 
   public String schemaName() {

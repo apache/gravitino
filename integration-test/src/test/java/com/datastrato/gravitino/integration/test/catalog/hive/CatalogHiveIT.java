@@ -678,8 +678,7 @@ public class CatalogHiveIT extends AbstractIT {
                 TABLE_COMMENT,
                 properties,
                 new Transform[] {
-                  IdentityPartitioningDTO.of(columns[1].name()),
-                  IdentityPartitioningDTO.of(columns[2].name())
+                  Transforms.identity(columns[1].name()), Transforms.identity(columns[2].name())
                 });
     org.apache.hadoop.hive.metastore.api.Table actualTable =
         hiveClientPool.run(client -> client.getTable(schemaName, tableName));
